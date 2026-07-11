@@ -10,11 +10,12 @@ const EMPTY_HISTORY_SUMMARY = Object.freeze({
 });
 
 export interface SbtActivityCacheEntry {
+  schemaVersion: typeof SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION;
   sbtAddress?: string;
-  sbtInfo?: { creationBlock?: unknown } | null;
+  sbtInfo?: ({ creationBlock?: unknown } & Record<string, unknown>) | null;
   mintedAddresses?: string[];
   burnedAddresses?: string[];
-  blockNumber?: number;
+  blockNumber?: number | null;
   creationBlock?: unknown;
   mintedCountByAddress?: SbtCountMap | null;
   burnedCountByAddress?: SbtCountMap | null;
@@ -22,8 +23,18 @@ export interface SbtActivityCacheEntry {
   burnedEventCount?: number;
   historySummary?: unknown;
   countsLoaded?: boolean;
-  [key: string]: unknown;
+  countsScanCheckpoint?: unknown;
+  slug?: string;
+  sessionSlug?: string;
+  sessionSlugExplicit?: boolean;
 }
+
+export const SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION = 1 as const;
+
+export type LegacySbtActivityCacheEntry = Omit<Partial<SbtActivityCacheEntry>, 'schemaVersion'> &
+  Record<string, unknown> & {
+    schemaVersion?: unknown;
+  };
 
 export interface BuildSbtActivityCacheEntryInput {
   sbtAddress: string;
@@ -43,12 +54,26 @@ const ensureMutableCountMap = (value: unknown): SbtCountMap => {
   return value as SbtCountMap;
 };
 
+export const isSbtActivityCacheEntry = (value: unknown): value is SbtActivityCacheEntry =>
+  !!value &&
+  typeof value === 'object' &&
+  !Array.isArray(value) &&
+  (value as { schemaVersion?: unknown }).schemaVersion === SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION;
+
+export const hydrateSbtActivityCacheEntry = (value: unknown): SbtActivityCacheEntry | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const legacyEntry = value as LegacySbtActivityCacheEntry;
+  legacyEntry.schemaVersion = SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION;
+  return legacyEntry as SbtActivityCacheEntry;
+};
+
 export const buildSbtActivityCacheEntry = ({
   sbtAddress,
   sbtInfo = null,
   creationBlock = sbtInfo?.creationBlock ?? null,
   blockNumber = 0,
 }: BuildSbtActivityCacheEntryInput): SbtActivityCacheEntry => ({
+  schemaVersion: SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION,
   sbtAddress,
   sbtInfo,
   mintedAddresses: [],
@@ -64,9 +89,14 @@ export const buildSbtActivityCacheEntry = ({
 });
 
 export const applySbtActivityCacheEntryUpdate = (
-  entry: SbtActivityCacheEntry,
+  entry: SbtActivityCacheEntry | LegacySbtActivityCacheEntry,
   { account, burned, eventBlockNumber }: ApplySbtActivityCacheEntryUpdateInput,
 ): SbtActivityCacheEntry => {
+  const versionedEntry = hydrateSbtActivityCacheEntry(entry);
+  if (!versionedEntry) {
+    throw new TypeError('Invalid SBT activity cache entry.');
+  }
+  entry = versionedEntry;
   if (!Array.isArray(entry.mintedAddresses)) entry.mintedAddresses = [];
   if (!Array.isArray(entry.burnedAddresses)) entry.burnedAddresses = [];
   entry.mintedCountByAddress = ensureMutableCountMap(entry.mintedCountByAddress);

@@ -38,7 +38,7 @@ import { peekCacheSync, readCache, subscribeCacheUpdates, writeCache } from '../
 import { createCacheUpdateCoalescer } from '../../utilities/cache/cacheUpdateCoalescer.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
-import { computeQuestionDivisiveness } from '../../utilities/survey/polisMath.js';
+import { computeQuestionDivisiveness } from '../../utilities/survey/consensusMath.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import {
   GLOBAL_SESSION_SELECTION_UPDATED_EVENT,
@@ -48,6 +48,7 @@ import {
 import { t } from '../../utilities/ui/terminology.js';
 import { POLIS_DEMO_DATA_AUTOLOAD_SLUGS } from '../../variables/appConfig.js';
 import { getPolisDemoDatasetForSlug } from '../PolisReport/PolisReport';
+import { persistCommunitySbtHolderHydrationResults } from './communitySbtHolderHydrationCache.js';
 
 const uiLog = createLogger('ui');
 const COMMUNITY_BEESWARM_DEMO_SLUG = 'demo';
@@ -493,8 +494,7 @@ class CommunityTab extends Component<any, any> {
       });
 
       if (changed) {
-        cacheObj[netKey].sbtList = sbtList;
-        await writeCache('sbtCache', slug, cacheObj);
+        await persistCommunitySbtHolderHydrationResults({ slug, netKey, results });
       }
       if (i + BATCH < entries.length) {
         await new Promise((r: any) => setTimeout(r, 75));
@@ -1595,6 +1595,7 @@ class CommunityTab extends Component<any, any> {
       return {
         index: result.commentIndex,
         questionId: String(comment.commentId || result.commentIndex),
+        // BeeswarmPlot expects `extremity`; this is 50/50-split divisiveness, not PCA extremity.
         extremity: result.divisiveness,
         label: String(comment.commentBody || '(No prompt)'),
         agrees: result.agrees,
@@ -1717,6 +1718,7 @@ class CommunityTab extends Component<any, any> {
       return {
         index: result.commentIndex,
         questionId,
+        // BeeswarmPlot expects `extremity`; this is 50/50-split divisiveness, not PCA extremity.
         extremity: result.divisiveness,
         label: question.prompt || '(No prompt)',
         agrees: result.agrees,

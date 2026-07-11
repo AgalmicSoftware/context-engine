@@ -25,8 +25,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -66,9 +64,7 @@ jobs:
           if [ "$BASELINE_MONOTONICITY_BASE" != "origin/main" ]; then
             git fetch --no-tags --depth=1 origin "$BASELINE_MONOTONICITY_BASE" || true
           fi
-          BASELINE_MONOTONICITY_COMMIT_TEXT="$(git log --format=%B "$BASELINE_MONOTONICITY_BASE"..HEAD || true)"
-          node scripts/check-baseline-monotonicity.mjs --base "$BASELINE_MONOTONICITY_BASE" --allow-text "$BASELINE_MONOTONICITY_ALLOW_TEXT
-          $BASELINE_MONOTONICITY_COMMIT_TEXT"
+          node scripts/check-baseline-monotonicity.mjs --base "$BASELINE_MONOTONICITY_BASE" --allow-text "$BASELINE_MONOTONICITY_ALLOW_TEXT"
 
       - name: Lint client
         run: npm run lint
@@ -84,6 +80,11 @@ jobs:
 
       - name: Verify public release surface
         run: npm run verify:public-release-surface
+      - name: Verify public asset ownership
+        run: npm run verify:public-assets
+
+      - name: Verify public text exposure
+        run: npm run verify:public-text
 
       - name: Build worker bundles
         run: npm run worker:bundle
@@ -279,9 +280,6 @@ jobs:
 
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
-
-      - name: Run contextEngine-cc tests
-        run: npm run test:cc
 
       - name: Run root Node tests
         run: npm run test:node

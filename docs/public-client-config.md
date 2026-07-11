@@ -1,16 +1,16 @@
 # Public Client Config
 
-`client/src/variables/appConfig.js` is now a thin public config reader.
+`client/src/variables/appConfig.ts` is the public config reader.
 Deployment URLs, feature toggles, and environment-specific client defaults can
 be overridden with `REACT_APP_*` variables, while deployment endpoint ownership
-stays centralized in `client/src/variables/publicDeploymentConfig.js`.
+stays centralized in `client/src/variables/publicDeploymentConfig.ts`.
 
 ## Source of Truth
 
 - Canonical example file: `client/.env.example`
-- Deployment endpoint owner: `client/src/variables/publicDeploymentConfig.js`
-- Runtime reader/re-export surface: `client/src/variables/appConfig.js`
-- Shared env parsing helpers: `client/src/variables/publicEnv.js`
+- Deployment endpoint owner: `client/src/variables/publicDeploymentConfig.ts`
+- Runtime reader/re-export surface: `client/src/variables/appConfig.ts`
+- Shared env parsing helpers: `client/src/variables/publicEnv.ts`
 
 ## How to Configure
 
@@ -27,8 +27,8 @@ server.
 
 ### 1. Set frontend variables
 
-Before building, review `client/.env.example`, `client/src/variables/publicDeploymentConfig.js`,
-and `client/src/variables/appConfig.js`. Vite bakes `REACT_APP_*` values into
+Before building, review `client/.env.example`, `client/src/variables/publicDeploymentConfig.ts`,
+and `client/src/variables/appConfig.ts`. Vite bakes `REACT_APP_*` values into
 the browser bundle at build time, so changes require a rebuild/redeploy.
 
 For a custom-domain self-host, the values to check first are:
@@ -61,6 +61,14 @@ Most feature toggles, Arweave read policy toggles, terminology mode, and RPC
 diagnostic flags can stay at the checked-in defaults. Any worker, chain, or
 registry override must match the worker and on-chain registry that the hosted
 frontend will actually use.
+
+The public posts route is enabled by default:
+
+- `REACT_APP_CE_ABOUT_POSTS_ENABLED=false` hides the About-page `Posts` link and
+  renders `/posts` as disabled for deployments that do not want the public posts
+  surface.
+- Authored posts live in the repository root `posts/` directory and are copied
+  into the static build output as `/posts/*`. See [`docs/posts.md`](posts.md).
 
 ### 2. Build the static bundle
 
@@ -162,14 +170,14 @@ SPA fallback concept, but their redirect config syntax differs.
 ## Notes
 
 - `client/.env` is optional. If it is missing, the app still uses the checked-in
-  defaults from `publicDeploymentConfig.js` and `appConfig.js`.
+  defaults from `publicDeploymentConfig.ts` and `appConfig.ts`.
 - Shared worker fallback now defaults to `https://demo-worker-030226.agalmic.workers.dev` unless `REACT_APP_CE_SHARED_WORKER_URL` overrides it.
 - The deploy-helper now defaults to `https://ce-deploy-helper.agalmic.workers.dev/`.
 - Healthcheck still stays blank until the official project-owned endpoint is finalized for OSS.
 - Only `REACT_APP_*` keys are exposed to the browser in the Vite client
   compatibility env.
-- `publicDeploymentConfig.js` is the single owner of deployment endpoint
-  fallbacks; `appConfig.js` re-exports those values for the existing client API.
+- `publicDeploymentConfig.ts` is the single owner of deployment endpoint
+  fallbacks; `appConfig.ts` re-exports those values for the existing client API.
 - Browser/runtime overrides still exist for some flags (`globalThis`,
   `localStorage`, URL params). The env values only set the boot defaults.
 
@@ -209,12 +217,20 @@ SPA fallback concept, but their redirect config syntax differs.
 - Custom RPC URLs supplied as worker secrets stay worker-private and are not
   mirrored into public registry fields. Client reads use only explicit
   browser-visible session `rpcUrl` / `rpcUrlsByChainId` values.
-- OP Sepolia browser fallbacks intentionally avoid leading with
-  `https://sepolia.optimism.io`; it remains available later in the list, but the
-  wallet/RainbowKit primary URL should prefer less rate-limited public mirrors
-  when PATH or a paid runtime RPC is not active.
-- Ethers read providers apply endpoint-level exponential backoff after RPC 429
-  responses before retrying that same URL.
+- OP Sepolia anonymous browser reads use only the official
+  `https://sepolia.optimism.io` endpoint. PublicNode, dRPC, and Tenderly are not
+  anonymous fallbacks because their browser-facing endpoints have returned
+  sustained `400`, `403`, or `429` responses under registry/SBT discovery load.
+  Production deployments should configure a session-visible sponsored RPC or
+  another authenticated provider instead of adding anonymous fanout.
+- Ethers read providers serialize distinct reads per endpoint. After a network
+  request returns `429` or an endpoint rejects browser access with `403`,
+  queued reads fail locally and use normal provider
+  fallback without issuing more requests to the cooling endpoint. Actual
+  network `429` responses increase the endpoint-level exponential cooldown;
+  locally generated cooldown errors do not extend it. Active-session SBT cache
+  warming also fetches only the selected registry slug instead of enumerating
+  every session.
 - Optional paid testnet read RPCs are env/runtime-only and are no longer
   committed in source.
   - `REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_HTTP`
@@ -237,7 +253,7 @@ SPA fallback concept, but their redirect config syntax differs.
     (`Group`, `Collect`, `Account`) or crypto-native (`SBT`, `Mint`, `Wallet`) terms.
   - Supported values: `plain` (default), `crypto`
 
-- `REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT=true`
+- `REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT=false`
   - Sets the first-run default for `demoSurfaceMode`, which controls the surface-level demo affordances.
   - Stored `ce:demoSurfaceMode` localStorage preferences win over this setting.
   - This only takes effect on fresh installs or when no stored preference exists.
@@ -255,10 +271,15 @@ SPA fallback concept, but their redirect config syntax differs.
     compatibility entries after the Cloudflare-backed demo question/response
     storage replaces the Arweave/on-chain copy.
 
+- `REACT_APP_CE_ENABLE_METAMASK_CONNECTOR=false`
+  - Selects the browser-wallet profile at build time. The default `false` profile is passkey-only: the login screen has no MetaMask button, and the emitted browser bundle excludes RainbowKit, WalletConnect, the MetaMask connector, and the MetaMask login asset.
+  - Set `true` before `npm run build` only for deployments that intentionally offer MetaMask login. Because this is a build-time profile, changing it requires rebuilding the client.
+  - After a default or explicitly disabled build, run `npm run verify:passkey-only-bundle` from `client/`. The verifier fails if the build profile is enabled or forbidden connector symbols/assets are present.
+
 - `REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK=false`
-  - Controls RainbowKit's MetaMask fallback when MetaMask is not injected.
-  - Default `false` keeps the login modal on the injected MetaMask connector and avoids opening WalletConnect bridge sockets during normal startup.
-  - Set `true` only when a deployment intentionally wants the legacy WalletConnect fallback for MetaMask mobile/QR flows.
+  - Controls RainbowKit's MetaMask fallback when MetaMask is not injected, but only when `REACT_APP_CE_ENABLE_METAMASK_CONNECTOR=true`.
+  - Default `false` keeps an enabled MetaMask profile on the injected connector and avoids opening WalletConnect bridge sockets during normal startup.
+  - Setting this to `true` cannot re-enable MetaMask in a passkey-only build.
 
 ## Arweave Read Policy Toggles
 
@@ -266,8 +287,11 @@ SPA fallback concept, but their redirect config syntax differs.
   - Controls whether browser Arweave payload reads stay on the configured AR.IO gateway for their retry budget.
   - Default `true` uses `REACT_APP_CE_ARWEAVE_AR_IO_URL` / `window.CE_ARWEAVE_AR_IO_URL` when provided, otherwise `https://ar-io.dev`.
   - Display-critical metadata reads for sessions, SBTs, surveys, and questions
-    also stay on AR.IO while this is enabled; they do not fan out through legacy
-    gateways unless direct mode is intentionally disabled.
+    plus SBT image/link candidates also stay on AR.IO while this is enabled;
+    their legacy gateway hints do not re-enable fanout. Use
+    `REACT_APP_CE_ARWEAVE_AR_IO_URL` for a custom AR.IO base. Legacy gateways
+    become candidates again only when direct mode is intentionally disabled,
+    including the maintained explicit per-request opt-out.
   - Set `false` only when a deployment intentionally wants legacy fallback fanout through `https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes.
 
 - `REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA=false`

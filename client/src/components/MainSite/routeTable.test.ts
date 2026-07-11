@@ -24,6 +24,7 @@ describe('MainSite route table', () => {
       'simUser',
       'userProfile',
       'about',
+      'posts',
       'demos',
       'matrix',
       'contracts',
@@ -44,6 +45,8 @@ describe('MainSite route table', () => {
     [`/u/${ADDRESS}`, 'userProfile', {}],
     ['/admin', 'admin', {}],
     ['/sponsor', 'sponsor', {}],
+    ['/posts', 'posts', {}],
+    ['/posts/first-post', 'posts', {}],
   ])('classifies %s as %s', (fullPath, key, expected) => {
     expect(resolveMainSiteRouteMatch({ fullPath, isAddress })).toEqual(
       expect.objectContaining({
@@ -81,7 +84,7 @@ describe('MainSite route table', () => {
   });
 
   it('keeps accepted double-slash SBT address paths on the SBT detail route', () => {
-    // PRD 647 section 0.5 accepts this degenerate path family as SBT detail.
+    // The route contract accepts this degenerate path family as SBT detail.
     expect(resolveMainSiteRouteMatch({ fullPath: `//sbt/${ADDRESS}`, isAddress })).toEqual(
       expect.objectContaining({
         key: 'sbtDetail',
@@ -99,6 +102,19 @@ describe('MainSite route table', () => {
   it('exposes cache-wait metadata without rendering anything', () => {
     expect(resolveMainSiteRouteMatch({ fullPath: '/admin', isAddress })).toEqual(
       expect.objectContaining({
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/posts', isAddress })).toEqual(
+      expect.objectContaining({
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/posts/first-post', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'posts',
         isKnownRoutePrefix: true,
         shouldBypassCacheHydrationWait: true,
       }),

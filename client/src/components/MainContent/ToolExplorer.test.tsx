@@ -356,6 +356,17 @@ describe('ToolExplorer session propagation', () => {
     expect(explorerCols).toHaveLength(3);
     explorerCols.forEach((col) => {
       expect(col).toHaveClass(styles.explorerColSparse);
+      expect(col).not.toHaveClass(styles.statusBorderEnabled);
+    });
+  });
+
+  it('enables live and future status borders only while demo mode is on', () => {
+    const { container } = renderToolExplorer({ demoSurfaceMode: true });
+    const explorerCols = Array.from(container.querySelectorAll(`.${styles.explorerCol}`));
+
+    expect(explorerCols).toHaveLength(6);
+    explorerCols.forEach((col) => {
+      expect(col).toHaveClass(styles.statusBorderEnabled);
     });
   });
 

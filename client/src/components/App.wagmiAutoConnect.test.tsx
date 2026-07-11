@@ -127,6 +127,11 @@ const mockAppDependencies = () => {
   jest.doMock('../utilities/ui/publicPageHead.js', () => ({
     syncPublicPageHead: mockSyncPublicPageHead,
   }));
+  jest.doMock('../app/runtime/appQueryClient', () => ({
+    appQueryFoundation: {
+      Provider: ({ children }: { children: React.ReactNode }) => children,
+    },
+  }));
 
   jest.doMock('./HooksHOC/withRouterBridge', () => ({
     __esModule: true,
@@ -206,6 +211,15 @@ const loadAppModule = (): any => {
   return appModule;
 };
 
+const buildEnabledMetaMaskConnectors = (): unknown => {
+  let connectors: unknown;
+  jest.isolateModules(() => {
+    const profile = require('../app/runtime/walletConnectorProfile.metamask');
+    connectors = profile.buildWalletConnectors([{ id: 84532, chainId: 84532, name: 'Base Sepolia' }]);
+  });
+  return connectors;
+};
+
 describe('App wagmi auto-connect persistence', () => {
   beforeEach(() => {
     jest.resetModules();
@@ -264,19 +278,23 @@ describe('App wagmi auto-connect persistence', () => {
     expect(mockCreateClient).toHaveBeenCalledWith(expect.objectContaining({ autoConnect: true }));
   });
 
-  it('passes the configured websocket provider through without enabling WalletConnect by default', () => {
+  it('passes the configured websocket provider through with no browser-wallet connectors by default', () => {
     loadAppModule();
 
     expect(mockCreateClient).toHaveBeenCalledWith(
       expect.objectContaining({
+        connectors: [],
         webSocketProvider: { kind: 'configured-websocket-provider' },
       }),
     );
+    expect(mockConnectorsForWallets).not.toHaveBeenCalled();
+    expect(mockMetaMaskWallet).not.toHaveBeenCalled();
+    expect(mockMetaMaskConnector).not.toHaveBeenCalled();
     expect(mockMetaMaskWalletCreateConnector).not.toHaveBeenCalled();
   });
 
-  it('uses an injected-only MetaMask connector by default to avoid WalletConnect bridge startup', () => {
-    loadAppModule();
+  it('uses an injected-only MetaMask connector when the browser-wallet profile is enabled', () => {
+    buildEnabledMetaMaskConnectors();
 
     const connectorCalls = mockConnectorsForWallets.mock.calls as unknown as Array<[WalletGroup[]]>;
     const walletGroups = connectorCalls[0]?.[0] ?? [];
@@ -300,7 +318,7 @@ describe('App wagmi auto-connect persistence', () => {
   it('preserves RainbowKit MetaMask WalletConnect fallback when explicitly enabled', () => {
     mockWalletConnectFallbackEnabled = true;
 
-    loadAppModule();
+    buildEnabledMetaMaskConnectors();
 
     const connectorCalls = mockConnectorsForWallets.mock.calls as unknown as Array<[WalletGroup[]]>;
     const walletGroups = connectorCalls[0]?.[0] ?? [];

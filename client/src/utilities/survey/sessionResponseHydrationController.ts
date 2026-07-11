@@ -117,7 +117,7 @@ interface HandlePartialResponseDataOptions {
 const RECENT_RESPONSE_PREFETCH_WINDOW_COUNT = 12;
 
 interface ResponseHydrationContractScripts {
-  getRelevantBlockWindowForFilter: (slug: string) => Promise<{ fromBlock: number; toBlock: number }>;
+  getRelevantBlockWindowForFilter: (sessionRef: unknown) => Promise<{ fromBlock: number; toBlock: number }>;
   getQuestionResponsesChunkedWithCallback: (
     providerName: string,
     fromBlock: number,
@@ -141,6 +141,7 @@ export interface SessionResponseHydrationHost {
   dgRead?: (name: string, slug: string) => Record<string, unknown> | null | undefined;
   dgWrite?: (name: string, slug: string, value: Record<string, unknown>) => unknown;
   getActiveSessionSlug?: () => string | null | undefined;
+  getSessionCfg?: (slug: string) => CacheRecord | null | undefined;
   getSessionChainId?: (slug: string) => string | number | null | undefined;
   getAccount?: () => string | null | undefined;
   scanScopeNoop?: (slug: string, op: string, onSkipped?: () => void) => boolean;
@@ -499,6 +500,18 @@ export const createSessionResponseHydrationController = (
     typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null;
   const getActiveSessionSlug = (): string =>
     String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
+  const getSessionBlockWindowRef = (slugIn: string): CacheRecord | string => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const cfg = typeof host.getSessionCfg === 'function' ? host.getSessionCfg(slug) : null;
+    if (!cfg || typeof cfg !== 'object') return slug;
+    return {
+      ...cfg,
+      slug: normalizeSessionSlug(cfg.slug || slug),
+      ...(cfg.blockLimits && typeof cfg.blockLimits === 'object'
+        ? { blockLimits: { ...(cfg.blockLimits as CacheRecord) } }
+        : {}),
+    };
+  };
   const getSessionChainId = (slug: string): string | number | null | undefined =>
     typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
   const getAccount = (): string | null | undefined => (typeof host.getAccount === 'function' ? host.getAccount() : '');
@@ -656,7 +669,7 @@ export const createSessionResponseHydrationController = (
 
       const networkID = String(getSessionChainId(slug) || '');
       const { fromBlock: baseFrom, toBlock: baseTo } =
-        await responseHydrationContractScripts.getRelevantBlockWindowForFilter(slug);
+        await responseHydrationContractScripts.getRelevantBlockWindowForFilter(getSessionBlockWindowRef(slug));
       if (baseFrom > baseTo) {
         setResponseState(
           (prev) => ({
@@ -1604,7 +1617,9 @@ export const createSessionResponseHydrationController = (
       setState({ isResponsesCacheReady: false });
 
       const networkID = String(getSessionChainId(slug) || '');
-      const { fromBlock: baseFrom } = await responseHydrationContractScripts.getRelevantBlockWindowForFilter(slug);
+      const { fromBlock: baseFrom } = await responseHydrationContractScripts.getRelevantBlockWindowForFilter(
+        getSessionBlockWindowRef(slug),
+      );
       const initialLastBlockQR = Math.max(0, Number(baseFrom || 0) - 1);
 
       const results = await Promise.all(

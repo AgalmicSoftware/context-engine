@@ -64,7 +64,7 @@
       width: 100%;
       ul {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         justify-content: stretch;
         align-items: center;
         gap: 4px;
@@ -113,7 +113,7 @@
       width: 100%;
       ul {
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         justify-content: stretch;
         align-items: center;
         gap: 6px;

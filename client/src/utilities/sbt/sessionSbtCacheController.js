@@ -21,8 +21,8 @@ import {
   seedSbtCountMapFromLegacyAddresses,
   hydrateLegacySbtCountState,
   getCurrentHolderAddressesFromCounts,
-  normalizeSbtCountsScanCheckpoint,
 } from './sbtCountHelpers.js';
+import { buildSbtCountsResumePlan, normalizeSbtCountsScanCheckpoint } from './sbtCountsCheckpointContract.js';
 import { normalizeSbtHistorySummary, buildSbtHistorySummaryFromCounts } from './sbtHistoryHelpers.js';
 import { resolveSbtCreationBlock } from './sbtCacheEntryHelpers.js';
 import { normalizeSbtRealtimeEventCursor, compareSbtRealtimeEventCursor } from './sbtRealtimeCursorHelpers.js';
@@ -34,7 +34,13 @@ import { resolveSbtRealtimeEventBlockNumber } from './sbtRealtimeEventBlockResol
 import { getSbtRealtimeEventCursorGuard } from './sbtRealtimeEventCursorGuard.js';
 import { updateSbtRealtimeCursorForNetworkCache } from './sbtRealtimeCursorCache.js';
 import { withSessionScopedSbtCacheBinding } from './sessionSbtCacheBinding.js';
-import { applySbtActivityCacheEntryUpdate, buildSbtActivityCacheEntry } from './sbtActivityCacheEntry.js';
+import {
+  applySbtActivityCacheEntryUpdate,
+  buildSbtActivityCacheEntry,
+  hydrateSbtActivityCacheEntry,
+} from './sbtActivityCacheEntry.js';
+import { buildSessionSbtCacheWriteEnvelope } from './sbtCacheWriteContract.js';
+import { buildSbtHydrationQueueEntry, buildSbtLightDiscoveryInFlightKey } from './sbtProgressListenerContract.js';
 import { needsSbtListMetadataHydration } from './sbtMetadataHydrationReadiness.js';
 import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 
@@ -53,9 +59,25 @@ export const createSessionSbtCacheController = (host = {}) => {
   };
   const dgRead = (...args) => (typeof host.dgRead === 'function' ? host.dgRead(...args) : null);
   const dgWrite = (...args) => (typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null);
+  const writeSbtCache = (sessionSlug, value) => {
+    const envelope = buildSessionSbtCacheWriteEnvelope({ sessionSlug, value });
+    return dgWrite(envelope.cacheName, envelope.sessionSlug, envelope.value);
+  };
   const getActiveSessionSlug = () =>
     String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
   const getSessionCfg = (slug) => (typeof host.getSessionCfg === 'function' ? host.getSessionCfg(slug) : null);
+  const getSessionBlockWindowRef = (slugIn) => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const cfg = getSessionCfg(slug);
+    if (!cfg || typeof cfg !== 'object') return slug;
+    // Regression guard: chain scans need the resolved display/registry merge;
+    // reducing it back to a slug drops demo block limits in strict mode.
+    return {
+      ...cfg,
+      slug: normalizeSessionSlug(cfg.slug || slug),
+      ...(cfg.blockLimits && typeof cfg.blockLimits === 'object' ? { blockLimits: { ...cfg.blockLimits } } : {}),
+    };
+  };
   const getSessionChainId = (slug) =>
     typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
   const getSessionScanScope = () =>
@@ -142,6 +164,23 @@ export const createSessionSbtCacheController = (host = {}) => {
   });
   const removeSbtRealtimeListenersForGroup = sbtRealtimeListenerCleanupController.removeSbtRealtimeListenersForGroup;
 
+  const isActiveSbtSlug = (slugIn) => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const activeSlug = normalizeSessionSlug(getActiveSessionSlug() || '');
+    return slug === activeSlug;
+  };
+
+  const setSbtCacheReadyForActiveSlug = (slugIn, cb) => {
+    if (!isActiveSbtSlug(slugIn)) return false;
+    setState((prev) => ({ isSBTCacheReady: true, sbtCacheRevision: prev.sbtCacheRevision + 1 }), cb);
+    return true;
+  };
+
+  const setSbtReadinessForActiveSlug = (slugIn, cb) => {
+    if (!isActiveSbtSlug(slugIn)) return false;
+    return setReadinessStateIfChanged({ isSBTCacheReady: true }, cb);
+  };
+
   const ensureSessionRouteSbtDiscovery = (slugIn) => {
     const pathname = getEffectiveRoutePath(getCurrentPath());
     if (!pathname.startsWith('/session/')) return null;
@@ -174,7 +213,11 @@ export const createSessionSbtCacheController = (host = {}) => {
     const slug = normalizeSessionSlug(typeof slugIn === 'string' ? slugIn : getActiveSessionSlug() || '');
     const hasForcedScopeSlug = opts && Object.prototype.hasOwnProperty.call(opts, 'forceScopeSlug');
     const forcedScopeSlug = hasForcedScopeSlug ? normalizeSessionSlug(opts?.forceScopeSlug ?? '') : '';
-    const inFlightKey = `${slug}|${forcedScopeSlug}|${opts?.force === true ? '1' : '0'}`;
+    const inFlightKey = buildSbtLightDiscoveryInFlightKey({
+      sessionSlug: slug,
+      forcedScopeSlug,
+      force: opts?.force === true,
+    });
     if (_lightSbtDiscoveryInFlight[inFlightKey]) {
       return _lightSbtDiscoveryInFlight[inFlightKey];
     }
@@ -208,12 +251,18 @@ export const createSessionSbtCacheController = (host = {}) => {
         }
 
         const sessionCfg = getSessionCfg(slug);
+        const sessionBlockWindowRef = getSessionBlockWindowRef(slug);
         const discoveryGroupRef = hasForcedScopeSlug
-          ? { ...(sessionCfg || {}), slug, __ignoreSessionScanScope: true }
+          ? {
+              ...(typeof sessionBlockWindowRef === 'object' ? sessionBlockWindowRef : {}),
+              slug,
+              __ignoreSessionScanScope: true,
+            }
           : slug;
+        const blockWindowRef = hasForcedScopeSlug ? discoveryGroupRef : sessionBlockWindowRef;
         const ignoredSet = new Set((sessionCfg?.ignored_SBTs_LIST || []).map((a) => (a || '').toLowerCase()));
         const { fromBlock: baseFrom, toBlock: baseTo } =
-          await contractScripts.getRelevantBlockWindowForFilter(discoveryGroupRef);
+          await contractScripts.getRelevantBlockWindowForFilter(blockWindowRef);
         const initialLastBlock = Math.max(0, baseFrom - 1);
 
         // Initial read just to check waterline
@@ -370,19 +419,21 @@ export const createSessionSbtCacheController = (host = {}) => {
                   unresolvedHydrationAddressSet.delete(lower);
                 }
 
-                netCache.sbtList[lower] = withSessionScopedSbtCacheBinding(
-                  {
-                    ...freshExisting,
-                    sbtAddress: addr,
-                    sbtInfo: storedInfo,
+                netCache.sbtList[lower] = hydrateSbtActivityCacheEntry(
+                  withSessionScopedSbtCacheBinding(
+                    {
+                      ...freshExisting,
+                      sbtAddress: addr,
+                      sbtInfo: storedInfo,
+                      slug,
+                      blockNumber: refreshed ? baseTo : freshExisting.blockNumber || 0,
+                    },
                     slug,
-                    blockNumber: refreshed ? baseTo : freshExisting.blockNumber || 0,
-                  },
-                  slug,
+                  ),
                 );
               }
 
-              await dgWrite('sbtCache', slug, cache);
+              await writeSbtCache(slug, cache);
               mainSiteLog.log(`[ensureLightSbtDiscovery] Group '${slug}': Batch saved.`);
               hydratedTargetCount = Math.min(totalHydrationTargets, hydratedTargetCount + batch.length);
               emitHydrationProgress({ lastBatchSize: batch.length });
@@ -399,13 +450,13 @@ export const createSessionSbtCacheController = (host = {}) => {
         const enqueueHydrationAddresses = (addresses = []) => {
           let addedCount = 0;
           (Array.isArray(addresses) ? addresses : []).forEach((addrRaw) => {
-            const addr = String(addrRaw || '').trim();
-            if (!addr) return;
-            const lower = addr.toLowerCase();
-            if (ignoredSet.has(lower)) return;
-            if (queuedHydrationAddressSet.has(lower)) return;
-            queuedHydrationAddressSet.add(lower);
-            queuedHydrationAddresses.push(addr);
+            const queueEntry = buildSbtHydrationQueueEntry(addrRaw, {
+              ignoredAddressKeys: ignoredSet,
+              queuedAddressKeys: queuedHydrationAddressSet,
+            });
+            if (!queueEntry) return;
+            queuedHydrationAddressSet.add(queueEntry.addressKey);
+            queuedHydrationAddresses.push(queueEntry.address);
             addedCount += 1;
           });
           if (addedCount > 0) {
@@ -510,7 +561,7 @@ export const createSessionSbtCacheController = (host = {}) => {
             );
           } else {
             cache[networkID].lastBlock = baseTo;
-            await dgWrite('sbtCache', slug, cache);
+            await writeSbtCache(slug, cache);
           }
         }
 
@@ -663,7 +714,9 @@ export const createSessionSbtCacheController = (host = {}) => {
       return;
     }
 
-    const { fromBlock: baseFrom, toBlock: baseTo } = await contractScripts.getRelevantBlockWindowForFilter(slug);
+    const { fromBlock: baseFrom, toBlock: baseTo } = await contractScripts.getRelevantBlockWindowForFilter(
+      getSessionBlockWindowRef(slug),
+    );
     if (baseFrom > baseTo) {
       setReadinessStateIfChanged({ isSBTCacheReady: true }, checkAllCachesReady);
       return;
@@ -680,7 +733,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       if (networkIDStr) {
         const mergedLegacyKey = mergeLegacyNumericNetworkKey(globalCache, networkIDStr);
         if (mergedLegacyKey) {
-          dgWrite('sbtCache', slug, globalCache);
+          writeSbtCache(slug, globalCache);
         }
       }
     }
@@ -743,7 +796,7 @@ export const createSessionSbtCacheController = (host = {}) => {
             } else {
               sbtInfoToUse = cachedSBT.sbtInfo;
             }
-            return {
+            return hydrateSbtActivityCacheEntry({
               sbtAddress: originalCaseAddress,
               sbtInfo: sbtInfoToUse,
               mintedAddresses: (cachedSBT?.mintedAddresses || []).map((a) => (a || '').toLowerCase()),
@@ -757,7 +810,7 @@ export const createSessionSbtCacheController = (host = {}) => {
               burnedEventCount: cachedSBT?.burnedEventCount || 0,
               historySummary: normalizeSbtHistorySummary(cachedSBT?.historySummary),
               blockNumber: cachedSBT?.blockNumber || 0,
-            };
+            });
           } catch (error) {
             mainSiteLog.error(`Error processing featured SBT ${sbtAddressLower} in priority pass:`, error);
             return null;
@@ -775,7 +828,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       }
       currentSbtListForNetwork = { ...currentSbtListForNetwork, ...priorityProcessedSbts };
       currentNetworkCache.sbtList = currentSbtListForNetwork;
-      dgWrite('sbtCache', slug, globalCache);
+      writeSbtCache(slug, globalCache);
       if (window.ENABLE_RPC_DEBUG_LOGGING === true) {
         mainSiteLog.log('initializeSbtCacheForGroup: Priority (featured metadata) pass complete.');
       }
@@ -787,15 +840,12 @@ export const createSessionSbtCacheController = (host = {}) => {
         await runPriorityFeaturedMetadataPass();
         writeFlag('sbt:partialReady', slug, true);
         writeFlag('sbt:deferredFullScanNeeded', slug, true);
-        setState(
-          (prev) => ({ isSBTCacheReady: true, sbtCacheRevision: prev.sbtCacheRevision + 1 }),
-          checkAllCachesReady,
-        );
+        setSbtCacheReadyForActiveSlug(slug, checkAllCachesReady);
         void ensureSessionRouteSbtDiscovery(slug);
         return;
       } catch (e) {
         mainSiteLog.error('[SBT Partial] Failed (will still unblock UI):', e);
-        setReadinessStateIfChanged({ isSBTCacheReady: true });
+        setSbtReadinessForActiveSlug(slug);
         return;
       }
     }
@@ -849,11 +899,11 @@ export const createSessionSbtCacheController = (host = {}) => {
           `[SBT Full] Cache is fresh (lastBlock=${overallLastBlockProcessedByNetwork}, tip=${baseTo}). Skipping discovery scan.`,
         );
         updateFullScanProgress(fullScanTotalUnits, true);
-        currentNetworkCache.lastBlock = baseTo;
-        dgWrite('sbtCache', slug, globalCache);
+        currentNetworkCache.lastBlock = overallLastBlockProcessedByNetwork;
+        writeSbtCache(slug, globalCache);
         writeFlag('sbt:deferredFullScanNeeded', slug, false);
         writeFlag('sbt:partialReady', slug, true);
-        setState((prev) => ({ isSBTCacheReady: true, sbtCacheRevision: prev.sbtCacheRevision + 1 }));
+        setSbtCacheReadyForActiveSlug(slug);
         return;
       }
 
@@ -983,7 +1033,7 @@ export const createSessionSbtCacheController = (host = {}) => {
               const burnedAddresses = (sbtAlreadyInMap?.burnedAddresses || []).map((a) => (a || '').toLowerCase());
               updateBatchProgress(batchIndex, 1, true);
 
-              return {
+              return hydrateSbtActivityCacheEntry({
                 sbtAddress: originalCaseAddress,
                 sbtInfo: sbtInfoToUse,
                 mintedAddresses,
@@ -996,7 +1046,7 @@ export const createSessionSbtCacheController = (host = {}) => {
                 burnedEventCount: existingCounts.burnedEventCount,
                 historySummary: normalizeSbtHistorySummary(sbtAlreadyInMap?.historySummary),
                 blockNumber: Number.isFinite(existingBlock) ? existingBlock : baseTo,
-              };
+              });
             }
 
             if (sbtAlreadyInMap?.countsLoaded && Number.isFinite(existingBlock)) {
@@ -1075,7 +1125,7 @@ export const createSessionSbtCacheController = (host = {}) => {
                 : countsBlock;
             updateBatchProgress(batchIndex, 1, true);
 
-            return {
+            return hydrateSbtActivityCacheEntry({
               sbtAddress: originalCaseAddress,
               sbtInfo: sbtInfoToUse,
               mintedAddresses,
@@ -1088,7 +1138,7 @@ export const createSessionSbtCacheController = (host = {}) => {
               burnedEventCount,
               historySummary: historySummary || null,
               blockNumber: finalCountsBlock,
-            };
+            });
           } catch (error) {
             updateBatchProgress(batchIndex, 1, true);
             mainSiteLog.error(`Error processing SBT ${sbtAddressLower} in main pass:`, error);
@@ -1134,7 +1184,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       updateFullScanProgress(fullScanTotalUnits, true);
       currentNetworkCache.lastBlock = discoveryScanSucceeded ? baseTo : overallLastBlockProcessedByNetwork;
       currentNetworkCache.sbtList = finalProcessedSbtsMap;
-      dgWrite('sbtCache', slug, globalCache);
+      writeSbtCache(slug, globalCache);
 
       // Write user cache
       if (userCacheModified) {
@@ -1144,7 +1194,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       writeFlag('sbt:deferredFullScanNeeded', slug, !discoveryScanSucceeded);
       writeFlag('sbt:partialReady', slug, true);
 
-      setState((prev) => ({ isSBTCacheReady: true, sbtCacheRevision: prev.sbtCacheRevision + 1 }));
+      setSbtCacheReadyForActiveSlug(slug);
       if (discoveryScanSucceeded) {
         mainSiteLog.log('initializeSbtCacheForGroup: Full discovery & processing complete.');
       } else {
@@ -1201,7 +1251,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       } catch (e) {
         mainSiteLog.error('[refreshSbtDataForGroup] Full rescan failed:', e);
         // Ensure we unblock UI even on failure
-        setReadinessStateIfChanged({ isSBTCacheReady: true });
+        setSbtReadinessForActiveSlug(slug);
       }
       return;
     }
@@ -1216,7 +1266,9 @@ export const createSessionSbtCacheController = (host = {}) => {
       const sbtAddressOriginalCase = sbtAddressParam;
       const sbtLower = sbtAddressOriginalCase.toLowerCase();
 
-      const { fromBlock: baseFrom, toBlock: baseTo } = await contractScripts.getRelevantBlockWindowForFilter(slug);
+      const { fromBlock: baseFrom, toBlock: baseTo } = await contractScripts.getRelevantBlockWindowForFilter(
+        getSessionBlockWindowRef(slug),
+      );
       const initialLastBlockSBT = Math.max(0, baseFrom - 1);
 
       // Read cache entry to decide whether we only need tokenURI metadata
@@ -1226,7 +1278,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       if (!cache[networkID]) cache[networkID] = { sbtList: {}, lastBlock: initialLastBlockSBT };
       if (!cache[networkID].sbtList) cache[networkID].sbtList = {};
 
-      const existing = cache[networkID].sbtList[sbtLower] || {};
+      const existing = hydrateSbtActivityCacheEntry(cache[networkID].sbtList[sbtLower]) || {};
       const info = existing?.sbtInfo || null;
       const existingHistorySummary = normalizeSbtHistorySummary(existing?.historySummary);
 
@@ -1264,15 +1316,15 @@ export const createSessionSbtCacheController = (host = {}) => {
         const historySummary = !forceCounts
           ? (await loadHistorySummary()) || existingHistorySummary
           : existingHistorySummary;
-        cache[networkID].sbtList[sbtLower] = {
+        cache[networkID].sbtList[sbtLower] = hydrateSbtActivityCacheEntry({
           ...existing,
           sbtAddress: sbtAddressOriginalCase,
           sbtInfo,
           slug,
           creationBlock: creationBlock != null ? creationBlock : null,
           historySummary: historySummary || null,
-        };
-        dgWrite('sbtCache', slug, cache);
+        });
+        writeSbtCache(slug, cache);
         setState((prev) => ({ sbtCacheRevision: prev.sbtCacheRevision + 1 }));
         if (window.ENABLE_RPC_DEBUG_LOGGING === true)
           mainSiteLog.log('[refreshSbtDataForGroup] Metadata-only hydration for', sbtAddressOriginalCase);
@@ -1302,15 +1354,15 @@ export const createSessionSbtCacheController = (host = {}) => {
           sbtInfo?.creationBlock,
         );
         const historySummary = (await loadHistorySummary()) || existingHistorySummary;
-        cache[networkID].sbtList[sbtLower] = {
+        cache[networkID].sbtList[sbtLower] = hydrateSbtActivityCacheEntry({
           ...existing,
           sbtAddress: sbtAddressOriginalCase,
           sbtInfo,
           slug,
           creationBlock: creationBlock != null ? creationBlock : null,
           historySummary: historySummary || null,
-        };
-        dgWrite('sbtCache', slug, cache);
+        });
+        writeSbtCache(slug, cache);
         setState((prev) => ({ sbtCacheRevision: prev.sbtCacheRevision + 1 }));
         return;
       }
@@ -1367,7 +1419,7 @@ export const createSessionSbtCacheController = (host = {}) => {
         if (!force && nowMs - lastCountsCheckpointWriteMs < SBT_COUNTS_CHECKPOINT_WRITE_MIN_MS) {
           return false;
         }
-        dgWrite('sbtCache', slug, cache);
+        writeSbtCache(slug, cache);
         hasPendingCountsCheckpointWrite = false;
         lastCountsCheckpointWriteMs = nowMs;
         return true;
@@ -1387,13 +1439,13 @@ export const createSessionSbtCacheController = (host = {}) => {
         // Regression guard: resumable checkpoints must stay isolated from finalized
         // holder fields. Publishing partial counts here lets cache readers treat an
         // incomplete scan as authoritative and can later double-merge the same range.
-        cache[networkID].sbtList[sbtLower] = {
+        cache[networkID].sbtList[sbtLower] = hydrateSbtActivityCacheEntry({
           ...currentEntry,
           sbtAddress: sbtAddressOriginalCase,
           ...(nextSbtInfo ? { sbtInfo: nextSbtInfo } : {}),
           countsLoaded: false,
           countsScanCheckpoint: normalized,
-        };
+        });
         queueCountsCheckpointWrite();
       };
 
@@ -1435,22 +1487,14 @@ export const createSessionSbtCacheController = (host = {}) => {
       };
       const countOptions = Object.keys(countOptionsBase).length > 0 ? countOptionsBase : null;
       const resumeCheckpoint = latestCountsCheckpoint;
-      const checkpointAlreadyCoversWindow =
-        !existing?.countsLoaded &&
-        resumeCheckpoint &&
-        resumeCheckpoint.phase === 'activity' &&
-        Number.isFinite(Number(resumeCheckpoint.blockNumber)) &&
-        Number(resumeCheckpoint.blockNumber) >= baseTo;
-      const canResumeFromCheckpoint =
-        !existing?.countsLoaded &&
-        resumeCheckpoint &&
-        Number.isFinite(Number(resumeCheckpoint.blockNumber)) &&
-        Number(resumeCheckpoint.blockNumber) >= startBlock - 1 &&
-        Number(resumeCheckpoint.blockNumber) < baseTo;
-      const initialProgressSeedBlock =
-        existing?.countsLoaded === true && Number.isFinite(existingBlock)
-          ? existingBlock
-          : Number(resumeCheckpoint?.blockNumber ?? startBlock - 1);
+      const { checkpointAlreadyCoversWindow, canResumeFromCheckpoint, initialProgressSeedBlock } =
+        buildSbtCountsResumePlan({
+          countsLoaded: existing?.countsLoaded === true,
+          existingBlock,
+          resumeCheckpoint,
+          startBlock,
+          toBlock: baseTo,
+        });
       const initialProgress = buildSbtCountsInitialProgress({
         startBlock,
         toBlock: baseTo,
@@ -1556,7 +1600,7 @@ export const createSessionSbtCacheController = (host = {}) => {
         sbtInfo?.creationBlock,
       );
 
-      cache[networkID].sbtList[sbtLower] = {
+      cache[networkID].sbtList[sbtLower] = hydrateSbtActivityCacheEntry({
         ...(cache[networkID].sbtList[sbtLower] || {}),
         sbtAddress: sbtAddressOriginalCase,
         sbtInfo,
@@ -1571,9 +1615,9 @@ export const createSessionSbtCacheController = (host = {}) => {
         historySummary: historySummary || null,
         blockNumber: finalCountsBlock,
         countsScanCheckpoint: countsOk ? null : latestCountsCheckpoint || null,
-      };
+      });
 
-      dgWrite('sbtCache', slug, cache);
+      writeSbtCache(slug, cache);
       setState((prev) => ({ sbtCacheRevision: prev.sbtCacheRevision + 1 }));
       if (window.ENABLE_RPC_DEBUG_LOGGING === true)
         mainSiteLog.log('[refreshSbtDataForGroup] Updated single SBT (full) entry:', {
@@ -1710,12 +1754,15 @@ export const createSessionSbtCacheController = (host = {}) => {
     const eventBlockNumber = await resolveSbtRealtimeEventBlockNumber({
       event,
       getReadProviderForSession,
-      getRelevantBlockWindowForFilter: contractScripts.getRelevantBlockWindowForFilter,
+      getRelevantBlockWindowForFilter: (slugRef) =>
+        contractScripts.getRelevantBlockWindowForFilter(getSessionBlockWindowRef(slugRef)),
       log: mainSiteLog,
       slug,
     });
 
-    const { fromBlock: baseFrom } = await contractScripts.getRelevantBlockWindowForFilter(slug);
+    const { fromBlock: baseFrom } = await contractScripts.getRelevantBlockWindowForFilter(
+      getSessionBlockWindowRef(slug),
+    );
     let currentCache = dgRead('sbtCache', slug) || {};
     const initialLastBlockSBT = Math.max(0, baseFrom - 1);
     // One-time migration: merge numeric-key (if any) into string key
@@ -1778,7 +1825,9 @@ export const createSessionSbtCacheController = (host = {}) => {
       return;
     }
 
-    const { fromBlock: baseFrom } = await contractScripts.getRelevantBlockWindowForFilter(slug);
+    const { fromBlock: baseFrom } = await contractScripts.getRelevantBlockWindowForFilter(
+      getSessionBlockWindowRef(slug),
+    );
     let currentCache = dgRead('sbtCache', slug) || {};
     const initialLastBlockSBT = Math.max(0, baseFrom - 1);
     // Merge any numeric-key cache into string key once
@@ -1811,7 +1860,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       networkCache.lastBlock = Math.max(networkCache.lastBlock || 0, eventBlockNumber);
       updateSbtRealtimeCursorForNetworkCache(networkCache, eventCursor);
 
-      dgWrite('sbtCache', slug, currentCache);
+      writeSbtCache(slug, currentCache);
       queueLocalRevisionUpdate({ needsSbtRevision: true });
       mainSiteLog.log('SBT cache updated with new SBT from onSbtCreatedDetectedForGroup:', sbtAddressOriginalCase);
       Promise.resolve().then(() => {
@@ -1870,7 +1919,9 @@ export const createSessionSbtCacheController = (host = {}) => {
     const sbtAddressLower = sbtAddressOriginalCase.toLowerCase();
     const accountLower = String(accountOriginalCase || '').toLowerCase();
 
-    const { fromBlock: baseFrom } = await contractScripts.getRelevantBlockWindowForFilter(slug);
+    const { fromBlock: baseFrom } = await contractScripts.getRelevantBlockWindowForFilter(
+      getSessionBlockWindowRef(slug),
+    );
     let currentCache = dgRead('sbtCache', slug) || {};
     const initialLastBlockSBT = Math.max(0, baseFrom - 1);
     mergeLegacyNumericNetworkKey(currentCache, networkID);
@@ -1917,7 +1968,7 @@ export const createSessionSbtCacheController = (host = {}) => {
     networkCache.lastBlock = Math.max(networkCache.lastBlock || 0, eventBlockNumber);
     updateSbtRealtimeCursorForNetworkCache(networkCache, eventCursor);
 
-    dgWrite('sbtCache', slug, currentCache);
+    writeSbtCache(slug, currentCache);
     queueLocalRevisionUpdate({ needsSbtRevision: true });
     mainSiteLog.log('SBT cache updated by SBTActivity event for:', sbtAddressOriginalCase);
 

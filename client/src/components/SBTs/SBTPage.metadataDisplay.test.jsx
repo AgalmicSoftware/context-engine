@@ -534,9 +534,10 @@ describe('SBTPage metadata display', () => {
   it('falls back through Arweave gateways before the default badge', () => {
     const txId = 'DqYBh1qm9GvaTOGkF5R7abnLoB3OPiXNNBcTsYPtlRc';
     const preferredGateway = 'https://arweave.net'; // intentional: real URL - verifies production gateway fallback order
+    const arIoGateway = 'https://ar-io.dev'; // intentional: real URL - verifies production gateway fallback order
     const fallbackGateway = 'https://gateway.irys.xyz'; // intentional: real URL - verifies production gateway fallback order
     const arIoSubdomainGateway = 'https://b2tadb22u32gxwsm4gsbpfd3ng44xia5zy7cltjuc4j3da7nsulq.ar-io.dev'; // intentional: real URL - verifies AR.IO subdomain parsing
-    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
+    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = false;
     const subject = createSubject({
       SBTAddress: '0x00000000000000000000000000000000000000a1',
     });
@@ -563,10 +564,14 @@ describe('SBTPage metadata display', () => {
 
     subject.handleDisplayImageError(firstAttempt);
     const secondAttempt = getDisplayImageRenderState(subject.state.sbtInfo, subject.state, defaultSbtImage);
-    expect(secondAttempt.src).toBe(`${fallbackGateway}/${txId}`);
+    expect(secondAttempt.src).toBe(`${arIoGateway}/${txId}`);
     subject.handleDisplayImageError(secondAttempt);
 
-    expect(subject.state.displayImageFallbackIndex).toBe(2);
+    const thirdAttempt = getDisplayImageRenderState(subject.state.sbtInfo, subject.state, defaultSbtImage);
+    expect(thirdAttempt.src).toBe(`${fallbackGateway}/${txId}`);
+    subject.handleDisplayImageError(thirdAttempt);
+
+    expect(subject.state.displayImageFallbackIndex).toBe(3);
 
     const tree = subject.render();
     const sbtImage = findElementInTree(

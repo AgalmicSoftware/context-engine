@@ -32,20 +32,65 @@ flowchart TD
   SessionWorker --> Contracts["EVM contracts<br/>SessionRegistry, Surveys, SBTFactory, CustomSBT"]
   Utilities --> Contracts
   Utilities --> Arweave["Arweave clients and storage refs"]
-  Cecc["contextEngine-cc extension"] --> SessionWorker
-  Cecc --> UtilitiesShared["shared envelope/question modules"]
   PublicRelease["public release tree"] --> Browser
   PublicRelease --> SessionWorker
-  PublicRelease -. strips .-> PrivateOnly["private E2E, TODO, agentBridgeWorker, contextEngine-cc"]
+  PublicRelease --> DeployHelper
 ```
 
-Primary navigation maps:
+Primary source entry points are `client/src/components/MainSite/AppShell.tsx`,
+`client/src/components/SurveyTool/SurveyTool.tsx`,
+`client/src/components/Sessions/SessionWizard.tsx`, and
+`client/src/components/Admin/AdminPage.tsx`.
 
-- `docs/MainSite.MAP.md`
-- `docs/SurveyTool.MAP.md`
-- `docs/contractScripts.MAP.md`
-- `docs/AdminPage.MAP.md`
-- `docs/SessionWizard.MAP.md`
+## Query Layer (Provisional)
+
+The client has one shared TanStack Query client at
+`client/src/app/runtime/appQueryClient.tsx`. It is the same instance as
+`wagmiClient.queryClient`; creating another `QueryClient` is not allowed.
+wagmi 0.9 provides that instance through a private React context, so App also
+mounts a default `QueryClientProvider` with the same instance for application
+queries. There are two provider contexts but only one client and one cache.
+
+Application query hooks belong between components and domain ports:
+
+```text
+route/page UI
+  -> query hook (cache, loading state, invalidation)
+  -> client/src/domains/** read port
+  -> low-level utility
+```
+
+Query functions must call domain read ports rather than importing low-level
+Web3, Arweave, worker, or storage utilities directly. Existing IndexedDB and
+localStorage caches remain authoritative persistence; this layer does not use a
+React Query persistence plugin.
+
+Keys use the primitive-only factory exposed as `appQueryFoundation.keys`. A
+scoped key has fixed slots
+`[domain, entity, chainId, sessionSlug, address, ...ids]`; absent scope values
+are `null`, addresses are normalized to lowercase, and object-valued IDs are
+rejected. Fixed scalar slots keep equality independent of object identity.
+
+Freshness is mapped per read family from current behavior, never invented:
+
+| Existing behavior | Query v4 mapping |
+| --- | --- |
+| Explicit TTL | Preserve it as `staleTime`; retain data with `cacheTime` according to the same lifecycle. |
+| Cache-revision or event driven | Use `staleTime: Infinity`; the existing event and successful write paths explicitly invalidate the affected key. |
+| User-triggered refresh | Keep the refresh control and invalidate or refetch the exact key. |
+
+TanStack Query v5 renames `cacheTime` to `gcTime`; dependency migration is a
+separate change and must not alter these semantics.
+
+This pattern remains provisional until a functional read surface completes the
+first exemplar and proves in-flight deduplication. Each migration slice must:
+
+1. Characterize loading, data shape, context changes, freshness, and fetch count.
+2. Add a hook over an existing domain read port using the shared key factory.
+3. Convert one named functional surface without changing routes, test IDs, copy,
+   payloads, storage keys, or write behavior.
+4. Wire existing events and successful writes to exact-key invalidation.
+5. Prove duplicate in-flight reads are collapsed and fetch counts do not rise.
 
 ## Enforcement System
 
@@ -59,6 +104,8 @@ The tracked checks work together:
   shrink or stay flat unless an intentional rollout explicitly allows growth.
 - `npm run verify:public-release-surface` prevents public files from importing
   stripped private paths.
+- Public release export checks retained Markdown for private references,
+  unavailable npm commands, and broken local links.
 - `npm run test:wiring` verifies test inventory, boundary checks, and text
   hygiene.
 - `npm run verify:release` adds client lint, typecheck, full client tests,
@@ -75,8 +122,6 @@ The worker surface is documented in `docs/session-cors-worker.md`.
 - `workers/deploy-helper/` is a separate helper worker used by `/new` and
   self-hosted deployments to call Cloudflare APIs, create the target worker and
   KV namespace, and seed initial session config/secrets.
-- `workers/agentBridgeWorker/` is an agent/Telegram bridge worker. It is private
-  to the full dev repo and stripped from the public release.
 - `scripts/worker-bundle.mjs` bundles `sessionCorsWorker` and `deploy-helper`
   into `dist/`; `scripts/verify-worker-bundle-sync.mjs` verifies those bundles
   are in sync with source.
@@ -112,38 +157,18 @@ The canonical Solidity contracts live in `contracts/`, with deploy scripts in
 - `SBTFactory.sol` deploys session/group SBT contracts.
 
 The client reads ABIs from `client/src/contractsABI/`. Checked-in defaults live
-in `client/src/variables/chains.js` and `client/src/variables/contracts.json`;
+in `client/src/variables/chains.ts` and `client/src/variables/contracts.json`;
 OP Sepolia (`11155420`) is the default chain fallback, while Base Sepolia
 (`84532`) remains a compatibility chain.
 
-## CC Extension
-
-`contextEngine-cc/` is the Claude Code integration. It contains the local hook,
-browser auth page, session/question helpers, and agent bridge contracts. Shared
-Envelope v1 primitives are mirrored between
-`client/src/utilities/shared/encryption/envelopeV1Core.mjs` and
-`contextEngine-cc/lib/shared/encryption/envelopeV1Core.mjs`, with
-`contextEngine-cc/lib/envelopeV1.mjs` acting as the Node adapter.
-
-The extension is part of the full private/dev repo. It is stripped from the
-public release artifact, so public release verification must never depend on it.
-
 ## Release And Public Surface
 
-Use `docs/releasing.md` for public history replay and stripped artifact release
-details. Use `docs/release-runbook.md` for the operator checklist. The strip
-patterns live in `scripts/lib/public-release-strip-patterns.sh`, and the public
-surface verifier makes imports into stripped paths fail locally and in CI.
+The release build creates a curated source tree and validates both code imports
+and retained Markdown before publication. Public source must not depend on files
+that are absent from that tree.
 
 ## E2E Harness
 
-The public smoke runner is `npm run test:e2e`, backed by the navigation smoke.
-The private full-repo E2E layer includes session setup, SBT, survey, gated
-decrypt, worker scope, and Cloudflare envelope/group suites. Details live in:
-
-- `docs/e2e-setup.md`
-- `docs/e2e-commands.md`
-- `docs/e2e-cadence.md`
-
-Private E2E entrypoints are intentionally stripped from the public release; the
-public release keeps the lightweight smoke path and documentation.
+The public smoke runner is `npm run test:e2e`, backed by the Vite navigation and
+route-style smoke. Broader workflow validation is maintained separately from the
+published source package.

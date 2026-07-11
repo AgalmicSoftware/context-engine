@@ -9,6 +9,7 @@ export const ALLOW_MARKER = '[allow-baseline-growth]';
 
 const BOUNDARY_BASELINE = 'scripts/client-boundaries-baseline.json';
 const TYPE_DEBT_BASELINE = 'scripts/type-debt-baseline.json';
+const DEAD_EXPORT_BASELINE = 'scripts/dead-exports-baseline.json';
 
 function usage() {
   return `Usage: node scripts/check-baseline-monotonicity.mjs [options]
@@ -16,6 +17,7 @@ function usage() {
 Fails if baseline files grow relative to a base ref:
   - ${BOUNDARY_BASELINE} must not gain violation entries.
   - ${TYPE_DEBT_BASELINE} must not increase any count.
+  - ${DEAD_EXPORT_BASELINE} must not increase either candidate count.
 
 Options:
   --base <ref>        Base git ref to compare against. Defaults to
@@ -137,6 +139,14 @@ function typeDebtIncreases(baseBaseline, currentBaseline) {
   });
 }
 
+function deadExportCountIncreases(baseBaseline, currentBaseline) {
+  return ['candidateDeadFiles', 'candidateUnusedExports'].flatMap((field) => {
+    const base = toFiniteCount(baseBaseline?.[field], field, DEAD_EXPORT_BASELINE);
+    const current = toFiniteCount(currentBaseline?.[field], field, DEAD_EXPORT_BASELINE);
+    return current > base ? [{ field, base, current }] : [];
+  });
+}
+
 export function shouldAllowBaselineGrowth(allowText = '') {
   return String(allowText).includes(ALLOW_MARKER)
     || process.env.BASELINE_MONOTONICITY_ALLOW === '1'
@@ -157,6 +167,7 @@ export function collectBaselineMonotonicityFindings({
       notices,
       boundaryGains: [],
       typeDebtIncreases: [],
+      deadExportIncreases: [],
     };
   }
 
@@ -172,17 +183,26 @@ export function collectBaselineMonotonicityFindings({
       notices,
       boundaryGains: [],
       typeDebtIncreases: [],
+      deadExportIncreases: [],
     };
   }
 
   const currentBoundary = readCurrentJson(resolvedRepoDir, BOUNDARY_BASELINE);
   const currentTypeDebt = readCurrentJson(resolvedRepoDir, TYPE_DEBT_BASELINE);
+  const currentDeadExports = readCurrentJson(resolvedRepoDir, DEAD_EXPORT_BASELINE);
+  let baseDeadExports = null;
+  try {
+    baseDeadExports = readBaseJson(resolvedRepoDir, baseCommit, DEAD_EXPORT_BASELINE);
+  } catch (_error) {
+    notices.push(`Baseline monotonicity bootstrap: ${DEAD_EXPORT_BASELINE} was not present at ${baseRef}.`);
+  }
 
   return {
     skipped: false,
     notices,
     boundaryGains: boundaryViolationGains(baseBoundary, currentBoundary),
     typeDebtIncreases: typeDebtIncreases(baseTypeDebt, currentTypeDebt),
+    deadExportIncreases: baseDeadExports ? deadExportCountIncreases(baseDeadExports, currentDeadExports) : [],
   };
 }
 
@@ -199,6 +219,10 @@ function formatTypeDebtIncrease(increase) {
   return `${increase.pattern}: ${increase.base} -> ${increase.current}`;
 }
 
+function formatDeadExportIncrease(increase) {
+  return `${increase.field}: ${increase.base} -> ${increase.current}`;
+}
+
 function printFindings(result, writeLine) {
   if (result.boundaryGains.length > 0) {
     writeLine(`${BOUNDARY_BASELINE} gained ${result.boundaryGains.length} violation entr${result.boundaryGains.length === 1 ? 'y' : 'ies'}:`);
@@ -213,10 +237,19 @@ function printFindings(result, writeLine) {
       writeLine(`  - ${formatTypeDebtIncrease(increase)}`);
     });
   }
+
+  if (result.deadExportIncreases.length > 0) {
+    writeLine(`${DEAD_EXPORT_BASELINE} increased ${result.deadExportIncreases.length} count${result.deadExportIncreases.length === 1 ? '' : 's'}:`);
+    result.deadExportIncreases.forEach((increase) => {
+      writeLine(`  - ${formatDeadExportIncrease(increase)}`);
+    });
+  }
 }
 
 export function hasBaselineGrowth(result) {
-  return result.boundaryGains.length > 0 || result.typeDebtIncreases.length > 0;
+  return result.boundaryGains.length > 0
+    || result.typeDebtIncreases.length > 0
+    || result.deadExportIncreases.length > 0;
 }
 
 function runCli(argv) {
@@ -252,13 +285,16 @@ function runCli(argv) {
     return 0;
   }
 
-  if (shouldAllowBaselineGrowth(options.allowText)) {
+  if (shouldAllowBaselineGrowth(options.allowText) && result.deadExportIncreases.length === 0) {
     console.log(`Baseline growth allowed by ${ALLOW_MARKER}.`);
     printFindings(result, (line) => console.log(line));
     return 0;
   }
 
   console.error('Baseline monotonicity check failed.');
+  if (result.deadExportIncreases.length > 0 && shouldAllowBaselineGrowth(options.allowText)) {
+    console.error(`${DEAD_EXPORT_BASELINE} growth cannot be allowed by ${ALLOW_MARKER}.`);
+  }
   console.error(`Use ${ALLOW_MARKER} in the PR title/body or commit message only for intentional checker-rule baseline growth.`);
   printFindings(result, (line) => console.error(line));
   return 1;

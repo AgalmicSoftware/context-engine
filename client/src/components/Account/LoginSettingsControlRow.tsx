@@ -22,7 +22,7 @@ export const LoginSettingsConfigToggleControl = ({
   <Button
     type="button"
     onClick={onToggle || undefined}
-    className={`${styles.sendTestnetFundsButton} ${styles.aiSettingsToggleButton}`}
+    className={`${styles.sendTestnetFundsButton} ${styles.aiSettingsToggleButton} ${styles.settingsConfigToggleButton}`}
     aria-expanded={expanded}
     data-testid={testId || undefined}
   >

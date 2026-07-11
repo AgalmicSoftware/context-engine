@@ -159,7 +159,7 @@ describe('rpcReadCache evictExpiredEntries', () => {
     });
 
     const first = provider.send('eth_blockNumber', []);
-    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const second = provider.send('eth_getBalance', [LOG_ADDRESS, 'latest']);
     await Promise.resolve();
 
@@ -170,6 +170,85 @@ describe('rpcReadCache evictExpiredEntries', () => {
       code: 'CE_RPC_RATE_LIMIT_BACKOFF',
       status: 429,
     });
+    expect(originalSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a slow neighboring request behind the endpoint gate before applying 429 backoff', async () => {
+    jest.useFakeTimers();
+    let rejectFirst;
+    const { originalSend, provider } = createWrappedProvider(async () => {
+      if (originalSend.mock.calls.length === 1) {
+        return new Promise((_, reject) => {
+          rejectFirst = reject;
+        });
+      }
+      return '0x14a34';
+    });
+
+    const first = provider.send('eth_blockNumber', []);
+    await Promise.resolve();
+    const second = provider.send('eth_getBalance', [LOG_ADDRESS, 'latest']);
+    await Promise.resolve();
+
+    jest.advanceTimersByTime(501);
+    await Promise.resolve();
+    expect(originalSend).toHaveBeenCalledTimes(1);
+
+    rejectFirst(Object.assign(new Error('Too Many Requests'), { status: 429 }));
+    await expect(first).rejects.toMatchObject({ status: 429 });
+    await expect(second).rejects.toMatchObject({
+      code: 'CE_RPC_RATE_LIMIT_BACKOFF',
+      status: 429,
+    });
+    expect(originalSend).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
+  it('does not release a thundering herd after a successful endpoint read', async () => {
+    let resolveFirst;
+    let callCount = 0;
+    const { originalSend, provider } = createWrappedProvider(async () => {
+      callCount += 1;
+      if (callCount === 1) {
+        return new Promise((resolve) => {
+          resolveFirst = resolve;
+        });
+      }
+      if (callCount === 2) {
+        throw Object.assign(new Error('Too Many Requests'), { status: 429 });
+      }
+      return 'unexpected-network-send';
+    });
+
+    const first = provider.send('eth_blockNumber', []);
+    const neighbors = Array.from({ length: 12 }, (_, index) =>
+      provider.send('eth_getBalance', [`0x${String(index + 1).padStart(40, '0')}`, 'latest']),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(originalSend).toHaveBeenCalledTimes(1);
+
+    resolveFirst('0x1');
+    await expect(first).resolves.toBe('0x1');
+    const settled = await Promise.allSettled(neighbors);
+
+    expect(settled).toHaveLength(12);
+    expect(settled.every((entry) => entry.status === 'rejected')).toBe(true);
+    expect(originalSend).toHaveBeenCalledTimes(2);
+    expect(Array.from(getCache().rateLimits.values())[0]?.retryAfterMs).toBe(60000);
+  });
+
+  it('opens the endpoint cooldown circuit after HTTP 403 responses', async () => {
+    const { originalSend, provider } = createWrappedProvider(async () => {
+      throw Object.assign(new Error('Forbidden'), { status: 403 });
+    });
+
+    await expect(provider.send('eth_getLogs', [{ fromBlock: '0x1', toBlock: 'latest' }])).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(provider.send('eth_getBalance', [LOG_ADDRESS, 'latest'])).rejects.toMatchObject({
+      code: 'CE_RPC_RATE_LIMIT_BACKOFF',
+    });
+
     expect(originalSend).toHaveBeenCalledTimes(1);
   });
 

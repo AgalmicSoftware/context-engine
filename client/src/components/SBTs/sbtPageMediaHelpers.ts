@@ -64,6 +64,8 @@ export const getDisplayImageUrlCandidates = (sbtInfo: SbtPageInfoImageLike | nul
         host.endsWith('.g8way.io');
       if (!isKnownArweaveGateway) return true;
       return (
+        host === 'ar-io.dev' ||
+        host.endsWith('.ar-io.dev') ||
         host === 'arweave.net' ||
         host.endsWith('.arweave.net') ||
         host === 'gateway.irys.xyz' ||

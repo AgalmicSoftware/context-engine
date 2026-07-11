@@ -678,7 +678,9 @@ describe('workerAuth fetchWorkerWithAuth', () => {
   const originalFetch = global.fetch;
 
   beforeEach(() => {
+    jest.clearAllMocks();
     const mockStore = require('../../store.js').default;
+    const { cryptoUtils } = require('../crypto/cryptography.js');
     mockStore.getState.mockReturnValue({
       profile: {
         account: TEST_ADDRESS,
@@ -689,8 +691,10 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     });
     mockProviderRequest.mockClear();
     mockProviderRequest.mockImplementation(defaultProviderRequest);
+    cryptoUtils._getProvider.mockImplementation(() => ({
+      request: mockProviderRequest,
+    }));
     localStorage.clear();
-    jest.clearAllMocks();
   });
 
   afterEach(() => {
@@ -870,6 +874,48 @@ describe('workerAuth fetchWorkerWithAuth', () => {
     expect(String(global.fetch.mock.calls[1][0])).toBe('https://worker.example/custom-prefix/auth/nonce');
     expect(String(global.fetch.mock.calls[2][0])).toBe('https://worker.example/custom-prefix/auth/login');
     expect(String(global.fetch.mock.calls[3][0])).toBe('https://worker.example/custom-prefix/ai');
+  });
+
+  it('preserves an object-valued passkey provider through worker authentication', async () => {
+    const { cryptoUtils } = require('../crypto/cryptography.js');
+    const passkeyProvider = {
+      isPasskeyEoa: true,
+      request: mockProviderRequest,
+    };
+    const ethersProvider = { provider: passkeyProvider };
+    cryptoUtils._getProvider.mockImplementation((providerLike) => {
+      if (providerLike === ethersProvider) return passkeyProvider;
+      if (providerLike === passkeyProvider) return passkeyProvider;
+      return {
+        request: async () => {
+          throw new Error('No EIP-1193 provider available.');
+        },
+      };
+    });
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'token-1', exp: Math.floor(Date.now() / 1000) + 3600 }))
+      .mockResolvedValueOnce(jsonResp(200, { ok: true }));
+
+    const response = await fetchWorkerWithAuth(
+      'https://worker.example/arweave/upload',
+      { method: 'POST', body: JSON.stringify({ data: '{}' }) },
+      {
+        sessionSlug: 'demo-1',
+        context: {
+          account: TEST_ADDRESS,
+          providerLike: ethersProvider,
+          chainId: 11155420,
+        },
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(cryptoUtils._getProvider).toHaveBeenCalledWith(ethersProvider);
+    expect(mockProviderRequest.mock.calls.map(([payload]) => payload?.method)).toEqual(
+      expect.arrayContaining(['eth_accounts']),
+    );
   });
 
   it('does not replay anonymous POST when compatibility probe is not confirmed', async () => {

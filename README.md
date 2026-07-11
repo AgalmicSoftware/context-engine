@@ -12,26 +12,17 @@ Context Engine is a toolkit for AI-enhanced deliberation, decision-making, and n
 
 ## Architecture At A Glance
 
-```mermaid
-flowchart LR
-  Browser["React client"] --> Wizard["Session setup"]
-  Browser --> Session["Session and survey UI"]
-  Wizard --> DeployHelper["deploy-helper worker"]
-  Session --> Worker["sessionCorsWorker"]
-  Worker --> Storage["Arweave or Cloudflare storage"]
-  Worker --> AI["AI, transcription, and worker-auth routes"]
-  Browser --> Contracts["EVM contracts"]
-  Worker --> Contracts
-  Contracts --> Gates["SBT groups and gates"]
-  Gates --> Session
-```
+<p align="center">
+  <img src="client/src/assets/img/readme-architecture-deployment-modes.png" alt="Context Engine deployment modes diagram showing Web App and AI Agent access to a shared session, then Hosted and Fast, Trustless and Slower, and company-operated infrastructure options with their setup credentials." />
+</p>
 
-The public app is a React SPA backed by Cloudflare Workers, Arweave or Cloudflare storage profiles, Lit/Chipotle encryption paths, and EVM contracts for sessions, surveys, and SBT groups. For the full runtime map, see [docs/architecture-overview.md](docs/architecture-overview.md).
+Context Engine is designed to keep workflows and product-facing capability boundaries consistent while deployment adapters determine where identity, keys, compute, coordination, and records live. Current public/hosted profiles combine supported managed services and public networks; future company-operated profiles are intended to connect existing organizational infrastructure without changing session and survey semantics. The hosted public deployment currently uses Cloudflare Workers, Cloudflare or Arweave storage, optional Lit/Chipotle encryption paths, and EVM contracts. For the concrete runtime topology, see [docs/architecture-overview.md](docs/architecture-overview.md).
 
 ## Deployment Modes
 
-- Public version: the hosted public app is available at [contextengine.xyz](https://contextengine.xyz).
-- Private mode: organizations can run Context Engine on their own infrastructure with self-hosted deployment options. See [docs/scaling.md](docs/scaling.md) for deployment profiles.
+- **Hosted public app — available:** use Context Engine at [contextengine.xyz](https://contextengine.xyz).
+- **Operator-managed public deployment — available:** host the static client, operate the Cloudflare worker in your account, and connect it to supported Arweave and public-EVM services.
+- **Company-operated edition — planned, with design work underway:** planning and adapter design are in progress for a packaged edition that runs on existing company hardware, on-premises environments, and private clouds. It will be made available after the adapter, packaging, security, and conformance work is complete, with support for connecting approved storage, identity and access, key-management, AI, and observability services. It is not yet generally available.
 
 ## Quick Start
 
@@ -65,7 +56,7 @@ For testing, run modes, and deeper setup:
 ### Survey and Response Management
 - Multiple question types: freeform, multiple choice, binary, and rating scales
 - Optional encryption of responses and results
-- Decentralized and permanent storage of responses
+- Optional decentralized and permanent response storage in the public Arweave-backed profile
 - Statistical / AI analysis and visualization of results
 - Export results as `.json`, `.csv`, `.pdf`
 
@@ -90,7 +81,7 @@ For testing, run modes, and deeper setup:
 ### Deployer UX: Sponsored Bundles
 
 - Deployers can use and set up sponsored bundles of API keys (for storage, EVM transactions, encryption network, AI API)
-- Sensitive and organizational deployments can plug in existing AI keys, and use local or custom options for storage, encryption, and EVM network functionality
+- Sensitive and organizational deployments can plug in existing AI keys and combine currently supported Cloudflare, Arweave, and public-EVM components; broader company-operated infrastructure adapters are planned
 
 ## AI Discourse Corpus
 
@@ -106,6 +97,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 - System design, data flows, and file map: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Docs index: [docs/README.md](docs/README.md)
 - User guide / end-to-end session setup: [docs/session-creation-guide.md](docs/session-creation-guide.md)
+- Public posts authoring: [docs/posts.md](docs/posts.md)
 - Testing guide: [docs/testing.md](docs/testing.md)
 - Run modes: [docs/run-modes.md](docs/run-modes.md)
 - Public client config and current defaults: [docs/public-client-config.md](docs/public-client-config.md)
@@ -117,7 +109,7 @@ The default public deployment supports hundreds to low thousands of concurrent p
 
 ## Licensing
 
-This repo is intentionally multi-license. The public open-source core is licensed under `MPL-2.0`. Files and directories with their own license notices remain under those notices, including MIT worker-side code, files with explicit MIT notices, the CPAL-licensed `contextEngine-cc/` add-on, and the CC0 project-authored annotations in [`ai-discourse-corpus/`](ai-discourse-corpus/). Third-party dependencies retain their own licenses. See [LICENSING.md](LICENSING.md) for the current boundary map and shared-file rules.
+This repo is intentionally multi-license. The public open-source core is licensed under `MPL-2.0`. Files and directories with their own license notices remain under those notices, including MIT worker-side code, files with explicit MIT notices, and the CC0 project-authored annotations in [`ai-discourse-corpus/`](ai-discourse-corpus/). Third-party dependencies retain their own licenses. See [LICENSING.md](LICENSING.md) for the current boundary map and shared-file rules.
 
 ## Roadmap
 

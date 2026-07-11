@@ -331,21 +331,69 @@ describe('compare user pure helpers', () => {
 
     expect(tokens.get('q1')).toEqual({ sign: 1, weight: 1.2 });
     expect(tokens.get('q2')).toEqual({ sign: -1, weight: 1.1 });
-    expect(tokens.get('q3')).toEqual({ sign: 1, weight: 1.4 });
+    expect(tokens.has('q3')).toBe(false);
     expect(tokens.get('q4::cli')).toEqual({ sign: 1, weight: 1 });
     expect(tokens.get('q4::ui')).toEqual({ sign: 1, weight: 1 });
   });
+
+  it.each([
+    [0, -1],
+    [1, -0.8],
+    [2, -0.6],
+    [3, -0.4],
+    [4, -0.2],
+    [5, 0],
+    [6, 0.2],
+    [7, 0.4],
+    [8, 0.6],
+    [9, 0.8],
+    [10, 1],
+  ])('encodes rating answer %s on the canonical 0-10 scale', (answer, expectedValue) => {
+    const { tokens } = encodeStancesForUser({
+      questions: [{ id: 'rating', type: 'rating', answer }],
+    });
+    const stance = tokens.get('rating');
+
+    if (expectedValue === 0) {
+      expect(stance).toBeUndefined();
+      return;
+    }
+
+    expect(stance.sign).toBe(expectedValue > 0 ? 1 : -1);
+    expect(stance.weight).toBeCloseTo(Math.abs(expectedValue));
+  });
+
+  it.each([' ', '\t', '\n', '*'])('drops blank or sentinel rating answer %j', (answer) => {
+    const { tokens } = encodeStancesForUser({
+      questions: [{ id: 'rating', type: 'rating', answer }],
+    });
+
+    expect(tokens.has('rating')).toBe(false);
+  });
+
+  it.each([-1, 11, Number.NaN, Number.POSITIVE_INFINITY, 'not-a-rating'])(
+    'drops non-canonical rating answer %s',
+    (answer) => {
+      const { tokens } = encodeStancesForUser({
+        questions: [{ id: 'rating', type: 'rating', answer }],
+      });
+
+      expect(tokens.has('rating')).toBe(false);
+    },
+  );
 
   it('selects top opinion tokens and builds opinion overlap rows', () => {
     const topTokens = selectTopOpinionTokens(opinionUsers, 4);
     const matrix = computeOverlapMatrix(opinionUsers, 4);
 
-    expect(topTokens.length).toBeGreaterThan(0);
-    expect(topTokens.length).toBeLessThanOrEqual(4);
+    expect(topTokens).toEqual(['q1', 'q2', 'q4::cli', 'q3']);
     expect(matrix.mode).toBe('opinion');
-    expect(matrix.columns).toHaveLength(topTokens.length);
-    expect(matrix.rows).toHaveLength(3);
-    expect(matrix.rows.flat().every((value) => [-1, 0, 1].includes(value))).toBe(true);
+    expect(matrix.columns.map((column) => column.key)).toEqual(topTokens);
+    expect(matrix.rows).toEqual([
+      [1, -1, 1, 0],
+      [1, 1, 1, -1],
+      [-1, 1, 0, -1],
+    ]);
   });
 
   it('falls back to an SBT presence matrix when opinion signal is sparse', () => {
@@ -393,11 +441,49 @@ describe('compare user pure helpers', () => {
       },
     ]);
     const evidence = computeVennEvidence(opinionUsers.slice(0, 2));
+    const opinionFixtureVenn = opinionVennTriplet(opinionUsers);
+    const opinionFixtureEvidence = computeVennEvidence(opinionUsers);
 
     expect(venn).toEqual({ a: 1, b: 1, c: 1, ab: 1, ac: 1, bc: 1, abc: 1 });
+    expect(opinionFixtureVenn).toEqual({ a: 2, b: 0, c: 2, ab: 2, ac: 0, bc: 2, abc: 0 });
+    expect(opinionFixtureEvidence.counts).toEqual(opinionFixtureVenn);
+    expect(evidence.counts).toEqual({ a: 2, b: 2, c: 0, ab: 2, ac: 0, bc: 0, abc: 0 });
     expect(evidence.counts.ab).toBeGreaterThan(0);
     expect(evidence.evidenceMap.ab.some((entry) => entry.includes('q1'))).toBe(true);
     expect(computeVennEvidence([opinionUsers[0]]).counts).toEqual({ a: 0, b: 0, c: 0, ab: 0, ac: 0, bc: 0, abc: 0 });
+  });
+
+  it('uses shared signed stance regions for Venn counts and evidence', () => {
+    const signedTokenUsers = [
+      {
+        tokens: new Map([
+          ['a', { sign: 1 }],
+          ['ab', { sign: 1 }],
+          ['ac', { sign: -1 }],
+          ['abc', { sign: -1 }],
+        ]),
+      },
+      {
+        tokens: new Map([
+          ['b', { sign: 1 }],
+          ['ab', { sign: 1 }],
+          ['bc', { sign: 1 }],
+          ['abc', { sign: -1 }],
+        ]),
+      },
+      {
+        tokens: new Map([
+          ['c', { sign: 1 }],
+          ['ac', { sign: -1 }],
+          ['bc', { sign: 1 }],
+          ['abc', { sign: -1 }],
+        ]),
+      },
+    ];
+    const expectedCounts = { a: 1, b: 1, c: 1, ab: 1, ac: 1, bc: 1, abc: 1 };
+
+    expect(opinionVennTriplet(signedTokenUsers)).toEqual(expectedCounts);
+    expect(computeVennEvidence(signedTokenUsers).counts).toEqual(expectedCounts);
   });
 
   it('creates and sanitizes deterministic compass points', () => {
@@ -425,5 +511,21 @@ describe('compare user pure helpers', () => {
       evidence: { x: ['one', 'two', 'three', 'four', 'five'], y: ['north'] },
     });
     expect(sanitizeCompass(null)).toBeNull();
+  });
+
+  it('collapses a numerically empty second compass axis for opposite two-user stances', () => {
+    const compass = pcaLiteCompass([
+      {
+        address: ADDRESS_A,
+        questions: [{ id: 'q1', type: 'binary', answer: 'yes' }],
+      },
+      {
+        address: ADDRESS_B,
+        questions: [{ id: 'q1', type: 'binary', answer: 'no' }],
+      },
+    ]);
+
+    expect(compass.points).toHaveLength(2);
+    expect(compass.points.map((point) => point.y)).toEqual([0, 0]);
   });
 });

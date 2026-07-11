@@ -87,6 +87,11 @@ const createMockHost = (overrides = {}) => {
       return true;
     }),
     getActiveSessionSlug: jest.fn(() => activeSlug || 'test-slug'),
+    getSessionCfg: jest.fn((slug) => ({
+      slug,
+      networkChainId: 11155420,
+      blockLimits: { start: 10, end: null },
+    })),
     getSessionChainId: jest.fn(() =>
       Object.prototype.hasOwnProperty.call(overrides, 'chainId') ? chainId : '11155420',
     ),
@@ -372,10 +377,37 @@ describe('createSessionSurveyCacheController', () => {
 
       await controller.initializeSurveyCacheForGroup('alpha');
 
-      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith('alpha');
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slug: 'alpha',
+          blockLimits: { start: 10, end: null },
+        }),
+      );
       expect(contractScripts.fetchUserSubmittedSurveyIDs).not.toHaveBeenCalled();
       expect(host.getStateSnapshot()).toMatchObject({ isSurveyCacheReady: true });
       expect(host.checkAllCachesReady).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes the resolved demo session config to survey block-window initialization', async () => {
+      const demoCfg = {
+        slug: 'demo-1',
+        networkChainId: 11155420,
+        blockLimits: { start: 44967477, end: null },
+      };
+      const host = createMockHost({
+        activeSlug: 'demo-1',
+        getSessionCfg: jest.fn((slug) => (slug === 'demo-1' ? demoCfg : null)),
+      });
+      const controller = createSessionSurveyCacheController(host);
+
+      await controller.initializeSurveyCacheForGroup('demo-1');
+
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slug: 'demo-1',
+          blockLimits: { start: 44967477, end: null },
+        }),
+      );
     });
 
     it('fetches survey IDs from the discovered block window', async () => {

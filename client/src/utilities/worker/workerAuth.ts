@@ -170,7 +170,11 @@ const resolveDefaultProviderLike = () => {
 };
 const getWalletContext = (overrideIn: unknown = {}) => {
   const override = asWorkerAuthContext(overrideIn);
-  const overrideProviderLike = toStr(override.providerLike || override.provider || '').trim();
+  const overrideProviderLikeRaw = override.providerLike || override.provider || '';
+  // Regression guard: ethers Web3Provider objects carry the passkey EIP-1193
+  // provider. Stringifying them loses that provider in passkey-only builds.
+  const overrideProviderLike =
+    typeof overrideProviderLikeRaw === 'string' ? overrideProviderLikeRaw.trim() : overrideProviderLikeRaw;
   try {
     const state = asStoreState(store?.getState?.());
     const profile = state?.profile || {};

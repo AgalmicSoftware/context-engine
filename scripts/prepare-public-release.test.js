@@ -9,6 +9,9 @@ const { spawnSync } = require('node:child_process');
 const SCRIPT_SOURCE_PATH = path.join(__dirname, 'prepare-public-release.sh');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
 const SURFACE_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-surface.js');
+const DOCS_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-docs.js');
+const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js');
+const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-prepare-public-release-tests');
 
 function writeFile(rootDir, relativePath, contents) {
@@ -28,7 +31,7 @@ function runPrepareScript(rootDir, outputDir) {
   });
 }
 
-test('prepare-public-release strips review artifacts and preserves the generated manifest', () => {
+test('prepare-public-release strips private surfaces without publishing an inventory manifest', () => {
   fs.mkdirSync(TEST_TMP_ROOT, { recursive: true });
   const tempRoot = fs.mkdtempSync(path.join(TEST_TMP_ROOT, 'ce-prepare-public-release-'));
   const sourceDir = path.join(tempRoot, 'source');
@@ -46,9 +49,28 @@ test('prepare-public-release strips review artifacts and preserves the generated
       path.join('scripts', 'verify-public-release-surface.js'),
       fs.readFileSync(SURFACE_VERIFIER_SOURCE_PATH, 'utf8'),
     );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-docs.js'),
+      fs.readFileSync(DOCS_VERIFIER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-assets.js'),
+      fs.readFileSync(ASSET_VERIFIER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-text.js'),
+      fs.readFileSync(TEXT_VERIFIER_SOURCE_PATH, 'utf8'),
+    );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 
-    writeFile(sourceDir, 'public.txt', 'keep [redacted-email] and /redacted-home\n');
+    writeFile(
+      sourceDir,
+      'public.txt',
+      `keep [redacted-email] and /redacted-home and contextengine${'@'}protonmail.com and ContextEngine${'@'}Protonmail.COM and contextengine+tag${'@'}protonmail.com\n`,
+    );
     writeFile(sourceDir, '.DS_Store', 'mac metadata\n');
     writeFile(sourceDir, '.secrets.baseline', '{"results":{".codex/secret.txt":[]}}\n');
     writeFile(sourceDir, '.env.local', 'SECRET=value\n');
@@ -70,6 +92,10 @@ test('prepare-public-release strips review artifacts and preserves the generated
     writeFile(sourceDir, path.join('docs', 'codebase-health-modernization-2026-05-07.md'), 'local audit notes\n');
     writeFile(sourceDir, path.join('docs', 'assets', 'codebase-health-modernization-2026-05-07.png'), 'local audit chart\n');
     writeFile(sourceDir, path.join('docs', 'telegram-response-export-scope-prd.md'), 'private product planning\n');
+    writeFile(sourceDir, path.join('docs', 'e2e-commands.md'), 'private operator commands\n');
+    writeFile(sourceDir, path.join('docs', 'release-runbook.md'), 'private release procedure\n');
+    writeFile(sourceDir, path.join('docs', 'security', 'audit-prep-2026-07-06.md'), 'private audit snapshot\n');
+    writeFile(sourceDir, 'AGENTS.md', 'private agent instructions\n');
     writeFile(sourceDir, path.join('ai-discourse-corpus', 'corpuses', '_local_helper.js'), 'local helper script\n');
     writeFile(sourceDir, path.join('.tmp-review', 'review.js'), 'temporary review snapshot\n');
     writeFile(sourceDir, 'private-pack.manifest.json', 'tracked root manifest that should be replaced\n');
@@ -87,7 +113,16 @@ test('prepare-public-release strips review artifacts and preserves the generated
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'private bridge worker\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'README.md'), 'private bridge docs\n');
     writeFile(sourceDir, path.join('scripts', 'run-agent-bridge-worker-tests.js'), 'private bridge test runner\n');
+    writeFile(sourceDir, path.join('scripts', 'run-contextengine-cc-tests.js'), 'private companion test runner\n');
+    writeFile(sourceDir, path.join('scripts', 'run-contextengine-cc-tests.test.js'), 'private companion runner test\n');
+    writeFile(sourceDir, path.join('scripts', 'e2e-env-example.test.js'), 'private E2E env fixture test\n');
     writeFile(sourceDir, path.join('scripts', 'vendor-cecc-ethers-bundle.js'), 'private companion vendoring\n');
+    writeFile(sourceDir, path.join('scripts', 'restore-private-pack.sh'), 'private restore workflow\n');
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'lib', 'passkey-wallet-derivation.js'),
+      "module.exports = { privateHarnessOnly: true };\n",
+    );
     writeFile(
       sourceDir,
       'package.json',
@@ -95,11 +130,15 @@ test('prepare-public-release strips review artifacts and preserves the generated
         {
           scripts: {
             test: 'node scripts/run-node-tests.js',
+            'test:cc': 'node scripts/run-contextengine-cc-tests.js',
+            'test:ci': 'npm run test && npm run test:cc',
             'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
             'ai:test-cf-envelope:worker': 'npm run -s ai:node -- scripts/e2e/cloudflare-worker-envelope.js',
             'ai:test-cf-envelope:all': 'npm run -s ai:test-cf-envelope:worker',
             'ai:test-session:demo-smoke': 'npm run -s ai:node -- scripts/test-session-demo.ui.js',
             'ai:test-session:closeout-smoke': 'npm run -s ai:test-session:demo-smoke',
+            'test:surveys-sbt': 'jest client/src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js',
+            tests: 'npm run test && npm run test:surveys-sbt',
           },
         },
         null,
@@ -111,16 +150,21 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /files stripped, output at /);
 
-    assert.equal(fs.readFileSync(path.join(outputDir, 'public.txt'), 'utf8'), 'keep [redacted-email] and /redacted-home\n');
+    assert.equal(
+      fs.readFileSync(path.join(outputDir, 'public.txt'), 'utf8'),
+      `keep [redacted-email] and /redacted-home and contextengine${'@'}protonmail.com and ContextEngine${'@'}Protonmail.COM and [redacted-email]\n`,
+    );
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(outputDir, 'package.json'), 'utf8')).scripts, {
       test: 'node scripts/run-node-tests.js',
+      'test:ci': 'npm run test',
+      tests: 'npm run test',
     });
     assert.equal(fs.existsSync(path.join(outputDir, '.DS_Store')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.secrets.baseline')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.env.local')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.env.e2e')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.env.e2e.local')), false);
-    assert.equal(fs.readFileSync(path.join(outputDir, '.env.e2e.example'), 'utf8'), 'E2E_AI_MOCK=1\n');
+    assert.equal(fs.existsSync(path.join(outputDir, '.env.e2e.example')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.keys')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.e2e-cache')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'release-public')), false);
@@ -136,6 +180,10 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'codebase-health-modernization-2026-05-07.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'assets', 'codebase-health-modernization-2026-05-07.png')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'telegram-response-export-scope-prd.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'e2e-commands.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'release-runbook.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'security', 'audit-prep-2026-07-06.md')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'AGENTS.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'ai-discourse-corpus', 'corpuses', '_local_helper.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
@@ -150,24 +198,13 @@ test('prepare-public-release strips review artifacts and preserves the generated
     assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'worker.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-agent-bridge-worker-tests.js')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.js')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.test.js')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'e2e-env-example.test.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'vendor-cecc-ethers-bundle.js')), false);
-
-    const manifestPath = path.join(outputDir, 'private-pack.manifest.json');
-    assert.equal(fs.existsSync(manifestPath), true);
-
-    const manifestText = fs.readFileSync(manifestPath, 'utf8');
-    assert.doesNotMatch(manifestText, /tracked root manifest that should be replaced/);
-    assert.doesNotMatch(manifestText, /TODO/);
-    assert.doesNotMatch(manifestText, new RegExp(`${'PR'}${'D'}s`));
-    assert.match(manifestText, /\.secrets\.baseline/);
-    assert.doesNotMatch(manifestText, /\.env\.local/);
-    assert.doesNotMatch(manifestText, /\.env\.e2e/);
-    assert.doesNotMatch(manifestText, /\.keys/);
-    assert.doesNotMatch(manifestText, /codebase-health-modernization/);
-    assert.doesNotMatch(manifestText, /telegram-response-export-scope-prd/);
-    assert.doesNotMatch(manifestText, /_local_helper/);
-    assert.doesNotMatch(manifestText, /\.private\.test/);
-    assert.match(manifestText, /private-pack\.manifest\.json/);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'restore-private-pack.sh')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'lib', 'passkey-wallet-derivation.js')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'private-pack.manifest.json')), false);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -190,6 +227,21 @@ test('prepare-public-release fails if private planning paths survive strip rules
       sourceDir,
       path.join('scripts', 'verify-public-release-surface.js'),
       fs.readFileSync(SURFACE_VERIFIER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-docs.js'),
+      fs.readFileSync(DOCS_VERIFIER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-assets.js'),
+      fs.readFileSync(ASSET_VERIFIER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-text.js'),
+      fs.readFileSync(TEXT_VERIFIER_SOURCE_PATH, 'utf8'),
     );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 

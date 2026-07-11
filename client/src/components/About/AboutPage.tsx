@@ -17,6 +17,7 @@ import styles from './AboutPage.module.scss';
 import cipPhoto from '../../assets/img/cip_photo.png';
 import polisLogo from '../../assets/img/polis_logo.png';
 import rxcLogo from '../../assets/img/rxc_logo.png';
+import { CE_ABOUT_POSTS_ENABLED } from '../../variables/appConfig.js';
 import { PUBLIC_REPO_URL, PUBLIC_WHITEPAPER_URL } from '../../variables/publicRepoMetadata.js';
 import {
   derivePrimarySessionSlugFromList,
@@ -54,7 +55,9 @@ type RoadmapSection = {
   }[];
 };
 
-const HEADER_LINKS = [{ url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper' }];
+const HEADER_LINKS = [
+  { url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper', external: true },
+];
 
 const ABOUT_DEMO_VIDEO_VIEW_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/view';
 const ABOUT_DEMO_VIDEO_EMBED_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/preview';
@@ -293,7 +296,12 @@ const USE_CASES = [
   },
 ];
 
-const HERO_TERTIARY_LINKS = HEADER_LINKS.filter(Boolean);
+const getHeroTertiaryLinks = () => [
+  ...HEADER_LINKS,
+  ...(CE_ABOUT_POSTS_ENABLED
+    ? [{ url: buildPublicRoute('/posts'), text: 'Posts', testId: 'ce-about-link-posts', external: false }]
+    : []),
+];
 
 export const getConfiguredRecognitionIndividuals = (individuals: unknown[] = []): RecognitionIndividual[] =>
   individuals.filter(
@@ -340,6 +348,7 @@ const AboutPage = () => {
   const activeUseCaseConfig = USE_CASES.find(({ slug }) => slug === activeUseCase) || null;
   const configuredRecognitionIndividuals = getConfiguredRecognitionIndividuals(RECOGNIZED_INDIVIDUALS);
   const hasRecognizedIndividuals = configuredRecognitionIndividuals.length > 0;
+  const heroTertiaryLinks = getHeroTertiaryLinks();
 
   const handleUseCaseToggle = (slug: string) => {
     setActiveUseCase((currentSlug) => (currentSlug === slug ? '' : slug));
@@ -470,19 +479,19 @@ const AboutPage = () => {
             </div>
 
             <div className={styles.heroLinks}>
-              {HERO_TERTIARY_LINKS.map((link) => (
+              {heroTertiaryLinks.map((link) => (
                 <a
                   key={link.text}
                   href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  target={link.external ? '_blank' : undefined}
+                  rel={link.external ? 'noopener noreferrer' : undefined}
                   className={styles.tertiaryLink}
                   data-testid={link.testId}
                 >
                   {link.text}
                 </a>
               ))}
-              <a href="mailto:[redacted-email]" className={styles.tertiaryLink}>
+              <a href="mailto:contextengine@protonmail.com" className={styles.tertiaryLink}>
                 Email
               </a>
             </div>

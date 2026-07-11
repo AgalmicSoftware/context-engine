@@ -54,6 +54,8 @@ describe('AboutPage', () => {
       'href',
       'https://github.com/AgalmicSoftware/context-engine/blob/main/whitepaper/whitepaper.md',
     );
+    expect(within(hero).getByTestId('ce-about-link-posts')).toBeVisible();
+    expect(within(hero).getByTestId('ce-about-link-posts')).toHaveAttribute('href', '/posts');
     expect(within(hero).getByLabelText(/view context engine on github/i)).toBeVisible();
     expect(within(hero).getByTestId('ce-about-link-github')).toHaveAttribute(
       'href',
@@ -62,7 +64,10 @@ describe('AboutPage', () => {
     expect(within(hero).queryByTestId('ce-about-link-contributing')).not.toBeInTheDocument();
     expect(within(hero).queryByTestId('ce-about-link-license')).not.toBeInTheDocument();
     expect(within(hero).queryByTestId('ce-about-link-slides')).not.toBeInTheDocument();
-    expect(within(hero).getByRole('link', { name: /Email/i })).toHaveAttribute('href', 'mailto:[redacted-email]');
+    expect(within(hero).getByRole('link', { name: /Email/i })).toHaveAttribute(
+      'href',
+      'mailto:contextengine@protonmail.com',
+    );
     expect(desktopDemoVideo.tagName.toLowerCase()).toBe('iframe');
     expect(desktopDemoVideo).toHaveAttribute('src', ABOUT_DEMO_VIDEO_EMBED_URL);
     expect(desktopDemoVideo).toHaveAttribute('title', 'Context Engine demo video');
@@ -130,6 +135,7 @@ describe('AboutPage', () => {
     renderAboutPage();
 
     expect(screen.getByRole('link', { name: /New Session/i })).toHaveAttribute('href', '/ce/new');
+    expect(screen.getByTestId('ce-about-link-posts')).toHaveAttribute('href', '/ce/posts');
   });
 
   it('shows one use-case detail panel at a time', () => {

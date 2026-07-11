@@ -3,10 +3,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, transformWithEsbuild } from 'vite';
+import { writePostSocialPreviewHtml } from './scripts/post-social-preview.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, 'src');
 const publicDir = path.resolve(__dirname, 'public');
+const postsDir = path.resolve(__dirname, '..', 'posts');
+const metaMaskImageFilename = 'metamask_icon_white.png';
 const headers = {
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
   'Cross-Origin-Embedder-Policy': 'unsafe-none',
@@ -52,6 +55,7 @@ const publicAssetContentTypes = {
   '.jpg': 'image/jpeg',
   '.js': 'text/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.md': 'text/markdown; charset=utf-8',
   '.png': 'image/png',
   '.svg': 'image/svg+xml',
   '.txt': 'text/plain; charset=utf-8',
@@ -127,7 +131,6 @@ const manualChunkGroups = [
       '/node_modules/java-random/',
       '/node_modules/ml-',
       '/node_modules/ml-kmeans/',
-      '/node_modules/networkanalysis-ts/',
       '/node_modules/react-simple-maps/',
       '/node_modules/robust-predicates/',
       '/node_modules/topojson-',
@@ -276,6 +279,24 @@ const resolvePublicAssetPath = (requestUrl) => {
   return fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile() ? resolvedPath : null;
 };
 
+const resolvePostsAssetPath = (requestUrl) => {
+  const rawPathname = String(requestUrl || '').split('?')[0].split('#')[0];
+  if (!rawPathname || rawPathname === '/' || rawPathname === '/posts') return null;
+  let pathname;
+  try {
+    pathname = decodeURIComponent(rawPathname);
+  } catch {
+    return null;
+  }
+  const relativePath = pathname.replace(/^\/+/, '');
+  if (!relativePath.startsWith('posts/')) return null;
+  const postRelativePath = relativePath.slice('posts/'.length);
+  if (!postRelativePath) return null;
+  const resolvedPath = path.resolve(postsDir, postRelativePath);
+  if (!resolvedPath.startsWith(`${postsDir}${path.sep}`)) return null;
+  return fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile() ? resolvedPath : null;
+};
+
 const readClientEnv = (mode) => {
   const loadedEnv = loadEnv(mode, __dirname, ['REACT_APP_', 'NEXT_PUBLIC_', 'PUBLIC_URL']);
   const reactAppEnv = Object.fromEntries(
@@ -291,6 +312,53 @@ const readClientEnv = (mode) => {
     NODE_ENV: mode === 'production' ? 'production' : 'development',
   };
 };
+
+export const parsePublicBoolEnv = (raw, fallback = false) => {
+  const normalized = String(raw ?? '')
+    .trim()
+    .toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return fallback;
+};
+
+export const resolveWalletRuntimeProfile = (clientEnv) => {
+  const metaMaskConnectorEnabled = parsePublicBoolEnv(clientEnv.REACT_APP_CE_ENABLE_METAMASK_CONNECTOR, false);
+  return {
+    metaMaskConnectorEnabled,
+    connectorModule: path.resolve(
+      srcDir,
+      'app',
+      'runtime',
+      metaMaskConnectorEnabled ? 'walletConnectorProfile.metamask.ts' : 'walletConnectorProfile.ts',
+    ),
+    uiModule: path.resolve(
+      srcDir,
+      'app',
+      'runtime',
+      metaMaskConnectorEnabled ? 'walletUiRuntime.metamask.tsx' : 'walletUiRuntime.tsx',
+    ),
+  };
+};
+
+const passkeyOnlyForbiddenModulePatterns = [
+  /\/node_modules\/@rainbow-me\/rainbowkit\//i,
+  /\/node_modules\/@walletconnect\//i,
+  /\/node_modules\/wagmi\/(?:dist\/)?connectors\/metamask/i,
+  /\/node_modules\/@wagmi\/.+\/metamask/i,
+  /\/walletConnectorProfile\.metamask\.tsx?$/i,
+  /\/walletUiRuntime\.metamask\.tsx?$/i,
+  /\/metamask_icon_white\.png$/i,
+];
+
+export const findPasskeyOnlyForbiddenModules = (moduleIds) =>
+  moduleIds
+    .map((moduleId) =>
+      String(moduleId || '')
+        .split(path.sep)
+        .join('/'),
+    )
+    .filter((moduleId) => passkeyOnlyForbiddenModulePatterns.some((pattern) => pattern.test(moduleId)));
 
 const resolveExistingTsSibling = (request, importer) => {
   if (!request.endsWith('.js') || !importer) return null;
@@ -359,14 +427,52 @@ const jsxInJsCompatibilityPlugin = () => ({
   },
 });
 
-const copyStaticImageAssetsPlugin = () => ({
+const copyStaticImageAssetsPlugin = (metaMaskConnectorEnabled) => ({
   name: 'ce-copy-static-image-assets',
   apply: 'build',
   writeBundle(options) {
     const sourceDir = path.resolve(srcDir, 'assets', 'img');
     const outputDir = path.resolve(options.dir || path.resolve(__dirname, 'build'), 'images');
     if (!fs.existsSync(sourceDir)) return;
-    fs.cpSync(sourceDir, outputDir, { recursive: true });
+    fs.cpSync(sourceDir, outputDir, {
+      recursive: true,
+      filter: (source) => metaMaskConnectorEnabled || path.basename(source) !== metaMaskImageFilename,
+    });
+  },
+});
+
+const walletProfileBundleGuardPlugin = (walletRuntimeProfile) => ({
+  name: 'ce-wallet-profile-bundle-guard',
+  apply: 'build',
+  generateBundle(_outputOptions, bundle) {
+    const moduleIds = Object.values(bundle).flatMap((output) =>
+      output.type === 'chunk' ? Object.keys(output.modules) : [],
+    );
+    const forbiddenModuleMatches = walletRuntimeProfile.metaMaskConnectorEnabled
+      ? []
+      : findPasskeyOnlyForbiddenModules(moduleIds);
+
+    if (forbiddenModuleMatches.length) {
+      this.error(
+        `Passkey-only build included forbidden wallet modules:\n${forbiddenModuleMatches
+          .map((moduleId) => `- ${moduleId}`)
+          .join('\n')}`,
+      );
+    }
+
+    this.emitFile({
+      type: 'asset',
+      fileName: 'ce-wallet-profile.json',
+      source: `${JSON.stringify(
+        {
+          version: 1,
+          metaMaskConnectorEnabled: walletRuntimeProfile.metaMaskConnectorEnabled,
+          passkeyOnlyBundleGuard: walletRuntimeProfile.metaMaskConnectorEnabled ? 'not-applicable' : 'passed',
+        },
+        null,
+        2,
+      )}\n`,
+    });
   },
 });
 
@@ -389,8 +495,33 @@ const publicAssetsCompatibilityPlugin = () => ({
   },
 });
 
+const postsAssetsCompatibilityPlugin = () => ({
+  name: 'ce-posts-assets-compatibility',
+  configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      const assetPath = resolvePostsAssetPath(req.url);
+      if (!assetPath) {
+        next();
+        return;
+      }
+      const contentType = publicAssetContentTypes[path.extname(assetPath).toLowerCase()];
+      if (contentType) res.setHeader('Content-Type', contentType);
+      fs.createReadStream(assetPath).pipe(res);
+    });
+  },
+  writeBundle(options) {
+    if (!fs.existsSync(postsDir)) return;
+    const outputDir = options.dir || path.resolve(__dirname, 'build');
+    fs.cpSync(postsDir, path.resolve(outputDir, 'posts'), {
+      recursive: true,
+    });
+    writePostSocialPreviewHtml({ buildDir: outputDir, postsDir });
+  },
+});
+
 export default defineConfig(({ mode }) => {
   const clientEnv = readClientEnv(mode);
+  const walletRuntimeProfile = resolveWalletRuntimeProfile(clientEnv);
 
   return {
     appType: 'spa',
@@ -405,8 +536,10 @@ export default defineConfig(({ mode }) => {
       react(),
       jsToTsCompatibilityPlugin(),
       litContractsSubpathShim(),
-      copyStaticImageAssetsPlugin(),
+      copyStaticImageAssetsPlugin(walletRuntimeProfile.metaMaskConnectorEnabled),
+      walletProfileBundleGuardPlugin(walletRuntimeProfile),
       publicAssetsCompatibilityPlugin(),
+      postsAssetsCompatibilityPlugin(),
       {
         name: 'ce-public-url-html-compatibility',
         transformIndexHtml(html) {
@@ -416,10 +549,14 @@ export default defineConfig(({ mode }) => {
     ],
     resolve: {
       alias: [
+        { find: /^.*\/walletConnectorProfile\.js$/, replacement: walletRuntimeProfile.connectorModule },
+        { find: /^.*\/walletUiRuntime\.js$/, replacement: walletRuntimeProfile.uiModule },
         { find: 'assets', replacement: path.resolve(srcDir, 'assets') },
         { find: 'components', replacement: path.resolve(srcDir, 'components') },
         { find: 'utilities', replacement: path.resolve(srcDir, 'utilities') },
         { find: 'variables', replacement: path.resolve(srcDir, 'variables') },
+        { find: /^buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
+        { find: /^node:buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
         { find: /^@metamask\/superstruct$/, replacement: path.resolve(srcDir, 'shims', 'metamask-superstruct.ts') },
         { find: /^zod-validation-error$/, replacement: path.resolve(__dirname, 'node_modules', 'zod-validation-error', 'dist', 'index.js') },
         { find: /^worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.ts') },

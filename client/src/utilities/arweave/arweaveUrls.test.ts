@@ -97,7 +97,7 @@ describe('arweaveUrls helpers', () => {
     expect(normalizeArweaveUrl(txId)).toBe(`${testArweaveGateway}/${txId}`);
   });
 
-  it('builds gateway fallback candidates for tx ids and known gateway URLs', () => {
+  it('builds only the configured AR.IO candidate while direct routing is enabled', () => {
     (globalThis as Record<string, unknown>).CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     (globalThis as Record<string, unknown>).CE_ARWEAVE_AR_IO_URL = testArIoGateway;
     (globalThis as Record<string, unknown>).CE_ARWEAVE_GATEWAYS = [
@@ -107,11 +107,22 @@ describe('arweaveUrls helpers', () => {
 
     const candidates = buildArweaveGatewayUrlCandidates(`${arIoSubdomainGateway}/${txId}?`);
 
+    expect(candidates).toEqual([`${testArIoGateway}/${txId}`]);
+  });
+
+  it('restores gateway fallback candidates when direct AR.IO routing is disabled', () => {
+    (globalThis as Record<string, unknown>).CE_ARWEAVE_DIRECT_TO_AR_IO = false;
+    (globalThis as Record<string, unknown>).CE_ARWEAVE_GATEWAYS = [
+      'https://backup.example.test',
+      canonicalArweaveGateway,
+    ];
+
+    const candidates = buildArweaveGatewayUrlCandidates(`${arIoSubdomainGateway}/${txId}?`);
+
     expect(candidates).toEqual([
-      `${testArIoGateway}/${txId}`,
+      `${defaultArIoGateway}/${txId}`,
       'https://backup.example.test/8_2VRRP5Ka0b5F9yiq_nm2hJto8qnQazZ2EtfLJ0viE',
       `${canonicalArweaveGateway}/${txId}`,
-      `${defaultArIoGateway}/${txId}`,
       `${irysGateway}/${txId}`,
       `${gatewayFanoutPrimary}/${txId}`,
       `${gatewayFanoutSecondary}/${txId}`,

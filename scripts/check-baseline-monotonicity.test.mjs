@@ -29,7 +29,10 @@ function writeJson(repoDir, relativePath, value) {
   fs.writeFileSync(absolutePath, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function writeBaselines(repoDir, { violations, counts }) {
+function writeBaselines(
+  repoDir,
+  { violations, counts, deadExports = { candidateDeadFiles: 4, candidateUnusedExports: 2 } },
+) {
   writeJson(repoDir, 'scripts/client-boundaries-baseline.json', {
     version: 1,
     mode: 'fail-on-new-violation',
@@ -37,6 +40,10 @@ function writeBaselines(repoDir, { violations, counts }) {
   });
   writeJson(repoDir, 'scripts/type-debt-baseline.json', {
     counts,
+  });
+  writeJson(repoDir, 'scripts/dead-exports-baseline.json', {
+    version: 1,
+    ...deadExports,
   });
 }
 
@@ -83,12 +90,14 @@ test('passes when baselines stay flat or shrink', () => {
     writeBaselines(repoDir, {
       violations: [],
       counts: { colonAny: 3, asAny: 2 },
+      deadExports: { candidateDeadFiles: 3, candidateUnusedExports: 2 },
     });
 
     const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
     assert.equal(result.skipped, false);
     assert.deepEqual(result.boundaryGains, []);
     assert.deepEqual(result.typeDebtIncreases, []);
+    assert.deepEqual(result.deadExportIncreases, []);
   });
 });
 
@@ -104,6 +113,7 @@ test('reports boundary gains and type-debt increases', () => {
     writeBaselines(repoDir, {
       violations: [BASE_VIOLATION, NEW_VIOLATION],
       counts: { colonAny: 5, asAny: 2 },
+      deadExports: { candidateDeadFiles: 5, candidateUnusedExports: 2 },
     });
 
     const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
@@ -113,6 +123,9 @@ test('reports boundary gains and type-debt increases', () => {
     ]);
     assert.deepEqual(result.typeDebtIncreases, [
       { pattern: 'colonAny', base: 4, current: 5 },
+    ]);
+    assert.deepEqual(result.deadExportIncreases, [
+      { field: 'candidateDeadFiles', base: 4, current: 5 },
     ]);
   });
 });
@@ -148,6 +161,39 @@ test('allow marker lets intentional baseline growth pass', () => {
   });
 });
 
+test('allow marker cannot permit dead-export baseline growth', () => {
+  withTempRepo((repoDir) => {
+    writeBaselines(repoDir, {
+      violations: [],
+      counts: { colonAny: 0 },
+      deadExports: { candidateDeadFiles: 4, candidateUnusedExports: 2 },
+    });
+    commitAll(repoDir, 'base baselines');
+    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
+
+    writeBaselines(repoDir, {
+      violations: [],
+      counts: { colonAny: 0 },
+      deadExports: { candidateDeadFiles: 5, candidateUnusedExports: 2 },
+    });
+
+    const result = spawnSync(process.execPath, [
+      SCRIPT_PATH,
+      '--repo',
+      repoDir,
+      '--base',
+      base,
+      '--allow-text',
+      `Attempted bypass ${ALLOW_MARKER}`,
+    ], {
+      encoding: 'utf8',
+    });
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /dead-exports-baseline\.json growth cannot be allowed/);
+  });
+});
+
 test('cli fails without allow marker when baselines grow', () => {
   withTempRepo((repoDir) => {
     writeBaselines(repoDir, {
@@ -160,6 +206,7 @@ test('cli fails without allow marker when baselines grow', () => {
     writeBaselines(repoDir, {
       violations: [NEW_VIOLATION],
       counts: { colonAny: 1 },
+      deadExports: { candidateDeadFiles: 5, candidateUnusedExports: 2 },
     });
 
     const result = spawnSync(process.execPath, [
@@ -176,6 +223,32 @@ test('cli fails without allow marker when baselines grow', () => {
     assert.match(result.stderr, /Baseline monotonicity check failed/);
     assert.match(result.stderr, /client-boundaries-baseline\.json gained 1 violation/);
     assert.match(result.stderr, /type-debt-baseline\.json increased 1 count/);
+    assert.match(result.stderr, /dead-exports-baseline\.json increased 1 count/);
+  });
+});
+
+test('bootstraps the dead-export baseline when the base ref predates it', () => {
+  withTempRepo((repoDir) => {
+    writeJson(repoDir, 'scripts/client-boundaries-baseline.json', {
+      version: 1,
+      mode: 'fail-on-new-violation',
+      violations: [],
+    });
+    writeJson(repoDir, 'scripts/type-debt-baseline.json', {
+      counts: { colonAny: 0 },
+    });
+    commitAll(repoDir, 'base baselines without dead exports');
+    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
+
+    writeJson(repoDir, 'scripts/dead-exports-baseline.json', {
+      version: 1,
+      candidateDeadFiles: 17,
+      candidateUnusedExports: 219,
+    });
+
+    const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
+    assert.deepEqual(result.deadExportIncreases, []);
+    assert.match(result.notices.join('\n'), /dead-exports-baseline\.json was not present/);
   });
 });
 

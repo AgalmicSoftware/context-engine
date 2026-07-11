@@ -1,5 +1,6 @@
 import {
   DEFAULT_PUBLIC_PAGE_DESCRIPTION,
+  DEFAULT_PUBLIC_PAGE_IMAGE,
   DEFAULT_PUBLIC_PAGE_TITLE,
   DEFAULT_PUBLIC_SITE_URL,
   buildCanonicalPublicUrl,
@@ -142,6 +143,7 @@ describe('publicPageHead', () => {
       expect.objectContaining({
         title: DEFAULT_PUBLIC_PAGE_TITLE,
         description: DEFAULT_PUBLIC_PAGE_DESCRIPTION,
+        image: DEFAULT_PUBLIC_PAGE_IMAGE,
         canonicalUrl: 'https://contextengine.xyz/session/demo?session=edge',
         ogUrl: 'https://contextengine.xyz/session/demo?session=edge',
       }),
@@ -152,6 +154,37 @@ describe('publicPageHead', () => {
     );
     expect(document.head.querySelector('meta[property="og:url"]')?.getAttribute('content')).toBe(
       'https://contextengine.xyz/session/demo?session=edge',
+    );
+    expect(document.head.querySelector('meta[property="og:image"]')?.getAttribute('content')).toBe(
+      DEFAULT_PUBLIC_PAGE_IMAGE,
+    );
+    expect(document.head.querySelector('meta[name="twitter:image"]')?.getAttribute('content')).toBe(
+      DEFAULT_PUBLIC_PAGE_IMAGE,
+    );
+  });
+
+  it('supports article metadata with a large social preview image', () => {
+    const state = syncPublicPageHead({
+      location: new URL('https://contextengine.xyz/posts/agent-village-wrapped-2026'),
+      title: 'Agent Village Wrapped',
+      description: 'A personal-agent evaluation.',
+      image: 'https://contextengine.xyz/posts/agent-village-wrapped/attachments/header.jpg',
+      ogType: 'article',
+      twitterCard: 'summary_large_image',
+    });
+
+    expect(state).toEqual(
+      expect.objectContaining({
+        ogType: 'article',
+        twitterCard: 'summary_large_image',
+      }),
+    );
+    expect(document.head.querySelector('meta[property="og:type"]')?.getAttribute('content')).toBe('article');
+    expect(document.head.querySelector('meta[property="og:image"]')?.getAttribute('content')).toBe(
+      'https://contextengine.xyz/posts/agent-village-wrapped/attachments/header.jpg',
+    );
+    expect(document.head.querySelector('meta[name="twitter:card"]')?.getAttribute('content')).toBe(
+      'summary_large_image',
     );
   });
 

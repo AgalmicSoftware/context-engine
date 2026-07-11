@@ -219,12 +219,6 @@ export function buildAggregatorFromLocalCache(
           parsed = rawResponse;
         }
       } catch {
-        try {
-          delete responderMap[resAddr];
-          dirty = true;
-        } catch (e) {
-          demoLog.warn('OnePageSession: fallback', e);
-        }
         parsed = null;
       }
       if (!parsed) return;

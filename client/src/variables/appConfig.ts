@@ -28,7 +28,10 @@ export const DEFAULT_AUTO_REQUEST_TESTNET_FUNDS = readPublicBoolEnv(
 // Default first-run value of `state.demoSurfaceMode`. If a user has a
 // stored `ce:demoSurfaceMode` preference in localStorage, that wins;
 // fresh installs / no-storage cases honor this env default.
-export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv('REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT', true);
+export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv('REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT', false);
+// MetaMask/RainbowKit is excluded from the default passkey-only client bundle.
+// Deployments that need browser-wallet login must opt in at build time.
+export const CE_ENABLE_METAMASK_CONNECTOR = readPublicBoolEnv('REACT_APP_CE_ENABLE_METAMASK_CONNECTOR', false);
 // RainbowKit's MetaMask wallet falls back to WalletConnect when MetaMask is not injected.
 // Keep that external bridge opt-in so local startup does not open WalletConnect sockets.
 export const CE_ENABLE_WALLETCONNECT_FALLBACK = readPublicBoolEnv('REACT_APP_CE_ENABLE_WALLETCONNECT_FALLBACK', false);
@@ -90,6 +93,9 @@ export const CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED = readPublicBoolEnv(
   'REACT_APP_CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED',
   true,
 );
+// Shows the public /posts route and the About-page Posts link. Root-level
+// posts live under /posts in the repository and are served as static assets.
+export const CE_ABOUT_POSTS_ENABLED = readPublicBoolEnv('REACT_APP_CE_ABOUT_POSTS_ENABLED', true);
 // Profile deep scans (/u/:address and compare) can optionally bypass CE_SESSION_SCAN_SCOPE and scan every known session.
 // Legacy all-session override is off by default; per-resource scan flags below can still enable fanout.
 export const CE_USER_PROFILE_SCAN_ALL_SESSIONS = readPublicBoolEnv(

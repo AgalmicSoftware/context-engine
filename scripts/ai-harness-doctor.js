@@ -6,12 +6,18 @@ const Module = require('node:module');
 const path = require('node:path');
 
 const OPERATOR_LOCAL_ABSENT = 'operator-local, not present in this checkout';
-const PORTO_FIX_HINT = 'porto-wallet-derivation was replaced by scripts/lib/passkey-derived-wallet.js';
+const PASSKEY_FIX_HINT = 'restore the operator-local scripts/lib/passkey-wallet-derivation.js helper';
 
 const PACKAGE_TEST_SCRIPT_RE = /scripts\/test-[^\s'"`]+?\.js\b/g;
 const TOP_LEVEL_SCRIPT_RE = /^test-.+\.js$/;
 const JS_FILE_RE = /\.(?:cjs|js)$/;
 const PATH_SEP_RE = /[\\/]/g;
+
+function dependencyFixHint(specifier) {
+  return path.basename(String(specifier || '')) === 'passkey-wallet-derivation.js'
+    ? PASSKEY_FIX_HINT
+    : `restore or update the missing dependency ${specifier}`;
+}
 
 function parseArgs(argv) {
   const options = {
@@ -223,7 +229,7 @@ function resolveSpecifier(specifier, importerPath) {
       module: specifier,
       importer: importerPath,
       error: error && error.message ? error.message : String(error),
-      fixHint: PORTO_FIX_HINT,
+      fixHint: dependencyFixHint(specifier),
     };
   }
 }
@@ -267,7 +273,7 @@ function firstUnresolvableRequire(filePath, rootDir, visited = new Set()) {
       module: path.relative(rootDir, normalizedFile),
       importer: null,
       error: error && error.message ? error.message : String(error),
-      fixHint: PORTO_FIX_HINT,
+      fixHint: dependencyFixHint(path.relative(rootDir, normalizedFile)),
     };
   }
 
@@ -373,7 +379,7 @@ if (require.main === module) {
 
 module.exports = {
   OPERATOR_LOCAL_ABSENT,
-  PORTO_FIX_HINT,
+  PASSKEY_FIX_HINT,
   analyzeEntrypoint,
   collectHarnessEntrypoints,
   extractTopLevelRequireSpecifiers,

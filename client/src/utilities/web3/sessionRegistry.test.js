@@ -331,6 +331,62 @@ describe('loadSessionRegistryCache persistence', () => {
     expect(Object.keys(persisted.chains || {})).toEqual([String(CONFIGURED_REGISTRY_CHAIN_ID)]);
     expect(contractMock.getSessionCount).toHaveBeenCalledTimes(1);
   });
+
+  it('loads requested session slugs without enumerating the full registry', async () => {
+    upsertSessionRegistryCache({
+      config: {
+        slug: 'cached-session',
+        networkChainId: CONFIGURED_REGISTRY_CHAIN_ID,
+        __registry: {
+          registryChainId: CONFIGURED_REGISTRY_CHAIN_ID,
+          sessionIdHex: '0x00000000000000000000000000000044',
+        },
+      },
+    });
+    const contractMock = {
+      getSessionCount: jest.fn(),
+      getSessionSlugByIndex: jest.fn(),
+      getSessionBySlug: jest.fn(async () => [
+        'demo-1',
+        CONFIGURED_REGISTRY_CHAIN_ID,
+        '',
+        '',
+        TEST_SIGNER_ADDRESS,
+        1,
+        2,
+        '0x00000000000000000000000000000055',
+      ]),
+      getResourceGate: jest.fn(async () => [[], 0, 0, 0]),
+      getSessionFields: jest.fn(async (_slug, keys) =>
+        keys.map((key) => (key === 'corsWorkerUrl' ? 'https://demo-1-worker.example' : '')),
+      ),
+    };
+    jest.spyOn(ethers.providers, 'JsonRpcProvider').mockImplementation(function MockJsonRpcProvider() {
+      return { send: jest.fn() };
+    });
+    jest.spyOn(ethers.providers, 'FallbackProvider').mockImplementation(function MockFallbackProvider(configs) {
+      return configs?.[0]?.provider || { send: jest.fn() };
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return contractMock;
+    });
+
+    const { loadSessionRegistryCache } = jest.requireActual('./sessionRegistry.js');
+    const cache = await loadSessionRegistryCache({
+      chainIds: [CONFIGURED_REGISTRY_CHAIN_ID],
+      slugs: ['demo-1'],
+      force: true,
+    });
+
+    expect(contractMock.getSessionCount).not.toHaveBeenCalled();
+    expect(contractMock.getSessionSlugByIndex).not.toHaveBeenCalled();
+    expect(contractMock.getSessionBySlug).toHaveBeenCalledTimes(1);
+    expect(contractMock.getSessionBySlug).toHaveBeenCalledWith('demo-1');
+    expect(cache.sessions['demo-1']).toEqual(
+      expect.objectContaining({ corsWorkerUrl: 'https://demo-1-worker.example' }),
+    );
+    expect(cache.sessions['cached-session']).toBeDefined();
+  });
 });
 
 describe('sessionRegistryStore worker config overlay', () => {

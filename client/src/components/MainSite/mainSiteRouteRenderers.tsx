@@ -41,6 +41,7 @@ import {
 import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE } from './routeConfig.js';
 import { resolveMainSiteRouteMatch } from './routeTable.js';
 import { renderMainSiteRouteView } from './mainSiteRouteViewMap.js';
+import { renderPostsRoute } from './postsRouteRenderer.js';
 import { buildPublicRoute, buildPublicUrl, replaceRouteResponderQueryParam } from './urlUtils.js';
 import { hasAutoFlag as hasAutoFlagFn } from './autoHashPersistence';
 import {
@@ -100,7 +101,6 @@ type RefreshQuestionResponsesOptions = Record<string, unknown>;
 type MainSiteSurveyMetadataCache = Record<string, { surveys?: Record<string, unknown> } | undefined>;
 type SessionConfigLike = MainSiteSessionConfigLike;
 type MainSiteRouteNetwork = Record<string, unknown> | null | undefined;
-
 const styles = stylesRaw as Record<string, string>;
 const asMainSiteRouteComponent = (component: unknown): MainSiteRouteComponent => component as MainSiteRouteComponent;
 const MainAreaTabs = asMainSiteRouteComponent(MainAreaTabsRaw);
@@ -1381,6 +1381,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         simUser: () => host._renderSimUserRoute(fullPath, defaultSessionNetwork),
         userProfile: () => host._renderUserProfileRoute(ctx),
         about: () => host._renderAboutRoute(),
+        posts: renderPostsRoute,
         demos: () => host._renderDemosRoute(),
         matrix: () => host._renderMatrixRoute(),
         contracts: () => host._renderContractsRoute(ctx),

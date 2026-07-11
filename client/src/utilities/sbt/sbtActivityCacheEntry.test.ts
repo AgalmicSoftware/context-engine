@@ -1,4 +1,10 @@
-import { applySbtActivityCacheEntryUpdate, buildSbtActivityCacheEntry } from './sbtActivityCacheEntry.js';
+import {
+  applySbtActivityCacheEntryUpdate,
+  buildSbtActivityCacheEntry,
+  hydrateSbtActivityCacheEntry,
+  isSbtActivityCacheEntry,
+  SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION,
+} from './sbtActivityCacheEntry.js';
 
 describe('sbtActivityCacheEntry', () => {
   it('builds the default uncached activity entry shape', () => {
@@ -8,6 +14,7 @@ describe('sbtActivityCacheEntry', () => {
         sbtInfo: { creationBlock: 12 },
       }),
     ).toEqual({
+      schemaVersion: SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION,
       sbtAddress: '0xSBT',
       sbtInfo: { creationBlock: 12 },
       mintedAddresses: [],
@@ -27,6 +34,24 @@ describe('sbtActivityCacheEntry', () => {
       },
       countsLoaded: false,
     });
+  });
+
+  it('narrows legacy entries in place without dropping extension fields', () => {
+    const legacyEntry = {
+      sbtAddress: '0xSBT',
+      legacyExtension: { retained: true },
+    };
+
+    const hydrated = hydrateSbtActivityCacheEntry(legacyEntry);
+
+    expect(hydrated).toBe(legacyEntry);
+    expect(hydrated).toEqual({
+      schemaVersion: SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION,
+      sbtAddress: '0xSBT',
+      legacyExtension: { retained: true },
+    });
+    expect(isSbtActivityCacheEntry(hydrated)).toBe(true);
+    expect(isSbtActivityCacheEntry({ sbtAddress: '0xSBT' })).toBe(false);
   });
 
   it('supports event-block overrides for newly created SBTs', () => {
@@ -69,6 +94,7 @@ describe('sbtActivityCacheEntry', () => {
 
     expect(updated).toBe(entry);
     expect(updated).toEqual({
+      schemaVersion: SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION,
       mintedAddresses: ['0xaaa', '0xbbb'],
       burnedAddresses: ['0xccc'],
       mintedCountByAddress: {
@@ -122,5 +148,6 @@ describe('sbtActivityCacheEntry', () => {
     });
     expect(updated.blockNumber).toBe(14);
     expect(updated.countsLoaded).toBe(false);
+    expect(updated.schemaVersion).toBe(SBT_ACTIVITY_CACHE_ENTRY_SCHEMA_VERSION);
   });
 });

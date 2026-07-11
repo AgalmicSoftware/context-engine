@@ -185,6 +185,10 @@ describe('client package modernization contract', () => {
     expect(viteConfig).not.toContain('!!raw-loader!');
     expect(viteIndex).toContain('__PUBLIC_URL__');
     expect(viteIndex).toContain('/src/viteEntry.ts');
+    expect(viteIndex).toContain('https://contextengine.xyz/assets/img/context-engine-social-preview-square.png');
+    expect(
+      fs.existsSync(path.resolve(__dirname, '../../../public/assets/img/context-engine-social-preview-square.png')),
+    ).toBe(true);
     expect(viteEntry).toContain("import 'assets/css/contextEngine.scss';");
     expect(viteEntry).toContain("import('./index')");
     expect(appEntry).not.toContain("import 'assets/css/contextEngine.scss';");
@@ -227,6 +231,18 @@ describe('client package modernization contract', () => {
     expect(viteConfig).toContain("'/node_modules/minimalistic-assert/'");
   });
 
+  it('keeps the default passkey-only wallet profile and its bundle verifier wired', () => {
+    const pkg = readClientPackageJson();
+    const viteConfig = readClientFile('vite.config.mjs');
+
+    expect(pkg.scripts['verify:passkey-only-bundle']).toBe('node scripts/verify-passkey-only-bundle.mjs');
+    expect(viteConfig).toContain('REACT_APP_CE_ENABLE_METAMASK_CONNECTOR');
+    expect(viteConfig).toContain("'walletConnectorProfile.ts'");
+    expect(viteConfig).toContain("'walletConnectorProfile.metamask.ts'");
+    expect(viteConfig).toContain("fileName: 'ce-wallet-profile.json'");
+    expect(viteConfig).toContain('findPasskeyOnlyForbiddenModules(moduleIds)');
+  });
+
   it('keeps Vite browser polyfill dependencies limited to imported runtime shims', () => {
     const pkg = readClientPackageJson();
     const viteConfig = readClientFile('vite.config.mjs');
@@ -247,6 +263,9 @@ describe('client package modernization contract', () => {
       expect(viteConfig).toContain(`/node_modules/${name}/`);
     });
     expect(viteConfig).toContain("include: ['buffer', 'process/browser']");
+    expect(viteConfig).toContain('find: /^buffer$/');
+    expect(viteConfig).toContain('find: /^node:buffer$/');
+    expect(viteConfig).toContain("path.resolve(__dirname, 'node_modules', 'buffer', 'index.js')");
 
     staleBrowserPolyfills.forEach((name) => {
       expect(pkg.dependencies[name]).toBeUndefined();

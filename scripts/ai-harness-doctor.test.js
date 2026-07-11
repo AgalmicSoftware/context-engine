@@ -8,7 +8,7 @@ const path = require('node:path');
 
 const {
   OPERATOR_LOCAL_ABSENT,
-  PORTO_FIX_HINT,
+  PASSKEY_FIX_HINT,
   analyzeEntrypoint,
   collectHarnessEntrypoints,
   extractTopLevelRequireSpecifiers,
@@ -80,11 +80,11 @@ test('runHarnessDoctor resolves restored passkey harness files', (t) => {
   assert.equal(report.summary.unresolved, 0);
 });
 
-test('runHarnessDoctor reports the first stale porto dependency with the passkey fix hint', (t) => {
+test('runHarnessDoctor reports a missing private passkey helper with its restore hint', (t) => {
   const rootDir = makeFixture(t);
   fs.writeFileSync(path.join(rootDir, 'scripts', 'lib', 'e2e', 'wallets.js'), `
     'use strict';
-    module.exports = require('porto-wallet-derivation');
+    module.exports = require('../passkey-wallet-derivation.js');
   `);
   fs.writeFileSync(path.join(rootDir, 'scripts', 'test-session-gates-any-all.js'), `
     'use strict';
@@ -96,9 +96,31 @@ test('runHarnessDoctor reports the first stale porto dependency with the passkey
 
   assert.equal(gateResult.status, 'unresolved');
   assert.deepEqual(gateResult.firstUnresolved, {
-    module: 'porto-wallet-derivation',
+    module: '../passkey-wallet-derivation.js',
     importer: path.join('scripts', 'lib', 'e2e', 'wallets.js'),
-    fixHint: PORTO_FIX_HINT,
+    fixHint: PASSKEY_FIX_HINT,
+  });
+});
+
+test('runHarnessDoctor names unrelated missing dependencies without a passkey hint', (t) => {
+  const rootDir = makeFixture(t);
+  fs.writeFileSync(path.join(rootDir, 'scripts', 'lib', 'e2e', 'wallets.js'), `
+    'use strict';
+    module.exports = {};
+  `);
+  fs.writeFileSync(path.join(rootDir, 'scripts', 'test-session-gates-any-all.js'), `
+    'use strict';
+    module.exports = require('../missing-client-module.js');
+  `);
+
+  const report = runHarnessDoctor(rootDir);
+  const gateResult = report.results.find((result) => result.entrypoint === 'scripts/test-session-gates-any-all.js');
+
+  assert.equal(gateResult.status, 'unresolved');
+  assert.deepEqual(gateResult.firstUnresolved, {
+    module: '../missing-client-module.js',
+    importer: path.join('scripts', 'test-session-gates-any-all.js'),
+    fixHint: 'restore or update the missing dependency ../missing-client-module.js',
   });
 });
 

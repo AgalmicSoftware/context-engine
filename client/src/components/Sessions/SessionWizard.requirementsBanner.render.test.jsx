@@ -67,7 +67,10 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.getByText('(Optional) A faucet private key for sponsoring user gas')).toBeInTheDocument();
     expect(screen.getByText('A turnkey tool for bundling these resources is in development.')).toBeInTheDocument();
     expect(screen.getByText(/in the meantime, you can get a sponsored session url by contacting/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: '[redacted-email]' })).toHaveAttribute('href', 'mailto:[redacted-email]');
+    expect(screen.getByRole('link', { name: 'contextengine@protonmail.com' })).toHaveAttribute(
+      'href',
+      'mailto:contextengine@protonmail.com',
+    );
   });
 
   it('updates the new-session requirements chain label when the selected deploy chain changes', async () => {

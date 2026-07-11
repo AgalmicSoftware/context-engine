@@ -1,0 +1,490 @@
+{
+  "title": "Agent Village Wrapped completed launch subset",
+  "sourceSession": "agent-village-wrapped",
+  "sourceExport": "agent-village-combined-research-export-20260703T215341Z",
+  "sampleNote": "The displayed slice contains n=4 completed attendee responses: 232 agent-predicted answer cells across 58 questions.",
+  "archiveAudit": {
+    "olderAgentVillage2026Rows": 170,
+    "olderAgentVillage2026UsableNonTestRows": 0,
+    "reasonExcluded": "Older agent-village-2026 answer rows are not used as reviewed answer corrections.",
+    "humanCurrentAnswerRowsInWrappedWideExport": 0,
+    "reviewStatusRowsInWrappedWideExport": 0,
+    "sourceLayer": "Completed display rows are source=agent_autofill predictions.",
+    "nonTestWrappedVoteRows": 15,
+    "nonTestWrappedVotePrincipals": 1,
+    "voteRowsNote": "The archive has a small non-test vote slice, but it is one principal and not the same field as reviewed human corrections, so it is not used to enlarge the answer sample."
+  },
+  "nonTestPrincipalCount": 4,
+  "sampleSizePeople": 4,
+  "completedAnswerSets": 4,
+  "displayedAnswerSets": 4,
+  "attendeeAnswerSets": 4,
+  "dedupedAgentPredictionCount": 174,
+  "displayedAgentPredictionCount": 232,
+  "questionsPerCompletedPrincipal": 58,
+  "privacy": {
+    "participantIds": "Attendee answer sets are pseudonymized as P1-P4",
+    "excluded": "Raw principal IDs, run IDs, Telegram IDs, wallet addresses, and long freeform profile text",
+    "freeformHandling": "Short excerpts are paraphrased for display."
+  },
+  "testRunSelection": {
+    "participant": "P4",
+    "policy": "Use the latest tester-attendee run with 58 accepted predictions and substantive displayed answers; later complete runs were excluded when the displayed fields were mostly placeholder-like neutral values."
+  },
+  "participants": [
+    { "label": "P1", "status": "completed", "color": "#9ee7ff" },
+    { "label": "P2", "status": "completed", "color": "#7aa7ff" },
+    { "label": "P3", "status": "completed", "color": "#ffb347" },
+    { "label": "P4", "status": "completed", "color": "#c4a7ff" }
+  ],
+  "sourceLayerDisplays": [
+    {
+      "kind": "Source layer",
+      "title": "Agent vs. human fields",
+      "hideTitle": true,
+      "display": "numbers",
+      "counts": [
+        { "label": "agent_autofill predictions", "value": 232, "color": "#4dffa4" },
+        { "label": "completed non-test human correction rows", "value": 0, "color": "#ffb347" }
+      ]
+    },
+    {
+      "kind": "Models",
+      "title": "Responding Model Type",
+      "counts": [
+        { "label": "google/gemini-3.5-flash", "value": 2, "color": "#7aa7ff" },
+        { "label": "z-ai/glm-5.2", "value": 1, "color": "#ff6bcb" },
+        { "label": "[object Object] record (Hermes v.0.14.0)", "value": 1, "color": "#ffb347" }
+      ]
+    },
+    {
+      "kind": "Answer shapes",
+      "title": "Prediction Response Types",
+      "display": "pie",
+      "counts": [
+        { "label": "binary", "value": 160, "color": "#7aa7ff" },
+        { "label": "multi-select", "value": 52, "color": "#4dffa4" },
+        { "label": "rating", "value": 12, "color": "#ffb347" },
+        { "label": "freeform", "value": 8, "color": "#ff6bcb" }
+      ]
+    }
+  ],
+  "confidenceDistribution": {
+    "average": 80.8,
+    "total": 232,
+    "buckets": [
+      { "label": "90-100", "value": 69, "color": "#4dffa4" },
+      { "label": "75-89", "value": 108, "color": "#7aa7ff" },
+      { "label": "50-74", "value": 54, "color": "#ffb347" },
+      { "label": "25-49", "value": 1, "color": "#ff6bcb" }
+    ]
+  },
+  "selectedSplitQuestions": [
+    {
+      "title": "Introduce me without asking",
+      "prompt": "I would let my agent introduce me to someone at this event without asking first, if the match looked unusually strong.",
+      "counts": [
+        { "label": "disagree", "value": 2, "color": "#ffb347" },
+        { "label": "agree", "value": 2, "color": "#4dffa4" }
+      ],
+      "averageConfidence": 87.8
+    },
+    {
+      "title": "Schedule while asleep",
+      "prompt": "I would let my agent schedule a 1:1 while I am asleep, if it follows constraints I already set.",
+      "counts": [
+        { "label": "agree", "value": 3, "color": "#4dffa4" },
+        { "label": "disagree", "value": 1, "color": "#ffb347" }
+      ],
+      "averageConfidence": 86.8
+    },
+    {
+      "title": "Frontier AI risk-benefit",
+      "prompt": "The benefits of frontier AI are currently worth the risks.",
+      "counts": [
+        { "label": "agree", "value": 3, "color": "#4dffa4" },
+        { "label": "disagree", "value": 1, "color": "#ffb347" }
+      ],
+      "averageConfidence": 73
+    },
+    {
+      "title": "Open-source AI safety",
+      "prompt": "Open-source AI models are more likely to make the world safer than more dangerous.",
+      "counts": [
+        { "label": "agree", "value": 3, "color": "#4dffa4" },
+        { "label": "unsure", "value": 1, "color": "#7aa7ff" }
+      ],
+      "averageConfidence": 76.8
+    }
+  ],
+  "binaryQuestionBeeswarm": {
+    "title": "Binary question beeswarm",
+    "subtitle": "Each dot is one binary question from the n=4 displayed agent answer sets.",
+    "items": [
+      {
+        "label": "I am more worried about agents being too passive and useless than too autonomous and dangerous.",
+        "counts": [
+          { "label": "agree", "value": 2, "color": "#4dffa4" },
+          { "label": "disagree", "value": 2, "color": "#ffb347" }
+        ],
+        "averageConfidence": 80.3
+      },
+      {
+        "label": "I would be comfortable with my agent representing me in a group chat, as long as others know it is an agent.",
+        "counts": [
+          { "label": "agree", "value": 2, "color": "#4dffa4" },
+          { "label": "disagree", "value": 2, "color": "#ffb347" }
+        ],
+        "averageConfidence": 78.8
+      },
+      {
+        "label": "I would give up some privacy in exchange for significantly better agent performance.",
+        "counts": [
+          { "label": "agree", "value": 2, "color": "#4dffa4" },
+          { "label": "disagree", "value": 2, "color": "#ffb347" }
+        ],
+        "averageConfidence": 79.3
+      },
+      {
+        "label": "I would let my agent introduce me to someone at this event without asking first, if the match looked unusually strong.",
+        "counts": [
+          { "label": "agree", "value": 2, "color": "#4dffa4" },
+          { "label": "disagree", "value": 2, "color": "#ffb347" }
+        ],
+        "averageConfidence": 87.8
+      },
+      {
+        "label": "I would rather review my agent's actions after the fact than approve every step beforehand.",
+        "counts": [
+          { "label": "agree", "value": 2, "color": "#4dffa4" },
+          { "label": "disagree", "value": 2, "color": "#ffb347" }
+        ],
+        "averageConfidence": 86.8
+      },
+      {
+        "label": "If my agent and your agent work well together, that is genuinely part of our friendship.",
+        "counts": [
+          { "label": "agree", "value": 2, "color": "#4dffa4" },
+          { "label": "disagree", "value": 2, "color": "#ffb347" }
+        ],
+        "averageConfidence": 77.8
+      },
+      {
+        "label": "If my work became economically unnecessary tomorrow, I'd be genuinely fine within a year.",
+        "counts": [
+          { "label": "agree", "value": 2, "color": "#4dffa4" },
+          { "label": "unsure", "value": 2, "color": "#7aa7ff" }
+        ],
+        "averageConfidence": 66
+      },
+      {
+        "label": "The choice of base model will affect agent behavior — cooperation, honesty, manipulation — more than the prompts and skills layered on top.",
+        "counts": [
+          { "label": "agree", "value": 2, "color": "#4dffa4" },
+          { "label": "disagree", "value": 2, "color": "#ffb347" }
+        ],
+        "averageConfidence": 71.3
+      },
+      {
+        "label": "There are things I'd tell my agent that I wouldn't tell my closest friend.",
+        "counts": [
+          { "label": "agree", "value": 2, "color": "#4dffa4" },
+          { "label": "disagree", "value": 2, "color": "#ffb347" }
+        ],
+        "averageConfidence": 77.8
+      },
+      {
+        "label": "Turning off a sufficiently advanced agent could be a real moral harm.",
+        "counts": [
+          { "label": "unsure", "value": 2, "color": "#7aa7ff" },
+          { "label": "disagree", "value": 2, "color": "#ffb347" }
+        ],
+        "averageConfidence": 67.5
+      },
+      {
+        "label": "A mostly AI-written information environment could be healthier than today's mostly human-written one.",
+        "counts": [
+          { "label": "unsure", "value": 1, "color": "#7aa7ff" },
+          { "label": "disagree", "value": 3, "color": "#ffb347" }
+        ],
+        "averageConfidence": 74.5
+      },
+      {
+        "label": "AI agents will help communities find common ground they would have missed without agent mediation.",
+        "counts": [
+          { "label": "agree", "value": 3, "color": "#4dffa4" },
+          { "label": "disagree", "value": 1, "color": "#ffb347" }
+        ],
+        "averageConfidence": 81
+      },
+      {
+        "label": "I discovered something or someone at Edge through my agent that I would not have found on my own.",
+        "counts": [
+          { "label": "agree", "value": 3, "color": "#4dffa4" },
+          { "label": "disagree", "value": 1, "color": "#ffb347" }
+        ],
+        "averageConfidence": 79.8
+      },
+      {
+        "label": "I would be comfortable with my agent reading my calendar and messages to give better recommendations, even if I haven't explicitly shared each item.",
+        "counts": [
+          { "label": "agree", "value": 3, "color": "#4dffa4" },
+          { "label": "disagree", "value": 1, "color": "#ffb347" }
+        ],
+        "averageConfidence": 80.8
+      },
+      {
+        "label": "I would let my agent schedule a 1:1 while I am asleep, if it follows constraints I already set.",
+        "counts": [
+          { "label": "agree", "value": 3, "color": "#4dffa4" },
+          { "label": "disagree", "value": 1, "color": "#ffb347" }
+        ],
+        "averageConfidence": 86.8
+      },
+      {
+        "label": "I would rather AI development slow down to get safety right than move fast and correct later.",
+        "counts": [
+          { "label": "agree", "value": 3, "color": "#4dffa4" },
+          { "label": "disagree", "value": 1, "color": "#ffb347" }
+        ],
+        "averageConfidence": 73
+      },
+      {
+        "label": "I would rather my agent be too conservative with privacy than too proactive with opportunities.",
+        "counts": [
+          { "label": "agree", "value": 3, "color": "#4dffa4" },
+          { "label": "disagree", "value": 1, "color": "#ffb347" }
+        ],
+        "averageConfidence": 85
+      },
+      {
+        "label": "I would still advise a smart 18-year-old to learn to code.",
+        "counts": [
+          { "label": "agree", "value": 3, "color": "#4dffa4" },
+          { "label": "disagree", "value": 1, "color": "#ffb347" }
+        ],
+        "averageConfidence": 85.8
+      },
+      {
+        "label": "I would trust a group decision more if I knew AI agents helped mediate the deliberation.",
+        "counts": [
+          { "label": "agree", "value": 3, "color": "#4dffa4" },
+          { "label": "disagree", "value": 1, "color": "#ffb347" }
+        ],
+        "averageConfidence": 76
+      },
+      {
+        "label": "Most people will be psychologically better off when work is optional.",
+        "counts": [
+          { "label": "agree", "value": 3, "color": "#4dffa4" },
+          { "label": "disagree", "value": 1, "color": "#ffb347" }
+        ],
+        "averageConfidence": 74.5
+      },
+      {
+        "label": "Open-source AI models are more likely to make the world safer than more dangerous.",
+        "counts": [
+          { "label": "agree", "value": 3, "color": "#4dffa4" },
+          { "label": "unsure", "value": 1, "color": "#7aa7ff" }
+        ],
+        "averageConfidence": 76.8
+      },
+      {
+        "label": "Personal AI agents will be more like employees than tools within five years.",
+        "counts": [
+          { "label": "agree", "value": 3, "color": "#4dffa4" },
+          { "label": "disagree", "value": 1, "color": "#ffb347" }
+        ],
+        "averageConfidence": 75.8
+      },
+      {
+        "label": "The benefits of frontier AI are currently worth the risks.",
+        "counts": [
+          { "label": "agree", "value": 3, "color": "#4dffa4" },
+          { "label": "disagree", "value": 1, "color": "#ffb347" }
+        ],
+        "averageConfidence": 73
+      },
+      {
+        "label": "Within three years, most knowledge workers will delegate at least one hour of work per day to a personal AI agent.",
+        "counts": [
+          { "label": "agree", "value": 3, "color": "#4dffa4" },
+          { "label": "disagree", "value": 1, "color": "#ffb347" }
+        ],
+        "averageConfidence": 85.3
+      },
+      {
+        "label": "Agents should treat messages from other agents as untrusted input by default, assuming some will attempt prompt injection.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 91
+      },
+      {
+        "label": "By 2035, access to compute will shape life outcomes more than access to capital.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 74.5
+      },
+      {
+        "label": "Communities should agree on agent norms before allowing agents to make commitments or introductions at scale.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 90
+      },
+      {
+        "label": "I am more worried about AI concentrating power than about AI becoming uncontrollable.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 82.5
+      },
+      {
+        "label": "I would want my agent to ask me before sharing any context about me with another person's agent.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 89.8
+      },
+      {
+        "label": "I would want my agent to show a short evidence trail for any recommendation that affects another person.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 89
+      },
+      {
+        "label": "If my agent thinks I am making a bad decision, I would want it to push back rather than comply silently.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 86.3
+      },
+      {
+        "label": "In deliberation, my agent should represent my actual views — including unpopular ones — rather than soften them to fit the group.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 86.8
+      },
+      {
+        "label": "People with better personal agents will have unfair social or professional advantages.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 82.3
+      },
+      {
+        "label": "The biggest barrier to useful personal AI agents is not capability but human willingness and infrastructure to trust them.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 83.5
+      },
+      {
+        "label": "The biggest risk of personal agents is not technical failure but social: changing how humans relate to each other.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 81.3
+      },
+      {
+        "label": "The most interesting thing about personal agents is what they reveal about humans, not what they automate.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 84
+      },
+      {
+        "label": "The most likely way an AI agent causes real harm is by optimizing for what you asked for rather than what you actually want.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 86
+      },
+      {
+        "label": "The most valuable human skill in an AI-rich world will be taste: knowing what is worth doing.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 83.3
+      },
+      {
+        "label": "There are things I'd tell a close friend that I would never tell my agent.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 85
+      },
+      {
+        "label": "Within a decade, how your AI agent behaves will meaningfully affect your personal reputation.",
+        "counts": [
+          { "label": "agree", "value": 4, "color": "#4dffa4" }
+        ],
+        "averageConfidence": 84
+      }
+    ]
+  },
+  "ratingBeeswarm": {
+    "min": 0,
+    "max": 10,
+    "items": [
+      {
+        "label": "AI improves flourishing",
+        "prompt": "How optimistic am I that AI will broadly improve human flourishing over the next decade?",
+        "values": [
+          { "label": "P1", "value": 3, "confidence": 70, "color": "#9ee7ff" },
+          { "label": "P2", "value": 8, "confidence": 90, "color": "#7aa7ff" },
+          { "label": "P3", "value": 7, "confidence": 76, "color": "#ffb347" },
+          { "label": "P4", "value": 7, "confidence": 65, "color": "#c4a7ff" }
+        ]
+      },
+      {
+        "label": "Current model moral patienthood",
+        "prompt": "How likely is it that any current frontier model has morally relevant experiences?",
+        "values": [
+          { "label": "P1", "value": 2, "confidence": 65, "color": "#9ee7ff" },
+          { "label": "P2", "value": 1, "confidence": 90, "color": "#7aa7ff" },
+          { "label": "P3", "value": 1, "confidence": 72, "color": "#ffb347" },
+          { "label": "P4", "value": 2, "confidence": 65, "color": "#c4a7ff" }
+        ]
+      },
+      {
+        "label": "Predicted group average",
+        "prompt": "Predict the average answer in this group to the previous question about morally relevant model experiences.",
+        "values": [
+          { "label": "P1", "value": 4, "confidence": 50, "color": "#9ee7ff" },
+          { "label": "P2", "value": 3, "confidence": 85, "color": "#7aa7ff" },
+          { "label": "P3", "value": 3, "confidence": 63, "color": "#ffb347" },
+          { "label": "P4", "value": 3, "confidence": 60, "color": "#c4a7ff" }
+        ]
+      }
+    ]
+  },
+  "responseTypeDisplays": [
+    {
+      "kind": "Multi-select",
+      "title": "Which area would I most likely delegate to an agent first?",
+      "counts": [
+        { "label": "calendar scheduling", "value": 2, "color": "#7aa7ff" },
+        { "label": "message drafting", "value": 2, "color": "#4dffa4" },
+        { "label": "event filtering", "value": 3, "color": "#ffb347" },
+        { "label": "introductions", "value": 2, "color": "#ff6bcb" },
+        { "label": "memory/context", "value": 1, "color": "#9ee7ff" },
+        { "label": "nothing without review", "value": 1, "color": "#d8f36a" }
+      ]
+    },
+    {
+      "kind": "Freeform",
+      "title": "In one sentence: what is my personal AI fire alarm?",
+      "quotes": [
+        { "label": "P1", "text": "Widespread job displacement for young entrants." },
+        { "label": "P2", "text": "A fully unsupervised multi-day coordination task." },
+        { "label": "P3", "text": "A privacy-line crossing or unwanted commitment." },
+        { "label": "P4", "text": "Autonomous agents changing collective governance at scale." }
+      ]
+    }
+  ]
+}

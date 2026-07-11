@@ -109,6 +109,18 @@ test('resolveTopLevelRouteSelection classifies sponsored bootstrap redeem routes
   );
 });
 
+test('resolveTopLevelRouteSelection exposes the resource-presence route without wallet auth', () => {
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/resource-presence',
+      method: 'GET',
+      request: { headers: { get: () => '' } },
+      deps: { toStr: (value) => String(value || '') },
+    }),
+    { kind: 'resource-presence' },
+  );
+});
+
 test('resolveTopLevelRouteSelection preserves trimmed authorization behavior for anonymous ai/transcribe classification', () => {
   assert.deepEqual(
     resolveTopLevelRouteSelection({

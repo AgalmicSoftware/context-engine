@@ -42,6 +42,10 @@
 
 .explorerContainerSparse {
   min-height: clamp(420px, 54vh, 760px);
+  width: 100%;
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -53,40 +57,54 @@
 }
 
 .explorerRowSparse {
-  align-items: stretch;
+  align-items: center;
+  flex: 1 1 auto;
+  width: 100%;
   margin-top: 0;
   margin-bottom: 0;
 }
 
 .explorerCol {
   padding: 10px;
-  &.live {
-    .square {
-      .backgroundImage {
-        border: 8px solid #4caf50; // Green border for live tools
+
+  &.statusBorderEnabled {
+    &.live {
+      .square {
+        .backgroundImage {
+          border: 4px solid rgba(77, 255, 164, 0.78);
+        }
       }
     }
-  }
 
-  &.future {
-    .square {
-      .backgroundImage {
-        border: 8px solid #2196f3; // Blue border for future tools
+    &.future {
+      .square {
+        .backgroundImage {
+          border: 4px solid rgba(91, 140, 255, 0.8);
+        }
       }
     }
   }
 
   .square {
     border-radius: var(--ce-radius-10);
-    background: var(--ce-color-bg);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: #24264d;
     box-shadow:
-      5px 5px 10px #0a0a23,
-      -5px -5px 10px #242456;
-    transition: all 0.3s ease-in-out;
+      -5px 6px 12px #171a3d,
+      5px -5px 12px rgba(59, 63, 126, 0.72),
+      0 18px 34px rgba(0, 0, 0, 0.28);
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease,
+      background 0.2s ease;
+
     &:hover {
+      transform: translateY(-3px);
+      background: #282b57;
       box-shadow:
-        3px 3px 6px #0a0a23,
-        -3px -3px 6px #242456;
+        -7px 8px 16px #171a3d,
+        7px -7px 16px rgba(65, 70, 140, 0.78),
+        0 24px 42px rgba(0, 0, 0, 0.34);
     }
 
     &.disabled {
@@ -96,17 +114,23 @@
 
     .backgroundImage {
       border-radius: var(--ce-radius-10);
-      transition: all 0.3s ease-in-out;
+      transition: transform 0.2s ease;
       &:hover {
-        transform: scale(1.05);
+        transform: scale(1.03);
       }
     }
   }
 }
 
 .explorerColSparse {
+  display: flex;
+  align-items: center;
+  padding: clamp(6px, 1vw, 12px);
+
   .square {
-    padding-bottom: 82%;
+    width: 100%;
+    height: clamp(250px, 36vh, 480px);
+    padding-bottom: 0;
   }
 }
 
@@ -381,7 +405,8 @@
 
   .explorerColSparse {
     .square {
-      padding-bottom: 76%;
+      height: clamp(250px, 36vh, 340px);
+      padding-bottom: 0;
     }
   }
 }
@@ -393,7 +418,8 @@
 
   .explorerColSparse {
     .square {
-      padding-bottom: 88%;
+      height: clamp(360px, 50vh, 620px);
+      padding-bottom: 0;
     }
   }
 

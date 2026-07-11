@@ -521,18 +521,23 @@
     font-size: 4.25em;
   }
 
-  .onboardingControls {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-self: flex-end;
+  .onboardingWalkthrough .onboardingControls {
+    display: grid;
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    align-self: stretch;
     background: transparent;
     width: 30%;
-    height: 500px;
+    height: auto;
+
+    > .sidebarOpen,
+    > .openSidebarButton,
+    > .takeSurveyButton {
+      min-height: 0;
+    }
   }
 
   .sidebarOpen {
-    height: 100%;
+    height: auto;
   }
 
   .openSidebarButton {
@@ -621,10 +626,6 @@
     background-size: auto;
     background-blend-mode: hue;
     // justify-content: space-between;
-  }
-
-  .onboardingControls {
-    display: flex;
   }
 
   .sidebarOpen {

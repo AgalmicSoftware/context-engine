@@ -75,6 +75,7 @@ describe('GateMultiSelectLock', () => {
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toHaveAttribute('aria-label', 'Choose access rule');
+    expect(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toHaveAttribute('data-ce-lock-state', 'unlocked');
 
     rerender(
       <GateMultiSelectLock
@@ -89,6 +90,7 @@ describe('GateMultiSelectLock', () => {
     );
 
     expect(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toHaveAttribute('aria-label', 'Edit locked access rule');
+    expect(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_BUTTON)).toHaveAttribute('data-ce-lock-state', 'locked');
   });
 
   it('marks selected gate rows with a visible selected-state affordance', () => {
@@ -170,7 +172,7 @@ describe('GateMultiSelectLock', () => {
       buildSbtDetailPath('0x1111111111111111111111111111111111111111', 'edge'),
     );
 
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_CHECKBOX));
     expect(onChangeSelectedGateIds).toHaveBeenCalledWith(['vip_access']);
 
     rerender(
@@ -185,7 +187,8 @@ describe('GateMultiSelectLock', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('checkbox', { checked: true }));
+    expect(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_CHECKBOX)).toBeChecked();
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.GATE_LOCK_CHECKBOX));
     expect(onChangeSelectedGateIds).toHaveBeenCalledWith([]);
   });
 });

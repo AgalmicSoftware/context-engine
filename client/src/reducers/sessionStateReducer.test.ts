@@ -63,7 +63,7 @@ describe('sessionStateReducer', () => {
       ETHUSDToggle: false,
       explainerMode: true,
       demoMode: { tools: false },
-      demoSurfaceMode: true,
+      demoSurfaceMode: false,
       loginModalToggled: false,
       afterLoginModalToggled: false,
       primarySessionSlug: initialSelection.primarySessionSlug,

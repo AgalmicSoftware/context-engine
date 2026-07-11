@@ -51,7 +51,11 @@ describe('OnboardingWalkthrough', () => {
     fireEvent.click(screen.getByText('Advance slide'));
     fireEvent.click(screen.getByText('Advance slide'));
 
-    fireEvent.click(screen.getByText('See Tools'));
+    const seeToolsButton = screen.getByRole('button', { name: 'See Tools' });
+
+    expect(seeToolsButton).toHaveClass('openSidebarButton', 'getStartedButton');
+
+    fireEvent.click(seeToolsButton);
 
     expect(changeTabFunction).toHaveBeenCalledWith(4);
   });

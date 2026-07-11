@@ -3,6 +3,8 @@ import { LoginAndSettingsModal } from './LoginAndSettingsModal';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as passkeyWallet from '../../wallet/passkeyWallet.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
+import { refreshSessionRegistryFieldsCache } from '../../utilities/web3/sessionRegistry.js';
+import { readWorkerResourcePresence } from '../../utilities/worker/workerResourcePresence';
 import contractScripts from '../../utilities/web3/chainGateway.js';
 import {
   getDemoSessionConfigBySlug,
@@ -82,6 +84,14 @@ jest.mock('../../utilities/web3/sponsoredAccess.js', () => ({
   checkSponsoredAccess: jest.fn(async () => ({ status: 'unknown' })),
 }));
 
+jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
+  refreshSessionRegistryFieldsCache: jest.fn(async () => null),
+}));
+
+jest.mock('../../utilities/worker/workerResourcePresence', () => ({
+  readWorkerResourcePresence: jest.fn(async () => null),
+}));
+
 jest.mock('../../utilities/worker/workerAuth.js', () => ({
   getWorkerSessionToken: jest.fn(async () => null),
   clearAllWorkerSessionTokens: jest.fn(),
@@ -112,6 +122,8 @@ const LoginAndSettingsModalSubject = LoginAndSettingsModal as any;
 const mockedCacheScripts = cacheScripts as any;
 const mockedPasskeyWallet = passkeyWallet as any;
 const mockedCheckSponsoredAccess = checkSponsoredAccess as any;
+const mockedRefreshSessionRegistryFieldsCache = refreshSessionRegistryFieldsCache as any;
+const mockedReadWorkerResourcePresence = readWorkerResourcePresence as any;
 const mockedContractScripts = contractScripts as any;
 const mockedGetDemoSessionConfigBySlug = getDemoSessionConfigBySlug as any;
 const mockedGetAllSessionSlugs = getAllSessionSlugs as any;
@@ -163,6 +175,8 @@ const mountClassSubject = (subject: any) => {
 describe('LoginAndSettingsModal cache clearing performance guards', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedRefreshSessionRegistryFieldsCache.mockResolvedValue(null);
+    mockedReadWorkerResourcePresence.mockResolvedValue(null);
     localStorage.clear();
     mockedGetSessionNetwork.mockReturnValue({ id: 84532, chainId: 84532, name: 'Base Sepolia' });
   });
@@ -435,6 +449,44 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(getWorkerSessionToken).not.toHaveBeenCalled();
   });
 
+  it('refreshes worker resource presence when account settings are opened', () => {
+    const prevProps = buildProps({
+      activeSessionSlug: 'demo-1',
+      loginModalToggled: false,
+    });
+    const nextProps = buildProps({
+      activeSessionSlug: 'demo-1',
+      loginModalToggled: true,
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(nextProps));
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+    subject.loadSponsoredAccess = jest.fn();
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.loadSponsoredAccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('coalesces simultaneous settings, account, and session sponsorship refreshes', () => {
+    const prevProps = buildProps({
+      account: '',
+      activeSessionSlug: 'demo-1',
+      loginModalToggled: false,
+    });
+    const nextProps = buildProps({
+      account: PASSKEY_ADDRESS,
+      activeSessionSlug: 'demo-2',
+      loginModalToggled: true,
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(nextProps));
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+    subject.loadSponsoredAccess = jest.fn();
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.loadSponsoredAccess).toHaveBeenCalledTimes(1);
+  });
+
   it('scans managed cache entries without cloning values and de-duplicates slug clears', async () => {
     mockedCacheScripts.listNamespaceEntriesSync.mockImplementation((namespace: string) => {
       if (namespace === 'questionsCache') {
@@ -496,8 +548,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     expect(treeHasPropValue(tree, 'className', 'accountWarningContainer')).toBe(true);
     expect(treeHasPropValue(tree, 'className', 'passkeyButtonContainer')).toBe(true);
-    expect(treeHasPropValue(tree, 'className', 'cryptoLoginLink')).toBe(true);
-    expect(treeHasPropValue(tree, 'aria-label', 'Open Crypto Login (RainbowKit)')).toBe(true);
+    expect(treeHasPropValue(tree, 'aria-label', 'Open Crypto Login (RainbowKit)')).toBe(false);
     expect(treeHasPropValue(tree, 'id', 'inModalTorusButton')).toBe(false);
     expect(treeHasPropValue(tree, 'id', 'torusButtonContainer')).toBe(false);
   });
@@ -1235,6 +1286,37 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     ]);
   });
 
+  it('uses active worker presence when registry sponsorship flags are stale', () => {
+    mockedGetAllSessionSlugs.mockReturnValue(['demo-1']);
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) =>
+      String(slug || '') === 'demo-1'
+        ? {
+            slug: 'demo-1',
+            sessionName: 'demo 1',
+            sponsoredKeys: { faucet: true },
+          }
+        : {},
+    );
+
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        activeSessionSlug: 'demo-1',
+      }),
+    );
+    subject.state.workerResourcePresence = {
+      ai: true,
+      arweave: true,
+      rpc: true,
+      txGas: true,
+    };
+
+    const sources = subject.getSponsoredSessionSources({ activeSlug: 'demo-1' });
+    expect(sources.byResource.ai[0]).toEqual(expect.objectContaining({ slug: 'demo-1', isActive: true }));
+    expect(sources.byResource.arweave[0]).toEqual(expect.objectContaining({ slug: 'demo-1', isActive: true }));
+    expect(sources.byResource.rpc[0]).toEqual(expect.objectContaining({ slug: 'demo-1', isActive: true }));
+    expect(sources.byResource.txGas[0]).toEqual(expect.objectContaining({ slug: 'demo-1', isActive: true }));
+  });
+
   it('refreshes settings overview sponsorship cards when sponsored keys change without slug churn', () => {
     mockedGetAllSessionSlugs.mockReturnValue(['edge']);
     let sponsoredKeys: any = {
@@ -1306,6 +1388,38 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('edge', { allowDemoFallback: true });
   });
 
+  it('keeps registry operational fields authoritative over a matching route overlay', () => {
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) =>
+      String(slug || '') === 'demo-1'
+        ? {
+            slug: 'demo-1',
+            sessionName: 'demo 1',
+            corsWorkerUrl: 'https://live-worker.example',
+            sponsoredKeys: { arweave: true, rpc: true },
+          }
+        : {},
+    );
+    const subject = new LoginAndSettingsModalSubject(
+      buildProps({
+        activeSessionSlug: 'demo-1',
+        sessionConfig: {
+          slug: 'demo-1',
+          sessionName: 'Demo display overlay',
+          corsWorkerUrl: 'https://stale-worker.example',
+          sponsoredKeys: { faucet: true },
+        },
+      }),
+    );
+
+    expect(subject.getDisplaySessionConfig('demo-1')).toEqual(
+      expect.objectContaining({
+        sessionName: 'demo 1',
+        corsWorkerUrl: 'https://live-worker.example',
+        sponsoredKeys: { faucet: true, arweave: true, rpc: true },
+      }),
+    );
+  });
+
   it('keeps loadSponsoredAccess strict when only a demo-session config exists', async () => {
     mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (String(slug || '') === 'rxc' ? null : {}));
     mockedGetDemoSessionConfigBySlug.mockImplementation((slug: any) =>
@@ -1344,5 +1458,27 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       expect(arg.sessionConfig).toEqual({});
     });
     expect(getDemoSessionConfigBySlug).not.toHaveBeenCalled();
+    expect(readWorkerResourcePresence).not.toHaveBeenCalled();
+  });
+
+  it('reads worker resource presence only while account settings are visible', async () => {
+    mockedGetSessionConfigBySlugOrDefault.mockReturnValue({
+      slug: 'demo-1',
+      corsWorkerUrl: 'https://worker.example',
+    });
+
+    const hiddenSubject = mountClassSubject(
+      new LoginAndSettingsModalSubject(buildProps({ activeSessionSlug: 'demo-1', loginModalToggled: false })),
+    );
+    await hiddenSubject.loadSponsoredAccess();
+    expect(readWorkerResourcePresence).not.toHaveBeenCalled();
+
+    const visibleSubject = mountClassSubject(
+      new LoginAndSettingsModalSubject(buildProps({ activeSessionSlug: 'demo-1', loginModalToggled: true })),
+    );
+    await visibleSubject.loadSponsoredAccess();
+
+    expect(readWorkerResourcePresence).toHaveBeenCalledTimes(1);
+    expect(readWorkerResourcePresence).toHaveBeenCalledWith(expect.objectContaining({ sessionSlug: 'demo-1' }));
   });
 });

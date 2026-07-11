@@ -115,6 +115,10 @@ function isAllowedPublicEmailPath(relativePath) {
     || relativePath.startsWith('client/src/data/ai-discourse-corpus/');
 }
 
+// Intentionally public addresses (e.g. the SECURITY.md vulnerability-reporting
+// contact). Keep in sync with the allowlist in scripts/prepare-public-release.sh.
+const allowedPublicEmailAddresses = new Set(['contextengine@protonmail.com']);
+
 function scanTextFile(relativePath, text, findings, warnings) {
   const lines = text.split(/\r?\n/);
   const emailRe = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig;
@@ -131,7 +135,7 @@ function scanTextFile(relativePath, text, findings, warnings) {
 
     emailRe.lastIndex = 0;
     while ((match = emailRe.exec(line)) !== null) {
-      if (isAllowedPublicEmailPath(relativePath)) {
+      if (isAllowedPublicEmailPath(relativePath) || allowedPublicEmailAddresses.has(match[0].toLowerCase())) {
         addWarning(warnings, 'public-email', relativePath, lineNumber, match[0]);
       } else {
         addFinding(findings, 'email', relativePath, lineNumber, match[0]);

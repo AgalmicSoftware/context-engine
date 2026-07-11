@@ -9,6 +9,7 @@ type SponsorSessionDisplayEntry = Record<string, unknown> & {
 
 type SponsoredAccessRecord = Record<string, SponsoredStatusEntry | null | undefined>;
 type SponsoredKeysRecord = Record<string, unknown>;
+type WorkerResourcePresenceRecord = Partial<Record<'ai' | 'arweave' | 'rpc' | 'txGas', boolean>>;
 type SponsorSessionsRecord = Record<string, unknown> & {
   byResource?: Record<string, readonly SponsorSessionDisplayEntry[]>;
 };
@@ -38,6 +39,22 @@ const SETTINGS_SPONSORSHIP_RESOURCES = Object.freeze([
 export const getSponsoredKeyAliases = (resourceKey: string = ''): string[] => {
   if (resourceKey === 'txGas') return ['faucet', 'txGas'];
   return [resourceKey];
+};
+
+export const mergeWorkerResourcePresenceIntoSponsoredKeys = (
+  sponsoredKeys: SponsoredKeysRecord = {},
+  presence: WorkerResourcePresenceRecord | null = null,
+): SponsoredKeysRecord => {
+  const merged = { ...(sponsoredKeys || {}) };
+  if (!presence) return merged;
+  (['ai', 'arweave', 'rpc', 'txGas'] as const).forEach((resourceKey) => {
+    const aliases = getSponsoredKeyAliases(resourceKey);
+    aliases.forEach((alias) => {
+      if (presence[resourceKey] === true) merged[alias] = true;
+      else if (presence[resourceKey] === false) delete merged[alias];
+    });
+  });
+  return merged;
 };
 
 export const formatSponsoredStatusMeta = (

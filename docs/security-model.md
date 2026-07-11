@@ -89,6 +89,29 @@ This design is simpler than smart-account systems and does not provide:
 - onchain session permissions
 - smart-contract recovery
 
+## SBT Invite Credential Boundary
+
+Limited SBT invite links are one-time bearer credentials until redemption.
+Anyone who obtains an unredeemed link can use its authorization; the link does
+not identify or authenticate an intended human recipient.
+
+The current `claimWithInvite` authorization signs the SBT contract address and
+a sequential nonce. It does not include the recipient address, so the wallet
+that submits a valid unconsumed invite becomes the recipient. This differs from
+password minting: `startClaim` records a commitment derived from the password
+and `msg.sender`, and `claimWithPassword` verifies that caller-bound commitment
+before minting.
+
+The currently configured OP Stack networks use sequencer-private transaction
+pools, which reduces exposure to public-mempool copying. It does not remove the
+bearer-link risk: links can still leak through forwarding, browser history,
+logs, analytics, screenshots, or any other channel before redemption.
+
+A recipient-bound commit-reveal invite flow has been designed but is not
+implemented. Until that contract flow ships, treat every unredeemed limited
+invite link as a transferable secret and share it only through an appropriate
+confidential channel.
+
 ## Browser Requirements
 
 - WebAuthn platform credentials

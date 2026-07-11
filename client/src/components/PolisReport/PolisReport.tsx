@@ -15,12 +15,12 @@ import {
   faChevronRight,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { beeswarmByExtremity, getCommentBarData } from '../../utilities/survey/polisMath';
+import { beeswarmByExtremity } from '../../utilities/survey/consensusMath';
 import {
   computePolisCommentStats,
   computePolisConversationMath,
   findRepresentativeQuestions,
-} from '../../utilities/survey/polisReportMath.js';
+} from '../../utilities/survey/consensusReportMath.js';
 
 import { getShortenedAddress } from 'utilities/ui/displayHelpers.js';
 import styles from './PolisReport.module.scss';
@@ -1104,12 +1104,10 @@ export default function PolisReport({
         </p>
       );
     }
-    const barData = getCommentBarData(ratingMatrix) || [];
-    const lines = barData.map((_bar: unknown, i: number) => {
+    const lines = ratingMatrix.map((votes, i: number) => {
       const label = questionLabels[i] || `#${i + 1}`;
       const originalId = allQuestions[i];
       const prompt = questionPrompts[originalId] || '(No prompt)';
-      const votes = ratingMatrix[i];
 
       const agrees = votes.filter((v) => v === 1).length;
       const disagrees = votes.filter((v) => v === -1).length;

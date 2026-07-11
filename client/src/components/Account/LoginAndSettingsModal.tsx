@@ -74,8 +74,8 @@ import {
   saveLocalResourceKeys,
   clearLocalResourceKeys,
 } from '../../utilities/session/resourceKeys.js';
-import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
+import type { WorkerResourcePresence } from '../../utilities/worker/workerResourcePresence';
 import { resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { markUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
 import { notify } from '../../utilities/ui/notify.js';
@@ -109,6 +109,7 @@ import {
   buildLoginSettingsSponsorshipCards,
   formatResourceSponsorHint as formatLoginSettingsResourceSponsorHint,
   getSponsoredKeyAliases,
+  mergeWorkerResourcePresenceIntoSponsoredKeys,
 } from './loginSettingsSponsoredStatusHelpers';
 import {
   LOGIN_SETTINGS_AI_REASONING_LEVELS as AI_REASONING_LEVELS,
@@ -118,6 +119,7 @@ import {
 import LoginAgentTokenPanel from './LoginAgentTokenPanel';
 import { createLoginAgentActions } from './loginAndSettingsAgentTokenActions';
 import { createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
+import { loadLoginSettingsSponsoredAccess } from './loginSettingsSponsoredAccessRuntime';
 
 const accountLog = createLogger('account');
 const normalizeAccountForComparison = (value: unknown): string =>
@@ -175,6 +177,7 @@ interface LoginAndSettingsModalState {
   resourceKeysStatus: string;
   sponsoredAccess: any;
   sponsoredAccessLoading: boolean;
+  workerResourcePresence: WorkerResourcePresence | null;
   sessionScanScope: string;
   sessionScanSlugs: string[];
   sessionScanSlugsInput: string;
@@ -364,6 +367,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       resourceKeysStatus: '',
       sponsoredAccess: null,
       sponsoredAccessLoading: false,
+      workerResourcePresence: null,
       sessionScanScope: normalizeSessionScanScope(this.props.selectedSessionScope || readSessionScanScope()),
       sessionScanSlugs: Array.isArray(initialSessionScanSlugs) ? initialSessionScanSlugs : [],
       sessionScanSlugsInput: (Array.isArray(initialSessionScanSlugs) ? initialSessionScanSlugs : [])
@@ -813,11 +817,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const testFundsContextChanged =
       this.getTestFundsRequestContextKey(this.props, this.state) !==
       this.getTestFundsRequestContextKey(prevProps, prevState);
+    const accountChanged = this.props.account !== prevProps.account;
+    const settingsOpened = this.props.loginModalToggled && !prevProps.loginModalToggled;
+    const needsSponsoredAccessRefresh = accountChanged || activeSessionChanged || settingsOpened;
     if (this.getWalletChainId() !== this.getWalletChainId(prevProps)) needsBalanceCheck = true;
-    if (this.props.account !== prevProps.account) {
+    if (accountChanged) {
       needsBalanceCheck = true;
       this.setStateIfMounted({ wagmiLoginUpdateNeeded: true });
-      this.loadSponsoredAccess();
     }
     if (this.props.provider !== prevProps.provider) needsBalanceCheck = true;
     if (this.props.wagmiAddress !== prevProps.wagmiAddress) needsBalanceCheck = true;
@@ -866,9 +872,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     if (activeSessionChanged) {
       this.loadAiSettings();
       this.loadResourceKeys();
-      this.loadSponsoredAccess();
       this.syncPasskeyWalletChain();
     }
+    if (needsSponsoredAccessRefresh) this.loadSponsoredAccess();
 
     const prevScope = normalizeSessionScanScope(prevProps.selectedSessionScope || '');
     const nextScope = normalizeSessionScanScope(this.props.selectedSessionScope || '');
@@ -1173,33 +1179,28 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   loadSponsoredAccess = async () => {
     const slug = this.getActiveSessionSlug();
-    const cfg = getSessionConfigBySlugOrDefault(slug) || {};
-    const account = this.props.account || '';
     const reqId = (this._sponsoredReqId = (this._sponsoredReqId || 0) + 1);
-    this.setStateIfMounted({ sponsoredAccessLoading: true });
+    this.setStateIfMounted({ sponsoredAccessLoading: true, workerResourcePresence: null });
     try {
-      const keys = ['ai', 'arweave', 'rpc', 'txGas'];
-      const results = await Promise.all(
-        keys.map((resourceKey: any) =>
-          checkSponsoredAccess({
-            sessionConfig: cfg,
-            sessionSlug: slug,
-            account,
-            resourceKey,
-          }),
-        ),
-      );
+      const { accessMap, workerResourcePresence } = await loadLoginSettingsSponsoredAccess({
+        slug,
+        sessionConfig: getSessionConfigBySlugOrDefault(slug) || {},
+        account: this.props.account || '',
+        providerLike: this.props.provider || null,
+        fallbackChainId: this.getTargetNetwork()?.id,
+        // Regression guard: old workers may reject resource-presence. Only probe
+        // when the settings UI that consumes the result is actually visible.
+        includeWorkerResourcePresence: !!this.props.loginModalToggled,
+      });
       if (reqId !== this._sponsoredReqId) return;
-      const accessMap = {
-        ai: results[0],
-        arweave: results[1],
-        rpc: results[2],
-        txGas: results[3],
-      };
-      this.setStateIfMounted({ sponsoredAccess: accessMap, sponsoredAccessLoading: false });
+      this.setStateIfMounted({
+        sponsoredAccess: accessMap,
+        sponsoredAccessLoading: false,
+        workerResourcePresence,
+      });
     } catch (_) {
       if (reqId !== this._sponsoredReqId) return;
-      this.setStateIfMounted({ sponsoredAccessLoading: false });
+      this.setStateIfMounted({ sponsoredAccessLoading: false, workerResourcePresence: null });
     }
   };
 
@@ -1617,6 +1618,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       active,
       '',
     ]);
+    const readSponsoredKeys = (slug: string, cfg: Record<string, unknown> | undefined) =>
+      mergeWorkerResourcePresenceIntoSponsoredKeys(
+        cfg?.sponsoredKeys && typeof cfg.sponsoredKeys === 'object'
+          ? (cfg.sponsoredKeys as Record<string, unknown>)
+          : {},
+        slug === active ? this.state.workerResourcePresence : null,
+      );
     const configBySlug = new Map<string, Record<string, unknown>>();
     const sponsoredSourceSignature = sourceSlugs.map((slug: string) => {
       const cfg = this.getDisplaySessionConfig(slug);
@@ -1625,7 +1633,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         slug,
         sessionName: cfg?.sessionName || cfg?.name || cfg?.title || '',
         networkChainId: cfg?.networkChainId || cfg?.chainId || '',
-        sponsoredKeys: cfg?.sponsoredKeys && typeof cfg.sponsoredKeys === 'object' ? cfg.sponsoredKeys : {},
+        sponsoredKeys: readSponsoredKeys(slug, cfg),
       };
     });
     const memoKey = JSON.stringify({
@@ -1646,7 +1654,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       const descriptor = this.getSessionDescriptor(slug, cfg, active);
       entries.set(slug, {
         ...descriptor,
-        sponsoredKeys: cfg?.sponsoredKeys && typeof cfg.sponsoredKeys === 'object' ? cfg.sponsoredKeys : {},
+        sponsoredKeys: readSponsoredKeys(slug, cfg),
       });
     };
 

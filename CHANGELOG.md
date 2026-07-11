@@ -2,16 +2,63 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- Completed the frontend modernization baseline with typed domain boundaries,
+  downward-only type-debt and size ratchets, decomposed session, survey, and
+  application shells, split CI/release verification, synchronized worker-bundle
+  checks, and public-release surface validation.
+- Added stable automation hooks for gate-lock state and gate selection without
+  changing user-facing behavior.
+- Hardened public documentation packaging so operator runbooks and internal
+  planning material are stripped, while retained Markdown is checked for
+  private references, unavailable commands, and broken local links.
+- Hardened public release artifacts so private file inventories are not
+  published, retained text is scanned for private references, and unowned image
+  files fail verification; removed unused image assets without changing the
+  active animated logos.
+- Reduced the two active logo GIFs by about two thirds while preserving their
+  dimensions, duration, looping behavior, luminosity-blended presentation, and
+  current Navbar and SBT loading owners.
+- Enlarged the sparse three-card Tools view so its image cards use the available
+  full-screen width and viewport height while retaining compact mobile sizing.
+- Replaced the default Tools image-card status frame with UserPage-style 3D
+  depth, keeping live/future borders visible only while demo mode is enabled.
+- Split the desktop main-screen welcome controls into equal-height rows and
+  aligned their rail to the slide edges without changing session welcome slides.
+
+### Fixed
+
+- Fixed passkey survey-response uploads by preserving object-valued EIP-1193
+  providers through worker authentication, kept SBT metadata and image reads on
+  AR.IO while direct mode is enabled, and serialized shared RPC reads per
+  endpoint so one 429 stops queued requests before they create a console burst.
+- Fixed active-session SBT loading and sponsorship reporting by avoiding full
+  registry enumeration, refreshing selected worker fields before survey
+  uploads, moving the rate-limited Tenderly OP Sepolia gateway to the last
+  fallback, and reading boolean-only resource presence from the session worker.
+- Prevented repeated RPC retries against browser-forbidden (`403`) endpoints,
+  and constrained returning passkey-wallet unlocks to the stored credential so
+  SBT mint/sign prompts do not reopen the passkey account chooser.
+- Removed failing anonymous OP Sepolia fallback fanout from cold session loads,
+  deferred worker resource-presence checks until account settings are opened,
+  and resolved Vite's browser `buffer` shim explicitly.
+
 ## [0.7.0] - 2026-07-06
 
 ### Added
 
-- Published the M1 public release through a history-preserving
-  `release-staging` PR, keeping the public-safe commit narrative on `main`.
+- Published the M1 source release with a curated public tree and public-safe
+  history on `main`.
 - Added the mode-first session creation entry flow for Cloudflare-backed and
   decentralized sessions, with the existing setup UI revealed after Continue.
 - Added public release PII scanning and stricter public push protection for
   release branches.
+- Added a default-off MetaMask build profile. Passkey-only builds remove the
+  MetaMask login control and fail if MetaMask/RainbowKit connector modules or
+  assets enter the emitted client bundle.
 
 ### Fixed
 
@@ -25,11 +72,17 @@ All notable changes to this project will be documented in this file.
 - Tag `v0.7.0` after the public `main` state and latest worker-bundle release
   asset smoke check are confirmed.
 
+## 2026-07-03
+
+### Completed TODOs
+
+- Added the public `/posts` route backed by root-level Markdown files, a default-on `REACT_APP_CE_ABOUT_POSTS_ENABLED` toggle, an About-page Posts link, static Vite serving/copying for `posts/`, per-post attachment directories, manifest header images, Markdown image blocks, and initial `ce-viz` post exhibits for category dot grids, ranked theme panels, theme networks, and quote walls.
+
 ## 2026-06-09
 
 ### Completed TODOs
 
-- Added a public-release surface verifier that blocks JavaScript/TypeScript imports into stripped paths before release replay branches are imported or pushed, changed the Worker Chipotle tests to read the public client action catalog instead of the stripped `contextEngine-cc` mirror, and made release replay run public `test:node` before push so stripped public-copy regressions fail locally.
+- Added a public-release surface verifier that blocks JavaScript/TypeScript imports into stripped paths before release branches are imported or pushed, changed the Worker Chipotle tests to read the public client action catalog instead of a private mirror, and made release replay run public `test:node` before push so stripped public-copy regressions fail locally.
 
 ## 2026-06-06
 

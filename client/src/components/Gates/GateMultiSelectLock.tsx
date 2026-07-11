@@ -194,6 +194,7 @@ const GateMultiSelectLock = ({
         aria-expanded={canEditGateLock ? open : undefined}
         aria-haspopup={canEditGateLock ? 'dialog' : undefined}
         data-testid={E2E_TESTIDS.GATE_LOCK_BUTTON}
+        data-ce-lock-state={locked ? 'locked' : 'unlocked'}
       >
         <FontAwesomeIcon
           icon={locked ? faLock : faLockOpen}
@@ -237,6 +238,7 @@ const GateMultiSelectLock = ({
                     className={styles.checkbox}
                     checked={checked}
                     onChange={() => toggleGate(gateId)}
+                    data-testid={E2E_TESTIDS.GATE_LOCK_CHECKBOX}
                   />
                   <span
                     className={`${styles.selectionMark}${checked ? ` ${styles.selectionMarkActive}` : ''}`}

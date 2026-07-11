@@ -4,7 +4,7 @@ Primary product and system specification:
 - `spec.md` (repo root)
 
 Canonical reference set:
-- root docs: `README.md`, `ARCHITECTURE.md`, `AGENTS.md`, `spec.md`
+- root docs: `README.md`, `ARCHITECTURE.md`, `CONTRIBUTING.md`, `spec.md`
 - the `docs/` reference docs listed below
 - `docs/architecture-overview.md` is the first-read architecture and verification
   map for new engineers and auditors
@@ -24,15 +24,18 @@ When you add or change a feature, update documentation in the same PR:
 
 ## Core Docs
 
-Code navigation maps:
-- `docs/ai-agent-bootstrap.md`: current AI-agent entry points and supported contracts.
-- `docs/MainSite.MAP.md`: app-shell route/runtime orchestration map.
-- `docs/SurveyTool.MAP.md`: survey/question runtime and encryption flow map.
-- `docs/SessionWizard.MAP.md`: session creation, worker deploy, and publish-flow map.
-- `docs/contractScripts.MAP.md`: web3 integration/navigation map for the `chainGateway` / legacy `contractScripts` surface.
+Architecture and repository conventions:
+- `docs/architecture-overview.md`: first-read runtime, storage, contract, and verification map.
+- `docs/adr/0001-client-domain-boundaries.md`: client domain-boundary rules.
+- `docs/adr/0002-worker-auth-revalidation.md`: worker authentication revalidation policy.
+- `docs/adr/0003-storage-port-and-read-model.md`: storage port and read-model boundary.
+- `docs/adr/0004-worker-auth-consistency-risk-acceptance.md`: accepted worker consistency limits.
+- `docs/adr/0005-route-table-migration.md`: route-table migration decision.
+- `docs/repo-structure.md`: canonical source naming and placement rules.
 
 Session, gates, and the Worker:
 - `docs/session-creation-guide.md`: End-to-end setup guide for creating a session from `/new`, including the "what a new session needs" checklist, sponsored bundle handoff, worker deploy paths, on-chain registration, and `/admin` verification.
+- `docs/posts.md`: Public `/posts` route, root `posts/` Markdown authoring, and `ce-viz` exhibit blocks.
 - `docs/session-listening-mode.md`: `?mode=listening` pile-adjacent microphone workflow, rolling 3-minute transcription, local recovery metadata, and question-generation output.
 - `docs/standard-sponsored-links-fixture.md`: Temporary tracked fixture for publishing a small set of public sponsored setup links with minimal onboarding friction.
 - `docs/session-registry.md`: SessionRegistry migration and on-chain gate authority model.
@@ -54,32 +57,25 @@ Payload schemas:
 - `docs/arweave-payloads.md`: Example Arweave payload shapes for surveys, questions, and SBT tokenURI JSON.
 
 Local development:
+- `docs/bundle-budget.md`: bundle-size budget and regression policy.
 - `docs/client-build-assets.md`: Vite build outputs over 500 KB, source ownership, and safe follow-up actions.
 - `docs/local-chain.md`: Foundry/Anvil local chain setup, deploy flow, and test commands.
 - `docs/run-modes.md`: repo run modes (`core-local`, `local-chain`, `hosted/onchain`) plus the current manual-fork verification note.
 - `docs/testing.md`: centralized test commands and runtime requirements across root, client, and E2E flows.
 
-Release:
-- `docs/dependency-audit-hotspots.md`: dependency audit remediations, accepted residuals, and package-specific audit commands.
-- `docs/dependency-audit.md`: current client npm audit disposition ledger and blocked/deferred package-family decisions.
-- `docs/release-runbook.md`: operator release checklist, gates, public strip policy, worker bundle publishing, and rollback notes.
-- `docs/releasing.md`: Public-history replay, stripped artifact export, and release hygiene checks.
-- `docs/security/at-rest-hardening-decision-note.md`: current passkey at-rest evidence and required decisions before worker KV secret encryption.
-- `docs/security/audit-prep-2026-07-06.md`: built-in audit-prep snapshot covering npm audit disposition, secrets/config sweeps, and contracts/worker inventory.
-- `docs/security-sweeps.md`: full-history secret-sweep commands, raw match counts, and dispositions.
-- `docs/testing-budget.md`: full client/test:node runtime budget, coverage snapshot, and slowest-suite report.
-- `docs/typescript-strictness-plan.md`: plan for moving from count ratchets toward directory-level compiler strictness.
+Design and public presentation:
+- `docs/design-system.md`: shared visual and interaction conventions.
+- `docs/visual-identity.md`: public visual identity and asset guidance.
+- `docs/reference-links.md`: background references used by the project documentation.
 
 Wallets:
 - `docs/passkey-wallet.md`: passkey-unlocked EOA wallet wiring and deterministic test wallet workflow.
 - `docs/forking-wallet.md`: RP ID and wallet setup checklist for forks.
 - `docs/security-model.md`: embedded wallet and soft-session security model.
-- `docs/passkey-wallet-migration-audit.md`: Porto migration audit and remaining risks.
 
-E2E workflows:
-- `docs/e2e-setup.md`: End-to-end workflow scripts, chain runtime modes, and the current manual-fork workflow for repeated verification against live deployments.
-- `docs/e2e-cadence.md`: operator cadence for nightly, pre-release, and per-lane E2E runs plus the E2E-BLOCKED protocol.
-- `docs/e2e-testid-api.md`: Stable `data-testid` hooks used by Playwright runners (TestID API).
+Verification:
+- `docs/testing.md`: public test commands and supported local verification paths.
+- `docs/bundle-budget.md`: client bundle-size thresholds and remediation guidance.
 
 Public discovery:
 - `docs/discoverability.md`: Static crawl assets, live GitHub branch links, and the Google Search Console checklist.

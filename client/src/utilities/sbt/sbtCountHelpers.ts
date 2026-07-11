@@ -33,7 +33,6 @@ export interface SbtCountState {
   burnedCountByAddress?: SbtCountMap | null;
   mintedEventCount?: number;
   burnedEventCount?: number;
-  [key: string]: unknown;
 }
 
 export const normalizeSbtCountMap = (value: Record<string, unknown> | null = null): SbtCountMap => {

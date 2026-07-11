@@ -65,6 +65,19 @@ const isRecord = (value: unknown): value is UnknownRecord =>
 
 const toRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
 
+const mergeDisplaySessionConfig = (overlay: UnknownRecord, canonical: UnknownRecord): LoginDisplaySessionConfig => ({
+  ...overlay,
+  ...canonical,
+  sponsoredKeys: {
+    ...(isRecord(overlay.sponsoredKeys) ? overlay.sponsoredKeys : {}),
+    ...(isRecord(canonical.sponsoredKeys) ? canonical.sponsoredKeys : {}),
+  },
+  contracts: {
+    ...(isRecord(overlay.contracts) ? overlay.contracts : {}),
+    ...(isRecord(canonical.contracts) ? canonical.contracts : {}),
+  },
+});
+
 const toStr = (value: unknown): string => String(value ?? '').trim();
 
 export const formatAgentTokenError = (error: unknown): string => {
@@ -91,7 +104,12 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
     const propConfigRecord = isRecord(propSessionConfig) ? propSessionConfig : null;
     const propConfigSlug = deps.normalizeSettingsSessionSlug(propConfigRecord?.slug || slug);
     if (!cfgIn && propConfigRecord && propConfigSlug === slug) {
-      return propConfigRecord;
+      const canonicalConfig = deps.getSessionConfigBySlugOrDefault(slug);
+      // Regression guard: route/demo overlays may add display fields, but registry
+      // worker URLs and sponsorship flags remain operational authority.
+      return isRecord(canonicalConfig)
+        ? mergeDisplaySessionConfig(propConfigRecord, canonicalConfig)
+        : propConfigRecord;
     }
     return toRecord(
       cfgIn ||

@@ -9,7 +9,7 @@ const ARWEAVE_FAILURE_PENDING_RETRY_MS = 30 * 1000;
 const ARWEAVE_FAILURE_INVALID_RETRY_MS = 30 * 60 * 1000;
 const MAX_FAILURE_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-type FailureCacheEntry = {
+export type FailureCacheEntry = {
   attempts?: number;
   firstFailedAtMs?: number;
   kind?: string;

@@ -35,8 +35,6 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'package.json',
       JSON.stringify({
         scripts: {
-          'test:surveys-sbt':
-            'src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js',
           'test:contracts':
             'forge test --match-contract "^(SurveysTest|CustomSBTTest|SessionRegistryTest|SurveysFuzzTest|CustomSBTFuzzTest|SessionRegistryFuzzTest|CustomSBTInvariantTest)$"',
           'test:root:jest':
@@ -46,6 +44,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:node:tracked': 'node scripts/run-node-tests.js --tracked-only',
           'client-boundaries:check': 'node scripts/check-client-boundaries.mjs',
           'dead-exports:advisory': 'node scripts/check-dead-exports-advisory.mjs',
+          'dead-exports:check': 'node scripts/check-dead-exports-advisory.mjs --check',
           'test:e2e': 'npm run -s test:e2e:smoke',
           'test:e2e:quick': 'npm run -s test:e2e:smoke',
           'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',
@@ -54,8 +53,9 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'coverage-floor:check': 'node scripts/check-coverage-floor.mjs',
           'test:ci':
             'npm run test:wiring && npm run type-debt:check && npm run verify:release && npm run test:client && npm run coverage-floor:check && npm run test:root:jest && npm run test:worker:session-cors && npm run test:node',
-          'test:wiring': 'node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check',
-          tests: 'npm run test:ci && npm run test:surveys-sbt',
+          'test:wiring':
+            'node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check && npm run -s dead-exports:check',
+          tests: 'npm run test:ci',
           'test:client': 'npm test -- --coverage --coverageReporters=json-summary',
           'test:release:client':
             'cd client && npm test -- --watchAll=false --runInBand',
@@ -64,9 +64,11 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'deploy-helper:deploy': 'node scripts/deploy-helper-deploy.mjs',
           'verify:worker-bundle': 'node scripts/verify-worker-bundle-sync.mjs',
           'verify:public-release-surface': 'node scripts/verify-public-release-surface.js',
+          'verify:public-assets': 'node scripts/verify-public-assets.js',
+          'verify:public-text': 'node scripts/verify-public-text.js',
           'verify:public-release-pii': 'bash scripts/verify-public-release-pii.sh',
           'verify:release':
-            'npm run lint && npm run typecheck:client && npm run -s test:node:tracked && npm run test:release:client && npm run verify:public-release-surface && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
+            'npm run lint && npm run typecheck:client && npm run -s test:node:tracked && npm run test:release:client && npm run verify:public-release-surface && npm run verify:public-assets && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
         },
       }),
     );
@@ -77,19 +79,16 @@ test('public-release style copies without .git still pass wiring checks', () => 
         'jobs:',
         '  wiring-and-release:',
         '    steps:',
-        '      - uses: actions/checkout@v4',
-        '        with:',
-        '          fetch-depth: 0',
         '      - run: npm run test:wiring',
         '      - run: npm run type-debt:check',
         '      - env:',
         '          BASELINE_MONOTONICITY_BASE: ${{ github.event.pull_request.base.sha || \'origin/main\' }}',
-        '        run: |',
-        '          BASELINE_MONOTONICITY_COMMIT_TEXT="$(git log --format=%B "$BASELINE_MONOTONICITY_BASE"..HEAD || true)"',
-        '          node scripts/check-baseline-monotonicity.mjs',
+        '        run: node scripts/check-baseline-monotonicity.mjs',
         '      - run: npm run lint',
         '      - run: npm run typecheck:client',
         '      - run: npm run verify:public-release-surface',
+        '      - run: npm run verify:public-assets',
+        '      - run: npm run verify:public-text',
         '      - run: npm run worker:bundle',
         '      - run: npm run verify:worker-bundle',
         '      - run: npm --prefix client run build',
@@ -111,7 +110,6 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '      - run: npm run test:worker:session-cors',
         '  cecc-and-node:',
         '    steps:',
-        '      - run: npm run test:cc',
         '      - run: npm run test:node',
         '      - run: npm run test:cache-guard',
         '      - continue-on-error: true',
@@ -157,6 +155,12 @@ test('public-release style copies without .git still pass wiring checks', () => 
         'verify_public_type_debt() {',
         '  npm run type-debt:check',
         '}',
+        'verify_public_assets() {',
+        '  node scripts/verify-public-assets.js',
+        '}',
+        'verify_public_text() {',
+        '  node scripts/verify-public-text.js',
+        '}',
       ].join('\n'),
     );
 
@@ -176,6 +180,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/coverage-baseline.json',
       'scripts/check-dead-exports-advisory.mjs',
       'scripts/check-dead-exports-advisory.test.mjs',
+      'scripts/dead-exports-baseline.json',
       'scripts/check-baseline-monotonicity.mjs',
       'scripts/check-baseline-monotonicity.test.mjs',
       'scripts/testInventoryConfig.js',
@@ -187,6 +192,12 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/verify-worker-bundle-sync.test.js',
       'scripts/verify-public-release-surface.js',
       'scripts/verify-public-release-surface.test.js',
+      'scripts/verify-public-docs.js',
+      'scripts/verify-public-docs.test.js',
+      'scripts/verify-public-assets.js',
+      'scripts/verify-public-assets.test.js',
+      'scripts/verify-public-text.js',
+      'scripts/verify-public-text.test.js',
       'scripts/verify-public-release-pii.sh',
       'scripts/verify-public-release-pii.test.js',
       'workers/sessionCorsWorker/package.json',

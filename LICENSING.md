@@ -8,7 +8,6 @@ The public open-source core is licensed under `MPL-2.0`. The root [LICENSE](LICE
 
 - The public open-source core is `MPL-2.0` by default.
 - The worker subtree is `MIT`.
-- `contextEngine-cc/` is a separately licensed add-on and remains `CPAL-1.0`.
 - Project-authored annotations in `ai-discourse-corpus/` are dedicated under `CC0-1.0`.
 - Files with explicit SPDX identifiers or local license notices remain under those notices.
 - Third-party dependencies, assets, and tooling keep their own licenses.
@@ -20,13 +19,11 @@ The public open-source core is licensed under `MPL-2.0`. The root [LICENSE](LICE
 | `LICENSE` | `MPL-2.0` | Standard MPL 2.0 text for the public open-source core default. |
 | `package.json` / `package-lock.json` | `MPL-2.0` | Root package metadata for repo-level project code and tooling unless a more specific notice applies. |
 | `client/` | `MPL-2.0` | Main browser app/package. `client/package.json` declares `MPL-2.0`, and `client/LICENSE` points to the root MPL text. |
-| `contextEngine-cc/` | `CPAL-1.0` | Separately licensed add-on package. It is not part of the default MPL-2.0 public core, and its package metadata and local `LICENSE` control. |
 | Repository docs/spec prose | `MPL-2.0` unless a more specific local note says otherwise | The previous map treated remaining docs/spec material as part of the root default license. No separate documentation-content license notice was found. |
 | Files with `SPDX-License-Identifier: MIT` | MIT | Explicit file-level notices control, including Solidity contracts, deployment scripts, and contract tests that carry MIT SPDX headers. |
 | `workers/` | MIT | Worker subtree. `workers/LICENSE` contains the MIT text for worker-side project code. |
 | `workers/sessionCorsWorker/` | MIT | Cloudflare worker/tooling package. `workers/sessionCorsWorker/package.json` declares `MIT`, and `workers/sessionCorsWorker/LICENSE` points to the subtree MIT text. |
 | `workers/deploy-helper/` | MIT | Helper worker source that stays on the worker side of the boundary. |
-| `workers/agentBridgeWorker/` | MIT while private | Private demo worker package. Its local package/license notices control while it exists in private repo states. |
 | `ai-discourse-corpus/` | Mixed upstream rights; `CC0-1.0` for project-authored annotations | No ownership is claimed over upstream linked/source material. See `ai-discourse-corpus/LICENSE.md` for the directory-specific rights notice covering summaries, tags, and structure. |
 
 This map does not override more specific file, directory, package, or third-party notices.

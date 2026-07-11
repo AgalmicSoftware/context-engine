@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from 'react';
 
 import { useAccount, useBalance, useBlockNumber, useNetwork, useProvider, useDisconnect } from 'wagmi';
-import { useConnectModal, useAccountModal, useChainModal } from '@rainbow-me/rainbowkit';
+import { useConnectModal, useAccountModal, useChainModal } from '../../app/runtime/walletUiRuntime.js';
 import { base, baseSepolia } from '../../variables/chains.js';
 import { getSessionNetwork } from '../../utilities/web3/chainGateway.js';
 import { clearUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';

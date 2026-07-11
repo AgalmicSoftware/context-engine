@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 
 export const DEFAULT_ROOT_DIR = path.resolve(__dirname, '..');
 export const SOURCE_ROOT = 'client/src';
+export const DEAD_EXPORT_BASELINE_PATH = 'scripts/dead-exports-baseline.json';
 
 const SOURCE_FILE_RE = /\.(?:js|jsx|mjs|cjs|ts|tsx)$/;
 const DECLARATION_FILE_RE = /\.d\.ts$/;
@@ -106,14 +107,18 @@ function resolveClientImport(sourceFile, specifier, fileSet) {
     return null;
   }
 
+  const explicitExtension = path.posix.extname(basePath);
+  const extensionlessBase = SOURCE_FILE_RE.test(explicitExtension)
+    ? basePath.slice(0, -explicitExtension.length)
+    : basePath;
   const candidates = [
     basePath,
-    `${basePath}.js`,
-    `${basePath}.jsx`,
-    `${basePath}.mjs`,
-    `${basePath}.cjs`,
-    `${basePath}.ts`,
-    `${basePath}.tsx`,
+    `${extensionlessBase}.js`,
+    `${extensionlessBase}.jsx`,
+    `${extensionlessBase}.mjs`,
+    `${extensionlessBase}.cjs`,
+    `${extensionlessBase}.ts`,
+    `${extensionlessBase}.tsx`,
     `${basePath}/index.js`,
     `${basePath}/index.jsx`,
     `${basePath}/index.ts`,
@@ -121,6 +126,23 @@ function resolveClientImport(sourceFile, specifier, fileSet) {
   ];
 
   return candidates.find((candidate) => fileSet.has(candidate)) || null;
+}
+
+// Parity-locked runtime twins (e.g. rpcDefaults.{js,ts}, litChipotlePolicy.{js,ts})
+// are one module: the .js exists only for no-loader runtime consumers and is
+// pinned byte-equivalent in behavior by a parity test. Reachability and
+// export-usage accounting must not report either twin as dead while the other
+// is alive.
+function resolveTwinSibling(file, fileSet) {
+  if (file.endsWith('.js')) {
+    const twin = `${file.slice(0, -'.js'.length)}.ts`;
+    return fileSet.has(twin) ? twin : null;
+  }
+  if (file.endsWith('.ts')) {
+    const twin = `${file.slice(0, -'.ts'.length)}.js`;
+    return fileSet.has(twin) ? twin : null;
+  }
+  return null;
 }
 
 function extractImportSpecifiers(sourceText) {
@@ -184,7 +206,11 @@ export function collectDeadExportAdvisory({ rootDir = DEFAULT_ROOT_DIR } = {}) {
     extractImportSpecifiers(sourceText)
       .map((specifier) => resolveClientImport(file, specifier, fileSet))
       .filter(Boolean)
-      .forEach((resolved) => importedFiles.add(resolved));
+      .forEach((resolved) => {
+        importedFiles.add(resolved);
+        const twin = resolveTwinSibling(resolved, fileSet);
+        if (twin) importedFiles.add(twin);
+      });
     fileExports.push({
       file,
       exports: extractNamedExports(sourceText),
@@ -194,10 +220,16 @@ export function collectDeadExportAdvisory({ rootDir = DEFAULT_ROOT_DIR } = {}) {
   const candidateDeadFiles = fileExports
     .filter(({ file, exports }) => isCandidateFile(file) && exports.length > 0 && !importedFiles.has(file))
     .map(({ file }) => file);
+  const exportsByFile = new Map(fileExports.map(({ file, exports }) => [file, exports]));
   const candidateUnusedExports = fileExports
     .filter(({ file }) => isCandidateFile(file))
     .flatMap(({ file, exports }) => exports
       .filter((exportName) => !allIdentifiers.has(exportName))
+      .filter((exportName) => {
+        // A shared twin export counts once, attributed to the .ts side.
+        const twin = resolveTwinSibling(file, fileSet);
+        return !(twin && file.endsWith('.js') && (exportsByFile.get(twin) || []).includes(exportName));
+      })
       .map((exportName) => ({ file, exportName })));
 
   return {
@@ -233,6 +265,64 @@ export function runDeadExportAdvisory({ rootDir = DEFAULT_ROOT_DIR, stdout = con
   return 0;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exit(runDeadExportAdvisory());
+function readDeadExportBaseline(rootDir) {
+  const baselinePath = path.join(rootDir, DEAD_EXPORT_BASELINE_PATH);
+  const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+  const candidateDeadFiles = Number(baseline?.candidateDeadFiles);
+  const candidateUnusedExports = Number(baseline?.candidateUnusedExports);
+  if (!Number.isFinite(candidateDeadFiles) || candidateDeadFiles < 0) {
+    throw new Error(`${DEAD_EXPORT_BASELINE_PATH} candidateDeadFiles must be a non-negative number`);
+  }
+  if (!Number.isFinite(candidateUnusedExports) || candidateUnusedExports < 0) {
+    throw new Error(`${DEAD_EXPORT_BASELINE_PATH} candidateUnusedExports must be a non-negative number`);
+  }
+  return { candidateDeadFiles, candidateUnusedExports };
+}
+
+export function collectDeadExportRatchet({ rootDir = DEFAULT_ROOT_DIR } = {}) {
+  const current = collectDeadExportAdvisory({ rootDir });
+  const baseline = readDeadExportBaseline(rootDir);
+  return {
+    current,
+    baseline,
+    deadFileIncrease: Math.max(0, current.candidateDeadFiles.length - baseline.candidateDeadFiles),
+    unusedExportIncrease: Math.max(0, current.candidateUnusedExports.length - baseline.candidateUnusedExports),
+  };
+}
+
+export function runDeadExportCheck({
+  rootDir = DEFAULT_ROOT_DIR,
+  stdout = console.log,
+  stderr = console.error,
+} = {}) {
+  let result;
+  try {
+    result = collectDeadExportRatchet({ rootDir });
+  } catch (error) {
+    stderr(`Dead export ratchet failed: ${error.message}`);
+    return 1;
+  }
+
+  const { current, baseline, deadFileIncrease, unusedExportIncrease } = result;
+  if (deadFileIncrease > 0) {
+    stderr(
+      `Dead export ratchet failed: candidate dead files increased: ${baseline.candidateDeadFiles} -> ${current.candidateDeadFiles.length}.`,
+    );
+  }
+  if (unusedExportIncrease > 0) {
+    stderr(
+      `Dead export ratchet failed: candidate unused named exports increased: ${baseline.candidateUnusedExports} -> ${current.candidateUnusedExports.length}.`,
+    );
+  }
+  if (deadFileIncrease > 0 || unusedExportIncrease > 0) return 1;
+
+  stdout(
+    `Dead export ratchet passed: dead files ${current.candidateDeadFiles.length}/${baseline.candidateDeadFiles}; unused named exports ${current.candidateUnusedExports.length}/${baseline.candidateUnusedExports}.`,
+  );
+  return 0;
+}
+
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+  process.exit(process.argv.includes('--check') ? runDeadExportCheck() : runDeadExportAdvisory());
 }

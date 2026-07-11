@@ -77,7 +77,7 @@ describe('loginAndSettings auth controllers', () => {
     );
   });
 
-  it('resolves agent-token session context from prop config before fallbacks', () => {
+  it('keeps canonical agent-token operational fields authoritative over a matching prop overlay', () => {
     const actions = createLoginAgentActions({
       changeAccount: jest.fn(),
       exchangeAgentClientLogin: async () => envelope,
@@ -86,7 +86,11 @@ describe('loginAndSettings auth controllers', () => {
       getAgentTokenInput: () => '',
       getDemoSessionConfigBySlug: () => ({ slug: 'demo' }),
       getPropSessionConfig: () => ({ slug: 'alpha', agentBridgeUrl: 'https://bridge.example/' }),
-      getSessionConfigBySlugOrDefault: () => ({ slug: 'fallback' }),
+      getSessionConfigBySlugOrDefault: () => ({
+        slug: 'alpha',
+        agentBridgeUrl: 'https://registry-bridge.example/',
+        sponsoredKeys: { ai: true },
+      }),
       getTargetNetwork: () => ({ id: 11155420 }),
       isTelegramFirstSessionConfig: () => true,
       normalizeSettingsSessionSlug: (slug) =>
@@ -101,8 +105,13 @@ describe('loginAndSettings auth controllers', () => {
 
     expect(actions.getAgentTokenLoginSessionContext()).toEqual({
       sessionSlug: 'alpha',
-      sessionConfig: { slug: 'alpha', agentBridgeUrl: 'https://bridge.example/' },
-      agentBridgeUrl: 'https://bridge.example',
+      sessionConfig: {
+        slug: 'alpha',
+        agentBridgeUrl: 'https://registry-bridge.example/',
+        sponsoredKeys: { ai: true },
+        contracts: {},
+      },
+      agentBridgeUrl: 'https://registry-bridge.example',
     });
     expect(actions.shouldShowAgentTokenLogin()).toBe(true);
   });

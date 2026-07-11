@@ -20,6 +20,7 @@ const E2E_TESTIDS = Object.freeze({
   NAV_BOOKMARKS: 'ce-nav-bookmarks',
   NAV_CONTRACTS: 'ce-nav-contracts',
   NAV_ABOUT: 'ce-nav-about',
+  NAV_POSTS: 'ce-nav-posts',
   NAV_ADMIN: 'ce-nav-admin',
   NAV_SESSION: 'ce-nav-session',
   NAV_SESSION_DOCS: 'ce-nav-session-docs',
@@ -37,6 +38,7 @@ const E2E_TESTIDS = Object.freeze({
   PAGE_BOOKMARKS_ROOT: 'ce-page-bookmarks-root',
   PAGE_CONTRACTS_ROOT: 'ce-page-contracts-root',
   PAGE_ABOUT_ROOT: 'ce-page-about-root',
+  PAGE_POSTS_ROOT: 'ce-page-posts-root',
   PAGE_ADMIN_ROOT: 'ce-page-admin-root',
   PAGE_SPONSOR_ROOT: 'ce-page-sponsor-root',
   PAGE_SESSION_ROOT: 'ce-page-session-root',
@@ -246,6 +248,7 @@ const E2E_TESTIDS = Object.freeze({
   GATE_LOCK_BUTTON: 'ce-gate-lock-button',
   GATE_LOCK_POPOVER: 'ce-gate-lock-popover',
   GATE_LOCK_ROW: 'ce-gate-lock-row',
+  GATE_LOCK_CHECKBOX: 'ce-gate-lock-checkbox',
 
   // Session OnePageSession
   SESSION_PILE_BACK: 'ce-session-pile-back',

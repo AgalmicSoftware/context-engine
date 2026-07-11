@@ -237,8 +237,12 @@ export const mergeMainSiteSessionDisplayConfig = (
   }
 
   for (const field of DEMO_DISPLAY_OBJECT_FIELDS) {
-    if (isRecord(display[field]) && !isRecord(strictConfig[field])) {
-      merged[field] = { ...display[field] };
+    if (isRecord(display[field])) {
+      // Regression guard: registry metadata may contain a partial object. Keep
+      // fixture defaults such as blockLimits.start while registry values win.
+      merged[field] = isRecord(strictConfig[field])
+        ? { ...display[field], ...strictConfig[field] }
+        : { ...display[field] };
     }
   }
 

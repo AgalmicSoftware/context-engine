@@ -46,14 +46,14 @@ Precedence:
 1. URL param: `?ceSessionScanScope=active|general|list|all`
 2. localStorage: `ce:sessionScanScope`
 3. runtime flag: `globalThis.CE_SESSION_SCAN_SCOPE`
-4. repo default from `client/src/variables/appConfig.js`
+4. repo default from `client/src/variables/appConfig.ts`
 
 Slug list input (`CE_SESSION_SCAN_SLUGS`) precedence:
 
 1. URL param: `?ceSessionScanSlugs=general,my-session`
 2. localStorage: `ce:sessionScanSlugs`
 3. runtime flag: `globalThis.CE_SESSION_SCAN_SLUGS`
-4. repo default from `client/src/variables/appConfig.js`
+4. repo default from `client/src/variables/appConfig.ts`
 
 Slug normalization:
 
@@ -113,7 +113,7 @@ Scope modes exposed in the modal:
 
 ## Profile deep-scan defaults
 
-Current defaults from `client/src/variables/appConfig.js`:
+Current defaults from `client/src/variables/appConfig.ts`:
 
 - `CE_USER_PROFILE_SCAN_ALL_SESSIONS = false`
 - `CE_USER_PROFILE_SCAN_ALL_SESSIONS_SBTS = false`
@@ -133,7 +133,7 @@ Runtime precedence:
 2. `globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS_SURVEYS`
 3. `globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS_QUESTIONS`
 4. `globalThis.CE_USER_PROFILE_SCAN_ALL_SESSIONS` as the legacy fallback
-5. defaults from `appConfig.js`
+5. defaults from `appConfig.ts`
 
 ## Important list-scope nuance
 
@@ -283,10 +283,3 @@ When enabled, the app forces:
 
 - `globalThis.CE_GETLOGS_MAX_CONCURRENCY` default `1`
 - `globalThis.CE_GETLOGS_MAX_RETRIES` default `2`
-
-## E2E note
-
-The browser E2E harness disables PATH-first ordering unless `E2E_PREFER_PATH_RPC=1`.
-That is a test harness behavior, not the normal app default.
-
-See [`docs/e2e-setup.md`](e2e-setup.md) for the E2E-specific controls.

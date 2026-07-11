@@ -1,20 +1,19 @@
 # Repo Structure Contract
 
 This document is the canonical naming and placement contract for the repository.
-Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed in the TODO section until deliberately renamed or moved.
+Use it for new files, refactors, and cleanup PRs.
 
 ## 1. Root Layout
 
 - `client/` holds the React SPA, frontend assets, and frontend-adjacent tests.
 - `workers/` holds Cloudflare Worker source and worker-specific support files.
 - `contracts/` holds Solidity contracts, interfaces, and contract-focused tests.
-- `scripts/` holds automation, seeding, audits, migration helpers, and E2E entrypoints.
+- `scripts/` holds build, verification, migration, and supported automation entrypoints.
 - `foundry/` holds Foundry-specific Solidity entry points; `foundry/script/` and `foundry/test/` intentionally keep Foundry's singular directory names one level below repo root.
 - `docs/` holds canonical implementation and operations documentation.
-- `TODO/` is an ignored local area for private planning notes and unshipped work items.
-- `contextEngine-cc/` holds the local Claude Code companion integration.
+- `posts/` holds public Markdown posts and the `/posts` route manifest.
 - `tests/` holds source-of-truth root Node/Jest test harnesses that are not practical to colocate elsewhere; shared helpers live under `tests/helpers/`.
-- `artifacts/`, `broadcast/`, `cache/`, `dist/`, `out/`, and `tmp/` are generated or runtime output locations and are not canonical homes for new source files.
+- `broadcast/`, `cache/`, `dist/`, `out/`, and `tmp/` are generated or runtime output locations and are not canonical homes for new source files.
 - New top-level directories are rare. Reuse an existing root area unless the new code has a clearly separate runtime, deployment surface, or ownership boundary.
 
 ## 2. React Component Structure
@@ -41,7 +40,7 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 - Utilities, helpers, adapters, config modules, and data loaders use camelCase filenames.
 - This applies under `client/src/utilities/` and to helper-only files that live beside a component.
 - Utility directory buckets are lowercase by domain: `ai/`, `crypto/`, `session/`, `web3/`, etc.
-- Use `.js` or `.mjs` for non-React modules unless the file actually renders JSX.
+- Use `.ts` for non-JSX TypeScript modules. Reserve `.js`/`.mjs` for compatibility barrels, scripts, or modules that must stay plain JavaScript for non-TypeScript consumers.
 - Keep JSON fixtures or static data source-adjacent when they only support one feature.
 
 ## 4. Test Naming
@@ -78,6 +77,8 @@ Use it for new files, refactors, and cleanup PRs. Legacy exceptions stay listed 
 - Shared UI still belongs under `client/src/components/` in a PascalCase directory.
 - Cross-cutting non-UI code belongs under `client/src/utilities/<domain>/`.
 
-## TODO: Remaining Naming Violations
+## Exceptions
 
-- [ ] `scripts/build_external_llm_prompt.py` uses snake_case instead of kebab-case.
+Public source should follow this contract. Private operator-only compatibility
+tools, when present in the development tree, are tracked separately and are not
+part of the public naming contract.

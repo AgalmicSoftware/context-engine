@@ -4,6 +4,7 @@ import {
   formatSponsoredStatusMeta,
   formatResourceSponsorHint,
   getSponsoredKeyAliases,
+  mergeWorkerResourcePresenceIntoSponsoredKeys,
 } from './loginSettingsSponsoredStatusHelpers';
 
 describe('loginSettingsSponsoredStatusHelpers', () => {
@@ -11,6 +12,19 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
     expect(getSponsoredKeyAliases('txGas')).toEqual(['faucet', 'txGas']);
     expect(getSponsoredKeyAliases('ai')).toEqual(['ai']);
     expect(getSponsoredKeyAliases()).toEqual(['']);
+  });
+
+  it('uses selected-worker presence as operational truth without mutating registry keys', () => {
+    const registryKeys = { ai: true, faucet: true };
+    expect(
+      mergeWorkerResourcePresenceIntoSponsoredKeys(registryKeys, {
+        ai: true,
+        arweave: true,
+        rpc: true,
+        txGas: false,
+      }),
+    ).toEqual({ ai: true, arweave: true, rpc: true });
+    expect(registryKeys).toEqual({ ai: true, faucet: true });
   });
 
   it('formats active-session sponsor status labels without changing fallback semantics', () => {

@@ -949,6 +949,7 @@ const contractScriptsRuntimeDeps = {
   resolveReadContext,
   resolveReadProvider,
   resolveArweaveUploadOpts,
+  refreshSessionRegistryFieldsCache: sessionRegistryUtils.refreshSessionRegistryFieldsCache,
   resolveSession,
   resolveSessionByName,
   resolveSessionNameValue,

@@ -34,7 +34,7 @@ If the default public branch changes, update:
 1. `client/index.html`
 2. `client/public/discoverability.html`
 3. `client/public/llms.txt`
-4. `client/src/variables/publicRepoMetadata.js`
+4. `client/src/variables/publicRepoMetadata.ts`
 5. `scripts/public-discovery.test.js`
 
 ## Google Crawl Checklist

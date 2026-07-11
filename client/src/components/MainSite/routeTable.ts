@@ -18,6 +18,7 @@ export type MainSiteRouteKey =
   | 'simUser'
   | 'userProfile'
   | 'about'
+  | 'posts'
   | 'demos'
   | 'matrix'
   | 'contracts'
@@ -142,6 +143,10 @@ const routeDefinitions: RouteDefinition[] = [
   {
     key: 'about',
     match: ({ fullPath }) => fullPath === '/about',
+  },
+  {
+    key: 'posts',
+    match: ({ fullPath }) => isOnOrWithinRoutePath(fullPath, '/posts'),
   },
   {
     key: 'demos',

@@ -27,6 +27,10 @@ export const resolveTopLevelRouteSelection = ({
     };
   }
 
+  if (path === '/resource-presence' && method === 'GET') {
+    return { kind: 'resource-presence' };
+  }
+
   if (path === '/sponsored/redeem-deploy' && method === 'POST') {
     return {
       kind: 'sponsored-bootstrap-redeem',

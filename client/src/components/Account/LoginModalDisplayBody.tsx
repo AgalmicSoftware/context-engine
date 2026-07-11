@@ -2,7 +2,7 @@ import React, { Suspense } from 'react';
 import { Button, CardBody } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBookmark, faFingerprint, faSignOutAlt, faSpinner } from '@fortawesome/free-solid-svg-icons';
-import MetaMaskLogo from 'assets/img/metamask_icon_white.png';
+import { MetaMaskLoginButton } from '../../app/runtime/walletUiRuntime.js';
 import styles from './Account.module.scss';
 
 type AccountUserPageProps = {
@@ -112,14 +112,11 @@ const LoginModalDisplayBody = ({
 
           {renderAgentTokenLoginPanel()}
 
-          <button
-            type="button"
-            aria-label="Open Crypto Login (RainbowKit)"
+          <MetaMaskLoginButton
             onClick={openCryptoModal}
             className={styles.cryptoLoginLink}
-          >
-            <img src={MetaMaskLogo} alt="MetaMask" className={styles.cryptoLoginIcon} />
-          </button>
+            iconClassName={styles.cryptoLoginIcon}
+          />
         </div>
       </CardBody>
     );

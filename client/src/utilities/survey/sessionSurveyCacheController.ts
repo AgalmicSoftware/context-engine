@@ -101,7 +101,7 @@ interface PendingSurveyRetryResult {
 }
 
 interface SurveyContractScripts {
-  getRelevantBlockWindowForFilter: (slug: string) => Promise<{ fromBlock: number; toBlock: number }>;
+  getRelevantBlockWindowForFilter: (sessionRef: unknown) => Promise<{ fromBlock: number; toBlock: number }>;
   getSurveyDataById: (
     providerName: string,
     surveyId: string,
@@ -134,6 +134,7 @@ export interface SessionSurveyCacheHost {
   dgRead?: (name: string, slug: string) => Record<string, unknown> | null | undefined;
   dgWrite?: (name: string, slug: string, value: Record<string, unknown>) => unknown;
   getActiveSessionSlug?: () => string;
+  getSessionCfg?: (slug: string) => CacheRecord | null | undefined;
   getSessionChainId?: (slug: string) => string | number | null | undefined;
   getSessionScanScope?: () => string;
   shouldSkipSessionScanForSlug?: (slug: string, op: string, scopeCtx?: unknown) => boolean;
@@ -184,6 +185,19 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
     typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null;
   const getActiveSessionSlug = (): string =>
     String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
+  const getSessionBlockWindowRef = (slugIn: string): CacheRecord | string => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const cfg = typeof host.getSessionCfg === 'function' ? host.getSessionCfg(slug) : null;
+    if (!cfg || typeof cfg !== 'object') return slug;
+    // Regression guard: preserve resolved demo block limits across chain scans.
+    return {
+      ...cfg,
+      slug: normalizeSessionSlug(cfg.slug || slug),
+      ...(cfg.blockLimits && typeof cfg.blockLimits === 'object'
+        ? { blockLimits: { ...(cfg.blockLimits as CacheRecord) } }
+        : {}),
+    };
+  };
   const getSessionChainId = (slug: string): string | number | null | undefined =>
     typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
   const getSessionScanScope = (): string =>
@@ -300,8 +314,9 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
         );
         const networkID = String(getSessionChainId(slug) || '');
 
-        const { fromBlock: baseFrom, toBlock: baseTo } =
-          await surveyContractScripts.getRelevantBlockWindowForFilter(slug);
+        const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(
+          getSessionBlockWindowRef(slug),
+        );
         if (baseFrom > baseTo) {
           setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
           return;
@@ -894,7 +909,9 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
       mainSiteLog.warn('No group chainId available');
       return;
     }
-    const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(slug);
+    const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(
+      getSessionBlockWindowRef(slug),
+    );
     const initialLastBlockSurvey = Math.max(0, baseFrom - 1);
     const surveysCache = (dgRead('surveysCache', slug) || {}) as Record<string, SurveyNetworkCache>;
 
