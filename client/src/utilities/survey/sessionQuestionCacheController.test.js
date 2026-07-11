@@ -481,7 +481,7 @@ describe('createSessionQuestionCacheController', () => {
       await controller.initializeQuestionCacheForGroup(SESSION_SLUG);
 
       expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(
-        expect.objectContaining({ networkChainId: NETWORK_ID }),
+        expect.objectContaining({ slug: SESSION_SLUG, networkChainId: NETWORK_ID }),
       );
       expect(contractScripts.getAllQuestionIDsChunkedWithCallback).not.toHaveBeenCalled();
       expect(host.getStateSnapshot()).toMatchObject({ isQuestionCacheReady: true });
@@ -599,6 +599,7 @@ describe('createSessionQuestionCacheController', () => {
 
       expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(
         expect.objectContaining({
+          slug: 'demo-1',
           blockLimits: { start: 44967477, end: null },
         }),
       );

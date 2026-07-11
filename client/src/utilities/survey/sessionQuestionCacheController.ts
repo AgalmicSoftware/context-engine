@@ -380,6 +380,20 @@ export const createSessionQuestionCacheController = (
     String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
   const getSessionCfg = (slug: string): CacheRecord | null =>
     typeof host.getSessionCfg === 'function' ? host.getSessionCfg(slug) || null : null;
+  const getSessionBlockWindowRef = (slugIn: string): CacheRecord | string => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const cfg = getSessionCfg(slug);
+    if (!cfg) return slug;
+    // Regression guard: block-window resolution needs the scoped slug and a
+    // disposable blockLimits object even when host config omits its own slug.
+    return {
+      ...cfg,
+      slug: normalizeSessionSlug(cfg.slug || slug),
+      ...(cfg.blockLimits && typeof cfg.blockLimits === 'object'
+        ? { blockLimits: { ...(cfg.blockLimits as CacheRecord) } }
+        : {}),
+    };
+  };
   const getSessionChainId = (slug: string): string | number | null | undefined =>
     typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
   const getSessionScanScope = (): string =>
@@ -675,7 +689,9 @@ export const createSessionQuestionCacheController = (
 
       let resolvedWindow: unknown = null;
       try {
-        resolvedWindow = await questionCacheContractScripts.getRelevantBlockWindowForFilter(sessionCfgForScan || slug);
+        resolvedWindow = await questionCacheContractScripts.getRelevantBlockWindowForFilter(
+          getSessionBlockWindowRef(slug),
+        );
       } catch (windowErr: unknown) {
         const windowError = isRecord(windowErr) ? windowErr : {};
         abortQuestionScan({
