@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
@@ -16,6 +16,14 @@ const mockGetAllSessionSlugs = jest.fn();
 const mockGetSessionConfigBySlug = jest.fn();
 const mockGetDemoSessionConfigBySlug = jest.fn();
 const mockCallAI = jest.fn();
+const mockPortGetAllSessionSlugs = jest.fn((...args: any[]) => mockGetAllSessionSlugs(...args));
+const mockPortGetSessionConfigBySlug = jest.fn((...args: any[]) => mockGetSessionConfigBySlug(...args));
+const mockSubscribeSessionRegistryUpdates = jest.fn(
+  (target: Window, listener: EventListenerOrEventListenerObject) => {
+    target.addEventListener('ce:session-registry-cache-updated', listener);
+    return () => target.removeEventListener('ce:session-registry-cache-updated', listener);
+  },
+);
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
@@ -35,6 +43,15 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
 jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   __esModule: true,
   SESSION_REGISTRY_CACHE_UPDATED_EVENT: 'ce:session-registry-cache-updated',
+}));
+
+jest.mock('../../domains/sessions/registry/sessionRegistryReadPorts.js', () => ({
+  __esModule: true,
+  sessionRegistryReadsPort: {
+    getAllSessionSlugs: (...args: any[]) => mockPortGetAllSessionSlugs(...args),
+    getSessionConfigBySlug: (...args: any[]) => mockPortGetSessionConfigBySlug(...args),
+    subscribeToCacheUpdates: (...args: any[]) => mockSubscribeSessionRegistryUpdates(...args),
+  },
 }));
 
 jest.mock('../../utilities/ai/aiClient.js', () => ({
@@ -704,7 +721,7 @@ describe('TagPage', () => {
     expect(screen.getByTestId('tag-page-session-scope')).toHaveTextContent('Session scope: edge + alpha');
   });
 
-  it('refreshes selector options when the session registry cache updates', () => {
+  it('refreshes selector options when the session registry cache updates', async () => {
     mockGetAllSessionSlugs.mockReturnValue(['', 'edge']);
 
     renderTagPage({ entry: '/tag/governance' });
@@ -717,7 +734,30 @@ describe('TagPage', () => {
       window.dispatchEvent(new Event('ce:session-registry-cache-updated'));
     });
 
-    expect(screen.getByRole('button', { name: /^alpha$/i })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^alpha$/i })).toBeInTheDocument();
+    });
+    expect(mockSubscribeSessionRegistryUpdates).toHaveBeenCalledTimes(1);
+    expect(mockGetAllSessionSlugs).toHaveBeenCalledTimes(2);
+  });
+
+  it('pins the registry read shape and exact mount call counts', () => {
+    mockGetAllSessionSlugs.mockReturnValue(['', 'edge']);
+    mockGetSessionConfigBySlug.mockImplementation((slug) =>
+      slug === 'edge' ? { slug: 'edge', sessionName: 'Edge Registry' } : { slug: '', sessionName: 'General' },
+    );
+
+    renderTagPage({ entry: '/tag/governance' });
+
+    expect(screen.getByTestId('tag-page-session-scope')).toHaveTextContent('Session scope: Edge Registry (edge)');
+    fireEvent.click(screen.getByRole('button', { name: /tag page session selector/i }));
+    expect(screen.getByRole('button', { name: 'Edge Registry (edge)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'General' })).toBeInTheDocument();
+    expect(mockGetAllSessionSlugs).toHaveBeenCalledTimes(1);
+    expect(mockGetSessionConfigBySlug.mock.calls).toEqual([['edge'], ['edge']]);
+    expect(mockPortGetAllSessionSlugs).not.toHaveBeenCalled();
+    expect(mockPortGetSessionConfigBySlug).not.toHaveBeenCalled();
+    expect(mockSubscribeSessionRegistryUpdates).toHaveBeenCalledTimes(1);
   });
 
   it('keeps explicit session query pins scoped to that session', () => {
