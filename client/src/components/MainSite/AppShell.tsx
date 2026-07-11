@@ -1294,7 +1294,10 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     if (!demoCfg && normalized === 'demo') {
       demoCfg = (getDemoSessionConfigBySlug('', { allowDemoFallback: true }) as MainSiteSessionConfigLike | null) || null;
     }
-    return mergeMainSiteSessionDisplayConfig(strictCfg, demoCfg) as MainSiteSessionConfigLike | null;
+    return mergeMainSiteSessionDisplayConfig(
+      strictCfg as SessionConfigLike | null,
+      demoCfg as SessionConfigLike | null,
+    ) as MainSiteSessionConfigLike | null;
   };
 
   getDisplaySessionChainId = (slugIn: unknown): number | null => {
