@@ -143,7 +143,7 @@ type Record = { score: number };
       'Four agents took the quiz — 58 questions each, 232 predictions — but no human corrections were made.',
     );
     expect(markdown).toContain(
-      'Everything below is unreviewed agent prediction, so it demonstrates what the eval collects rather than how accurately the agents represented their principals.',
+      'Everything below consists of unreviewed agent predictions, so it demonstrates what the eval collects rather than how accurately the agents represented their principals.',
     );
     expect(markdown).toContain('"title": "Evaluation protocol, scoring, and record schema"');
     expect(markdown).toContain('schemaVersion: "agent-mirror-eval/v1"');
