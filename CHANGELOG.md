@@ -19,6 +19,9 @@ All notable changes to this project will be documented in this file.
   published, retained text is scanned for private references, and unowned image
   files fail verification; removed unused image assets without changing the
   active animated logos.
+- Reduced the two active logo GIFs by about two thirds while preserving their
+  dimensions, duration, looping behavior, luminosity-blended presentation, and
+  current Navbar and SBT loading owners.
 
 ### Fixed
 
