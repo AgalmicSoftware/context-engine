@@ -283,10 +283,3 @@ When enabled, the app forces:
 
 - `globalThis.CE_GETLOGS_MAX_CONCURRENCY` default `1`
 - `globalThis.CE_GETLOGS_MAX_RETRIES` default `2`
-
-## E2E note
-
-The browser E2E harness disables PATH-first ordering unless `E2E_PREFER_PATH_RPC=1`.
-That is a test harness behavior, not the normal app default.
-
-See [`docs/e2e-setup.md`](e2e-setup.md) for the E2E-specific controls.

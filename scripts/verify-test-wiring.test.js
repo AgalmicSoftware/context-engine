@@ -190,6 +190,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/verify-worker-bundle-sync.test.js',
       'scripts/verify-public-release-surface.js',
       'scripts/verify-public-release-surface.test.js',
+      'scripts/verify-public-docs.js',
+      'scripts/verify-public-docs.test.js',
       'scripts/verify-public-release-pii.sh',
       'scripts/verify-public-release-pii.test.js',
       'workers/sessionCorsWorker/package.json',

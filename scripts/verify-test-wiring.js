@@ -104,6 +104,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/verify-worker-bundle-sync.test.js');
   expectFile('scripts/verify-public-release-surface.js');
   expectFile('scripts/verify-public-release-surface.test.js');
+  expectFile('scripts/verify-public-docs.js');
+  expectFile('scripts/verify-public-docs.test.js');
   expectFile('scripts/verify-public-release-pii.sh');
   expectFile('scripts/verify-public-release-pii.test.js');
   expectFile('scripts/sync-public-history.sh');

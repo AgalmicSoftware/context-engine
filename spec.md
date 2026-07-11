@@ -299,7 +299,7 @@ Intent for these features:
 ### Frontend (React)
 
 - UI lives under `client/` and is a mixed JavaScript/TypeScript React app with class components plus hooks-based modules.
-- Vite is the canonical client dev/build toolchain. `npm run dev` starts the local Vite server, `npm run build` writes the production build to `client/build/`, and `npm run preview:vite` serves a local Vite preview.
+- Vite is the canonical client dev/build toolchain. From `client/`, `npm run dev` starts the local Vite server, `npm run build` writes the production build to `client/build/`, and `npm run preview` serves a local Vite preview.
 - Routing is centralized via `client/src/components/MainSite/MainSite.tsx` (path parsing and lazy module loading).
 - State management uses Redux (`client/src/store.js`, reducers under `client/src/reducers/`).
 - Group/session-aware caches are stored in localStorage under `dg:<cacheName>:<slug>` keys (see `docs/cache/*`).
@@ -370,16 +370,11 @@ Local chain and contracts:
 Client tests:
 - `npm run test:client`
 
-Selected automation workflows (E2E-ish):
-- `npm run ai:ux-workflows` (multi-path UX workflow runner; emits run manifests to `artifacts/`).
-- `npm run ai:test-gates:any-all` (verifies Any/All gate behavior via worker `/auth/login`).
-- `npm run ai:seed-survey:question-types` (Playwright UI automation seeding).
-- `npm run ai:test-gated-decrypt:all-types` (gated decrypt verification across question types).
-- `npm run ai:test-doc-library:session:filetypes` and `npm run ai:test-doc-library:session:multi-gate` (Doc Library upload/decrypt coverage).
-- `npm run ai:test-session-setup:default-worker` and `npm run ai:test-session-setup:sponsored-inline-sbt` (Session Wizard coverage, including sponsored setup paths).
-- `npm run ai:test-survey-authoring:encryption-matrix` and `npm run ai:test-survey-response:encryption-matrix` (survey authoring/response encryption coverage).
-- `npm run ai:test-sbt-create:variants` and `npm run ai:test-sbt-collect:variants` (SBT lifecycle coverage).
-- `npm run ai:test-admin:gate-update` and `npm run ai:test-worker-scopes:matrix` (admin and worker-scope coverage).
+Published workflow verification:
+- `npm run test:e2e` runs the Vite navigation and route-style smoke.
+- `npm run test:node` runs public Node regression suites.
+- `npm run verify:release` runs client lint, typecheck, client tests, public
+  surface validation, worker bundle verification, and the production build.
 
 See also:
 - `docs/local-chain.md`

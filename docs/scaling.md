@@ -4,7 +4,9 @@ Context Engine is designed to scale from small community sessions to large enter
 
 ## Current Default
 
-The current default is a public EVM deployment on OP Sepolia with synchronous writes, Arweave storage, Lit Protocol encryption, and direct RPC reads. This is the simplest and most trust-minimized operating mode. It supports hundreds to low thousands of concurrent participants per session.
+The current default is a public EVM deployment on OP Sepolia with synchronous writes, Arweave storage, optional Lit Protocol encryption, and direct RPC reads. This is the simplest and most trust-minimized operating mode. It supports hundreds to low thousands of concurrent participants per session.
+
+Unless a mode is explicitly labeled available below, it describes a target architecture rather than a turnkey released deployment. In particular, company-operated private-chain, Postgres/SQLite follower, Local Key Release, and app-rollup profiles are still in development or planned.
 
 ## Write Path
 
@@ -14,23 +16,23 @@ Settlement defines when an action is treated as complete. `sync` waits for canon
 
 Write gateway defines who accepts the write. `direct` sends writes from browser or wallet to the execution layer. `worker` accepts signed payloads and settles them through an API or queue. `sequencer` accepts ordered intents and commits them to the underlying execution layer.
 
-The recommended escalation path is `public-evm + sync` first, then `private-poa + sync`, then async or batch settlement where product semantics allow it, then `app-rollup` for the highest-scale hosted path.
+The planned escalation path is `public-evm + sync` first, then `private-poa + sync`, then async or batch settlement where product semantics allow it, then `app-rollup` for the highest-scale hosted path.
 
 | Mode | Throughput potential | Trust model | Cost profile | Best for |
 |---|---|---|---|---|
 | `public-evm + sync` | lowest | strongest public-chain default | highest per write | OSS/public default |
-| `private-poa + sync` | high | operator-run chain | low marginal write cost | enterprise/self-hosted CE |
-| `public-evm + async` | modest improvement | gateway or sequencer adds trust | gas still public | hosted public deployments |
-| `private-poa + batch` | very high | operator-run chain plus queue or sequencer | low | large enterprise/private communities |
-| `app-rollup + sync` | high | sequencer trust or permissioned trust | medium | serious hosted CE |
+| `private-poa + sync` | high | operator-run chain | low marginal write cost | planned enterprise/self-hosted CE |
+| `public-evm + async` | modest improvement | gateway or sequencer adds trust | gas still public | planned hosted public deployments |
+| `private-poa + batch` | very high | operator-run chain plus queue or sequencer | low | planned large enterprise/private communities |
+| `app-rollup + sync` | high | sequencer trust or permissioned trust | medium | planned high-scale hosted CE |
 
 ## Read Path
 
 Repeated RPC reads do not scale. Recomputing logs, gate checks, and page hydration in many browsers and worker requests creates unnecessary fanout and latency.
 
-The scaling model is an open-source index follower that normalizes on-chain state plus Arweave-backed metadata and payload references into queryable read models. The follower builds that state once and serves browsers, workers, and read APIs from indexed tables instead of repeated raw RPC scans.
+The target scaling model is an open-source index follower that normalizes on-chain state plus Arweave-backed metadata and payload references into queryable read models. The follower would build that state once and serve browsers, workers, and read APIs from indexed tables instead of repeated raw RPC scans.
 
-The follower has two deployment forms. `Follower Core` is the self-hosted canonical deployment, backed by Postgres or SQLite. `Cloudflare Lite mirror` is a lighter shared or sponsored deployment using Cloudflare Workers with D1 and optional R2 mirrors. Gate snapshots are optional and come later: worker auth should remain live and on-chain authoritative until read parity is stable.
+The planned follower has two deployment forms. `Follower Core` is the target self-hosted canonical deployment, backed by Postgres or SQLite. `Cloudflare Lite mirror` is the lighter shared or sponsored target using Cloudflare Workers with D1 and optional R2 mirrors. Neither should be read as a generally available turnkey follower package yet. Gate snapshots are optional and come later: worker auth should remain live and on-chain authoritative until read parity is stable.
 
 ## Encryption and Private Compute
 
@@ -53,16 +55,16 @@ Private query capability defines what indexed systems may do with protected data
 
 ## Deployment Profiles
 
-Deployment profiles package the scaling layers into named defaults. They are presets, not hard locks: operators can start from a coherent profile and override lower-level infrastructure choices as needed.
+The profile names below describe architecture targets; they are not literal current configuration identifiers. The current session wizard offers `Fast & Cheap (Cloudflare)` and `Trustless & Public (Decentralized)` as its two initial presets, then records Advanced per-axis changes as `Custom`. See the [session creation guide](session-creation-guide.md#session-creation-walkthrough) for the implemented choices. Planned rows describe intended packaging and must not be presented as installable releases yet.
 
-| Profile | Audience | Read path | Write path | Encryption / private compute | Hosting style |
-|---|---|---|---|---|---|
-| `oss-default` | OSS users, small communities | RPC or optional indexed-lite | public sync | `lit-public`, client decrypt | simple public deploy |
-| `sponsored-cloudflare` | maintainer-run shared sessions | Cloudflare Lite mirror | public sync or light async intake | `lit-public` now; Local Key Release only for private profiles | Cloudflare-first |
-| `enterprise-private` | self-hosted orgs / regulated installs | full OSS follower core | private PoA sync or batch | key-release passkey-private or KMS/Vault/OpenBao compatibility; TEE later | Docker, VPC, or on-prem |
-| `max-scale-rollup` | future hosted large-scale CE | full follower core plus specialized read APIs | app rollup plus batch or async settlement | `tee` or future `threshold-private` | serious hosted infra |
+| Profile | Availability | Audience | Read path | Write path | Encryption / private compute | Hosting style |
+|---|---|---|---|---|---|---|
+| `oss-default` | Conceptual name; current public reference path exists | OSS users, small communities | direct RPC reads | public sync | optional `lit-public`, client decrypt | simple public deploy |
+| `sponsored-cloudflare` | Partial: worker and sponsorship building blocks exist; packaged Lite mirror remains planned | maintainer-run shared sessions | current worker-backed reads; Lite mirror remains planned | public sync or supported worker intake | optional `lit-public`; Local Key Release only for future private profiles | Cloudflare-first |
+| `enterprise-private` | Planned; design work underway | self-hosted orgs / regulated installs | planned full OSS follower core | planned private PoA sync or batch | planned key-release passkey-private or KMS/Vault/OpenBao compatibility; TEE later | Docker, VPC, or on-prem |
+| `max-scale-rollup` | Planned | future hosted large-scale CE | planned full follower core plus specialized read APIs | app rollup plus batch or async settlement | `tee` or future `threshold-private` | serious hosted infra |
 
-Migration paths are straightforward. Public deployments move `oss-default -> sponsored-cloudflare -> max-scale-rollup`. Private deployments move `oss-default -> enterprise-private`.
+The intended profile sequences are `oss-default -> sponsored-cloudflare -> max-scale-rollup` for public deployments and `oss-default -> enterprise-private` for company-operated deployments. These are roadmap sequences, not automatic or currently turnkey migrations.
 
 ## Related
 

@@ -7,7 +7,7 @@ are not practical to colocate with client, worker, or script sources.
 
 - `foundry/script/` contains Foundry Solidity deploy scripts.
 - `foundry/test/` contains Forge Solidity suites.
-- `scripts/` contains JS/Python tooling, E2E runners, audits, and automation.
+- `scripts/` contains JS/Python tooling, audits, and supported automation.
 - `tests/root/` contains root Node/Jest tests for workers, deploy helpers, and compatibility harnesses.
 - `tests/helpers/` contains helper modules shared by `tests/root/`.
 
@@ -27,9 +27,8 @@ If you are deciding where to add new files:
 - Local-chain Surveys + SBT integration only: `npm run test:surveys-sbt`
 - Client Jest/RTL coverage gate: `npm run test:client`
 - Root `node:test` suites: `npm run test:node`
-- CE-CC tests: `npm run test:cc`
 - Solidity: `npm run test:contracts`
-- E2E: `npm run ai:test-*`
+- Public route/style smoke: `npm run test:e2e`
 
 ## Why Foundry still has singular names
 

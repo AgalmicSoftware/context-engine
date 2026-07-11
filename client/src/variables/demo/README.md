@@ -32,18 +32,18 @@ This directory contains demo and fixture data for the Context Engine survey plat
 
 | File | Purpose |
 | --- | --- |
-| [`historical_figure_demographics.js`](./historical_figure_demographics.js) | Computes demographic breakdowns from merged historical figure data plus the Polis fixture. Exports `DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS` and the default historical figure lookup object. |
-| [`historical_figure_demographics.test.js`](./historical_figure_demographics.test.js) | Regression coverage for the demographics lookup and fixture completeness. |
+| [`historical_figure_demographics.ts`](./historical_figure_demographics.ts) | Computes demographic breakdowns from merged historical figure data plus the Polis fixture. Exports `DEMO_ANALYSIS_DEMOGRAPHIC_FIELDS` and the default historical figure lookup object. |
+| [`historical_figure_demographics.test.ts`](./historical_figure_demographics.test.ts) | Regression coverage for the demographics lookup and fixture completeness. |
 | [`debateData.ts`](./debateData.ts) | Debate HUD fixture module with debate cards, argument trees, audience roster/votes, voter profiles, and source links. |
-| [`index.js`](./index.js) | Barrel export for the most commonly imported demo datasets and demographics helpers. |
+| [`index.ts`](./index.ts) | Barrel export for the most commonly imported demo datasets and demographics helpers. |
 
 ## Primary Consumers
 
 The main consumers of this folder are:
 
-- [`demoAnalysisAdapter.js`](../../utilities/demo/demoAnalysisAdapter.js)
-- [`demoAvatars.js`](../../utilities/ui/demoAvatars.js)
-- [`sessionSourceResolver.js`](../../utilities/session/sessionSourceResolver.js)
+- [`demoAnalysisAdapter.ts`](../../utilities/demo/demoAnalysisAdapter.ts)
+- [`demoAvatars.ts`](../../utilities/ui/demoAvatars.ts)
+- [`sessionSourceResolver.ts`](../../utilities/session/sessionSourceResolver.ts)
 - [`PolisReport.tsx`](../../components/PolisReport/PolisReport.tsx)
 - [`DebateMap.tsx`](../../components/DebateMap/DebateMap.tsx)
 - [`PoliticalCompassView.tsx`](../../components/DemoViews/DebateHUD/PoliticalCompassView.tsx)
@@ -116,8 +116,8 @@ PoliticalCompassView, PolisReport, CommunityTab, SimUserPage
 
 Related files:
 
-- [`demoAvatars.js`](../../utilities/ui/demoAvatars.js)
-- [`historicalFigureAvatars.js`](../../utilities/ui/historicalFigureAvatars.js)
+- [`demoAvatars.ts`](../../utilities/ui/demoAvatars.ts)
+- [`historicalFigureAvatars.ts`](../../utilities/ui/historicalFigureAvatars.ts)
 - [`historicalFigureLocalPhotoManifest.json`](../../utilities/ui/historicalFigureLocalPhotoManifest.json)
 - [`historicalFigurePhotoManifest.json`](../../utilities/ui/historicalFigurePhotoManifest.json)
 
@@ -132,7 +132,7 @@ To add a new historical figure cleanly, update the datasets that drive the surfa
 
 1. Update [`policy_atlas_council.json`](./policy_atlas_council.json) with the new figure's `id`, `name`, `bio`, `atlasCategory`, SBT metadata, question content, and tags.
 2. Update [`historical_figures_tree_qs_and_votes.json`](./historical_figures_tree_qs_and_votes.json) with debate questions, at least several in-character comments, and vote stances.
-3. Update [`historical_figure_demographics.js`](./historical_figure_demographics.js) with the figure's demographics entry, including display name, bio, era, country, gender, affiliation, and atlas category.
+3. Update [`historical_figure_demographics.ts`](./historical_figure_demographics.ts) with the figure's demographics entry, including display name, bio, era, country, gender, affiliation, and atlas category.
 4. Update [`demo_sbt_collection.json`](./demo_sbt_collection.json) with matching demographic attributes.
 5. Update [`historicalFigureLocalPhotoManifest.json`](../../utilities/ui/historicalFigureLocalPhotoManifest.json) first, then keep [`historicalFigurePhotoManifest.json`](../../utilities/ui/historicalFigurePhotoManifest.json) aligned if a second manifest is still being used for hosted or mirrored sources.
 6. Optionally update [`additional_historical_figures.json`](./additional_historical_figures.json) when you need richer persona fields such as `biggestHope`, `biggestFear`, or `avatarPrompt`.
@@ -159,4 +159,4 @@ The breakdown tab now uses [`demo_analysis_data.json`](./demo_analysis_data.json
 
 - Most JSON fixtures in this folder use `snake_case`.
 - Most fixture filenames in this folder now follow `snake_case`, including [`demo_polis_data.json`](./demo_polis_data.json).
-- JS modules in this folder now follow the same `snake_case` filename convention, including [`historical_figure_demographics.js`](./historical_figure_demographics.js).
+- TypeScript modules in this folder now follow the same `snake_case` filename convention, including [`historical_figure_demographics.ts`](./historical_figure_demographics.ts).

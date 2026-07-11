@@ -32,20 +32,15 @@ flowchart TD
   SessionWorker --> Contracts["EVM contracts<br/>SessionRegistry, Surveys, SBTFactory, CustomSBT"]
   Utilities --> Contracts
   Utilities --> Arweave["Arweave clients and storage refs"]
-  Cecc["contextEngine-cc extension"] --> SessionWorker
-  Cecc --> UtilitiesShared["shared envelope/question modules"]
   PublicRelease["public release tree"] --> Browser
   PublicRelease --> SessionWorker
-  PublicRelease -. strips .-> PrivateOnly["private E2E, TODO, agentBridgeWorker, contextEngine-cc"]
+  PublicRelease --> DeployHelper
 ```
 
-Primary navigation maps:
-
-- `docs/MainSite.MAP.md`
-- `docs/SurveyTool.MAP.md`
-- `docs/contractScripts.MAP.md`
-- `docs/AdminPage.MAP.md`
-- `docs/SessionWizard.MAP.md`
+Primary source entry points are `client/src/components/MainSite/AppShell.tsx`,
+`client/src/components/SurveyTool/SurveyTool.tsx`,
+`client/src/components/Sessions/SessionWizard.tsx`, and
+`client/src/components/Admin/AdminPage.tsx`.
 
 ## Enforcement System
 
@@ -59,6 +54,8 @@ The tracked checks work together:
   shrink or stay flat unless an intentional rollout explicitly allows growth.
 - `npm run verify:public-release-surface` prevents public files from importing
   stripped private paths.
+- Public release export checks retained Markdown for private references,
+  unavailable npm commands, and broken local links.
 - `npm run test:wiring` verifies test inventory, boundary checks, and text
   hygiene.
 - `npm run verify:release` adds client lint, typecheck, full client tests,
@@ -75,8 +72,6 @@ The worker surface is documented in `docs/session-cors-worker.md`.
 - `workers/deploy-helper/` is a separate helper worker used by `/new` and
   self-hosted deployments to call Cloudflare APIs, create the target worker and
   KV namespace, and seed initial session config/secrets.
-- `workers/agentBridgeWorker/` is an agent/Telegram bridge worker. It is private
-  to the full dev repo and stripped from the public release.
 - `scripts/worker-bundle.mjs` bundles `sessionCorsWorker` and `deploy-helper`
   into `dist/`; `scripts/verify-worker-bundle-sync.mjs` verifies those bundles
   are in sync with source.
@@ -116,34 +111,14 @@ in `client/src/variables/chains.js` and `client/src/variables/contracts.json`;
 OP Sepolia (`11155420`) is the default chain fallback, while Base Sepolia
 (`84532`) remains a compatibility chain.
 
-## CC Extension
-
-`contextEngine-cc/` is the Claude Code integration. It contains the local hook,
-browser auth page, session/question helpers, and agent bridge contracts. Shared
-Envelope v1 primitives are mirrored between
-`client/src/utilities/shared/encryption/envelopeV1Core.mjs` and
-`contextEngine-cc/lib/shared/encryption/envelopeV1Core.mjs`, with
-`contextEngine-cc/lib/envelopeV1.mjs` acting as the Node adapter.
-
-The extension is part of the full private/dev repo. It is stripped from the
-public release artifact, so public release verification must never depend on it.
-
 ## Release And Public Surface
 
-Use `docs/releasing.md` for public history replay and stripped artifact release
-details. Use `docs/release-runbook.md` for the operator checklist. The strip
-patterns live in `scripts/lib/public-release-strip-patterns.sh`, and the public
-surface verifier makes imports into stripped paths fail locally and in CI.
+The release build creates a curated source tree and validates both code imports
+and retained Markdown before publication. Public source must not depend on files
+that are absent from that tree.
 
 ## E2E Harness
 
-The public smoke runner is `npm run test:e2e`, backed by the navigation smoke.
-The private full-repo E2E layer includes session setup, SBT, survey, gated
-decrypt, worker scope, and Cloudflare envelope/group suites. Details live in:
-
-- `docs/e2e-setup.md`
-- `docs/e2e-commands.md`
-- `docs/e2e-cadence.md`
-
-Private E2E entrypoints are intentionally stripped from the public release; the
-public release keeps the lightweight smoke path and documentation.
+The public smoke runner is `npm run test:e2e`, backed by the Vite navigation and
+route-style smoke. Broader workflow validation is maintained separately from the
+published source package.

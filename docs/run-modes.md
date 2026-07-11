@@ -54,8 +54,7 @@ Hybrid E2E verification when you want real deployed contracts and seeded live st
 - Start Anvil in fork mode yourself against the target chain
 - Point E2E `RPC_URL` at that local fork
 - Keep `CHAIN` / `CHAIN_ID` / `SESSION_REGISTRY` / `SBT_FACTORY` aligned to the upstream chain you forked
-- See [docs/e2e-setup.md](e2e-setup.md) for the current manual-fork workflow
-- First-class `E2E_CHAIN_MODE=fork` orchestration is not yet in the committed runners; track that follow-up in private planning.
+- First-class fork orchestration is not part of the published command surface.
 
 ## `hosted/onchain`
 

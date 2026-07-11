@@ -188,13 +188,6 @@ Useful signals:
 - `PATH RPC ok`
 - `RPC provider error`
 
-## E2E note
-
-The app default is PATH-first, but the E2E harness explicitly disables PATH-first ordering unless
-`E2E_PREFER_PATH_RPC=1` is set.
-
-See [`docs/e2e-setup.md`](e2e-setup.md) for the test harness behavior.
-
 ## Self-hosted PATH notes
 
 This repo does not ship a PATH gateway.

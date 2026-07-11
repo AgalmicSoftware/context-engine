@@ -337,14 +337,8 @@ Optional linking should require the user to prove ownership of the old address.
 Moving assets remains a normal user transaction unless the app adds an explicit
 transfer flow.
 
-## Deterministic Test Wallets
+## Test Coverage
 
-The root AI/E2E scripts still use deterministic non-identifying wallet fixtures
-for repeatable OP Sepolia testing. `npm run ai:wallet` prints the deterministic
-address and, with `SHOW_PRIVATE_KEY=1`, private local-only fixture material for
-automation. Do not use fixture keys for production funds.
-
-`scripts/seed-survey-question-types.js` now seeds passkey-derived wallet
-metadata in IndexedDB for browser automation instead of storing a plaintext
-session record. The mock PRF output stays in the E2E harness payload and is not
-written into the wallet record.
+Passkey derivation, encrypted wallet persistence, unlock behavior, and account
+recovery are covered by the client unit and integration suites. Test fixtures
+are non-identifying and must never be used for production funds.

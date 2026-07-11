@@ -1,6 +1,6 @@
 # scripts/
 
-JS/Python tooling, automation, audits, seeders, and E2E runners live here.
+JS/Python tooling, build automation, audits, and verification runners live here.
 
 This directory is intentionally separate from the Foundry Solidity script
 directory:
@@ -10,8 +10,8 @@ directory:
 
 Common contents here include:
 
-- `test-*.js` / `test-*.ui.js` E2E runners
-- `run-*.js` suite wrappers
+- public route/style smoke and test runners
+- suite wrappers
 - worker build, bundle verification, and deploy-helper publish scripts
 - release, audit, and maintenance helpers
 
@@ -31,7 +31,8 @@ npm run client-boundaries:check
 
 This compares conservative client import-boundary rules against `scripts/client-boundaries-baseline.json` and fails for new violations, duplicate baseline entries, or resolved baseline entries that were not pruned in the same change. The checker resolves Vite client aliases, guards production imports from excluded test/harness files, and flags likely low-level pass-through facades outside sanctioned domain/runtime layers. Use `node scripts/check-client-boundaries.mjs --write-baseline` after reviewed boundary cleanup removes or intentionally reclassifies entries.
 
-The stripped public checkout keeps `scripts/vite-navigation-smoke.js` as the maintained local route/style smoke runner. Private full-workflow E2E files may be absent in this checkout; see [`../docs/e2e-commands.md`](../docs/e2e-commands.md) for the public smoke command and private-runner notes.
+The published checkout keeps `scripts/vite-navigation-smoke.js` as the maintained
+local route/style smoke runner. Run it through `npm run test:e2e`.
 
 Deploy-helper quick command:
 

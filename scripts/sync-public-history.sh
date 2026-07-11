@@ -65,6 +65,20 @@ PRIVATE_REPLAY_MESSAGE_TOKENS=(
   "contextEngine-cc"
   "docs/agent-native"
   "agent-native"
+  "workers/agentBridgeWorker"
+  "client/public/skill.md"
+  "scripts/e2e"
+  "scripts/lib/e2e"
+  "scripts/test-"
+  "scripts/seed-"
+  "artifacts/"
+  ".claude"
+  ".codex"
+  "CLAUDE.md"
+  "AGENTS.md"
+  "release-staging"
+  "private branch"
+  "dev branch"
   "OpenClaw"
   "Telegram bridge"
   "TODO/"
@@ -144,6 +158,11 @@ private_replay_message_token() {
     fi
   done
 
+  if grep -Eiq -- '[Pp][Rr][Dd][Ss]?[[:space:]#:_-]*[0-9]+' "$message_file"; then
+    printf '%s\n' "internal planning identifier"
+    return 0
+  fi
+
   return 1
 }
 
@@ -166,6 +185,18 @@ const replacements = [
   [/private bridge/gi, 'private integration'],
   [/private agent/gi, 'private integration'],
   [/TODO\//gi, 'private planning/'],
+  [/workers\/agentBridgeWorker/gi, 'private integration'],
+  [/client\/public\/skill\.md/gi, 'private integration asset'],
+  [/scripts\/(?:lib\/)?e2e/gi, 'private test tooling'],
+  [/scripts\/(?:test|seed)-[^\s`'")]+/gi, 'private test tooling'],
+  [/artifacts\//gi, 'generated output/'],
+  [/\.claude/gi, 'private agent settings'],
+  [/\.codex/gi, 'private agent settings'],
+  [/CLAUDE\.md/gi, 'private agent instructions'],
+  [/AGENTS\.md/gi, 'private agent instructions'],
+  [/release-staging[\w-]*/gi, 'public release branch'],
+  [/\b(?:private|dev) branch\b/gi, 'source branch'],
+  [/\bPRDs?\s*(?:[#:_-]\s*)?\d+\b/gi, 'internal planning item'],
 ];
 
 for (const [pattern, replacement] of replacements) {
@@ -373,6 +404,19 @@ verify_public_release_surface() {
   fi
 
   log_info "Verifying public release surface imports."
+  node "$verifier" "$TEMP_CLONE" >&2
+}
+
+verify_public_docs() {
+  local verifier="$TEMP_CLONE/scripts/verify-public-docs.js"
+
+  if [ ! -f "$verifier" ]; then
+    fail "Public documentation verifier was not found in replay output: scripts/verify-public-docs.js" 1
+  fi
+
+  # Regression guard: replay strips private files commit by commit; validating
+  # the finished public tree prevents retained docs from naming what was removed.
+  log_info "Verifying public documentation content and references."
   node "$verifier" "$TEMP_CLONE" >&2
 }
 
@@ -739,6 +783,10 @@ if [ -n "$offending_identities" ]; then
 fi
 
 if ! verify_public_release_surface; then
+  exit 2
+fi
+
+if ! verify_public_docs; then
   exit 2
 fi
 

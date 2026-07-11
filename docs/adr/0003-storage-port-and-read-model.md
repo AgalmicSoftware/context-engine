@@ -8,7 +8,7 @@ Accepted.
 
 On 2026-07-02, and reaffirmed on 2026-07-05, the project chose stable
 session-storage route names for uploaded metadata and payload reads. Earlier
-planning used read/list wording in PRD 645 Phase 8, but the implemented route
+earlier planning used read/list wording, but the implemented route
 contract now uses upload, fetch, and query names.
 
 ## Decision

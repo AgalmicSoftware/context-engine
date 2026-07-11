@@ -37,13 +37,12 @@
           │  SBT-gated ACC  │   │  /auth/nonce + /login   │
           └─────────────────┘   │  /ai  /transcribe       │
                                 │  /arweave/upload         │
-          ┌─────────────────┐   │  /admin/set-config      │
-          │ contextEngine-cc│   │  request_test_eth        │
-          │ (Claude Code)   │   │  fetch_url / fetch_image│
-          │                 │   │                         │
-          │ hook + passkey  │   │  KV: config + secrets   │
-          │ terminal survey │   └─────────────────────────┘
-          └─────────────────┘
+                                │  /admin/set-config      │
+                                │  request_test_eth        │
+                                │  fetch_url / fetch_image│
+                                │                         │
+                                │  KV: config + secrets   │
+                                └─────────────────────────┘
 ```
 
 ### Corporate / Private Deployment (planned)
@@ -105,7 +104,6 @@ The corporate deployment roadmap remains in private planning until the public de
 | **Contracts** | Solidity on any EVM chain: session registry (gates + metadata pointers), surveys (hash anchoring), SBTs (membership tokens), factory | `contracts/` |
 | **Arweave** | Immutable JSON storage: session metadata, survey/question payloads, SBT tokenURI, doc library files | N/A (external) |
 | **Lit Protocol** | Client-side encrypt/decrypt with SBT-gated access control conditions (ACC) | N/A (external SDK) |
-| **contextEngine-cc** | Claude Code extension: passkey auth, terminal-based survey UX via hook protocol | `contextEngine-cc/` |
 
 ## Data Flows
 
