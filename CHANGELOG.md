@@ -24,6 +24,8 @@ All notable changes to this project will be documented in this file.
   current Navbar and SBT loading owners.
 - Enlarged the sparse three-card Tools view so its image cards use the available
   full-screen width and viewport height while retaining compact mobile sizing.
+- Replaced the default Tools image-card status frame with UserPage-style 3D
+  depth, keeping live/future borders visible only while demo mode is enabled.
 
 ### Fixed
 
