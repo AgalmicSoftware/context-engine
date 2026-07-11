@@ -1,4 +1,5 @@
 import {
+  mergeMainSiteSessionDisplayConfig,
   resolveMainSiteExplicitSessionSlugFromPath,
   resolveMainSiteGlobalPrimarySessionSlug,
   resolveMainSiteQuestionRouteSessionContext,
@@ -413,6 +414,27 @@ describe('routeSessionResolution', () => {
         temporary: true,
         sourceSessionSlug: 'demo',
       },
+    });
+  });
+
+  it('fills a missing registry start block from the matching demo display config', () => {
+    const result = mergeMainSiteSessionDisplayConfig(
+      {
+        slug: 'demo-1',
+        corsWorkerUrl: 'https://registry-worker.example',
+        blockLimits: { end: null },
+      },
+      {
+        slug: 'demo-1',
+        demoCompatibilitySeed: { temporary: true },
+        blockLimits: { start: 44967477, end: null },
+      },
+    );
+
+    expect(result).toMatchObject({
+      slug: 'demo-1',
+      corsWorkerUrl: 'https://registry-worker.example',
+      blockLimits: { start: 44967477, end: null },
     });
   });
 

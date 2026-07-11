@@ -145,6 +145,7 @@ import {
 import type { SessionConfigLike } from '../shellTypes';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
+  mergeMainSiteSessionDisplayConfig,
   resolveMainSiteExplicitSessionSlugFromPath,
   resolveMainSiteGlobalPrimarySessionSlug,
   resolveMainSiteQuestionRouteSessionContext,
@@ -894,6 +895,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     dgRead: (name: string, slug: string) => this.readDgRecord(name, slug),
     dgWrite: (name: string, slug: string, value: Record<string, unknown>) => this.DG.write(name, slug, value),
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
+    getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),
     getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
     getAccount: () => this.props.account,
     scanScopeNoop: (slug: string, op: string, onSkipped?: () => void) => this.scanScopeNoop(slug, op, onSkipped),
@@ -1287,14 +1289,12 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   getDisplaySessionCfg = (slugIn: unknown): MainSiteSessionConfigLike | null => {
     const normalized = normalizeSessionSlug(slugIn ?? '');
     const strictCfg = this.getSessionCfg(normalized);
-    if (strictCfg) return strictCfg;
-    const demoCfg =
+    let demoCfg =
       (getDemoSessionConfigBySlug(normalized, { allowDemoFallback: true }) as MainSiteSessionConfigLike | null) || null;
-    if (demoCfg) return demoCfg;
-    if (normalized === 'demo') {
-      return (getDemoSessionConfigBySlug('', { allowDemoFallback: true }) as MainSiteSessionConfigLike | null) || null;
+    if (!demoCfg && normalized === 'demo') {
+      demoCfg = (getDemoSessionConfigBySlug('', { allowDemoFallback: true }) as MainSiteSessionConfigLike | null) || null;
     }
-    return null;
+    return mergeMainSiteSessionDisplayConfig(strictCfg, demoCfg) as MainSiteSessionConfigLike | null;
   };
 
   getDisplaySessionChainId = (slugIn: unknown): number | null => {
@@ -1308,7 +1308,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
   getCacheSessionCfg = (slugIn: unknown): MainSiteSessionConfigLike | null => {
     const normalized = normalizeSessionSlug(slugIn ?? '');
-    return this.getSessionCfg(normalized) || this.getDisplaySessionCfg(normalized);
+    return this.getDisplaySessionCfg(normalized);
   };
 
   getCacheSessionChainId = (slugIn: unknown): number | null => {

@@ -814,6 +814,31 @@ describe('createSessionSbtCacheController', () => {
       expect(contractScripts.getRelevantBlockWindowForFilter).not.toHaveBeenCalled();
     });
 
+    it('passes the resolved demo session config to SBT block-window initialization', async () => {
+      const demoCfg = {
+        slug: 'demo-1',
+        networkChainId: 11155420,
+        blockLimits: { start: 44967477, end: null },
+        ignored_SBTs_LIST: [],
+        featured_SBTs_LIST: [],
+      };
+      const host = createMockHost({
+        activeSlug: 'demo-1',
+        currentPath: '/session/demo-1',
+        getSessionCfg: jest.fn((slug) => (slug === 'demo-1' ? demoCfg : null)),
+      });
+      const controller = createSessionSbtCacheController(host);
+
+      await controller.initializeSbtCacheForGroup('demo-1', { mode: 'partial' });
+
+      expect(contractScripts.getRelevantBlockWindowForFilter.mock.calls[0][0]).toEqual(
+        expect.objectContaining({
+          slug: 'demo-1',
+          blockLimits: { start: 44967477, end: null },
+        }),
+      );
+    });
+
     it('skips light discovery early when chain ID is missing', async () => {
       const host = createMockHost({ chainId: '' });
       const controller = createSessionSbtCacheController(host);
@@ -1473,7 +1498,9 @@ describe('createSessionSbtCacheController', () => {
         countsOnly: true,
       });
 
-      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith('alpha');
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(
+        expect.objectContaining({ slug: 'alpha' }),
+      );
       expect(contractScripts.getSbtMetadata).not.toHaveBeenCalled();
       expect(contractScripts.getSbtMintBurnCountsByAddress).toHaveBeenCalledWith(
         'none',

@@ -168,7 +168,7 @@ type ResolvedSessionWindowLike = {
 };
 
 interface QuestionCacheContractScripts {
-  getRelevantBlockWindowForFilter: (slug: string) => Promise<ResolvedSessionWindowLike>;
+  getRelevantBlockWindowForFilter: (sessionRef: unknown) => Promise<ResolvedSessionWindowLike>;
   getQuestionData: (
     providerName: string,
     questionId: string,
@@ -675,7 +675,7 @@ export const createSessionQuestionCacheController = (
 
       let resolvedWindow: unknown = null;
       try {
-        resolvedWindow = await questionCacheContractScripts.getRelevantBlockWindowForFilter(slug);
+        resolvedWindow = await questionCacheContractScripts.getRelevantBlockWindowForFilter(sessionCfgForScan || slug);
       } catch (windowErr: unknown) {
         const windowError = isRecord(windowErr) ? windowErr : {};
         abortQuestionScan({

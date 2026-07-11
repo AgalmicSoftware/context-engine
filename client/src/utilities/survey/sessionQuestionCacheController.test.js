@@ -480,7 +480,9 @@ describe('createSessionQuestionCacheController', () => {
 
       await controller.initializeQuestionCacheForGroup(SESSION_SLUG);
 
-      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(SESSION_SLUG);
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(
+        expect.objectContaining({ networkChainId: NETWORK_ID }),
+      );
       expect(contractScripts.getAllQuestionIDsChunkedWithCallback).not.toHaveBeenCalled();
       expect(host.getStateSnapshot()).toMatchObject({ isQuestionCacheReady: true });
       expect(host.checkAllCachesReady).toHaveBeenCalledTimes(1);
@@ -595,7 +597,11 @@ describe('createSessionQuestionCacheController', () => {
       const initPromise = controller.initializeQuestionCacheForGroup('demo-1');
       await flushMicrotasks(6);
 
-      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith('demo-1');
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(
+        expect.objectContaining({
+          blockLimits: { start: 44967477, end: null },
+        }),
+      );
       expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef']).toMatchObject({
         id: '0xabcdef',
         prompt: 'Fixture prompt',

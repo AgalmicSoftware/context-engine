@@ -180,6 +180,11 @@ const createMockHost = (overrides = {}) => {
     }),
     dgWrite,
     getActiveSessionSlug: jest.fn(() => activeSlug || SESSION_SLUG),
+    getSessionCfg: jest.fn((slug) => ({
+      slug,
+      networkChainId: NETWORK_ID,
+      blockLimits: { start: 10, end: null },
+    })),
     getSessionChainId: jest.fn(() =>
       Object.prototype.hasOwnProperty.call(overrides, 'chainId') ? chainId : NETWORK_ID,
     ),
@@ -438,6 +443,12 @@ describe('createSessionResponseHydrationController', () => {
 
       await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
 
+      expect(contractScripts.getRelevantBlockWindowForFilter).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slug: SESSION_SLUG,
+          blockLimits: { start: 10, end: null },
+        }),
+      );
       expect(contractScripts.getQuestionResponsesChunkedWithCallback).not.toHaveBeenCalled();
       expect(resolvePersistedQuestionResponsesWatermark).not.toHaveBeenCalled();
       expect(host.getStateSnapshot()).toMatchObject({
