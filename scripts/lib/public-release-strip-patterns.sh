@@ -77,6 +77,7 @@ scripts/capture-ux-*
 scripts/run-agent-bridge-worker-tests.js
 scripts/run-contextengine-cc-tests.js
 scripts/run-contextengine-cc-tests.test.js
+scripts/e2e-env-example.test.js
 scripts/vendor-cecc-ethers-bundle.js
 scripts/build_external_llm_prompt.py
 scripts/restore-private-pack.sh
@@ -145,6 +146,7 @@ scripts/start-playwright-server.js
 scripts/run-agent-bridge-worker-tests.js
 scripts/run-contextengine-cc-tests.js
 scripts/run-contextengine-cc-tests.test.js
+scripts/e2e-env-example.test.js
 scripts/vendor-cecc-ethers-bundle.js
 scripts/restore-private-pack.sh
 scripts/audit-diff.sh

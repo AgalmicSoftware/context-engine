@@ -122,7 +122,14 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFileMissing('client/src/assets/worker/sessionCorsWorker.unbundled.js.txt');
   expectFileMissing('client/src/assets/worker/deploy-helper-worker.js.txt');
 
-  expectScriptContains('test:surveys-sbt', 'src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js');
+  const surveysSbtProxyPath = 'client/src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js';
+  if (fs.existsSync(path.join(rootDir, surveysSbtProxyPath))) {
+    expectScriptContains('test:surveys-sbt', 'src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js');
+    expectScriptContains('tests', 'npm run test:surveys-sbt');
+  } else {
+    expectScriptMissing('test:surveys-sbt');
+    expectScriptOmits('tests', 'npm run test:surveys-sbt');
+  }
   expectScriptContains('test:contracts', 'SurveysTest');
   expectScriptContains('test:contracts', 'CustomSBTTest');
   expectScriptContains('test:contracts', 'SessionRegistryTest');
@@ -152,7 +159,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:wiring', 'dead-exports:check');
   expectScriptContains('test:wiring', 'scripts/verify-test-inventory.js');
   expectScriptContains('tests', 'npm run test:ci');
-  expectScriptContains('tests', 'npm run test:surveys-sbt');
   expectScriptContains('test:client', '--coverage');
   expectScriptContains('test:client', '--coverageReporters=json-summary');
   expectScriptContains('test:release:client', 'npm test -- --watchAll=false --runInBand');

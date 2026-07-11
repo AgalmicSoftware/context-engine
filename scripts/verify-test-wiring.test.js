@@ -35,8 +35,6 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'package.json',
       JSON.stringify({
         scripts: {
-          'test:surveys-sbt':
-            'src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js',
           'test:contracts':
             'forge test --match-contract "^(SurveysTest|CustomSBTTest|SessionRegistryTest|SurveysFuzzTest|CustomSBTFuzzTest|SessionRegistryFuzzTest|CustomSBTInvariantTest)$"',
           'test:root:jest':
@@ -57,7 +55,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
             'npm run test:wiring && npm run type-debt:check && npm run verify:release && npm run test:client && npm run coverage-floor:check && npm run test:root:jest && npm run test:worker:session-cors && npm run test:node',
           'test:wiring':
             'node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check && npm run -s dead-exports:check',
-          tests: 'npm run test:ci && npm run test:surveys-sbt',
+          tests: 'npm run test:ci',
           'test:client': 'npm test -- --coverage --coverageReporters=json-summary',
           'test:release:client':
             'cd client && npm test -- --watchAll=false --runInBand',
