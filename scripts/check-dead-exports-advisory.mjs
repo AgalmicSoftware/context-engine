@@ -128,6 +128,23 @@ function resolveClientImport(sourceFile, specifier, fileSet) {
   return candidates.find((candidate) => fileSet.has(candidate)) || null;
 }
 
+// Parity-locked runtime twins (e.g. rpcDefaults.{js,ts}, litChipotlePolicy.{js,ts})
+// are one module: the .js exists only for no-loader runtime consumers and is
+// pinned byte-equivalent in behavior by a parity test. Reachability and
+// export-usage accounting must not report either twin as dead while the other
+// is alive.
+function resolveTwinSibling(file, fileSet) {
+  if (file.endsWith('.js')) {
+    const twin = `${file.slice(0, -'.js'.length)}.ts`;
+    return fileSet.has(twin) ? twin : null;
+  }
+  if (file.endsWith('.ts')) {
+    const twin = `${file.slice(0, -'.ts'.length)}.js`;
+    return fileSet.has(twin) ? twin : null;
+  }
+  return null;
+}
+
 function extractImportSpecifiers(sourceText) {
   const specifiers = [];
   for (const pattern of [IMPORT_RE, EXPORT_FROM_RE, DYNAMIC_IMPORT_RE, REQUIRE_RE]) {
@@ -189,7 +206,11 @@ export function collectDeadExportAdvisory({ rootDir = DEFAULT_ROOT_DIR } = {}) {
     extractImportSpecifiers(sourceText)
       .map((specifier) => resolveClientImport(file, specifier, fileSet))
       .filter(Boolean)
-      .forEach((resolved) => importedFiles.add(resolved));
+      .forEach((resolved) => {
+        importedFiles.add(resolved);
+        const twin = resolveTwinSibling(resolved, fileSet);
+        if (twin) importedFiles.add(twin);
+      });
     fileExports.push({
       file,
       exports: extractNamedExports(sourceText),
@@ -199,10 +220,16 @@ export function collectDeadExportAdvisory({ rootDir = DEFAULT_ROOT_DIR } = {}) {
   const candidateDeadFiles = fileExports
     .filter(({ file, exports }) => isCandidateFile(file) && exports.length > 0 && !importedFiles.has(file))
     .map(({ file }) => file);
+  const exportsByFile = new Map(fileExports.map(({ file, exports }) => [file, exports]));
   const candidateUnusedExports = fileExports
     .filter(({ file }) => isCandidateFile(file))
     .flatMap(({ file, exports }) => exports
       .filter((exportName) => !allIdentifiers.has(exportName))
+      .filter((exportName) => {
+        // A shared twin export counts once, attributed to the .ts side.
+        const twin = resolveTwinSibling(file, fileSet);
+        return !(twin && file.endsWith('.js') && (exportsByFile.get(twin) || []).includes(exportName));
+      })
       .map((exportName) => ({ file, exportName })));
 
   return {
