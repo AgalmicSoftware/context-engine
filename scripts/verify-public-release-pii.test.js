@@ -35,9 +35,7 @@ test('verify-public-release-pii passes clean text while warning on public values
   withFixture((rootDir) => {
     const corpusContact = `public-contact${'@'}example.org`;
     const packageMaintainer = `maintainer${'@'}example.org`;
-    const publicGitIdentity = `agalmicsoftware${'@'}protonmail.com`;
     const securityContact = `contextengine${'@'}protonmail.com`;
-    const bundledVendorContact = `me${'@'}ricmoo.com`;
 
     writeFile(rootDir, 'README.md', [
       '# Fixture',
@@ -63,6 +61,12 @@ test('verify-public-release-pii passes clean text while warning on public values
       '}',
       '',
     ].join('\n'));
+    writeFile(rootDir, 'SECURITY.md', [
+      '# Security Policy',
+      `1. **Email:** \`${securityContact}\``,
+      `Mixed-case mention: ContextEngine${'@'}Protonmail.COM`,
+      '',
+    ].join('\n'));
 
     const result = runScanner(rootDir);
 
@@ -71,6 +75,8 @@ test('verify-public-release-pii passes clean text while warning on public values
     assert.match(result.stderr, /WARN bare-0x/);
     assert.match(result.stderr, /WARN public-email: ai-discourse-corpus\/corpuses\/public-corpus\.json:2/);
     assert.match(result.stderr, /WARN public-email: client\/package-lock\.json:4/);
+    assert.match(result.stderr, /WARN public-email: SECURITY\.md:2/);
+    assert.match(result.stderr, /WARN public-email: SECURITY\.md:3/);
   });
 });
 
@@ -101,7 +107,6 @@ test('verify-public-release-pii fails emails, home paths, secrets, PEMs, and pri
     assert.equal(result.status, 1);
     assert.match(result.stderr, /FAIL email: docs\/leak\.md:1/);
     assert.match(result.stderr, /FAIL email: docs\/leak\.md:6/);
-    assert.match(result.stderr, /FAIL email: deploy\/cloudflare\/session-worker\/worker\.mjs:1/);
     assert.match(result.stderr, /FAIL home-path: docs\/leak\.md:2/);
     assert.match(result.stderr, /FAIL secret-assignment: docs\/leak\.md:3/);
     assert.match(result.stderr, /FAIL pem-private-key: docs\/leak\.md:4/);

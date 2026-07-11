@@ -55,7 +55,11 @@ test('prepare-public-release strips private surfaces without publishing an inven
     );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 
-    writeFile(sourceDir, 'public.txt', 'keep\n');
+    writeFile(
+      sourceDir,
+      'public.txt',
+      `keep [redacted-email] and /redacted-home and contextengine${'@'}protonmail.com and ContextEngine${'@'}Protonmail.COM and contextengine+tag${'@'}protonmail.com\n`,
+    );
     writeFile(sourceDir, '.DS_Store', 'mac metadata\n');
     writeFile(sourceDir, '.secrets.baseline', '{"results":{".codex/secret.txt":[]}}\n');
     writeFile(sourceDir, '.env.local', 'SECRET=value\n');
@@ -132,7 +136,10 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /files stripped, output at /);
 
-    assert.equal(fs.readFileSync(path.join(outputDir, 'public.txt'), 'utf8'), 'keep\n');
+    assert.equal(
+      fs.readFileSync(path.join(outputDir, 'public.txt'), 'utf8'),
+      `keep [redacted-email] and /redacted-home and contextengine${'@'}protonmail.com and ContextEngine${'@'}Protonmail.COM and [redacted-email]\n`,
+    );
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(outputDir, 'package.json'), 'utf8')).scripts, {
       test: 'node scripts/run-node-tests.js',
     });
