@@ -449,6 +449,44 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(getWorkerSessionToken).not.toHaveBeenCalled();
   });
 
+  it('refreshes worker resource presence when account settings are opened', () => {
+    const prevProps = buildProps({
+      activeSessionSlug: 'demo-1',
+      loginModalToggled: false,
+    });
+    const nextProps = buildProps({
+      activeSessionSlug: 'demo-1',
+      loginModalToggled: true,
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(nextProps));
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+    subject.loadSponsoredAccess = jest.fn();
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.loadSponsoredAccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('coalesces simultaneous settings, account, and session sponsorship refreshes', () => {
+    const prevProps = buildProps({
+      account: '',
+      activeSessionSlug: 'demo-1',
+      loginModalToggled: false,
+    });
+    const nextProps = buildProps({
+      account: PASSKEY_ADDRESS,
+      activeSessionSlug: 'demo-2',
+      loginModalToggled: true,
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(nextProps));
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+    subject.loadSponsoredAccess = jest.fn();
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.loadSponsoredAccess).toHaveBeenCalledTimes(1);
+  });
+
   it('scans managed cache entries without cloning values and de-duplicates slug clears', async () => {
     mockedCacheScripts.listNamespaceEntriesSync.mockImplementation((namespace: string) => {
       if (namespace === 'questionsCache') {
@@ -1420,5 +1458,33 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       expect(arg.sessionConfig).toEqual({});
     });
     expect(getDemoSessionConfigBySlug).not.toHaveBeenCalled();
+    expect(readWorkerResourcePresence).not.toHaveBeenCalled();
+  });
+
+  it('reads worker resource presence only while account settings are visible', async () => {
+    mockedGetSessionConfigBySlugOrDefault.mockReturnValue({
+      slug: 'demo-1',
+      corsWorkerUrl: 'https://worker.example',
+    });
+
+    const hiddenSubject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({ activeSessionSlug: 'demo-1', loginModalToggled: false }),
+      ),
+    );
+    await hiddenSubject.loadSponsoredAccess();
+    expect(readWorkerResourcePresence).not.toHaveBeenCalled();
+
+    const visibleSubject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({ activeSessionSlug: 'demo-1', loginModalToggled: true }),
+      ),
+    );
+    await visibleSubject.loadSponsoredAccess();
+
+    expect(readWorkerResourcePresence).toHaveBeenCalledTimes(1);
+    expect(readWorkerResourcePresence).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionSlug: 'demo-1' }),
+    );
   });
 });

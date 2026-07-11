@@ -48,13 +48,9 @@ const publicRpcUrlsByChainId = freezeUrlListMap({
     'https://base-sepolia.drpc.org',
     'https://sepolia.base.org',
   ],
-  11155420: [
-    'https://sepolia.optimism.io',
-    'https://optimism-sepolia.publicnode.com',
-    'https://optimism-sepolia-rpc.publicnode.com',
-    'https://optimism-sepolia.drpc.org',
-    'https://optimism-sepolia.gateway.tenderly.co',
-  ],
+  // Keep the browser default on the official endpoint. Other anonymous OP
+  // Sepolia gateways have returned persistent 400/403/429 responses in-app.
+  11155420: ['https://sepolia.optimism.io'],
   42161: ['https://arb1.arbitrum.io/rpc', 'https://arbitrum.publicnode.com'],
   421614: ['https://sepolia-rollup.arbitrum.io/rpc', 'https://arbitrum-sepolia.publicnode.com'],
   747474: ['https://rpc.katana.network'],

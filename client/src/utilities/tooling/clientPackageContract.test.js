@@ -267,6 +267,9 @@ describe('client package modernization contract', () => {
       expect(viteConfig).toContain(`/node_modules/${name}/`);
     });
     expect(viteConfig).toContain("include: ['buffer', 'process/browser']");
+    expect(viteConfig).toContain("find: /^buffer$/");
+    expect(viteConfig).toContain("find: /^node:buffer$/");
+    expect(viteConfig).toContain("path.resolve(__dirname, 'node_modules', 'buffer', 'index.js')");
 
     staleBrowserPolyfills.forEach((name) => {
       expect(pkg.dependencies[name]).toBeUndefined();

@@ -36,6 +36,9 @@ All notable changes to this project will be documented in this file.
 - Prevented repeated RPC retries against browser-forbidden (`403`) endpoints,
   and constrained returning passkey-wallet unlocks to the stored credential so
   SBT mint/sign prompts do not reopen the passkey account chooser.
+- Removed failing anonymous OP Sepolia fallback fanout from cold session loads,
+  deferred worker resource-presence checks until account settings are opened,
+  and resolved Vite's browser `buffer` shim explicitly.
 
 ## [0.7.0] - 2026-07-06
 

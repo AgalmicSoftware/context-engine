@@ -217,10 +217,12 @@ SPA fallback concept, but their redirect config syntax differs.
 - Custom RPC URLs supplied as worker secrets stay worker-private and are not
   mirrored into public registry fields. Client reads use only explicit
   browser-visible session `rpcUrl` / `rpcUrlsByChainId` values.
-- OP Sepolia browser fallbacks lead with the official
-  `https://sepolia.optimism.io` endpoint. Tenderly remains wired as the last
-  fallback instead of the primary endpoint because its anonymous gateway can
-  return sustained `429` responses under registry/SBT discovery load.
+- OP Sepolia anonymous browser reads use only the official
+  `https://sepolia.optimism.io` endpoint. PublicNode, dRPC, and Tenderly are not
+  anonymous fallbacks because their browser-facing endpoints have returned
+  sustained `400`, `403`, or `429` responses under registry/SBT discovery load.
+  Production deployments should configure a session-visible sponsored RPC or
+  another authenticated provider instead of adding anonymous fanout.
 - Ethers read providers serialize distinct reads per endpoint. After a network
   request returns `429` or an endpoint rejects browser access with `403`,
   queued reads fail locally and use normal provider

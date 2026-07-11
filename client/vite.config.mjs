@@ -554,6 +554,8 @@ export default defineConfig(({ mode }) => {
         { find: 'components', replacement: path.resolve(srcDir, 'components') },
         { find: 'utilities', replacement: path.resolve(srcDir, 'utilities') },
         { find: 'variables', replacement: path.resolve(srcDir, 'variables') },
+        { find: /^buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
+        { find: /^node:buffer$/, replacement: path.resolve(__dirname, 'node_modules', 'buffer', 'index.js') },
         { find: /^@metamask\/superstruct$/, replacement: path.resolve(srcDir, 'shims', 'metamask-superstruct.ts') },
         { find: /^zod-validation-error$/, replacement: path.resolve(__dirname, 'node_modules', 'zod-validation-error', 'dist', 'index.js') },
         { find: /^worker_threads$/, replacement: path.resolve(srcDir, 'shims', 'node-worker-threads.ts') },

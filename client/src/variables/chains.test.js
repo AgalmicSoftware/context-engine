@@ -25,10 +25,6 @@ const BASE_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze([
 ]);
 const OP_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze([
   'https://sepolia.optimism.io', // intentional: production RPC fallback snapshot
-  'https://optimism-sepolia.publicnode.com', // intentional: production RPC fallback snapshot
-  'https://optimism-sepolia-rpc.publicnode.com', // intentional: production RPC fallback snapshot
-  'https://optimism-sepolia.drpc.org', // intentional: production RPC fallback snapshot
-  'https://optimism-sepolia.gateway.tenderly.co', // intentional: production RPC fallback snapshot
 ]);
 
 const withoutLeadingOptionalRpcUrls = (urls, optionalUrls = []) => {

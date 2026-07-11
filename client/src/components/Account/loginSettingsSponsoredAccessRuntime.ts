@@ -18,12 +18,14 @@ export const loadLoginSettingsSponsoredAccess = async ({
   account,
   providerLike,
   fallbackChainId,
+  includeWorkerResourcePresence = true,
 }: {
   slug: string;
   sessionConfig: UnknownRecord;
   account: string;
   providerLike?: unknown;
   fallbackChainId?: unknown;
+  includeWorkerResourcePresence?: boolean;
 }): Promise<LoginSettingsSponsoredAccessResult> => {
   let cfg = sessionConfig || {};
   const chainId = Number(
@@ -50,11 +52,13 @@ export const loadLoginSettingsSponsoredAccess = async ({
         checkSponsoredAccess({ sessionConfig: cfg, sessionSlug: slug, account, resourceKey }),
       ),
     ),
-    readWorkerResourcePresence({
-      sessionConfig: cfg,
-      sessionSlug: slug,
-      context: { account, providerLike: providerLike || null, chainId: chainId || null },
-    }),
+    includeWorkerResourcePresence
+      ? readWorkerResourcePresence({
+          sessionConfig: cfg,
+          sessionSlug: slug,
+          context: { account, providerLike: providerLike || null, chainId: chainId || null },
+        })
+      : Promise.resolve(null),
   ]);
 
   return {

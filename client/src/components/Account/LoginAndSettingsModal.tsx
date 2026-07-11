@@ -817,11 +817,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const testFundsContextChanged =
       this.getTestFundsRequestContextKey(this.props, this.state) !==
       this.getTestFundsRequestContextKey(prevProps, prevState);
+    const accountChanged = this.props.account !== prevProps.account;
+    const settingsOpened = this.props.loginModalToggled && !prevProps.loginModalToggled;
+    const needsSponsoredAccessRefresh = accountChanged || activeSessionChanged || settingsOpened;
     if (this.getWalletChainId() !== this.getWalletChainId(prevProps)) needsBalanceCheck = true;
-    if (this.props.account !== prevProps.account) {
+    if (accountChanged) {
       needsBalanceCheck = true;
       this.setStateIfMounted({ wagmiLoginUpdateNeeded: true });
-      this.loadSponsoredAccess();
     }
     if (this.props.provider !== prevProps.provider) needsBalanceCheck = true;
     if (this.props.wagmiAddress !== prevProps.wagmiAddress) needsBalanceCheck = true;
@@ -870,9 +872,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     if (activeSessionChanged) {
       this.loadAiSettings();
       this.loadResourceKeys();
-      this.loadSponsoredAccess();
       this.syncPasskeyWalletChain();
     }
+    if (needsSponsoredAccessRefresh) this.loadSponsoredAccess();
 
     const prevScope = normalizeSessionScanScope(prevProps.selectedSessionScope || '');
     const nextScope = normalizeSessionScanScope(this.props.selectedSessionScope || '');
@@ -1186,6 +1188,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         account: this.props.account || '',
         providerLike: this.props.provider || null,
         fallbackChainId: this.getTargetNetwork()?.id,
+        // Regression guard: old workers may reject resource-presence. Only probe
+        // when the settings UI that consumes the result is actually visible.
+        includeWorkerResourcePresence: !!this.props.loginModalToggled,
       });
       if (reqId !== this._sponsoredReqId) return;
       this.setStateIfMounted({
