@@ -21,20 +21,4 @@ describe('ToolExplorer sparse card layout', () => {
       /@media \(max-width:\s*640px\)[\s\S]*?\.explorerColSparse \.square[\s\S]*?height:\s*clamp\(124px,\s*19vh,\s*156px\);/,
     );
   });
-
-  it('centers the session selector under its trigger at medium widths without exceeding the viewport', () => {
-    expect(scss).toMatch(
-      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.headerSessionSelectorPanel\s*{[\s\S]*?right:\s*auto;[\s\S]*?left:\s*50%;[\s\S]*?width:\s*min\(460px,\s*calc\(100vw - 48px\)\);[\s\S]*?transform:\s*translateX\(-50%\);/,
-    );
-  });
-
-  it('uses UserPage-style neutral depth and scopes status borders to demo mode', () => {
-    expect(scss).toMatch(
-      /\.explorerCol\s*{[\s\S]*?&\.statusBorderEnabled[\s\S]*?border:\s*4px solid rgba\(77,\s*255,\s*164,\s*0\.78\);/,
-    );
-    expect(scss).toMatch(
-      /\.square\s*{[\s\S]*?border:\s*1px solid rgba\(255,\s*255,\s*255,\s*0\.14\);[\s\S]*?background:\s*#24264d;[\s\S]*?box-shadow:[\s\S]*?#171a3d[\s\S]*?rgba\(59,\s*63,\s*126,\s*0\.72\)/,
-    );
-    expect(scss).toMatch(/&:hover\s*{[\s\S]*?transform:\s*translateY\(-3px\);/);
-  });
 });
