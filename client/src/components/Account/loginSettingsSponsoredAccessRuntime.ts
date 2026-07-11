@@ -5,7 +5,20 @@ import {
   type WorkerResourcePresence,
 } from '../../utilities/worker/workerResourcePresence';
 
-type UnknownRecord = Record<string, any>;
+type RegistrySessionReference = {
+  registryChainId?: unknown;
+  sessionIdHex?: unknown;
+};
+
+type SponsoredAccessSessionConfig = Record<string, unknown> & {
+  networkChainId?: unknown;
+  chainId?: unknown;
+  sessionId?: unknown;
+  __registry?: RegistrySessionReference | null;
+};
+
+const isSponsoredAccessSessionConfig = (value: unknown): value is SponsoredAccessSessionConfig =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export type LoginSettingsSponsoredAccessResult = {
   accessMap: Record<'ai' | 'arweave' | 'rpc' | 'txGas', unknown>;
@@ -21,7 +34,7 @@ export const loadLoginSettingsSponsoredAccess = async ({
   includeWorkerResourcePresence = true,
 }: {
   slug: string;
-  sessionConfig: UnknownRecord;
+  sessionConfig: SponsoredAccessSessionConfig;
   account: string;
   providerLike?: unknown;
   fallbackChainId?: unknown;
@@ -39,7 +52,7 @@ export const loadLoginSettingsSponsoredAccess = async ({
         sessionId: cfg.sessionId || cfg.__registry?.sessionIdHex || null,
         providerLike: providerLike || null,
       });
-      if (refreshed) cfg = refreshed;
+      if (isSponsoredAccessSessionConfig(refreshed)) cfg = refreshed;
     } catch {
       // Preserve the existing registry snapshot when a targeted refresh is unavailable.
     }
