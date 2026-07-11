@@ -41,4 +41,13 @@ describe('queryKeys', () => {
       }),
     ).toThrow('Query key ids must be scalar values');
   });
+
+  it('rejects non-finite numeric ids that would hash like null', () => {
+    expect(() => queryKeys.scoped('survey', 'questions', { ids: [Number.NaN] })).toThrow(
+      'Query key numeric ids must be finite',
+    );
+    expect(() => queryKeys.scoped('survey', 'questions', { ids: [Number.POSITIVE_INFINITY] })).toThrow(
+      'Query key numeric ids must be finite',
+    );
+  });
 });

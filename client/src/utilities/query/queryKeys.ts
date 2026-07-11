@@ -38,6 +38,9 @@ const normalizeOptionalText = (value: string | null | undefined): string | null 
 
 const normalizeIds = (ids: readonly QueryKeyScalar[] = []): QueryKeyScalar[] =>
   ids.map((value) => {
+    if (typeof value === 'number' && !Number.isFinite(value)) {
+      throw new Error('Query key numeric ids must be finite');
+    }
     if (value === null || ['string', 'number', 'boolean'].includes(typeof value)) return value;
     throw new Error('Query key ids must be scalar values');
   });
