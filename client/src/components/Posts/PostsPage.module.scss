@@ -214,6 +214,7 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
   min-width: 0;
   box-sizing: border-box;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   margin-bottom: 24px;
   padding-bottom: 18px;
@@ -326,10 +327,14 @@ $viz-panel-border: rgba(255, 255, 255, 0.13);
 }
 
 .postTitle {
+  min-width: 0;
   font-size: 2.45rem;
+  overflow-wrap: anywhere;
 }
 
 .postMeta {
+  width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -2752,6 +2757,35 @@ h3.postHeading {
 
   .postArticle {
     padding: 18px;
+  }
+
+  .postMeta {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+  }
+
+  .tagList {
+    width: 70%;
+    max-width: 70%;
+    flex: 0 1 70%;
+    flex-wrap: wrap;
+    column-gap: 3px;
+    row-gap: 6px;
+    overflow-x: visible;
+    padding-bottom: 0;
+  }
+
+  .tag {
+    min-height: 26px;
+    padding: 0 3px;
+    font-size: 0.78rem;
+  }
+
+  .postDate {
+    flex: 0 0 auto;
+    align-self: flex-end;
+    margin-left: auto;
   }
 
   .vizGroupCard {

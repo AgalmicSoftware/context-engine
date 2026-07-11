@@ -482,13 +482,6 @@ const buildBinaryBeeswarmPlacements = (items: BinaryBeeswarmQuestionDatum[], sca
   return placements;
 };
 
-const getInitialBinaryView = (): 'swarm' | 'list' =>
-  typeof window !== 'undefined' &&
-  typeof window.matchMedia === 'function' &&
-  window.matchMedia('(max-width: 560px)').matches
-    ? 'list'
-    : 'swarm';
-
 const BinaryTooltipSplitBar = ({ counts }: { counts: ResponseCountDatum[] }) => {
   const total = counts.reduce((sum, count) => sum + count.value, 0);
   if (total <= 0) return null;
@@ -538,7 +531,7 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const clearPin = React.useCallback(() => setPinnedIndex(null), []);
   useEscapeToClear(pinnedIndex !== null, clearPin);
 
-  const [view, setView] = React.useState<'swarm' | 'list'>(getInitialBinaryView);
+  const [view, setView] = React.useState<'swarm' | 'list'>('swarm');
   const [sortKey, setSortKey] = React.useState<'difference' | 'confidence'>('difference');
 
   if (items.length === 0) {

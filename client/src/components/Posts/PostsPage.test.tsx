@@ -848,7 +848,7 @@ describe('PostsPage', () => {
     expect(screen.getByText('Consensus')).toBeInTheDocument();
   });
 
-  it('defaults the binary visualization to the list view on narrow screens', async () => {
+  it('keeps the binary visualization in swarm view on narrow screens', async () => {
     const originalMatchMedia = window.matchMedia;
     Object.defineProperty(window, 'matchMedia', {
       configurable: true,
@@ -874,9 +874,9 @@ describe('PostsPage', () => {
       renderPostsPage(fetcher, true, ['/posts/first-post']);
 
       await screen.findByRole('heading', { name: 'First Post', level: 1 });
-      expect(await screen.findByTestId('ce-posts-binary-list')).toBeInTheDocument();
-      expect(screen.getByTestId('ce-posts-binary-view-list')).toHaveAttribute('aria-pressed', 'true');
-      expect(screen.queryByRole('img', { name: 'Consensus and Difference' })).not.toBeInTheDocument();
+      expect(await screen.findByRole('img', { name: 'Consensus and Difference' })).toBeInTheDocument();
+      expect(screen.getByTestId('ce-posts-binary-view-swarm')).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.queryByTestId('ce-posts-binary-list')).not.toBeInTheDocument();
     } finally {
       Object.defineProperty(window, 'matchMedia', {
         configurable: true,
@@ -926,6 +926,14 @@ describe('PostsPage', () => {
     expect(scss).toMatch(/\.tagList\s*{[\s\S]*flex:\s*1 1 auto;/);
   });
 
+  it('keeps the post hero and title inside the mobile article width', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.postHeader\s*{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\);/);
+    expect(scss).toMatch(/\.postTitle\s*{[\s\S]*min-width:\s*0;[\s\S]*overflow-wrap:\s*anywhere;/);
+    expect(scss).toMatch(/\.postMeta\s*{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/);
+  });
+
   it('keeps full rating questions readable in the precision matrix', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
 
@@ -940,6 +948,14 @@ describe('PostsPage', () => {
     );
     expect(scss).toMatch(
       /@media \(max-width: 820px\)\s*{[\s\S]*\.postMeta\s*{[\s\S]*flex-wrap:\s*nowrap;[\s\S]*align-items:\s*center;[\s\S]*\.tagList\s*{[\s\S]*width:\s*70%;[\s\S]*max-width:\s*70%;[\s\S]*flex:\s*0 1 70%;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*overflow-x:\s*auto;[\s\S]*\.postDate\s*{[\s\S]*flex:\s*0 0 auto;[\s\S]*margin-left:\s*auto;[\s\S]*text-align:\s*right;/,
+    );
+  });
+
+  it('wraps every mobile tag inside the 70 percent metadata column without scrolling', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /@media \(max-width: 560px\)\s*{[\s\S]*\.postMeta\s*{[\s\S]*display:\s*flex;[\s\S]*align-items:\s*flex-end;[\s\S]*\.tagList\s*{[\s\S]*width:\s*70%;[\s\S]*max-width:\s*70%;[\s\S]*flex-wrap:\s*wrap;[\s\S]*overflow-x:\s*visible;[\s\S]*\.tag\s*{[\s\S]*font-size:\s*0\.78rem;[\s\S]*\.postDate\s*{[\s\S]*align-self:\s*flex-end;/,
     );
   });
 
