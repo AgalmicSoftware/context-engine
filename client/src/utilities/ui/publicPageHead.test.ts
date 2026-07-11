@@ -155,6 +155,31 @@ describe('publicPageHead', () => {
     );
   });
 
+  it('supports article metadata with a large social preview image', () => {
+    const state = syncPublicPageHead({
+      location: new URL('https://contextengine.xyz/posts/agent-village-wrapped-2026'),
+      title: 'Agent Village Wrapped',
+      description: 'A personal-agent evaluation.',
+      image: 'https://contextengine.xyz/posts/agent-village-wrapped/attachments/header.jpg',
+      ogType: 'article',
+      twitterCard: 'summary_large_image',
+    });
+
+    expect(state).toEqual(
+      expect.objectContaining({
+        ogType: 'article',
+        twitterCard: 'summary_large_image',
+      }),
+    );
+    expect(document.head.querySelector('meta[property="og:type"]')?.getAttribute('content')).toBe('article');
+    expect(document.head.querySelector('meta[property="og:image"]')?.getAttribute('content')).toBe(
+      'https://contextengine.xyz/posts/agent-village-wrapped/attachments/header.jpg',
+    );
+    expect(document.head.querySelector('meta[name="twitter:card"]')?.getAttribute('content')).toBe(
+      'summary_large_image',
+    );
+  });
+
   it('emits deployment-origin discovery significantLink URLs for root-host deployments', () => {
     window.history.replaceState({}, '', '/');
 

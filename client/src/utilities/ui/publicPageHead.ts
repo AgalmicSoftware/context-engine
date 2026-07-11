@@ -25,6 +25,8 @@ export type PublicPageHeadState = {
   title: string;
   description: string;
   image: string;
+  ogType: string;
+  twitterCard: string;
   canonicalUrl: string;
   ogUrl: string;
 };
@@ -230,6 +232,8 @@ export const syncPublicPageHead = ({
   title = DEFAULT_PUBLIC_PAGE_TITLE,
   description = DEFAULT_PUBLIC_PAGE_DESCRIPTION,
   image = DEFAULT_PUBLIC_PAGE_IMAGE,
+  ogType = 'website',
+  twitterCard = 'summary',
   canonicalUrl,
   ogUrl,
 }: {
@@ -237,6 +241,8 @@ export const syncPublicPageHead = ({
   title?: unknown;
   description?: unknown;
   image?: unknown;
+  ogType?: unknown;
+  twitterCard?: unknown;
   canonicalUrl?: unknown;
   ogUrl?: unknown;
 } = {}): PublicPageHeadState | null => {
@@ -245,17 +251,19 @@ export const syncPublicPageHead = ({
   const resolvedTitle = toStr(title) || DEFAULT_PUBLIC_PAGE_TITLE;
   const resolvedDescription = toStr(description) || DEFAULT_PUBLIC_PAGE_DESCRIPTION;
   const resolvedImage = toStr(image) || DEFAULT_PUBLIC_PAGE_IMAGE;
+  const resolvedOgType = toStr(ogType) || 'website';
+  const resolvedTwitterCard = toStr(twitterCard) || 'summary';
   const resolvedCanonicalUrl = toStr(canonicalUrl) || buildCanonicalPublicUrl(location);
   const resolvedOgUrl = toStr(ogUrl) || resolvedCanonicalUrl;
 
   document.title = resolvedTitle;
   setMetaContent('meta[name="description"]', { name: 'description' }, resolvedDescription);
-  setMetaContent('meta[property="og:type"]', { property: 'og:type' }, 'website');
+  setMetaContent('meta[property="og:type"]', { property: 'og:type' }, resolvedOgType);
   setMetaContent('meta[property="og:url"]', { property: 'og:url' }, resolvedOgUrl);
   setMetaContent('meta[property="og:title"]', { property: 'og:title' }, resolvedTitle);
   setMetaContent('meta[property="og:description"]', { property: 'og:description' }, resolvedDescription);
   setMetaContent('meta[property="og:image"]', { property: 'og:image' }, resolvedImage);
-  setMetaContent('meta[name="twitter:card"]', { name: 'twitter:card' }, 'summary');
+  setMetaContent('meta[name="twitter:card"]', { name: 'twitter:card' }, resolvedTwitterCard);
   setMetaContent('meta[name="twitter:title"]', { name: 'twitter:title' }, resolvedTitle);
   setMetaContent('meta[name="twitter:description"]', { name: 'twitter:description' }, resolvedDescription);
   setMetaContent('meta[name="twitter:image"]', { name: 'twitter:image' }, resolvedImage);
@@ -285,6 +293,8 @@ export const syncPublicPageHead = ({
     title: resolvedTitle,
     description: resolvedDescription,
     image: resolvedImage,
+    ogType: resolvedOgType,
+    twitterCard: resolvedTwitterCard,
     canonicalUrl: resolvedCanonicalUrl,
     ogUrl: resolvedOgUrl,
   };

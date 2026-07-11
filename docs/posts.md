@@ -70,6 +70,19 @@ attachments naturally:
 `attachments` is optional metadata for the post asset directory. Markdown image
 title text renders as the figure caption.
 
+## Social Link Previews
+
+Production builds generate crawler-facing HTML at both
+`/posts/:slug.html` and `/posts/:slug/index.html`. These static entry points let
+link-preview services read post metadata without executing the React app. The
+preview uses the manifest `title` and `summary`, sets the Open Graph type to
+`article`, and uses `headerImage.src` for the Open Graph and Twitter image with
+a `summary_large_image` card.
+
+Header images should therefore be compressed web assets, preferably JPEG or
+WebP, rather than full-resolution working files. The Agent Village post keeps
+its PNG source alongside a compressed JPEG selected by the manifest.
+
 ## Disclosure Blocks
 
 Wrap Markdown content in `ce-disclosure` markers when detailed methods, schemas,

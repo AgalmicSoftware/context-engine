@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { syncPublicPageHead } from '../../utilities/ui/publicPageHead.js';
 import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import { CE_ABOUT_POSTS_ENABLED } from '../../variables/appConfig.js';
 import {
@@ -57,6 +58,15 @@ const readPostSlugFromPathname = (pathname: string): string => {
 
 const buildPostRoute = (slug: string): string => buildPublicRoute(`/posts/${encodeURIComponent(slug)}`);
 
+const buildAbsoluteBrowserUrl = (value: string): string => {
+  if (!value || typeof window === 'undefined') return value;
+  try {
+    return new URL(value, window.location.origin).toString();
+  } catch {
+    return value;
+  }
+};
+
 const PostsPage = ({ enabled = CE_ABOUT_POSTS_ENABLED, fetcher = defaultFetch }: PostsPageProps) => {
   const location = useLocation();
   const [status, setStatus] = useState<PostsPageStatus>('idle');
@@ -99,6 +109,27 @@ const PostsPage = ({ enabled = CE_ABOUT_POSTS_ENABLED, fetcher = defaultFetch }:
     () => (selectedSlug ? posts.find((post) => post.slug === selectedSlug) || null : null),
     [posts, selectedSlug],
   );
+
+  useEffect(() => {
+    if (!selectedPostMeta) return undefined;
+
+    syncPublicPageHead({
+      location: {
+        origin: window.location.origin,
+        pathname: location.pathname,
+        search: location.search,
+      },
+      title: selectedPostMeta.title,
+      description: selectedPostMeta.summary,
+      image: buildAbsoluteBrowserUrl(selectedPostMeta.headerImage?.src || ''),
+      ogType: 'article',
+      twitterCard: selectedPostMeta.headerImage ? 'summary_large_image' : 'summary',
+    });
+
+    return () => {
+      syncPublicPageHead();
+    };
+  }, [location.pathname, location.search, selectedPostMeta]);
 
   useEffect(() => {
     if (!enabled || !selectedSlug || !selectedPostMeta) {

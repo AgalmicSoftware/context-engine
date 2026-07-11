@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, transformWithEsbuild } from 'vite';
+import { writePostSocialPreviewHtml } from './scripts/post-social-preview.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, 'src');
@@ -509,9 +510,11 @@ const postsAssetsCompatibilityPlugin = () => ({
   },
   writeBundle(options) {
     if (!fs.existsSync(postsDir)) return;
-    fs.cpSync(postsDir, path.resolve(options.dir || path.resolve(__dirname, 'build'), 'posts'), {
+    const outputDir = options.dir || path.resolve(__dirname, 'build');
+    fs.cpSync(postsDir, path.resolve(outputDir, 'posts'), {
       recursive: true,
     });
+    writePostSocialPreviewHtml({ buildDir: outputDir, postsDir });
   },
 });
 

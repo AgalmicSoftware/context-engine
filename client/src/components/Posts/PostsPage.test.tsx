@@ -335,6 +335,20 @@ describe('PostsPage', () => {
     expect(screen.queryByRole('heading', { name: 'Posts', level: 1 })).not.toBeInTheDocument();
     const detailHeading = await screen.findByRole('heading', { name: 'First Post', level: 1 });
     expect(detailHeading).toBeInTheDocument();
+    await waitFor(() => expect(document.title).toBe('First Post'));
+    expect(document.head.querySelector('meta[property="og:type"]')).toHaveAttribute('content', 'article');
+    expect(document.head.querySelector('meta[property="og:image"]')).toHaveAttribute(
+      'content',
+      `${window.location.origin}/posts/first-post/attachments/first-hero.jpeg`,
+    );
+    expect(document.head.querySelector('meta[name="twitter:card"]')).toHaveAttribute(
+      'content',
+      'summary_large_image',
+    );
+    expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      `${window.location.origin}/posts/first-post`,
+    );
     expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
     expect(screen.queryByText('Post')).not.toBeInTheDocument();
     expect(screen.queryByText('First summary')).not.toBeInTheDocument();
@@ -370,7 +384,7 @@ describe('PostsPage', () => {
     expect(screen.getByText('Agent Village media example')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Context Engine' })).toHaveAttribute('href', 'https://contextengine.xyz');
     expect(screen.getByText(/<script>alert\("no html"\)<\/script>/)).toBeInTheDocument();
-    expect(document.querySelector('script')).not.toBeInTheDocument();
+    expect(Array.from(document.scripts).some((script) => script.textContent?.includes('alert("no html")'))).toBe(false);
     const sampleHeading = screen.getByRole('heading', { name: 'Data Visualization (n=4)', level: 2 });
     const sampleSize = within(sampleHeading).getByText('(n=4)');
     expect(sampleSize.tagName).toBe('SPAN');
@@ -501,6 +515,9 @@ describe('PostsPage', () => {
 
     expect(screen.getByTestId('test-location')).toHaveTextContent('/posts');
     expect(await screen.findByRole('heading', { name: 'Posts', level: 1 })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.head.querySelector('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary'),
+    );
     expect(await screen.findByRole('link', { name: /First Post/i })).toBeInTheDocument();
     expect(screen.getByText('First summary')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'First Post', level: 2 })).not.toBeInTheDocument();
