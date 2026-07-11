@@ -127,6 +127,11 @@ const mockAppDependencies = () => {
   jest.doMock('../utilities/ui/publicPageHead.js', () => ({
     syncPublicPageHead: mockSyncPublicPageHead,
   }));
+  jest.doMock('../app/runtime/appQueryClient', () => ({
+    appQueryFoundation: {
+      Provider: ({ children }: { children: React.ReactNode }) => children,
+    },
+  }));
 
   jest.doMock('./HooksHOC/withRouterBridge', () => ({
     __esModule: true,

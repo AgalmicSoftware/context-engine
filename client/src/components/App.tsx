@@ -18,9 +18,11 @@ import { toastTheme } from '../utilities/ui/toastTheme.js';
 
 import { WagmiConfig } from 'wagmi';
 import { chains, wagmiClient } from '../app/runtime/appWagmiRuntime';
+import { appQueryFoundation } from '../app/runtime/appQueryClient';
 import { WalletUiProvider } from '../app/runtime/walletUiRuntime.js';
 
 const AppShell = React.lazy(() => import('./MainSite/AppShell'));
+const AppQueryClientProvider = appQueryFoundation.Provider;
 
 const log = createLogger('general');
 
@@ -252,23 +254,25 @@ class App extends React.Component<AppProps, AppState> {
 
     return (
       <WagmiConfig client={wagmiClient}>
-        <WalletUiProvider chains={chains}>
-          <Provider store={store}>
-            <AppErrorBoundary>
-              <CEToaster position="bottom-right" toastOptions={{ style: toastTheme }} />
-              <Routes>
-                <Route
-                  path="*"
-                  element={
-                    <Suspense fallback={null}>
-                      <AppShell path={urlPath} {...siteProps} />
-                    </Suspense>
-                  }
-                />
-              </Routes>
-            </AppErrorBoundary>
-          </Provider>
-        </WalletUiProvider>
+        <AppQueryClientProvider>
+          <WalletUiProvider chains={chains}>
+            <Provider store={store}>
+              <AppErrorBoundary>
+                <CEToaster position="bottom-right" toastOptions={{ style: toastTheme }} />
+                <Routes>
+                  <Route
+                    path="*"
+                    element={
+                      <Suspense fallback={null}>
+                        <AppShell path={urlPath} {...siteProps} />
+                      </Suspense>
+                    }
+                  />
+                </Routes>
+              </AppErrorBoundary>
+            </Provider>
+          </WalletUiProvider>
+        </AppQueryClientProvider>
       </WagmiConfig>
     );
   }
