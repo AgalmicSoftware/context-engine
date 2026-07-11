@@ -21,6 +21,9 @@ import {
   dispatchSponsoredBootstrapRedeem as dispatchSponsoredBootstrapRedeemBoundary,
 } from './sponsoredBootstrapRedeemDispatch.js';
 import {
+  dispatchResourcePresenceRequest as dispatchResourcePresenceRequestBoundary,
+} from './resourcePresenceDispatch.js';
+import {
   getRouteBaseHeaders as getRouteBaseHeadersBoundary,
 } from './routeBaseHeaders.js';
 import {
@@ -52,6 +55,9 @@ export const createWorkerRouteShellWithWorkerDeps = ({
   );
   const dispatchSponsoredBootstrapRedeem = (
     deps?.dispatchSponsoredBootstrapRedeem || dispatchSponsoredBootstrapRedeemBoundary
+  );
+  const dispatchResourcePresenceRequest = (
+    deps?.dispatchResourcePresenceRequest || dispatchResourcePresenceRequestBoundary
   );
   const dispatchAdminRequestWithWorkerDeps = (
     deps?.dispatchAdminRequestWithWorkerDeps || dispatchAdminRequestWithWorkerDepsBoundary
@@ -96,6 +102,26 @@ export const createWorkerRouteShellWithWorkerDeps = ({
       }
 
       const envSlug = getDefaultWorkerSessionSlug(env);
+
+      if (routeSelection.kind === 'resource-presence') {
+        return await dispatchResourcePresenceRequest({
+          request,
+          env,
+          slugHint: envSlug,
+          baseHeaders: routeBaseHeaders,
+          deps: {
+            resolveRequestSlugWithoutToken: deps?.resolveRequestSlugWithoutToken,
+            getSessionConfig: deps?.getSessionConfig,
+            getCorsContext: deps?.getCorsContext,
+            getSessionSecrets: deps?.getSessionSecrets,
+            json: deps?.json,
+          },
+          constants: {
+            missingSlugError: constants?.missingSlugError,
+            sessionConfigNotFoundError: constants?.sessionConfigNotFoundError,
+          },
+        });
+      }
 
       if (routeSelection.kind === 'auth-nonce') {
         return await dispatchAuthNonceRequestWithWorkerDeps({

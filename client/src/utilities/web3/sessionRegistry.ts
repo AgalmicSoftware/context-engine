@@ -1628,7 +1628,7 @@ export const refreshSessionRegistryFieldsCache = async ({
 };
 
 export const loadSessionRegistryCache = async (
-  { chainIds, providerLike, account, lit, force, bootstrapRpc } = {} as AnyRecord,
+  { chainIds, slugs, providerLike, account, lit, force, bootstrapRpc } = {} as AnyRecord,
 ) => {
   if (!USE_ONCHAIN_SESSION_REGISTRY && !force) return null;
   const useBootstrapRpc = typeof bootstrapRpc === 'boolean' ? bootstrapRpc : true;
@@ -1654,6 +1654,9 @@ export const loadSessionRegistryCache = async (
   }
 
   const ids = Array.isArray(chainIds) && chainIds.length ? chainIds : getSessionRegistryChainIds();
+  const requestedSlugs = Array.isArray(slugs)
+    ? Array.from(new Set(slugs.map((slug) => toRegistrySlug(slug)).filter(Boolean)))
+    : [];
 
   const cache: RegistryCache = {
     ts: Date.now(),
@@ -1673,11 +1676,15 @@ export const loadSessionRegistryCache = async (
     );
     if (!contract) return null;
 
-    let count = 0;
-    try {
-      count = Number(await contract.getSessionCount());
-    } catch (_) {
-      return { chainId, chainEntry: null, configs: [], hadLoadErrors: true };
+    let sessionSources: Array<number | string> = requestedSlugs;
+    if (!sessionSources.length) {
+      let count = 0;
+      try {
+        count = Number(await contract.getSessionCount());
+      } catch (_) {
+        return { chainId, chainEntry: null, configs: [], hadLoadErrors: true };
+      }
+      sessionSources = Array.from({ length: Math.max(0, Math.floor(count)) }, (_entry, index) => index);
     }
 
     const chainEntry: RegistryCache = {
@@ -1687,13 +1694,16 @@ export const loadSessionRegistryCache = async (
       sessionsById: {},
     };
 
-    const sessionIndexes = Array.from({ length: Math.max(0, Math.floor(count)) }, (_entry, index) => index);
-    const sessionResults = await mapWithConcurrency(sessionIndexes, REGISTRY_SESSION_LOAD_CONCURRENCY, async (i) => {
-      let slug = '';
-      try {
-        slug = await contract.getSessionSlugByIndex(i);
-      } catch (_) {
-        return { config: null, hadLoadErrors: true };
+    // Regression guard: active-session consumers must not enumerate every registry
+    // entry; doing so multiplied each session into gate/field reads and triggered RPC 429 storms.
+    const sessionResults = await mapWithConcurrency(sessionSources, REGISTRY_SESSION_LOAD_CONCURRENCY, async (source) => {
+      let slug = typeof source === 'string' ? source : '';
+      if (!slug) {
+        try {
+          slug = await contract.getSessionSlugByIndex(source);
+        } catch (_) {
+          return { config: null, hadLoadErrors: true };
+        }
       }
       if (!slug) return { config: null, hadLoadErrors: false };
       let tuple = null;
@@ -1783,7 +1793,7 @@ export const loadSessionRegistryCache = async (
   );
   const previousCount = previousSessions ? Object.keys(previousSessions).length : 0;
   const currentCount = Object.keys(cache.sessions || {}).length;
-  const shouldMergePrevious = hadLoadErrors || (previousCount && currentCount < previousCount);
+  const shouldMergePrevious = requestedSlugs.length > 0 || hadLoadErrors || (previousCount && currentCount < previousCount);
 
   if (shouldMergePrevious && previousSessions) {
     Object.entries(previousSessions).forEach(([slug, cfg]) => {
@@ -1811,6 +1821,7 @@ export const loadSessionRegistryCache = async (
       value: {
         hadLoadErrors: !!hadLoadErrors,
         loadedChainIds: Array.isArray(ids) ? [...ids] : [],
+        requestedSlugs: [...requestedSlugs],
         sessionCount: Object.keys(cache.sessions || {}).length,
         ts: Date.now(),
       },
@@ -1822,6 +1833,7 @@ export const loadSessionRegistryCache = async (
     cache.__loadMeta = {
       hadLoadErrors: !!hadLoadErrors,
       loadedChainIds: Array.isArray(ids) ? [...ids] : [],
+      requestedSlugs: [...requestedSlugs],
       sessionCount: Object.keys(cache.sessions || {}).length,
       ts: Date.now(),
     };

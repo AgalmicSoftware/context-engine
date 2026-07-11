@@ -49,11 +49,11 @@ const publicRpcUrlsByChainId = freezeUrlListMap({
     'https://sepolia.base.org',
   ],
   11155420: [
-    'https://optimism-sepolia.gateway.tenderly.co',
-    'https://optimism-sepolia.drpc.org',
     'https://sepolia.optimism.io',
     'https://optimism-sepolia.publicnode.com',
     'https://optimism-sepolia-rpc.publicnode.com',
+    'https://optimism-sepolia.drpc.org',
+    'https://optimism-sepolia.gateway.tenderly.co',
   ],
   42161: ['https://arb1.arbitrum.io/rpc', 'https://arbitrum.publicnode.com'],
   421614: ['https://sepolia-rollup.arbitrum.io/rpc', 'https://arbitrum-sepolia.publicnode.com'],

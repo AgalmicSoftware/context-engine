@@ -24,11 +24,11 @@ const BASE_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze([
   'https://sepolia.base.org', // intentional: production RPC fallback snapshot
 ]);
 const OP_SEPOLIA_PUBLIC_RPC_URLS = Object.freeze([
-  'https://optimism-sepolia.gateway.tenderly.co', // intentional: production RPC fallback snapshot
-  'https://optimism-sepolia.drpc.org', // intentional: production RPC fallback snapshot
   'https://sepolia.optimism.io', // intentional: production RPC fallback snapshot
   'https://optimism-sepolia.publicnode.com', // intentional: production RPC fallback snapshot
   'https://optimism-sepolia-rpc.publicnode.com', // intentional: production RPC fallback snapshot
+  'https://optimism-sepolia.drpc.org', // intentional: production RPC fallback snapshot
+  'https://optimism-sepolia.gateway.tenderly.co', // intentional: production RPC fallback snapshot
 ]);
 
 const withoutLeadingOptionalRpcUrls = (urls, optionalUrls = []) => {
@@ -101,10 +101,10 @@ describe('chains RPC defaults', () => {
     );
   });
 
-  it('uses an archive-capable OP Sepolia public RPC as the first non-PATH fallback', () => {
+  it('uses the official OP Sepolia RPC before rate-limited fallback gateways', () => {
     const url = getDefaultHttpRpc(11155420, { allowPath: false });
     expect(url).toBe(OP_SEPOLIA_PUBLIC_RPC_URLS[0]);
-    expect(url).toBe('https://optimism-sepolia.gateway.tenderly.co');
+    expect(url).toBe('https://sepolia.optimism.io');
     expect(chainHttpRpcNoPath(optimismSepolia)).toBe(url);
   });
 

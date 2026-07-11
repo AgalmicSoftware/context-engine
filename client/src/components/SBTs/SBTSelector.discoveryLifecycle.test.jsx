@@ -514,7 +514,11 @@ describe('SBTSelector discovery lifecycle', () => {
       instance.componentDidMount();
       await Promise.resolve();
 
-      expect(registrySpy).toHaveBeenCalledWith({ chainIds: [84532], force: true });
+      expect(registrySpy).toHaveBeenCalledWith({
+        chainIds: [84532],
+        slugs: ['draft-slug'],
+        force: true,
+      });
     } finally {
       registrySpy.mockRestore();
     }

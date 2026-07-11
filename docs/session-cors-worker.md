@@ -1141,6 +1141,13 @@ Signed login/bootstrap requests:
 ## Endpoints
 
 - `GET /health` (requires Authorization token; does not require session KV config, so it works for newly registered sessions during bootstrap)
+- `GET /resource-presence` with `X-Session-Slug`
+  - Validates the selected session and its browser-origin CORS policy.
+  - Returns only `{ ai, arweave, rpc, txGas }` booleans derived from worker-held
+    secrets. It never returns secret names, values, previews, or provider URLs.
+  - The account/settings sponsorship cards use this as operational truth for
+    the active session and retain registry flags as a compatibility fallback
+    for older workers that return `404`.
 - `POST /ai` or `POST /` with JSON `{ action: "ai", provider: "anthropic"|"openai"|"openrouter"|"custom", ... }`
   - Anonymous access is allowed only under the rules above (request `apiKey`, or explicit open `default+ai` gates with available on-chain authority).
   - Optional overrides: `apiKey` (all providers), `rpcUrl` (custom provider only).

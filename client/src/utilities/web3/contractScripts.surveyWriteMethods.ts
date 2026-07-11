@@ -73,6 +73,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
     getTimedMemoValue,
     normalizeSbtSessionLinkFields,
     resolveArweaveUploadOpts,
+    refreshSessionRegistryFieldsCache,
     resolveSessionNameValue,
     attachPayloadPointerFields,
     buildArweaveDebugContext,
@@ -598,7 +599,31 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       let questionResponseUploads: PayloadPointerUpload[] = [];
       let surveyResponseHashBytes = ethers.constants.HashZero;
 
-      const cfg = resolveSession(groupKeyOrCfg || '');
+      let cfg = resolveSession(groupKeyOrCfg || '');
+      const resolvedArweaveOpts = await resolveArweaveUploadOpts(groupKeyOrCfg, {
+        providerLike: ethersProvider,
+        signer,
+        refreshSessionConfig:
+          typeof refreshSessionRegistryFieldsCache === 'function'
+            ? async ({ slug, sessionConfig }: any) =>
+                refreshSessionRegistryFieldsCache({
+                  chainId:
+                    sessionConfig?.networkChainId ||
+                    sessionConfig?.chainId ||
+                    sessionConfig?.__registry?.registryChainId ||
+                    cfg?.networkChainId ||
+                    null,
+                  slug,
+                  sessionId:
+                    sessionConfig?.sessionId ||
+                    sessionConfig?.__registry?.sessionIdHex ||
+                    cfg?.sessionId ||
+                    null,
+                  providerLike: signingProvider,
+                })
+            : null,
+      });
+      if (resolvedArweaveOpts?.sessionConfig) cfg = resolvedArweaveOpts.sessionConfig;
       const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES);
       if (ARWEAVE_ACTIVE || canUseSessionStorage) {
         const uploadContext = {
@@ -608,10 +633,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           chainId: cfg?.networkChainId || null,
         };
         const arweaveOpts = {
-          ...(await resolveArweaveUploadOpts(groupKeyOrCfg, {
-            providerLike: ethersProvider,
-            signer,
-          })),
+          ...resolvedArweaveOpts,
           context: uploadContext,
         };
         if (surveyResponse) {

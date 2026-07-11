@@ -75,7 +75,12 @@ import {
   clearLocalResourceKeys,
 } from '../../utilities/session/resourceKeys.js';
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
+import { refreshSessionRegistryFieldsCache } from '../../utilities/web3/sessionRegistry.js';
 import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
+import {
+  readWorkerResourcePresence,
+  type WorkerResourcePresence,
+} from '../../utilities/worker/workerResourcePresence';
 import { resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
 import { markUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
 import { notify } from '../../utilities/ui/notify.js';
@@ -109,6 +114,7 @@ import {
   buildLoginSettingsSponsorshipCards,
   formatResourceSponsorHint as formatLoginSettingsResourceSponsorHint,
   getSponsoredKeyAliases,
+  mergeWorkerResourcePresenceIntoSponsoredKeys,
 } from './loginSettingsSponsoredStatusHelpers';
 import {
   LOGIN_SETTINGS_AI_REASONING_LEVELS as AI_REASONING_LEVELS,
@@ -175,6 +181,7 @@ interface LoginAndSettingsModalState {
   resourceKeysStatus: string;
   sponsoredAccess: any;
   sponsoredAccessLoading: boolean;
+  workerResourcePresence: WorkerResourcePresence | null;
   sessionScanScope: string;
   sessionScanSlugs: string[];
   sessionScanSlugsInput: string;
@@ -364,6 +371,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       resourceKeysStatus: '',
       sponsoredAccess: null,
       sponsoredAccessLoading: false,
+      workerResourcePresence: null,
       sessionScanScope: normalizeSessionScanScope(this.props.selectedSessionScope || readSessionScanScope()),
       sessionScanSlugs: Array.isArray(initialSessionScanSlugs) ? initialSessionScanSlugs : [],
       sessionScanSlugsInput: (Array.isArray(initialSessionScanSlugs) ? initialSessionScanSlugs : [])
@@ -1173,22 +1181,53 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   loadSponsoredAccess = async () => {
     const slug = this.getActiveSessionSlug();
-    const cfg = getSessionConfigBySlugOrDefault(slug) || {};
+    let cfg = getSessionConfigBySlugOrDefault(slug) || {};
     const account = this.props.account || '';
     const reqId = (this._sponsoredReqId = (this._sponsoredReqId || 0) + 1);
-    this.setStateIfMounted({ sponsoredAccessLoading: true });
+    this.setStateIfMounted({ sponsoredAccessLoading: true, workerResourcePresence: null });
     try {
-      const keys = ['ai', 'arweave', 'rpc', 'txGas'];
-      const results = await Promise.all(
-        keys.map((resourceKey: any) =>
-          checkSponsoredAccess({
-            sessionConfig: cfg,
-            sessionSlug: slug,
-            account,
-            resourceKey,
-          }),
-        ),
+      const chainId = Number(
+        (cfg as any)?.networkChainId ||
+          (cfg as any)?.chainId ||
+          (cfg as any)?.__registry?.registryChainId ||
+          this.getTargetNetwork()?.id ||
+          0,
       );
+      if (slug && chainId) {
+        try {
+          const refreshed = await refreshSessionRegistryFieldsCache({
+            chainId,
+            slug,
+            sessionId: (cfg as any)?.sessionId || (cfg as any)?.__registry?.sessionIdHex || null,
+            providerLike: this.props.provider || null,
+          });
+          if (refreshed) cfg = refreshed;
+        } catch (_) {
+          // Preserve the existing registry snapshot when a targeted refresh is unavailable.
+        }
+      }
+      const keys = ['ai', 'arweave', 'rpc', 'txGas'];
+      const [results, workerResourcePresence] = await Promise.all([
+        Promise.all(
+          keys.map((resourceKey: any) =>
+            checkSponsoredAccess({
+              sessionConfig: cfg,
+              sessionSlug: slug,
+              account,
+              resourceKey,
+            }),
+          ),
+        ),
+        readWorkerResourcePresence({
+          sessionConfig: cfg,
+          sessionSlug: slug,
+          context: {
+            account,
+            providerLike: this.props.provider || null,
+            chainId: chainId || null,
+          },
+        }),
+      ]);
       if (reqId !== this._sponsoredReqId) return;
       const accessMap = {
         ai: results[0],
@@ -1196,10 +1235,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         rpc: results[2],
         txGas: results[3],
       };
-      this.setStateIfMounted({ sponsoredAccess: accessMap, sponsoredAccessLoading: false });
+      this.setStateIfMounted({
+        sponsoredAccess: accessMap,
+        sponsoredAccessLoading: false,
+        workerResourcePresence,
+      });
     } catch (_) {
       if (reqId !== this._sponsoredReqId) return;
-      this.setStateIfMounted({ sponsoredAccessLoading: false });
+      this.setStateIfMounted({ sponsoredAccessLoading: false, workerResourcePresence: null });
     }
   };
 
@@ -1617,6 +1660,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       active,
       '',
     ]);
+    const readSponsoredKeys = (slug: string, cfg: Record<string, unknown> | undefined) =>
+      mergeWorkerResourcePresenceIntoSponsoredKeys(
+        cfg?.sponsoredKeys && typeof cfg.sponsoredKeys === 'object'
+          ? (cfg.sponsoredKeys as Record<string, unknown>)
+          : {},
+        slug === active ? this.state.workerResourcePresence : null,
+      );
     const configBySlug = new Map<string, Record<string, unknown>>();
     const sponsoredSourceSignature = sourceSlugs.map((slug: string) => {
       const cfg = this.getDisplaySessionConfig(slug);
@@ -1625,7 +1675,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         slug,
         sessionName: cfg?.sessionName || cfg?.name || cfg?.title || '',
         networkChainId: cfg?.networkChainId || cfg?.chainId || '',
-        sponsoredKeys: cfg?.sponsoredKeys && typeof cfg.sponsoredKeys === 'object' ? cfg.sponsoredKeys : {},
+        sponsoredKeys: readSponsoredKeys(slug, cfg),
       };
     });
     const memoKey = JSON.stringify({
@@ -1646,7 +1696,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       const descriptor = this.getSessionDescriptor(slug, cfg, active);
       entries.set(slug, {
         ...descriptor,
-        sponsoredKeys: cfg?.sponsoredKeys && typeof cfg.sponsoredKeys === 'object' ? cfg.sponsoredKeys : {},
+        sponsoredKeys: readSponsoredKeys(slug, cfg),
       });
     };
 

@@ -481,8 +481,13 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     this.refreshScopedUniverse({ forceDiscover: false });
     this.hydrateSelectedSbtNames();
     if (this.shouldWarmRegistryCacheForTargets()) {
-      const chainId = this.getSessionNetworkId(this.getEffectiveSessionSlug());
-      loadSessionRegistryCache({ chainIds: chainId ? [chainId] : undefined, force: true }).then(() => {
+      const effectiveSessionSlug = this.getEffectiveSessionSlug();
+      const chainId = this.getSessionNetworkId(effectiveSessionSlug);
+      loadSessionRegistryCache({
+        chainIds: chainId ? [chainId] : undefined,
+        slugs: [effectiveSessionSlug],
+        force: true,
+      }).then(() => {
         if (this._isMounted) this.refreshScopedUniverse({ forceDiscover: true });
       });
     }
@@ -587,8 +592,13 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       this.hydrateSelectedSbtNames();
     }
     if (updateEffects.shouldWarmRegistryCache) {
-      const chainId = this.getSessionNetworkId(this.getEffectiveSessionSlug());
-      loadSessionRegistryCache({ chainIds: chainId ? [chainId] : undefined, force: true }).then(() => {
+      const effectiveSessionSlug = this.getEffectiveSessionSlug();
+      const chainId = this.getSessionNetworkId(effectiveSessionSlug);
+      loadSessionRegistryCache({
+        chainIds: chainId ? [chainId] : undefined,
+        slugs: [effectiveSessionSlug],
+        force: true,
+      }).then(() => {
         if (this._isMounted) this.refreshScopedUniverse({ forceDiscover: true });
       });
     }
