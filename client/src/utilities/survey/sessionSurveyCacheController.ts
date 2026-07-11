@@ -314,8 +314,9 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
         );
         const networkID = String(getSessionChainId(slug) || '');
 
-        const { fromBlock: baseFrom, toBlock: baseTo } =
-          await surveyContractScripts.getRelevantBlockWindowForFilter(getSessionBlockWindowRef(slug));
+        const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(
+          getSessionBlockWindowRef(slug),
+        );
         if (baseFrom > baseTo) {
           setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
           return;
@@ -908,8 +909,9 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
       mainSiteLog.warn('No group chainId available');
       return;
     }
-    const { fromBlock: baseFrom, toBlock: baseTo } =
-      await surveyContractScripts.getRelevantBlockWindowForFilter(getSessionBlockWindowRef(slug));
+    const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(
+      getSessionBlockWindowRef(slug),
+    );
     const initialLastBlockSurvey = Math.max(0, baseFrom - 1);
     const surveysCache = (dgRead('surveysCache', slug) || {}) as Record<string, SurveyNetworkCache>;
 

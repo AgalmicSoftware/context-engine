@@ -115,8 +115,7 @@ export const parsePostMarkdown = (markdown: string): PostMarkdownBlock[] => {
           parsed.spec && typeof parsed.spec === 'object' && !Array.isArray(parsed.spec)
             ? (parsed.spec as Record<string, unknown>)
             : {};
-        const title =
-          typeof record.title === 'string' && record.title.trim() ? record.title.trim() : 'More details';
+        const title = typeof record.title === 'string' && record.title.trim() ? record.title.trim() : 'More details';
         blocks.push({
           type: 'disclosureStart',
           raw: code,

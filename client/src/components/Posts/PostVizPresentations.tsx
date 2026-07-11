@@ -444,10 +444,9 @@ export const ResponseTypeGridPresentation = ({
       {panels.map((panel) => {
         const isMultiSelect = panel.kind.toLowerCase() === 'multi-select';
         const maxValue = Math.max(...panel.counts.map((count) => count.value), 1);
-        const orderedCounts =
-          isMultiSelect
-            ? [...panel.counts].sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
-            : panel.counts;
+        const orderedCounts = isMultiSelect
+          ? [...panel.counts].sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
+          : panel.counts;
         const displayAsNumbers = panel.display === 'numbers' || panel.display === 'metrics';
         const displayAsPie = panel.display === 'pie';
         const displayAsSplit = !displayAsNumbers && !displayAsPie && isResponseSplitPanel(panel);

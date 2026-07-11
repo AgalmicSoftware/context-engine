@@ -341,10 +341,7 @@ describe('PostsPage', () => {
       'content',
       `${window.location.origin}/posts/first-post/attachments/first-hero.jpeg`,
     );
-    expect(document.head.querySelector('meta[name="twitter:card"]')).toHaveAttribute(
-      'content',
-      'summary_large_image',
-    );
+    expect(document.head.querySelector('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary_large_image');
     expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute(
       'href',
       `${window.location.origin}/posts/first-post`,
@@ -993,9 +990,7 @@ describe('PostsPage', () => {
   it('keeps confidence-band labels and counts readable', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
 
-    expect(scss).toMatch(
-      /\.editorialBarMeta\s*{[\s\S]*font-size:\s*0\.94rem;[\s\S]*line-height:\s*1\.3;/,
-    );
+    expect(scss).toMatch(/\.editorialBarMeta\s*{[\s\S]*font-size:\s*0\.94rem;[\s\S]*line-height:\s*1\.3;/);
   });
 
   it('keeps both editorial pie legends readable and matched', () => {

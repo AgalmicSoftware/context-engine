@@ -1292,7 +1292,8 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     let demoCfg =
       (getDemoSessionConfigBySlug(normalized, { allowDemoFallback: true }) as MainSiteSessionConfigLike | null) || null;
     if (!demoCfg && normalized === 'demo') {
-      demoCfg = (getDemoSessionConfigBySlug('', { allowDemoFallback: true }) as MainSiteSessionConfigLike | null) || null;
+      demoCfg =
+        (getDemoSessionConfigBySlug('', { allowDemoFallback: true }) as MainSiteSessionConfigLike | null) || null;
     }
     return mergeMainSiteSessionDisplayConfig(
       strictCfg as SessionConfigLike | null,

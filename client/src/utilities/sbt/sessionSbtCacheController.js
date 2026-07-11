@@ -75,9 +75,7 @@ export const createSessionSbtCacheController = (host = {}) => {
     return {
       ...cfg,
       slug: normalizeSessionSlug(cfg.slug || slug),
-      ...(cfg.blockLimits && typeof cfg.blockLimits === 'object'
-        ? { blockLimits: { ...cfg.blockLimits } }
-        : {}),
+      ...(cfg.blockLimits && typeof cfg.blockLimits === 'object' ? { blockLimits: { ...cfg.blockLimits } } : {}),
     };
   };
   const getSessionChainId = (slug) =>
@@ -716,8 +714,9 @@ export const createSessionSbtCacheController = (host = {}) => {
       return;
     }
 
-    const { fromBlock: baseFrom, toBlock: baseTo } =
-      await contractScripts.getRelevantBlockWindowForFilter(getSessionBlockWindowRef(slug));
+    const { fromBlock: baseFrom, toBlock: baseTo } = await contractScripts.getRelevantBlockWindowForFilter(
+      getSessionBlockWindowRef(slug),
+    );
     if (baseFrom > baseTo) {
       setReadinessStateIfChanged({ isSBTCacheReady: true }, checkAllCachesReady);
       return;
@@ -1267,8 +1266,9 @@ export const createSessionSbtCacheController = (host = {}) => {
       const sbtAddressOriginalCase = sbtAddressParam;
       const sbtLower = sbtAddressOriginalCase.toLowerCase();
 
-      const { fromBlock: baseFrom, toBlock: baseTo } =
-        await contractScripts.getRelevantBlockWindowForFilter(getSessionBlockWindowRef(slug));
+      const { fromBlock: baseFrom, toBlock: baseTo } = await contractScripts.getRelevantBlockWindowForFilter(
+        getSessionBlockWindowRef(slug),
+      );
       const initialLastBlockSBT = Math.max(0, baseFrom - 1);
 
       // Read cache entry to decide whether we only need tokenURI metadata
@@ -1760,8 +1760,9 @@ export const createSessionSbtCacheController = (host = {}) => {
       slug,
     });
 
-    const { fromBlock: baseFrom } =
-      await contractScripts.getRelevantBlockWindowForFilter(getSessionBlockWindowRef(slug));
+    const { fromBlock: baseFrom } = await contractScripts.getRelevantBlockWindowForFilter(
+      getSessionBlockWindowRef(slug),
+    );
     let currentCache = dgRead('sbtCache', slug) || {};
     const initialLastBlockSBT = Math.max(0, baseFrom - 1);
     // One-time migration: merge numeric-key (if any) into string key
@@ -1824,8 +1825,9 @@ export const createSessionSbtCacheController = (host = {}) => {
       return;
     }
 
-    const { fromBlock: baseFrom } =
-      await contractScripts.getRelevantBlockWindowForFilter(getSessionBlockWindowRef(slug));
+    const { fromBlock: baseFrom } = await contractScripts.getRelevantBlockWindowForFilter(
+      getSessionBlockWindowRef(slug),
+    );
     let currentCache = dgRead('sbtCache', slug) || {};
     const initialLastBlockSBT = Math.max(0, baseFrom - 1);
     // Merge any numeric-key cache into string key once
@@ -1917,8 +1919,9 @@ export const createSessionSbtCacheController = (host = {}) => {
     const sbtAddressLower = sbtAddressOriginalCase.toLowerCase();
     const accountLower = String(accountOriginalCase || '').toLowerCase();
 
-    const { fromBlock: baseFrom } =
-      await contractScripts.getRelevantBlockWindowForFilter(getSessionBlockWindowRef(slug));
+    const { fromBlock: baseFrom } = await contractScripts.getRelevantBlockWindowForFilter(
+      getSessionBlockWindowRef(slug),
+    );
     let currentCache = dgRead('sbtCache', slug) || {};
     const initialLastBlockSBT = Math.max(0, baseFrom - 1);
     mergeLegacyNumericNetworkKey(currentCache, networkID);

@@ -1,9 +1,6 @@
 import { checkSponsoredAccess } from '../../utilities/web3/sponsoredAccess.js';
 import { refreshSessionRegistryFieldsCache } from '../../utilities/web3/sessionRegistry.js';
-import {
-  readWorkerResourcePresence,
-  type WorkerResourcePresence,
-} from '../../utilities/worker/workerResourcePresence';
+import { readWorkerResourcePresence, type WorkerResourcePresence } from '../../utilities/worker/workerResourcePresence';
 
 type RegistrySessionReference = {
   registryChainId?: unknown;
@@ -41,9 +38,7 @@ export const loadLoginSettingsSponsoredAccess = async ({
   includeWorkerResourcePresence?: boolean;
 }): Promise<LoginSettingsSponsoredAccessResult> => {
   let cfg = sessionConfig || {};
-  const chainId = Number(
-    cfg.networkChainId || cfg.chainId || cfg.__registry?.registryChainId || fallbackChainId || 0,
-  );
+  const chainId = Number(cfg.networkChainId || cfg.chainId || cfg.__registry?.registryChainId || fallbackChainId || 0);
   if (slug && chainId) {
     try {
       const refreshed = await refreshSessionRegistryFieldsCache({

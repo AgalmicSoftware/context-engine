@@ -615,10 +615,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
                     null,
                   slug,
                   sessionId:
-                    sessionConfig?.sessionId ||
-                    sessionConfig?.__registry?.sessionIdHex ||
-                    cfg?.sessionId ||
-                    null,
+                    sessionConfig?.sessionId || sessionConfig?.__registry?.sessionIdHex || cfg?.sessionId || null,
                   providerLike: signingProvider,
                 })
             : null,

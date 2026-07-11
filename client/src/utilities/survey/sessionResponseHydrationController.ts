@@ -1617,8 +1617,9 @@ export const createSessionResponseHydrationController = (
       setState({ isResponsesCacheReady: false });
 
       const networkID = String(getSessionChainId(slug) || '');
-      const { fromBlock: baseFrom } =
-        await responseHydrationContractScripts.getRelevantBlockWindowForFilter(getSessionBlockWindowRef(slug));
+      const { fromBlock: baseFrom } = await responseHydrationContractScripts.getRelevantBlockWindowForFilter(
+        getSessionBlockWindowRef(slug),
+      );
       const initialLastBlockQR = Math.max(0, Number(baseFrom || 0) - 1);
 
       const results = await Promise.all(

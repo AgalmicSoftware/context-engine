@@ -8,9 +8,7 @@ describe('vite PostCSS compatibility', () => {
   const clientRoot = path.join(__dirname, '..');
 
   beforeAll(async () => {
-    ({ renderPostSocialPreviewHtml, writePostSocialPreviewHtml } = await import(
-      '../scripts/post-social-preview.mjs'
-    ));
+    ({ renderPostSocialPreviewHtml, writePostSocialPreviewHtml } = await import('../scripts/post-social-preview.mjs'));
   });
 
   it('keeps the retired PurgeCSS config out of the Vite CSS module path', () => {
@@ -71,12 +69,10 @@ describe('vite PostCSS compatibility', () => {
       expect(html).toContain(
         'property="og:image" content="https://contextengine.xyz/posts/agent-village-wrapped/attachments/header.jpg"',
       );
-      expect(html).toContain(
-        'rel="canonical" href="https://contextengine.xyz/posts/agent-village-wrapped-2026"',
+      expect(html).toContain('rel="canonical" href="https://contextengine.xyz/posts/agent-village-wrapped-2026"');
+      expect(() => renderPostSocialPreviewHtml('<html><head></head></html>', { ...post, slug: '../private' })).toThrow(
+        'Unsafe post slug',
       );
-      expect(() =>
-        renderPostSocialPreviewHtml('<html><head></head></html>', { ...post, slug: '../private' }),
-      ).toThrow('Unsafe post slug');
     } finally {
       fs.rmSync(tempRoot, { recursive: true, force: true });
     }

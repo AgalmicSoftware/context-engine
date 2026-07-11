@@ -18,10 +18,7 @@ import cipPhoto from '../../assets/img/cip_photo.png';
 import polisLogo from '../../assets/img/polis_logo.png';
 import rxcLogo from '../../assets/img/rxc_logo.png';
 import { CE_ABOUT_POSTS_ENABLED } from '../../variables/appConfig.js';
-import {
-  PUBLIC_REPO_URL,
-  PUBLIC_WHITEPAPER_URL,
-} from '../../variables/publicRepoMetadata.js';
+import { PUBLIC_REPO_URL, PUBLIC_WHITEPAPER_URL } from '../../variables/publicRepoMetadata.js';
 import {
   derivePrimarySessionSlugFromList,
   GLOBAL_SESSION_SELECTION_UPDATED_EVENT,

@@ -1696,71 +1696,75 @@ export const loadSessionRegistryCache = async (
 
     // Regression guard: active-session consumers must not enumerate every registry
     // entry; doing so multiplied each session into gate/field reads and triggered RPC 429 storms.
-    const sessionResults = await mapWithConcurrency(sessionSources, REGISTRY_SESSION_LOAD_CONCURRENCY, async (source) => {
-      let slug = typeof source === 'string' ? source : '';
-      if (!slug) {
+    const sessionResults = await mapWithConcurrency(
+      sessionSources,
+      REGISTRY_SESSION_LOAD_CONCURRENCY,
+      async (source) => {
+        let slug = typeof source === 'string' ? source : '';
+        if (!slug) {
+          try {
+            slug = await contract.getSessionSlugByIndex(source);
+          } catch (_) {
+            return { config: null, hadLoadErrors: true };
+          }
+        }
+        if (!slug) return { config: null, hadLoadErrors: false };
+        let tuple = null;
         try {
-          slug = await contract.getSessionSlugByIndex(source);
+          tuple = await contract.getSessionBySlug(slug);
         } catch (_) {
           return { config: null, hadLoadErrors: true };
         }
-      }
-      if (!slug) return { config: null, hadLoadErrors: false };
-      let tuple = null;
-      try {
-        tuple = await contract.getSessionBySlug(slug);
-      } catch (_) {
-        return { config: null, hadLoadErrors: true };
-      }
-      const session = decodeSessionTuple(tuple);
-      if (!session) return { config: null, hadLoadErrors: false };
+        const session = decodeSessionTuple(tuple);
+        if (!session) return { config: null, hadLoadErrors: false };
 
-      let metadata = null;
-      const hasMetadataUri = !!(session.metadataURI || session.encryptedMetadataURI);
-      if (session.metadataURI) {
-        metadata = await fetchMetadataFromArweave(session.metadataURI, {
-          chainId: session.chainId || chainId,
-          slug: session.slug || slug,
-          caller: 'loadSessionRegistryCache.metadataURI',
+        let metadata = null;
+        const hasMetadataUri = !!(session.metadataURI || session.encryptedMetadataURI);
+        if (session.metadataURI) {
+          metadata = await fetchMetadataFromArweave(session.metadataURI, {
+            chainId: session.chainId || chainId,
+            slug: session.slug || slug,
+            caller: 'loadSessionRegistryCache.metadataURI',
+          });
+        } else if (session.encryptedMetadataURI) {
+          const encrypted = await fetchMetadataFromArweave(session.encryptedMetadataURI, {
+            chainId: session.chainId || chainId,
+            slug: session.slug || slug,
+            caller: 'loadSessionRegistryCache.encryptedMetadataURI',
+          });
+          const decrypted = await tryDecryptEnvelope(encrypted, {
+            account,
+            providerLike,
+            chainId: session.chainId || chainId,
+            lit,
+          });
+          metadata = decrypted || null;
+        }
+
+        const gatesByResource: RegistryGateMap = {};
+        const gateEntries = await Promise.all(
+          DEFAULT_RESOURCES.map(async (resourceKey) => {
+            const gate = await fetchGateForResource(contract, slug, resourceKey);
+            return { resourceKey, gate };
+          }),
+        );
+        gateEntries.forEach(({ resourceKey, gate }) => {
+          gatesByResource[resourceKey] = gate;
         });
-      } else if (session.encryptedMetadataURI) {
-        const encrypted = await fetchMetadataFromArweave(session.encryptedMetadataURI, {
-          chainId: session.chainId || chainId,
-          slug: session.slug || slug,
-          caller: 'loadSessionRegistryCache.encryptedMetadataURI',
+
+        const fieldsByKey = await fetchSessionFields(contract, slug);
+
+        const config = buildSessionConfigFromRegistry({
+          session,
+          metadata,
+          gatesByResource,
+          fieldsByKey,
+          registryChainId: chainId,
+          metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
         });
-        const decrypted = await tryDecryptEnvelope(encrypted, {
-          account,
-          providerLike,
-          chainId: session.chainId || chainId,
-          lit,
-        });
-        metadata = decrypted || null;
-      }
-
-      const gatesByResource: RegistryGateMap = {};
-      const gateEntries = await Promise.all(
-        DEFAULT_RESOURCES.map(async (resourceKey) => {
-          const gate = await fetchGateForResource(contract, slug, resourceKey);
-          return { resourceKey, gate };
-        }),
-      );
-      gateEntries.forEach(({ resourceKey, gate }) => {
-        gatesByResource[resourceKey] = gate;
-      });
-
-      const fieldsByKey = await fetchSessionFields(contract, slug);
-
-      const config = buildSessionConfigFromRegistry({
-        session,
-        metadata,
-        gatesByResource,
-        fieldsByKey,
-        registryChainId: chainId,
-        metadataLoadState: resolveMetadataLoadState({ metadata, hasMetadataUri }),
-      });
-      return { config, hadLoadErrors: false };
-    });
+        return { config, hadLoadErrors: false };
+      },
+    );
 
     return {
       chainId,
@@ -1793,7 +1797,8 @@ export const loadSessionRegistryCache = async (
   );
   const previousCount = previousSessions ? Object.keys(previousSessions).length : 0;
   const currentCount = Object.keys(cache.sessions || {}).length;
-  const shouldMergePrevious = requestedSlugs.length > 0 || hadLoadErrors || (previousCount && currentCount < previousCount);
+  const shouldMergePrevious =
+    requestedSlugs.length > 0 || hadLoadErrors || (previousCount && currentCount < previousCount);
 
   if (shouldMergePrevious && previousSessions) {
     Object.entries(previousSessions).forEach(([slug, cfg]) => {

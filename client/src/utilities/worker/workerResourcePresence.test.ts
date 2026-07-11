@@ -18,15 +18,16 @@ describe('workerResourcePresence', () => {
   });
 
   it('reads resource booleans from the selected session worker without wallet auth', async () => {
-    const fetchImpl = jest.fn(async () =>
-      new Response(
-        JSON.stringify({
-          ok: true,
-          sessionSlug: 'demo-1',
-          resources: { ai: true, arweave: true, rpc: true, txGas: true, secret: 'ignored' },
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      ),
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionSlug: 'demo-1',
+            resources: { ai: true, arweave: true, rpc: true, txGas: true, secret: 'ignored' },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
     ) as unknown as typeof fetch;
 
     await expect(
@@ -53,11 +54,12 @@ describe('workerResourcePresence', () => {
   });
 
   it('uses the explicit general alias for the default session header', async () => {
-    const fetchImpl = jest.fn(async () =>
-      new Response(JSON.stringify({ resources: { ai: false, arweave: false, rpc: false, txGas: false } }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(JSON.stringify({ resources: { ai: false, arweave: false, rpc: false, txGas: false } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     ) as unknown as typeof fetch;
 
     await readWorkerResourcePresence({ sessionSlug: '', fetchImpl });

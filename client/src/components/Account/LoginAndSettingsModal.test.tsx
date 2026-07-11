@@ -1468,23 +1468,17 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     });
 
     const hiddenSubject = mountClassSubject(
-      new LoginAndSettingsModalSubject(
-        buildProps({ activeSessionSlug: 'demo-1', loginModalToggled: false }),
-      ),
+      new LoginAndSettingsModalSubject(buildProps({ activeSessionSlug: 'demo-1', loginModalToggled: false })),
     );
     await hiddenSubject.loadSponsoredAccess();
     expect(readWorkerResourcePresence).not.toHaveBeenCalled();
 
     const visibleSubject = mountClassSubject(
-      new LoginAndSettingsModalSubject(
-        buildProps({ activeSessionSlug: 'demo-1', loginModalToggled: true }),
-      ),
+      new LoginAndSettingsModalSubject(buildProps({ activeSessionSlug: 'demo-1', loginModalToggled: true })),
     );
     await visibleSubject.loadSponsoredAccess();
 
     expect(readWorkerResourcePresence).toHaveBeenCalledTimes(1);
-    expect(readWorkerResourcePresence).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionSlug: 'demo-1' }),
-    );
+    expect(readWorkerResourcePresence).toHaveBeenCalledWith(expect.objectContaining({ sessionSlug: 'demo-1' }));
   });
 });

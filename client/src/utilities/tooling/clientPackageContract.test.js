@@ -185,13 +185,9 @@ describe('client package modernization contract', () => {
     expect(viteConfig).not.toContain('!!raw-loader!');
     expect(viteIndex).toContain('__PUBLIC_URL__');
     expect(viteIndex).toContain('/src/viteEntry.ts');
-    expect(viteIndex).toContain(
-      'https://contextengine.xyz/assets/img/context-engine-social-preview-square.png',
-    );
+    expect(viteIndex).toContain('https://contextengine.xyz/assets/img/context-engine-social-preview-square.png');
     expect(
-      fs.existsSync(
-        path.resolve(__dirname, '../../../public/assets/img/context-engine-social-preview-square.png'),
-      ),
+      fs.existsSync(path.resolve(__dirname, '../../../public/assets/img/context-engine-social-preview-square.png')),
     ).toBe(true);
     expect(viteEntry).toContain("import 'assets/css/contextEngine.scss';");
     expect(viteEntry).toContain("import('./index')");
@@ -267,8 +263,8 @@ describe('client package modernization contract', () => {
       expect(viteConfig).toContain(`/node_modules/${name}/`);
     });
     expect(viteConfig).toContain("include: ['buffer', 'process/browser']");
-    expect(viteConfig).toContain("find: /^buffer$/");
-    expect(viteConfig).toContain("find: /^node:buffer$/");
+    expect(viteConfig).toContain('find: /^buffer$/');
+    expect(viteConfig).toContain('find: /^node:buffer$/');
     expect(viteConfig).toContain("path.resolve(__dirname, 'node_modules', 'buffer', 'index.js')");
 
     staleBrowserPolyfills.forEach((name) => {

@@ -533,11 +533,7 @@ const getRpcRateLimitBackoffError = (key: string, meta: ProviderSendMeta): (Erro
   return buildRpcRateLimitBackoffError(meta, state);
 };
 
-const runWithRpcRateLimitGate = async <T>(
-  key: string,
-  meta: ProviderSendMeta,
-  send: () => Promise<T>,
-): Promise<T> => {
+const runWithRpcRateLimitGate = async <T>(key: string, meta: ProviderSendMeta, send: () => Promise<T>): Promise<T> => {
   if (!key) return await send();
   // Regression guard: release endpoint reads one at a time. Releasing every
   // waiter after a successful probe lets a later 429 arrive after the burst escaped.
@@ -820,9 +816,7 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
       }
     }
 
-    const run: Promise<unknown> = runWithRpcRateLimitGate(rateLimitKey, sendMeta, () =>
-      originalSend(method, params),
-    );
+    const run: Promise<unknown> = runWithRpcRateLimitGate(rateLimitKey, sendMeta, () => originalSend(method, params));
 
     if (shouldDedupe) globalCache.inflight.set(keyHash, run);
 
