@@ -42,6 +42,56 @@ Primary source entry points are `client/src/components/MainSite/AppShell.tsx`,
 `client/src/components/Sessions/SessionWizard.tsx`, and
 `client/src/components/Admin/AdminPage.tsx`.
 
+## Query Layer (Provisional)
+
+The client has one shared TanStack Query client at
+`client/src/app/runtime/appQueryClient.tsx`. It is the same instance as
+`wagmiClient.queryClient`; creating another `QueryClient` is not allowed.
+wagmi 0.9 provides that instance through a private React context, so App also
+mounts a default `QueryClientProvider` with the same instance for application
+queries. There are two provider contexts but only one client and one cache.
+
+Application query hooks belong between components and domain ports:
+
+```text
+route/page UI
+  -> query hook (cache, loading state, invalidation)
+  -> client/src/domains/** read port
+  -> low-level utility
+```
+
+Query functions must call domain read ports rather than importing low-level
+Web3, Arweave, worker, or storage utilities directly. Existing IndexedDB and
+localStorage caches remain authoritative persistence; this layer does not use a
+React Query persistence plugin.
+
+Keys use the primitive-only factory exposed as `appQueryFoundation.keys`. A
+scoped key has fixed slots
+`[domain, entity, chainId, sessionSlug, address, ...ids]`; absent scope values
+are `null`, addresses are normalized to lowercase, and object-valued IDs are
+rejected. Fixed scalar slots keep equality independent of object identity.
+
+Freshness is mapped per read family from current behavior, never invented:
+
+| Existing behavior | Query v4 mapping |
+| --- | --- |
+| Explicit TTL | Preserve it as `staleTime`; retain data with `cacheTime` according to the same lifecycle. |
+| Cache-revision or event driven | Use `staleTime: Infinity`; the existing event and successful write paths explicitly invalidate the affected key. |
+| User-triggered refresh | Keep the refresh control and invalidate or refetch the exact key. |
+
+TanStack Query v5 renames `cacheTime` to `gcTime`; dependency migration is a
+separate change and must not alter these semantics.
+
+This pattern remains provisional until a functional read surface completes the
+first exemplar and proves in-flight deduplication. Each migration slice must:
+
+1. Characterize loading, data shape, context changes, freshness, and fetch count.
+2. Add a hook over an existing domain read port using the shared key factory.
+3. Convert one named functional surface without changing routes, test IDs, copy,
+   payloads, storage keys, or write behavior.
+4. Wire existing events and successful writes to exact-key invalidation.
+5. Prove duplicate in-flight reads are collapsed and fetch counts do not rise.
+
 ## Enforcement System
 
 The tracked checks work together:
