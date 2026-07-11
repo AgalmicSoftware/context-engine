@@ -193,10 +193,10 @@ describe('appConfig env-backed config', () => {
   });
 
   it.each([
-    [undefined, true],
+    [undefined, false],
     ['false', false],
     ['true', true],
-    ['wat', true],
+    ['wat', false],
   ])('reads REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT=%p as %p', (value, expected) => {
     if (typeof value === 'undefined') {
       delete process.env.REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT;

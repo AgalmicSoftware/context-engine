@@ -28,7 +28,7 @@ export const DEFAULT_AUTO_REQUEST_TESTNET_FUNDS = readPublicBoolEnv(
 // Default first-run value of `state.demoSurfaceMode`. If a user has a
 // stored `ce:demoSurfaceMode` preference in localStorage, that wins;
 // fresh installs / no-storage cases honor this env default.
-export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv('REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT', true);
+export const DEFAULT_DEMO_SURFACE_MODE = readPublicBoolEnv('REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT', false);
 // MetaMask/RainbowKit is excluded from the default passkey-only client bundle.
 // Deployments that need browser-wallet login must opt in at build time.
 export const CE_ENABLE_METAMASK_CONNECTOR = readPublicBoolEnv('REACT_APP_CE_ENABLE_METAMASK_CONNECTOR', false);

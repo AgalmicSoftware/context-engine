@@ -245,7 +245,7 @@ SPA fallback concept, but their redirect config syntax differs.
     (`Group`, `Collect`, `Account`) or crypto-native (`SBT`, `Mint`, `Wallet`) terms.
   - Supported values: `plain` (default), `crypto`
 
-- `REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT=true`
+- `REACT_APP_CE_DEMO_SURFACE_MODE_DEFAULT=false`
   - Sets the first-run default for `demoSurfaceMode`, which controls the surface-level demo affordances.
   - Stored `ce:demoSurfaceMode` localStorage preferences win over this setting.
   - This only takes effect on fresh installs or when no stored preference exists.

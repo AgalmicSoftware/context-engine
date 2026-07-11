@@ -22,10 +22,17 @@ const LoginTooltipsToggleControl = ({
     <Button
       type="button"
       onClick={onToggle}
-      className={`${styles.sendTestnetFundsButton} ${styles.aiSettingsToggleButton} ${styles.tooltipsToggleButton}`}
+      className={`${styles.sendTestnetFundsButton} ${styles.aiSettingsToggleButton} ${styles.tooltipsToggleButton} ${styles.preferenceToggleButton}`}
       aria-pressed={tooltipsEnabled}
+      aria-label={`Explainers ${tooltipsEnabled ? 'On' : 'Off'}`}
     >
-      Explainers {tooltipsEnabled ? 'On' : 'Off'}
+      <span className={styles.preferenceToggleLabel}>Explainers</span>
+      <span className={styles.preferenceToggleTrack} aria-hidden="true">
+        <span className={styles.preferenceToggleThumb} />
+      </span>
+      <span className={styles.preferenceToggleState} aria-hidden="true">
+        {tooltipsEnabled ? 'On' : 'Off'}
+      </span>
     </Button>
     {tooltipsEnabled ? (
       <>
