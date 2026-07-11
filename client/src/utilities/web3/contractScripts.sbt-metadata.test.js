@@ -66,6 +66,9 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     try {
       delete globalThis.CE_ARWEAVE_PREFLIGHT_SBT_METADATA;
     } catch (_) {}
+    try {
+      delete globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO;
+    } catch (_) {}
   });
 
   it('uses extensionless direct-image tokenURI as renderable image when response content-type is image/*', async () => {
@@ -640,7 +643,8 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     expect(arweaveSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('uses gateway fanout for display-critical SBT tokenURI metadata', async () => {
+  it('does not override the active AR.IO-only toggle for display-critical SBT tokenURI metadata', async () => {
+    globalThis.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     const rawTxId = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
     const stub = baseContractStub(rawTxId);
     stub.name.mockResolvedValue('Gateway First SBT');
@@ -670,13 +674,13 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
     expect(arweaveOpts).toEqual(
       expect.objectContaining({
         bypassFailureCache: true,
-        directToArIo: false,
         debugContext: expect.objectContaining({
           category: 'sbt_metadata',
         }),
-        gateways: expect.arrayContaining(['https://ar-io.dev', 'https://arweave.net']),
       }),
     );
+    expect(arweaveOpts).not.toHaveProperty('directToArIo');
+    expect(arweaveOpts).not.toHaveProperty('gateways');
     expect(arweaveOpts).not.toHaveProperty('disableExistencePrecheck');
     expect(arweaveOpts).not.toHaveProperty('preflightTxExistence');
   });
@@ -707,7 +711,7 @@ describe('contractScripts.getSbtMetadata tokenURI parsing', () => {
       expect.objectContaining({
         name: 'Gateway First Image SBT',
         contractName: 'Gateway First Image SBT',
-        image: `https://arweave.net/${imageTxId}`,
+        image: `https://ar-io.dev/${imageTxId}`,
       }),
     );
     expect(checkTxExistsSpy).not.toHaveBeenCalled();

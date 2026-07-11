@@ -173,6 +173,37 @@ describe('rpcReadCache evictExpiredEntries', () => {
     expect(originalSend).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps a slow neighboring request behind the endpoint probe before applying 429 backoff', async () => {
+    jest.useFakeTimers();
+    let rejectFirst;
+    const { originalSend, provider } = createWrappedProvider(async () => {
+      if (originalSend.mock.calls.length === 1) {
+        return new Promise((_, reject) => {
+          rejectFirst = reject;
+        });
+      }
+      return '0x14a34';
+    });
+
+    const first = provider.send('eth_blockNumber', []);
+    await Promise.resolve();
+    const second = provider.send('eth_getBalance', [LOG_ADDRESS, 'latest']);
+    await Promise.resolve();
+
+    jest.advanceTimersByTime(501);
+    await Promise.resolve();
+    expect(originalSend).toHaveBeenCalledTimes(1);
+
+    rejectFirst(Object.assign(new Error('Too Many Requests'), { status: 429 }));
+    await expect(first).rejects.toMatchObject({ status: 429 });
+    await expect(second).rejects.toMatchObject({
+      code: 'CE_RPC_RATE_LIMIT_BACKOFF',
+      status: 429,
+    });
+    expect(originalSend).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
+  });
+
   it('lets fallback callers skip a cooling-down primary endpoint without another network send', async () => {
     const primary = createWrappedProvider(async () => {
       throw Object.assign(new Error('Too Many Requests'), { status: 429 });

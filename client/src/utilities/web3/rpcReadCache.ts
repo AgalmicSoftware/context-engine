@@ -137,7 +137,9 @@ const normalizeDebugMethod = (value: unknown): string => {
 const nowMs = (): number => Date.now();
 const RPC_RATE_LIMIT_BASE_BACKOFF_MS = 60_000;
 const RPC_RATE_LIMIT_MAX_BACKOFF_MS = 5 * 60_000;
-const RPC_RATE_LIMIT_PROBE_WAIT_MS = 500;
+// A slow 429 response must settle before neighboring reads are released;
+// 500 ms allowed the initial getLogs burst to escape before backoff engaged.
+const RPC_RATE_LIMIT_PROBE_WAIT_MS = 10_000;
 
 const isCacheDisabled = (): boolean => {
   try {

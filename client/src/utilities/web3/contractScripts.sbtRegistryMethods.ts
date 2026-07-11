@@ -48,7 +48,6 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
     SBT_FACTORY_ABI,
     SBT_FACTORY_INTERFACE,
     SBT_READ_PROVIDER_OPTIONS,
-    SBT_TOKENURI_METADATA_GATEWAYS,
     SBT_TOKENURI_METADATA_TIMEOUT_MS,
     STORAGE_BACKENDS,
     STORAGE_RESOURCE_KEYS,
@@ -1006,8 +1005,8 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
                   txId: tokenUriArweaveTxId,
                   groupKeyOrCfg,
                   arweaveOpts: {
-                    directToArIo: false,
-                    gateways: SBT_TOKENURI_METADATA_GATEWAYS,
+                    // Honor the deployment-wide AR.IO-only toggle. Per-call
+                    // fanout here previously made SBT names intermittently blank.
                     bypassFailureCache: true,
                     shortCircuitNotFound: true,
                     retries: 0,
@@ -1102,7 +1101,7 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
                 out.name = MASKED_SBT_FIELD_VALUE;
               }
               if (!isLockedField('image') && typeof json.image === 'string') {
-                const normalizedImage = normalizeUri(json.image, { gateway: 'https://arweave.net' });
+                const normalizedImage = normalizeUri(json.image);
                 if (normalizedImage) {
                   out.image = normalizedImage;
                 }

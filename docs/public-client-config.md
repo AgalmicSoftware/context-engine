@@ -279,8 +279,11 @@ SPA fallback concept, but their redirect config syntax differs.
   - Controls whether browser Arweave payload reads stay on the configured AR.IO gateway for their retry budget.
   - Default `true` uses `REACT_APP_CE_ARWEAVE_AR_IO_URL` / `window.CE_ARWEAVE_AR_IO_URL` when provided, otherwise `https://ar-io.dev`.
   - Display-critical metadata reads for sessions, SBTs, surveys, and questions
-    also stay on AR.IO while this is enabled; they do not fan out through legacy
-    gateways unless direct mode is intentionally disabled.
+    plus SBT image/link candidates also stay on AR.IO while this is enabled;
+    their legacy gateway hints do not re-enable fanout. Use
+    `REACT_APP_CE_ARWEAVE_AR_IO_URL` for a custom AR.IO base. Legacy gateways
+    become candidates again only when direct mode is intentionally disabled,
+    including the maintained explicit per-request opt-out.
   - Set `false` only when a deployment intentionally wants legacy fallback fanout through `https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes.
 
 - `REACT_APP_CE_ARWEAVE_PREFLIGHT_SESSION_METADATA=false`

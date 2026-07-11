@@ -253,13 +253,9 @@ export const buildArweaveGatewayUrlCandidates = (
   const txId = parseArweaveTxId(raw);
   if (!txId) return [raw];
 
-  const gateways = normalizeGatewayList([
-    gateway,
-    getPreferredArweaveGateway(gateway),
-    getRuntimeArweaveGatewayOverride(),
-    ...getRuntimeArweaveGatewayFallbacks(),
-    ...ARWEAVE_DEFAULT_GATEWAY_CANDIDATES,
-  ]);
+  // Keep media/link candidate fanout aligned with payload reads. When the
+  // AR.IO-only toggle is active, explicit legacy URLs must not re-enable it.
+  const gateways = getDefaultArweaveGateways({ gateway });
 
   if (!gateways.length) return [raw];
   return gateways.map((base) => `${base}/${txId}`);
