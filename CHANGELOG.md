@@ -26,6 +26,8 @@ All notable changes to this project will be documented in this file.
   full-screen width and viewport height while retaining compact mobile sizing.
 - Replaced the default Tools image-card status frame with UserPage-style 3D
   depth, keeping live/future borders visible only while demo mode is enabled.
+- Split the desktop main-screen welcome controls into equal-height rows and
+  aligned their rail to the slide edges without changing session welcome slides.
 
 ### Fixed
 
