@@ -20,8 +20,8 @@ All notable changes to this project will be documented in this file.
 
 - Fixed passkey survey-response uploads by preserving object-valued EIP-1193
   providers through worker authentication, kept SBT metadata and image reads on
-  AR.IO while direct mode is enabled, and extended the shared RPC 429 probe
-  window so exponential backoff engages before neighboring reads create a burst.
+  AR.IO while direct mode is enabled, and serialized shared RPC reads per
+  endpoint so one 429 stops queued requests before they create a console burst.
 - Fixed active-session SBT loading and sponsorship reporting by avoiding full
   registry enumeration, refreshing selected worker fields before survey
   uploads, moving the rate-limited Tenderly OP Sepolia gateway to the last

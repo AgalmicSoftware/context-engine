@@ -45,17 +45,12 @@ interface RpcRateLimitState {
   retryAfterMs: number;
 }
 
-interface RpcRateLimitProbe {
-  promise: Promise<void>;
-  startedAt: number;
-}
-
 interface RpcReadCacheState {
   v: number;
   inflight: Map<string, Promise<unknown>>;
   cacheByMethod: RpcCacheByMethod;
   rateLimits: Map<string, RpcRateLimitState>;
-  rateLimitProbes: Map<string, RpcRateLimitProbe>;
+  rateLimitTails: Map<string, Promise<void>>;
 }
 
 interface ProviderDebugContext extends LooseObject {
@@ -118,7 +113,7 @@ const createGlobalCacheState = (): RpcReadCacheState => ({
   inflight: new Map<string, Promise<unknown>>(),
   cacheByMethod: createCacheByMethod(),
   rateLimits: new Map<string, RpcRateLimitState>(),
-  rateLimitProbes: new Map<string, RpcRateLimitProbe>(),
+  rateLimitTails: new Map<string, Promise<void>>(),
 });
 
 const getGlobalObject = (): RpcCacheGlobals =>
@@ -137,9 +132,6 @@ const normalizeDebugMethod = (value: unknown): string => {
 const nowMs = (): number => Date.now();
 const RPC_RATE_LIMIT_BASE_BACKOFF_MS = 60_000;
 const RPC_RATE_LIMIT_MAX_BACKOFF_MS = 5 * 60_000;
-// A slow 429 response must settle before neighboring reads are released;
-// 500 ms allowed the initial getLogs burst to escape before backoff engaged.
-const RPC_RATE_LIMIT_PROBE_WAIT_MS = 10_000;
 
 const isCacheDisabled = (): boolean => {
   try {
@@ -414,8 +406,8 @@ const getGlobalCache = (): RpcReadCacheState => {
   if (!(g.__CE_RPC_READ_CACHE__.rateLimits instanceof Map)) {
     g.__CE_RPC_READ_CACHE__.rateLimits = new Map<string, RpcRateLimitState>();
   }
-  if (!(g.__CE_RPC_READ_CACHE__.rateLimitProbes instanceof Map)) {
-    g.__CE_RPC_READ_CACHE__.rateLimitProbes = new Map<string, RpcRateLimitProbe>();
+  if (!(g.__CE_RPC_READ_CACHE__.rateLimitTails instanceof Map)) {
+    g.__CE_RPC_READ_CACHE__.rateLimitTails = new Map<string, Promise<void>>();
   }
   return g.__CE_RPC_READ_CACHE__;
 };
@@ -540,37 +532,42 @@ const getRpcRateLimitBackoffError = (key: string, meta: ProviderSendMeta): (Erro
   return buildRpcRateLimitBackoffError(meta, state);
 };
 
-const waitForActiveRateLimitProbe = async (key: string): Promise<void> => {
-  if (!key) return;
-  const probe = getGlobalCache().rateLimitProbes.get(key);
-  if (!probe?.promise) return;
-  const elapsed = nowMs() - Number(probe.startedAt || 0);
-  const remaining = Math.max(0, RPC_RATE_LIMIT_PROBE_WAIT_MS - elapsed);
-  if (remaining <= 0) return;
-  await Promise.race([
-    probe.promise,
-    new Promise<void>((resolve) => {
-      setTimeout(resolve, remaining);
-    }),
-  ]);
-};
-
-const trackRateLimitProbe = (key: string, run: Promise<unknown>): void => {
-  if (!key) return;
+const runWithRpcRateLimitGate = async <T>(
+  key: string,
+  meta: ProviderSendMeta,
+  send: () => Promise<T>,
+): Promise<T> => {
+  if (!key) return await send();
+  // Regression guard: release endpoint reads one at a time. Releasing every
+  // waiter after a successful probe lets a later 429 arrive after the burst escaped.
   const cache = getGlobalCache();
-  const probe: RpcRateLimitProbe = {
-    promise: run.then(
-      () => undefined,
-      () => undefined,
-    ),
-    startedAt: nowMs(),
-  };
-  cache.rateLimitProbes.set(key, probe);
-  probe.promise.then(() => {
-    if (cache.rateLimitProbes.get(key) === probe) {
-      cache.rateLimitProbes.delete(key);
-    }
+  const previous = cache.rateLimitTails.get(key) || Promise.resolve();
+  let releaseTurn = (): void => {};
+  const turn = new Promise<void>((resolve) => {
+    releaseTurn = resolve;
   });
+  const tail = previous.then(
+    () => turn,
+    () => turn,
+  );
+  cache.rateLimitTails.set(key, tail);
+
+  await previous.catch(() => undefined);
+  try {
+    const backoffError = getRpcRateLimitBackoffError(key, meta);
+    if (backoffError) throw backoffError;
+    const result = await send();
+    recordRpcRateLimitSuccess(key);
+    return result;
+  } catch (err) {
+    recordRpcRateLimitError(key, err);
+    throw err;
+  } finally {
+    releaseTurn();
+    if (cache.rateLimitTails.get(key) === tail) {
+      cache.rateLimitTails.delete(key);
+    }
+  }
 };
 
 const recordRpcRateLimitSuccess = (key: string): void => {
@@ -579,6 +576,7 @@ const recordRpcRateLimitSuccess = (key: string): void => {
 };
 
 const recordRpcRateLimitError = (key: string, err: unknown): void => {
+  if (isObj(err) && err.code === 'CE_RPC_RATE_LIMIT_BACKOFF') return;
   if (!key || !isRpcRateLimitError(err)) return;
   const cache = getGlobalCache();
   const prev = cache.rateLimits.get(key);
@@ -733,23 +731,7 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
 
     // Fast path: if this method is not a target for dedupe/TTL caching, do nothing.
     if (!wantsDedupe && !wantsTtl && !debugOnly) {
-      let backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
-      if (backoffError) throw backoffError;
-      await waitForActiveRateLimitProbe(rateLimitKey);
-      backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
-      if (backoffError) throw backoffError;
-      const run: Promise<unknown> = (async (): Promise<unknown> => {
-        return await originalSend(method, params);
-      })();
-      trackRateLimitProbe(rateLimitKey, run);
-      try {
-        const result = await run;
-        recordRpcRateLimitSuccess(rateLimitKey);
-        return result;
-      } catch (err) {
-        recordRpcRateLimitError(rateLimitKey, err);
-        throw err;
-      }
+      return await runWithRpcRateLimitGate(rateLimitKey, sendMeta, () => originalSend(method, params));
     }
 
     const cacheOff = isCacheDisabled();
@@ -794,27 +776,7 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
       }
     }
 
-    let backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
-    if (backoffError) {
-      if (isDebug) {
-        rpcDebugRecord({
-          chainId,
-          providerKey,
-          url,
-          method,
-          params,
-          fnTag: debugContext.fnTag,
-          scopeTag: debugContext.scopeTag,
-          outcome: 'error',
-          ms: nowMs() - t0,
-          stackSnippet,
-          keyHash,
-        });
-      }
-      throw backoffError;
-    }
-    await waitForActiveRateLimitProbe(rateLimitKey);
-    backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
+    const backoffError = getRpcRateLimitBackoffError(rateLimitKey, sendMeta);
     if (backoffError) {
       if (isDebug) {
         rpcDebugRecord({
@@ -857,17 +819,15 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
       }
     }
 
-    const run: Promise<unknown> = (async (): Promise<unknown> => {
-      return await originalSend(method, params);
-    })();
-    trackRateLimitProbe(rateLimitKey, run);
+    const run: Promise<unknown> = runWithRpcRateLimitGate(rateLimitKey, sendMeta, () =>
+      originalSend(method, params),
+    );
 
     if (shouldDedupe) globalCache.inflight.set(keyHash, run);
 
     try {
       const result = await run;
       const elapsed = nowMs() - t0;
-      recordRpcRateLimitSuccess(rateLimitKey);
       if (ttlMs > 0) {
         const cacheMap = getCacheMapForMethod(method);
         const limit = METHOD_CACHE_LIMITS[method as RpcCacheMethod] || 0;
@@ -892,7 +852,6 @@ export const wrapEthersJsonRpcSend = <T extends WrappedProvider | null | undefin
       }
       return result;
     } catch (err) {
-      recordRpcRateLimitError(rateLimitKey, err);
       if (isDebug) {
         rpcDebugRecord({
           chainId,
@@ -936,7 +895,7 @@ export const __test__resetRpcReadCache = (): void => {
       g.__CE_RPC_READ_CACHE__.inflight = new Map<string, Promise<unknown>>();
       g.__CE_RPC_READ_CACHE__.cacheByMethod = createCacheByMethod();
       g.__CE_RPC_READ_CACHE__.rateLimits = new Map<string, RpcRateLimitState>();
-      g.__CE_RPC_READ_CACHE__.rateLimitProbes = new Map<string, RpcRateLimitProbe>();
+      g.__CE_RPC_READ_CACHE__.rateLimitTails = new Map<string, Promise<void>>();
     } catch (e) {
       log.warn('rpcReadCache: fallback', e);
     }

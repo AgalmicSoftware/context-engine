@@ -221,9 +221,13 @@ SPA fallback concept, but their redirect config syntax differs.
   `https://sepolia.optimism.io` endpoint. Tenderly remains wired as the last
   fallback instead of the primary endpoint because its anonymous gateway can
   return sustained `429` responses under registry/SBT discovery load.
-- Ethers read providers apply endpoint-level exponential backoff after RPC 429
-  responses before retrying that same URL. Active-session SBT cache warming also
-  fetches only the selected registry slug instead of enumerating every session.
+- Ethers read providers serialize distinct reads per endpoint. After a network
+  request returns `429`, queued reads fail locally and use normal provider
+  fallback without issuing more requests to the cooling endpoint. Actual
+  network `429` responses increase the endpoint-level exponential cooldown;
+  locally generated cooldown errors do not extend it. Active-session SBT cache
+  warming also fetches only the selected registry slug instead of enumerating
+  every session.
 - Optional paid testnet read RPCs are env/runtime-only and are no longer
   committed in source.
   - `REACT_APP_CE_BASE_SEPOLIA_PAID_RPC_URL_HTTP`
