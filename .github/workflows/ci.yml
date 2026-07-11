@@ -25,8 +25,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -66,9 +64,7 @@ jobs:
           if [ "$BASELINE_MONOTONICITY_BASE" != "origin/main" ]; then
             git fetch --no-tags --depth=1 origin "$BASELINE_MONOTONICITY_BASE" || true
           fi
-          BASELINE_MONOTONICITY_COMMIT_TEXT="$(git log --format=%B "$BASELINE_MONOTONICITY_BASE"..HEAD || true)"
-          node scripts/check-baseline-monotonicity.mjs --base "$BASELINE_MONOTONICITY_BASE" --allow-text "$BASELINE_MONOTONICITY_ALLOW_TEXT
-          $BASELINE_MONOTONICITY_COMMIT_TEXT"
+          node scripts/check-baseline-monotonicity.mjs --base "$BASELINE_MONOTONICITY_BASE" --allow-text "$BASELINE_MONOTONICITY_ALLOW_TEXT"
 
       - name: Lint client
         run: npm run lint

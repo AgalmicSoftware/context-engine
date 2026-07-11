@@ -69,7 +69,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(
       sourceDir,
       'public.txt',
-      `keep owner@example.test and /Users/alice/context-engine and contextengine${'@'}protonmail.com and ContextEngine${'@'}Protonmail.COM and contextengine+tag${'@'}protonmail.com\n`,
+      `keep [redacted-email] and /redacted-home and contextengine${'@'}protonmail.com and ContextEngine${'@'}Protonmail.COM and contextengine+tag${'@'}protonmail.com\n`,
     );
     writeFile(sourceDir, '.DS_Store', 'mac metadata\n');
     writeFile(sourceDir, '.secrets.baseline', '{"results":{".codex/secret.txt":[]}}\n');

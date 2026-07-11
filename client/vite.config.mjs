@@ -8,6 +8,7 @@ import { writePostSocialPreviewHtml } from './scripts/post-social-preview.mjs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, 'src');
 const publicDir = path.resolve(__dirname, 'public');
+const postsDir = path.resolve(__dirname, '..', 'posts');
 const metaMaskImageFilename = 'metamask_icon_white.png';
 const headers = {
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
