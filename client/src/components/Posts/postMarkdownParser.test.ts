@@ -140,19 +140,22 @@ type Record = { score: number };
       'Telegram was the interface users interacted with their Hermes agents through at Edge.',
     );
     expect(markdown).toContain(
-      'Four agents took the quiz — 58 questions each, 232 predictions — but no human corrections were made.',
+      'Four agents took the quiz — 58 questions each, 232 predictions — but no human corrections were made this time.',
     );
-    expect(markdown).toContain(
+    expect(markdown).not.toContain(
       'Everything below consists of unreviewed agent predictions, so it demonstrates what the eval collects rather than how accurately the agents represented their principals.',
     );
     expect(markdown).toContain('"title": "Evaluation protocol, scoring, and record schema"');
     expect(markdown).toContain('schemaVersion: "agent-mirror-eval/v1"');
-    expect(markdown).toContain('The gap between blind and post-view agreement measures the anchoring itself');
     expect(markdown).toContain(
-      'A prediction assigned 90% confidence is calibrated if about 90% of reviewed predictions in that prespecified confidence band are accepted unchanged.',
+      'If the agent says it is 90% confident, about 90% of those reviewed predictions should remain unchanged.',
     );
     expect(markdown).toContain(
-      'report the weighted absolute gap as expected calibration error, alongside the row-level Brier score.',
+      "To measure that bias, participants answer some questions before seeing the agent's prediction.",
+    );
+    expect(markdown).not.toContain('The gap between blind and post-view agreement measures the anchoring itself');
+    expect(markdown).toContain(
+      'Self-service event setup is a work in progress, and we can set up an instance for events today.',
     );
     expect(markdown).not.toContain('does 90 mean 90?');
     expect(markdown).toContain('longitudinalRole: "anchor" | "holdout";');
@@ -178,6 +181,13 @@ type Record = { score: number };
     ]);
     const modelsPanel = displayedSummary?.panels.find((panel: any) => panel.title === 'Responding Model Type');
     expect(modelsPanel?.display).toBe('pie');
+    expect(modelsPanel?.counts).toContainEqual({
+      label: '[object Object] record (Hermes v.0.14.0)',
+      value: 1,
+      color: '#ffb347',
+    });
+    expect(modelsPanel?.note).toBeUndefined();
+    expect(markdown).not.toContain('One run stored its model metadata as [object Object]');
     const answerShapesPanel = displayedSummary?.panels.find(
       (panel: any) => panel.title === 'Prediction Response Types',
     );

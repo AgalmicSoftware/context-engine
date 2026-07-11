@@ -301,6 +301,18 @@ export const EditorialResponseTypeGridPresentation = ({
         const distributionLabel = `${panel.title} distribution: ${panel.counts
           .map((count) => `${count.label} ${formatValue(count.value)}`)
           .join(', ')}`;
+        const editorialLegend = (
+          <div className={styles.editorialLegend}>
+            {panel.counts.map((count) => (
+              <div key={count.label} className={styles.editorialLegendRow}>
+                <span className={styles.editorialLegendSwatch} style={{ backgroundColor: count.color }} />
+                <span>{count.label}</span>
+                <strong>{formatValue(count.value)}</strong>
+                <span>{total > 0 ? formatValue((count.value / total) * 100, '%') : '0%'}</span>
+              </div>
+            ))}
+          </div>
+        );
 
         return (
           <article
@@ -366,6 +378,7 @@ export const EditorialResponseTypeGridPresentation = ({
                 >
                   <span aria-hidden="true">{formatValue(pie.total)} total</span>
                 </div>
+                {editorialLegend}
               </div>
             )}
             {panel.summaryValue !== null && (
@@ -397,18 +410,7 @@ export const EditorialResponseTypeGridPresentation = ({
                 ))}
               </div>
             )}
-            {(panel.display === 'distribution' || displayAsRing) && (
-              <div className={styles.editorialLegend}>
-                {panel.counts.map((count) => (
-                  <div key={count.label} className={styles.editorialLegendRow}>
-                    <span className={styles.editorialLegendSwatch} style={{ backgroundColor: count.color }} />
-                    <span>{count.label}</span>
-                    <strong>{formatValue(count.value)}</strong>
-                    <span>{total > 0 ? formatValue((count.value / total) * 100, '%') : '0%'}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+            {panel.display === 'distribution' && editorialLegend}
             {panel.note && <p className={styles.responseTypeNote}>{renderFormattedText(panel.note)}</p>}
           </article>
         );

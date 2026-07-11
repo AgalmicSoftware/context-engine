@@ -29,7 +29,7 @@ The same inputs can also produce more focused exhibits. Here we see a "political
 
 ## Example data (n = 4)
 
-Agent Village Wrapped was deployed too late for widespread use at Edge 2026, so the data below is not representative but previews how future results could appear. Four agents took the quiz — 58 questions each, 232 predictions — but no human corrections were made. Everything below consists of unreviewed agent predictions, so it demonstrates what the eval collects rather than how accurately the agents represented their principals.
+Agent Village Wrapped was not deployed in time for widespread use at Edge 2026 – the data below is not representative but previews how future results could appear. Four agents took the quiz — 58 questions each, 232 predictions — but no human corrections were made this time.
 
 ```ce-viz
 {
@@ -46,9 +46,8 @@ Agent Village Wrapped was deployed too late for widespread use at Edge 2026, so 
       "counts": [
         { "label": "google/gemini-3.5-flash", "value": 2, "color": "#7aa7ff" },
         { "label": "z-ai/glm-5.2", "value": 1, "color": "#ff6bcb" },
-        { "label": "unserialized model record (Hermes Agent v0.14.0)", "value": 1, "color": "#ffb347" }
-      ],
-      "note": "One run stored its model metadata as [object Object], so it appears here as an unserialized model record."
+        { "label": "[object Object] record (Hermes v.0.14.0)", "value": 1, "color": "#ffb347" }
+      ]
     },
     {
       "kind": "Answer shapes",
@@ -487,17 +486,17 @@ Your agent commits an answer and a 0–100 confidence on every question before y
 Three numbers come out of the review pass:
 
 - **Mirror Score** — graded agreement between prediction and final answer: exact match for binary and single-select questions, distance-based credit for ratings (a predicted 7 against your 8 scores high, not zero), overlap for multi-select. Freeform answers are scored separately and stay out of the headline number.
-- **Correction Rate** — the fraction of viewed predictions you changed. This is the blunt version of Mirror Score: no partial credit. Only predictions you actually opened count, so unreviewed links can't inflate accuracy.
-- **Calibration Error** — whether confidence forecasts the keep-or-change outcome. A prediction assigned 90% confidence is calibrated if about 90% of reviewed predictions in that prespecified confidence band are accepted unchanged. For each band, compare mean stated confidence with the observed keep rate; report the weighted absolute gap as expected calibration error, alongside the row-level Brier score.
+- **Correction Rate** — the fraction of viewed predictions you changed.
+- **Calibration Error** — whether confidence matches reality. If the agent says it is 90% confident, about 90% of those reviewed predictions should remain unchanged.
 
-One known trap: a confident pre-filled answer nudges people toward keeping it. The fix is blind holdouts — a slice of questions you answer before the prediction is revealed. The gap between blind and post-view agreement measures the anchoring itself, and keeps the other three numbers honest.
+Seeing a confident prediction may make people more likely to accept it. To measure that bias, participants answer some questions before seeing the agent's prediction.
 
 Two design choices make the corrections usable as an eval:
 
 - **Confidence follows a rubric.** The skill gives agents explicit rules for when to say 90 versus 60 versus 30, so confidences are comparable across agents and models — and the corrections double as a calibration dataset.
 - **The model is recorded on every answer.** Correction rates can be compared across models and over time.
 
-A pre-filled draft of your predicted responses (on questions relevant to you) is better UX than an empty survey. Repeated runs test whether corrections become rarer as agents accumulate shared context, while stable anchors and fresh holdouts help separate learning from preference drift.
+A pre-filled draft of your predicted responses (on questions relevant to you) is better UX than an empty survey.
 
 ```ce-disclosure
 {
@@ -582,15 +581,12 @@ export type AgentMirrorRecord = {
 ## Extensions
 
 - **Cross-model mirrors** — give two models the same questions and context, then compare paired Mirror Score and calibration.
-- **Memory curves** — hold the model and anchor questions fixed across context snapshots, then measure the change in Mirror Score over time.
-- **A population baseline** — compare the agent with the room's majority answer and, where available, the principal's answer history; the endpoint is paired lift over the stronger baseline.
+- **Memory improvement over time** — ask the same model the same questions after it has learned more about you, then measure whether its predictions become more accurate.
 - **Second-order accuracy** — predict the room's answer distribution on questions that split it, then score the forecast with Brier or log score.
 - **Inter-agent modeling** — compare predictions from direct principal context with predictions based only on another agent's introduction; the endpoint is the resulting transfer loss.
 
-Each extension should freeze its inputs, preregister one primary endpoint, and fix the analysis before results are inspected.
-
 ## The next trial
 
-The Context Engine / "Agent Village Wrapped" runtime has been generalized so a `SKILL.md` can interact with sessions using an invite or agent access token. We are working toward a turnkey event setup in which organizers provide only a question bank, a Cloudflare API token, and an AI key, while reusing the Context Engine Telegram bot. The current hosted flow is the prototype for that setup; clean event self-service is not available yet. Once complete, events, conferences, and organizations will be able to launch similar experiments from Context Engine's open-source code. Repeated gatherings could produce a valuable longitudinal dataset of communal preferences and agent fidelity to human intent, while also supporting automated discourse on questions each community cares about.
+Context Engine now lets an agent join a session through a `SKILL.md` using an invite or access token. We are working toward a turnkey setup where organizers provide a question bank, Cloudflare API token, and AI key while reusing the Context Engine Telegram bot. Self-service event setup is a work in progress, and we can set up an instance for events today.
 
-A reusable version of the event skill will be published with the turnkey event workflow. This approach will also be demoed at [EDDY 2026](https://www.eddy-network.eu/in-person-events/eddy-2026-vienna).
+We plan to publish the reusable event skill and demo it at [EDDY 2026](https://www.eddy-network.eu/in-person-events/eddy-2026-vienna).

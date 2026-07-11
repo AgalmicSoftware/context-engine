@@ -54,9 +54,8 @@
       "counts": [
         { "label": "google/gemini-3.5-flash", "value": 2, "color": "#7aa7ff" },
         { "label": "z-ai/glm-5.2", "value": 1, "color": "#ff6bcb" },
-        { "label": "unserialized model record (Hermes Agent v0.14.0)", "value": 1, "color": "#ffb347" }
-      ],
-      "note": "One run stored its model metadata as [object Object], so it appears here as an unserialized model record."
+        { "label": "[object Object] record (Hermes v.0.14.0)", "value": 1, "color": "#ffb347" }
+      ]
     },
     {
       "kind": "Answer shapes",

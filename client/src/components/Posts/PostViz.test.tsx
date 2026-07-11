@@ -63,6 +63,10 @@ describe('PostViz presentation variants', () => {
     });
     expect(modelChart).toHaveClass('editorialChartCircle');
     expect(answerShapeChart).toHaveClass('editorialChartCircle');
+    const answerShapeLayout = answerShapeChart.parentElement as HTMLElement;
+    expect(answerShapeLayout).toHaveClass('editorialRingLayout');
+    expect(within(answerShapeLayout).getByText('binary')).toBeInTheDocument();
+    expect(within(answerShapeLayout).getByText('160')).toBeInTheDocument();
 
     const confidence = within(statistics).getByRole('group', { name: 'Agent confidence' });
     expect(within(confidence).getByText('80.8')).toBeInTheDocument();

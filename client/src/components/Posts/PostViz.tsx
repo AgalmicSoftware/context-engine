@@ -612,7 +612,9 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                 </span>
                 <span className={styles.binaryListCounts}>{formatBinaryCountsLabel(item.counts)}</span>
                 {item.averageConfidence > 0 && (
-                  <span className={styles.binaryListConfidence}>conf {formatValue(item.averageConfidence)}/100</span>
+                  <span className={styles.binaryListConfidence}>
+                    avg confidence {formatValue(item.averageConfidence)}%
+                  </span>
                 )}
               </div>
             </li>
@@ -655,7 +657,7 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                     y={y + 4}
                     textAnchor="end"
                   >
-                    {tick}
+                    {tick}%
                   </text>
                 </g>
               );
@@ -715,7 +717,7 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
               };
               const countsLabel = formatBinaryCountsLabel(item.counts);
               const confidenceLabel =
-                item.averageConfidence > 0 ? `, average confidence: ${formatValue(item.averageConfidence)}/100` : '';
+                item.averageConfidence > 0 ? `, average confidence: ${formatValue(item.averageConfidence)}%` : '';
               const promptLabel = item.prompt || item.label;
               const ariaLabel = `${promptLabel}: ${countsLabel}${confidenceLabel}`;
               const isActive = activeIndex === index;
@@ -812,7 +814,7 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
               <BinaryTooltipSplitBar counts={activeItem.counts} />
               <span>{formatBinaryCountsLabel(activeItem.counts)}</span>
               {activeItem.averageConfidence > 0 && (
-                <span>Average confidence: {formatValue(activeItem.averageConfidence)}/100</span>
+                <span>Average confidence: {formatValue(activeItem.averageConfidence)}%</span>
               )}
             </div>
           )}

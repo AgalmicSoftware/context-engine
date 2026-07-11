@@ -441,12 +441,13 @@ describe('PostsPage', () => {
       element.getAttribute('aria-label')?.includes('Agents should schedule while I sleep.'),
     ) as Element;
     expect(schedulingDot).toBeInTheDocument();
+    expect(schedulingDot.getAttribute('aria-label')).toContain('average confidence: 87%');
     await userEvent.hover(schedulingDot);
     const binaryTooltip = await screen.findByRole('tooltip');
     expect(within(binaryTooltip).getByText('Agents should schedule while I sleep.')).toBeInTheDocument();
     expect(within(binaryTooltip).getByText('agree 3, disagree 1')).toBeInTheDocument();
     expect(within(binaryTooltip).queryByText(/Dot color:/)).not.toBeInTheDocument();
-    expect(within(binaryTooltip).getByText('Average confidence: 87/100')).toBeInTheDocument();
+    expect(within(binaryTooltip).getByText('Average confidence: 87%')).toBeInTheDocument();
     await userEvent.unhover(schedulingDot);
     await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
     expect(screen.getByText('Other response shapes')).toBeInTheDocument();
@@ -769,8 +770,8 @@ describe('PostsPage', () => {
     await screen.findByRole('heading', { name: 'First Post', level: 1 });
     const binaryBeeswarmSvg = await screen.findByRole('img', { name: 'Consensus and Difference' });
     expect(within(binaryBeeswarmSvg as HTMLElement).getByText('Avg. confidence')).toBeInTheDocument();
-    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('60')).toBeInTheDocument();
-    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('100')).toBeInTheDocument();
+    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('60%')).toBeInTheDocument();
+    expect(within(binaryBeeswarmSvg as HTMLElement).getByText('100%')).toBeInTheDocument();
     const schedulingDot = Array.from(binaryBeeswarmSvg.querySelectorAll('[aria-label]')).find((element) =>
       element.getAttribute('aria-label')?.includes('Agents should schedule while I sleep.'),
     ) as Element;
@@ -833,7 +834,7 @@ describe('PostsPage', () => {
     expect(rows[0]).toHaveTextContent('Agents should ask before introductions.');
     expect(rows[1]).toHaveTextContent('Agents should schedule while I sleep.');
     expect(rows[0]).toHaveTextContent('agree 2, disagree 2');
-    expect(rows[0]).toHaveTextContent('conf 88/100');
+    expect(rows[0]).toHaveTextContent('avg confidence 88%');
     expect(screen.queryByText('Consensus')).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByTestId('ce-posts-binary-sort-confidence'));
@@ -923,6 +924,86 @@ describe('PostsPage', () => {
 
     expect(scss).toMatch(/\.postDate\s*{[\s\S]*margin-left:\s*auto;/);
     expect(scss).toMatch(/\.tagList\s*{[\s\S]*flex:\s*1 1 auto;/);
+  });
+
+  it('keeps full rating questions readable in the precision matrix', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.precisionQuestionText\s*{[\s\S]*font-size:\s*0\.94rem;[\s\S]*line-height:\s*1\.42;/);
+  });
+
+  it('uses green post tags in a single metadata row through tablet widths', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.tag\s*{[\s\S]*border:\s*1px solid rgba\(77, 255, 164, 0\.36\);[\s\S]*background:\s*rgba\(77, 255, 164, 0\.1\);[\s\S]*color:\s*#4dffa4;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 820px\)\s*{[\s\S]*\.postMeta\s*{[\s\S]*flex-wrap:\s*nowrap;[\s\S]*align-items:\s*center;[\s\S]*\.tagList\s*{[\s\S]*width:\s*70%;[\s\S]*max-width:\s*70%;[\s\S]*flex:\s*0 1 70%;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*overflow-x:\s*auto;[\s\S]*\.postDate\s*{[\s\S]*flex:\s*0 0 auto;[\s\S]*margin-left:\s*auto;[\s\S]*text-align:\s*right;/,
+    );
+  });
+
+  it('places the editorial response legend beside its ring chart', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.editorialRingLayout\s*{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(94px, 124px\) minmax\(0, 1fr\);[\s\S]*align-items:\s*center;/,
+    );
+  });
+
+  it('keeps precision freeform responses comfortably readable', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.responseTypePrecisionPanel[\s\S]*\.responseQuotes blockquote\s*{[\s\S]*font-size:\s*1\.08rem;[\s\S]*line-height:\s*1\.5;/,
+    );
+  });
+
+  it('uses the multichoice question size for every precision response heading', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.responseTypePrecisionPanel,[\s\S]*h4\s*{[\s\S]*font-size:\s*clamp\(1\.2rem, 2\.1cqi, 1\.55rem\);[\s\S]*line-height:\s*1\.3;/,
+    );
+  });
+
+  it('keeps binary chart axis labels prominent', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.binaryBeeswarmYAxisLabel\s*{[\s\S]*font-size:\s*15px;/);
+    expect(scss).toMatch(/\.binaryBeeswarmAxisLabel\s*{[\s\S]*font-size:\s*16px;/);
+  });
+
+  it('keeps confidence-band labels and counts readable', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.editorialBarMeta\s*{[\s\S]*font-size:\s*0\.94rem;[\s\S]*line-height:\s*1\.3;/,
+    );
+  });
+
+  it('keeps both editorial pie legends readable and matched', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.editorialLegendRow\s*{[\s\S]*font-size:\s*0\.94rem;[\s\S]*> span:last-child\s*{[\s\S]*font-size:\s*0\.82rem;/,
+    );
+    expect(scss).toMatch(
+      /\.responsePieLegendItem\s*{[\s\S]*font-size:\s*0\.94rem;[\s\S]*\.responsePieLegendValue\s*{[\s\S]*> span\s*{[\s\S]*font-size:\s*0\.82rem;/,
+    );
+  });
+
+  it('contains the post header image within the available viewport width', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.pageShell\s*{[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;/);
+    expect(scss).toMatch(
+      /\.postArticle\s*{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;[\s\S]*box-sizing:\s*border-box;/,
+    );
+    expect(scss).toMatch(
+      /\.postHeroFigure\s*{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*box-sizing:\s*border-box;/,
+    );
+    expect(scss).toMatch(/\.postHeroImage,[\s\S]*\.postImage\s*{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;/);
   });
 
   it('does not fetch posts when the config disables the page', async () => {
