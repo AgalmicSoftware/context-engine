@@ -185,6 +185,14 @@ describe('client package modernization contract', () => {
     expect(viteConfig).not.toContain('!!raw-loader!');
     expect(viteIndex).toContain('__PUBLIC_URL__');
     expect(viteIndex).toContain('/src/viteEntry.ts');
+    expect(viteIndex).toContain(
+      'https://contextengine.xyz/assets/img/context-engine-social-preview-square.png',
+    );
+    expect(
+      fs.existsSync(
+        path.resolve(__dirname, '../../../public/assets/img/context-engine-social-preview-square.png'),
+      ),
+    ).toBe(true);
     expect(viteEntry).toContain("import 'assets/css/contextEngine.scss';");
     expect(viteEntry).toContain("import('./index')");
     expect(appEntry).not.toContain("import 'assets/css/contextEngine.scss';");

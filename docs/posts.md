@@ -83,6 +83,10 @@ Header images should therefore be compressed web assets, preferably JPEG or
 WebP, rather than full-resolution working files. The Agent Village post keeps
 its PNG source alongside a compressed JPEG selected by the manifest.
 
+Non-post routes use the square Context Engine mark at
+`/assets/img/context-engine-social-preview-square.png`. Individual posts replace
+that default with their manifest header image.
+
 ## Disclosure Blocks
 
 Wrap Markdown content in `ce-disclosure` markers when detailed methods, schemas,
