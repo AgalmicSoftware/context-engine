@@ -433,7 +433,7 @@ const ToolExplorer = (props: ToolExplorerProps) => {
                 xs="12"
                 sm="6"
                 md="4"
-                className={`${styles.explorerCol} ${useSparseGrid ? styles.explorerColSparse : ''} ${props.disabled ? styles.disabled : ''} ${styles[props.status]}`}
+                className={`${styles.explorerCol} ${useSparseGrid ? styles.explorerColSparse : ''} ${props.disabled ? styles.disabled : ''} ${styles[props.status]} ${demoSurfaceEnabled ? styles.statusBorderEnabled : ''}`}
                 onClick={() => handleClick(Component, data)}
               >
                 <div className={styles.square}>
