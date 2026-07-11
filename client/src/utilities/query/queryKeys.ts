@@ -42,7 +42,7 @@ const normalizeIds = (ids: readonly QueryKeyScalar[] = []): QueryKeyScalar[] =>
     throw new Error('Query key ids must be scalar values');
   });
 
-export const queryKeys = {
+export const queryKeys = Object.freeze({
   domain: (domain: string): readonly [string] => Object.freeze([normalizeRequiredPart(domain, 'domain')]),
   entity: (domain: string, entity: string): readonly [string, string] =>
     Object.freeze([normalizeRequiredPart(domain, 'domain'), normalizeRequiredPart(entity, 'entity')]),
@@ -55,4 +55,4 @@ export const queryKeys = {
       normalizeOptionalText(scope.address)?.toLowerCase() || null,
       ...normalizeIds(scope.ids),
     ]) as ScopedQueryKey,
-};
+});

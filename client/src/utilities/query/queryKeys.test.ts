@@ -2,6 +2,7 @@ import { queryKeys } from './queryKeys';
 
 describe('queryKeys', () => {
   it('builds stable tuples with fixed scope slots', () => {
+    expect(Object.isFrozen(queryKeys)).toBe(true);
     expect(queryKeys.domain('sbt')).toEqual(['sbt']);
     expect(queryKeys.entity('sbt', 'holders')).toEqual(['sbt', 'holders']);
     expect(
