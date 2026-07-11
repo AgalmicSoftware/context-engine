@@ -459,7 +459,8 @@ const getRpcErrorText = (err: unknown): string => {
 };
 
 const isRpcRateLimitError = (err: unknown): boolean => {
-  if (getNumericRpcErrorStatus(err) === 429) return true;
+  const status = getNumericRpcErrorStatus(err);
+  if (status === 429 || status === 403) return true;
   return /\b429\b|too many requests|rate[-\s]?limit|throttl/i.test(getRpcErrorText(err));
 };
 

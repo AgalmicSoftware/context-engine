@@ -222,7 +222,8 @@ SPA fallback concept, but their redirect config syntax differs.
   fallback instead of the primary endpoint because its anonymous gateway can
   return sustained `429` responses under registry/SBT discovery load.
 - Ethers read providers serialize distinct reads per endpoint. After a network
-  request returns `429`, queued reads fail locally and use normal provider
+  request returns `429` or an endpoint rejects browser access with `403`,
+  queued reads fail locally and use normal provider
   fallback without issuing more requests to the cooling endpoint. Actual
   network `429` responses increase the endpoint-level exponential cooldown;
   locally generated cooldown errors do not extend it. Active-session SBT cache

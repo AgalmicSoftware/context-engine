@@ -26,6 +26,9 @@ All notable changes to this project will be documented in this file.
   registry enumeration, refreshing selected worker fields before survey
   uploads, moving the rate-limited Tenderly OP Sepolia gateway to the last
   fallback, and reading boolean-only resource presence from the session worker.
+- Prevented repeated RPC retries against browser-forbidden (`403`) endpoints,
+  and constrained returning passkey-wallet unlocks to the stored credential so
+  SBT mint/sign prompts do not reopen the passkey account chooser.
 
 ## [0.7.0] - 2026-07-06
 

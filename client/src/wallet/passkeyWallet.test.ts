@@ -198,6 +198,32 @@ describe('PasskeyEoaWalletClient', () => {
     expect(sessionClient.calls[0].privateKey).not.toBe(PRIVATE_KEY);
   });
 
+  it('targets the stored passkey credential when re-unlocking a derived wallet', async () => {
+    const storage = createMemoryWalletStorage();
+    const first = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage,
+      credentials: makeCredentials(),
+      sessionClient: makeSessionClient(),
+    });
+    const createdAddress = await first.createWallet();
+    const stored = await storage.read();
+    await first.disconnect();
+
+    const returningCredentials = makeCredentials();
+    const returning = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage,
+      credentials: returningCredentials,
+      sessionClient: makeSessionClient(),
+    });
+
+    await expect(returning.unlockWallet()).resolves.toBe(createdAddress);
+    const request = (returningCredentials.get as jest.Mock).mock.calls[0][0];
+    expect(request.publicKey.allowCredentials).toHaveLength(1);
+    expect(bufferToBase64URL(request.publicKey.allowCredentials[0].id)).toBe(stored?.credentialId);
+  });
+
   it('does not persist or log PRF output or derived private keys', async () => {
     const storage = createMemoryWalletStorage();
     const sessionClient = makeSessionClient();

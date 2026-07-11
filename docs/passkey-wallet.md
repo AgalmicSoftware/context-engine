@@ -180,9 +180,13 @@ These values must never be sent to a server or persisted in logs:
 
 ## Unlock Flow
 
-1. User clicks Continue or Sign in.
-2. The app performs discoverable WebAuthn authentication for the configured RP
-   ID, allowing the browser/OS passkey picker to search the passkey keychain.
+1. User clicks Continue or Sign in, or a signing action needs to re-unlock an
+   expired soft session.
+2. When saved wallet metadata exists, the app supplies its credential ID in
+   WebAuthn `allowCredentials`, so the browser prompts for that passkey instead
+   of reopening account discovery. If local metadata was cleared, passkey-derived
+   mode uses discoverable authentication for the configured RP ID so the
+   browser/OS picker can recover the wallet from the passkey keychain.
 3. The app requires PRF output.
 4. In `passkey-derived` mode, the app derives the EOA private key directly from
    PRF output and versioned wallet derivation labels.

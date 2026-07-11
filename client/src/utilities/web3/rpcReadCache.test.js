@@ -237,6 +237,21 @@ describe('rpcReadCache evictExpiredEntries', () => {
     expect(Array.from(getCache().rateLimits.values())[0]?.retryAfterMs).toBe(60000);
   });
 
+  it('opens the endpoint cooldown circuit after HTTP 403 responses', async () => {
+    const { originalSend, provider } = createWrappedProvider(async () => {
+      throw Object.assign(new Error('Forbidden'), { status: 403 });
+    });
+
+    await expect(provider.send('eth_getLogs', [{ fromBlock: '0x1', toBlock: 'latest' }])).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(provider.send('eth_getBalance', [LOG_ADDRESS, 'latest'])).rejects.toMatchObject({
+      code: 'CE_RPC_RATE_LIMIT_BACKOFF',
+    });
+
+    expect(originalSend).toHaveBeenCalledTimes(1);
+  });
+
   it('lets fallback callers skip a cooling-down primary endpoint without another network send', async () => {
     const primary = createWrappedProvider(async () => {
       throw Object.assign(new Error('Too Many Requests'), { status: 429 });

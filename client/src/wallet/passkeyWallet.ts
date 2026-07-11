@@ -266,15 +266,31 @@ export class PasskeyEoaWalletClient {
     let privateKey: HexString | null = null;
     try {
       if (this.config.walletKeyMode === 'passkey-derived') {
+        const storedRecord = await this.storage.read();
+        if (storedRecord && storedRecord.rpId !== this.config.rpId) {
+          throw new Error(`Stored wallet belongs to RP ID "${storedRecord.rpId}", not "${this.config.rpId}".`);
+        }
+        if (storedRecord && !isPasskeyDerivedWalletRecord(storedRecord)) {
+          throw new Error('Stored wallet metadata is not a passkey-derived wallet.');
+        }
         const saltBytes = await getPasskeyDerivedPrfSalt(this.config);
         const { credential, prfOutput } = await authenticatePasskeyCredential({
           config: this.config,
+          credentialId: storedRecord?.credentialId,
           salt: saltBytes,
           credentials: this.credentials,
         });
         const credentialId = bufferToBase64URL(credential.rawId);
+        // Regression guard: a returning wallet must target its saved credential;
+        // omitting allowCredentials reopens the account chooser during mint/sign.
+        if (storedRecord && credentialId !== storedRecord.credentialId) {
+          throw new Error('Passkey assertion does not match the stored wallet credential.');
+        }
         privateKey = await deriveEoaPrivateKeyFromPrf({ prfOutput, config: this.config });
         const address = getAddressForPrivateKey(privateKey);
+        if (storedRecord && address.toLowerCase() !== storedRecord.evmAddress.toLowerCase()) {
+          throw new Error('Passkey-derived wallet address does not match stored metadata.');
+        }
         const record = createPasskeyDerivedWalletRecord({
           config: this.config,
           credentialId,
