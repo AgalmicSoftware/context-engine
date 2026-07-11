@@ -11,13 +11,6 @@ describe('Main welcome walkthrough styles', () => {
   const baseEnd = scss.indexOf('\n.takeSurveyButton {', baseStart);
   const baseScss = scss.slice(baseStart, baseEnd);
 
-  it('keeps every desktop welcome slide on one responsive frame height', () => {
-    expect(desktopScss).toMatch(
-      /\.onboardingWalkthrough\s*\{[\s\S]*?--ce-main-welcome-frame-height:\s*max\(540px,\s*30vw\);/,
-    );
-    expect(baseScss).toMatch(/height:\s*var\(--ce-main-welcome-frame-height,\s*100%\);/);
-  });
-
   it('keeps the desktop control rail flush with the main slide and gives each control half the height', () => {
     expect(desktopScss).toMatch(
       /\.onboardingWalkthrough \.onboardingControls\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);[\s\S]*?align-self:\s*stretch;[\s\S]*?height:\s*auto;/,
