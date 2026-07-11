@@ -72,7 +72,7 @@ describe('CommonGround deliberation snapshot export', () => {
         {
           type: 'binary',
           commentId: 'safe-id',
-          commentBody: 'Email test person@example.com should not export',
+          commentBody: 'Email test contextengine@protonmail.com should not export',
         },
         {
           type: 'binary',
@@ -117,7 +117,7 @@ describe('CommonGround deliberation snapshot export', () => {
       ['index', 'text'],
     ]);
     expect(snapshot.statements[0]).not.toHaveProperty('id');
-    expect(JSON.stringify(snapshot)).not.toMatch(/person@example\.com/);
+    expect(JSON.stringify(snapshot)).not.toMatch(/contextengine@protonmail\.com/);
     expect(JSON.stringify(snapshot)).not.toMatch(/0x1234567890123456789012345678901234567890/);
     expect(JSON.stringify(snapshot)).not.toMatch(/name\.eth/i);
   });
