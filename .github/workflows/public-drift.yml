@@ -33,8 +33,6 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/main-tree"
           git archive --format=tar HEAD | tar -xf - -C "$RUNNER_TEMP/main-tree"
-          rm -f "$RUNNER_TEMP/main-tree/private-pack.manifest.json"
-          rm -f "$RUNNER_TEMP/release-public/private-pack.manifest.json"
           if ! diff -qr "$RUNNER_TEMP/main-tree" "$RUNNER_TEMP/release-public" > "$RUNNER_TEMP/public-drift.diff"; then
             echo "The stripped public artifact differs from the public main tree:"
             cat "$RUNNER_TEMP/public-drift.diff"

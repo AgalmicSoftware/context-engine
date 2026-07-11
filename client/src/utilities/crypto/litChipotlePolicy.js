@@ -1,5 +1,5 @@
-// CE-CC no-loader runtime bridge: contextEngine-cc/lib/litNodeHooks.mjs
-// imports this .js twin directly (Node cannot load the .ts source). Vite also
+// Node no-loader consumers import this .js twin directly because Node cannot
+// load the .ts source. Vite also
 // resolves the './litChipotlePolicy.js' specifier to this file at build time,
 // while typecheck binds the .ts twin. The twins are pinned behavior-identical
 // by scripts/lit-chipotle-policy-parity.test.js (same pattern as

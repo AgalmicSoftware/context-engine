@@ -170,7 +170,7 @@ Notes:
   - a normal URL (`https://...`),
   - `ar://<txId>`,
   - or a bare Arweave txId (`<txId>`, 43-char base64url).
-  The client normalizes `ar://` and bare txIds to the preferred Arweave gateway via `normalizeArweaveUrl` (`client/src/utilities/arweave/arweaveUrls.js`):
+  The client normalizes `ar://` and bare txIds to the preferred Arweave gateway via `normalizeArweaveUrl` (`client/src/utilities/arweave/arweaveUrls.ts`):
   `CE_ARWEAVE_AR_IO_URL` / `https://ar-io.dev` while `CE_ARWEAVE_DIRECT_TO_AR_IO` is enabled, which is the default. Arweave reads stay on that AR.IO gateway for their retry budget instead of fanning out to legacy gateways. Set `CE_ARWEAVE_DIRECT_TO_AR_IO=false` only when a deployment intentionally wants fallback fanout through `ARWEAVE_GATEWAY_URL`, `https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes.
   Runtime overrides: `window.CE_ARWEAVE_GATEWAY_URL`, `window.CE_ARWEAVE_DIRECT_TO_AR_IO`, `window.CE_ARWEAVE_AR_IO_URL`.
   If you see console noise like `Failed to load resource ... (<txId>, line 0)`, check the Network tab for the request URL:
@@ -211,7 +211,7 @@ Wizard UX notes:
 - In `/session/new`, the Lit metadata block is collapsible and `arweave` / `litCredentials` metadata sections are hidden from the form. `litCredentials` reads are now intentionally fenced off so payer material does not flow through metadata.
 - The worker code preview in `/session/new` shows unbundled source only and is collapsed by default.
 - In `/session/new`, Session ID now lives in the Metadata section as a read-only single-line field with icon actions (regenerate/copy).
-- In `/session/new`, Smart Contracts now includes an editable `Session Registry` address field that defaults from `getSessionRegistryAddress(chainId)` (from `client/src/variables/chains.js`) and is used as the registry-address override for deploy/register actions in that wizard.
+- In `/session/new`, Smart Contracts includes an editable `Session Registry` address field that defaults from `getSessionRegistryAddress(chainId)` (from `client/src/variables/chains.ts`) and is used as the registry-address override for deploy/register actions in that wizard.
 - In `/session/new`, saved metadata `contracts` now keeps only `surveys`, `sbtFactory`, and `sessionRegistry`; non-authoritative extras like `xp` are excluded from the published metadata contract block.
 - In `/session/new`, SBT selector manual entry is inline (`+ By Address`) and no longer a full-width button row.
 - In `/session/new`, SBT creation is now available inline through a modal. New SBT drafts show a predicted deterministic address immediately, can be reused in the wizard before deployment, and are deployed during Publish before the session registration transaction is sent.
@@ -318,19 +318,23 @@ When `USE_ONCHAIN_SESSION_REGISTRY` is enabled:
    - Session `scopes` overrides remain authoritative for anonymous paths (`scopes.ai=false` blocks `/ai`; `scopes.transcribe=false` blocks `/transcribe`).
    - `txGas` still controls `scopes.faucet` for logged-in tokens, but same-wallet `request_test_eth` requests now re-check the current on-chain `txGas` gate when that scope is missing. Third-party generic transfers still require `scopes.faucet=true`, and faucet has no anonymous path.
 
-## Migration Notes / TODO
+## Current Default and Remaining Cleanup
 
-- Deploy `SessionRegistry.sol` and populate `SESSION_REGISTRY_ADDRESSES`.
-- When ready, set `USE_ONCHAIN_SESSION_REGISTRY = true` by default and remove the
-  fallback to `demo_sessions.json` through the chain gateway.
-- Clean up `demo_sessions.json` after production cutover.
-- Consider splitting large metadata into multiple Arweave objects if size grows.
+- `USE_ONCHAIN_SESSION_REGISTRY` defaults to `true` in
+  `client/src/variables/appConfig.ts`; on-chain registry resolution is the
+  normal runtime path.
+- `SESSION_REGISTRY_ADDRESSES` contains the checked-in per-chain registry
+  defaults, with local overrides merged for local development.
+- The `demo_sessions.json` fallback remains compatibility behavior only when an
+  operator explicitly disables on-chain registry mode. Removing that fallback
+  is a future compatibility decision, not a pending production switch.
+- Large metadata can be split into multiple Arweave objects if payload size
+  becomes an operational issue.
 
-## Flip-The-Switch Checklist
+## Deployment Verification Checklist
 
-- Deploy `SessionRegistry.sol` (admin = deployer per session).
-- Set `SESSION_REGISTRY_ADDRESSES` for the target chain IDs.
-- Populate on-chain sessions (use `/session/new` to create entries).
-- Verify Arweave metadata loads + Lit decryption works for locked fields.
-- Set `USE_ONCHAIN_SESSION_REGISTRY = true`.
-- Remove the demoSessions fallback TODOs in the chain gateway.
+- Confirm the target chain has a configured `SessionRegistry` address.
+- Populate or create sessions through `/session/new`.
+- Verify registry reads, Arweave metadata, and Lit decryption for locked fields.
+- Exercise disabled registry mode only when maintaining an intentional legacy
+  deployment that still requires the demo-session fallback.

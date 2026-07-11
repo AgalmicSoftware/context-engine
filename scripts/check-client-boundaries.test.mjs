@@ -304,7 +304,7 @@ test('naming-migration aliases may re-export canonical low-level modules', () =>
       rootDir,
       'client/src/utilities/web3/legacyChainReads.ts',
       `
-        /** naming-migration alias, remove per PRD 653/654. */
+        /** naming-migration alias, remove after compatibility cleanup. */
         export {
           createChainReads,
           createChainReads as createLegacyChainReads,

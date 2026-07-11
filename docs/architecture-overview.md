@@ -107,7 +107,7 @@ The canonical Solidity contracts live in `contracts/`, with deploy scripts in
 - `SBTFactory.sol` deploys session/group SBT contracts.
 
 The client reads ABIs from `client/src/contractsABI/`. Checked-in defaults live
-in `client/src/variables/chains.js` and `client/src/variables/contracts.json`;
+in `client/src/variables/chains.ts` and `client/src/variables/contracts.json`;
 OP Sepolia (`11155420`) is the default chain fallback, while Base Sepolia
 (`84532`) remains a compatibility chain.
 

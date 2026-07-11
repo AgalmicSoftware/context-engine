@@ -97,6 +97,31 @@ test('collectNodeTestFiles can filter to git-tracked node tests', () => {
   });
 });
 
+test('tracked-only collection excludes tests matched by public strip patterns', () => {
+  withTempRepo((rootDir) => {
+    execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
+    writeFile(rootDir, 'tests/root/arweave-metadata-uri.test.js');
+    writeFile(rootDir, 'scripts/lib/e2e/wallets.test.js');
+    const helperPath = path.join(rootDir, 'scripts/lib/public-release-strip-patterns.sh');
+    fs.mkdirSync(path.dirname(helperPath), { recursive: true });
+    fs.writeFileSync(helperPath, [
+      '#!/usr/bin/env bash',
+      'ce_public_release_strip_patterns() {',
+      "  printf '%s\\n' scripts/lib/e2e",
+      '}',
+      '',
+    ].join('\n'));
+    execFileSync('git', ['add', 'tests/root/arweave-metadata-uri.test.js', 'scripts/lib/e2e/wallets.test.js'], {
+      cwd: rootDir,
+      stdio: 'ignore',
+    });
+
+    assert.deepEqual(collectNodeTestFiles(rootDir, { trackedOnly: true }), [
+      'tests/root/arweave-metadata-uri.test.js',
+    ]);
+  });
+});
+
 test('parseRunNodeTestsArgs accepts tracked-only flag or env opt-in', () => {
   assert.deepEqual(parseRunNodeTestsArgs(['--tracked-only'], {}), {
     trackedOnly: true,

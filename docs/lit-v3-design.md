@@ -1,21 +1,29 @@
-# Lit v3 Design: Chipotle Worker-Mediated SBT-Gated Encryption
+# Lit v3 Design and Migration Record: Chipotle Worker-Mediated SBT-Gated Encryption
 
-_Last updated: May 9, 2026._
+_Last updated: July 10, 2026._
 
 ## Why this doc exists
 
-Context Engine's current Lit integration is a Naga-era browser runtime built around:
+Context Engine's active Lit runtime is worker-mediated Chipotle execution for
+supported sessions. This document records the migration from the former
+Naga-era browser runtime and the design decisions that shaped the current
+implementation.
+
+The legacy runtime replaced by this design was built around:
 
 - `createLitHooks()` in `client/src/utilities/crypto/litProtocol.ts`
 - browser `saveKey()` / `getKey()` calls against Lit ACC encryption APIs
 - session auth/payment delegation for decrypt and sponsored usage
 - SBT-gated Access Control Conditions (ACCs) passed directly from the browser
 
-That model cannot be carried over to Chipotle as a simple SDK swap.
+That model could not be carried over to Chipotle as a simple SDK swap.
 
-## Verified migration constraint
+## Historical migration constraint
 
-As of April 29, 2026, the dedicated Chipotle worker smoke test in this repo can reach the real Chipotle API with a valid usage key, but a scoped key rejected arbitrary inline action execution.
+On April 29, 2026, the dedicated Chipotle worker smoke test reached the real
+Chipotle API with a valid usage key, while a scoped key rejected arbitrary
+inline action execution. This observation informed the registered-action design
+that is now implemented.
 
 Observed live result:
 

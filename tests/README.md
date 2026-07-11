@@ -23,8 +23,6 @@ If you are deciding where to add new files:
 
 - Canonical PR gate: `npm run test:ci`
 - Same canonical gate via npm default: `npm test`
-- Extended local gate with Anvil Surveys + SBT integration: `npm run tests`
-- Local-chain Surveys + SBT integration only: `npm run test:surveys-sbt`
 - Client Jest/RTL coverage gate: `npm run test:client`
 - Root `node:test` suites: `npm run test:node`
 - Solidity: `npm run test:contracts`

@@ -41,10 +41,12 @@ test('verifyPublicDocs accepts public-safe docs, package commands, and local lin
       '',
     ].join('\n'));
     writeFile(rootDir, 'docs/details.md', '# Details\n');
+    writeFile(rootDir, 'client/src/feature.ts', 'export const feature = true;\n');
+    writeFile(rootDir, 'docs/paths.md', 'Source: `client/src/feature.ts`. Generated: `client/build/`.\n');
 
     const result = verifyPublicDocs(rootDir);
     assert.deepEqual(result.findings, []);
-    assert.equal(result.scannedFiles, 2);
+    assert.equal(result.scannedFiles, 3);
   });
 });
 
@@ -56,6 +58,7 @@ test('verifyPublicDocs rejects private markers, unavailable commands, and broken
       'The private branch includes contextEngine-cc and workers/agentBridgeWorker.',
       'Run `npm run ai:private-flow`.',
       'See [missing](missing.md).',
+      'Stale source path: `client/src/missingFeature.js`.',
       '',
     ].join('\n'));
 
@@ -69,6 +72,7 @@ test('verifyPublicDocs rejects private markers, unavailable commands, and broken
     assert.match(formatted, /private bridge path/);
     assert.match(formatted, /missing public npm script: ai:private-flow/);
     assert.match(formatted, /broken local Markdown link: missing\.md/);
+    assert.match(formatted, /missing inline repository path: client\/src\/missingFeature\.js/);
   });
 });
 

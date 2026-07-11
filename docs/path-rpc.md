@@ -11,14 +11,14 @@ For scan-scope, profile deep-scan, and RPC guardrail flags, see
 - PATH is Pocket Network's gateway product.
 - The built-in public endpoint family currently lives under `api.pocket.network`.
 - Context Engine uses PATH in two different places:
-  - client read-provider ordering (`client/src/variables/chains.js`, `client/src/utilities/web3/contractScripts.impl.ts`)
+  - client read-provider ordering (`client/src/variables/chains.ts`, `client/src/utilities/web3/contractScripts.impl.ts`)
   - worker/session RPC overrides (`workers/sessionCorsWorker/worker.js`, Session Wizard/Admin worker config payloads)
 
 Built-in anonymous RPC defaults live in `client/src/variables/rpcDefaults.js`.
 
 ## Current client defaults
 
-- `PREFER_PATH_RPC = true` in `client/src/variables/appConfig.js`
+- `PREFER_PATH_RPC = true` in `client/src/variables/appConfig.ts`
 - `CE_RPC_PROVIDER_MODE = "fallback"` by default
 - `globalThis.CE_PREFER_PATH_RPC = false` can disable PATH-first client reads at runtime
 - `globalThis.CE_RPC_PROVIDER_MODE = "infura_only"` disables PATH for any supported chain that has a configured paid diagnostics RPC and uses that paid RPC only for that chain

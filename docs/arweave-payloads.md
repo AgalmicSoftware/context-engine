@@ -59,7 +59,7 @@ Notes:
   - Full gateway URL: `https://ar-io.dev/<txId>` (with `https://arweave.net/<txId>` still accepted)
   - Arweave URI: `ar://<txId>`
   - Bare txId: `<txId>` (43-char base64url)
-  The client normalizes `ar://` and bare txIds to a gateway URL via `normalizeArweaveUrl` (`client/src/utilities/arweave/arweaveUrls.js`).
+  The client normalizes `ar://` and bare txIds to a gateway URL via `normalizeArweaveUrl` (`client/src/utilities/arweave/arweaveUrls.ts`).
 - Debugging: if you see browser console errors like `Failed to load resource ... (<txId>, line 0)`, check the Network tab for the full URL:
   - If the request is to your app origin (for example `http://localhost:3000/<txId>`), some UI is rendering a bare txId as a relative URL.
     Normalize before rendering.

@@ -108,6 +108,10 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/verify-public-docs.test.js');
   expectFile('scripts/verify-public-release-pii.sh');
   expectFile('scripts/verify-public-release-pii.test.js');
+  expectFile('scripts/verify-public-assets.js');
+  expectFile('scripts/verify-public-assets.test.js');
+  expectFile('scripts/verify-public-text.js');
+  expectFile('scripts/verify-public-text.test.js');
   expectFile('scripts/sync-public-history.sh');
   expectFile('workers/sessionCorsWorker/package.json');
   expectFile(publishWorkflowPath);
@@ -157,6 +161,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('deploy-helper:deploy', 'scripts/deploy-helper-deploy.mjs');
   expectScriptContains('verify:worker-bundle', 'scripts/verify-worker-bundle-sync.mjs');
   expectScriptContains('verify:public-release-surface', 'scripts/verify-public-release-surface.js');
+  expectScriptContains('verify:public-assets', 'scripts/verify-public-assets.js');
+  expectScriptContains('verify:public-text', 'scripts/verify-public-text.js');
   expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
   expectScriptContains('coverage-floor:check', 'scripts/check-coverage-floor.mjs');
   expectScriptContains('dead-exports:advisory', 'scripts/check-dead-exports-advisory.mjs');
@@ -166,6 +172,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:release', 'npm run -s test:node:tracked');
   expectScriptContains('verify:release', 'npm run test:release:client');
   expectScriptContains('verify:release', 'npm run verify:public-release-surface');
+  expectScriptContains('verify:release', 'npm run verify:public-assets');
   expectScriptContains('verify:release', 'npm run worker:bundle');
   expectScriptContains('verify:release', 'npm run verify:worker-bundle');
   expectScriptContains('verify:release', 'npm --prefix client run build');
@@ -173,6 +180,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
 
   expectSyncPublicHistoryContains('npm run test:wiring', '"npm run test:wiring"');
   expectSyncPublicHistoryContains('npm run type-debt:check', '"npm run type-debt:check"');
+  expectSyncPublicHistoryContains('verify_public_assets', '"verify_public_assets"');
+  expectSyncPublicHistoryContains('verify_public_text', '"verify_public_text"');
 
   expectWorkflowContains('wiring-and-release:', 'the wiring-and-release job');
   expectWorkflowContains('contracts:', 'the contracts job');
@@ -193,6 +202,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('run: npm run lint', '"npm run lint"');
   expectWorkflowContains('run: npm run typecheck:client', '"npm run typecheck:client"');
   expectWorkflowContains('run: npm run verify:public-release-surface', '"npm run verify:public-release-surface"');
+  expectWorkflowContains('run: npm run verify:public-assets', '"npm run verify:public-assets"');
+  expectWorkflowContains('run: npm run verify:public-text', '"npm run verify:public-text"');
   expectWorkflowContains('run: npm run worker:bundle', '"npm run worker:bundle"');
   expectWorkflowContains('run: npm run verify:worker-bundle', '"npm run verify:worker-bundle"');
   expectWorkflowContains('run: npm --prefix client run build', '"npm --prefix client run build"');
@@ -201,7 +212,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('run: npm run coverage-floor:check', '"npm run coverage-floor:check"');
   expectWorkflowContains('run: npm run test:root:jest', '"npm run test:root:jest"');
   expectWorkflowContains('run: npm run test:worker:session-cors', '"npm run test:worker:session-cors"');
-  expectWorkflowContains('run: npm run test:cc', '"npm run test:cc"');
   expectWorkflowContains('run: npm run test:node', '"npm run test:node"');
   expectWorkflowContains('run: npm run test:cache-guard', '"npm run test:cache-guard"');
   expectWorkflowContains('continue-on-error: true', 'non-blocking advisory step');

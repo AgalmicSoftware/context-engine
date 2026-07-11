@@ -189,7 +189,7 @@ Decrypt:  Client ──▸ Lit SDK decrypt(payload) ──▸ Lit nodes verify S
 | AI | `utilities/ai/aiClient.js`, `aiSettings.ts` |
 | Survey logic | `utilities/survey/questionRouting.ts`, `filterStateUtils.ts`, `compareUsers.ts` |
 | **Config / variables** | |
-| Feature flags | `variables/appConfig.ts` (`appConfig.js` remains as a compatibility entry) |
+| Feature flags | `variables/appConfig.ts` |
 | Chain config | `variables/chains.ts` |
 | Session fallback | `variables/demo/demo_sessions.json` |
 
@@ -209,15 +209,14 @@ Decrypt:  Client ──▸ Lit SDK decrypt(payload) ──▸ Lit nodes verify S
 | `sessionCorsWorker/worker.js` | Multi-tenant CORS proxy: auth, AI, Arweave, transcription, faucet |
 | `deploy-helper/worker.js` | One-click worker deployment from the session wizard |
 
-### E2E Tests (`scripts/`)
+### Verification
 
-| Script pattern | What it tests |
-|----------------|--------------|
-| `test-*.ui.js` | Playwright-based E2E automation |
+Public unit and integration coverage lives beside client source and under
+`tests/root/`. Supported public commands are documented in `docs/testing.md`.
 
 ## Contract Addresses
 
-Contracts are chain-agnostic EVM Solidity. Deployments are configured per chain in `client/src/variables/chains.js` (`SESSION_REGISTRY_ADDRESSES`, `SESSION_CONTRACTS_BY_CHAIN`).
+Contracts are chain-agnostic EVM Solidity. Deployments are configured per chain in `client/src/variables/chains.ts` (`SESSION_REGISTRY_ADDRESSES`, `SESSION_CONTRACTS_BY_CHAIN`).
 
 | Chain | SessionRegistry | Surveys | SBTFactory |
 |-------|----------------|---------|------------|
@@ -232,12 +231,12 @@ The current OP Sepolia `SBTFactory` default above was deployed in tx
 The legacy Base Sepolia `SBTFactory` default above was deployed in tx
 `0x4a0428a0fe6d6090fd6112885ea46b30ff84a1a551d0806c0f9afda4b44a5f21`.
 
-To add a new chain: deploy contracts, add entries to `SESSION_REGISTRY_ADDRESSES` and `SESSION_CONTRACTS_BY_CHAIN` in `chains.js`, and add the chain definition to the chain registry.
+To add a new chain: deploy contracts, add entries to `SESSION_REGISTRY_ADDRESSES` and `SESSION_CONTRACTS_BY_CHAIN` in `chains.ts`, and add the chain definition to the chain registry.
 
 ### Address Discovery
 
 Contract address discovery is currently file-based rather than on-chain.
-`client/src/variables/chains.js` imports the base deployment map from `contracts.json`.
+`client/src/variables/chains.ts` imports the base deployment map from `contracts.json`.
 `SESSION_REGISTRY_ADDRESSES` maps each supported chain ID to its `SessionRegistry` address.
 `SESSION_CONTRACTS_BY_CHAIN` provides the per-chain contract configuration used by the SPA.
 That bundle includes addresses such as `SessionRegistry`, `Surveys`, and `SBTFactory`.

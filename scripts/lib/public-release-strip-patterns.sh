@@ -75,8 +75,14 @@ scripts/run-e2e-*
 scripts/run-ux-*
 scripts/capture-ux-*
 scripts/run-agent-bridge-worker-tests.js
+scripts/run-contextengine-cc-tests.js
+scripts/run-contextengine-cc-tests.test.js
 scripts/vendor-cecc-ethers-bundle.js
 scripts/build_external_llm_prompt.py
+scripts/restore-private-pack.sh
+scripts/audit-diff.sh
+scripts/audit-full.sh
+scripts/dependency-audit-hotspots.test.js
 tests/root/*.private.test.*
 artifacts
 private-pack.manifest.json
@@ -87,31 +93,6 @@ client/src/utilities/worker/sessionCorsWorker.*.proxy.test.js
 client/src/utilities/web3/contractScripts.*.proxy.test.js
 ai-discourse-corpus/corpuses/_*.js
 EOF
-  ce_public_release_private_doc_patterns
-}
-
-ce_public_release_manifest_exclude_patterns() {
-  cat <<'EOF'
-TODO
-contextEngine-cc/TODO
-.env
-.env.example
-.env.local
-.env.*.local
-.env.e2e
-.env.e2e.example
-.keys
-.e2e-secrets
-.e2e-cache
-docs/codebase-*.md
-docs/assets/codebase-*
-docs/*PRD*.md
-docs/*prd*.md
-tests/root/*.private.test.*
-ai-discourse-corpus/corpuses/_*.js
-EOF
-  # Private documentation names and checksums must not leak through the
-  # reversible private-pack manifest that accompanies the public artifact.
   ce_public_release_private_doc_patterns
 }
 
@@ -162,7 +143,13 @@ scripts/lib/e2e
 scripts/lib/passkey-wallet-derivation.js
 scripts/start-playwright-server.js
 scripts/run-agent-bridge-worker-tests.js
+scripts/run-contextengine-cc-tests.js
+scripts/run-contextengine-cc-tests.test.js
 scripts/vendor-cecc-ethers-bundle.js
+scripts/restore-private-pack.sh
+scripts/audit-diff.sh
+scripts/audit-full.sh
+scripts/dependency-audit-hotspots.test.js
 tests/root/*.private.test.*
 whitepaper/Slides.pdf
 whitepaper/IdeasMap.md

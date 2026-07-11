@@ -84,6 +84,11 @@ jobs:
 
       - name: Verify public release surface
         run: npm run verify:public-release-surface
+      - name: Verify public asset ownership
+        run: npm run verify:public-assets
+
+      - name: Verify public text exposure
+        run: npm run verify:public-text
 
       - name: Build worker bundles
         run: npm run worker:bundle
@@ -279,9 +284,6 @@ jobs:
 
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
-
-      - name: Run contextEngine-cc tests
-        run: npm run test:cc
 
       - name: Run root Node tests
         run: npm run test:node

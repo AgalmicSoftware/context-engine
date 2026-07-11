@@ -244,7 +244,7 @@ Admin test panel:
   This recovery also covers login-stage 404s (`Worker login failed (404)`) so fresh workers can be
   bootstrapped from the selected session without manual KV edits.
 - If selected metadata omits `registryAddress`/`rpcUrl`, the admin payload now backfills those from
-  chain defaults (`chains.js`) before calling `/admin/set-config`.
+  chain defaults (`chains.ts`) before calling `/admin/set-config`.
 - Admin metadata saves now also reuse the same signed `/admin/set-config` path after a successful
   Arweave + SessionRegistry metadata update, so worker-relevant config such as `blockLimits`,
   faucet thresholds, and registry/rpc/contracts context stay aligned with the latest admin-edited session metadata.
@@ -1289,7 +1289,7 @@ Warning: passing a Cloudflare API token to a deploy-helper requires trust.
 
 - The default deploy-helper bundle URL is the GitHub release asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
 - Canonical worker sources live under `workers/sessionCorsWorker/` and `workers/deploy-helper/`.
-- This repo no longer mirrors `.js.txt` worker copies into `client/src/assets/worker/`.
+- This repo no longer mirrors `.js.txt` worker copies into the client asset tree.
 - Rebuild local fallback bundles with `nvm use 20 && npm run worker:bundle` and verify they match source with `npm run verify:worker-bundle`.
 - `dist/sessionCorsWorker.bundle.js` and `dist/deployHelper.bundle.js` are generated local/manual fallback bundles for worker upload flows; they are not tracked git artifacts anymore.
 - GitHub bundle publishing is now automated via `.github/workflows/publish-worker-bundles.yml`. Once Actions are enabled in the GitHub repo, every push to `main`/`master` creates a fresh release containing both bundle assets and explicitly marks that release as latest, which keeps `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js` live.

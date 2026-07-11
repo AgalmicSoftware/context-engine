@@ -238,7 +238,7 @@ const isPassthroughFacadeRuleScope = (filePath) => (
 );
 
 const isNamingMigrationAlias = (sourceText) => (
-  /^\s*\/\*\*\s*naming-migration alias, remove per PRD 653\/654\.\s*\*\/\s*/.test(sourceText)
+  /^\s*\/\*\*\s*naming-migration alias, remove after compatibility cleanup\.\s*\*\/\s*/.test(sourceText)
 );
 
 const isComponentRuntimeFacadeCandidate = (filePath) => (

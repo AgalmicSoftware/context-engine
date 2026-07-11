@@ -1,16 +1,16 @@
 # Public Client Config
 
-`client/src/variables/appConfig.js` is now a thin public config reader.
+`client/src/variables/appConfig.ts` is the public config reader.
 Deployment URLs, feature toggles, and environment-specific client defaults can
 be overridden with `REACT_APP_*` variables, while deployment endpoint ownership
-stays centralized in `client/src/variables/publicDeploymentConfig.js`.
+stays centralized in `client/src/variables/publicDeploymentConfig.ts`.
 
 ## Source of Truth
 
 - Canonical example file: `client/.env.example`
-- Deployment endpoint owner: `client/src/variables/publicDeploymentConfig.js`
-- Runtime reader/re-export surface: `client/src/variables/appConfig.js`
-- Shared env parsing helpers: `client/src/variables/publicEnv.js`
+- Deployment endpoint owner: `client/src/variables/publicDeploymentConfig.ts`
+- Runtime reader/re-export surface: `client/src/variables/appConfig.ts`
+- Shared env parsing helpers: `client/src/variables/publicEnv.ts`
 
 ## How to Configure
 
@@ -27,8 +27,8 @@ server.
 
 ### 1. Set frontend variables
 
-Before building, review `client/.env.example`, `client/src/variables/publicDeploymentConfig.js`,
-and `client/src/variables/appConfig.js`. Vite bakes `REACT_APP_*` values into
+Before building, review `client/.env.example`, `client/src/variables/publicDeploymentConfig.ts`,
+and `client/src/variables/appConfig.ts`. Vite bakes `REACT_APP_*` values into
 the browser bundle at build time, so changes require a rebuild/redeploy.
 
 For a custom-domain self-host, the values to check first are:
@@ -170,14 +170,14 @@ SPA fallback concept, but their redirect config syntax differs.
 ## Notes
 
 - `client/.env` is optional. If it is missing, the app still uses the checked-in
-  defaults from `publicDeploymentConfig.js` and `appConfig.js`.
+  defaults from `publicDeploymentConfig.ts` and `appConfig.ts`.
 - Shared worker fallback now defaults to `https://demo-worker-030226.agalmic.workers.dev` unless `REACT_APP_CE_SHARED_WORKER_URL` overrides it.
 - The deploy-helper now defaults to `https://ce-deploy-helper.agalmic.workers.dev/`.
 - Healthcheck still stays blank until the official project-owned endpoint is finalized for OSS.
 - Only `REACT_APP_*` keys are exposed to the browser in the Vite client
   compatibility env.
-- `publicDeploymentConfig.js` is the single owner of deployment endpoint
-  fallbacks; `appConfig.js` re-exports those values for the existing client API.
+- `publicDeploymentConfig.ts` is the single owner of deployment endpoint
+  fallbacks; `appConfig.ts` re-exports those values for the existing client API.
 - Browser/runtime overrides still exist for some flags (`globalThis`,
   `localStorage`, URL params). The env values only set the boot defaults.
 

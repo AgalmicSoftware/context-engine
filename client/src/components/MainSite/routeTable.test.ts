@@ -84,7 +84,7 @@ describe('MainSite route table', () => {
   });
 
   it('keeps accepted double-slash SBT address paths on the SBT detail route', () => {
-    // PRD 647 section 0.5 accepts this degenerate path family as SBT detail.
+    // The route contract accepts this degenerate path family as SBT detail.
     expect(resolveMainSiteRouteMatch({ fullPath: `//sbt/${ADDRESS}`, isAddress })).toEqual(
       expect.objectContaining({
         key: 'sbtDetail',

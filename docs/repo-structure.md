@@ -77,6 +77,8 @@ Use it for new files, refactors, and cleanup PRs.
 - Shared UI still belongs under `client/src/components/` in a PascalCase directory.
 - Cross-cutting non-UI code belongs under `client/src/utilities/<domain>/`.
 
-## TODO: Remaining Naming Violations
+## Exceptions
 
-- [ ] `scripts/build_external_llm_prompt.py` uses snake_case instead of kebab-case.
+Public source should follow this contract. Private operator-only compatibility
+tools, when present in the development tree, are tracked separately and are not
+part of the public naming contract.
