@@ -546,7 +546,7 @@ describe('sbtPage password and metadata helpers', () => {
     });
   });
 
-  it('falls back to the default image after the preferred Arweave image candidate fails', () => {
+  it('falls back to the default image after the AR.IO-only image candidate fails', () => {
     const txId = 'DqYBh1qm9GvaTOGkF5R7abnLoB3OPiXNNBcTsYPtlRc';
     arweaveGlobals.CE_ARWEAVE_DIRECT_TO_AR_IO = true;
     arweaveGlobals.CE_ARWEAVE_AR_IO_URL = 'https://ar-io.dev';
@@ -555,9 +555,9 @@ describe('sbtPage password and metadata helpers', () => {
     const firstState = getDisplayImageRenderState({ image }, {}, '/default.png');
     expect(firstState.sourceKey).toBe(image);
     expect(firstState.activeIndex).toBe(0);
-    expect(firstState.src).toBe(`https://arweave.net/${txId}`);
+    expect(firstState.src).toBe(`https://ar-io.dev/${txId}`);
     expect(firstState.canRetry).toBe(true);
-    expect(firstState.candidates).toEqual([`https://arweave.net/${txId}`, `https://gateway.irys.xyz/${txId}`]);
+    expect(firstState.candidates).toEqual([`https://ar-io.dev/${txId}`]);
 
     const fallbackState = getDisplayImageRenderState(
       { image },
@@ -568,7 +568,7 @@ describe('sbtPage password and metadata helpers', () => {
       '/default.png',
     );
     expect(fallbackState.activeIndex).toBe(1);
-    expect(fallbackState.src).toBe(`https://gateway.irys.xyz/${txId}`);
+    expect(fallbackState.src).toBe('/default.png');
 
     const defaultFallbackState = getDisplayImageRenderState(
       { image },
@@ -591,7 +591,7 @@ describe('sbtPage password and metadata helpers', () => {
       '/default.png',
     );
     expect(staleFallbackState.activeIndex).toBe(0);
-    expect(staleFallbackState.src).toBe(`https://arweave.net/${txId}`);
+    expect(staleFallbackState.src).toBe(`https://ar-io.dev/${txId}`);
   });
 
   it('builds the next display image fallback state only from the active failed candidate', () => {

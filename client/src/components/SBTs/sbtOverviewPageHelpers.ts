@@ -183,7 +183,6 @@ export const normalizeSBTsPageFeaturedCardImageUrl = (value: unknown): string =>
   if (/^ipfs:\/\//i.test(raw)) return `https://ipfs.io/ipfs/${raw.replace(/^ipfs:\/\//i, '')}`;
   return normalizeArweaveUrl(raw, {
     contextLabel: 'sbt_page_featured_image',
-    gateway: 'https://arweave.net',
   });
 };
 

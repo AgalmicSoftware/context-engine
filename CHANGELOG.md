@@ -16,6 +16,13 @@ All notable changes to this project will be documented in this file.
   planning material are stripped, while retained Markdown is checked for
   private references, unavailable commands, and broken local links.
 
+### Fixed
+
+- Fixed passkey survey-response uploads by preserving object-valued EIP-1193
+  providers through worker authentication, kept SBT metadata and image reads on
+  AR.IO while direct mode is enabled, and extended the shared RPC 429 probe
+  window so exponential backoff engages before neighboring reads create a burst.
+
 ## [0.7.0] - 2026-07-06
 
 ### Added
