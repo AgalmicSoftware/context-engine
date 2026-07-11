@@ -42,6 +42,10 @@
 
 .explorerContainerSparse {
   min-height: clamp(420px, 54vh, 760px);
+  width: 100%;
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -53,7 +57,9 @@
 }
 
 .explorerRowSparse {
-  align-items: stretch;
+  align-items: center;
+  flex: 1 1 auto;
+  width: 100%;
   margin-top: 0;
   margin-bottom: 0;
 }
@@ -105,8 +111,14 @@
 }
 
 .explorerColSparse {
+  display: flex;
+  align-items: center;
+  padding: clamp(6px, 1vw, 12px);
+
   .square {
-    padding-bottom: 82%;
+    width: 100%;
+    height: clamp(250px, 36vh, 480px);
+    padding-bottom: 0;
   }
 }
 
@@ -381,7 +393,8 @@
 
   .explorerColSparse {
     .square {
-      padding-bottom: 76%;
+      height: clamp(250px, 36vh, 340px);
+      padding-bottom: 0;
     }
   }
 }
@@ -393,7 +406,8 @@
 
   .explorerColSparse {
     .square {
-      padding-bottom: 88%;
+      height: clamp(360px, 50vh, 620px);
+      padding-bottom: 0;
     }
   }
 

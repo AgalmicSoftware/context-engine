@@ -22,6 +22,8 @@ All notable changes to this project will be documented in this file.
 - Reduced the two active logo GIFs by about two thirds while preserving their
   dimensions, duration, looping behavior, luminosity-blended presentation, and
   current Navbar and SBT loading owners.
+- Enlarged the sparse three-card Tools view so its image cards use the available
+  full-screen width and viewport height while retaining compact mobile sizing.
 
 ### Fixed
 
