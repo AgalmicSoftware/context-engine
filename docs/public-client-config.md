@@ -12,34 +12,6 @@ stays centralized in `client/src/variables/publicDeploymentConfig.ts`.
 - Runtime reader/re-export surface: `client/src/variables/appConfig.ts`
 - Shared env parsing helpers: `client/src/variables/publicEnv.ts`
 
-## Session Wrapped Capability Record
-
-Agent Session Wrapped discovery is session-scoped public config, not a
-browser environment secret. A successfully verified dedicated deployment may
-publish exactly this versioned record in the canonical session config:
-
-```json
-{
-  "agentSessionWrapped": {
-    "version": 1,
-    "enabled": true,
-    "origin": "https://<dedicated-bridge>.<workers-subdomain>.workers.dev",
-    "protocolVersion": "agent-session-wrapped-v1",
-    "revision": "wrapped-<safe-revision>",
-    "verifiedAt": "<ISO-8601 timestamp>"
-  }
-}
-```
-
-The client accepts an HTTPS origin with no credentials, path, query, or
-fragment and safe bounded protocol/revision identifiers. The record contains
-no Cloudflare token, worker secret, member credential, Telegram credential, or
-provider key. `sessionModeProfile.surfaces.agentHttp` is the only enablement
-bit; it must mirror `agentSessionWrapped.enabled`. `surfaces.telegram` is a
-separate optional adapter bit. Deploy and redeploy code preserves the last
-verified record until the replacement Worker has passed activation, health,
-protocol, pinned-authority, and durable-config checks.
-
 ## How to Configure
 
 1. Copy the example file: `cp client/.env.example client/.env`
@@ -55,8 +27,8 @@ server.
 
 ### 1. Set frontend variables
 
-Before building, review `client/.env.example`, `client/src/variables/publicDeploymentConfig.js`,
-and `client/src/variables/appConfig.js`. Vite bakes `REACT_APP_*` values into
+Before building, review `client/.env.example`, `client/src/variables/publicDeploymentConfig.ts`,
+and `client/src/variables/appConfig.ts`. Vite bakes `REACT_APP_*` values into
 the browser bundle at build time, so changes require a rebuild/redeploy.
 
 For a custom-domain self-host, the values to check first are:
@@ -242,8 +214,8 @@ SPA fallback concept, but their redirect config syntax differs.
 - Healthcheck still stays blank until the official project-owned endpoint is finalized for OSS.
 - Only `REACT_APP_*` keys are exposed to the browser in the Vite client
   compatibility env.
-- `publicDeploymentConfig.js` is the single owner of deployment endpoint
-  fallbacks; `appConfig.js` re-exports those values for the existing client API.
+- `publicDeploymentConfig.ts` is the single owner of deployment endpoint
+  fallbacks; `appConfig.ts` re-exports those values for the existing client API.
 - Browser/runtime overrides still exist for some flags (`globalThis`,
   `localStorage`, URL params). The env values only set the boot defaults.
 

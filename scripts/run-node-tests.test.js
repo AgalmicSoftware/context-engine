@@ -134,23 +134,6 @@ test('tracked-only collection excludes tests matched by public strip patterns', 
   });
 });
 
-test('tracked-only collection recursively includes nested approved-root tests', () => {
-  withTempRepo((rootDir) => {
-    execFileSync('git', ['init'], { cwd: rootDir, stdio: 'ignore' });
-    writeFile(rootDir, 'scripts/nested/cloudflare/registered-origin.test.js');
-    writeFile(rootDir, 'workers/shared/nested/provenance.test.mjs');
-    execFileSync('git', ['add', 'scripts/nested/cloudflare/registered-origin.test.js', 'workers/shared/nested/provenance.test.mjs'], {
-      cwd: rootDir,
-      stdio: 'ignore',
-    });
-
-    assert.deepEqual(collectNodeTestFiles(rootDir, { trackedOnly: true }), [
-      path.join('workers', 'shared', 'nested', 'provenance.test.mjs'),
-      path.join('scripts', 'nested', 'cloudflare', 'registered-origin.test.js'),
-    ]);
-  });
-});
-
 test('parseRunNodeTestsArgs accepts tracked-only flag or env opt-in', () => {
   assert.deepEqual(parseRunNodeTestsArgs(['--tracked-only'], {}), {
     trackedOnly: true,

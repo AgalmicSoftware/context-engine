@@ -89,11 +89,13 @@ jobs:
       - name: Typecheck client
         run: npm run typecheck:client
 
-      - name: Stage tested Worker bundle candidate
-        run: >-
-          node scripts/worker-release-artifacts.mjs stage
-          --dist dist
-          --output "${{ runner.temp }}/worker-bundle-candidate"
+      - name: Verify public release surface
+        run: npm run verify:public-release-surface
+      - name: Verify public asset ownership
+        run: npm run verify:public-assets
+
+      - name: Verify public text exposure
+        run: npm run verify:public-text
 
       - name: Verify release-staging version advancement
         if: ${{ startsWith(github.ref_name, 'release-staging') || startsWith(github.head_ref, 'release-staging') }}
@@ -318,8 +320,11 @@ jobs:
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
 
-      - name: Run Context Engine CC and Node gate
-        run: npm run ci:gate -- cecc-and-node
+      - name: Run root Node tests
+        run: npm run test:node
+
+      - name: Run cache guard
+        run: npm run test:cache-guard
 
       - name: Run dead export advisory
         continue-on-error: true

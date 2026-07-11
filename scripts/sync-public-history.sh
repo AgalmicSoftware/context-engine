@@ -523,6 +523,28 @@ verify_public_docs() {
   node "$verifier" "$TEMP_CLONE" >&2
 }
 
+verify_public_assets() {
+  local verifier="$TEMP_CLONE/scripts/verify-public-assets.js"
+
+  if [ ! -f "$verifier" ]; then
+    fail "Public asset verifier was not found in replay output: scripts/verify-public-assets.js" 1
+  fi
+
+  log_info "Verifying public asset ownership references."
+  node "$verifier" "$TEMP_CLONE" >&2
+}
+
+verify_public_text() {
+  local verifier="$TEMP_CLONE/scripts/verify-public-text.js"
+
+  if [ ! -f "$verifier" ]; then
+    fail "Public text verifier was not found in replay output: scripts/verify-public-text.js" 1
+  fi
+
+  log_info "Verifying retained public text for private references."
+  node "$verifier" "$TEMP_CLONE" >&2
+}
+
 ensure_public_node_modules_link() {
   local node_path="$REPO_ROOT/node_modules"
   local temp_node_path="$TEMP_CLONE/node_modules"
@@ -904,6 +926,14 @@ if ! verify_public_release_surface; then
 fi
 
 if ! verify_public_docs; then
+  exit 2
+fi
+
+if ! verify_public_assets; then
+  exit 2
+fi
+
+if ! verify_public_text; then
   exit 2
 fi
 

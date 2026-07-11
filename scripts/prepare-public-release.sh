@@ -77,33 +77,6 @@ while IFS= read -r pattern; do
   STRIP_ASSERT_ABSENT+=("$pattern")
 done < <(ce_public_release_strip_assert_absent_patterns)
 
-MANIFEST_EXCLUDE_PATTERNS=()
-while IFS= read -r pattern; do
-  MANIFEST_EXCLUDE_PATTERNS+=("$pattern")
-done < <(ce_public_release_manifest_exclude_patterns)
-
-path_matches_manifest_exclude() {
-  local relative_path="$1"
-  local pattern
-
-  for pattern in "${MANIFEST_EXCLUDE_PATTERNS[@]}"; do
-    case "$pattern" in
-      *'*'*|*'?'*|*'['*)
-        if [[ "$relative_path" == $pattern ]]; then
-          return 0
-        fi
-        ;;
-      *)
-        if [[ "$relative_path" == "$pattern" || "$relative_path" == "$pattern/"* ]]; then
-          return 0
-        fi
-        ;;
-    esac
-  done
-
-  return 1
-}
-
 verify_private_planning_paths_absent() {
   local findings
 
@@ -153,13 +126,34 @@ if (packageJson.scripts && typeof packageJson.scripts === 'object') {
     /\bscripts\/run-ux-[^\s'"]+\.js\b/,
     /\bscripts\/capture-ux-[^\s'"]+\.js\b/,
     /\bscripts\/run-agent-bridge-worker-tests\.js\b/,
+    /\bscripts\/run-contextengine-cc-tests\.js\b/,
     /\bscripts\/vendor-cecc-ethers-bundle\.js\b/,
+    /\bscripts\/restore-private-pack\.sh\b/,
+    /\bclient\/src\/utilities\/web3\/contractScripts\.[^\s'"]+\.proxy\.test\.js\b/,
   ];
 
   for (const [name, command] of Object.entries(scripts)) {
     if (strippedRunnerPatterns.some((pattern) => pattern.test(String(command)))) {
       removed.add(name);
     }
+  }
+
+  const standaloneNpmRun = (segment, scriptName) => {
+    const escapedName = scriptName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`^\\s*npm\\s+run(?:\\s+-s)?\\s+${escapedName}(?:\\s+--.*)?\\s*$`).test(segment);
+  };
+
+  // Regression guard: public aggregates such as test:ci must keep their public
+  // segments when one private leaf is stripped; deleting the whole aggregate
+  // either removes the public gate or encourages a misleading no-op fallback.
+  for (const [name, command] of Object.entries(scripts)) {
+    if (removed.has(name)) continue;
+    const segments = String(command).split(/\s*&&\s*/);
+    const retained = segments.filter((segment) => (
+      ![...removed].some((removedName) => standaloneNpmRun(segment, removedName))
+    ));
+    if (retained.length === 0) removed.add(name);
+    else scripts[name] = retained.join(' && ');
   }
 
   let changed = true;
@@ -285,8 +279,6 @@ STAGING_ROOT="$TMP_ROOT/release"
 MATCHED_PATHS_FILE="$TMP_ROOT/matched-paths.txt"
 STRIP_ENTRIES_FILE="$TMP_ROOT/strip-entries.txt"
 COPY_FILE_LIST="$TMP_ROOT/copy-file-list.txt"
-MANIFEST_PATH="$STAGING_ROOT/private-pack.manifest.json"
-
 mkdir -p "$STAGING_ROOT"
 
 (
@@ -374,42 +366,6 @@ done < "$MATCHED_PATHS_FILE"
 sort -u "$STRIP_ENTRIES_FILE" -o "$STRIP_ENTRIES_FILE"
 
 stripped_count=$(wc -l < "$STRIP_ENTRIES_FILE" | tr -d ' ')
-entry_index=0
-
-{
-  printf '{\n'
-  printf '  "manifest_version": 1,\n'
-  printf '  "sha256_format": "sha256sum",\n'
-  printf '  "entries": [\n'
-
-  while IFS= read -r path; do
-    [ -n "$path" ] || continue
-
-    if path_matches_manifest_exclude "$path"; then
-      continue
-    fi
-
-    if [ "$entry_index" -gt 0 ]; then
-      printf ',\n'
-    fi
-
-    if [ -L "$STAGING_ROOT/$path" ]; then
-      link_target=$(readlink "$STAGING_ROOT/$path")
-      checksum_line="$(sha256_text "$link_target")  $path"
-      printf '    {"type":"symlink","sha256sum":"%s","linkTarget":"%s"}' \
-        "$(json_escape "$checksum_line")" \
-        "$(json_escape "$link_target")"
-    else
-      checksum_line=$(sha256sum_line "$STAGING_ROOT" "$path")
-      printf '    {"type":"file","sha256sum":"%s"}' "$(json_escape "$checksum_line")"
-    fi
-
-    entry_index=$((entry_index + 1))
-  done < "$STRIP_ENTRIES_FILE"
-
-  printf '\n  ]\n'
-  printf '}\n'
-} > "$MANIFEST_PATH"
 
 while IFS= read -r path; do
   [ -n "$path" ] || continue
@@ -448,6 +404,20 @@ fi
 # Regression guard: source-side private docs are allowed on dev, so validate
 # Markdown only after the strip and package-script scrub have completed.
 node "$STAGING_ROOT/scripts/verify-public-docs.js" "$STAGING_ROOT" >&2
+
+if [ ! -f "$STAGING_ROOT/scripts/verify-public-assets.js" ]; then
+  printf 'Public asset verifier is missing from release copy: scripts/verify-public-assets.js\n' >&2
+  exit 1
+fi
+
+node "$STAGING_ROOT/scripts/verify-public-assets.js" "$STAGING_ROOT" >&2
+
+if [ ! -f "$STAGING_ROOT/scripts/verify-public-text.js" ]; then
+  printf 'Public text verifier is missing from release copy: scripts/verify-public-text.js\n' >&2
+  exit 1
+fi
+
+node "$STAGING_ROOT/scripts/verify-public-text.js" "$STAGING_ROOT" >&2
 
 mv "$STAGING_ROOT" "$OUTPUT_ABS"
 

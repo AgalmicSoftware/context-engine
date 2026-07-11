@@ -1,3 +1,9 @@
+// Node no-loader consumers import this .js twin directly because Node cannot
+// load the .ts source. Vite also
+// resolves the './litChipotlePolicy.js' specifier to this file at build time,
+// while typecheck binds the .ts twin. The twins are pinned behavior-identical
+// by scripts/lit-chipotle-policy-parity.test.js (same pattern as
+// variables/rpcDefaults.{js,ts}). Change BOTH files together.
 import { ethers } from 'ethers';
 
 export const CHIPOTLE_WRAPPED_KEY_VERSION = 2;

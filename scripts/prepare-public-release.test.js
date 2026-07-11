@@ -11,6 +11,8 @@ const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
 const SURFACE_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-surface.js');
 const DOCS_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-docs.js');
+const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js');
+const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-prepare-public-release-tests');
 const REPO_ROOT = path.join(__dirname, '..');
 
@@ -58,6 +60,16 @@ test('prepare-public-release strips private surfaces without publishing an inven
       sourceDir,
       path.join('scripts', 'verify-public-docs.js'),
       fs.readFileSync(DOCS_VERIFIER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-assets.js'),
+      fs.readFileSync(ASSET_VERIFIER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-text.js'),
+      fs.readFileSync(TEXT_VERIFIER_SOURCE_PATH, 'utf8'),
     );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 
@@ -118,7 +130,10 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'private bridge worker\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'README.md'), 'private bridge docs\n');
     writeFile(sourceDir, path.join('scripts', 'run-agent-bridge-worker-tests.js'), 'private bridge test runner\n');
+    writeFile(sourceDir, path.join('scripts', 'run-contextengine-cc-tests.js'), 'private companion test runner\n');
+    writeFile(sourceDir, path.join('scripts', 'run-contextengine-cc-tests.test.js'), 'private companion runner test\n');
     writeFile(sourceDir, path.join('scripts', 'vendor-cecc-ethers-bundle.js'), 'private companion vendoring\n');
+    writeFile(sourceDir, path.join('scripts', 'restore-private-pack.sh'), 'private restore workflow\n');
     writeFile(
       sourceDir,
       path.join('scripts', 'lib', 'passkey-wallet-derivation.js'),
@@ -131,11 +146,15 @@ test('prepare-public-release strips private surfaces without publishing an inven
         {
           scripts: {
             test: 'node scripts/run-node-tests.js',
+            'test:cc': 'node scripts/run-contextengine-cc-tests.js',
+            'test:ci': 'npm run test && npm run test:cc',
             'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
             'ai:test-cf-envelope:worker': 'npm run -s ai:node -- scripts/e2e/cloudflare-worker-envelope.js',
             'ai:test-cf-envelope:all': 'npm run -s ai:test-cf-envelope:worker',
             'ai:test-session:demo-smoke': 'npm run -s ai:node -- scripts/test-session-demo.ui.js',
             'ai:test-session:closeout-smoke': 'npm run -s ai:test-session:demo-smoke',
+            'test:surveys-sbt': 'jest client/src/utilities/web3/contractScripts.surveys-sbt.proxy.test.js',
+            tests: 'npm run test && npm run test:surveys-sbt',
           },
         },
         null,
@@ -153,6 +172,8 @@ test('prepare-public-release strips private surfaces without publishing an inven
     );
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(outputDir, 'package.json'), 'utf8')).scripts, {
       test: 'node scripts/run-node-tests.js',
+      'test:ci': 'npm run test',
+      tests: 'npm run test',
     });
     assert.equal(fs.existsSync(path.join(outputDir, '.DS_Store')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.secrets.baseline')), false);
@@ -195,31 +216,12 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'worker.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-agent-bridge-worker-tests.js')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.js')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.test.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'vendor-cecc-ethers-bundle.js')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'restore-private-pack.sh')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'lib', 'passkey-wallet-derivation.js')), false);
-
-    const manifestPath = path.join(outputDir, 'private-pack.manifest.json');
-    assert.equal(fs.existsSync(manifestPath), true);
-
-    const manifestText = fs.readFileSync(manifestPath, 'utf8');
-    assert.doesNotMatch(manifestText, /tracked root manifest that should be replaced/);
-    assert.doesNotMatch(manifestText, /TODO/);
-    assert.doesNotMatch(manifestText, new RegExp(`${'PR'}${'D'}s`));
-    assert.match(manifestText, /\.secrets\.baseline/);
-    assert.doesNotMatch(manifestText, /\.env\.local/);
-    assert.doesNotMatch(manifestText, /\.env\.e2e/);
-    assert.doesNotMatch(manifestText, /\.env\.example/);
-    assert.doesNotMatch(manifestText, /\.keys/);
-    assert.doesNotMatch(manifestText, /codebase-health-modernization/);
-    assert.doesNotMatch(manifestText, /telegram-response-export-scope-prd/);
-    assert.doesNotMatch(manifestText, /e2e-commands/);
-    assert.doesNotMatch(manifestText, /release-runbook/);
-    assert.doesNotMatch(manifestText, /audit-prep/);
-    assert.doesNotMatch(manifestText, /AGENTS\.md/);
-    assert.doesNotMatch(manifestText, /_local_helper/);
-    assert.doesNotMatch(manifestText, /\.private\.test/);
-    assert.match(manifestText, /private-pack\.manifest\.json/);
-    assert.match(manifestText, /scripts\/lib\/passkey-wallet-derivation\.js/);
+    assert.equal(fs.existsSync(path.join(outputDir, 'private-pack.manifest.json')), false);
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -247,6 +249,16 @@ test('prepare-public-release fails if private planning paths survive strip rules
       sourceDir,
       path.join('scripts', 'verify-public-docs.js'),
       fs.readFileSync(DOCS_VERIFIER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-assets.js'),
+      fs.readFileSync(ASSET_VERIFIER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'verify-public-text.js'),
+      fs.readFileSync(TEXT_VERIFIER_SOURCE_PATH, 'utf8'),
     );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
 

@@ -330,10 +330,14 @@ Intent for these features:
 
 ### Frontend (React)
 
-- UI lives under `client/` and is a mixed JavaScript/TypeScript React app with class components plus hooks-based modules.
+- UI lives under `client/`; production React components are TSX, with a smaller
+  set of JavaScript compatibility modules remaining outside the component
+  surface.
 - Vite is the canonical client dev/build toolchain. From `client/`, `npm run dev` starts the local Vite server, `npm run build` writes the production build to `client/build/`, and `npm run preview` serves a local Vite preview.
-- Routing is centralized via `client/src/components/MainSite/MainSite.tsx` (path parsing and lazy module loading).
-- State management uses Redux (`client/src/store.js`, reducers under `client/src/reducers/`).
+- Routing is centralized through `client/src/components/MainSite/AppShell.tsx`,
+  `client/src/components/MainSite/routeTable.ts`, and the co-located lazy route
+  modules.
+- State management uses Redux (`client/src/store.ts`, reducers under `client/src/reducers/`).
 - Group/session-aware caches are stored in localStorage under `dg:<cacheName>:<slug>` keys (see `docs/cache/*`).
 
 ### Smart Contracts (Solidity)

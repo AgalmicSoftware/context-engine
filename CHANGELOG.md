@@ -15,6 +15,10 @@ All notable changes to this project will be documented in this file.
 - Hardened public documentation packaging so operator runbooks and internal
   planning material are stripped, while retained Markdown is checked for
   private references, unavailable commands, and broken local links.
+- Hardened public release artifacts so private file inventories are not
+  published, retained text is scanned for private references, and unowned image
+  files fail verification; removed unused image assets without changing the
+  active animated logos.
 
 ### Fixed
 

@@ -184,7 +184,7 @@ Notes:
   - a normal URL (`https://...`),
   - `ar://<txId>`,
   - or a bare Arweave txId (`<txId>`, 43-char base64url).
-  The client normalizes `ar://` and bare txIds to the preferred Arweave gateway via `normalizeArweaveUrl` (`client/src/utilities/arweave/arweaveUrls.js`):
+  The client normalizes `ar://` and bare txIds to the preferred Arweave gateway via `normalizeArweaveUrl` (`client/src/utilities/arweave/arweaveUrls.ts`):
   `CE_ARWEAVE_AR_IO_URL` / `https://ar-io.dev` while `CE_ARWEAVE_DIRECT_TO_AR_IO` is enabled, which is the default. Arweave reads stay on that AR.IO gateway for their retry budget instead of fanning out to legacy gateways. Set `CE_ARWEAVE_DIRECT_TO_AR_IO=false` only when a deployment intentionally wants fallback fanout through `ARWEAVE_GATEWAY_URL`, `https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes.
   Runtime overrides: `window.CE_ARWEAVE_GATEWAY_URL`, `window.CE_ARWEAVE_DIRECT_TO_AR_IO`, `window.CE_ARWEAVE_AR_IO_URL`.
   If you see console noise like `Failed to load resource ... (<txId>, line 0)`, check the Network tab for the request URL:

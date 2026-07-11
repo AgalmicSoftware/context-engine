@@ -14,7 +14,6 @@ const SKIP_DIRS = new Set([
   '.e2e-cache',
   '.keys',
   '.tmp',
-  '.tmp-build-audit',
   '.tmp-review',
   'TODO',
   'artifacts',
@@ -59,29 +58,19 @@ function isTextFile(absolutePath) {
   return !sample.includes(0);
 }
 
-function findUnreferencedAssetNames(files, images) {
-  const unreferencedNames = new Set(images.map((absolutePath) => path.basename(absolutePath)));
-  for (const absolutePath of files) {
-    if (unreferencedNames.size === 0) break;
-    if (IMAGE_RE.test(absolutePath) || !isTextFile(absolutePath)) continue;
-    const contents = fs.readFileSync(absolutePath, 'utf8');
-    for (const assetName of unreferencedNames) {
-      if (contents.includes(assetName)) unreferencedNames.delete(assetName);
-    }
-  }
-  return unreferencedNames;
-}
-
 function verifyPublicAssets(rootDir = path.resolve(__dirname, '..')) {
   const absoluteRoot = path.resolve(rootDir);
   const files = walkFiles(absoluteRoot);
   const images = files.filter((absolutePath) => IMAGE_RE.test(absolutePath));
-  const unreferencedNames = findUnreferencedAssetNames(files, images);
+  const text = files
+    .filter((absolutePath) => !IMAGE_RE.test(absolutePath) && isTextFile(absolutePath))
+    .map((absolutePath) => fs.readFileSync(absolutePath, 'utf8'))
+    .join('\n');
 
   // Regression guard: dynamic public assets still need a literal manifest entry.
   // Without one, an unreferenced binary silently bloats every release artifact.
   const findings = images
-    .filter((absolutePath) => unreferencedNames.has(path.basename(absolutePath)))
+    .filter((absolutePath) => !text.includes(path.basename(absolutePath)))
     .map((absolutePath) => ({
       file: normalizePath(path.relative(absoluteRoot, absolutePath)),
       kind: 'unreferenced public asset',

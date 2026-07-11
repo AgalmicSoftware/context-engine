@@ -83,12 +83,25 @@ The inventory check keeps root tests classified as one of:
 
 - public-safe Node tests run by `npm run test:node`
 - public-safe Jest tests run by `npm run test:root:jest`
-- local-chain tests run by dedicated chain-backed commands such as
-  `npm run test:surveys-sbt`
+- local-chain tests maintained in the full development checkout
 - package-local tests run by their package's documented command
 
 Do not add live credentials, private deployment names, or identifying fixtures
 to root `package.json` scripts.
+
+### Public Release Checks
+
+```bash
+npm run verify:public-release-surface
+npm run verify:public-assets
+```
+
+The release-surface check rejects retained code that imports a stripped path.
+The asset check rejects image files that have no literal owner in source,
+documentation, or a public asset manifest. Public artifact preparation also
+runs the documentation and all-text checks after private paths and package
+commands have been removed; `verify:public-text` is therefore intended for a
+prepared public tree rather than the full development checkout.
 
 ## E2E Workflows
 

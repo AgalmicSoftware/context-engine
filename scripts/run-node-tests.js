@@ -8,6 +8,10 @@ const {
   ROOT_NODE_TEST_FILES,
   ROOT_PRIVATE_STRIPPED_TEST_FILE_RE,
 } = require('./testInventoryConfig');
+const {
+  createStripMatcher,
+  loadStripPatterns,
+} = require('./verify-public-release-surface');
 
 const STATIC_NODE_TEST_FILES = ROOT_NODE_TEST_FILES;
 
@@ -77,7 +81,7 @@ function collectNodeTestFiles(rootDir = path.resolve(__dirname, '..'), options =
 
   // Regression guard: the clean-checkout release gate must not execute tests
   // whose helpers are intentionally absent from the public/clean tree.
-  return uniqueFiles.filter((relativePath) => {
+  return files.filter((relativePath) => {
     const normalized = relativePath.split(path.sep).join('/');
     return trackedFiles.has(normalized) && !isStrippedPath(normalized);
   });
