@@ -473,6 +473,12 @@ export const buildLockAudienceButtonAction = ({
     };
   }
 
+  if (normalizedFieldKey === 'additional' && encrypted) {
+    return {
+      kind: 'disable-field-encryption-and-close-menu' as const,
+    };
+  }
+
   if (menuOpen && encrypted) {
     return {
       kind: 'disable-field-encryption-and-close-menu' as const,

@@ -622,6 +622,53 @@ describe('createSessionQuestionCacheController', () => {
       controller.destroy();
     });
 
+    it('refreshes cached temporary demo metadata when fixture tags change', async () => {
+      const windowDeferred = createDeferred();
+      const staleQuestion = {
+        id: '0xabcdef',
+        type: 'binary',
+        prompt: 'Fixture prompt',
+        tags: ['demo-fixture', 'context-corpus', 'binary'],
+        sessionSlug: 'demo-1',
+        temporaryDemoSeed: true,
+      };
+      const host = createMockHost({
+        activeSlug: 'demo-1',
+        sessionCfg: {
+          networkChainId: NETWORK_ID,
+          blockLimits: { start: 44967477, end: null },
+          demoCompatibilitySeed: { temporary: true },
+        },
+        initialStorage: {
+          questionsCache: {
+            'demo-1': createQuestionsCacheEnvelope({ '0xabcdef': staleQuestion }),
+          },
+        },
+      });
+      const controller = createSessionQuestionCacheController(host);
+
+      getTemporaryDemoSessionQuestionFixtures.mockReturnValue([
+        {
+          ...staleQuestion,
+          tags: ['binary', 'AI SAFETY', 'arxiv'],
+        },
+      ]);
+      contractScripts.getRelevantBlockWindowForFilter.mockReturnValueOnce(windowDeferred.promise);
+
+      const initPromise = controller.initializeQuestionCacheForGroup('demo-1');
+      await flushMicrotasks(6);
+
+      expect(host.getStored('questionsCache', 'demo-1')?.[NETWORK_ID]?.questions?.['0xabcdef']?.tags).toEqual([
+        'binary',
+        'AI SAFETY',
+        'arxiv',
+      ]);
+
+      windowDeferred.resolve({ fromBlock: 44967477, toBlock: 44967476 });
+      await initPromise;
+      controller.destroy();
+    });
+
     it('publishes temporary demo fixtures before chain discovery settles', async () => {
       const discoveryDeferred = createDeferred();
       const host = createMockHost({

@@ -28,6 +28,9 @@ const renderStandaloneQuestion = () =>
 const getAnswerLockIconName = () =>
   screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK).querySelector('svg')?.getAttribute('data-icon');
 
+const getAdditionalLockIconName = () =>
+  screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK).querySelector('svg')?.getAttribute('data-icon');
+
 const normalizeQuestionIdKey = (value) =>
   String(value || '')
     .trim()
@@ -115,6 +118,19 @@ describe('SurveyQuestions lock audience controls', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_GATE)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_FOLLOW)).not.toBeInTheDocument();
+  });
+
+  it('keeps the answer encrypted when additional comments opt out', async () => {
+    renderStandaloneQuestion();
+    await screen.findByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK);
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ANSWER_LOCK));
+    fireEvent.click(screen.getByTitle('Additional comments'));
+    fireEvent.click(await screen.findByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK));
+
+    expect(getAnswerLockIconName()).toBe('lock');
+    expect(getAdditionalLockIconName()).toBe('unlock');
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE)).not.toBeInTheDocument();
   });
 
   it('derives lock-audience display state for additional fields with inherit mode', () => {

@@ -68,4 +68,22 @@ describe('SurveyQuestionsLockAudienceControl', () => {
     expect(onSelectAudience).toHaveBeenCalledWith('gate', 'gate-1');
     expect(onToggleGateDetails).toHaveBeenCalledWith('q1', 'gate-1', 'answer');
   });
+
+  it('does not add a plaintext menu option for additional comments', () => {
+    render(
+      <SurveyQuestionsLockAudienceControl
+        qid="q1"
+        effectiveFieldKey="additional"
+        buttonTitle="Choose encryption audience"
+        hasAudienceMenu
+        menuOpen
+        fieldState={{ encrypted: true }}
+        showFollowOption
+        normalizedSelfAudienceLabel="only me"
+      />,
+    );
+
+    expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_NONE)).not.toBeInTheDocument();
+    expect(screen.getByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_FOLLOW)).toHaveTextContent('Match Answer');
+  });
 });
