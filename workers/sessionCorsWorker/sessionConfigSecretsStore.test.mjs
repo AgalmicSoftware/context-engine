@@ -121,6 +121,31 @@ test('putSessionConfig normalizes the value and writes the config KV key', async
   ]);
 });
 
+test('putSessionConfig fails closed before KV persistence for secret-like config aliases', async () => {
+  const unsafeConfigs = [
+    { requestKey: 'secret' },
+    { customProviderKey: 'secret' },
+    { ai: { models: { fast: { apiKeys: { primary: 'secret' } } } } },
+    { ai: { models: { fast: { providerKeys: ['secret'] } } } },
+    { ai: { models: { fast: { authorization: 'Bearer secret' } } } },
+    { ai: { models: { fast: { apiCredential: 'secret' } } } },
+    { nested: { provider: { apiKeys: { primary: 'secret' } } } },
+  ];
+  let writes = 0;
+
+  for (const config of unsafeConfigs) {
+    await assert.rejects(
+      () => putSessionConfig({ GROUP_KV: {} }, 'session-a', config, {
+        normalizeWorkerConfigRecord: (value) => value,
+        putKvJson: async () => { writes += 1; },
+      }),
+      /Secret-like values are not allowed in public session config fields\./,
+    );
+  }
+
+  assert.equal(writes, 0);
+});
+
 test('putSessionSecrets wraps the secrets payload in a v1 envelope', async () => {
   const calls = [];
   const env = { GROUP_KV: {} };

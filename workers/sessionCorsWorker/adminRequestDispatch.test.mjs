@@ -235,6 +235,67 @@ test('dispatchAdminRequest rejects secret-like values in open config subtrees be
   });
 });
 
+test('dispatchAdminRequest rejects nested provider secret aliases and generic top-level keys', async () => {
+  const unsafeConfigs = [
+    { ai: { models: { fast: { apiKeys: { primary: 'secret' } } } } },
+    { ai: { models: { fast: { providerKeys: ['secret'] } } } },
+    { ai: { models: { fast: { authorization: 'Bearer secret' } } } },
+    { ai: { models: { fast: { apiCredential: 'secret' } } } },
+    { nested: { provider: { apiKeys: { primary: 'secret' } } } },
+    { requestKey: 'secret' },
+    { customProviderKey: 'secret' },
+  ];
+  let writes = 0;
+
+  for (const config of unsafeConfigs) {
+    const result = await dispatchAdminRequest({
+      request: { json: async () => createSignedBody({ config }) },
+      env: { GROUP_KV: {} },
+      baseHeaders: {},
+      slug: 'session-a',
+      action: 'set-config',
+      deps: createAdminDeps({
+        putSessionConfig: async () => { writes += 1; },
+      }),
+    });
+
+    assert.equal(result.status, 400, JSON.stringify(config));
+    assert.equal(
+      result.body.error,
+      'Secret-like values are not allowed in public session config fields.',
+      JSON.stringify(config),
+    );
+  }
+
+  assert.equal(writes, 0);
+});
+
+test('dispatchAdminRequest preserves explicitly public key fields and structural authorization', async () => {
+  const writes = [];
+  const config = {
+    keyProvider: 'worker_secret',
+    publicKey: 'public-id',
+    resourceKey: 'default',
+    sessionModeProfile: {
+      authorization: { mechanisms: ['worker_roles'] },
+    },
+  };
+
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody({ config }) },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      putSessionConfig: async (...args) => { writes.push(args); },
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(writes.length, 1);
+});
+
 test('dispatchAdminRequest filters and normalizes allowed secrets before persisting', async () => {
   const calls = [];
 

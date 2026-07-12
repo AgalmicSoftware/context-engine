@@ -4,6 +4,10 @@ import {
   buildSessionSecretsEnvelope,
   unwrapSessionSecretsEnvelope,
 } from '../shared/sessionSecretsEnvelope.mjs';
+import {
+  findForbiddenCloudflareDeploymentTokenPath,
+  findForbiddenWorkerConfigSecretPath,
+} from '../shared/workerSessionConfig.mjs';
 
 const SESSION_KV_PREFIX = 'session';
 
@@ -32,6 +36,12 @@ export const putSessionConfig = async (env, slug, value, deps) => {
   const putKvJsonFn = typeof deps?.putKvJson === 'function' ? deps.putKvJson : putKvJson;
   const normalized = normalizeConfig(value, { slug });
   if (!normalized) throw new Error('Invalid session config.');
+  if (findForbiddenCloudflareDeploymentTokenPath(normalized)) {
+    throw new Error('Cloudflare deployment tokens are not allowed in session config.');
+  }
+  if (findForbiddenWorkerConfigSecretPath(normalized)) {
+    throw new Error('Secret-like values are not allowed in public session config fields.');
+  }
   await putKvJsonFn(env, buildSessionConfigKvKey(slug), normalized);
 };
 

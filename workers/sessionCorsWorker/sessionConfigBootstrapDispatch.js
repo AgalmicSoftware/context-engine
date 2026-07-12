@@ -22,6 +22,19 @@ const buildBootstrapHeaders = (headers) => {
   return next;
 };
 
+const protectBootstrapResponse = (response, baseHeaders) => {
+  if (!response) return response;
+  const headers = buildBootstrapHeaders(response.headers || baseHeaders);
+  if (response instanceof Response) {
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+  return { ...response, headers };
+};
+
 export const dispatchSessionConfigBootstrapRequest = async ({
   request,
   env,
@@ -49,7 +62,7 @@ export const dispatchSessionConfigBootstrapRequest = async ({
     return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
   }
   const corsContext = await deps?.getCorsContext?.({ request, config });
-  if (!corsContext?.ok) return corsContext?.response;
+  if (!corsContext?.ok) return protectBootstrapResponse(corsContext?.response, protectedBaseHeaders);
 
   return deps?.json?.({
     ok: true,

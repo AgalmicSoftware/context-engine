@@ -21,6 +21,7 @@ const buildWorkerCanonicalConfig = () => ({
   allowOrigins: ['https://app.example.test'],
   sessionModeProfile: {
     authority: { mode: 'worker_canonical' },
+    authorization: { mechanisms: ['worker_roles'] },
     encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
   },
   workerAuthority: {
@@ -33,7 +34,17 @@ const buildWorkerCanonicalConfig = () => ({
     cloudflare: { apiToken: 'nested-cloudflare-token' },
   },
   ai: {
-    models: { fast: { provider: 'openai', model: 'gpt-5', openaiKey: 'sk-nested-provider-key' } },
+    models: {
+      fast: {
+        provider: 'openai',
+        model: 'gpt-5',
+        openaiKey: 'sk-nested-provider-key',
+        apiKeys: { primary: 'sk-api-keys-alias' },
+        providerKeys: ['sk-provider-keys-alias'],
+        authorization: 'Bearer sk-authorization-alias',
+        apiCredential: 'sk-api-credential-alias',
+      },
+    },
     apiKey: 'sk-never-public',
     headers: { Authorization: 'Bearer sk-header-secret' },
     provider: { key: 'sk-generic-key' },
@@ -62,6 +73,7 @@ test('projectPublicWorkerSessionConfig returns canonical fields and recursively 
     allowOrigins: ['https://app.example.test'],
     sessionModeProfile: {
       authority: { mode: 'worker_canonical' },
+      authorization: { mechanisms: ['worker_roles'] },
       encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
     },
     workerAuthority: {
@@ -82,6 +94,10 @@ test('projectPublicWorkerSessionConfig returns canonical fields and recursively 
     'sk-header-secret',
     'sk-generic-key',
     'sk-nested-provider-key',
+    'sk-api-keys-alias',
+    'sk-provider-keys-alias',
+    'sk-authorization-alias',
+    'sk-api-credential-alias',
     'user:password',
     'cf-never-public',
     'rpc-secret',
@@ -116,6 +132,21 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
     findForbiddenWorkerConfigSecretPath({ ai: { models: { fast: { openaiKey: 'secret' } } } }),
     'config.ai.models.fast.openaiKey',
   );
+  for (const alias of ['apiKeys', 'providerKeys', 'authorization', 'apiCredential']) {
+    assert.equal(
+      findForbiddenWorkerConfigSecretPath({ ai: { models: { fast: { [alias]: 'secret' } } } }),
+      `config.ai.models.fast.${alias}`,
+    );
+  }
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({ nested: { provider: { apiKeys: { primary: 'secret' } } } }),
+    'config.nested.provider.apiKeys',
+  );
+  assert.equal(findForbiddenWorkerConfigSecretPath({ requestKey: 'secret' }), 'config.requestKey');
+  assert.equal(findForbiddenWorkerConfigSecretPath({ customProviderKey: 'secret' }), 'config.customProviderKey');
+  assert.equal(findForbiddenWorkerConfigSecretPath({ keyProvider: 'worker_secret' }), '');
+  assert.equal(findForbiddenWorkerConfigSecretPath({ publicKey: 'public-id' }), '');
+  assert.equal(findForbiddenWorkerConfigSecretPath({ resourceKey: 'default' }), '');
   assert.equal(findForbiddenWorkerConfigSecretPath({ workerAuthority: { resourceKey: 'public-id' } }), '');
 });
 
@@ -187,13 +218,22 @@ test('dispatchSessionConfigBootstrapRequest rejects missing config, wrong author
       json,
     },
   })).status, 404);
-  assert.equal((await dispatchSessionConfigBootstrapRequest({
+  const blockedCorsResponse = await dispatchSessionConfigBootstrapRequest({
     ...base,
     deps: {
       resolveRequestSlugWithoutToken: slugResolver,
       getSessionConfig: async () => buildWorkerCanonicalConfig(),
-      getCorsContext: async () => ({ ok: false, response: { status: 403 } }),
+      getCorsContext: async () => ({
+        ok: false,
+        response: new Response(JSON.stringify({ error: 'Origin not allowed.' }), {
+          status: 403,
+          headers: { Vary: 'Origin' },
+        }),
+      }),
       json,
     },
-  })).status, 403);
+  });
+  assert.equal(blockedCorsResponse.status, 403);
+  assert.equal(blockedCorsResponse.headers.get('Cache-Control'), 'no-store');
+  assert.equal(blockedCorsResponse.headers.get('Vary'), 'Origin, X-Session-Slug');
 });

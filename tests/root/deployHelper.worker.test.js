@@ -30,11 +30,28 @@ const cfFailure = (status, message, errors = [{ message }]) => new Response(JSON
 const makeFetchSequence = (responses = []) => {
   const queue = [...responses];
   const calls = [];
+  const workerNamePreflightCalls = [];
   const fetchMock = async (...args) => {
-    calls.push(args);
     const [url, init = {}] = args;
     const normalizedUrl = String(url);
     const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET' && /\/workers\/scripts\/[^/]+\/settings$/.test(normalizedUrl)) {
+      workerNamePreflightCalls.push(args);
+      if (workerNamePreflightCalls.length === 1) {
+        return fetchMock.workerNamePreflightOverride || cfFailure(404, 'Worker not found.');
+      }
+      if (fetchMock.workerCleanupSettingsOverride) return fetchMock.workerCleanupSettingsOverride;
+      const scriptUpload = [...calls].reverse().find(([candidateUrl, candidateInit = {}]) => (
+        String(candidateInit.method || '').toUpperCase() === 'PUT' &&
+        /\/workers\/scripts\/[^/]+$/.test(String(candidateUrl))
+      ));
+      const metadataBlob = scriptUpload?.[1]?.body?.get?.('metadata');
+      const metadata = metadataBlob
+        ? JSON.parse(await new Response(metadataBlob).text())
+        : { bindings: [] };
+      return cfSuccess({ bindings: metadata.bindings || [] });
+    }
+    calls.push(args);
     if (method === 'GET' && /\/accounts\/[^/]+\/workers\/subdomain$/.test(normalizedUrl)) {
       return cfSuccess({ subdomain: 'tenant-subdomain', status: 'active' });
     }
@@ -65,6 +82,13 @@ const makeFetchSequence = (responses = []) => {
           String(candidateInit.method || '').toUpperCase() === 'PUT' &&
           String(candidateUrl) === normalizedUrl
         ));
+      if (fetchMock.kvReadbackTransform) {
+        const latestConfig = JSON.parse(latestConfigWrite?.[1]?.body || '{}');
+        return new Response(JSON.stringify(fetchMock.kvReadbackTransform(latestConfig)), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
       return new Response(latestConfigWrite?.[1]?.body || '{}', {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -77,6 +101,7 @@ const makeFetchSequence = (responses = []) => {
     return next;
   };
   fetchMock.calls = calls;
+  fetchMock.workerNamePreflightCalls = workerNamePreflightCalls;
   return fetchMock;
 };
 
@@ -352,11 +377,6 @@ describe('deploy-helper worker', () => {
           authority: { mode: 'worker_canonical' },
           encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
         },
-        workerAuthority: {
-          version: 1,
-          participantScopes: ['ai', 'transcribe', 'storage', 'groups'],
-          anonymousScopes: ['ai', 'transcribe'],
-        },
         bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
         storageProfile: {
           backend: 'cloudflare',
@@ -364,8 +384,10 @@ describe('deploy-helper worker', () => {
         },
         secrets: { openaiKey: 'sk-never-store' },
       }), {}, {});
+      const payload = await response.json();
 
       expect(response.status).toBe(200);
+      expect(payload?.workerName).toMatch(/^test-worker-[0-9a-f]{12}$/);
       const configWrite = JSON.parse(fetchMock.calls[2][1].body);
       const serialized = JSON.stringify(configWrite);
       expect(configWrite).toEqual(expect.objectContaining({
@@ -374,7 +396,11 @@ describe('deploy-helper worker', () => {
         sessionName: 'Alpha Session',
         sessionInfo: 'Worker-canonical session',
         sessionModeProfile: expect.objectContaining({ authority: { mode: 'worker_canonical' } }),
-        workerAuthority: expect.objectContaining({ version: 1 }),
+        workerAuthority: {
+          version: 1,
+          participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
+          anonymousScopes: [],
+        },
         ai: { models: { fast: { provider: 'openai', model: 'gpt-5' } } },
       }));
       expect(serialized).not.toContain('cf-never-store');
@@ -403,7 +429,9 @@ describe('deploy-helper worker', () => {
       ));
       const configRewrite = JSON.parse(finalConfigWrite[1].body);
       expect(configRewrite.configRevision).toBe('revision-a');
-      expect(configRewrite.corsWorkerUrl).toBe('https://test-worker.tenant-subdomain.workers.dev/');
+      expect(configRewrite.corsWorkerUrl).toBe(
+        `https://${payload.workerName}.tenant-subdomain.workers.dev/`
+      );
       const configReadbackIndex = fetchMock.calls.findIndex(([url, init = {}]) => (
         String(init.method || 'GET').toUpperCase() === 'GET' && String(url).endsWith(':config')
       ));
@@ -412,6 +440,126 @@ describe('deploy-helper worker', () => {
         .filter((index) => index >= 0);
       expect(secretWriteIndices).not.toHaveLength(0);
       expect(secretWriteIndices.every((index) => index > configReadbackIndex)).toBe(true);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('rejects an invalid worker-canonical authority policy before Cloudflare mutation', async () => {
+    const fetchMock = makeFetchSequence([]);
+    global.fetch = fetchMock;
+
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'cf-token',
+      accountId: 'acc-123',
+      workerName: 'test-worker',
+      sessionSlug: 'alpha-session',
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+      },
+      workerAuthority: {
+        version: 2,
+        participantScopes: ['storage'],
+        anonymousScopes: [],
+      },
+      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+    }), {}, {});
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload?.error).toBe('Worker-canonical authority policy must use version 1.');
+    expect(fetchMock.calls).toHaveLength(0);
+    expect(fetchMock.workerNamePreflightCalls).toHaveLength(0);
+  });
+
+  it('rejects an existing worker-canonical name before creating KV or overwriting a script', async () => {
+    const fetchMock = makeFetchSequence([]);
+    fetchMock.workerNamePreflightOverride = cfSuccess({ compatibility_date: '2024-09-02' });
+    global.fetch = fetchMock;
+
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'cf-token',
+      accountId: 'acc-123',
+      workerName: 'existing-worker',
+      sessionSlug: 'alpha-session',
+      allowOverwrite: true,
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+    }), {}, {});
+    const payload = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(payload?.error).toContain('already exists');
+    expect(fetchMock.workerNamePreflightCalls).toHaveLength(1);
+    expect(String(fetchMock.workerNamePreflightCalls[0][0])).toMatch(
+      /\/workers\/scripts\/existing-worker-[0-9a-f]{12}\/settings$/
+    );
+    expect(fetchMock.calls).toHaveLength(0);
+  });
+
+  it('preserves existing noncanonical worker update behavior', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({ id: 'worker-updated' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    fetchMock.workerNamePreflightOverride = cfSuccess({ compatibility_date: '2024-09-02' });
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'existing-worker',
+        sessionSlug: 'alpha-session',
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload?.workerName).toBe('existing-worker');
+      expect(fetchMock.workerNamePreflightCalls).toHaveLength(1);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('never deletes a pre-existing noncanonical worker during rollback', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({ id: 'worker-updated' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    fetchMock.workerNamePreflightOverride = cfSuccess({ compatibility_date: '2024-09-02' });
+    fetchMock.workerSecretPutOverride = cfFailure(500, 'runtime secret write failed');
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'existing-worker',
+        sessionSlug: 'alpha-session',
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: 'existing-worker' });
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(url).endsWith('/workers/scripts/existing-worker') && init.method === 'DELETE'
+      ))).toBe(false);
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -576,7 +724,10 @@ describe('deploy-helper worker', () => {
   });
 
   it('returns a structured 502 when fetching the worker bundle fails', async () => {
-    global.fetch = async () => {
+    global.fetch = async (url) => {
+      if (String(url).endsWith('/workers/scripts/test-worker/settings')) {
+        return cfFailure(404, 'Worker not found.');
+      }
       throw new TypeError('fetch failed');
     };
 
@@ -622,7 +773,8 @@ describe('deploy-helper worker', () => {
       expect(response.status).toBe(502);
       expect(payload?.workerUrl).toBeUndefined();
       expect(payload?.error).toBe('final config rewrite failed');
-      expect(fetchMock.calls.length).toBe(7);
+      expect(fetchMock.calls.length).toBe(9);
+      expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
       expect(fetchMock.calls.some(([url]) => String(url).endsWith(':secrets'))).toBe(false);
       expect(fetchMock.calls.some(([url]) => String(url).endsWith('/secrets'))).toBe(false);
       expectBundleDiagnosticsLog(consoleLogSpy, 'bundleUrl');
@@ -663,6 +815,47 @@ describe('deploy-helper worker', () => {
       expect(response.status).toBe(502);
       expect(payload?.workerUrl).toBeUndefined();
       expect(payload?.error).toBe('Worker config verification failed after deployment.');
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('fails worker-canonical readback when the persisted authority policy does not match', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    fetchMock.kvReadbackTransform = (latestConfig) => ({
+      ...latestConfig,
+      workerAuthority: {
+        version: 1,
+        participantScopes: [],
+        anonymousScopes: [],
+      },
+    });
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        adminAddress: '0x00000000000000000000000000000000000000aa',
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(payload?.error).toBe('Worker config verification failed after deployment.');
+      expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -746,6 +939,46 @@ describe('deploy-helper worker', () => {
     }
   });
 
+  it('does not delete a script whose deployment ownership changed before rollback', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    fetchMock.workerSecretPutOverride = cfFailure(500, 'runtime secret write failed');
+    fetchMock.workerCleanupSettingsOverride = cfSuccess({
+      bindings: [{ name: 'CE_DEPLOYMENT_ID', type: 'plain_text', text: 'different-deployment' }],
+    });
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: 'test-worker' });
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(url).endsWith('/workers/scripts/test-worker') && init.method === 'DELETE'
+      ))).toBe(false);
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(url).endsWith('/storage/kv/namespaces/kv-123') && init.method === 'DELETE'
+      ))).toBe(true);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
   it('includes bundle diagnostics when Cloudflare rejects the uploaded worker entrypoint', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -754,6 +987,7 @@ describe('deploy-helper worker', () => {
       cfSuccess({ id: 'kv-123' }),
       cfSuccess({}),
       cfFailure(400, 'The uploaded script has no registered event handlers.'),
+      cfSuccess({}),
     ]);
     global.fetch = fetchMock;
 
@@ -798,6 +1032,7 @@ describe('deploy-helper worker', () => {
         expect(uploadedBundle).toBe(bundleText);
         return cfFailure(400, 'The uploaded script has no registered event handlers.');
       },
+      cfSuccess({}),
     ]);
     global.fetch = fetchMock;
 
