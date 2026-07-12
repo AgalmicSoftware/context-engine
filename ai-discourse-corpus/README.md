@@ -14,7 +14,7 @@ This corpus is maintained as part of [Context Engine](https://github.com/Agalmic
 | `arxiv-ai-safety-corpus.json` | 278 | Academic papers on AI safety, alignment, interpretability, and governance. |
 | `cross-corpus-debates.json` | 16 | Structured debate trees that synthesize evidence across multiple AI discourse sources. |
 | `dwarkesh-lab-insiders-corpus.json` | 152 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
-| `enriched-tweets.json` | 4036 | Enriched social-media discourse with summaries, tags, relevance signals, and linked context. |
+| `enriched-tweets.json` | 4140 | Enriched social-media discourse with summaries, tags, relevance signals, and linked context. |
 | `lab-primary-docs-corpus.json` | 30 | Primary safety/governance documents from frontier labs: safety frameworks (RSP, Preparedness, FSF), system cards, framework compliance reports, model specs, and deployment updates. |
 | `lesswrong-posts-corpus.json` | 219 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
 | `metr-evals-metrics-corpus.json` | 95 | METR publications, benchmarks, evaluation reports, and measurement-oriented policy material. |
