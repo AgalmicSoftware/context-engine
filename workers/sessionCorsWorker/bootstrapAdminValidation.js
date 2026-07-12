@@ -18,6 +18,15 @@ export const validateBootstrapAdmin = async ({
     requestedAdmin.toLowerCase() === address.toLowerCase()
   );
 
+  const boundBootstrapAdmin = deps?.toStr?.(env?.BOOTSTRAP_ADMIN_ADDRESS || '').trim();
+  if (boundBootstrapAdmin) {
+    if (!deps?.isAddress?.(boundBootstrapAdmin)) return false;
+    return (
+      requestedAdminMatches &&
+      boundBootstrapAdmin.toLowerCase() === address.toLowerCase()
+    );
+  }
+
   const registryAddress = deps?.toStr?.(env?.REGISTRY_ADDRESS || '').trim();
   const registryRpcUrls = deps?.normalizeRpcUrlList?.(env?.RPC_URL) || [];
   const registrySlug = deps?.toRegistrySessionSlug?.(slug);

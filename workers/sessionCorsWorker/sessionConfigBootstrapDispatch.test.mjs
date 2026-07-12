@@ -33,7 +33,7 @@ const buildWorkerCanonicalConfig = () => ({
     cloudflare: { apiToken: 'nested-cloudflare-token' },
   },
   ai: {
-    models: { fast: { provider: 'openai', model: 'gpt-5' } },
+    models: { fast: { provider: 'openai', model: 'gpt-5', openaiKey: 'sk-nested-provider-key' } },
     apiKey: 'sk-never-public',
     headers: { Authorization: 'Bearer sk-header-secret' },
     provider: { key: 'sk-generic-key' },
@@ -81,6 +81,7 @@ test('projectPublicWorkerSessionConfig returns canonical fields and recursively 
     'sk-never-public',
     'sk-header-secret',
     'sk-generic-key',
+    'sk-nested-provider-key',
     'user:password',
     'cf-never-public',
     'rpc-secret',
@@ -110,6 +111,12 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
     findForbiddenWorkerConfigSecretPath({ sessionModeProfile: { authorization: { mechanisms: ['worker_roles'] } } }),
     '',
   );
+  assert.equal(findForbiddenWorkerConfigSecretPath({ openaiKey: 'secret' }), 'config.openaiKey');
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({ ai: { models: { fast: { openaiKey: 'secret' } } } }),
+    'config.ai.models.fast.openaiKey',
+  );
+  assert.equal(findForbiddenWorkerConfigSecretPath({ workerAuthority: { resourceKey: 'public-id' } }), '');
 });
 
 test('dispatchSessionConfigBootstrapRequest returns only CORS-scoped worker-canonical config', async () => {
@@ -163,10 +170,13 @@ test('dispatchSessionConfigBootstrapRequest rejects missing config, wrong author
   const json = (body, status, headers) => ({ body, status, headers });
   const slugResolver = () => ({ ok: true, slug: 'session-a', explicitSlugProvided: true });
 
-  assert.equal((await dispatchSessionConfigBootstrapRequest({
+  const missingResponse = await dispatchSessionConfigBootstrapRequest({
     ...base,
     deps: { resolveRequestSlugWithoutToken: slugResolver, getSessionConfig: async () => null, json },
-  })).status, 404);
+  });
+  assert.equal(missingResponse.status, 404);
+  assert.equal(missingResponse.headers.get('Cache-Control'), 'no-store');
+  assert.equal(missingResponse.headers.get('Vary'), 'Origin, X-Session-Slug');
   assert.equal((await dispatchSessionConfigBootstrapRequest({
     ...base,
     deps: {

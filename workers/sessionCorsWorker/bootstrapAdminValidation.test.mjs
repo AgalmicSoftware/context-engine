@@ -44,6 +44,30 @@ test('validateBootstrapAdmin preserves legacy requested-admin match when the wor
   assert.equal(result, true);
 });
 
+test('validateBootstrapAdmin requires the deployment-bound admin while KV config is unavailable', async () => {
+  const deps = createDeps();
+  const matching = await validateBootstrapAdmin({
+    env: { BOOTSTRAP_ADMIN_ADDRESS: '0xabc123' },
+    slug: 'session-a',
+    address: '0xAbC123',
+    body: createBody(),
+    deps,
+  });
+  const mismatched = await validateBootstrapAdmin({
+    env: { BOOTSTRAP_ADMIN_ADDRESS: '0xabc123' },
+    slug: 'session-a',
+    address: '0xdef456',
+    body: createBody({
+      adminAddress: '0xdef456',
+      config: { adminAddress: '0xdef456' },
+    }),
+    deps,
+  });
+
+  assert.equal(matching, true);
+  assert.equal(mismatched, false);
+});
+
 test('validateBootstrapAdmin preserves legacy requested-admin match when the slug is not registered on-chain', async () => {
   let registryReadCalled = false;
 

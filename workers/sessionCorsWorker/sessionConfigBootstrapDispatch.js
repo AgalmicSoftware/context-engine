@@ -30,22 +30,23 @@ export const dispatchSessionConfigBootstrapRequest = async ({
   deps,
   constants,
 } = {}) => {
+  const protectedBaseHeaders = buildBootstrapHeaders(baseHeaders);
   const slugResolution = deps?.resolveRequestSlugWithoutToken?.({ request, env, slugHint }) || {
     ok: false,
     error: 'Invalid session slug.',
   };
   if (!slugResolution.ok) {
-    return deps?.json?.({ error: slugResolution.error }, 400, baseHeaders);
+    return deps?.json?.({ error: slugResolution.error }, 400, protectedBaseHeaders);
   }
   if (!slugResolution.explicitSlugProvided) {
-    return deps?.json?.({ error: constants?.missingSlugError }, 400, baseHeaders);
+    return deps?.json?.({ error: constants?.missingSlugError }, 400, protectedBaseHeaders);
   }
 
   const slug = slugResolution.slug;
   const config = await deps?.getSessionConfig?.(env, slug);
   // Do not expose chain-canonical config through a caller-selected worker.
   if (!config || !isWorkerCanonicalSessionConfig(config)) {
-    return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, baseHeaders);
+    return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
   }
   const corsContext = await deps?.getCorsContext?.({ request, config });
   if (!corsContext?.ok) return corsContext?.response;

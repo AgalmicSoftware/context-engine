@@ -51,6 +51,17 @@ const OPEN_CONFIG_SUBTREE_KEYS = Object.freeze([
 
 const normalizeKey = (value) => toStr(value).replace(/[^a-z0-9]/gi, '').toLowerCase();
 const OMIT_PUBLIC_VALUE = Symbol('omit-public-worker-config-value');
+const SAFE_PUBLIC_KEY_FIELD_NAMES = new Set(['keyprovider', 'publickey', 'resourcekey']);
+const TOP_LEVEL_PROVIDER_KEY_NAMES = new Set([
+  'aikey',
+  'anthropickey',
+  'geminikey',
+  'googleaikey',
+  'groqkey',
+  'mistralkey',
+  'openaikey',
+  'openrouterkey',
+]);
 const hasSensitiveTokenValue = (value) => {
   if (value == null || value === false) return false;
   if (typeof value === 'string') return value.trim() !== '';
@@ -59,7 +70,7 @@ const hasSensitiveTokenValue = (value) => {
 
 const isSecretAdjacentKey = (key, value) => {
   const normalized = normalizeKey(key);
-  if (normalized === 'keyprovider') return false;
+  if (SAFE_PUBLIC_KEY_FIELD_NAMES.has(normalized)) return false;
   if (normalized.startsWith('exposes') && typeof value === 'boolean') return false;
   if (normalized.startsWith('faucet')) return true;
   if (normalized === 'litcredentials') return true;
@@ -73,6 +84,7 @@ const isSecretAdjacentKey = (key, value) => {
     normalized === 'secrets' ||
     normalized === 'credentials' ||
     normalized.endsWith('apikey') ||
+    normalized.endsWith('key') ||
     normalized.endsWith('privatekey') ||
     normalized.endsWith('secret') ||
     normalized.endsWith('token') ||
@@ -166,6 +178,9 @@ const findForbiddenOpenConfigSecretPath = (value, path) => {
 
 export const findForbiddenWorkerConfigSecretPath = (config, path = 'config') => {
   const source = isObj(config) ? config : {};
+  for (const key of Object.keys(source)) {
+    if (TOP_LEVEL_PROVIDER_KEY_NAMES.has(normalizeKey(key))) return `${path}.${key}`;
+  }
   for (const key of OPEN_CONFIG_SUBTREE_KEYS) {
     if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
     const nested = findForbiddenOpenConfigSecretPath(source[key], `${path}.${key}`);

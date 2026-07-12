@@ -821,6 +821,12 @@ export const executeDeployHelperRequest = async ({
   const hatsAddress = toStr(body?.hatsAddress).trim();
   const adminHatId = toStr(body?.adminHatId).trim();
   const adminAddress = toStr(body?.adminAddress).trim();
+  const workerCanonicalRequested = (
+    toStr(body?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === 'worker_canonical'
+  );
+  if (workerCanonicalRequested && !/^0x[0-9a-f]{40}$/i.test(adminAddress)) {
+    return buildFailure(400, { error: 'A valid adminAddress is required for worker-canonical deploys.' });
+  }
   const rpcUrl = toStr(body?.rpcUrl).trim();
   const rpcUrlsByChainId = (body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === 'object')
     ? body.rpcUrlsByChainId
@@ -877,25 +883,31 @@ export const executeDeployHelperRequest = async ({
 
   const config = {
     slug: sessionSlug,
-    registryAddress,
-    registryChainId,
-    hatsAddress,
-    adminHatId,
     adminAddress,
-    rpcUrl,
-    rpcUrlsByChainId,
     allowOrigins,
     limits,
     scopes,
-    faucet,
     embeddedDeployHelperEnabled,
+    ...(!workerCanonicalRequested
+      ? {
+          registryAddress,
+          registryChainId,
+          hatsAddress,
+          adminHatId,
+          rpcUrl,
+          rpcUrlsByChainId,
+          faucet,
+        }
+      : (rpcUrl || Object.keys(rpcUrlsByChainId).length)
+        ? { rpcUrl, rpcUrlsByChainId }
+        : {}),
     ...selectDeployWorkerSessionConfigFields(body),
   };
   if (storageProfile) {
     config.storageProfile = storageProfile;
   }
   const blockLimits = sanitizeBlockLimits(body?.blockLimits);
-  if (blockLimits) {
+  if (blockLimits && !workerCanonicalRequested) {
     config.blockLimits = blockLimits;
   }
   if (findForbiddenCloudflareDeploymentTokenPath(config)) {
@@ -945,20 +957,6 @@ export const executeDeployHelperRequest = async ({
     });
   }
 
-  const secretsPut = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(secretsEnvelope),
-  }, cfFetchOptions);
-  if (!secretsPut.ok) {
-    return buildFailure(502, {
-      error: secretsPut.error,
-      detail: secretsPut.detail,
-    }, {
-      fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretsPut),
-    });
-  }
-
   const tokenSecret = randomSecret();
   const metadata = {
     main_module: 'worker.mjs',
@@ -971,6 +969,9 @@ export const executeDeployHelperRequest = async ({
         ? [{ name: 'CE_STORAGE_R2', type: 'r2_bucket', bucket_name: storageBindingPlan.r2BucketName }]
         : []),
       { name: 'DEFAULT_SESSION_SLUG', type: 'plain_text', text: sessionSlug },
+      ...(adminAddress
+        ? [{ name: 'BOOTSTRAP_ADMIN_ADDRESS', type: 'plain_text', text: adminAddress }]
+        : []),
       { name: 'DEPLOY_HELPER_ENABLED', type: 'plain_text', text: embeddedDeployHelperEnabled ? '1' : '0' },
     ],
     compatibility_date: toStr(env?.WORKER_COMPATIBILITY_DATE || DEFAULT_COMPAT_DATE),
@@ -1003,42 +1004,8 @@ export const executeDeployHelperRequest = async ({
     });
   }
 
-  const secretResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: 'TOKEN_HMAC_SECRET', type: 'secret_text', text: tokenSecret }),
-  }, cfFetchOptions);
-  if (!secretResp.ok) {
-    return buildFailure(502, {
-      error: secretResp.error,
-      detail: secretResp.detail,
-    }, {
-      fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretResp),
-    });
-  }
-
   const envelopeKekSecretRequired = deployStorageRequiresEnvelopeKek(storageProfile);
   let envelopeKekSecretSet = false;
-  if (envelopeKekSecretRequired) {
-    const envelopeKekResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: STORAGE_ENVELOPE_KEK_SECRET_NAME,
-        type: 'secret_text',
-        text: randomSecret(),
-      }),
-    }, cfFetchOptions);
-    if (!envelopeKekResp.ok) {
-      return buildFailure(502, {
-        error: envelopeKekResp.error,
-        detail: envelopeKekResp.detail,
-      }, {
-        fallbackEligible: shouldAllowFallbackForCloudflareFailure(envelopeKekResp),
-      });
-    }
-    envelopeKekSecretSet = true;
-  }
 
   const {
     subdomain,
@@ -1066,7 +1033,7 @@ export const executeDeployHelperRequest = async ({
     sessionKvPrefix: 'session',
     writesSessionConfig: true,
     writesSessionSecrets: true,
-    tokenSecretSet: true,
+    tokenSecretSet: false,
     envelopeKekSecretSet,
     subdomain,
     subdomainStatus,
@@ -1075,6 +1042,11 @@ export const executeDeployHelperRequest = async ({
     scriptSubdomainEnabled,
     scriptSubdomainError,
   };
+  if (!workerUrl) {
+    return buildFailure(502, {
+      error: subdomainError || scriptSubdomainError || 'Cloudflare did not return a shareable worker URL.',
+    });
+  }
   if (workerUrl) {
     const configWithWorkerUrl = {
       ...config,
@@ -1116,6 +1088,76 @@ export const executeDeployHelperRequest = async ({
       });
     }
     deploymentPayload.configVerified = true;
+  }
+
+  const cleanupSecretBearingDeployment = async () => {
+    const [scriptCleanup, kvCleanup] = await Promise.all([
+      cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}`, { method: 'DELETE' }, cfFetchOptions),
+      cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}`, { method: 'DELETE' }, cfFetchOptions),
+    ]);
+    return {
+      kvNamespaceId: kvCleanup.ok ? '' : kvId,
+      workerName: scriptCleanup.ok ? '' : workerName,
+    };
+  };
+
+  // Runtime and session secrets are written only after the public worker URL
+  // and canonical config have both been verified.
+  const secretResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'TOKEN_HMAC_SECRET', type: 'secret_text', text: tokenSecret }),
+  }, cfFetchOptions);
+  if (!secretResp.ok) {
+    const orphanResources = await cleanupSecretBearingDeployment();
+    return buildFailure(502, {
+      error: secretResp.error,
+      detail: secretResp.detail,
+      orphanResources,
+    }, {
+      fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretResp),
+    });
+  }
+  deploymentPayload.tokenSecretSet = true;
+
+  if (envelopeKekSecretRequired) {
+    const envelopeKekResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: STORAGE_ENVELOPE_KEK_SECRET_NAME,
+        type: 'secret_text',
+        text: randomSecret(),
+      }),
+    }, cfFetchOptions);
+    if (!envelopeKekResp.ok) {
+      const orphanResources = await cleanupSecretBearingDeployment();
+      return buildFailure(502, {
+        error: envelopeKekResp.error,
+        detail: envelopeKekResp.detail,
+        orphanResources,
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(envelopeKekResp),
+      });
+    }
+    envelopeKekSecretSet = true;
+    deploymentPayload.envelopeKekSecretSet = true;
+  }
+
+  const secretsPut = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(secretsEnvelope),
+  }, cfFetchOptions);
+  if (!secretsPut.ok) {
+    const orphanResources = await cleanupSecretBearingDeployment();
+    return buildFailure(502, {
+      error: secretsPut.error,
+      detail: secretsPut.detail,
+      orphanResources,
+    }, {
+      fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretsPut),
+    });
   }
 
   return buildSuccess(200, deploymentPayload);
