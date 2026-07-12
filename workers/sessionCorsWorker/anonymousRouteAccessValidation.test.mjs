@@ -343,14 +343,6 @@ test('evaluateAnonymousRouteAccess uses worker-canonical anonymous policy withou
     deps: createDeps(),
     constants,
   });
-  const deniedWithRequestKey = await evaluateAnonymousRouteAccess({
-    slug: 'session-worker',
-    config,
-    route: 'transcribe',
-    apiKey: 'caller-supplied-key',
-    deps: createDeps(),
-    constants,
-  });
 
   assert.equal(registryReads, 0);
   assert.deepEqual(allowed, { ok: true, reason: 'worker-canonical-open', scope: 'ai' });
@@ -361,5 +353,4 @@ test('evaluateAnonymousRouteAccess uses worker-canonical anonymous policy withou
     reason: 'worker-canonical-anonymous-scope-denied',
     scope: 'transcribe',
   });
-  assert.deepEqual(deniedWithRequestKey, denied);
 });

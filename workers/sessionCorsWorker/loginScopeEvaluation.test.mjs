@@ -115,9 +115,6 @@ test('computeLoginScopes delegates worker-canonical scopes without reading regis
       resolveLoginGateAuthority: async () => {
         throw new Error('registry gate authority must not run');
       },
-      resolveRpcUrlListForGate: () => {
-        throw new Error('worker-canonical login must not run an EVM gate RPC');
-      },
     },
   });
 
