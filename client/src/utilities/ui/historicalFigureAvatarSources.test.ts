@@ -48,6 +48,21 @@ const expectApprovedAvatarSource = (value: unknown) => {
 };
 
 describe('historical figure avatar sources', () => {
+  it('keeps one canonical Buckminster Fuller avatar asset and reference', () => {
+    const publicAvatarDir = path.resolve(__dirname, '../../../public/historical-avatars');
+    const referencedSources = JSON.stringify([
+      historicalFigures,
+      historicalFiguresMerged,
+      additionalHistoricalFigures,
+      historicalFigureLocalPhotoManifest,
+      historicalFigurePhotoManifest,
+    ]);
+
+    expect(fs.existsSync(path.join(publicAvatarDir, 'buckminsterfuller.jpg'))).toBe(true);
+    expect(fs.existsSync(path.join(publicAvatarDir, 'fuller.jpg'))).toBe(false);
+    expect(referencedSources).not.toContain(`/historical-avatars/${'fuller'}.jpg`);
+  });
+
   it('keeps avatar manifests free of duplicate top-level keys', () => {
     expect(getDuplicateTopLevelManifestKeys('./historicalFigureLocalPhotoManifest.json')).toEqual([]);
     expect(getDuplicateTopLevelManifestKeys('./historicalFigurePhotoManifest.json')).toEqual([]);
