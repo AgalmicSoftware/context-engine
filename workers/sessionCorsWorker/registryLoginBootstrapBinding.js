@@ -75,8 +75,8 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
     address,
     config,
   } = {}) => {
-    void env;
     const {
+      authorityMode,
       registryAddress,
       registryRpcUrls,
       registrySlug,
@@ -98,7 +98,9 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
 
     return (deps?.computeLoginScopes || computeLoginScopesBoundary)({
       address,
+      authorityMode,
       config,
+      env,
       registryAddress,
       registryRpcUrls,
       registrySlug,
@@ -114,6 +116,7 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
         toChainId: deps?.toChainId,
         toStr: deps?.toStr,
         log: deps?.log || console.log,
+        ...(deps?.isWorkerGroupMember ? { isWorkerGroupMember: deps.isWorkerGroupMember } : {}),
       },
     });
   };

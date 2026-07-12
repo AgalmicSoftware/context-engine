@@ -162,3 +162,37 @@ test('resolveLoginAuthorityContext preserves session-check-unavailable warning a
     },
   ]]);
 });
+
+test('resolveLoginAuthorityContext uses persisted worker-canonical config without registry reads', async () => {
+  let registryReads = 0;
+  const result = await resolveLoginAuthorityContext({
+    slug: 'session-worker',
+    address: '0xabc123',
+    config: {
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      workerAuthority: { version: 1, participantScopes: ['storage'] },
+    },
+    deps: createDeps({
+      resolveRegistryRpcUrls: () => [],
+      readSessionExistsOnChain: async () => {
+        registryReads += 1;
+        return { exists: false, errors: [], error: null };
+      },
+    }),
+  });
+
+  assert.equal(registryReads, 0);
+  assert.deepEqual(result, {
+    authorityMode: 'worker_canonical',
+    registryAddress: '',
+    registryRpcUrls: [],
+    registrySlug: 'session-worker',
+    sessionCheck: {
+      exists: true,
+      source: 'worker-config',
+      rpcUrl: '',
+      errors: [],
+      error: null,
+    },
+  });
+});

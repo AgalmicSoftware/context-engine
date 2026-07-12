@@ -94,3 +94,31 @@ test('computeLoginScopes preserves default-gate denial when login gate authority
     /Access denied: default gate failed\./
   );
 });
+
+test('computeLoginScopes delegates worker-canonical scopes without reading registry gates', async () => {
+  const calls = [];
+  const scopes = await computeLoginScopes({
+    address: '0x0000000000000000000000000000000000000002',
+    authorityMode: 'worker_canonical',
+    config: {
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      workerAuthority: { version: 1, participantScopes: ['storage'] },
+    },
+    env: { GROUP_KV: {} },
+    registrySlug: 'session-worker',
+    deps: {
+      resolveWorkerCanonicalLoginScopes: async (value) => {
+        calls.push(value);
+        return { storage: true };
+      },
+      resolveLoginGateAuthority: async () => {
+        throw new Error('registry gate authority must not run');
+      },
+    },
+  });
+
+  assert.deepEqual(scopes, { storage: true });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].slug, 'session-worker');
+  assert.deepEqual(calls[0].env, { GROUP_KV: {} });
+});

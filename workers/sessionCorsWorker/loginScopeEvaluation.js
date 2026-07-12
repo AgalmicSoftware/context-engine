@@ -1,10 +1,15 @@
 import {
   resolveLoginGateAuthority,
 } from './loginGateAuthority.js';
+import {
+  resolveWorkerCanonicalLoginScopes as resolveWorkerCanonicalLoginScopesBoundary,
+} from './workerCanonicalAuthority.js';
 
 export const computeLoginScopes = async ({
   address,
+  authorityMode,
   config,
+  env,
   registryAddress,
   registryRpcUrls,
   registrySlug,
@@ -12,6 +17,18 @@ export const computeLoginScopes = async ({
   resourceKeys,
   deps,
 } = {}) => {
+  if (authorityMode === 'worker_canonical') {
+    return (deps?.resolveWorkerCanonicalLoginScopes || resolveWorkerCanonicalLoginScopesBoundary)({
+      address,
+      config,
+      env,
+      slug: registrySlug,
+      deps: {
+        isWorkerGroupMember: deps?.isWorkerGroupMember,
+      },
+    });
+  }
+
   const keys = Array.isArray(resourceKeys) ? resourceKeys : [];
   const gateResults = await (
     deps?.resolveLoginGateAuthority || resolveLoginGateAuthority

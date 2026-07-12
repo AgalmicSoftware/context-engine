@@ -301,3 +301,47 @@ test('evaluateAnonymousRouteAccess preserves default/ai gate lookup failures and
     }
   );
 });
+
+test('evaluateAnonymousRouteAccess uses worker-canonical anonymous policy without registry reads', async () => {
+  let registryReads = 0;
+  const config = {
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    workerAuthority: {
+      version: 1,
+      participantScopes: ['ai', 'transcribe'],
+      anonymousScopes: ['ai'],
+    },
+  };
+
+  const allowed = await evaluateAnonymousRouteAccess({
+    slug: 'session-worker',
+    config,
+    route: 'ai',
+    apiKey: '',
+    deps: createDeps({
+      readSessionExistsOnChain: async () => {
+        registryReads += 1;
+        return { exists: false };
+      },
+    }),
+    constants,
+  });
+  const denied = await evaluateAnonymousRouteAccess({
+    slug: 'session-worker',
+    config,
+    route: 'transcribe',
+    apiKey: '',
+    deps: createDeps(),
+    constants,
+  });
+
+  assert.equal(registryReads, 0);
+  assert.deepEqual(allowed, { ok: true, reason: 'worker-canonical-open', scope: 'ai' });
+  assert.deepEqual(denied, {
+    ok: false,
+    status: 403,
+    error: constants.anonymousRouteDeniedError,
+    reason: 'worker-canonical-anonymous-scope-denied',
+    scope: 'transcribe',
+  });
+});

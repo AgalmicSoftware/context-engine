@@ -282,6 +282,67 @@ describe('sessionCorsWorker auth routes', () => {
     expect(kv.delete).toHaveBeenCalledWith(`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`);
   });
 
+  it('issues passkey-wallet login tokens for unregistered worker-canonical sessions', async () => {
+    global.fetch = jest.fn(() => Promise.reject(new Error('registry fetch must not run')));
+    const workerSlug = 'worker-canonical-auth';
+    const kv = createMemoryKv({
+      [`session:${workerSlug}:config`]: JSON.stringify({
+        slug: workerSlug,
+        adminAddress: wallet.address,
+        allowOrigins: [loginOrigin],
+        sessionModeProfile: {
+          authority: { mode: 'worker_canonical' },
+          authorization: { mechanisms: ['worker_roles'] },
+        },
+        workerAuthority: {
+          version: 1,
+          participantScopes: ['ai', 'transcribe', 'storage', 'groups'],
+          anonymousScopes: ['ai', 'transcribe'],
+        },
+      }),
+    });
+    const env = {
+      GROUP_KV: kv,
+      TOKEN_HMAC_SECRET: 'test-secret',
+    };
+
+    const nonceResponse = await sessionCorsWorker.fetch(
+      makeAuthJsonRequest('/auth/nonce', {
+        address: wallet.address,
+        sessionSlug: workerSlug,
+      }),
+      env,
+      {},
+    );
+    const { nonce } = await nonceResponse.json();
+    const message = buildLoginSiweMessage({ address: wallet.address, nonce });
+    const signature = await wallet.signMessage(message);
+    const loginResponse = await sessionCorsWorker.fetch(
+      makeAuthJsonRequest('/auth/login', {
+        address: wallet.address,
+        sessionSlug: workerSlug,
+        message,
+        signature,
+      }),
+      env,
+      {},
+    );
+    const payload = await loginResponse.json();
+
+    expect(loginResponse.status).toBe(200);
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(decodeTokenPayload(payload.token)).toMatchObject({
+      slug: workerSlug,
+      scopes: {
+        admin: true,
+        ai: true,
+        transcribe: true,
+        storage: true,
+        groups: true,
+      },
+    });
+  });
+
   it('issues login tokens with exact mixed scopes from resource gates', async () => {
     const fetchMock = buildRpcFetchMock({
       rpcUrl,
