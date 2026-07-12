@@ -125,7 +125,6 @@ if (packageJson.scripts && typeof packageJson.scripts === 'object') {
     /\bscripts\/run-e2e-[^\s'"]+\.js\b/,
     /\bscripts\/run-ux-[^\s'"]+\.js\b/,
     /\bscripts\/capture-ux-[^\s'"]+\.js\b/,
-    /\bscripts\/run-agent-bridge-worker-tests\.js\b/,
     /\bscripts\/run-contextengine-cc-tests\.js\b/,
     /\bscripts\/vendor-cecc-ethers-bundle\.js\b/,
     /\bscripts\/restore-private-pack\.sh\b/,

@@ -28,6 +28,10 @@ All notable changes to this project will be documented in this file.
   depth, keeping live/future borders visible only while demo mode is enabled.
 - Split the desktop main-screen welcome controls into equal-height rows and
   aligned their rail to the slide edges without changing session welcome slides.
+- Stabilized the desktop main-screen welcome carousel at one responsive frame
+  height so advancing between slides no longer resizes the card.
+- Added the agent bridge worker and its test runner to the public release
+  surface, with public-safe setup examples and artifact-level PII verification.
 
 ### Fixed
 

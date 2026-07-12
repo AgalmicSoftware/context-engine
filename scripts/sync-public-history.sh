@@ -83,7 +83,6 @@ PRIVATE_REPLAY_MESSAGE_TOKENS=(
   "contextEngine-cc"
   "docs/agent-native"
   "agent-native"
-  "workers/agentBridgeWorker"
   "client/public/skill.md"
   "scripts/e2e"
   "scripts/lib/e2e"
@@ -235,7 +234,6 @@ const replacements = [
   [/OpenClaw/gi, 'external agent'],
   [/private agent/gi, 'private integration'],
   [/TODO\//gi, 'private planning/'],
-  [/workers\/agentBridgeWorker/gi, 'private integration'],
   [/client\/public\/skill\.md/gi, 'private integration asset'],
   [/scripts\/(?:lib\/)?e2e/gi, 'private test tooling'],
   [/scripts\/(?:test|seed)-[^\s`'")]+/gi, 'private test tooling'],
