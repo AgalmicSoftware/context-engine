@@ -837,7 +837,7 @@ export const TagPageView = ({
   const registryChainId = network?.chainId ?? network?.id ?? null;
   const { snapshotQuery: sessionRegistrySnapshotQuery } = useSessionRegistryReads({
     chainId: registryChainId,
-    enabled: !isDemoCorpusContext,
+    includeRegistryList: !isDemoCorpusContext,
     sessionSlugs: registryRequestedSlugs,
   });
   const sessionRegistrySnapshot = sessionRegistrySnapshotQuery.data || {

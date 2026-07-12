@@ -50,6 +50,11 @@ The client has one shared TanStack Query client at
 wagmi 0.9 provides that instance through a private React context, so App also
 mounts a default `QueryClientProvider` with the same instance for application
 queries. There are two provider contexts but only one client and one cache.
+Hook modules consume that client with TanStack's `useQueryClient()` context and
+must not import `appQueryClient.tsx`; only the app bootstrap and its identity
+test import the foundation module. This keeps wagmi's ESM bundle and its
+module-scope `configureChains`/`createClient` side effects out of unrelated
+component and test import graphs.
 
 Application query hooks belong between components and domain ports:
 
@@ -65,7 +70,8 @@ Web3, Arweave, worker, or storage utilities directly. Existing IndexedDB and
 localStorage caches remain authoritative persistence; this layer does not use a
 React Query persistence plugin.
 
-Keys use the primitive-only factory exposed as `appQueryFoundation.keys`. A
+Keys use the primitive-only `queryKeys` factory, which the app foundation also
+exposes for bootstrap consumers. A
 scoped key has fixed slots
 `[domain, entity, chainId, sessionSlug, address, ...ids]`; absent scope values
 are `null`, addresses are normalized to lowercase, and object-valued IDs are

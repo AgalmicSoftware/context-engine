@@ -1,5 +1,6 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
@@ -9,7 +10,6 @@ import TagPage, { readTagAiCacheEntry, writeTagAiCacheEntry } from './TagPage';
 import TagModal from './TagModal';
 import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
 import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.js';
-import { appQueryFoundation } from '../../app/runtime/appQueryClient';
 
 const mockListNamespaceEntriesSync = jest.fn();
 const mockSubscribeCacheUpdates = jest.fn(() => () => {});
@@ -30,19 +30,6 @@ const SESSION_REGISTRY_MOUNT_READ_BASELINE = Object.freeze({
   configReads: 2,
   totalReads: 3,
 });
-
-jest.mock('../../app/runtime/appWagmiRuntime', () => ({
-  wagmiClient: (() => {
-    const { QueryClient } = jest.requireActual('@tanstack/react-query');
-    return {
-      queryClient: new QueryClient({
-        defaultOptions: {
-          queries: { retry: false },
-        },
-      }),
-    };
-  })(),
-}));
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
@@ -134,8 +121,12 @@ jest.mock('reactstrap', () => {
 
 const TagPageComponent = TagPage as React.ComponentType<any>;
 const TagModalComponent = TagModal as React.ComponentType<any>;
-const AppQueryProvider = appQueryFoundation.Provider;
 const buildTagInterpretationPromptAny = buildTagInterpretationPrompt as any;
+let queryClient: QueryClient;
+
+const AppQueryProvider = ({ children }: { children: React.ReactNode }) => (
+  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+);
 
 describe('tag AI cache helpers', () => {
   it('refreshes cache recency when reading an existing interpretation', () => {
@@ -317,7 +308,11 @@ const renderTagModal = ({
 
 describe('TagPage', () => {
   beforeEach(() => {
-    appQueryFoundation.client.clear();
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    });
     mockSubscribeCacheUpdates.mockReturnValue(() => {});
     mockGetAllSessionSlugs.mockReturnValue(['', 'edge', 'alpha', 'beta']);
     mockGetSessionConfigBySlug.mockReturnValue(null);
@@ -962,7 +957,11 @@ describe('TagPage', () => {
 
 describe('TagModal', () => {
   beforeEach(() => {
-    appQueryFoundation.client.clear();
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    });
     mockSubscribeCacheUpdates.mockReturnValue(() => {});
     mockGetAllSessionSlugs.mockReturnValue(['', 'edge', 'alpha', 'beta']);
     mockGetSessionConfigBySlug.mockReturnValue(null);
@@ -986,6 +985,12 @@ describe('TagModal', () => {
   });
 
   it('uses dedicated tag-modal shell classes and keeps the demo info cog beside the modal close control', () => {
+    mockGetSessionConfigBySlug.mockImplementation((slug) =>
+      slug === 'edge' ? { slug: 'edge', sessionName: 'Registry Edge' } : null,
+    );
+    mockGetDemoSessionConfigBySlug.mockImplementation((slug) =>
+      slug === 'edge' ? { slug: 'edge', sessionName: 'Demo Edge' } : null,
+    );
     renderTagModal({
       entry: '/demo/corpus-viewer',
       demoCorpusMode: true,
@@ -1008,7 +1013,9 @@ describe('TagModal', () => {
     expect(
       screen.getByText(/demo corpus mode uses the demo corpus records currently loaded in this view/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/session scope: edge/i)).toBeInTheDocument();
+    expect(screen.getByText(/session scope: Registry Edge \(edge\)/i)).toBeInTheDocument();
+    expect(mockPortGetAllSessionSlugs).not.toHaveBeenCalled();
+    expect(mockPortGetSessionConfigBySlug).toHaveBeenCalledWith('edge');
     expect(screen.queryByTestId('ce-tag-page-session-selector-toggle')).not.toBeInTheDocument();
   });
 

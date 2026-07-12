@@ -1,6 +1,6 @@
 import React, { type ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { appQueryFoundation } from '../../app/runtime/appQueryClient';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useSessionRegistryReads } from './useSessionRegistryReads';
 
 const mockGetAllSessionSlugs = jest.fn();
@@ -12,19 +12,6 @@ const mockSubscribeToCacheUpdates = jest.fn(
   },
 );
 
-jest.mock('../../app/runtime/appWagmiRuntime', () => ({
-  wagmiClient: (() => {
-    const { QueryClient } = jest.requireActual('@tanstack/react-query');
-    return {
-      queryClient: new QueryClient({
-        defaultOptions: {
-          queries: { retry: false },
-        },
-      }),
-    };
-  })(),
-}));
-
 jest.mock('../../domains/sessions/registry/sessionRegistryReadPorts.js', () => ({
   __esModule: true,
   sessionRegistryReadsPort: {
@@ -34,14 +21,19 @@ jest.mock('../../domains/sessions/registry/sessionRegistryReadPorts.js', () => (
   },
 }));
 
+let queryClient: QueryClient;
+
 const QueryWrapper = ({ children }: { children: ReactNode }) => {
-  const Provider = appQueryFoundation.Provider;
-  return <Provider>{children}</Provider>;
+  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 };
 
 describe('useSessionRegistryReads', () => {
   beforeEach(() => {
-    appQueryFoundation.client.clear();
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    });
     mockGetAllSessionSlugs.mockReturnValue(['', 'edge']);
     mockGetSessionConfigBySlug.mockImplementation((slug) =>
       slug ? { slug, sessionName: `${slug} session` } : null,
@@ -57,19 +49,19 @@ describe('useSessionRegistryReads', () => {
     renderHook(() => useSessionRegistryReads({ chainId: '11155420' }), {
       wrapper: QueryWrapper,
     });
-    const [query] = appQueryFoundation.client.getQueryCache().getAll();
+    const [query] = queryClient.getQueryCache().getAll();
     const key = query.queryKey;
 
     expect(key).toEqual(['sessions', 'registry', 11155420, null, null, 'snapshot']);
     expect(Object.isFrozen(key)).toBe(true);
   });
 
-  it('resolves the shared app client and preserves synchronous mount data', () => {
+  it('resolves the provider client and preserves synchronous mount data', () => {
     const { result } = renderHook(() => useSessionRegistryReads({ chainId: 84532 }), {
       wrapper: QueryWrapper,
     });
 
-    expect(result.current.queryClient).toBe(appQueryFoundation.client);
+    expect(result.current.queryClient).toBe(queryClient);
     expect(result.current.snapshotQuery.data).toEqual({
       slugs: ['', 'edge'],
       configsBySlug: {
@@ -82,8 +74,40 @@ describe('useSessionRegistryReads', () => {
     expect(mockGetSessionConfigBySlug).toHaveBeenCalledWith('edge');
   });
 
+  it('keeps requested-only config reads isolated from the registry list projection', () => {
+    const { result } = renderHook(
+      () =>
+        useSessionRegistryReads({
+          chainId: 84532,
+          includeRegistryList: false,
+          sessionSlugs: ['edge'],
+        }),
+      { wrapper: QueryWrapper },
+    );
+    const [query] = queryClient.getQueryCache().getAll();
+
+    expect(query.queryKey).toEqual([
+      'sessions',
+      'registry',
+      84532,
+      null,
+      null,
+      'snapshot',
+      'requested-only',
+      'edge',
+    ]);
+    expect(result.current.snapshotQuery.data).toEqual({
+      slugs: [],
+      configsBySlug: {
+        edge: { slug: 'edge', sessionName: 'edge session' },
+      },
+    });
+    expect(mockGetAllSessionSlugs).not.toHaveBeenCalled();
+    expect(mockGetSessionConfigBySlug).toHaveBeenCalledWith('edge');
+  });
+
   it('invalidates the registry family and refetches on the cache event', async () => {
-    const invalidateQueries = jest.spyOn(appQueryFoundation.client, 'invalidateQueries');
+    const invalidateQueries = jest.spyOn(queryClient, 'invalidateQueries');
     const { result, unmount } = renderHook(() => useSessionRegistryReads({ chainId: 84532 }), {
       wrapper: QueryWrapper,
     });
