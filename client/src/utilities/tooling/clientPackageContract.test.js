@@ -82,6 +82,14 @@ describe('client package modernization contract', () => {
     );
   });
 
+  it('makes bundle analysis build its own sourcemaps without changing production builds', () => {
+    const pkg = readClientPackageJson();
+
+    expect(pkg.scripts.build).not.toContain('sourcemap');
+    expect(pkg.scripts.analyze).toContain('npm run build -- --sourcemap true');
+    expect(pkg.scripts.analyze).toContain('--html build/bundle-report.html');
+  });
+
   it('keeps legacy Vite aliases and CRA fallback scripts removed from the client package contract', () => {
     const pkg = readClientPackageJson();
     const eslintConfig = readClientFile('eslint.config.mjs');
