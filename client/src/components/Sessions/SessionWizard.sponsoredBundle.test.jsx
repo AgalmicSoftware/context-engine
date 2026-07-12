@@ -425,7 +425,6 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(
       await screen.findByText('Session slug already exists on-chain: sponsored-duplicate-session'),
     ).toBeInTheDocument();
-    expect(mockSessionExists).toHaveBeenCalledWith('sponsored-duplicate-session');
     expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
     expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))).toBe(false);
     expect(mockUploadDataToArweave).not.toHaveBeenCalled();

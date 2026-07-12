@@ -19,14 +19,14 @@ describe('sessionModeProfile', () => {
     expect(compiled.storageProfile).toEqual(
       expect.objectContaining({
         backend: 'cloudflare',
-        payloadAccessControl: { gate: 'sbt_gate', encryption: 'none' },
+        payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
         resources: expect.objectContaining({
           questions: 'active',
           responses: 'active',
         }),
       }),
     );
-    expect(compiled.payloadAccessControl).toEqual({ gate: 'sbt_gate', encryption: 'none' });
+    expect(compiled.payloadAccessControl).toEqual({ gate: 'sbt_gate', encryption: 'worker_envelope' });
     expect(compiled.payloadAccessMode).toBe('worker_sbt_gate');
     expect(compiled.resultsExposure).toEqual({
       aggregateResultsEnabled: true,
@@ -65,12 +65,13 @@ describe('sessionModeProfile', () => {
     );
 
     const litWithoutChain = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    litWithoutChain.encryption.mode = 'lit';
+    litWithoutChain.encryption = { mode: 'lit' };
     expect(validateSessionModeProfile(litWithoutChain).issues).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'lit_requires_registry_chain' })]),
     );
 
     const encryptedExportWithoutEncryption = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    encryptedExportWithoutEncryption.encryption = { mode: 'none' };
     encryptedExportWithoutEncryption.export.scope = 'encrypted_envelopes_only';
     expect(validateSessionModeProfile(encryptedExportWithoutEncryption).issues).toEqual(
       expect.arrayContaining([expect.objectContaining({ code: 'encrypted_export_requires_encryption' })]),
@@ -144,6 +145,7 @@ describe('sessionModeProfile', () => {
   it('lets explicit Cloudflare access override the default gate', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.encryption = { mode: 'none' };
     profile.storage.payloadAccessControl = { gate: 'none', encryption: 'none' };
 
     const compiled = compileSessionModeProfile(profile);

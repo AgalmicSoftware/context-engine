@@ -5,14 +5,15 @@ import SessionModeProfileField from './SessionModeProfileField';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('SessionModeProfileField', () => {
-  it('starts with no selected preset and gates Continue', () => {
+  it('starts with no selected preset and no entry Continue button', () => {
     const onChange = jest.fn();
     render(<SessionModeProfileField registryChainId={11155420} onChange={onChange} />);
 
-    expect(screen.getByTestId('ce-new-preset-continue')).toBeDisabled();
+    expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByText(/Hosted on Cloudflare\. Session-scoped by default\./)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/Hosted on Cloudflare with worker-managed encryption by default\./)).toBeInTheDocument();
     expect(screen.getByText(/Published publicly and permanently unless you enable encryption\./)).toBeInTheDocument();
     expect(screen.getByText('Cloudflare API token')).toBeInTheDocument();
     expect(screen.getAllByText('AI provider key')).toHaveLength(2);
@@ -54,27 +55,55 @@ describe('SessionModeProfileField', () => {
     );
   });
 
-  it('continues only after a mode profile exists', () => {
+  it('continues immediately after an entry preset is selected', () => {
     const onChange = jest.fn();
     const onContinue = jest.fn();
-    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    const { rerender } = render(
-      <SessionModeProfileField registryChainId={11155420} onChange={onChange} onContinue={onContinue} />,
-    );
-
-    fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
-    expect(onContinue).not.toHaveBeenCalled();
-
-    rerender(
+    render(
       <SessionModeProfileField
         registryChainId={11155420}
-        value={profile}
         onChange={onChange}
         onContinue={onContinue}
+        entryOnly
       />,
     );
-    fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
+
+    fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preset: 'fast_cheap_cloudflare',
+        storage: { backend: 'cloudflare' },
+        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+      }),
+      expect.objectContaining({
+        storageProfile: expect.objectContaining({
+          backend: 'cloudflare',
+          payloadAccessControl: expect.objectContaining({ encryption: 'worker_envelope' }),
+        }),
+      }),
+    );
     expect(onContinue).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
+  });
+
+  it('offers Lit and Cloudflare-internal encryption for the Cloudflare preset', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const onChange = jest.fn();
+    render(<SessionModeProfileField registryChainId={11155420} value={profile} onChange={onChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
+
+    const encryptionOptions = within(screen.getByRole('radiogroup', { name: /encryption/i }));
+    expect(encryptionOptions.getByRole('radio', { name: 'Cloudflare internal' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(encryptionOptions.getByRole('radio', { name: 'Lit' })).not.toBeDisabled();
+    fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ preset: 'custom', encryption: { mode: 'lit' } }),
+      expect.any(Object),
+    );
   });
 
   it('marks profile custom after an advanced override', () => {
