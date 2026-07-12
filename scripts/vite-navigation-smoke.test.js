@@ -4,7 +4,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  DEFAULT_ROUTE_TEXT,
   compactSmokeSummary,
+  findMissingExpectedText,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
   normalizeBaseUrl,
@@ -42,6 +44,17 @@ test('normalizeLayoutProbeSelectors keeps default browser layout checks and acce
 
 test('routeUrl joins normalized app URLs and routes', () => {
   assert.equal(routeUrl('http://127.0.0.1:3000', '/session/demo'), 'http://127.0.0.1:3000/session/demo');
+});
+
+test('session smoke markers survive both resolving and loaded pe4 shell states', () => {
+  const expectedText = DEFAULT_ROUTE_TEXT['/session/pe4'];
+  const resolvingState = 'LOG IN Resolving pe4 Session... Questions – Answer or Add Groups – Join or Create Results – View or Save';
+  const loadedState = 'LOG IN pe4 Loading... 0s 0 / 0 Groups Join or Create Results View';
+
+  assert.deepEqual(expectedText, ['Groups', 'Results']);
+  assert.deepEqual(findMissingExpectedText(resolvingState, expectedText), []);
+  assert.deepEqual(findMissingExpectedText(loadedState, expectedText), []);
+  assert.deepEqual(findMissingExpectedText('LOG IN pe4 Groups Join or Create', expectedText), ['Results']);
 });
 
 test('failed local chain probes are allowed without masking same-origin asset failures', () => {
