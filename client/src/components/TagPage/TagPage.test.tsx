@@ -19,12 +19,10 @@ const mockGetDemoSessionConfigBySlug = jest.fn();
 const mockCallAI = jest.fn();
 const mockPortGetAllSessionSlugs = jest.fn((...args: any[]) => mockGetAllSessionSlugs(...args));
 const mockPortGetSessionConfigBySlug = jest.fn((...args: any[]) => mockGetSessionConfigBySlug(...args));
-const mockSubscribeSessionRegistryUpdates = jest.fn(
-  (target: Window, listener: EventListenerOrEventListenerObject) => {
-    target.addEventListener('ce:session-registry-cache-updated', listener);
-    return () => target.removeEventListener('ce:session-registry-cache-updated', listener);
-  },
-);
+const mockSubscribeSessionRegistryUpdates = jest.fn((target: Window, listener: EventListenerOrEventListenerObject) => {
+  target.addEventListener('ce:session-registry-cache-updated', listener);
+  return () => target.removeEventListener('ce:session-registry-cache-updated', listener);
+});
 const SESSION_REGISTRY_MOUNT_READ_BASELINE = Object.freeze({
   slugReads: 1,
   configReads: 2,

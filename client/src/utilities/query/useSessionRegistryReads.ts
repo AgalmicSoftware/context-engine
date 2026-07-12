@@ -26,9 +26,11 @@ type UseSessionRegistryReadsResult = {
 
 const sessionRegistryQueryKeys = Object.freeze({
   family: sessionRegistryQueryFamilyKey,
-  snapshot: (
-    { chainId = null, includeRegistryList = true, sessionSlugs = [] }: UseSessionRegistryReadsOptions = {},
-  ): ScopedQueryKey => {
+  snapshot: ({
+    chainId = null,
+    includeRegistryList = true,
+    sessionSlugs = [],
+  }: UseSessionRegistryReadsOptions = {}): ScopedQueryKey => {
     const requestedSlugs = Array.from(new Set(sessionSlugs.map(String))).sort();
     return queryKeys.scoped('sessions', 'registry', {
       chainId,

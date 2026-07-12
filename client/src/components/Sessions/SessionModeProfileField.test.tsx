@@ -59,12 +59,7 @@ describe('SessionModeProfileField', () => {
     const onChange = jest.fn();
     const onContinue = jest.fn();
     render(
-      <SessionModeProfileField
-        registryChainId={11155420}
-        onChange={onChange}
-        onContinue={onContinue}
-        entryOnly
-      />,
+      <SessionModeProfileField registryChainId={11155420} onChange={onChange} onContinue={onContinue} entryOnly />,
     );
 
     fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));

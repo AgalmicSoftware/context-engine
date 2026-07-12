@@ -6,12 +6,10 @@ import { useSessionRegistryReads } from './useSessionRegistryReads';
 
 const mockGetAllSessionSlugs = jest.fn();
 const mockGetSessionConfigBySlug = jest.fn();
-const mockSubscribeToCacheUpdates = jest.fn(
-  (target: Window, listener: EventListenerOrEventListenerObject) => {
-    target.addEventListener('ce:session-registry-cache-updated', listener);
-    return () => target.removeEventListener('ce:session-registry-cache-updated', listener);
-  },
-);
+const mockSubscribeToCacheUpdates = jest.fn((target: Window, listener: EventListenerOrEventListenerObject) => {
+  target.addEventListener('ce:session-registry-cache-updated', listener);
+  return () => target.removeEventListener('ce:session-registry-cache-updated', listener);
+});
 
 jest.mock('../../domains/sessions/registry/sessionRegistryReadPorts.js', () => ({
   __esModule: true,
@@ -44,9 +42,7 @@ describe('useSessionRegistryReads', () => {
       },
     });
     mockGetAllSessionSlugs.mockReturnValue(['', 'edge']);
-    mockGetSessionConfigBySlug.mockImplementation((slug) =>
-      slug ? { slug, sessionName: `${slug} session` } : null,
-    );
+    mockGetSessionConfigBySlug.mockImplementation((slug) => (slug ? { slug, sessionName: `${slug} session` } : null));
   });
 
   afterEach(() => {

@@ -214,10 +214,7 @@ const dedupeSessionSlugs = (values: unknown[] | unknown = []): string[] => {
   return out;
 };
 
-const buildSessionScopeLabel = (
-  slugIn = '',
-  configsBySlug: Record<string, SessionRegistryConfig> = {},
-): string => {
+const buildSessionScopeLabel = (slugIn = '', configsBySlug: Record<string, SessionRegistryConfig> = {}): string => {
   const slug = normalizeSessionSlug(slugIn);
   if (!slug) return 'General';
   const cfg = configsBySlug[slug] || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) || {};

@@ -15,14 +15,7 @@ describe('queryKeys', () => {
         ids: ['token-1', 7, true, null],
       }),
     ).toEqual([appScope, 'sbt', 'holders', 11155420, 'demo-session', '0xabcd', 'token-1', 7, true, null]);
-    expect(queryKeys.scoped('session', 'registry', {})).toEqual([
-      appScope,
-      'session',
-      'registry',
-      null,
-      null,
-      null,
-    ]);
+    expect(queryKeys.scoped('session', 'registry', {})).toEqual([appScope, 'session', 'registry', null, null, null]);
   });
 
   it('copies scalar inputs instead of retaining scope or ids identity', () => {

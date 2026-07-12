@@ -32,8 +32,7 @@ const PRESET_CARDS = [
     id: SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
     title: 'Fast & Cheap (Cloudflare)',
     badge: 'Recommended',
-    copy:
-      'Hosted on Cloudflare with worker-managed encryption by default. Session-scoped, not permanent, and optionally anchored later.',
+    copy: 'Hosted on Cloudflare with worker-managed encryption by default. Session-scoped, not permanent, and optionally anchored later.',
     keys: ['Cloudflare API token', 'AI provider key', 'Arweave JWK', 'RPC URL/key', 'Lit key only for Lit encryption'],
   },
   {

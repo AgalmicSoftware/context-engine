@@ -607,9 +607,7 @@ describe('error paths', () => {
           initializeGroupPasswordHash: true,
         },
       ),
-    ).rejects.toThrow(
-      'Configured deterministic SBT deployment must be submitted by the SBT admin wallet.',
-    );
+    ).rejects.toThrow('Configured deterministic SBT deployment must be submitted by the SBT admin wallet.');
 
     expect(mockFactory.estimateGas.createSBTDeterministicConfigured).not.toHaveBeenCalled();
     expect(mockFactory.createSBTDeterministicConfigured).not.toHaveBeenCalled();
