@@ -44,6 +44,7 @@ contract Surveys {
         bytes32[] calldata questionIds,
         bytes32[] calldata questionContentHashes
     ) external {
+        require(surveyContentHash != bytes32(0), "Invalid survey content hash");
         require(surveyHashes[surveyId] == bytes32(0), "Survey with this ID already exists");
         surveyHashes[surveyId] = surveyContentHash;
         surveyCreators[surveyId] = msg.sender;
@@ -71,6 +72,7 @@ contract Surveys {
         );
 
         for (uint256 i = 0; i < questionIds.length; i++) {
+            require(contentHashes[i] != bytes32(0), "Invalid question content hash");
             require(questionHashes[questionIds[i]] == bytes32(0), "Question with this ID already exists");
             questionHashes[questionIds[i]] = contentHashes[i];
 

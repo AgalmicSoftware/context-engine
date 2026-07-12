@@ -51,6 +51,42 @@ contract SurveysTest is TestUtils {
         assertFalse(ok, "expected duplicate survey to revert");
     }
 
+    function testAddSurveyRejectsZeroContentHash() public {
+        bytes32 surveyId = keccak256(abi.encodePacked("survey-zero-hash"));
+        bytes32[] memory empty = new bytes32[](0);
+
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Invalid survey content hash"));
+        surveys.addSurvey(surveyId, bytes32(0), empty, empty);
+    }
+
+    function testAddSurveyDuplicateCannotReplaceCreator() public {
+        bytes32 surveyId = keccak256(abi.encodePacked("survey-creator-guard"));
+        bytes32 surveyHash = keccak256(abi.encodePacked("survey-data"));
+        bytes32 replacementHash = keccak256(abi.encodePacked("replacement-data"));
+        bytes32[] memory empty = new bytes32[](0);
+
+        vm.prank(creator);
+        surveys.addSurvey(surveyId, surveyHash, empty, empty);
+
+        vm.prank(otherUser);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Survey with this ID already exists"));
+        surveys.addSurvey(surveyId, replacementHash, empty, empty);
+
+        assertEq(surveys.surveyCreators(surveyId), creator, "duplicate changed survey creator");
+    }
+
+    function testAddQuestionsRejectsZeroContentHash() public {
+        bytes32[] memory questionIds = new bytes32[](1);
+        bytes32[] memory questionHashes = new bytes32[](1);
+        bytes32[] memory surveyIds = new bytes32[](1);
+        questionIds[0] = keccak256(abi.encodePacked("zero-hash-question"));
+        questionHashes[0] = bytes32(0);
+        surveyIds[0] = bytes32(0);
+
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Invalid question content hash"));
+        surveys.addQuestions(questionIds, questionHashes, surveyIds);
+    }
+
     function testAddQuestionsStandaloneAndAssociated() public {
         bytes32 surveyId = keccak256(abi.encodePacked("survey-standalone"));
         bytes32 surveyHash = keccak256(abi.encodePacked("survey-data"));
