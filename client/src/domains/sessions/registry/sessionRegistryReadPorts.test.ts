@@ -33,6 +33,20 @@ const buildRegistryModule = (overrides: Partial<SessionRegistryReadModule> = {})
 });
 
 describe('session registry read ports', () => {
+  it('routes resolved slug and config reads through the session facade', () => {
+    const getAllSessionSlugs = jest.fn(() => ['', 'edge']);
+    const getSessionConfigBySlug = jest.fn((slug) => ({ slug, sessionName: 'Edge' }));
+    const port = bindSessionRegistryReadsPort({
+      sessionRegistry: () => buildRegistryModule(),
+      sessionConfig: () => ({ getAllSessionSlugs, getSessionConfigBySlug }),
+    });
+
+    expect(port.getAllSessionSlugs({ includeEmpty: true })).toEqual(['', 'edge']);
+    expect(port.getSessionConfigBySlug('edge')).toEqual({ slug: 'edge', sessionName: 'Edge' });
+    expect(getAllSessionSlugs).toHaveBeenCalledWith({ includeEmpty: true });
+    expect(getSessionConfigBySlug).toHaveBeenCalledWith('edge');
+  });
+
   it('routes cache reads and shared registry operations through call-time lookup', async () => {
     const firstModule = buildRegistryModule({
       loadSessionRegistryCache: jest.fn(async () => ({ sessions: { first: {} } })),

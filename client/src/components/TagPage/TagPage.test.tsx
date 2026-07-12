@@ -9,6 +9,7 @@ import TagPage, { readTagAiCacheEntry, writeTagAiCacheEntry } from './TagPage';
 import TagModal from './TagModal';
 import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
 import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.js';
+import { appQueryFoundation } from '../../app/runtime/appQueryClient';
 
 const mockListNamespaceEntriesSync = jest.fn();
 const mockSubscribeCacheUpdates = jest.fn(() => () => {});
@@ -24,6 +25,19 @@ const mockSubscribeSessionRegistryUpdates = jest.fn(
     return () => target.removeEventListener('ce:session-registry-cache-updated', listener);
   },
 );
+
+jest.mock('../../app/runtime/appWagmiRuntime', () => ({
+  wagmiClient: (() => {
+    const { QueryClient } = jest.requireActual('@tanstack/react-query');
+    return {
+      queryClient: new QueryClient({
+        defaultOptions: {
+          queries: { retry: false },
+        },
+      }),
+    };
+  })(),
+}));
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
@@ -115,6 +129,7 @@ jest.mock('reactstrap', () => {
 
 const TagPageComponent = TagPage as React.ComponentType<any>;
 const TagModalComponent = TagModal as React.ComponentType<any>;
+const AppQueryProvider = appQueryFoundation.Provider;
 const buildTagInterpretationPromptAny = buildTagInterpretationPrompt as any;
 
 describe('tag AI cache helpers', () => {
@@ -261,11 +276,13 @@ const renderTagPage = ({
   tagPageProps = {},
 }: Record<string, any> = {}) =>
   render(
-    <Provider store={createTagPageStore(sessionState)}>
-      <MemoryRouter initialEntries={[entry]}>
-        <TagPageComponent questionResponsesNonce={0} isQuestionCacheReady={isQuestionCacheReady} {...tagPageProps} />
-      </MemoryRouter>
-    </Provider>,
+    <AppQueryProvider>
+      <Provider store={createTagPageStore(sessionState)}>
+        <MemoryRouter initialEntries={[entry]}>
+          <TagPageComponent questionResponsesNonce={0} isQuestionCacheReady={isQuestionCacheReady} {...tagPageProps} />
+        </MemoryRouter>
+      </Provider>
+    </AppQueryProvider>,
   );
 
 const renderTagModal = ({
@@ -278,21 +295,24 @@ const renderTagModal = ({
   toggle = jest.fn(),
 }: Record<string, any> = {}) =>
   render(
-    <Provider store={createTagPageStore(sessionState)}>
-      <MemoryRouter initialEntries={[entry]}>
-        <TagModalComponent
-          isOpen={isOpen}
-          toggle={toggle}
-          activeTag={activeTag}
-          demoCorpusMode={demoCorpusMode}
-          demoCorpusRecords={demoCorpusRecordsOverride}
-        />
-      </MemoryRouter>
-    </Provider>,
+    <AppQueryProvider>
+      <Provider store={createTagPageStore(sessionState)}>
+        <MemoryRouter initialEntries={[entry]}>
+          <TagModalComponent
+            isOpen={isOpen}
+            toggle={toggle}
+            activeTag={activeTag}
+            demoCorpusMode={demoCorpusMode}
+            demoCorpusRecords={demoCorpusRecordsOverride}
+          />
+        </MemoryRouter>
+      </Provider>
+    </AppQueryProvider>,
   );
 
 describe('TagPage', () => {
   beforeEach(() => {
+    appQueryFoundation.client.clear();
     mockSubscribeCacheUpdates.mockReturnValue(() => {});
     mockGetAllSessionSlugs.mockReturnValue(['', 'edge', 'alpha', 'beta']);
     mockGetSessionConfigBySlug.mockReturnValue(null);
@@ -754,9 +774,9 @@ describe('TagPage', () => {
     expect(screen.getByRole('button', { name: 'Edge Registry (edge)' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'General' })).toBeInTheDocument();
     expect(mockGetAllSessionSlugs).toHaveBeenCalledTimes(1);
-    expect(mockGetSessionConfigBySlug.mock.calls).toEqual([['edge'], ['edge']]);
-    expect(mockPortGetAllSessionSlugs).not.toHaveBeenCalled();
-    expect(mockPortGetSessionConfigBySlug).not.toHaveBeenCalled();
+    expect(mockGetSessionConfigBySlug.mock.calls).toEqual([['edge']]);
+    expect(mockPortGetAllSessionSlugs).toHaveBeenCalledTimes(1);
+    expect(mockPortGetSessionConfigBySlug).toHaveBeenCalledTimes(1);
     expect(mockSubscribeSessionRegistryUpdates).toHaveBeenCalledTimes(1);
   });
 
@@ -929,6 +949,7 @@ describe('TagPage', () => {
 
 describe('TagModal', () => {
   beforeEach(() => {
+    appQueryFoundation.client.clear();
     mockSubscribeCacheUpdates.mockReturnValue(() => {});
     mockGetAllSessionSlugs.mockReturnValue(['', 'edge', 'alpha', 'beta']);
     mockGetSessionConfigBySlug.mockReturnValue(null);
@@ -1008,17 +1029,19 @@ describe('TagModal', () => {
     scrollArea.scrollTop = 240;
 
     rerender(
-      <Provider store={createTagPageStore({})}>
-        <MemoryRouter initialEntries={['/demo/corpus-viewer']}>
-          <TagModalComponent
-            isOpen={true}
-            toggle={toggle}
-            activeTag="Open Source"
-            demoCorpusMode={false}
-            demoCorpusRecords={[]}
-          />
-        </MemoryRouter>
-      </Provider>,
+      <AppQueryProvider>
+        <Provider store={createTagPageStore({})}>
+          <MemoryRouter initialEntries={['/demo/corpus-viewer']}>
+            <TagModalComponent
+              isOpen={true}
+              toggle={toggle}
+              activeTag="Open Source"
+              demoCorpusMode={false}
+              demoCorpusRecords={[]}
+            />
+          </MemoryRouter>
+        </Provider>
+      </AppQueryProvider>,
     );
 
     expect(screen.getByRole('heading', { name: '#Open Source' })).toBeInTheDocument();
