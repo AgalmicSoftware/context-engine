@@ -25,6 +25,11 @@ const mockSubscribeSessionRegistryUpdates = jest.fn(
     return () => target.removeEventListener('ce:session-registry-cache-updated', listener);
   },
 );
+const SESSION_REGISTRY_MOUNT_READ_BASELINE = Object.freeze({
+  slugReads: 1,
+  configReads: 2,
+  totalReads: 3,
+});
 
 jest.mock('../../app/runtime/appWagmiRuntime', () => ({
   wagmiClient: (() => {
@@ -761,7 +766,7 @@ describe('TagPage', () => {
     expect(mockGetAllSessionSlugs).toHaveBeenCalledTimes(2);
   });
 
-  it('pins the registry read shape and exact mount call counts', () => {
+  it('preserves the registry shape without exceeding the mount read baseline', () => {
     mockGetAllSessionSlugs.mockReturnValue(['', 'edge']);
     mockGetSessionConfigBySlug.mockImplementation((slug) =>
       slug === 'edge' ? { slug: 'edge', sessionName: 'Edge Registry' } : { slug: '', sessionName: 'General' },
@@ -778,6 +783,14 @@ describe('TagPage', () => {
     expect(mockPortGetAllSessionSlugs).toHaveBeenCalledTimes(1);
     expect(mockPortGetSessionConfigBySlug).toHaveBeenCalledTimes(1);
     expect(mockSubscribeSessionRegistryUpdates).toHaveBeenCalledTimes(1);
+    const currentReads = {
+      slugReads: mockPortGetAllSessionSlugs.mock.calls.length,
+      configReads: mockPortGetSessionConfigBySlug.mock.calls.length,
+    };
+    expect(currentReads).toEqual({ slugReads: 1, configReads: 1 });
+    expect(currentReads.slugReads + currentReads.configReads).toBeLessThanOrEqual(
+      SESSION_REGISTRY_MOUNT_READ_BASELINE.totalReads,
+    );
   });
 
   it('keeps explicit session query pins scoped to that session', () => {

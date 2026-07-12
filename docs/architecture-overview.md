@@ -42,7 +42,7 @@ Primary source entry points are `client/src/components/MainSite/AppShell.tsx`,
 `client/src/components/Sessions/SessionWizard.tsx`, and
 `client/src/components/Admin/AdminPage.tsx`.
 
-## Query Layer (Provisional)
+## Query Layer
 
 The client has one shared TanStack Query client at
 `client/src/app/runtime/appQueryClient.tsx`. It is the same instance as
@@ -82,8 +82,22 @@ Freshness is mapped per read family from current behavior, never invented:
 TanStack Query v5 renames `cacheTime` to `gcTime`; dependency migration is a
 separate change and must not alter these semantics.
 
-This pattern remains provisional until a functional read surface completes the
-first exemplar and proves in-flight deduplication. Each migration slice must:
+The first functional exemplar is TagPage's session-registry snapshot. It reads
+through the session-registry domain port, uses synchronous `initialData` to
+preserve the previous first render, and keeps `staleTime: Infinity`. The
+existing session-registry cache-update event invalidates the
+`['sessions', 'registry']` key family; successful cache loads and upserts
+already emit that event. Fetch/upsert orchestration remains outside the read
+hook. Its characterized mount reads decreased from three to two.
+
+The event-driven invalidation recipe is:
+
+1. Key the projection with the shared scalar key factory.
+2. Subscribe to the existing cache or revision event in the read hook.
+3. Invalidate the narrow domain/entity key family on that event.
+4. Keep write completion responsible only for emitting the existing signal.
+
+Each migration slice must:
 
 1. Characterize loading, data shape, context changes, freshness, and fetch count.
 2. Add a hook over an existing domain read port using the shared key factory.
