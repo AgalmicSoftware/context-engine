@@ -5,6 +5,7 @@ import {
 } from '../../../domains/sessions/publish/sessionPublishAdapters.js';
 import { setGlobalLitHooks } from '../../../utilities/crypto/litProtocol.js';
 import { SPONSORED_FIELD_KEYS } from '../../../utilities/session/sponsoredFlags.js';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../../utilities/session/sessionModeProfile';
 import type { WorkerSecretsLike } from '../../shellTypes';
 import useSessionWizardWorkerSecretsController from './useSessionWizardWorkerSecretsController';
 
@@ -179,6 +180,21 @@ describe('useSessionWizardWorkerSecretsController', () => {
       'Lit group ID',
       'Lit PKP ID',
     ]);
+  });
+
+  it('requires only the AI key for the default Cloudflare profile', () => {
+    const { result } = createControllerHarness({
+      network: { id: 0 },
+      registryChainId: 0,
+      draft: baseDraft({
+        networkChainId: 0,
+        rpc: { providers: {} },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      }),
+      workerSecrets: baseWorkerSecrets(),
+    });
+
+    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['OpenAI key']);
   });
 
   it('preserves sponsored fallback fields only for the current slug and worker URL', () => {

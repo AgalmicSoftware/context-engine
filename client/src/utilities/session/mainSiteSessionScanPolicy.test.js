@@ -33,6 +33,7 @@ const makeHost = (overrides = {}) => ({
   getSessionSlugHintFromSearch: jest.fn().mockReturnValue(null),
   getSessionTokenFromPath: jest.fn().mockReturnValue(''),
   isSbtListRoutePath: jest.fn().mockReturnValue(false),
+  isWorkerCanonicalSessionSlug: jest.fn().mockReturnValue(false),
   ...overrides,
 });
 
@@ -316,6 +317,21 @@ describe('createSessionScanPolicy', () => {
 
     expect(policy.shouldSkipSessionScanForSlug('beta', 'scan')).toBe(true);
     expect(mockLogger.info).toHaveBeenCalledTimes(1);
+  });
+
+  it('always skips chain scans and SBT listeners for worker-canonical sessions', () => {
+    const host = makeHost({
+      isWorkerCanonicalSessionSlug: jest.fn((slug) => slug === 'worker-session'),
+    });
+    const policy = createSessionScanPolicy(host);
+
+    scanScopeModule.readSessionScanScope.mockReturnValue('all');
+    listenersModule.readSbtInstanceListenersMode.mockReturnValue('on');
+
+    expect(policy.shouldSkipSessionScanForSlug('worker-session', 'responses')).toBe(true);
+    expect(policy.isSessionSlugAllowedForScan('worker-session')).toBe(false);
+    expect(policy.isSbtInstanceListenerEnabledForGroup('worker-session')).toBe(false);
+    expect(scanScopeModule.isSessionSlugAllowedByScope).not.toHaveBeenCalled();
   });
 
   it('runs the onSkipped callback when a slug is out of scope', () => {

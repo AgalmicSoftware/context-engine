@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppShell, appShellDispatchActions } from './AppShell';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -787,6 +787,44 @@ describe('AppShell route render smoke', () => {
     );
   });
 
+  it('fresh-loads a worker-canonical admin link without registry lookup', async () => {
+    const workerOrigin = 'https://admin-worker.example.com';
+    const sessionId = '0xabcdefabcdefabcdefabcdefabcdefab';
+    const workerConfig = {
+      slug: 'admin-worker',
+      sessionId,
+      configRevision: 'admin-revision-1',
+      corsWorkerUrl: workerOrigin,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          sessionSlug: workerConfig.slug,
+          config: workerConfig,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const subject = createSubject({
+      path: '/admin',
+      search:
+        `?sessionId=${sessionId}&sessionSlug=${workerConfig.slug}` + `&worker=${encodeURIComponent(workerOrigin)}`,
+      sessionConfig: null,
+    });
+
+    const view = render(subject.render());
+
+    expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toBeInTheDocument();
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+    view.rerender(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ADMIN_ROOT)).toBeInTheDocument();
+    expect(mockAdminPage.mock.calls.at(-1)?.[0]?.initialSessionConfig).toEqual(workerConfig);
+    expect(mockAdminPage.mock.calls.at(-1)?.[0]?.initialRegistryChainId).toBeNull();
+  });
+
   it('renders the posts root without waiting for cache hydration', async () => {
     const subject = createSubject({ path: '/posts' });
     subject.state = {
@@ -832,6 +870,72 @@ describe('AppShell route render smoke', () => {
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'demo');
     expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-question-session-slug', 'demo');
+  });
+
+  it('fresh-loads an explicit worker-canonical session without registry fallback', async () => {
+    const workerOrigin = 'https://worker-session.example.com';
+    const workerConfig = {
+      slug: 'worker-session',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      configRevision: 'revision-1',
+      corsWorkerUrl: workerOrigin,
+      sessionName: 'Worker Session',
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+        storage: { mode: 'worker_kv' },
+        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+      },
+      workerAuthority: { participantScopes: ['ai', 'storage'] },
+    };
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          sessionSlug: 'worker-session',
+          config: workerConfig,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const subject = createSubject({
+      path: '/session/worker-session',
+      search: `?worker=${encodeURIComponent(workerOrigin)}`,
+      activeSessionSlug: 'edge',
+      sessionConfig: null,
+    });
+    subject.resolveSessionPathSlug = jest.fn();
+
+    const view = render(subject.render());
+
+    expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent(
+      'Loading worker session',
+    );
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+
+    view.rerender(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'worker-session');
+    expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual(workerConfig);
+    expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://worker-session.example.com/session-config?slug=worker-session');
+  });
+
+  it('fails closed on duplicate worker discovery parameters without registry fallback', async () => {
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+    const subject = createSubject({
+      path: '/session/worker-session',
+      search: '?worker=https%3A%2F%2Ffirst.example.com&worker=https%3A%2F%2Fsecond.example.com',
+      sessionConfig: null,
+    });
+    subject.resolveSessionPathSlug = jest.fn();
+
+    render(subject.render());
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('must appear exactly once');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
   });
 
   it('redirects a first-visit root load to the about page', async () => {

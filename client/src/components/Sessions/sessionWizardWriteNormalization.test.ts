@@ -343,6 +343,66 @@ describe('sessionWizardWriteNormalization', () => {
     });
     expect(payload.contracts.reputation).toBeUndefined();
   });
+
+  test('buildSessionWizardWorkerConfigPayload emits a reload-safe two-key worker-canonical config', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'two-key-session',
+      draft: {
+        sessionName: 'Two Key Session',
+        sessionInfo: 'Worker-canonical session content.',
+        sessionHeaderImg: 'https://images.example/header.png',
+        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
+        blockLimits: { start: 250 },
+        contracts: {
+          surveys: { address: '0x111', chainId: DEFAULT_CONFIG_CHAIN_ID },
+        },
+        sessionModeProfile,
+      },
+      deployPayload: {
+        apiToken: 'must-never-persist',
+        openaiKey: 'must-never-persist',
+        registryAddress: '0xRegistry',
+        registryChainId: DEFAULT_CONFIG_CHAIN_ID,
+        rpcUrl: 'https://rpc.example',
+        rpcUrlsByChainId: { [DEFAULT_CONFIG_CHAIN_ID]: ['https://rpc.example'] },
+        faucet: { rpcUrl: 'https://faucet.example' },
+        allowOrigins: ['https://app.example'],
+      },
+      workerSecrets: {
+        litUsageApiKey: 'must-never-persist',
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+
+    expect(payload).toEqual(
+      expect.objectContaining({
+        slug: 'two-key-session',
+        sessionId: '0x123e4567e89b12d3a456426614174000',
+        sessionName: 'Two Key Session',
+        sessionInfo: 'Worker-canonical session content.',
+        sessionHeaderImg: 'https://images.example/header.png',
+        adminAddress: '0x00000000000000000000000000000000000000aa',
+        workerAuthority: {
+          version: 1,
+          participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
+          anonymousScopes: [],
+        },
+      }),
+    );
+    expect(payload.contracts).toBeUndefined();
+    expect(payload.blockLimits).toBeUndefined();
+    expect(payload.registryAddress).toBeUndefined();
+    expect(payload.registryChainId).toBeUndefined();
+    expect(payload.networkChainId).toBeUndefined();
+    expect(payload.rpcUrl).toBeUndefined();
+    expect(payload.rpcUrlsByChainId).toBeUndefined();
+    expect(payload.faucet).toBeUndefined();
+    expect(payload.litCredentials).toBeUndefined();
+    expect(JSON.stringify(payload)).not.toMatch(/must-never-persist|0xRegistry|rpc\.example|faucet\.example/i);
+  });
   test('session storage profile is session-owned metadata and worker config, with Cloudflare secrets omitted', () => {
     const metadata = sanitizeSessionWizardMetadataPayload(
       {

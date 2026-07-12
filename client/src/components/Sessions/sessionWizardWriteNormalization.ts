@@ -31,6 +31,7 @@ import {
   profileFromLegacyConfig,
   type SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
+import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
 import type {
   AnyRecord,
   ChainIdLike,
@@ -296,31 +297,69 @@ export const buildSessionWizardWorkerConfigPayload = ({
       draft: resolvedDraft,
       deployPayload: resolvedDeployPayload,
     });
+  const modeRequirements = resolveSessionWizardModeRequirements(effectiveSessionModeProfile);
+  const isWorkerCanonical = modeRequirements.isWorkerCanonical;
+  const workerAuthority = isObj(resolvedDeployPayload.workerAuthority)
+    ? cloneValue(resolvedDeployPayload.workerAuthority)
+    : isWorkerCanonical
+      ? {
+          version: 1,
+          participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
+          anonymousScopes: [],
+        }
+      : undefined;
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
-    registryAddress: trimString(resolvedDeployPayload.registryAddress || registryAddress),
-    registryChainId: Number(resolvedDeployPayload.registryChainId || registryChainId || chainId || 0) || 0,
-    networkChainId: chainId || null,
+    sessionName: trimString(resolvedDraft.sessionName),
+    sessionInfo: trimString(resolvedDraft.sessionInfo),
+    sessionHeaderImg: trimString(resolvedDraft.sessionHeaderImg),
+    ai: isObj(resolvedDraft.ai) ? cloneValue(resolvedDraft.ai) : {},
+    registryAddress: isWorkerCanonical ? '' : trimString(resolvedDeployPayload.registryAddress || registryAddress),
+    registryChainId: isWorkerCanonical
+      ? 0
+      : Number(resolvedDeployPayload.registryChainId || registryChainId || chainId || 0) || 0,
+    networkChainId: modeRequirements.requiresRpc ? chainId || null : isWorkerCanonical ? null : chainId || null,
     corsWorkerUrl: trimString(workerUrl || resolvedDeployPayload.corsWorkerUrl || resolvedDraft.corsWorkerUrl),
-    rpcUrl: trimString(resolvedDeployPayload.rpcUrl),
-    rpcUrlsByChainId: isObj(resolvedDeployPayload.rpcUrlsByChainId)
-      ? cloneValue(resolvedDeployPayload.rpcUrlsByChainId)
-      : {},
+    rpcUrl: !isWorkerCanonical || modeRequirements.requiresRpc ? trimString(resolvedDeployPayload.rpcUrl) : '',
+    rpcUrlsByChainId:
+      (!isWorkerCanonical || modeRequirements.requiresRpc) && isObj(resolvedDeployPayload.rpcUrlsByChainId)
+        ? cloneValue(resolvedDeployPayload.rpcUrlsByChainId)
+        : {},
     allowOrigins: Array.isArray(resolvedDeployPayload.allowOrigins)
       ? cloneValue(resolvedDeployPayload.allowOrigins)
       : [],
     limits: isObj(resolvedDeployPayload.limits) ? cloneValue(resolvedDeployPayload.limits) : {},
     scopes: isObj(resolvedDeployPayload.scopes) ? cloneValue(resolvedDeployPayload.scopes) : {},
-    faucet: isObj(resolvedDeployPayload.faucet)
-      ? cloneValue(resolvedDeployPayload.faucet)
-      : cloneValue(resolveWorkerFaucetConfig()),
-    litCredentials: isWorkerSbtGateCloudflareStorageProfile(storageProfile)
-      ? {}
-      : buildWorkerLitCredentialsConfig(workerSecrets),
+    faucet:
+      !isWorkerCanonical && isObj(resolvedDeployPayload.faucet)
+        ? cloneValue(resolvedDeployPayload.faucet)
+        : !isWorkerCanonical
+          ? cloneValue(resolveWorkerFaucetConfig())
+          : {},
+    litCredentials:
+      isWorkerSbtGateCloudflareStorageProfile(storageProfile) ||
+      (modeRequirements.selected && !modeRequirements.requiresLit)
+        ? {}
+        : buildWorkerLitCredentialsConfig(workerSecrets),
     ...(effectiveSessionModeProfile ? { sessionModeProfile: cloneValue(effectiveSessionModeProfile) } : {}),
+    ...(workerAuthority ? { workerAuthority } : {}),
     storageProfile,
   };
+
+  if (isWorkerCanonical) {
+    delete next.registryAddress;
+    delete next.registryChainId;
+    delete next.faucet;
+    if (!modeRequirements.requiresRpc) {
+      delete next.networkChainId;
+      delete next.rpcUrl;
+      delete next.rpcUrlsByChainId;
+    }
+    if (!modeRequirements.requiresLit) {
+      delete next.litCredentials;
+    }
+  }
 
   if (
     typeof resolvedDeployPayload.embeddedDeployHelperEnabled === 'boolean' ||
@@ -330,11 +369,11 @@ export const buildSessionWizardWorkerConfigPayload = ({
       (resolvedDeployPayload.embeddedDeployHelperEnabled ?? resolvedDraft.embeddedDeployHelperEnabled) !== false;
   }
 
-  const blockLimits = normalizeBlockLimits(resolvedDraft.blockLimits, latestChainBlock);
+  const blockLimits = !isWorkerCanonical ? normalizeBlockLimits(resolvedDraft.blockLimits, latestChainBlock) : null;
   if (blockLimits) {
     next.blockLimits = blockLimits;
   }
-  if (Object.keys(normalizedContracts).length) {
+  if (!isWorkerCanonical && Object.keys(normalizedContracts).length) {
     next.contracts = normalizedContracts;
   }
 

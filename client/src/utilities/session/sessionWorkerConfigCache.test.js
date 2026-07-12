@@ -2,14 +2,146 @@ import {
   clearCachedSessionWorkerConfig,
   getCachedSessionWorkerConfig,
   getSessionWorkerConfigReplicaState,
+  getVerifiedWorkerCanonicalSessionBootstrap,
+  getWorkerCanonicalSessionBootstrap,
+  markWorkerCanonicalSessionBootstrapVerified,
   overlayCachedSessionWorkerConfig,
   readSessionWorkerConfigCache,
   upsertCachedSessionWorkerConfig,
+  upsertWorkerCanonicalSessionBootstrap,
 } from './sessionWorkerConfigCache.js';
 
 describe('sessionWorkerConfigCache', () => {
   beforeEach(() => {
     localStorage.clear();
+  });
+
+  it('pins worker-canonical bootstrap config under a chain-zero session identity without touching registry cache', () => {
+    const registrySentinel = JSON.stringify({ sessions: { registered: { slug: 'registered' } } });
+    localStorage.setItem('dg:sessionRegistryCache:v1', registrySentinel);
+    const config = {
+      slug: 'cloud-session',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      configRevision: 'revision-1',
+      corsWorkerUrl: 'https://worker.example',
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+        storage: { mode: 'worker_kv' },
+        encryption: { mode: 'worker_envelope' },
+      },
+    };
+
+    const result = upsertWorkerCanonicalSessionBootstrap({
+      slug: config.slug,
+      sessionIdHex: config.sessionId,
+      workerOrigin: config.corsWorkerUrl,
+      configRevision: config.configRevision,
+      config,
+    });
+
+    expect(result).toMatchObject({
+      status: 'cached',
+      cacheKey: 'session:0:0x00112233445566778899aabbccddeeff',
+      workerOrigin: 'https://worker.example',
+    });
+    expect(readSessionWorkerConfigCache().bySession[result.cacheKey]).toMatchObject({
+      slug: 'cloud-session',
+      sessionIdHex: '0x00112233445566778899aabbccddeeff',
+      registryChainId: 0,
+      workerOrigin: 'https://worker.example',
+      configRevision: 'revision-1',
+      authorityMode: 'worker_canonical',
+      canonicalConfig: config,
+    });
+    expect(localStorage.getItem('dg:sessionRegistryCache:v1')).toBe(registrySentinel);
+  });
+
+  it('reloads a worker-canonical chain-zero entry and requires the pinned origin', () => {
+    const config = {
+      slug: 'cloud-session',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      corsWorkerUrl: 'https://worker.example',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    upsertWorkerCanonicalSessionBootstrap({
+      slug: config.slug,
+      sessionIdHex: config.sessionId,
+      workerOrigin: config.corsWorkerUrl,
+      config,
+    });
+
+    expect(readSessionWorkerConfigCache().bySession).toHaveProperty('session:0:0x00112233445566778899aabbccddeeff');
+    expect(getWorkerCanonicalSessionBootstrap({ slug: config.slug, workerOrigin: 'https://worker.example' })).toEqual(
+      config,
+    );
+    expect(
+      getVerifiedWorkerCanonicalSessionBootstrap({ slug: config.slug, workerOrigin: 'https://worker.example' }),
+    ).toBeNull();
+    expect(
+      markWorkerCanonicalSessionBootstrapVerified({
+        slug: config.slug,
+        sessionIdHex: config.sessionId,
+        workerOrigin: 'https://worker.example',
+      }),
+    ).toBe(true);
+    expect(
+      getVerifiedWorkerCanonicalSessionBootstrap({ slug: config.slug, workerOrigin: 'https://worker.example' }),
+    ).toEqual(config);
+    expect(getWorkerCanonicalSessionBootstrap({ slug: config.slug, workerOrigin: 'https://other.example' })).toBeNull();
+  });
+
+  it('requires an explicit TOFU re-pin before replacing a slug with a different worker identity', () => {
+    const firstConfig = {
+      slug: 'cloud-session',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      corsWorkerUrl: 'https://first.example',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    const replacementConfig = {
+      ...firstConfig,
+      sessionId: '0xffeeddccbbaa99887766554433221100',
+      corsWorkerUrl: 'https://replacement.example',
+    };
+    upsertWorkerCanonicalSessionBootstrap({
+      slug: firstConfig.slug,
+      sessionIdHex: firstConfig.sessionId,
+      workerOrigin: firstConfig.corsWorkerUrl,
+      config: firstConfig,
+    });
+
+    const conflict = upsertWorkerCanonicalSessionBootstrap({
+      slug: replacementConfig.slug,
+      sessionIdHex: replacementConfig.sessionId,
+      workerOrigin: replacementConfig.corsWorkerUrl,
+      config: replacementConfig,
+    });
+    expect(conflict).toMatchObject({
+      status: 'conflict',
+      existingWorkerOrigin: 'https://first.example',
+      workerOrigin: 'https://replacement.example',
+    });
+    expect(
+      getWorkerCanonicalSessionBootstrap({ slug: firstConfig.slug, workerOrigin: firstConfig.corsWorkerUrl }),
+    ).toEqual(firstConfig);
+
+    expect(
+      upsertWorkerCanonicalSessionBootstrap({
+        slug: replacementConfig.slug,
+        sessionIdHex: replacementConfig.sessionId,
+        workerOrigin: replacementConfig.corsWorkerUrl,
+        config: replacementConfig,
+        allowRepin: true,
+      }).status,
+    ).toBe('cached');
+    expect(
+      getWorkerCanonicalSessionBootstrap({
+        slug: replacementConfig.slug,
+        workerOrigin: replacementConfig.corsWorkerUrl,
+      }),
+    ).toEqual(replacementConfig);
+    expect(
+      getWorkerCanonicalSessionBootstrap({ slug: firstConfig.slug, workerOrigin: firstConfig.corsWorkerUrl }),
+    ).toBeNull();
   });
 
   it('returns an empty normalized store when no cache exists', () => {

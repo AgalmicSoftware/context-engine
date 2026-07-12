@@ -1,6 +1,7 @@
 import { canonicalizeSessionSlug } from './canonicalSessionContext.js';
 import { parseWorkerConfig } from './sessionParsers.js';
 import { readConfiguredSessionWorkerUrlCandidate } from './sessionWorkerUrlCompatibility.js';
+import { normalizeWorkerCanonicalSessionIdHex, parseSessionWorkerDiscoveryOrigin } from './sessionWorkerDiscovery.js';
 import { normalizeSessionIdHex } from '../shared/primitives.js';
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 import type {
@@ -15,6 +16,12 @@ import type {
 
 type WorkerConfig = SessionWorkerConfig;
 type WorkerConfigFieldPresence = SessionWorkerConfigFieldPresence;
+type WorkerCanonicalBootstrapRecord = WorkerConfigRecord & {
+  authorityMode?: string;
+  canonicalConfig?: SessionConfigLike;
+  configRevision?: string;
+  workerOrigin?: string;
+};
 type CacheIdentity = {
   slug: string;
   sessionIdHex: string;
@@ -66,6 +73,7 @@ const WORKER_CONFIG_CACHE_VERSION = 3;
 const WORKER_CONFIG_REPLICA_META = '__workerConfigReplicaMeta';
 const SESSION_WORKER_CACHE_KEY_PREFIX = 'session:';
 const SLUG_WORKER_CACHE_KEY_PREFIX = 'slug:';
+const verifiedWorkerCanonicalBootstrapKeys = new Set<string>();
 
 const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 const hasOwn = (value: unknown, key: string): boolean => Object.prototype.hasOwnProperty.call(value || {}, key);
@@ -80,6 +88,13 @@ const cloneValue = <T>(value: T): T => {
     }, {}) as T;
   }
   return value;
+};
+const parseWorkerCanonicalOrigin = (value: unknown): string => {
+  try {
+    return parseSessionWorkerDiscoveryOrigin(value);
+  } catch {
+    return '';
+  }
 };
 const hasWorkerConfigValue = (config: unknown): boolean => {
   const configObj = isObj(config) ? config : {};
@@ -112,13 +127,32 @@ const normalizeWriteNonce = (value: unknown, fallback = 0): number => {
 };
 const buildSlugCacheKey = (slugIn: unknown = ''): string =>
   `${SLUG_WORKER_CACHE_KEY_PREFIX}${canonicalizeSessionSlug(slugIn)}`;
+const buildVerifiedWorkerCanonicalBootstrapKey = ({
+  slug,
+  sessionIdHex,
+  workerOrigin,
+}: {
+  slug?: unknown;
+  sessionIdHex?: unknown;
+  workerOrigin?: unknown;
+}): string => {
+  const normalizedSlug = canonicalizeSessionSlug(slug);
+  const normalizedSessionIdHex = normalizeWorkerCanonicalSessionIdHex(sessionIdHex);
+  const normalizedWorkerOrigin = parseWorkerCanonicalOrigin(workerOrigin);
+  return normalizedSlug && normalizedSessionIdHex && normalizedWorkerOrigin
+    ? `${normalizedWorkerOrigin}\n${normalizedSlug}\n${normalizedSessionIdHex}`
+    : '';
+};
 const buildAuthoritativeCacheKey = ({ sessionIdHex, registryChainId }: Partial<CacheIdentityInput> = {}): string => {
   const normalizedSessionIdHex = normalizeSessionIdHex(sessionIdHex);
   if (!normalizedSessionIdHex) return '';
   const normalizedRegistryChainId = normalizeChainId(registryChainId);
+  const hasExplicitZeroChain = Number(registryChainId) === 0;
   return normalizedRegistryChainId
     ? `${SESSION_WORKER_CACHE_KEY_PREFIX}${normalizedRegistryChainId}:${normalizedSessionIdHex}`
-    : `${SESSION_WORKER_CACHE_KEY_PREFIX}${normalizedSessionIdHex}`;
+    : hasExplicitZeroChain
+      ? `${SESSION_WORKER_CACHE_KEY_PREFIX}0:${normalizedSessionIdHex}`
+      : `${SESSION_WORKER_CACHE_KEY_PREFIX}${normalizedSessionIdHex}`;
 };
 const buildCacheKeyFromIdentity = ({ slug, sessionIdHex, registryChainId }: Partial<CacheIdentity> = {}): string =>
   buildAuthoritativeCacheKey({ sessionIdHex, registryChainId }) || buildSlugCacheKey(slug);
@@ -334,17 +368,39 @@ const normalizeWorkerConfigRecord = (
   const rawConfig = isObj(rawRecord?.config) ? rawRecord.config : value;
   const normalizedConfig = normalizeWorkerConfigEntry(rawConfig);
   if (!normalizedConfig) return null;
+  const canonicalConfig = isObj(rawRecord?.canonicalConfig)
+    ? (cloneValue(rawRecord.canonicalConfig) as SessionConfigLike)
+    : undefined;
+  const authorityMode = toTrimmedString(rawRecord?.authorityMode);
+  const sessionIdHex =
+    authorityMode === 'worker_canonical'
+      ? normalizeWorkerCanonicalSessionIdHex(rawRecord?.sessionIdHex ?? fallbackMeta.sessionIdHex)
+      : normalizeSessionIdHex(rawRecord?.sessionIdHex ?? fallbackMeta.sessionIdHex);
+  const workerOrigin =
+    authorityMode === 'worker_canonical'
+      ? parseWorkerCanonicalOrigin(rawRecord?.workerOrigin)
+      : normalizeWorkerUrl(rawRecord?.workerOrigin);
+  if (authorityMode === 'worker_canonical' && (!sessionIdHex || !workerOrigin || !canonicalConfig)) return null;
   return {
     config: normalizedConfig,
     cachedAtMs: normalizeTimestampMs(rawRecord?.cachedAtMs || rawRecord?.cachedAt || rawRecord?.updatedAt),
     writeNonce: normalizeWriteNonce(rawRecord?.writeNonce, 1),
     slug: canonicalizeSessionSlug(rawRecord?.slug ?? fallbackMeta.slug ?? ''),
-    sessionIdHex: normalizeSessionIdHex(rawRecord?.sessionIdHex ?? fallbackMeta.sessionIdHex),
-    registryChainId: normalizeChainId(rawRecord?.registryChainId ?? fallbackMeta.registryChainId),
+    sessionIdHex,
+    registryChainId:
+      authorityMode === 'worker_canonical'
+        ? 0
+        : normalizeChainId(rawRecord?.registryChainId ?? fallbackMeta.registryChainId),
     fieldPresence: normalizeWorkerConfigFieldPresence(
       rawRecord?.fieldPresence ?? rawRecord?.configFieldPresence,
       rawConfig,
     ),
+    ...(canonicalConfig ? { canonicalConfig } : {}),
+    ...(workerOrigin ? { workerOrigin } : {}),
+    ...(toTrimmedString(rawRecord?.configRevision)
+      ? { configRevision: toTrimmedString(rawRecord?.configRevision) }
+      : {}),
+    ...(authorityMode ? { authorityMode } : {}),
   };
 };
 
@@ -647,6 +703,168 @@ export const upsertCachedSessionWorkerConfig = ({
   };
   writeStore(finalizeStore(store.bySession));
   return normalizedConfig;
+};
+
+export type WorkerCanonicalBootstrapCacheResult = {
+  status: 'cached' | 'conflict' | 'invalid';
+  cacheKey: string;
+  config: SessionConfigLike | null;
+  existingWorkerOrigin: string;
+  workerOrigin: string;
+};
+
+export const upsertWorkerCanonicalSessionBootstrap = ({
+  slug,
+  sessionIdHex,
+  workerOrigin,
+  configRevision,
+  config,
+  allowRepin = false,
+}: {
+  slug?: unknown;
+  sessionIdHex?: unknown;
+  workerOrigin?: unknown;
+  configRevision?: unknown;
+  config?: unknown;
+  allowRepin?: boolean;
+} = {}): WorkerCanonicalBootstrapCacheResult => {
+  const normalizedSlug = canonicalizeSessionSlug(slug);
+  const normalizedSessionIdHex = normalizeWorkerCanonicalSessionIdHex(sessionIdHex);
+  const normalizedWorkerOrigin = parseWorkerCanonicalOrigin(workerOrigin);
+  const canonicalConfig = isObj(config) ? (cloneValue(config) as SessionConfigLike) : null;
+  const cacheKey = buildAuthoritativeCacheKey({ sessionIdHex: normalizedSessionIdHex, registryChainId: 0 });
+  if (!normalizedSlug || !normalizedSessionIdHex || !normalizedWorkerOrigin || !canonicalConfig || !cacheKey) {
+    return {
+      status: 'invalid',
+      cacheKey: '',
+      config: null,
+      existingWorkerOrigin: '',
+      workerOrigin: normalizedWorkerOrigin,
+    };
+  }
+
+  const store = readSessionWorkerConfigCache();
+  const canonicalEntries = Object.entries(store.bySession).filter(([, rawRecord]) => {
+    const record = rawRecord as WorkerCanonicalBootstrapRecord;
+    return record.authorityMode === 'worker_canonical' && canonicalizeSessionSlug(record.slug) === normalizedSlug;
+  });
+  const conflictEntry = canonicalEntries.find(([, rawRecord]) => {
+    const record = rawRecord as WorkerCanonicalBootstrapRecord;
+    return (
+      parseWorkerCanonicalOrigin(record.workerOrigin) !== normalizedWorkerOrigin ||
+      record.sessionIdHex !== normalizedSessionIdHex
+    );
+  });
+  if (conflictEntry && !allowRepin) {
+    const conflictRecord = conflictEntry[1] as WorkerCanonicalBootstrapRecord;
+    return {
+      status: 'conflict',
+      cacheKey,
+      config: cloneValue(conflictRecord.canonicalConfig || null),
+      existingWorkerOrigin: parseWorkerCanonicalOrigin(conflictRecord.workerOrigin),
+      workerOrigin: normalizedWorkerOrigin,
+    };
+  }
+  if (allowRepin) {
+    for (const verifiedKey of verifiedWorkerCanonicalBootstrapKeys) {
+      if (verifiedKey.split('\n')[1] === normalizedSlug) verifiedWorkerCanonicalBootstrapKeys.delete(verifiedKey);
+    }
+    canonicalEntries.forEach(([key]) => delete store.bySession[key]);
+  }
+
+  const normalizedWorkerConfig = normalizeWorkerConfigEntry({
+    ...canonicalConfig,
+    corsWorkerUrl: normalizedWorkerOrigin,
+  });
+  if (!normalizedWorkerConfig) {
+    return {
+      status: 'invalid',
+      cacheKey: '',
+      config: null,
+      existingWorkerOrigin: '',
+      workerOrigin: normalizedWorkerOrigin,
+    };
+  }
+  const previous = store.bySession[cacheKey] as WorkerCanonicalBootstrapRecord | undefined;
+  store.bySession[cacheKey] = {
+    config: normalizedWorkerConfig,
+    cachedAtMs: Date.now(),
+    writeNonce: normalizeWriteNonce(previous?.writeNonce, 0) + 1,
+    slug: normalizedSlug,
+    sessionIdHex: normalizedSessionIdHex,
+    registryChainId: 0,
+    fieldPresence: detectWorkerConfigFieldPresence(canonicalConfig),
+    authorityMode: 'worker_canonical',
+    canonicalConfig,
+    configRevision: toTrimmedString(configRevision),
+    workerOrigin: normalizedWorkerOrigin,
+  } as WorkerCanonicalBootstrapRecord;
+  writeStore(finalizeStore(store.bySession));
+  return {
+    status: 'cached',
+    cacheKey,
+    config: cloneValue(canonicalConfig),
+    existingWorkerOrigin: '',
+    workerOrigin: normalizedWorkerOrigin,
+  };
+};
+
+export const getWorkerCanonicalSessionBootstrap = ({
+  slug,
+  workerOrigin,
+}: {
+  slug?: unknown;
+  workerOrigin?: unknown;
+} = {}): SessionConfigLike | null => {
+  const normalizedSlug = canonicalizeSessionSlug(slug);
+  const normalizedWorkerOrigin = parseWorkerCanonicalOrigin(workerOrigin);
+  const store = readSessionWorkerConfigCache();
+  const matchingRecords = Object.values(store.bySession).filter((rawRecord) => {
+    const record = rawRecord as WorkerCanonicalBootstrapRecord;
+    return (
+      record.authorityMode === 'worker_canonical' &&
+      canonicalizeSessionSlug(record.slug) === normalizedSlug &&
+      parseWorkerCanonicalOrigin(record.workerOrigin) === normalizedWorkerOrigin &&
+      isObj(record.canonicalConfig)
+    );
+  }) as WorkerCanonicalBootstrapRecord[];
+  if (matchingRecords.length !== 1) return null;
+  return cloneValue(matchingRecords[0].canonicalConfig) as SessionConfigLike;
+};
+
+export const markWorkerCanonicalSessionBootstrapVerified = ({
+  slug,
+  sessionIdHex,
+  workerOrigin,
+}: {
+  slug?: unknown;
+  sessionIdHex?: unknown;
+  workerOrigin?: unknown;
+} = {}): boolean => {
+  const verifiedKey = buildVerifiedWorkerCanonicalBootstrapKey({ slug, sessionIdHex, workerOrigin });
+  if (!verifiedKey) return false;
+  const cached = getWorkerCanonicalSessionBootstrap({ slug, workerOrigin });
+  const cachedSessionIdHex = normalizeWorkerCanonicalSessionIdHex(cached?.sessionIdHex ?? cached?.sessionId);
+  if (!cached || cachedSessionIdHex !== normalizeWorkerCanonicalSessionIdHex(sessionIdHex)) return false;
+  verifiedWorkerCanonicalBootstrapKeys.add(verifiedKey);
+  return true;
+};
+
+export const getVerifiedWorkerCanonicalSessionBootstrap = ({
+  slug,
+  workerOrigin,
+}: {
+  slug?: unknown;
+  workerOrigin?: unknown;
+} = {}): SessionConfigLike | null => {
+  const cached = getWorkerCanonicalSessionBootstrap({ slug, workerOrigin });
+  if (!cached) return null;
+  const verifiedKey = buildVerifiedWorkerCanonicalBootstrapKey({
+    slug,
+    sessionIdHex: cached.sessionIdHex ?? cached.sessionId,
+    workerOrigin,
+  });
+  return verifiedKey && verifiedWorkerCanonicalBootstrapKeys.has(verifiedKey) ? cached : null;
 };
 
 export const clearCachedSessionWorkerConfig = (slugOrOptions: unknown = '', sessionConfig: unknown = null): void => {

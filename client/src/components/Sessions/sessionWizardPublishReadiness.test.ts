@@ -7,6 +7,7 @@ import {
   resolveSessionWizardPublishUiPlan,
   type SessionWizardPublishReadinessInput,
 } from './sessionWizardPublishReadiness';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const txId = 'a'.repeat(43);
 
@@ -22,6 +23,26 @@ const baseInput: SessionWizardPublishReadinessInput = {
 };
 
 describe('resolveSessionWizardPublishReadiness', () => {
+  it('treats a configured worker URL as worker-canonical publish readiness without metadata', () => {
+    expect(
+      resolveSessionWizardPublishReadiness({
+        ...baseInput,
+        workerMode: 'custom',
+        usesDefaultWorkerUrl: false,
+        deployVerifiedInUi: false,
+        deployWorkerMatchesConfiguredUrl: false,
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        canPublishNow: true,
+        hasManualMetadata: false,
+        hasUploadedMetadata: false,
+        readinessKind: 'worker-config',
+        showUploadBlockedReason: false,
+      }),
+    );
+  });
   it('allows default worker metadata upload to satisfy publish readiness', () => {
     expect(resolveSessionWizardPublishReadiness(baseInput)).toEqual({
       canUploadMetadataNow: true,
@@ -572,7 +593,9 @@ describe('resolveSessionWizardPublishRequestDescriptor', () => {
         shouldAutoDeployWorker: true,
         shouldDeployPendingSbts: true,
         shouldUploadMetadata: false,
+        shouldPersistWorkerConfig: false,
         shouldRegisterSession: true,
+        shouldRefreshRegistryCache: true,
         steps: ['deploy-worker', 'deploy-sbts', 'register-session', 'done'],
         stepNumbers: {
           'deploy-worker': 1,

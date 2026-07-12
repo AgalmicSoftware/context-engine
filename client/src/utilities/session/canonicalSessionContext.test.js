@@ -223,6 +223,182 @@ describe('canonicalSessionContext', () => {
     });
   });
 
+  it('accepts an explicitly validated worker-canonical KV source without registry or Arweave identity', () => {
+    const workerConfig = {
+      slug: 'worker-room',
+      sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      configRevision: 'revision-1',
+      sessionName: 'Worker Room',
+      sessionInfo: 'Canonical worker content.',
+      tags: ['worker', 'fixture'],
+      corsWorkerUrl: 'https://worker-room.example.test',
+      allowOrigins: ['https://app.example.test'],
+      gates: [{ id: 'member', type: 'worker_role' }],
+      sponsored: { defaultGateId: 'member' },
+      sponsoredSbtAddress: '0x0000000000000000000000000000000000000001',
+      workerAuthority: { version: 1, participantScopes: ['ai', 'storage'] },
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+      },
+      storageProfile: { backend: 'cloudflare' },
+    };
+
+    const resolved = resolveCanonicalSessionContext({
+      requestedSlug: 'worker-room',
+      validatedWorkerCanonicalSource: {
+        validated: true,
+        source: 'worker-kv',
+        config: workerConfig,
+      },
+      mode: 'production',
+    });
+
+    expect(resolved.ok).toBe(true);
+    expect(resolved.errors).toEqual([]);
+    expect(resolved.provenance).toEqual({
+      identity: 'worker-kv',
+      metadata: 'worker-kv',
+      worker: 'worker-kv',
+      local: 'missing',
+    });
+    expect(resolved.context.identity).toEqual({
+      slug: 'worker-room',
+      sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      metadataURI: '',
+      chainId: null,
+    });
+    expect(resolved.context.effective).toMatchObject({
+      slug: 'worker-room',
+      sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      sessionName: 'Worker Room',
+      sessionInfo: 'Canonical worker content.',
+      corsWorkerUrl: 'https://worker-room.example.test',
+      gates: [{ id: 'member', type: 'worker_role' }],
+      sponsored: { defaultGateId: 'member' },
+      sponsoredSbtAddress: '0x0000000000000000000000000000000000000001',
+      sessionModeProfile: workerConfig.sessionModeProfile,
+      workerAuthority: workerConfig.workerAuthority,
+    });
+    expect(resolved.context.effective).not.toHaveProperty('metadataURI');
+    expect(resolved.context.effective).not.toHaveProperty('chainId');
+  });
+
+  it('does not let a worker query or mode string grant worker-KV authority', () => {
+    const resolved = resolveCanonicalSessionContext({
+      requestedSlug: 'worker-room',
+      routeContext: {
+        slug: 'worker-room',
+        sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        worker: 'https://worker-room.example.test',
+      },
+      mode: 'worker_canonical',
+    });
+
+    expect(resolved.ok).toBe(false);
+    expect(resolved.errors).toContain('Missing authoritative session identity source.');
+    expect(resolved.provenance.identity).toBe('route');
+  });
+
+  it('fails closed when the explicit worker-canonical source is not validated or has the wrong profile', () => {
+    const baseConfig = {
+      slug: 'worker-room',
+      sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      corsWorkerUrl: 'https://worker-room.example.test',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    const unvalidated = resolveCanonicalSessionContext({
+      requestedSlug: 'worker-room',
+      validatedWorkerCanonicalSource: {
+        validated: false,
+        source: 'worker-kv',
+        config: baseConfig,
+      },
+      mode: 'production',
+    });
+    const wrongProfile = resolveCanonicalSessionContext({
+      requestedSlug: 'worker-room',
+      validatedWorkerCanonicalSource: {
+        validated: true,
+        source: 'worker-kv',
+        config: {
+          ...baseConfig,
+          sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } },
+        },
+      },
+      mode: 'production',
+    });
+
+    for (const resolved of [unvalidated, wrongProfile]) {
+      expect(resolved.ok).toBe(false);
+      expect(resolved.errors).toContain('Invalid validated worker-canonical source.');
+      expect(resolved.errors).toContain('Missing authoritative session identity source.');
+      expect(resolved.provenance.identity).toBe('route');
+    }
+  });
+
+  it('does not let registry or Arweave fields override an explicitly validated worker-canonical source', () => {
+    const resolved = resolveCanonicalSessionContext({
+      requestedSlug: 'worker-room',
+      registrySession: VALID_REGISTRY_SESSION,
+      metadata: VALID_ARWEAVE_METADATA,
+      workerConfig: {
+        corsWorkerUrl: 'https://registry-worker.example.test',
+        allowOrigins: ['https://registry.example.test'],
+      },
+      validatedWorkerCanonicalSource: {
+        validated: true,
+        source: 'worker-kv',
+        config: {
+          slug: 'worker-room',
+          sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          sessionName: 'Worker Room',
+          corsWorkerUrl: 'https://worker-room.example.test',
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        },
+      },
+      mode: 'production',
+    });
+
+    expect(resolved.ok).toBe(true);
+    expect(resolved.context.identity.slug).toBe('worker-room');
+    expect(resolved.context.identity.sessionId).toBe('0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
+    expect(resolved.context.metadata.sessionName).toBe('Worker Room');
+    expect(resolved.context.effective.sessionName).toBe('Worker Room');
+    expect(resolved.context.effective.corsWorkerUrl).toBe('https://worker-room.example.test');
+    expect(resolved.context.effective).not.toHaveProperty('metadataURI');
+    expect(resolved.provenance.identity).toBe('worker-kv');
+    expect(resolved.provenance.metadata).toBe('worker-kv');
+  });
+
+  it('does not fall back to registry identity when a validated worker-canonical config has no session ID', () => {
+    const resolved = resolveCanonicalSessionContext({
+      requestedSlug: 'worker-room',
+      registrySession: VALID_REGISTRY_SESSION,
+      validatedWorkerCanonicalSource: {
+        validated: true,
+        source: 'worker-kv',
+        config: {
+          slug: 'worker-room',
+          sessionName: 'Incomplete Worker Room',
+          corsWorkerUrl: 'https://worker-room.example.test',
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        },
+      },
+      mode: 'production',
+    });
+
+    expect(resolved.ok).toBe(false);
+    expect(resolved.errors).toContain('Missing authoritative session identity source.');
+    expect(resolved.context.identity).toEqual({
+      slug: 'worker-room',
+      sessionId: '',
+      metadataURI: '',
+      chainId: null,
+    });
+    expect(resolved.provenance.identity).toBe('worker-kv');
+  });
+
   it('keeps worker config authoritative over metadata-shaped worker fields in the effective config', () => {
     const resolved = resolveCanonicalSessionContext({
       requestedSlug: VALID_REGISTRY_SESSION.slug,

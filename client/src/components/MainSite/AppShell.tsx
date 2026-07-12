@@ -63,7 +63,7 @@ import {
   createSessionMetaRefreshController,
   type SessionMetaRefreshController,
 } from '../../utilities/session/sessionMetaController.js';
-import { createSessionScanPolicy, type SessionScanPolicy } from '../../utilities/session/mainSiteSessionScanPolicy.js';
+import { type SessionScanPolicy } from '../../utilities/session/mainSiteSessionScanPolicy.js';
 import {
   createSessionProfileScanController,
   type SessionProfileScanController,
@@ -208,6 +208,7 @@ import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE } from './ro
 import { resolveMainSiteRouteMatch } from './routeTable.js';
 import { renderMainSiteRouteView } from './mainSiteRouteViewMap.js';
 import { createMainSiteRouteRenderers } from './mainSiteRouteRenderers.js';
+import { createMainSiteSessionScanPolicy } from './mainSiteSessionScanPolicyBinding.js';
 import { runMainSiteScanSpecificUserProfile } from './mainSiteProfileScanRuntime.js';
 import {
   buildPublicRoute,
@@ -732,13 +733,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   _queuedSurveyGroupScanHintedSlug = '';
   _queuedSurveyGroupScanTimer: ReturnType<typeof setTimeout> | null = null;
   _surveyGroupScanInFlight = new Set<string>();
-  _scanPolicy: SessionScanPolicy = createSessionScanPolicy({
-    getActiveSessionSlug: () => this.getActiveSessionSlug(),
-    getCurrentPath: () => this.getCurrentPathname(),
-    getSessionSlugHintFromSearch: (search: string) => this.getSessionSlugHintFromSearch(search),
-    getSessionTokenFromPath: (path: string) => this.getSessionTokenFromPath(path),
-    isSbtListRoutePath: (path: string) => this.isSbtListRoutePath(path),
-  });
+  _scanPolicy: SessionScanPolicy = createMainSiteSessionScanPolicy(this);
   _profileScanController: SessionProfileScanController = createSessionProfileScanController({
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
     getSessionSlugFromState: () => this.getSessionSlugFromState(),
@@ -911,7 +906,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   _profileScanTelemetrySeq = 0;
   _cacheReinitRunSeq = 0;
   _activeCacheReinitRunToken = 0;
-  _sessionRouteLightDiscoveryInFlight: Record<string, unknown> = {};
   _mounted = false;
   _sessionPathResolver: SessionPathResolverController = createSessionPathResolverController({
     getProvider: () => this.props.provider,

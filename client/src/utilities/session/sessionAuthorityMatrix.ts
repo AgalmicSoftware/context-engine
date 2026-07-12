@@ -3,7 +3,8 @@
  * @description Canonical authority rules for session config resolution across registry, metadata,
  *              worker config, browser overrides, and cache replicas.
  *
- * Key exports: AUTHORITY_SOURCES, AUTHORITY_MATRIX, isDemoSourceAllowed
+ * Key exports: AUTHORITY_SOURCES, AUTHORITY_MATRIX, WORKER_CANONICAL_AUTHORITY_MATRIX,
+ *              resolveSessionAuthorityGroup, isDemoSourceAllowed
  */
 type AuthorityGroup = {
   fields: string[];
@@ -128,6 +129,63 @@ export const AUTHORITY_MATRIX = deepFreeze<AuthorityMatrix>({
     ],
   },
 });
+
+export const WORKER_CANONICAL_AUTHORITY_MATRIX = deepFreeze<AuthorityMatrix>({
+  identity: {
+    fields: ['slug', 'sessionId'],
+    authoritativeSource: AUTHORITY_SOURCES.WORKER_KV,
+    allowedFallbacks: [],
+    mustNotOverride: [
+      AUTHORITY_SOURCES.REGISTRY,
+      AUTHORITY_SOURCES.ARWEAVE,
+      AUTHORITY_SOURCES.BROWSER,
+      AUTHORITY_SOURCES.CACHE,
+    ],
+  },
+  gates: {
+    fields: ['sponsored', 'sponsoredSbtAddress', 'gates'],
+    authoritativeSource: AUTHORITY_SOURCES.WORKER_KV,
+    allowedFallbacks: [],
+    mustNotOverride: [
+      AUTHORITY_SOURCES.REGISTRY,
+      AUTHORITY_SOURCES.ARWEAVE,
+      AUTHORITY_SOURCES.BROWSER,
+      AUTHORITY_SOURCES.DEMO,
+      AUTHORITY_SOURCES.CACHE,
+    ],
+  },
+  slugNormalization: {
+    fields: ['slug'],
+    authoritativeSource: AUTHORITY_SOURCES.WORKER_KV,
+    allowedFallbacks: [],
+    mustNotOverride: [
+      AUTHORITY_SOURCES.REGISTRY,
+      AUTHORITY_SOURCES.ARWEAVE,
+      AUTHORITY_SOURCES.BROWSER,
+      AUTHORITY_SOURCES.CACHE,
+    ],
+  },
+  textMetadata: {
+    fields: ['sessionName', 'sessionInfo', 'tags', 'ai', 'lit', 'encryption'],
+    authoritativeSource: AUTHORITY_SOURCES.WORKER_KV,
+    allowedFallbacks: [],
+    mustNotOverride: [
+      AUTHORITY_SOURCES.REGISTRY,
+      AUTHORITY_SOURCES.ARWEAVE,
+      AUTHORITY_SOURCES.BROWSER,
+      AUTHORITY_SOURCES.DEMO,
+      AUTHORITY_SOURCES.CACHE,
+    ],
+  },
+  workerConfig: AUTHORITY_MATRIX.workerConfig,
+});
+
+export const resolveSessionAuthorityGroup = (fieldGroup: string, authorityMode: string): AuthorityGroup | undefined => {
+  if (authorityMode === 'worker_canonical' && WORKER_CANONICAL_AUTHORITY_MATRIX[fieldGroup]) {
+    return WORKER_CANONICAL_AUTHORITY_MATRIX[fieldGroup];
+  }
+  return AUTHORITY_MATRIX[fieldGroup];
+};
 
 export const isDemoSourceAllowed = (fieldGroup: string, mode: string): boolean => {
   if (mode !== 'demo' && mode !== 'off-chain') return false;

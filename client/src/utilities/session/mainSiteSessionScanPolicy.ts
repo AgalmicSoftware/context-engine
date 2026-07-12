@@ -28,6 +28,7 @@ export interface SessionScanPolicyHost {
   getSessionSlugHintFromSearch: (search: string) => string | null;
   getSessionTokenFromPath: (path: string) => string | null;
   isSbtListRoutePath: (path: string) => boolean;
+  isWorkerCanonicalSessionSlug: (slug: string) => boolean;
 }
 
 export interface SessionScanScopeContext {
@@ -117,6 +118,7 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
     scopeContextIn: SessionScanScopeContext | null = null,
   ): boolean => {
     const slug = normalizeSessionSlug(slugIn || '');
+    if (host.isWorkerCanonicalSessionSlug(slug)) return false;
     const scopeContext = scopeContextIn || getSessionScanScopeContext();
     return isSessionSlugAllowedByScope(slug, scopeContext);
   };
@@ -167,6 +169,7 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
 
   const isSbtInstanceListenerEnabledForGroup = (slugIn: string): boolean => {
     if (typeof window === 'undefined') return false;
+    if (host.isWorkerCanonicalSessionSlug(normalizeSessionSlug(slugIn))) return false;
     if (areSbtInstanceListenersSuppressedByMode()) return false;
     if (window.DISABLE_SBT_INSTANCE_LISTENERS === true) return false;
     const raw =
@@ -224,6 +227,10 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
     operation: string,
     scopeContextIn: SessionScanScopeContext | null = null,
   ): boolean => {
+    if (host.isWorkerCanonicalSessionSlug(normalizeSessionSlug(slugIn || ''))) {
+      logScopeSkipOnce(operation, slugIn, scopeContextIn);
+      return true;
+    }
     const scopeContext = scopeContextIn || getSessionScanScopeContext();
     if (scopeContext.scope === 'all') return false;
     const allowed = isSessionSlugAllowedForScan(slugIn, scopeContext);

@@ -161,6 +161,7 @@ type AdminPageProps = {
   ensureLightSbtUniverse?: () => unknown;
   initialSessionId?: unknown;
   initialRegistryChainId?: unknown;
+  initialSessionConfig?: unknown;
 };
 
 export const __adminPageTestUtils = {
@@ -191,8 +192,24 @@ const AdminPage = ({
   ensureLightSbtUniverse,
   initialSessionId,
   initialRegistryChainId,
+  initialSessionConfig,
 }: AdminPageProps) => {
-  const [sessions, setSessions] = useState<AdminSessionRegistryEntry[]>([]);
+  const initialWorkerCanonicalConfigRef = useRef<AdminSessionConfigLike | null>(null);
+  if (!initialWorkerCanonicalConfigRef.current) {
+    const candidate = asAdminSessionConfig(initialSessionConfig);
+    const candidateProfile = asAdminSessionConfig(candidate.sessionModeProfile);
+    const candidateAuthority = asAdminSessionConfig(candidateProfile.authority);
+    if (candidateAuthority.mode === 'worker_canonical' && normalizeSlug(candidate.slug)) {
+      initialWorkerCanonicalConfigRef.current = candidate;
+    }
+  }
+  const mergeInitialWorkerCanonicalSession = useCallback((entries: AdminSessionRegistryEntry[] = []) => {
+    const initialConfig = initialWorkerCanonicalConfigRef.current;
+    const initialSlug = normalizeSlug(initialConfig?.slug);
+    if (!initialConfig || !initialSlug || entries.some(([slug]) => slug === initialSlug)) return entries;
+    return [[initialSlug, initialConfig] as AdminSessionRegistryEntry, ...entries];
+  }, []);
+  const [sessions, setSessions] = useState<AdminSessionRegistryEntry[]>(() => mergeInitialWorkerCanonicalSession([]));
   const [selectedSlug, setSelectedSlug] = useState('');
   const [ignoreRequestedSession, setIgnoreRequestedSession] = useState(false);
   const [workerUrl, setWorkerUrl] = useState('');
@@ -353,14 +370,15 @@ const AdminPage = ({
 
   const syncSessionsFromRegistryCache = useCallback(() => {
     const cached = adminSessionRegistryPorts.reads.getAllSessionEntries();
-    const nextSessions = Array.isArray(cached) ? cached : [];
+    const nextSessions = mergeInitialWorkerCanonicalSession(Array.isArray(cached) ? cached : []);
     setSessions(nextSessions);
     return nextSessions;
-  }, []);
+  }, [mergeInitialWorkerCanonicalSession]);
 
   const loadSessions = useCallback(
     async ({ forceOnChain }: any = {}) => {
       const cached = syncSessionsFromRegistryCache();
+      if (initialWorkerCanonicalConfigRef.current) return cached;
 
       const chainIds = requestedChainId ? [requestedChainId] : undefined;
       const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;

@@ -7,6 +7,7 @@ import {
 } from '../../../utilities/crypto/litProtocol.js';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../../utilities/session/sponsoredFlags.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
+import { resolveSessionWizardModeRequirements } from '../sessionWizardModeRequirements';
 import {
   arweavePublishAdapter,
   workerAuthPublishAdapter,
@@ -192,13 +193,19 @@ const useSessionWizardWorkerSecretsController = ({
 
   const getMissingWorkerSecretsForDeploy = useCallback(
     (secretsSnapshot = getCurrentWorkerSecrets()) => {
+      const modeRequirements = resolveSessionWizardModeRequirements(draft?.sessionModeProfile);
       const missing = [];
       if (!toStr(secretsSnapshot.openaiKey).trim()) {
         missing.push('OpenAI key');
       }
-      if (!toStr(secretsSnapshot.arweaveJwk).trim()) missing.push('Arweave JWK');
+      if (
+        (!modeRequirements.selected || modeRequirements.requiresArweave) &&
+        !toStr(secretsSnapshot.arweaveJwk).trim()
+      ) {
+        missing.push('Arweave JWK');
+      }
       const rpcUrl = resolveWorkerRpcUrl();
-      if (!rpcUrl) missing.push('Worker RPC URL');
+      if ((!modeRequirements.selected || modeRequirements.requiresRpc) && !rpcUrl) missing.push('Worker RPC URL');
       const hasAnyChipotleField =
         CHIPOTLE_LIT_CONFIG_FIELDS.some((key) => !!toStr(secretsSnapshot?.[key]).trim()) ||
         !!toStr(secretsSnapshot?.litAccountApiKey).trim() ||
@@ -211,7 +218,11 @@ const useSessionWizardWorkerSecretsController = ({
           !toStr(secretsSnapshot?.litPkpId).trim() &&
           !toStr(secretsSnapshot?.litActionCid).trim() &&
           !toStr(secretsSnapshot?.litUsageApiKey).trim());
-      if (hasAnyChipotleField && !bootstrapOnlyChipotleConfig) {
+      if (
+        (!modeRequirements.selected || modeRequirements.requiresLit) &&
+        hasAnyChipotleField &&
+        !bootstrapOnlyChipotleConfig
+      ) {
         const requiredChipotleFields = [
           ['litApiBase', 'Lit API base'],
           ['litGroupId', 'Lit group ID'],
@@ -223,7 +234,7 @@ const useSessionWizardWorkerSecretsController = ({
       }
       return missing;
     },
-    [getCurrentWorkerSecrets, resolveWorkerRpcUrl],
+    [draft?.sessionModeProfile, getCurrentWorkerSecrets, resolveWorkerRpcUrl],
   );
 
   const chipotleHookWorkerSecrets = useMemo<WorkerSecretsLike>(

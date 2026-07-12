@@ -111,17 +111,22 @@ export const getSessionWizardWorkerDeployValidationError = ({
   networkChainId,
   pathProvider,
   faucetRpcUrl,
+  requiresRegistry = true,
+  requiresRpc = true,
 }: {
   registryAddress?: unknown;
   registryChainId?: ChainIdLike;
   networkChainId?: ChainIdLike;
   pathProvider?: AnyRecord | null;
   faucetRpcUrl?: unknown;
+  requiresRegistry?: boolean;
+  requiresRpc?: boolean;
 } = {}): string => {
   const chainId = Number(registryChainId || networkChainId || 0) || 0;
-  if (!toStr(registryAddress).trim()) {
+  if (requiresRegistry && !toStr(registryAddress).trim()) {
     return 'Registry address is required before deploying a worker.';
   }
+  if (!requiresRpc) return '';
   const rpcUrl = resolveSessionWizardWorkerRpcUrl({
     chainId,
     pathProvider,

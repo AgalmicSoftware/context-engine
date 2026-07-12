@@ -12,6 +12,7 @@ import type { PublishedPendingSbtLink } from './sessionWizardPublishLinks';
 export type SessionWizardPublishExecutionPlanLike = {
   shouldAutoDeployWorker?: boolean;
   shouldDeployPendingSbts?: boolean;
+  shouldPersistWorkerConfig?: boolean;
   shouldUploadMetadata?: boolean;
   stepNumbers?: Record<string, number>;
 };
@@ -35,6 +36,15 @@ export type SessionWizardPublishControllerPorts = {
   deployPendingSbts?: (
     args: SessionWizardPublishWorkerSignerArgs,
   ) => Promise<SessionWizardPendingDraftLike[] | null | undefined>;
+  persistWorkerConfig?: (
+    args: SessionWizardPublishWorkerSignerArgs,
+  ) => Promise<SessionWizardPublishPersistWorkerConfigResult | null | undefined>;
+};
+
+export type SessionWizardPublishPersistWorkerConfigResult = {
+  workerUrl?: string;
+  configRevision?: string;
+  publicConfig?: AnyRecord;
 };
 
 export type SessionWizardPublishControllerCallbacks = {
@@ -51,6 +61,7 @@ export type SessionWizardPublishControllerResult = {
   status: 'blocked' | 'completed';
   workerUrlOverride: string;
   deployedPendingDrafts: SessionWizardPendingDraftLike[];
+  verifiedWorkerConfig: SessionWizardPublishPersistWorkerConfigResult | null;
 };
 
 export type SessionWizardPublishStartPreflightInput = {
@@ -242,6 +253,14 @@ export type SessionWizardRegisterSuccessSettlementDescriptor = {
   };
 };
 
+export type SessionWizardWorkerPublishSuccessSettlementDescriptor = {
+  formattedSessionId: string;
+  sessionUrl: string;
+  adminUrl: string;
+  adminUrlStatus: string;
+  nextSessionIdStatus: string;
+};
+
 export type SessionWizardRegisterFailureSettlementInput = {
   error?: unknown;
 };
@@ -327,12 +346,14 @@ export const runSessionWizardPublishController = async ({
       status: 'blocked',
       workerUrlOverride: '',
       deployedPendingDrafts: [],
+      verifiedWorkerConfig: null,
     };
   }
 
   const { publishExecutionPlan } = input;
   let workerUrlOverride = '';
   let deployedPendingDrafts: SessionWizardPendingDraftLike[] = [];
+  let verifiedWorkerConfig: SessionWizardPublishPersistWorkerConfigResult | null = null;
 
   if (publishExecutionPlan.shouldAutoDeployWorker) {
     callbacks.setPublishStep(getPublishStepNumber(publishExecutionPlan, 'deploy-worker'));
@@ -352,10 +373,28 @@ export const runSessionWizardPublishController = async ({
       })) || [];
   }
 
+  if (publishExecutionPlan.shouldPersistWorkerConfig) {
+    if (typeof ports.persistWorkerConfig !== 'function') {
+      throw new Error('Worker config persistence port is required.');
+    }
+    callbacks.setPublishStep(getPublishStepNumber(publishExecutionPlan, 'persist-worker-config'));
+    verifiedWorkerConfig =
+      (await ports.persistWorkerConfig({
+        workerUrlOverride,
+        signerAccountOverride: input.signerAccountOverride || '',
+      })) || null;
+    const verifiedWorkerUrl = toStr(verifiedWorkerConfig?.workerUrl).trim();
+    if (!verifiedWorkerUrl) {
+      throw new Error('Worker config persistence did not return a verified worker URL.');
+    }
+    workerUrlOverride = verifiedWorkerUrl;
+  }
+
   return {
     status: 'completed',
     workerUrlOverride,
     deployedPendingDrafts,
+    verifiedWorkerConfig,
   };
 };
 
@@ -703,6 +742,32 @@ export const resolveSessionWizardRegisterSuccessSettlementDescriptor = ({
       providerLike,
       account,
     },
+  };
+};
+
+export const resolveSessionWizardWorkerPublishSuccessSettlementDescriptor = ({
+  slug,
+  sessionId,
+  workerOrigin,
+  origin,
+}: {
+  slug?: unknown;
+  sessionId?: unknown;
+  workerOrigin?: unknown;
+  origin?: string;
+} = {}): SessionWizardWorkerPublishSuccessSettlementDescriptor => {
+  const formattedSessionId = sessionRegistryUtils.formatSessionId(sessionId) || toStr(sessionId).trim();
+  return {
+    formattedSessionId,
+    sessionUrl: buildSessionWizardSessionUrl({ slug, workerOrigin, origin }),
+    adminUrl: buildSessionWizardAdminUrl({
+      sessionId: formattedSessionId,
+      sessionSlug: slug,
+      workerOrigin,
+      origin,
+    }),
+    adminUrlStatus: '',
+    nextSessionIdStatus: 'Generated a new session ID for your next session.',
   };
 };
 

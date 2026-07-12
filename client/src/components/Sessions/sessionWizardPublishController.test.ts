@@ -9,6 +9,7 @@ import {
   resolveSessionWizardRegisterIdentityDescriptor,
   resolveSessionWizardRegisterPreflightDescriptor,
   resolveSessionWizardRegisterSuccessSettlementDescriptor,
+  resolveSessionWizardWorkerPublishSuccessSettlementDescriptor,
   resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
   resolveSessionWizardPublishAdminPreflightDescriptor,
@@ -53,6 +54,7 @@ describe('runSessionWizardPublishController', () => {
       status: 'blocked',
       workerUrlOverride: '',
       deployedPendingDrafts: [],
+      verifiedWorkerConfig: null,
     });
 
     expect(deployWorker).not.toHaveBeenCalled();
@@ -93,6 +95,7 @@ describe('runSessionWizardPublishController', () => {
       status: 'completed',
       workerUrlOverride: 'https://deployed-worker.example',
       deployedPendingDrafts: [],
+      verifiedWorkerConfig: null,
     });
 
     expect(events).toEqual(['setPublishStep:3', 'deployWorker']);
@@ -125,6 +128,7 @@ describe('runSessionWizardPublishController', () => {
       status: 'completed',
       workerUrlOverride: '',
       deployedPendingDrafts: [],
+      verifiedWorkerConfig: null,
     });
 
     expect(deployWorker).not.toHaveBeenCalled();
@@ -173,6 +177,7 @@ describe('runSessionWizardPublishController', () => {
       status: 'completed',
       workerUrlOverride: 'https://deployed-worker.example',
       deployedPendingDrafts: [{ id: 'pending-sbt-1' }],
+      verifiedWorkerConfig: null,
     });
 
     expect(events).toEqual([
@@ -212,6 +217,7 @@ describe('runSessionWizardPublishController', () => {
       status: 'completed',
       workerUrlOverride: '',
       deployedPendingDrafts: [{ id: 'pending-only' }],
+      verifiedWorkerConfig: null,
     });
 
     expect(deployWorker).not.toHaveBeenCalled();
@@ -220,6 +226,74 @@ describe('runSessionWizardPublishController', () => {
       workerUrlOverride: '',
       signerAccountOverride: '0x00000000000000000000000000000000000000bb',
     });
+  });
+
+  it('persists and verifies worker config after deploy before completing the controller', async () => {
+    const events: string[] = [];
+    const persistWorkerConfig = jest.fn(async (args) => {
+      events.push(`persist:${args.workerUrlOverride}:${args.signerAccountOverride}`);
+      return {
+        workerUrl: 'https://deployed-worker.example',
+        configRevision: 'revision-a',
+        publicConfig: { slug: 'worker-session' },
+      };
+    });
+
+    await expect(
+      runSessionWizardPublishController({
+        input: {
+          publishExecutionPlan: buildPlan({
+            shouldPersistWorkerConfig: true,
+            stepNumbers: {
+              'deploy-worker': 1,
+              'persist-worker-config': 2,
+            },
+          }),
+          signerAccountOverride: '0x00000000000000000000000000000000000000aa',
+        },
+        ports: {
+          deployWorker: async () => ({
+            ok: true,
+            deployComplete: true,
+            workerUrl: 'https://deployed-worker.example',
+          }),
+          persistWorkerConfig,
+        },
+        callbacks: {
+          setPublishStep: (step) => events.push(`step:${step}`),
+        },
+      }),
+    ).resolves.toEqual({
+      status: 'completed',
+      workerUrlOverride: 'https://deployed-worker.example',
+      deployedPendingDrafts: [],
+      verifiedWorkerConfig: {
+        workerUrl: 'https://deployed-worker.example',
+        configRevision: 'revision-a',
+        publicConfig: { slug: 'worker-session' },
+      },
+    });
+
+    expect(events).toEqual([
+      'step:1',
+      'step:2',
+      'persist:https://deployed-worker.example:0x00000000000000000000000000000000000000aa',
+    ]);
+  });
+
+  it('fails closed when a worker-canonical plan lacks a persistence port', async () => {
+    await expect(
+      runSessionWizardPublishController({
+        input: {
+          publishExecutionPlan: buildPlan({
+            shouldAutoDeployWorker: false,
+            shouldPersistWorkerConfig: true,
+          }),
+        },
+        ports: { deployWorker: jest.fn() },
+        callbacks: { setPublishStep: jest.fn() },
+      }),
+    ).rejects.toThrow('Worker config persistence port is required.');
   });
 
   it('maps failed deploy results to the existing worker deploy error message', async () => {
@@ -1029,6 +1103,26 @@ describe('resolveSessionWizardRegisterSuccessSettlementDescriptor', () => {
         }),
       }),
     );
+  });
+});
+
+describe('resolveSessionWizardWorkerPublishSuccessSettlementDescriptor', () => {
+  it('builds reload-safe session and admin links with the verified worker origin', () => {
+    expect(
+      resolveSessionWizardWorkerPublishSuccessSettlementDescriptor({
+        slug: 'worker-session',
+        sessionId: '0x00000000000000000000000000000001',
+        workerOrigin: 'https://worker.example/',
+        origin: 'https://context.example',
+      }),
+    ).toEqual({
+      formattedSessionId: '00000000-0000-0000-0000-000000000001',
+      sessionUrl: 'https://context.example/session/worker-session?worker=https%3A%2F%2Fworker.example',
+      adminUrl:
+        'https://context.example/admin?sessionId=00000000-0000-0000-0000-000000000001&sessionSlug=worker-session&worker=https%3A%2F%2Fworker.example',
+      adminUrlStatus: '',
+      nextSessionIdStatus: 'Generated a new session ID for your next session.',
+    });
   });
 });
 

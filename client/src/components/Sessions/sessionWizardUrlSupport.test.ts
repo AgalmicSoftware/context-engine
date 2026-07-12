@@ -41,6 +41,34 @@ describe('sessionWizardUrlSupport', () => {
         origin: 'https://app.example',
       }),
     ).toBe('https://app.example/admin?sessionId=abc-123&chainId=84532');
+
+    expect(
+      buildSessionWizardSessionUrl({
+        slug: 'worker-session',
+        origin: 'https://app.example',
+        workerOrigin: 'https://worker.example/',
+      }),
+    ).toBe('https://app.example/session/worker-session?worker=https%3A%2F%2Fworker.example');
+    expect(
+      buildSessionWizardAdminUrl({
+        sessionId: 'abc-123',
+        sessionSlug: 'worker-session',
+        origin: 'https://app.example',
+        workerOrigin: 'https://worker.example/',
+      }),
+    ).toBe(
+      'https://app.example/admin?sessionId=abc-123&sessionSlug=worker-session&worker=https%3A%2F%2Fworker.example',
+    );
+  });
+
+  it('never copies credentials or paths into shareable worker links', () => {
+    expect(
+      buildSessionWizardSessionUrl({
+        slug: 'worker-session',
+        origin: 'https://app.example',
+        workerOrigin: 'https://user:secret@worker.example/path',
+      }),
+    ).toBe('https://app.example/session/worker-session');
   });
 
   it('normalizes worker urls and resolves explorer bases', () => {
