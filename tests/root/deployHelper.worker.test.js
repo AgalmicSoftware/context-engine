@@ -271,6 +271,76 @@ describe('deploy-helper worker', () => {
     }
   });
 
+  it('seeds reload-safe worker-canonical config without persisting deployment or AI keys', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({ subdomain: 'tenant-subdomain', status: 'active' }),
+      cfSuccess({ enabled: true }),
+      cfSuccess({}),
+    ]);
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-never-store',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        configRevision: 'revision-a',
+        sessionName: 'Alpha Session',
+        sessionInfo: 'Worker-canonical session',
+        ai: {
+          models: { fast: { provider: 'openai', model: 'gpt-5' } },
+          apiKey: 'sk-never-store',
+        },
+        sessionModeProfile: {
+          authority: { mode: 'worker_canonical' },
+          encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+        },
+        workerAuthority: {
+          version: 1,
+          participantScopes: ['ai', 'transcribe', 'storage', 'groups'],
+          anonymousScopes: ['ai', 'transcribe'],
+        },
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' },
+        },
+        secrets: { openaiKey: 'sk-never-store' },
+      }), {}, {});
+
+      expect(response.status).toBe(200);
+      const configWrite = JSON.parse(fetchMock.calls[5][1].body);
+      const serialized = JSON.stringify(configWrite);
+      expect(configWrite).toEqual(expect.objectContaining({
+        sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        configRevision: 'revision-a',
+        sessionName: 'Alpha Session',
+        sessionInfo: 'Worker-canonical session',
+        sessionModeProfile: expect.objectContaining({ authority: { mode: 'worker_canonical' } }),
+        workerAuthority: expect.objectContaining({ version: 1 }),
+        ai: { models: { fast: { provider: 'openai', model: 'gpt-5' } } },
+      }));
+      expect(serialized).not.toContain('cf-never-store');
+      expect(serialized).not.toContain('sk-never-store');
+
+      const configRewrite = JSON.parse(fetchMock.calls[9][1].body);
+      expect(configRewrite.configRevision).toBe('revision-a');
+      expect(configRewrite.corsWorkerUrl).toBe('https://test-worker.tenant-subdomain.workers.dev/');
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
   it('binds Cloudflare storage index KV and persists a sanitized storage profile', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([

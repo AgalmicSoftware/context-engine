@@ -5,6 +5,7 @@ import {
 } from '../sessionCorsWorker/storageRefNormalization.js';
 import { buildSessionSecretsEnvelope } from './sessionSecretsEnvelope.mjs';
 import { resolveCloudflareApiBaseUrl } from './deployHelperEndpointConfig.mjs';
+import { selectDeployWorkerSessionConfigFields } from './workerSessionConfig.mjs';
 
 const { getPathRpcUrl } = rpcDefaults;
 
@@ -969,6 +970,7 @@ export const executeDeployHelperRequest = async ({
   }
 
   const config = {
+    slug: sessionSlug,
     registryAddress,
     registryChainId,
     hatsAddress,
@@ -981,6 +983,7 @@ export const executeDeployHelperRequest = async ({
     scopes,
     faucet,
     embeddedDeployHelperEnabled,
+    ...selectDeployWorkerSessionConfigFields(body),
   };
   if (storageProfile) {
     config.storageProfile = storageProfile;

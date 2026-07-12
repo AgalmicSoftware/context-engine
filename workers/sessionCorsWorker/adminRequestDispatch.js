@@ -31,6 +31,9 @@ import {
   ABUSE_COUNTER_TYPES,
   recordAbuseEvent as recordAbuseEventBoundary,
 } from './abuseObservability.js';
+import {
+  findForbiddenCloudflareDeploymentTokenPath,
+} from '../shared/workerSessionConfig.mjs';
 
 const ALLOWED_SECRET_KEYS = [
   'openaiKey',
@@ -188,6 +191,11 @@ export const dispatchAdminRequest = async ({
       deps,
     });
     if (!incoming) return deps?.json?.({ error: 'Missing config.' }, 400, headers);
+    if (findForbiddenCloudflareDeploymentTokenPath(incoming)) {
+      return deps?.json?.({
+        error: 'Cloudflare deployment tokens are not allowed in session config.',
+      }, 400, headers);
+    }
 
     const merged = deps?.mergeWorkerConfigRecords?.({
       existingConfig,

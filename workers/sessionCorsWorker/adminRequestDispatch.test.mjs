@@ -177,6 +177,34 @@ test('dispatchAdminRequest seeds bootstrap adminAddress from the top-level body 
   });
 });
 
+test('dispatchAdminRequest rejects Cloudflare deployment tokens in session config before persistence', async () => {
+  let writes = 0;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        config: {
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          nested: { cloudflareApiToken: 'cf-never-store' },
+        },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      putSessionConfig: async () => { writes += 1; },
+    }),
+  });
+
+  assert.equal(writes, 0);
+  assert.deepEqual(result, {
+    body: { error: 'Cloudflare deployment tokens are not allowed in session config.' },
+    status: 400,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
 test('dispatchAdminRequest filters and normalizes allowed secrets before persisting', async () => {
   const calls = [];
 
