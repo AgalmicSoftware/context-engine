@@ -58,7 +58,26 @@ export const normalizeSessionWizardWorkerUrl = (url: unknown): string => normali
 const resolveBrowserOrigin = (): string =>
   typeof window !== 'undefined' && window.location ? toStr(window.location.origin).trim() : '';
 
-export const buildSessionWizardSessionUrl = ({ slug, origin }: { slug?: unknown; origin?: string }): string => {
+const normalizeShareableWorkerOrigin = (value: unknown): string => {
+  try {
+    const parsed = new URL(toStr(value).trim());
+    if (!/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) return '';
+    if (parsed.pathname !== '/' || parsed.search || parsed.hash) return '';
+    return parsed.origin;
+  } catch {
+    return '';
+  }
+};
+
+export const buildSessionWizardSessionUrl = ({
+  slug,
+  origin,
+  workerOrigin,
+}: {
+  slug?: unknown;
+  origin?: string;
+  workerOrigin?: unknown;
+}): string => {
   const normalizedSlug = normalizeSessionWizardSlug(slug);
   if (!normalizedSlug) return '';
   const base = toStr(origin).trim() || resolveBrowserOrigin();

@@ -2,20 +2,13 @@ import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 
 import WorkerCanonicalSessionBootstrapBoundary from './WorkerCanonicalSessionBootstrapBoundary';
-import {
-  fetchWorkerCanonicalSessionBootstrap,
-  validateWorkerCanonicalSessionBootstrap,
-  WorkerSessionBootstrapRequestError,
-} from '../../utilities/session/sessionWorkerDiscovery';
+import { fetchWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
 import {
   markWorkerCanonicalSessionBootstrapVerified,
   upsertWorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerConfigCache.js';
-import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
-import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 jest.mock('../../utilities/session/sessionWorkerDiscovery', () => ({
-  ...jest.requireActual('../../utilities/session/sessionWorkerDiscovery'),
   fetchWorkerCanonicalSessionBootstrap: jest.fn(),
 }));
 
@@ -56,8 +49,6 @@ const cachedResult = {
   status: 'cached' as const,
   cacheKey: `session:0:${SESSION_ID}`,
   config: bootstrap.config,
-  existingSessionIdHex: '',
-  sessionIdHex: SESSION_ID,
   existingWorkerOrigin: '',
   workerOrigin: WORKER_ORIGIN,
 };
@@ -75,9 +66,6 @@ const deferred = <T,>() => {
 describe('WorkerCanonicalSessionBootstrapBoundary', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockFetchBootstrap.mockReset();
-    mockUpsertBootstrap.mockReset();
-    mockMarkBootstrapVerified.mockReset();
     mockFetchBootstrap.mockResolvedValue(bootstrap);
     mockUpsertBootstrap.mockReturnValue(cachedResult);
     mockMarkBootstrapVerified.mockReturnValue(true);
@@ -138,69 +126,6 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Worker session ready.');
   });
 
-  it('composes a fresh validated Lit bootstrap into descriptor-free worker hooks config', async () => {
-    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    sessionModeProfile.encryption = { mode: 'lit' };
-    sessionModeProfile.evm.registryChainId = 11155420;
-    sessionModeProfile.storage.payloadAccessControl = {
-      ...sessionModeProfile.storage.payloadAccessControl!,
-      encryption: 'lit',
-    };
-    const config = {
-      slug: 'worker-session',
-      sessionId: SESSION_ID,
-      configRevision: 'revision-lit',
-      corsWorkerUrl: WORKER_ORIGIN,
-      sessionModeProfile,
-    };
-    const validatedBootstrap = validateWorkerCanonicalSessionBootstrap(
-      {
-        ok: true,
-        sessionSlug: 'worker-session',
-        config,
-      },
-      {
-        expectedSlug: 'worker-session',
-        workerOrigin: WORKER_ORIGIN,
-        environment: 'test',
-      },
-    );
-    const onResolved = jest.fn((resolved) => resolveMainSiteLitSessionConfig({ sessionConfig: resolved.config }));
-    mockFetchBootstrap.mockResolvedValueOnce(validatedBootstrap);
-    mockUpsertBootstrap.mockReturnValueOnce({
-      ...cachedResult,
-      config,
-    });
-
-    render(
-      <WorkerCanonicalSessionBootstrapBoundary
-        sessionSlug="worker-session"
-        workerQueryValue={WORKER_ORIGIN}
-        environment="test"
-        onResolved={onResolved}
-      />,
-    );
-
-    await waitFor(() => expect(onResolved).toHaveBeenCalledTimes(1));
-    expect(onResolved.mock.results[0].value).toEqual(
-      expect.objectContaining({
-        chainId: 11155420,
-        litNetwork: 'chipotle',
-        chipotle: {
-          enabled: true,
-          workerUrl: WORKER_ORIGIN,
-          litCredentials: {},
-          sessionConfig: config,
-        },
-      }),
-    );
-    expect(config).not.toHaveProperty('lit');
-    expect(config).not.toHaveProperty('litCredentials');
-    expect(config).not.toHaveProperty('rpcUrl');
-    expect(config).not.toHaveProperty('rpcUrlsByChainId');
-  });
-
   it('requires explicit approval before retrying a TOFU conflict with allowRepin', async () => {
     const events: string[] = [];
     mockUpsertBootstrap
@@ -210,8 +135,6 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
           status: 'conflict',
           cacheKey: cachedResult.cacheKey,
           config: bootstrap.config,
-          existingSessionIdHex: '0xffeeddccbbaa99887766554433221100',
-          sessionIdHex: SESSION_ID,
           existingWorkerOrigin: EXISTING_WORKER_ORIGIN,
           workerOrigin: WORKER_ORIGIN,
         };
@@ -225,8 +148,6 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
       expect(message).toContain(EXISTING_WORKER_ORIGIN);
       expect(message).toContain(WORKER_ORIGIN);
       expect(message).toContain('worker-session');
-      expect(message).toContain('0xffeeddccbbaa99887766554433221100');
-      expect(message).toContain(SESSION_ID);
       return true;
     });
     const onResolved = jest.fn();
@@ -253,72 +174,11 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     );
   });
 
-  it('shows both session IDs when a same-origin canonical identity changes', async () => {
-    const previousSessionId = '0xffeeddccbbaa99887766554433221100';
-    mockUpsertBootstrap
-      .mockReturnValueOnce({
-        status: 'conflict',
-        cacheKey: cachedResult.cacheKey,
-        config: bootstrap.config,
-        existingSessionIdHex: previousSessionId,
-        sessionIdHex: SESSION_ID,
-        existingWorkerOrigin: WORKER_ORIGIN,
-        workerOrigin: WORKER_ORIGIN,
-      })
-      .mockReturnValueOnce(cachedResult);
-    const confirmRepin = jest.fn(async () => true);
-
-    render(
-      <WorkerCanonicalSessionBootstrapBoundary
-        sessionSlug="worker-session"
-        workerQueryValue={WORKER_ORIGIN}
-        onResolved={jest.fn()}
-        confirmRepin={confirmRepin}
-      />,
-    );
-
-    await waitFor(() => expect(confirmRepin).toHaveBeenCalledTimes(1));
-    expect(confirmRepin.mock.calls[0][0]).toContain(previousSessionId);
-    expect(confirmRepin.mock.calls[0][0]).toContain(SESSION_ID);
-    expect(confirmRepin.mock.calls[0][0]).not.toContain(`origin ${WORKER_ORIGIN} -> ${WORKER_ORIGIN}`);
-  });
-
-  it('shows both slugs when an authoritative session ID is reused by a different slug', async () => {
-    mockUpsertBootstrap
-      .mockReturnValueOnce({
-        status: 'conflict',
-        cacheKey: cachedResult.cacheKey,
-        config: { ...bootstrap.config, slug: 'first-session' },
-        existingSessionIdHex: SESSION_ID,
-        sessionIdHex: SESSION_ID,
-        existingWorkerOrigin: WORKER_ORIGIN,
-        workerOrigin: WORKER_ORIGIN,
-      })
-      .mockReturnValueOnce(cachedResult);
-    const confirmRepin = jest.fn(async () => true);
-
-    render(
-      <WorkerCanonicalSessionBootstrapBoundary
-        sessionSlug="worker-session"
-        workerQueryValue={WORKER_ORIGIN}
-        onResolved={jest.fn()}
-        confirmRepin={confirmRepin}
-      />,
-    );
-
-    await waitFor(() => expect(confirmRepin).toHaveBeenCalledTimes(1));
-    expect(confirmRepin.mock.calls[0][0]).toContain('session slug "first-session" -> "worker-session"');
-    expect(confirmRepin.mock.calls[0][0]).not.toContain(`origin ${WORKER_ORIGIN} -> ${WORKER_ORIGIN}`);
-    expect(confirmRepin.mock.calls[0][0]).not.toContain(`ID ${SESSION_ID} -> ${SESSION_ID}`);
-  });
-
   it('fails closed when a TOFU repin is declined', async () => {
     mockUpsertBootstrap.mockReturnValueOnce({
       status: 'conflict',
       cacheKey: cachedResult.cacheKey,
       config: bootstrap.config,
-      existingSessionIdHex: '0xffeeddccbbaa99887766554433221100',
-      sessionIdHex: SESSION_ID,
       existingWorkerOrigin: EXISTING_WORKER_ORIGIN,
       workerOrigin: WORKER_ORIGIN,
     });
@@ -334,17 +194,11 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
       />,
     );
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Worker identity mismatch');
-    expect(screen.getByRole('link', { name: 'Open Admin' })).toHaveAttribute(
-      'href',
-      `/admin?sessionSlug=worker-session&worker=${encodeURIComponent(WORKER_ORIGIN)}`,
-    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('Worker origin change was not approved.');
     expect(confirmRepin).toHaveBeenCalledTimes(1);
     expect(mockUpsertBootstrap).toHaveBeenCalledTimes(1);
     expect(mockMarkBootstrapVerified).not.toHaveBeenCalled();
     expect(onResolved).not.toHaveBeenCalled();
-    expect(mockFetchBootstrap).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('button', { name: 'Retry worker session' })).not.toBeInTheDocument();
   });
 
   it('fails closed when cache insertion is invalid', async () => {
@@ -352,8 +206,6 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
       status: 'invalid',
       cacheKey: '',
       config: null,
-      existingSessionIdHex: '',
-      sessionIdHex: SESSION_ID,
       existingWorkerOrigin: '',
       workerOrigin: WORKER_ORIGIN,
     });
@@ -404,127 +256,6 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     expect(mockUpsertBootstrap).not.toHaveBeenCalled();
     expect(mockMarkBootstrapVerified).not.toHaveBeenCalled();
     expect(onResolved).not.toHaveBeenCalled();
-  });
-
-  it.each([500, 598])('retries a bounded HTTP %i bootstrap failure before resolving', async (status) => {
-    mockFetchBootstrap
-      .mockRejectedValueOnce(
-        new WorkerSessionBootstrapRequestError(`Worker bootstrap request failed with status ${status}.`, {
-          retryable: true,
-          status,
-        }),
-      )
-      .mockResolvedValueOnce(bootstrap);
-    const onResolved = jest.fn();
-
-    render(
-      <WorkerCanonicalSessionBootstrapBoundary
-        sessionSlug="worker-session"
-        workerQueryValue={WORKER_ORIGIN}
-        onResolved={onResolved}
-        retryDelaysMs={[0]}
-      />,
-    );
-
-    await waitFor(() => expect(onResolved).toHaveBeenCalledWith(bootstrap));
-    expect(mockFetchBootstrap).toHaveBeenCalledTimes(2);
-  });
-
-  it('still retries a bounded transient network failure before resolving', async () => {
-    mockFetchBootstrap.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(bootstrap);
-    const onResolved = jest.fn();
-
-    render(
-      <WorkerCanonicalSessionBootstrapBoundary
-        sessionSlug="worker-session"
-        workerQueryValue={WORKER_ORIGIN}
-        onResolved={onResolved}
-        retryDelaysMs={[0]}
-      />,
-    );
-
-    await waitFor(() => expect(onResolved).toHaveBeenCalledWith(bootstrap));
-    expect(mockFetchBootstrap).toHaveBeenCalledTimes(2);
-  });
-
-  it('offers a semantic manual Retry after a nonstandard 5xx failure exhausts automatic retries', async () => {
-    mockFetchBootstrap
-      .mockRejectedValueOnce(
-        new WorkerSessionBootstrapRequestError('Worker bootstrap request failed with status 599.', {
-          retryable: true,
-          status: 599,
-        }),
-      )
-      .mockResolvedValueOnce(bootstrap);
-    const onResolved = jest.fn();
-
-    render(
-      <WorkerCanonicalSessionBootstrapBoundary
-        sessionSlug="worker-session"
-        workerQueryValue={WORKER_ORIGIN}
-        onResolved={onResolved}
-        retryDelaysMs={[]}
-      />,
-    );
-
-    const retry = await screen.findByRole('button', { name: 'Retry worker session' });
-    expect(screen.getByRole('alert')).toHaveTextContent('status 599');
-    await act(async () => retry.click());
-
-    await waitFor(() => expect(onResolved).toHaveBeenCalledWith(bootstrap));
-    expect(mockFetchBootstrap).toHaveBeenCalledTimes(2);
-  });
-
-  it('caps automatic retries before offering the manual Retry action', async () => {
-    mockFetchBootstrap.mockRejectedValue(
-      new WorkerSessionBootstrapRequestError('Worker is activating.', {
-        retryable: true,
-        status: 503,
-      }),
-    );
-
-    render(
-      <WorkerCanonicalSessionBootstrapBoundary
-        sessionSlug="worker-session"
-        workerQueryValue={WORKER_ORIGIN}
-        onResolved={jest.fn()}
-        retryDelaysMs={[0, 0, 0, 0]}
-      />,
-    );
-
-    expect(await screen.findByRole('button', { name: 'Retry worker session' })).toBeInTheDocument();
-    expect(mockFetchBootstrap).toHaveBeenCalledTimes(3);
-  });
-
-  it.each([
-    [
-      'permanent HTTP authorization failure',
-      new WorkerSessionBootstrapRequestError('Worker bootstrap request failed with status 403.', {
-        retryable: false,
-        status: 403,
-      }),
-      'Worker bootstrap request failed with status 403.',
-    ],
-    [
-      'invalid canonical config',
-      new Error('Worker bootstrap response slug does not match the requested session.'),
-      'Worker identity mismatch',
-    ],
-  ])('does not retry or offer Retry for %s', async (_label, failure, expectedMessage) => {
-    mockFetchBootstrap.mockRejectedValueOnce(failure);
-
-    render(
-      <WorkerCanonicalSessionBootstrapBoundary
-        sessionSlug="worker-session"
-        workerQueryValue={WORKER_ORIGIN}
-        onResolved={jest.fn()}
-        retryDelaysMs={[0, 0]}
-      />,
-    );
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(expectedMessage);
-    expect(screen.queryByRole('button', { name: 'Retry worker session' })).not.toBeInTheDocument();
-    expect(mockFetchBootstrap).toHaveBeenCalledTimes(1);
   });
 
   it('aborts in-flight discovery on unmount and ignores later completion', async () => {

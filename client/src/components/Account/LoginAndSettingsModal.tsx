@@ -529,7 +529,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return this.getActiveSessionSlug();
   };
 
-  getActiveSessionCapabilities = () => {
+  getTargetNetwork = () => {
     const slug = this.getActiveSessionSlug();
     return this._sessionCapabilityProjectionResolver(this.getDisplaySessionConfig(slug));
   };

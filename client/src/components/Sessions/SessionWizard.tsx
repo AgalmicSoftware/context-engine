@@ -55,7 +55,7 @@ import {
   getSessionRegistryChains,
 } from '../../variables/chains.js';
 import type { SessionConfig, UnknownRecord } from '../../utilities/session/sessionTypes.js';
-import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
+import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../utilities/session/sponsoredFlags.js';
@@ -119,7 +119,6 @@ import {
 import {
   beginSessionPublishReducerAttempt,
   markSessionPublishEffectFailed,
-  markSessionPublishEffectSucceeded,
   runSessionPublishEffect,
 } from '../../domains/sessions/publish/sessionPublishDispatch.js';
 import {
@@ -167,13 +166,7 @@ import {
   type SessionWizardRegisterTxEntry,
 } from './sessionWizardPublishController';
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
-import { resolveSessionWizardModeFieldPolicy } from './sessionWizardModeFieldPolicy';
-import {
-  checkSessionWizardWorkerSlugExists,
-  resolveSessionWizardSlugAvailabilityPort,
-} from './sessionWizardSlugAvailability';
 import { createSessionWizardPublishRuntimeController } from './sessionWizardPublishRuntimeController';
-import { resolveSessionWizardWorkerPublishEvidence } from './sessionWizardWorkerPublishEvidence';
 import {
   resolveSessionWizardPublishRequestDescriptor,
   resolveSessionWizardPublishUiPlan,
@@ -3799,13 +3792,17 @@ const SessionWizard = ({
         }
         return;
       }
-      try {
-        await resolveAvailableRegisterIdentity();
-      } catch (err) {
-        const publishFailureSettlement = resolveSessionWizardPublishFailureSettlementDescriptor({ error: err });
-        setStatus(publishFailureSettlement.errorMessage);
-        dispatchSessionPublish({ type: 'edit' });
-        return;
+      if (
+        resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile).publish.registerSession
+      ) {
+        try {
+          await resolveAvailableRegisterIdentity();
+        } catch (err) {
+          const publishFailureSettlement = resolveSessionWizardPublishFailureSettlementDescriptor({ error: err });
+          setStatus(publishFailureSettlement.errorMessage);
+          dispatchSessionPublish({ type: 'edit' });
+          return;
+        }
       }
       dispatchSessionPublish({ type: 'edit' });
       setSessionUrl('');
@@ -3852,45 +3849,17 @@ const SessionWizard = ({
           sponsoredAutoDeployReady: sponsoredAutoDeployState.ready,
           deployComplete,
           canUploadMetadataNow,
+          sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
         });
         const { publishExecutionPlan } = publishRequestDescriptor;
         beginSessionPublishReducerAttempt(dispatchSessionPublish, publishExecutionPlan);
         let uploadResult = null;
         let workerUrlOverride = '';
         let deployedPendingDrafts = [];
-        const publishControllerResult = await runSessionWizardPublishController({
-          input: {
-            publishExecutionPlan,
-            signerAccountOverride,
-          },
-          ports: {
-            deployWorker: () =>
-              runSessionPublishEffect({
-                dispatch: dispatchSessionPublish,
-                effect: 'deployWorker',
-                getErrorMessage: getSessionWizardErrorMessage,
-                run: () =>
-                  runTrackedPublishEffect('deployWorker', () => handleDeployWorker({ forceSponsoredAutoDeploy: true })),
-                result: (deployResult) => ({ workerUrl: deployResult?.workerUrl || '' }),
-              }),
-            deployPendingSbts: ({ workerUrlOverride: pendingWorkerUrlOverride, signerAccountOverride }) =>
-              runSessionPublishEffect({
-                dispatch: dispatchSessionPublish,
-                effect: 'deployPendingSbts',
-                getErrorMessage: getSessionWizardErrorMessage,
-                run: () =>
-                  runTrackedPublishEffect('deployPendingSbts', () =>
-                    deployPendingSbtDrafts({
-                      workerUrlOverride: pendingWorkerUrlOverride,
-                      signerAccountOverride,
-                    }),
-                  ),
-                result: (deployedDrafts) => ({
-                  deployedPendingSbtCount: deployedDrafts.length,
-                }),
-              }),
-          },
-          callbacks: { setPublishStep: ignoreSessionPublishStep },
+        const publishControllerResult = await sessionWizardPublishRuntimeController.runPreparation({
+          publishExecutionPlan,
+          signerAccountOverride,
+          runTrackedPublishEffect,
         });
         workerUrlOverride = publishControllerResult.workerUrlOverride;
         deployedPendingDrafts = publishControllerResult.deployedPendingDrafts;
@@ -3914,18 +3883,12 @@ const SessionWizard = ({
           callbacks: { setPublishStep: ignoreSessionPublishStep },
         });
         uploadResult = metadataUploadControllerResult.uploadResult;
-        const registerStepRequest = resolveSessionWizardRegisterStepRequest({
+        await sessionWizardPublishRuntimeController.settleRegistration({
           publishExecutionPlan,
           uploadResult,
+          publishControllerResult,
+          runTrackedPublishEffect,
         });
-        activeSessionPublishEffect = 'registerSession';
-        await runSessionPublishEffect({
-          dispatch: dispatchSessionPublish,
-          effect: 'registerSession',
-          getErrorMessage: getSessionWizardErrorMessage,
-          run: () => handleRegisterGroup(registerStepRequest.registerGroupArgs),
-        });
-        markSessionPublishEffectSucceeded(dispatchSessionPublish, 'refreshRegistryCache');
         const completionRequest = resolveSessionWizardPublishCompletionRequest({
           publishExecutionPlan,
           deployedPendingDrafts,
@@ -4403,7 +4366,8 @@ const SessionWizard = ({
     getErrorMessage: getSessionWizardErrorMessage,
     deployWorker: () => handleDeployWorker({ forceSponsoredAutoDeploy: true }),
     deployPendingSbts: deployPendingSbtDrafts,
-    getWorkerPublishEvidence,
+    getCurrentWorkerSecrets,
+    resolveWorkerBaseUrl,
     resolveWorkerRpcUrl,
     resolveWorkerRpcUrlMap,
     parseAllowOriginsInput,
@@ -4415,9 +4379,7 @@ const SessionWizard = ({
       setSessionUrl,
       setAdminUrl,
       setAdminUrlStatus,
-      setWorkerCanonicalPublishSettled: workerCanonicalSettlement.setSettled,
       clearSessionWizardCache,
-      writeSessionWizardWorkerSettlement,
       setSessionId,
       setSessionIdStatus,
     },
@@ -4669,6 +4631,7 @@ const SessionWizard = ({
     publishAdvancedOpen,
     publishStepElapsedMs,
     sbtsLabel: t('sbts'),
+    sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
   });
   const {
     publishProgressDisplayState: { publishStep },

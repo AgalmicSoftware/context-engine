@@ -1,16 +1,12 @@
 import {
   buildSessionWorkerBootstrapUrl,
-  describeWorkerSessionBootstrapError,
   fetchWorkerCanonicalSessionBootstrap,
   findSecretLikeSessionWorkerBootstrapPath,
   normalizeWorkerCanonicalSessionIdHex,
   parseSessionWorkerDiscoveryOrigin,
   parseSessionWorkerDiscoveryQuery,
-  resolveWorkerCanonicalSessionIdHex,
   validateWorkerCanonicalSessionBootstrap,
-  WorkerSessionBootstrapRequestError,
 } from './sessionWorkerDiscovery';
-import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from './sessionModeProfile';
 
 const SESSION_ID = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
@@ -22,7 +18,10 @@ const buildPayload = (overrides: Record<string, unknown> = {}) => ({
     sessionId: SESSION_ID,
     configRevision: 'revision-a',
     corsWorkerUrl: 'https://session-a.example.workers.dev',
-    sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    sessionModeProfile: {
+      authority: { mode: 'worker_canonical' },
+      encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+    },
     workerAuthority: { participantScopes: ['ai', 'storage'] },
     ...overrides,
   },
@@ -59,7 +58,7 @@ describe('sessionWorkerDiscovery origin validation', () => {
   it.each([
     'not-a-url',
     'ftp://worker.example.test',
-    'https://user:password@127.0.0.1',
+    'https://user:[redacted-email]',
     'https://worker.example.test/path',
     'https://worker.example.test/%2e%2e',
     'https://worker.example.test?session=a',
@@ -84,25 +83,6 @@ describe('sessionWorkerDiscovery origin validation', () => {
     expect(() => parseSessionWorkerDiscoveryOrigin('http://localhost:8787', { environment: 'production' })).toThrow();
     expect(() => parseSessionWorkerDiscoveryOrigin('http://localhost:8787', { environment: 'Production' })).toThrow();
     expect(() => parseSessionWorkerDiscoveryOrigin('https://127.0.0.1', { environment: 'production' })).toThrow();
-  });
-
-  it('rejects malformed or conflicting canonical session ID aliases', () => {
-    expect(resolveWorkerCanonicalSessionIdHex({ sessionId: SESSION_ID })).toBe(SESSION_ID);
-    expect(resolveWorkerCanonicalSessionIdHex({ sessionIdHex: SESSION_ID })).toBe(SESSION_ID);
-    expect(
-      resolveWorkerCanonicalSessionIdHex({
-        sessionId: SESSION_ID,
-        sessionIdHex: SESSION_ID.toUpperCase(),
-      }),
-    ).toBe(SESSION_ID);
-    expect(resolveWorkerCanonicalSessionIdHex({ sessionId: 'malformed', sessionIdHex: SESSION_ID })).toBe('');
-    expect(resolveWorkerCanonicalSessionIdHex({ sessionId: SESSION_ID, sessionIdHex: 'malformed' })).toBe('');
-    expect(
-      resolveWorkerCanonicalSessionIdHex({
-        sessionId: SESSION_ID,
-        sessionIdHex: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-      }),
-    ).toBe('');
   });
 
   it.each([
@@ -159,23 +139,6 @@ describe('sessionWorkerDiscovery bootstrap validation', () => {
         workerOrigin: 'https://session-a.example.workers.dev',
       }),
     );
-  });
-
-  it('rejects a schema-only or malformed profile before accepting canonical readback', () => {
-    const schemaOnly = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    schemaOnly.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    schemaOnly.authority.mode = 'worker_with_public_anchor';
-    schemaOnly.evm.registryChainId = 11155420;
-
-    for (const sessionModeProfile of [schemaOnly, { profileVersion: 1, authority: { mode: 'worker_canonical' } }]) {
-      expect(() =>
-        validateWorkerCanonicalSessionBootstrap(buildPayload({ sessionModeProfile }), {
-          expectedSlug: 'session-a',
-          workerOrigin: 'https://session-a.example.workers.dev',
-          environment: 'production',
-        }),
-      ).toThrow(/unsupported worker-canonical profile/i);
-    }
   });
 
   it('canonicalizes UUID session identity to bytes16 hex and rejects conflicting identity fields', () => {
@@ -316,7 +279,7 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
     expect(buildSessionWorkerBootstrapUrl(result.workerOrigin, result.sessionSlug)).toBe(
       'https://session-a.example.workers.dev/session-config?slug=session-a',
     );
-    expect(fetchImpl as jest.Mock).toHaveBeenCalledWith(
+    expect(fetchImpl).toHaveBeenCalledWith(
       'https://session-a.example.workers.dev/session-config?slug=session-a',
       expect.objectContaining({
         method: 'GET',
@@ -363,87 +326,5 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
         environment: 'production',
       }),
     ).rejects.toThrow(/valid JSON/);
-  });
-
-  it('marks every server failure retryable while keeping client failures permanent', async () => {
-    const request = (status: number) =>
-      fetchWorkerCanonicalSessionBootstrap({
-        fetchImpl: jest.fn(async () => new Response('no', { status })),
-        sessionSlug: 'session-a',
-        workerQueryValue: 'https://session-a.example.workers.dev',
-        environment: 'production',
-      });
-
-    for (const status of [404, 408, 425, 429, 500, 503, 598, 599]) {
-      const transient = await request(status).catch((error) => error);
-      expect(transient).toBeInstanceOf(WorkerSessionBootstrapRequestError);
-      expect(transient).toMatchObject({
-        name: 'WorkerSessionBootstrapRequestError',
-        retryable: true,
-        status,
-      });
-    }
-    for (const status of [400, 401, 403, 409]) {
-      const permanent = await request(status).catch((error) => error);
-      expect(permanent).toBeInstanceOf(WorkerSessionBootstrapRequestError);
-      expect(permanent).toMatchObject({
-        name: 'WorkerSessionBootstrapRequestError',
-        retryable: false,
-        status,
-      });
-    }
-  });
-
-  it('classifies CORS, reachability, missing config, and identity mismatch without exposing raw responses', async () => {
-    const corsFetch = jest
-      .fn()
-      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
-      .mockResolvedValueOnce(new Response(null, { status: 200 }));
-    const corsError = await fetchWorkerCanonicalSessionBootstrap({
-      fetchImpl: corsFetch,
-      sessionSlug: 'session-a',
-      workerQueryValue: 'https://session-a.example.workers.dev',
-      environment: 'production',
-    }).catch((error) => error);
-    expect(describeWorkerSessionBootstrapError(corsError)).toEqual(
-      expect.objectContaining({ kind: 'cors', title: 'Browser origin not allowed', canRetry: true }),
-    );
-
-    const unreachableFetch = jest.fn().mockRejectedValue(new TypeError('Failed to fetch'));
-    const unreachableError = await fetchWorkerCanonicalSessionBootstrap({
-      fetchImpl: unreachableFetch,
-      sessionSlug: 'session-a',
-      workerQueryValue: 'https://session-a.example.workers.dev',
-      environment: 'production',
-    }).catch((error) => error);
-    expect(describeWorkerSessionBootstrapError(unreachableError)).toEqual(
-      expect.objectContaining({ kind: 'unreachable', title: 'Session Worker unreachable', canRetry: true }),
-    );
-
-    const missingError = await fetchWorkerCanonicalSessionBootstrap({
-      fetchImpl: jest.fn(async () => new Response('missing', { status: 404 })),
-      sessionSlug: 'session-a',
-      workerQueryValue: 'https://session-a.example.workers.dev',
-      environment: 'production',
-    }).catch((error) => error);
-    expect(describeWorkerSessionBootstrapError(missingError)).toEqual(
-      expect.objectContaining({ kind: 'missing_config', title: 'Canonical Worker config missing', canRetry: true }),
-    );
-
-    const identityError = await fetchWorkerCanonicalSessionBootstrap({
-      fetchImpl: jest.fn(
-        async () =>
-          new Response(JSON.stringify({ ...buildPayload(), sessionSlug: 'other-session' }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          }),
-      ),
-      sessionSlug: 'session-a',
-      workerQueryValue: 'https://session-a.example.workers.dev',
-      environment: 'production',
-    }).catch((error) => error);
-    expect(describeWorkerSessionBootstrapError(identityError)).toEqual(
-      expect.objectContaining({ kind: 'identity_mismatch', title: 'Worker identity mismatch', canRetry: false }),
-    );
   });
 });

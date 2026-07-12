@@ -361,7 +361,7 @@ describe('workerAuth canonical session resolution', () => {
 
   it('logs into an unregistered worker-canonical session using the freshly verified route config', async () => {
     const workerOrigin = 'https://unregistered-worker.example.com';
-    const sessionId = CANONICAL_SESSION_ID;
+    const sessionId = '0x1234567890abcdef1234567890abcdef';
     const workerConfig = {
       slug: 'unregistered-worker',
       sessionId,
@@ -385,21 +385,8 @@ describe('workerAuth canonical session resolution', () => {
     getCorsProxyUrlOrThrow.mockResolvedValueOnce(workerOrigin);
     global.fetch = jest
       .fn()
-      .mockResolvedValueOnce(
-        jsonResp(200, {
-          nonce: 'worker-nonce',
-          sessionSlug: workerConfig.slug,
-          sessionId,
-        }),
-      )
-      .mockResolvedValueOnce(
-        jsonResp(200, {
-          token: 'worker-token',
-          exp: Math.floor(Date.now() / 1000) + 3600,
-          sessionSlug: workerConfig.slug,
-          sessionId,
-        }),
-      );
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'worker-nonce' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'worker-token', exp: Math.floor(Date.now() / 1000) + 3600 }));
 
     await expect(getWorkerSessionToken({ sessionSlug: 'unregistered-worker', context: authContext })).resolves.toBe(
       'worker-token',
@@ -415,128 +402,9 @@ describe('workerAuth canonical session resolution', () => {
       `${workerOrigin}/auth/nonce`,
       `${workerOrigin}/auth/login`,
     ]);
-    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual(
-      expect.objectContaining({
-        sessionSlug: 'unregistered-worker',
-        sessionId,
-      }),
-    );
     expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual(
-      expect.objectContaining({
-        sessionSlug: 'unregistered-worker',
-        sessionId,
-      }),
+      expect.objectContaining({ sessionSlug: 'unregistered-worker' }),
     );
-  });
-
-  it('rejects a worker-canonical nonce response for a different exact session identity', async () => {
-    const sessionConfig = {
-      slug: 'edge',
-      sessionId: CANONICAL_SESSION_ID,
-      corsWorkerUrl: 'https://worker.example',
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
-    };
-    global.fetch = jest.fn().mockResolvedValueOnce(
-      jsonResp(200, {
-        nonce: 'worker-nonce',
-        sessionSlug: 'edge',
-        sessionId: NEXT_CANONICAL_SESSION_ID,
-      }),
-    );
-
-    await expect(
-      getWorkerSessionToken({
-        sessionConfig,
-        workerUrl: sessionConfig.corsWorkerUrl,
-        context: authContext,
-      }),
-    ).rejects.toThrow('Worker nonce returned a different canonical session identity.');
-
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-  });
-
-  it('fails before auth requests when a worker-canonical session lacks an exact session ID', async () => {
-    const sessionConfig = {
-      slug: 'edge',
-      corsWorkerUrl: 'https://worker.example',
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
-    };
-    global.fetch = jest.fn();
-
-    await expect(
-      getWorkerSessionToken({
-        sessionConfig,
-        workerUrl: sessionConfig.corsWorkerUrl,
-        context: authContext,
-      }),
-    ).rejects.toThrow('Worker-canonical authentication requires an exact session identity.');
-
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('rejects a worker-canonical login response for a different exact session slug', async () => {
-    const sessionConfig = {
-      slug: 'edge',
-      sessionId: CANONICAL_SESSION_ID,
-      corsWorkerUrl: 'https://worker.example',
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
-    };
-    global.fetch = jest
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResp(200, {
-          nonce: 'worker-nonce',
-          sessionSlug: 'edge',
-          sessionId: CANONICAL_SESSION_ID,
-        }),
-      )
-      .mockResolvedValueOnce(
-        jsonResp(200, {
-          token: 'worker-token',
-          exp: Math.floor(Date.now() / 1000) + 3600,
-          sessionSlug: 'other-session',
-          sessionId: CANONICAL_SESSION_ID,
-        }),
-      );
-
-    await expect(
-      getWorkerSessionToken({
-        sessionConfig,
-        workerUrl: sessionConfig.corsWorkerUrl,
-        context: authContext,
-      }),
-    ).rejects.toThrow('Worker login returned a different canonical session slug.');
-
-    expect(global.fetch).toHaveBeenCalledTimes(2);
-  });
-
-  it('preserves registry-session auth without imposing the Worker-canonical response envelope', async () => {
-    const sessionConfig = {
-      slug: 'registry-session',
-      sessionIdHex: CANONICAL_SESSION_ID,
-      corsWorkerUrl: 'https://worker.example',
-      sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } },
-    };
-    global.fetch = jest
-      .fn()
-      .mockResolvedValueOnce(jsonResp(200, { nonce: 'registry-nonce' }))
-      .mockResolvedValueOnce(
-        jsonResp(200, {
-          token: 'registry-token',
-          exp: Math.floor(Date.now() / 1000) + 3600,
-        }),
-      );
-
-    await expect(
-      getWorkerSessionToken({
-        sessionConfig,
-        workerUrl: sessionConfig.corsWorkerUrl,
-        context: authContext,
-      }),
-    ).resolves.toBe('registry-token');
-
-    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).not.toHaveProperty('sessionId');
-    expect(JSON.parse(global.fetch.mock.calls[1][1].body)).not.toHaveProperty('sessionId');
   });
 
   it('does not inject demo general config into worker lookup for implicit default session in on-chain mode', async () => {

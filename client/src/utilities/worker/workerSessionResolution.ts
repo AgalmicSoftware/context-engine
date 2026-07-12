@@ -6,6 +6,7 @@ import {
   normalizeSessionSlug,
   resolveActiveSessionSlug,
   resolveSessionConfigAliases,
+  resolveSessionSlugFromPathname,
 } from '../session/sessionNaming.js';
 import { getDemoSessionConfigForDisplay } from '../session/sessionSourceResolver.js';
 import { getVerifiedWorkerCanonicalSessionBootstrap } from '../session/sessionWorkerConfigCache.js';
@@ -115,7 +116,9 @@ export const resolveWorkerSessionContext = ({
       sessionConfig,
     },
     {
-      defaults: { activeSessionSlug: getActiveSessionSlugFromStore() },
+      defaults: {
+        activeSessionSlug: resolveActiveSessionSlug(asRecord(sessionConfig)) || getActiveSessionSlugFromStore(),
+      },
       resolveBySlug: (slug) =>
         resolveWorkerSessionConfigBySlug({
           sessionSlug: slug,

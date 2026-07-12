@@ -6,6 +6,10 @@ import {
   resolveWorkerSessionConfigBySlug,
   resolveWorkerSessionContext,
 } from './workerSessionResolution.js';
+import {
+  markWorkerCanonicalSessionBootstrapVerified,
+  upsertWorkerCanonicalSessionBootstrap,
+} from '../session/sessionWorkerConfigCache.js';
 
 const mockGetState = jest.fn();
 const mockGetRegistrySessionConfig = jest.fn();

@@ -8,18 +8,14 @@ import {
   normalizeSessionSlug,
 } from '../../domains/sessions/sessionConfig.js';
 import { getVerifiedWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerConfigCache.js';
-import {
-  parseSessionWorkerDiscoveryQuery,
-  validateWorkerCanonicalSessionBootstrap,
-} from '../../utilities/session/sessionWorkerDiscovery.js';
+import { parseSessionWorkerDiscoveryQuery } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { DEFAULT_SESSION_SLUG } from '../../variables/appConfig.js';
-import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { resolveMainSiteSessionRouteContext } from './routeSessionResolution.js';
 import { SessionLoadingSkeleton } from './routeStatusViews.js';
 import type { AppShell } from './AppShell';
 import type { WorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
 
-type SessionConfig = Record<string, unknown>;
+type SessionConfig = Record<string, any>;
 type SessionRouteContext = ReturnType<typeof resolveMainSiteSessionRouteContext>;
 type WorkerRouteKind = 'standard' | 'error' | 'bootstrap' | 'verified';
 
@@ -35,15 +31,6 @@ type WorkerCanonicalRouteState = {
 export type MainSiteSessionRouteResolution = WorkerCanonicalRouteState & {
   sessionRoute: SessionRouteContext | null;
 };
-
-export type VerifiedWorkerCanonicalLitRouteConfig = {
-  explicitWorkerRoute: boolean;
-  sessionConfig: SessionConfig | null;
-  sessionSlug: string;
-  workerOrigin: string;
-};
-
-export type WorkerCanonicalLitRouteContext = Omit<VerifiedWorkerCanonicalLitRouteConfig, 'sessionConfig'>;
 
 type ResolveWorkerRouteStateOptions = {
   searchStr: string;
@@ -71,76 +58,6 @@ const emptyWorkerRouteState = (): WorkerCanonicalRouteState => ({
   sessionConfig: null,
 });
 
-export const resolveWorkerCanonicalLitRouteContext = ({
-  sessionTokenRaw,
-  searchStr,
-}: {
-  sessionTokenRaw: string;
-  searchStr: string;
-}): WorkerCanonicalLitRouteContext => {
-  const sessionSlug = normalizeSessionSlug(sessionTokenRaw);
-  const explicitWorkerRoute = !!sessionSlug && new URLSearchParams(searchStr).has('worker');
-  if (!explicitWorkerRoute) {
-    return { explicitWorkerRoute: false, sessionSlug, workerOrigin: '' };
-  }
-
-  let workerOrigin = '';
-  try {
-    workerOrigin = parseSessionWorkerDiscoveryQuery(searchStr);
-  } catch {
-    return { explicitWorkerRoute: true, sessionSlug, workerOrigin: '' };
-  }
-  return { explicitWorkerRoute: true, sessionSlug, workerOrigin };
-};
-
-export const resolveVerifiedWorkerCanonicalLitRouteConfig = ({
-  sessionTokenRaw,
-  searchStr,
-  controller,
-  getVerifiedConfig = getVerifiedWorkerCanonicalSessionBootstrap,
-}: {
-  sessionTokenRaw: string;
-  searchStr: string;
-  controller: WorkerCanonicalRouteController;
-  getVerifiedConfig?: typeof getVerifiedWorkerCanonicalSessionBootstrap;
-}): VerifiedWorkerCanonicalLitRouteConfig => {
-  const { explicitWorkerRoute, sessionSlug, workerOrigin } = resolveWorkerCanonicalLitRouteContext({
-    sessionTokenRaw,
-    searchStr,
-  });
-  if (!explicitWorkerRoute) {
-    return { explicitWorkerRoute: false, sessionConfig: null, sessionSlug, workerOrigin: '' };
-  }
-  if (!workerOrigin || !controller.hasVerifiedRoute(sessionSlug, workerOrigin)) {
-    return { explicitWorkerRoute: true, sessionConfig: null, sessionSlug, workerOrigin };
-  }
-
-  const cachedConfig = getVerifiedConfig({ slug: sessionSlug, workerOrigin });
-  if (!cachedConfig) {
-    return { explicitWorkerRoute: true, sessionConfig: null, sessionSlug, workerOrigin };
-  }
-  try {
-    const bootstrap = validateWorkerCanonicalSessionBootstrap(
-      {
-        ok: true,
-        sessionSlug,
-        config: cachedConfig,
-      },
-      { expectedSlug: sessionSlug, workerOrigin },
-    );
-    return {
-      explicitWorkerRoute: true,
-      sessionConfig: bootstrap.config,
-      sessionSlug: bootstrap.sessionSlug,
-      workerOrigin: bootstrap.workerOrigin,
-    };
-  } catch {
-    // Query routing is never authority: only the validated, verified cache may
-    // supply runtime Lit configuration, even after a prior route resolution.
-    return { explicitWorkerRoute: true, sessionConfig: null, sessionSlug, workerOrigin };
-  }
-};
-
 const resolveWorkerRouteState = ({
   searchStr,
   workerSessionSlug,
@@ -148,14 +65,6 @@ const resolveWorkerRouteState = ({
   requireSessionSlug = false,
   getVerifiedConfig = getVerifiedWorkerCanonicalSessionBootstrap,
 }: ResolveWorkerRouteStateOptions): WorkerCanonicalRouteState => {
-  const workerDiscoveryValues = new URLSearchParams(searchStr).getAll('worker');
-  if (workerDiscoveryValues.length === 1 && !workerDiscoveryValues[0].trim()) {
-    return {
-      ...emptyWorkerRouteState(),
-      kind: 'error',
-      error: 'No Session Worker origin is available in this discovery link.',
-    };
-  }
   let workerOrigin = '';
   try {
     workerOrigin = parseSessionWorkerDiscoveryQuery(searchStr);
@@ -166,16 +75,7 @@ const resolveWorkerRouteState = ({
       error: error instanceof Error ? error.message : 'Invalid worker discovery URL.',
     };
   }
-  if (!workerOrigin) {
-    if (new URLSearchParams(searchStr).has('worker')) {
-      return {
-        ...emptyWorkerRouteState(),
-        kind: 'error',
-        error: 'No Session Worker origin is available in this discovery link.',
-      };
-    }
-    return emptyWorkerRouteState();
-  }
+  if (!workerOrigin) return emptyWorkerRouteState();
 
   const normalizedSlug = normalizeSessionSlug(workerSessionSlug);
   const workerOnlySearch = `?worker=${encodeURIComponent(workerOrigin)}`;
@@ -272,13 +172,7 @@ export const resolveMainSiteSessionRouteForRender = ({
 };
 
 export const renderWorkerCanonicalRouteError = (route: WorkerCanonicalRouteState): React.ReactElement | null =>
-  route.kind === 'error' ? (
-    <div role="alert" data-testid="ce-worker-canonical-discovery-error">
-      <h3>Worker discovery record missing or invalid</h3>
-      <p>{route.error}</p>
-      <a href={buildPublicRoute('/new')}>Return to session selection</a>
-    </div>
-  ) : null;
+  route.kind === 'error' ? <div role="alert">{route.error}</div> : null;
 
 export const renderWorkerCanonicalRouteBootstrap = (
   route: WorkerCanonicalRouteState,

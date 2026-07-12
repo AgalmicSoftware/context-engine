@@ -209,6 +209,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     mockedGetDemoSessionConfigBySlug.mockReturnValue(null);
     localStorage.clear();
     mockedGetSessionNetwork.mockReturnValue({ id: 84532, chainId: 84532, name: 'Base Sepolia' });
+    window.history.replaceState({}, '', '/');
   });
 
   it('does not update local state after unmount while session restore is pending', async () => {

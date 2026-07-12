@@ -49,18 +49,6 @@ import { sanitizeSessionWizardWorkerSecretsForLitMode } from '../sessionWizardWo
 import { getSessionWizardWorkerDeployValidationError } from '../sessionWizardWorkerRpc';
 import { resolveSessionWizardModeRequirements } from '../sessionWizardModeRequirements';
 import {
-  requireSessionWizardAgentSessionWrappedCapability,
-  resolveSessionWizardAgentSessionWrappedDeployment,
-} from '../sessionWizardAgentSessionWrappedDeploy';
-import { buildSessionWizardDeployStorageProfilePayload } from '../sessionWizardWorkerDeployStorage';
-import {
-  advanceSessionWizardDeployAttemptGeneration,
-  isStructuredSessionWizardDeployAttemptConflict,
-  markSessionWizardDeployAttemptCompleted,
-  resolveSessionWizardDeployAttemptIdentity,
-  shouldRetainSessionWizardDeployAttemptIdentity,
-} from '../sessionWizardDeployAttemptIdentity';
-import {
   normalizeSessionWizardSlug as normalizeSlug,
   normalizeSessionWizardWorkerUrl as normalizeWorkerUrl,
 } from '../sessionWizardUrlSupport';
@@ -306,12 +294,15 @@ const useSessionWizardWorkerDeploy = ({
           throw new Error('Connect your wallet to set the admin address.');
         }
         const configuredWorkerUrlBeforeDeploy = normalizeWorkerUrl(toStr(currentDraft.corsWorkerUrl).trim());
+        const modeRequirements = resolveSessionWizardModeRequirements(currentDraft.sessionModeProfile);
         const workerConfigError = getSessionWizardWorkerDeployValidationError({
           registryAddress: runtime.registryAddress,
           registryChainId: runtime.registryChainId,
           networkChainId: currentDraft.networkChainId,
           pathProvider: currentDraft?.rpc?.providers?.path || currentDraft?.rpc?.path || {},
           faucetRpcUrl: currentDraft?.faucet?.rpcUrl,
+          requiresRegistry: !modeRequirements.selected || modeRequirements.publish.registerSession,
+          requiresRpc: !modeRequirements.selected || modeRequirements.requiresRpc,
         });
         if (workerConfigError) {
           throw new Error(workerConfigError);
@@ -365,7 +356,17 @@ const useSessionWizardWorkerDeploy = ({
           bundleFile: runtime.bundleFile,
           bundleUrl: requestedBundleUrl,
         });
-        const deploySecrets = runtime.workerSecretsEnabled ? buildWorkerSecretsPayload(currentWorkerSecrets) : {};
+        const allDeploySecrets = runtime.workerSecretsEnabled ? buildWorkerSecretsPayload(currentWorkerSecrets) : {};
+        const deploySecrets = modeRequirements.isWorkerCanonical
+          ? Object.entries(allDeploySecrets).reduce<AnyRecord>((acc, [key, value]) => {
+              const allowed =
+                key === 'openaiKey' ||
+                (modeRequirements.requiresLit && key.startsWith('lit')) ||
+                (modeRequirements.requiresRpc && (key === 'customRpcUrl' || key === 'customRpcKey'));
+              if (allowed) acc[key] = value;
+              return acc;
+            }, {})
+          : allDeploySecrets;
         const deployBlockLimits = normalizeBlockLimitsForConfig(currentDraft?.blockLimits, runtime.latestChainBlock);
         const deployStorageProfile = buildDeployStorageProfilePayload(currentDraft, {});
         const payload: AnyRecord = {
@@ -386,11 +387,49 @@ const useSessionWizardWorkerDeploy = ({
           faucet: resolveWorkerFaucetConfig(),
           embeddedDeployHelperEnabled: runtime.embeddedDeployHelperEnabled,
         };
+        const canonicalSeedConfig = buildSessionWizardWorkerConfigPayload({
+          slug,
+          draft: currentDraft,
+          deployPayload: payload,
+          workerSecrets: currentWorkerSecrets,
+          account: resolvedAdmin,
+          registryAddress: runtime.registryAddress,
+          registryChainId: runtime.registryChainId,
+          networkChainId: runtime.network?.id,
+          sessionId: toStr(runtime.sessionId || '').trim(),
+          latestChainBlock: runtime.latestChainBlock,
+          resolveWorkerFaucetConfig,
+        });
+        [
+          'sessionId',
+          'sessionName',
+          'sessionInfo',
+          'sessionHeaderImg',
+          'sessionModeProfile',
+          'workerAuthority',
+          'ai',
+        ].forEach((key) => {
+          if (canonicalSeedConfig[key] !== undefined) payload[key] = canonicalSeedConfig[key];
+        });
+        payload.configRevision =
+          typeof globalThis.crypto?.randomUUID === 'function'
+            ? globalThis.crypto.randomUUID()
+            : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
         if (deployBlockLimits) {
           payload.blockLimits = deployBlockLimits;
         }
         if (deployStorageProfile) {
           payload.storageProfile = deployStorageProfile;
+        }
+        if (modeRequirements.isWorkerCanonical) {
+          delete payload.registryAddress;
+          delete payload.registryChainId;
+          delete payload.faucet;
+          delete payload.blockLimits;
+          if (!modeRequirements.requiresRpc) {
+            delete payload.rpcUrl;
+            delete payload.rpcUrlsByChainId;
+          }
         }
         if (Object.keys(deploySecrets).length) {
           payload.secrets = deploySecrets;

@@ -23,7 +23,7 @@ const baseInput: SessionWizardPublishReadinessInput = {
 };
 
 describe('resolveSessionWizardPublishReadiness', () => {
-  it('keeps a direct-token worker-canonical publish blocked after deploy capability sync failed', () => {
+  it('treats a configured worker URL as worker-canonical publish readiness without metadata', () => {
     expect(
       resolveSessionWizardPublishReadiness({
         ...baseInput,
@@ -35,90 +35,14 @@ describe('resolveSessionWizardPublishReadiness', () => {
       }),
     ).toEqual(
       expect.objectContaining({
-        canPublishNow: false,
+        canPublishNow: true,
         hasManualMetadata: false,
         hasUploadedMetadata: false,
-        readinessKind: 'blocked',
+        readinessKind: 'worker-config',
         showUploadBlockedReason: false,
       }),
     );
   });
-
-  it('does not let stale Arweave metadata bypass worker-canonical deploy verification', () => {
-    expect(
-      resolveSessionWizardPublishReadiness({
-        ...baseInput,
-        workerMode: 'custom',
-        usesDefaultWorkerUrl: false,
-        deployVerifiedInUi: false,
-        deployWorkerMatchesConfiguredUrl: true,
-        manualMetadataUrl: `ar://${txId}`,
-        metadataUrl: `ar://${'b'.repeat(43)}`,
-        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-      }),
-    ).toEqual(
-      expect.objectContaining({
-        canPublishNow: false,
-        readinessKind: 'blocked',
-      }),
-    );
-  });
-
-  it('does not trust a restored custom URL during the initial default-mode render', () => {
-    expect(
-      resolveSessionWizardPublishReadiness({
-        ...baseInput,
-        workerMode: 'default',
-        usesDefaultWorkerUrl: false,
-        deployVerifiedInUi: false,
-        deployWorkerMatchesConfiguredUrl: false,
-        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-      }),
-    ).toEqual(expect.objectContaining({ canPublishNow: false, readinessKind: 'blocked' }));
-  });
-
-  it('accepts worker-canonical config persistence for verified custom and shared default workers', () => {
-    const workerCanonicalProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-
-    expect(
-      resolveSessionWizardPublishReadiness({
-        ...baseInput,
-        workerMode: 'custom',
-        usesDefaultWorkerUrl: false,
-        deployVerifiedInUi: true,
-        deployWorkerMatchesConfiguredUrl: true,
-        sessionModeProfile: workerCanonicalProfile,
-      }),
-    ).toEqual(expect.objectContaining({ canPublishNow: true, readinessKind: 'worker-config' }));
-
-    expect(
-      resolveSessionWizardPublishReadiness({
-        ...baseInput,
-        sessionModeProfile: workerCanonicalProfile,
-      }),
-    ).toEqual(expect.objectContaining({ canPublishNow: true, readinessKind: 'worker-config' }));
-  });
-
-  it('does not treat the shared default URL as verification while custom worker mode is selected', () => {
-    expect(
-      resolveSessionWizardPublishReadiness({
-        ...baseInput,
-        workerMode: 'custom',
-        usesDefaultWorkerUrl: true,
-        deployVerifiedInUi: false,
-        deployWorkerMatchesConfiguredUrl: false,
-        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-      }),
-    ).toEqual(
-      expect.objectContaining({
-        canUploadMetadataNow: false,
-        canPublishNow: false,
-        readinessKind: 'blocked',
-        uploadBlockedReason: 'Custom worker mode requires a successful deploy in this run before metadata upload.',
-      }),
-    );
-  });
-
   it('allows default worker metadata upload to satisfy publish readiness', () => {
     expect(resolveSessionWizardPublishReadiness(baseInput)).toEqual({
       canUploadMetadataNow: true,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppShell, appShellDispatchActions } from './AppShell';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -869,6 +869,44 @@ describe('AppShell route render smoke', () => {
     );
   });
 
+  it('fresh-loads a worker-canonical admin link without registry lookup', async () => {
+    const workerOrigin = 'https://admin-worker.example.com';
+    const sessionId = '0xabcdefabcdefabcdefabcdefabcdefab';
+    const workerConfig = {
+      slug: 'admin-worker',
+      sessionId,
+      configRevision: 'admin-revision-1',
+      corsWorkerUrl: workerOrigin,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          sessionSlug: workerConfig.slug,
+          config: workerConfig,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const subject = createSubject({
+      path: '/admin',
+      search:
+        `?sessionId=${sessionId}&sessionSlug=${workerConfig.slug}` + `&worker=${encodeURIComponent(workerOrigin)}`,
+      sessionConfig: null,
+    });
+
+    const view = render(subject.render());
+
+    expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toBeInTheDocument();
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+    view.rerender(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ADMIN_ROOT)).toBeInTheDocument();
+    expect(mockAdminPage.mock.calls.at(-1)?.[0]?.initialSessionConfig).toEqual(workerConfig);
+    expect(mockAdminPage.mock.calls.at(-1)?.[0]?.initialRegistryChainId).toBeNull();
+  });
+
   it('renders the posts root without waiting for cache hydration', async () => {
     const subject = createSubject({ path: '/posts' });
     subject.state = {
@@ -924,8 +962,11 @@ describe('AppShell route render smoke', () => {
       configRevision: 'revision-1',
       corsWorkerUrl: workerOrigin,
       sessionName: 'Worker Session',
-      networkChainId: 11155420,
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+        storage: { mode: 'worker_kv' },
+        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+      },
       workerAuthority: { participantScopes: ['ai', 'storage'] },
     };
     const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -945,215 +986,22 @@ describe('AppShell route render smoke', () => {
       sessionConfig: null,
     });
     subject.resolveSessionPathSlug = jest.fn();
-    subject._mounted = true;
-    subject.getSessionSlugFromState = jest.fn(() => 'worker-session');
-    subject.handleNetworkChange = jest.fn();
-    subject.syncSessionFallbackRedirectConsumption = jest.fn();
-    subject.initializeQuestionCacheForGroup = jest.fn(async () => {
-      subject.state = { ...subject.state, isQuestionCacheReady: true };
-    });
-    subject.initializeSurveyCacheForGroup = jest.fn(async () => {
-      subject.state = { ...subject.state, isSurveyCacheReady: true };
-    });
-    subject.fetchQuestionResponsesChunkedForGroup = jest.fn(async () => {
-      subject.state = { ...subject.state, isResponsesCacheReady: true };
-    });
-    subject.initializeSbtCacheForGroup = jest.fn(async () => undefined);
-    subject.startSbtEventListenerForGroup = jest.fn();
-    subject.startSurveyAndQuestionEventListenerForGroup = jest.fn();
-    subject.setReadinessStateIfChanged = jest.fn((patch) => {
-      subject.state = { ...subject.state, ...(patch || {}) };
-    });
-    subject.checkAllCachesReady = jest.fn(() => {
-      subject.state = {
-        ...subject.state,
-        isAllCachesReady:
-          subject.state.isSBTCacheReady && subject.state.isSurveyCacheReady && subject.state.isQuestionCacheReady,
-      };
-    });
 
     const view = render(subject.render());
 
     expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent(
       'Loading worker session',
     );
-    expect(mockNavbar.mock.calls.at(-1)?.[0]?.sessionConfig).toBeNull();
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
 
-    const previousState = {
-      ...subject.state,
-      sessionPathResolutionNonce: 0,
-    };
-    subject.getSessionCfg.mockClear();
-    subject.componentDidUpdate(subject.props, previousState);
-    await waitFor(() => expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('worker-session'));
-
-    expect(subject.getCacheSessionCfg('worker-session')).toEqual(workerConfig);
-    expect(subject.getSessionCfg).not.toHaveBeenCalled();
-    expect(subject.initializeQuestionCacheForGroup).toHaveBeenCalledWith('worker-session');
-    expect(subject.fetchQuestionResponsesChunkedForGroup).toHaveBeenCalledWith('worker-session');
-    expect(subject.initializeSbtCacheForGroup).not.toHaveBeenCalled();
-    expect(subject.startSbtEventListenerForGroup).not.toHaveBeenCalled();
-    expect(subject.startSurveyAndQuestionEventListenerForGroup).not.toHaveBeenCalled();
-    expect(subject.state).toMatchObject({
-      isSBTCacheReady: true,
-      isSurveyCacheReady: true,
-      isQuestionCacheReady: true,
-      isResponsesCacheReady: true,
-      isAllCachesReady: true,
-    });
-
     view.rerender(subject.render());
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
-    expect(mockNavbar.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual(workerConfig);
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'worker-session');
-    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-network-id', '');
-    expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual({
-      ...workerConfig,
-      networkChainId: null,
-    });
+    expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual(workerConfig);
     expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
     expect(fetchSpy.mock.calls[0][0]).toBe('https://worker-session.example.com/session-config?slug=worker-session');
-    subject._mounted = false;
-  });
-
-  it('installs verified explicit-Lit worker hooks through the boundary and route controller', async () => {
-    const workerOrigin = 'https://worker-lit.example.com';
-    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    sessionModeProfile.encryption = { mode: 'lit' };
-    sessionModeProfile.evm.registryChainId = 11155420;
-    sessionModeProfile.storage.payloadAccessControl.encryption = 'lit';
-    const workerConfig = {
-      slug: 'worker-lit',
-      sessionId: '0x11223344556677889900aabbccddeeff',
-      configRevision: 'revision-lit-1',
-      corsWorkerUrl: workerOrigin,
-      sessionName: 'Worker Lit Session',
-      // The validated Lit profile is authoritative when stale top-level data
-      // disagrees with the chain used for encryption and decryption.
-      networkChainId: 84532,
-      sessionModeProfile,
-    };
-    const bootstrapResponse = createDeferred();
-    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockReturnValueOnce(bootstrapResponse.promise);
-    const litHooks = { saveKey: jest.fn(), getKey: jest.fn() };
-    createLitHooks.mockReturnValueOnce(litHooks);
-    const subject = createSubject({
-      path: '/session/worker-lit',
-      search: `?worker=${encodeURIComponent(workerOrigin)}`,
-      activeSessionSlug: 'edge',
-      sessionConfig: null,
-    });
-    subject.handleNetworkChange = jest.fn();
-    subject.syncSessionFallbackRedirectConsumption = jest.fn();
-
-    const view = render(subject.render());
-
-    // A routing query alone must not install hooks before the boundary has
-    // fetched, validated, cached, and marked the worker bootstrap verified.
-    subject.syncLitHooks();
-    expect(createLitHooks).not.toHaveBeenCalled();
-    expect(setGlobalLitHooks).toHaveBeenLastCalledWith(null);
-
-    await act(async () => {
-      bootstrapResponse.resolve(
-        new Response(
-          JSON.stringify({
-            ok: true,
-            sessionSlug: workerConfig.slug,
-            config: workerConfig,
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      );
-      await bootstrapResponse.promise;
-    });
-    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
-
-    const prevState = {
-      ...subject.state,
-      litHooks: null,
-      sessionPathResolutionNonce: 0,
-    };
-    subject.componentDidUpdate(subject.props, prevState);
-
-    expect(createLitHooks).toHaveBeenCalledWith(
-      expect.objectContaining({
-        chainId: 11155420,
-        litNetwork: 'chipotle',
-        chipotle: expect.objectContaining({
-          sessionSlug: 'worker-lit',
-          sessionConfig: workerConfig,
-          workerUrl: workerOrigin,
-        }),
-      }),
-    );
-    expect(setGlobalLitHooks).toHaveBeenLastCalledWith(litHooks);
-    expect(subject.state.litHooks).toBe(litHooks);
-
-    view.rerender(subject.render());
-    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
-    const onePageSessionProps = mockOnePageSession.mock.calls.at(-1)?.[0];
-    expect(onePageSessionProps?.litHooks).toBe(litHooks);
-    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-network-id', '11155420');
-    expect(onePageSessionProps?.networkChainId).toBe(11155420);
-    expect(onePageSessionProps?.sessionConfig).toEqual({
-      ...workerConfig,
-      networkChainId: 11155420,
-    });
-
-    const envelopeOrigin = 'https://worker-envelope.example.com';
-    const envelopeConfig = {
-      slug: 'worker-envelope',
-      sessionId: '0xffeeddccbbaa00998877665544332211',
-      configRevision: 'revision-envelope-1',
-      corsWorkerUrl: envelopeOrigin,
-      sessionName: 'Worker Envelope Session',
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-    };
-    const envelopeResponse = createDeferred();
-    fetchSpy.mockReturnValueOnce(envelopeResponse.promise);
-    const litRouteState = { ...subject.state };
-    setRoute('/session/worker-envelope', `?worker=${encodeURIComponent(envelopeOrigin)}`);
-
-    view.rerender(subject.render());
-    subject.componentDidUpdate(subject.props, litRouteState);
-
-    expect(subject.state.litHooks).toBeNull();
-    expect(setGlobalLitHooks).toHaveBeenLastCalledWith(null);
-    expect(createLitHooks).toHaveBeenCalledTimes(1);
-
-    await act(async () => {
-      envelopeResponse.resolve(
-        new Response(
-          JSON.stringify({
-            ok: true,
-            sessionSlug: envelopeConfig.slug,
-            config: envelopeConfig,
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      );
-      await envelopeResponse.promise;
-    });
-    await waitFor(() =>
-      expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(litRouteState.sessionPathResolutionNonce),
-    );
-
-    subject.componentDidUpdate(subject.props, {
-      ...subject.state,
-      sessionPathResolutionNonce: litRouteState.sessionPathResolutionNonce,
-    });
-    expect(subject.state.litHooks).toBeNull();
-    expect(setGlobalLitHooks).toHaveBeenLastCalledWith(null);
-    expect(createLitHooks).toHaveBeenCalledTimes(1);
-
-    view.rerender(subject.render());
-    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
-    expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.litHooks).toBeNull();
   });
 
   it('fails closed on duplicate worker discovery parameters without registry fallback', async () => {

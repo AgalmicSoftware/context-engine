@@ -30,7 +30,7 @@ export type SessionWizardPublishReadinessDescriptor = {
 };
 
 export type SessionWizardPublishReadinessKind =
-  'blocked' | 'manual-metadata' | 'sponsored-auto-deploy' | 'uploaded-metadata' | 'worker-upload';
+  'blocked' | 'manual-metadata' | 'sponsored-auto-deploy' | 'uploaded-metadata' | 'worker-config' | 'worker-upload';
 
 export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput & {
   buildMetadataGatewayUrl?: SessionWizardPublishMetadataGatewayUrlBuilder | null;
@@ -118,6 +118,7 @@ export function resolveSessionWizardPublishReadiness({
   metadataUrl,
   sessionModeProfile = null,
 }: SessionWizardPublishReadinessInput): SessionWizardPublishReadinessDescriptor {
+  const modeRequirements = resolveSessionWizardModeRequirements(sessionModeProfile);
   const canUploadMetadataNow =
     !!resolvedWorkerBaseUrl &&
     (workerMode === 'default' || usesDefaultWorkerUrl || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
@@ -130,18 +131,26 @@ export function resolveSessionWizardPublishReadiness({
         : 'Deploy the worker and ensure the worker URL is set before uploading metadata.';
   const hasManualMetadata = !!normalizeSessionWizardArweaveUri(manualMetadataUrl);
   const hasUploadedMetadata = !!normalizeSessionWizardArweaveUri(metadataUrl);
+  const canPersistWorkerConfigNow = modeRequirements.isWorkerCanonical && !!resolvedWorkerBaseUrl;
   const canPublishNow =
-    canUploadMetadataNow || canUseSponsoredAutoDeployNow || hasManualMetadata || hasUploadedMetadata;
-  const readinessKind: SessionWizardPublishReadinessKind = hasManualMetadata
-    ? 'manual-metadata'
-    : hasUploadedMetadata
-      ? 'uploaded-metadata'
-      : canUploadMetadataNow
-        ? 'worker-upload'
-        : canUseSponsoredAutoDeployNow
-          ? 'sponsored-auto-deploy'
-          : 'blocked';
-  const showUploadBlockedReason = !canPublishNow && !hasManualMetadata && !hasUploadedMetadata;
+    canPersistWorkerConfigNow ||
+    canUploadMetadataNow ||
+    canUseSponsoredAutoDeployNow ||
+    hasManualMetadata ||
+    hasUploadedMetadata;
+  const readinessKind: SessionWizardPublishReadinessKind = canPersistWorkerConfigNow
+    ? 'worker-config'
+    : hasManualMetadata
+      ? 'manual-metadata'
+      : hasUploadedMetadata
+        ? 'uploaded-metadata'
+        : canUploadMetadataNow
+          ? 'worker-upload'
+          : canUseSponsoredAutoDeployNow
+            ? 'sponsored-auto-deploy'
+            : 'blocked';
+  const showUploadBlockedReason =
+    !modeRequirements.isWorkerCanonical && !canPublishNow && !hasManualMetadata && !hasUploadedMetadata;
 
   return {
     canUploadMetadataNow,

@@ -60,10 +60,6 @@ import {
 } from '../../utilities/session/sessionMetaController.js';
 import { type SessionScanPolicy } from '../../utilities/session/mainSiteSessionScanPolicy.js';
 import {
-  claimsWorkerCanonicalAuthority,
-  resolveSessionCapabilityProjection,
-} from '../../utilities/session/sessionCapabilityProjection';
-import {
   createSessionProfileScanController,
   type SessionProfileScanController,
   type SessionProfileScanHost,
@@ -202,13 +198,7 @@ import { resolveMainSiteRouteMatch } from './routeTable.js';
 import { renderMainSiteRouteView } from './mainSiteRouteViewMap.js';
 import { createMainSiteRouteRenderers } from './mainSiteRouteRenderers.js';
 import { createMainSiteSessionScanPolicy } from './mainSiteSessionScanPolicyBinding.js';
-import {
-  initializeMainSiteWorkerCanonicalCachesForGroup,
-  preloadMainSiteAboutDemoSessionData,
-  resolveMainSiteDisplaySessionChainId,
-  resolveMainSiteDisplaySessionConfig,
-  resolveMainSiteDisplaySessionNetwork,
-} from './mainSiteCapabilityHostRuntime';
+import { runMainSiteScanSpecificUserProfile } from './mainSiteProfileScanRuntime.js';
 import {
   buildPublicRoute,
   buildPublicUrl,

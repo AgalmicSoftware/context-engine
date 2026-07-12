@@ -122,7 +122,12 @@ jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-se
 
 const AdminPage = require('./AdminPage').default;
 
-const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, initialRegistryChainId } = {}) => {
+const renderAdminPage = async ({
+  account = ADMIN_ADDRESS,
+  initialSessionId,
+  initialRegistryChainId,
+  initialSessionConfig,
+} = {}) => {
   let utils;
   await act(async () => {
     utils = render(
@@ -133,6 +138,7 @@ const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, init
         toggleLoginModal={jest.fn()}
         initialSessionId={initialSessionId}
         initialRegistryChainId={initialRegistryChainId}
+        initialSessionConfig={initialSessionConfig}
       />,
     );
     await Promise.resolve();
@@ -256,6 +262,30 @@ describe('AdminPage rendered interactions', () => {
         sessionConfig: expect.objectContaining({ slug: 'edge' }),
       }),
     );
+  });
+
+  it('uses an explicit worker-canonical config without loading the registry', async () => {
+    sessionEntries = [];
+    const initialSessionConfig = {
+      slug: 'worker-admin',
+      sessionId: '0x1234567890abcdef1234567890abcdef',
+      sessionName: 'Worker Admin Session',
+      corsWorkerUrl: 'https://worker-admin.example.test',
+      adminAddress: ADMIN_ADDRESS,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    mockResolveCorsProxyUrl.mockResolvedValue({
+      url: initialSessionConfig.corsWorkerUrl,
+      source: 'session-config',
+      status: 'ok',
+    });
+
+    await renderAdminPage({ initialSessionConfig });
+
+    expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue('worker-admin');
+    expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
+    expect(mockLoadSessionRegistryCache).not.toHaveBeenCalled();
+    expect(mockFetchSessionFromRegistry).not.toHaveBeenCalled();
   });
 
   it('reveals the tests section only after the worker Test button is clicked', async () => {

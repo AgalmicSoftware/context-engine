@@ -242,7 +242,6 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
-          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldPersistWorkerConfig: true,
             stepNumbers: {
@@ -286,7 +285,6 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
-          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldAutoDeployWorker: false,
             shouldPersistWorkerConfig: true,
@@ -1105,6 +1103,26 @@ describe('resolveSessionWizardRegisterSuccessSettlementDescriptor', () => {
         }),
       }),
     );
+  });
+});
+
+describe('resolveSessionWizardWorkerPublishSuccessSettlementDescriptor', () => {
+  it('builds reload-safe session and admin links with the verified worker origin', () => {
+    expect(
+      resolveSessionWizardWorkerPublishSuccessSettlementDescriptor({
+        slug: 'worker-session',
+        sessionId: '0x00000000000000000000000000000001',
+        workerOrigin: 'https://worker.example/',
+        origin: 'https://context.example',
+      }),
+    ).toEqual({
+      formattedSessionId: '00000000-0000-0000-0000-000000000001',
+      sessionUrl: 'https://context.example/session/worker-session?worker=https%3A%2F%2Fworker.example',
+      adminUrl:
+        'https://context.example/admin?sessionId=00000000-0000-0000-0000-000000000001&sessionSlug=worker-session&worker=https%3A%2F%2Fworker.example',
+      adminUrlStatus: '',
+      nextSessionIdStatus: 'Generated a new session ID for your next session.',
+    });
   });
 });
 

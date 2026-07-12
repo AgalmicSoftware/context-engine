@@ -15,12 +15,8 @@ import {
 } from '../../utilities/survey/questionRouting.js';
 import { isRouteResponderAddress } from '../../utilities/session/mainSiteUtils.js';
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
-import {
-  getDemoSessionConfigBySlug,
-  getSessionConfigBySlug,
-  normalizeSessionSlug,
-} from '../../domains/sessions/sessionConfig.js';
-import { DEFAULT_SESSION_SLUG, DEFAULT_SESSION_SLUG_ALIAS } from '../../variables/appConfig.js';
+import { normalizeSessionSlug } from '../../domains/sessions/sessionConfig.js';
+import { DEFAULT_SESSION_SLUG_ALIAS } from '../../variables/appConfig.js';
 import {
   composeMainSiteAuthViewProps,
   composeMainSiteLoginViewProps,
@@ -33,7 +29,6 @@ import {
   ExperimentalStub as ExperimentalStubRaw,
   NotFoundRoute as NotFoundRouteRaw,
   readHashQueryParam,
-  SessionLoadingSkeleton as SessionLoadingSkeletonRaw,
 } from './routeStatusViews';
 import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE } from './routeConfig.js';
 import { resolveMainSiteRouteMatch } from './routeTable.js';
@@ -43,9 +38,17 @@ import { buildPublicRoute, buildPublicUrl, replaceRouteResponderQueryParam } fro
 import { hasAutoFlag as hasAutoFlagFn } from './autoHashPersistence';
 import {
   resolveMainSiteQuestionRouteSessionContext,
-  resolveMainSiteSessionRouteContext,
   resolveMainSiteSessionRouteSourceSlug,
 } from './routeSessionResolution.js';
+import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
+import {
+  renderWorkerCanonicalRouteBootstrap,
+  renderWorkerCanonicalRouteError,
+  renderMissingMainSiteSessionConfig,
+  renderUnresolvedMainSiteSessionId,
+  resolveMainSiteAdminWorkerRoute,
+  resolveMainSiteSessionRouteForRender,
+} from './workerCanonicalRouteResolution.js';
 import {
   AboutPage as AboutPageRaw,
   AdminPage as AdminPageRaw,
@@ -141,7 +144,8 @@ const hasMainSiteRegistryIdentity = (sessionConfig: unknown): boolean => {
   );
 };
 
-export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): MainSiteRouteRendererMap => ({
+export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) => ({
+  workerCanonicalRoutes: getWorkerCanonicalRouteController(host),
   _renderDebateRoute: (fullPath: string) => <ExperimentalStub featureName="Debate view" path={fullPath} />,
 
   _renderBookmarksRoute: () => (
@@ -1037,20 +1041,12 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
       (!!parts[2] && !isDocsRoute && !isQuestionsRoute) ||
       (subroute === 'questions' && !!nextSubroute && nextSubroute !== 'results') ||
       (subroute === 'questions' && nextSubroute === 'results' && !!parts[4]);
-    const sessionRoute = resolveMainSiteSessionRouteContext({
+    const workerRoute = resolveMainSiteSessionRouteForRender({
       sessionTokenRaw,
-      formatSessionId: sessionRegistryReadsPort.formatSessionId,
-      resolveSessionConfigById: (sessionId: string | number) =>
-        sessionRegistryReadsPort.getSessionConfigById(sessionId),
-      resolveSessionConfigBySlug: (slug: string) =>
-        sessionRegistryReadsPort.getSessionConfig(slug) || getSessionConfigBySlug(slug),
-      resolveDisplaySessionConfigBySlug: (slug: string) =>
-        getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) ||
-        (normalizeSessionSlug(slug) === 'demo' ? getDemoSessionConfigBySlug('', { allowDemoFallback: true }) : null),
-      resolveSessionSlugFromPathToken: (sessionToken: string) =>
-        sessionToken
-          ? host.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve: true })
-          : DEFAULT_SESSION_SLUG,
+      searchStr,
+      controller: workerCanonicalRoutes,
+      resolveSessionSlugFromPathToken: (sessionToken) =>
+        host.resolveSessionSlugFromPathToken(sessionToken, { allowAsyncResolve: true }),
     });
     const workerRouteError = renderWorkerCanonicalRouteError(workerRoute);
     if (workerRouteError) return workerRouteError;
@@ -1072,31 +1068,8 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
       }
     }
 
-    if (sessionRoute.hasUnresolvedSessionId) {
-      const unresolvedSessionId = sessionIdFromPath!;
-      const idStatus = host._sessionPathResolver.getIdStatus(unresolvedSessionId);
-      const recentError = !!(idStatus.lastErrorTs && Date.now() - idStatus.lastErrorTs < 2 * 60 * 1000);
-      const keepResolving = recentError && idStatus.retryCount > 0;
-      host.resolveSessionPathId(unresolvedSessionId);
-      if (!idStatus.hasAttempted || idStatus.isPending || keepResolving) {
-        return <SessionLoadingSkeleton statusTitle={`Resolving ${unresolvedSessionId} Session...`} />;
-      }
-      return (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '50vh',
-            color: 'rgba(244,247,255,0.65)',
-          }}
-        >
-          <h3>Session Not Found</h3>
-          <p>No session metadata was found for {sessionIdFromPath}.</p>
-        </div>
-      );
-    }
+    const unresolvedSessionIdView = renderUnresolvedMainSiteSessionId(sessionRoute, host);
+    if (unresolvedSessionIdView) return unresolvedSessionIdView;
 
     slug = normalizeSessionSlug(slug);
     const canonicalSessionToken = slug || sessionTokenRaw || DEFAULT_SESSION_SLUG_ALIAS;
@@ -1112,31 +1085,13 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost): M
     }
     const sessionConfig = sessionRoute.sessionConfig;
     if (!sessionConfig) {
-      if (slug) {
-        const slugStatus = host._sessionPathResolver.getSlugStatus(slug);
-        const recentError = !!(slugStatus.lastErrorTs && Date.now() - slugStatus.lastErrorTs < 2 * 60 * 1000);
-        const keepResolving = recentError && slugStatus.retryCount > 0;
-        host.resolveSessionPathSlug(slug);
-        if (!slugStatus.hasAttempted || slugStatus.isPending || keepResolving) {
-          return <SessionLoadingSkeleton statusTitle={`Resolving ${slug} Session...`} />;
-        }
-        return (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              height: '50vh',
-              color: 'rgba(244,247,255,0.65)',
-            }}
-          >
-            <h3>Session Not Found</h3>
-            <p>No session metadata was found for {slug}.</p>
-          </div>
-        );
-      }
-      return <div>Session not found.</div>;
+      return renderMissingMainSiteSessionConfig({
+        sessionConfig,
+        slug,
+        workerRoute,
+        workerController: workerCanonicalRoutes,
+        host,
+      });
     }
     const effectiveSessionConfig = resolveExplicitWorkerSessionConfig({
       workerOrigin,

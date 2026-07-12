@@ -147,6 +147,27 @@ type AdminMetadataBlockLimitsDraft = {
   start: string;
   end: string;
 };
+type AdminSessionConfigLike = {
+  sessionName?: unknown;
+  sessionId?: unknown;
+  networkChainId?: unknown;
+  __registry?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+type AdminPageProps = {
+  account?: string;
+  provider?: string;
+  network?: {
+    id?: unknown;
+    chainId?: unknown;
+  } | null;
+  toggleLoginModal?: (payload?: unknown) => unknown;
+  loginComplete?: boolean;
+  ensureLightSbtUniverse?: () => unknown;
+  initialSessionId?: unknown;
+  initialRegistryChainId?: unknown;
+  initialSessionConfig?: unknown;
+};
 
 export const __adminPageTestUtils = {
   applyAdminMetadataDraft,
@@ -173,8 +194,24 @@ const AdminPage = ({
   ensureLightSbtUniverse,
   initialSessionId,
   initialRegistryChainId,
-}: any) => {
-  const [sessions, setSessions] = useState<any>([]);
+  initialSessionConfig,
+}: AdminPageProps) => {
+  const initialWorkerCanonicalConfigRef = useRef<AdminSessionConfigLike | null>(null);
+  if (!initialWorkerCanonicalConfigRef.current) {
+    const candidate = asAdminSessionConfig(initialSessionConfig);
+    const candidateProfile = asAdminSessionConfig(candidate.sessionModeProfile);
+    const candidateAuthority = asAdminSessionConfig(candidateProfile.authority);
+    if (candidateAuthority.mode === 'worker_canonical' && normalizeSlug(candidate.slug)) {
+      initialWorkerCanonicalConfigRef.current = candidate;
+    }
+  }
+  const mergeInitialWorkerCanonicalSession = useCallback((entries: AdminSessionRegistryEntry[] = []) => {
+    const initialConfig = initialWorkerCanonicalConfigRef.current;
+    const initialSlug = normalizeSlug(initialConfig?.slug);
+    if (!initialConfig || !initialSlug || entries.some(([slug]) => slug === initialSlug)) return entries;
+    return [[initialSlug, initialConfig] as AdminSessionRegistryEntry, ...entries];
+  }, []);
+  const [sessions, setSessions] = useState<AdminSessionRegistryEntry[]>(() => mergeInitialWorkerCanonicalSession([]));
   const [selectedSlug, setSelectedSlug] = useState('');
   const [ignoreRequestedSession, setIgnoreRequestedSession] = useState(false);
   const [workerUrl, setWorkerUrl] = useState('');
@@ -347,6 +384,7 @@ const AdminPage = ({
   const loadSessions = useCallback(
     async ({ forceOnChain }: any = {}) => {
       const cached = syncSessionsFromRegistryCache();
+      if (initialWorkerCanonicalConfigRef.current) return cached;
 
       const chainIds = requestedChainId ? [requestedChainId] : undefined;
       const shouldForceRegistryRead = !USE_ONCHAIN_SESSION_REGISTRY || !!forceOnChain;

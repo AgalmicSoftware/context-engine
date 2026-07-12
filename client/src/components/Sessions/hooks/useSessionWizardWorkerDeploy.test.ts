@@ -2,11 +2,6 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { cryptoUtils } from '../../../utilities/crypto/cryptography.js';
 import { INVALID_SESSION_SLUG_FORMAT_ERROR } from '../sessionWizardSlugValidation';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../../utilities/session/sessionModeProfile';
-import { readSessionWorkerConfigCache } from '../../../utilities/session/sessionWorkerConfigCache.js';
-import { buildSessionWizardPublishExecutionPlan } from '../sessionWizardPublishFlow';
-import { resolveSessionWizardPublishReadiness } from '../sessionWizardPublishReadiness';
-import { resolveSessionWizardWorkerRequirementReadiness } from '../sessionWizardWorkerRequirementProof';
-import { resolveSessionWizardWorkerPublishEvidence } from '../sessionWizardWorkerPublishEvidence';
 import useSessionWizardWorkerDeploy, { type SessionWizardWorkerDeployRuntime } from './useSessionWizardWorkerDeploy';
 import type { WorkerSecretsLike } from '../../shellTypes';
 
@@ -423,6 +418,61 @@ describe('useSessionWizardWorkerDeploy', () => {
     );
     expect(deployPayload.storageProfile.resources.questions).toBe('active');
     expect(deployPayload.storageProfile.resources.responses).toBe('active');
+  });
+
+  it('deploys the default worker-canonical profile without registry, RPC, faucet, or Arweave secrets', async () => {
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      registryAddress: '',
+      registryChainId: 0,
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      draft: {
+        slug: 'two-key-session',
+        sessionName: 'Two Key Session',
+        sessionInfo: 'Worker-canonical session.',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    options.getCurrentWorkerSecrets.mockReturnValue({
+      openaiKey: 'sk-ai',
+      arweaveJwk: 'must-not-send',
+      faucetPrivateKey: 'must-not-send',
+      litUsageApiKey: 'must-not-send',
+    });
+    options.resolveWorkerRpcUrl.mockReturnValue('');
+    options.resolveWorkerRpcUrlMap.mockReturnValue({});
+    options.resolveWorkerFaucetConfig.mockReturnValue({});
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+    const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
+    expect(deployPayload).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'two-key-session',
+        sessionId: '0x123e4567e89b12d3a456426614174000',
+        sessionName: 'Two Key Session',
+        sessionInfo: 'Worker-canonical session.',
+        sessionModeProfile: expect.objectContaining({ authority: { mode: 'worker_canonical' } }),
+        workerAuthority: expect.objectContaining({ version: 1 }),
+        configRevision: expect.any(String),
+        adminAddress: '0x00000000000000000000000000000000000000aa',
+        secrets: { openaiKey: 'sk-ai' },
+      }),
+    );
+    expect(deployPayload.registryAddress).toBeUndefined();
+    expect(deployPayload.registryChainId).toBeUndefined();
+    expect(deployPayload.rpcUrl).toBeUndefined();
+    expect(deployPayload.rpcUrlsByChainId).toBeUndefined();
+    expect(deployPayload.faucet).toBeUndefined();
+    expect(deployPayload.blockLimits).toBeUndefined();
+    expect(JSON.stringify(deployPayload)).not.toMatch(/must-not-send/);
   });
 
   it('keeps non-Cloudflare deploy-helper payloads on the legacy shape', async () => {

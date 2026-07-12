@@ -67,4 +67,17 @@ describe('SessionWizard worker RPC configuration', () => {
       }),
     ).toBe('RPC URL is required for chain 777777 before deploying a worker.');
   });
+
+  it('does not require registry or RPC inputs for worker-canonical deploys', () => {
+    expect(
+      getSessionWizardWorkerDeployValidationError({
+        registryAddress: '',
+        registryChainId: 0,
+        pathProvider: {},
+        faucetRpcUrl: '',
+        requiresRegistry: false,
+        requiresRpc: false,
+      }),
+    ).toBe('');
+  });
 });
