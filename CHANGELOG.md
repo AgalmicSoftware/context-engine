@@ -28,6 +28,8 @@ All notable changes to this project will be documented in this file.
   depth, keeping live/future borders visible only while demo mode is enabled.
 - Split the desktop main-screen welcome controls into equal-height rows and
   aligned their rail to the slide edges without changing session welcome slides.
+- Stabilized the desktop main-screen welcome carousel at one responsive frame
+  height so advancing between slides no longer resizes the card.
 
 ### Fixed
 
