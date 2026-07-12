@@ -27,6 +27,15 @@ describe('postsContent', () => {
     expect(unlistedTopLevelMarkdown).toEqual([]);
   });
 
+  it('uses the intended Facebook quiz wording and source in the Agent Village post', () => {
+    const markdown = readFileSync('../posts/agent-village-wrapped/agent-village-wrapped.md', 'utf8');
+
+    expect(markdown).toContain(
+      '[on Facebook](https://www.niemanlab.org/2014/02/are-quizzes-the-new-lists-what-buzzfeeds-latest-viral-success-means-for-publishing/)',
+    );
+    expect(markdown).not.toContain('[for Facebook]');
+  });
+
   it('normalizes valid manifest entries and drops incomplete or unsafe posts', () => {
     expect(
       normalizePostsManifest({
