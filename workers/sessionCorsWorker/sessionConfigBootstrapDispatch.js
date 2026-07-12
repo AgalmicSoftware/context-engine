@@ -7,6 +7,21 @@ import {
 
 export { projectPublicWorkerSessionConfig };
 
+const buildBootstrapHeaders = (headers) => {
+  const next = new Headers(headers || {});
+  const vary = new Set(
+    (next.get('Vary') || '')
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+  );
+  vary.add('Origin');
+  vary.add('X-Session-Slug');
+  next.set('Vary', [...vary].join(', '));
+  next.set('Cache-Control', 'no-store');
+  return next;
+};
+
 export const dispatchSessionConfigBootstrapRequest = async ({
   request,
   env,
@@ -39,5 +54,5 @@ export const dispatchSessionConfigBootstrapRequest = async ({
     ok: true,
     sessionSlug: slug,
     config: projectPublicWorkerSessionConfig(config),
-  }, 200, corsContext.headers);
+  }, 200, buildBootstrapHeaders(corsContext.headers));
 };

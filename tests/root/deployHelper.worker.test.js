@@ -32,6 +32,21 @@ const makeFetchSequence = (responses = []) => {
   const calls = [];
   const fetchMock = async (...args) => {
     calls.push(args);
+    const [url, init = {}] = args;
+    const normalizedUrl = String(url);
+    if (String(init.method || 'GET').toUpperCase() === 'GET' && /\/values\/session:[^/]+:config$/.test(normalizedUrl)) {
+      if (fetchMock.kvReadbackOverride) return fetchMock.kvReadbackOverride;
+      const latestConfigWrite = [...calls]
+        .reverse()
+        .find(([candidateUrl, candidateInit = {}]) => (
+          String(candidateInit.method || '').toUpperCase() === 'PUT' &&
+          String(candidateUrl) === normalizedUrl
+        ));
+      return new Response(latestConfigWrite?.[1]?.body || '{}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
     const next = queue.shift();
     if (typeof next === 'function') {
       return next(...args);
@@ -163,10 +178,11 @@ describe('deploy-helper worker', () => {
 
       expect(response.status).toBe(200);
       expect(payload?.ok).toBe(true);
-      expect(fetchMock.calls.length).toBe(9);
+      expect(payload?.configVerified).toBe(true);
+      expect(fetchMock.calls.length).toBe(10);
       expectBundleDiagnosticsLog(consoleLogSpy, 'bundleUrl');
 
-      const scriptUpload = fetchMock.calls[2];
+      const scriptUpload = fetchMock.calls[4];
       const uploadForm = scriptUpload[1].body;
       const uploadMetadata = await readScriptUploadMetadata(scriptUpload);
       expect(uploadMetadata.main_module).toBe('worker.mjs');
@@ -178,12 +194,12 @@ describe('deploy-helper worker', () => {
         .map(([, init]) => JSON.parse(init.body));
       expect(workerSecretWrites.map((secret) => secret.name)).toEqual(['TOKEN_HMAC_SECRET']);
 
-      const configWrite = fetchMock.calls[4];
+      const configWrite = fetchMock.calls[2];
       expect(JSON.parse(configWrite[1].body).allowOrigins).toEqual([
         'http://localhost:3000',
       ]);
 
-      const secretsWrite = fetchMock.calls[5];
+      const secretsWrite = fetchMock.calls[3];
       expect(String(secretsWrite[0])).toMatch(/\/storage\/kv\/namespaces\/kv-123\/values\/session:alpha-session:secrets$/);
       const secretsEnvelope = JSON.parse(secretsWrite[1].body);
       expect(secretsEnvelope).toEqual(expect.objectContaining({
@@ -242,7 +258,7 @@ describe('deploy-helper worker', () => {
       const payload = await response.json();
 
       expect(response.status).toBe(200);
-      const uploadMetadata = await readScriptUploadMetadata(fetchMock.calls[2]);
+      const uploadMetadata = await readScriptUploadMetadata(fetchMock.calls[4]);
       expect(uploadMetadata.bindings).toEqual(expect.arrayContaining([
         { name: 'CE_STORAGE_INDEX_KV', type: 'kv_namespace', namespace_id: 'kv-123' },
       ]));
@@ -259,7 +275,7 @@ describe('deploy-helper worker', () => {
       expect(envelopeKek).toMatch(/^[0-9a-f]{64}$/);
       expect(envelopeKek).not.toBe(tokenSecret);
 
-      const configWrite = JSON.parse(fetchMock.calls[5][1].body);
+      const configWrite = JSON.parse(fetchMock.calls[2][1].body);
       expect(configWrite.storageProfile.payloadAccessControl.encryption).toBe('worker_envelope');
       expect(JSON.stringify(payload)).not.toContain(envelopeKek);
       expect(JSON.stringify(configWrite)).not.toContain(envelopeKek);
@@ -300,7 +316,12 @@ describe('deploy-helper worker', () => {
         ai: {
           models: { fast: { provider: 'openai', model: 'gpt-5' } },
           apiKey: 'sk-never-store',
+          headers: { Authorization: 'Bearer sk-header-secret' },
+          provider: { key: 'sk-generic-key' },
+          endpoint: 'https://user:password@api.example.test',
         },
+        cfApiToken: 'cf-alias-never-store',
+        scopes: { cloudflare: { credentials: { token: 'nested-cf-never-store' } } },
         sessionModeProfile: {
           authority: { mode: 'worker_canonical' },
           encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
@@ -319,7 +340,7 @@ describe('deploy-helper worker', () => {
       }), {}, {});
 
       expect(response.status).toBe(200);
-      const configWrite = JSON.parse(fetchMock.calls[5][1].body);
+      const configWrite = JSON.parse(fetchMock.calls[2][1].body);
       const serialized = JSON.stringify(configWrite);
       expect(configWrite).toEqual(expect.objectContaining({
         sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -331,7 +352,12 @@ describe('deploy-helper worker', () => {
         ai: { models: { fast: { provider: 'openai', model: 'gpt-5' } } },
       }));
       expect(serialized).not.toContain('cf-never-store');
+      expect(serialized).not.toContain('cf-alias-never-store');
+      expect(serialized).not.toContain('nested-cf-never-store');
       expect(serialized).not.toContain('sk-never-store');
+      expect(serialized).not.toContain('sk-header-secret');
+      expect(serialized).not.toContain('sk-generic-key');
+      expect(serialized).not.toContain('user:password');
 
       const configRewrite = JSON.parse(fetchMock.calls[9][1].body);
       expect(configRewrite.configRevision).toBe('revision-a');
@@ -380,14 +406,14 @@ describe('deploy-helper worker', () => {
       expect(response.status).toBe(200);
       expect(payload?.ok).toBe(true);
 
-      const uploadMetadata = await readScriptUploadMetadata(fetchMock.calls[2]);
+      const uploadMetadata = await readScriptUploadMetadata(fetchMock.calls[4]);
       expect(uploadMetadata.bindings).toEqual(expect.arrayContaining([
         { name: 'GROUP_KV', type: 'kv_namespace', namespace_id: 'kv-123' },
         { name: 'CE_STORAGE_INDEX_KV', type: 'kv_namespace', namespace_id: 'kv-123' },
       ]));
       expect(uploadMetadata.bindings.some((binding) => binding.name === 'CE_STORAGE_R2')).toBe(false);
 
-      const configWrite = JSON.parse(fetchMock.calls[4][1].body);
+      const configWrite = JSON.parse(fetchMock.calls[2][1].body);
       expect(configWrite.storageProfile).toEqual(expect.objectContaining({
         backend: 'cloudflare',
         sessionOwned: true,
@@ -445,13 +471,13 @@ describe('deploy-helper worker', () => {
       }), {}, {});
 
       expect(response.status).toBe(200);
-      const uploadMetadata = await readScriptUploadMetadata(fetchMock.calls[2]);
+      const uploadMetadata = await readScriptUploadMetadata(fetchMock.calls[4]);
       expect(uploadMetadata.bindings).toEqual(expect.arrayContaining([
         { name: 'CE_STORAGE_INDEX_KV', type: 'kv_namespace', namespace_id: 'kv-123' },
         { name: 'CE_STORAGE_R2', type: 'r2_bucket', bucket_name: 'ce-session-payloads' },
       ]));
 
-      const configWrite = JSON.parse(fetchMock.calls[4][1].body);
+      const configWrite = JSON.parse(fetchMock.calls[2][1].body);
       expect(configWrite.storageProfile.backend).toBe('cloudflare');
       expect(JSON.stringify(configWrite)).not.toContain('ce-session-payloads');
     } finally {
@@ -514,7 +540,7 @@ describe('deploy-helper worker', () => {
     expect(payload?.error).toBe('Failed to fetch bundle: fetch failed');
   });
 
-  it('returns a partial-success response when only the final config rewrite fails', async () => {
+  it('fails without surfacing a worker URL when the final config rewrite fails', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
       new Response('export default { fetch() {} };', { status: 200 }),
@@ -539,14 +565,48 @@ describe('deploy-helper worker', () => {
       }), {}, {});
       const payload = await response.json();
 
-      expect(response.status).toBe(207);
-      expect(payload?.ok).toBe(true);
-      expect(payload?.partial).toBe(true);
-      expect(payload?.workerUrl).toBe('https://test-worker.tenant-subdomain.workers.dev/'); // intentional: real URL — tests worker URL construction
-      expect(payload?.configWriteError).toBe('final config rewrite failed');
-      expect(payload?.configWriteStatus).toBe(500);
+      expect(response.status).toBe(502);
+      expect(payload?.workerUrl).toBeUndefined();
+      expect(payload?.error).toBe('final config rewrite failed');
       expect(fetchMock.calls.length).toBe(9);
       expectBundleDiagnosticsLog(consoleLogSpy, 'bundleUrl');
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('fails without surfacing a worker URL when config readback does not match', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({ subdomain: 'tenant-subdomain', status: 'active' }),
+      cfSuccess({ enabled: true }),
+      cfSuccess({}),
+    ]);
+    fetchMock.kvReadbackOverride = new Response(JSON.stringify({
+      slug: 'different-session',
+      corsWorkerUrl: 'https://attacker.example',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(payload?.workerUrl).toBeUndefined();
+      expect(payload?.error).toBe('Worker config verification failed after deployment.');
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -558,6 +618,8 @@ describe('deploy-helper worker', () => {
     const fetchMock = makeFetchSequence([
       new Response('export default { fetch() {} };', { status: 200 }),
       cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({}),
       cfFailure(400, 'The uploaded script has no registered event handlers.'),
     ]);
     global.fetch = fetchMock;
@@ -596,6 +658,8 @@ describe('deploy-helper worker', () => {
     const bundleText = '\nexport default { fetch() { return new Response("ok"); } };\n';
     const fetchMock = makeFetchSequence([
       cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({}),
       async (...args) => {
         const uploadForm = args[1].body;
         const uploadedBundle = await new Response(uploadForm.get('worker.mjs')).text();

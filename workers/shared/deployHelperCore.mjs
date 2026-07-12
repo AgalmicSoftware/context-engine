@@ -5,7 +5,12 @@ import {
 } from '../sessionCorsWorker/storageRefNormalization.js';
 import { buildSessionSecretsEnvelope } from './sessionSecretsEnvelope.mjs';
 import { resolveCloudflareApiBaseUrl } from './deployHelperEndpointConfig.mjs';
-import { selectDeployWorkerSessionConfigFields } from './workerSessionConfig.mjs';
+import {
+  findForbiddenCloudflareDeploymentTokenPath,
+  findForbiddenWorkerConfigSecretPath,
+  sanitizeWorkerConfigOpenSubtree,
+  selectDeployWorkerSessionConfigFields,
+} from './workerSessionConfig.mjs';
 
 const { getPathRpcUrl } = rpcDefaults;
 
@@ -824,8 +829,8 @@ export const executeDeployHelperRequest = async ({
   const allowOrigins = normalizeAllowList(
     allowOriginsInput.length ? allowOriginsInput : [requestOrigin]
   );
-  const limits = body?.limits || {};
-  const scopes = body?.scopes || {};
+  const limits = sanitizeWorkerConfigOpenSubtree(body?.limits || {});
+  const scopes = sanitizeWorkerConfigOpenSubtree(body?.scopes || {});
   const faucetInput = body?.faucet && typeof body.faucet === 'object' ? body.faucet : {};
   const faucet = {
     rpcUrl: toStr(faucetInput.rpcUrl).trim() || DEFAULT_FAUCET_RPC_URL,
@@ -870,6 +875,41 @@ export const executeDeployHelperRequest = async ({
     },
   }));
 
+  const config = {
+    slug: sessionSlug,
+    registryAddress,
+    registryChainId,
+    hatsAddress,
+    adminHatId,
+    adminAddress,
+    rpcUrl,
+    rpcUrlsByChainId,
+    allowOrigins,
+    limits,
+    scopes,
+    faucet,
+    embeddedDeployHelperEnabled,
+    ...selectDeployWorkerSessionConfigFields(body),
+  };
+  if (storageProfile) {
+    config.storageProfile = storageProfile;
+  }
+  const blockLimits = sanitizeBlockLimits(body?.blockLimits);
+  if (blockLimits) {
+    config.blockLimits = blockLimits;
+  }
+  if (findForbiddenCloudflareDeploymentTokenPath(config)) {
+    return buildFailure(400, { error: 'Cloudflare deployment tokens are not allowed in session config.' });
+  }
+  if (findForbiddenWorkerConfigSecretPath(config)) {
+    return buildFailure(400, { error: 'Secret-like values are not allowed in public session config fields.' });
+  }
+
+  const sessionConfigKey = `session:${sessionSlug}:config`;
+  const sessionSecretsKey = `session:${sessionSlug}:secrets`;
+  const secrets = sanitizeSecrets(body?.secrets || {});
+  const secretsEnvelope = buildSessionSecretsEnvelope(secrets);
+
   const kvCreate = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -886,6 +926,37 @@ export const executeDeployHelperRequest = async ({
   const kvId = kvCreate.data?.result?.id;
   if (!kvId) {
     return buildFailure(502, { error: 'Failed to create KV namespace.' }, { fallbackEligible: true });
+  }
+
+  // Establish the signed admin binding before the runnable script can ever be
+  // attached to this namespace. Otherwise a redeployed workers.dev hostname
+  // has a first-write interval where an unrelated signer can claim the slug.
+  const configPut = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  }, cfFetchOptions);
+  if (!configPut.ok) {
+    return buildFailure(502, {
+      error: configPut.error,
+      detail: configPut.detail,
+    }, {
+      fallbackEligible: shouldAllowFallbackForCloudflareFailure(configPut),
+    });
+  }
+
+  const secretsPut = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(secretsEnvelope),
+  }, cfFetchOptions);
+  if (!secretsPut.ok) {
+    return buildFailure(502, {
+      error: secretsPut.error,
+      detail: secretsPut.detail,
+    }, {
+      fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretsPut),
+    });
   }
 
   const tokenSecret = randomSecret();
@@ -969,63 +1040,6 @@ export const executeDeployHelperRequest = async ({
     envelopeKekSecretSet = true;
   }
 
-  const config = {
-    slug: sessionSlug,
-    registryAddress,
-    registryChainId,
-    hatsAddress,
-    adminHatId,
-    adminAddress,
-    rpcUrl,
-    rpcUrlsByChainId,
-    allowOrigins,
-    limits,
-    scopes,
-    faucet,
-    embeddedDeployHelperEnabled,
-    ...selectDeployWorkerSessionConfigFields(body),
-  };
-  if (storageProfile) {
-    config.storageProfile = storageProfile;
-  }
-  const blockLimits = sanitizeBlockLimits(body?.blockLimits);
-  if (blockLimits) {
-    config.blockLimits = blockLimits;
-  }
-
-  const sessionConfigKey = `session:${sessionSlug}:config`;
-  const sessionSecretsKey = `session:${sessionSlug}:secrets`;
-  const secrets = sanitizeSecrets(body?.secrets || {});
-  const secretsEnvelope = buildSessionSecretsEnvelope(secrets);
-
-  const configPut = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(config),
-  }, cfFetchOptions);
-  if (!configPut.ok) {
-    return buildFailure(502, {
-      error: configPut.error,
-      detail: configPut.detail,
-    }, {
-      fallbackEligible: shouldAllowFallbackForCloudflareFailure(configPut),
-    });
-  }
-
-  const secretsPut = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(secretsEnvelope),
-  }, cfFetchOptions);
-  if (!secretsPut.ok) {
-    return buildFailure(502, {
-      error: secretsPut.error,
-      detail: secretsPut.detail,
-    }, {
-      fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretsPut),
-    });
-  }
-
   const {
     subdomain,
     subdomainStatus,
@@ -1072,14 +1086,36 @@ export const executeDeployHelperRequest = async ({
       body: JSON.stringify(configWithWorkerUrl),
     }, cfFetchOptions);
     if (!configUpdate.ok) {
-      return buildSuccess(207, {
-        ...deploymentPayload,
-        partial: true,
-        configWriteError: configUpdate.error,
-        configWriteStatus: configUpdate.status || 502,
-        configWriteDetail: configUpdate.detail,
+      return buildFailure(502, {
+        error: configUpdate.error || 'Failed to persist the final worker config.',
+        detail: configUpdate.detail,
       });
     }
+    const configReadback = await cfFetch(
+      apiToken,
+      `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`,
+      { method: 'GET' },
+      cfFetchOptions,
+    );
+    const readbackConfig = configReadback.data?.result || configReadback.data || {};
+    const expectedAuthorityMode = toStr(configWithWorkerUrl?.sessionModeProfile?.authority?.mode).trim();
+    const verified = (
+      configReadback.ok &&
+      toStr(readbackConfig.slug).trim() === toStr(configWithWorkerUrl.slug).trim() &&
+      toStr(readbackConfig.corsWorkerUrl).trim() === toStr(configWithWorkerUrl.corsWorkerUrl).trim() &&
+      (!configWithWorkerUrl.configRevision ||
+        toStr(readbackConfig.configRevision).trim() === toStr(configWithWorkerUrl.configRevision).trim()) &&
+      (!configWithWorkerUrl.sessionId ||
+        toStr(readbackConfig.sessionId).trim() === toStr(configWithWorkerUrl.sessionId).trim()) &&
+      (!expectedAuthorityMode ||
+        toStr(readbackConfig?.sessionModeProfile?.authority?.mode).trim() === expectedAuthorityMode)
+    );
+    if (!verified) {
+      return buildFailure(502, {
+        error: 'Worker config verification failed after deployment.',
+      });
+    }
+    deploymentPayload.configVerified = true;
   }
 
   return buildSuccess(200, deploymentPayload);

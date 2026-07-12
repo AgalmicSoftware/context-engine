@@ -62,10 +62,6 @@ export const evaluateAnonymousRouteAccess = async ({
     };
   }
 
-  if (requestApiKey) {
-    return { ok: true, reason: 'request-api-key' };
-  }
-
   if (isWorkerCanonicalSessionConfig(config)) {
     const result = evaluateWorkerCanonicalAnonymousAccess({ config, route: routeKey });
     return result.ok
@@ -75,6 +71,10 @@ export const evaluateAnonymousRouteAccess = async ({
           status: 403,
           error: anonymousRouteDeniedError,
         };
+  }
+
+  if (requestApiKey) {
+    return { ok: true, reason: 'request-api-key' };
   }
 
   const registryAddress = toTrimmedString(config?.registryAddress, deps);

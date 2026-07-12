@@ -5,6 +5,10 @@ import {
   dispatchSessionConfigBootstrapRequest,
   projectPublicWorkerSessionConfig,
 } from './sessionConfigBootstrapDispatch.js';
+import {
+  findForbiddenCloudflareDeploymentTokenPath,
+  findForbiddenWorkerConfigSecretPath,
+} from '../shared/workerSessionConfig.mjs';
 
 const buildWorkerCanonicalConfig = () => ({
   slug: 'session-a',
@@ -31,6 +35,9 @@ const buildWorkerCanonicalConfig = () => ({
   ai: {
     models: { fast: { provider: 'openai', model: 'gpt-5' } },
     apiKey: 'sk-never-public',
+    headers: { Authorization: 'Bearer sk-header-secret' },
+    provider: { key: 'sk-generic-key' },
+    endpoint: 'https://user:password@api.example.test',
   },
   rpcUrl: 'https://user:rpc-secret@rpc.example.test',
   rpcUrlsByChainId: { 1: ['https://rpc.example.test/secret'] },
@@ -70,9 +77,39 @@ test('projectPublicWorkerSessionConfig returns canonical fields and recursively 
       models: { fast: { provider: 'openai', model: 'gpt-5' } },
     },
   });
-  for (const secret of ['sk-never-public', 'cf-never-public', 'rpc-secret', '0xprivate', 'secret-cid']) {
+  for (const secret of [
+    'sk-never-public',
+    'sk-header-secret',
+    'sk-generic-key',
+    'user:password',
+    'cf-never-public',
+    'rpc-secret',
+    '0xprivate',
+    'secret-cid',
+  ]) {
     assert.equal(serialized.includes(secret), false);
   }
+});
+
+test('Cloudflare deployment-token detection covers aliases and nested Cloudflare token fields', () => {
+  assert.equal(findForbiddenCloudflareDeploymentTokenPath({ cfApiToken: 'secret' }), 'config.cfApiToken');
+  assert.equal(
+    findForbiddenCloudflareDeploymentTokenPath({ cloudflare: { credentials: { token: 'secret' } } }),
+    'config.cloudflare.credentials.token',
+  );
+  assert.equal(findForbiddenCloudflareDeploymentTokenPath({ ai: { models: {} } }), '');
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({ ai: { headers: { Authorization: 'Bearer secret' } } }),
+    'config.ai.headers',
+  );
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({ ai: { endpoint: 'https://user:password@api.example.test' } }),
+    'config.ai.endpoint',
+  );
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({ sessionModeProfile: { authorization: { mechanisms: ['worker_roles'] } } }),
+    '',
+  );
 });
 
 test('dispatchSessionConfigBootstrapRequest returns only CORS-scoped worker-canonical config', async () => {
@@ -104,7 +141,11 @@ test('dispatchSessionConfigBootstrapRequest returns only CORS-scoped worker-cano
   assert.equal(response.body.sessionSlug, 'session-a');
   assert.equal(response.body.config.configRevision, 'revision-a');
   assert.equal(JSON.stringify(response).includes('sk-never-public'), false);
-  assert.deepEqual(response.headers, { 'Access-Control-Allow-Origin': 'https://app.example.test' });
+  assert.deepEqual(Object.fromEntries(response.headers.entries()), {
+    'access-control-allow-origin': 'https://app.example.test',
+    'cache-control': 'no-store',
+    vary: 'Origin, X-Session-Slug',
+  });
 });
 
 test('dispatchSessionConfigBootstrapRequest rejects missing config, wrong authority, and blocked CORS', async () => {

@@ -33,6 +33,7 @@ import {
 } from './abuseObservability.js';
 import {
   findForbiddenCloudflareDeploymentTokenPath,
+  findForbiddenWorkerConfigSecretPath,
 } from '../shared/workerSessionConfig.mjs';
 
 const ALLOWED_SECRET_KEYS = [
@@ -194,6 +195,11 @@ export const dispatchAdminRequest = async ({
     if (findForbiddenCloudflareDeploymentTokenPath(incoming)) {
       return deps?.json?.({
         error: 'Cloudflare deployment tokens are not allowed in session config.',
+      }, 400, headers);
+    }
+    if (findForbiddenWorkerConfigSecretPath(incoming)) {
+      return deps?.json?.({
+        error: 'Secret-like values are not allowed in public session config fields.',
       }, 400, headers);
     }
 

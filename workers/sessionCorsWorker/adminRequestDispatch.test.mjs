@@ -205,6 +205,36 @@ test('dispatchAdminRequest rejects Cloudflare deployment tokens in session confi
   });
 });
 
+test('dispatchAdminRequest rejects secret-like values in open config subtrees before persistence', async () => {
+  let writes = 0;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        config: {
+          ai: {
+            models: { fast: { provider: 'openai', model: 'gpt-5' } },
+            headers: { Authorization: 'Bearer secret' },
+          },
+        },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      putSessionConfig: async () => { writes += 1; },
+    }),
+  });
+
+  assert.equal(writes, 0);
+  assert.deepEqual(result, {
+    body: { error: 'Secret-like values are not allowed in public session config fields.' },
+    status: 400,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
 test('dispatchAdminRequest filters and normalizes allowed secrets before persisting', async () => {
   const calls = [];
 
