@@ -6,6 +6,7 @@ import {
   type SessionRegistryRecord,
 } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { queryKeys, type QueryKeyScope, type ScopedQueryKey } from './queryKeys.js';
+import { sessionRegistryQueryFamilyKey } from './sessionRegistryQueryInvalidation.js';
 
 type SessionRegistrySnapshot = {
   slugs: string[];
@@ -23,10 +24,8 @@ type UseSessionRegistryReadsResult = {
   snapshotQuery: UseQueryResult<SessionRegistrySnapshot>;
 };
 
-const registryFamilyKey = queryKeys.entity('sessions', 'registry');
-
 const sessionRegistryQueryKeys = Object.freeze({
-  family: registryFamilyKey,
+  family: sessionRegistryQueryFamilyKey,
   snapshot: (
     { chainId = null, includeRegistryList = true, sessionSlugs = [] }: UseSessionRegistryReadsOptions = {},
   ): ScopedQueryKey => {

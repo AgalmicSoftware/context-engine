@@ -1,6 +1,7 @@
 import React, { type ReactNode } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { appQueryFoundation } from '../../app/runtime/appQueryClient';
 import { useSessionRegistryReads } from './useSessionRegistryReads';
 
 const mockGetAllSessionSlugs = jest.fn();
@@ -19,6 +20,13 @@ jest.mock('../../domains/sessions/registry/sessionRegistryReadPorts.js', () => (
     getSessionConfigBySlug: (...args: any[]) => mockGetSessionConfigBySlug(...args),
     subscribeToCacheUpdates: (...args: any[]) => mockSubscribeToCacheUpdates(...args),
   },
+}));
+
+jest.mock('../../app/runtime/appWagmiRuntime', () => ({
+  wagmiClient: (() => {
+    const { QueryClient: TestQueryClient } = jest.requireActual('@tanstack/react-query');
+    return { queryClient: new TestQueryClient({ defaultOptions: { queries: { retry: false } } }) };
+  })(),
 }));
 
 let queryClient: QueryClient;
@@ -127,5 +135,33 @@ describe('useSessionRegistryReads', () => {
     expect(mockSubscribeToCacheUpdates).toHaveBeenCalledTimes(1);
 
     unmount();
+  });
+
+  it('refetches a registry write dispatched while no consumer is mounted', async () => {
+    queryClient = appQueryFoundation.client;
+    queryClient.clear();
+    const SharedQueryWrapper = appQueryFoundation.Provider;
+    const firstMount = renderHook(() => useSessionRegistryReads({ chainId: 84532 }), {
+      wrapper: SharedQueryWrapper,
+    });
+
+    expect(firstMount.result.current.snapshotQuery.data?.slugs).toEqual(['', 'edge']);
+    firstMount.unmount();
+
+    mockGetAllSessionSlugs.mockReturnValue(['', 'edge', 'alpha']);
+    act(() => {
+      window.dispatchEvent(new Event('ce:session-registry-cache-updated'));
+    });
+
+    const secondMount = renderHook(() => useSessionRegistryReads({ chainId: 84532 }), {
+      wrapper: SharedQueryWrapper,
+    });
+    await waitFor(() => {
+      expect(secondMount.result.current.snapshotQuery.data?.slugs).toEqual(['', 'edge', 'alpha']);
+    });
+    expect(mockGetAllSessionSlugs).toHaveBeenCalledTimes(2);
+
+    secondMount.unmount();
+    queryClient.clear();
   });
 });
