@@ -15,7 +15,7 @@ import { SessionLoadingSkeleton } from './routeStatusViews.js';
 import type { AppShell } from './AppShell';
 import type { WorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
 
-type SessionConfig = Record<string, any>;
+type SessionConfig = Record<string, unknown>;
 type SessionRouteContext = ReturnType<typeof resolveMainSiteSessionRouteContext>;
 type WorkerRouteKind = 'standard' | 'error' | 'bootstrap' | 'verified';
 
