@@ -14,6 +14,12 @@ contract SurveysFuzzTest is TestUtils {
     }
 
     function testFuzz_addSurvey_noDuplicate(bytes32 id) public {
+        if (id == bytes32(0)) {
+            bytes32[] memory empty = new bytes32[](0);
+            vm.expectRevert(abi.encodeWithSignature("Error(string)", "Survey ID cannot be zero"));
+            surveys.addSurvey(id, keccak256(abi.encodePacked("survey-hash", id)), empty, empty);
+            return;
+        }
         fuzz_addSurvey_noDuplicate(id);
     }
 

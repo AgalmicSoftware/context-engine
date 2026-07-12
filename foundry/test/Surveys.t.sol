@@ -55,8 +55,15 @@ contract SurveysTest is TestUtils {
         bytes32 surveyId = keccak256(abi.encodePacked("survey-zero-hash"));
         bytes32[] memory empty = new bytes32[](0);
 
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Invalid survey content hash"));
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Survey content hash cannot be zero"));
         surveys.addSurvey(surveyId, bytes32(0), empty, empty);
+    }
+
+    function testAddSurveyRejectsZeroSurveyId() public {
+        bytes32[] memory empty = new bytes32[](0);
+
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Survey ID cannot be zero"));
+        surveys.addSurvey(bytes32(0), keccak256(abi.encodePacked("survey-data")), empty, empty);
     }
 
     function testAddSurveyDuplicateCannotReplaceCreator() public {
@@ -83,8 +90,38 @@ contract SurveysTest is TestUtils {
         questionHashes[0] = bytes32(0);
         surveyIds[0] = bytes32(0);
 
-        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Invalid question content hash"));
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Question content hash cannot be zero"));
         surveys.addQuestions(questionIds, questionHashes, surveyIds);
+    }
+
+    function testAddQuestionsRejectsZeroQuestionId() public {
+        bytes32[] memory questionIds = new bytes32[](1);
+        bytes32[] memory questionHashes = new bytes32[](1);
+        bytes32[] memory surveyIds = new bytes32[](1);
+        questionIds[0] = bytes32(0);
+        questionHashes[0] = keccak256(abi.encodePacked("question-data"));
+        surveyIds[0] = bytes32(0);
+
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Question ID cannot be zero"));
+        surveys.addQuestions(questionIds, questionHashes, surveyIds);
+    }
+
+    function testAddSurveyRejectsLinkedZeroQuestionHashWithoutReservingIds() public {
+        bytes32 surveyId = keccak256(abi.encodePacked("survey-linked-zero"));
+        bytes32 surveyHash = keccak256(abi.encodePacked("survey-data"));
+        bytes32 questionId = keccak256(abi.encodePacked("linked-zero-question"));
+        bytes32[] memory questionIds = new bytes32[](1);
+        bytes32[] memory questionHashes = new bytes32[](1);
+        questionIds[0] = questionId;
+        questionHashes[0] = bytes32(0);
+
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Question content hash cannot be zero"));
+        surveys.addSurvey(surveyId, surveyHash, questionIds, questionHashes);
+
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Survey does not exist"));
+        surveys.getSurveyHash(surveyId);
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Question does not exist"));
+        surveys.getQuestionHash(questionId);
     }
 
     function testAddQuestionsStandaloneAndAssociated() public {
@@ -190,6 +227,48 @@ contract SurveysTest is TestUtils {
             surveys.userResponses(user, surveyId),
             surveyResponseHash,
             "survey response mismatch"
+        );
+    }
+
+    function testSubmitResponsesRejectsZeroQuestionResponseHash() public {
+        bytes32 surveyId = keccak256(abi.encodePacked("survey-zero-response"));
+        bytes32 surveyHash = keccak256(abi.encodePacked("survey-data"));
+        bytes32 questionId = keccak256(abi.encodePacked("question-zero-response"));
+        bytes32[] memory questionIds = new bytes32[](1);
+        bytes32[] memory questionHashes = new bytes32[](1);
+        questionIds[0] = questionId;
+        questionHashes[0] = keccak256(abi.encodePacked("question-data"));
+        surveys.addSurvey(surveyId, surveyHash, questionIds, questionHashes);
+
+        bytes32[] memory responseHashes = new bytes32[](1);
+        responseHashes[0] = bytes32(0);
+
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Question response hash cannot be zero"));
+        surveys.submitResponses(questionIds, responseHashes, bytes32(0), bytes32(0));
+    }
+
+    function testSubmitResponsesRejectsMismatchedSurveyResponsePairs() public {
+        bytes32 surveyId = keccak256(abi.encodePacked("survey-mismatched-response"));
+        bytes32 surveyHash = keccak256(abi.encodePacked("survey-data"));
+        bytes32 questionId = keccak256(abi.encodePacked("question-mismatched-response"));
+        bytes32[] memory questionIds = new bytes32[](1);
+        bytes32[] memory questionHashes = new bytes32[](1);
+        questionIds[0] = questionId;
+        questionHashes[0] = keccak256(abi.encodePacked("question-data"));
+        surveys.addSurvey(surveyId, surveyHash, questionIds, questionHashes);
+
+        bytes32[] memory responseHashes = new bytes32[](1);
+        responseHashes[0] = keccak256(abi.encodePacked("response-data"));
+
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Survey response ID/hash mismatch"));
+        surveys.submitResponses(questionIds, responseHashes, surveyId, bytes32(0));
+
+        vm.expectRevert(abi.encodeWithSignature("Error(string)", "Survey response ID/hash mismatch"));
+        surveys.submitResponses(
+            questionIds,
+            responseHashes,
+            bytes32(0),
+            keccak256(abi.encodePacked("survey-response-data"))
         );
     }
 }

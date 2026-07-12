@@ -278,6 +278,116 @@ describe('error paths', () => {
     );
   });
 
+  it('rejects zero survey and question IDs before uploading payloads', async () => {
+    window.ethereum = makeRpcProvider();
+
+    await expect(
+      addSurvey('wagmi', '', { title: 'Zero survey' }, [QUESTION_ID], [{ prompt: 'Question' }], GROUP_CFG),
+    ).rejects.toThrow('addSurveyWithQuestions: surveyId cannot be zero.');
+
+    await expect(
+      contractScripts.addQuestions(
+        'wagmi',
+        [''],
+        [{ prompt: 'Zero question' }],
+        [ethers.constants.HashZero],
+        GROUP_CFG,
+      ),
+    ).rejects.toThrow('addQuestions: questionIds[0] cannot be zero.');
+
+    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
+  });
+
+  it('rejects zero survey and question content hashes before submitting transactions', async () => {
+    const rpcProvider = makeRpcProvider();
+    window.ethereum = rpcProvider;
+    const mockSurveyContract = makeWriteContractMock({
+      address: GROUP_CFG.contracts.surveys.address,
+      methods: ['addSurvey', 'addQuestions'],
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return mockSurveyContract;
+    });
+
+    arweaveClient.uploadDataToArweave.mockResolvedValueOnce(SURVEY_TX_ID).mockResolvedValueOnce(QUESTION_TX_ID);
+    arweaveClient.base64urlToHex
+      .mockReturnValueOnce(ethers.constants.HashZero)
+      .mockReturnValueOnce(`0x${'22'.repeat(32)}`);
+
+    await expect(
+      addSurvey(
+        'wagmi',
+        SURVEY_ID,
+        { title: 'Zero content hash' },
+        [QUESTION_ID],
+        [{ prompt: 'Question' }],
+        GROUP_CFG,
+      ),
+    ).rejects.toThrow('addSurveyWithQuestions: survey content hash cannot be zero.');
+
+    arweaveClient.uploadDataToArweave.mockReset();
+    arweaveClient.base64urlToHex.mockReset();
+    arweaveClient.uploadDataToArweave.mockResolvedValueOnce(QUESTION_TX_ID);
+    arweaveClient.base64urlToHex.mockReturnValueOnce(ethers.constants.HashZero);
+
+    await expect(
+      contractScripts.addQuestions(
+        'wagmi',
+        [QUESTION_ID],
+        [{ prompt: 'Zero question content hash' }],
+        [ethers.constants.HashZero],
+        GROUP_CFG,
+      ),
+    ).rejects.toThrow('addQuestions: content hashes[0] cannot be zero.');
+
+    expect(mockSurveyContract.interface.encodeFunctionData).not.toHaveBeenCalled();
+    expect(rpcProvider.request).not.toHaveBeenCalledWith(expect.objectContaining({ method: 'eth_sendTransaction' }));
+  });
+
+  it('rejects zero response hashes and mismatched optional survey response pairs before submitting transactions', async () => {
+    const rpcProvider = makeRpcProvider();
+    window.ethereum = rpcProvider;
+    const mockSurveyContract = makeWriteContractMock({
+      address: GROUP_CFG.contracts.surveys.address,
+      methods: ['submitResponses'],
+    });
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return mockSurveyContract;
+    });
+
+    await expect(
+      submitResponses('wagmi', [QUESTION_ID], [{ answer: 'yes' }], SURVEY_ID, null, GROUP_CFG),
+    ).rejects.toThrow('submitResponses: survey response ID/hash mismatch.');
+
+    await expect(
+      submitResponses(
+        'wagmi',
+        [QUESTION_ID],
+        [{ answer: 'yes' }],
+        ethers.constants.HashZero,
+        { complete: true },
+        GROUP_CFG,
+      ),
+    ).rejects.toThrow('submitResponses: survey response ID/hash mismatch.');
+
+    arweaveClient.uploadDataToArweave.mockResolvedValueOnce(CF_RESPONSE_ID);
+    arweaveClient.base64urlToHex.mockReturnValueOnce(ethers.constants.HashZero);
+
+    await expect(
+      submitResponses(
+        'wagmi',
+        [QUESTION_ID],
+        [{ answer: 'yes' }],
+        ethers.constants.HashZero,
+        null,
+        GROUP_CFG,
+      ),
+    ).rejects.toThrow('submitResponses: questionResponseHashes[0] cannot be zero.');
+
+    expect(mockSurveyContract.interface.encodeFunctionData).not.toHaveBeenCalled();
+    expect(rpcProvider.request).not.toHaveBeenCalledWith(expect.objectContaining({ method: 'eth_sendTransaction' }));
+  });
+
   it('does not fall back to injected wallet reads for minted token counts by default', async () => {
     const injectedProvider = makeRpcProvider();
     window.ethereum = injectedProvider;

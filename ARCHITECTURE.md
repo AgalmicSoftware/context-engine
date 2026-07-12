@@ -198,9 +198,9 @@ Decrypt:  Client ──▸ Lit SDK decrypt(payload) ──▸ Lit nodes verify S
 | Contract | Purpose |
 |----------|---------|
 | `SessionRegistry.sol` | Session registry, resource gates (Any/All SBT rules), metadata URI pointers |
-| `Surveys.sol` | Survey/question registration and response hash anchoring |
+| `Surveys.sol` | Survey/question registration and response hash anchoring. Explicit existence state preserves `bytes32(0)` as the absence sentinel; zero IDs, zero content/response hashes, and mismatched optional survey-response pairs revert. |
 | `CustomSBT.sol` | Non-transferable ERC-721 (SBT) with ERC-5192 / ERC-5484-aligned lock + burn-auth surfaces, password/invite/signature mint paths, `SBTActivity` history events, and `getHistorySummary()` for count-only reads. Transfers, approvals, and `safeTransferFrom` revert with `Soulbound()`. |
-| `SBTFactory.sol` | Deploys new CustomSBT instances (optionally deterministic via CREATE2) |
+| `SBTFactory.sol` | Deploys new CustomSBT instances (optionally deterministic via CREATE2). Configured deterministic deployments require the transaction sender to be the configured SBT admin. |
 
 ### Workers (`workers/`)
 
@@ -223,7 +223,14 @@ Contracts are chain-agnostic EVM Solidity. Deployments are configured per chain 
 | OP Sepolia (11155420) | `0xDcB1731984E9F75c6a061c38dD8b67d18De4C0c1` | `0x59664B9dA510a33F2edB7E14Cf0c2749bf506B8A` | `0x8CBeE1EE46603b446b499cb32F63fa9860a50478` |
 | Base Sepolia (84532) | `0xD55Aa8fb29964d034d59B90DFFD23790f7B34B00` | `0xcccb5c1a96b3e10f395e318ae75db24e45bd3808` | `0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA` |
 
-CustomSBT instances are deployed per-group via SBTFactory.
+The listed immutable Surveys and SBTFactory deployments predate the current
+source hardening. The restrictions above become live only after a testnet
+redeploy and corresponding address/transaction updates; no mainnet migration is
+in scope.
+
+CustomSBT instances are deployed per-group via SBTFactory. Configured
+deterministic SBT creation is admin-submitted; sponsored or relayed configured
+creation requires a separate authorization design.
 
 The current OP Sepolia `SBTFactory` default above was deployed in tx
 `0x57b91018ed6b93f64c83d5a44bfb9d0be1920f96929ecc045aa3946ba7cc917e`.

@@ -26,6 +26,8 @@ contract Surveys {
     mapping(bytes32 => bytes32) public questionHashes; // questionId => contentHash
     mapping(bytes32 => bytes32) public questionToSurvey; // questionId => surveyId (optional)
     mapping(address => mapping(bytes32 => bytes32)) public userResponses; // User address => (questionId or surveyId) => responseHash
+    mapping(bytes32 => bool) private surveyExists; // surveyId => exists
+    mapping(bytes32 => bool) private questionExists; // questionId => exists
 
     // Events
     event SurveyAdded(address indexed creator, bytes32 indexed surveyId);
@@ -44,8 +46,20 @@ contract Surveys {
         bytes32[] calldata questionIds,
         bytes32[] calldata questionContentHashes
     ) external {
-        require(surveyContentHash != bytes32(0), "Invalid survey content hash");
-        require(surveyHashes[surveyId] == bytes32(0), "Survey with this ID already exists");
+        require(surveyId != bytes32(0), "Survey ID cannot be zero");
+        require(surveyContentHash != bytes32(0), "Survey content hash cannot be zero");
+        require(!surveyExists[surveyId], "Survey with this ID already exists");
+        require(questionIds.length == questionContentHashes.length, "Array lengths must match");
+
+        // Regression guard: validate the whole batch before reserving the survey ID;
+        // otherwise a bad linked question could leave sentinel-backed partial state.
+        for (uint256 i = 0; i < questionIds.length; i++) {
+            require(questionIds[i] != bytes32(0), "Question ID cannot be zero");
+            require(questionContentHashes[i] != bytes32(0), "Question content hash cannot be zero");
+            require(!questionExists[questionIds[i]], "Question with this ID already exists");
+        }
+
+        surveyExists[surveyId] = true;
         surveyHashes[surveyId] = surveyContentHash;
         surveyCreators[surveyId] = msg.sender;
 
@@ -72,12 +86,14 @@ contract Surveys {
         );
 
         for (uint256 i = 0; i < questionIds.length; i++) {
-            require(contentHashes[i] != bytes32(0), "Invalid question content hash");
-            require(questionHashes[questionIds[i]] == bytes32(0), "Question with this ID already exists");
+            require(questionIds[i] != bytes32(0), "Question ID cannot be zero");
+            require(contentHashes[i] != bytes32(0), "Question content hash cannot be zero");
+            require(!questionExists[questionIds[i]], "Question with this ID already exists");
+            questionExists[questionIds[i]] = true;
             questionHashes[questionIds[i]] = contentHashes[i];
 
             if (surveyIds[i] != bytes32(0)) {
-                require(surveyHashes[surveyIds[i]] != bytes32(0), "Associated survey does not exist");
+                require(surveyExists[surveyIds[i]], "Associated survey does not exist");
                 require(msg.sender == surveyCreators[surveyIds[i]], "Only survey creator can add questions");
                 questionToSurvey[questionIds[i]] = surveyIds[i];
             }
@@ -99,14 +115,16 @@ contract Surveys {
         bytes32 surveyResponseHash
     ) external {
         require(questionIds.length == questionResponseHashes.length, "Array lengths must match");
+        require((surveyId == bytes32(0)) == (surveyResponseHash == bytes32(0)), "Survey response ID/hash mismatch");
 
         for (uint256 i = 0; i < questionIds.length; i++) {
-            require(questionHashes[questionIds[i]] != bytes32(0), "Question does not exist");
+            require(questionResponseHashes[i] != bytes32(0), "Question response hash cannot be zero");
+            require(questionExists[questionIds[i]], "Question does not exist");
             userResponses[msg.sender][questionIds[i]] = questionResponseHashes[i];
         }
 
-        if (surveyId != bytes32(0) && surveyResponseHash != bytes32(0)) {
-            require(surveyHashes[surveyId] != bytes32(0), "Survey does not exist");
+        if (surveyId != bytes32(0)) {
+            require(surveyExists[surveyId], "Survey does not exist");
             userResponses[msg.sender][surveyId] = surveyResponseHash;
         }
 
@@ -127,7 +145,7 @@ contract Surveys {
     /// @param questionId The ID of the question to query.
     /// @return The hash pointing to the stored question content.
     function getQuestionHash(bytes32 questionId) external view returns (bytes32) {
-        require(questionHashes[questionId] != bytes32(0), "Question does not exist");
+        require(questionExists[questionId], "Question does not exist");
         return questionHashes[questionId];
     }
 
@@ -136,7 +154,7 @@ contract Surveys {
     /// @param surveyId The ID of the survey to query.
     /// @return The hash pointing to the stored survey content.
     function getSurveyHash(bytes32 surveyId) external view returns (bytes32) {
-        require(surveyHashes[surveyId] != bytes32(0), "Survey does not exist");
+        require(surveyExists[surveyId], "Survey does not exist");
         return surveyHashes[surveyId];
     }
 
