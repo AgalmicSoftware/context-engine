@@ -22,6 +22,12 @@ describe('ToolExplorer sparse card layout', () => {
     );
   });
 
+  it('centers the session selector under its trigger at medium widths without exceeding the viewport', () => {
+    expect(scss).toMatch(
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1366px\)\s*{[\s\S]*?\.headerSessionSelectorPanel\s*{[\s\S]*?right:\s*auto;[\s\S]*?left:\s*50%;[\s\S]*?width:\s*min\(460px,\s*calc\(100vw - 48px\)\);[\s\S]*?transform:\s*translateX\(-50%\);/,
+    );
+  });
+
   it('uses UserPage-style neutral depth and scopes status borders to demo mode', () => {
     expect(scss).toMatch(
       /\.explorerCol\s*{[\s\S]*?&\.statusBorderEnabled[\s\S]*?border:\s*4px solid rgba\(77,\s*255,\s*164,\s*0\.78\);/,
