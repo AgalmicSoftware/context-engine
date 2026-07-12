@@ -573,6 +573,48 @@ describe('error paths', () => {
     expect(mockFactory.createSBTDeterministicConfigured).not.toHaveBeenCalled();
   });
 
+  it('fails before broadcasting configured deterministic deploys from a non-admin signer', async () => {
+    window.ethereum = makeRpcProvider();
+
+    const mockFactory = {
+      estimateGas: {
+        createSBTDeterministicConfigured: jest.fn(),
+      },
+      createSBTDeterministicConfigured: jest.fn(),
+    };
+
+    jest.spyOn(ethers, 'Contract').mockImplementation(function MockContract() {
+      return mockFactory;
+    });
+
+    await expect(
+      createSBT(
+        'wagmi',
+        'Error Path Group',
+        'EPG',
+        0,
+        '0x00000000000000000000000000000000000000bb',
+        0,
+        false,
+        0,
+        [],
+        'ipfs://token-uri',
+        ethers.constants.HashZero,
+        GROUP_CFG,
+        'predictable-salt',
+        {
+          useConfiguredDeterministic: true,
+          initializeGroupPasswordHash: true,
+        },
+      ),
+    ).rejects.toThrow(
+      'Configured deterministic SBT deployment must be submitted by the SBT admin wallet.',
+    );
+
+    expect(mockFactory.estimateGas.createSBTDeterministicConfigured).not.toHaveBeenCalled();
+    expect(mockFactory.createSBTDeterministicConfigured).not.toHaveBeenCalled();
+  });
+
   it('surfaces a clear preview error when configured deterministic prediction is unavailable on the factory', async () => {
     const unsupportedCall = Object.assign(new Error('missing revert data in call exception'), {
       code: 'CALL_EXCEPTION',

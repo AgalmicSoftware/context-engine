@@ -208,6 +208,8 @@ contract SBTFactory {
         bytes32 finalGroupPasswordHash,
         bool initializeGroupPasswordHash
     ) external returns (address) {
+        require(adminAddress != address(0), "Configured deterministic deploy requires admin");
+        require(msg.sender == adminAddress, "Configured deterministic deploy caller must be admin");
         MySBT.MintMode mintMode =
             _deriveMintMode(limitedNumber, hasPasswordMint, hashedPasswords, bytes32(0), initializeGroupPasswordHash);
         require(

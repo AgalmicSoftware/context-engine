@@ -261,6 +261,15 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
       if (useConfiguredDeterministic && !initializeGroupPasswordHash && hasNonZeroHashValue(groupPasswordHash)) {
         throw new Error('Configured deterministic SBT deployment cannot preinitialize a group password hash.');
       }
+      if (useConfiguredDeterministic) {
+        if (!ethers.utils.isAddress(String(adminAddress || ''))) {
+          throw new Error('Configured deterministic SBT deployment requires a valid admin address.');
+        }
+        const signerAddress = await signer.getAddress();
+        if (ethers.utils.getAddress(signerAddress) !== ethers.utils.getAddress(adminAddress)) {
+          throw new Error('Configured deterministic SBT deployment must be submitted by the SBT admin wallet.');
+        }
+      }
 
       rpcLog('RPC Call (Tx):', {
         function: 'createSBT',

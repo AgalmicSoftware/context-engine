@@ -194,6 +194,7 @@ contract CustomSBTTest is TestUtils {
             salt, "ContextEngine", "CE-SBT-CFG1", 0, admin, 0, false, MySBT.BurnAuth.Neither, empty, false
         );
 
+        vm.prank(admin);
         address deployed = factory.createSBTDeterministicConfigured(
             salt,
             "ContextEngine",
@@ -227,6 +228,7 @@ contract CustomSBTTest is TestUtils {
             salt, "ContextEngine", "CE-SBT-CFG2", 0, admin, 0, false, MySBT.BurnAuth.Neither, empty, true
         );
 
+        vm.prank(admin);
         address deployed = factory.createSBTDeterministicConfigured(
             salt,
             "ContextEngine",
@@ -249,10 +251,52 @@ contract CustomSBTTest is TestUtils {
         assertFalse(sbt.tokenURIInitAllowed(), "token URI init should be disabled after deploy");
     }
 
+    function testDeterministicConfiguredDeployRejectsNonAdminCaller() public {
+        bytes32[] memory empty = new bytes32[](0);
+
+        vm.prank(user);
+        vm.expectRevert("Configured deterministic deploy caller must be admin");
+        factory.createSBTDeterministicConfigured(
+            keccak256("predict-non-admin"),
+            "ContextEngine",
+            "CE-SBT-CFG-NONADMIN",
+            0,
+            admin,
+            0,
+            false,
+            MySBT.BurnAuth.Neither,
+            empty,
+            "ar://configured-metadata",
+            bytes32(0),
+            false
+        );
+    }
+
+    function testDeterministicConfiguredDeployRejectsZeroAdmin() public {
+        bytes32[] memory empty = new bytes32[](0);
+
+        vm.expectRevert("Configured deterministic deploy requires admin");
+        factory.createSBTDeterministicConfigured(
+            keccak256("predict-zero-admin"),
+            "ContextEngine",
+            "CE-SBT-CFG-ZERO",
+            0,
+            address(0),
+            0,
+            false,
+            MySBT.BurnAuth.Neither,
+            empty,
+            "ar://configured-metadata",
+            bytes32(0),
+            false
+        );
+    }
+
     function testDeterministicConfiguredDeployRejectsPreinitializedGroupPasswordHash() public {
         bytes32[] memory empty = new bytes32[](0);
         bytes32 salt = keccak256("predict-group-password-unsupported");
         bytes32 finalGroupPasswordHash = keccak256(abi.encodePacked(signer));
+        vm.prank(admin);
         (bool ok,) = address(factory).call(
             abi.encodeWithSelector(
                 factory.createSBTDeterministicConfigured.selector,
