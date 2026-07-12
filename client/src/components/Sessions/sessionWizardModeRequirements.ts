@@ -10,9 +10,10 @@ const SESSION_WIZARD_REQUIREMENT_IDS = Object.freeze({
   LIT: 'lit',
 } as const);
 
-type SessionWizardRequirementId = (typeof SESSION_WIZARD_REQUIREMENT_IDS)[keyof typeof SESSION_WIZARD_REQUIREMENT_IDS];
+export type SessionWizardRequirementId =
+  (typeof SESSION_WIZARD_REQUIREMENT_IDS)[keyof typeof SESSION_WIZARD_REQUIREMENT_IDS];
 
-type SessionWizardModeRequirements = {
+export type SessionWizardModeRequirements = {
   selected: boolean;
   authorityMode: string;
   isWorkerCanonical: boolean;

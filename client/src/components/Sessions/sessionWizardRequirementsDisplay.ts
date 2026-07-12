@@ -1,3 +1,6 @@
+import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
+import { resolveSessionWizardModeRequirements, type SessionWizardRequirementId } from './sessionWizardModeRequirements';
+
 type SessionWizardRecord = Record<string, unknown>;
 
 type ResolveSessionWizardNewSessionRequirementsDisplayStateArgs = {
@@ -10,6 +13,7 @@ type ResolveSessionWizardNewSessionRequirementsDisplayStateArgs = {
   normalizedAppliedSponsoredBundle?: SessionWizardRecord | null;
   persistedNewSessionBannerDismissed?: unknown;
   sponsoredBundleStatus?: SessionWizardRecord | null;
+  sessionModeProfile?: unknown;
 };
 
 type SessionWizardNewSessionRequirementsDisplayState = {
@@ -20,6 +24,7 @@ type SessionWizardNewSessionRequirementsDisplayState = {
   hasNewSessionLitRequirementCovered: boolean;
   isNewSessionBannerDismissedForCurrentContext: boolean;
   newSessionRequiresLitCredential: boolean;
+  requiredRequirementIds: SessionWizardRequirementId[];
   shouldRespectPersistedNewSessionBannerDismissal: boolean;
   showNewSessionRequirementsBanner: boolean;
   sponsoredBundleCoversNewSessionRequirements: boolean;
@@ -39,20 +44,33 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
   normalizedAppliedSponsoredBundle = null,
   persistedNewSessionBannerDismissed = false,
   sponsoredBundleStatus = null,
+  sessionModeProfile = null,
 }: ResolveSessionWizardNewSessionRequirementsDisplayStateArgs = {}): SessionWizardNewSessionRequirementsDisplayState => {
+  const modeRequirements = resolveSessionWizardModeRequirements(
+    sessionModeProfile && typeof sessionModeProfile === 'object' ? (sessionModeProfile as SessionModeProfile) : null,
+  );
   const sponsoredBundleStatusTone = toRequirementString(sponsoredBundleStatus?.tone).trim().toLowerCase();
-  const hasNewSessionAiRequirementCovered = !!toRequirementString(currentWorkerSecrets?.openaiKey).trim();
-  const hasNewSessionArweaveRequirementCovered = !!toRequirementString(currentWorkerSecrets?.arweaveJwk).trim();
-  const newSessionRequiresLitCredential = !cloudflareWorkerSbtGateMode;
+  const hasNewSessionAiRequirementCovered = ['openaiKey', 'anthropicKey', 'openrouterKey'].some(
+    (key) => !!toRequirementString(currentWorkerSecrets?.[key]).trim(),
+  );
+  const hasNewSessionArweaveRequirementCovered =
+    (modeRequirements.selected && !modeRequirements.requiresArweave) ||
+    !!toRequirementString(currentWorkerSecrets?.arweaveJwk).trim();
+  const newSessionRequiresLitCredential = modeRequirements.selected
+    ? modeRequirements.requiresLit
+    : !cloudflareWorkerSbtGateMode;
   const hasNewSessionLitRequirementCovered =
     !newSessionRequiresLitCredential || !!toRequirementString(currentWorkerSecrets?.litAccountApiKey).trim();
-  const hasNewSessionFundingRequirementCovered = !!(
-    toRequirementString(currentWorkerSecrets?.faucetPrivateKey).trim() ||
-    toRequirementString(normalizedAppliedSponsoredBundle?.faucetGrantToken).trim()
-  );
-  const hasNewSessionDeployRequirementCovered = !!toRequirementString(
-    normalizedAppliedSponsoredBundle?.deployGrantToken,
-  ).trim();
+  const hasNewSessionFundingRequirementCovered =
+    (modeRequirements.selected && !modeRequirements.requiresFunding) ||
+    !!(
+      toRequirementString(currentWorkerSecrets?.faucetPrivateKey).trim() ||
+      toRequirementString(normalizedAppliedSponsoredBundle?.faucetGrantToken).trim()
+    );
+  const requiresCloudflareDeploy = modeRequirements.requiredRequirementIds.includes('cloudflareApiToken');
+  const hasNewSessionDeployRequirementCovered =
+    (modeRequirements.selected && !requiresCloudflareDeploy) ||
+    !!toRequirementString(normalizedAppliedSponsoredBundle?.deployGrantToken).trim();
   const sponsoredBundleCoversNewSessionRequirements =
     sponsoredBundleStatusTone === 'success' &&
     hasNewSessionAiRequirementCovered &&
@@ -80,6 +98,7 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
     hasNewSessionLitRequirementCovered,
     isNewSessionBannerDismissedForCurrentContext,
     newSessionRequiresLitCredential,
+    requiredRequirementIds: modeRequirements.requiredRequirementIds,
     shouldRespectPersistedNewSessionBannerDismissal,
     showNewSessionRequirementsBanner,
     sponsoredBundleCoversNewSessionRequirements,

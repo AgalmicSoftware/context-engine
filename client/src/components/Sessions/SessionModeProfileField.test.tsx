@@ -15,12 +15,13 @@ describe('SessionModeProfileField', () => {
     expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
     expect(screen.getByText(/Hosted on Cloudflare with worker-managed encryption by default\./)).toBeInTheDocument();
     expect(screen.getByText(/Published publicly and permanently unless you enable encryption\./)).toBeInTheDocument();
-    expect(screen.getByText('Cloudflare API token')).toBeInTheDocument();
+    const cloudflareCard = within(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
+    expect(cloudflareCard.getByText('Cloudflare API token')).toBeInTheDocument();
+    expect(cloudflareCard.getByText('AI provider key')).toBeInTheDocument();
+    expect(cloudflareCard.queryByText(/Arweave|RPC|Lit/)).not.toBeInTheDocument();
     expect(screen.getAllByText('AI provider key')).toHaveLength(2);
-    expect(screen.getByText('Arweave JWK')).toBeInTheDocument();
     expect(screen.getByText('Arweave wallet/JWK')).toBeInTheDocument();
-    expect(screen.getAllByText('RPC URL/key')).toHaveLength(2);
-    expect(screen.getByText('Lit key only for Lit encryption')).toBeInTheDocument();
+    expect(screen.getByText('RPC URL/key')).toBeInTheDocument();
     expect(screen.getByText('Lit API key if encryption is enabled')).toBeInTheDocument();
   });
 

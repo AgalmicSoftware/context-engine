@@ -1,4 +1,5 @@
 import { resolveSessionWizardNewSessionRequirementsDisplayState } from './sessionWizardRequirementsDisplay';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('sessionWizardRequirementsDisplay', () => {
   it('shows manual new-session requirements when no sponsored bundle owns the entry flow', () => {
@@ -73,6 +74,42 @@ describe('sessionWizardRequirementsDisplay', () => {
     ).toMatchObject({
       hasNewSessionLitRequirementCovered: true,
       newSessionRequiresLitCredential: false,
+    });
+  });
+
+  it('treats the default Cloudflare profile as a two-key sponsored setup', () => {
+    expect(
+      resolveSessionWizardNewSessionRequirementsDisplayState({
+        currentWorkerSecrets: { openaiKey: 'openai' },
+        hasSponsoredBundleLink: true,
+        isNewSessionWizardRoute: true,
+        normalizedAppliedSponsoredBundle: { deployGrantToken: 'cloudflare-deploy' },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        sponsoredBundleStatus: { tone: 'success' },
+      }),
+    ).toMatchObject({
+      hasNewSessionArweaveRequirementCovered: true,
+      hasNewSessionFundingRequirementCovered: true,
+      hasNewSessionLitRequirementCovered: true,
+      newSessionRequiresLitCredential: false,
+      requiredRequirementIds: ['cloudflareApiToken', 'aiProviderKey'],
+      sponsoredBundleCoversNewSessionRequirements: true,
+    });
+  });
+
+  it.each(['anthropicKey', 'openrouterKey'])('accepts one configured %s as the AI provider requirement', (key) => {
+    expect(
+      resolveSessionWizardNewSessionRequirementsDisplayState({
+        currentWorkerSecrets: { [key]: 'provider-secret' },
+        hasSponsoredBundleLink: true,
+        isNewSessionWizardRoute: true,
+        normalizedAppliedSponsoredBundle: { deployGrantToken: 'cloudflare-deploy' },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        sponsoredBundleStatus: { tone: 'success' },
+      }),
+    ).toMatchObject({
+      hasNewSessionAiRequirementCovered: true,
+      sponsoredBundleCoversNewSessionRequirements: true,
     });
   });
 });

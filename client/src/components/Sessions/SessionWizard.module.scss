@@ -2702,21 +2702,28 @@ $muted-text: tokens.$ce-muted-text;
   min-height: 240px;
   padding: 16px;
   text-align: left;
-  color: rgba(244, 247, 255, 0.9);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(244, 247, 255, 0.14);
+  color: #f7f9ff;
+  background: #343b68;
+  border: 1px solid #7586c4;
   border-radius: 8px;
   cursor: pointer;
 }
 
 .modePresetCard:hover,
 .modePresetCard:focus-visible {
-  border-color: rgba(122, 255, 203, 0.62);
+  border-color: #8fffc4;
+  background: #3d4679;
+}
+
+.modePresetCard:focus-visible {
+  outline: 3px solid #8fffc4;
+  outline-offset: 3px;
 }
 
 .modePresetCardSelected {
-  border-color: rgba(122, 255, 203, 0.86);
-  background: rgba(122, 255, 203, 0.08);
+  border-color: #4dffa4;
+  background: #285a52;
+  box-shadow: inset 0 0 0 2px #4dffa4;
 }
 
 .modePresetTitle {
@@ -2727,7 +2734,7 @@ $muted-text: tokens.$ce-muted-text;
 .modePresetCopy {
   font-size: 0.9rem;
   line-height: 1.45;
-  color: rgba(244, 247, 255, 0.74);
+  color: #eef2ff;
 }
 
 .modePresetKeys {
@@ -2737,7 +2744,7 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .modePresetKeysLabel {
-  color: rgba(244, 247, 255, 0.58);
+  color: #e0e7ff;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -2754,10 +2761,10 @@ $muted-text: tokens.$ce-muted-text;
 .modePresetKey {
   display: inline-flex;
   align-items: center;
-  border: 1px solid rgba(124, 167, 255, 0.28);
+  border: 1px solid #8fa9ff;
   border-radius: 999px;
-  background: rgba(124, 167, 255, 0.08);
-  color: rgba(224, 235, 255, 0.86);
+  background: #25335d;
+  color: #f5f7ff;
   font-size: 0.78rem;
   font-weight: 700;
   line-height: 1.2;

@@ -16,6 +16,7 @@ type SessionWizardIntroStatusRailProps = {
   onDismissRequirements: () => void;
   onFocusNormalModeSection: (key: string) => void;
   onRetrySponsoredBundle: () => void;
+  requiredRequirementIds?: React.ComponentProps<typeof SessionWizardRequirementsBanner>['requiredRequirementIds'];
   showNewSessionRequirementsBanner: boolean;
   showNormalModeRail?: boolean;
   sponsoredBundleStatus?: React.ComponentProps<typeof SessionWizardSponsoredStatus>['status'];
@@ -32,6 +33,7 @@ const SessionWizardIntroStatusRail = ({
   onDismissRequirements,
   onFocusNormalModeSection,
   onRetrySponsoredBundle,
+  requiredRequirementIds,
   showNewSessionRequirementsBanner,
   showNormalModeRail = true,
   sponsoredBundleStatus = null,
@@ -43,6 +45,7 @@ const SessionWizardIntroStatusRail = ({
         fundingRequirementLabel={fundingRequirementLabel}
         newSessionRequiresLitCredential={newSessionRequiresLitCredential}
         onDismiss={onDismissRequirements}
+        requiredRequirementIds={requiredRequirementIds}
       />
     ) : null}
 

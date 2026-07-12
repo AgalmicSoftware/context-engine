@@ -913,9 +913,11 @@ const SessionWizard = ({
     [draft?.storageProfile],
   );
   const cloudflareWorkerSbtGateMode = isWorkerSbtGateCloudflareStorageProfile(normalizedDraftStorageProfile);
-  const visibleWorkerResourceKeys = useMemo(
-    () => workerResourceKeys.filter((key) => !cloudflareWorkerSbtGateMode || key !== 'lit'),
-    [cloudflareWorkerSbtGateMode, workerResourceKeys],
+  const sessionModeRequirements = resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile);
+  const visibleWorkerResourceKeys = workerResourceKeys.filter((key) =>
+    sessionModeRequirements.selected
+      ? sessionModeRequirements.visibleWorkerResourceKeys.includes(key)
+      : !cloudflareWorkerSbtGateMode || key !== 'lit',
   );
   const effectivePersistWorkerSecrets = DEV_PERSIST_WORKER_SECRETS && persistWorkerSecrets;
 
@@ -1989,9 +1991,7 @@ const SessionWizard = ({
         }
         return;
       }
-      if (
-        resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile).publish.registerSession
-      ) {
+      if (sessionModeRequirements.publish.registerSession) {
         try {
           await resolveAvailableRegisterIdentity();
         } catch (err) {
@@ -2616,7 +2616,7 @@ const SessionWizard = ({
   const normalizedAppliedSponsoredBundle = sponsoredBundlePublishAdapter.normalizeSparseSponsoredBundlePayload(
     sponsoredBundleAppliedBundleRef.current,
   );
-  const { newSessionRequiresLitCredential, showNewSessionRequirementsBanner } =
+  const { newSessionRequiresLitCredential, requiredRequirementIds, showNewSessionRequirementsBanner } =
     resolveSessionWizardNewSessionRequirementsDisplayState({
       cloudflareWorkerSbtGateMode,
       currentWorkerSecrets,
@@ -2626,6 +2626,7 @@ const SessionWizard = ({
       newSessionBannerDismissedContext,
       normalizedAppliedSponsoredBundle,
       persistedNewSessionBannerDismissed,
+      sessionModeProfile: draft.sessionModeProfile,
       sponsoredBundleStatus,
     });
   const publishUiPlan = resolveSessionWizardPublishReducerUiPlan({
@@ -2839,6 +2840,7 @@ const SessionWizard = ({
       newSessionFundingRequirementHref={newSessionFundingRequirementHref}
       newSessionFundingRequirementLabel={newSessionFundingRequirementLabel}
       newSessionRequiresLitCredential={newSessionRequiresLitCredential}
+      newSessionRequiredRequirementIds={requiredRequirementIds}
       normalModeBundleHelpText={normalModeBundleHelpText}
       normalModeBundleUrl={normalModeBundleUrl}
       normalModeBundleUrlOverride={normalModeBundleUrlOverride}

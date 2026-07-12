@@ -25,7 +25,11 @@ jest.mock('./SessionWizardHeader', () => (props: any) => (
 ));
 
 jest.mock('./SessionWizardRequirementsBanner', () => (props: any) => (
-  <div data-testid="shell-requirements" data-funding-href={props.fundingRequirementHref || ''}>
+  <div
+    data-testid="shell-requirements"
+    data-funding-href={props.fundingRequirementHref || ''}
+    data-requirement-ids={(props.requiredRequirementIds || []).join(',')}
+  >
     <span>{props.fundingRequirementLabel}</span>
     <button type="button" onClick={props.onDismiss}>
       dismiss requirements
@@ -207,6 +211,7 @@ const baseProps = (): SessionWizardShellProps => ({
   newSessionFundingRequirementHref: 'https://faucet.example.test',
   newSessionFundingRequirementLabel: 'OP Sepolia ETH',
   newSessionRequiresLitCredential: true,
+  newSessionRequiredRequirementIds: ['cloudflareApiToken', 'aiProviderKey'],
   normalModeBundleHelpText: 'bundle help',
   normalModeBundleUrl: 'https://bundle.example.test',
   normalModeBundleUrlOverride: '',
@@ -381,6 +386,7 @@ describe('SessionWizardShell', () => {
     expect(publish.compareDocumentPosition(modals) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     expect(requirements).toHaveTextContent('OP Sepolia ETH');
+    expect(requirements).toHaveAttribute('data-requirement-ids', 'cloudflareApiToken,aiProviderKey');
     expect(worker).toHaveAttribute('data-worker-url', 'https://worker.example.test');
     expect(publish).toHaveAttribute('data-worker-source', 'custom worker URL');
     expect(publish).toHaveAttribute('data-metadata-label', 'Metadata URI');

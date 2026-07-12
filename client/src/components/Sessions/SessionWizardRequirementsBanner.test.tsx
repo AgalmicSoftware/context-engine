@@ -59,4 +59,50 @@ describe('SessionWizardRequirementsBanner', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Anvil ETH for on-chain registration')).toBeInTheDocument();
   });
+
+  it('renders exactly the two profile-derived Cloudflare requirements without not-required notices', () => {
+    render(
+      <SessionWizardRequirementsBanner
+        fundingRequirementLabel="OP Sepolia ETH"
+        onDismiss={jest.fn()}
+        requiredRequirementIds={['cloudflareApiToken', 'aiProviderKey']}
+      />,
+    );
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    expect(screen.getByRole('link', { name: 'Cloudflare API token' })).toHaveAttribute(
+      'href',
+      SESSION_WIZARD_REQUIREMENT_LINKS.cloudflareApiTokens,
+    );
+    expect(screen.getByRole('link', { name: 'AI provider key' })).toBeInTheDocument();
+    expect(screen.queryByText(/Arweave|Lit|RPC|wallet|faucet|funding|gas/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not required/i)).not.toBeInTheDocument();
+  });
+
+  it('preserves explicit decentralized and Lit requirements without the legacy faucet notice', () => {
+    const { rerender } = render(
+      <SessionWizardRequirementsBanner
+        fundingRequirementHref={SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet}
+        fundingRequirementLabel="OP Sepolia ETH"
+        onDismiss={jest.fn()}
+        requiredRequirementIds={['aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding']}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: 'Arweave wallet (JWK)' })).toBeInTheDocument();
+    expect(screen.getByText(/RPC URL or provider key/i)).toBeInTheDocument();
+    expect(screen.getByText(/connected wallet/i)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Lit API key' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/faucet private key/i)).not.toBeInTheDocument();
+
+    rerender(
+      <SessionWizardRequirementsBanner
+        fundingRequirementHref={SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet}
+        fundingRequirementLabel="OP Sepolia ETH"
+        onDismiss={jest.fn()}
+        requiredRequirementIds={['aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding', 'lit']}
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Lit API key' })).toBeInTheDocument();
+  });
 });

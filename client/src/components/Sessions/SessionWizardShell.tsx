@@ -102,6 +102,7 @@ export type SessionWizardShellProps = {
   newSessionFundingRequirementHref: IntroStatusRailProps['fundingRequirementHref'];
   newSessionFundingRequirementLabel: IntroStatusRailProps['fundingRequirementLabel'];
   newSessionRequiresLitCredential: IntroStatusRailProps['newSessionRequiresLitCredential'];
+  newSessionRequiredRequirementIds: IntroStatusRailProps['requiredRequirementIds'];
   normalizeSbtSelection: WizardModalsProps['normalizeSbtSelection'];
   normalModeBundleHelpText: WorkerPanelProps['normalModeBundleHelpText'];
   normalModeBundleUrl: WorkerPanelProps['normalModeBundleUrl'];
@@ -263,6 +264,7 @@ const SessionWizardShell = ({
   newSessionFundingRequirementHref,
   newSessionFundingRequirementLabel,
   newSessionRequiresLitCredential,
+  newSessionRequiredRequirementIds,
   normalizeSbtSelection,
   normalModeBundleHelpText,
   normalModeBundleUrl,
@@ -398,6 +400,7 @@ const SessionWizardShell = ({
         onDismissRequirements={onDismissNewSessionRequirementsBanner}
         onFocusNormalModeSection={focusNormalModeSection}
         onRetrySponsoredBundle={onRetrySponsoredBundle}
+        requiredRequirementIds={newSessionRequiredRequirementIds}
         showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
         showNormalModeRail
         sponsoredBundleStatus={sponsoredBundleStatus}
