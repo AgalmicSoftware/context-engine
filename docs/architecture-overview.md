@@ -67,15 +67,23 @@ route/page UI
 
 Query functions must call domain read ports rather than importing low-level
 Web3, Arweave, worker, or storage utilities directly. Existing IndexedDB and
-localStorage caches remain authoritative persistence; this layer does not use a
-React Query persistence plugin.
+localStorage caches remain authoritative persistence. wagmi 0.9 installs its
+React Query persistence plugin on the shared client, so every application key
+starts with `{ scope: 'ce-app', persist: false }` to opt out of `wagmi.cache`.
+Old string-first application entries no longer match and age out naturally.
 
-Keys use the primitive-only `queryKeys` factory, which the app foundation also
-exposes for bootstrap consumers. A
+Keys use the `queryKeys` factory, which the app foundation also exposes for
+bootstrap consumers. After the frozen application scope object, a
 scoped key has fixed slots
-`[domain, entity, chainId, sessionSlug, address, ...ids]`; absent scope values
+`[appScope, domain, entity, chainId, sessionSlug, address, ...ids]`; absent scope values
 are `null`, addresses are normalized to lowercase, and object-valued IDs are
-rejected. Fixed scalar slots keep equality independent of object identity.
+rejected. The remaining fixed scalar slots keep equality independent of input
+object identity.
+
+The application layer inherits wagmi 0.9's query defaults: a 24-hour
+`cacheTime`, zero retries, `refetchOnWindowFocus: false`, and
+`networkMode: 'offlineFirst'`. Read families override freshness only when their
+existing behavior requires it.
 
 Freshness is mapped per read family from current behavior, never invented:
 
@@ -92,7 +100,7 @@ The first functional exemplar is TagPage's session-registry snapshot. It reads
 through the session-registry domain port, uses synchronous `initialData` to
 preserve the previous first render, and keeps `staleTime: Infinity`. The
 existing session-registry cache-update event invalidates the
-`['sessions', 'registry']` key family; successful cache loads and upserts
+`[appScope, 'sessions', 'registry']` key family; successful cache loads and upserts
 already emit that event. Fetch/upsert orchestration remains outside the read
 hook. Its characterized mount reads decreased from three to two.
 

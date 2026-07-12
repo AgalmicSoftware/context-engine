@@ -31,7 +31,7 @@ describe('app query client wiring', () => {
 
     expect(appQueryFoundation.client).toBe(wagmiClient.queryClient);
     expect(observedClient).toBe(wagmiClient.queryClient);
-    expect(appQueryFoundation.keys.domain('app')).toEqual(['app']);
+    expect(appQueryFoundation.keys.domain('app')).toEqual([{ scope: 'ce-app', persist: false }, 'app']);
   });
 
   it('pins wagmi 0.9 to a private React Query context', () => {

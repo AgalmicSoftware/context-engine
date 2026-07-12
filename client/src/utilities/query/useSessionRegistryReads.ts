@@ -97,4 +97,4 @@ export const useSessionRegistryReads = (
 // | synchronous cache read on render | initialData uses the same read port |
 // | no registry TTL | staleTime: Infinity |
 // | cache load/upsert completion | existing cache-update event invalidates this family |
-// | no explicit eviction contract | v4 cacheTime remains at its library default |
+// | no explicit eviction contract | shared wagmi client retains queries for 24 hours |

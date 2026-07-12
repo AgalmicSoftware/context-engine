@@ -36,6 +36,7 @@ const QueryWrapper = ({ children }: { children: ReactNode }) => {
 };
 
 describe('useSessionRegistryReads', () => {
+  const appScope = { scope: 'ce-app', persist: false };
   beforeEach(() => {
     queryClient = new QueryClient({
       defaultOptions: {
@@ -53,14 +54,14 @@ describe('useSessionRegistryReads', () => {
     jest.clearAllMocks();
   });
 
-  it('builds a frozen scalar key for the registry snapshot', () => {
+  it('builds a frozen app-scoped key for the registry snapshot', () => {
     renderHook(() => useSessionRegistryReads({ chainId: '11155420' }), {
       wrapper: QueryWrapper,
     });
     const [query] = queryClient.getQueryCache().getAll();
     const key = query.queryKey;
 
-    expect(key).toEqual(['sessions', 'registry', 11155420, null, null, 'snapshot']);
+    expect(key).toEqual([appScope, 'sessions', 'registry', 11155420, null, null, 'snapshot']);
     expect(Object.isFrozen(key)).toBe(true);
   });
 
@@ -95,6 +96,7 @@ describe('useSessionRegistryReads', () => {
     const [query] = queryClient.getQueryCache().getAll();
 
     expect(query.queryKey).toEqual([
+      appScope,
       'sessions',
       'registry',
       84532,
@@ -129,7 +131,7 @@ describe('useSessionRegistryReads', () => {
       expect(result.current.snapshotQuery.data?.slugs).toEqual(['', 'edge', 'alpha']);
     });
     expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['sessions', 'registry'],
+      queryKey: [appScope, 'sessions', 'registry'],
     });
     expect(mockGetAllSessionSlugs).toHaveBeenCalledTimes(2);
     expect(mockSubscribeToCacheUpdates).toHaveBeenCalledTimes(1);
