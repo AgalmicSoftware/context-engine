@@ -142,12 +142,39 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
     findForbiddenWorkerConfigSecretPath({ nested: { provider: { apiKeys: { primary: 'secret' } } } }),
     'config.nested.provider.apiKeys',
   );
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({ nested: { customProviderKey: 'secret' } }),
+    'config.nested.customProviderKey',
+  );
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({ nested: { requestKey: 'secret' } }),
+    'config.nested.requestKey',
+  );
   assert.equal(findForbiddenWorkerConfigSecretPath({ requestKey: 'secret' }), 'config.requestKey');
   assert.equal(findForbiddenWorkerConfigSecretPath({ customProviderKey: 'secret' }), 'config.customProviderKey');
+  assert.equal(findForbiddenWorkerConfigSecretPath({ authorization: 'Bearer secret' }), 'config.authorization');
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({ sessionModeProfile: { authorization: 'Bearer secret' } }),
+    'config.sessionModeProfile.authorization',
+  );
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({ sessionModeProfile: { authorization: ['Bearer secret'] } }),
+    'config.sessionModeProfile.authorization',
+  );
+  assert.deepEqual(
+    projectPublicWorkerSessionConfig({ sessionModeProfile: { authorization: 'Bearer secret' } }),
+    { sessionModeProfile: {} },
+  );
   assert.equal(findForbiddenWorkerConfigSecretPath({ keyProvider: 'worker_secret' }), '');
   assert.equal(findForbiddenWorkerConfigSecretPath({ publicKey: 'public-id' }), '');
   assert.equal(findForbiddenWorkerConfigSecretPath({ resourceKey: 'default' }), '');
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({ authorization: { roles: { moderator: [] } } }),
+    '',
+  );
   assert.equal(findForbiddenWorkerConfigSecretPath({ workerAuthority: { resourceKey: 'public-id' } }), '');
+  assert.equal(findForbiddenWorkerConfigSecretPath({ nested: { publicKey: 'public-id' } }), '');
+  assert.equal(findForbiddenWorkerConfigSecretPath({ nested: { resourceKey: 'default' } }), '');
 });
 
 test('dispatchSessionConfigBootstrapRequest returns only CORS-scoped worker-canonical config', async () => {

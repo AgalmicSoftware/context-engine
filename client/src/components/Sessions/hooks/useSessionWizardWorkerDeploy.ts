@@ -457,6 +457,7 @@ const useSessionWizardWorkerDeploy = ({
               err.statusCode = sponsoredDeployRes.status;
               err.responseError = nextData?.error || '';
               err.responseBundleDiagnostics = nextData?.bundleDiagnostics || null;
+              err.responseOrphanResources = nextData?.orphanResources || null;
               throw err;
             }
             return {
@@ -486,6 +487,7 @@ const useSessionWizardWorkerDeploy = ({
             err.statusCode = res.status;
             err.responseError = nextData?.error || '';
             err.responseBundleDiagnostics = nextData?.bundleDiagnostics || null;
+            err.responseOrphanResources = nextData?.orphanResources || null;
             throw err;
           }
           return {

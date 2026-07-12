@@ -115,6 +115,29 @@ export const formatSessionWizardDeployBundleDiagnostics = (bundleDiagnostics: un
   return parts.join(' ');
 };
 
+export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): string => {
+  const resources = asDeployRecord(value);
+  const workerName = toStr(resources?.workerName).trim();
+  const kvNamespaceId = toStr(resources?.kvNamespaceId).trim();
+  const workerCleanupStatus = toStr(resources?.workerCleanupStatus).trim();
+  const labels = [
+    workerName && workerCleanupStatus === 'owned-delete-failed' ? `worker ${workerName}` : '',
+    kvNamespaceId ? `KV namespace ${kvNamespaceId}` : '',
+  ].filter(Boolean);
+  const cleanupInstruction = labels.length
+    ? ` Cleanup incomplete: remove ${labels.join(' and ')} in Cloudflare before retrying.`
+    : '';
+  const ownershipNote =
+    workerCleanupStatus === 'preserved-existing'
+      ? ' The pre-existing worker was preserved.'
+      : workerCleanupStatus === 'ownership-changed'
+        ? ' A newer or foreign worker deployment was detected and preserved.'
+        : workerCleanupStatus === 'ownership-unverified'
+          ? ' Worker ownership could not be verified, so no worker deletion was attempted.'
+          : '';
+  return `${cleanupInstruction}${ownershipNote}`;
+};
+
 export const normalizeSessionWizardDeployErrorMessage = ({
   err,
   helperBase,
@@ -132,37 +155,45 @@ export const normalizeSessionWizardDeployErrorMessage = ({
   const responseLower = responseError.toLowerCase();
   const bundleDiagnostics = error?.responseBundleDiagnostics;
   const diagnosticsSummary = bundleDiagnostics ? formatSessionWizardDeployBundleDiagnostics(bundleDiagnostics) : '';
+  const orphanResourcesSummary = formatSessionWizardDeployOrphanResources(error?.responseOrphanResources);
+  const withOrphanResources = (message: string): string => `${message}${orphanResourcesSummary}`;
 
   if ((statusCode === 403 && responseLower.includes('origin')) || responseLower.includes('origin not allowed')) {
-    return buildSessionWizardDeployHelperCorsMessage({
-      helperBase,
-      detail: responseError || 'Origin not allowed',
-      currentOrigin,
-    });
+    return withOrphanResources(
+      buildSessionWizardDeployHelperCorsMessage({
+        helperBase,
+        detail: responseError || 'Origin not allowed',
+        currentOrigin,
+      }),
+    );
   }
   if (lowered.includes('origin not allowed')) {
-    return buildSessionWizardDeployHelperCorsMessage({
-      helperBase,
-      detail: raw,
-      currentOrigin,
-    });
+    return withOrphanResources(
+      buildSessionWizardDeployHelperCorsMessage({
+        helperBase,
+        detail: raw,
+        currentOrigin,
+      }),
+    );
   }
   if (lowered.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR) || responseLower.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR)) {
-    return raw || responseError;
+    return withOrphanResources(raw || responseError);
   }
   if (lowered.includes('failed to fetch') || lowered.includes('networkerror')) {
     const helper = toStr(helperBase).trim() || 'deploy-helper';
     const origin = resolveCurrentOrigin(currentOrigin) || '<current-origin>';
-    return `Deploy request could not reach ${helper}. This is usually CORS or helper availability; ensure ${origin} is allowed and retry.`;
+    return withOrphanResources(
+      `Deploy request could not reach ${helper}. This is usually CORS or helper availability; ensure ${origin} is allowed and retry.`,
+    );
   }
   if (
     (lowered.includes(CLOUDFLARE_MISSING_HANDLER_ERROR) || responseLower.includes(CLOUDFLARE_MISSING_HANDLER_ERROR)) &&
     diagnosticsSummary
   ) {
     const base = raw || responseError || 'Worker deploy failed.';
-    return `${base} Bundle diagnostics: ${diagnosticsSummary}`;
+    return withOrphanResources(`${base} Bundle diagnostics: ${diagnosticsSummary}`);
   }
-  if (raw) return raw;
-  if (statusCode > 0) return `Worker deploy failed (${statusCode}).`;
-  return 'Worker deploy failed.';
+  if (raw) return withOrphanResources(raw);
+  if (statusCode > 0) return withOrphanResources(`Worker deploy failed (${statusCode}).`);
+  return withOrphanResources('Worker deploy failed.');
 };

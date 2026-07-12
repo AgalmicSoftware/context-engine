@@ -130,6 +130,11 @@ test('putSessionConfig fails closed before KV persistence for secret-like config
     { ai: { models: { fast: { authorization: 'Bearer secret' } } } },
     { ai: { models: { fast: { apiCredential: 'secret' } } } },
     { nested: { provider: { apiKeys: { primary: 'secret' } } } },
+    { nested: { customProviderKey: 'secret' } },
+    { nested: { requestKey: 'secret' } },
+    { authorization: 'Bearer secret' },
+    { sessionModeProfile: { authorization: 'Bearer secret' } },
+    { sessionModeProfile: { authorization: ['Bearer secret'] } },
   ];
   let writes = 0;
 

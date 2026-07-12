@@ -72,10 +72,15 @@ const hasSensitiveTokenValue = (value) => {
   return true;
 };
 
-const isRecursiveProviderSecretAlias = ({ key, path }) => {
+const isRecursiveProviderSecretAlias = ({ key, path, value }) => {
   const normalized = normalizeKey(key);
   const fieldPath = `${path}.${key}`;
-  if (normalized === 'authorization' && SAFE_STRUCTURAL_AUTHORIZATION_PATHS.has(fieldPath)) {
+  if (SAFE_PUBLIC_KEY_FIELD_NAMES.has(normalized)) return false;
+  if (
+    normalized === 'authorization' &&
+    SAFE_STRUCTURAL_AUTHORIZATION_PATHS.has(fieldPath) &&
+    isObj(value)
+  ) {
     return false;
   }
   return (
@@ -84,7 +89,8 @@ const isRecursiveProviderSecretAlias = ({ key, path }) => {
     normalized.endsWith('apikeys') ||
     normalized.endsWith('providerkeys') ||
     normalized.endsWith('credential') ||
-    normalized.endsWith('credentials')
+    normalized.endsWith('credentials') ||
+    normalized.endsWith('key')
   );
 };
 
@@ -95,10 +101,14 @@ const isSecretAdjacentKey = (key, value, path) => {
   if (normalized.startsWith('exposes') && typeof value === 'boolean') return false;
   // These exact objects describe authorization policy. The same field name in
   // a provider/config subtree is credential-like and must stay secret.
-  if (normalized === 'authorization' && SAFE_STRUCTURAL_AUTHORIZATION_PATHS.has(fieldPath)) {
+  if (
+    normalized === 'authorization' &&
+    SAFE_STRUCTURAL_AUTHORIZATION_PATHS.has(fieldPath) &&
+    isObj(value)
+  ) {
     return false;
   }
-  if (isRecursiveProviderSecretAlias({ key, path })) return true;
+  if (isRecursiveProviderSecretAlias({ key, path, value })) return true;
   if (normalized.startsWith('faucet')) return true;
   if (normalized === 'litcredentials') return true;
   if (normalized === 'rpc' || normalized.includes('rpcurl') || normalized.includes('rpcendpoint')) return true;
@@ -215,7 +225,7 @@ const findForbiddenRecursiveProviderAliasPath = (value, path) => {
   }
   if (!isObj(value)) return '';
   for (const key of Object.keys(value)) {
-    if (isRecursiveProviderSecretAlias({ key, path })) return `${path}.${key}`;
+    if (isRecursiveProviderSecretAlias({ key, path, value: value[key] })) return `${path}.${key}`;
     const nested = findForbiddenRecursiveProviderAliasPath(value[key], `${path}.${key}`);
     if (nested) return nested;
   }

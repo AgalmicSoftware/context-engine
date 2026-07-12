@@ -1140,6 +1140,57 @@ export const executeDeployHelperRequest = async ({
     compatibility_flags: ['nodejs_compat'],
   };
 
+  const cleanupDeploymentResources = async () => {
+    let removableWorkerName = '';
+    let workerCleanupStatus = '';
+    const cleanupWorkerIfOwned = async () => {
+      if (preserveWorkerOnRollback) {
+        workerCleanupStatus = workerNamePreflight.ok ? 'preserved-existing' : 'ownership-unverified';
+        return;
+      }
+      const settingsResp = await cfFetch(
+        apiToken,
+        `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
+        { method: 'GET' },
+        cfFetchOptions,
+      );
+      if (!settingsResp.ok) {
+        if (Number(settingsResp.status || 0) !== 404) workerCleanupStatus = 'ownership-unverified';
+        return;
+      }
+      const bindings = Array.isArray(settingsResp.data?.result?.bindings)
+        ? settingsResp.data.result.bindings
+        : [];
+      const deploymentStillOwned = bindings.some((binding) => (
+        toStr(binding?.name).trim() === DEPLOYMENT_ID_BINDING_NAME &&
+        toStr(binding?.text).trim() === deploymentId
+      ));
+      if (!deploymentStillOwned) {
+        workerCleanupStatus = 'ownership-changed';
+        return;
+      }
+      const scriptCleanup = await cfFetch(
+        apiToken,
+        `/accounts/${accountId}/workers/scripts/${workerName}`,
+        { method: 'DELETE' },
+        cfFetchOptions,
+      );
+      if (!scriptCleanup.ok) {
+        removableWorkerName = workerName;
+        workerCleanupStatus = 'owned-delete-failed';
+      }
+    };
+    const [, kvCleanup] = await Promise.all([
+      cleanupWorkerIfOwned(),
+      cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}`, { method: 'DELETE' }, cfFetchOptions),
+    ]);
+    return {
+      kvNamespaceId: kvCleanup.ok ? '' : kvId,
+      workerName: removableWorkerName,
+      ...(workerCleanupStatus ? { workerCleanupStatus } : {}),
+    };
+  };
+
   const form = new FormData();
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }), 'metadata.json');
   form.append('worker.mjs', new Blob([bundleSource], { type: 'application/javascript+module' }), 'worker.mjs');
@@ -1157,12 +1208,12 @@ export const executeDeployHelperRequest = async ({
       diagnostics: bundleDiagnostics,
     }));
     const bundleSummary = formatBundleDiagnostics(bundleDiagnostics);
-    const orphanKvNamespaceId = await cleanupStagedKv();
+    const orphanResources = await cleanupDeploymentResources();
     return buildFailure(502, {
       error: `${scriptUpload.error} Bundle diagnostics: ${bundleSummary}`,
       detail: scriptUpload.detail,
       bundleDiagnostics,
-      orphanResources: { kvNamespaceId: orphanKvNamespaceId, workerName: '' },
+      orphanResources,
     }, {
       fallbackEligible: shouldAllowFallbackForCloudflareFailure(scriptUpload),
     });
@@ -1170,35 +1221,6 @@ export const executeDeployHelperRequest = async ({
 
   const envelopeKekSecretRequired = deployStorageRequiresEnvelopeKek(storageProfile);
   let envelopeKekSecretSet = false;
-
-  const cleanupDeploymentResources = async () => {
-    let deploymentStillOwned = false;
-    if (!preserveWorkerOnRollback) {
-      const settingsResp = await cfFetch(
-        apiToken,
-        `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
-        { method: 'GET' },
-        cfFetchOptions,
-      );
-      const bindings = Array.isArray(settingsResp.data?.result?.bindings)
-        ? settingsResp.data.result.bindings
-        : [];
-      deploymentStillOwned = settingsResp.ok && bindings.some((binding) => (
-        toStr(binding?.name).trim() === DEPLOYMENT_ID_BINDING_NAME &&
-        toStr(binding?.text).trim() === deploymentId
-      ));
-    }
-    const [scriptCleanup, kvCleanup] = await Promise.all([
-      deploymentStillOwned
-        ? cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}`, { method: 'DELETE' }, cfFetchOptions)
-        : Promise.resolve({ ok: false }),
-      cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}`, { method: 'DELETE' }, cfFetchOptions),
-    ]);
-    return {
-      kvNamespaceId: kvCleanup.ok ? '' : kvId,
-      workerName: scriptCleanup.ok ? '' : workerName,
-    };
-  };
 
   const {
     subdomain,

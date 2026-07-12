@@ -242,6 +242,11 @@ test('dispatchAdminRequest rejects nested provider secret aliases and generic to
     { ai: { models: { fast: { authorization: 'Bearer secret' } } } },
     { ai: { models: { fast: { apiCredential: 'secret' } } } },
     { nested: { provider: { apiKeys: { primary: 'secret' } } } },
+    { nested: { customProviderKey: 'secret' } },
+    { nested: { requestKey: 'secret' } },
+    { authorization: 'Bearer secret' },
+    { sessionModeProfile: { authorization: 'Bearer secret' } },
+    { sessionModeProfile: { authorization: ['Bearer secret'] } },
     { requestKey: 'secret' },
     { customProviderKey: 'secret' },
   ];
@@ -276,6 +281,7 @@ test('dispatchAdminRequest preserves explicitly public key fields and structural
     keyProvider: 'worker_secret',
     publicKey: 'public-id',
     resourceKey: 'default',
+    authorization: { roles: { moderator: ['0x00000000000000000000000000000000000000aa'] } },
     sessionModeProfile: {
       authorization: { mechanisms: ['worker_roles'] },
     },

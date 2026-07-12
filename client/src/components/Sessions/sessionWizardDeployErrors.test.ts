@@ -2,6 +2,7 @@ import {
   buildSessionWizardDeployHelperCorsMessage,
   buildSessionWizardDeployHelperWorkersDevStatusMessage,
   formatSessionWizardDeployBundleDiagnostics,
+  formatSessionWizardDeployOrphanResources,
   normalizeSessionWizardDeployErrorMessage,
   resolveSessionWizardDeployStatusDisplayState,
   withSessionWizardDeployHelperWorkersDevStatus,
@@ -174,5 +175,64 @@ describe('sessionWizardDeployErrors', () => {
     );
 
     expect(normalizeSessionWizardDeployErrorMessage()).toBe('Worker deploy failed.');
+  });
+
+  it('surfaces only safe orphan identifiers after incomplete Cloudflare cleanup', () => {
+    expect(
+      formatSessionWizardDeployOrphanResources({
+        workerName: 'ce-session-ab12',
+        kvNamespaceId: 'kv-public-id',
+        workerCleanupStatus: 'owned-delete-failed',
+        apiToken: 'must-not-appear',
+      }),
+    ).toBe(
+      ' Cleanup incomplete: remove worker ce-session-ab12 and KV namespace kv-public-id in Cloudflare before retrying.',
+    );
+    expect(
+      normalizeSessionWizardDeployErrorMessage({
+        err: {
+          message: 'Worker script upload was not confirmed.',
+          responseOrphanResources: {
+            workerName: 'ce-session-ab12',
+            kvNamespaceId: 'kv-public-id',
+            workerCleanupStatus: 'owned-delete-failed',
+            apiToken: 'must-not-appear',
+          },
+        },
+      }),
+    ).toBe(
+      'Worker script upload was not confirmed. Cleanup incomplete: remove worker ce-session-ab12 and KV namespace kv-public-id in Cloudflare before retrying.',
+    );
+    expect(
+      formatSessionWizardDeployOrphanResources({
+        workerName: '',
+        workerCleanupStatus: 'ownership-changed',
+      }),
+    ).toBe(' A newer or foreign worker deployment was detected and preserved.');
+    expect(
+      formatSessionWizardDeployOrphanResources({
+        workerName: '',
+        workerCleanupStatus: 'ownership-unverified',
+      }),
+    ).toBe(' Worker ownership could not be verified, so no worker deletion was attempted.');
+    expect(formatSessionWizardDeployOrphanResources({ workerName: 'unverified-worker' })).toBe('');
+    expect(
+      formatSessionWizardDeployOrphanResources({
+        workerName: 'preserved-worker',
+        workerCleanupStatus: 'preserved-existing',
+      }),
+    ).toBe(' The pre-existing worker was preserved.');
+    expect(
+      formatSessionWizardDeployOrphanResources({
+        workerName: 'foreign-worker',
+        workerCleanupStatus: 'ownership-changed',
+      }),
+    ).toBe(' A newer or foreign worker deployment was detected and preserved.');
+    expect(
+      formatSessionWizardDeployOrphanResources({
+        workerName: 'unknown-worker',
+        workerCleanupStatus: 'ownership-unverified',
+      }),
+    ).toBe(' Worker ownership could not be verified, so no worker deletion was attempted.');
   });
 });

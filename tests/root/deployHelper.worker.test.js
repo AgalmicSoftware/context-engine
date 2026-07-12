@@ -61,6 +61,9 @@ const makeFetchSequence = (responses = []) => {
     if (method === 'PUT' && /\/workers\/scripts\/[^/]+\/secrets$/.test(normalizedUrl)) {
       if (fetchMock.workerSecretPutOverride) return fetchMock.workerSecretPutOverride;
     }
+    if (method === 'DELETE' && /\/workers\/scripts\/[^/]+$/.test(normalizedUrl)) {
+      if (fetchMock.workerDeleteOverride) return fetchMock.workerDeleteOverride;
+    }
     if (method === 'PUT' && /\/values\/session:[^/]+:config$/.test(normalizedUrl)) {
       const priorConfigPut = calls
         .slice(0, -1)
@@ -556,7 +559,11 @@ describe('deploy-helper worker', () => {
       const payload = await response.json();
 
       expect(response.status).toBe(502);
-      expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: 'existing-worker' });
+      expect(payload?.orphanResources).toEqual({
+        kvNamespaceId: '',
+        workerName: '',
+        workerCleanupStatus: 'preserved-existing',
+      });
       expect(fetchMock.calls.some(([url, init = {}]) => (
         String(url).endsWith('/workers/scripts/existing-worker') && init.method === 'DELETE'
       ))).toBe(false);
@@ -967,7 +974,11 @@ describe('deploy-helper worker', () => {
       const payload = await response.json();
 
       expect(response.status).toBe(502);
-      expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: 'test-worker' });
+      expect(payload?.orphanResources).toEqual({
+        kvNamespaceId: '',
+        workerName: '',
+        workerCleanupStatus: 'ownership-changed',
+      });
       expect(fetchMock.calls.some(([url, init = {}]) => (
         String(url).endsWith('/workers/scripts/test-worker') && init.method === 'DELETE'
       ))).toBe(false);
@@ -975,6 +986,104 @@ describe('deploy-helper worker', () => {
         String(url).endsWith('/storage/kv/namespaces/kv-123') && init.method === 'DELETE'
       ))).toBe(true);
     } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it.each([
+    {
+      label: 'deletes an exactly owned script',
+      settingsOverride: null,
+      expectedOrphans: { kvNamespaceId: '', workerName: '' },
+      shouldDeleteScript: true,
+    },
+    {
+      label: 'reports only an exactly owned script whose deletion failed',
+      settingsOverride: null,
+      scriptDeleteResponse: cfFailure(500, 'Worker deletion failed.'),
+      expectedOwnedDeleteFailure: true,
+      shouldDeleteScript: true,
+    },
+    {
+      label: 'treats a confirmed 404 as already absent',
+      settingsOverride: cfFailure(404, 'Worker not found.'),
+      expectedOrphans: { kvNamespaceId: '', workerName: '' },
+      shouldDeleteScript: false,
+    },
+    {
+      label: 'preserves a changed deployment owner',
+      settingsOverride: cfSuccess({
+        bindings: [{ name: 'CE_DEPLOYMENT_ID', type: 'plain_text', text: 'different-deployment' }],
+      }),
+      expectedOrphans: {
+        kvNamespaceId: '',
+        workerName: '',
+        workerCleanupStatus: 'ownership-changed',
+      },
+      shouldDeleteScript: false,
+    },
+    {
+      label: 'reports indeterminate ownership without removal instructions',
+      settingsOverride: cfFailure(503, 'Settings unavailable.'),
+      expectedOrphans: {
+        kvNamespaceId: '',
+        workerName: '',
+        workerCleanupStatus: 'ownership-unverified',
+      },
+      shouldDeleteScript: false,
+    },
+  ])('$label after an ambiguous canonical script upload failure', async ({
+    settingsOverride,
+    scriptDeleteResponse,
+    expectedOrphans,
+    expectedOwnedDeleteFailure,
+    shouldDeleteScript,
+  }) => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfFailure(502, 'Worker upload response was lost.'),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    if (settingsOverride) fetchMock.workerCleanupSettingsOverride = settingsOverride;
+    if (scriptDeleteResponse) fetchMock.workerDeleteOverride = scriptDeleteResponse;
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'canonical-worker',
+        sessionSlug: 'alpha-session',
+        adminAddress: '0x00000000000000000000000000000000000000aa',
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      if (expectedOwnedDeleteFailure) {
+        expect(payload?.orphanResources).toEqual({
+          kvNamespaceId: '',
+          workerName: expect.stringMatching(/^canonical-worker-[0-9a-f]{12}$/),
+          workerCleanupStatus: 'owned-delete-failed',
+        });
+      } else {
+        expect(payload?.orphanResources).toEqual(expectedOrphans);
+      }
+      const scriptDeleteCalls = fetchMock.calls.filter(([url, init = {}]) => (
+        /\/workers\/scripts\/canonical-worker-[0-9a-f]{12}$/.test(String(url)) && init.method === 'DELETE'
+      ));
+      expect(scriptDeleteCalls).toHaveLength(shouldDeleteScript ? 1 : 0);
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(url).endsWith('/storage/kv/namespaces/kv-123') && init.method === 'DELETE'
+      ))).toBe(true);
+    } finally {
+      consoleErrorSpy.mockRestore();
       consoleLogSpy.mockRestore();
     }
   });
@@ -987,6 +1096,7 @@ describe('deploy-helper worker', () => {
       cfSuccess({ id: 'kv-123' }),
       cfSuccess({}),
       cfFailure(400, 'The uploaded script has no registered event handlers.'),
+      cfSuccess({}),
       cfSuccess({}),
     ]);
     global.fetch = fetchMock;
@@ -1032,6 +1142,7 @@ describe('deploy-helper worker', () => {
         expect(uploadedBundle).toBe(bundleText);
         return cfFailure(400, 'The uploaded script has no registered event handlers.');
       },
+      cfSuccess({}),
       cfSuccess({}),
     ]);
     global.fetch = fetchMock;

@@ -300,6 +300,33 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(deployPayload.storageProfile.resources.responses).toBe('active');
   });
 
+  it('surfaces incomplete Cloudflare cleanup identifiers from deploy-helper failures', async () => {
+    global.fetch = jest.fn(async () => ({
+      ok: false,
+      status: 502,
+      json: async () => ({
+        error: 'Worker script upload was not confirmed.',
+        orphanResources: {
+          workerName: 'ce-session-ab12',
+          kvNamespaceId: 'kv-public-id',
+          workerCleanupStatus: 'owned-delete-failed',
+        },
+      }),
+    })) as jest.Mock;
+    const options = buildDeployHookOptions();
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let deployResult;
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker();
+    });
+
+    const message =
+      'Worker script upload was not confirmed. Cleanup incomplete: remove worker ce-session-ab12 and KV namespace kv-public-id in Cloudflare before retrying.';
+    expect(deployResult).toEqual({ ok: false, error: message });
+    expect(options.updateDeploymentState).toHaveBeenCalledWith({ deployStatus: message });
+  });
+
   it('deploys the default worker-canonical profile without registry, RPC, faucet, or Arweave secrets', async () => {
     const fetchMock = mockSuccessfulWorkerDeployFetch();
     const options = buildDeployHookOptions();
