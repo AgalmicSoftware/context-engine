@@ -29,7 +29,6 @@ ce_public_release_strip_patterns() {
   cat <<'EOF'
 contextEngine-cc
 client/public/skill.md
-workers/agentBridgeWorker
 TODO
 local-private-version
 CLAUDE.md
@@ -74,7 +73,6 @@ scripts/start-playwright-server.js
 scripts/run-e2e-*
 scripts/run-ux-*
 scripts/capture-ux-*
-scripts/run-agent-bridge-worker-tests.js
 scripts/run-contextengine-cc-tests.js
 scripts/run-contextengine-cc-tests.test.js
 scripts/e2e-env-example.test.js
@@ -133,7 +131,6 @@ docs/*PRD*.md
 docs/*prd*.md
 docs/agent-native*.md
 client/public/skill.md
-workers/agentBridgeWorker
 video-clickthrough-local
 local-private-version
 scripts/test-*.js
@@ -143,7 +140,6 @@ scripts/e2e
 scripts/lib/e2e
 scripts/lib/passkey-wallet-derivation.js
 scripts/start-playwright-server.js
-scripts/run-agent-bridge-worker-tests.js
 scripts/run-contextengine-cc-tests.js
 scripts/run-contextengine-cc-tests.test.js
 scripts/e2e-env-example.test.js

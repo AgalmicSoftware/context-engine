@@ -29,7 +29,6 @@ const FORBIDDEN_MARKERS = Object.freeze([
   { label: 'private planning path', re: /(?:^|[^\w])TODO\//gi },
   { label: 'private agent settings path', re: /(?:^|[^\w.-])\.(?:claude|codex)(?:\/|\b)|\bCLAUDE\.md\b/gi },
   { label: 'private companion path', re: /\bcontextEngine-cc(?:\/|\b)/gi },
-  { label: 'private bridge path', re: /\bworkers\/agentBridgeWorker(?:\/|\b)/gi },
   { label: 'private skill path', re: /\bclient\/public\/skill\.md\b/gi },
   { label: 'private inventory manifest', re: /\bprivate-pack\.manifest\.json\b/gi },
 ]);

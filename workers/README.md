@@ -7,6 +7,7 @@ Current status:
 - `workers/` project code is `MIT`.
 - `workers/sessionCorsWorker/` is `MIT`.
 - `workers/deploy-helper/` is `MIT`.
+- `workers/agentBridgeWorker/` is `MIT`.
 - Third-party worker dependencies and tooling keep their own licenses and should be checked separately from the worker subtree's MIT designation.
 
 See [LICENSE](LICENSE) for the worker subtree's MIT text.
