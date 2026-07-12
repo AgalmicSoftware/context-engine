@@ -13,6 +13,7 @@ const DOCS_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-docs.js');
 const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js');
 const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-prepare-public-release-tests');
+const REPO_ROOT = path.join(__dirname, '..');
 
 function writeFile(rootDir, relativePath, contents) {
   const absolutePath = path.join(rootDir, relativePath);
@@ -65,6 +66,14 @@ test('prepare-public-release strips private surfaces without publishing an inven
       fs.readFileSync(TEXT_VERIFIER_SOURCE_PATH, 'utf8'),
     );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
+
+    for (const relativePath of [
+      '.github/ISSUE_TEMPLATE/config.yml',
+      'client/src/variables/publicRepoMetadata.ts',
+      'workers/sessionCorsWorker/chipotleClient.test.mjs',
+    ]) {
+      writeFile(sourceDir, relativePath, fs.readFileSync(path.join(REPO_ROOT, relativePath), 'utf8'));
+    }
 
     writeFile(
       sourceDir,
@@ -154,6 +163,21 @@ test('prepare-public-release strips private surfaces without publishing an inven
       fs.readFileSync(path.join(outputDir, 'public.txt'), 'utf8'),
       `keep [redacted-email] and /redacted-home and contextengine${'@'}protonmail.com and ContextEngine${'@'}Protonmail.COM and [redacted-email]\n`,
     );
+    assert.match(
+      fs.readFileSync(path.join(outputDir, '.github/ISSUE_TEMPLATE/config.yml'), 'utf8'),
+      /mailto:contextengine@protonmail\.com/,
+    );
+    assert.match(
+      fs.readFileSync(path.join(outputDir, 'client/src/variables/publicRepoMetadata.ts'), 'utf8'),
+      /PUBLIC_SECURITY_EMAIL = 'contextengine@protonmail\.com'/,
+    );
+    const publicChipotleTest = fs.readFileSync(
+      path.join(outputDir, 'workers/sessionCorsWorker/chipotleClient.test.mjs'),
+      'utf8',
+    );
+    assert.match(publicChipotleTest, /credentialedApiBase/);
+    assert.match(publicChipotleTest, /must not include credentials/);
+    assert.doesNotMatch(publicChipotleTest, /\[redacted-email\]/);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(outputDir, 'package.json'), 'utf8')).scripts, {
       test: 'node scripts/run-node-tests.js',
       'test:ci': 'npm run test',

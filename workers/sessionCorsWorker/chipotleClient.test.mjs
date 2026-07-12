@@ -150,7 +150,6 @@ test('normalizeLitChipotleApiBase rejects unsafe API bases', () => {
   const rejectedBases = [
     'https://attacker.example',
     'http://api.chipotle.litprotocol.com',
-    'https://user:[redacted-email]',
     'https://api.chipotle.litprotocol.com.evil.example',
     'https://127.0.0.1:8787',
     'https://10.0.0.5',
@@ -170,6 +169,20 @@ test('normalizeLitChipotleApiBase rejects unsafe API bases', () => {
       apiBase,
     );
   }
+});
+
+test('normalizeLitChipotleApiBase rejects embedded URL credentials', () => {
+  const credentialedApiBase = new URL('https://api.chipotle.litprotocol.com');
+  credentialedApiBase.username = 'user';
+  credentialedApiBase.password = 'pass';
+
+  assert.throws(
+    () => normalizeLitChipotleApiBase(credentialedApiBase.toString()),
+    (error) => {
+      assert.equal(error.message, 'Lit Chipotle API base URL must not include credentials.');
+      return true;
+    },
+  );
 });
 
 test('normalizeLitChipotleApiBase allows only explicit localhost test bases', () => {
