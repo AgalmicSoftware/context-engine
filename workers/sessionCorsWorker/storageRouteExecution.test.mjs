@@ -5,6 +5,9 @@ import {
   exportCloudflareEncryptedPayloadEnvelopes,
   storageRoute,
 } from './storageRouteExecution.js';
+import { dispatchAuthenticatedSecretPathRoute } from './authenticatedSecretPathRouteDispatch.js';
+import { getSessionSecrets } from './sessionConfigSecretsStore.js';
+import { createWorkerExecutionServicesWithWorkerDeps } from './workerExecutionServiceBinding.js';
 import {
   rewrapStorageEnvelopeSessionKeyForDeployment,
   rotateStorageEnvelopeKeys,
@@ -171,6 +174,7 @@ const uploadEnvelopePayload = async ({
 };
 
 test('storageRoute delegates Arweave uploads and returns storageRef compatibility fields', async () => {
+  const env = { marker: 'worker-env' };
   const request = new Request('https://worker.example/storage/upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -182,13 +186,18 @@ test('storageRoute delegates Arweave uploads and returns storageRef compatibilit
     path: '/storage/upload',
     method: 'POST',
     request,
+    env,
     config: { storageProfile: { backend: 'arweave' } },
     slug: 'session-a',
     uploaderAddress: '0xabc',
     baseHeaders: { 'Access-Control-Allow-Origin': 'https://app.example' },
     deps: {
       json,
-      getSessionSecrets: async () => ({ arweaveJwk: '{}' }),
+      getSessionSecrets: async (receivedEnv, receivedSlug) => {
+        assert.equal(receivedEnv, env);
+        assert.equal(receivedSlug, 'session-a');
+        return { arweaveJwk: '{}' };
+      },
       arweaveUpload: async (value) => {
         uploadContext = value;
         return json({ id: TX_ID });
@@ -211,6 +220,7 @@ test('storageRoute delegates Arweave uploads and returns storageRef compatibilit
 });
 
 test('storageRoute returns lit-arweave storageRef for encrypted Arweave session storage', async () => {
+  const env = { marker: 'worker-env' };
   const request = new Request('https://worker.example/storage/upload', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -221,13 +231,18 @@ test('storageRoute returns lit-arweave storageRef for encrypted Arweave session 
     path: '/storage/upload',
     method: 'POST',
     request,
+    env,
     config: { storageProfile: { backend: 'lit-arweave' } },
     slug: 'session-a',
     uploaderAddress: '0xabc',
     baseHeaders: {},
     deps: {
       json,
-      getSessionSecrets: async () => ({ arweaveJwk: '{}' }),
+      getSessionSecrets: async (receivedEnv, receivedSlug) => {
+        assert.equal(receivedEnv, env);
+        assert.equal(receivedSlug, 'session-a');
+        return { arweaveJwk: '{}' };
+      },
       arweaveUpload: async () => json({ id: TX_ID }),
     },
   });
@@ -241,6 +256,55 @@ test('storageRoute returns lit-arweave storageRef for encrypted Arweave session 
     encrypted: true,
     resource: 'responses',
   });
+});
+
+test('authenticated storage binding loads production session secrets with env and slug', async () => {
+  const kvReads = [];
+  const env = {
+    GROUP_KV: {
+      async get(key) {
+        kvReads.push(key);
+        return JSON.stringify({ arweaveJwk: '{}' });
+      },
+    },
+  };
+  let uploadContext = null;
+  const services = createWorkerExecutionServicesWithWorkerDeps({
+    deps: {
+      json,
+      getSessionSecrets,
+      createArweaveUploadWithWorkerDeps: () => async (value) => {
+        uploadContext = value;
+        return json({ id: TX_ID }, 200);
+      },
+    },
+  });
+
+  const result = await dispatchAuthenticatedSecretPathRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: { ok: true }, resource: 'questions' }),
+    }),
+    env,
+    config: { storageProfile: { backend: 'arweave' } },
+    slug: 'session-a',
+    address: '0xabc',
+    headers: {},
+    scopes: { storage: true },
+    deps: {
+      evaluateAuthenticatedRoutePreflight: async () => ({ ok: true }),
+      storageRoute: services.storageRoute,
+    },
+  });
+
+  assert.equal(result.handled, true);
+  assert.equal(result.response.status, 200);
+  assert.deepEqual(kvReads, ['session:session-a:secrets']);
+  assert.deepEqual(uploadContext.secrets, { arweaveJwk: '{}' });
+  assert.equal(uploadContext.slug, 'session-a');
 });
 
 test('storageRoute rejects oversized Arweave storage uploads before handoff', async () => {

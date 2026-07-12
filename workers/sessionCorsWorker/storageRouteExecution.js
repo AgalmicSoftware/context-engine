@@ -869,7 +869,7 @@ const parseArweaveUploadResponse = async (response) => {
 };
 
 const handleArweaveStorageUpload = async ({ request, env, config, slug, uploaderAddress, backend, payload, baseHeaders, deps }) => {
-  const secrets = (await deps?.getSessionSecrets?.(slug)) || {};
+  const secrets = (await deps?.getSessionSecrets?.(env, slug)) || {};
   const response = await deps?.arweaveUpload?.({
     request,
     env,
