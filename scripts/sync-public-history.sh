@@ -277,51 +277,6 @@ ensure_public_replay_message() {
   fi
 }
 
-bind_public_replay_to_source() {
-  local commit_sha="$1"
-  local message_file="$2"
-
-  git interpret-trailers \
-    --in-place \
-    --if-exists replace \
-    --if-missing add \
-    --trailer "CE-Private-Source: $commit_sha" \
-    "$message_file"
-}
-
-sync_agent_bridge_public_package_wiring() {
-  local commit_sha="$1"
-  local target_package="$TEMP_CLONE/package.json"
-  local source_package="$TMP_ROOT/agent-bridge-source-package.json"
-
-  if [ ! -f "$target_package" ]; then
-    fail "Agent Bridge public cutover requires package.json in replay output." 2
-  fi
-
-  if ! git -C "$REPO_ROOT" show "${commit_sha}:package.json" > "$source_package"; then
-    fail "Agent Bridge public cutover source is missing package.json at $commit_sha." 2
-  fi
-
-  node - "$target_package" "$source_package" <<'NODE'
-const fs = require('node:fs');
-
-const targetPath = process.argv[2];
-const sourcePath = process.argv[3];
-const targetPackage = JSON.parse(fs.readFileSync(targetPath, 'utf8'));
-const sourcePackage = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
-const scriptName = 'test:worker:agent-bridge';
-const command = sourcePackage.scripts?.[scriptName];
-
-if (typeof command !== 'string' || !command.includes('scripts/run-agent-bridge-worker-tests.js')) {
-  throw new Error(`Agent Bridge public cutover source is missing ${scriptName}`);
-}
-
-targetPackage.scripts ||= {};
-targetPackage.scripts[scriptName] = command;
-fs.writeFileSync(targetPath, `${JSON.stringify(targetPackage, null, 2)}\n`);
-NODE
-}
-
 apply_agent_bridge_public_history_policy() {
   local commit_sha="$1"
   local path
@@ -348,8 +303,6 @@ apply_agent_bridge_public_history_policy() {
         printf 'Agent Bridge public cutover marker is missing from source commit %s.\n' "$commit_sha" >&2
         exit 2
       fi
-
-      sync_agent_bridge_public_package_wiring "$commit_sha"
     fi
   )
 }
@@ -377,11 +330,6 @@ strip_private_paths_from_clone() {
     done
 
     apply_agent_bridge_public_history_policy "$commit_sha"
-    git -C "$REPO_ROOT" show "${commit_sha}:package.json" > "$TMP_ROOT/public-package-source.json"
-    node \
-      "$REPO_ROOT/scripts/scrub-public-package-json.js" \
-      "$TEMP_CLONE/package.json" \
-      "$TMP_ROOT/public-package-source.json"
 
     git add -A
   )
@@ -438,13 +386,14 @@ reset_clone_to_branch_head() {
 }
 
 resolve_private_cherry_pick_conflicts() {
+  local commit_sha="$1"
   local path
   local found_conflict=0
 
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     found_conflict=1
-    if ! path_matches_strip_pattern "$path"; then
+    if ! path_matches_strip_pattern "$path" "$commit_sha"; then
       return 1
     fi
   done < <(git -C "$TEMP_CLONE" diff --name-only --diff-filter=U)
@@ -453,7 +402,7 @@ resolve_private_cherry_pick_conflicts() {
     return 1
   fi
 
-  strip_private_paths_from_clone
+  strip_private_paths_from_clone "$commit_sha"
 
   if git -C "$TEMP_CLONE" diff --name-only --diff-filter=U | grep -q .; then
     return 1
@@ -541,6 +490,45 @@ verify_public_text() {
 
   log_info "Verifying retained public text for private references."
   node "$verifier" "$TEMP_CLONE" >&2
+}
+
+verify_agent_bridge_public_replay_pii() {
+  local commit_sha="$1"
+  local verifier="$REPO_ROOT/scripts/verify-public-release-pii.sh"
+  local surface_root="$TMP_ROOT/agent-bridge-public-surface"
+  local scan_status=0
+
+  if ! agent_bridge_is_public_for_source_commit "$commit_sha"; then
+    return 0
+  fi
+
+  if [ ! -f "$verifier" ]; then
+    fail "Agent Bridge replay PII verifier was not found: scripts/verify-public-release-pii.sh" 2
+  fi
+
+  if [ ! -d "$TEMP_CLONE/workers/agentBridgeWorker" ]; then
+    fail "Agent Bridge public subtree is missing after the cutover at source commit $commit_sha." 2
+  fi
+
+  if [ ! -f "$TEMP_CLONE/scripts/run-agent-bridge-worker-tests.js" ]; then
+    fail "Agent Bridge public test runner is missing after the cutover at source commit $commit_sha." 2
+  fi
+
+  rm -rf "$surface_root"
+  mkdir -p "$surface_root/workers" "$surface_root/scripts"
+  cp -R "$TEMP_CLONE/workers/agentBridgeWorker" "$surface_root/workers/agentBridgeWorker"
+  cp \
+    "$TEMP_CLONE/scripts/run-agent-bridge-worker-tests.js" \
+    "$surface_root/scripts/run-agent-bridge-worker-tests.js"
+
+  # This gate runs for every public Agent Bridge source commit, before the
+  # replay commit is created. A credential added and deleted later therefore
+  # never becomes reachable from public history even when the final tip is clean.
+  log_info "Scanning Agent Bridge public replay commit for PII/secrets: $commit_sha"
+  bash "$verifier" "$surface_root" >&2
+  scan_status=$?
+  rm -rf "$surface_root"
+  return "$scan_status"
 }
 
 ensure_public_node_modules_link() {
@@ -847,8 +835,8 @@ for commit_sha in "${COMMITS[@]}"; do
   git -C "$REPO_ROOT" log -1 --format='%B' "$commit_sha" > "$message_file"
 
   log_info "Replaying $commit_sha | $subject"
-  if ! git -C "$TEMP_CLONE" cherry-pick --no-commit "$commit_sha" >/dev/null 2>&1; then
-    if resolve_private_cherry_pick_conflicts; then
+  if ! git -C "$TEMP_CLONE" cherry-pick --no-commit -X theirs "$commit_sha" >/dev/null 2>&1; then
+    if resolve_private_cherry_pick_conflicts "$commit_sha"; then
       log_info "Resolved stripped-path cherry-pick conflicts for $commit_sha | $subject"
     else
       log_error "Cherry-pick failed for $commit_sha | $subject"

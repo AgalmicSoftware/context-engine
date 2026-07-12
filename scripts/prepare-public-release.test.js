@@ -137,6 +137,16 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'public agent bridge worker\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'README.md'), 'agent bridge docs\n');
+    writeFile(
+      sourceDir,
+      path.join('workers', 'agentBridgeWorker', 'PUBLIC_RELEASE_CUTOVER'),
+      [
+        'context-engine-agent-bridge-public-cutover-v1',
+        'audited=2025-01-04',
+        'scope=workers/agentBridgeWorker,scripts/run-agent-bridge-worker-tests.js',
+        '',
+      ].join('\n'),
+    );
     writeFile(sourceDir, path.join('scripts', 'run-agent-bridge-worker-tests.js'), 'agent bridge test runner\n');
     writeFile(sourceDir, path.join('scripts', 'run-contextengine-cc-tests.js'), 'private companion test runner\n');
     writeFile(sourceDir, path.join('scripts', 'run-contextengine-cc-tests.test.js'), 'private companion runner test\n');
@@ -239,6 +249,10 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'skill.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker')), true);
     assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'worker.js')), true);
+    assert.equal(
+      fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'PUBLIC_RELEASE_CUTOVER')),
+      true,
+    );
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-agent-bridge-worker-tests.js')), true);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.test.js')), false);

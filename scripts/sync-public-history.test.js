@@ -12,6 +12,7 @@ const SURFACE_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release
 const DOCS_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-docs.js');
 const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js');
 const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
+const PII_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-pii.sh');
 const PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
 const PRE_PUSH_HOOK_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-sync-public-history-tests');
@@ -59,6 +60,11 @@ function installSyncScriptFixture(sourceDir) {
   );
   writeFile(
     sourceDir,
+    path.join('scripts', 'verify-public-release-pii.sh'),
+    fs.readFileSync(PII_VERIFIER_SOURCE_PATH, 'utf8'),
+  );
+  writeFile(
+    sourceDir,
     path.join('scripts', 'install-private-branch-guard.sh'),
     fs.readFileSync(PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH, 'utf8'),
   );
@@ -68,6 +74,7 @@ function installSyncScriptFixture(sourceDir) {
     fs.readFileSync(PRE_PUSH_HOOK_SOURCE_PATH, 'utf8'),
   );
   fs.chmodSync(path.join(sourceDir, 'scripts', 'sync-public-history.sh'), 0o755);
+  fs.chmodSync(path.join(sourceDir, 'scripts', 'verify-public-release-pii.sh'), 0o755);
   fs.chmodSync(path.join(sourceDir, 'scripts', 'install-private-branch-guard.sh'), 0o755);
   fs.chmodSync(path.join(sourceDir, '.githooks', 'pre-push'), 0o755);
 }
@@ -156,6 +163,21 @@ function setupSourceRepo() {
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent doc\n');
     writeFile(sourceDir, path.join('docs', 'telegram-response-export-scope-prd.md'), 'private release planning\n');
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
+    writeFile(
+      sourceDir,
+      path.join('workers', 'agentBridgeWorker', 'worker.js'),
+      'private pre-cutover agent bridge worker\n',
+    );
+    writeFile(
+      sourceDir,
+      path.join('workers', 'agentBridgeWorker', 'retired-private-notes.txt'),
+      'deleted before the audited public cutover\n',
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'run-agent-bridge-worker-tests.js'),
+      'private pre-cutover agent bridge test runner\n',
+    );
     commitAll(sourceDir, 'Private agent-only commit', {
       authorDate: '2025-01-03T06:07:08Z',
       committerDate: '2025-01-03T06:07:08Z',
@@ -175,6 +197,17 @@ function setupSourceRepo() {
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill v2\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'public agent bridge worker\n');
     writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'transportMock.mjs'), 'agent bridge mock\n');
+    fs.rmSync(path.join(sourceDir, 'workers', 'agentBridgeWorker', 'retired-private-notes.txt'));
+    writeFile(
+      sourceDir,
+      path.join('workers', 'agentBridgeWorker', 'PUBLIC_RELEASE_CUTOVER'),
+      [
+        'context-engine-agent-bridge-public-cutover-v1',
+        'audited=2025-01-04',
+        'scope=workers/agentBridgeWorker,scripts/run-agent-bridge-worker-tests.js',
+        '',
+      ].join('\n'),
+    );
     writeFile(sourceDir, path.join('scripts', 'run-agent-bridge-worker-tests.js'), 'agent bridge test runner\n');
     writeFile(sourceDir, path.join('scripts', 'vendor-cecc-ethers-bundle.js'), 'private companion vendoring\n');
     commitAll(sourceDir, 'Mixed commit', {
@@ -353,6 +386,45 @@ test('sync-public-history replays public commits, skips private-only commits, an
     ]).trim().split('\n');
     assert.deepEqual(firstWorkerAppearance, ['Mixed commit']);
 
+    const preCutoverPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', replayedShas[0]]);
+    assert.doesNotMatch(preCutoverPaths, /^workers\/agentBridgeWorker\//m);
+    assert.doesNotMatch(preCutoverPaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
+
+    assert.equal(
+      git(sourceDir, ['show', `${replayedShas[1]}:workers/agentBridgeWorker/worker.js`]),
+      'public agent bridge worker\n',
+    );
+    assert.equal(
+      git(sourceDir, ['show', `${replayedShas[1]}:scripts/run-agent-bridge-worker-tests.js`]),
+      'agent bridge test runner\n',
+    );
+    assert.equal(
+      git(sourceDir, ['show', `${replayedShas[1]}:workers/agentBridgeWorker/PUBLIC_RELEASE_CUTOVER`]),
+      [
+        'context-engine-agent-bridge-public-cutover-v1',
+        'audited=2025-01-04',
+        'scope=workers/agentBridgeWorker,scripts/run-agent-bridge-worker-tests.js',
+        '',
+      ].join('\n'),
+    );
+    const retiredPrivatePath = spawnSync(
+      'git',
+      ['cat-file', '-e', `${replayedShas[1]}:workers/agentBridgeWorker/retired-private-notes.txt`],
+      { cwd: sourceDir, encoding: 'utf8' },
+    );
+    assert.notEqual(retiredPrivatePath.status, 0);
+
+    const firstWorkerAppearance = git(sourceDir, [
+      'log',
+      '--reverse',
+      '--format=%s',
+      'origin/main..release-staging',
+      '--',
+      'workers/agentBridgeWorker',
+      'scripts/run-agent-bridge-worker-tests.js',
+    ]).trim().split('\n');
+    assert.deepEqual(firstWorkerAppearance, ['Mixed commit']);
+
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'release-staging']);
     assertNoPrivatePlanningPaths(trackedPaths);
     assert.doesNotMatch(trackedPaths, /^TODO\//m);
@@ -420,6 +492,37 @@ test('sync-public-history rejects retained Markdown that exposes private plannin
     assert.equal(result.status, 2);
     assert.match(result.stderr, /Public documentation verification failed/);
     assert.match(result.stderr, /internal planning identifier/);
+
+    const remoteCheck = spawnSync('git', ['ls-remote', '--heads', 'origin', 'release-staging'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+    assert.equal(remoteCheck.status, 0);
+    assert.equal(remoteCheck.stdout.trim(), '');
+  });
+});
+
+test('sync-public-history rejects a runner secret added and deleted after the Agent Bridge cutover', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const unsafeToken = ['live', 'credential', 'material', 'must', 'not', 'ship'].join('-');
+    const runnerPath = path.join('scripts', 'run-agent-bridge-worker-tests.js');
+    writeFile(sourceDir, runnerPath, `const agent_api_token = '${unsafeToken}';\n`);
+    commitAll(sourceDir, 'Add temporary agent bridge runner credential', {
+      authorDate: '2025-01-05T06:07:08Z',
+      committerDate: '2025-01-05T06:07:08Z',
+    });
+    writeFile(sourceDir, runnerPath, 'agent bridge test runner\n');
+    commitAll(sourceDir, 'Remove temporary agent bridge runner credential', {
+      authorDate: '2025-01-05T07:08:09Z',
+      committerDate: '2025-01-05T07:08:09Z',
+    });
+
+    const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Scanning Agent Bridge public replay commit for PII\/secrets/);
+    assert.match(result.stderr, /public release PII scan failed/);
+    assert.match(result.stderr, /scripts\/run-agent-bridge-worker-tests\.js/);
 
     const remoteCheck = spawnSync('git', ['ls-remote', '--heads', 'origin', 'release-staging'], {
       cwd: sourceDir,
