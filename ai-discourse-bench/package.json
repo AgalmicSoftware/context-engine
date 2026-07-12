@@ -1,0 +1,29 @@
+{
+  "name": "ai-discourse-bench",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Self-contained Context Engine benchmark folder for mapping AI model agreement and disagreement over AI discourse questions.",
+  "license": "MIT",
+  "bin": {
+    "ai-discourse-bench": "./bin/ai-discourse-bench.mjs"
+  },
+  "scripts": {
+    "generate:questions": "node ./scripts/generate-sample-question-bank.mjs",
+    "validate": "node ./bin/ai-discourse-bench.mjs validate --questions ./data/question-bank.sample.json --models ./data/model-roster.sample.json --personas ./data/personas.sample.json",
+    "test": "node --test",
+    "check:results-sync": "node ./scripts/check-context-engine-results-sync.mjs",
+    "sync:results-snapshot": "node ./scripts/check-context-engine-results-sync.mjs --write",
+    "run:mock": "node ./bin/ai-discourse-bench.mjs run --provider mock --questions ./data/question-bank.sample.json --models ./data/model-roster.sample.json --out ./runs/mock-self-runs.json --repeats 1",
+    "run:mock:persona": "node ./bin/ai-discourse-bench.mjs run --provider mock --mode persona --persona ada-lovelace --questions ./data/question-bank.sample.json --models ./data/model-roster.sample.json --personas ./data/personas.sample.json --out ./runs/mock-ada-runs.json --repeats 1",
+    "report:mock": "node ./bin/ai-discourse-bench.mjs build-report --questions ./data/question-bank.sample.json --models ./data/model-roster.sample.json --runs ./runs/mock-self-runs.json --out ./results/mock-self-report.json",
+    "render:mock": "node ./bin/ai-discourse-bench.mjs render-report --report ./results/mock-self-report.json --out ./results/mock-self-report.html",
+    "export:ce:mock": "node ./bin/ai-discourse-bench.mjs export-ce --report ./results/mock-self-report.json --out ./results/mock-self-ce-polis-export.json",
+    "export:analysis:mock": "node ./bin/ai-discourse-bench.mjs export-analysis-input --report ./results/mock-self-report.json --out ./results/mock-self-ai-analysis-input.json",
+    "local:full": "node ./scripts/run-local-full.mjs",
+    "smoke": "npm run validate && npm test && npm run run:mock && npm run report:mock && npm run render:mock && npm run export:ce:mock && npm run export:analysis:mock"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

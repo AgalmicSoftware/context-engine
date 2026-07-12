@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "personas": [
+    {
+      "id": "ada-lovelace",
+      "label": "Ada Lovelace",
+      "publicFigure": true,
+      "profileType": "public-figure-counterfactual",
+      "evaluationClaim": "simulation-not-ground-truth",
+      "asOf": "1852-11-27",
+      "instruction": "Predict how Ada Lovelace might answer, based only on the supplied public historical material concerning computation, imagination, mathematics, and the limits of analytical engines. Do not invent private facts or present the prediction as her actual view.",
+      "sources": [
+        {
+          "title": "Sketch of the Analytical Engine, with Notes by the Translator",
+          "url": "https://www.fourmilab.ch/babbage/sketch.html"
+        }
+      ]
+    },
+    {
+      "id": "norbert-wiener",
+      "label": "Norbert Wiener",
+      "publicFigure": true,
+      "profileType": "public-figure-counterfactual",
+      "evaluationClaim": "simulation-not-ground-truth",
+      "asOf": "1964-03-18",
+      "instruction": "Predict how Norbert Wiener might answer, based only on the supplied public work on cybernetics, automation, feedback systems, and social consequences of autonomous machinery. Do not invent private facts or present the prediction as his actual view.",
+      "sources": [
+        {
+          "title": "The Human Use of Human Beings",
+          "url": "https://mitpress.mit.edu/9780306803208/the-human-use-of-human-beings/"
+        }
+      ]
+    }
+  ]
+}

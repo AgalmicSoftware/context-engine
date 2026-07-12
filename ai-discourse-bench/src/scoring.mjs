@@ -1,0 +1,538 @@
+import { ANSWER_SCORE, ANSWER_VALUES } from './config.mjs';
+
+const mean = (values) => {
+  const nums = values.filter((value) => Number.isFinite(value));
+  if (nums.length === 0) return null;
+  return nums.reduce((sum, value) => sum + value, 0) / nums.length;
+};
+
+const round = (value, digits = 4) => (
+  Number.isFinite(value) ? Number(value.toFixed(digits)) : null
+);
+
+const emptyCounts = () => Object.fromEntries(ANSWER_VALUES.map((answer) => [answer, 0]));
+
+const validCount = (summary = {}) => ANSWER_VALUES.reduce(
+  (sum, answer) => sum + Number(summary.counts?.[answer] || 0),
+  0
+);
+
+const answerFromMeanScore = (score) => {
+  if (!Number.isFinite(score)) return null;
+  if (score > 0.25) return 'Agree';
+  if (score < -0.25) return 'Disagree';
+  return 'Unsure';
+};
+
+const entropy = (counts = {}) => {
+  const total = ANSWER_VALUES.reduce((sum, answer) => sum + Number(counts[answer] || 0), 0);
+  if (!total) return null;
+  const raw = ANSWER_VALUES.reduce((sum, answer) => {
+    const probability = Number(counts[answer] || 0) / total;
+    return probability > 0 ? sum - probability * Math.log2(probability) : sum;
+  }, 0);
+  return round(raw / Math.log2(ANSWER_VALUES.length));
+};
+
+const groupBy = (items, getKey) => {
+  const map = new Map();
+  items.forEach((item) => {
+    const key = getKey(item);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(item);
+  });
+  return map;
+};
+
+const summarizeRuns = (runs) => {
+  const counts = emptyCounts();
+  let invalid = 0;
+  const scores = [];
+  runs.forEach((run) => {
+    if (run.normalizedAnswer && counts[run.normalizedAnswer] !== undefined) {
+      counts[run.normalizedAnswer] += 1;
+      scores.push(ANSWER_SCORE[run.normalizedAnswer]);
+    } else {
+      invalid += 1;
+    }
+  });
+  return {
+    counts,
+    invalid,
+    total: runs.length,
+    valid: scores.length,
+    meanScore: round(mean(scores)),
+    uncertaintyRate: runs.length ? round(counts.Unsure / runs.length) : null,
+    invalidRate: runs.length ? round(invalid / runs.length) : null,
+    responseEntropy: entropy(counts),
+  };
+};
+
+const summarizePolarity = (runs) => {
+  const canonical = summarizeRuns(runs.filter((run) => run.polarity === 'canonical'));
+  const reversed = summarizeRuns(runs.filter((run) => run.polarity === 'reversed'));
+  const delta = (
+    canonical.meanScore !== null && reversed.meanScore !== null
+      ? Math.abs(canonical.meanScore - reversed.meanScore)
+      : null
+  );
+  return {
+    canonical,
+    reversedNormalized: reversed,
+    meanDelta: round(delta),
+    consistencyScore: delta === null ? null : round(1 - Math.min(1, delta / 2)),
+  };
+};
+
+const summarizeModelQuestionRuns = (runs) => ({
+  ...summarizeRuns(runs),
+  polarity: summarizePolarity(runs),
+});
+
+const summarizeCellForm = (cells, formKey) => {
+  const counts = emptyCounts();
+  const values = [];
+  let invalid = 0;
+  cells.forEach((cell) => {
+    const score = cell?.polarity?.[formKey]?.meanScore;
+    const answer = answerFromMeanScore(score);
+    if (!answer) {
+      invalid += 1;
+      return;
+    }
+    counts[answer] += 1;
+    values.push(score);
+  });
+  return {
+    counts,
+    invalid,
+    total: cells.length,
+    valid: values.length,
+    meanScore: round(mean(values)),
+    uncertaintyRate: cells.length ? round(counts.Unsure / cells.length) : null,
+    invalidRate: cells.length ? round(invalid / cells.length) : null,
+    responseEntropy: entropy(counts),
+  };
+};
+
+const summarizeCells = (cells, rawRuns) => {
+  const counts = emptyCounts();
+  const values = [];
+  let invalid = 0;
+  cells.forEach((cell) => {
+    const answer = answerFromMeanScore(cell?.meanScore);
+    if (!answer) {
+      invalid += 1;
+      return;
+    }
+    counts[answer] += 1;
+    values.push(cell.meanScore);
+  });
+  const consistencyValues = cells
+    .map((cell) => cell?.polarity?.consistencyScore)
+    .filter(Number.isFinite);
+  return {
+    counts,
+    invalid,
+    total: cells.length,
+    valid: values.length,
+    meanScore: round(mean(values)),
+    uncertaintyRate: cells.length ? round(counts.Unsure / cells.length) : null,
+    invalidRate: cells.length ? round(invalid / cells.length) : null,
+    responseEntropy: entropy(counts),
+    runSummary: summarizeRuns(rawRuns),
+    polarity: {
+      canonical: summarizeCellForm(cells, 'canonical'),
+      reversedNormalized: summarizeCellForm(cells, 'reversedNormalized'),
+      meanDelta: round(mean(cells.map((cell) => cell?.polarity?.meanDelta))),
+      consistencyScore: round(mean(consistencyValues)),
+    },
+  };
+};
+
+const distribution = (summary = {}) => {
+  const total = validCount(summary);
+  if (!total) return null;
+  return ANSWER_VALUES.map((answer) => Number(summary.counts?.[answer] || 0) / total);
+};
+
+const klDivergence = (left, right) => left.reduce((sum, probability, index) => (
+  probability > 0 ? sum + probability * Math.log2(probability / right[index]) : sum
+), 0);
+
+const distributionSimilarity = (leftSummary, rightSummary) => {
+  const left = distribution(leftSummary);
+  const right = distribution(rightSummary);
+  if (!left || !right) return null;
+  const midpoint = left.map((value, index) => (value + right[index]) / 2);
+  const divergence = (klDivergence(left, midpoint) + klDivergence(right, midpoint)) / 2;
+  return round(1 - Math.sqrt(Math.max(0, Math.min(1, divergence))));
+};
+
+const buildCoverage = ({
+  questionBank,
+  modelRoster,
+  runs,
+  byModelQuestion,
+  expectedRepeats,
+  minimumSimilarityOverlap,
+  repeatConfigurationValid,
+  bankValidated,
+}) => {
+  const questionCount = questionBank.questions?.length || 0;
+  const expectedRunsPerModel = questionCount * 2 * expectedRepeats;
+  return Object.fromEntries((modelRoster.models || []).map((model) => {
+    const modelRuns = runs.filter((run) => run.modelId === model.id);
+    const cells = questionBank.questions.map((question) => byModelQuestion[model.id]?.[question.id]);
+    const answeredQuestions = cells.filter((cell) => Number.isFinite(cell?.meanScore)).length;
+    const pairedQuestions = cells.filter((cell) => (
+      validCount(cell?.polarity?.canonical) > 0 && validCount(cell?.polarity?.reversedNormalized) > 0
+    )).length;
+    const completeQuestions = cells.filter((cell) => (
+      Number(cell?.polarity?.canonical?.total || 0) >= expectedRepeats
+      && Number(cell?.polarity?.reversedNormalized?.total || 0) >= expectedRepeats
+    )).length;
+    const validRuns = modelRuns.filter((run) => ANSWER_VALUES.includes(run.normalizedAnswer)).length;
+    const coverageRate = questionCount ? answeredQuestions / questionCount : 0;
+    const pairedCoverageRate = questionCount ? pairedQuestions / questionCount : 0;
+    const completionRate = questionCount ? completeQuestions / questionCount : 0;
+    const validRate = modelRuns.length ? validRuns / modelRuns.length : 0;
+    const fixtureProvider = model.provider === 'mock'
+      || modelRuns.some((run) => run.provider === 'mock')
+      || /(^|[-_])stub($|[-_])/i.test(model.id);
+    const eligibleForRelease = (
+      coverageRate >= 0.95
+      && pairedCoverageRate >= 0.95
+      && completionRate >= 0.95
+      && validRate >= 0.8
+      && repeatConfigurationValid
+      && bankValidated
+      && !fixtureProvider
+    );
+    return [model.id, {
+      questionCount,
+      answeredQuestions,
+      pairedQuestions,
+      completeQuestions,
+      expectedRuns: expectedRunsPerModel,
+      actualRuns: modelRuns.length,
+      validRuns,
+      coverageRate: round(coverageRate),
+      pairedCoverageRate: round(pairedCoverageRate),
+      completionRate: round(completionRate),
+      validRate: round(validRate),
+      fixtureProvider,
+      eligibleForSimilarity: answeredQuestions >= minimumSimilarityOverlap,
+      eligibleForRelease,
+    }];
+  }));
+};
+
+const buildSimilarity = ({ questionBank, modelRoster, byModelQuestion, coverage, minimumSimilarityOverlap }) => {
+  const models = modelRoster.models || [];
+  const similarityMatrix = {};
+  const similarityDetails = {};
+  const similarityEdges = [];
+  models.forEach((left) => {
+    similarityMatrix[left.id] = {};
+    similarityDetails[left.id] = {};
+    models.forEach((right) => {
+      if (left.id === right.id) {
+        similarityMatrix[left.id][right.id] = 1;
+        similarityDetails[left.id][right.id] = {
+          similarity: 1,
+          questionsCompared: coverage[left.id]?.answeredQuestions || 0,
+          sufficientOverlap: Boolean(coverage[left.id]?.eligibleForSimilarity),
+        };
+        return;
+      }
+      const similarities = (questionBank.questions || [])
+        .map((question) => distributionSimilarity(
+          byModelQuestion[left.id]?.[question.id],
+          byModelQuestion[right.id]?.[question.id]
+        ))
+        .filter(Number.isFinite);
+      const questionsCompared = similarities.length;
+      const sufficientOverlap = questionsCompared >= minimumSimilarityOverlap;
+      const similarity = sufficientOverlap ? round(mean(similarities)) : null;
+      const detail = {
+        similarity,
+        questionsCompared,
+        requiredQuestions: minimumSimilarityOverlap,
+        overlapRate: questionBank.questions?.length
+          ? round(questionsCompared / questionBank.questions.length)
+          : 0,
+        sufficientOverlap,
+      };
+      similarityMatrix[left.id][right.id] = similarity;
+      similarityDetails[left.id][right.id] = detail;
+      if (left.id < right.id) {
+        similarityEdges.push({
+          source: left.id,
+          target: right.id,
+          ...detail,
+          difference: similarity === null ? null : round(1 - similarity),
+        });
+      }
+    });
+  });
+  return { similarityMatrix, similarityDetails, similarityEdges };
+};
+
+const buildOpinionGroups = (models, similarityMatrix, coverage, threshold = 0.72) => {
+  const eligibleIds = models
+    .map((model) => model.id)
+    .filter((id) => coverage[id]?.eligibleForSimilarity);
+  const unvisited = new Set(eligibleIds);
+  const groupById = {};
+  let groupIndex = 0;
+  while (unvisited.size) {
+    const [seed] = [...unvisited].sort();
+    const queue = [seed];
+    unvisited.delete(seed);
+    while (queue.length) {
+      const current = queue.shift();
+      groupById[current] = groupIndex;
+      [...unvisited].forEach((candidate) => {
+        if (Number(similarityMatrix[current]?.[candidate]) >= threshold) {
+          unvisited.delete(candidate);
+          queue.push(candidate);
+        }
+      });
+    }
+    groupIndex += 1;
+  }
+  return groupById;
+};
+
+const buildQuestionTopicAtlas = (questionBank, byQuestion) => {
+  const topicMap = new Map();
+  questionBank.questions.forEach((question) => {
+    const topic = question.topic || 'uncategorized';
+    if (!topicMap.has(topic)) {
+      topicMap.set(topic, { id: topic, label: topic, questionIds: [], meanScores: [] });
+    }
+    const row = topicMap.get(topic);
+    row.questionIds.push(question.id);
+    const summary = byQuestion[question.id];
+    if (Number.isFinite(summary?.meanScore)) row.meanScores.push(summary.meanScore);
+  });
+  return {
+    generatedBy: 'deterministic-topic-rollup',
+    note: 'AI-generated debate atlas nodes can replace or enrich these topic circles after runs.',
+    topicCircles: Array.from(topicMap.values()).map((topic) => ({
+      id: topic.id,
+      label: topic.label,
+      questionCount: topic.questionIds.length,
+      questionIds: topic.questionIds,
+      averageStance: round(mean(topic.meanScores)),
+    })),
+  };
+};
+
+const buildRiskMatrixInputs = (questionBank, byQuestion) => {
+  const facetMap = new Map();
+  (questionBank.questions || []).forEach((question) => {
+    const facets = Array.isArray(question.riskFacets) && question.riskFacets.length
+      ? question.riskFacets
+      : ['uncategorized'];
+    facets.forEach((facet) => {
+      if (!facetMap.has(facet)) {
+        facetMap.set(facet, { id: facet, label: facet, questionIds: [], meanScores: [] });
+      }
+      const row = facetMap.get(facet);
+      row.questionIds.push(question.id);
+      const summary = byQuestion[question.id];
+      if (Number.isFinite(summary?.meanScore)) row.meanScores.push(summary.meanScore);
+    });
+  });
+  return {
+    generatedBy: 'deterministic-risk-facet-rollup',
+    note: 'Question facets only. Risk/opportunity interactions require an explicitly generated analysis overlay.',
+    facets: Array.from(facetMap.values()).map((facet) => ({
+      id: facet.id,
+      label: facet.label,
+      questionCount: facet.questionIds.length,
+      questionIds: facet.questionIds,
+      averageStance: round(mean(facet.meanScores)),
+    })),
+  };
+};
+
+export const buildResultsReport = ({ questionBank, modelRoster, runsFile }) => {
+  const runs = runsFile.runs || [];
+  const models = modelRoster.models || [];
+  const questions = questionBank.questions || [];
+  const byModelQuestion = {};
+
+  for (const [key, groupedRuns] of groupBy(runs, (run) => `${run.modelId}\u0000${run.questionId}`)) {
+    const [modelId, questionId] = key.split('\u0000');
+    if (!byModelQuestion[modelId]) byModelQuestion[modelId] = {};
+    byModelQuestion[modelId][questionId] = summarizeModelQuestionRuns(groupedRuns);
+  }
+
+  const byModel = {};
+  models.forEach((model) => {
+    const cells = questions.map((question) => byModelQuestion[model.id]?.[question.id]);
+    byModel[model.id] = summarizeCells(cells, runs.filter((run) => run.modelId === model.id));
+  });
+
+  const byQuestion = {};
+  questions.forEach((question) => {
+    const cells = models.map((model) => byModelQuestion[model.id]?.[question.id]);
+    byQuestion[question.id] = summarizeCells(cells, runs.filter((run) => run.questionId === question.id));
+  });
+
+  const expectedRepeats = Number(questionBank.runPlan?.repeatsPerPolarity || 10);
+  const declaredRepeatValues = [
+    runsFile.repeats,
+    ...(Array.isArray(runsFile.repeatValues) ? runsFile.repeatValues : []),
+    runsFile.manifest?.repeats,
+    ...(Array.isArray(runsFile.sourceManifests)
+      ? runsFile.sourceManifests.map((manifest) => manifest?.repeats)
+      : []),
+  ]
+    .filter((value) => value !== undefined && value !== null && value !== '')
+    .map(Number);
+  const repeatConfigurationValid = declaredRepeatValues.length > 0
+    && declaredRepeatValues.every((value) => Number.isInteger(value) && value === expectedRepeats);
+  const bankReleaseStatus = questionBank.releaseStatus || 'unvalidated';
+  const bankValidated = bankReleaseStatus === 'validated';
+  const minimumSimilarityOverlap = Math.max(1, Math.ceil(questions.length * 0.5));
+  const coverage = buildCoverage({
+    questionBank,
+    modelRoster,
+    runs,
+    byModelQuestion,
+    expectedRepeats,
+    minimumSimilarityOverlap,
+    repeatConfigurationValid,
+    bankValidated,
+  });
+  const similarity = buildSimilarity({
+    questionBank,
+    modelRoster,
+    byModelQuestion,
+    coverage,
+    minimumSimilarityOverlap,
+  });
+  const opinionGroups = buildOpinionGroups(models, similarity.similarityMatrix, coverage);
+
+  const breakdown = {};
+  models.forEach((model) => {
+    Object.entries(model.traits || {}).forEach(([trait, value]) => {
+      if (!breakdown[trait]) breakdown[trait] = {};
+      const key = String(value || 'unknown');
+      if (!breakdown[trait][key]) breakdown[trait][key] = [];
+      breakdown[trait][key].push(model.id);
+    });
+  });
+
+  const integrityWarnings = models.flatMap((model) => {
+    const row = coverage[model.id];
+    if (row.eligibleForRelease) return [];
+    return [`${model.id} is preview-only: coverage=${row.coverageRate}, paired=${row.pairedCoverageRate}, completion=${row.completionRate}, valid=${row.validRate}${row.fixtureProvider ? ', fixture provider' : ''}`];
+  });
+  if (!repeatConfigurationValid) {
+    integrityWarnings.unshift(`run artifacts declare repeats [${declaredRepeatValues.join(', ') || 'missing'}], but the question bank requires ${expectedRepeats} per polarity`);
+  }
+  if (!bankValidated) {
+    integrityWarnings.unshift(`question bank release status is ${bankReleaseStatus}; only validated banks can produce release-ready reports`);
+  }
+  const releaseReady = models.length >= 2 && models.every((model) => coverage[model.id]?.eligibleForRelease);
+
+  return {
+    schemaVersion: 2,
+    kind: 'ai_discourse_bench_report',
+    benchmarkId: questionBank.benchmarkId,
+    title: questionBank.title || 'AI Discourse Benchmark',
+    generatedAt: new Date().toISOString(),
+    mode: runsFile.mode || 'self',
+    personaId: runsFile.personaId || null,
+    personaProfile: runsFile.manifest?.personaProfile || runsFile.sourceManifests?.find((entry) => entry?.personaProfile)?.personaProfile || null,
+    status: releaseReady ? 'release-ready' : 'preview',
+    integrity: {
+      releaseReady,
+      expectedRepeatsPerPolarity: expectedRepeats,
+      declaredRepeatValues,
+      repeatConfigurationValid,
+      bankReleaseStatus,
+      bankValidated,
+      minimumSimilarityOverlap,
+      sourceBenchmarkIds: runsFile.sourceBenchmarkIds || [runsFile.benchmarkId].filter(Boolean),
+      coverageByModel: coverage,
+      warnings: integrityWarnings,
+    },
+    counts: {
+      questions: questions.length,
+      models: models.length,
+      eligibleModels: models.filter((model) => coverage[model.id]?.eligibleForRelease).length,
+      runs: runs.length,
+    },
+    questions: questions.map((question) => ({
+      id: question.id,
+      prompt: question.canonicalPrompt,
+      reversedPrompt: question.reversedPrompt,
+      topic: question.topic || 'uncategorized',
+      subtopics: question.subtopics || [],
+      disagreementAxis: question.disagreementAxis || '',
+      agreeMeans: question.agreeMeans || '',
+      sourceAnchors: question.sourceAnchors || [],
+      agentVillageAnchors: question.agentVillageAnchors || [],
+      riskFacets: question.riskFacets || [],
+      whyIncluded: question.whyIncluded || '',
+    })),
+    participants: models.map((model) => ({
+      id: model.id,
+      label: model.label,
+      model: model.model,
+      provider: model.provider,
+      traits: model.traits || {},
+      summary: byModel[model.id],
+      coverage: coverage[model.id],
+      opinionGroup: opinionGroups[model.id] ?? null,
+    })),
+    polisReport: {
+      aggregationUnit: 'model-participant',
+      repeatedRunsAreNestedObservations: true,
+      byModel,
+      byQuestion,
+      byModelQuestion,
+      ...similarity,
+    },
+    participantGraph: {
+      method: 'distributional-distance-mds',
+      opinionGroupMethod: 'similarity-connected-components',
+      opinionGroupThreshold: 0.72,
+      nodes: models.map((model) => ({
+        id: model.id,
+        label: model.label,
+        traits: model.traits || {},
+        coverage: coverage[model.id],
+        opinionGroup: opinionGroups[model.id] ?? null,
+      })),
+      edges: similarity.similarityEdges,
+    },
+    breakdown,
+    debateAtlas: buildQuestionTopicAtlas(questionBank, byQuestion),
+    riskMatrix: buildRiskMatrixInputs(questionBank, byQuestion),
+    rawMaterial: {
+      runManifest: runsFile.manifest || null,
+      sourceManifests: runsFile.sourceManifests || [],
+      debateAtlasInputs: questions.map((question) => ({
+        questionId: question.id,
+        topic: question.topic || 'uncategorized',
+        subtopics: question.subtopics || [],
+        disagreementAxis: question.disagreementAxis || '',
+        sourceAnchors: question.sourceAnchors || [],
+        agentVillageAnchors: question.agentVillageAnchors || [],
+      })),
+      riskMatrixInputs: questions.map((question) => ({
+        questionId: question.id,
+        riskFacets: question.riskFacets || [],
+        topic: question.topic || 'uncategorized',
+        sourceAnchors: question.sourceAnchors || [],
+      })),
+    },
+  };
+};

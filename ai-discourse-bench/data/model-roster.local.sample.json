@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "models": [
+    {
+      "id": "local-llama-8b",
+      "label": "Local Llama 8B",
+      "model": "llama3.1:8b",
+      "provider": "local",
+      "temperature": 0.2,
+      "maxTokens": 220,
+      "traits": {
+        "parameterClass": "8B",
+        "ossStatus": "open-weights",
+        "countryOfOrigin": "US",
+        "providerClass": "local"
+      }
+    },
+    {
+      "id": "local-qwen-14b",
+      "label": "Local Qwen 14B",
+      "model": "qwen2.5:14b",
+      "provider": "local",
+      "temperature": 0.2,
+      "maxTokens": 220,
+      "traits": {
+        "parameterClass": "14B",
+        "ossStatus": "open-weights",
+        "countryOfOrigin": "China",
+        "providerClass": "local"
+      }
+    }
+  ]
+}
