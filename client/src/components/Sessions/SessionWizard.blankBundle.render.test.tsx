@@ -200,17 +200,13 @@ const mockedBuildContractViewerContracts = buildContractViewerContracts as jest.
 
 const commitSessionModeProfileGateIfPresent = () => {
   if (screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)) return;
-  let continueButton = screen.queryByTestId('ce-new-preset-continue') as HTMLButtonElement | null;
-  if (!continueButton) return;
-  if (continueButton.disabled) {
-    const preset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
-    if (preset) {
-      act(() => {
-        fireEvent.click(preset);
-      });
-    }
+  const preset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
+  if (preset) {
+    act(() => {
+      fireEvent.click(preset);
+    });
   }
-  continueButton = screen.queryByTestId('ce-new-preset-continue') as HTMLButtonElement | null;
+  const continueButton = screen.queryByTestId('ce-new-preset-continue') as HTMLButtonElement | null;
   if (continueButton && !continueButton.disabled) {
     act(() => {
       fireEvent.click(continueButton);

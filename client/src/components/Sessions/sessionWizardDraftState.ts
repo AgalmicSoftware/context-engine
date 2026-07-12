@@ -90,10 +90,9 @@ const buildCachedDraftSessionModeProfile = (draft: AnyRecord): SessionModeProfil
         ...profile.storage,
         backend: 'cloudflare',
       },
-      encryption: {
-        ...profile.encryption,
-        mode: 'lit',
-      },
+      // Keep mode-specific metadata aligned: a Lit migration must not retain
+      // the Cloudflare preset worker-secret key provider.
+      encryption: { mode: 'lit' },
     };
     return nextProfile;
   }

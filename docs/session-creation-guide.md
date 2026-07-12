@@ -158,27 +158,28 @@ The same wallet is used for:
 
 Open `/new`. The app canonicalizes that route to `/session/new`, but `/new` is the intended entry point.
 
-The first screen is the session-mode choice. Nothing is preselected, and
-Continue stays disabled until the creator chooses a preset. The four-stage
-setup stays hidden until Continue, then opens with fields prefilled from the
-chosen mode:
+The first screen is the session-mode choice. Nothing is preselected. Choosing
+a preset immediately opens the four-stage setup with fields prefilled from the
+chosen mode; there is no separate Continue action on this entry screen:
 
 - `Fast & Cheap (Cloudflare)` compiles to a Cloudflare-backed,
-  worker-canonical session shape. Its card lists the Cloudflare API token,
-  AI provider key, Arweave JWK, RPC URL/key, and optional Lit key needed
-  for Lit encryption.
+  worker-canonical session shape with Cloudflare-internal worker encryption
+  enabled by default. Its card lists the Cloudflare API token, AI provider
+  key, Arweave JWK, RPC URL/key, and optional Lit key needed when switching
+  the encryption mode to Lit.
 - `Trustless & Public (Decentralized)` compiles to the public Arweave +
   EVM-registry session shape. Its card lists the Arweave wallet/JWK, RPC
   URL/key, AI provider key, and optional Lit key needed when encryption is
   enabled.
 
-After Continue, the selected profile remains visible above the setup stages so
-Advanced per-axis changes, such as enabling the Telegram surface or changing
-storage/authority/encryption independently, flip the profile to `custom`. New
-session publishes write the `sessionModeProfile` profile as the source of truth
-and compile it down to the existing storage profile / payload-access fields for
-runtime compatibility. Legacy `telegramOnly` fields are read only as a migration
-fallback and are not written by new sessions.
+After selection, the profile remains visible above the setup stages. Advanced
+options let creators switch Cloudflare sessions between Cloudflare-internal and
+Lit encryption, or change storage, authority, and other axes independently;
+those edits flip the profile to `custom`. New session publishes write the
+`sessionModeProfile` profile as the source of truth and compile it down to the
+existing storage profile / payload-access fields for runtime compatibility.
+Legacy `telegramOnly` fields are read only as a migration fallback and are not
+written by new sessions.
 
 The normal-mode wizard is effectively four stages:
 

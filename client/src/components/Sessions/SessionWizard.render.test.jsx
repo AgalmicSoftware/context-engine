@@ -859,7 +859,7 @@ describe('SessionWizard rendered validation', () => {
   });
 
   it.each(['/new', '/session/new'])(
-    'shows only session mode on %s until Continue reveals the prefilled setup',
+    'shows only session mode on %s until a preset reveals the prefilled setup',
     async (pathname) => {
       localStorage.setItem(
         'ce:sessionWizardDraft:v1',
@@ -873,7 +873,7 @@ describe('SessionWizard rendered validation', () => {
       window.history.replaceState({}, '', pathname);
       renderSessionWizard();
 
-      expect(screen.getByTestId('ce-new-preset-continue')).toBeDisabled();
+      expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
       expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
       expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute(
         'aria-checked',
@@ -888,16 +888,12 @@ describe('SessionWizard rendered validation', () => {
       expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
 
       fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
-      expect(screen.getByTestId('ce-new-preset-continue')).not.toBeDisabled();
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
+      expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
       expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute(
         'aria-checked',
         'true',
       );
-      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
-
-      fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
-      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
-      expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /advanced options/i })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();

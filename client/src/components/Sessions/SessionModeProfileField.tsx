@@ -32,7 +32,8 @@ const PRESET_CARDS = [
     id: SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
     title: 'Fast & Cheap (Cloudflare)',
     badge: 'Recommended',
-    copy: 'Hosted on Cloudflare. Session-scoped by default. Not permanent. Can be publicly anchored later.',
+    copy:
+      'Hosted on Cloudflare with worker-managed encryption by default. Session-scoped, not permanent, and optionally anchored later.',
     keys: ['Cloudflare API token', 'AI provider key', 'Arweave JWK', 'RPC URL/key', 'Lit key only for Lit encryption'],
   },
   {
@@ -138,6 +139,7 @@ const SessionModeProfileField = ({
       if (!confirmed) return;
     }
     commitProfile(nextProfile);
+    if (entryOnly && typeof onContinue === 'function') onContinue();
   };
 
   const updateProfile = (mutate: (draft: SessionModeProfile) => void) => {
@@ -167,7 +169,7 @@ const SessionModeProfileField = ({
             <span className={styles.modeProfileChip}>Custom</span>
           ) : null}
         </div>
-        {showContinue ? (
+        {showContinue && !entryOnly ? (
           <Button
             type="button"
             color="primary"
@@ -270,7 +272,7 @@ const SessionModeProfileField = ({
                     { value: 'lit', label: 'Lit', disabled: !!litDisabledReason, title: litDisabledReason },
                     {
                       value: 'worker_envelope',
-                      label: 'Worker envelope',
+                      label: 'Cloudflare internal',
                       disabled: !!workerEnvelopeDisabledReason,
                       title: workerEnvelopeDisabledReason,
                     },
