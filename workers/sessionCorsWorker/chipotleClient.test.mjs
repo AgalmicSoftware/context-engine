@@ -144,6 +144,116 @@ test('normalizeLitChipotleApiBase trims trailing slashes and core prefix', () =>
   );
 });
 
+test('normalizeLitChipotleApiBase rejects unsafe API bases', () => {
+  const rejectedBases = [
+    'https://attacker.example',
+    'http://api.chipotle.litprotocol.com',
+    'https://api.chipotle.litprotocol.com.evil.example',
+    'https://127.0.0.1:8787',
+    'https://10.0.0.5',
+    'https://169.254.169.254',
+    'https://[fd00::1]',
+    'https://api.chipotle.litprotocol.com:8443',
+    'https://api.chipotle.litprotocol.com/other',
+    'https://api.chipotle.litprotocol.com/core/v1/extra',
+    'https://api.chipotle.litprotocol.com/core/v1?debug=1',
+    'not a url',
+  ];
+
+  for (const apiBase of rejectedBases) {
+    assert.throws(
+      () => normalizeLitChipotleApiBase(apiBase),
+      /Lit Chipotle API base URL/,
+      apiBase,
+    );
+  }
+});
+
+test('normalizeLitChipotleApiBase rejects embedded URL credentials', () => {
+  const credentialedApiBase = new URL('https://api.chipotle.litprotocol.com');
+  credentialedApiBase.username = 'user';
+  credentialedApiBase.password = 'pass';
+
+  assert.throws(
+    () => normalizeLitChipotleApiBase(credentialedApiBase.toString()),
+    (error) => {
+      assert.equal(error.message, 'Lit Chipotle API base URL must not include credentials.');
+      return true;
+    },
+  );
+});
+
+test('normalizeLitChipotleApiBase allows only explicit localhost test bases', () => {
+  assert.equal(
+    normalizeLitChipotleApiBase('http://localhost:8787/core/v1/', { allowLocalApiBase: true }),
+    'http://localhost:8787',
+  );
+  assert.equal(
+    normalizeLitChipotleApiBase('http://127.0.0.2:8787', { allowLocalApiBase: true }),
+    'http://127.0.0.2:8787',
+  );
+  assert.throws(
+    () => normalizeLitChipotleApiBase('http://192.168.1.5:8787', { allowLocalApiBase: true }),
+    /Lit Chipotle API base URL/,
+  );
+  assert.equal(
+    isLitChipotleLocalApiBaseAllowed({ LIT_CHIPOTLE_ALLOW_LOCAL_API_BASE: 'true' }),
+    true,
+  );
+});
+
+test('fetchChipotleJson validates the final URL before credentials are attached', async () => {
+  let fetchCalled = false;
+
+  await assert.rejects(
+    fetchChipotleJson({
+      apiBase: 'https://attacker.example',
+      apiKey: 'lit-secret',
+      path: '/billing/balance',
+      body: { leak: true },
+      fetchImpl: async () => {
+        fetchCalled = true;
+        return jsonResponse({ ok: true });
+      },
+    }),
+    /host is not approved/,
+  );
+
+  assert.equal(fetchCalled, false);
+});
+
+test('fetchChipotleJson builds approved Chipotle URLs and rejects path escapes', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    return jsonResponse({ ok: true });
+  };
+
+  const result = await fetchChipotleJson({
+    apiBase: ' https://api.chipotle.litprotocol.com/core/v1/ ',
+    apiKey: 'lit-secret',
+    path: '/billing/balance',
+    fetchImpl,
+  });
+
+  assert.deepEqual(result, { ok: true });
+  assert.equal(calls[0][0], 'https://api.chipotle.litprotocol.com/core/v1/billing/balance');
+  assert.equal(calls[0][1].headers['X-Api-Key'], 'lit-secret');
+  assert.equal(calls[0][1].headers.Authorization, 'Bearer lit-secret');
+  assert.equal(calls[0][1].redirect, 'error');
+
+  await assert.rejects(
+    fetchChipotleJson({
+      apiBase: 'https://api.chipotle.litprotocol.com',
+      apiKey: 'lit-secret',
+      path: '../new_account',
+      fetchImpl,
+    }),
+    /request path/,
+  );
+  assert.equal(calls.length, 1);
+});
+
 test('default Chipotle action lets a non-holder encrypt for an SBT gate', async () => {
   const policy = makePolicy();
   const plaintext = makeWrappedPlaintext(policy, `0x${'44'.repeat(32)}`);
