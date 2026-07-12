@@ -5,6 +5,7 @@ const DEFAULT_RP_NAME = 'Context Engine';
 const DEFAULT_TTL_SECONDS = 900;
 const DEFAULT_WALLET_KEY_MODE = 'passkey-derived';
 const DEFAULT_DERIVATION_NAMESPACE = 'context-engine';
+type PasskeyWalletRuntimeLocation = { origin?: string; hostname?: string };
 const PREVIEW_HOST_PATTERNS = [
   /\.vercel\.app$/i,
   /\.netlify\.app$/i,
@@ -70,6 +71,16 @@ const isLocalHost = (host: string): boolean =>
 
 const isPreviewHost = (host: string): boolean => PREVIEW_HOST_PATTERNS.some((pattern) => pattern.test(host));
 
+const resolvePasskeyWalletRpId = (configuredRpId: unknown, browserHostname: unknown): string => {
+  const configured = normalizeHostname(configuredRpId);
+  if (configured) return configured;
+
+  const browserHost = normalizeHostname(browserHostname);
+  // The current browser host is deployment-controlled and is the natural WebAuthn RP ID default.
+  // Loopback aliases share localhost so local sessions remain stable across localhost and 127.0.0.1.
+  return isLocalHost(browserHost) ? 'localhost' : browserHost;
+};
+
 const originHost = (origin: string): string => {
   try {
     return normalizeHostname(new URL(origin).hostname);
@@ -118,11 +129,11 @@ export const validatePasskeyWalletConfig = (config: PasskeyWalletConfig): Passke
   return { ...config, rpId, derivationNamespace };
 };
 
-export const getPasskeyWalletConfig = (): PasskeyWalletConfig => {
-  const windowOrigin = getWindowOrigin();
-  const windowHost = normalizeHostname(getWindowHostname());
+export const getPasskeyWalletConfig = (runtimeLocation?: PasskeyWalletRuntimeLocation): PasskeyWalletConfig => {
+  const windowOrigin = runtimeLocation?.origin ?? getWindowOrigin();
+  const windowHost = normalizeHostname(runtimeLocation?.hostname ?? getWindowHostname());
   const configuredRpId = readDualEnv('NEXT_PUBLIC_RP_ID', 'REACT_APP_NEXT_PUBLIC_RP_ID', '');
-  const rpId = configuredRpId || (isLocalHost(windowHost) ? 'localhost' : '');
+  const rpId = resolvePasskeyWalletRpId(configuredRpId, windowHost);
   const appOrigin = readDualEnv('NEXT_PUBLIC_APP_ORIGIN', 'REACT_APP_NEXT_PUBLIC_APP_ORIGIN', windowOrigin);
   const accountOrigin = readDualEnv('NEXT_PUBLIC_ACCOUNT_ORIGIN', 'REACT_APP_NEXT_PUBLIC_ACCOUNT_ORIGIN', appOrigin);
   const ttlSeconds = readDualIntEnv(

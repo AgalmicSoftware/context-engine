@@ -1,4 +1,4 @@
-import { isRpIdAllowedForOrigin, validatePasskeyWalletConfig } from './config.js';
+import { getPasskeyWalletConfig, isRpIdAllowedForOrigin, validatePasskeyWalletConfig } from './config.js';
 import type { PasskeyWalletConfig } from './types.js';
 
 const baseConfig = (overrides: Partial<PasskeyWalletConfig> = {}): PasskeyWalletConfig => ({
@@ -33,6 +33,21 @@ describe('passkey wallet config', () => {
           accountOrigin: 'http://localhost:3000',
         }),
       ).rpId,
+    ).toBe('localhost');
+  });
+
+  it('defaults the RP ID to the browser deployment host when env configuration is absent', () => {
+    expect(
+      getPasskeyWalletConfig({
+        origin: 'https://app.example.com',
+        hostname: 'app.example.com',
+      }).rpId,
+    ).toBe('app.example.com');
+    expect(
+      getPasskeyWalletConfig({
+        origin: 'http://127.0.0.1:3000',
+        hostname: '127.0.0.1',
+      }).rpId,
     ).toBe('localhost');
   });
 
