@@ -8,7 +8,10 @@ import type {
 export type SessionPublishExecutionPlanInput = {
   shouldAutoDeployWorker?: boolean;
   shouldDeployPendingSbts?: boolean;
+  shouldPersistWorkerConfig?: boolean;
   shouldUploadMetadata?: boolean;
+  shouldRegisterSession?: boolean;
+  shouldRefreshRegistryCache?: boolean;
 };
 
 export type SessionPublishDispatch = (action: SessionPublishAction) => void;
@@ -29,8 +32,10 @@ export const buildSessionPublishReducerPlan = (
 ): SessionPublishPlan => ({
   autoDeployWorker: !!publishExecutionPlan.shouldAutoDeployWorker,
   deployPendingSbts: !!publishExecutionPlan.shouldDeployPendingSbts,
+  persistWorkerConfig: !!publishExecutionPlan.shouldPersistWorkerConfig,
   uploadMetadata: !!publishExecutionPlan.shouldUploadMetadata,
-  refreshRegistryCache: true,
+  registerSession: publishExecutionPlan.shouldRegisterSession !== false,
+  refreshRegistryCache: publishExecutionPlan.shouldRefreshRegistryCache !== false,
 });
 
 export const markSessionPublishEffectSucceeded = (

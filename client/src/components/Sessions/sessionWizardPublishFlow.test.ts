@@ -16,6 +16,7 @@ import {
   resolveSessionWizardShouldAutoDeployWorker,
   shouldForceSessionWizardNormalModeManualBundleRetry,
 } from './sessionWizardPublishFlow';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('sessionWizardPublishFlow', () => {
   it('auto-deploys only for sponsored custom-worker flows that are not already deployed', () => {
@@ -79,7 +80,9 @@ describe('sessionWizardPublishFlow', () => {
       shouldAutoDeployWorker: true,
       shouldDeployPendingSbts: true,
       shouldUploadMetadata: true,
+      shouldPersistWorkerConfig: false,
       shouldRegisterSession: true,
+      shouldRefreshRegistryCache: true,
       steps: ['deploy-worker', 'deploy-sbts', 'upload-metadata', 'register-session', 'done'],
       stepNumbers: {
         'deploy-worker': 1,
@@ -104,9 +107,68 @@ describe('sessionWizardPublishFlow', () => {
         shouldAutoDeployWorker: false,
         shouldDeployPendingSbts: false,
         shouldUploadMetadata: false,
+        shouldPersistWorkerConfig: false,
         shouldRegisterSession: true,
+        shouldRefreshRegistryCache: true,
       }),
     );
+  });
+
+  it('persists worker-canonical config without Arweave, registration, or registry refresh effects', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+
+    expect(
+      buildSessionWizardPublishExecutionPlan({
+        workerMode: 'custom',
+        sponsoredAutoDeployReady: false,
+        deployComplete: true,
+        hasPendingDrafts: false,
+        hasManualMetadata: false,
+        canUploadMetadataNow: true,
+        sessionModeProfile,
+      }),
+    ).toEqual({
+      shouldAutoDeployWorker: false,
+      shouldDeployPendingSbts: false,
+      shouldUploadMetadata: false,
+      shouldPersistWorkerConfig: true,
+      shouldRegisterSession: false,
+      shouldRefreshRegistryCache: false,
+      steps: ['persist-worker-config', 'done'],
+      stepNumbers: {
+        'persist-worker-config': 1,
+        done: 2,
+      },
+    });
+  });
+
+  it('preserves decentralized upload, registration, and registry refresh behavior', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+
+    expect(
+      buildSessionWizardPublishExecutionPlan({
+        workerMode: 'default',
+        sponsoredAutoDeployReady: false,
+        deployComplete: false,
+        hasPendingDrafts: false,
+        hasManualMetadata: false,
+        canUploadMetadataNow: true,
+        sessionModeProfile,
+      }),
+    ).toEqual({
+      shouldAutoDeployWorker: false,
+      shouldDeployPendingSbts: false,
+      shouldUploadMetadata: true,
+      shouldPersistWorkerConfig: false,
+      shouldRegisterSession: true,
+      shouldRefreshRegistryCache: true,
+      steps: ['upload-metadata', 'register-session', 'done'],
+      stepNumbers: {
+        'upload-metadata': 1,
+        'register-session': 2,
+        done: 3,
+      },
+    });
   });
 
   it('keeps manual metadata and upload readiness out of the upload side-effect decision', () => {
@@ -742,5 +804,13 @@ describe('sessionWizardPublishFlow', () => {
       ],
       showPublishProgress: false,
     });
+
+    expect(
+      resolveSessionWizardPublishProgressDisplayState({
+        publishBusy: true,
+        publishStep: 1,
+        publishSteps: ['persist-worker-config', 'done'],
+      }).activePublishProgressStepLabel,
+    ).toBe('Verify Worker Config');
   });
 });

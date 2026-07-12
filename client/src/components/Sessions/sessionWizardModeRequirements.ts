@@ -1,0 +1,138 @@
+import type { SessionModeProfile, SessionModeResourceKey } from '../../utilities/session/sessionModeProfile';
+
+const SESSION_WIZARD_REQUIREMENT_IDS = Object.freeze({
+  CLOUDFLARE_API_TOKEN: 'cloudflareApiToken',
+  AI_PROVIDER_KEY: 'aiProviderKey',
+  ARWEAVE_JWK: 'arweaveJwk',
+  RPC: 'rpc',
+  WALLET: 'wallet',
+  FUNDING: 'funding',
+  LIT: 'lit',
+} as const);
+
+type SessionWizardRequirementId = (typeof SESSION_WIZARD_REQUIREMENT_IDS)[keyof typeof SESSION_WIZARD_REQUIREMENT_IDS];
+
+type SessionWizardModeRequirements = {
+  selected: boolean;
+  authorityMode: string;
+  isWorkerCanonical: boolean;
+  presetKeyChips: string[];
+  requiredRequirementIds: SessionWizardRequirementId[];
+  requiredWorkerSecretFields: string[];
+  visibleWorkerResourceKeys: string[];
+  requiresArweave: boolean;
+  requiresRpc: boolean;
+  requiresLit: boolean;
+  requiresFunding: boolean;
+  requiresWallet: boolean;
+  publish: {
+    persistWorkerConfig: boolean;
+    uploadMetadata: boolean;
+    registerSession: boolean;
+    refreshRegistryCache: boolean;
+  };
+};
+
+const emptyRequirements = (): SessionWizardModeRequirements => ({
+  selected: false,
+  authorityMode: '',
+  isWorkerCanonical: false,
+  presetKeyChips: [],
+  requiredRequirementIds: [],
+  requiredWorkerSecretFields: [],
+  visibleWorkerResourceKeys: [],
+  requiresArweave: false,
+  requiresRpc: false,
+  requiresLit: false,
+  requiresFunding: false,
+  requiresWallet: false,
+  publish: {
+    persistWorkerConfig: false,
+    uploadMetadata: false,
+    registerSession: false,
+    refreshRegistryCache: false,
+  },
+});
+
+const hasOnChainCondition = (profile: SessionModeProfile): boolean => {
+  const documents = [profile.encryption?.accessConditions, profile.storage?.payloadAccessControl?.accessConditions];
+  return documents.some(
+    (document) =>
+      Array.isArray(document?.conditions) && document.conditions.some((condition) => condition?.kind === 'sbt_onchain'),
+  );
+};
+
+const hasActiveResource = (profile: SessionModeProfile, resource: SessionModeResourceKey): boolean => {
+  const stage = profile.storage?.resources?.[resource]?.stage;
+  return !stage || stage === 'active';
+};
+
+export const resolveSessionWizardModeRequirements = (
+  profile: SessionModeProfile | null | undefined,
+): SessionWizardModeRequirements => {
+  if (!profile || typeof profile !== 'object') return emptyRequirements();
+
+  const authorityMode = String(profile.authority?.mode || '');
+  const isWorkerCanonical = authorityMode === 'worker_canonical';
+  const usesCloudflare = profile.storage?.backend === 'cloudflare';
+  const requiresArweave = profile.storage?.backend === 'arweave';
+  const requiresLit = profile.encryption?.mode === 'lit';
+  const requiresRegistry = authorityMode === 'evm_registry_canonical';
+  const requiresRpc =
+    requiresRegistry ||
+    authorityMode === 'worker_with_public_anchor' ||
+    requiresLit ||
+    profile.authorization?.mechanisms?.includes('sbt_onchain') ||
+    hasOnChainCondition(profile);
+  const requiresFunding = requiresRegistry;
+  const requiresWallet = requiresRegistry;
+
+  const requiredRequirementIds: SessionWizardRequirementId[] = [];
+  if (usesCloudflare) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_API_TOKEN);
+  requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.AI_PROVIDER_KEY);
+  if (requiresArweave) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.ARWEAVE_JWK);
+  if (requiresRpc) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.RPC);
+  if (requiresWallet) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.WALLET);
+  if (requiresFunding) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.FUNDING);
+  if (requiresLit) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.LIT);
+
+  const requiredWorkerSecretFields = ['openaiKey'];
+  if (requiresArweave) requiredWorkerSecretFields.push('arweaveJwk');
+  if (requiresLit) requiredWorkerSecretFields.push('litAccountApiKey');
+
+  const visibleWorkerResourceKeys = ['ai'];
+  if (requiresArweave && hasActiveResource(profile, 'docsContext')) visibleWorkerResourceKeys.push('arweave');
+  if (requiresRpc) visibleWorkerResourceKeys.push('rpc');
+  if (requiresFunding) visibleWorkerResourceKeys.push('txGas');
+  if (requiresLit) visibleWorkerResourceKeys.push('lit');
+
+  const presetKeyChips = usesCloudflare
+    ? [
+        'Cloudflare API token',
+        'AI provider key',
+        ...(requiresRpc ? ['RPC URL/key'] : []),
+        ...(requiresLit ? ['Lit API key'] : []),
+      ]
+    : ['AI provider key', 'Arweave wallet/JWK', 'RPC URL/key', 'Lit API key if encryption is enabled'];
+
+  return {
+    selected: true,
+    authorityMode,
+    isWorkerCanonical,
+    presetKeyChips,
+    requiredRequirementIds,
+    requiredWorkerSecretFields,
+    visibleWorkerResourceKeys,
+    requiresArweave,
+    requiresRpc,
+    requiresLit,
+    requiresFunding,
+    requiresWallet,
+    publish: {
+      persistWorkerConfig: isWorkerCanonical,
+      uploadMetadata: requiresArweave,
+      registerSession: requiresRegistry,
+      refreshRegistryCache: requiresRegistry,
+    },
+  };
+};

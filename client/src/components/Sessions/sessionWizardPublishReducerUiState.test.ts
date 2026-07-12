@@ -10,9 +10,10 @@ import {
 const stepNumbers = {
   'deploy-worker': 1,
   'deploy-sbts': 2,
-  'upload-metadata': 3,
-  'register-session': 4,
-  done: 5,
+  'persist-worker-config': 3,
+  'upload-metadata': 4,
+  'register-session': 5,
+  done: 6,
 };
 
 const state = (overrides: Partial<SessionPublishState>): SessionPublishState =>
@@ -43,19 +44,24 @@ describe('resolveSessionWizardPublishReducerUiState', () => {
     [
       'uploadingMetadata',
       state({ status: 'uploadingMetadata', currentEffect: 'uploadMetadata' }),
+      { publishBusy: true, publishStep: 4 },
+    ],
+    [
+      'persistingWorkerConfig',
+      state({ status: 'persistingWorkerConfig', currentEffect: 'persistWorkerConfig' }),
       { publishBusy: true, publishStep: 3 },
     ],
     [
       'registerSession',
       state({ status: 'registeringOnChain', currentEffect: 'registerSession' }),
-      { publishBusy: true, publishStep: 4 },
+      { publishBusy: true, publishStep: 5 },
     ],
     [
       'refreshRegistryCache',
       state({ status: 'registeringOnChain', currentEffect: 'refreshRegistryCache' }),
-      { publishBusy: true, publishStep: 4 },
+      { publishBusy: true, publishStep: 5 },
     ],
-    ['published', state({ status: 'published' }), { publishBusy: false, publishStep: 5 }],
+    ['published', state({ status: 'published' }), { publishBusy: false, publishStep: 6 }],
     [
       'failedRecoverable',
       state({

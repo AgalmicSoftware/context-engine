@@ -5,6 +5,7 @@ export type SessionPublishStatus =
   | 'deployingWorker'
   | 'uploadingMetadata'
   | 'deployingPendingSbts'
+  | 'persistingWorkerConfig'
   | 'registeringOnChain'
   | 'published'
   | 'failedRecoverable'
@@ -14,6 +15,7 @@ export type SessionPublishEffect =
   | 'checkRequirements'
   | 'deployWorker'
   | 'deployPendingSbts'
+  | 'persistWorkerConfig'
   | 'uploadMetadata'
   | 'registerSession'
   | 'refreshRegistryCache';
@@ -21,7 +23,9 @@ export type SessionPublishEffect =
 export type SessionPublishPlan = {
   autoDeployWorker?: boolean;
   deployPendingSbts?: boolean;
+  persistWorkerConfig?: boolean;
   uploadMetadata?: boolean;
+  registerSession?: boolean;
   refreshRegistryCache?: boolean;
 };
 
@@ -94,6 +98,7 @@ const EFFECT_STATUSES: Record<SessionPublishEffect, SessionPublishStatus> = {
   checkRequirements: 'checkingRequirements',
   deployWorker: 'deployingWorker',
   deployPendingSbts: 'deployingPendingSbts',
+  persistWorkerConfig: 'persistingWorkerConfig',
   uploadMetadata: 'uploadingMetadata',
   registerSession: 'registeringOnChain',
   refreshRegistryCache: 'registeringOnChain',
@@ -119,8 +124,9 @@ export const buildSessionPublishEffectQueue = (plan: SessionPublishPlan = {}): S
   const queue: SessionPublishEffect[] = ['checkRequirements'];
   if (plan.autoDeployWorker) queue.push('deployWorker');
   if (plan.deployPendingSbts) queue.push('deployPendingSbts');
+  if (plan.persistWorkerConfig) queue.push('persistWorkerConfig');
   if (plan.uploadMetadata) queue.push('uploadMetadata');
-  queue.push('registerSession');
+  if (plan.registerSession !== false) queue.push('registerSession');
   if (plan.refreshRegistryCache) queue.push('refreshRegistryCache');
   return queue;
 };
