@@ -40,6 +40,7 @@
     "test:client": "cd client && CI=1 npm test -- --watchAll=false --runInBand --coverage --coverageReporters=lcov --coverageReporters=json-summary --coverageReporters=text-summary",
     "test:root:jest": "cd client && npm test -- --watchAll=false --runInBand --testMatch '<rootDir>/../tests/root/deployHelper.worker.test.js' '<rootDir>/../tests/root/sessionCorsWorker.admin.test.js' '<rootDir>/../tests/root/sessionCorsWorker.arweave.test.js' '<rootDir>/../tests/root/sessionCorsWorker.auth.test.js' '<rootDir>/../tests/root/sessionCorsWorker.authenticatedActions.test.js' '<rootDir>/../tests/root/sessionCorsWorker.authenticatedRoutes.test.js' '<rootDir>/../tests/root/sessionCorsWorker.gates.test.js' '<rootDir>/../tests/root/sessionCorsWorker.health.test.js'",
     "test:worker:session-cors": "npm --prefix workers/sessionCorsWorker test",
+    "test:worker:agent-bridge": "node scripts/run-agent-bridge-worker-tests.js",
     "test:node": "node scripts/run-node-tests.js",
     "test:node:tracked": "node scripts/run-node-tests.js --tracked-only",
     "client-boundaries:check": "node scripts/check-client-boundaries.mjs",

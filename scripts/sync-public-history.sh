@@ -61,6 +61,19 @@ while IFS= read -r pattern; do
   STRIP_PATTERNS+=("$pattern")
 done < <(ce_public_release_strip_patterns)
 
+AGENT_BRIDGE_PUBLIC_CUTOVER_MARKER="workers/agentBridgeWorker/PUBLIC_RELEASE_CUTOVER"
+AGENT_BRIDGE_PUBLIC_CUTOVER_HEADER="context-engine-agent-bridge-public-cutover-v1"
+AGENT_BRIDGE_PUBLIC_HISTORY_PATHS=(
+  "workers/agentBridgeWorker"
+  "scripts/run-agent-bridge-worker-tests.js"
+)
+AGENT_BRIDGE_PUBLIC_CUTOVER_REQUIRED_PATHS=(
+  "$AGENT_BRIDGE_PUBLIC_CUTOVER_MARKER"
+  "workers/agentBridgeWorker/worker.js"
+  "scripts/run-agent-bridge-worker-tests.js"
+)
+AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT=""
+
 PRIVATE_REPLAY_MESSAGE_TOKENS=(
   "contextEngine-cc"
   "docs/agent-native"
@@ -109,8 +122,29 @@ cleanup() {
 }
 trap cleanup EXIT
 
+is_agent_bridge_public_history_path() {
+  local relative_path="$1"
+
+  case "$relative_path" in
+    workers/agentBridgeWorker|workers/agentBridgeWorker/*|scripts/run-agent-bridge-worker-tests.js)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+agent_bridge_is_public_for_source_commit() {
+  local commit_sha="$1"
+
+  [ -n "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ] &&
+    git -C "$REPO_ROOT" merge-base --is-ancestor "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" "$commit_sha"
+}
+
 path_matches_strip_pattern() {
   local relative_path="$1"
+  local commit_sha="${2:-}"
   local pattern
 
   for pattern in "${STRIP_PATTERNS[@]}"; do
@@ -128,6 +162,12 @@ path_matches_strip_pattern() {
     esac
   done
 
+  if [ -n "$commit_sha" ] && is_agent_bridge_public_history_path "$relative_path"; then
+    if ! agent_bridge_is_public_for_source_commit "$commit_sha"; then
+      return 0
+    fi
+  fi
+
   return 1
 }
 
@@ -137,7 +177,7 @@ commit_is_empty_after_strip() {
 
   while IFS= read -r changed_path; do
     [ -n "$changed_path" ] || continue
-    if ! path_matches_strip_pattern "$changed_path"; then
+    if ! path_matches_strip_pattern "$changed_path" "$commit_sha"; then
       return 1
     fi
   done < <(git -C "$REPO_ROOT" diff-tree --no-commit-id --name-only -r --root "$commit_sha")
@@ -223,7 +263,38 @@ ensure_public_replay_message() {
   fi
 }
 
+apply_agent_bridge_public_history_policy() {
+  local commit_sha="$1"
+  local path
+
+  (
+    cd "$TEMP_CLONE"
+
+    # Always clear the replay checkout first. At the cutover commit this turns
+    # the reviewed source tree into one complete public snapshot instead of
+    # exposing the formerly private file-by-file development history.
+    for path in "${AGENT_BRIDGE_PUBLIC_HISTORY_PATHS[@]}"; do
+      git rm -rf --ignore-unmatch -- "$path" >/dev/null 2>&1 || true
+      rm -rf -- "$path"
+    done
+
+    if agent_bridge_is_public_for_source_commit "$commit_sha"; then
+      for path in "${AGENT_BRIDGE_PUBLIC_HISTORY_PATHS[@]}"; do
+        if git -C "$REPO_ROOT" cat-file -e "${commit_sha}:${path}" 2>/dev/null; then
+          git checkout "$commit_sha" -- "$path"
+        fi
+      done
+
+      if [ ! -f "$AGENT_BRIDGE_PUBLIC_CUTOVER_MARKER" ]; then
+        printf 'Agent Bridge public cutover marker is missing from source commit %s.\n' "$commit_sha" >&2
+        exit 2
+      fi
+    fi
+  )
+}
+
 strip_private_paths_from_clone() {
+  local commit_sha="$1"
   local pattern
   local matches=()
 
@@ -243,6 +314,8 @@ strip_private_paths_from_clone() {
         rm -rf -- "${matches[@]}"
       fi
     done
+
+    apply_agent_bridge_public_history_policy "$commit_sha"
 
     git add -A
   )
@@ -305,13 +378,14 @@ clone_has_no_pending_changes() {
 }
 
 resolve_private_cherry_pick_conflicts() {
+  local commit_sha="$1"
   local path
   local found_conflict=0
 
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     found_conflict=1
-    if ! path_matches_strip_pattern "$path"; then
+    if ! path_matches_strip_pattern "$path" "$commit_sha"; then
       return 1
     fi
   done < <(git -C "$TEMP_CLONE" diff --name-only --diff-filter=U)
@@ -320,7 +394,7 @@ resolve_private_cherry_pick_conflicts() {
     return 1
   fi
 
-  strip_private_paths_from_clone
+  strip_private_paths_from_clone "$commit_sha"
 
   if git -C "$TEMP_CLONE" diff --name-only --diff-filter=U | grep -q .; then
     return 1
@@ -434,6 +508,45 @@ verify_public_text() {
 
   log_info "Verifying retained public text for private references."
   node "$verifier" "$TEMP_CLONE" >&2
+}
+
+verify_agent_bridge_public_replay_pii() {
+  local commit_sha="$1"
+  local verifier="$REPO_ROOT/scripts/verify-public-release-pii.sh"
+  local surface_root="$TMP_ROOT/agent-bridge-public-surface"
+  local scan_status=0
+
+  if ! agent_bridge_is_public_for_source_commit "$commit_sha"; then
+    return 0
+  fi
+
+  if [ ! -f "$verifier" ]; then
+    fail "Agent Bridge replay PII verifier was not found: scripts/verify-public-release-pii.sh" 2
+  fi
+
+  if [ ! -d "$TEMP_CLONE/workers/agentBridgeWorker" ]; then
+    fail "Agent Bridge public subtree is missing after the cutover at source commit $commit_sha." 2
+  fi
+
+  if [ ! -f "$TEMP_CLONE/scripts/run-agent-bridge-worker-tests.js" ]; then
+    fail "Agent Bridge public test runner is missing after the cutover at source commit $commit_sha." 2
+  fi
+
+  rm -rf "$surface_root"
+  mkdir -p "$surface_root/workers" "$surface_root/scripts"
+  cp -R "$TEMP_CLONE/workers/agentBridgeWorker" "$surface_root/workers/agentBridgeWorker"
+  cp \
+    "$TEMP_CLONE/scripts/run-agent-bridge-worker-tests.js" \
+    "$surface_root/scripts/run-agent-bridge-worker-tests.js"
+
+  # This gate runs for every public Agent Bridge source commit, before the
+  # replay commit is created. A credential added and deleted later therefore
+  # never becomes reachable from public history even when the final tip is clean.
+  log_info "Scanning Agent Bridge public replay commit for PII/secrets: $commit_sha"
+  bash "$verifier" "$surface_root" >&2
+  scan_status=$?
+  rm -rf "$surface_root"
+  return "$scan_status"
 }
 
 ensure_public_node_modules_link() {
@@ -615,6 +728,43 @@ if ! git -C "$REPO_ROOT" show-ref --verify --quiet "refs/heads/$SOURCE_BRANCH"; 
   fail "Local source branch $SOURCE_BRANCH was not found." 1
 fi
 
+AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT=$(
+  git -C "$REPO_ROOT" log \
+    --diff-filter=A \
+    --format='%H' \
+    "$SOURCE_BRANCH" \
+    -- "$AGENT_BRIDGE_PUBLIC_CUTOVER_MARKER" |
+    sed -n '1p'
+)
+
+if git -C "$REPO_ROOT" cat-file -e "${SOURCE_BRANCH}:${AGENT_BRIDGE_PUBLIC_CUTOVER_MARKER}" 2>/dev/null; then
+  if [ -z "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ]; then
+    fail "Agent Bridge public cutover marker exists, but its introducing commit could not be resolved." 2
+  fi
+
+  cutover_header=$(
+    git -C "$REPO_ROOT" show \
+      "${AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT}:${AGENT_BRIDGE_PUBLIC_CUTOVER_MARKER}" |
+      sed -n '1p'
+  )
+  if [ "$cutover_header" != "$AGENT_BRIDGE_PUBLIC_CUTOVER_HEADER" ]; then
+    fail "Agent Bridge public cutover marker has an unsupported header." 2
+  fi
+
+  for required_path in "${AGENT_BRIDGE_PUBLIC_CUTOVER_REQUIRED_PATHS[@]}"; do
+    if ! git -C "$REPO_ROOT" cat-file -e \
+      "${AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT}:${required_path}" 2>/dev/null; then
+      fail "Agent Bridge public cutover commit is missing required path: $required_path" 2
+    fi
+  done
+
+  log_info "Agent Bridge public history cutover: $AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT"
+elif [ -n "$AGENT_BRIDGE_PUBLIC_CUTOVER_COMMIT" ]; then
+  fail "Agent Bridge public cutover marker was removed from the source branch." 2
+else
+  log_info "Agent Bridge public history remains stripped; no cutover marker is present."
+fi
+
 git -C "$REPO_ROOT" fetch --quiet origin main
 
 SOURCE_BASE="${SOURCE_BASE_REF:-origin/main}"
@@ -733,7 +883,7 @@ for commit_sha in "${COMMITS[@]}"; do
 
   log_info "Replaying $commit_sha | $subject"
   if ! git -C "$TEMP_CLONE" cherry-pick --no-commit -X theirs "$commit_sha" >/dev/null 2>&1; then
-    if resolve_private_cherry_pick_conflicts; then
+    if resolve_private_cherry_pick_conflicts "$commit_sha"; then
       log_info "Resolved stripped-path cherry-pick conflicts for $commit_sha | $subject"
     elif resolve_theirs_cherry_pick_conflicts; then
       log_info "Resolved remaining cherry-pick conflicts from source for $commit_sha | $subject"
@@ -750,7 +900,11 @@ for commit_sha in "${COMMITS[@]}"; do
     fi
   fi
 
-  strip_private_paths_from_clone
+  strip_private_paths_from_clone "$commit_sha"
+
+  if ! verify_agent_bridge_public_replay_pii "$commit_sha"; then
+    exit 2
+  fi
 
   if git -C "$TEMP_CLONE" diff --cached --quiet; then
     SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
