@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useQuery, useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query';
 import {
   sessionRegistryReadsPort,
@@ -6,7 +5,6 @@ import {
   type SessionRegistryRecord,
 } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { queryKeys, type QueryKeyScope, type ScopedQueryKey } from './queryKeys.js';
-import { sessionRegistryQueryFamilyKey } from './sessionRegistryQueryInvalidation.js';
 
 type SessionRegistrySnapshot = {
   slugs: string[];
@@ -25,7 +23,6 @@ type UseSessionRegistryReadsResult = {
 };
 
 const sessionRegistryQueryKeys = Object.freeze({
-  family: sessionRegistryQueryFamilyKey,
   snapshot: ({
     chainId = null,
     includeRegistryList = true,
@@ -83,13 +80,6 @@ export const useSessionRegistryReads = (
       ),
     staleTime: Infinity,
   });
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return undefined;
-    return sessionRegistryReadsPort.subscribeToCacheUpdates(window, () => {
-      void queryClient.invalidateQueries({ queryKey: sessionRegistryQueryKeys.family });
-    });
-  }, [queryClient]);
 
   return { queryClient, snapshotQuery };
 };

@@ -1,5 +1,5 @@
 import React, { type ReactNode } from 'react';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { appQueryFoundation } from '../../app/runtime/appQueryClient';
 import { useSessionRegistryReads } from './useSessionRegistryReads';
@@ -32,6 +32,17 @@ let queryClient: QueryClient;
 const QueryWrapper = ({ children }: { children: ReactNode }) => {
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 };
+
+const AppQueryClientProvider = appQueryFoundation.Provider;
+
+const RegistrySnapshotProbe = () => {
+  const { snapshotQuery } = useSessionRegistryReads({ chainId: 84532 });
+  return <output data-testid="registry-snapshot-slugs">{snapshotQuery.data?.slugs.join('|') || ''}</output>;
+};
+
+const AppRegistryHarness = ({ showConsumer = true }: { showConsumer?: boolean }) => (
+  <AppQueryClientProvider>{showConsumer ? <RegistrySnapshotProbe /> : null}</AppQueryClientProvider>
+);
 
 describe('useSessionRegistryReads', () => {
   const appScope = { scope: 'ce-app', persist: false };
@@ -112,11 +123,13 @@ describe('useSessionRegistryReads', () => {
     expect(mockGetSessionConfigBySlug).toHaveBeenCalledWith('edge');
   });
 
-  it('invalidates the registry family and refetches on the cache event', async () => {
+  it('invalidates and refetches an active registry query exactly once per cache event', async () => {
+    queryClient = appQueryFoundation.client;
+    queryClient.clear();
     const invalidateQueries = jest.spyOn(queryClient, 'invalidateQueries');
-    const { result, unmount } = renderHook(() => useSessionRegistryReads({ chainId: 84532 }), {
-      wrapper: QueryWrapper,
-    });
+    const view = render(<AppRegistryHarness />);
+
+    expect(screen.getByTestId('registry-snapshot-slugs')).toHaveTextContent('|edge');
 
     mockGetAllSessionSlugs.mockReturnValue(['', 'edge', 'alpha']);
     act(() => {
@@ -124,42 +137,72 @@ describe('useSessionRegistryReads', () => {
     });
 
     await waitFor(() => {
-      expect(result.current.snapshotQuery.data?.slugs).toEqual(['', 'edge', 'alpha']);
+      expect(screen.getByTestId('registry-snapshot-slugs')).toHaveTextContent('|edge|alpha');
     });
-    expect(invalidateQueries).toHaveBeenCalledWith({
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries).toHaveBeenLastCalledWith({
       queryKey: [appScope, 'sessions', 'registry'],
     });
     expect(mockGetAllSessionSlugs).toHaveBeenCalledTimes(2);
     expect(mockSubscribeToCacheUpdates).toHaveBeenCalledTimes(1);
 
-    unmount();
+    view.unmount();
+    act(() => {
+      window.dispatchEvent(new Event('ce:session-registry-cache-updated'));
+    });
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+    queryClient.clear();
   });
 
-  it('refetches a registry write dispatched while no consumer is mounted', async () => {
+  it('refetches a registry write while the provider stays mounted without a consumer', async () => {
     queryClient = appQueryFoundation.client;
     queryClient.clear();
-    const SharedQueryWrapper = appQueryFoundation.Provider;
-    const firstMount = renderHook(() => useSessionRegistryReads({ chainId: 84532 }), {
-      wrapper: SharedQueryWrapper,
-    });
+    const view = render(<AppRegistryHarness />);
 
-    expect(firstMount.result.current.snapshotQuery.data?.slugs).toEqual(['', 'edge']);
-    firstMount.unmount();
+    expect(screen.getByTestId('registry-snapshot-slugs')).toHaveTextContent('|edge');
+    view.rerender(<AppRegistryHarness showConsumer={false} />);
+    expect(screen.queryByTestId('registry-snapshot-slugs')).not.toBeInTheDocument();
 
     mockGetAllSessionSlugs.mockReturnValue(['', 'edge', 'alpha']);
     act(() => {
       window.dispatchEvent(new Event('ce:session-registry-cache-updated'));
     });
 
-    const secondMount = renderHook(() => useSessionRegistryReads({ chainId: 84532 }), {
-      wrapper: SharedQueryWrapper,
-    });
+    view.rerender(<AppRegistryHarness />);
     await waitFor(() => {
-      expect(secondMount.result.current.snapshotQuery.data?.slugs).toEqual(['', 'edge', 'alpha']);
+      expect(screen.getByTestId('registry-snapshot-slugs')).toHaveTextContent('|edge|alpha');
     });
     expect(mockGetAllSessionSlugs).toHaveBeenCalledTimes(2);
+    expect(mockSubscribeToCacheUpdates).toHaveBeenCalledTimes(1);
 
-    secondMount.unmount();
+    view.unmount();
+    queryClient.clear();
+  });
+
+  it('shares one registry listener until the last provider for a client unmounts', () => {
+    queryClient = appQueryFoundation.client;
+    queryClient.clear();
+    const invalidateQueries = jest.spyOn(queryClient, 'invalidateQueries');
+    const firstProvider = render(<AppQueryClientProvider>{null}</AppQueryClientProvider>);
+    const secondProvider = render(<AppQueryClientProvider>{null}</AppQueryClientProvider>);
+
+    expect(mockSubscribeToCacheUpdates).toHaveBeenCalledTimes(1);
+    act(() => {
+      window.dispatchEvent(new Event('ce:session-registry-cache-updated'));
+    });
+    expect(invalidateQueries).toHaveBeenCalledTimes(1);
+
+    firstProvider.unmount();
+    act(() => {
+      window.dispatchEvent(new Event('ce:session-registry-cache-updated'));
+    });
+    expect(invalidateQueries).toHaveBeenCalledTimes(2);
+
+    secondProvider.unmount();
+    act(() => {
+      window.dispatchEvent(new Event('ce:session-registry-cache-updated'));
+    });
+    expect(invalidateQueries).toHaveBeenCalledTimes(2);
     queryClient.clear();
   });
 });

@@ -10,9 +10,7 @@ import { installSessionRegistryQueryInvalidation } from '../../utilities/query/s
 const appQueryClient: QueryClient = wagmiClient.queryClient;
 
 const AppQueryClientProvider = ({ children }: { children: ReactNode }) => {
-  useEffect(() => {
-    installSessionRegistryQueryInvalidation(appQueryClient);
-  }, []);
+  useEffect(() => installSessionRegistryQueryInvalidation(appQueryClient), []);
 
   return <QueryClientProvider client={appQueryClient}>{children}</QueryClientProvider>;
 };

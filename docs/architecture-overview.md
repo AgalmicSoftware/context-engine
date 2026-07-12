@@ -99,16 +99,22 @@ separate change and must not alter these semantics.
 The first functional exemplar is TagPage's session-registry snapshot. It reads
 through the session-registry domain port, uses synchronous `initialData` to
 preserve the previous first render, and keeps `staleTime: Infinity`. The
-existing session-registry cache-update event invalidates the
-`[appScope, 'sessions', 'registry']` key family; successful cache loads and upserts
-already emit that event. Fetch/upsert orchestration remains outside the read
-hook. Its characterized mount reads decreased from three to two.
+app query provider owns one app-lifetime subscription that maps the existing
+session-registry cache-update event to the
+`[appScope, 'sessions', 'registry']` key family. This keeps inactive queries
+marked stale so they refetch on the next mount, without adding a duplicate
+subscription for each mounted consumer.
+Successful cache loads and upserts already emit that event. Fetch/upsert
+orchestration remains outside the read hook. Its characterized mount reads
+decreased from three to two.
 
 The event-driven invalidation recipe is:
 
-1. Key the projection with the shared scalar key factory.
-2. Subscribe to the existing cache or revision event in the read hook.
-3. Invalidate the narrow domain/entity key family on that event.
+1. Key the projection with the shared query key factory.
+2. Register one app-lifetime subscription per shared query client for the
+   existing cache or revision event, with cleanup owned by its provider.
+3. Invalidate the narrow domain/entity key family on that event; read hooks do
+   not register duplicate listeners.
 4. Keep write completion responsible only for emitting the existing signal.
 
 Each migration slice must:

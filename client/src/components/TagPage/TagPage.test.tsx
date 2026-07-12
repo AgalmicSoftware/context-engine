@@ -10,6 +10,7 @@ import TagPage, { readTagAiCacheEntry, writeTagAiCacheEntry } from './TagPage';
 import TagModal from './TagModal';
 import buildTagInterpretationPrompt from '../../prompts/tagInterpretationPrompt.js';
 import { buildDemoCorpusRecords } from '../../utilities/demo/demoCorpusRecords.js';
+import { installSessionRegistryQueryInvalidation } from '../../utilities/query/sessionRegistryQueryInvalidation.js';
 
 const mockListNamespaceEntriesSync = jest.fn();
 const mockSubscribeCacheUpdates = jest.fn(() => () => {});
@@ -122,9 +123,11 @@ const TagModalComponent = TagModal as React.ComponentType<any>;
 const buildTagInterpretationPromptAny = buildTagInterpretationPrompt as any;
 let queryClient: QueryClient;
 
-const AppQueryProvider = ({ children }: { children: React.ReactNode }) => (
-  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-);
+const AppQueryProvider = ({ children }: { children: React.ReactNode }) => {
+  const client = queryClient;
+  React.useEffect(() => installSessionRegistryQueryInvalidation(client), [client]);
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+};
 
 describe('tag AI cache helpers', () => {
   it('refreshes cache recency when reading an existing interpretation', () => {
