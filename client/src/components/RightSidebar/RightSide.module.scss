@@ -16,14 +16,7 @@
 
 @media (min-width: 769px) and (max-width: 1366px) {
   .rightSideContainer {
-    flex: 0 0 23%;
-    display: flex;
-    align-self: stretch;
-    margin-top: 5px;
-  }
-
-  .rightSideCard {
-    display: flex;
+    display: none;
   }
 }
 

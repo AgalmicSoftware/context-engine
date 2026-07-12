@@ -278,7 +278,7 @@ export const SESSION_MODE_PRESETS: Readonly<Record<Exclude<SessionModePresetId, 
       storage: { backend: 'cloudflare' },
       identity: { default: 'passkey', enabled: ['passkey'] },
       authorization: { mechanisms: ['worker_roles'] },
-      encryption: { mode: 'none' },
+      encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
       surfaces: {
         web: true,
         telegram: false,
@@ -534,7 +534,7 @@ export const profileFromLegacyConfig = (sessionConfig: unknown): SessionModeProf
 
   if (normalizedBackend === STORAGE_BACKENDS.LIT_ARWEAVE) {
     profile.storage.backend = 'arweave';
-    profile.encryption.mode = 'lit';
+    profile.encryption = { mode: 'lit' };
   } else if (normalizedBackend === STORAGE_BACKENDS.CLOUDFLARE) {
     profile.authority.mode = 'worker_canonical';
     profile.storage.backend = 'cloudflare';
@@ -543,12 +543,14 @@ export const profileFromLegacyConfig = (sessionConfig: unknown): SessionModeProf
       gate: access.gate,
       encryption: access.encryption,
     };
-    profile.encryption.mode =
+    // Mode switches replace, rather than merge, mode-specific key metadata.
+    // Carrying worker_secret into Lit/none profiles misstates the decrypt path.
+    profile.encryption =
       access.encryption === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE
-        ? 'worker_envelope'
+        ? { mode: 'worker_envelope', keyProvider: 'worker_secret' }
         : access.encryption === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.LIT
-          ? 'lit'
-          : 'none';
+          ? { mode: 'lit' }
+          : { mode: 'none' };
     if (
       isRecord(storageProfile.payloadAccessControl) &&
       isRecord(storageProfile.payloadAccessControl.accessConditions)
@@ -561,7 +563,7 @@ export const profileFromLegacyConfig = (sessionConfig: unknown): SessionModeProf
   } else {
     profile.authority.mode = 'evm_registry_canonical';
     profile.storage.backend = 'arweave';
-    profile.encryption.mode = 'none';
+    profile.encryption = { mode: 'none' };
   }
 
   return profile;

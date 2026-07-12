@@ -40,23 +40,20 @@ describe('SurveyQuestions additional comment locks', () => {
     jest.useRealTimers();
   });
 
-  it('turns off additional comment encryption when clicking the open active lock', async () => {
+  it('turns off additional comment encryption by clicking the active lock', async () => {
     renderStandaloneQuestion();
 
     const additionalInput = await openAdditionalComments();
     expect(additionalInput).toHaveAttribute('placeholder', 'related thoughts or URLs (optional)');
+    expect(getAdditionalLockIconName()).toBe('unlock');
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK));
     expect(await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_SELF)).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_SELF));
     await waitFor(() => {
-      expect(screen.queryByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_SELF)).not.toBeInTheDocument();
+      expect(getAdditionalLockIconName()).toBe('lock');
     });
-    expect(getAdditionalLockIconName()).toBe('lock');
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK));
-    expect(await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCK_AUDIENCE_SELF)).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.SURVEY_ADDITIONAL_LOCK));
 

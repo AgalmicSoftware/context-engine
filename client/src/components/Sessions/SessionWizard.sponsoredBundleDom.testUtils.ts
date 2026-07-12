@@ -27,7 +27,8 @@ const enableAdvancedMode = () => {
 
 const hasCommittedSessionModeProfile = () => {
   const continueButton = screen.queryByTestId('ce-new-preset-continue');
-  return !!continueButton && !continueButton.disabled;
+  if (continueButton) return !continueButton.disabled;
+  return !!screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
 };
 
 const ensureSessionModeProfileSelected = () => {
@@ -36,6 +37,12 @@ const ensureSessionModeProfileSelected = () => {
     act(() => {
       fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
     });
+    const continueButton = screen.queryByTestId('ce-new-preset-continue');
+    if (continueButton && !continueButton.disabled) {
+      act(() => {
+        fireEvent.click(continueButton);
+      });
+    }
     return;
   }
   const normalModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL);
@@ -59,14 +66,7 @@ const ensureSessionModeProfileSelected = () => {
 };
 
 const continueNewSessionEntry = () => {
-  const continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (!continueButton) return;
   ensureSessionModeProfileSelected();
-  const enabledContinueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (!enabledContinueButton || enabledContinueButton.disabled) return;
-  act(() => {
-    fireEvent.click(enabledContinueButton);
-  });
 };
 
 const selectNormalModeCard = (label) => {

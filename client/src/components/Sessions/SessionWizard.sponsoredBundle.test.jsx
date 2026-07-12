@@ -408,13 +408,22 @@ describe('SessionWizard sponsored bundle flow', () => {
       expect(publishButton).not.toBeDisabled();
     });
 
+    await waitFor(() => {
+      expect(mockSessionExists).toHaveBeenCalledWith('sponsored-duplicate-session');
+    });
+    mockSessionExists.mockReset();
     publishClicked = true;
-    fireEvent.click(publishButton);
+    mockSessionExists.mockImplementation(async () => publishClicked);
+    const currentPublishButton = screen.getByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
+    expect(currentPublishButton).not.toBeDisabled();
+    fireEvent.click(currentPublishButton);
 
+    await waitFor(() => {
+      expect(mockSessionExists).toHaveBeenCalledWith('sponsored-duplicate-session');
+    });
     expect(
       await screen.findByText('Session slug already exists on-chain: sponsored-duplicate-session'),
     ).toBeInTheDocument();
-    expect(mockSessionExists).toHaveBeenCalledWith('sponsored-duplicate-session');
     expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
     expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/sponsored/redeem-deploy'))).toBe(false);
     expect(mockUploadDataToArweave).not.toHaveBeenCalled();

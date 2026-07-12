@@ -45,4 +45,21 @@ describe('Account.module.scss modal account layout guards', () => {
       /\.sendTestnetFundsButton\.settingsConfigToggleButton,[\s\S]*?\.sendTestnetFundsButton\.preferenceToggleButton\s*{[\s\S]*?border-color:\s*rgba\(255, 255, 255, 0\.36\);/,
     );
   });
+
+  it('wraps settings controls into non-overlapping half rows at medium widths', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'Account.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)\s*{[\s\S]*?\.settingsRow\s*{[\s\S]*?flex-wrap:\s*wrap;[\s\S]*?justify-content:\s*center;/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)[\s\S]*?\.settingsRow > \*\s*{[\s\S]*?flex:\s*1 1 calc\(50% - 6px\);[\s\S]*?min-width:\s*0;[\s\S]*?max-width:\s*100%;/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)[\s\S]*?\.settingsSessionRoute,[\s\S]*?\.settingsConfigToggleButton\s*{[\s\S]*?width:\s*100%;[\s\S]*?justify-content:\s*center;/,
+    );
+    expect(scss).toMatch(
+      /@media \(min-width:\s*769px\) and \(max-width:\s*1023px\)[\s\S]*?\.tooltipsToggleButton\s*{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?width:\s*auto;[\s\S]*?min-width:\s*0;[\s\S]*?justify-content:\s*center;/,
+    );
+  });
 });

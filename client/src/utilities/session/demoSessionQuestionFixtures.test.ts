@@ -34,6 +34,23 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     );
   });
 
+  it('exposes only source-derived tags in the demo-1 question filter', () => {
+    const questions = getTemporaryDemoSessionQuestionFixtures('demo-1');
+    const tags = new Set(questions.flatMap((question) => (question.tags as string[]) || []));
+
+    expect(tags).not.toContain('demo-fixture');
+    expect(tags).not.toContain('context-corpus');
+    expect(questions[0].tags).toEqual([
+      'binary',
+      'EXISTENTIAL RISK & SAFETY FOUNDATIONS',
+      'tweets',
+      'arxiv',
+      'LessWrong',
+      'insiders',
+      'laws',
+    ]);
+  });
+
   it('converts poll comments to single-select multichoice questions', () => {
     const questions = getTemporaryDemoSessionQuestionFixtures('demo-1');
     const pollQuestion = questions.find(
@@ -66,6 +83,7 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
     const config = (demoSessions as Record<string, any>)['demo-1'];
 
     expect(config.corsWorkerUrl).toBe('');
+    expect(config.defaultTags).toBe('');
     expect(config.networkChainId).toBe(11155420);
     expect(config.sponsoredKeys).toBeUndefined();
     expect(config.__registry).toBeUndefined();

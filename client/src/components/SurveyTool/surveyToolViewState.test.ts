@@ -116,6 +116,19 @@ describe('surveyToolViewState', () => {
     });
   });
 
+  it('unlocks encrypted additional comments directly from the lock button', () => {
+    expect(
+      buildLockAudienceButtonAction({
+        effectiveFieldKey: 'additional',
+        fieldEncrypted: true,
+        hasAudienceMenu: true,
+        menuOpen: false,
+      }),
+    ).toEqual({
+      kind: 'disable-field-encryption-and-close-menu',
+    });
+  });
+
   it('builds masked-prompt, answer-lock, and gated-notice view state', () => {
     expect(
       isQuestionPromptMasked({

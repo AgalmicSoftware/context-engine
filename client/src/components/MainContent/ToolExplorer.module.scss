@@ -399,6 +399,13 @@
 }
 
 @media (min-width: 769px) and (max-width: 1366px) {
+  .headerSessionSelectorPanel {
+    right: auto;
+    left: 50%;
+    width: min(460px, calc(100vw - 48px));
+    transform: translateX(-50%);
+  }
+
   .explorerContainerSparse {
     min-height: clamp(400px, 48vh, 620px);
   }

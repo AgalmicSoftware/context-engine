@@ -637,7 +637,12 @@ export const createSessionQuestionCacheController = (
             .trim()
             .toLowerCase();
           if (!lowered) return;
-          if (hasHydratedQuestionMetadata(localNet.questions[lowered])) return;
+          const cachedQuestion = localNet.questions[lowered];
+          const cachedDemoFixture = isRecord(cachedQuestion?.demoFixture) ? cachedQuestion.demoFixture : null;
+          const isCachedTemporaryDemoQuestion =
+            cachedQuestion?.temporaryDemoSeed === true ||
+            normalizeSessionSlug(cachedDemoFixture?.sourceSessionSlug || '') === 'demo';
+          if (hasHydratedQuestionMetadata(cachedQuestion) && !isCachedTemporaryDemoQuestion) return;
 
           const questionData = {
             ...questionRaw,

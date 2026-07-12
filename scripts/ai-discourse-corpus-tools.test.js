@@ -20,7 +20,7 @@ test('summarizes corpus files without dumping full JSON records', () => {
 
   assert.equal(crossCorpus.count, 16);
   assert.equal(summary.clientDebates.count, 16);
-  assert.equal(tweets.count, 4036);
+  assert.equal(tweets.count, 4140);
   assert.ok(tweets.sizeBytes > 10_000_000);
 });
 

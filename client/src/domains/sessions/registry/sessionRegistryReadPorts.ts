@@ -1,4 +1,5 @@
 import * as defaultSessionRegistry from '../../../utilities/web3/sessionRegistry.js';
+import * as defaultSessionConfig from '../sessionConfig.js';
 import {
   bindSessionRegistryPublishAdapter,
   type SessionRegistryPublishModule,
@@ -32,7 +33,9 @@ export type SessionRegistryReadsPort = {
   loadSessionRegistryCache: (input?: SessionRegistryRecord) => Promise<unknown>;
   loadGroupRegistryCache: (input?: SessionRegistryRecord) => Promise<unknown>;
   getAllSessionEntries: () => SessionRegistryEntry[];
+  getAllSessionSlugs: (options?: { includeEmpty?: boolean }) => string[];
   getSessionConfig: (slug: string) => SessionRegistryRecord | null | undefined;
+  getSessionConfigBySlug: (slug: string) => SessionRegistryRecord | null | undefined;
   getSessionConfigById: (sessionId: string | number) => SessionRegistryRecord | null | undefined;
   fetchSessionFromRegistry: (input?: SessionRegistryRecord) => Promise<SessionRegistryRecord | null | undefined>;
   upsertSessionRegistryCache: (input?: SessionRegistryRecord) => unknown;
@@ -45,8 +48,14 @@ export type SessionRegistryReadsPort = {
   ) => () => void;
 };
 
+export type SessionRegistryConfigModule = {
+  getAllSessionSlugs: (options?: { includeEmpty?: boolean }) => string[];
+  getSessionConfigBySlug: (slug: unknown) => SessionRegistryRecord | null | undefined;
+};
+
 export type BindSessionRegistryReadsPortArgs = {
   sessionRegistry: () => SessionRegistryReadModule;
+  sessionConfig?: () => SessionRegistryConfigModule;
 };
 
 const resolveCacheUpdateEvent = (module: SessionRegistryReadModule): string =>
@@ -55,6 +64,7 @@ const resolveCacheUpdateEvent = (module: SessionRegistryReadModule): string =>
 
 export const bindSessionRegistryReadsPort = ({
   sessionRegistry: readSessionRegistry,
+  sessionConfig: readSessionConfig,
 }: BindSessionRegistryReadsPortArgs): SessionRegistryReadsPort => {
   const publishAdapter = bindSessionRegistryPublishAdapter({
     sessionRegistry: readSessionRegistry,
@@ -64,7 +74,27 @@ export const bindSessionRegistryReadsPort = ({
     loadSessionRegistryCache: (input) => readSessionRegistry().loadSessionRegistryCache(input),
     loadGroupRegistryCache: (input) => readSessionRegistry().loadGroupRegistryCache(input),
     getAllSessionEntries: () => readSessionRegistry().sessionRegistryStore.getAllSessionEntries(),
+    getAllSessionSlugs: (options) => {
+      if (readSessionConfig) return readSessionConfig().getAllSessionSlugs(options);
+      const includeEmpty = options?.includeEmpty !== false;
+      return Array.from(
+        new Set(
+          readSessionRegistry()
+            .sessionRegistryStore.getAllSessionEntries()
+            .map(([key, config]) => {
+              const record = config && typeof config === 'object' ? (config as SessionRegistryRecord) : {};
+              const rawSlug = typeof record.slug === 'string' ? record.slug : key;
+              return rawSlug === 'general' ? '' : String(rawSlug || '');
+            })
+            .filter((slug) => includeEmpty || slug !== ''),
+        ),
+      );
+    },
     getSessionConfig: (slug) => readSessionRegistry().sessionRegistryStore.getSessionConfig(slug),
+    getSessionConfigBySlug: (slug) =>
+      readSessionConfig
+        ? readSessionConfig().getSessionConfigBySlug(slug)
+        : readSessionRegistry().sessionRegistryStore.getSessionConfig(slug),
     getSessionConfigById: (sessionId) => readSessionRegistry().sessionRegistryStore.getSessionConfigById(sessionId),
     fetchSessionFromRegistry: (input) =>
       publishAdapter.fetchSessionFromRegistry(input || {}) as Promise<SessionRegistryRecord | null | undefined>,
@@ -84,4 +114,5 @@ export const bindSessionRegistryReadsPort = ({
 
 export const sessionRegistryReadsPort = bindSessionRegistryReadsPort({
   sessionRegistry: () => defaultSessionRegistry as SessionRegistryReadModule,
+  sessionConfig: () => defaultSessionConfig as SessionRegistryConfigModule,
 });

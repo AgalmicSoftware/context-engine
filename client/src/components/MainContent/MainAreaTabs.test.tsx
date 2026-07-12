@@ -56,7 +56,8 @@ describe('MainAreaTabs', () => {
 
     expect(screen.queryByText('Votes')).not.toBeInTheDocument();
     expect(screen.getByText('Latest')).toBeInTheDocument();
-    expect(screen.getByText('Community')).toBeInTheDocument();
+    expect(screen.getByText('Stats')).toBeInTheDocument();
+    expect(screen.queryByText('Community')).not.toBeInTheDocument();
     expect(screen.getByText('Tools')).toBeInTheDocument();
     expect(screen.getByText('Welcome')).toBeInTheDocument();
     expect(container.querySelector('.mainAreaTabsAlt')).toBeInTheDocument();

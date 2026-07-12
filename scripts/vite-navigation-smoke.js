@@ -12,7 +12,7 @@ const DEFAULT_ROUTES = Object.freeze([
 ]);
 const DEFAULT_ROUTE_TEXT = Object.freeze({
   '/session/demo': ['Session'],
-  '/session/pe4': ['Session'],
+  '/session/pe4': ['Groups', 'Results'],
   '/admin': ['Session Admin'],
   '/about': ['Context Engine'],
   '/contracts': ['Contract'],
@@ -92,6 +92,12 @@ function isAllowedConsoleIssue(issue) {
 
 function routeUrl(baseUrl, route) {
   return `${baseUrl}${route}`;
+}
+
+function findMissingExpectedText(bodyText, expectedText = []) {
+  const normalizedBodyText = String(bodyText || '').toLowerCase();
+  return expectedText
+    .filter((text) => !normalizedBodyText.includes(String(text).toLowerCase()));
 }
 
 async function inspectRoute(browser, baseUrl, route, options = {}) {
@@ -214,9 +220,7 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
   const unexpectedConsoleIssues = consoleIssues
     .filter((issue) => !isAllowedConsoleIssue(issue));
   const expectedText = options.expectedText?.[route] || DEFAULT_ROUTE_TEXT[route] || [];
-  const normalizedBodyTextPreview = info.bodyTextPreview.toLowerCase();
-  const missingText = expectedText
-    .filter((text) => !normalizedBodyTextPreview.includes(text.toLowerCase()));
+  const missingText = findMissingExpectedText(info.bodyTextPreview, expectedText);
 
   return {
     route,
@@ -353,6 +357,7 @@ module.exports = {
   DEFAULT_ROUTES,
   DEFAULT_ROUTE_TEXT,
   compactSmokeSummary,
+  findMissingExpectedText,
   inspectRoute,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,

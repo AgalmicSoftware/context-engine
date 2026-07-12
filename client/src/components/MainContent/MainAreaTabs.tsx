@@ -27,7 +27,7 @@ export const MAIN_AREA_TABS = Object.freeze({
 
 const MAIN_AREA_TAB_TITLES = Object.freeze({
   [MAIN_AREA_TABS.LATEST]: 'Latest',
-  [MAIN_AREA_TABS.COMMUNITY]: 'Community',
+  [MAIN_AREA_TABS.COMMUNITY]: 'Stats',
   [MAIN_AREA_TABS.TOOLS]: 'Tools',
   [MAIN_AREA_TABS.WELCOME]: 'Welcome',
 } as Record<number, string>);

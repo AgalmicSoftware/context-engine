@@ -5,7 +5,7 @@ date: 2026-07-06
 
 # Agent Village Wrapped: Does Your Agent Know You? (Experiment + Eval)
 
-Many people dislike filling out surveys, but would happily take a quiz about what kind of dog they are and share the results [on Facebook](https://www.nbcnews.com/id/wbna33830316). Could this insight about shareable output formats (and the viral success of "Spotify Wrapped") be useful for participatory deliberation experiments?
+Many people dislike filling out surveys, but would happily take a quiz about what kind of pasta they are [for Facebook](https://www.niemanlab.org/2014/02/are-quizzes-the-new-lists-what-buzzfeeds-latest-viral-success-means-for-publishing/) and share the results. Could this insight about shareable output formats (and the viral success of "Spotify Wrapped") be useful for participatory deliberation experiments?
 
 Agent Village Wrapped and its associated evaluation were created to begin measuring how accurately a personal AI agent represents a human user via a low-friction process. We believe there are social AI games and future products in this direction, and that agents could help solve participation challenges facing civic tech – leading to a future where your agent is always [bargaining and coalition-building on your behalf](https://blog.cosmos-institute.org/p/coasean-bargaining-at-scale).
 

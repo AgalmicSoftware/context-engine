@@ -1,5 +1,6 @@
 import React from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Provider } from 'react-redux';
 import { createStore } from 'redux';
 import { TestMemoryRouter as MemoryRouter } from 'testUtils/TestMemoryRouter';
@@ -16,6 +17,19 @@ const mockGetAllSessionSlugs = jest.fn();
 const mockGetSessionConfigBySlug = jest.fn();
 const mockGetDemoSessionConfigBySlug = jest.fn();
 const mockCallAI = jest.fn();
+const mockPortGetAllSessionSlugs = jest.fn((...args: any[]) => mockGetAllSessionSlugs(...args));
+const mockPortGetSessionConfigBySlug = jest.fn((...args: any[]) => mockGetSessionConfigBySlug(...args));
+const mockSubscribeSessionRegistryUpdates = jest.fn(
+  (target: Window, listener: EventListenerOrEventListenerObject) => {
+    target.addEventListener('ce:session-registry-cache-updated', listener);
+    return () => target.removeEventListener('ce:session-registry-cache-updated', listener);
+  },
+);
+const SESSION_REGISTRY_MOUNT_READ_BASELINE = Object.freeze({
+  slugReads: 1,
+  configReads: 2,
+  totalReads: 3,
+});
 
 jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
@@ -35,6 +49,15 @@ jest.mock('../../utilities/web3/chainGateway.js', () => ({
 jest.mock('../../utilities/web3/sessionRegistry.js', () => ({
   __esModule: true,
   SESSION_REGISTRY_CACHE_UPDATED_EVENT: 'ce:session-registry-cache-updated',
+}));
+
+jest.mock('../../domains/sessions/registry/sessionRegistryReadPorts.js', () => ({
+  __esModule: true,
+  sessionRegistryReadsPort: {
+    getAllSessionSlugs: (...args: any[]) => mockPortGetAllSessionSlugs(...args),
+    getSessionConfigBySlug: (...args: any[]) => mockPortGetSessionConfigBySlug(...args),
+    subscribeToCacheUpdates: (...args: any[]) => mockSubscribeSessionRegistryUpdates(...args),
+  },
 }));
 
 jest.mock('../../utilities/ai/aiClient.js', () => ({
@@ -99,6 +122,11 @@ jest.mock('reactstrap', () => {
 const TagPageComponent = TagPage as React.ComponentType<any>;
 const TagModalComponent = TagModal as React.ComponentType<any>;
 const buildTagInterpretationPromptAny = buildTagInterpretationPrompt as any;
+let queryClient: QueryClient;
+
+const AppQueryProvider = ({ children }: { children: React.ReactNode }) => (
+  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+);
 
 describe('tag AI cache helpers', () => {
   it('refreshes cache recency when reading an existing interpretation', () => {
@@ -244,11 +272,13 @@ const renderTagPage = ({
   tagPageProps = {},
 }: Record<string, any> = {}) =>
   render(
-    <Provider store={createTagPageStore(sessionState)}>
-      <MemoryRouter initialEntries={[entry]}>
-        <TagPageComponent questionResponsesNonce={0} isQuestionCacheReady={isQuestionCacheReady} {...tagPageProps} />
-      </MemoryRouter>
-    </Provider>,
+    <AppQueryProvider>
+      <Provider store={createTagPageStore(sessionState)}>
+        <MemoryRouter initialEntries={[entry]}>
+          <TagPageComponent questionResponsesNonce={0} isQuestionCacheReady={isQuestionCacheReady} {...tagPageProps} />
+        </MemoryRouter>
+      </Provider>
+    </AppQueryProvider>,
   );
 
 const renderTagModal = ({
@@ -261,21 +291,28 @@ const renderTagModal = ({
   toggle = jest.fn(),
 }: Record<string, any> = {}) =>
   render(
-    <Provider store={createTagPageStore(sessionState)}>
-      <MemoryRouter initialEntries={[entry]}>
-        <TagModalComponent
-          isOpen={isOpen}
-          toggle={toggle}
-          activeTag={activeTag}
-          demoCorpusMode={demoCorpusMode}
-          demoCorpusRecords={demoCorpusRecordsOverride}
-        />
-      </MemoryRouter>
-    </Provider>,
+    <AppQueryProvider>
+      <Provider store={createTagPageStore(sessionState)}>
+        <MemoryRouter initialEntries={[entry]}>
+          <TagModalComponent
+            isOpen={isOpen}
+            toggle={toggle}
+            activeTag={activeTag}
+            demoCorpusMode={demoCorpusMode}
+            demoCorpusRecords={demoCorpusRecordsOverride}
+          />
+        </MemoryRouter>
+      </Provider>
+    </AppQueryProvider>,
   );
 
 describe('TagPage', () => {
   beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    });
     mockSubscribeCacheUpdates.mockReturnValue(() => {});
     mockGetAllSessionSlugs.mockReturnValue(['', 'edge', 'alpha', 'beta']);
     mockGetSessionConfigBySlug.mockReturnValue(null);
@@ -704,7 +741,7 @@ describe('TagPage', () => {
     expect(screen.getByTestId('tag-page-session-scope')).toHaveTextContent('Session scope: edge + alpha');
   });
 
-  it('refreshes selector options when the session registry cache updates', () => {
+  it('refreshes selector options when the session registry cache updates', async () => {
     mockGetAllSessionSlugs.mockReturnValue(['', 'edge']);
 
     renderTagPage({ entry: '/tag/governance' });
@@ -717,7 +754,38 @@ describe('TagPage', () => {
       window.dispatchEvent(new Event('ce:session-registry-cache-updated'));
     });
 
-    expect(screen.getByRole('button', { name: /^alpha$/i })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^alpha$/i })).toBeInTheDocument();
+    });
+    expect(mockSubscribeSessionRegistryUpdates).toHaveBeenCalledTimes(1);
+    expect(mockGetAllSessionSlugs).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves the registry shape without exceeding the mount read baseline', () => {
+    mockGetAllSessionSlugs.mockReturnValue(['', 'edge']);
+    mockGetSessionConfigBySlug.mockImplementation((slug) =>
+      slug === 'edge' ? { slug: 'edge', sessionName: 'Edge Registry' } : { slug: '', sessionName: 'General' },
+    );
+
+    renderTagPage({ entry: '/tag/governance' });
+
+    expect(screen.getByTestId('tag-page-session-scope')).toHaveTextContent('Session scope: Edge Registry (edge)');
+    fireEvent.click(screen.getByRole('button', { name: /tag page session selector/i }));
+    expect(screen.getByRole('button', { name: 'Edge Registry (edge)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'General' })).toBeInTheDocument();
+    expect(mockGetAllSessionSlugs).toHaveBeenCalledTimes(1);
+    expect(mockGetSessionConfigBySlug.mock.calls).toEqual([['edge']]);
+    expect(mockPortGetAllSessionSlugs).toHaveBeenCalledTimes(1);
+    expect(mockPortGetSessionConfigBySlug).toHaveBeenCalledTimes(1);
+    expect(mockSubscribeSessionRegistryUpdates).toHaveBeenCalledTimes(1);
+    const currentReads = {
+      slugReads: mockPortGetAllSessionSlugs.mock.calls.length,
+      configReads: mockPortGetSessionConfigBySlug.mock.calls.length,
+    };
+    expect(currentReads).toEqual({ slugReads: 1, configReads: 1 });
+    expect(currentReads.slugReads + currentReads.configReads).toBeLessThanOrEqual(
+      SESSION_REGISTRY_MOUNT_READ_BASELINE.totalReads,
+    );
   });
 
   it('keeps explicit session query pins scoped to that session', () => {
@@ -889,6 +957,11 @@ describe('TagPage', () => {
 
 describe('TagModal', () => {
   beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    });
     mockSubscribeCacheUpdates.mockReturnValue(() => {});
     mockGetAllSessionSlugs.mockReturnValue(['', 'edge', 'alpha', 'beta']);
     mockGetSessionConfigBySlug.mockReturnValue(null);
@@ -912,6 +985,12 @@ describe('TagModal', () => {
   });
 
   it('uses dedicated tag-modal shell classes and keeps the demo info cog beside the modal close control', () => {
+    mockGetSessionConfigBySlug.mockImplementation((slug) =>
+      slug === 'edge' ? { slug: 'edge', sessionName: 'Registry Edge' } : null,
+    );
+    mockGetDemoSessionConfigBySlug.mockImplementation((slug) =>
+      slug === 'edge' ? { slug: 'edge', sessionName: 'Demo Edge' } : null,
+    );
     renderTagModal({
       entry: '/demo/corpus-viewer',
       demoCorpusMode: true,
@@ -934,7 +1013,9 @@ describe('TagModal', () => {
     expect(
       screen.getByText(/demo corpus mode uses the demo corpus records currently loaded in this view/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/session scope: edge/i)).toBeInTheDocument();
+    expect(screen.getByText(/session scope: Registry Edge \(edge\)/i)).toBeInTheDocument();
+    expect(mockPortGetAllSessionSlugs).not.toHaveBeenCalled();
+    expect(mockPortGetSessionConfigBySlug).toHaveBeenCalledWith('edge');
     expect(screen.queryByTestId('ce-tag-page-session-selector-toggle')).not.toBeInTheDocument();
   });
 
@@ -968,17 +1049,19 @@ describe('TagModal', () => {
     scrollArea.scrollTop = 240;
 
     rerender(
-      <Provider store={createTagPageStore({})}>
-        <MemoryRouter initialEntries={['/demo/corpus-viewer']}>
-          <TagModalComponent
-            isOpen={true}
-            toggle={toggle}
-            activeTag="Open Source"
-            demoCorpusMode={false}
-            demoCorpusRecords={[]}
-          />
-        </MemoryRouter>
-      </Provider>,
+      <AppQueryProvider>
+        <Provider store={createTagPageStore({})}>
+          <MemoryRouter initialEntries={['/demo/corpus-viewer']}>
+            <TagModalComponent
+              isOpen={true}
+              toggle={toggle}
+              activeTag="Open Source"
+              demoCorpusMode={false}
+              demoCorpusRecords={[]}
+            />
+          </MemoryRouter>
+        </Provider>
+      </AppQueryProvider>,
     );
 
     expect(screen.getByRole('heading', { name: '#Open Source' })).toBeInTheDocument();

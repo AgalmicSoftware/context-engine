@@ -96,14 +96,14 @@ describe('Footer', () => {
     expect(screen.queryByTestId('ce-footer-agalmic-link')).not.toBeInTheDocument();
   });
 
-  it('uses full-width readable footer nav links across the mobile breakpoints', () => {
+  it('keeps all five footer links on one full-width row across the mobile breakpoints', () => {
     [
-      { minWidth: 0, maxWidth: 319, columns: 2, fontSize: 'clamp\\(0\\.9rem, 5\\.4vw, 1\\.08rem\\)' },
-      { minWidth: 320, maxWidth: 465, columns: 3, fontSize: 'clamp\\(0\\.86rem, 3\\.05vw, 1\\.08rem\\)' },
-      { minWidth: 466, maxWidth: 768, columns: 3, fontSize: 'clamp\\(1rem, 2\\.4vw, 1\\.22rem\\)' },
-    ].forEach(({ minWidth, maxWidth, columns, fontSize }) => {
+      { minWidth: 0, maxWidth: 319, fontSize: 'clamp\\(0\\.56rem, 2\\.75vw, 0\\.68rem\\)' },
+      { minWidth: 320, maxWidth: 465, fontSize: 'clamp\\(0\\.62rem, 2\\.45vw, 0\\.78rem\\)' },
+      { minWidth: 466, maxWidth: 768, fontSize: 'clamp\\(0\\.78rem, 1\\.9vw, 1rem\\)' },
+    ].forEach(({ minWidth, maxWidth, fontSize }) => {
       const breakpointRule = new RegExp(
-        `@media \\(min-width: ${minWidth}px\\) and \\(max-width: ${maxWidth}px\\) \\{[\\s\\S]*?\\.footer \\{[\\s\\S]*?nav \\{[\\s\\S]*?width: 100%;[\\s\\S]*?ul \\{[\\s\\S]*?display: grid;[\\s\\S]*?grid-template-columns: repeat\\(${columns}, minmax\\(0, 1fr\\)\\);[\\s\\S]*?justify-content: stretch;[\\s\\S]*?width: 100%;[\\s\\S]*?li \\{[\\s\\S]*?width: 100%;[\\s\\S]*?li \\.footerLink \\{[\\s\\S]*?display: flex;[\\s\\S]*?font-size: ${fontSize};[\\s\\S]*?justify-content: center;[\\s\\S]*?width: 100%;`,
+        `@media \\(min-width: ${minWidth}px\\) and \\(max-width: ${maxWidth}px\\) \\{[\\s\\S]*?\\.footer \\{[\\s\\S]*?nav \\{[\\s\\S]*?width: 100%;[\\s\\S]*?ul \\{[\\s\\S]*?display: grid;[\\s\\S]*?grid-template-columns: repeat\\(5, minmax\\(0, 1fr\\)\\);[\\s\\S]*?justify-content: stretch;[\\s\\S]*?width: 100%;[\\s\\S]*?li \\{[\\s\\S]*?width: 100%;[\\s\\S]*?li \\.footerLink \\{[\\s\\S]*?display: flex;[\\s\\S]*?font-size: ${fontSize};[\\s\\S]*?justify-content: center;[\\s\\S]*?margin-left: 0 !important;[\\s\\S]*?margin-right: 0 !important;[\\s\\S]*?white-space: nowrap;[\\s\\S]*?width: 100%;`,
       );
 
       expect(footerStylesheet).toMatch(breakpointRule);

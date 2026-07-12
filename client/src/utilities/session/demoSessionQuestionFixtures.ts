@@ -65,8 +65,6 @@ const buildDemoQuestionFromComment = (
     type,
     prompt,
     tags: uniqueStrings([
-      'demo-fixture',
-      'context-corpus',
       fixtureType,
       comment?.category,
       ...splitSources(comment?.sources),

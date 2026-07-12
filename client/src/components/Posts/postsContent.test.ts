@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from 'node:fs';
+
 import { buildPostAssetUrl, getPostAssetBasePath, normalizePostsManifest } from './postsContent';
 
 const mutableEnv = process.env as Record<string, string | undefined>;
@@ -12,6 +14,19 @@ afterEach(() => {
 });
 
 describe('postsContent', () => {
+  it('publishes only listed posts and keeps placeholder Markdown out of the public posts root', () => {
+    const manifest = JSON.parse(readFileSync('../posts/manifest.json', 'utf8'));
+    const posts = normalizePostsManifest(manifest);
+    const listedFiles = new Set(posts.map((post) => post.file.replace(/^\/posts\//, '')));
+    const unlistedTopLevelMarkdown = readdirSync('../posts', { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.md'))
+      .map((entry) => entry.name)
+      .filter((file) => !listedFiles.has(file));
+
+    expect(posts.map((post) => post.slug)).toEqual(['agent-village-wrapped-2026']);
+    expect(unlistedTopLevelMarkdown).toEqual([]);
+  });
+
   it('normalizes valid manifest entries and drops incomplete or unsafe posts', () => {
     expect(
       normalizePostsManifest({
@@ -87,7 +102,7 @@ describe('postsContent', () => {
 
   it('derives post-local attachment bases from nested post files', () => {
     expect(getPostAssetBasePath('agent-village-wrapped/agent-village-wrapped.md')).toBe('agent-village-wrapped');
-    expect(getPostAssetBasePath('/posts/mapping-collective-intelligence.md')).toBe('');
+    expect(getPostAssetBasePath('/posts/standalone.md')).toBe('');
     expect(getPostAssetBasePath('../private.md')).toBe('');
   });
 });

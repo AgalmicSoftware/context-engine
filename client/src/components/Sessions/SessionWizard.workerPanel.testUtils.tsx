@@ -381,12 +381,13 @@ const clickSessionModePresetForTest = (testId) => {
 };
 const hasSelectedSessionModeProfile = () => {
   const continueButton = screen.queryByTestId('ce-new-preset-continue');
-  return !continueButton || !continueButton.disabled;
+  if (continueButton) return !continueButton.disabled;
+  return !!screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
 };
 function ensureSessionModeProfileReady() {
+  if (hasSelectedSessionModeProfile()) return true;
   let continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (!continueButton) return false;
-  if (continueButton.disabled) {
+  if (!continueButton || continueButton.disabled) {
     const candidatePresets = [
       resolveSessionModePresetTestId(),
       'ce-new-preset-fast_cheap_cloudflare',
@@ -394,21 +395,21 @@ function ensureSessionModeProfileReady() {
     ];
     for (const presetTestId of [...new Set(candidatePresets)]) {
       if (!clickSessionModePresetForTest(presetTestId)) continue;
+      if (hasSelectedSessionModeProfile()) break;
       continueButton = screen.queryByTestId('ce-new-preset-continue');
       if (continueButton && !continueButton.disabled) break;
     }
   }
-  return !!continueButton && !continueButton.disabled;
-}
-function commitSessionModeProfileGateIfPresent() {
-  const setupVisible = !!screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-  if (!ensureSessionModeProfileReady() || setupVisible) return;
-  const continueButton = screen.queryByTestId('ce-new-preset-continue');
-  if (continueButton && !continueButton.disabled) {
+  continueButton = screen.queryByTestId('ce-new-preset-continue');
+  if (!hasSelectedSessionModeProfile() && continueButton && !continueButton.disabled) {
     act(() => {
       fireEvent.click(continueButton);
     });
   }
+  return hasSelectedSessionModeProfile();
+}
+function commitSessionModeProfileGateIfPresent() {
+  ensureSessionModeProfileReady();
 }
 const ensureSessionModeProfileSelected = () => {
   if (hasSelectedSessionModeProfile()) return;
