@@ -54,7 +54,7 @@
     "typecheck:client": "npm --prefix client run typecheck",
     "type-debt:check": "node scripts/check-type-debt-ratchet.mjs",
     "coverage-floor:check": "node scripts/check-coverage-floor.mjs",
-    "test:ci": "npm run test:wiring && npm run type-debt:check && npm run verify:release && npm run test:contracts && npm run test:client && npm run coverage-floor:check && npm run test:root:jest && npm run test:worker:session-cors && npm run test:node && npm run test:cache-guard",
+    "test:ci": "npm run test:wiring && npm run type-debt:check && npm run verify:release && npm run test:contracts && npm run test:client && npm run coverage-floor:check && npm run test:root:jest && npm run test:worker:session-cors && npm run test:worker:agent-bridge && npm run test:node && npm run test:cache-guard",
     "test:e2e": "npm run -s test:e2e:smoke",
     "test:e2e:quick": "npm run -s test:e2e:smoke",
     "test:e2e:smoke": "npm run -s ai:test-nav:smoke",

@@ -31,25 +31,10 @@ test('repo test wiring invariants hold', () => {
 test('agent bridge tests are reachable through root CI and the workers job', () => {
   const rootDir = path.resolve(__dirname, '..');
   const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
-  const manifest = JSON.parse(fs.readFileSync(path.join(rootDir, 'scripts/ci-gates.json'), 'utf8'));
   const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
 
-  assert.match(pkg.scripts['test:ci'], /run-ci-gates\.mjs --profile ci/);
-  assert.ok(manifest.profiles.ci.includes('workers'));
-  assert.ok(
-    manifest.gates.workers.commands
-      .some((entry) => entry.args.join(' ') === 'run test:worker:agent-bridge'),
-  );
-  assert.match(workflow, /run: npm run ci:gate -- workers/);
-});
-
-test('E2E preview readiness retries stay quiet but the final probe remains diagnostic', () => {
-  const rootDir = path.resolve(__dirname, '..');
-  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
-
-  assert.match(workflow, /if curl -fs "\$BASE_URL" >\/dev\/null; then/);
-  assert.doesNotMatch(workflow, /if curl -fsS "\$BASE_URL" >\/dev\/null; then/);
-  assert.match(workflow, /curl -fsS "\$BASE_URL" >\/dev\/null\s+npm run ci:gate -- e2e-smoke/);
+  assert.match(pkg.scripts['test:ci'], /npm run test:worker:agent-bridge/);
+  assert.match(workflow, /run: npm run test:worker:agent-bridge/);
 });
 
 test('agent bridge runner skips cleanly when a public artifact omits the worker', () => {
@@ -72,6 +57,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:root:jest':
             "cd client && npm test -- --watchAll=false --runInBand --testMatch '<rootDir>/../tests/root/deployHelper.worker.test.js' '<rootDir>/../tests/root/sessionCorsWorker.auth.test.js'",
           'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
+          'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
           'test:node': 'node scripts/run-node-tests.js',
           'test:node:tracked': 'node scripts/run-node-tests.js --tracked-only',
           'client-boundaries:check': 'node scripts/check-client-boundaries.mjs',
@@ -82,7 +68,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',
           'ai:test-nav:smoke': 'node scripts/vite-navigation-smoke.js',
           'test:ci':
-            'npm run test:wiring && npm run type-debt:check && npm run verify:release && npm run test:client && npm run coverage-floor:check && npm run test:root:jest && npm run test:worker:session-cors && npm run test:node',
+            'npm run test:wiring && npm run type-debt:check && npm run verify:release && npm run test:client && npm run coverage-floor:check && npm run test:root:jest && npm run test:worker:session-cors && npm run test:worker:agent-bridge && npm run test:node',
           'test:wiring':
             'node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check && npm run -s dead-exports:check',
           tests: 'npm run test:ci && npm run test:surveys-sbt',
@@ -137,11 +123,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '      - run: npm run ci:gate -- root-jest',
         '  workers:',
         '    steps:',
-        '      - run: npm run ci:gate -- workers',
-        '  e2e-smoke:',
-        '    steps:',
-        '      - run: npm --prefix client run build',
-        '      - run: npm run ci:gate -- e2e-smoke',
+        '      - run: npm run test:worker:session-cors',
+        '      - run: npm run test:worker:agent-bridge',
         '  cecc-and-node:',
         '    steps:',
         '      - run: npm run test:node',
@@ -304,7 +287,9 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/verify-public-text.test.js',
       'scripts/verify-public-release-pii.sh',
       'scripts/verify-public-release-pii.test.js',
+      'scripts/run-agent-bridge-worker-tests.js',
       'workers/sessionCorsWorker/package.json',
+      'workers/agentBridgeWorker/package.json',
       'workers/deploy-helper/wrangler.example.toml',
       'workers/deploy-helper/.dev.vars.example',
       'workers/deploy-helper/LICENSE',

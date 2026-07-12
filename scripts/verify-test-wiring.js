@@ -150,6 +150,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/verify-public-text.test.js');
   expectFile('scripts/sync-public-history.sh');
   expectFile('workers/sessionCorsWorker/package.json');
+  expectFile('workers/agentBridgeWorker/package.json');
+  expectFile('scripts/run-agent-bridge-worker-tests.js');
   expectFile(publishWorkflowPath);
   expectFile(promoteWorkflowPath);
   expectFile('workers/deploy-helper/wrangler.example.toml');
@@ -182,6 +184,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:root:jest', '../tests/root/sessionCorsWorker.auth.test.js');
   expectScriptContains('test:root:jest', '../tests/root/deployHelper.worker.test.js');
   expectScriptContains('test:worker:session-cors', 'npm --prefix workers/sessionCorsWorker test');
+  expectScriptContains('test:worker:agent-bridge', 'scripts/run-agent-bridge-worker-tests.js');
   expectScriptContains('test:e2e', 'npm run -s test:e2e:smoke');
   expectScriptContains('test:e2e:quick', 'npm run -s test:e2e:smoke');
   expectScriptContains('test:e2e:smoke', 'npm run -s ai:test-nav:smoke');
@@ -191,6 +194,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:ci', 'npm run coverage-floor:check');
   expectScriptContains('test:ci', 'npm run test:root:jest');
   expectScriptContains('test:ci', 'npm run test:worker:session-cors');
+  expectScriptContains('test:ci', 'npm run test:worker:agent-bridge');
   expectScriptContains('test:ci', 'npm run test:node');
   expectScriptContains('test:wiring', 'client-boundaries:check');
   expectScriptContains('test:wiring', 'dead-exports:check');
@@ -337,6 +341,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('run: npm run coverage-floor:check', '"npm run coverage-floor:check"');
   expectWorkflowContains('run: npm run test:root:jest', '"npm run test:root:jest"');
   expectWorkflowContains('run: npm run test:worker:session-cors', '"npm run test:worker:session-cors"');
+  expectWorkflowContains('run: npm run test:worker:agent-bridge', '"npm run test:worker:agent-bridge"');
   expectWorkflowContains('run: npm run test:node', '"npm run test:node"');
   expectWorkflowContains('run: npm run test:cache-guard', '"npm run test:cache-guard"');
   expectWorkflowContains('continue-on-error: true', 'non-blocking advisory step');
