@@ -585,6 +585,81 @@ test('storageRoute can use KV-only Cloudflare payload storage when R2 is unavail
   assert.doesNotMatch(JSON.stringify(listed), /ce-storage-payload|bucket|token|secret/i);
 });
 
+for (const resource of ['media', 'images']) {
+  test(`storageRoute rejects encoded KV-only ${resource} values before any payload or index write`, async () => {
+    const kv = createMockKv();
+    const response = await storageRoute({
+      path: '/storage/upload',
+      method: 'POST',
+      request: new Request('https://worker.example/storage/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: 'x'.repeat(900),
+          contentType: 'application/octet-stream',
+          resource,
+        }),
+      }),
+      env: { CE_STORAGE_INDEX_KV: kv, CE_MAX_UPLOAD_BYTES: '4096' },
+      config: CLOUDFLARE_WORKER_GATE_CONFIG,
+      slug: 'session-a',
+      uploaderAddress: '0xabc',
+      baseHeaders: {},
+      deps: {
+        json,
+        maxKvValueBytes: 1024,
+        randomBytes: fixedRandomBytes,
+        now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+      },
+    });
+    const body = await readJson(response);
+
+    assert.equal(response.status, 413);
+    assert.match(body.error, /KV storage payload too large after encoding/);
+    assert.equal(kv.store.size, 0);
+  });
+}
+
+test('storageRoute applies the final KV value cap after worker-envelope expansion', async () => {
+  const kv = createMockKv();
+  const env = {
+    CE_STORAGE_INDEX_KV: kv,
+    CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
+    CE_MAX_UPLOAD_BYTES: '4096',
+  };
+  let config = createEnvelopeConfig();
+  const response = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: 'encrypted media payload',
+        contentType: 'application/octet-stream',
+        resource: 'media',
+      }),
+    }),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000abc',
+    baseHeaders: {},
+    deps: {
+      json,
+      maxKvValueBytes: 700,
+      randomBytes: createSequenceRandomBytes(),
+      putSessionConfig: async (_env, _slug, nextConfig) => { config = nextConfig; },
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    },
+  });
+  const body = await readJson(response);
+
+  assert.equal(response.status, 413);
+  assert.match(body.error, /KV storage payload too large after encoding/);
+  assert.equal(kv.store.size, 0);
+});
+
 test('storageRoute accepts deploy-helper KV alias bindings for Cloudflare payload storage', async () => {
   const kv = createMockKv();
   const env = { GROUP_KV: kv, CE_STORAGE_INDEX_KV: kv };

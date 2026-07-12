@@ -1,6 +1,10 @@
 export const DEFAULT_MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+// Cloudflare KV's hard value limit is 25 MiB. Keep one MiB of headroom for
+// serialization drift and reject the final encoded record, not just raw input.
+export const DEFAULT_MAX_KV_VALUE_BYTES = 24 * 1024 * 1024;
 export const MAX_UPLOAD_BYTES_ENV = 'CE_MAX_UPLOAD_BYTES';
 export const UPLOAD_TOO_LARGE_ERROR = 'Upload payload too large.';
+export const KV_VALUE_TOO_LARGE_ERROR = 'KV storage payload too large after encoding.';
 
 const toFinitePositiveInteger = (value) => {
   const numberValue = Number(value);
@@ -13,6 +17,13 @@ export const resolveMaxUploadBytes = ({ env, deps, maxUploadBytes } = {}) => (
   toFinitePositiveInteger(deps?.maxUploadBytes) ||
   toFinitePositiveInteger(env?.[MAX_UPLOAD_BYTES_ENV]) ||
   DEFAULT_MAX_UPLOAD_BYTES
+);
+
+export const resolveMaxKvValueBytes = ({ deps, maxKvValueBytes } = {}) => Math.min(
+  toFinitePositiveInteger(maxKvValueBytes) ||
+    toFinitePositiveInteger(deps?.maxKvValueBytes) ||
+    DEFAULT_MAX_KV_VALUE_BYTES,
+  DEFAULT_MAX_KV_VALUE_BYTES,
 );
 
 const tooLarge = (maxUploadBytes) => ({
@@ -36,4 +47,16 @@ export const rejectBytesOverLimit = ({ bytes, maxUploadBytes } = {}) => {
   const byteLength = Number(bytes?.byteLength ?? bytes?.length ?? 0);
   if (!Number.isFinite(byteLength)) return null;
   return byteLength > limit ? tooLarge(limit) : null;
+};
+
+export const rejectKvValueOverLimit = ({ serializedValue, deps, maxKvValueBytes } = {}) => {
+  const limit = resolveMaxKvValueBytes({ deps, maxKvValueBytes });
+  const encodedBytes = new TextEncoder().encode(String(serializedValue ?? '')).byteLength;
+  if (encodedBytes <= limit) return null;
+  return {
+    ok: false,
+    status: 413,
+    error: `${KV_VALUE_TOO_LARGE_ERROR} Maximum allowed KV value is ${limit} bytes.`,
+    payload: null,
+  };
 };

@@ -26,6 +26,7 @@ import {
 import {
   rejectBytesOverLimit,
   rejectContentLengthOverLimit,
+  rejectKvValueOverLimit,
   resolveMaxUploadBytes,
 } from './uploadSizeLimits.js';
 
@@ -1012,6 +1013,21 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     payloadAccessControl: metadata.payloadAccessControl,
   });
 
+  const serializedMetadata = JSON.stringify(metadata);
+  const serializedKvPayload = canWriteR2
+    ? ''
+    : JSON.stringify({
+        metadata,
+        payloadBase64url: bytesToBase64url(bytesToStore || new Uint8Array()),
+      });
+  const kvValueFailure = (
+    (!canWriteR2 && rejectKvValueOverLimit({ serializedValue: serializedKvPayload, deps })) ||
+    (index && rejectKvValueOverLimit({ serializedValue: serializedMetadata, deps }))
+  );
+  if (kvValueFailure) {
+    return responseJson(deps, { error: kvValueFailure.error }, kvValueFailure.status, baseHeaders);
+  }
+
   if (canWriteR2) {
     await r2.put(objectKey, bytesToStore, {
       httpMetadata: { contentType: metadata.contentType },
@@ -1025,14 +1041,11 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
       },
     });
   } else {
-    await index.put(buildPayloadKey({ slug, id }), JSON.stringify({
-      metadata,
-      payloadBase64url: bytesToBase64url(bytesToStore || new Uint8Array()),
-    }));
+    await index.put(buildPayloadKey({ slug, id }), serializedKvPayload);
   }
 
   if (index && typeof index.put === 'function') {
-    await index.put(buildIndexKey({ slug, resource, id }), JSON.stringify(metadata));
+    await index.put(buildIndexKey({ slug, resource, id }), serializedMetadata);
   }
 
   const storageRef = normalizeStorageRef(metadata);
