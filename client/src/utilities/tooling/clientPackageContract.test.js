@@ -86,8 +86,9 @@ describe('client package modernization contract', () => {
     const pkg = readClientPackageJson();
 
     expect(pkg.scripts.build).not.toContain('sourcemap');
-    expect(pkg.scripts.analyze).toContain('npm run build -- --sourcemap true');
-    expect(pkg.scripts.analyze).toContain('--html build/bundle-report.html');
+    expect(pkg.scripts.analyze).toBe(
+      "npm run build -- --sourcemap true && source-map-explorer 'build/assets/*.js' --no-border-checks --html build/bundle-report.html",
+    );
   });
 
   it('keeps legacy Vite aliases and CRA fallback scripts removed from the client package contract', () => {

@@ -60,7 +60,7 @@
   "scripts": {
     "postinstall": "patch-package",
     "dev": "PUBLIC_URL=/ vite --host 0.0.0.0 --port 3000",
-    "analyze": "npm run build -- --sourcemap true && source-map-explorer 'build/assets/*.js' --html build/bundle-report.html",
+    "analyze": "npm run build -- --sourcemap true && source-map-explorer 'build/assets/*.js' --no-border-checks --html build/bundle-report.html",
     "start": "serve -s build",
     "prebuild": "node scripts/clean-legacy-vite-output.mjs",
     "build": "PUBLIC_URL=/ vite build",
