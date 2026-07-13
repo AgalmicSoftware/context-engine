@@ -97,6 +97,23 @@ describe('sessionWizardRequirementsDisplay', () => {
     });
   });
 
+  it('shows SBT transaction requirements only while an undeployed draft is pending', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = 'custom';
+    profile.authorization.mechanisms.push('sbt_onchain');
+
+    const settled = resolveSessionWizardNewSessionRequirementsDisplayState({
+      sessionModeProfile: profile,
+    });
+    const pending = resolveSessionWizardNewSessionRequirementsDisplayState({
+      hasPendingSbtDrafts: true,
+      sessionModeProfile: profile,
+    });
+
+    expect(settled.requiredRequirementIds).toEqual(['cloudflareApiToken', 'aiProviderKey', 'rpc']);
+    expect(pending.requiredRequirementIds).toEqual(['cloudflareApiToken', 'aiProviderKey', 'rpc', 'wallet', 'funding']);
+  });
+
   it.each(['anthropicKey', 'openrouterKey'])('does not accept unselected %s for the default OpenAI models', (key) => {
     expect(
       resolveSessionWizardNewSessionRequirementsDisplayState({

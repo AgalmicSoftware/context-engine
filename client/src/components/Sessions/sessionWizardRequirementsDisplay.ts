@@ -7,6 +7,7 @@ type SessionWizardRecord = Record<string, unknown>;
 type ResolveSessionWizardNewSessionRequirementsDisplayStateArgs = {
   cloudflareWorkerSbtGateMode?: unknown;
   currentWorkerSecrets?: SessionWizardRecord | null;
+  hasPendingSbtDrafts?: unknown;
   hasSponsoredBundleLink?: unknown;
   isNewSessionWizardRoute?: unknown;
   newSessionBannerDismissalContextKey?: unknown;
@@ -39,6 +40,7 @@ const toRequirementString = (value: unknown): string => String(value ?? '');
 export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
   cloudflareWorkerSbtGateMode = false,
   currentWorkerSecrets = null,
+  hasPendingSbtDrafts = false,
   hasSponsoredBundleLink = false,
   isNewSessionWizardRoute = false,
   newSessionBannerDismissalContextKey = '',
@@ -51,6 +53,7 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
 }: ResolveSessionWizardNewSessionRequirementsDisplayStateArgs = {}): SessionWizardNewSessionRequirementsDisplayState => {
   const modeRequirements = resolveSessionWizardModeRequirements(
     sessionModeProfile && typeof sessionModeProfile === 'object' ? (sessionModeProfile as SessionModeProfile) : null,
+    { hasPendingSbtDrafts: !!hasPendingSbtDrafts },
   );
   const sponsoredBundleStatusTone = toRequirementString(sponsoredBundleStatus?.tone).trim().toLowerCase();
   const hasAnyAiProviderKey = ['openaiKey', 'anthropicKey', 'openrouterKey'].some(

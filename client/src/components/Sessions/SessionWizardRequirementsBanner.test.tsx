@@ -109,4 +109,17 @@ describe('SessionWizardRequirementsBanner', () => {
     );
     expect(screen.getByRole('link', { name: 'Lit API key' })).toBeInTheDocument();
   });
+
+  it('describes the wallet as an SBT publishing requirement when that is the transaction purpose', () => {
+    render(
+      <SessionWizardRequirementsBanner
+        fundingRequirementLabel="OP Sepolia ETH for on-chain SBT publishing"
+        onDismiss={jest.fn()}
+        requiredRequirementIds={['aiProviderKey', 'rpc', 'wallet', 'funding']}
+      />,
+    );
+
+    expect(screen.getByText('A connected wallet for on-chain SBT publishing')).toBeInTheDocument();
+    expect(screen.queryByText('A connected wallet for on-chain registration')).not.toBeInTheDocument();
+  });
 });

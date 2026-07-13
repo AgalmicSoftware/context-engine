@@ -913,7 +913,9 @@ const SessionWizard = ({
     [draft?.storageProfile],
   );
   const cloudflareWorkerSbtGateMode = isWorkerSbtGateCloudflareStorageProfile(normalizedDraftStorageProfile);
-  const sessionModeRequirements = resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile);
+  const sessionModeRequirements = resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile, {
+    hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
+  });
   const visibleWorkerResourceKeys = workerResourceKeys.filter((key) =>
     sessionModeRequirements.selected
       ? sessionModeRequirements.visibleWorkerResourceKeys.includes(key)
@@ -2628,6 +2630,7 @@ const SessionWizard = ({
     resolveSessionWizardNewSessionRequirementsDisplayState({
       cloudflareWorkerSbtGateMode,
       currentWorkerSecrets,
+      hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
       hasSponsoredBundleLink,
       isNewSessionWizardRoute,
       newSessionBannerDismissalContextKey,

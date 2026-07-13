@@ -39,6 +39,10 @@ export type SessionWizardModeRequirements = {
   };
 };
 
+type ResolveSessionWizardModeRequirementsOptions = {
+  hasPendingSbtDrafts?: boolean;
+};
+
 const emptyRequirements = (): SessionWizardModeRequirements => ({
   selected: false,
   authorityMode: '',
@@ -80,6 +84,7 @@ const hasActiveResource = (profile: SessionModeProfile, resource: SessionModeRes
 
 export const resolveSessionWizardModeRequirements = (
   profile: SessionModeProfile | null | undefined,
+  { hasPendingSbtDrafts = false }: ResolveSessionWizardModeRequirementsOptions = {},
 ): SessionWizardModeRequirements => {
   if (!profile || typeof profile !== 'object') return emptyRequirements();
 
@@ -90,16 +95,18 @@ export const resolveSessionWizardModeRequirements = (
   const requiresLit = profile.encryption?.mode === 'lit';
   const requiresRegistry = authorityMode === 'evm_registry_canonical';
   const deployPendingSbts = profile.authorization?.mechanisms?.includes('sbt_onchain') || hasOnChainCondition(profile);
+  const willDeployPendingSbts = deployPendingSbts && hasPendingSbtDrafts;
   const requiresRpc =
     requiresRegistry ||
     authorityMode === 'worker_with_public_anchor' ||
     requiresLit ||
     profile.authorization?.mechanisms?.includes('sbt_onchain') ||
     hasOnChainCondition(profile);
-  // Creating a pending SBT is itself an EVM transaction even when the session
-  // authority and canonical config remain worker-owned.
-  const requiresFunding = requiresRegistry || deployPendingSbts;
-  const requiresWallet = requiresRegistry || deployPendingSbts;
+  // Publishing a pending SBT is itself an EVM transaction even when the
+  // session authority and canonical config remain worker-owned. Existing
+  // on-chain SBT conditions still need RPC reads, but not transaction inputs.
+  const requiresFunding = requiresRegistry || willDeployPendingSbts;
+  const requiresWallet = requiresRegistry || willDeployPendingSbts;
 
   const requiredRequirementIds: SessionWizardRequirementId[] = [];
   if (usesCloudflare) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_API_TOKEN);
@@ -151,7 +158,7 @@ export const resolveSessionWizardModeRequirements = (
     },
     publishSettings: {
       showArweaveMetadataControls: requiresArweave,
-      showGasOverrideControls: requiresRegistry || deployPendingSbts,
+      showGasOverrideControls: requiresRegistry || willDeployPendingSbts,
     },
   };
 };

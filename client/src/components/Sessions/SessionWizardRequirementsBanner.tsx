@@ -32,6 +32,9 @@ const SessionWizardRequirementsBanner = ({
   const requires = (requirementId: SessionWizardRequirementId): boolean =>
     !hasResolvedRequirements || requiredRequirementIds.includes(requirementId);
   const showLegacySponsorshipCopy = !hasResolvedRequirements || !requiredRequirementIds.includes('cloudflareApiToken');
+  const walletRequirementLabel = fundingRequirementLabel.includes('SBT publishing')
+    ? 'A connected wallet for on-chain SBT publishing'
+    : 'A connected wallet for on-chain registration';
 
   return (
     <section className={styles.newSessionBanner} aria-labelledby="new-session-requirements-title">
@@ -110,7 +113,7 @@ const SessionWizardRequirementsBanner = ({
             </li>
           ) : null}
           {requires('rpc') ? <li>RPC URL or provider key for on-chain reads and publishing</li> : null}
-          {requires('wallet') ? <li>A connected wallet for on-chain registration</li> : null}
+          {requires('wallet') ? <li>{walletRequirementLabel}</li> : null}
           {requires('funding') ? (
             <li>
               {fundingRequirementHref ? (

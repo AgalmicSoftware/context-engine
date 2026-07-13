@@ -69,7 +69,7 @@ describe('sessionWizardModeRequirements', () => {
     });
   });
 
-  it('attributes RPC to an explicit on-chain SBT condition without adding Arweave', () => {
+  it('requires transaction inputs for an on-chain SBT condition only while a draft is pending', () => {
     const profile = cloudflareProfile();
     profile.preset = 'custom';
     profile.evm.registryChainId = 11155420;
@@ -89,18 +89,26 @@ describe('sessionWizardModeRequirements', () => {
     const requirements = resolveSessionWizardModeRequirements(profile);
     expect(requirements.requiresRpc).toBe(true);
     expect(requirements.requiresArweave).toBe(false);
-    expect(requirements.requiresWallet).toBe(true);
-    expect(requirements.requiresFunding).toBe(true);
-    expect(requirements.requiredRequirementIds).toEqual([
+    expect(requirements.requiresWallet).toBe(false);
+    expect(requirements.requiresFunding).toBe(false);
+    expect(requirements.requiredRequirementIds).toEqual(['cloudflareApiToken', 'aiProviderKey', 'rpc']);
+    expect(requirements.visibleWorkerResourceKeys).toEqual(['ai', 'rpc']);
+    expect(requirements.publish.deployPendingSbts).toBe(true);
+    expect(requirements.publishSettings.showGasOverrideControls).toBe(false);
+
+    const pendingRequirements = resolveSessionWizardModeRequirements(profile, { hasPendingSbtDrafts: true });
+    expect(pendingRequirements.requiresWallet).toBe(true);
+    expect(pendingRequirements.requiresFunding).toBe(true);
+    expect(pendingRequirements.requiredRequirementIds).toEqual([
       'cloudflareApiToken',
       'aiProviderKey',
       'rpc',
       'wallet',
       'funding',
     ]);
-    expect(requirements.visibleWorkerResourceKeys).toEqual(['ai', 'rpc', 'txGas']);
-    expect(requirements.publish.deployPendingSbts).toBe(true);
-    expect(requirements.publishSettings.showGasOverrideControls).toBe(true);
+    expect(pendingRequirements.visibleWorkerResourceKeys).toEqual(['ai', 'rpc', 'txGas']);
+    expect(pendingRequirements.publish.deployPendingSbts).toBe(true);
+    expect(pendingRequirements.publishSettings.showGasOverrideControls).toBe(true);
   });
 
   it('preserves decentralized Arweave, RPC, funding, registry, and optional Lit requirements', () => {
