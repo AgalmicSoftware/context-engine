@@ -181,10 +181,11 @@ export const resolveSurveyToolResultsModalCloseState = ({
 }: ResolveSurveyToolResultsModalCloseStateArgs = {}): SurveyToolResultsModalCloseState => {
   const currentPathname = typeof pathname === 'string' ? pathname : '';
   const shouldCallExternalCloseHandler = !!hasExternalCloseHandler;
-  const shouldTrimResultsPath = currentPathname.endsWith('/results') && !shouldCallExternalCloseHandler;
-  const sessionQuestionsResultsMatch = shouldTrimResultsPath
-    ? currentPathname.match(/^(.*\/session\/[^/]+)\/questions\/results$/)
+  const sessionQuestionsResultsMatch = !shouldCallExternalCloseHandler
+    ? currentPathname.match(/^(.*\/session\/[^/]+)\/questions\/results\/?$/i)
     : null;
+  const shouldTrimResultsPath =
+    !shouldCallExternalCloseHandler && (!!sessionQuestionsResultsMatch || currentPathname.endsWith('/results'));
 
   return {
     shouldTrimResultsPath,

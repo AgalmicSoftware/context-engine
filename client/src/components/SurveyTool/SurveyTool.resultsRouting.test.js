@@ -97,29 +97,32 @@ describe('SurveyTool results routing', () => {
     }
   });
 
-  it('trims /results from URL when closing results modal without external close handler', () => {
-    const priorUrl = window.location.href;
+  it.each(['/session/edge/questions/results', '/session/edge/questions/results/', '/session/edge/QUESTIONS/RESULTS'])(
+    'returns to the session root when closing results from %s',
+    (resultsPath) => {
+      const priorUrl = window.location.href;
 
-    try {
-      window.history.pushState({}, '', '/session/edge/questions/results');
-      const subject = new SurveyTool({
-        autoOpenResults: false,
-        preventUrlChange: true,
-      });
+      try {
+        window.history.pushState({}, '', resultsPath);
+        const subject = new SurveyTool({
+          autoOpenResults: false,
+          preventUrlChange: true,
+        });
 
-      subject.setState = jest.fn((next) => {
-        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-        subject.state = { ...subject.state, ...(patch || {}) };
-      });
+        subject.setState = jest.fn((next) => {
+          const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+          subject.state = { ...subject.state, ...(patch || {}) };
+        });
 
-      subject.closeResultsModal();
+        subject.closeResultsModal();
 
-      expect(subject.setState).toHaveBeenCalledWith({ showResultsModal: false });
-      expect(window.location.pathname).toBe('/session/edge');
-    } finally {
-      window.history.replaceState({}, '', priorUrl);
-    }
-  });
+        expect(subject.setState).toHaveBeenCalledWith({ showResultsModal: false });
+        expect(window.location.pathname).toBe('/session/edge');
+      } finally {
+        window.history.replaceState({}, '', priorUrl);
+      }
+    },
+  );
 
   it('keeps route-driven auto-open owned by SurveyTool instead of cascading it into SurveySelector', () => {
     const subject = new SurveyTool({
