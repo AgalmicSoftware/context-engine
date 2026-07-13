@@ -275,6 +275,35 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     expect(confirmRepin.mock.calls[0][0]).not.toContain(`origin ${WORKER_ORIGIN} -> ${WORKER_ORIGIN}`);
   });
 
+  it('shows both slugs when an authoritative session ID is reused by a different slug', async () => {
+    mockUpsertBootstrap
+      .mockReturnValueOnce({
+        status: 'conflict',
+        cacheKey: cachedResult.cacheKey,
+        config: { ...bootstrap.config, slug: 'first-session' },
+        existingSessionIdHex: SESSION_ID,
+        sessionIdHex: SESSION_ID,
+        existingWorkerOrigin: WORKER_ORIGIN,
+        workerOrigin: WORKER_ORIGIN,
+      })
+      .mockReturnValueOnce(cachedResult);
+    const confirmRepin = jest.fn(async () => true);
+
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        onResolved={jest.fn()}
+        confirmRepin={confirmRepin}
+      />,
+    );
+
+    await waitFor(() => expect(confirmRepin).toHaveBeenCalledTimes(1));
+    expect(confirmRepin.mock.calls[0][0]).toContain('session slug "first-session" -> "worker-session"');
+    expect(confirmRepin.mock.calls[0][0]).not.toContain(`origin ${WORKER_ORIGIN} -> ${WORKER_ORIGIN}`);
+    expect(confirmRepin.mock.calls[0][0]).not.toContain(`ID ${SESSION_ID} -> ${SESSION_ID}`);
+  });
+
   it('fails closed when a TOFU repin is declined', async () => {
     mockUpsertBootstrap.mockReturnValueOnce({
       status: 'conflict',

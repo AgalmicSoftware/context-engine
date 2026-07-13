@@ -75,9 +75,14 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
 
         let cacheResult = cacheBootstrap(bootstrap, false);
         if (cacheResult.status === 'conflict') {
+          const existingSlug = typeof cacheResult.config?.slug === 'string' ? cacheResult.config.slug.trim() : '';
+          const slugChanged = !!existingSlug && existingSlug !== bootstrap.sessionSlug;
           const originChanged = cacheResult.existingWorkerOrigin !== bootstrap.workerOrigin;
           const identityChanged = cacheResult.existingSessionIdHex !== bootstrap.sessionId;
           const changeSummary = [
+            slugChanged
+              ? `session slug "${existingSlug}" -> "${bootstrap.sessionSlug}"`
+              : `session slug "${bootstrap.sessionSlug}"`,
             originChanged
               ? `worker origin ${cacheResult.existingWorkerOrigin} -> ${bootstrap.workerOrigin}`
               : `worker origin ${bootstrap.workerOrigin}`,
