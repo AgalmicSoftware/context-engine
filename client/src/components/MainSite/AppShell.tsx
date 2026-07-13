@@ -35,12 +35,7 @@ import { surveyReadsPort } from '../../domains/surveys/surveyChainReadsPort.js';
 import { faucetFundingPort } from '../../domains/worker/faucetFundingPort.js';
 import { deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
-import {
-  createLitHooks,
-  attachLitDevTools,
-  getGlobalLitHooks,
-  setGlobalLitHooks,
-} from '../../utilities/crypto/litProtocol.js';
+import { getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { ethers } from 'ethers';
 import {
   CE_FIRST_VISIT_ROOT_REDIRECT_ENABLED,
@@ -157,7 +152,7 @@ import {
   resolveMainSiteSessionSlugFromProps,
   resolveMainSiteSessionSlugFromPathToken,
 } from './routeSessionResolution.js';
-import { resolveMainSiteLitSessionConfig, resolveMainSiteLitSessionConfigSource } from './litSessionConfig.js';
+import { resolveMainSiteLitRouteContextKey, syncMainSiteLitHooks } from './mainSiteLitHooksBinding.js';
 import {
   buildMetadataSessionCacheEnvelope as buildMetadataSessionCacheEnvelopeFn,
   resolveMetadataSessionBinding as resolveMetadataSessionBindingFn,
@@ -187,7 +182,6 @@ import {
 } from '../../utilities/cache/sessionCacheConstants.js';
 import {
   buildMainSiteCacheManagerReadyStatePatch,
-  buildMainSiteLitHooksStatePatch,
   isRouteResponderAddress,
 } from '../../utilities/session/mainSiteUtils.js';
 import {
@@ -941,6 +935,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   _sessionFallbackRedirectPath = '';
   _lastProcessedQuestionIdFromPath = '';
   _lastProcessedQuestionSlugFromPath: string | null = null;
+  _lastLitRouteContextKey = '';
 
   get _registryBootstrapPromise(): Promise<unknown> | null {
     const controller = this._profileScanController as MainSiteProfileScanControllerBootstrap;
@@ -1550,44 +1545,15 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     return true;
   };
 
+  getLitRouteContextKey = () => resolveMainSiteLitRouteContextKey(this);
+
   syncLitHooks = () => {
-    if (typeof window === 'undefined') return;
-    const slug = this.getActiveSessionSlug();
-    const cfg = resolveMainSiteLitSessionConfigSource({
-      slug,
-      resolveRegistryConfigBySlug: (sessionSlug: string) => sessionRegistryReadsPort.getSessionConfig(sessionSlug),
-      resolveStaticConfigBySlug: (sessionSlug: string) => getSessionConfigBySlugOrDefault(sessionSlug),
-    });
-    const { chainId, litNetwork, litChain, accessControlConditions, userMaxPrice, chipotle } =
-      resolveMainSiteLitSessionConfig({
-        sessionConfig: cfg,
-        networkChainIdFallback: this.props.network?.id || null,
-      });
-
-    const hooks = chipotle
-      ? createLitHooks({
-          providerLike: this.props.provider,
-          account: this.props.account,
-          chainId,
-          litChain,
-          litNetwork,
-          userMaxPrice,
-          accessControlConditions: accessControlConditions || undefined,
-          chipotle: {
-            ...chipotle,
-            sessionSlug: slug,
-          },
-        })
-      : null;
-
-    setGlobalLitHooks(hooks);
-    attachLitDevTools({
-      providerLike: this.props.provider,
-      account: this.props.account,
-      chainId,
-      litChain,
-    });
-    this.setState(buildMainSiteLitHooksStatePatch(hooks));
+    const result = syncMainSiteLitHooks(this);
+    if (!result) return;
+    // Keep the route key aligned with hook installation. A later navigation can
+    // then clear a prior session's hooks before its new bootstrap is trusted.
+    this._lastLitRouteContextKey = result.routeContextKey;
+    this.setState({ litHooks: result.hooks });
   };
 
   getSessionInfoForGroup = (sessionConfig: unknown = {}, slug = '') => {
@@ -2847,7 +2813,10 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       this.props.account !== prevProps.account ||
       this.props.provider !== prevProps.provider ||
       this.getSessionSlugFromProps(this.props) !== this.getSessionSlugFromProps(prevProps);
-    if (sessionContextChanged) {
+    const sessionPathResolutionChanged =
+      Number(this.state.sessionPathResolutionNonce || 0) !== Number(prevState?.sessionPathResolutionNonce || 0);
+    const litRouteContextChanged = this.getLitRouteContextKey() !== this._lastLitRouteContextKey;
+    if (sessionContextChanged || sessionPathResolutionChanged || litRouteContextChanged) {
       this.syncLitHooks();
       this.refreshSessionInfo();
       this.refreshSessionMetaFields();

@@ -18,6 +18,8 @@ import {
 import { FIRST_VISIT_STORAGE_KEY } from '../Onboarding/onboardingConfig.js';
 import { FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY } from './sessionFallbackRedirect.js';
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
+import { createLitHooks, setGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile.js';
 
 const mockAdminPage = jest.fn(() => null);
 const mockSponsorPage = jest.fn(() => null);
@@ -317,9 +319,11 @@ jest.mock('../../utilities/ui/uiRuntimeStats.js', () => ({
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   __esModule: true,
+  buildSbtAccessControlConditions: jest.fn(() => []),
   createLitHooks: jest.fn(() => ({})),
   attachLitDevTools: jest.fn(),
   getGlobalLitHooks: jest.fn(() => null),
+  resolveLitChain: jest.fn(() => 'optimismSepolia'),
   setGlobalLitHooks: jest.fn(),
 }));
 
@@ -921,6 +925,132 @@ describe('AppShell route render smoke', () => {
     expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual(workerConfig);
     expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
     expect(fetchSpy.mock.calls[0][0]).toBe('https://worker-session.example.com/session-config?slug=worker-session');
+  });
+
+  it('installs verified explicit-Lit worker hooks through the boundary and route controller', async () => {
+    const workerOrigin = 'https://worker-lit.example.com';
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.encryption = { mode: 'lit' };
+    sessionModeProfile.evm.registryChainId = 11155420;
+    const workerConfig = {
+      slug: 'worker-lit',
+      sessionId: '0x11223344556677889900aabbccddeeff',
+      configRevision: 'revision-lit-1',
+      corsWorkerUrl: workerOrigin,
+      sessionName: 'Worker Lit Session',
+      sessionModeProfile,
+    };
+    const bootstrapResponse = createDeferred();
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockReturnValueOnce(bootstrapResponse.promise);
+    const litHooks = { saveKey: jest.fn(), getKey: jest.fn() };
+    createLitHooks.mockReturnValueOnce(litHooks);
+    const subject = createSubject({
+      path: '/session/worker-lit',
+      search: `?worker=${encodeURIComponent(workerOrigin)}`,
+      activeSessionSlug: 'edge',
+      sessionConfig: null,
+    });
+    subject.handleNetworkChange = jest.fn();
+    subject.syncSessionFallbackRedirectConsumption = jest.fn();
+
+    const view = render(subject.render());
+
+    // A routing query alone must not install hooks before the boundary has
+    // fetched, validated, cached, and marked the worker bootstrap verified.
+    subject.syncLitHooks();
+    expect(createLitHooks).not.toHaveBeenCalled();
+    expect(setGlobalLitHooks).toHaveBeenLastCalledWith(null);
+
+    await act(async () => {
+      bootstrapResponse.resolve(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionSlug: workerConfig.slug,
+            config: workerConfig,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+      await bootstrapResponse.promise;
+    });
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+
+    const prevState = {
+      ...subject.state,
+      litHooks: null,
+      sessionPathResolutionNonce: 0,
+    };
+    subject.componentDidUpdate(subject.props, prevState);
+
+    expect(createLitHooks).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chainId: 11155420,
+        litNetwork: 'chipotle',
+        chipotle: expect.objectContaining({
+          sessionSlug: 'worker-lit',
+          sessionConfig: workerConfig,
+          workerUrl: workerOrigin,
+        }),
+      }),
+    );
+    expect(setGlobalLitHooks).toHaveBeenLastCalledWith(litHooks);
+    expect(subject.state.litHooks).toBe(litHooks);
+
+    view.rerender(subject.render());
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.litHooks).toBe(litHooks);
+
+    const envelopeOrigin = 'https://worker-envelope.example.com';
+    const envelopeConfig = {
+      slug: 'worker-envelope',
+      sessionId: '0xffeeddccbbaa00998877665544332211',
+      configRevision: 'revision-envelope-1',
+      corsWorkerUrl: envelopeOrigin,
+      sessionName: 'Worker Envelope Session',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    const envelopeResponse = createDeferred();
+    fetchSpy.mockReturnValueOnce(envelopeResponse.promise);
+    const litRouteState = { ...subject.state };
+    setRoute('/session/worker-envelope', `?worker=${encodeURIComponent(envelopeOrigin)}`);
+
+    view.rerender(subject.render());
+    subject.componentDidUpdate(subject.props, litRouteState);
+
+    expect(subject.state.litHooks).toBeNull();
+    expect(setGlobalLitHooks).toHaveBeenLastCalledWith(null);
+    expect(createLitHooks).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      envelopeResponse.resolve(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionSlug: envelopeConfig.slug,
+            config: envelopeConfig,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+      await envelopeResponse.promise;
+    });
+    await waitFor(() =>
+      expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(litRouteState.sessionPathResolutionNonce),
+    );
+
+    subject.componentDidUpdate(subject.props, {
+      ...subject.state,
+      sessionPathResolutionNonce: litRouteState.sessionPathResolutionNonce,
+    });
+    expect(subject.state.litHooks).toBeNull();
+    expect(setGlobalLitHooks).toHaveBeenLastCalledWith(null);
+    expect(createLitHooks).toHaveBeenCalledTimes(1);
+
+    view.rerender(subject.render());
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.litHooks).toBeNull();
   });
 
   it('fails closed on duplicate worker discovery parameters without registry fallback', async () => {
