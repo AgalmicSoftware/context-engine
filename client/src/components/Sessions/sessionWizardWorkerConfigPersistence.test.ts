@@ -1,4 +1,6 @@
 import { persistAndVerifySessionWizardWorkerConfig } from './sessionWizardWorkerConfigPersistence';
+import { buildSessionWizardWorkerConfigPayload } from './sessionWizardWriteNormalization';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const ADMIN_ADDRESS = '0x1111111111111111111111111111111111111111';
 const SESSION_ID = '0x00112233445566778899aabbccddeeff';
@@ -174,6 +176,66 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
         }),
       }),
     );
+  });
+
+  it('composes an explicit-Lit worker payload through signed persistence while config and public verification stay RPC-free', async () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.encryption = { mode: 'lit' };
+    sessionModeProfile.evm.registryChainId = 11155420;
+    const config = buildSessionWizardWorkerConfigPayload({
+      slug: 'worker-session',
+      draft: {
+        sessionName: 'Worker Lit Session',
+        networkChainId: 11155420,
+        sessionModeProfile,
+      },
+      deployPayload: {
+        rpcUrl: 'https://rpc.example.test',
+        rpcUrlsByChainId: { 11155420: ['https://rpc.example.test'] },
+      },
+      workerSecrets: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group_123',
+        litPkpId: 'pkp_123',
+        litActionCid: 'bafy123',
+      },
+      account: ADMIN_ADDRESS,
+      sessionId: SESSION_ID,
+      workerUrl: WORKER_ORIGIN,
+    });
+    const signAdminAction = jest.fn(async () => ({ signature: '0xsigned' }));
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          config: verifiedConfig('revision-lit-rpc', {
+            sessionName: 'Worker Lit Session',
+            sessionModeProfile,
+            networkChainId: 11155420,
+          }),
+        }),
+      );
+
+    const result = await persistAndVerifySessionWizardWorkerConfig({
+      workerUrl: WORKER_ORIGIN,
+      slug: 'worker-session',
+      sessionId: SESSION_ID,
+      adminAddress: ADMIN_ADDRESS,
+      config,
+      signAdminAction,
+      fetchImpl,
+      configRevision: 'revision-lit-rpc',
+      retryDelaysMs: [],
+    });
+
+    const signedConfig = signAdminAction.mock.calls[0][0].body.config;
+    expect(signedConfig).not.toHaveProperty('rpcUrl');
+    expect(signedConfig).not.toHaveProperty('rpcUrlsByChainId');
+    expect(signedConfig).toEqual(expect.objectContaining({ networkChainId: 11155420 }));
+    expect(result.publicConfig).not.toHaveProperty('rpcUrl');
+    expect(result.publicConfig).not.toHaveProperty('rpcUrlsByChainId');
   });
 
   it.each([

@@ -414,6 +414,7 @@ describe('sessionWizardWriteNormalization', () => {
       slug: 'worker-lit-session',
       draft: {
         sessionName: 'Worker Lit Session',
+        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
         sessionModeProfile,
       },
       deployPayload: {
@@ -439,6 +440,9 @@ describe('sessionWizardWriteNormalization', () => {
       litPkpId: 'pkp_123',
       litActionCid: 'bafy123',
     });
+    expect(payload.networkChainId).toBe(DEFAULT_CONFIG_CHAIN_ID);
+    expect(payload.rpcUrl).toBeUndefined();
+    expect(payload.rpcUrlsByChainId).toBeUndefined();
     expect(JSON.stringify(payload)).not.toContain('must-never-persist');
   });
   test('session storage profile is session-owned metadata and worker config, with Cloudflare secrets omitted', () => {

@@ -383,6 +383,51 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(JSON.stringify(deployPayload)).not.toMatch(/must-not-send/);
   });
 
+  it('routes explicit-Lit RPC inputs through session secrets without duplicating them in canonical config', async () => {
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const options = buildDeployHookOptions();
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.encryption = { mode: 'lit' };
+    sessionModeProfile.evm.registryChainId = 11155420;
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      draft: {
+        ...options.refs.runtimeRef.current.draft,
+        slug: 'worker-lit-session',
+        sessionModeProfile,
+      },
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    options.getCurrentWorkerSecrets.mockReturnValue({
+      openaiKey: 'sk-ai',
+      customRpcUrl: 'https://rpc.example.test',
+      customRpcKey: 'rpc-secret',
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+      litUsageApiKey: 'lit-secret',
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+    const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
+    expect(deployPayload.rpcUrl).toBeUndefined();
+    expect(deployPayload.rpcUrlsByChainId).toBeUndefined();
+    expect(deployPayload.secrets).toEqual({
+      openaiKey: 'sk-ai',
+      customRpcUrl: 'https://rpc.example.test',
+      customRpcKey: 'rpc-secret',
+      litUsageApiKey: 'lit-secret',
+    });
+  });
+
   it.each([
     ['anthropic', 'anthropicKey', 'openrouterKey'],
     ['openrouter', 'openrouterKey', 'anthropicKey'],

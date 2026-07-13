@@ -905,6 +905,50 @@ test('executeSessionLitChipotleAction falls back to a default public RPC for the
   });
 });
 
+test('executeSessionLitChipotleAction prefers the session-secret custom RPC over public fallbacks', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+      return jsonResponse('QmAction123');
+    }
+    if (String(url).endsWith('/core/v1/lit_action')) {
+      return jsonResponse({
+        has_error: false,
+        logs: '',
+        response: { ok: true, allowed: true },
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  await executeSessionLitChipotleAction({
+    config: {
+      networkChainId: 11155420,
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litActionCid: 'QmAction123',
+        litPkpId: '0xpkp123',
+      },
+    },
+    secrets: {
+      litUsageApiKey: 'usage-key',
+      customRpcUrl: 'https://rpc.example.test',
+    },
+    request: {
+      actionCode: 'async function main() { return { ok: true }; }',
+      op: 'check',
+      sbtAddresses: ['0x29563ff3aCC8AFb220D810F8022218095e25C1f6'],
+      chainId: 11155420,
+    },
+    requesterAddress: '0x00000000000000000000000000000000000000aa',
+    fetchImpl,
+  });
+
+  const body = JSON.parse(calls[1][1].body);
+  assert.equal(body.js_params.rpcUrl, 'https://rpc.example.test/');
+});
+
 
 test('resolveLitChipotleProvisioningRuntime prefers session account secrets before worker env credentials and accepts group names', () => {
   assert.deepEqual(resolveLitChipotleProvisioningRuntime({

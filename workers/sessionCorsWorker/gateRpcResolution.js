@@ -1,8 +1,15 @@
+import rpcDefaults from '../../client/src/variables/rpcDefaults.js';
 import {
   mergeRpcUrlLists as defaultMergeRpcUrlLists,
   normalizeRpcUrlList as defaultNormalizeRpcUrlList,
 } from './rpcUrlListNormalization.js';
 import { toChainId as defaultToChainId } from './chainIdNormalization.js';
+
+const { getPublicRpcUrls } = rpcDefaults;
+
+const isWorkerCanonicalConfig = (config) => (
+  config?.sessionModeProfile?.authority?.mode === 'worker_canonical'
+);
 
 export const resolveRpcUrlListForGate = ({
   config,
@@ -18,6 +25,9 @@ export const resolveRpcUrlListForGate = ({
   const toChainId = typeof deps?.toChainId === 'function'
     ? deps.toChainId
     : defaultToChainId;
+  const resolvePublicRpcUrls = typeof deps?.getPublicRpcUrls === 'function'
+    ? deps.getPublicRpcUrls
+    : getPublicRpcUrls;
 
   const configRpcUrls = normalizeRpcUrlList(config?.rpcUrl);
   const chainId = toChainId(gateChainId);
@@ -30,8 +40,11 @@ export const resolveRpcUrlListForGate = ({
 
   const registryChainId = toChainId(config?.registryChainId);
   if (registryChainId && registryChainId === chainId) {
-    return mergeRpcUrlLists(mapped, configRpcUrls);
+    const configured = mergeRpcUrlLists(mapped, configRpcUrls);
+    if (configured.length) return configured;
   }
 
-  return mapped;
+  if (mapped.length) return mapped;
+  if (!isWorkerCanonicalConfig(config)) return [];
+  return normalizeRpcUrlList(resolvePublicRpcUrls(chainId));
 };

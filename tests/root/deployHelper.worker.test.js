@@ -607,6 +607,65 @@ describe('deploy-helper worker', () => {
     }
   });
 
+  it('keeps explicit-Lit worker RPC credentials in the secret-only record instead of canonical config', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({ subdomain: 'tenant-subdomain', status: 'active' }),
+      cfSuccess({ enabled: true }),
+      cfSuccess({}),
+    ]);
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'lit-session',
+        sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        adminAddress: '0x00000000000000000000000000000000000000aa',
+        networkChainId: 11155420,
+        rpcUrl: 'https://rpc.example.test',
+        rpcUrlsByChainId: { 11155420: ['https://rpc.example.test'] },
+        sessionModeProfile: {
+          authority: { mode: 'worker_canonical' },
+          encryption: { mode: 'lit' },
+        },
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+        secrets: {
+          customRpcUrl: 'https://rpc.example.test',
+          customRpcKey: 'rpc-secret',
+          litAccountApiKey: 'lit-secret',
+        },
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload?.ok).toBe(true);
+      const configWrite = JSON.parse(fetchMock.calls[2][1].body);
+      expect(configWrite.rpcUrl).toBeUndefined();
+      expect(configWrite.rpcUrlsByChainId).toBeUndefined();
+      expect(configWrite.sessionModeProfile.encryption).toEqual({ mode: 'lit' });
+
+      const secretsWrite = fetchMock.calls.find(([url]) => String(url).endsWith(':secrets'));
+      const secretsEnvelope = JSON.parse(secretsWrite[1].body);
+      expect(secretsEnvelope.secrets).toEqual({
+        customRpcUrl: 'https://rpc.example.test',
+        customRpcKey: 'rpc-secret',
+        litAccountApiKey: 'lit-secret',
+      });
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
   it('rejects an invalid worker-canonical authority policy before Cloudflare mutation', async () => {
     const fetchMock = makeFetchSequence([]);
     global.fetch = fetchMock;

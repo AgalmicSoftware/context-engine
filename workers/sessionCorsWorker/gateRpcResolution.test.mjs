@@ -74,6 +74,55 @@ test('resolveRpcUrlListForGate returns mapped-only RPC URLs for a non-registry g
   ]);
 });
 
+test('resolveRpcUrlListForGate falls back to supported OP and Base Sepolia public RPCs', () => {
+  const opSepolia = resolveRpcUrlListForGate({
+    config: {
+      networkChainId: 11155420,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    },
+    gateChainId: 11155420,
+    deps,
+  });
+  const baseSepolia = resolveRpcUrlListForGate({
+    config: {
+      networkChainId: 84532,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    },
+    gateChainId: 84532,
+    deps,
+  });
+
+  assert.equal(opSepolia[0], 'https://sepolia.optimism.io');
+  assert.equal(baseSepolia[0], 'https://base-sepolia-rpc.publicnode.com');
+});
+
+test('resolveRpcUrlListForGate keeps missing-RPC legacy sessions fail-closed', () => {
+  const result = resolveRpcUrlListForGate({
+    config: {
+      networkChainId: 11155420,
+      sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } },
+    },
+    gateChainId: 11155420,
+    deps,
+  });
+
+  assert.deepEqual(result, []);
+});
+
+test('resolveRpcUrlListForGate keeps explicit chain config ahead of supported-chain fallbacks', () => {
+  const result = resolveRpcUrlListForGate({
+    config: {
+      rpcUrlsByChainId: {
+        11155420: ['https://configured-rpc.example.test'],
+      },
+    },
+    gateChainId: 11155420,
+    deps,
+  });
+
+  assert.deepEqual(result, ['https://configured-rpc.example.test']);
+});
+
 test('resolveRpcUrlListForGate merges mapped and direct RPC URLs when the gate chain matches the registry chain', () => {
   const result = resolveRpcUrlListForGate({
     config: {

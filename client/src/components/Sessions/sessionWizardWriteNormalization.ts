@@ -351,11 +351,9 @@ export const buildSessionWizardWorkerConfigPayload = ({
     delete next.registryAddress;
     delete next.registryChainId;
     delete next.faucet;
-    if (!modeRequirements.requiresRpc) {
-      delete next.networkChainId;
-      delete next.rpcUrl;
-      delete next.rpcUrlsByChainId;
-    }
+    delete next.rpcUrl;
+    delete next.rpcUrlsByChainId;
+    if (!modeRequirements.requiresRpc) delete next.networkChainId;
     if (!modeRequirements.requiresLit) {
       delete next.litCredentials;
     }

@@ -424,10 +424,11 @@ const useSessionWizardWorkerDeploy = ({
           delete payload.registryChainId;
           delete payload.faucet;
           delete payload.blockLimits;
-          if (!modeRequirements.requiresRpc) {
-            delete payload.rpcUrl;
-            delete payload.rpcUrlsByChainId;
-          }
+          // Worker-canonical RPC values stay in the dedicated session-secrets
+          // record. Keeping them out of canonical config also keeps bootstrap
+          // reads non-secret while Chipotle resolves customRpcUrl from secrets.
+          delete payload.rpcUrl;
+          delete payload.rpcUrlsByChainId;
         }
         if (Object.keys(deploySecrets).length) {
           payload.secrets = deploySecrets;

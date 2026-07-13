@@ -1070,9 +1070,7 @@ export const executeDeployHelperRequest = async ({
           rpcUrlsByChainId,
           faucet,
         }
-      : (rpcUrl || Object.keys(rpcUrlsByChainId).length)
-        ? { rpcUrl, rpcUrlsByChainId }
-        : {}),
+      : {}),
     ...selectDeployWorkerSessionConfigFields(body),
   };
   if (workerCanonicalRequested) {
