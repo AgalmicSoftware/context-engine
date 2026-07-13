@@ -27,6 +27,7 @@ export type SessionWizardModeRequirements = {
   requiresFunding: boolean;
   requiresWallet: boolean;
   publish: {
+    deployPendingSbts: boolean;
     persistWorkerConfig: boolean;
     uploadMetadata: boolean;
     registerSession: boolean;
@@ -52,6 +53,7 @@ const emptyRequirements = (): SessionWizardModeRequirements => ({
   requiresFunding: false,
   requiresWallet: false,
   publish: {
+    deployPendingSbts: false,
     persistWorkerConfig: false,
     uploadMetadata: false,
     registerSession: false,
@@ -87,6 +89,7 @@ export const resolveSessionWizardModeRequirements = (
   const requiresArweave = profile.storage?.backend === 'arweave';
   const requiresLit = profile.encryption?.mode === 'lit';
   const requiresRegistry = authorityMode === 'evm_registry_canonical';
+  const deployPendingSbts = profile.authorization?.mechanisms?.includes('sbt_onchain') || hasOnChainCondition(profile);
   const requiresRpc =
     requiresRegistry ||
     authorityMode === 'worker_with_public_anchor' ||
@@ -138,6 +141,7 @@ export const resolveSessionWizardModeRequirements = (
     requiresFunding,
     requiresWallet,
     publish: {
+      deployPendingSbts,
       persistWorkerConfig: isWorkerCanonical,
       uploadMetadata: requiresArweave,
       registerSession: requiresRegistry,

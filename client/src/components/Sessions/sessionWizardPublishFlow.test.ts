@@ -122,7 +122,7 @@ describe('sessionWizardPublishFlow', () => {
         workerMode: 'custom',
         sponsoredAutoDeployReady: false,
         deployComplete: true,
-        hasPendingDrafts: false,
+        hasPendingDrafts: true,
         hasManualMetadata: false,
         canUploadMetadataNow: true,
         sessionModeProfile,

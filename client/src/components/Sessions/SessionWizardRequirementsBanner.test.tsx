@@ -77,6 +77,8 @@ describe('SessionWizardRequirementsBanner', () => {
     expect(screen.getByRole('link', { name: 'AI provider key' })).toBeInTheDocument();
     expect(screen.queryByText(/Arweave|Lit|RPC|wallet|faucet|funding|gas/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/not required/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/turnkey tool/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'contextengine@protonmail.com' })).not.toBeInTheDocument();
   });
 
   it('preserves explicit decentralized and Lit requirements without the legacy faucet notice', () => {

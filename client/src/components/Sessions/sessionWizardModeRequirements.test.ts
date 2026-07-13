@@ -25,6 +25,7 @@ describe('sessionWizardModeRequirements', () => {
         requiresLit: false,
         requiresFunding: false,
         publish: {
+          deployPendingSbts: false,
           persistWorkerConfig: true,
           uploadMetadata: false,
           registerSession: false,
@@ -56,6 +57,7 @@ describe('sessionWizardModeRequirements', () => {
     expect(requirements.requiresRpc).toBe(true);
     expect(requirements.requiresArweave).toBe(false);
     expect(requirements.publish).toEqual({
+      deployPendingSbts: false,
       persistWorkerConfig: true,
       uploadMetadata: false,
       registerSession: false,
@@ -88,6 +90,7 @@ describe('sessionWizardModeRequirements', () => {
     expect(requirements.requiresRpc).toBe(true);
     expect(requirements.requiresArweave).toBe(false);
     expect(requirements.visibleWorkerResourceKeys).toEqual(['ai', 'rpc']);
+    expect(requirements.publish.deployPendingSbts).toBe(true);
   });
 
   it('preserves decentralized Arweave, RPC, funding, registry, and optional Lit requirements', () => {
@@ -109,6 +112,7 @@ describe('sessionWizardModeRequirements', () => {
         visibleWorkerResourceKeys: ['ai', 'arweave', 'rpc', 'txGas'],
         requiredWorkerSecretFields: ['openaiKey', 'arweaveJwk'],
         publish: {
+          deployPendingSbts: true,
           persistWorkerConfig: false,
           uploadMetadata: true,
           registerSession: true,

@@ -128,14 +128,20 @@ const SessionWizardRequirementsBanner = ({
           ) : null}
           {!hasResolvedRequirements ? <li>(Optional) A faucet private key for sponsoring user gas</li> : null}
         </ul>
-        <p className={styles.newSessionBannerCopy}>A turnkey tool for bundling these resources is in development.</p>
-        <p className={styles.newSessionBannerCopy}>
-          In the meantime, you can get a sponsored session URL by contacting{' '}
-          <a href="mailto:contextengine@protonmail.com" className={styles.newSessionBannerLink}>
-            contextengine@protonmail.com
-          </a>
-          .
-        </p>
+        {!hasResolvedRequirements ? (
+          <>
+            <p className={styles.newSessionBannerCopy}>
+              A turnkey tool for bundling these resources is in development.
+            </p>
+            <p className={styles.newSessionBannerCopy}>
+              In the meantime, you can get a sponsored session URL by contacting{' '}
+              <a href="mailto:contextengine@protonmail.com" className={styles.newSessionBannerLink}>
+                contextengine@protonmail.com
+              </a>
+              .
+            </p>
+          </>
+        ) : null}
       </div>
     </section>
   );

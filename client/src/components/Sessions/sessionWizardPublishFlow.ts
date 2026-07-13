@@ -57,9 +57,11 @@ export const buildSessionWizardPublishPlan = ({
   sessionModeProfile?: SessionModeProfile | null;
 } = {}) => {
   const modeRequirements = resolveSessionWizardModeRequirements(sessionModeProfile);
+  const shouldDeployPendingSbts =
+    !!hasPendingDrafts && (!modeRequirements.selected || modeRequirements.publish.deployPendingSbts);
   const steps: string[] = [];
   if (shouldAutoDeployWorker) steps.push('deploy-worker');
-  if (hasPendingDrafts) steps.push('deploy-sbts');
+  if (shouldDeployPendingSbts) steps.push('deploy-sbts');
   if (modeRequirements.selected && modeRequirements.publish.persistWorkerConfig) {
     steps.push('persist-worker-config');
   }
@@ -169,7 +171,11 @@ export const buildSessionWizardPublishExecutionPlan = ({
     sponsoredAutoDeployReady,
     deployComplete,
   });
-  const shouldDeployPendingSbts = !!hasPendingDrafts;
+  // Pending SBT drafts live outside the selected profile. Suppress them unless
+  // the profile explicitly retains on-chain SBT authorization so switching to
+  // worker-canonical mode cannot silently reintroduce wallet/gas work.
+  const shouldDeployPendingSbts =
+    !!hasPendingDrafts && (!modeRequirements.selected || modeRequirements.publish.deployPendingSbts);
   const shouldUploadMetadata =
     (!modeRequirements.selected || modeRequirements.publish.uploadMetadata) &&
     (!!canUploadMetadataNow || !!sponsoredAutoDeployReady) &&
