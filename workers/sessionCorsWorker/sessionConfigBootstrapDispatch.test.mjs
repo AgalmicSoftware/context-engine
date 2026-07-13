@@ -175,6 +175,33 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
   assert.equal(findForbiddenWorkerConfigSecretPath({ workerAuthority: { resourceKey: 'public-id' } }), '');
   assert.equal(findForbiddenWorkerConfigSecretPath({ nested: { publicKey: 'public-id' } }), '');
   assert.equal(findForbiddenWorkerConfigSecretPath({ nested: { resourceKey: 'default' } }), '');
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({
+      storageEnvelope: {
+        keyProvider: 'worker_secret',
+        sessionKey: {
+          version: 1,
+          alg: 'AES-256-GCM',
+          wrapAlg: 'AES-GCM-KW-v1',
+          iv: 'public-iv',
+          wrappedKey: 'encrypted-key-material',
+        },
+      },
+    }),
+    '',
+  );
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({
+      storageEnvelope: { sessionKey: { privateKey: 'plaintext-secret' } },
+    }),
+    'config.storageEnvelope.sessionKey.privateKey',
+  );
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({
+      storageEnvelope: { unrelatedKey: 'plaintext-secret' },
+    }),
+    'config.storageEnvelope.unrelatedKey',
+  );
 });
 
 test('dispatchSessionConfigBootstrapRequest returns only CORS-scoped worker-canonical config', async () => {

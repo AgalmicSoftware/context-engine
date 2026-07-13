@@ -56,6 +56,10 @@ const SAFE_STRUCTURAL_AUTHORIZATION_PATHS = new Set([
   'config.authorization',
   'config.sessionModeProfile.authorization',
 ]);
+const SAFE_WRAPPED_STORAGE_KEY_PATHS = new Set([
+  'config.storageEnvelope.sessionKey',
+  'config.storageEnvelope.sessionKey.wrappedKey',
+]);
 const TOP_LEVEL_PROVIDER_KEY_NAMES = new Set([
   'aikey',
   'anthropickey',
@@ -75,6 +79,7 @@ const hasSensitiveTokenValue = (value) => {
 const isRecursiveProviderSecretAlias = ({ key, path, value }) => {
   const normalized = normalizeKey(key);
   const fieldPath = `${path}.${key}`;
+  if (SAFE_WRAPPED_STORAGE_KEY_PATHS.has(fieldPath)) return false;
   if (SAFE_PUBLIC_KEY_FIELD_NAMES.has(normalized)) return false;
   if (
     normalized === 'authorization' &&
@@ -97,6 +102,7 @@ const isRecursiveProviderSecretAlias = ({ key, path, value }) => {
 const isSecretAdjacentKey = (key, value, path) => {
   const normalized = normalizeKey(key);
   const fieldPath = `${path}.${key}`;
+  if (SAFE_WRAPPED_STORAGE_KEY_PATHS.has(fieldPath)) return false;
   if (SAFE_PUBLIC_KEY_FIELD_NAMES.has(normalized)) return false;
   if (normalized.startsWith('exposes') && typeof value === 'boolean') return false;
   // These exact objects describe authorization policy. The same field name in

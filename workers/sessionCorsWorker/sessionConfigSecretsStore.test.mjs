@@ -121,6 +121,31 @@ test('putSessionConfig normalizes the value and writes the config KV key', async
   ]);
 });
 
+test('putSessionConfig persists only the expected wrapped storage-envelope key fields', async () => {
+  const writes = [];
+  const config = {
+    slug: 'session-a',
+    storageEnvelope: {
+      version: 1,
+      keyProvider: 'worker_secret',
+      sessionKey: {
+        version: 1,
+        alg: 'AES-256-GCM',
+        wrapAlg: 'AES-GCM-KW-v1',
+        iv: 'public-iv',
+        wrappedKey: 'encrypted-key-material',
+      },
+    },
+  };
+
+  await putSessionConfig({ GROUP_KV: {} }, 'session-a', config, {
+    normalizeWorkerConfigRecord: (value) => value,
+    putKvJson: async (...args) => writes.push(args),
+  });
+
+  assert.deepEqual(writes, [[{ GROUP_KV: {} }, 'session:session-a:config', config]]);
+});
+
 test('putSessionConfig fails closed before KV persistence for secret-like config aliases', async () => {
   const unsafeConfigs = [
     { requestKey: 'secret' },
@@ -135,6 +160,8 @@ test('putSessionConfig fails closed before KV persistence for secret-like config
     { authorization: 'Bearer secret' },
     { sessionModeProfile: { authorization: 'Bearer secret' } },
     { sessionModeProfile: { authorization: ['Bearer secret'] } },
+    { storageEnvelope: { sessionKey: { privateKey: 'plaintext-secret' } } },
+    { storageEnvelope: { unrelatedKey: 'plaintext-secret' } },
   ];
   let writes = 0;
 
