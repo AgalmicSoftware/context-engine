@@ -194,7 +194,22 @@ describe('useSessionWizardWorkerSecretsController', () => {
       workerSecrets: baseWorkerSecrets(),
     });
 
-    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['OpenAI key']);
+    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['AI provider key']);
+  });
+
+  it.each(['anthropicKey', 'openrouterKey'])('accepts %s as the default Cloudflare AI provider key', (key) => {
+    const { result } = createControllerHarness({
+      network: { id: 0 },
+      registryChainId: 0,
+      draft: baseDraft({
+        networkChainId: 0,
+        rpc: { providers: {} },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      }),
+      workerSecrets: baseWorkerSecrets({ [key]: 'provider-secret' }),
+    });
+
+    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual([]);
   });
 
   it('preserves sponsored fallback fields only for the current slug and worker URL', () => {

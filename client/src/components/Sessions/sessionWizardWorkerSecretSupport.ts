@@ -28,6 +28,14 @@ export const WORKER_SECRET_PERSISTED_FIELDS = Object.freeze(
   Object.keys(DEFAULT_WORKER_SECRETS).filter((key) => !WORKER_SECRET_CACHE_SAFE_FIELDS.includes(key)),
 );
 
+export const AI_PROVIDER_WORKER_SECRET_FIELDS = Object.freeze(['openaiKey', 'anthropicKey', 'openrouterKey']);
+
+export const hasConfiguredAiProviderWorkerSecret = (value: WorkerSecretsLike | AnyRecord = {}): boolean =>
+  AI_PROVIDER_WORKER_SECRET_FIELDS.some((key) => !!toStr(value?.[key]).trim());
+
+export const isAiProviderWorkerSecretField = (key: unknown): boolean =>
+  AI_PROVIDER_WORKER_SECRET_FIELDS.includes(toStr(key).trim());
+
 export const normalizeWorkerSecrets = (value: WorkerSecretsLike | AnyRecord = {}): WorkerSecretsLike => {
   const next: WorkerSecretsLike = { ...DEFAULT_WORKER_SECRETS };
   if (!value || typeof value !== 'object') return next;

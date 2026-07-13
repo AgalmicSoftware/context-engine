@@ -22,6 +22,7 @@ import {
   resolveSessionWizardWorkerRpcUrlMapFromDraft,
 } from '../sessionWizardWorkerRuntimeSupport';
 import {
+  hasConfiguredAiProviderWorkerSecret,
   CHIPOTLE_LIT_CONFIG_FIELDS,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
   sanitizeSessionWizardWorkerSecretsForLitMode,
@@ -195,8 +196,8 @@ const useSessionWizardWorkerSecretsController = ({
     (secretsSnapshot = getCurrentWorkerSecrets()) => {
       const modeRequirements = resolveSessionWizardModeRequirements(draft?.sessionModeProfile);
       const missing = [];
-      if (!toStr(secretsSnapshot.openaiKey).trim()) {
-        missing.push('OpenAI key');
+      if (!hasConfiguredAiProviderWorkerSecret(secretsSnapshot)) {
+        missing.push(modeRequirements.isWorkerCanonical ? 'AI provider key' : 'OpenAI key');
       }
       if (
         (!modeRequirements.selected || modeRequirements.requiresArweave) &&

@@ -382,6 +382,42 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(JSON.stringify(deployPayload)).not.toMatch(/must-not-send/);
   });
 
+  it.each(['anthropicKey', 'openrouterKey'])(
+    'preserves the configured %s in a worker-canonical deploy',
+    async (key) => {
+      const fetchMock = mockSuccessfulWorkerDeployFetch();
+      const options = buildDeployHookOptions();
+      options.refs.runtimeRef.current = {
+        ...options.refs.runtimeRef.current,
+        registryAddress: '',
+        registryChainId: 0,
+        sessionId: '123e4567-e89b-12d3-a456-426614174000',
+        draft: {
+          slug: 'provider-key-session',
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        },
+        workerSecretsEnabled: true,
+      } as SessionWizardWorkerDeployRuntime;
+      options.getCurrentWorkerSecrets.mockReturnValue({
+        [key]: 'provider-secret',
+        arweaveJwk: 'must-not-send',
+        faucetPrivateKey: 'must-not-send',
+      });
+      options.resolveWorkerRpcUrl.mockReturnValue('');
+      options.resolveWorkerRpcUrlMap.mockReturnValue({});
+      const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+      await act(async () => {
+        await result.current.handleDeployWorker();
+      });
+
+      const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+      const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
+      expect(deployPayload.secrets).toEqual({ [key]: 'provider-secret' });
+      expect(JSON.stringify(deployPayload)).not.toMatch(/must-not-send/);
+    },
+  );
+
   it('keeps non-Cloudflare deploy-helper payloads on the legacy shape', async () => {
     const fetchMock = mockSuccessfulWorkerDeployFetch();
     const options = buildDeployHookOptions();

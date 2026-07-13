@@ -40,7 +40,10 @@ import {
   cacheSessionWorkerConfigAfterDeploy,
   resolveSponsoredBundleBootstrapWorkerUrl,
 } from '../sessionWizardSponsoredBundleSupport';
-import { sanitizeSessionWizardWorkerSecretsForLitMode } from '../sessionWizardWorkerSecretSupport';
+import {
+  isAiProviderWorkerSecretField,
+  sanitizeSessionWizardWorkerSecretsForLitMode,
+} from '../sessionWizardWorkerSecretSupport';
 import { getSessionWizardWorkerDeployValidationError } from '../sessionWizardWorkerRpc';
 import { resolveSessionWizardModeRequirements } from '../sessionWizardModeRequirements';
 import {
@@ -354,7 +357,7 @@ const useSessionWizardWorkerDeploy = ({
         const deploySecrets = modeRequirements.isWorkerCanonical
           ? Object.entries(allDeploySecrets).reduce<AnyRecord>((acc, [key, value]) => {
               const allowed =
-                key === 'openaiKey' ||
+                isAiProviderWorkerSecretField(key) ||
                 (modeRequirements.requiresLit && key.startsWith('lit')) ||
                 (modeRequirements.requiresRpc && (key === 'customRpcUrl' || key === 'customRpcKey'));
               if (allowed) acc[key] = value;
