@@ -1323,6 +1323,102 @@ test('dispatchAdminRequest persists a signed Lit descriptor through the real con
   });
 });
 
+test('dispatchAdminRequest rejects deeply nested secrets through the real config store', async () => {
+  const unsafeConfigs = [
+    { nested: { faucet: 'secret' } },
+    { arbitrary: [{ deeper: { faucet: { amountEth: '0.001' } } }] },
+    { nested: { password: 'secret' } },
+    { arbitrary: [{ deeper: { token: 'secret' } }] },
+    { arbitrary: [{ deeper: { arweaveJwk: { kty: 'RSA' } } }] },
+  ];
+
+  for (const config of unsafeConfigs) {
+    const env = { GROUP_KV: createMemoryKv() };
+    const result = await dispatchAdminRequest({
+      request: {
+        json: async () => createSignedBody({
+          adminAddress: '0xabc',
+          config: {
+            slug: 'session-a',
+            sessionName: 'Worker Session',
+            ...config,
+          },
+        }),
+      },
+      env,
+      baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+      slug: '',
+      action: 'set-config',
+      deps: createAdminDeps({
+        resolveAdminRequestAuthority: async () => ({
+          ok: true,
+          existingConfig: null,
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+          targetSlug: 'session-a',
+        }),
+        isAddress: (value) => value === '0xabc',
+        mergeWorkerConfigRecords,
+        putSessionConfig,
+      }),
+    });
+
+    assert.equal(result.status, 400, JSON.stringify(config));
+    assert.equal(
+      result.body.error,
+      'Secret-like values are not allowed in public session config fields.',
+      JSON.stringify(config),
+    );
+    assert.equal(await getSessionConfig(env, 'session-a'), null, JSON.stringify(config));
+  }
+});
+
+test('dispatchAdminRequest persists boolean scope permissions through the real config store', async () => {
+  const env = { GROUP_KV: createMemoryKv() };
+  const scopes = {
+    ai: true,
+    faucet: false,
+    token: false,
+    password: false,
+    arweaveJwk: false,
+  };
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        adminAddress: '0xabc',
+        config: {
+          slug: 'session-a',
+          sessionName: 'Worker Session',
+          scopes,
+        },
+      }),
+    },
+    env,
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: null,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      isAddress: (value) => value === '0xabc',
+      mergeWorkerConfigRecords,
+      putSessionConfig,
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(await getSessionConfig(env, 'session-a'), {
+    slug: 'session-a',
+    adminAddress: '0xabc',
+    sessionName: 'Worker Session',
+    scopes,
+    limits: {},
+  });
+});
+
 test('dispatchAdminRequest provisions Lit descriptors through the real worker config store', async () => {
   const env = { GROUP_KV: createMemoryKv(), LIT_ACCOUNT_API_KEY: 'account-key' };
   const existingConfig = {

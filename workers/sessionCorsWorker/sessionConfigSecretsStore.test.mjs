@@ -166,6 +166,46 @@ test('putSessionConfig persists only the established non-secret Lit descriptor f
   assert.deepEqual(writes, [[{ GROUP_KV: {} }, 'session:session-a:config', config]]);
 });
 
+test('putSessionConfig preserves public session and storage profile descriptors', async () => {
+  const writes = [];
+  const config = {
+    slug: 'session-a',
+    sessionModeProfile: {
+      authority: { mode: 'worker_canonical' },
+      authorization: { mechanisms: ['worker_roles'] },
+      encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+    },
+    storageProfile: {
+      backend: 'cloudflare',
+      resources: { questions: 'active', responses: 'active' },
+      payloadAccessControl: {
+        gate: 'role_gate',
+        encryption: 'worker_envelope',
+        accessConditions: {
+          match: 'any',
+          conditions: [
+            { kind: 'worker_role', role: 'admin' },
+            { kind: 'agent_grant_scope', scope: 'storage' },
+          ],
+        },
+      },
+      cloudflare: {
+        payloadAccessMode: 'worker_envelope',
+        exposesAccountId: false,
+        exposesBucketName: false,
+        exposesWorkerToken: false,
+      },
+    },
+  };
+
+  await putSessionConfig({ GROUP_KV: {} }, 'session-a', config, {
+    normalizeWorkerConfigRecord: (value) => value,
+    putKvJson: async (...args) => writes.push(args),
+  });
+
+  assert.deepEqual(writes, [[{ GROUP_KV: {} }, 'session:session-a:config', config]]);
+});
+
 test('putSessionConfig fails closed before KV persistence for secret-like config aliases', async () => {
   const unsafeConfigs = [
     { requestKey: 'secret' },
@@ -177,6 +217,14 @@ test('putSessionConfig fails closed before KV persistence for secret-like config
     { nested: { provider: { apiKeys: { primary: 'secret' } } } },
     { nested: { customProviderKey: 'secret' } },
     { nested: { requestKey: 'secret' } },
+    { nested: { faucet: 'secret' } },
+    { arbitrary: [{ deeper: { faucet: { amountEth: '0.001' } } }] },
+    { nested: { password: 'secret' } },
+    { nested: { token: 'secret' } },
+    { nested: { arweaveJwk: { kty: 'RSA' } } },
+    { arbitrary: [{ deeper: { password: 'secret' } }] },
+    { arbitrary: [{ deeper: { token: 'secret' } }] },
+    { arbitrary: [{ deeper: { arweaveJwk: 'secret' } }] },
     { authorization: 'Bearer secret' },
     { sessionModeProfile: { authorization: 'Bearer secret' } },
     { sessionModeProfile: { authorization: ['Bearer secret'] } },

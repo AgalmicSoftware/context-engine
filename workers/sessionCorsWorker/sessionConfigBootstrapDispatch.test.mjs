@@ -165,6 +165,18 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
     findForbiddenWorkerConfigSecretPath({ nested: { requestKey: 'secret' } }),
     'config.nested.requestKey',
   );
+  for (const [config, expectedPath] of [
+    [{ nested: { faucet: 'secret' } }, 'config.nested.faucet'],
+    [{ arbitrary: [{ deeper: { faucet: { amountEth: '0.001' } } }] }, 'config.arbitrary.0.deeper.faucet'],
+    [{ nested: { password: 'secret' } }, 'config.nested.password'],
+    [{ nested: { token: 'secret' } }, 'config.nested.token'],
+    [{ nested: { arweaveJwk: { kty: 'RSA' } } }, 'config.nested.arweaveJwk'],
+    [{ arbitrary: [{ deeper: { password: 'secret' } }] }, 'config.arbitrary.0.deeper.password'],
+    [{ arbitrary: [{ deeper: { token: 'secret' } }] }, 'config.arbitrary.0.deeper.token'],
+    [{ arbitrary: [{ deeper: { arweaveJwk: 'secret' } }] }, 'config.arbitrary.0.deeper.arweaveJwk'],
+  ]) {
+    assert.equal(findForbiddenWorkerConfigSecretPath(config), expectedPath);
+  }
   assert.equal(findForbiddenWorkerConfigSecretPath({ requestKey: 'secret' }), 'config.requestKey');
   assert.equal(findForbiddenWorkerConfigSecretPath({ customProviderKey: 'secret' }), 'config.customProviderKey');
   assert.equal(findForbiddenWorkerConfigSecretPath({
@@ -212,6 +224,45 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
   assert.equal(findForbiddenWorkerConfigSecretPath({ workerAuthority: { resourceKey: 'public-id' } }), '');
   assert.equal(findForbiddenWorkerConfigSecretPath({ nested: { publicKey: 'public-id' } }), '');
   assert.equal(findForbiddenWorkerConfigSecretPath({ nested: { resourceKey: 'default' } }), '');
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({
+      scopes: {
+        ai: true,
+        faucet: false,
+        token: false,
+        password: false,
+        arweaveJwk: false,
+      },
+    }),
+    '',
+  );
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({ scopes: { faucet: 'secret' } }),
+    'config.scopes.faucet',
+  );
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({ scopes: { nested: { token: false } } }),
+    'config.scopes.nested.token',
+  );
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({
+      faucet: {
+        rpcUrl: 'https://rpc.example.test',
+        amountEth: '0.001',
+      },
+    }),
+    '',
+  );
+  assert.equal(
+    findForbiddenWorkerConfigSecretPath({
+      nested: {
+        exposesWorkerToken: false,
+        passwordProtected: true,
+        tokenType: 'Bearer',
+      },
+    }),
+    '',
+  );
   assert.equal(
     findForbiddenWorkerConfigSecretPath({
       storageEnvelope: {

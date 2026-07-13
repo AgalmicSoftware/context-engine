@@ -60,6 +60,8 @@ const SAFE_WRAPPED_STORAGE_KEY_PATHS = new Set([
   'config.storageEnvelope.sessionKey',
   'config.storageEnvelope.sessionKey.wrappedKey',
 ]);
+const SAFE_BOOLEAN_SCOPE_PATH = 'config.scopes';
+const SAFE_LEGACY_FAUCET_CONFIG_PATH = 'config.faucet';
 export const WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS = Object.freeze([
   'litApiBase',
   'litGroupId',
@@ -83,11 +85,16 @@ const hasSensitiveTokenValue = (value) => {
   return true;
 };
 
-const isRecursiveProviderSecretAlias = ({ key, path, value }) => {
+// This baseline runs across every persisted config branch, including arrays.
+// Keep exceptions explicit because accepted values are written to plaintext KV.
+const isRecursiveSecretAlias = ({ key, path, value }) => {
   const normalized = normalizeKey(key);
   const fieldPath = `${path}.${key}`;
   if (SAFE_WRAPPED_STORAGE_KEY_PATHS.has(fieldPath)) return false;
   if (SAFE_PUBLIC_KEY_FIELD_NAMES.has(normalized)) return false;
+  if (path === SAFE_BOOLEAN_SCOPE_PATH && typeof value === 'boolean') return false;
+  if (fieldPath === SAFE_LEGACY_FAUCET_CONFIG_PATH && isObj(value)) return false;
+  if (normalized.startsWith('exposes') && typeof value === 'boolean') return false;
   if (
     normalized === 'authorization' &&
     SAFE_STRUCTURAL_AUTHORIZATION_PATHS.has(fieldPath) &&
@@ -102,7 +109,12 @@ const isRecursiveProviderSecretAlias = ({ key, path, value }) => {
     normalized.endsWith('providerkeys') ||
     normalized.endsWith('credential') ||
     normalized.endsWith('credentials') ||
-    normalized.endsWith('key')
+    normalized.endsWith('key') ||
+    normalized.startsWith('faucet') ||
+    normalized.endsWith('secret') ||
+    normalized.endsWith('token') ||
+    normalized.endsWith('password') ||
+    normalized.endsWith('jwk')
   );
 };
 
@@ -111,6 +123,7 @@ const isSecretAdjacentKey = (key, value, path) => {
   const fieldPath = `${path}.${key}`;
   if (SAFE_WRAPPED_STORAGE_KEY_PATHS.has(fieldPath)) return false;
   if (SAFE_PUBLIC_KEY_FIELD_NAMES.has(normalized)) return false;
+  if (path === SAFE_BOOLEAN_SCOPE_PATH && typeof value === 'boolean') return false;
   if (normalized.startsWith('exposes') && typeof value === 'boolean') return false;
   // These exact objects describe authorization policy. The same field name in
   // a provider/config subtree is credential-like and must stay secret.
@@ -121,7 +134,7 @@ const isSecretAdjacentKey = (key, value, path) => {
   ) {
     return false;
   }
-  if (isRecursiveProviderSecretAlias({ key, path, value })) return true;
+  if (isRecursiveSecretAlias({ key, path, value })) return true;
   if (normalized.startsWith('faucet')) return true;
   if (normalized === 'litcredentials') return true;
   if (normalized === 'rpc' || normalized.includes('rpcurl') || normalized.includes('rpcendpoint')) return true;
@@ -228,18 +241,18 @@ const findForbiddenOpenConfigSecretPath = (value, path) => {
   return '';
 };
 
-const findForbiddenRecursiveProviderAliasPath = (value, path) => {
+const findForbiddenRecursiveSecretAliasPath = (value, path) => {
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index += 1) {
-      const nested = findForbiddenRecursiveProviderAliasPath(value[index], `${path}.${index}`);
+      const nested = findForbiddenRecursiveSecretAliasPath(value[index], `${path}.${index}`);
       if (nested) return nested;
     }
     return '';
   }
   if (!isObj(value)) return '';
   for (const key of Object.keys(value)) {
-    if (isRecursiveProviderSecretAlias({ key, path, value: value[key] })) return `${path}.${key}`;
-    const nested = findForbiddenRecursiveProviderAliasPath(value[key], `${path}.${key}`);
+    if (isRecursiveSecretAlias({ key, path, value: value[key] })) return `${path}.${key}`;
+    const nested = findForbiddenRecursiveSecretAliasPath(value[key], `${path}.${key}`);
     if (nested) return nested;
   }
   return '';
@@ -280,7 +293,7 @@ export const findForbiddenWorkerConfigSecretPath = (config, path = 'config') => 
   }
   const recursiveSource = { ...source };
   delete recursiveSource.litCredentials;
-  return findForbiddenRecursiveProviderAliasPath(recursiveSource, path);
+  return findForbiddenRecursiveSecretAliasPath(recursiveSource, path);
 };
 
 export const projectPublicWorkerSessionConfig = (config) => (
