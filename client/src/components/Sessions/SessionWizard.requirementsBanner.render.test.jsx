@@ -18,6 +18,20 @@ const expectSponsoredStatusText = async (expectedText) => {
   });
 };
 
+const selectCloudflarePreset = async () => {
+  const preset = screen.getByTestId('ce-new-preset-fast_cheap_cloudflare');
+  const originalConfirm = window.confirm;
+  window.confirm = jest.fn(() => true);
+  try {
+    fireEvent.click(preset);
+  } finally {
+    window.confirm = originalConfirm;
+  }
+  await waitFor(() => {
+    expect(preset).toHaveAttribute('aria-checked', 'true');
+  });
+};
+
 describe('SessionWizard new-session requirements banner', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
@@ -40,31 +54,30 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
   });
 
-  it('renders the new-session requirements copy and contact link on /session/new', async () => {
+  it('renders the decentralized requirements copy and contact link on /session/new', async () => {
     window.history.replaceState({}, '', '/session/new');
 
     renderSessionWizard({ network: null });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
 
-    expect(screen.getByRole('link', { name: 'OpenAI API key' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'AI provider key' })).toHaveAttribute(
       'href',
       'https://platform.openai.com/api-keys',
     );
     expect(screen.getByText(/for text and transcription/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Lit API key' })).toHaveAttribute(
-      'href',
-      'https://developer.litprotocol.com/management/api_keys',
-    );
+    expect(screen.queryByRole('link', { name: 'Lit API key' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Arweave wallet (JWK)' })).toHaveAttribute(
       'href',
       'https://docs.arweave.org/developers/wallets/arweave-wallet',
     );
+    expect(screen.getByText(/RPC URL or provider key/i)).toBeInTheDocument();
+    expect(screen.getByText(/connected wallet/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'OP Sepolia ETH for on-chain registration' })).toHaveAttribute(
       'href',
       'https://console.optimism.io/faucet',
     );
-    expect(screen.getByText('(Optional) A faucet private key for sponsoring user gas')).toBeInTheDocument();
+    expect(screen.queryByText(/faucet private key/i)).not.toBeInTheDocument();
     expect(screen.getByText('A turnkey tool for bundling these resources is in development.')).toBeInTheDocument();
     expect(screen.getByText(/in the meantime, you can get a sponsored session url by contacting/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'contextengine@protonmail.com' })).toHaveAttribute(
@@ -110,7 +123,7 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
   });
 
-  it('keeps the new-session requirements banner visible when sponsored setup is missing deploy access', async () => {
+  it('keeps Cloudflare requirements visible when sponsored setup is missing deploy access', async () => {
     window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
     const sponsoredBundleWithoutDeployAccess = buildMockSponsoredBundle();
     delete sponsoredBundleWithoutDeployAccess.deployGrantToken;
@@ -122,6 +135,7 @@ describe('SessionWizard new-session requirements banner', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectCloudflarePreset();
     await expectSponsoredStatusText(
       'Sponsored resources applied: OpenAI key, Arweave wallet, faucet funding, Lit API key.',
     );
