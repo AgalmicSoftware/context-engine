@@ -6,6 +6,7 @@ import styles from './SessionDocumentsPage.module.scss';
 import DocumentLibraryPanel from './DocumentLibraryPanel';
 import { normalizeSessionIdHex } from '../../utilities/docLibrary/tags.js';
 import { normalizeSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { parseSessionWorkerDiscoveryOrigin } from '../../utilities/session/sessionWorkerDiscovery.js';
 
 type SessionConfig = {
   slug?: string;
@@ -31,6 +32,7 @@ type SessionDocumentsPageProps = {
   sessionSlug?: string;
   sessionConfig?: SessionConfig;
   sessionIdHex?: string;
+  workerOrigin?: string;
 };
 
 const DocumentLibraryPanelComponent = DocumentLibraryPanel as React.ComponentType<any>;
@@ -38,11 +40,20 @@ const DocumentLibraryPanelComponent = DocumentLibraryPanel as React.ComponentTyp
 const buildSessionBackHref = ({
   sessionToken,
   sessionSlug,
-}: Pick<SessionDocumentsPageProps, 'sessionToken' | 'sessionSlug'> = {}) => {
+  workerOrigin,
+}: Pick<SessionDocumentsPageProps, 'sessionToken' | 'sessionSlug' | 'workerOrigin'> = {}) => {
   const hasExplicitSessionSlug = sessionSlug !== undefined && sessionSlug !== null;
   const rawSlug = hasExplicitSessionSlug ? sessionSlug : sessionToken;
   const slug = normalizeSessionSlug(rawSlug || '');
-  return slug ? `/session/${encodeURIComponent(slug)}` : '/session';
+  const sessionHref = slug ? `/session/${encodeURIComponent(slug)}` : '/session';
+  if (!workerOrigin) return sessionHref;
+  try {
+    const params = new URLSearchParams();
+    params.set('worker', parseSessionWorkerDiscoveryOrigin(workerOrigin));
+    return `${sessionHref}?${params.toString()}`;
+  } catch (_) {
+    return sessionHref;
+  }
 };
 
 export default function SessionDocumentsPage({
@@ -56,6 +67,7 @@ export default function SessionDocumentsPage({
   sessionSlug,
   sessionConfig,
   sessionIdHex,
+  workerOrigin,
 }: SessionDocumentsPageProps = {}) {
   const resolvedSessionIdHex = useMemo(
     () =>
@@ -70,7 +82,7 @@ export default function SessionDocumentsPage({
     [sessionIdHex, sessionConfig],
   );
 
-  const backHref = buildSessionBackHref({ sessionToken, sessionSlug });
+  const backHref = buildSessionBackHref({ sessionToken, sessionSlug, workerOrigin });
 
   return (
     <div className={styles.page}>

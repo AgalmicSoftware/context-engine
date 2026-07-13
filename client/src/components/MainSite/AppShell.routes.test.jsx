@@ -150,6 +150,7 @@ jest.mock('../DocumentLibrary/SessionDocumentsPage', () => {
         'data-session-id-hex': String(props.sessionIdHex || ''),
         'data-session-slug': String(props.sessionSlug || ''),
         'data-session-token': String(props.sessionToken || ''),
+        'data-worker-origin': String(props.workerOrigin || ''),
       });
     },
   };
@@ -1539,6 +1540,48 @@ describe('AppShell route render smoke', () => {
       'data-session-id-hex',
       '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     );
+  });
+
+  it('forwards validated worker discovery to an unregistered worker-canonical docs route', async () => {
+    const workerOrigin = 'https://worker-docs.example.workers.dev';
+    const workerConfig = {
+      slug: 'worker-docs',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      configRevision: 'worker-docs-revision-1',
+      corsWorkerUrl: workerOrigin,
+      sessionName: 'Worker Docs',
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+        storage: { backend: 'cloudflare' },
+        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+      },
+    };
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          sessionSlug: workerConfig.slug,
+          config: workerConfig,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const subject = createSubject({
+      path: '/session/worker-docs/docs',
+      search: `?worker=${encodeURIComponent(workerOrigin)}`,
+      sessionConfig: null,
+    });
+    subject.resolveSessionPathSlug = jest.fn();
+
+    const view = render(subject.render());
+
+    expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toBeInTheDocument();
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+    view.rerender(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_DOCS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-session-docs-page')).toHaveAttribute('data-worker-origin', workerOrigin);
+    expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
   });
 
   it('renders the session route with resolved session metadata', async () => {

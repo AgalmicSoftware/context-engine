@@ -1086,6 +1086,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
               sessionSlug={resolvedSlug}
               sessionConfig={sessionConfig}
               sessionIdHex={sessionConfig?.__registry?.sessionIdHex || null}
+              workerOrigin={workerOrigin}
             />
           </div>
         </Suspense>
