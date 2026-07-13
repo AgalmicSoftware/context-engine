@@ -20,6 +20,7 @@ import { isRouteResponderAddress } from '../../utilities/session/mainSiteUtils.j
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { normalizeSessionSlug } from '../../domains/sessions/sessionConfig.js';
 import { DEFAULT_SESSION_SLUG_ALIAS } from '../../variables/appConfig.js';
+import { getChainById } from '../../variables/chains.js';
 import {
   composeMainSiteAuthViewProps,
   composeMainSiteLoginViewProps,
@@ -146,6 +147,21 @@ const hasMainSiteRegistryIdentity = (sessionConfig: unknown): boolean => {
     registry.sessionIdHex ||
     registry.metadataURI
   );
+};
+
+const resolveExplicitWorkerSessionNetwork = ({
+  workerOrigin,
+  sessionConfig,
+  fallbackNetwork,
+}: {
+  workerOrigin: string;
+  sessionConfig: SessionConfigLike;
+  fallbackNetwork: MainSiteRouteNetwork;
+}): MainSiteRouteNetwork => {
+  if (!workerOrigin) return fallbackNetwork;
+  const chainId = Number(sessionConfig.networkChainId || 0);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) return null;
+  return getChainById(chainId) || { id: chainId, chainId };
 };
 
 export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) => ({
@@ -1071,7 +1087,11 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
 
     if (isDocsRoute) {
       const resolvedSlug = normalizeSessionSlug(sessionConfig.slug || slug);
-      const sessionNetwork = host.getSessionNetwork(resolvedSlug) || defaultSessionNetwork;
+      const sessionNetwork = resolveExplicitWorkerSessionNetwork({
+        workerOrigin,
+        sessionConfig,
+        fallbackNetwork: host.getSessionNetwork(resolvedSlug) || defaultSessionNetwork,
+      });
       return (
         <Suspense fallback={<LazyFallback label="Loading Docs..." />}>
           <div data-testid={E2E_TESTIDS.PAGE_SESSION_DOCS_ROOT}>
@@ -1142,6 +1162,11 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const walletViewProps = composeMainSiteWalletViewProps(host.props);
     const loginViewProps = composeMainSiteLoginViewProps(host.props);
     const sessionCacheViewProps = composeMainSiteSessionCacheViewProps(host.state);
+    const sessionNetwork = resolveExplicitWorkerSessionNetwork({
+      workerOrigin,
+      sessionConfig,
+      fallbackNetwork: defaultSessionNetwork,
+    });
 
     return (
       <Suspense fallback={<LazyFallback label="Loading Session..." />}>
@@ -1162,7 +1187,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
               networkChainId={sessionConfig.networkChainId}
               questionsGenPrompt={sessionConfig.questionsGenPrompt}
               {...walletViewProps}
-              network={defaultSessionNetwork}
+              network={sessionNetwork}
               {...loginViewProps}
               {...sessionCacheViewProps}
               refreshSurveyResponsesByID={refreshSessionRouteSurveyResponsesByID}

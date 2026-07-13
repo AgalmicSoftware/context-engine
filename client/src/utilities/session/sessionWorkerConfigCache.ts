@@ -709,6 +709,8 @@ export type WorkerCanonicalBootstrapCacheResult = {
   status: 'cached' | 'conflict' | 'invalid';
   cacheKey: string;
   config: SessionConfigLike | null;
+  existingSessionIdHex: string;
+  sessionIdHex: string;
   existingWorkerOrigin: string;
   workerOrigin: string;
 };
@@ -738,6 +740,8 @@ export const upsertWorkerCanonicalSessionBootstrap = ({
       status: 'invalid',
       cacheKey: '',
       config: null,
+      existingSessionIdHex: '',
+      sessionIdHex: normalizedSessionIdHex,
       existingWorkerOrigin: '',
       workerOrigin: normalizedWorkerOrigin,
     };
@@ -761,6 +765,8 @@ export const upsertWorkerCanonicalSessionBootstrap = ({
       status: 'conflict',
       cacheKey,
       config: cloneValue(conflictRecord.canonicalConfig || null),
+      existingSessionIdHex: conflictRecord.sessionIdHex,
+      sessionIdHex: normalizedSessionIdHex,
       existingWorkerOrigin: parseWorkerCanonicalOrigin(conflictRecord.workerOrigin),
       workerOrigin: normalizedWorkerOrigin,
     };
@@ -781,6 +787,8 @@ export const upsertWorkerCanonicalSessionBootstrap = ({
       status: 'invalid',
       cacheKey: '',
       config: null,
+      existingSessionIdHex: '',
+      sessionIdHex: normalizedSessionIdHex,
       existingWorkerOrigin: '',
       workerOrigin: normalizedWorkerOrigin,
     };
@@ -804,6 +812,8 @@ export const upsertWorkerCanonicalSessionBootstrap = ({
     status: 'cached',
     cacheKey,
     config: cloneValue(canonicalConfig),
+    existingSessionIdHex: '',
+    sessionIdHex: normalizedSessionIdHex,
     existingWorkerOrigin: '',
     workerOrigin: normalizedWorkerOrigin,
   };

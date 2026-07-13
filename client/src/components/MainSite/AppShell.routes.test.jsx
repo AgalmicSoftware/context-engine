@@ -170,6 +170,7 @@ jest.mock('../OnePageSession/OnePageSession', () => {
         'data-session-info': String(props.sessionInfo || ''),
         'data-session-slug': String(props.slug || ''),
         'data-question-session-slug': String(props.questionSessionSlug || ''),
+        'data-network-id': String(props.network?.id || ''),
       });
     },
   };
@@ -885,6 +886,7 @@ describe('AppShell route render smoke', () => {
       configRevision: 'revision-1',
       corsWorkerUrl: workerOrigin,
       sessionName: 'Worker Session',
+      networkChainId: 11155420,
       sessionModeProfile: {
         authority: { mode: 'worker_canonical' },
         storage: { mode: 'worker_kv' },
@@ -922,6 +924,7 @@ describe('AppShell route render smoke', () => {
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'worker-session');
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-network-id', '11155420');
     expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual(workerConfig);
     expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
     expect(fetchSpy.mock.calls[0][0]).toBe('https://worker-session.example.com/session-config?slug=worker-session');

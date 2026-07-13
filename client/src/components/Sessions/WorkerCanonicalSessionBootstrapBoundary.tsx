@@ -75,13 +75,23 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
 
         let cacheResult = cacheBootstrap(bootstrap, false);
         if (cacheResult.status === 'conflict') {
+          const originChanged = cacheResult.existingWorkerOrigin !== bootstrap.workerOrigin;
+          const identityChanged = cacheResult.existingSessionIdHex !== bootstrap.sessionId;
+          const changeSummary = [
+            originChanged
+              ? `worker origin ${cacheResult.existingWorkerOrigin} -> ${bootstrap.workerOrigin}`
+              : `worker origin ${bootstrap.workerOrigin}`,
+            identityChanged
+              ? `session ID ${cacheResult.existingSessionIdHex} -> ${bootstrap.sessionId}`
+              : `session ID ${bootstrap.sessionId}`,
+          ].join('; ');
           const approved = await confirmWorkerOriginChange(
-            `Session "${bootstrap.sessionSlug}" was previously linked to ${cacheResult.existingWorkerOrigin}. ` +
-              `Trust and replace it with ${bootstrap.workerOrigin}?`,
+            `Session "${bootstrap.sessionSlug}" has a different canonical worker identity (${changeSummary}). ` +
+              'Trust and replace the previously pinned identity?',
             confirmRepin,
           );
           if (!active) return;
-          if (!approved) throw new Error('Worker origin change was not approved.');
+          if (!approved) throw new Error('Worker identity change was not approved.');
           cacheResult = cacheBootstrap(bootstrap, true);
         }
         if (cacheResult.status !== 'cached') {

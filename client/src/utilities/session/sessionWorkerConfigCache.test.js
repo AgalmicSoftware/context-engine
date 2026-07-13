@@ -117,6 +117,8 @@ describe('sessionWorkerConfigCache', () => {
     });
     expect(conflict).toMatchObject({
       status: 'conflict',
+      existingSessionIdHex: firstConfig.sessionId,
+      sessionIdHex: replacementConfig.sessionId,
       existingWorkerOrigin: 'https://first.example',
       workerOrigin: 'https://replacement.example',
     });
