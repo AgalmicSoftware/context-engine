@@ -339,6 +339,15 @@ const selectCloudflarePreset = () => {
     fireEvent.click(continueButton);
   }
 };
+const selectDecentralizedPreset = () => {
+  const preset = screen.queryByTestId('ce-new-preset-trustless_public_decentralized');
+  if (!preset) return;
+  fireEvent.click(preset);
+  const continueButton = screen.queryByTestId('ce-new-preset-continue');
+  if (continueButton && !continueButton.disabled) {
+    fireEvent.click(continueButton);
+  }
+};
 const getMockSelectorById = (selectorId) =>
   screen
     .queryAllByTestId('mock-wizard-sbt-selector')
@@ -911,7 +920,7 @@ describe('SessionWizard rendered validation', () => {
     mockSessionExists.mockImplementation(async () => publishClicked);
 
     renderLoggedInSessionWizard();
-    selectCloudflarePreset();
+    selectDecentralizedPreset();
     enableAdvancedMode();
     const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     const slugInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG);
