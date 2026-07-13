@@ -295,7 +295,7 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
 test('dispatchSessionConfigBootstrapRequest returns only CORS-scoped worker-canonical config', async () => {
   const config = buildWorkerCanonicalConfig();
   const response = await dispatchSessionConfigBootstrapRequest({
-    request: new Request('https://worker.example/session-config', {
+    request: new Request('https://worker.example/session-config?slug=session-a', {
       headers: { Origin: 'https://app.example.test', 'X-Session-Slug': 'session-a' },
     }),
     env: { GROUP_KV: {} },
@@ -326,6 +326,51 @@ test('dispatchSessionConfigBootstrapRequest returns only CORS-scoped worker-cano
     'cache-control': 'no-store',
     vary: 'Origin, X-Session-Slug',
   });
+});
+
+test('dispatchSessionConfigBootstrapRequest rejects invalid or mismatched slug query aliases', async () => {
+  let configReads = 0;
+  const json = (body, status, headers) => ({ body, status, headers });
+  const base = {
+    env: {},
+    slugHint: '',
+    baseHeaders: {},
+    deps: {
+      resolveRequestSlugWithoutToken: () => ({
+        ok: true,
+        slug: 'session-a',
+        explicitSlugProvided: true,
+      }),
+      getSessionConfig: async () => {
+        configReads += 1;
+        return buildWorkerCanonicalConfig();
+      },
+      json,
+    },
+    constants: {
+      missingSlugError: 'Session slug is required.',
+      sessionConfigNotFoundError: 'Session config not found.',
+    },
+  };
+
+  const mismatch = await dispatchSessionConfigBootstrapRequest({
+    ...base,
+    request: new Request('https://worker.example/session-config?slug=session-b', {
+      headers: { 'X-Session-Slug': 'session-a' },
+    }),
+  });
+  assert.equal(mismatch.status, 400);
+  assert.equal(mismatch.body.error, 'Session config slug query does not match X-Session-Slug.');
+
+  const invalid = await dispatchSessionConfigBootstrapRequest({
+    ...base,
+    request: new Request('https://worker.example/session-config?slug=Session%20A', {
+      headers: { 'X-Session-Slug': 'session-a' },
+    }),
+  });
+  assert.equal(invalid.status, 400);
+  assert.match(invalid.body.error, /Invalid session slug/);
+  assert.equal(configReads, 0);
 });
 
 test('dispatchSessionConfigBootstrapRequest rejects missing config, wrong authority, and blocked CORS', async () => {

@@ -119,7 +119,7 @@ export type SessionWizardPublishCompletionControllerPorts = {
 export type SessionWizardPublishCompletionControllerCallbacks = {
   promoteDeployedPendingSbtSelections: (deployedDrafts: SessionWizardPendingDraftLike[]) => void;
   setPublishedPendingSbtLinks: (links: PublishedPendingSbtLink[]) => void;
-  clearPendingSbtDrafts: () => void;
+  replacePendingSbtDrafts: (drafts: SessionWizardPendingDraftLike[]) => void;
   setPublishStep: (step: number) => void;
 };
 
@@ -824,7 +824,14 @@ export const runSessionWizardPublishCompletionController = ({
     sessionSlug: toStr(input.sessionSlug).trim(),
   });
   callbacks.setPublishedPendingSbtLinks(publishedPendingSbtLinks);
-  callbacks.clearPendingSbtDrafts();
+  // Regression guard: a selected mode can suppress SBT deployment; only
+  // drafts proven deployed may be removed from the author's pending state.
+  const remainingPendingDrafts = pendingDraftSnapshot.filter((entry) => {
+    if (entry?.deployed === true) return false;
+    const addressKey = getPendingDraftAddressKey(entry);
+    return !addressKey || !newlyDeployedPendingAddressSet.has(addressKey);
+  });
+  callbacks.replacePendingSbtDrafts(remainingPendingDrafts);
   callbacks.setPublishStep(getPublishStepNumber(input.publishExecutionPlan, 'done'));
 
   return {

@@ -182,6 +182,7 @@ describe('sessionWizardDeployErrors', () => {
       formatSessionWizardDeployOrphanResources({
         workerName: 'ce-session-ab12',
         kvNamespaceId: 'kv-public-id',
+        kvCleanupStatus: 'delete-failed',
         workerCleanupStatus: 'owned-delete-failed',
         apiToken: 'must-not-appear',
       }),
@@ -195,6 +196,7 @@ describe('sessionWizardDeployErrors', () => {
           responseOrphanResources: {
             workerName: 'ce-session-ab12',
             kvNamespaceId: 'kv-public-id',
+            kvCleanupStatus: 'delete-failed',
             workerCleanupStatus: 'owned-delete-failed',
             apiToken: 'must-not-appear',
           },
@@ -219,9 +221,28 @@ describe('sessionWizardDeployErrors', () => {
     expect(
       formatSessionWizardDeployOrphanResources({
         workerName: 'preserved-worker',
+        kvNamespaceId: 'kv-live-id',
+        kvCleanupStatus: 'retained-live-worker',
         workerCleanupStatus: 'preserved-existing',
       }),
-    ).toBe(' The pre-existing worker was preserved.');
+    ).toBe(
+      ' The pre-existing worker was preserved. KV namespace kv-live-id was retained because it remains or may remain bound to the live worker. Do not delete it before recovery or ownership verification.',
+    );
+    expect(
+      formatSessionWizardDeployOrphanResources({
+        kvNamespaceId: 'kv-legacy-live-id',
+        workerCleanupStatus: 'preserved-existing',
+      }),
+    ).not.toContain('remove KV namespace');
+    const failedOwnedCleanup = formatSessionWizardDeployOrphanResources({
+      workerName: 'owned-worker',
+      kvNamespaceId: 'kv-owned-live-id',
+      kvCleanupStatus: 'retained-live-worker',
+      workerCleanupStatus: 'owned-delete-failed',
+    });
+    expect(failedOwnedCleanup).toContain('remove worker owned-worker');
+    expect(failedOwnedCleanup).not.toContain('remove KV namespace');
+    expect(failedOwnedCleanup).toContain('Do not delete it before recovery');
     expect(
       formatSessionWizardDeployOrphanResources({
         workerName: 'foreign-worker',

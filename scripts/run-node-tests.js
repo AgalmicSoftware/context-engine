@@ -6,6 +6,7 @@ const { execFileSync, spawnSync } = require('node:child_process');
 
 const {
   ROOT_NODE_TEST_FILES,
+  ROOT_OPTIONAL_NODE_TEST_FILES,
   ROOT_PRIVATE_STRIPPED_TEST_FILE_RE,
 } = require('./testInventoryConfig');
 const {
@@ -41,6 +42,11 @@ function collectNodeTestFiles(rootDir = path.resolve(__dirname, '..'), options =
   const files = [];
 
   STATIC_NODE_TEST_FILES.forEach((relativePath) => {
+    if (fs.existsSync(path.join(rootDir, relativePath))) {
+      files.push(relativePath);
+    }
+  });
+  ROOT_OPTIONAL_NODE_TEST_FILES.forEach((relativePath) => {
     if (fs.existsSync(path.join(rootDir, relativePath))) {
       files.push(relativePath);
     }

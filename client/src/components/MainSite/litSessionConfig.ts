@@ -38,7 +38,7 @@ const isSessionConfigRecord = (value: unknown): value is MainSiteLitSessionConfi
 const readRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
-const resolveValidatedWorkerCanonicalLitProfile = (value: unknown): SessionModeProfile | null => {
+export const resolveValidatedWorkerCanonicalLitProfile = (value: unknown): SessionModeProfile | null => {
   if (!isSessionConfigRecord(value)) return null;
   const authority = readRecord(value.authority);
   const encryption = readRecord(value.encryption);

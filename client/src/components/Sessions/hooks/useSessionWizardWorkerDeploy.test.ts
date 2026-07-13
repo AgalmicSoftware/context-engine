@@ -383,6 +383,46 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(JSON.stringify(deployPayload)).not.toMatch(/must-not-send/);
   });
 
+  it('does not use stale hidden Lit credentials after switching to a selected non-Lit profile', async () => {
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      registryAddress: '',
+      registryChainId: 0,
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      draft: {
+        slug: 'non-lit-session',
+        sessionName: 'Non-Lit Session',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    options.getCurrentWorkerSecrets.mockReturnValue({
+      openaiKey: 'sk-ai',
+      litAccountApiKey: 'stale-hidden-account-key',
+      litApiBase: 'https://stale-lit.example.test',
+      litGroupId: 'stale-group',
+      litPkpId: 'stale-pkp',
+      litActionCid: 'stale-cid',
+    });
+    options.resolveWorkerRpcUrl.mockReturnValue('');
+    options.resolveWorkerRpcUrlMap.mockReturnValue({});
+    options.resolveWorkerFaucetConfig.mockReturnValue({});
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    const requestedUrls = fetchMock.mock.calls.map(([url]) => String(url));
+    expect(requestedUrls).not.toContain('https://deployed.example.test/admin/lit-chipotle-bootstrap-session');
+    expect(requestedUrls).not.toContain('https://deployed.example.test/admin/lit-chipotle-provision');
+    const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+    const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
+    expect(deployPayload.secrets).toEqual({ openaiKey: 'sk-ai' });
+  });
+
   it('routes explicit-Lit RPC inputs through session secrets without duplicating them in canonical config', async () => {
     const fetchMock = mockSuccessfulWorkerDeployFetch();
     const options = buildDeployHookOptions();

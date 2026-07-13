@@ -85,6 +85,20 @@ const defaultNormalizeAiModels = (raw: AnyRecord = {}): AnyRecord => (isObj(raw)
 const defaultNormalizeAiModelForProvider = (_modelType: string, _providerValue: string, modelValue: unknown): string =>
   trimString(modelValue);
 
+const buildSessionWizardPublicAiConfig = (value: unknown): AnyRecord => {
+  const next = isObj(value) ? (cloneValue(value) as AnyRecord) : {};
+  if (!isObj(next.models) || !isObj(next.models.transcription)) return next;
+
+  const transcription = next.models.transcription as AnyRecord;
+  // The draft keeps a browser-side transcription endpoint, including an empty
+  // default. Worker config is public and provider endpoints belong in secrets.
+  next.models.transcription = {
+    ...(trimString(transcription.provider) ? { provider: trimString(transcription.provider) } : {}),
+    ...(trimString(transcription.model) ? { model: trimString(transcription.model) } : {}),
+  };
+  return next;
+};
+
 export const sanitizeSessionWizardMetadataPayload = (
   metadata: AnyRecord,
   {
@@ -314,7 +328,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
     sessionName: trimString(resolvedDraft.sessionName),
     sessionInfo: trimString(resolvedDraft.sessionInfo),
     sessionHeaderImg: trimString(resolvedDraft.sessionHeaderImg),
-    ai: isObj(resolvedDraft.ai) ? cloneValue(resolvedDraft.ai) : {},
+    ai: buildSessionWizardPublicAiConfig(resolvedDraft.ai),
     registryAddress: isWorkerCanonical ? '' : trimString(resolvedDeployPayload.registryAddress || registryAddress),
     registryChainId: isWorkerCanonical
       ? 0

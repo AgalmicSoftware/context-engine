@@ -10,6 +10,7 @@ const {
   ROOT_JEST_TEST_FILES,
   ROOT_LOCAL_CHAIN_TEST_FILES,
   ROOT_NODE_TEST_FILES,
+  ROOT_OPTIONAL_NODE_TEST_FILES,
 } = require('./testInventoryConfig');
 const { verifyTestInventory } = require('./verify-test-inventory');
 
@@ -75,6 +76,9 @@ test('verifyTestInventory tolerates stripped public copies without private runti
   withTempRepo((rootDir) => {
     writeInventoryFixture(rootDir, { includePrivateRuntime: false });
 
+    ROOT_OPTIONAL_NODE_TEST_FILES.forEach((relativePath) => {
+      assert.equal(fs.existsSync(path.join(rootDir, relativePath)), false);
+    });
     assert.deepEqual(verifyTestInventory(rootDir), []);
   });
 });

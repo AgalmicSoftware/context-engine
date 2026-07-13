@@ -2111,7 +2111,8 @@ const SessionWizard = ({
           callbacks: {
             promoteDeployedPendingSbtSelections,
             setPublishedPendingSbtLinks,
-            clearPendingSbtDrafts: () => setPendingSbtDrafts([]),
+            replacePendingSbtDrafts: (remainingDrafts) =>
+              setPendingSbtDrafts(normalizePendingSbtDrafts(remainingDrafts)),
             setPublishStep: ignoreSessionPublishStep,
           },
         });

@@ -45,6 +45,7 @@ import {
   resolveMainSiteSessionRouteSourceSlug,
 } from './routeSessionResolution.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
+import { resolveValidatedWorkerCanonicalLitProfile } from './litSessionConfig';
 import {
   renderWorkerCanonicalRouteBootstrap,
   renderWorkerCanonicalRouteError,
@@ -147,6 +148,23 @@ const hasMainSiteRegistryIdentity = (sessionConfig: unknown): boolean => {
     registry.sessionIdHex ||
     registry.metadataURI
   );
+};
+
+const resolveExplicitWorkerSessionConfig = ({
+  workerOrigin,
+  sessionConfig,
+}: {
+  workerOrigin: string;
+  sessionConfig: SessionConfigLike;
+}): SessionConfigLike => {
+  if (!workerOrigin) return sessionConfig;
+  const validatedLitProfile = resolveValidatedWorkerCanonicalLitProfile(sessionConfig.sessionModeProfile);
+  const chainId = Number(validatedLitProfile?.evm.registryChainId || 0);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) return sessionConfig;
+  if (Number(sessionConfig.networkChainId || 0) === chainId) return sessionConfig;
+  // The validated Lit profile drives both hook construction and downstream
+  // response-gate/mint consumers; never leave a stale top-level chain override.
+  return { ...sessionConfig, networkChainId: chainId };
 };
 
 const resolveExplicitWorkerSessionNetwork = ({
@@ -1069,6 +1087,10 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         host,
       });
     }
+    const effectiveSessionConfig = resolveExplicitWorkerSessionConfig({
+      workerOrigin,
+      sessionConfig,
+    });
 
     const sessionConfigSlug = normalizeSessionSlug(sessionConfig.slug || '');
     const sessionRegistryInfo =
@@ -1086,10 +1108,14 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     }
 
     if (isDocsRoute) {
-      const resolvedSlug = normalizeSessionSlug(sessionConfig.slug || slug);
+      const resolvedSlug = normalizeSessionSlug(effectiveSessionConfig.slug || slug);
+      const effectiveRegistryInfo =
+        effectiveSessionConfig.__registry && typeof effectiveSessionConfig.__registry === 'object'
+          ? (effectiveSessionConfig.__registry as Record<string, unknown>)
+          : {};
       const sessionNetwork = resolveExplicitWorkerSessionNetwork({
         workerOrigin,
-        sessionConfig,
+        sessionConfig: effectiveSessionConfig,
         fallbackNetwork: host.getSessionNetwork(resolvedSlug) || defaultSessionNetwork,
       });
       return (
@@ -1104,8 +1130,8 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
               loginComplete={host.props.loginComplete}
               sessionToken={sessionTokenRaw}
               sessionSlug={resolvedSlug}
-              sessionConfig={sessionConfig}
-              sessionIdHex={sessionConfig?.__registry?.sessionIdHex || null}
+              sessionConfig={effectiveSessionConfig}
+              sessionIdHex={effectiveRegistryInfo.sessionIdHex || null}
               workerOrigin={workerOrigin}
             />
           </div>
@@ -1122,9 +1148,9 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const sessionRouteSourceSlug = resolveMainSiteSessionRouteSourceSlug({
       sessionTokenRaw,
       sessionSlug: slug,
-      sessionConfig,
+      sessionConfig: effectiveSessionConfig as ShellSessionConfigLike,
     });
-    const sessionRouteDisplaySlug = normalizeSessionSlug(sessionConfig.slug || slug);
+    const sessionRouteDisplaySlug = normalizeSessionSlug(effectiveSessionConfig.slug || slug);
     const shouldRefreshBuiltInDemoLiveBucket =
       normalizeSessionSlug(sessionTokenRaw) === 'demo' &&
       sessionRouteDisplaySlug === 'demo' &&
@@ -1156,15 +1182,24 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         Promise.resolve(host.refreshQuestionResponses(questionIds, { ...(opts || {}), slug: 'demo' })),
       ]).then(() => undefined);
     };
-    const resolvedSessionInfo = host.getSessionInfoForGroup(sessionConfig, sessionConfig?.slug || slug);
-    const resolvedSessionName = host.getSessionNameForGroup(sessionConfig, sessionConfig?.slug || slug);
-    const resolvedSessionHeader = host.getSessionHeaderForGroup(sessionConfig, sessionConfig?.slug || slug);
+    const resolvedSessionInfo = host.getSessionInfoForGroup(
+      effectiveSessionConfig,
+      effectiveSessionConfig?.slug || slug,
+    );
+    const resolvedSessionName = host.getSessionNameForGroup(
+      effectiveSessionConfig,
+      effectiveSessionConfig?.slug || slug,
+    );
+    const resolvedSessionHeader = host.getSessionHeaderForGroup(
+      effectiveSessionConfig,
+      effectiveSessionConfig?.slug || slug,
+    );
     const walletViewProps = composeMainSiteWalletViewProps(host.props);
     const loginViewProps = composeMainSiteLoginViewProps(host.props);
     const sessionCacheViewProps = composeMainSiteSessionCacheViewProps(host.state);
     const sessionNetwork = resolveExplicitWorkerSessionNetwork({
       workerOrigin,
-      sessionConfig,
+      sessionConfig: effectiveSessionConfig,
       fallbackNetwork: defaultSessionNetwork,
     });
 
@@ -1173,19 +1208,19 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         <RouteErrorBoundary resetKey={host.props.path}>
           <div data-testid={E2E_TESTIDS.PAGE_SESSION_ROOT}>
             <OnePageSession
-              slug={sessionConfig.slug || slug}
+              slug={effectiveSessionConfig.slug || slug}
               sessionName={resolvedSessionName}
               sessionHeader={resolvedSessionHeader}
               sessionInfo={resolvedSessionInfo}
-              sessionConfig={sessionConfig}
-              defaultTags={sessionConfig.defaultTags}
-              defaultSbtTags={sessionConfig.defaultSbtTags}
-              defaultFilterState={sessionConfig.defaultFilterState}
-              defaultFeaturedSBTs={sessionConfig.defaultFeaturedSBTs || []}
-              contracts={sessionConfig.contracts || {}}
-              blockLimits={sessionConfig.blockLimits || { start: null, end: null }}
-              networkChainId={sessionConfig.networkChainId}
-              questionsGenPrompt={sessionConfig.questionsGenPrompt}
+              sessionConfig={effectiveSessionConfig}
+              defaultTags={effectiveSessionConfig.defaultTags}
+              defaultSbtTags={effectiveSessionConfig.defaultSbtTags}
+              defaultFilterState={effectiveSessionConfig.defaultFilterState}
+              defaultFeaturedSBTs={effectiveSessionConfig.defaultFeaturedSBTs || []}
+              contracts={effectiveSessionConfig.contracts || {}}
+              blockLimits={effectiveSessionConfig.blockLimits || { start: null, end: null }}
+              networkChainId={effectiveSessionConfig.networkChainId}
+              questionsGenPrompt={effectiveSessionConfig.questionsGenPrompt}
               {...walletViewProps}
               network={sessionNetwork}
               {...loginViewProps}
@@ -1201,9 +1236,9 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
               sbtRealtimeCoverageBySlug={host.state.sbtRealtimeCoverageBySlug}
               cacheInitializationError={cacheInitializationError}
               autoFeatureSBTsBySessionSlug={
-                sessionConfig?.autoFeatureSBTsBySessionSlug !== undefined
-                  ? sessionConfig.autoFeatureSBTsBySessionSlug
-                  : sessionConfig?.autoFeatureSBTsWithFeaturedSbtTags
+                effectiveSessionConfig?.autoFeatureSBTsBySessionSlug !== undefined
+                  ? effectiveSessionConfig.autoFeatureSBTsBySessionSlug
+                  : effectiveSessionConfig?.autoFeatureSBTsWithFeaturedSbtTags
               }
               routeQuestionsOpen={isQuestionsRoute}
               routeAutoOpenResults={isQuestionResultsRoute}

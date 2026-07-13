@@ -4,6 +4,9 @@ import {
 import {
   isWorkerCanonicalSessionConfig,
 } from './workerCanonicalAuthority.js';
+import {
+  validateInboundWorkerSessionSlug,
+} from './sessionSlugResolution.js';
 
 export { projectPublicWorkerSessionConfig };
 
@@ -56,6 +59,19 @@ export const dispatchSessionConfigBootstrapRequest = async ({
   }
 
   const slug = slugResolution.slug;
+  let querySlugRaw = null;
+  try {
+    querySlugRaw = new URL(request?.url || '').searchParams.get('slug');
+  } catch {}
+  if (querySlugRaw != null) {
+    const querySlug = validateInboundWorkerSessionSlug(querySlugRaw);
+    if (!querySlug.ok) {
+      return deps?.json?.({ error: querySlug.error }, 400, protectedBaseHeaders);
+    }
+    if (querySlug.slug !== slug) {
+      return deps?.json?.({ error: 'Session config slug query does not match X-Session-Slug.' }, 400, protectedBaseHeaders);
+    }
+  }
   const config = await deps?.getSessionConfig?.(env, slug);
   // Do not expose chain-canonical config through a caller-selected worker.
   if (!config || !isWorkerCanonicalSessionConfig(config)) {

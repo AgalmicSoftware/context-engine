@@ -1295,7 +1295,7 @@ describe('resolveSessionWizardPublishFailureSettlementDescriptor', () => {
 });
 
 describe('runSessionWizardPublishCompletionController', () => {
-  it('promotes pending drafts, publishes links, clears drafts, and marks done in order', () => {
+  it('promotes deployed drafts, publishes links, retains undeployed drafts, and marks done in order', () => {
     const events: string[] = [];
     const normalizedDeployedDrafts = [
       {
@@ -1354,8 +1354,9 @@ describe('runSessionWizardPublishCompletionController', () => {
       events.push('setPublishedPendingSbtLinks');
       expect(links).toBe(publishedLinks);
     });
-    const clearPendingSbtDrafts = jest.fn(() => {
-      events.push('clearPendingSbtDrafts');
+    const replacePendingSbtDrafts = jest.fn((drafts) => {
+      events.push('replacePendingSbtDrafts');
+      expect(drafts).toEqual([pendingDraftSnapshot[2]]);
     });
     const setPublishStep = jest.fn((step) => {
       events.push(`setPublishStep:${step}`);
@@ -1365,6 +1366,7 @@ describe('runSessionWizardPublishCompletionController', () => {
       runSessionWizardPublishCompletionController({
         input: {
           publishExecutionPlan: buildPlan({
+            shouldDeployPendingSbts: true,
             stepNumbers: {
               done: 5,
             },
@@ -1380,7 +1382,7 @@ describe('runSessionWizardPublishCompletionController', () => {
         callbacks: {
           promoteDeployedPendingSbtSelections,
           setPublishedPendingSbtLinks,
-          clearPendingSbtDrafts,
+          replacePendingSbtDrafts,
           setPublishStep,
         },
       }),
@@ -1394,15 +1396,48 @@ describe('runSessionWizardPublishCompletionController', () => {
       'promoteDeployedPendingSbtSelections',
       'buildPublishedPendingSbtLinks',
       'setPublishedPendingSbtLinks',
-      'clearPendingSbtDrafts',
+      'replacePendingSbtDrafts',
       'setPublishStep:5',
     ]);
+  });
+
+  it('preserves undeployed pending drafts when the selected mode suppresses SBT deployment', () => {
+    const pendingDraft = {
+      predictedAddress: '0x00000000000000000000000000000000000000cc',
+      displayName: 'Deferred Group',
+      deployed: false,
+    };
+    const replacePendingSbtDrafts = jest.fn();
+
+    runSessionWizardPublishCompletionController({
+      input: {
+        publishExecutionPlan: buildPlan({
+          shouldDeployPendingSbts: false,
+          stepNumbers: { done: 2 },
+        }),
+        deployedPendingDrafts: [],
+        pendingDraftSnapshot: [pendingDraft],
+        sessionSlug: 'worker-session',
+      },
+      ports: {
+        normalizePendingDrafts: (drafts) => [...drafts],
+        buildPublishedPendingSbtLinks: () => [],
+      },
+      callbacks: {
+        promoteDeployedPendingSbtSelections: jest.fn(),
+        setPublishedPendingSbtLinks: jest.fn(),
+        replacePendingSbtDrafts,
+        setPublishStep: jest.fn(),
+      },
+    });
+
+    expect(replacePendingSbtDrafts).toHaveBeenCalledWith([pendingDraft]);
   });
 
   it('preserves completion failure behavior by stopping later callbacks', () => {
     const error = new Error('promotion failed');
     const setPublishedPendingSbtLinks = jest.fn();
-    const clearPendingSbtDrafts = jest.fn();
+    const replacePendingSbtDrafts = jest.fn();
     const setPublishStep = jest.fn();
 
     expect(() =>
@@ -1426,14 +1461,14 @@ describe('runSessionWizardPublishCompletionController', () => {
             throw error;
           }),
           setPublishedPendingSbtLinks,
-          clearPendingSbtDrafts,
+          replacePendingSbtDrafts,
           setPublishStep,
         },
       }),
     ).toThrow(error);
 
     expect(setPublishedPendingSbtLinks).not.toHaveBeenCalled();
-    expect(clearPendingSbtDrafts).not.toHaveBeenCalled();
+    expect(replacePendingSbtDrafts).not.toHaveBeenCalled();
     expect(setPublishStep).not.toHaveBeenCalled();
   });
 });

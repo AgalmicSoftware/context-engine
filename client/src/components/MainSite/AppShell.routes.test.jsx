@@ -942,6 +942,9 @@ describe('AppShell route render smoke', () => {
       configRevision: 'revision-lit-1',
       corsWorkerUrl: workerOrigin,
       sessionName: 'Worker Lit Session',
+      // The validated Lit profile is authoritative when stale top-level data
+      // disagrees with the chain used for encryption and decryption.
+      networkChainId: 84532,
       sessionModeProfile,
     };
     const bootstrapResponse = createDeferred();
@@ -1003,7 +1006,14 @@ describe('AppShell route render smoke', () => {
 
     view.rerender(subject.render());
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
-    expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.litHooks).toBe(litHooks);
+    const onePageSessionProps = mockOnePageSession.mock.calls.at(-1)?.[0];
+    expect(onePageSessionProps?.litHooks).toBe(litHooks);
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-network-id', '11155420');
+    expect(onePageSessionProps?.networkChainId).toBe(11155420);
+    expect(onePageSessionProps?.sessionConfig).toEqual({
+      ...workerConfig,
+      networkChainId: 11155420,
+    });
 
     const envelopeOrigin = 'https://worker-envelope.example.com';
     const envelopeConfig = {

@@ -119,10 +119,19 @@ export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): s
   const resources = asDeployRecord(value);
   const workerName = toStr(resources?.workerName).trim();
   const kvNamespaceId = toStr(resources?.kvNamespaceId).trim();
+  const kvCleanupStatus = toStr(resources?.kvCleanupStatus).trim();
   const workerCleanupStatus = toStr(resources?.workerCleanupStatus).trim();
+  const workerMayStillOwnKv = [
+    'preserved-existing',
+    'ownership-changed',
+    'ownership-unverified',
+  ].includes(workerCleanupStatus);
+  const retainedKv = !!kvNamespaceId && (
+    kvCleanupStatus === 'retained-live-worker' || (!kvCleanupStatus && workerMayStillOwnKv)
+  );
   const labels = [
     workerName && workerCleanupStatus === 'owned-delete-failed' ? `worker ${workerName}` : '',
-    kvNamespaceId ? `KV namespace ${kvNamespaceId}` : '',
+    kvNamespaceId && !retainedKv ? `KV namespace ${kvNamespaceId}` : '',
   ].filter(Boolean);
   const cleanupInstruction = labels.length
     ? ` Cleanup incomplete: remove ${labels.join(' and ')} in Cloudflare before retrying.`
@@ -135,7 +144,10 @@ export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): s
         : workerCleanupStatus === 'ownership-unverified'
           ? ' Worker ownership could not be verified, so no worker deletion was attempted.'
           : '';
-  return `${cleanupInstruction}${ownershipNote}`;
+  const retainedKvNote = retainedKv
+    ? ` KV namespace ${kvNamespaceId} was retained because it remains or may remain bound to the live worker. Do not delete it before recovery or ownership verification.`
+    : '';
+  return `${cleanupInstruction}${ownershipNote}${retainedKvNote}`;
 };
 
 export const normalizeSessionWizardDeployErrorMessage = ({

@@ -8,6 +8,15 @@ const ROOT_NODE_TEST_FILES = Object.freeze([
   'tests/root/rpcDefaults.compat.test.js',
   'tests/root/sessionCorsWorker.faucet-proof.test.mjs',
   'tests/root/sessionCorsWorker.package.test.js',
+  'workers/shared/deployHelperEndpointConfig.test.mjs',
+]);
+
+// These tests belong to private E2E surfaces that are stripped from public
+// release copies. The normal checkout runs them when present without making
+// their absence a public test-inventory failure.
+const ROOT_OPTIONAL_NODE_TEST_FILES = Object.freeze([
+  'scripts/e2e/cloudflare/session-worker-ui.test.js',
+  'scripts/e2e/cloudflare/worker-login-result.test.js',
 ]);
 
 const ROOT_JEST_TEST_FILES = Object.freeze([
@@ -37,6 +46,7 @@ module.exports = {
   ROOT_JEST_TEST_FILES,
   ROOT_LOCAL_CHAIN_TEST_FILES,
   ROOT_NODE_TEST_FILES,
+  ROOT_OPTIONAL_NODE_TEST_FILES,
   ROOT_PRIVATE_STRIPPED_TEST_FILE_RE,
   ROOT_TEST_FILES,
 };
