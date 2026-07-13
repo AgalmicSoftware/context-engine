@@ -97,13 +97,38 @@ describe('sessionWizardRequirementsDisplay', () => {
     });
   });
 
-  it.each(['anthropicKey', 'openrouterKey'])('accepts one configured %s as the AI provider requirement', (key) => {
+  it.each(['anthropicKey', 'openrouterKey'])('does not accept unselected %s for the default OpenAI models', (key) => {
     expect(
       resolveSessionWizardNewSessionRequirementsDisplayState({
         currentWorkerSecrets: { [key]: 'provider-secret' },
         hasSponsoredBundleLink: true,
         isNewSessionWizardRoute: true,
         normalizedAppliedSponsoredBundle: { deployGrantToken: 'cloudflare-deploy' },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        sponsoredBundleStatus: { tone: 'success' },
+      }),
+    ).toMatchObject({
+      hasNewSessionAiRequirementCovered: false,
+      sponsoredBundleCoversNewSessionRequirements: false,
+    });
+  });
+
+  it.each([
+    ['anthropic', 'anthropicKey'],
+    ['openrouter', 'openrouterKey'],
+  ])('accepts the configured %s key when that provider is selected', (provider, key) => {
+    expect(
+      resolveSessionWizardNewSessionRequirementsDisplayState({
+        currentWorkerSecrets: { [key]: 'provider-secret', openaiKey: 'transcription-secret' },
+        hasSponsoredBundleLink: true,
+        isNewSessionWizardRoute: true,
+        normalizedAppliedSponsoredBundle: { deployGrantToken: 'cloudflare-deploy' },
+        sessionAi: {
+          models: {
+            fast: { provider },
+            thinking: { provider },
+          },
+        },
         sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
         sponsoredBundleStatus: { tone: 'success' },
       }),

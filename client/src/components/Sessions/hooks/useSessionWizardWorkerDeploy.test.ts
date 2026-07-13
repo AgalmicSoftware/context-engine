@@ -345,6 +345,7 @@ describe('useSessionWizardWorkerDeploy', () => {
     } as SessionWizardWorkerDeployRuntime;
     options.getCurrentWorkerSecrets.mockReturnValue({
       openaiKey: 'sk-ai',
+      anthropicKey: 'must-not-send',
       arweaveJwk: 'must-not-send',
       faucetPrivateKey: 'must-not-send',
       litUsageApiKey: 'must-not-send',
@@ -382,9 +383,12 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(JSON.stringify(deployPayload)).not.toMatch(/must-not-send/);
   });
 
-  it.each(['anthropicKey', 'openrouterKey'])(
-    'preserves the configured %s in a worker-canonical deploy',
-    async (key) => {
+  it.each([
+    ['anthropic', 'anthropicKey', 'openrouterKey'],
+    ['openrouter', 'openrouterKey', 'anthropicKey'],
+  ])(
+    'preserves only the selected %s and transcription keys in a worker-canonical deploy',
+    async (provider, key, irrelevantKey) => {
       const fetchMock = mockSuccessfulWorkerDeployFetch();
       const options = buildDeployHookOptions();
       options.refs.runtimeRef.current = {
@@ -394,12 +398,20 @@ describe('useSessionWizardWorkerDeploy', () => {
         sessionId: '123e4567-e89b-12d3-a456-426614174000',
         draft: {
           slug: 'provider-key-session',
+          ai: {
+            models: {
+              fast: { provider },
+              thinking: { provider },
+            },
+          },
           sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
         },
         workerSecretsEnabled: true,
       } as SessionWizardWorkerDeployRuntime;
       options.getCurrentWorkerSecrets.mockReturnValue({
         [key]: 'provider-secret',
+        [irrelevantKey]: 'must-not-send',
+        openaiKey: 'transcription-secret',
         arweaveJwk: 'must-not-send',
         faucetPrivateKey: 'must-not-send',
       });
@@ -413,7 +425,7 @@ describe('useSessionWizardWorkerDeploy', () => {
 
       const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
       const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
-      expect(deployPayload.secrets).toEqual({ [key]: 'provider-secret' });
+      expect(deployPayload.secrets).toEqual({ [key]: 'provider-secret', openaiKey: 'transcription-secret' });
       expect(JSON.stringify(deployPayload)).not.toMatch(/must-not-send/);
     },
   );

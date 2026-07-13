@@ -425,7 +425,7 @@ describe('SessionWizard worker resource rendering', () => {
       selectNormalModeCard('Worker');
 
       const tooltipCases = [
-        ['ai', 'Session-funded OpenAI key used for text generation and transcription.'],
+        ['ai', 'Session-funded provider key used by the selected AI models.'],
         ['rpc', 'Authenticated RPC endpoint used by the worker for chain reads and related operations.'],
         ['arweave', 'Account used to pay for Arweave uploads and storage.'],
         ['txGas', 'Faucet signer used to send small testnet funding grants.'],

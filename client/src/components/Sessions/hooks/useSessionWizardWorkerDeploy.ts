@@ -40,10 +40,8 @@ import {
   cacheSessionWorkerConfigAfterDeploy,
   resolveSponsoredBundleBootstrapWorkerUrl,
 } from '../sessionWizardSponsoredBundleSupport';
-import {
-  isAiProviderWorkerSecretField,
-  sanitizeSessionWizardWorkerSecretsForLitMode,
-} from '../sessionWizardWorkerSecretSupport';
+import { sanitizeSessionWizardWorkerSecretsForLitMode } from '../sessionWizardWorkerSecretSupport';
+import { resolveSessionWizardResourceSecretFields } from '../sessionWizardResourceConfig';
 import { getSessionWizardWorkerDeployValidationError } from '../sessionWizardWorkerRpc';
 import { resolveSessionWizardModeRequirements } from '../sessionWizardModeRequirements';
 import {
@@ -354,10 +352,13 @@ const useSessionWizardWorkerDeploy = ({
           bundleUrl: requestedBundleUrl,
         });
         const allDeploySecrets = runtime.workerSecretsEnabled ? buildWorkerSecretsPayload(currentWorkerSecrets) : {};
+        const selectedAiSecretFields = new Set(
+          resolveSessionWizardResourceSecretFields('ai', currentDraft.ai).map((field) => field.key),
+        );
         const deploySecrets = modeRequirements.isWorkerCanonical
           ? Object.entries(allDeploySecrets).reduce<AnyRecord>((acc, [key, value]) => {
               const allowed =
-                isAiProviderWorkerSecretField(key) ||
+                selectedAiSecretFields.has(key) ||
                 (modeRequirements.requiresLit && key.startsWith('lit')) ||
                 (modeRequirements.requiresRpc && (key === 'customRpcUrl' || key === 'customRpcKey'));
               if (allowed) acc[key] = value;

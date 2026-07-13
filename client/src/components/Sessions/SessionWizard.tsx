@@ -2626,6 +2626,7 @@ const SessionWizard = ({
       newSessionBannerDismissedContext,
       normalizedAppliedSponsoredBundle,
       persistedNewSessionBannerDismissed,
+      sessionAi: draft.ai,
       sessionModeProfile: draft.sessionModeProfile,
       sponsoredBundleStatus,
     });

@@ -194,22 +194,70 @@ describe('useSessionWizardWorkerSecretsController', () => {
       workerSecrets: baseWorkerSecrets(),
     });
 
-    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['AI provider key']);
+    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['OpenAI key']);
   });
 
-  it.each(['anthropicKey', 'openrouterKey'])('accepts %s as the default Cloudflare AI provider key', (key) => {
+  it.each(['anthropicKey', 'openrouterKey'])(
+    'does not accept unselected %s for the default Cloudflare AI models',
+    (key) => {
+      const { result } = createControllerHarness({
+        network: { id: 0 },
+        registryChainId: 0,
+        draft: baseDraft({
+          networkChainId: 0,
+          rpc: { providers: {} },
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        }),
+        workerSecrets: baseWorkerSecrets({ [key]: 'provider-secret' }),
+      });
+
+      expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['OpenAI key']);
+    },
+  );
+
+  it.each([
+    ['anthropic', 'anthropicKey'],
+    ['openrouter', 'openrouterKey'],
+  ])('accepts the selected %s provider key for worker-canonical AI models', (provider, key) => {
     const { result } = createControllerHarness({
       network: { id: 0 },
       registryChainId: 0,
       draft: baseDraft({
         networkChainId: 0,
         rpc: { providers: {} },
+        ai: {
+          models: {
+            fast: { provider },
+            thinking: { provider },
+          },
+        },
         sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
       }),
-      workerSecrets: baseWorkerSecrets({ [key]: 'provider-secret' }),
+      workerSecrets: baseWorkerSecrets({ [key]: 'provider-secret', openaiKey: 'transcription-secret' }),
     });
 
     expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual([]);
+  });
+
+  it('requires every provider selected by mixed worker-canonical AI models', () => {
+    const { result } = createControllerHarness({
+      network: { id: 0 },
+      registryChainId: 0,
+      draft: baseDraft({
+        networkChainId: 0,
+        rpc: { providers: {} },
+        ai: {
+          models: {
+            fast: { provider: 'openai' },
+            thinking: { provider: 'anthropic' },
+          },
+        },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      }),
+      workerSecrets: baseWorkerSecrets({ anthropicKey: 'provider-secret' }),
+    });
+
+    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['OpenAI key']);
   });
 
   it('preserves sponsored fallback fields only for the current slug and worker URL', () => {

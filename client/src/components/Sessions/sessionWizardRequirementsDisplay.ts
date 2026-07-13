@@ -1,5 +1,6 @@
 import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import { resolveSessionWizardModeRequirements, type SessionWizardRequirementId } from './sessionWizardModeRequirements';
+import { resolveSessionWizardResourceSecretFields } from './sessionWizardResourceConfig';
 
 type SessionWizardRecord = Record<string, unknown>;
 
@@ -13,6 +14,7 @@ type ResolveSessionWizardNewSessionRequirementsDisplayStateArgs = {
   normalizedAppliedSponsoredBundle?: SessionWizardRecord | null;
   persistedNewSessionBannerDismissed?: unknown;
   sponsoredBundleStatus?: SessionWizardRecord | null;
+  sessionAi?: unknown;
   sessionModeProfile?: unknown;
 };
 
@@ -44,15 +46,21 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
   normalizedAppliedSponsoredBundle = null,
   persistedNewSessionBannerDismissed = false,
   sponsoredBundleStatus = null,
+  sessionAi = null,
   sessionModeProfile = null,
 }: ResolveSessionWizardNewSessionRequirementsDisplayStateArgs = {}): SessionWizardNewSessionRequirementsDisplayState => {
   const modeRequirements = resolveSessionWizardModeRequirements(
     sessionModeProfile && typeof sessionModeProfile === 'object' ? (sessionModeProfile as SessionModeProfile) : null,
   );
   const sponsoredBundleStatusTone = toRequirementString(sponsoredBundleStatus?.tone).trim().toLowerCase();
-  const hasNewSessionAiRequirementCovered = ['openaiKey', 'anthropicKey', 'openrouterKey'].some(
+  const hasAnyAiProviderKey = ['openaiKey', 'anthropicKey', 'openrouterKey'].some(
     (key) => !!toRequirementString(currentWorkerSecrets?.[key]).trim(),
   );
+  const hasNewSessionAiRequirementCovered = modeRequirements.isWorkerCanonical
+    ? resolveSessionWizardResourceSecretFields('ai', sessionAi).every(
+        (field) => !!toRequirementString(currentWorkerSecrets?.[field.key]).trim(),
+      )
+    : hasAnyAiProviderKey;
   const hasNewSessionArweaveRequirementCovered =
     (modeRequirements.selected && !modeRequirements.requiresArweave) ||
     !!toRequirementString(currentWorkerSecrets?.arweaveJwk).trim();
