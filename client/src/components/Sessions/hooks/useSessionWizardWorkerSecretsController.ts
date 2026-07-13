@@ -238,7 +238,7 @@ const useSessionWizardWorkerSecretsController = ({
       }
       return missing;
     },
-    [draft?.sessionModeProfile, getCurrentWorkerSecrets, resolveWorkerRpcUrl],
+    [draft?.ai, draft?.sessionModeProfile, getCurrentWorkerSecrets, resolveWorkerRpcUrl],
   );
 
   const chipotleHookWorkerSecrets = useMemo<WorkerSecretsLike>(

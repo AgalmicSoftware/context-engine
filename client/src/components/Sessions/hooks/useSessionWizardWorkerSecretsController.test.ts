@@ -103,6 +103,7 @@ const baseDraft = (overrides: Record<string, unknown> = {}) => ({
 const createControllerHarness = (overrides: Record<string, unknown> = {}) => {
   const {
     draft: draftOverride,
+    draftFactory: draftFactoryOverride,
     workerSecrets: workerSecretsOverride,
     applyWorkerSecretsUpdate: applyWorkerSecretsUpdateOverride,
     updateDraftValue: updateDraftValueOverride,
@@ -116,7 +117,10 @@ const createControllerHarness = (overrides: Record<string, unknown> = {}) => {
       account: '0x00000000000000000000000000000000000000aa',
       provider: 'injected-provider',
       network: { id: 11155420 },
-      draft: baseDraft((draftOverride as Record<string, unknown> | undefined) || {}),
+      draft:
+        typeof draftFactoryOverride === 'function'
+          ? draftFactoryOverride()
+          : baseDraft((draftOverride as Record<string, unknown> | undefined) || {}),
       wizardMode: 'advanced',
       deployComplete: false,
       deployWorkerUrl: '',
@@ -258,6 +262,37 @@ describe('useSessionWizardWorkerSecretsController', () => {
     });
 
     expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['OpenAI key']);
+  });
+
+  it('refreshes provider-aware readiness when the selected AI providers change', () => {
+    let draft = baseDraft({
+      networkChainId: 0,
+      rpc: { providers: {} },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const { result, rerender } = createControllerHarness({
+      network: { id: 0 },
+      registryChainId: 0,
+      draftFactory: () => draft,
+      workerSecrets: baseWorkerSecrets({ openaiKey: 'provider-secret' }),
+    });
+
+    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual([]);
+
+    draft = baseDraft({
+      networkChainId: 0,
+      rpc: { providers: {} },
+      ai: {
+        models: {
+          fast: { provider: 'anthropic' },
+          thinking: { provider: 'anthropic' },
+        },
+      },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    rerender();
+
+    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['Anthropic key']);
   });
 
   it('preserves sponsored fallback fields only for the current slug and worker URL', () => {
