@@ -139,6 +139,43 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     expect(result.configRevision).toBe('revision-2');
   });
 
+  it('signs the exact non-secret Lit descriptor fields for a worker-canonical Lit session', async () => {
+    const litCredentials = {
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+    };
+    const signAdminAction = jest.fn(async () => ({ signature: '0xsigned' }));
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+      .mockResolvedValueOnce(jsonResponse(200, { config: verifiedConfig('revision-lit') }));
+
+    await persistAndVerifySessionWizardWorkerConfig({
+      workerUrl: WORKER_ORIGIN,
+      slug: 'worker-session',
+      sessionId: SESSION_ID,
+      adminAddress: ADMIN_ADDRESS,
+      config: {
+        ...baseConfig(),
+        litCredentials,
+      },
+      signAdminAction,
+      fetchImpl,
+      configRevision: 'revision-lit',
+      retryDelaysMs: [],
+    });
+
+    expect(signAdminAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          config: expect.objectContaining({ litCredentials }),
+        }),
+      }),
+    );
+  });
+
   it.each([
     ['slug', { slug: 'different-session' }],
     ['session id', { sessionId: '0xffeeddccbbaa99887766554433221100' }],
@@ -236,6 +273,12 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     ['AI provider key', { ai: { anthropicKey: 'ai-secret' } }],
     ['Arweave JWK', { storage: { arweaveJwk: 'arweave-secret' } }],
     ['Lit credential', { litCredentials: { litUsageApiKey: 'lit-secret' } }],
+    ['Lit account credential', { litCredentials: { litAccountApiKey: 'lit-secret' } }],
+    ['generic Lit API key', { litCredentials: { apiKey: 'lit-secret' } }],
+    ['generic Lit token', { litCredentials: { token: 'lit-secret' } }],
+    ['unknown Lit descriptor field', { litCredentials: { litNetwork: 'datil' } }],
+    ['nested Lit secret alias', { litCredentials: { metadata: { clientSecret: 'lit-secret' } } }],
+    ['credential-bearing Lit API base', { litCredentials: { litApiBase: 'https://user:secret@lit.example' } }],
     ['RPC config', { rpcUrlsByChainId: { '1': ['https://rpc-key.example'] } }],
     ['faucet config', { faucet: { privateKey: 'faucet-secret' } }],
   ])('rejects a secret-bearing %s before signing or persistence', async (_label, secretConfig) => {
@@ -288,5 +331,36 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
         retryDelaysMs: [],
       }),
     ).rejects.toThrow(/secret-bearing worker config field/i);
+  });
+
+  it('rejects a verified public response that exposes even a non-secret Lit descriptor', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          config: {
+            ...verifiedConfig('revision-public-lit'),
+            litCredentials: {
+              litApiBase: 'https://api.chipotle.litprotocol.com',
+              litActionCid: 'bafy123',
+            },
+          },
+        }),
+      );
+
+    await expect(
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: baseConfig(),
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl,
+        configRevision: 'revision-public-lit',
+        retryDelaysMs: [],
+      }),
+    ).rejects.toThrow(/public worker config response exposed litCredentials/i);
   });
 });

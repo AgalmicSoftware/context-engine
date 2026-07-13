@@ -60,6 +60,13 @@ const SAFE_WRAPPED_STORAGE_KEY_PATHS = new Set([
   'config.storageEnvelope.sessionKey',
   'config.storageEnvelope.sessionKey.wrappedKey',
 ]);
+export const WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS = Object.freeze([
+  'litApiBase',
+  'litGroupId',
+  'litPkpId',
+  'litActionCid',
+]);
+const WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET = new Set(WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS);
 const TOP_LEVEL_PROVIDER_KEY_NAMES = new Set([
   'aikey',
   'anthropickey',
@@ -238,8 +245,25 @@ const findForbiddenRecursiveProviderAliasPath = (value, path) => {
   return '';
 };
 
+const findInvalidLitCredentialsDescriptorPath = (value, path = 'config.litCredentials') => {
+  if (!isObj(value)) return path;
+  for (const key of Object.keys(value)) {
+    const fieldPath = `${path}.${key}`;
+    if (!WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET.has(key)) return fieldPath;
+    if (typeof value[key] !== 'string' || hasUrlCredentials(value[key])) return fieldPath;
+  }
+  return '';
+};
+
 export const findForbiddenWorkerConfigSecretPath = (config, path = 'config') => {
   const source = isObj(config) ? config : {};
+  if (Object.prototype.hasOwnProperty.call(source, 'litCredentials')) {
+    const invalidLitCredentialsPath = findInvalidLitCredentialsDescriptorPath(
+      source.litCredentials,
+      `${path}.litCredentials`,
+    );
+    if (invalidLitCredentialsPath) return invalidLitCredentialsPath;
+  }
   for (const key of Object.keys(source)) {
     const normalized = normalizeKey(key);
     if (
@@ -254,7 +278,9 @@ export const findForbiddenWorkerConfigSecretPath = (config, path = 'config') => 
     const nested = findForbiddenOpenConfigSecretPath(source[key], `${path}.${key}`);
     if (nested) return nested;
   }
-  return findForbiddenRecursiveProviderAliasPath(source, path);
+  const recursiveSource = { ...source };
+  delete recursiveSource.litCredentials;
+  return findForbiddenRecursiveProviderAliasPath(recursiveSource, path);
 };
 
 export const projectPublicWorkerSessionConfig = (config) => (

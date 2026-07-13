@@ -2,6 +2,7 @@ import {
   parseSessionWorkerDiscoveryOrigin,
   type DiscoveryEnvironment,
 } from '../../utilities/session/sessionWorkerDiscovery';
+import { CHIPOTLE_LIT_CONFIG_FIELDS } from './sessionWizardWorkerSecretSupport';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -47,6 +48,7 @@ const DEFAULT_RETRY_DELAYS_MS = Object.freeze([100, 250, 500]);
 const SESSION_ID_PATTERN = /^0x[0-9a-f]{32}$/;
 const ADDRESS_PATTERN = /^0x[0-9a-f]{40}$/;
 const REVISION_PATTERN = /^[a-z0-9._:-]{1,128}$/i;
+const LIT_CREDENTIAL_DESCRIPTOR_FIELDS = new Set<string>(CHIPOTLE_LIT_CONFIG_FIELDS);
 
 const toTrimmedString = (value: unknown): string =>
   typeof value === 'string' ? value.trim() : value == null ? '' : String(value).trim();
@@ -88,6 +90,31 @@ const isSecretBearingConfigField = (key: unknown): boolean => {
   return false;
 };
 
+const hasUrlCredentials = (value: unknown): boolean => {
+  if (typeof value !== 'string' || !/^https?:\/\//i.test(value.trim())) return false;
+  try {
+    const parsed = new URL(value);
+    return !!parsed.username || !!parsed.password;
+  } catch {
+    return false;
+  }
+};
+
+const cloneLitCredentialsDescriptor = (value: unknown, path: string): UnknownRecord => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`Secret-bearing worker config field "${path}" is not allowed.`);
+  }
+  return Object.entries(value as UnknownRecord).reduce((acc: UnknownRecord, [key, entry]) => {
+    const nextPath = `${path}.${key}`;
+    if (!LIT_CREDENTIAL_DESCRIPTOR_FIELDS.has(key) || typeof entry !== 'string' || hasUrlCredentials(entry)) {
+      throw new Error(`Secret-bearing worker config field "${nextPath}" is not allowed.`);
+    }
+    const normalized = entry.trim();
+    if (normalized) acc[key] = normalized;
+    return acc;
+  }, {});
+};
+
 const clonePublicConfigValue = (value: unknown, path: string, seen: WeakSet<object>): unknown => {
   if (value == null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') {
@@ -108,6 +135,10 @@ const clonePublicConfigValue = (value: unknown, path: string, seen: WeakSet<obje
     const next: UnknownRecord = {};
     for (const [key, entry] of Object.entries(source)) {
       const nextPath = path ? `${path}.${key}` : key;
+      if (path === 'config' && key === 'litCredentials') {
+        next[key] = cloneLitCredentialsDescriptor(entry, nextPath);
+        continue;
+      }
       if (
         isSecretBearingConfigField(key) &&
         !(normalizeSecretFieldKey(key).startsWith('exposes') && typeof entry === 'boolean')
@@ -163,6 +194,14 @@ const readResponseError = (body: UnknownRecord): string =>
 
 const getPublicConfigFromResponse = (body: UnknownRecord): UnknownRecord => {
   const candidate = body.config || body.sessionConfig || body;
+  if (
+    candidate &&
+    typeof candidate === 'object' &&
+    !Array.isArray(candidate) &&
+    Object.prototype.hasOwnProperty.call(candidate, 'litCredentials')
+  ) {
+    throw new Error('Public worker config response exposed litCredentials.');
+  }
   return clonePublicConfig(candidate);
 };
 

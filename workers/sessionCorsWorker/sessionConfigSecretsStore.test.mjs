@@ -146,6 +146,26 @@ test('putSessionConfig persists only the expected wrapped storage-envelope key f
   assert.deepEqual(writes, [[{ GROUP_KV: {} }, 'session:session-a:config', config]]);
 });
 
+test('putSessionConfig persists only the established non-secret Lit descriptor fields', async () => {
+  const writes = [];
+  const config = {
+    slug: 'session-a',
+    litCredentials: {
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+    },
+  };
+
+  await putSessionConfig({ GROUP_KV: {} }, 'session-a', config, {
+    normalizeWorkerConfigRecord: (value) => value,
+    putKvJson: async (...args) => writes.push(args),
+  });
+
+  assert.deepEqual(writes, [[{ GROUP_KV: {} }, 'session:session-a:config', config]]);
+});
+
 test('putSessionConfig fails closed before KV persistence for secret-like config aliases', async () => {
   const unsafeConfigs = [
     { requestKey: 'secret' },
@@ -162,6 +182,13 @@ test('putSessionConfig fails closed before KV persistence for secret-like config
     { sessionModeProfile: { authorization: ['Bearer secret'] } },
     { storageEnvelope: { sessionKey: { privateKey: 'plaintext-secret' } } },
     { storageEnvelope: { unrelatedKey: 'plaintext-secret' } },
+    { litCredentials: { litAccountApiKey: 'account-secret' } },
+    { litCredentials: { litUsageApiKey: 'usage-secret' } },
+    { litCredentials: { apiKey: 'generic-secret' } },
+    { litCredentials: { token: 'generic-secret' } },
+    { litCredentials: { litNetwork: 'datil' } },
+    { litCredentials: { metadata: { clientSecret: 'nested-secret' } } },
+    { litCredentials: { litApiBase: 'https://user:secret@lit.example' } },
   ];
   let writes = 0;
 

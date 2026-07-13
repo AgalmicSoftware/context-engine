@@ -108,6 +108,21 @@ test('projectPublicWorkerSessionConfig returns canonical fields and recursively 
   }
 });
 
+test('projectPublicWorkerSessionConfig omits the complete persisted Lit descriptor', () => {
+  const projected = projectPublicWorkerSessionConfig({
+    ...buildWorkerCanonicalConfig(),
+    litCredentials: {
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+    },
+  });
+
+  assert.equal(Object.prototype.hasOwnProperty.call(projected, 'litCredentials'), false);
+  assert.equal(JSON.stringify(projected).includes('bafy123'), false);
+});
+
 test('Cloudflare deployment-token detection covers aliases and nested Cloudflare token fields', () => {
   assert.equal(findForbiddenCloudflareDeploymentTokenPath({ cfApiToken: 'secret' }), 'config.cfApiToken');
   assert.equal(
@@ -152,6 +167,28 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
   );
   assert.equal(findForbiddenWorkerConfigSecretPath({ requestKey: 'secret' }), 'config.requestKey');
   assert.equal(findForbiddenWorkerConfigSecretPath({ customProviderKey: 'secret' }), 'config.customProviderKey');
+  assert.equal(findForbiddenWorkerConfigSecretPath({
+    litCredentials: {
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+    },
+  }), '');
+  for (const unsafeLitCredentials of [
+    { litAccountApiKey: 'account-secret' },
+    { litUsageApiKey: 'usage-secret' },
+    { apiKey: 'generic-secret' },
+    { token: 'generic-secret' },
+    { litNetwork: 'datil' },
+    { metadata: { clientSecret: 'nested-secret' } },
+    { litApiBase: 'https://user:secret@lit.example' },
+  ]) {
+    assert.match(
+      findForbiddenWorkerConfigSecretPath({ litCredentials: unsafeLitCredentials }),
+      /^config\.litCredentials\./,
+    );
+  }
   assert.equal(findForbiddenWorkerConfigSecretPath({ authorization: 'Bearer secret' }), 'config.authorization');
   assert.equal(
     findForbiddenWorkerConfigSecretPath({ sessionModeProfile: { authorization: 'Bearer secret' } }),
