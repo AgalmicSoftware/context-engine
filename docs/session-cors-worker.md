@@ -69,12 +69,14 @@ For the default `Fast & Cheap (Cloudflare)` preset:
 
 1) Fill in the Cloudflare API token and one key for the selected AI provider.
    - The "Create API token" link opens a prefilled Cloudflare token template with the required
-     Workers KV, Workers Scripts, R2, D1, and Durable Objects permissions used by the deploy-helper.
-     `Account Settings: Edit` is needed only when the helper must create or change the
-     account-level workers.dev subdomain.
+     `Workers Scripts: Edit` and `Workers KV Storage: Edit` permissions used by the default
+     deploy-helper path. The helper's workers.dev subdomain calls are also covered by
+     `Workers Scripts: Edit`.
    - CLI equivalent for agents/local setup: `npm run -s cloudflare:token-link -- --slug <session-slug>`
-     Add `--include-workers-dev-subdomain-setup` only when the account does not already have a
-     workers.dev subdomain or when intentionally changing it.
+     Add `--include-r2-storage` only for an advanced deployment that manages an existing R2 bucket;
+     the flag does not create the bucket.
+   - When the template preselects `All accounts`, restrict Account Resources to the one account
+     where the session worker will run before creating the token.
    - The template auto-names the token as `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMAM` or `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMPM` (local time).
    - The first-party wizard derives the worker name and no longer asks for a
      Cloudflare account ID; the deploy-helper resolves the account from the API
@@ -1380,9 +1382,8 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   authoritative preflight `404` before creating it. Rollback deletes only
   resources that still prove ownership by the current deployment id.
 - Optional: pass `subdomain` (or `workersSubdomain`) to set the account-level workers.dev subdomain
-  when none exists yet (falls back to a deterministic `ce-<accountId>` name). This is the only
-  deploy-helper path that needs `Account Settings: Edit`; script-level Workers.dev enablement uses
-  the Workers script scope.
+  when none exists yet (falls back to a deterministic `ce-<accountId>` name). Account-level and
+  script-level workers.dev setup are both covered by `Workers Scripts: Edit`.
 - `allowOrigins` entries are normalized to origins (`https://host`, `http://localhost:3000`), and the
   helper returns a normalized `workerUrl` with protocol. The first-party Session Wizard default seed list includes the hosted app plus local dev/E2E origins for ports `3000`, `3001`, and `7391`.
 - `/new` now uses the project helper by default at `https://ce-deploy-helper.agalmic.workers.dev/`.

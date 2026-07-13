@@ -56,6 +56,7 @@ const makeFetchSequence = (responses = []) => {
       return cfSuccess({ subdomain: 'tenant-subdomain', status: 'active' });
     }
     if (method === 'POST' && /\/workers\/scripts\/[^/]+\/subdomain$/.test(normalizedUrl)) {
+      if (fetchMock.scriptSubdomainOverride) return fetchMock.scriptSubdomainOverride;
       return cfSuccess({ enabled: true });
     }
     if (method === 'PUT' && /\/workers\/scripts\/[^/]+\/secrets$/.test(normalizedUrl)) {
@@ -1064,6 +1065,45 @@ describe('deploy-helper worker', () => {
       expect(fetchMock.calls.some(([url]) => String(url).endsWith(':secrets'))).toBe(false);
       expect(fetchMock.calls.some(([url]) => String(url).endsWith('/secrets'))).toBe(false);
       expectBundleDiagnosticsLog(consoleLogSpy, 'bundleUrl');
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('rolls back instead of surfacing a worker URL when the script subdomain stays disabled', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    fetchMock.scriptSubdomainOverride = cfSuccess({ enabled: false });
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(payload?.workerUrl).toBeUndefined();
+      expect(payload?.error).toMatch(/did not enable workers\.dev/i);
+      expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(url).endsWith('/workers/scripts/test-worker') && init.method === 'DELETE'
+      ))).toBe(true);
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(url).endsWith('/storage/kv/namespaces/kv-123') && init.method === 'DELETE'
+      ))).toBe(true);
     } finally {
       consoleLogSpy.mockRestore();
     }

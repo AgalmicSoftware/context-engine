@@ -248,7 +248,7 @@ export const lookupCloudflareAccount = async ({
   apiBaseUrl = '',
   env = null,
 } = {}) => {
-  const accountsResp = await cfFetch(apiToken, '/accounts?per_page=1', {}, {
+  const accountsResp = await cfFetch(apiToken, '/accounts?per_page=5', {}, {
     fetchImpl,
     apiBaseUrl,
     env,
@@ -263,7 +263,18 @@ export const lookupCloudflareAccount = async ({
       fallbackEligible: status >= 500 || status === 429,
     };
   }
-  const account = accountsResp.data?.result?.[0] || null;
+  const accounts = Array.isArray(accountsResp.data?.result) ? accountsResp.data.result : [];
+  const totalCount = Number(accountsResp.data?.result_info?.total_count || accounts.length);
+  if (accounts.length > 1 || totalCount > 1) {
+    return {
+      ok: false,
+      error: 'Multiple accounts are available for this token. Choose an account explicitly or restrict the token to one account.',
+      detail: undefined,
+      status: 409,
+      fallbackEligible: false,
+    };
+  }
+  const account = accounts[0] || null;
   if (!account || !account.id) {
     return {
       ok: false,
@@ -841,13 +852,16 @@ export const ensureWorkersDevSubdomain = async ({
       body: JSON.stringify({ enabled: true }),
     }, cfFetchOptions);
     if (scriptSubdomainResp.ok) {
-      scriptSubdomainEnabled = scriptSubdomainResp.data?.result?.enabled !== false;
+      scriptSubdomainEnabled = scriptSubdomainResp.data?.result?.enabled === true;
+      if (!scriptSubdomainEnabled) {
+        scriptSubdomainError = 'Cloudflare did not enable workers.dev for this Worker.';
+      }
     } else {
       scriptSubdomainError = scriptSubdomainResp.error || 'Failed to enable workers.dev for script.';
     }
   }
 
-  const workerUrl = subdomain ? `https://${workerName}.${subdomain}.workers.dev/` : '';
+  const workerUrl = subdomain && scriptSubdomainEnabled ? `https://${workerName}.${subdomain}.workers.dev/` : '';
   return {
     subdomain,
     subdomainStatus,

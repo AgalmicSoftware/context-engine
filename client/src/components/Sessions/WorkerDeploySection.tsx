@@ -274,7 +274,7 @@ const WorkerDeploySection = ({
                 {renderTooltip({
                   id: 'gw-cf-token-tip',
                   content:
-                    'Use the prefilled template link below. It includes Workers, R2 objects, D1 or KV metadata indexes, and Durable Objects for signer coordination only. Add Account Settings: Edit only when creating or changing the workers.dev subdomain.',
+                    'The default template requests only Workers Scripts: Edit and Workers KV Storage: Edit. KV stores canonical config, encrypted payload envelopes and indexes, groups, audit rows, and deploy state.',
                   placement: 'right',
                   testId: 'ce-wizard-worker-tooltip-gw-cf-token-tip',
                   ariaLabel: 'Cloudflare API token info',
@@ -296,7 +296,15 @@ const WorkerDeploySection = ({
                 <Button
                   type="button"
                   className={styles.secondaryButton}
-                  onClick={() => window.open(buildCloudflareTokenTemplateUrl({ slug: cloudflareTokenSlug }), '_blank')}
+                  onClick={() =>
+                    window.open(
+                      buildCloudflareTokenTemplateUrl({
+                        accountId: deployForm.accountId,
+                        slug: cloudflareTokenSlug,
+                      }),
+                      '_blank',
+                    )
+                  }
                 >
                   Create prefilled API token
                 </Button>
@@ -304,7 +312,15 @@ const WorkerDeploySection = ({
               <div className={styles.helperText}>
                 You must be logged into Cloudflare before using the prefilled API token button.
               </div>
-              <div className={styles.helperText}>Account is inferred from the API token during deploy.</div>
+              {!deployForm.accountId && (
+                <div className={styles.helperText}>
+                  Cloudflare may preselect All accounts. Before creating the token, restrict Account Resources to the
+                  one account where this worker will run.
+                </div>
+              )}
+              <div className={styles.helperText}>
+                Account is inferred during deploy only when the token can see exactly one account.
+              </div>
             </FormGroup>
             <FormGroup>
               <Label>Admin address</Label>

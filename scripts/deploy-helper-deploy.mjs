@@ -55,7 +55,7 @@ export const printUsage = () => {
     '',
     'Flags:',
     '  --worker-name <name>          Cloudflare worker script name for the deploy-helper',
-    '  --api-token <token>           Cloudflare API token with Workers KV + Workers Scripts + Account Settings edit scopes',
+    '  --api-token <token>           Cloudflare API token with Workers KV Storage + Workers Scripts edit scopes',
     '  --account-id <id>             Optional Cloudflare account ID (auto-resolved from the token when omitted)',
     '  --allowed-origins <csv>       Optional comma/newline-delimited origin allowlist written into ALLOWED_ORIGINS',
     '                                When omitted, seeds the hosted/local defaults used by /new before it prepends the current browser origin',

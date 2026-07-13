@@ -95,11 +95,54 @@ describe('WorkerDeploySection', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create prefilled API token' }));
     expect(openSpy).toHaveBeenCalledWith(expect.stringContaining('demo-worker'), '_blank');
+    const tokenUrl = new URL(String(openSpy.mock.calls[0][0]));
+    expect(tokenUrl.searchParams.get('accountId')).toBe('*');
+    expect(JSON.parse(tokenUrl.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
+      { key: 'workers_scripts', type: 'edit' },
+      { key: 'workers_kv_storage', type: 'edit' },
+    ]);
+    expect(screen.getByText(/Cloudflare may preselect All accounts/i)).toBeInTheDocument();
+    expect(screen.getByText(/only when the token can see exactly one account/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
     expect(handleDeployWorker).toHaveBeenCalledTimes(1);
 
     openSpy.mockRestore();
+  });
+
+  it('scopes the prefilled token link to a known Cloudflare account', () => {
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+
+    renderWorkerDeploySection({
+      deployForm: {
+        workerName: 'demo-worker',
+        bundleUrl: '',
+        apiToken: '',
+        accountId: 'cf-account-1',
+        adminAddress: '',
+      },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create prefilled API token' }));
+
+    const tokenUrl = new URL(String(openSpy.mock.calls[0][0]));
+    expect(tokenUrl.searchParams.get('accountId')).toBe('cf-account-1');
+    expect(screen.queryByText(/Cloudflare may preselect All accounts/i)).not.toBeInTheDocument();
+
+    openSpy.mockRestore();
+  });
+
+  it('describes the least-privilege default Cloudflare token scopes', () => {
+    renderWorkerDeploySection({
+      renderInfoTooltip: ({ content, testId }: RenderInfoTooltipProps) => <div data-testid={testId}>{content}</div>,
+    });
+
+    expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-cf-token-tip')).toHaveTextContent(
+      'Workers Scripts: Edit and Workers KV Storage: Edit',
+    );
+    expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-cf-token-tip')).not.toHaveTextContent(
+      /R2|D1|Durable Objects|Account Settings/,
+    );
   });
 
   it('keeps a cached Cloudflare account id when first filling the API token', () => {

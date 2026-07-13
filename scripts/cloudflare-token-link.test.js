@@ -6,7 +6,6 @@ const assert = require('node:assert/strict');
 const {
   CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS,
   CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS,
-  CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION,
   buildCloudflareTokenTemplatePermissions,
   buildCloudflareTokenTemplateUrl,
   parseArgs,
@@ -28,51 +27,34 @@ test('buildCloudflareTokenTemplateUrl only requests the deploy-helper scopes it 
   assert.deepEqual(JSON.parse(url.searchParams.get('permissionGroupKeys')), [
     { key: 'workers_scripts', type: 'edit' },
     { key: 'workers_kv_storage', type: 'edit' },
-    { key: 'workers_r2', type: 'edit' },
-    { key: 'd1', type: 'edit' },
-    { key: 'workers_durable_objects', type: 'edit' },
   ]);
-  assert.equal(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS.length, 5);
+  assert.equal(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS.length, 2);
+  assert.deepEqual(buildCloudflareTokenTemplatePermissions(), CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS);
 });
 
-test('buildCloudflareTokenTemplateUrl adds Account Settings only for workers.dev subdomain setup', () => {
+test('buildCloudflareTokenTemplateUrl adds only R2 for an explicit advanced R2 deployment', () => {
   const url = new URL(buildCloudflareTokenTemplateUrl({
+    accountId: 'cf-account-1',
     slug: 'alpha-session',
-    includeWorkersDevSubdomainSetup: true,
+    includeR2Storage: true,
   }));
 
   assert.deepEqual(JSON.parse(url.searchParams.get('permissionGroupKeys')), [
     { key: 'workers_scripts', type: 'edit' },
     { key: 'workers_kv_storage', type: 'edit' },
     { key: 'workers_r2', type: 'edit' },
-    { key: 'd1', type: 'edit' },
-    { key: 'workers_durable_objects', type: 'edit' },
-    { key: 'account_settings', type: 'edit' },
   ]);
-  assert.deepEqual(CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION, { key: 'account_settings', type: 'edit' });
-  assert.deepEqual(buildCloudflareTokenTemplatePermissions({
-    includeWorkersDevSubdomainSetup: false,
-  }), CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS);
+  assert.deepEqual(buildCloudflareTokenTemplatePermissions({ includeR2Storage: true }), JSON.parse(url.searchParams.get('permissionGroupKeys')));
+  assert.equal(url.searchParams.get('accountId'), 'cf-account-1');
 });
 
-test('buildCloudflareTokenTemplateUrl can omit R2/D1 for default Telegram smoke deploy', () => {
-  const url = new URL(buildCloudflareTokenTemplateUrl({
-    slug: 'alpha-session',
-    includeDocStorage: false,
-  }));
-  const permissions = JSON.parse(url.searchParams.get('permissionGroupKeys'));
-
-  assert.deepEqual(permissions, [
-    { key: 'workers_scripts', type: 'edit' },
-    { key: 'workers_kv_storage', type: 'edit' },
-    { key: 'workers_durable_objects', type: 'edit' },
-  ]);
-  assert.deepEqual(buildCloudflareTokenTemplatePermissions({ includeDocStorage: false }), permissions);
-});
-
-test('buildCloudflareTokenTemplateUrl does not request legacy broad Cloudflare product scopes', () => {
+test('buildCloudflareTokenTemplateUrl does not request unrelated Cloudflare product scopes by default', () => {
   const permissionKeys = CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS.map((permission) => permission.key);
 
+  assert.equal(permissionKeys.includes('workers_r2'), false);
+  assert.equal(permissionKeys.includes('d1'), false);
+  assert.equal(permissionKeys.includes('workers_durable_objects'), false);
+  assert.equal(permissionKeys.includes('account_settings'), false);
   assert.equal(permissionKeys.includes('pages'), false);
   assert.equal(permissionKeys.includes('builds'), false);
   assert.equal(permissionKeys.includes('agents'), false);
@@ -82,11 +64,8 @@ test('buildCloudflareTokenTemplateUrl does not request legacy broad Cloudflare p
 });
 
 test('Cloudflare token helper documents storage resource boundaries', () => {
-  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.r2, /questions, surveys, and responses/);
-  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.d1, /metadata and index/);
-  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.kv, /metadata indexes/);
-  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.durableObjects, /not ordinary payload blob storage/);
-  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.accountSettings, /workers\.dev subdomain/);
+  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.kv, /canonical config/);
+  assert.match(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.r2, /optional existing R2 bucket/);
 });
 
 test('buildCloudflareTokenTemplateUrl falls back to the general slug when none is provided', () => {
@@ -98,14 +77,12 @@ test('buildCloudflareTokenTemplateUrl falls back to the general slug when none i
   );
 });
 
-test('parseArgs accepts the workers.dev setup scope flag', () => {
+test('parseArgs accepts the explicit R2 storage scope flag', () => {
   assert.deepEqual(parseArgs([
     '--slug', 'alpha',
-    '--include-workers-dev-subdomain-setup',
-    '--no-doc-storage',
+    '--include-r2-storage',
   ]), {
     slug: 'alpha',
-    'include-workers-dev-subdomain-setup': true,
-    'no-doc-storage': true,
+    'include-r2-storage': true,
   });
 });

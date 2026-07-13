@@ -10,29 +10,13 @@ export const CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS = Object.freeze([
   { key: 'workers_kv_storage', type: 'edit' },
 ]);
 
-export const CLOUDFLARE_TOKEN_TEMPLATE_DOC_STORAGE_PERMISSIONS = Object.freeze([
-  { key: 'workers_r2', type: 'edit' },
-  { key: 'd1', type: 'edit' },
-]);
+export const CLOUDFLARE_TOKEN_TEMPLATE_R2_PERMISSIONS = Object.freeze([{ key: 'workers_r2', type: 'edit' }]);
 
-export const CLOUDFLARE_TOKEN_TEMPLATE_RUNTIME_PERMISSIONS = Object.freeze([
-  { key: 'workers_durable_objects', type: 'edit' },
-]);
-
-export const CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS = Object.freeze([
-  ...CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS,
-  ...CLOUDFLARE_TOKEN_TEMPLATE_DOC_STORAGE_PERMISSIONS,
-  ...CLOUDFLARE_TOKEN_TEMPLATE_RUNTIME_PERMISSIONS,
-]);
-
-export const CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION = Object.freeze({ key: 'account_settings', type: 'edit' });
+export const CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS = CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS;
 
 export const CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS = Object.freeze({
-  r2: 'CE payload blobs for session context, docs, media, questions, surveys, and responses',
-  d1: 'metadata and index records where queryable storage indexes are modeled',
-  kv: 'metadata indexes, short-lived action IDs, webhook replay cache, and ephemeral start params',
-  durableObjects: 'signer/runtime coordination only, not ordinary payload blob storage',
-  accountSettings: 'Only needed when creating or changing the account-level workers.dev subdomain',
+  kv: 'canonical config, encrypted payload envelopes and indexes, groups, audit rows, and deploy state',
+  r2: 'optional existing R2 bucket for advanced deployments that explicitly enable R2 payload storage',
 });
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'] as const;
@@ -54,19 +38,13 @@ const buildTokenName = (slug?: unknown): string => {
 };
 
 export const buildCloudflareTokenTemplatePermissions = ({
-  includeWorkersDevSubdomainSetup = false,
-  includeDocStorage = true,
+  includeR2Storage = false,
 }: {
-  includeWorkersDevSubdomainSetup?: boolean;
-  includeDocStorage?: boolean;
+  includeR2Storage?: boolean;
 } = {}) => {
   const permissions: CloudflareTokenPermission[] = [...CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS];
-  if (includeDocStorage === true) {
-    permissions.push(...CLOUDFLARE_TOKEN_TEMPLATE_DOC_STORAGE_PERMISSIONS);
-  }
-  permissions.push(...CLOUDFLARE_TOKEN_TEMPLATE_RUNTIME_PERMISSIONS);
-  if (includeWorkersDevSubdomainSetup === true) {
-    permissions.push(CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION);
+  if (includeR2Storage === true) {
+    permissions.push(...CLOUDFLARE_TOKEN_TEMPLATE_R2_PERMISSIONS);
   }
   return permissions;
 };
@@ -74,21 +52,18 @@ export const buildCloudflareTokenTemplatePermissions = ({
 export const buildCloudflareTokenTemplateUrl = ({
   accountId,
   slug,
-  includeWorkersDevSubdomainSetup = false,
-  includeDocStorage = true,
+  includeR2Storage = false,
 }: {
   accountId?: unknown;
   slug?: unknown;
-  includeWorkersDevSubdomainSetup?: boolean;
-  includeDocStorage?: boolean;
+  includeR2Storage?: boolean;
 } = {}): string => {
   const params = new URLSearchParams();
   params.set(
     'permissionGroupKeys',
     JSON.stringify(
       buildCloudflareTokenTemplatePermissions({
-        includeWorkersDevSubdomainSetup,
-        includeDocStorage,
+        includeR2Storage,
       }),
     ),
   );
