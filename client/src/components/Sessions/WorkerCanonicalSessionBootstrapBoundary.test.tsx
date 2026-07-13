@@ -2,13 +2,19 @@ import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 
 import WorkerCanonicalSessionBootstrapBoundary from './WorkerCanonicalSessionBootstrapBoundary';
-import { fetchWorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
+import {
+  fetchWorkerCanonicalSessionBootstrap,
+  validateWorkerCanonicalSessionBootstrap,
+} from '../../utilities/session/sessionWorkerDiscovery';
 import {
   markWorkerCanonicalSessionBootstrapVerified,
   upsertWorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerConfigCache.js';
+import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 jest.mock('../../utilities/session/sessionWorkerDiscovery', () => ({
+  ...jest.requireActual('../../utilities/session/sessionWorkerDiscovery'),
   fetchWorkerCanonicalSessionBootstrap: jest.fn(),
 }));
 
@@ -124,6 +130,65 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     );
     expect(mockMarkBootstrapVerified.mock.invocationCallOrder[0]).toBeLessThan(onResolved.mock.invocationCallOrder[0]);
     expect(screen.getByRole('status')).toHaveTextContent('Worker session ready.');
+  });
+
+  it('composes a fresh validated Lit bootstrap into descriptor-free worker hooks config', async () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.encryption = { mode: 'lit' };
+    sessionModeProfile.evm.registryChainId = 11155420;
+    const config = {
+      slug: 'worker-session',
+      sessionId: SESSION_ID,
+      configRevision: 'revision-lit',
+      corsWorkerUrl: WORKER_ORIGIN,
+      sessionModeProfile,
+    };
+    const validatedBootstrap = validateWorkerCanonicalSessionBootstrap(
+      {
+        ok: true,
+        sessionSlug: 'worker-session',
+        config,
+      },
+      {
+        expectedSlug: 'worker-session',
+        workerOrigin: WORKER_ORIGIN,
+        environment: 'test',
+      },
+    );
+    const onResolved = jest.fn((resolved) => resolveMainSiteLitSessionConfig({ sessionConfig: resolved.config }));
+    mockFetchBootstrap.mockResolvedValueOnce(validatedBootstrap);
+    mockUpsertBootstrap.mockReturnValueOnce({
+      ...cachedResult,
+      config,
+    });
+
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        environment="test"
+        onResolved={onResolved}
+      />,
+    );
+
+    await waitFor(() => expect(onResolved).toHaveBeenCalledTimes(1));
+    expect(onResolved.mock.results[0].value).toEqual(
+      expect.objectContaining({
+        chainId: 11155420,
+        litNetwork: 'chipotle',
+        chipotle: {
+          enabled: true,
+          workerUrl: WORKER_ORIGIN,
+          litCredentials: {},
+          sessionConfig: config,
+        },
+      }),
+    );
+    expect(config).not.toHaveProperty('lit');
+    expect(config).not.toHaveProperty('litCredentials');
+    expect(config).not.toHaveProperty('rpcUrl');
+    expect(config).not.toHaveProperty('rpcUrlsByChainId');
   });
 
   it('requires explicit approval before retrying a TOFU conflict with allowRepin', async () => {

@@ -1,7 +1,20 @@
 import { resolveMainSiteLitSessionConfig, resolveMainSiteLitSessionConfigSource } from './litSessionConfig.js';
+import {
+  SESSION_MODE_PRESET_IDS,
+  cloneSessionModePreset,
+  type SessionModeProfile,
+} from '../../utilities/session/sessionModeProfile';
 
 const VALID_SBT_ADDRESS = '0x0000000000000000000000000000000000000001';
 const resolveConfig = resolveMainSiteLitSessionConfig;
+
+const buildWorkerCanonicalLitProfile = (): SessionModeProfile => {
+  const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+  profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+  profile.encryption = { mode: 'lit' };
+  profile.evm.registryChainId = 11155420;
+  return profile;
+};
 
 const buildSessionConfigWithGate = ({
   chainId,
@@ -161,6 +174,54 @@ describe('litSessionConfig', () => {
     });
     expect(result.litNetwork).toBe('chipotle');
     expect(result.accessControlConditions).toEqual(expect.any(Array));
+  });
+
+  it('derives a descriptor-free Chipotle runtime from a validated worker-canonical Lit profile', () => {
+    const sessionModeProfile = buildWorkerCanonicalLitProfile();
+    const sessionConfig = {
+      slug: 'worker-lit-session',
+      corsWorkerUrl: 'https://worker.example.test',
+      sessionModeProfile,
+    };
+
+    const result = resolveConfig({ sessionConfig });
+
+    expect(result.chipotle).toEqual({
+      enabled: true,
+      workerUrl: 'https://worker.example.test',
+      litCredentials: {},
+      sessionConfig,
+    });
+    expect(result.chainId).toBe(11155420);
+    expect(result.litNetwork).toBe('chipotle');
+    expect(result.accessControlConditions).toBeNull();
+    expect(sessionConfig).not.toHaveProperty('lit');
+    expect(sessionConfig).not.toHaveProperty('litCredentials');
+    expect(sessionConfig).not.toHaveProperty('rpcUrl');
+    expect(sessionConfig).not.toHaveProperty('rpcUrlsByChainId');
+  });
+
+  it('does not infer Chipotle from non-Lit or untrusted worker profiles', () => {
+    const workerEnvelopeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const wrongAuthorityProfile = buildWorkerCanonicalLitProfile();
+    wrongAuthorityProfile.authority.mode = 'evm_registry_canonical';
+    const malformedProfile = {
+      authority: { mode: 'worker_canonical' },
+      storage: { backend: 'cloudflare' },
+      encryption: { mode: 'lit' },
+      evm: { registryChainId: 11155420 },
+    };
+
+    [workerEnvelopeProfile, wrongAuthorityProfile, malformedProfile].forEach((sessionModeProfile) => {
+      expect(
+        resolveConfig({
+          sessionConfig: {
+            corsWorkerUrl: 'https://worker.example.test',
+            sessionModeProfile,
+          },
+        }).chipotle,
+      ).toBeNull();
+    });
   });
 
   it('uses the primary encryption gate when the default resource is open', () => {
