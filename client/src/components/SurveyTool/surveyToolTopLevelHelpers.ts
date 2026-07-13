@@ -188,23 +188,18 @@ export const resolveSurveyToolResultsModalCloseState = ({
   const currentSearch = typeof search === 'string' ? search : '';
   const currentHash = typeof hash === 'string' ? hash : '';
   const shouldCallExternalCloseHandler = !!hasExternalCloseHandler;
-  const sessionQuestionsResultsMatch = !shouldCallExternalCloseHandler
-    ? currentPathname.match(/^(.*\/session\/[^/]+)\/questions\/results\/?$/i)
+  const shouldTrimResultsPath = currentPathname.endsWith('/results') && !shouldCallExternalCloseHandler;
+  const sessionQuestionsResultsMatch = shouldTrimResultsPath
+    ? currentPathname.match(/^(.*\/session\/[^/]+)\/questions\/results$/)
     : null;
-  const genericResultsMatch = !shouldCallExternalCloseHandler ? currentPathname.match(/\/results\/?$/i) : null;
-  const shouldTrimResultsPath =
-    !shouldCallExternalCloseHandler && (!!sessionQuestionsResultsMatch || !!genericResultsMatch);
-
-  const nextPathname = shouldTrimResultsPath
-    ? sessionQuestionsResultsMatch
-      ? sessionQuestionsResultsMatch[1]
-      : currentPathname.slice(0, genericResultsMatch?.index ?? currentPathname.length)
-    : currentPathname;
 
   return {
     shouldTrimResultsPath,
-    nextPathname,
-    nextUrl: `${nextPathname}${currentSearch}${currentHash}`,
+    nextPathname: shouldTrimResultsPath
+      ? sessionQuestionsResultsMatch
+        ? sessionQuestionsResultsMatch[1]
+        : currentPathname.slice(0, currentPathname.length - '/results'.length)
+      : currentPathname,
     shouldCallExternalCloseHandler,
   };
 };

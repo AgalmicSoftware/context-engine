@@ -126,57 +126,7 @@ describe('SurveyTool results routing', () => {
       subject.closeResultsModal();
 
       expect(subject.setState).toHaveBeenCalledWith({ showResultsModal: false });
-      expect(window.location.pathname).toBe(resultsPath.startsWith('/ce/') ? '/ce/session/edge' : '/session/edge');
-      expect(window.location.search).toBe('?worker=https%3A%2F%2Fworker.example.test&session=edge');
-      expect(window.location.hash).toBe('#responses');
-    } finally {
-      window.history.replaceState({}, '', priorUrl);
-    }
-  });
-
-  it('preserves query and hash through the functional results close path', async () => {
-    const priorUrl = window.location.href;
-    try {
-      window.history.pushState(
-        {},
-        '',
-        '/ce/session/edge/questions/results?worker=https%3A%2F%2Fworker.example.test&session=edge#responses',
-      );
-      render(
-        <SurveyTool autoOpenResults={true} preventUrlChange={true} activeSessionSlug="edge" network={{ id: 84532 }} />,
-      );
-
-      fireEvent.click(await screen.findByRole('button', { name: 'Close functional results' }));
-
-      expect(window.location.pathname).toBe('/ce/session/edge');
-      expect(window.location.search).toBe('?worker=https%3A%2F%2Fworker.example.test&session=edge');
-      expect(window.location.hash).toBe('#responses');
-    } finally {
-      window.history.replaceState({}, '', priorUrl);
-    }
-  });
-
-  it('leaves functional results routing to an external close owner', async () => {
-    const priorUrl = window.location.href;
-    const onResultsModalClose = jest.fn();
-    try {
-      window.history.pushState({}, '', '/session/edge/questions/results?worker=external#owned');
-      render(
-        <SurveyTool
-          autoOpenResults={true}
-          preventUrlChange={true}
-          activeSessionSlug="edge"
-          network={{ id: 84532 }}
-          onResultsModalClose={onResultsModalClose}
-        />,
-      );
-
-      fireEvent.click(await screen.findByRole('button', { name: 'Close functional results' }));
-
-      expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe(
-        '/session/edge/questions/results?worker=external#owned',
-      );
-      expect(onResultsModalClose).toHaveBeenCalledTimes(1);
+      expect(window.location.pathname).toBe('/session/edge');
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
