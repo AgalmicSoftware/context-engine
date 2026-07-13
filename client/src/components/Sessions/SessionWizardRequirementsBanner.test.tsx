@@ -96,6 +96,8 @@ describe('SessionWizardRequirementsBanner', () => {
     expect(screen.getByText(/connected wallet/i)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Lit API key' })).not.toBeInTheDocument();
     expect(screen.queryByText(/faucet private key/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/turnkey tool/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'contextengine@protonmail.com' })).toBeInTheDocument();
 
     rerender(
       <SessionWizardRequirementsBanner

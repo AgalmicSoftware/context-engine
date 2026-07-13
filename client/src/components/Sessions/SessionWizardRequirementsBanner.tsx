@@ -31,6 +31,7 @@ const SessionWizardRequirementsBanner = ({
   const hasResolvedRequirements = Array.isArray(requiredRequirementIds);
   const requires = (requirementId: SessionWizardRequirementId): boolean =>
     !hasResolvedRequirements || requiredRequirementIds.includes(requirementId);
+  const showLegacySponsorshipCopy = !hasResolvedRequirements || !requiredRequirementIds.includes('cloudflareApiToken');
 
   return (
     <section className={styles.newSessionBanner} aria-labelledby="new-session-requirements-title">
@@ -128,7 +129,7 @@ const SessionWizardRequirementsBanner = ({
           ) : null}
           {!hasResolvedRequirements ? <li>(Optional) A faucet private key for sponsoring user gas</li> : null}
         </ul>
-        {!hasResolvedRequirements ? (
+        {showLegacySponsorshipCopy ? (
           <>
             <p className={styles.newSessionBannerCopy}>
               A turnkey tool for bundling these resources is in development.
