@@ -475,6 +475,138 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(JSON.stringify(deployPayload)).not.toMatch(/must-not-send/);
   });
 
+  it('does not use stale hidden Lit credentials after switching to a selected non-Lit profile', async () => {
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      registryAddress: '',
+      registryChainId: 0,
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      draft: {
+        slug: 'non-lit-session',
+        sessionName: 'Non-Lit Session',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    options.getCurrentWorkerSecrets.mockReturnValue({
+      openaiKey: 'sk-ai',
+      litAccountApiKey: 'stale-hidden-account-key',
+      litApiBase: 'https://stale-lit.example.test',
+      litGroupId: 'stale-group',
+      litPkpId: 'stale-pkp',
+      litActionCid: 'stale-cid',
+    });
+    options.resolveWorkerRpcUrl.mockReturnValue('');
+    options.resolveWorkerRpcUrlMap.mockReturnValue({});
+    options.resolveWorkerFaucetConfig.mockReturnValue({});
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    const requestedUrls = fetchMock.mock.calls.map(([url]) => String(url));
+    expect(requestedUrls).not.toContain('https://deployed.example.test/admin/lit-chipotle-bootstrap-session');
+    expect(requestedUrls).not.toContain('https://deployed.example.test/admin/lit-chipotle-provision');
+    const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+    const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
+    expect(deployPayload.secrets).toEqual({ openaiKey: 'sk-ai' });
+  });
+
+  it('routes explicit-Lit RPC inputs through session secrets without duplicating them in canonical config', async () => {
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const options = buildDeployHookOptions();
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.encryption = { mode: 'lit' };
+    sessionModeProfile.evm.registryChainId = 11155420;
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      draft: {
+        ...options.refs.runtimeRef.current.draft,
+        slug: 'worker-lit-session',
+        sessionModeProfile,
+      },
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    options.getCurrentWorkerSecrets.mockReturnValue({
+      openaiKey: 'sk-ai',
+      customRpcUrl: 'https://rpc.example.test',
+      customRpcKey: 'rpc-secret',
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+      litUsageApiKey: 'lit-secret',
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+    const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
+    expect(deployPayload.rpcUrl).toBeUndefined();
+    expect(deployPayload.rpcUrlsByChainId).toBeUndefined();
+    expect(deployPayload.secrets).toEqual({
+      openaiKey: 'sk-ai',
+      customRpcUrl: 'https://rpc.example.test',
+      customRpcKey: 'rpc-secret',
+      litUsageApiKey: 'lit-secret',
+    });
+  });
+
+  it.each([
+    ['anthropic', 'anthropicKey', 'openrouterKey'],
+    ['openrouter', 'openrouterKey', 'anthropicKey'],
+  ])(
+    'preserves only the selected %s and transcription keys in a worker-canonical deploy',
+    async (provider, key, irrelevantKey) => {
+      const fetchMock = mockSuccessfulWorkerDeployFetch();
+      const options = buildDeployHookOptions();
+      options.refs.runtimeRef.current = {
+        ...options.refs.runtimeRef.current,
+        registryAddress: '',
+        registryChainId: 0,
+        sessionId: '123e4567-e89b-12d3-a456-426614174000',
+        draft: {
+          slug: 'provider-key-session',
+          ai: {
+            models: {
+              fast: { provider },
+              thinking: { provider },
+            },
+          },
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        },
+        workerSecretsEnabled: true,
+      } as SessionWizardWorkerDeployRuntime;
+      options.getCurrentWorkerSecrets.mockReturnValue({
+        [key]: 'provider-secret',
+        [irrelevantKey]: 'must-not-send',
+        openaiKey: 'transcription-secret',
+        arweaveJwk: 'must-not-send',
+        faucetPrivateKey: 'must-not-send',
+      });
+      options.resolveWorkerRpcUrl.mockReturnValue('');
+      options.resolveWorkerRpcUrlMap.mockReturnValue({});
+      const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+      await act(async () => {
+        await result.current.handleDeployWorker();
+      });
+
+      const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+      const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
+      expect(deployPayload.secrets).toEqual({ [key]: 'provider-secret', openaiKey: 'transcription-secret' });
+      expect(JSON.stringify(deployPayload)).not.toMatch(/must-not-send/);
+    },
+  );
+
   it('keeps non-Cloudflare deploy-helper payloads on the legacy shape', async () => {
     const fetchMock = mockSuccessfulWorkerDeployFetch();
     const options = buildDeployHookOptions();

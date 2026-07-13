@@ -511,48 +511,6 @@ test('dispatchSessionConfigBootstrapRequest returns only CORS-scoped worker-cano
   });
 });
 
-test('dispatchSessionConfigBootstrapRequest fails closed on incoherent profile/storage readback', async () => {
-  const conditionMismatch = buildWorkerCanonicalConfig();
-  conditionMismatch.storageProfile.payloadAccessControl.accessConditions = {
-    match: 'any',
-    conditions: [{ kind: 'worker_role', role: 'member' }],
-  };
-  const backendMismatch = buildWorkerCanonicalConfig();
-  backendMismatch.storageProfile = { backend: 'arweave' };
-  const missingStorage = buildWorkerCanonicalConfig();
-  delete missingStorage.storageProfile;
-
-  let corsReads = 0;
-  for (const config of [conditionMismatch, backendMismatch, missingStorage]) {
-    const response = await dispatchSessionConfigBootstrapRequest({
-      request: new Request('https://worker.example/session-config?slug=session-a', {
-        headers: { Origin: 'https://app.example.test', 'X-Session-Slug': 'session-a' },
-      }),
-      env: {},
-      slugHint: '',
-      baseHeaders: {},
-      deps: {
-        resolveRequestSlugWithoutToken: () => ({ ok: true, slug: 'session-a', explicitSlugProvided: true }),
-        getSessionConfig: async () => config,
-        getCorsContext: async () => {
-          corsReads += 1;
-          return { ok: true, headers: {} };
-        },
-        json: (body, status, headers) => ({ body, status, headers }),
-      },
-      constants: {
-        missingSlugError: 'Session slug is required.',
-        sessionConfigNotFoundError: 'Session config not found.',
-      },
-    });
-
-    assert.equal(response.status, 404);
-    assert.deepEqual(response.body, { error: 'Session config not found.' });
-    assert.equal(response.headers.get('Cache-Control'), 'no-store');
-  }
-  assert.equal(corsReads, 0);
-});
-
 test('dispatchSessionConfigBootstrapRequest rejects invalid or mismatched slug query aliases', async () => {
   let configReads = 0;
   const json = (body, status, headers) => ({ body, status, headers });

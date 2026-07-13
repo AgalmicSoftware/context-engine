@@ -290,6 +290,10 @@ Worker-canonical discovery:
 - For `worker_canonical`, Worker KV is authoritative for identity, content,
   gates, and worker config. The client does not fall back to Arweave or
   SessionRegistry when an explicit worker discovery request fails.
+- For a validated explicit-Lit worker profile, the profile's
+  `evm.registryChainId` is authoritative for the route network and the effective
+  session config passed to response-gate and auto-mint consumers. A stale
+  top-level `networkChainId` cannot override the chain used for Lit operations.
 
 Legacy/default worker URL:
 - `CLOUDFLARE_CORS_WORKER_URL` remains the shared fallback worker URL for the
@@ -1324,6 +1328,9 @@ Signed login/bootstrap requests:
 ## Endpoints
 
 - `GET /session-config?slug=<slug>` with matching `X-Session-Slug`
+  - `X-Session-Slug` remains the authoritative selector. When the optional
+    `slug` query alias is present, the worker validates it and returns `400`
+    unless it is canonical and exactly matches the resolved header slug.
   - Public, CORS-scoped bootstrap for persisted `worker_canonical` sessions;
     registry-canonical or missing configs return `404`.
   - Returns `{ ok, sessionSlug, config }` with the sanitized canonical config
@@ -1488,6 +1495,20 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
 - Worker-canonical deploys use a unique physical script suffix and require an
   authoritative preflight `404` before creating it. Rollback deletes only
   resources that still prove ownership by the current deployment id.
+- Every deploy requires the resolved physical script name to be absent. If a
+  legacy or custom named worker already exists, the helper returns `409` before
+  creating KV, uploading a script, or changing runtime secrets. Choose a fresh
+  worker name; preserving an existing worker requires a separate explicit
+  state-migration workflow because its KV may contain auth markers, groups,
+  storage indexes, and wrapped envelope keys that are not in the deploy request.
+- Rollback deletes a staged KV namespace only after the uploaded script is
+  confirmed absent or the exact deployment-id owner is deleted. If ownership
+  changed, cannot be verified, or script deletion fails, the helper retains and
+  reports that KV; do not delete it until the live binding is recovered or
+  independently verified.
+- Concurrent low-level deploys using the same custom/legacy worker name are not
+  supported; serialize them or choose unique names. First-party
+  worker-canonical deploys avoid that race with a random physical-name suffix.
 - Optional: pass `subdomain` (or `workersSubdomain`) to set the account-level workers.dev subdomain
   when none exists yet (falls back to a deterministic `ce-<accountId>` name). This is the only
   deploy-helper path that needs `Account Settings: Edit`; script-level Workers.dev enablement uses

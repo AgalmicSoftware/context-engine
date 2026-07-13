@@ -41,6 +41,7 @@ import {
   resolveMainSiteSessionRouteSourceSlug,
 } from './routeSessionResolution.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
+import { resolveValidatedWorkerCanonicalLitProfile } from './litSessionConfig';
 import {
   renderWorkerCanonicalRouteBootstrap,
   renderWorkerCanonicalRouteError,
@@ -142,6 +143,38 @@ const hasMainSiteRegistryIdentity = (sessionConfig: unknown): boolean => {
     registry.sessionIdHex ||
     registry.metadataURI
   );
+};
+
+const resolveExplicitWorkerSessionConfig = ({
+  workerOrigin,
+  sessionConfig,
+}: {
+  workerOrigin: string;
+  sessionConfig: SessionConfigLike;
+}): SessionConfigLike => {
+  if (!workerOrigin) return sessionConfig;
+  const validatedLitProfile = resolveValidatedWorkerCanonicalLitProfile(sessionConfig.sessionModeProfile);
+  const chainId = Number(validatedLitProfile?.evm.registryChainId || 0);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) return sessionConfig;
+  if (Number(sessionConfig.networkChainId || 0) === chainId) return sessionConfig;
+  // The validated Lit profile drives both hook construction and downstream
+  // response-gate/mint consumers; never leave a stale top-level chain override.
+  return { ...sessionConfig, networkChainId: chainId };
+};
+
+const resolveExplicitWorkerSessionNetwork = ({
+  workerOrigin,
+  sessionConfig,
+  fallbackNetwork,
+}: {
+  workerOrigin: string;
+  sessionConfig: SessionConfigLike;
+  fallbackNetwork: MainSiteRouteNetwork;
+}): MainSiteRouteNetwork => {
+  if (!workerOrigin) return fallbackNetwork;
+  const chainId = Number(sessionConfig.networkChainId || 0);
+  if (!Number.isSafeInteger(chainId) || chainId <= 0) return null;
+  return getChainById(chainId) || { id: chainId, chainId };
 };
 
 export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) => ({
@@ -1136,8 +1169,8 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
               loginComplete={host.props.loginComplete}
               sessionToken={sessionTokenRaw}
               sessionSlug={resolvedSlug}
-              sessionConfig={sessionConfig}
-              sessionIdHex={sessionConfig?.__registry?.sessionIdHex || null}
+              sessionConfig={effectiveSessionConfig}
+              sessionIdHex={effectiveRegistryInfo.sessionIdHex || null}
               workerOrigin={workerOrigin}
             />
           </div>
@@ -1156,7 +1189,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
       sessionSlug: slug,
       sessionConfig: effectiveSessionConfig as ShellSessionConfigLike,
     });
-    const sessionRouteDisplaySlug = normalizeSessionSlug(sessionConfig.slug || slug);
+    const sessionRouteDisplaySlug = normalizeSessionSlug(effectiveSessionConfig.slug || slug);
     const shouldRefreshBuiltInDemoLiveBucket =
       normalizeSessionSlug(sessionTokenRaw) === 'demo' &&
       sessionRouteDisplaySlug === 'demo' &&

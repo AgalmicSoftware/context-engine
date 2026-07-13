@@ -36,6 +36,31 @@ const isSessionConfigRecord = (value: unknown): value is MainSiteLitSessionConfi
 const readRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
+export const resolveValidatedWorkerCanonicalLitProfile = (value: unknown): SessionModeProfile | null => {
+  if (!isSessionConfigRecord(value)) return null;
+  const authority = readRecord(value.authority);
+  const encryption = readRecord(value.encryption);
+  const evm = readRecord(value.evm);
+  const storage = readRecord(value.storage);
+  const registryChainId = evm.registryChainId;
+  if (
+    authority.mode !== 'worker_canonical' ||
+    encryption.mode !== 'lit' ||
+    storage.backend !== 'cloudflare' ||
+    !Number.isSafeInteger(registryChainId) ||
+    Number(registryChainId) <= 0
+  ) {
+    return null;
+  }
+
+  try {
+    const profile = value as SessionModeProfile;
+    return validateSessionModeProfile(profile).valid ? profile : null;
+  } catch {
+    return null;
+  }
+};
+
 const resolvePrimaryLitGate = (cfg: MainSiteLitSessionConfigLike = {}) => {
   const defaultGate = getDefaultSponsoredGate(cfg);
   const encryptionConfig = readRecord(cfg.encryption);

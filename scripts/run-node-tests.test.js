@@ -44,11 +44,9 @@ test('collectNodeTestFiles recursively includes classified root, script, and sha
     writeFile(rootDir, 'scripts/lib/e2e/tx.test.js');
     writeFile(rootDir, 'scripts/lib/e2e/network-default-consumers.test.js');
     writeFile(rootDir, 'scripts/lib/e2e/worker-auth.test.js');
-    writeFile(rootDir, 'scripts/nested/recovery/checkpoint.test.mjs');
     writeFile(rootDir, 'scripts/e2e/cloudflare/session-worker-ui.test.js');
     writeFile(rootDir, 'scripts/e2e/cloudflare/worker-login-result.test.js');
     writeFile(rootDir, 'workers/shared/deployHelperEndpointConfig.test.mjs');
-    writeFile(rootDir, 'workers/shared/provenance/manifest.test.mjs');
 
     assert.deepEqual(collectNodeTestFiles(rootDir), [
       'tests/root/arweave-metadata-uri.test.js',
@@ -58,6 +56,9 @@ test('collectNodeTestFiles recursively includes classified root, script, and sha
       'tests/root/rpcDefaults.compat.test.js',
       'tests/root/sessionCorsWorker.faucet-proof.test.mjs',
       'tests/root/sessionCorsWorker.package.test.js',
+      path.join('workers', 'shared', 'deployHelperEndpointConfig.test.mjs'),
+      path.join('scripts', 'e2e', 'cloudflare', 'session-worker-ui.test.js'),
+      path.join('scripts', 'e2e', 'cloudflare', 'worker-login-result.test.js'),
       'tests/root/private-runtime.private.test.mjs',
       path.join('scripts', 'run-node-tests.test.js'),
       path.join('scripts', 'verify-test-wiring.test.js'),

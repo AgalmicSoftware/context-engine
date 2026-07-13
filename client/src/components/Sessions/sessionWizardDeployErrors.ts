@@ -145,9 +145,14 @@ export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): s
   const kvNamespaceId = toStr(resources?.kvNamespaceId).trim();
   const kvCleanupStatus = toStr(resources?.kvCleanupStatus).trim();
   const workerCleanupStatus = toStr(resources?.workerCleanupStatus).trim();
-  const workerMayStillOwnKv = WORKER_MAY_STILL_OWN_KV_STATUSES.has(workerCleanupStatus);
-  const retainedKv =
-    !!kvNamespaceId && (RETAINED_KV_CLEANUP_STATUSES.has(kvCleanupStatus) || (!kvCleanupStatus && workerMayStillOwnKv));
+  const workerMayStillOwnKv = [
+    'preserved-existing',
+    'ownership-changed',
+    'ownership-unverified',
+  ].includes(workerCleanupStatus);
+  const retainedKv = !!kvNamespaceId && (
+    kvCleanupStatus === 'retained-live-worker' || (!kvCleanupStatus && workerMayStillOwnKv)
+  );
   const labels = [
     workerName && workerCleanupStatus === 'owned-delete-failed' ? `worker ${workerName}` : '',
     kvNamespaceId && !retainedKv ? `KV namespace ${kvNamespaceId}` : '',
@@ -158,16 +163,14 @@ export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): s
   const ownershipNote =
     workerCleanupStatus === 'preserved-existing'
       ? ' The pre-existing worker was preserved.'
-      : workerCleanupStatus === 'retained-pre-existing'
-        ? ' The existing worker and deployment state were preserved.'
-        : workerCleanupStatus === 'retained-config-propagation-pending'
-          ? ' Worker config propagation is still pending; the deployment was preserved for recovery.'
-          : workerCleanupStatus === 'ownership-changed'
-            ? ' A newer or foreign worker deployment was detected and preserved.'
-            : workerCleanupStatus === 'ownership-unverified'
-              ? ' Worker ownership could not be verified, so no worker deletion was attempted.'
-              : '';
-  const retainedKvNote = retainedKv ? buildRetainedKvGuidance({ kvNamespaceId, kvCleanupStatus }) : '';
+      : workerCleanupStatus === 'ownership-changed'
+        ? ' A newer or foreign worker deployment was detected and preserved.'
+        : workerCleanupStatus === 'ownership-unverified'
+          ? ' Worker ownership could not be verified, so no worker deletion was attempted.'
+          : '';
+  const retainedKvNote = retainedKv
+    ? ` KV namespace ${kvNamespaceId} was retained because it remains or may remain bound to the live worker. Do not delete it before recovery or ownership verification.`
+    : '';
   return `${cleanupInstruction}${ownershipNote}${retainedKvNote}`;
 };
 

@@ -1,4 +1,7 @@
 import { persistAndVerifySessionWizardWorkerConfig } from './sessionWizardWorkerConfigPersistence';
+import { buildSessionWizardWorkerConfigPayload } from './sessionWizardWriteNormalization';
+import { buildSessionWizardDefaultTemplate } from './sessionWizardDraftState';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const ADMIN_ADDRESS = '0x1111111111111111111111111111111111111111';
 const SESSION_ID = '0x00112233445566778899aabbccddeeff';
@@ -111,6 +114,64 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       configRevision: 'revision-1',
       publicConfig: verifiedConfig('revision-1'),
     });
+  });
+
+  it('persists the real default worker-canonical draft without exposing its transcription RPC field', async () => {
+    const draft = buildSessionWizardDefaultTemplate();
+    draft.slug = 'worker-session';
+    draft.sessionName = 'Default Worker Session';
+    draft.sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    draft.storageProfile = { backend: 'cloudflare' };
+    const config = buildSessionWizardWorkerConfigPayload({
+      slug: draft.slug,
+      draft,
+      account: ADMIN_ADDRESS,
+      sessionId: SESSION_ID,
+      workerUrl: WORKER_ORIGIN,
+    });
+    const revision = 'revision-default-draft';
+    const persistedConfig = {
+      ...config,
+      slug: 'worker-session',
+      sessionId: SESSION_ID,
+      adminAddress: ADMIN_ADDRESS,
+      corsWorkerUrl: WORKER_ORIGIN,
+      configRevision: revision,
+    };
+    const signAdminAction = jest.fn(async () => ({ signature: '0xsigned' }));
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+      .mockResolvedValueOnce(jsonResponse(200, { config: persistedConfig }));
+
+    expect(config.ai).toEqual(
+      expect.objectContaining({
+        models: expect.objectContaining({
+          transcription: { provider: 'openai', model: 'whisper-1' },
+        }),
+      }),
+    );
+    expect(config.ai.models.transcription).not.toHaveProperty('rpcUrl');
+
+    await expect(
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: draft.slug,
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config,
+        signAdminAction,
+        fetchImpl,
+        configRevision: revision,
+        retryDelaysMs: [],
+      }),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        workerOrigin: WORKER_ORIGIN,
+        configRevision: revision,
+      }),
+    );
+    expect(signAdminAction).toHaveBeenCalledTimes(1);
   });
 
   it('retries a stale successful read until the requested config revision is visible', async () => {

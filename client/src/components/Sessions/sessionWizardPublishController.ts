@@ -856,9 +856,10 @@ export const runSessionWizardPublishCompletionController = ({
   callbacks.setPublishedPendingSbtLinks(publishedPendingSbtLinks);
   // Regression guard: a selected mode can suppress SBT deployment; only
   // drafts proven deployed may be removed from the author's pending state.
-  const remainingPendingDrafts = resolveSessionWizardRemainingPendingDrafts({
-    deployedPendingDrafts: normalizedDeployedPendingDrafts,
-    pendingDraftSnapshot,
+  const remainingPendingDrafts = pendingDraftSnapshot.filter((entry) => {
+    if (entry?.deployed === true) return false;
+    const addressKey = getPendingDraftAddressKey(entry);
+    return !addressKey || !newlyDeployedPendingAddressSet.has(addressKey);
   });
   callbacks.replacePendingSbtDrafts(remainingPendingDrafts);
   callbacks.setPublishStep(getPublishStepNumber(input.publishExecutionPlan, 'done'));

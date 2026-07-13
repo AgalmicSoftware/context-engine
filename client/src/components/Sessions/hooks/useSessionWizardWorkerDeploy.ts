@@ -581,8 +581,11 @@ const useSessionWizardWorkerDeploy = ({
             skipped: true,
           };
         }
+        // Regression guard: hidden stale Lit credentials must not provision
+        // resources for a selected non-Lit mode; profile-less legacy flows remain supported.
+        const shouldSyncLitAfterDeploy = !modeRequirements.selected || modeRequirements.requiresLit;
         let litBootstrapStatus: WorkerSecretSyncResult = { warning: '', note: '', synced: false, skipped: true };
-        if (resolvedDeployWorkerUrl) {
+        if (resolvedDeployWorkerUrl && shouldSyncLitAfterDeploy) {
           litBootstrapStatus = await syncWorkerLitSessionBootstrapAfterDeploy({
             workerUrl: resolvedDeployWorkerUrl,
             account: resolvedAdmin,
@@ -655,7 +658,7 @@ const useSessionWizardWorkerDeploy = ({
           });
         }
         let litProvisionStatus: WorkerSecretSyncResult = { warning: '', note: '', synced: false, skipped: true };
-        if (resolvedDeployWorkerUrl) {
+        if (resolvedDeployWorkerUrl && shouldSyncLitAfterDeploy) {
           litProvisionStatus = await syncWorkerLitActionProvisionAfterDeploy({
             workerUrl: resolvedDeployWorkerUrl,
             account: resolvedAdmin,

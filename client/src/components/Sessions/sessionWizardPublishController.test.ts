@@ -1366,6 +1366,7 @@ describe('runSessionWizardPublishCompletionController', () => {
       runSessionWizardPublishCompletionController({
         input: {
           publishExecutionPlan: buildPlan({
+            shouldDeployPendingSbts: true,
             stepNumbers: {
               done: 5,
             },
@@ -1381,7 +1382,7 @@ describe('runSessionWizardPublishCompletionController', () => {
         callbacks: {
           promoteDeployedPendingSbtSelections,
           setPublishedPendingSbtLinks,
-          clearPendingSbtDrafts,
+          replacePendingSbtDrafts,
           setPublishStep,
         },
       }),
@@ -1461,7 +1462,7 @@ describe('runSessionWizardPublishCompletionController', () => {
             throw error;
           }),
           setPublishedPendingSbtLinks,
-          clearPendingSbtDrafts,
+          replacePendingSbtDrafts,
           setPublishStep,
         },
       }),

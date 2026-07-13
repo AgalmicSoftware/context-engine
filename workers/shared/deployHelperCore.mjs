@@ -907,7 +907,6 @@ const executeDeployHelperRequestCore = async ({
     cfFetchOptions,
   );
   const workerNameConfirmedAbsent = !workerNamePreflight.ok && Number(workerNamePreflight.status || 0) === 404;
-  const mayResumeExistingWorker = workerNamePreflight.ok && !!toStr(idempotencyContext?.requestMarker).trim();
   // A non-404 lookup failure cannot distinguish an available name from a live
   // worker, so every deploy mode fails closed before provisioning resources.
   if (!workerNamePreflight.ok && !workerNameConfirmedAbsent) {
@@ -922,30 +921,11 @@ const executeDeployHelperRequestCore = async ({
   // namespace may contain auth markers, groups, storage indexes, and wrapped
   // envelope keys that are not part of this deploy request. Require a fresh
   // script name until an explicit state-migration workflow exists.
-  if (workerNamePreflight.ok && !mayResumeExistingWorker) {
+  if (workerNamePreflight.ok) {
     return buildFailure(409, {
-      error: `Generated worker name "${workerName}" already exists. In-place redeploy is disabled to protect existing worker state. Retry to allocate a new physical worker name.`,
+      error: `Worker name "${workerName}" already exists. In-place redeploy is disabled to protect existing worker state. Choose a new worker name before retrying.`,
     });
   }
-  // Resolve the account workers.dev hostname before staging config. The URL is
-  // deterministic once the account subdomain is known, so a fresh namespace
-  // receives its complete canonical config in one same-key write.
-  const accountSubdomain = await ensureWorkersDevAccountSubdomain({
-    apiToken,
-    accountId,
-    requestedSubdomain: toStr(body?.subdomain || body?.workersSubdomain).trim(),
-    fetchImpl,
-    apiBaseUrl,
-    env,
-  });
-  if (!accountSubdomain.subdomain) {
-    return buildFailure(502, {
-      error: accountSubdomain.subdomainError || 'Cloudflare did not return a workers.dev account subdomain.',
-    }, {
-      fallbackEligible: accountSubdomain.fallbackEligible,
-    });
-  }
-  const anticipatedWorkerUrl = `https://${workerName}.${accountSubdomain.subdomain}.workers.dev/`;
   const rpcUrl = toStr(body?.rpcUrl).trim();
   const rpcUrlsByChainId = (body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === 'object')
     ? body.rpcUrlsByChainId
@@ -1434,19 +1414,27 @@ const executeDeployHelperRequestCore = async ({
       : { kvNamespaceId: kvId, kvCleanupStatus: 'delete-failed' };
   };
 
-  if (!resumeUploadedWorker && idempotencyContext?.definitiveUploadRejected !== true) {
-    // Establish the signed admin binding before the runnable script can ever be
-    // attached to this namespace. Otherwise a redeployed workers.dev hostname
-    // has a first-write interval where an unrelated signer can claim the slug.
-    const configPut = await putFreshKvNamespaceValue({
-      apiToken,
-      path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`,
-      options: {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
-      },
-      cfFetchOptions,
+  // Establish the signed admin binding before the runnable script can ever be
+  // attached to this namespace. Otherwise a redeployed workers.dev hostname
+  // has a first-write interval where an unrelated signer can claim the slug.
+  const configPut = await putFreshKvNamespaceValue({
+    apiToken,
+    path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`,
+    options: {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    },
+    cfFetchOptions,
+  });
+  if (!configPut.ok) {
+    const orphanKv = await cleanupStagedKv();
+    return buildFailure(502, {
+      error: configPut.error,
+      detail: configPut.detail,
+      orphanResources: { ...orphanKv, workerName: '' },
+    }, {
+      fallbackEligible: shouldAllowFallbackForCloudflareFailure(configPut),
     });
     if (!configPut.ok) {
       const orphanKv = await cleanupStagedKv();
@@ -1484,6 +1472,27 @@ const executeDeployHelperRequestCore = async ({
     }
   }
 
+  // Stage both canonical records before a new script can become reachable.
+  // This avoids a first-write or missing-secret interval during fresh deploys.
+  const secretsPut = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(secretsEnvelope),
+  }, cfFetchOptions);
+  if (!secretsPut.ok) {
+    const orphanKv = await cleanupStagedKv();
+    return buildFailure(502, {
+      error: secretsPut.error,
+      detail: secretsPut.detail,
+      orphanResources: { ...orphanKv, workerName: '' },
+    }, {
+      fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretsPut),
+    });
+  }
+
+  const envelopeKekSecretRequired = deployStorageRequiresEnvelopeKek(storageProfile);
+  const tokenSecret = randomSecret();
+  const envelopeKekSecret = envelopeKekSecretRequired ? randomSecret() : '';
   const metadata = {
     main_module: 'worker.mjs',
     bindings: [
@@ -1518,28 +1527,19 @@ const executeDeployHelperRequestCore = async ({
     compatibility_date: toStr(env?.WORKER_COMPATIBILITY_DATE || DEFAULT_COMPAT_DATE),
     compatibility_flags: ['nodejs_compat'],
   };
-  const readWorkerSettingsAfterUpload = async () => {
-    let settingsResp = null;
-    // Settings can briefly lag an accepted upload. Re-read before classifying
-    // ownership, but never reinterpret a persistent 404 as proof that an
-    // upload attempt had no effect.
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      settingsResp = await cfFetch(
+  const cleanupDeploymentResources = async () => {
+    let removableWorkerName = '';
+    let workerCleanupStatus = '';
+    const cleanupWorkerIfOwned = async () => {
+      const settingsResp = await cfFetch(
         apiToken,
         `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
         { method: 'GET' },
         cfFetchOptions,
       );
-      if (settingsResp.ok) break;
-    }
-    return settingsResp;
-  };
-  const cleanupDeploymentResources = async () => {
-    let removableWorkerName = workerName;
-    let workerCleanupStatus = '';
-    const cleanupWorkerIfOwned = async () => {
-      if (!uploadedWorkerThisInvocation) {
-        workerCleanupStatus = 'retained-pre-existing';
+      if (!settingsResp.ok) {
+        if (Number(settingsResp.status || 0) === 404) return true;
+        workerCleanupStatus = 'ownership-unverified';
         return false;
       }
       const settingsResp = await readWorkerSettingsAfterUpload();
@@ -1559,12 +1559,10 @@ const executeDeployHelperRequestCore = async ({
         cfFetchOptions,
       );
       if (!scriptCleanup.ok) {
-        workerCleanupStatus = isAmbiguousCloudflareMutationFailure(scriptCleanup)
-          ? 'owned-delete-failed'
-          : 'owned-delete-rejected';
+        removableWorkerName = workerName;
+        workerCleanupStatus = 'owned-delete-failed';
         return false;
       }
-      removableWorkerName = '';
       return true;
     };
     // The uploaded script may have been applied even when Cloudflare's response
@@ -1576,14 +1574,6 @@ const executeDeployHelperRequestCore = async ({
       return {
         kvNamespaceId: kvId,
         kvCleanupStatus: 'retained-live-worker',
-        workerName: removableWorkerName,
-        ...(workerCleanupStatus ? { workerCleanupStatus } : {}),
-      };
-    }
-    if (!createdKvThisInvocation) {
-      return {
-        kvNamespaceId: kvId,
-        kvCleanupStatus: 'retained-pre-existing',
         workerName: removableWorkerName,
         ...(workerCleanupStatus ? { workerCleanupStatus } : {}),
       };
@@ -1623,166 +1613,19 @@ const executeDeployHelperRequestCore = async ({
   };
 
   const scriptUploadPath = `/accounts/${accountId}/workers/scripts/${workerName}`;
-  if (!resumeUploadedWorker) {
-    // Recheck the allocated physical name after staging KV. Legacy random names
-    // guard caller-prefix collisions; stable request names intentionally converge
-    // and must retain their request-marked namespace if another call advances first.
-    const finalWorkerNamePreflight = await cfFetch(
-      apiToken,
-      `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
-      { method: 'GET' },
-      cfFetchOptions,
-    );
-    if (finalWorkerNamePreflight.ok) {
-      if (requestMarker && idempotencyContext?.definitiveUploadRejected === true) {
-        if (!workerSettingsMatchDeployment(finalWorkerNamePreflight, kvId, { ignoreBundleIdentity: true })) {
-          return buildDeploymentFailure(409, {
-            error: 'Existing worker does not match this deployment request; required bindings differ and resume stopped.',
-            deploymentRequestPending: true,
-            orphanResources: {
-              kvNamespaceId: kvId,
-              kvCleanupStatus: 'retained-upload-pending',
-              workerName,
-              workerCleanupStatus: 'ownership-changed',
-            },
-          });
-        }
-        if (readWorkerBundleSha256(finalWorkerNamePreflight) === bundleDiagnostics.sha256) {
-          resumeUploadedWorker = true;
-        } else {
-          replaceRejectedWorker = true;
-        }
-      } else if (requestMarker) {
-        return buildDeploymentFailure(503, {
-          error: 'This deployment request is already advancing in another invocation. Retry the same request ID.',
-          deploymentRequestPending: true,
-          orphanResources: {
-            kvNamespaceId: kvId,
-            kvCleanupStatus: 'retained-live-worker',
-            workerName,
-          },
-        });
-      } else {
-        const orphanKv = await cleanupStagedKv();
-        return buildDeploymentFailure(409, {
-          error: `Generated worker name "${workerName}" became unavailable during deployment. No script was uploaded; retry to allocate a new physical worker name.`,
-          orphanResources: { ...orphanKv, workerName: '' },
-        });
-      }
-    }
-    if (!finalWorkerNamePreflight.ok && Number(finalWorkerNamePreflight.status || 0) !== 404) {
-      const orphanKv = await cleanupStagedKv();
-      return buildDeploymentFailure(502, {
-        error: finalWorkerNamePreflight.error || 'Failed to re-verify worker-name availability.',
-        detail: finalWorkerNamePreflight.detail,
-        orphanResources: { ...orphanKv, workerName: '' },
-      }, {
-        fallbackEligible: shouldAllowFallbackForCloudflareFailure(finalWorkerNamePreflight),
-      });
-    }
-    if (!resumeUploadedWorker) {
-      try {
-        await idempotencyContext?.markUploadStarted?.(bundleDiagnostics?.sha256);
-      } catch (error) {
-        return buildDeploymentFailure(503, {
-          error: `Failed to journal deployment upload identity: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
-          deploymentRequestPending: true,
-          orphanResources: {
-            kvNamespaceId: kvId,
-            kvCleanupStatus: 'retained-upload-pending',
-            workerName,
-          },
-        }, { fallbackEligible: true });
-      }
-      uploadedWorkerThisInvocation = true;
-      let scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
-        method: 'PUT',
-        body: buildScriptUploadForm(),
-      }, cfFetchOptions);
-      const migrationPreconditionFailure = Number(scriptUpload.status || 0) === 412 && /migration tag precondition failed/i.test([
-        scriptUpload.error,
-        ...(Array.isArray(scriptUpload.detail)
-          ? scriptUpload.detail.map((entry) => toStr(entry?.message || entry))
-          : [scriptUpload.detail]),
-      ].filter(Boolean).join('\n'));
-      if (migrationPreconditionFailure) {
-        // A prior deploy of this same script already applied the class migration.
-        // Retry the identical module and bindings without replaying that migration.
-        scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
-          method: 'PUT',
-          body: buildScriptUploadForm({ omitMigrations: true }),
-        }, cfFetchOptions);
-      }
-      if (!scriptUpload.ok) {
-        consoleImpl?.error?.('[deploy-helper] script upload failed', JSON.stringify({
-          workerName,
-          sessionSlug: displaySlug,
-          error: scriptUpload.error,
-          detail: scriptUpload.detail,
-          diagnostics: bundleDiagnostics,
-        }));
-        const bundleSummary = formatBundleDiagnostics(bundleDiagnostics);
-        const uploadWasDefinitivelyRejected = isDefinitiveWorkerUploadRejection(scriptUpload);
-        const stableUploadWasDefinitivelyRejected = (
-          uploadWasDefinitivelyRejected &&
-          !!requestMarker &&
-          !!kvId
-        );
-        const stableUploadMayHaveCommitted = (
-          !uploadWasDefinitivelyRejected &&
-          !!requestMarker &&
-          !!kvId
-        );
-        let rejectionJournalError = '';
-        if (stableUploadWasDefinitivelyRejected) {
-          try {
-            await idempotencyContext?.markDefinitiveUploadRejected?.(bundleDiagnostics?.sha256);
-          } catch (error) {
-            rejectionJournalError = toStr(error?.message || error).trim() || 'Unknown error.';
-          }
-        }
-        const orphanResources = stableUploadWasDefinitivelyRejected || stableUploadMayHaveCommitted
-          ? {
-              kvNamespaceId: kvId,
-              kvCleanupStatus: 'retained-upload-pending',
-              workerName,
-            }
-          : uploadWasDefinitivelyRejected
-            ? { ...(await cleanupStagedKv()), workerName: '' }
-            : await cleanupDeploymentResources();
-        return buildDeploymentFailure(rejectionJournalError ? 503 : 502, {
-          error: rejectionJournalError
-            ? `Failed to persist definitive upload rejection: ${rejectionJournalError}`
-            : `${scriptUpload.error} Bundle diagnostics: ${bundleSummary}`,
-          detail: scriptUpload.detail,
-          bundleDiagnostics,
-          orphanResources,
-          ...(stableUploadWasDefinitivelyRejected || stableUploadMayHaveCommitted
-            ? { deploymentRequestPending: true }
-            : {}),
-        }, {
-          fallbackEligible: rejectionJournalError
-            ? true
-            : shouldAllowFallbackForCloudflareFailure(scriptUpload),
-        });
-      }
-      if (idempotencyContext?.definitiveUploadRejected === true) {
-        // This retry reused already-staged KV state. Treat the corrected upload
-        // like a resume so secrets/config are preserved until signed sync.
-        resumeUploadedWorker = true;
-      }
-    }
-  }
-
-  // Confirm that the uploaded script still carries this deployment's marker
-  // before enabling its hostname or writing runtime secrets. If another writer
-  // replaced it, preserve both resources for an operator rather than deleting
-  // a script that is no longer ours or activating a mixed deployment.
-  const uploadedWorkerSettings = await readWorkerSettingsAfterUpload();
-  const uploadedWorkerStillOwned = workerSettingsMatchDeployment(uploadedWorkerSettings, kvId);
-  if (!uploadedWorkerStillOwned) {
-    const settingsVisibilityPending = !uploadedWorkerSettings.ok &&
-      Number(uploadedWorkerSettings.status || 0) === 404;
+  const scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
+    method: 'PUT',
+    body: form,
+  }, cfFetchOptions);
+  if (!scriptUpload.ok) {
+    consoleImpl?.error?.('[deploy-helper] script upload failed', JSON.stringify({
+      workerName,
+      sessionSlug: displaySlug,
+      error: scriptUpload.error,
+      detail: scriptUpload.detail,
+      diagnostics: bundleDiagnostics,
+    }));
+    const bundleSummary = formatBundleDiagnostics(bundleDiagnostics);
     const orphanResources = await cleanupDeploymentResources();
     return buildDeploymentFailure(uploadedWorkerSettings.ok ? 409 : 502, {
       error: uploadedWorkerSettings.ok
@@ -1794,34 +1637,6 @@ const executeDeployHelperRequestCore = async ({
       fallbackEligible: settingsVisibilityPending ||
         (!uploadedWorkerSettings.ok && shouldAllowFallbackForCloudflareFailure(uploadedWorkerSettings)),
     });
-  }
-
-  let resumedSecretBindings = new Set();
-  if (resumeUploadedWorker) {
-    const secretList = await cfFetch(
-      apiToken,
-      `/accounts/${accountId}/workers/scripts/${workerName}/secrets`,
-      { method: 'GET' },
-      cfFetchOptions,
-    );
-    const listedSecrets = secretList?.data?.result;
-    if (!secretList.ok || !Array.isArray(listedSecrets)) {
-      return buildDeploymentFailure(502, {
-        error: secretList.error || 'Failed to verify existing Worker secret bindings during recovery.',
-        detail: secretList.detail,
-        deploymentRequestPending: true,
-        orphanResources: {
-          kvNamespaceId: kvId,
-          kvCleanupStatus: 'retained-pre-existing',
-          workerName,
-          workerCleanupStatus: 'retained-pre-existing',
-        },
-      }, { fallbackEligible: true });
-    }
-    resumedSecretBindings = new Set(listedSecrets
-      .filter((binding) => toStr(binding?.type).trim() === 'secret_text')
-      .map((binding) => toStr(binding?.name).trim())
-      .filter(Boolean));
   }
 
   let envelopeKekSecretSet = false;
@@ -1870,9 +1685,9 @@ const executeDeployHelperRequestCore = async ({
     // Mutable retry secrets must be applied by the signed post-deploy sync.
     writesSessionSecrets: !resumeUploadedWorker,
     tokenSecretSet: false,
-    tokenSecretPreserved,
+    tokenSecretPreserved: false,
     envelopeKekSecretSet,
-    envelopeKekSecretPreserved,
+    envelopeKekSecretPreserved: false,
     subdomain,
     subdomainStatus,
     subdomainEnabled,
@@ -1968,69 +1783,30 @@ const executeDeployHelperRequestCore = async ({
     deploymentPayload.configVerified = configExactlyVerified;
   }
 
-  if (
-    resumeUploadedWorker &&
-    !envelopeKekSecretPreserved &&
-    !tokenSecretPreserved
-  ) {
-    // A prior invocation uploaded the exact owned script but stopped before
-    // either runtime secret was installed. Its staged ciphertext was bound to
-    // an in-memory KEK that Cloudflare cannot reveal. Replace only that
-    // unreachable record with an encrypted empty payload under this retry's
-    // KEK; the caller then performs the normal signed secret sync because the
-    // response retains writesSessionSecrets=false.
-    const recoveryEnvelope = await buildEncryptedSessionSecretsEnvelope({}, {
-      env: { [STORAGE_ENVELOPE_KEK_SECRET_NAME]: candidateEnvelopeKekSecret },
-      slug: sessionSlug || displaySlug,
-    });
-    const recoverySecretsPut = await cfFetch(
-      apiToken,
-      `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`,
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(recoveryEnvelope),
-      },
-      cfFetchOptions,
-    );
-    if (!recoverySecretsPut.ok) {
-      return buildDeploymentFailure(503, {
-        error: recoverySecretsPut.error || 'Failed to recover encrypted session secrets staging.',
-        detail: recoverySecretsPut.detail,
-        deploymentRequestPending: true,
-        orphanResources: {
-          kvNamespaceId: kvId,
-          kvCleanupStatus: 'retained-runtime-secret-pending',
-          workerName,
-          workerCleanupStatus: 'retained-runtime-secret-pending',
-        },
-      }, { fallbackEligible: true });
+  // Runtime secrets are written only after the public worker URL and canonical
+  // config have both been verified. Existing scripts never reach this path.
+  if (!deploymentPayload.tokenSecretSet) {
+    const secretResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'TOKEN_HMAC_SECRET', type: 'secret_text', text: tokenSecret }),
+    }, cfFetchOptions);
+    if (!secretResp.ok) {
+      const orphanResources = await cleanupDeploymentResources();
+      return buildFailure(502, {
+        error: secretResp.error,
+        detail: secretResp.detail,
+        orphanResources,
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretResp),
+      });
     }
+    deploymentPayload.tokenSecretSet = true;
   }
 
-  // Runtime secrets are written only after the public worker URL and canonical
-  // config have both been verified. Storage readiness comes first; the HMAC
-  // secret is the final activation gate that makes login possible.
-  const runtimeSecretsPath = `/accounts/${accountId}/workers/scripts/${workerName}/secrets`;
-  const reconcileRuntimeSecretWrite = async (name, result) => {
-    const pending = !!idempotencyContext && isAmbiguousCloudflareMutationFailure(result);
-    if (!pending) return { ok: false, pending: false };
-    const inventory = await cfFetch(apiToken, runtimeSecretsPath, { method: 'GET' }, cfFetchOptions);
-    const committed = inventory.ok && Array.isArray(inventory?.data?.result) &&
-      inventory.data.result.some((entry) => (
-        toStr(entry?.type).trim() === 'secret_text' && toStr(entry?.name).trim() === name
-      ));
-    return { ok: committed, pending: !committed };
-  };
-  const retainedRuntimeSecretResources = () => ({
-    kvNamespaceId: kvId,
-    kvCleanupStatus: 'retained-runtime-secret-pending',
-    workerName,
-    workerCleanupStatus: 'retained-runtime-secret-pending',
-  });
   if (envelopeKekSecretRequired) {
     if (!deploymentPayload.envelopeKekSecretPreserved) {
-      const envelopeKekResp = await cfFetch(apiToken, runtimeSecretsPath, {
+      const envelopeKekResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2040,98 +1816,18 @@ const executeDeployHelperRequestCore = async ({
         }),
       }, cfFetchOptions);
       if (!envelopeKekResp.ok) {
-        const reconciled = await reconcileRuntimeSecretWrite(
-          STORAGE_ENVELOPE_KEK_SECRET_NAME,
-          envelopeKekResp,
-        );
-        if (!reconciled.ok) {
-          const orphanResources = reconciled.pending
-            ? retainedRuntimeSecretResources()
-            : await cleanupDeploymentResources();
-          return buildDeploymentFailure(502, {
-            error: envelopeKekResp.error,
-            detail: envelopeKekResp.detail,
-            orphanResources,
-            ...(reconciled.pending ? { deploymentRequestPending: true } : {}),
-          }, {
-            fallbackEligible: shouldAllowFallbackForCloudflareFailure(envelopeKekResp),
-          });
-        }
-      }
-      envelopeKekSecretSet = true;
-      deploymentPayload.envelopeKekSecretSet = true;
-    }
-  }
-
-  if (!deploymentPayload.tokenSecretSet && !deploymentPayload.tokenSecretPreserved) {
-    const secretResp = await cfFetch(apiToken, runtimeSecretsPath, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'TOKEN_HMAC_SECRET', type: 'secret_text', text: tokenSecret }),
-    }, cfFetchOptions);
-    if (!secretResp.ok) {
-      const reconciled = await reconcileRuntimeSecretWrite('TOKEN_HMAC_SECRET', secretResp);
-      if (!reconciled.ok) {
-        const orphanResources = reconciled.pending
-          ? retainedRuntimeSecretResources()
-          : await cleanupDeploymentResources();
-        return buildDeploymentFailure(502, {
-          error: secretResp.error,
-          detail: secretResp.detail,
+        const orphanResources = await cleanupDeploymentResources();
+        return buildFailure(502, {
+          error: envelopeKekResp.error,
+          detail: envelopeKekResp.detail,
           orphanResources,
-          ...(reconciled.pending ? { deploymentRequestPending: true } : {}),
         }, {
-          fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretResp),
+          fallbackEligible: shouldAllowFallbackForCloudflareFailure(envelopeKekResp),
         });
       }
     }
-    deploymentPayload.tokenSecretSet = true;
-  }
-
-  if (body?.sessionModeProfile?.surfaces?.agentHttp === true) {
-    const wrappedDeploy = await executeAgentSessionWrappedDeployment({
-      body: {
-        deploymentKind: AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
-        apiToken,
-        sessionSlug: displaySlug,
-        sessionWorkerOrigin: workerUrl,
-        sessionDeploymentIdentity: body?.agentSessionWrappedDeploymentIdentity,
-        authorityMode: body?.sessionModeProfile?.authority?.mode,
-        bundleUrl: body?.agentBridgeBundleUrl,
-        bundleManifestUrl: body?.agentBridgeBundleManifestUrl,
-        bundleSha256: body?.agentBridgeBundleSha256,
-      },
-      env,
-      accountId,
-      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
-      fetchImpl,
-      markMutationStarted: idempotencyContext?.markMutationStarted,
-    });
-    if (!wrappedDeploy.ok) {
-      return buildDeploymentFailure(wrappedDeploy.status, {
-        ...(wrappedDeploy.body || {}),
-        partial: true,
-        deploymentRequestPending: true,
-      }, { fallbackEligible: wrappedDeploy.status >= 500 });
-    }
-    const capabilityWrite = await persistAgentSessionWrappedCapability({
-      apiToken,
-      accountId,
-      kvNamespaceId: kvId,
-      sessionConfigKey,
-      sessionSlug: displaySlug,
-      sessionWorkerOrigin: workerUrl,
-      capability: wrappedDeploy.body.agentSessionWrapped,
-      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
-    });
-    if (!capabilityWrite.ok) {
-      return buildDeploymentFailure(capabilityWrite.status, {
-        ...(capabilityWrite.body || {}),
-        partial: true,
-        deploymentRequestPending: true,
-      }, { fallbackEligible: capabilityWrite.status >= 500 });
-    }
-    deploymentPayload.agentSessionWrapped = capabilityWrite.body.agentSessionWrapped;
+    envelopeKekSecretSet = true;
+    deploymentPayload.envelopeKekSecretSet = true;
   }
 
   return buildSuccess(200, deploymentPayload);
