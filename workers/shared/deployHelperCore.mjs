@@ -1167,6 +1167,7 @@ export const executeDeployHelperRequest = async ({
     compatibility_date: toStr(env?.WORKER_COMPATIBILITY_DATE || DEFAULT_COMPAT_DATE),
     compatibility_flags: ['nodejs_compat'],
   };
+  let scriptUploadCompleted = false;
 
   const cleanupDeploymentResources = async () => {
     let removableWorkerName = '';
@@ -1208,6 +1209,18 @@ export const executeDeployHelperRequest = async ({
         workerCleanupStatus = 'owned-delete-failed';
       }
     };
+    // A legacy named-worker upload replaces the script metadata in place, so
+    // the preserved script may already point at this deployment's fresh KV.
+    // Without a restorable pre-upload snapshot, retaining and reporting that
+    // KV is the only rollback path that cannot leave the live script broken.
+    if (preserveWorkerOnRollback && scriptUploadCompleted) {
+      await cleanupWorkerIfOwned();
+      return {
+        kvNamespaceId: kvId,
+        workerName: removableWorkerName,
+        ...(workerCleanupStatus ? { workerCleanupStatus } : {}),
+      };
+    }
     const [, kvCleanup] = await Promise.all([
       cleanupWorkerIfOwned(),
       cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}`, { method: 'DELETE' }, cfFetchOptions),
@@ -1246,6 +1259,7 @@ export const executeDeployHelperRequest = async ({
       fallbackEligible: shouldAllowFallbackForCloudflareFailure(scriptUpload),
     });
   }
+  scriptUploadCompleted = true;
 
   const envelopeKekSecretRequired = deployStorageRequiresEnvelopeKek(storageProfile);
   let envelopeKekSecretSet = false;

@@ -752,7 +752,7 @@ describe('deploy-helper worker', () => {
     }
   });
 
-  it('never deletes a pre-existing noncanonical worker during rollback', async () => {
+  it('keeps the replacement KV alive when a pre-existing noncanonical worker fails after upload', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
       new Response('export default { fetch() {} };', { status: 200 }),
@@ -762,8 +762,65 @@ describe('deploy-helper worker', () => {
       cfSuccess({}),
       cfSuccess({}),
     ]);
-    fetchMock.workerNamePreflightOverride = cfSuccess({ compatibility_date: '2024-09-02' });
+    fetchMock.workerNamePreflightOverride = cfSuccess({
+      compatibility_date: '2024-09-02',
+      bindings: [{ name: 'GROUP_KV', type: 'kv_namespace', namespace_id: 'kv-existing' }],
+    });
     fetchMock.workerSecretPutOverride = cfFailure(500, 'runtime secret write failed');
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'existing-worker',
+        sessionSlug: 'alpha-session',
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(payload?.orphanResources).toEqual({
+        kvNamespaceId: 'kv-123',
+        workerName: '',
+        workerCleanupStatus: 'preserved-existing',
+      });
+      const survivingScriptUpload = fetchMock.calls.find(([url, init = {}]) => (
+        String(url).endsWith('/workers/scripts/existing-worker') && init.method === 'PUT'
+      ));
+      const survivingMetadata = await readScriptUploadMetadata(survivingScriptUpload);
+      expect(survivingMetadata.bindings).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          name: 'GROUP_KV',
+          type: 'kv_namespace',
+          namespace_id: 'kv-123',
+        }),
+      ]));
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(url).endsWith('/workers/scripts/existing-worker') && init.method === 'DELETE'
+      ))).toBe(false);
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(url).endsWith('/storage/kv/namespaces/kv-123') && init.method === 'DELETE'
+      ))).toBe(false);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('deletes staged KV when a pre-existing noncanonical worker upload itself fails', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfFailure(400, 'Worker upload rejected.'),
+      cfSuccess({}),
+    ]);
+    fetchMock.workerNamePreflightOverride = cfSuccess({
+      compatibility_date: '2024-09-02',
+      bindings: [{ name: 'GROUP_KV', type: 'kv_namespace', namespace_id: 'kv-existing' }],
+    });
     global.fetch = fetchMock;
 
     try {
@@ -785,7 +842,11 @@ describe('deploy-helper worker', () => {
       expect(fetchMock.calls.some(([url, init = {}]) => (
         String(url).endsWith('/workers/scripts/existing-worker') && init.method === 'DELETE'
       ))).toBe(false);
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(url).endsWith('/storage/kv/namespaces/kv-123') && init.method === 'DELETE'
+      ))).toBe(true);
     } finally {
+      consoleErrorSpy.mockRestore();
       consoleLogSpy.mockRestore();
     }
   });
