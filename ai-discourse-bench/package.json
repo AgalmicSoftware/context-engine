@@ -9,6 +9,7 @@
     "ai-discourse-bench": "./bin/ai-discourse-bench.mjs"
   },
   "scripts": {
+    "build:candidate-bank": "node ./scripts/build-candidate-bank.mjs",
     "generate:questions": "node ./scripts/generate-sample-question-bank.mjs",
     "validate": "node ./bin/ai-discourse-bench.mjs validate --questions ./data/question-bank.sample.json --models ./data/model-roster.sample.json --personas ./data/personas.sample.json",
     "test": "node --test",
@@ -19,9 +20,11 @@
     "report:mock": "node ./bin/ai-discourse-bench.mjs build-report --questions ./data/question-bank.sample.json --models ./data/model-roster.sample.json --runs ./runs/mock-self-runs.json --out ./results/mock-self-report.json",
     "render:mock": "node ./bin/ai-discourse-bench.mjs render-report --report ./results/mock-self-report.json --out ./results/mock-self-report.html",
     "export:ce:mock": "node ./bin/ai-discourse-bench.mjs export-ce --report ./results/mock-self-report.json --out ./results/mock-self-ce-polis-export.json",
+    "export:ce:native:mock": "node ./bin/ai-discourse-bench.mjs export-ce-native --report ./results/mock-self-report.json --out ./results/mock-self-ce-native.json",
+    "snapshot:mock": "node ./bin/ai-discourse-bench.mjs snapshot-report --report ./results/mock-self-report.json --out ./results/mock-self-snapshot.json --label mock-self",
     "export:analysis:mock": "node ./bin/ai-discourse-bench.mjs export-analysis-input --report ./results/mock-self-report.json --out ./results/mock-self-ai-analysis-input.json",
     "local:full": "node ./scripts/run-local-full.mjs",
-    "smoke": "npm run validate && npm test && npm run run:mock && npm run report:mock && npm run render:mock && npm run export:ce:mock && npm run export:analysis:mock"
+    "smoke": "npm run validate && npm test && npm run run:mock && npm run report:mock && npm run render:mock && npm run export:ce:mock && npm run export:ce:native:mock && npm run snapshot:mock && npm run export:analysis:mock"
   },
   "engines": {
     "node": ">=20.19.0"

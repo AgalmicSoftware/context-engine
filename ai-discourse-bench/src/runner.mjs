@@ -12,7 +12,7 @@ import {
   normalizeForCanonicalPolarity,
   parseModelAnswer,
 } from './normalize.mjs';
-import { buildRunManifest, sha256 } from './provenance.mjs';
+import { buildRunManifest, hashJson, sha256 } from './provenance.mjs';
 
 const nowIso = () => new Date().toISOString();
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -30,6 +30,7 @@ const callModel = async ({ providerOverride, modelEntry, prompt }) => {
       temperature: modelEntry.temperature ?? 0.2,
       maxTokens: modelEntry.maxTokens ?? 220,
       timeoutMs: modelEntry.timeoutMs,
+      structuredOutput: modelEntry.structuredOutput || 'auto',
     });
   }
   throw new Error(`Unsupported provider: ${provider}`);
@@ -181,6 +182,7 @@ export const runBenchmark = async ({
       temperature: task.modelEntry.temperature ?? 0.2,
       maxTokens: task.modelEntry.maxTokens ?? 220,
       timeoutMs: task.modelEntry.timeoutMs ?? null,
+      structuredOutput: task.modelEntry.structuredOutput || 'auto',
     };
     return run.runId === task.runId
       && run.promptHash === sha256(buildPromptForTask(task))
@@ -188,7 +190,9 @@ export const runBenchmark = async ({
       && run.provider === expectedProvider
       && Number(run.generation?.temperature) === Number(expectedGeneration.temperature)
       && Number(run.generation?.maxTokens) === Number(expectedGeneration.maxTokens)
-      && (run.generation?.timeoutMs ?? null) === expectedGeneration.timeoutMs;
+      && (run.generation?.timeoutMs ?? null) === expectedGeneration.timeoutMs
+      && (run.generation?.structuredOutput || 'auto') === expectedGeneration.structuredOutput
+      && hashJson(run.modelProvenance || {}) === hashJson(task.modelEntry.provenance || {});
   };
   const taskByRunId = new Map(tasks.map((task) => [task.runId, task]));
   const runsById = new Map(
@@ -264,7 +268,9 @@ export const runBenchmark = async ({
         temperature: task.modelEntry.temperature ?? 0.2,
         maxTokens: task.modelEntry.maxTokens ?? 220,
         timeoutMs: task.modelEntry.timeoutMs ?? null,
+        structuredOutput: task.modelEntry.structuredOutput || 'auto',
       },
+      modelProvenance: task.modelEntry.provenance || {},
       rawAnswer: parsed.answer,
       normalizedAnswer,
       confidence: parsed.confidence,

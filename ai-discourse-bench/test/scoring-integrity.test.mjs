@@ -60,13 +60,55 @@ test('distributional similarity distinguishes oscillation from consistent uncert
   assert.equal(report.polisReport.byModelQuestion['model-a'].q1.meanScore, 0);
   assert.equal(report.polisReport.byModelQuestion['model-b'].q1.meanScore, 0);
   assert.equal(report.polisReport.similarityMatrix['model-a']['model-b'], 0.5);
-  assert.deepEqual(report.polisReport.similarityDetails['model-a']['model-b'], {
-    similarity: 0.5,
-    questionsCompared: 2,
-    requiredQuestions: 1,
-    overlapRate: 1,
-    sufficientOverlap: true,
+  const similarity = report.polisReport.similarityDetails['model-a']['model-b'];
+  assert.equal(similarity.similarity, 0.5);
+  assert.equal(similarity.questionsCompared, 2);
+  assert.equal(similarity.requiredQuestions, 1);
+  assert.equal(similarity.overlapRate, 1);
+  assert.equal(similarity.sufficientOverlap, true);
+  assert.deepEqual(similarity.similarityInterval, {
+    low: 0,
+    high: 1,
+    confidenceLevel: 0.95,
+    iterations: 1000,
+    method: 'deterministic-percentile-bootstrap',
   });
+});
+
+test('report exposes deterministic uncertainty and canonical-versus-reversed sensitivity', () => {
+  const questionBank = {
+    benchmarkId: 'bench',
+    runPlan: { repeatsPerPolarity: 2 },
+    questions: [question('q1')],
+  };
+  const modelRoster = { models: [model('model-a')] };
+  const runs = [
+    { modelId: 'model-a', questionId: 'q1', polarity: 'canonical', normalizedAnswer: 'Agree' },
+    { modelId: 'model-a', questionId: 'q1', polarity: 'canonical', normalizedAnswer: 'Agree' },
+    { modelId: 'model-a', questionId: 'q1', polarity: 'reversed', normalizedAnswer: 'Disagree' },
+    { modelId: 'model-a', questionId: 'q1', polarity: 'reversed', normalizedAnswer: 'Disagree' },
+  ];
+
+  const first = buildResultsReport({ questionBank, modelRoster, runsFile: { repeats: 2, runs } });
+  const second = buildResultsReport({ questionBank, modelRoster, runsFile: { repeats: 2, runs } });
+  const cell = first.polisReport.byModelQuestion['model-a'].q1;
+
+  assert.deepEqual(cell.meanScoreInterval, second.polisReport.byModelQuestion['model-a'].q1.meanScoreInterval);
+  assert.deepEqual(cell.polarity.wordingSensitivity, {
+    paired: true,
+    meanAbsoluteShift: 2,
+    signedShift: -2,
+    level: 'high',
+  });
+  assert.deepEqual(first.polisReport.byModel['model-a'].wordingSensitivity, {
+    pairedUnits: 1,
+    totalUnits: 1,
+    meanAbsoluteShift: 2,
+    meanSignedShift: -2,
+    highSensitivityRate: 1,
+    moderateOrHighRate: 1,
+  });
+  assert.equal(first.statistics.bootstrapIterations, 1000);
 });
 
 test('release eligibility rejects fixture and incomplete participants', () => {
@@ -263,6 +305,7 @@ test('release provenance binds manifest models to the selected report roster', (
     models: [{
       id: 'model-a', model: 'provider/model-a', provider: 'local',
       temperature: 0.3, maxTokens: 300, timeoutMs: 90000,
+      traits: {}, provenance: {}, pricing: null,
     }],
   };
   const runs = ['canonical', 'reversed'].map((polarity) => ({
@@ -286,6 +329,13 @@ test('release provenance binds manifest models to the selected report roster', (
     runs,
   }, { ...options, selectedModelsById: changedGenerationRoster });
   assert.ok(generationErrors.some((error) => error.includes('generation settings do not match')));
+
+  const changedTraitsRoster = new Map([['model-a', { ...selectedModel, traits: { ossStatus: 'closed' } }]]);
+  const traitErrors = validateReleaseRunFile({ manifest, runs }, {
+    ...options,
+    selectedModelsById: changedTraitsRoster,
+  });
+  assert.ok(traitErrors.some((error) => error.includes('traits does not match')));
 });
 
 test('strict run provenance ties run ids to their coordinates', () => {

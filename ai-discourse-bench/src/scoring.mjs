@@ -1,4 +1,5 @@
 import { ANSWER_SCORE, ANSWER_VALUES } from './config.mjs';
+import { bootstrapMeanInterval } from './statistics.mjs';
 
 const mean = (values) => {
   const nums = values.filter((value) => Number.isFinite(value));
@@ -44,7 +45,7 @@ const groupBy = (items, getKey) => {
   return map;
 };
 
-const summarizeRuns = (runs) => {
+const summarizeRuns = (runs, seed = 'runs') => {
   const counts = emptyCounts();
   let invalid = 0;
   const scores = [];
@@ -62,18 +63,37 @@ const summarizeRuns = (runs) => {
     total: runs.length,
     valid: scores.length,
     meanScore: round(mean(scores)),
+    meanScoreInterval: bootstrapMeanInterval(scores, { seed }),
     uncertaintyRate: runs.length ? round(counts.Unsure / runs.length) : null,
     invalidRate: runs.length ? round(invalid / runs.length) : null,
     responseEntropy: entropy(counts),
   };
 };
 
-const summarizePolarity = (runs) => {
-  const canonical = summarizeRuns(runs.filter((run) => run.polarity === 'canonical'));
-  const reversed = summarizeRuns(runs.filter((run) => run.polarity === 'reversed'));
+const sensitivityLevel = (delta) => {
+  if (!Number.isFinite(delta)) return 'unavailable';
+  if (delta >= 0.75) return 'high';
+  if (delta >= 0.25) return 'moderate';
+  return 'low';
+};
+
+const summarizePolarity = (runs, seed = 'polarity') => {
+  const canonical = summarizeRuns(
+    runs.filter((run) => run.polarity === 'canonical'),
+    `${seed}:canonical`,
+  );
+  const reversed = summarizeRuns(
+    runs.filter((run) => run.polarity === 'reversed'),
+    `${seed}:reversed`,
+  );
   const delta = (
     canonical.meanScore !== null && reversed.meanScore !== null
       ? Math.abs(canonical.meanScore - reversed.meanScore)
+      : null
+  );
+  const signedShift = (
+    canonical.meanScore !== null && reversed.meanScore !== null
+      ? reversed.meanScore - canonical.meanScore
       : null
   );
   return {
@@ -81,15 +101,21 @@ const summarizePolarity = (runs) => {
     reversedNormalized: reversed,
     meanDelta: round(delta),
     consistencyScore: delta === null ? null : round(1 - Math.min(1, delta / 2)),
+    wordingSensitivity: {
+      paired: delta !== null,
+      meanAbsoluteShift: round(delta),
+      signedShift: round(signedShift),
+      level: sensitivityLevel(delta),
+    },
   };
 };
 
-const summarizeModelQuestionRuns = (runs) => ({
-  ...summarizeRuns(runs),
-  polarity: summarizePolarity(runs),
+const summarizeModelQuestionRuns = (runs, seed) => ({
+  ...summarizeRuns(runs, `${seed}:combined`),
+  polarity: summarizePolarity(runs, seed),
 });
 
-const summarizeCellForm = (cells, formKey) => {
+const summarizeCellForm = (cells, formKey, seed) => {
   const counts = emptyCounts();
   const values = [];
   let invalid = 0;
@@ -109,13 +135,14 @@ const summarizeCellForm = (cells, formKey) => {
     total: cells.length,
     valid: values.length,
     meanScore: round(mean(values)),
+    meanScoreInterval: bootstrapMeanInterval(values, { seed }),
     uncertaintyRate: cells.length ? round(counts.Unsure / cells.length) : null,
     invalidRate: cells.length ? round(invalid / cells.length) : null,
     responseEntropy: entropy(counts),
   };
 };
 
-const summarizeCells = (cells, rawRuns) => {
+const summarizeCells = (cells, rawRuns, seed) => {
   const counts = emptyCounts();
   const values = [];
   let invalid = 0;
@@ -131,21 +158,39 @@ const summarizeCells = (cells, rawRuns) => {
   const consistencyValues = cells
     .map((cell) => cell?.polarity?.consistencyScore)
     .filter(Number.isFinite);
+  const sensitivityRows = cells
+    .map((cell) => cell?.polarity?.wordingSensitivity)
+    .filter((row) => row?.paired);
+  const absoluteShifts = sensitivityRows.map((row) => row.meanAbsoluteShift).filter(Number.isFinite);
+  const signedShifts = sensitivityRows.map((row) => row.signedShift).filter(Number.isFinite);
   return {
     counts,
     invalid,
     total: cells.length,
     valid: values.length,
     meanScore: round(mean(values)),
+    meanScoreInterval: bootstrapMeanInterval(values, { seed: `${seed}:cells` }),
     uncertaintyRate: cells.length ? round(counts.Unsure / cells.length) : null,
     invalidRate: cells.length ? round(invalid / cells.length) : null,
     responseEntropy: entropy(counts),
-    runSummary: summarizeRuns(rawRuns),
+    runSummary: summarizeRuns(rawRuns, `${seed}:runs`),
     polarity: {
-      canonical: summarizeCellForm(cells, 'canonical'),
-      reversedNormalized: summarizeCellForm(cells, 'reversedNormalized'),
+      canonical: summarizeCellForm(cells, 'canonical', `${seed}:canonical`),
+      reversedNormalized: summarizeCellForm(cells, 'reversedNormalized', `${seed}:reversed`),
       meanDelta: round(mean(cells.map((cell) => cell?.polarity?.meanDelta))),
       consistencyScore: round(mean(consistencyValues)),
+    },
+    wordingSensitivity: {
+      pairedUnits: sensitivityRows.length,
+      totalUnits: cells.length,
+      meanAbsoluteShift: round(mean(absoluteShifts)),
+      meanSignedShift: round(mean(signedShifts)),
+      highSensitivityRate: sensitivityRows.length
+        ? round(sensitivityRows.filter((row) => row.level === 'high').length / sensitivityRows.length)
+        : null,
+      moderateOrHighRate: sensitivityRows.length
+        ? round(sensitivityRows.filter((row) => ['moderate', 'high'].includes(row.level)).length / sensitivityRows.length)
+        : null,
     },
   };
 };
@@ -241,6 +286,7 @@ const buildSimilarity = ({ questionBank, modelRoster, byModelQuestion, coverage,
         similarityMatrix[left.id][right.id] = 1;
         similarityDetails[left.id][right.id] = {
           similarity: 1,
+          similarityInterval: { low: 1, high: 1, confidenceLevel: 0.95, iterations: 0, method: 'identity' },
           questionsCompared: coverage[left.id]?.answeredQuestions || 0,
           sufficientOverlap: Boolean(coverage[left.id]?.eligibleForSimilarity),
         };
@@ -255,8 +301,12 @@ const buildSimilarity = ({ questionBank, modelRoster, byModelQuestion, coverage,
       const questionsCompared = similarities.length;
       const sufficientOverlap = questionsCompared >= minimumSimilarityOverlap;
       const similarity = sufficientOverlap ? round(mean(similarities)) : null;
+      const similarityInterval = sufficientOverlap
+        ? bootstrapMeanInterval(similarities, { seed: `similarity:${left.id}:${right.id}` })
+        : null;
       const detail = {
         similarity,
+        similarityInterval,
         questionsCompared,
         requiredQuestions: minimumSimilarityOverlap,
         overlapRate: questionBank.questions?.length
@@ -359,28 +409,59 @@ const buildRiskMatrixInputs = (questionBank, byQuestion) => {
   };
 };
 
+const uniqueValues = (values) => [...new Set(values.filter((value) => value !== null && value !== undefined && value !== ''))].sort();
+
+const buildObservedRuntimeProvenance = (models, runs) => Object.fromEntries(models.map((model) => {
+  const modelRuns = runs.filter((run) => run.modelId === model.id);
+  const metadata = modelRuns.map((run) => run.responseMetadata || {});
+  return [model.id, {
+    declared: model.provenance || {},
+    requestedModel: model.model,
+    declaredProvider: model.provider,
+    runProviders: uniqueValues(modelRuns.map((run) => run.provider)),
+    resolvedModels: uniqueValues(metadata.map((row) => row.resolvedModel)),
+    resolvedProviders: uniqueValues(metadata.map((row) => row.resolvedProvider || row.provider)),
+    systemFingerprints: uniqueValues(metadata.map((row) => row.systemFingerprint)),
+    endpoints: uniqueValues(metadata.map((row) => row.endpoint)),
+    structuredOutputModes: uniqueValues(metadata.map((row) => row.structuredOutput?.used)),
+    structuredOutputFallbacks: metadata.filter((row) => row.structuredOutput?.fallback).length,
+  }];
+}));
+
 export const buildResultsReport = ({ questionBank, modelRoster, runsFile }) => {
   const runs = runsFile.runs || [];
   const models = modelRoster.models || [];
   const questions = questionBank.questions || [];
+  const runtimeProvenance = buildObservedRuntimeProvenance(models, runs);
   const byModelQuestion = {};
 
   for (const [key, groupedRuns] of groupBy(runs, (run) => `${run.modelId}\u0000${run.questionId}`)) {
     const [modelId, questionId] = key.split('\u0000');
     if (!byModelQuestion[modelId]) byModelQuestion[modelId] = {};
-    byModelQuestion[modelId][questionId] = summarizeModelQuestionRuns(groupedRuns);
+    byModelQuestion[modelId][questionId] = summarizeModelQuestionRuns(
+      groupedRuns,
+      `cell:${modelId}:${questionId}`,
+    );
   }
 
   const byModel = {};
   models.forEach((model) => {
     const cells = questions.map((question) => byModelQuestion[model.id]?.[question.id]);
-    byModel[model.id] = summarizeCells(cells, runs.filter((run) => run.modelId === model.id));
+    byModel[model.id] = summarizeCells(
+      cells,
+      runs.filter((run) => run.modelId === model.id),
+      `model:${model.id}`,
+    );
   });
 
   const byQuestion = {};
   questions.forEach((question) => {
     const cells = models.map((model) => byModelQuestion[model.id]?.[question.id]);
-    byQuestion[question.id] = summarizeCells(cells, runs.filter((run) => run.questionId === question.id));
+    byQuestion[question.id] = summarizeCells(
+      cells,
+      runs.filter((run) => run.questionId === question.id),
+      `question:${question.id}`,
+    );
   });
 
   const expectedRepeats = Number(questionBank.runPlan?.repeatsPerPolarity || 10);
@@ -469,6 +550,13 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile }) => {
       eligibleModels: models.filter((model) => coverage[model.id]?.eligibleForRelease).length,
       runs: runs.length,
     },
+    statistics: {
+      intervalMethod: 'deterministic-percentile-bootstrap',
+      confidenceLevel: 0.95,
+      bootstrapIterations: 1000,
+      resamplingUnit: 'nested observations within each reported aggregate',
+      wordingSensitivityThresholds: { moderate: 0.25, high: 0.75 },
+    },
     questions: questions.map((question) => ({
       id: question.id,
       prompt: question.canonicalPrompt,
@@ -487,6 +575,8 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile }) => {
       label: model.label,
       model: model.model,
       provider: model.provider,
+      provenance: model.provenance || {},
+      runtimeProvenance: runtimeProvenance[model.id],
       traits: model.traits || {},
       summary: byModel[model.id],
       coverage: coverage[model.id],
@@ -507,6 +597,8 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile }) => {
       nodes: models.map((model) => ({
         id: model.id,
         label: model.label,
+        provenance: model.provenance || {},
+        runtimeProvenance: runtimeProvenance[model.id],
         traits: model.traits || {},
         coverage: coverage[model.id],
         opinionGroup: opinionGroups[model.id] ?? null,
@@ -519,6 +611,7 @@ export const buildResultsReport = ({ questionBank, modelRoster, runsFile }) => {
     rawMaterial: {
       runManifest: runsFile.manifest || null,
       sourceManifests: runsFile.sourceManifests || [],
+      runtimeProvenance,
       debateAtlasInputs: questions.map((question) => ({
         questionId: question.id,
         topic: question.topic || 'uncategorized',

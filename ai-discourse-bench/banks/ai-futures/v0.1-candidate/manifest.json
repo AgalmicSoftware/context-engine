@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "kind": "ai_discourse_bench_question_bank_manifest",
+  "track": "ai-futures",
+  "version": "0.1.0-candidate.1",
+  "releaseStatus": "candidate",
+  "benchmarkId": "ai-discourse-bench-ai-futures-v0.1-candidate",
+  "questionBankHash": "df7afefecc8c282eefb68fe30035160aaf21242eb9ed0298a2eb3afe8002d74b",
+  "sourceCorpusRevision": "81fa7cdcd54aee5fb0d8c8fbccc566f98bc9f7a1",
+  "sourceFiles": [
+    {
+      "corpus": "ai-laws-policy",
+      "relativePath": "ai-discourse-corpus/corpuses/ai-laws-policy-corpus.json",
+      "sha256": "a60597c933f96a0d6bb4b77332e749eb2b9875aaaf71c39762c1232221cad247"
+    },
+    {
+      "corpus": "ai-scifi-books",
+      "relativePath": "ai-discourse-corpus/corpuses/ai-scifi-books-corpus.json",
+      "sha256": "7a455e69f2798a22a741dc1b3cdbb3daa38ae2597d256962d25469b3d8c40104"
+    },
+    {
+      "corpus": "arxiv-ai-safety",
+      "relativePath": "ai-discourse-corpus/corpuses/arxiv-ai-safety-corpus.json",
+      "sha256": "ea5622e1dbb1eefdd7220bc108a1b1f230e677eef366edccee034dca34e4a300"
+    },
+    {
+      "corpus": "cross-corpus",
+      "relativePath": "ai-discourse-corpus/corpuses/cross-corpus-debates.json",
+      "sha256": "0e439c203c74eba4f6c871fe01cbfc76521c229a6e564575d78f6c57f27dc4eb"
+    },
+    {
+      "corpus": "dwarkesh-lab-insiders",
+      "relativePath": "ai-discourse-corpus/corpuses/dwarkesh-lab-insiders-corpus.json",
+      "sha256": "4b51f76ca38e83c198b601c407342d63c5caf648c88218800df52509ed18cb6c"
+    },
+    {
+      "corpus": "tweets",
+      "relativePath": "ai-discourse-corpus/corpuses/enriched-tweets.json",
+      "sha256": "60f735ee8597005606641fe77ab6c740e6d67f0c50aec4f907c36d79c1116a67"
+    },
+    {
+      "corpus": "lesswrong-posts",
+      "relativePath": "ai-discourse-corpus/corpuses/lesswrong-posts-corpus.json",
+      "sha256": "6a08bd1b560201ebfa5927a3e2d8c852e63f0e12fb71b6acbe5fde67ec90e637"
+    },
+    {
+      "corpus": "loophole-historical-cases",
+      "relativePath": "ai-discourse-corpus/corpuses/loophole-historical-cases.json",
+      "sha256": "9182a3604891b566b9f5380db1468d9e0a7551ea381241798aebb4cafd68c3a1"
+    },
+    {
+      "corpus": "metr-evals-metrics",
+      "relativePath": "ai-discourse-corpus/corpuses/metr-evals-metrics-corpus.json",
+      "sha256": "90296d0f288ca5a7001a7cdc61db6486607cb3b845e7760f6a595fd8b981e5e4"
+    }
+  ],
+  "reviewStatus": "pending-human-review"
+}

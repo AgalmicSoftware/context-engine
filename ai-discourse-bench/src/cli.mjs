@@ -32,13 +32,20 @@ import {
 import { runBenchmark } from './runner.mjs';
 import { buildResultsReport } from './scoring.mjs';
 import { hashJson } from './provenance.mjs';
+import { buildExperimentPlan } from './experiment-plan.mjs';
+import { buildContextEngineBenchmarkDataset } from './ce-native-export.mjs';
+import { buildReportSnapshot, compareLongitudinalSnapshots } from './longitudinal.mjs';
 
 const usage = `Usage:
   ai-discourse-bench validate --questions <file> --models <file> [--personas <file>]
+  ai-discourse-bench plan-run --questions <file> --models <file> [--out <file>] [--provider mock|local|openrouter] [--mode self|persona] [--persona <id>] [--personas <file>] [--repeats <n>] [--limit-questions <n>]
   ai-discourse-bench run --questions <file> --models <file> --out <file> [--provider mock|local|openrouter] [--mode self|persona] [--persona <id>] [--personas <file>] [--repeats <n>] [--concurrency <n>] [--max-attempts <n>] [--resume] [--checkpoint <file.jsonl>]
   ai-discourse-bench build-report --questions <file> --models <file[,file...]> --runs <file[,file...]> --out <file> [--limit-questions <n>] [--release]
   ai-discourse-bench render-report --report <file> --out <file.html> [--analysis <overlay.json>]
   ai-discourse-bench export-ce --report <file> --out <file.json>
+  ai-discourse-bench export-ce-native --report <file> --out <file.json>
+  ai-discourse-bench snapshot-report --report <file> --out <file.json> [--label <label>]
+  ai-discourse-bench compare-snapshots --baseline <file> --current <file> --out <file.json>
   ai-discourse-bench export-analysis-input --report <file> --out <file.json>
   ai-discourse-bench print-prompt [--file <prompt.md>]
 `;
@@ -148,6 +155,35 @@ const commandRun = async (args) => {
   console.log(`wrote ${result.runs.length} runs to ${args.out} (${result.resumedRuns} resumed; checkpoint ${checkpointPath})`);
 };
 
+const commandPlanRun = async (args) => {
+  const provider = args.provider || '';
+  if (provider && !PROVIDERS.includes(provider)) {
+    throw new Error(`--provider must be one of ${PROVIDERS.join(', ')}`);
+  }
+  const mode = args.mode || 'self';
+  if (!['self', 'persona'].includes(mode)) throw new Error('--mode must be self or persona');
+  const repeats = parsePositiveInt(args.repeats, DEFAULT_REPEATS, '--repeats');
+  const inputs = await readInputs(args, { personasOptional: mode !== 'persona' });
+  const persona = mode === 'persona'
+    ? inputs.personasFile.personas.find((entry) => entry.id === args.persona)
+    : null;
+  if (mode === 'persona' && !persona) throw new Error(`Persona ${args.persona || '(missing)'} was not found.`);
+  const plan = buildExperimentPlan({
+    questionBank: inputs.questionBank,
+    modelRoster: inputs.modelRoster,
+    mode,
+    persona,
+    providerOverride: provider,
+    repeats,
+  });
+  if (args.out) {
+    await writeJsonFile(args.out, plan);
+    console.log(`wrote experiment plan to ${args.out}`);
+  } else {
+    console.log(JSON.stringify(plan, null, 2));
+  }
+};
+
 const commandBuildReport = async (args) => {
   if (!args.runs) throw new Error(`Missing --runs\n${usage}`);
   if (!args.out) throw new Error(`Missing --out\n${usage}`);
@@ -218,6 +254,29 @@ const commandExportAnalysisInput = async (args) => {
   console.log(`wrote AI analysis input to ${args.out}`);
 };
 
+const commandExportCeNative = async (args) => {
+  if (!args.report) throw new Error(`Missing --report\n${usage}`);
+  if (!args.out) throw new Error(`Missing --out\n${usage}`);
+  await writeJsonFile(args.out, buildContextEngineBenchmarkDataset(await readJsonFile(args.report)));
+  console.log(`wrote native Context Engine benchmark dataset to ${args.out}`);
+};
+
+const commandSnapshotReport = async (args) => {
+  if (!args.report) throw new Error(`Missing --report\n${usage}`);
+  if (!args.out) throw new Error(`Missing --out\n${usage}`);
+  await writeJsonFile(args.out, buildReportSnapshot(await readJsonFile(args.report), { label: args.label || '' }));
+  console.log(`wrote longitudinal snapshot to ${args.out}`);
+};
+
+const commandCompareSnapshots = async (args) => {
+  if (!args.baseline) throw new Error(`Missing --baseline\n${usage}`);
+  if (!args.current) throw new Error(`Missing --current\n${usage}`);
+  if (!args.out) throw new Error(`Missing --out\n${usage}`);
+  const [baseline, current] = await Promise.all([readJsonFile(args.baseline), readJsonFile(args.current)]);
+  await writeJsonFile(args.out, compareLongitudinalSnapshots(baseline, current));
+  console.log(`wrote longitudinal comparison to ${args.out}`);
+};
+
 export const runCli = async (argv) => {
   const args = parseArgs(argv);
   switch (args.command) {
@@ -225,12 +284,20 @@ export const runCli = async (argv) => {
       return commandValidate(args);
     case 'run':
       return commandRun(args);
+    case 'plan-run':
+      return commandPlanRun(args);
     case 'build-report':
       return commandBuildReport(args);
     case 'render-report':
       return commandRenderReport(args);
     case 'export-ce':
       return commandExportCe(args);
+    case 'export-ce-native':
+      return commandExportCeNative(args);
+    case 'snapshot-report':
+      return commandSnapshotReport(args);
+    case 'compare-snapshots':
+      return commandCompareSnapshots(args);
     case 'export-analysis-input':
       return commandExportAnalysisInput(args);
     case 'print-prompt':

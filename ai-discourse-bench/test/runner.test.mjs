@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import { createCheckpointWriter, readCheckpointRuns } from '../src/checkpoint.mjs';
 import { runBenchmark } from '../src/runner.mjs';
+import { buildResultsReport } from '../src/scoring.mjs';
 
 const questionBank = {
   benchmarkId: 'runner-test',
@@ -40,7 +41,10 @@ test('runner retries transport failures, records attempts, and emits a reproduci
       }
       return {
         content: '{"answer":"Agree","confidence":0.7,"rationale":"bounded"}',
-        metadata: { resolvedModel: modelEntry.model, requestId: `request-${calls}`, usage: { total_tokens: 9 } },
+        metadata: {
+          provider: 'local', resolvedProvider: 'local', resolvedModel: modelEntry.model,
+          requestId: `request-${calls}`, usage: { total_tokens: 9 },
+        },
       };
     },
   });
@@ -52,8 +56,14 @@ test('runner retries transport failures, records attempts, and emits a reproduci
   assert.equal(result.manifest.modelRosterHash.length, 64);
   assert.equal(result.manifest.promptTemplateHash.length, 64);
   assert.equal(result.manifest.completedRuns, 2);
+  assert.equal(result.manifest.models[0].structuredOutput, 'auto');
+  assert.deepEqual(result.manifest.models[0].provenance, {});
   assert.ok(result.runs.some((run) => run.attempts.length === 2));
   assert.ok(result.runs.every((run) => run.promptHash.length === 64));
+  assert.ok(result.runs.every((run) => run.generation.structuredOutput === 'auto'));
+  const report = buildResultsReport({ questionBank, modelRoster, runsFile: result });
+  assert.deepEqual(report.participants[0].runtimeProvenance.resolvedModels, ['model-a']);
+  assert.deepEqual(report.participants[0].runtimeProvenance.resolvedProviders, ['local']);
 });
 
 test('runner resumes deterministic compatible successful runs without calling them again', async () => {
@@ -100,6 +110,39 @@ test('runner reruns failed, invalid, and prompt or generation-mismatched checkpo
   assert.equal(calls, 2);
   assert.equal(resumed.resumedRuns, 0);
   assert.ok(resumed.runs.every((run) => run.normalizedAnswer));
+});
+
+test('runner does not reuse runs after declared model provenance changes', async () => {
+  const rosterWithRevision = (modelRevision) => ({
+    models: [{
+      ...modelRoster.models[0],
+      provenance: { modelRevision },
+    }],
+  });
+  const first = await runBenchmark({
+    questionBank,
+    modelRoster: rosterWithRevision('revision-a'),
+    providerOverride: 'mock',
+    repeats: 1,
+    maxAttempts: 1,
+  });
+  let calls = 0;
+  const rerun = await runBenchmark({
+    questionBank,
+    modelRoster: rosterWithRevision('revision-b'),
+    providerOverride: 'mock',
+    repeats: 1,
+    maxAttempts: 1,
+    existingRuns: first.runs,
+    callModelImpl: async () => {
+      calls += 1;
+      return { content: '{"answer":"Agree","confidence":0.5,"rationale":"test"}', metadata: {} };
+    },
+  });
+
+  assert.equal(calls, 2);
+  assert.equal(rerun.resumedRuns, 0);
+  assert.ok(rerun.runs.every((run) => run.modelProvenance.modelRevision === 'revision-b'));
 });
 
 test('checkpoint writer appends durable JSONL records that can be resumed', async () => {

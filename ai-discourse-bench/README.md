@@ -65,6 +65,31 @@ from the corpus-grounded topic packs with:
 npm run generate:questions
 ```
 
+The recommended runnable bank is the source-resolved 50-question candidate:
+
+```bash
+npm run build:candidate-bank
+```
+
+This writes `banks/ai-futures/v0.1-candidate/question-bank.json` plus a manifest
+that pins the bank hash, corpus revision, and source-file hashes. It covers all
+20 topics and every question resolves to concrete evidence in the OSS corpus.
+It remains `candidate`, not `validated`, until independent claim, reversal, and
+single-axis review is complete.
+
+Before launching calls, inspect the experiment plan:
+
+```bash
+node ./bin/ai-discourse-bench.mjs plan-run \
+  --questions ./banks/ai-futures/v0.1-candidate/question-bank.json \
+  --models ./data/model-roster.sample.json \
+  --repeats 10
+```
+
+The plan reports exact calls, deterministic token estimates, configured
+credentials/endpoints, structured-output mode, and cost when roster pricing is
+available.
+
 ## Local Models
 
 Run against an OpenAI-compatible local server:
@@ -73,7 +98,7 @@ Run against an OpenAI-compatible local server:
 AIDB_LOCAL_BASE_URL=http://127.0.0.1:8000/v1 \
 node ./bin/ai-discourse-bench.mjs run \
   --provider local \
-  --questions ./data/question-bank.sample.json \
+  --questions ./banks/ai-futures/v0.1-candidate/question-bank.json \
   --models ./data/model-roster.sample.json \
   --out ./runs/local-self-runs.json \
   --repeats 10 \
@@ -86,11 +111,12 @@ The runner writes a JSONL checkpoint beside the output. Re-run the same command
 with `--resume` after an interruption; deterministic run ids prevent completed
 model/question/polarity/repeat cells from being launched again.
 
-Run the full 200-question local benchmark with 10 canonical runs and 10 reversed
-runs per model:
+Run the 50-question candidate bank with 10 canonical runs and 10 reversed runs
+per model:
 
 ```bash
 AIDB_LOCAL_BASE_URL=http://127.0.0.1:8000/v1 \
+AIDB_QUESTION_BANK=./banks/ai-futures/v0.1-candidate/question-bank.json \
 AIDB_LOCAL_MODELS="llama3.1:8b|Llama 3.1 8B|8B|open-weights|US,qwen2.5:14b|Qwen 2.5 14B|14B|open-weights|China" \
 npm run local:full
 ```
@@ -102,8 +128,8 @@ This writes:
 - `results/local-self-report.json`
 - `results/local-self-report.html`
 
-For two models, the default run count is `200 questions * 2 polarities * 10
-repeats * 2 models = 8000` local model calls. Set `AIDB_REPEATS` only for a
+For two models, the default run count is `50 questions * 2 polarities * 10
+repeats * 2 models = 2000` local model calls. Set `AIDB_REPEATS` only for a
 short dry run; leave it unset for the benchmark default of 10.
 
 For a fast wiring check against real local models, limit the bank:
@@ -114,6 +140,14 @@ AIDB_LIMIT_QUESTIONS=5 AIDB_REPEATS=1 AIDB_MAX_TOKENS=700 npm run local:full
 
 `local:full` also accepts `AIDB_CONCURRENCY`, `AIDB_MAX_ATTEMPTS`,
 `AIDB_SCHEDULE_SEED`, and `AIDB_RESUME=1`.
+
+Model roster entries may set `structuredOutput` to `auto`, `json_schema`,
+`json_object`, or `none`. `auto` tries the strict answer schema and falls back
+only when the endpoint returns a structured-output capability error; the
+fallback is recorded in response metadata. Roster `provenance` may pin model
+and weights revisions, quantization, inference engine/runtime version, source
+URL, license, system prompt id, and `asOf` date. Reports preserve both declared
+provenance and observed resolved provider/model/fingerprint values.
 
 ## OpenRouter
 
@@ -205,11 +239,41 @@ node ./bin/ai-discourse-bench.mjs export-ce \
   --out ./results/mock-self-ce-polis-export.json
 ```
 
-The CE export treats each model as a participant/responder. Each model/question
+The compatibility CE export treats each model as a participant/responder. Each model/question
 cell uses the averaged benchmark score and discretizes it back to
 `Agree` / `Unsure` / `Disagree`, while preserving the source run counts and
-mean score in response metadata. This is the preferred bridge toward rendering
-benchmark results through the native Context Engine results components.
+mean score in response metadata. It is intentionally lossy.
+
+For native integration, use the lossless benchmark contract:
+
+```bash
+node ./bin/ai-discourse-bench.mjs export-ce-native \
+  --report ./results/mock-self-report.json \
+  --out ./results/mock-self-ce-native.json
+```
+
+`ce_benchmark_results_dataset` preserves repeated-answer distributions,
+uncertainty intervals, wording sensitivity, similarity details, model
+provenance, graph inputs, and integrity state. Its schema is
+`schemas/ce-benchmark-results-v1.schema.json`; this is the preferred substrate
+for eventual native Context Engine rendering.
+
+Track model changes over time with content-addressed snapshots:
+
+```bash
+node ./bin/ai-discourse-bench.mjs snapshot-report \
+  --report ./results/baseline-report.json \
+  --out ./results/baseline-snapshot.json \
+  --label 2026-07
+
+node ./bin/ai-discourse-bench.mjs compare-snapshots \
+  --baseline ./results/baseline-snapshot.json \
+  --current ./results/current-snapshot.json \
+  --out ./results/model-drift.json
+```
+
+Comparisons report per-model stance shifts, direction changes, and pairwise
+similarity drift on common models and questions.
 
 For second-pass AI analysis, export a compact analysis input:
 

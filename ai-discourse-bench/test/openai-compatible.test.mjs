@@ -28,6 +28,52 @@ test('local provider targets a local OpenAI-compatible chat endpoint', async () 
   assert.equal(content.metadata.endpoint, 'http://127.0.0.1:11434/v1');
   assert.equal(seen.url, 'http://127.0.0.1:11434/v1/chat/completions');
   assert.equal(seen.options.headers.authorization, 'Bearer local');
+  assert.equal(JSON.parse(seen.options.body).response_format.type, 'json_schema');
+  assert.equal(
+    JSON.parse(seen.options.body).response_format.json_schema.schema.properties.confidence.type,
+    'number',
+  );
+  assert.equal(content.metadata.structuredOutput.used, 'json_schema');
+});
+
+test('auto structured output falls back only on capability errors and records the downgrade', async () => {
+  const bodies = [];
+  const result = await callOpenAiCompatibleChat({
+    provider: 'local',
+    model: 'no-schema-model',
+    prompt: 'Answer.',
+    env: { AIDB_LOCAL_BASE_URL: 'http://127.0.0.1:11434/v1' },
+    fetchImpl: async (_url, options) => {
+      bodies.push(JSON.parse(options.body));
+      if (bodies.length === 1) {
+        return { ok: false, status: 400, text: async () => 'response_format is unsupported' };
+      }
+      return okResponse;
+    },
+  });
+
+  assert.equal(bodies[0].response_format.type, 'json_schema');
+  assert.equal('response_format' in bodies[1], false);
+  assert.equal(result.metadata.structuredOutput.used, 'none');
+  assert.equal(result.metadata.structuredOutput.fallback.status, 400);
+});
+
+test('auto structured output does not hide authentication or server failures', async () => {
+  let calls = 0;
+  await assert.rejects(
+    callOpenAiCompatibleChat({
+      provider: 'openrouter',
+      model: 'provider/failing-model',
+      prompt: 'Answer.',
+      env: { OPENROUTER_API_KEY: 'test-key' },
+      fetchImpl: async () => {
+        calls += 1;
+        return { ok: false, status: 401, text: async () => 'invalid key' };
+      },
+    }),
+    (error) => error.status === 401 && error.retryable === false,
+  );
+  assert.equal(calls, 1);
 });
 
 test('OpenRouter provider sends required auth and attribution headers', async () => {

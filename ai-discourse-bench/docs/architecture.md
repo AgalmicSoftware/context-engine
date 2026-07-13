@@ -11,11 +11,15 @@ and generated diagrams together under `ai-discourse-bench/`.
      OSS `ai-discourse-corpus/`.
    - Review and prune generated candidates into a versioned question bank.
    - Each question has canonical and reversed-polarity wording.
+   - `build:candidate-bank` creates a 50-question source-resolved candidate and
+     manifest while preserving human review as a release gate.
 
 2. **Model roster**
    - `data/model-roster.sample.json` shows the model metadata shape.
    - Traits such as `parameterClass`, `ossStatus`, `countryOfOrigin`, and
      `providerClass` are used by the breakdown view.
+   - Optional provenance, structured-output, and pricing fields feed run
+     manifests, observed-runtime reports, and experiment plans.
 
 3. **Run modes**
    - `self`: models answer as themselves.
@@ -27,6 +31,8 @@ and generated diagrams together under `ai-discourse-bench/`.
    - `local`: OpenAI-compatible local server, default
      `http://127.0.0.1:8000/v1`.
    - `openrouter`: OpenRouter chat completions endpoint.
+   - `plan-run` computes exact calls plus token/cost/readiness estimates before
+     either real provider is contacted.
 
 5. **Aggregation**
    - Reversed-polarity answers are normalized back to canonical polarity.
@@ -39,6 +45,8 @@ and generated diagrams together under `ai-discourse-bench/`.
      Jensen-Shannon similarity, participant graph edges, trait breakdowns,
      deterministic topic circles, and optional provenance-bound second-pass
      topic/compass/risk-scenario overlays.
+   - Reports include deterministic bootstrap intervals and explicit signed and
+     absolute canonical/reversed wording sensitivity.
 
 6. **Rendering target**
    - The report JSON is shaped to render like a Context Engine results report:
@@ -48,6 +56,8 @@ and generated diagrams together under `ai-discourse-bench/`.
    - Reports can also be exported as Context Engine `PolisReport`
      `questionResponses`, with each model treated as a participant and each
      averaged model/question score converted to a binary response row.
+   - `export-ce-native` emits the lossless `ce_benchmark_results_dataset`
+     contract for future native rendering without discretizing distributions.
    - A source-hash gate and the `$ai-discourse-bench-results-sync` skill track
      drift from live Context Engine Results components until direct shared
      imports are practical.
@@ -58,6 +68,8 @@ and generated diagrams together under `ai-discourse-bench/`.
      `--resume` support long local and hosted runs.
    - Run manifests hash the bank, roster, prompt, persona, seed, and generation
      settings. Release mode enforces coverage and provider gates.
+   - Longitudinal snapshots preserve model/question stance and similarity data;
+     snapshot comparisons report stance-direction and similarity drift.
 
 ## Running
 

@@ -151,6 +151,8 @@ export instead of as extra visible or hidden mode panes.
 - `byModelQuestion`: model-by-question matrix with repeats nested in each cell.
 - `similarityMatrix`: pairwise distributional similarity over shared questions.
 - `similarityEdges`: graph-friendly similarity/difference edges with overlap.
+- stance and similarity summaries include deterministic 95% bootstrap
+  intervals; polarity summaries include signed and absolute wording sensitivity.
 
 This is the core view for "where do models agree or disagree?"
 
@@ -217,9 +219,20 @@ shape consumed by `client/src/components/PolisReport/PolisReport.tsx`:
 - response metadata preserves model traits, mean score, counts, invalid rate,
   and polarity summaries.
 
-This export is the intended bridge for rendering benchmark outputs through the
-native Context Engine results path instead of maintaining a separate renderer
-forever.
+This compatibility export can feed the current binary response path, but it is
+lossy because model/question means are discretized.
+
+`export-ce-native` instead emits `ce_benchmark_results_dataset`, defined by
+`schemas/ce-benchmark-results-v1.schema.json`. It preserves model participants,
+declared and observed provenance, statements, complete model/question summary
+distributions, uncertainty intervals, wording sensitivity, similarity details,
+coverage, graph inputs, breakdowns, and integrity state. This lossless contract
+is the preferred substrate for eventual native Context Engine rendering.
+
+`snapshot-report` creates a content-addressed longitudinal snapshot from the
+same report. `compare-snapshots` compares compatible benchmark/mode/persona
+snapshots and reports model stance shift, direction changes, and participant
+similarity drift over common questions and models.
 
 ## Participant Graph
 

@@ -1,4 +1,5 @@
 import { ANSWER_VALUES, PROVIDERS } from './config.mjs';
+import { hashJson } from './provenance.mjs';
 
 const isRecord = (value) => (
   !!value && typeof value === 'object' && !Array.isArray(value)
@@ -41,6 +42,17 @@ export const validateQuestionBank = (questionBank) => {
     && !['development-seed', 'candidate', 'validated'].includes(questionBank.releaseStatus)) {
     errors.push('releaseStatus must be development-seed, candidate, or validated');
   }
+  const requiresReleaseMetadata = ['candidate', 'validated'].includes(questionBank.releaseStatus);
+  if (requiresReleaseMetadata) {
+    requireString(errors, questionBank.track, 'track');
+    requireString(errors, questionBank.version, 'version');
+    if (!isRecord(questionBank.sourceCorpus)) {
+      errors.push('sourceCorpus must be an object for candidate and validated banks');
+    } else {
+      requireString(errors, questionBank.sourceCorpus.name, 'sourceCorpus.name');
+      requireString(errors, questionBank.sourceCorpus.revision, 'sourceCorpus.revision');
+    }
+  }
   if (!isRecord(questionBank.runPlan)) {
     errors.push('runPlan must be an object');
   } else {
@@ -75,6 +87,50 @@ export const validateQuestionBank = (questionBank) => {
     }
     if (!Array.isArray(question.sourceAnchors) && !Array.isArray(question.agentVillageAnchors)) {
       errors.push(`${base} must include sourceAnchors or agentVillageAnchors`);
+    }
+    if (requiresReleaseMetadata) {
+      if (!['normative', 'empirical', 'forecast', 'moral', 'institutional'].includes(question.claimType)) {
+        errors.push(`${base}.claimType must be normative, empirical, forecast, moral, or institutional`);
+      }
+      requireString(errors, question.selectionRationale, `${base}.selectionRationale`);
+      const sourceEvidence = requireArray(errors, question.sourceEvidence, `${base}.sourceEvidence`);
+      if (sourceEvidence.length === 0) errors.push(`${base}.sourceEvidence must not be empty`);
+      sourceEvidence.forEach((evidence, evidenceIndex) => {
+        const evidenceBase = `${base}.sourceEvidence[${evidenceIndex}]`;
+        if (!isRecord(evidence)) {
+          errors.push(`${evidenceBase} must be an object`);
+          return;
+        }
+        requireString(errors, evidence.corpus, `${evidenceBase}.corpus`);
+        requireString(errors, evidence.idOrUrl, `${evidenceBase}.idOrUrl`);
+        requireString(errors, evidence.title, `${evidenceBase}.title`);
+        requireString(errors, evidence.sourceRecordHash, `${evidenceBase}.sourceRecordHash`);
+        if (typeof evidence.sourceRecordHash === 'string' && !/^[a-f0-9]{64}$/i.test(evidence.sourceRecordHash)) {
+          errors.push(`${evidenceBase}.sourceRecordHash must be a SHA-256 hex digest`);
+        }
+        if (evidence.resolution !== 'resolved') errors.push(`${evidenceBase}.resolution must be resolved`);
+        const supportingRecords = requireArray(errors, evidence.supportingRecords, `${evidenceBase}.supportingRecords`);
+        const hasConcreteUrl = typeof evidence.url === 'string'
+          || supportingRecords.some((record) => typeof record?.url === 'string');
+        if (!hasConcreteUrl) errors.push(`${evidenceBase} must include a concrete source URL`);
+      });
+      if (!isRecord(question.review)) {
+        errors.push(`${base}.review must be an object`);
+      } else {
+        if (question.review.sourceResolution !== 'resolved') {
+          errors.push(`${base}.review.sourceResolution must be resolved`);
+        }
+        if (questionBank.releaseStatus === 'validated') {
+          for (const field of ['claimSupport', 'reversal', 'singleAxis']) {
+            if (question.review[field] !== 'approved') {
+              errors.push(`${base}.review.${field} must be approved for validated banks`);
+            }
+          }
+          if (question.review.adjudicationStatus !== 'approved') {
+            errors.push(`${base}.review.adjudicationStatus must be approved for validated banks`);
+          }
+        }
+      }
     }
   });
   return errors;
@@ -115,6 +171,30 @@ export const validateModelRoster = (modelRoster) => {
     }
     if (model.timeoutMs !== undefined && (!Number.isInteger(Number(model.timeoutMs)) || Number(model.timeoutMs) < 1)) {
       errors.push(`${base}.timeoutMs must be a positive integer`);
+    }
+    if (model.structuredOutput !== undefined
+      && !['auto', 'none', 'json_object', 'json_schema'].includes(model.structuredOutput)) {
+      errors.push(`${base}.structuredOutput must be auto, none, json_object, or json_schema`);
+    }
+    if (model.provenance !== undefined && !isRecord(model.provenance)) {
+      errors.push(`${base}.provenance must be an object`);
+    }
+    if (isRecord(model.provenance)) {
+      for (const field of ['modelRevision', 'weightsRevision', 'quantization', 'inferenceEngine', 'runtimeVersion', 'systemPromptId', 'license', 'asOf']) {
+        if (model.provenance[field] !== undefined) requireString(errors, model.provenance[field], `${base}.provenance.${field}`);
+      }
+      if (model.provenance.sourceUrl !== undefined) requireHttpUrl(errors, model.provenance.sourceUrl, `${base}.provenance.sourceUrl`);
+    }
+    if (model.pricing !== undefined && !isRecord(model.pricing)) {
+      errors.push(`${base}.pricing must be an object`);
+    }
+    if (isRecord(model.pricing)) {
+      for (const field of ['inputPerMillion', 'outputPerMillion']) {
+        if (model.pricing[field] !== undefined
+          && (!Number.isFinite(Number(model.pricing[field])) || Number(model.pricing[field]) < 0)) {
+          errors.push(`${base}.pricing.${field} must be a non-negative number`);
+        }
+      }
     }
   });
   return errors;
@@ -331,11 +411,22 @@ export const validateReleaseRunFile = (runsFile, {
         temperature: selected.temperature ?? 0.2,
         maxTokens: selected.maxTokens ?? 220,
         timeoutMs: selected.timeoutMs ?? null,
+        structuredOutput: selected.structuredOutput || 'auto',
       };
       if (Number(model.temperature) !== Number(expectedGeneration.temperature)
         || Number(model.maxTokens) !== Number(expectedGeneration.maxTokens)
-        || (model.timeoutMs ?? null) !== expectedGeneration.timeoutMs) {
+        || (model.timeoutMs ?? null) !== expectedGeneration.timeoutMs
+        || (model.structuredOutput || 'auto') !== expectedGeneration.structuredOutput) {
         errors.push(`manifest.models[${index}] generation settings do not match the selected model roster`);
+      }
+      if (hashJson(model.provenance || {}) !== hashJson(selected.provenance || {})) {
+        errors.push(`manifest.models[${index}].provenance does not match the selected model roster`);
+      }
+      if (hashJson(model.traits || {}) !== hashJson(selected.traits || {})) {
+        errors.push(`manifest.models[${index}].traits does not match the selected model roster`);
+      }
+      if (hashJson(model.pricing || null) !== hashJson(selected.pricing || null)) {
+        errors.push(`manifest.models[${index}].pricing does not match the selected model roster`);
       }
     }
   });

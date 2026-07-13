@@ -93,6 +93,9 @@ export const buildRunManifest = ({
     temperature: model.temperature ?? 0.2,
     maxTokens: model.maxTokens ?? 220,
     timeoutMs: model.timeoutMs ?? null,
+    structuredOutput: model.structuredOutput || 'auto',
+    provenance: model.provenance || {},
+    pricing: model.pricing || null,
     traits: model.traits || {},
   })),
 });

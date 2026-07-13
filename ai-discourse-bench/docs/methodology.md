@@ -44,6 +44,18 @@ pairwise distances. Opinion groups are connected components over a documented
 similarity threshold. Models without enough overlap are shown separately and
 are not assigned misleading similarity positions.
 
+Stance means and pairwise similarity means include deterministic 95% percentile
+bootstrap intervals. The report records the 1,000-iteration method and
+resampling unit. Single observations receive a degenerate interval and should
+not be read as strong evidence. These intervals describe repeat and participant
+variation in the collected sample; they do not establish population-level
+model rankings.
+
+Canonical and normalized-reversed means remain separately available. Wording
+sensitivity reports absolute shift, signed shift, and low/moderate/high bands at
+0.25 and 0.75 points on the -1 to 1 stance scale. Reversal is therefore measured
+as sensitivity rather than described as an automatic bias correction.
+
 ## Coverage And Release Status
 
 Every report exposes model-level question coverage, canonical/reversed pairing,
@@ -65,6 +77,13 @@ roster, prompt template, persona data when applicable, schedule seed, and
 generation configuration. Each response records its deterministic run id,
 prompt hash, attempt count, requested and resolved model identity, provider
 request metadata, token usage when available, and latency.
+
+Roster provenance can pin model and weights revisions, quantization, inference
+engine and runtime version, source URL, license, system prompt id, and as-of
+date. Response metadata separately records observed resolved provider/model,
+endpoint, system fingerprint, and structured-output mode. `auto` structured
+output falls back from JSON Schema only for endpoint capability errors and
+records the downgrade.
 
 Each release manifest model is matched against the model roster selected for
 the report, including effective provider and generation settings. This prevents
@@ -104,7 +123,10 @@ synthetic seed content.
 
 ## Question-Bank Status
 
-`data/question-bank.sample.json` is a development seed bank. It is not yet a
-validated benchmark release. The release process for corpus provenance,
-semantic deduplication, reversal review, source coverage, and held-out question
-policy is intentionally tracked as deferred private planning work.
+`data/question-bank.sample.json` is a 200-question development seed. The
+recommended runnable bank is
+`banks/ai-futures/v0.1-candidate/question-bank.json`: 50 selected questions
+across all 20 topics with resolved question-level evidence, source-record
+hashes, a pinned corpus revision, and a bank manifest. It is still a candidate.
+Independent claim support, reversal, and single-axis adjudication must be
+approved before its status can become `validated` or its reports release-ready.

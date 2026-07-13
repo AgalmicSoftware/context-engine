@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextengine.org/schemas/ce-benchmark-results-v1.schema.json",
+  "title": "Context Engine Benchmark Results Dataset v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "sourceReport", "participants", "statements", "responses", "polisReport", "integrity"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "kind": { "const": "ce_benchmark_results_dataset" },
+    "generatedAt": { "type": "string" },
+    "sourceReport": { "type": "object" },
+    "stanceScale": { "type": "object" },
+    "statistics": { "type": "object" },
+    "participants": { "type": "array", "items": { "type": "object" } },
+    "statements": { "type": "array", "items": { "type": "object" } },
+    "responses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["participantId", "statementId", "summary"],
+        "properties": {
+          "participantId": { "type": "string" },
+          "statementId": { "type": "string" },
+          "summary": { "type": ["object", "null"] }
+        }
+      }
+    },
+    "polisReport": { "type": "object" },
+    "participantGraph": { "type": "object" },
+    "breakdown": { "type": "object" },
+    "integrity": { "type": "object" },
+    "note": { "type": "string" }
+  }
+}
