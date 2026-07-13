@@ -15,6 +15,7 @@ test('standalone report declares every live Context Engine Results source it mir
   const actual = await buildResultsSyncSnapshot(contextEngineRoot);
   assert.deepEqual(compareResultsSyncSnapshot(expected, actual), []);
   assert.ok(Object.keys(actual.files).length >= 10);
+  assert.ok(Object.hasOwn(actual.files, 'client/src/components/DemoViews/DemoAnalysis/WorldResultsMap.tsx'));
 });
 
 test('Results sync comparison reports changed and newly-added source files', () => {

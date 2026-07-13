@@ -26,7 +26,7 @@ Keep the standalone benchmark report aligned with live Context Engine Results wh
 - `PolisReport.tsx` and `PolisReport.module.scss`: report sections, beeswarm, participant graph, and controls.
 - `DebateMap.tsx` and `DebateMap.module.scss`: Debate Map structure and interactions.
 - `RiskMatrix.tsx` and `RiskMatrix.module.scss`: matrix, selectors, and modal behavior.
-- `DemoAnalysisWorkspace.tsx` and its module stylesheet: Breakdown composition.
+- `DemoAnalysisWorkspace.tsx`, `WorldResultsMap.tsx`, and the workspace module stylesheet: Breakdown composition and country-map behavior.
 - `SurveyResults.module.scss`: Raw Results and export surfaces.
 
 ## Guardrails

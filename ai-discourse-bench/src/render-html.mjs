@@ -1,5 +1,11 @@
 import { buildSecondPassAnalysisInput } from './analysis-export.mjs';
 import { buildContextEnginePolisExport } from './ce-export.mjs';
+import {
+  WORLD_MAP_GEOGRAPHIES,
+  WORLD_MAP_GRATICULE_PATH,
+  WORLD_MAP_SPHERE_PATH,
+  WORLD_MAP_VIEW_BOX,
+} from './world-map-geographies.mjs';
 
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
   '&': '&amp;',
@@ -517,6 +523,50 @@ const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This static diagram uses distributional
 const REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT = "Polis Auto is the closest live control vocabulary for this static export. The generated position is classical MDS over Jensen-Shannon answer-distribution distance, and opinion groups are connected components over the report threshold. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.";
 const OPINION_GROUPS_TOOLTIP_TEXT = "Static exports use the generated connected-component groups. Re-run the report after new benchmark data to update them.";
 const D3_CATEGORY10 = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
+const WORLD_MAP_ANSWER_COLORS = Object.freeze({
+  Agree: '#4dffa4',
+  Unsure: '#ffd166',
+  Disagree: '#ff6b6b',
+});
+const WORLD_MAP_DEFAULT_COUNTRY_FILL = 'rgba(226, 232, 255, 0.08)';
+const WORLD_MAP_COUNTRY_ALIASES = Object.freeze({
+  AU: 'Australia',
+  AUS: 'Australia',
+  AT: 'Austria',
+  AUT: 'Austria',
+  BE: 'Belgium',
+  BEL: 'Belgium',
+  BR: 'Brazil',
+  BRA: 'Brazil',
+  CA: 'Canada',
+  CAN: 'Canada',
+  CN: 'China',
+  CHN: 'China',
+  CZ: 'Czechia',
+  CZE: 'Czechia',
+  DK: 'Denmark',
+  DNK: 'Denmark',
+  DE: 'Germany',
+  DEU: 'Germany',
+  FR: 'France',
+  FRA: 'France',
+  GB: 'United Kingdom',
+  GBR: 'United Kingdom',
+  UK: 'United Kingdom',
+  IN: 'India',
+  IND: 'India',
+  JP: 'Japan',
+  JPN: 'Japan',
+  KR: 'South Korea',
+  KOR: 'South Korea',
+  RU: 'Russia',
+  RUS: 'Russia',
+  TR: 'Turkey',
+  TUR: 'Turkey',
+  US: 'United States of America',
+  USA: 'United States of America',
+  'United States': 'United States of America',
+});
 
 const participantsById = (report) => Object.fromEntries((report.participants || []).map((entry) => [entry.id, entry]));
 
@@ -1851,39 +1901,59 @@ const renderBreakdown = (report) => {
     }).join('');
   const countryGroups = Object.entries(traits.countryOfOrigin || {})
     .sort((left, right) => right[1].length - left[1].length);
-  const countryPositions = {
-    US: [25, 42],
-    'United States': [25, 42],
-    Canada: [23, 29],
-    China: [72, 43],
-    UK: [48, 34],
-    'United Kingdom': [48, 34],
-    France: [49, 39],
-    Germany: [52, 37],
-    Japan: [82, 46],
-  };
-  const mapMarkers = countryGroups.map(([country, ids], index) => {
-    const [x, y] = countryPositions[country] || [20 + ((index * 17) % 60), 34 + ((index * 13) % 34)];
-    const radius = 7 + Math.min(18, ids.length * 4);
-    return `<g class="worldMapMarker" data-ce-searchable transform="translate(${escapeHtml(x)}, ${escapeHtml(y)})">
-      <circle r="${escapeHtml(radius)}" fill="${escapeHtml(stanceColor(participantMap[ids[0]]?.summary?.meanScore))}" fill-opacity="0.72" stroke="#ffffff" stroke-width="1.4"></circle>
-      <text y="${escapeHtml(radius + 13)}" text-anchor="middle">${escapeHtml(formatDisplayLabel(country))}</text>
-      <title>${escapeHtml(`${formatDisplayLabel(country)}: ${ids.map((id) => participantMap[id]?.label || id).join(', ')}`)}</title>
-    </g>`;
+  const mapDataByGeography = new Map(countryGroups.map(([country, ids]) => {
+    const summary = aggregateQuestionSummaryForModels(report, selectedQuestion?.id, ids);
+    const distribution = answerDistributionRows(summary)
+      .sort((left, right) => right.count - left.count);
+    const topAnswer = distribution[0];
+    const geographyName = WORLD_MAP_COUNTRY_ALIASES[String(country).trim()] || String(country).trim();
+    return [geographyName, {
+      country,
+      ids,
+      topAnswer: topAnswer?.count > 0 ? topAnswer.responseText : null,
+      topRate: topAnswer?.count > 0 ? topAnswer.rate : 0,
+    }];
+  }));
+  const mapCountries = WORLD_MAP_GEOGRAPHIES.map((geography) => {
+    const countryData = mapDataByGeography.get(geography.name);
+    const hasData = Boolean(countryData?.topAnswer);
+    const fill = hasData
+      ? WORLD_MAP_ANSWER_COLORS[countryData.topAnswer] || WORLD_MAP_DEFAULT_COUNTRY_FILL
+      : WORLD_MAP_DEFAULT_COUNTRY_FILL;
+    const title = hasData
+      ? `${formatDisplayLabel(countryData.country)}: ${countryData.topAnswer} (${(countryData.topRate * 100).toFixed(0)}%)`
+      : `${geography.name}: No data`;
+    const participantLabels = hasData
+      ? countryData.ids.map((id) => participantMap[id]?.label || id).join(', ')
+      : '';
+    return `<path
+      class="worldMapCountry${hasData ? ' worldMapCountryHasData' : ''}"
+      fill="${escapeHtml(fill)}"
+      data-ce-world-map-country="${escapeHtml(geography.name)}"
+      ${hasData ? `data-ce-searchable tabindex="0" aria-label="${escapeHtml(`${title}. Models: ${participantLabels}`)}"` : ''}
+      d="${escapeHtml(geography.path)}"
+    ><title>${escapeHtml(title)}</title></path>`;
   }).join('');
+  const mapLegend = Object.entries(WORLD_MAP_ANSWER_COLORS)
+    .map(([label, color]) => `<span class="legendPill">
+      <span class="legendSwatch" style="background-color:${escapeHtml(color)}"></span>
+      ${escapeHtml(label)}
+    </span>`)
+    .join('');
   const mapPanelHeader = selectedQuestion
     ? `<div>
         <h3 class="panelTitle">World Results Map</h3>
-        <p class="panelMeta">${countryGroups.length ? 'Model origin cohorts shown as static benchmark markers.' : 'Showing all country segments in the demo corpus.'}</p>
+        <p class="panelMeta">${countryGroups.length ? 'Showing all model-origin country cohorts in this benchmark.' : 'Showing all country segments in the demo corpus.'}</p>
       </div>`
     : '<h3 class="panelTitle">World Results Map</h3>';
-  const mapPanelBody = selectedQuestion ? `<div class="mapFrameShell">
+  const mapPanelBody = selectedQuestion ? `<div class="mapLegend" aria-label="Map answer legend">${mapLegend}</div>
+  <div class="mapFrameShell">
     <div class="mapFrameViewport">
       <div class="mapFrame mapFrameCompact" data-testid="demo-analysis-world-map">
-        <svg class="aidb-world-map-svg" viewBox="0 0 100 60" role="img" aria-label="World results map">
-          <path d="M8 30 C18 17 36 16 45 27 C55 13 78 19 91 31 C81 45 62 45 52 34 C40 48 20 44 8 30Z" fill="rgba(226,232,255,0.22)" stroke="#cbd5e1" stroke-width="0.6"></path>
-          <path d="M11 30 C20 25 28 27 35 33 M45 27 C51 30 58 29 65 24 M58 38 C67 35 75 37 85 32" fill="none" stroke="#e4e5e6" stroke-width="0.5"></path>
-          ${mapMarkers}
+        <svg class="aidb-world-map-svg" viewBox="${escapeHtml(WORLD_MAP_VIEW_BOX)}" role="img" aria-label="World results map" preserveAspectRatio="xMidYMid meet">
+          <path class="worldMapSphere" d="${escapeHtml(WORLD_MAP_SPHERE_PATH)}"></path>
+          <path class="worldMapGraticule" d="${escapeHtml(WORLD_MAP_GRATICULE_PATH)}"></path>
+          <g class="worldMapCountries">${mapCountries}</g>
         </svg>
       </div>
     </div>
@@ -3173,6 +3243,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .activePills, .pillsLayout, .tagFilterRow, .mapLegend { display: flex; flex-wrap: wrap; gap: 0.55rem; }
     .activePills { margin-bottom: 1rem; }
     .pillButton, .legendPill, .ratePill { display: inline-flex; align-items: center; gap: 0.4rem; border-radius: var(--ce-radius-16, 16px); padding: 0.4rem 0.75rem; border: 1px solid #ced4da; background: #f1f3f5; color: #495057; font-size: 0.88rem; font-weight: 500; }
+    .legendSwatch { width: 0.7rem; height: 0.7rem; border-radius: var(--ce-radius-pill, 999px); }
     .pillButton { cursor: pointer; }
     button.pillButton { font: inherit; text-align: left; }
     .pillButtonActive, .segmentButton:hover { border-color: #b6d4fe; background: #d1e7fd; color: #084298; }
@@ -3246,9 +3317,13 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .mapFrameViewportEmpty { min-height: 280px; padding: 1.5rem; text-align: center; }
     .mapViewportHint { margin: 0; max-width: 34rem; color: #5f6b7a; font-size: 1rem; line-height: 1.55; }
     .mapFrameCompact { align-items: center; display: flex; justify-content: center; margin-top: 0; width: 100%; padding: 0; }
-    .aidb-world-map-svg { display: block; width: 100%; height: auto; min-height: 250px; }
-    .aidb-world-map-svg text { fill: #334155; font-size: 3px; font-weight: 700; letter-spacing: 0; }
-    .worldMapMarker circle { filter: drop-shadow(0 8px 12px rgba(15, 23, 42, 0.14)); }
+    .aidb-world-map-svg { display: block; width: 100%; height: auto; max-width: none; }
+    .worldMapSphere { fill: transparent; stroke: #e4e5e6; stroke-width: 0.5; }
+    .worldMapGraticule { fill: none; stroke: #e4e5e6; stroke-width: 0.5; }
+    .worldMapCountry { stroke: #ffffff; stroke-width: 0.7; outline: none; transition: fill 0.12s ease; }
+    .worldMapCountry:hover, .worldMapCountry:focus-visible { fill: #ff5533; outline: none; }
+    .worldMapCountry:active { fill: #ee4422; }
+    .worldMapCountryHasData:focus-visible { stroke: #0f5ec7; stroke-width: 1.8; }
     .breakdownDataset { display: grid; gap: 0.65rem; padding: 0.9rem; border: 1px solid #e0e0e0; border-radius: var(--ce-radius-8, 8px); background: #ffffff; }
     .breakdownDatasetHeader { display: flex; justify-content: space-between; gap: 0.75rem; align-items: center; }
     .breakdownDatasetTitle { font-weight: 600; color: #495057; }

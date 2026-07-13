@@ -17,6 +17,7 @@ export const RESULTS_SYNC_SOURCE_FILES = Object.freeze([
   'client/src/components/MainContent/RiskMatrix.module.scss',
   'client/src/components/DemoViews/DemoAnalysis/DemoAnalysisWorkspace.tsx',
   'client/src/components/DemoViews/DemoAnalysis/DemoAnalysisWorkspace.module.scss',
+  'client/src/components/DemoViews/DemoAnalysis/WorldResultsMap.tsx',
   'client/src/components/SurveyTool/SurveyResults.module.scss',
 ]);
 

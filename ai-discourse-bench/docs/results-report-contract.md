@@ -302,11 +302,15 @@ at 980px and narrower, and one column at 640px and narrower. The static CSS
 keeps the direct DemoAnalysis class rules for `workspace`, `primaryGrid`,
 `secondaryGrid`, `panel`, `panelTitle`, and `panelMeta`, with `demoAnalysis*`
 aliases only where the standalone markup needs an additional stable hook. Once a question is selected, the map is
-a static benchmark-origin cohort map rather than the full interactive
-`react-simple-maps` component, but it preserves the same panel class vocabulary
-and pane order so the standalone Results view tracks the client UX. The Context
-Engine client can use the same fields as filters, cohort rows, or comparison
-facets.
+a self-contained benchmark-origin cohort map generated from the same
+`world-atlas@2` geography and Equal Earth projection used by the live
+`react-simple-maps` component. Countries with model-origin cohorts are filled by
+that cohort's dominant answer for the selected question using the live
+Agree/Unsure/Disagree colors; countries without cohort data remain muted. The
+standalone artifact also preserves the live legend, country hover treatment,
+tooltip wording, panel vocabulary, and responsive map frame without requiring a
+runtime map download. The Context Engine client can use the same fields as
+filters, cohort rows, or comparison facets.
 Polis mini box plots should mirror the live `PolisReport.module.scss` rule:
 the standalone stylesheet provides only `display: block` plus the border, while
 the `200x30` dimensions stay on the SVG attributes as they do in the client.
