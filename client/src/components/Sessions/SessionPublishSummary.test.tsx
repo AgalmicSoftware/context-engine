@@ -3,6 +3,15 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import SessionPublishSummary from './SessionPublishSummary';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import {
+  cloneSessionModePreset,
+  SESSION_MODE_PRESET_IDS,
+  type SessionModePresetId,
+} from '../../utilities/session/sessionModeProfile';
+import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
+
+const resolvePresetPublishSettings = (presetId: Exclude<SessionModePresetId, 'custom'>) =>
+  resolveSessionWizardModeRequirements(cloneSessionModePreset(presetId)).publishSettings;
 
 const buildPublishUiPlan = (overrides: Record<string, any> = {}) => {
   const publishReadiness = {
@@ -86,6 +95,7 @@ const buildProps = (
   localWorkerBundleFallbackFilePath: '',
   sponsoredManualBundleRetryMessage: '',
   publishUiPlan: buildPublishUiPlan(),
+  publishSettingsCapabilities: resolvePresetPublishSettings(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
   renderInfoTooltip: () => null,
   resolvedWorkerBaseUrl: '',
   workerUrlSource: 'manual',
@@ -326,13 +336,15 @@ describe('SessionPublishSummary', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Advanced publish settings' }));
+    const settingsButton = screen.getByRole('button', { name: 'Advanced publish settings' });
+    expect(settingsButton).toBeInTheDocument();
+    fireEvent.click(settingsButton);
 
     expect(onTogglePublishAdvanced).toHaveBeenCalledTimes(1);
     expect(onPublish).not.toHaveBeenCalled();
   });
 
-  it('renders advanced worker and metadata controls without publishing', () => {
+  it('keeps decentralized Arweave and gas controls visible without publishing', () => {
     const onManualMetadataUrlChange = jest.fn();
     const onPublish = jest.fn();
 
@@ -356,6 +368,7 @@ describe('SessionPublishSummary', () => {
     expect(
       screen.getByText('Arweave upload worker: https://worker.example.test (custom worker URL)'),
     ).toBeInTheDocument();
+    expect(screen.getByText('Gas limit override')).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText('ar://<txId> or https://arweave.net/<txId>'), {
       target: { value: 'ar://metadata-tx' },
@@ -363,6 +376,30 @@ describe('SessionPublishSummary', () => {
 
     expect(onManualMetadataUrlChange).toHaveBeenCalledWith('ar://metadata-tx');
     expect(onPublish).not.toHaveBeenCalled();
+  });
+
+  it('keeps worker-canonical publish settings free of Arweave and gas controls', () => {
+    render(
+      <SessionPublishSummary
+        {...buildProps({
+          publishSettingsCapabilities: resolvePresetPublishSettings(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          publishUiPlan: buildPublishUiPlan({
+            publishActionDisplayState: {
+              publishAdvancedOpen: true,
+              settingsButtonActive: true,
+            },
+          }),
+        })}
+      />,
+    );
+
+    expect(screen.queryByText(/Arweave upload worker:/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Manual metadata URI (optional)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gas limit override')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gas price override (gwei, legacy)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Max fee per gas (gwei)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Max priority fee per gas (gwei)')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Advanced publish settings' })).not.toBeInTheDocument();
   });
 
   it('keeps manual metadata and gas controls callback-only while showing active metadata sources', () => {

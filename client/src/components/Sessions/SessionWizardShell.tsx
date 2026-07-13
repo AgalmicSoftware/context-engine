@@ -137,6 +137,7 @@ export type SessionWizardShellProps = {
   primaryDraftEntries: MetadataEditorProps['primaryEntries'];
   provider: WizardModalsProps['provider'];
   publishUiPlan: PublishSectionProps['publishUiPlan'];
+  publishSettingsCapabilities: PublishSectionProps['publishSettingsCapabilities'];
   publishedPendingSbtLinks: PublishSectionProps['publishedPendingSbtLinks'];
   registerExplorerBaseUrl: PublishSectionProps['registerExplorerBaseUrl'];
   registerTxs: PublishSectionProps['registerTxs'];
@@ -299,6 +300,7 @@ const SessionWizardShell = ({
   primaryDraftEntries,
   provider,
   publishUiPlan,
+  publishSettingsCapabilities,
   publishedPendingSbtLinks,
   registerExplorerBaseUrl,
   registerTxs,
@@ -547,6 +549,7 @@ const SessionWizardShell = ({
           localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
           sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
           publishUiPlan={publishUiPlan}
+          publishSettingsCapabilities={publishSettingsCapabilities}
           renderInfoTooltip={renderSessionWizardInfoTooltip}
           resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
           workerUrlSource={workerUrlSource}

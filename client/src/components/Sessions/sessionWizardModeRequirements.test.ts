@@ -30,6 +30,10 @@ describe('sessionWizardModeRequirements', () => {
           registerSession: false,
           refreshRegistryCache: false,
         },
+        publishSettings: {
+          showArweaveMetadataControls: false,
+          showGasOverrideControls: false,
+        },
       }),
     );
   });
@@ -56,6 +60,10 @@ describe('sessionWizardModeRequirements', () => {
       uploadMetadata: false,
       registerSession: false,
       refreshRegistryCache: false,
+    });
+    expect(requirements.publishSettings).toEqual({
+      showArweaveMetadataControls: false,
+      showGasOverrideControls: false,
     });
   });
 
@@ -106,11 +114,19 @@ describe('sessionWizardModeRequirements', () => {
           registerSession: true,
           refreshRegistryCache: true,
         },
+        publishSettings: {
+          showArweaveMetadataControls: true,
+          showGasOverrideControls: true,
+        },
       }),
     );
     expect(lit.visibleWorkerResourceKeys).toEqual(['ai', 'arweave', 'rpc', 'txGas', 'lit']);
     expect(lit.requiredWorkerSecretFields).toEqual(['openaiKey', 'arweaveJwk', 'litAccountApiKey']);
     expect(lit.requiresLit).toBe(true);
+    expect(lit.publishSettings).toEqual({
+      showArweaveMetadataControls: true,
+      showGasOverrideControls: true,
+    });
   });
 
   it('returns an unselected descriptor instead of inventing legacy requirements', () => {
@@ -121,6 +137,10 @@ describe('sessionWizardModeRequirements', () => {
         requiredRequirementIds: [],
         requiredWorkerSecretFields: [],
         visibleWorkerResourceKeys: [],
+        publishSettings: {
+          showArweaveMetadataControls: true,
+          showGasOverrideControls: true,
+        },
       }),
     );
   });

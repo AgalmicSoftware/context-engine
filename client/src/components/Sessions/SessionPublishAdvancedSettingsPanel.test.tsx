@@ -16,6 +16,10 @@ const buildProps = (
   onManualMaxFeePerGasGweiChange: jest.fn(),
   onManualMaxPriorityFeePerGasGweiChange: jest.fn(),
   onManualMetadataUrlChange: jest.fn(),
+  publishSettingsCapabilities: {
+    showArweaveMetadataControls: true,
+    showGasOverrideControls: true,
+  },
   renderInfoTooltip: (options) => <span data-testid={String(options.testId)}>{String(options.ariaLabel)}</span>,
   resolvedWorkerBaseUrl: '',
   workerUrlSource: 'manual',
@@ -96,5 +100,25 @@ describe('SessionPublishAdvancedSettingsPanel', () => {
 
     expect(screen.getByText('Arweave upload worker: Not set (manual)')).toBeInTheDocument();
     expect(screen.getByText('Manual metadata URI (optional)')).toBeInTheDocument();
+  });
+
+  it('hides Arweave and gas settings when the profile resolver disables both capabilities', () => {
+    render(
+      <SessionPublishAdvancedSettingsPanel
+        {...buildProps({
+          publishSettingsCapabilities: {
+            showArweaveMetadataControls: false,
+            showGasOverrideControls: false,
+          },
+        })}
+      />,
+    );
+
+    expect(screen.queryByText(/Arweave upload worker:/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Manual metadata URI (optional)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gas limit override')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gas price override (gwei, legacy)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Max fee per gas (gwei)')).not.toBeInTheDocument();
+    expect(screen.queryByText('Max priority fee per gas (gwei)')).not.toBeInTheDocument();
   });
 });

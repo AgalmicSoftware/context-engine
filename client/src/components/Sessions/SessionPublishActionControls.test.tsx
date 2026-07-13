@@ -23,6 +23,7 @@ const buildProps = (
   displayState: buildDisplayState(),
   onPublish: jest.fn(),
   onTogglePublishAdvanced: jest.fn(),
+  showSettingsButton: true,
   ...overrides,
 });
 
@@ -113,5 +114,20 @@ describe('SessionPublishActionControls', () => {
 
     expect(onTogglePublishAdvanced).toHaveBeenCalledTimes(1);
     expect(onPublish).not.toHaveBeenCalled();
+  });
+
+  it('omits the settings button when the selected profile has no publish settings', () => {
+    const onTogglePublishAdvanced = jest.fn();
+    render(
+      <SessionPublishActionControls
+        {...buildProps({
+          onTogglePublishAdvanced,
+          showSettingsButton: false,
+        })}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Advanced publish settings' })).not.toBeInTheDocument();
+    expect(onTogglePublishAdvanced).not.toHaveBeenCalled();
   });
 });

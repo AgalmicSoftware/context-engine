@@ -2875,6 +2875,7 @@ const SessionWizard = ({
       primaryDraftEntries={primaryDraftEntries}
       provider={provider}
       publishUiPlan={publishUiPlan}
+      publishSettingsCapabilities={sessionModeRequirements.publishSettings}
       publishedPendingSbtLinks={publishedPendingSbtLinks}
       registerExplorerBaseUrl={registerExplorerBaseUrl}
       registerTxs={registerTxs}

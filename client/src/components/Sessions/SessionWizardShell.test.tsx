@@ -289,6 +289,10 @@ const baseProps = (): SessionWizardShellProps => ({
       uploadBlockedReason: '',
     },
   },
+  publishSettingsCapabilities: {
+    showArweaveMetadataControls: true,
+    showGasOverrideControls: true,
+  },
   publishedPendingSbtLinks: [],
   registerExplorerBaseUrl: '',
   registerTxs: [],

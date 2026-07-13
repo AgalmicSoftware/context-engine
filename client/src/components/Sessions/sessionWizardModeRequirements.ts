@@ -32,6 +32,10 @@ export type SessionWizardModeRequirements = {
     registerSession: boolean;
     refreshRegistryCache: boolean;
   };
+  publishSettings: {
+    showArweaveMetadataControls: boolean;
+    showGasOverrideControls: boolean;
+  };
 };
 
 const emptyRequirements = (): SessionWizardModeRequirements => ({
@@ -52,6 +56,10 @@ const emptyRequirements = (): SessionWizardModeRequirements => ({
     uploadMetadata: false,
     registerSession: false,
     refreshRegistryCache: false,
+  },
+  publishSettings: {
+    showArweaveMetadataControls: true,
+    showGasOverrideControls: true,
   },
 });
 
@@ -134,6 +142,10 @@ export const resolveSessionWizardModeRequirements = (
       uploadMetadata: requiresArweave,
       registerSession: requiresRegistry,
       refreshRegistryCache: requiresRegistry,
+    },
+    publishSettings: {
+      showArweaveMetadataControls: requiresArweave,
+      showGasOverrideControls: requiresRegistry,
     },
   };
 };

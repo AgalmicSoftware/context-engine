@@ -10,6 +10,7 @@ import SessionPublishProgressPanel from './SessionPublishProgressPanel';
 import SessionPublishResultLinks from './SessionPublishResultLinks';
 import type { SessionWizardPublishUiPlan } from './sessionWizardPublishReadiness';
 import type { PublishedPendingSbtLink } from './sessionWizardPublishLinks';
+import type { SessionWizardModeRequirements } from './sessionWizardModeRequirements';
 
 type PublishSummaryItem = {
   label: string;
@@ -39,6 +40,7 @@ export type SessionPublishSummaryProps = {
   localWorkerBundleFallbackFilePath: string;
   sponsoredManualBundleRetryMessage: string;
   publishUiPlan: SessionWizardPublishUiPlan;
+  publishSettingsCapabilities: SessionWizardModeRequirements['publishSettings'];
   renderInfoTooltip: (options: Record<string, unknown>) => React.ReactNode;
   resolvedWorkerBaseUrl: string;
   workerUrlSource: string;
@@ -80,6 +82,7 @@ const SessionPublishSummary = ({
   localWorkerBundleFallbackFilePath,
   sponsoredManualBundleRetryMessage,
   publishUiPlan,
+  publishSettingsCapabilities,
   renderInfoTooltip,
   resolvedWorkerBaseUrl,
   workerUrlSource,
@@ -107,6 +110,8 @@ const SessionPublishSummary = ({
   const { displayMode, publishAdvancedOpen } = publishActionDisplayState;
   const isNormalDisplayMode = displayMode === 'normal';
   const { showUploadBlockedReason, uploadBlockedReason } = publishReadiness;
+  const showPublishSettingsButton =
+    publishSettingsCapabilities.showArweaveMetadataControls || publishSettingsCapabilities.showGasOverrideControls;
 
   return (
     <section id="session-wizard-section-publish" className={styles.panel}>
@@ -132,6 +137,7 @@ const SessionPublishSummary = ({
                 displayState={publishActionDisplayState}
                 onPublish={onPublish}
                 onTogglePublishAdvanced={onTogglePublishAdvanced}
+                showSettingsButton={showPublishSettingsButton}
               />
             </div>
           ) : (
@@ -139,6 +145,7 @@ const SessionPublishSummary = ({
               displayState={publishActionDisplayState}
               onPublish={onPublish}
               onTogglePublishAdvanced={onTogglePublishAdvanced}
+              showSettingsButton={showPublishSettingsButton}
             />
           )}
 
@@ -173,6 +180,7 @@ const SessionPublishSummary = ({
               onManualMaxFeePerGasGweiChange={onManualMaxFeePerGasGweiChange}
               onManualMaxPriorityFeePerGasGweiChange={onManualMaxPriorityFeePerGasGweiChange}
               onManualMetadataUrlChange={onManualMetadataUrlChange}
+              publishSettingsCapabilities={publishSettingsCapabilities}
               renderInfoTooltip={renderInfoTooltip}
               resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
               workerUrlSource={workerUrlSource}
