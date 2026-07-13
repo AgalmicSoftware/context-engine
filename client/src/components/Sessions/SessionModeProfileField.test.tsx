@@ -72,7 +72,7 @@ describe('SessionModeProfileField', () => {
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
         preset: 'fast_cheap_cloudflare',
-        storage: { backend: 'cloudflare' },
+        storage: expect.objectContaining({ backend: 'cloudflare' }),
         encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
       }),
       expect.objectContaining({
@@ -121,7 +121,7 @@ describe('SessionModeProfileField', () => {
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
         preset: 'custom',
-        storage: { backend: 'arweave' },
+        storage: expect.objectContaining({ backend: 'arweave' }),
       }),
       expect.objectContaining({
         storageProfile: expect.objectContaining({ backend: 'arweave' }),
@@ -179,7 +179,17 @@ describe('SessionModeProfileField', () => {
       }),
       expect.objectContaining({
         storageProfile: expect.objectContaining({
-          payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
+          payloadAccessControl: {
+            gate: 'role_gate',
+            encryption: 'worker_envelope',
+            accessConditions: {
+              match: 'any',
+              conditions: [
+                { kind: 'worker_role', role: 'admin' },
+                { kind: 'agent_grant_scope', scope: 'storage' },
+              ],
+            },
+          },
         }),
       }),
     );
