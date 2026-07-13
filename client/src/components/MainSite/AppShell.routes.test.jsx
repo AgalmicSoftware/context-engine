@@ -1632,7 +1632,11 @@ describe('AppShell route render smoke', () => {
       configRevision: 'worker-docs-revision-1',
       corsWorkerUrl: workerOrigin,
       sessionName: 'Worker Docs',
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+        storage: { backend: 'cloudflare' },
+        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+      },
     };
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(

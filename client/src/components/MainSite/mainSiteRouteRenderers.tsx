@@ -1136,8 +1136,8 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
               loginComplete={host.props.loginComplete}
               sessionToken={sessionTokenRaw}
               sessionSlug={resolvedSlug}
-              sessionConfig={effectiveSessionConfig}
-              sessionIdHex={effectiveRegistryInfo.sessionIdHex || null}
+              sessionConfig={sessionConfig}
+              sessionIdHex={sessionConfig?.__registry?.sessionIdHex || null}
               workerOrigin={workerOrigin}
             />
           </div>
