@@ -159,7 +159,7 @@ A longer-term goal is cryptographic diplomacy: incentive-compatible programmatic
 
 Programmable cryptography seems like an underexplored toolkit for AI safety and alignment efforts (0xPARC, 2023). Storytelling is another area that seems underexplored in current AI alignment efforts – Context Engine is intended to help various groups define, debate, and analyze visions of possible futures, and connect them directly to present-day choices.
 
-Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, Loophole, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
+Context Engine recognizes and builds on the pioneering work of those involved with RadicalxChange, Pol.is, vTaiwan, g0v, TalkToTheCity, the Plurality Book, 0xPARC, Zuzalu, Edge City, MetaGov, PCARE, and many other related efforts. The author also gratefully acknowledges the AI programming assistance that finally made this effort tractable.
 
 
 ## References
@@ -197,8 +197,6 @@ Buterin, V. (2023, November 27). "My techno-optimism." *vitalik.eth.limo.* https
 Buterin, V., Hitzig, Z., & Weyl, E. G. (2019). "A Flexible Design for Funding Public Goods." *Management Science*, 65(11), 5171-5187. https://doi.org/10.1287/mnsc.2019.3337
 
 Griffin, C. (2024, May 30). "The AI Policy Atlas." *AI Policy Perspectives.* https://www.aipolicyperspectives.com/p/the-ai-policy-atlas
-
-Hogan, B. (n.d.). *Loophole: AI Policy Loophole Finder.* GitHub. https://github.com/brendanhogan/loophole
 
 Huang, S., Carter, S., Eaton, J., Pollack, S., Callender, D., III, Makagiansar, N., Gonzalez, M., Carr, S., Hong, J., Handa, K., McCain, M., Millar, T., Julapalli, M., Yun, G., Alt, A. J., Larsson, C., Leibrock, J., Gallivan, M., Sumers, T., Durmus, E., Kearney, M., Shen, J. H., Clark, J., Stern, M., & Ganguli, D. (2026, March 18). "What 81,000 People Want from AI." *Anthropic.* https://anthropic.com/features/81k-interviews
 
