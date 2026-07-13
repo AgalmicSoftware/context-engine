@@ -217,6 +217,31 @@ export const cfFetch = async (
   return { ok: true, data };
 };
 
+const NEW_KV_NAMESPACE_RETRY_DELAYS_MS = Object.freeze([250, 500, 1000]);
+
+// A newly created namespace can briefly return 404/10013. Retry only the
+// first idempotent config write; every later deploy write remains fail-closed.
+const isNewKvNamespacePropagationFailure = (result) => {
+  if (!result || result.ok || Number(result.status || 0) !== 404) return false;
+  const detail = Array.isArray(result.detail) ? result.detail : [];
+  if (detail.some((entry) => Number(entry?.code || 0) === 10013)) return true;
+  const message = [result.error, ...detail.map((entry) => entry?.message)]
+    .map((value) => toStr(value).trim().toLowerCase())
+    .filter(Boolean)
+    .join(' ');
+  return message.includes('get namespace') && message.includes('namespace not found');
+};
+
+const putFreshKvNamespaceValue = async ({ apiToken, path, options, cfFetchOptions }) => {
+  let result = await cfFetch(apiToken, path, options, cfFetchOptions);
+  for (const delayMs of NEW_KV_NAMESPACE_RETRY_DELAYS_MS) {
+    if (!isNewKvNamespacePropagationFailure(result)) return result;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    result = await cfFetch(apiToken, path, options, cfFetchOptions);
+  }
+  return result;
+};
+
 export const lookupCloudflareAccount = async ({
   apiToken,
   fetchImpl = globalThis.fetch,
@@ -1102,11 +1127,16 @@ export const executeDeployHelperRequest = async ({
   // Establish the signed admin binding before the runnable script can ever be
   // attached to this namespace. Otherwise a redeployed workers.dev hostname
   // has a first-write interval where an unrelated signer can claim the slug.
-  const configPut = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(config),
-  }, cfFetchOptions);
+  const configPut = await putFreshKvNamespaceValue({
+    apiToken,
+    path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`,
+    options: {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    },
+    cfFetchOptions,
+  });
   if (!configPut.ok) {
     const orphanKvNamespaceId = await cleanupStagedKv();
     return buildFailure(502, {

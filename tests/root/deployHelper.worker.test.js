@@ -279,6 +279,165 @@ describe('deploy-helper worker', () => {
     }
   });
 
+  it('retries the first config write while a new KV namespace is propagating', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfFailure(404, "get namespace: 'namespace not found'", [
+        { code: 10013, message: "get namespace: 'namespace not found'" },
+      ]),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(
+        makeJsonRequest('/deploy', {
+          apiToken: 'cf-token',
+          accountId: 'acc-123',
+          workerName: 'canonical-worker',
+          sessionSlug: 'alpha-session',
+          adminAddress: '0x00000000000000000000000000000000000000aa',
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          storageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' },
+          },
+          bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+        }),
+        {},
+        {},
+      );
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload?.configVerified).toBe(true);
+      expect(
+        fetchMock.calls.filter(([url, init = {}]) =>
+          String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':config'),
+        ),
+      ).toHaveLength(3);
+      expect(
+        fetchMock.calls.some(
+          ([url, init = {}]) =>
+            String(init.method || '').toUpperCase() === 'DELETE' &&
+            String(url).endsWith('/storage/kv/namespaces/kv-123'),
+        ),
+      ).toBe(false);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('cleans up once when KV namespace propagation retries are exhausted', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const propagationFailure = () =>
+      cfFailure(404, "get namespace: 'namespace not found'", [
+        { code: 10013, message: "get namespace: 'namespace not found'" },
+      ]);
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      propagationFailure(),
+      propagationFailure(),
+      propagationFailure(),
+      propagationFailure(),
+      cfFailure(503, 'KV cleanup unavailable.'),
+    ]);
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(
+        makeJsonRequest('/deploy', {
+          apiToken: 'cf-token',
+          accountId: 'acc-123',
+          workerName: 'canonical-worker',
+          sessionSlug: 'alpha-session',
+          adminAddress: '0x00000000000000000000000000000000000000aa',
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+        }),
+        {},
+        {},
+      );
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(payload?.error).toBe("get namespace: 'namespace not found'");
+      expect(payload?.detail).toEqual([
+        { code: 10013, message: "get namespace: 'namespace not found'" },
+      ]);
+      expect(payload?.orphanResources).toEqual({ kvNamespaceId: 'kv-123', workerName: '' });
+      expect(
+        fetchMock.calls.filter(([url, init = {}]) =>
+          String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':config'),
+        ),
+      ).toHaveLength(4);
+      expect(
+        fetchMock.calls.filter(
+          ([url, init = {}]) =>
+            String(init.method || '').toUpperCase() === 'DELETE' &&
+            String(url).endsWith('/storage/kv/namespaces/kv-123'),
+        ),
+      ).toHaveLength(1);
+      expect(
+        fetchMock.calls.some(
+          ([url, init = {}]) =>
+            String(init.method || '').toUpperCase() === 'PUT' && /\/workers\/scripts\/[^/]+$/.test(String(url)),
+        ),
+      ).toBe(false);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('does not retry unrelated KV 404 failures', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-123' }),
+      cfFailure(404, 'KV value path was not found.'),
+      cfSuccess({}),
+    ]);
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(
+        makeJsonRequest('/deploy', {
+          apiToken: 'cf-token',
+          accountId: 'acc-123',
+          workerName: 'canonical-worker',
+          sessionSlug: 'alpha-session',
+          adminAddress: '0x00000000000000000000000000000000000000aa',
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+        }),
+        {},
+        {},
+      );
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(payload?.error).toBe('KV value path was not found.');
+      expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
+      expect(
+        fetchMock.calls.filter(([url, init = {}]) =>
+          String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':config'),
+        ),
+      ).toHaveLength(1);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
   it('provisions an envelope KEK for worker-envelope storage without leaking it', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
