@@ -31,6 +31,7 @@ const callModel = async ({ providerOverride, modelEntry, prompt }) => {
       maxTokens: modelEntry.maxTokens ?? 220,
       timeoutMs: modelEntry.timeoutMs,
       structuredOutput: modelEntry.structuredOutput || 'auto',
+      providerRouting: modelEntry.providerRouting || null,
     });
   }
   throw new Error(`Unsupported provider: ${provider}`);
@@ -183,6 +184,7 @@ export const runBenchmark = async ({
       maxTokens: task.modelEntry.maxTokens ?? 220,
       timeoutMs: task.modelEntry.timeoutMs ?? null,
       structuredOutput: task.modelEntry.structuredOutput || 'auto',
+      providerRouting: task.modelEntry.providerRouting || null,
     };
     return run.runId === task.runId
       && run.promptHash === sha256(buildPromptForTask(task))
@@ -192,6 +194,7 @@ export const runBenchmark = async ({
       && Number(run.generation?.maxTokens) === Number(expectedGeneration.maxTokens)
       && (run.generation?.timeoutMs ?? null) === expectedGeneration.timeoutMs
       && (run.generation?.structuredOutput || 'auto') === expectedGeneration.structuredOutput
+      && hashJson(run.generation?.providerRouting || null) === hashJson(expectedGeneration.providerRouting)
       && hashJson(run.modelProvenance || {}) === hashJson(task.modelEntry.provenance || {});
   };
   const taskByRunId = new Map(tasks.map((task) => [task.runId, task]));
@@ -269,6 +272,7 @@ export const runBenchmark = async ({
         maxTokens: task.modelEntry.maxTokens ?? 220,
         timeoutMs: task.modelEntry.timeoutMs ?? null,
         structuredOutput: task.modelEntry.structuredOutput || 'auto',
+        providerRouting: task.modelEntry.providerRouting || null,
       },
       modelProvenance: task.modelEntry.provenance || {},
       rawAnswer: parsed.answer,

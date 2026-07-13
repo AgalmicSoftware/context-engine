@@ -176,6 +176,36 @@ export const validateModelRoster = (modelRoster) => {
       && !['auto', 'none', 'json_object', 'json_schema'].includes(model.structuredOutput)) {
       errors.push(`${base}.structuredOutput must be auto, none, json_object, or json_schema`);
     }
+    if (model.providerRouting !== undefined && !isRecord(model.providerRouting)) {
+      errors.push(`${base}.providerRouting must be an object`);
+    }
+    if (isRecord(model.providerRouting)) {
+      if (model.provider !== 'openrouter') {
+        errors.push(`${base}.providerRouting is only valid for openrouter models`);
+      }
+      const allowedRoutingFields = new Set(['order', 'allow_fallbacks', 'require_parameters', 'data_collection', 'zdr']);
+      Object.keys(model.providerRouting).forEach((field) => {
+        if (!allowedRoutingFields.has(field)) errors.push(`${base}.providerRouting.${field} is not supported`);
+      });
+      if (model.providerRouting.order !== undefined) {
+        const order = requireArray(errors, model.providerRouting.order, `${base}.providerRouting.order`);
+        const seenProviders = new Set();
+        order.forEach((providerName, providerIndex) => {
+          requireString(errors, providerName, `${base}.providerRouting.order[${providerIndex}]`);
+          if (seenProviders.has(providerName)) errors.push(`${base}.providerRouting.order duplicates ${providerName}`);
+          seenProviders.add(providerName);
+        });
+      }
+      for (const field of ['allow_fallbacks', 'require_parameters', 'zdr']) {
+        if (model.providerRouting[field] !== undefined && typeof model.providerRouting[field] !== 'boolean') {
+          errors.push(`${base}.providerRouting.${field} must be a boolean`);
+        }
+      }
+      if (model.providerRouting.data_collection !== undefined
+        && !['allow', 'deny'].includes(model.providerRouting.data_collection)) {
+        errors.push(`${base}.providerRouting.data_collection must be allow or deny`);
+      }
+    }
     if (model.provenance !== undefined && !isRecord(model.provenance)) {
       errors.push(`${base}.provenance must be an object`);
     }
@@ -241,6 +271,38 @@ export const validatePersonas = (personasFile) => {
       }
       requireString(errors, source.title, `${sourceBase}.title`);
       requireHttpUrl(errors, source.url, `${sourceBase}.url`);
+    });
+    const sourceUrls = new Set(sources.map((source) => source?.url).filter(Boolean));
+    const evidence = requireArray(errors, persona.evidence, `${base}.evidence`);
+    if (evidence.length === 0) errors.push(`${base}.evidence must contain at least one source-grounded summary`);
+    if (evidence.length > 50) errors.push(`${base}.evidence must not contain more than 50 entries`);
+    const evidenceIds = new Set();
+    evidence.forEach((entry, evidenceIndex) => {
+      const evidenceBase = `${base}.evidence[${evidenceIndex}]`;
+      if (!isRecord(entry)) {
+        errors.push(`${evidenceBase} must be an object`);
+        return;
+      }
+      requireString(errors, entry.id, `${evidenceBase}.id`);
+      if (evidenceIds.has(entry.id)) errors.push(`${evidenceBase}.id duplicates ${entry.id}`);
+      evidenceIds.add(entry.id);
+      requireString(errors, entry.title, `${evidenceBase}.title`);
+      requireHttpUrl(errors, entry.sourceUrl, `${evidenceBase}.sourceUrl`);
+      if (typeof entry.sourceUrl === 'string' && !sourceUrls.has(entry.sourceUrl)) {
+        errors.push(`${evidenceBase}.sourceUrl must match a declared public source`);
+      }
+      requireString(errors, entry.date, `${evidenceBase}.date`);
+      if (typeof entry.date === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) {
+        errors.push(`${evidenceBase}.date must use YYYY-MM-DD`);
+      }
+      if (typeof entry.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(entry.date)
+        && typeof persona.asOf === 'string' && entry.date > persona.asOf) {
+        errors.push(`${evidenceBase}.date must not be after the persona evidence cutoff`);
+      }
+      requireString(errors, entry.summary, `${evidenceBase}.summary`);
+      if (typeof entry.summary === 'string' && entry.summary.length > 2000) {
+        errors.push(`${evidenceBase}.summary must not exceed 2000 characters`);
+      }
     });
   });
   return errors;
@@ -412,11 +474,13 @@ export const validateReleaseRunFile = (runsFile, {
         maxTokens: selected.maxTokens ?? 220,
         timeoutMs: selected.timeoutMs ?? null,
         structuredOutput: selected.structuredOutput || 'auto',
+        providerRouting: selected.providerRouting || null,
       };
       if (Number(model.temperature) !== Number(expectedGeneration.temperature)
         || Number(model.maxTokens) !== Number(expectedGeneration.maxTokens)
         || (model.timeoutMs ?? null) !== expectedGeneration.timeoutMs
-        || (model.structuredOutput || 'auto') !== expectedGeneration.structuredOutput) {
+        || (model.structuredOutput || 'auto') !== expectedGeneration.structuredOutput
+        || hashJson(model.providerRouting || null) !== hashJson(expectedGeneration.providerRouting)) {
         errors.push(`manifest.models[${index}] generation settings do not match the selected model roster`);
       }
       if (hashJson(model.provenance || {}) !== hashJson(selected.provenance || {})) {
@@ -452,6 +516,18 @@ export const validateReleaseRunFile = (runsFile, {
     }
     if (run.model !== model.model) errors.push(`runs[${index}].model does not match manifest.models`);
     if (run.provider !== model.provider) errors.push(`runs[${index}].provider does not match manifest.models`);
+    if (isRecord(run.generation)) {
+      const generationMatches = Number(run.generation.temperature) === Number(model.temperature ?? 0.2)
+        && Number(run.generation.maxTokens) === Number(model.maxTokens ?? 220)
+        && (run.generation.timeoutMs ?? null) === (model.timeoutMs ?? null)
+        && (run.generation.structuredOutput || 'auto') === (model.structuredOutput || 'auto')
+        && hashJson(run.generation.providerRouting || null) === hashJson(model.providerRouting || null);
+      if (!generationMatches) errors.push(`runs[${index}].generation does not match manifest.models`);
+    }
+    if (isRecord(run.modelProvenance)
+      && hashJson(run.modelProvenance) !== hashJson(model.provenance || {})) {
+      errors.push(`runs[${index}].modelProvenance does not match manifest.models`);
+    }
   });
   return errors;
 };

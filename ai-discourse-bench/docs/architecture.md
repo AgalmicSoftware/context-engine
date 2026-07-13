@@ -102,16 +102,19 @@ node ./bin/ai-discourse-bench.mjs run \
 OpenRouter:
 
 ```bash
-OPENROUTER_API_KEY=... \
-node ./bin/ai-discourse-bench.mjs run \
-  --provider openrouter \
-  --questions ./data/question-bank.sample.json \
-  --models ./data/model-roster.sample.json \
-  --out ./runs/openrouter-self-runs.json \
-  --repeats 10 \
-  --concurrency 4 \
-  --max-attempts 3
+npm run openrouter:plan
+OPENROUTER_API_KEY=... npm run openrouter:full
 ```
+
+The OpenRouter path uses the same OpenAI-compatible adapter as local models,
+but sends an optional roster-defined `provider` routing object. Routing policy,
+dated model ids, declared pricing, and observed serving provider/model values
+are preserved separately so changes in OpenRouter routing cannot silently pass
+resume or release validation. `require_parameters: true` prevents a route that
+does not support requested structured output from being selected.
+Before a full run, a catalog preflight verifies that each request id still maps
+to the roster's declared canonical revision, pricing, expiration state, and
+structured-output capability. Drift stops the run before any completion call.
 
 Full local benchmark run:
 
@@ -141,6 +144,11 @@ node ./bin/ai-discourse-bench.mjs run \
   --out ./runs/mock-norbert-wiener-runs.json \
   --repeats 1
 ```
+
+Persona profiles contain both public-source URLs and dated paraphrased evidence
+summaries. The summaries are embedded into each prompt; URLs are provenance,
+not an assumption that the model can browse. Self and persona artifacts are
+kept in separate compatibility domains and cannot be merged into one report.
 
 Build a report:
 

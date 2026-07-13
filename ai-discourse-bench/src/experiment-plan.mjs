@@ -4,6 +4,20 @@ import { hashJson } from './provenance.mjs';
 const round = (value, digits = 4) => Number(value.toFixed(digits));
 const estimateTokens = (text) => Math.ceil(String(text || '').length / 4);
 
+export const assertWithinEstimatedCostBudget = (plan, maxEstimatedCostUsd) => {
+  const limit = Number(maxEstimatedCostUsd);
+  if (!Number.isFinite(limit) || limit <= 0) {
+    throw new Error('OpenRouter estimated-cost ceiling must be a positive number');
+  }
+  if (!Number.isFinite(plan?.estimatedCostUsd)) {
+    throw new Error('OpenRouter run has unknown estimated cost; add current roster pricing before running');
+  }
+  if (plan.estimatedCostUsd > limit) {
+    throw new Error(`OpenRouter estimated cost $${plan.estimatedCostUsd} exceeds the $${limit} ceiling`);
+  }
+  return { estimatedCostUsd: plan.estimatedCostUsd, maxEstimatedCostUsd: limit };
+};
+
 const providerReadiness = (provider, env) => {
   if (provider === 'mock') return { configured: true, requirement: 'none' };
   if (provider === 'local') {
@@ -52,6 +66,7 @@ export const buildExperimentPlan = ({
       estimatedOutputTokens,
       estimatedCostUsd,
       structuredOutput: model.structuredOutput || 'auto',
+      providerRouting: model.providerRouting || null,
       readiness: providerReadiness(provider, env),
       provenance: model.provenance || {},
     };

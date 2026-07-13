@@ -151,20 +151,38 @@ provenance and observed resolved provider/model/fingerprint values.
 
 ## OpenRouter
 
+Inspect the checked-in five-model OpenRouter plan before spending credits:
+
 ```bash
-OPENROUTER_API_KEY=... \
-node ./bin/ai-discourse-bench.mjs run \
-  --provider openrouter \
-  --questions ./data/question-bank.sample.json \
-  --models ./data/model-roster.sample.json \
-  --out ./runs/openrouter-self-runs.json \
-  --repeats 10 \
-  --concurrency 4 \
-  --max-attempts 3
+npm run openrouter:audit
+npm run openrouter:plan
 ```
 
-Use OpenRouter model ids in the model roster, for example
-`anthropic/claude-sonnet-4` or `openai/gpt-4.1`.
+The sample roster uses valid OpenRouter request ids while recording their dated
+canonical revisions and per-million-token prices as of `2026-07-13`. The full
+runner fetches OpenRouter's current model catalog before making any completion
+calls and fails if a revision, price, expiration, or structured-output
+capability has drifted. It also requests routes that support every submitted
+parameter without provider fallback.
+
+```bash
+OPENROUTER_API_KEY=... \
+npm run openrouter:full
+```
+
+`openrouter:full` defaults to the 50-question candidate bank, 10 runs per
+polarity, and `data/model-roster.openrouter.sample.json`. It writes an
+experiment plan, checkpoint, run artifact, report JSON, and clickable HTML.
+For a low-cost wiring check, set `AIDB_LIMIT_QUESTIONS=1 AIDB_REPEATS=1`.
+Use `AIDB_MODEL_ROSTER` to select another roster and `AIDB_RESUME=1` to resume.
+The full runner refuses an estimated cost above `$10` by default; set
+`AIDB_MAX_ESTIMATED_COST_USD` to an explicit positive ceiling for the run.
+
+OpenRouter roster entries may include a validated `providerRouting` object with
+`order`, `allow_fallbacks`, `require_parameters`, `data_collection`, and `zdr`.
+The exact policy is sent as OpenRouter's `provider` request field, preserved in
+run provenance, and included in resume/release compatibility checks. The
+observed serving provider and resolved model are recorded from every response.
 
 ## Persona Mode
 
@@ -182,9 +200,25 @@ node ./bin/ai-discourse-bench.mjs run \
 
 Persona mode is a source-bounded counterfactual simulation for public
 historical or contemporary figures only. It is not ground truth about that
-person. Persona records require an evidence cutoff, public sources, and an
-explicit simulation claim. The benchmark should not include private-person
+person. Persona records require an evidence cutoff, public sources, paraphrased
+source summaries embedded directly in the prompt, and an explicit simulation
+claim. URLs alone are not treated as usable evidence because benchmark models
+are not expected to browse. The benchmark should not include private-person
 profiles or identifying participant data.
+
+Run the OpenRouter roster through a historical-persona lens:
+
+```bash
+OPENROUTER_API_KEY=... \
+AIDB_MODE=persona \
+AIDB_PERSONA=norbert-wiener \
+npm run openrouter:full
+```
+
+Self and persona runs produce separate reports. This prevents a simulated
+figure from being confused with a model's own stated profile while allowing
+the same models and questions to be compared across lenses with longitudinal
+or downstream analysis tools.
 
 ## Generate a Report
 

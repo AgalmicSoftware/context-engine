@@ -283,6 +283,32 @@ test('release provenance binds provider and model identity to the manifest', () 
     runs: [{ ...runs[0], provider: 'mock' }, runs[1]],
   }, options);
   assert.ok(errors.some((error) => error.includes('provider does not match manifest.models')));
+
+  const routedManifest = {
+    ...manifest,
+    models: [{
+      ...manifest.models[0],
+      temperature: 0.2,
+      maxTokens: 220,
+      structuredOutput: 'json_schema',
+      providerRouting: { allow_fallbacks: false },
+      provenance: { modelRevision: 'revision-a' },
+    }],
+  };
+  const routedRuns = runs.map((run) => ({
+    ...run,
+    generation: {
+      temperature: 0.2,
+      maxTokens: 220,
+      timeoutMs: null,
+      structuredOutput: 'json_schema',
+      providerRouting: { allow_fallbacks: true },
+    },
+    modelProvenance: { modelRevision: 'revision-b' },
+  }));
+  const routedErrors = validateReleaseRunFile({ manifest: routedManifest, runs: routedRuns }, options);
+  assert.ok(routedErrors.some((error) => error.includes('generation does not match manifest.models')));
+  assert.ok(routedErrors.some((error) => error.includes('modelProvenance does not match manifest.models')));
 });
 
 test('release provenance binds manifest models to the selected report roster', () => {

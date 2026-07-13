@@ -61,6 +61,7 @@ export const callOpenAiCompatibleChat = async ({
   maxTokens = 220,
   timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
   structuredOutput = 'auto',
+  providerRouting = null,
   env = process.env,
   fetchImpl = fetch,
 }) => {
@@ -72,7 +73,10 @@ export const callOpenAiCompatibleChat = async ({
     throw new Error(`${provider} requires an API key. Set OPENROUTER_API_KEY for OpenRouter or AIDB_LOCAL_API_KEY/OPENAI_API_KEY for local servers that require one.`);
   }
   const startedAtMs = Date.now();
-  const cacheKey = `${provider}:${config.baseUrl}:${model}`;
+  const effectiveProviderRouting = provider === 'openrouter' && providerRouting
+    ? providerRouting
+    : null;
+  const cacheKey = `${provider}:${config.baseUrl}:${model}:${JSON.stringify(effectiveProviderRouting || {})}`;
   const cachedAutoMode = structuredOutput === 'auto' ? autoCapabilityCache.get(cacheKey) : null;
   const requestedMode = structuredOutput;
   let usedMode = cachedAutoMode || structuredOutput;
@@ -95,6 +99,7 @@ export const callOpenAiCompatibleChat = async ({
           temperature,
           max_tokens: maxTokens,
           ...(responseFormatFor(mode) ? { response_format: responseFormatFor(mode) } : {}),
+          ...(effectiveProviderRouting ? { provider: effectiveProviderRouting } : {}),
           messages: [
             {
               role: 'system',
@@ -154,6 +159,7 @@ export const callOpenAiCompatibleChat = async ({
       usage: data?.usage || null,
       latencyMs: Date.now() - startedAtMs,
       endpoint: config.baseUrl,
+      providerRouting: effectiveProviderRouting,
       structuredOutput: {
         requested: requestedMode,
         used: usedMode === 'auto' ? 'json_schema' : usedMode,

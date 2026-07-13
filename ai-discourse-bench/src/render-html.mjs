@@ -1311,6 +1311,9 @@ const renderSummaryStats = (report) => {
   const averageVotes = voters
     ? totalConcreteVotes / voters
     : 0;
+  const activeFilter = report.mode === 'persona'
+    ? `Persona lens: ${report.personaProfile?.label || report.personaId || 'Unknown'}${report.personaProfile?.asOf ? ` (evidence through ${report.personaProfile.asOf})` : ''}`
+    : 'None';
   const personaAttribute = report.personaId ? ` data-benchmark-persona="${escapeHtml(report.personaId)}"` : '';
   return renderCollapsibleSection({
     id: 'report',
@@ -1324,7 +1327,7 @@ const renderSummaryStats = (report) => {
         <div class="statsItem">${renderStatLabel('Votes/Voter Avg', 'The average number of vote actions each participant made.')}<span class="statValue">${escapeHtml(averageVotes.toFixed(2))}</span></div>
       </div>
       <div class="statsRow">
-        <div class="statsItem">${renderStatLabel('Active Filters', 'Summary of all active filters applied to this data.')}<div class="statValue"><span>None</span></div></div>
+        <div class="statsItem">${renderStatLabel('Active Filters', 'Summary of all active filters applied to this data.')}<div class="statValue"><span>${escapeHtml(activeFilter)}</span></div></div>
       </div>
       <div class="statsRow">
         <div class="statsItem">${renderStatLabel('Blockchain')}<span class="statValue">Unknown</span></div>

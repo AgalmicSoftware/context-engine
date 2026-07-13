@@ -14,6 +14,22 @@
           "title": "Sketch of the Analytical Engine, with Notes by the Translator",
           "url": "https://www.fourmilab.ch/babbage/sketch.html"
         }
+      ],
+      "evidence": [
+        {
+          "id": "analytical-engine-rule-boundedness",
+          "title": "Notes on the Analytical Engine: rule-bounded operation",
+          "sourceUrl": "https://www.fourmilab.ch/babbage/sketch.html",
+          "date": "1843-07-01",
+          "summary": "Lovelace describes the Analytical Engine as carrying out operations that people know how to specify, cautioning against attributing independent origination to the machine."
+        },
+        {
+          "id": "analytical-engine-symbolic-potential",
+          "title": "Notes on the Analytical Engine: symbolic applications",
+          "sourceUrl": "https://www.fourmilab.ch/babbage/sketch.html",
+          "date": "1843-07-01",
+          "summary": "Lovelace argues that a general analytical engine could operate on symbols beyond ordinary arithmetic when their relationships can be expressed through formal rules."
+        }
       ]
     },
     {
@@ -28,6 +44,22 @@
         {
           "title": "The Human Use of Human Beings",
           "url": "https://mitpress.mit.edu/9780306803208/the-human-use-of-human-beings/"
+        }
+      ],
+      "evidence": [
+        {
+          "id": "automation-human-purpose",
+          "title": "The Human Use of Human Beings: automation and human purpose",
+          "sourceUrl": "https://mitpress.mit.edu/9780306803208/the-human-use-of-human-beings/",
+          "date": "1950-01-01",
+          "summary": "Wiener treats automation as a social and ethical problem as well as a technical one, emphasizing that machinery should remain accountable to human purposes."
+        },
+        {
+          "id": "feedback-social-consequences",
+          "title": "The Human Use of Human Beings: feedback and social consequences",
+          "sourceUrl": "https://mitpress.mit.edu/9780306803208/the-human-use-of-human-beings/",
+          "date": "1950-01-01",
+          "summary": "Wiener connects feedback and communication systems to institutional power and warns that poorly chosen objectives can produce serious consequences at scale."
         }
       ]
     }

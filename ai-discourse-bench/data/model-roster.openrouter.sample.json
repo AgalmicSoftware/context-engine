@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "asOf": "2026-07-13",
+  "source": "https://openrouter.ai/api/v1/models",
+  "models": [
+    {
+      "id": "openrouter-gpt-5-6-luna",
+      "label": "GPT-5.6 Luna",
+      "provider": "openrouter",
+      "model": "openai/gpt-5.6-luna",
+      "temperature": 0.2,
+      "maxTokens": 220,
+      "structuredOutput": "json_schema",
+      "providerRouting": {
+        "allow_fallbacks": false,
+        "require_parameters": true,
+        "data_collection": "deny"
+      },
+      "traits": {
+        "parameterClass": "frontier",
+        "ossStatus": "closed",
+        "countryOfOrigin": "US",
+        "providerClass": "commercial-api"
+      },
+      "pricing": {
+        "inputPerMillion": 1,
+        "outputPerMillion": 6
+      },
+      "provenance": {
+        "modelRevision": "openai/gpt-5.6-luna-20260709",
+        "sourceUrl": "https://openrouter.ai/api/v1/model/openai/gpt-5.6-luna",
+        "license": "proprietary",
+        "asOf": "2026-07-13"
+      }
+    },
+    {
+      "id": "openrouter-claude-sonnet-5",
+      "label": "Claude Sonnet 5",
+      "provider": "openrouter",
+      "model": "anthropic/claude-sonnet-5",
+      "temperature": 0.2,
+      "maxTokens": 220,
+      "structuredOutput": "json_schema",
+      "providerRouting": {
+        "allow_fallbacks": false,
+        "require_parameters": true,
+        "data_collection": "deny"
+      },
+      "traits": {
+        "parameterClass": "frontier",
+        "ossStatus": "closed",
+        "countryOfOrigin": "US",
+        "providerClass": "commercial-api"
+      },
+      "pricing": {
+        "inputPerMillion": 2,
+        "outputPerMillion": 10
+      },
+      "provenance": {
+        "modelRevision": "anthropic/claude-sonnet-5-20260630",
+        "sourceUrl": "https://openrouter.ai/api/v1/model/anthropic/claude-sonnet-5",
+        "license": "proprietary",
+        "asOf": "2026-07-13"
+      }
+    },
+    {
+      "id": "openrouter-gemini-3-1-flash-lite",
+      "label": "Gemini 3.1 Flash Lite",
+      "provider": "openrouter",
+      "model": "google/gemini-3.1-flash-lite",
+      "temperature": 0.2,
+      "maxTokens": 220,
+      "structuredOutput": "json_schema",
+      "providerRouting": {
+        "allow_fallbacks": false,
+        "require_parameters": true,
+        "data_collection": "deny"
+      },
+      "traits": {
+        "parameterClass": "frontier-small",
+        "ossStatus": "closed",
+        "countryOfOrigin": "US",
+        "providerClass": "commercial-api"
+      },
+      "pricing": {
+        "inputPerMillion": 0.25,
+        "outputPerMillion": 1.5
+      },
+      "provenance": {
+        "modelRevision": "google/gemini-3.1-flash-lite-20260507",
+        "sourceUrl": "https://openrouter.ai/api/v1/model/google/gemini-3.1-flash-lite",
+        "license": "proprietary",
+        "asOf": "2026-07-13"
+      }
+    },
+    {
+      "id": "openrouter-qwen-3-5-35b-a3b",
+      "label": "Qwen3.5 35B A3B",
+      "provider": "openrouter",
+      "model": "qwen/qwen3.5-35b-a3b",
+      "temperature": 0.2,
+      "maxTokens": 220,
+      "structuredOutput": "json_schema",
+      "providerRouting": {
+        "allow_fallbacks": false,
+        "require_parameters": true,
+        "data_collection": "deny"
+      },
+      "traits": {
+        "parameterClass": "35B-A3B",
+        "ossStatus": "open-weights",
+        "countryOfOrigin": "China",
+        "providerClass": "hosted-open-weights"
+      },
+      "pricing": {
+        "inputPerMillion": 0.14,
+        "outputPerMillion": 1
+      },
+      "provenance": {
+        "modelRevision": "qwen/qwen3.5-35b-a3b-20260224",
+        "sourceUrl": "https://openrouter.ai/api/v1/model/qwen/qwen3.5-35b-a3b",
+        "asOf": "2026-07-13"
+      }
+    },
+    {
+      "id": "openrouter-deepseek-v3-2",
+      "label": "DeepSeek V3.2",
+      "provider": "openrouter",
+      "model": "deepseek/deepseek-v3.2",
+      "temperature": 0.2,
+      "maxTokens": 220,
+      "structuredOutput": "json_schema",
+      "providerRouting": {
+        "allow_fallbacks": false,
+        "require_parameters": true,
+        "data_collection": "deny"
+      },
+      "traits": {
+        "parameterClass": "frontier-open-weights",
+        "ossStatus": "open-weights",
+        "countryOfOrigin": "China",
+        "providerClass": "hosted-open-weights"
+      },
+      "pricing": {
+        "inputPerMillion": 0.2145,
+        "outputPerMillion": 0.32175
+      },
+      "provenance": {
+        "modelRevision": "deepseek/deepseek-v3.2-20251201",
+        "sourceUrl": "https://openrouter.ai/api/v1/model/deepseek/deepseek-v3.2",
+        "asOf": "2026-07-13"
+      }
+    }
+  ]
+}

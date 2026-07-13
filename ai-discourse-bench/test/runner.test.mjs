@@ -145,6 +145,48 @@ test('runner does not reuse runs after declared model provenance changes', async
   assert.ok(rerun.runs.every((run) => run.modelProvenance.modelRevision === 'revision-b'));
 });
 
+test('runner records provider routing and does not reuse runs after routing changes', async () => {
+  const rosterWithRouting = (allowFallbacks) => ({
+    models: [{
+      id: 'model-a',
+      label: 'Model A',
+      model: 'provider/model-a',
+      provider: 'openrouter',
+      traits: {},
+      providerRouting: {
+        allow_fallbacks: allowFallbacks,
+        require_parameters: true,
+      },
+    }],
+  });
+  const first = await runBenchmark({
+    questionBank,
+    modelRoster: rosterWithRouting(false),
+    providerOverride: 'mock',
+    repeats: 1,
+    maxAttempts: 1,
+  });
+  assert.equal(first.manifest.models[0].providerRouting.allow_fallbacks, false);
+  assert.equal(first.runs[0].generation.providerRouting.allow_fallbacks, false);
+
+  let calls = 0;
+  const rerun = await runBenchmark({
+    questionBank,
+    modelRoster: rosterWithRouting(true),
+    providerOverride: 'mock',
+    repeats: 1,
+    maxAttempts: 1,
+    existingRuns: first.runs,
+    callModelImpl: async () => {
+      calls += 1;
+      return { content: '{"answer":"Agree","confidence":0.5,"rationale":"test"}', metadata: {} };
+    },
+  });
+
+  assert.equal(calls, 2);
+  assert.equal(rerun.resumedRuns, 0);
+});
+
 test('checkpoint writer appends durable JSONL records that can be resumed', async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'aidb-checkpoint-'));
   const checkpoint = path.join(directory, 'runs.jsonl');

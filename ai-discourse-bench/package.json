@@ -1,6 +1,6 @@
 {
   "name": "ai-discourse-bench",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Self-contained Context Engine benchmark folder for mapping AI model agreement and disagreement over AI discourse questions.",
@@ -24,6 +24,9 @@
     "snapshot:mock": "node ./bin/ai-discourse-bench.mjs snapshot-report --report ./results/mock-self-report.json --out ./results/mock-self-snapshot.json --label mock-self",
     "export:analysis:mock": "node ./bin/ai-discourse-bench.mjs export-analysis-input --report ./results/mock-self-report.json --out ./results/mock-self-ai-analysis-input.json",
     "local:full": "node ./scripts/run-local-full.mjs",
+    "openrouter:audit": "node ./scripts/audit-openrouter-roster.mjs",
+    "openrouter:plan": "node ./bin/ai-discourse-bench.mjs plan-run --provider openrouter --questions ./banks/ai-futures/v0.1-candidate/question-bank.json --models ./data/model-roster.openrouter.sample.json --repeats 10",
+    "openrouter:full": "node ./scripts/run-openrouter-full.mjs",
     "smoke": "npm run validate && npm test && npm run run:mock && npm run report:mock && npm run render:mock && npm run export:ce:mock && npm run export:ce:native:mock && npm run snapshot:mock && npm run export:analysis:mock"
   },
   "engines": {

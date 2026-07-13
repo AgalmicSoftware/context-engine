@@ -78,10 +78,17 @@ test('auto structured output does not hide authentication or server failures', a
 
 test('OpenRouter provider sends required auth and attribution headers', async () => {
   const seen = {};
+  const providerRouting = {
+    order: ['anthropic'],
+    allow_fallbacks: false,
+    require_parameters: true,
+    data_collection: 'deny',
+  };
   await callOpenAiCompatibleChat({
     provider: 'openrouter',
     model: 'openai/example',
     prompt: 'Answer.',
+    providerRouting,
     env: {
       OPENROUTER_API_KEY: 'test-key',
       OPENROUTER_SITE_URL: 'https://example.test',
@@ -98,6 +105,23 @@ test('OpenRouter provider sends required auth and attribution headers', async ()
   assert.equal(seen.options.headers.authorization, 'Bearer test-key');
   assert.equal(seen.options.headers['HTTP-Referer'], 'https://example.test');
   assert.equal(seen.options.headers['X-Title'], 'ai-discourse-bench-test');
+  assert.deepEqual(JSON.parse(seen.options.body).provider, providerRouting);
+});
+
+test('local requests do not leak OpenRouter routing fields', async () => {
+  let body;
+  await callOpenAiCompatibleChat({
+    provider: 'local',
+    model: 'local-model',
+    prompt: 'Answer.',
+    providerRouting: { allow_fallbacks: false },
+    env: { AIDB_LOCAL_BASE_URL: 'http://127.0.0.1:11434/v1' },
+    fetchImpl: async (_url, options) => {
+      body = JSON.parse(options.body);
+      return okResponse;
+    },
+  });
+  assert.equal('provider' in body, false);
 });
 
 test('OpenAI-compatible requests time out instead of hanging indefinitely', async () => {
