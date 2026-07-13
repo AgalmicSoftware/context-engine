@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
 
@@ -623,6 +623,12 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     await expectSponsoredStatus('Sponsored resources applied.');
 
+    fireEvent.click(screen.getByRole('button', { name: /Advanced options/i }));
+    const encryptionOptions = within(screen.getByRole('radiogroup', { name: /Encryption/i }));
+    fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
+    await waitFor(() => {
+      expect(encryptionOptions.getByRole('radio', { name: 'Lit' })).toHaveAttribute('aria-checked', 'true');
+    });
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
