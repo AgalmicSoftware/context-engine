@@ -5,8 +5,8 @@ export const DEFAULT_CONCURRENCY = 1;
 export const DEFAULT_MAX_ATTEMPTS = 3;
 export const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
 export const DEFAULT_RETRY_BASE_DELAY_MS = 750;
-export const HARNESS_VERSION = '0.3.0';
-export const QUESTION_PROMPT_TEMPLATE_VERSION = 'aidb-question-v3';
+export const HARNESS_VERSION = '0.4.0';
+export const QUESTION_PROMPT_TEMPLATE_VERSION = 'aidb-question-v4';
 
 export const ANSWER_VALUES = Object.freeze(['Agree', 'Unsure', 'Disagree']);
 

@@ -1,6 +1,6 @@
 {
   "name": "ai-discourse-bench",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "Self-contained Context Engine benchmark folder for mapping AI model agreement and disagreement over AI discourse questions.",

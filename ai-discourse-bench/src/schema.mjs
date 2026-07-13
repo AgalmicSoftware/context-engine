@@ -247,61 +247,19 @@ export const validatePersonas = (personasFile) => {
     if (seen.has(persona.id)) errors.push(`${base}.id duplicates ${persona.id}`);
     seen.add(persona.id);
     requireString(errors, persona.label, `${base}.label`);
-    requireString(errors, persona.instruction, `${base}.instruction`);
     if (persona.publicFigure !== true) {
       errors.push(`${base}.publicFigure must be true for benchmark personas`);
     }
-    if (persona.profileType !== 'public-figure-counterfactual') {
-      errors.push(`${base}.profileType must be public-figure-counterfactual`);
+    if (persona.profileType !== 'public-figure-weights-only') {
+      errors.push(`${base}.profileType must be public-figure-weights-only`);
     }
-    if (persona.evaluationClaim !== 'simulation-not-ground-truth') {
-      errors.push(`${base}.evaluationClaim must be simulation-not-ground-truth`);
+    if (persona.evaluationClaim !== 'model-interpretation-not-ground-truth') {
+      errors.push(`${base}.evaluationClaim must be model-interpretation-not-ground-truth`);
     }
-    requireString(errors, persona.asOf, `${base}.asOf`);
-    if (typeof persona.asOf === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(persona.asOf)) {
-      errors.push(`${base}.asOf must use YYYY-MM-DD`);
-    }
-    const sources = requireArray(errors, persona.sources, `${base}.sources`);
-    if (sources.length === 0) errors.push(`${base}.sources must contain at least one public source`);
-    sources.forEach((source, sourceIndex) => {
-      const sourceBase = `${base}.sources[${sourceIndex}]`;
-      if (!isRecord(source)) {
-        errors.push(`${sourceBase} must be an object`);
-        return;
-      }
-      requireString(errors, source.title, `${sourceBase}.title`);
-      requireHttpUrl(errors, source.url, `${sourceBase}.url`);
-    });
-    const sourceUrls = new Set(sources.map((source) => source?.url).filter(Boolean));
-    const evidence = requireArray(errors, persona.evidence, `${base}.evidence`);
-    if (evidence.length === 0) errors.push(`${base}.evidence must contain at least one source-grounded summary`);
-    if (evidence.length > 50) errors.push(`${base}.evidence must not contain more than 50 entries`);
-    const evidenceIds = new Set();
-    evidence.forEach((entry, evidenceIndex) => {
-      const evidenceBase = `${base}.evidence[${evidenceIndex}]`;
-      if (!isRecord(entry)) {
-        errors.push(`${evidenceBase} must be an object`);
-        return;
-      }
-      requireString(errors, entry.id, `${evidenceBase}.id`);
-      if (evidenceIds.has(entry.id)) errors.push(`${evidenceBase}.id duplicates ${entry.id}`);
-      evidenceIds.add(entry.id);
-      requireString(errors, entry.title, `${evidenceBase}.title`);
-      requireHttpUrl(errors, entry.sourceUrl, `${evidenceBase}.sourceUrl`);
-      if (typeof entry.sourceUrl === 'string' && !sourceUrls.has(entry.sourceUrl)) {
-        errors.push(`${evidenceBase}.sourceUrl must match a declared public source`);
-      }
-      requireString(errors, entry.date, `${evidenceBase}.date`);
-      if (typeof entry.date === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(entry.date)) {
-        errors.push(`${evidenceBase}.date must use YYYY-MM-DD`);
-      }
-      if (typeof entry.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(entry.date)
-        && typeof persona.asOf === 'string' && entry.date > persona.asOf) {
-        errors.push(`${evidenceBase}.date must not be after the persona evidence cutoff`);
-      }
-      requireString(errors, entry.summary, `${evidenceBase}.summary`);
-      if (typeof entry.summary === 'string' && entry.summary.length > 2000) {
-        errors.push(`${evidenceBase}.summary must not exceed 2000 characters`);
+    const allowedFields = new Set(['id', 'label', 'publicFigure', 'profileType', 'evaluationClaim']);
+    Object.keys(persona).forEach((field) => {
+      if (!allowedFields.has(field)) {
+        errors.push(`${base}.${field} is not allowed in weights-only persona mode`);
       }
     });
   });

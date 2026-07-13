@@ -21,8 +21,8 @@ coverage, release, persona, and analysis-provenance rules.
   question.
 - Trait-level breakdowns by model metadata such as parameter class, OSS status,
   country of origin, and provider class.
-- Persona prediction mode, where models predict how a public historical or
-  contemporary figure would answer the same bank.
+- Weights-only persona mode, where models predict how a named public historical
+  or contemporary figure would answer using only knowledge in model weights.
 
 ## Result Views
 
@@ -198,13 +198,13 @@ node ./bin/ai-discourse-bench.mjs run \
   --repeats 1
 ```
 
-Persona mode is a source-bounded counterfactual simulation for public
-historical or contemporary figures only. It is not ground truth about that
-person. Persona records require an evidence cutoff, public sources, paraphrased
-source summaries embedded directly in the prompt, and an explicit simulation
-claim. URLs alone are not treated as usable evidence because benchmark models
-are not expected to browse. The benchmark should not include private-person
-profiles or identifying participant data.
+Persona mode is a weights-only interpretation for public historical or
+contemporary figures. The prompt includes the figure's name and the same generic
+prediction instructions for every persona, with no evidence packet, custom
+profile instruction, source list, or cutoff date. This isolates differences in
+what models already encode and how they interpret the named figure. It is not
+ground truth about that person, and the benchmark should not include
+private-person profiles or identifying participant data.
 
 Run the OpenRouter roster through a historical-persona lens:
 
@@ -218,7 +218,9 @@ npm run openrouter:full
 Self and persona runs produce separate reports. This prevents a simulated
 figure from being confused with a model's own stated profile while allowing
 the same models and questions to be compared across lenses with longitudinal
-or downstream analysis tools.
+or downstream analysis tools. A separate source-grounded calibration track is
+deferred; it should use a distinct mode and must not be mixed with weights-only
+persona results.
 
 ## Generate a Report
 

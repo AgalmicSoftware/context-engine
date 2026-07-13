@@ -66,6 +66,35 @@ test('runner retries transport failures, records attempts, and emits a reproduci
   assert.deepEqual(report.participants[0].runtimeProvenance.resolvedProviders, ['local']);
 });
 
+test('runner retries unparseable completions within the attempt budget', async () => {
+  const callsByPrompt = new Map();
+  const result = await runBenchmark({
+    questionBank,
+    modelRoster,
+    repeats: 1,
+    concurrency: 2,
+    maxAttempts: 2,
+    retryBaseDelayMs: 1,
+    sleepImpl: async () => {},
+    callModelImpl: async ({ prompt }) => {
+      const calls = (callsByPrompt.get(prompt) || 0) + 1;
+      callsByPrompt.set(prompt, calls);
+      return {
+        content: calls === 1
+          ? ''
+          : '{"answer":"Agree","confidence":0.7,"rationale":"bounded"}',
+        metadata: { finishReason: calls === 1 ? 'length' : 'stop' },
+      };
+    },
+  });
+
+  assert.equal([...callsByPrompt.values()].reduce((sum, calls) => sum + calls, 0), 4);
+  assert.ok(result.runs.every((run) => run.normalizedAnswer));
+  assert.ok(result.runs.every((run) => run.attempts.length === 2));
+  assert.ok(result.runs.every((run) => run.attempts[0].parseError === 'empty response'));
+  assert.ok(result.runs.every((run) => run.attempts[1].parseError === ''));
+});
+
 test('runner resumes deterministic compatible successful runs without calling them again', async () => {
   const first = await runBenchmark({ questionBank, modelRoster, providerOverride: 'mock', repeats: 1, maxAttempts: 1 });
   let calls = 0;

@@ -56,7 +56,7 @@ test('report preserves raw atlas and risk-matrix material', async () => {
   assert.match(html, /\.beeswarmCircleNoData \{ fill: #cbd5e1; opacity: 0\.42; stroke: #94a3b8; stroke-width: 1; \}/);
 });
 
-test('persona reports visibly identify the public-figure lens and evidence cutoff', async () => {
+test('persona reports visibly identify the weights-only public-figure lens', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
     1
@@ -71,13 +71,18 @@ test('persona reports visibly identify the public-figure lens and evidence cutof
       mode: 'persona',
       personaId: 'ada-lovelace',
       manifest: {
-        personaProfile: { id: 'ada-lovelace', label: 'Ada Lovelace', asOf: '1852-11-27' },
+        personaProfile: {
+          id: 'ada-lovelace',
+          label: 'Ada Lovelace',
+          profileType: 'public-figure-weights-only',
+        },
       },
       runs: [],
     },
   });
   const html = renderHtmlReport(report);
-  assert.match(html, /Persona lens: Ada Lovelace \(evidence through 1852-11-27\)/);
+  assert.match(html, /Persona lens: Ada Lovelace \(weights-only\)/);
+  assert.doesNotMatch(html, /evidence through/);
   assert.match(html, /data-benchmark-persona="ada-lovelace"/);
 });
 

@@ -90,7 +90,8 @@ the report, including effective provider and generation settings. This prevents
 a same-ID roster from relabeling runs produced by a different model.
 
 The runner shuffles canonical and reversed tasks deterministically, supports
-bounded concurrency and retry/backoff, and writes a durable JSONL checkpoint.
+bounded concurrency and retry/backoff for transport failures and unparseable
+completions, and writes a durable JSONL checkpoint.
 Repeating the command with `--resume` reuses completed run ids.
 Only successful records whose prompt, model, provider, and generation settings
 still match are reusable; failed, invalid, legacy, or configuration-mismatched
@@ -103,19 +104,19 @@ published report does not silently become an answer-level data dump.
 
 ## Persona Mode
 
-Persona mode is a source-bounded counterfactual simulation: models predict how
-a named public figure might answer as of a declared evidence cutoff. It is not
-ground truth about that person. Every persona definition must identify this
-claim, provide an `asOf` date, cite public sources, and include dated
-paraphrased evidence summaries tied to those sources. The summaries are placed
-in the prompt because URLs alone are not evidence available to a non-browsing
-model. Evidence dated after the cutoff is rejected. Unsupported positions
-should resolve to `Unsure`.
+Persona mode measures weights-only interpretation: models predict how a named
+public figure might answer using only knowledge already present in their model
+weights. Every model receives the figure's name and identical generic
+instructions. Persona profiles cannot add evidence, sources, custom
+instructions, or cutoff dates. It is not ground truth about that person;
+unsupported or ambiguous positions should resolve to `Unsure`.
 
 Persona runs are an additional lens, not another model participant. A model's
 self report and its prediction for a public figure remain separate datasets.
-Until a persona pack includes human-adjudicated calibration labels, the report
-measures agreement among model simulations, not fidelity to the real person.
+The report measures agreement among model interpretations, not fidelity to the
+real person. Source-grounded calibration is a separate deferred evaluation
+track and must use a distinct mode so its conditioned outputs are never
+compared as weights-only persona results.
 
 ## AI Analysis Boundary
 

@@ -216,6 +216,7 @@ export const runBenchmark = async ({
     let rawOutput = '';
     let responseMetadata = {};
     let error = '';
+    let parsed = parseModelAnswer(rawOutput);
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       const attemptStartedAt = nowIso();
@@ -227,15 +228,20 @@ export const runBenchmark = async ({
         }));
         rawOutput = response.content;
         responseMetadata = response.metadata;
+        parsed = parseModelAnswer(rawOutput);
         attempts.push({
           attempt,
           startedAt: attemptStartedAt,
           completedAt: nowIso(),
           error: '',
+          parseError: parsed.parseError,
           responseMetadata,
         });
         error = '';
-        break;
+        if (parsed.answer) break;
+        if (attempt < maxAttempts) {
+          await sleepImpl(retryBaseDelayMs * (2 ** (attempt - 1)));
+        }
       } catch (caught) {
         error = caught && typeof caught.message === 'string' ? caught.message : String(caught || 'unknown error');
         attempts.push({
@@ -252,7 +258,6 @@ export const runBenchmark = async ({
       }
     }
 
-    const parsed = parseModelAnswer(rawOutput);
     const normalizedAnswer = normalizeForCanonicalPolarity(parsed.answer, task.polarity);
     return {
       schemaVersion: DEFAULT_OUTPUT_SCHEMA_VERSION,

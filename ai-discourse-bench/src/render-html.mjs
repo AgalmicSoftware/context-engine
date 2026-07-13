@@ -1312,7 +1312,7 @@ const renderSummaryStats = (report) => {
     ? totalConcreteVotes / voters
     : 0;
   const activeFilter = report.mode === 'persona'
-    ? `Persona lens: ${report.personaProfile?.label || report.personaId || 'Unknown'}${report.personaProfile?.asOf ? ` (evidence through ${report.personaProfile.asOf})` : ''}`
+    ? `Persona lens: ${report.personaProfile?.label || report.personaId || 'Unknown'} (weights-only)`
     : 'None';
   const personaAttribute = report.personaId ? ` data-benchmark-persona="${escapeHtml(report.personaId)}"` : '';
   return renderCollapsibleSection({

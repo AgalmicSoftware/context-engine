@@ -23,8 +23,8 @@ and generated diagrams together under `ai-discourse-bench/`.
 
 3. **Run modes**
    - `self`: models answer as themselves.
-   - `persona`: source-bounded counterfactual predictions for a public figure,
-     with an evidence cutoff and public citations.
+   - `persona`: weights-only predictions for a named public figure, with no
+     supplied evidence, custom profile instruction, or cutoff date.
 
 4. **Providers**
    - `mock`: deterministic no-network smoke tests.

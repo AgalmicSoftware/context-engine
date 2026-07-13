@@ -74,11 +74,9 @@ export const buildRunManifest = ({
   personaProfile: persona ? {
     id: persona.id,
     label: persona.label,
-    asOf: persona.asOf,
+    publicFigure: persona.publicFigure,
     profileType: persona.profileType,
     evaluationClaim: persona.evaluationClaim,
-    sources: persona.sources,
-    evidence: persona.evidence,
   } : null,
   providerOverride: providerOverride || null,
   repeats,
