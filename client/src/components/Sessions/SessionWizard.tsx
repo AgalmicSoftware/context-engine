@@ -933,8 +933,16 @@ const SessionWizard = ({
         getChainById,
         getChainName,
         registryChainId,
+        purpose:
+          sessionModeRequirements.publish.deployPendingSbts && !sessionModeRequirements.publish.registerSession
+            ? 'SBT publishing'
+            : 'registration',
       }),
-    [registryChainId],
+    [
+      registryChainId,
+      sessionModeRequirements.publish.deployPendingSbts,
+      sessionModeRequirements.publish.registerSession,
+    ],
   );
   const newSessionFundingRequirementLabel = newSessionFundingRequirement.label;
   const newSessionFundingRequirementHref = newSessionFundingRequirement.href;

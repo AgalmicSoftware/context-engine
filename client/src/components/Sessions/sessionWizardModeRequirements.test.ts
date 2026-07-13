@@ -89,8 +89,18 @@ describe('sessionWizardModeRequirements', () => {
     const requirements = resolveSessionWizardModeRequirements(profile);
     expect(requirements.requiresRpc).toBe(true);
     expect(requirements.requiresArweave).toBe(false);
-    expect(requirements.visibleWorkerResourceKeys).toEqual(['ai', 'rpc']);
+    expect(requirements.requiresWallet).toBe(true);
+    expect(requirements.requiresFunding).toBe(true);
+    expect(requirements.requiredRequirementIds).toEqual([
+      'cloudflareApiToken',
+      'aiProviderKey',
+      'rpc',
+      'wallet',
+      'funding',
+    ]);
+    expect(requirements.visibleWorkerResourceKeys).toEqual(['ai', 'rpc', 'txGas']);
     expect(requirements.publish.deployPendingSbts).toBe(true);
+    expect(requirements.publishSettings.showGasOverrideControls).toBe(true);
   });
 
   it('preserves decentralized Arweave, RPC, funding, registry, and optional Lit requirements', () => {

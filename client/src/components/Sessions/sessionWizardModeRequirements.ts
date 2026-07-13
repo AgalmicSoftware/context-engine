@@ -96,8 +96,10 @@ export const resolveSessionWizardModeRequirements = (
     requiresLit ||
     profile.authorization?.mechanisms?.includes('sbt_onchain') ||
     hasOnChainCondition(profile);
-  const requiresFunding = requiresRegistry;
-  const requiresWallet = requiresRegistry;
+  // Creating a pending SBT is itself an EVM transaction even when the session
+  // authority and canonical config remain worker-owned.
+  const requiresFunding = requiresRegistry || deployPendingSbts;
+  const requiresWallet = requiresRegistry || deployPendingSbts;
 
   const requiredRequirementIds: SessionWizardRequirementId[] = [];
   if (usesCloudflare) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_API_TOKEN);
@@ -149,7 +151,7 @@ export const resolveSessionWizardModeRequirements = (
     },
     publishSettings: {
       showArweaveMetadataControls: requiresArweave,
-      showGasOverrideControls: requiresRegistry,
+      showGasOverrideControls: requiresRegistry || deployPendingSbts,
     },
   };
 };

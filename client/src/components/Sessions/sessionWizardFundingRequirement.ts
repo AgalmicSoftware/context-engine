@@ -17,6 +17,7 @@ type ResolveFundingRequirementArgs = {
   getChainById?: (chainId: number) => ChainLike;
   getChainName?: (chainId: number | string | null | undefined) => string;
   registryChainId?: number | string | null;
+  purpose?: 'registration' | 'SBT publishing';
 };
 
 export const resolveSessionWizardFundingRequirement = ({
@@ -24,6 +25,7 @@ export const resolveSessionWizardFundingRequirement = ({
   getChainById = () => null,
   getChainName = () => '',
   registryChainId = 0,
+  purpose = 'registration',
 }: ResolveFundingRequirementArgs = {}): { href: string; label: string } => {
   const chainId = Number(registryChainId || defaultChainId || 0) || 0;
   const chain =
@@ -34,7 +36,7 @@ export const resolveSessionWizardFundingRequirement = ({
   const chainName = toStr(chain?.name).trim();
   const chainSymbol = toStr(chain?.nativeCurrency?.symbol).trim() || 'ETH';
   return {
-    label: `${chainName || 'Selected network'} ${chainSymbol} for on-chain registration`,
+    label: `${chainName || 'Selected network'} ${chainSymbol} for on-chain ${purpose}`,
     href: Number(chain?.id || 0) === 11155420 ? SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet : '',
   };
 };

@@ -37,4 +37,21 @@ describe('resolveSessionWizardFundingRequirement', () => {
       label: 'Selected network ETH for on-chain registration',
     });
   });
+
+  it('names SBT publishing when a worker-canonical profile needs an on-chain draft deployment', () => {
+    expect(
+      resolveSessionWizardFundingRequirement({
+        defaultChainId: 11155420,
+        getChainById: (chainId) => ({
+          id: chainId,
+          name: 'OP Sepolia',
+          nativeCurrency: { symbol: 'ETH' },
+        }),
+        purpose: 'SBT publishing',
+      }),
+    ).toEqual({
+      href: SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet,
+      label: 'OP Sepolia ETH for on-chain SBT publishing',
+    });
+  });
 });
