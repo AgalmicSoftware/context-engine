@@ -752,13 +752,22 @@ export const upsertWorkerCanonicalSessionBootstrap = ({
     const record = rawRecord as WorkerCanonicalBootstrapRecord;
     return record.authorityMode === 'worker_canonical' && canonicalizeSessionSlug(record.slug) === normalizedSlug;
   });
-  const conflictEntry = canonicalEntries.find(([, rawRecord]) => {
+  const slugConflictEntry = canonicalEntries.find(([, rawRecord]) => {
     const record = rawRecord as WorkerCanonicalBootstrapRecord;
     return (
       parseWorkerCanonicalOrigin(record.workerOrigin) !== normalizedWorkerOrigin ||
       record.sessionIdHex !== normalizedSessionIdHex
     );
   });
+  const authoritativeRecord = store.bySession[cacheKey] as WorkerCanonicalBootstrapRecord | undefined;
+  const authoritativeKeyConflict =
+    !!authoritativeRecord &&
+    (authoritativeRecord.authorityMode !== 'worker_canonical' ||
+      canonicalizeSessionSlug(authoritativeRecord.slug) !== normalizedSlug ||
+      parseWorkerCanonicalOrigin(authoritativeRecord.workerOrigin) !== normalizedWorkerOrigin ||
+      normalizeWorkerCanonicalSessionIdHex(authoritativeRecord.sessionIdHex) !== normalizedSessionIdHex);
+  const authoritativeConflictEntry = authoritativeKeyConflict ? ([cacheKey, authoritativeRecord] as const) : undefined;
+  const conflictEntry = slugConflictEntry || authoritativeConflictEntry;
   if (conflictEntry && !allowRepin) {
     const conflictRecord = conflictEntry[1] as WorkerCanonicalBootstrapRecord;
     return {
@@ -772,10 +781,19 @@ export const upsertWorkerCanonicalSessionBootstrap = ({
     };
   }
   if (allowRepin) {
-    for (const verifiedKey of verifiedWorkerCanonicalBootstrapKeys) {
-      if (verifiedKey.split('\n')[1] === normalizedSlug) verifiedWorkerCanonicalBootstrapKeys.delete(verifiedKey);
+    const entriesToReplace = new Map<string, WorkerCanonicalBootstrapRecord>(
+      canonicalEntries.map(([key, record]) => [key, record as WorkerCanonicalBootstrapRecord]),
+    );
+    if (authoritativeConflictEntry) entriesToReplace.set(cacheKey, authoritativeConflictEntry[1]);
+    const slugsToUnverify = new Set<string>([normalizedSlug]);
+    for (const record of entriesToReplace.values()) {
+      const recordSlug = canonicalizeSessionSlug(record.slug);
+      if (recordSlug) slugsToUnverify.add(recordSlug);
     }
-    canonicalEntries.forEach(([key]) => delete store.bySession[key]);
+    for (const verifiedKey of verifiedWorkerCanonicalBootstrapKeys) {
+      if (slugsToUnverify.has(verifiedKey.split('\n')[1])) verifiedWorkerCanonicalBootstrapKeys.delete(verifiedKey);
+    }
+    for (const key of entriesToReplace.keys()) delete store.bySession[key];
   }
 
   const normalizedWorkerConfig = normalizeWorkerConfigEntry({
