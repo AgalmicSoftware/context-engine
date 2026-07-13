@@ -350,7 +350,27 @@ describe('surveyToolTopLevelHelpers', () => {
       }),
     ).toEqual({
       shouldTrimResultsPath: true,
-      nextPathname: '/session/edge/questions',
+      nextPathname: '/session/edge',
+      shouldCallExternalCloseHandler: false,
+    });
+    expect(
+      resolveSurveyToolResultsModalCloseState({
+        pathname: '/ce/session/edge/questions/results',
+        hasExternalCloseHandler: false,
+      }),
+    ).toEqual({
+      shouldTrimResultsPath: true,
+      nextPathname: '/ce/session/edge',
+      shouldCallExternalCloseHandler: false,
+    });
+    expect(
+      resolveSurveyToolResultsModalCloseState({
+        pathname: '/questions/results',
+        hasExternalCloseHandler: false,
+      }),
+    ).toEqual({
+      shouldTrimResultsPath: true,
+      nextPathname: '/questions',
       shouldCallExternalCloseHandler: false,
     });
     expect(

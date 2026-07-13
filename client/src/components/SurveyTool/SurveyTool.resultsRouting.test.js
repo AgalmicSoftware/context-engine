@@ -115,7 +115,7 @@ describe('SurveyTool results routing', () => {
       subject.closeResultsModal();
 
       expect(subject.setState).toHaveBeenCalledWith({ showResultsModal: false });
-      expect(window.location.pathname).toBe('/session/edge/questions');
+      expect(window.location.pathname).toBe('/session/edge');
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
