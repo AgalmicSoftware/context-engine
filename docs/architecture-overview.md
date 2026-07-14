@@ -26,16 +26,30 @@ flowchart TD
   Browser["React app routes and pages<br/>client/src/components/**"] --> Domains["Domain ports and planners<br/>client/src/domains/**"]
   Domains --> Utilities["Low-level utilities<br/>client/src/utilities/**"]
   Browser --> Wizard["/new and /session/new<br/>SessionWizard"]
-  Wizard --> DeployHelper["deploy-helper worker<br/>workers/deploy-helper"]
-  Browser --> SessionWorker["sessionCorsWorker<br/>workers/sessionCorsWorker"]
-  SessionWorker --> Storage["Arweave and worker storage routes"]
-  SessionWorker --> Contracts["EVM contracts<br/>SessionRegistry, Surveys, SBTFactory, CustomSBT"]
-  Utilities --> Contracts
-  Utilities --> Arweave["Arweave clients and storage refs"]
+  Wizard --> ProfileChoice{"Session infrastructure profile"}
+  ProfileChoice --> Hosted["Hosted & Fast<br/>implemented default path"]
+  ProfileChoice --> Trustless["Trustless & Slower<br/>implemented opt-in"]
+  ProfileChoice -.-> Company["Company-Operated<br/>planned"]
+  Hosted --> DeployHelper["deploy-helper worker<br/>workers/deploy-helper"]
+  DeployHelper --> HostedWorker["per-session sessionCorsWorker<br/>canonical config, auth, AI, storage"]
+  HostedWorker --> CloudflareStorage["Cloudflare KV payload/index storage<br/>optional existing R2"]
+  Trustless --> Contracts["Public EVM contracts<br/>SessionRegistry, Surveys, SBTFactory, CustomSBT"]
+  Trustless --> Arweave["Arweave metadata and payloads"]
+  Trustless --> WorkerServices["profile-enabled session worker services<br/>AI, auth, fetch, Arweave routes"]
+  Company -.-> OrgAdapters["Planned IAM, key release/KMS, storage,<br/>AI, networking, observability adapters"]
   PublicRelease["public release tree"] --> Browser
-  PublicRelease --> SessionWorker
+  PublicRelease --> HostedWorker
   PublicRelease --> DeployHelper
 ```
+
+Static app hosting, public/private session access, and the session
+infrastructure profile are independent choices. The `/new` screen does not
+automatically preselect a card; `Fast & Cheap (Cloudflare)` is the implemented
+default/recommended path once chosen, and
+`Trustless & Public (Decentralized)` is the implemented opt-in path. The
+Company-Operated branch is a planned adapter architecture, not a shipped
+corporate package. It can target entirely off-chain infrastructure; a private
+EVM would be only a possible future adapter, never a requirement.
 
 Primary source entry points are `client/src/components/MainSite/AppShell.tsx`,
 `client/src/components/SurveyTool/SurveyTool.tsx`,
@@ -153,6 +167,10 @@ The worker surface is documented in `docs/session-cors-worker.md`.
 - `workers/sessionCorsWorker/` is the session worker. It handles AI proxying,
   transcription, Arweave uploads, storage routes, fetch helpers, auth, gates,
   faucet support, and sponsored/deploy-helper paths.
+- In the default `Fast & Cheap (Cloudflare)` profile, a creator-owned
+  per-session instance is the canonical config, auth, and payload-storage
+  authority. Its passkey-derived admin EOA signs config without submitting an
+  EVM transaction.
 - `workers/deploy-helper/` is a separate helper worker used by `/new` and
   self-hosted deployments to call Cloudflare APIs, create the target worker and
   KV namespace, and seed initial session config/secrets.
@@ -169,20 +187,31 @@ Auth decisions:
 
 ## Storage Model
 
-Arweave remains the durable public payload store for metadata, payloads, and
-most uploaded images. The session worker also exposes canonical storage routes:
+Storage authority follows the selected profile:
+
+- Hosted & Fast uses the session worker's Cloudflare bindings for canonical
+  config, encrypted payload envelopes, and indexes. KV-only payload storage is
+  the default-compatible path; binding an existing R2 bucket is an explicit
+  advanced option.
+- Trustless & Slower keeps Arweave as its durable metadata and payload store,
+  with public EVM contracts anchoring the selected registry and gate state.
+- Company-Operated targets organization-selected storage adapters and does not
+  require Arweave or EVM storage.
+
+The session worker exposes the profile-aware canonical storage routes:
 
 - `POST /storage/upload`
 - `GET|POST /storage/read`
 - `GET|POST /storage/list`
 
-`docs/session-cors-worker.md` describes how those routes map to Arweave,
-Cloudflare storage, worker envelopes, and gated access checks.
+`docs/session-cors-worker.md` describes how those routes map to Cloudflare or
+Arweave storage, worker envelopes, and gated access checks.
 
 ## Contracts And Chains
 
-The canonical Solidity contracts live in `contracts/`, with deploy scripts in
-`foundry/script/` and tests in `foundry/test/`:
+For Trustless & Slower and custom chain-backed profiles, the canonical Solidity
+contracts live in `contracts/`, with deploy scripts in `foundry/script/` and
+tests in `foundry/test/`:
 
 - `SessionRegistry.sol` stores session identity, metadata pointers, admins,
   worker URLs, sponsored flags, and resource gates.
@@ -190,10 +219,12 @@ The canonical Solidity contracts live in `contracts/`, with deploy scripts in
 - `CustomSBT.sol` implements the non-transferable SBT token.
 - `SBTFactory.sol` deploys session/group SBT contracts.
 
-The client reads ABIs from `client/src/contractsABI/`. Checked-in defaults live
-in `client/src/variables/chains.ts` and `client/src/variables/contracts.json`;
-OP Sepolia (`11155420`) is the default chain fallback, while Base Sepolia
-(`84532`) remains a compatibility chain.
+The client reads ABIs from `client/src/contractsABI/`. Checked-in chain-profile
+fallbacks live in `client/src/variables/chains.ts` and
+`client/src/variables/contracts.json`; OP Sepolia (`11155420`) is the default
+chain fallback when a profile selects EVM behavior, while Base Sepolia
+(`84532`) remains a compatibility chain. Neither chain is required by the
+default worker-canonical profile.
 
 ## Release And Public Surface
 
