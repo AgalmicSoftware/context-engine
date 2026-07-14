@@ -2,11 +2,12 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes } from '@fortawesome/free-solid-svg-icons';
 
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './SessionWizard.module.scss';
+import { buildCloudflareTokenTemplateUrl } from './cloudflareTokenTemplate.js';
 import type { SessionWizardRequirementId } from './sessionWizardModeRequirements';
 
 export const SESSION_WIZARD_REQUIREMENT_LINKS = Object.freeze({
-  cloudflareApiTokens: 'https://dash.cloudflare.com/profile/api-tokens',
   openaiApiKey: 'https://platform.openai.com/api-keys',
   litApiKeys: 'https://developer.litprotocol.com/management/api_keys',
   arweaveWallet: 'https://docs.arweave.org/developers/wallets/arweave-wallet',
@@ -14,6 +15,8 @@ export const SESSION_WIZARD_REQUIREMENT_LINKS = Object.freeze({
 });
 
 type SessionWizardRequirementsBannerProps = {
+  cloudflareTokenAccountId?: string;
+  cloudflareTokenSlug?: string;
   fundingRequirementHref?: string;
   fundingRequirementLabel: string;
   newSessionRequiresLitCredential?: boolean;
@@ -22,6 +25,8 @@ type SessionWizardRequirementsBannerProps = {
 };
 
 const SessionWizardRequirementsBanner = ({
+  cloudflareTokenAccountId = '',
+  cloudflareTokenSlug = '',
   fundingRequirementHref = '',
   fundingRequirementLabel,
   newSessionRequiresLitCredential = true,
@@ -35,6 +40,10 @@ const SessionWizardRequirementsBanner = ({
   const walletRequirementLabel = fundingRequirementLabel.includes('SBT publishing')
     ? 'A connected wallet for on-chain SBT publishing'
     : 'A connected wallet for on-chain registration';
+  const cloudflareTokenTemplateHref = buildCloudflareTokenTemplateUrl({
+    accountId: cloudflareTokenAccountId,
+    slug: cloudflareTokenSlug,
+  });
 
   return (
     <section className={styles.newSessionBanner} aria-labelledby="new-session-requirements-title">
@@ -57,14 +66,16 @@ const SessionWizardRequirementsBanner = ({
           {requires('cloudflareApiToken') ? (
             <li>
               <a
-                href={SESSION_WIZARD_REQUIREMENT_LINKS.cloudflareApiTokens}
+                href={cloudflareTokenTemplateHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={styles.newSessionBannerLink}
+                data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK}
               >
                 Cloudflare API token
               </a>{' '}
-              for deploying the session worker
+              with the required permissions prefilled. Create it, copy the generated token, and paste it into the Worker
+              step. Before creating it, restrict Account Resources to the account that will own the session worker.
             </li>
           ) : null}
           {requires('aiProviderKey') ? (

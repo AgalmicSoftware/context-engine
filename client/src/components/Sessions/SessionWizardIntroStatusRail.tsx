@@ -7,6 +7,8 @@ import SessionWizardSponsoredStatus from './SessionWizardSponsoredStatus';
 
 type SessionWizardIntroStatusRailProps = {
   activeNormalModeIndex: number;
+  cloudflareTokenAccountId?: string;
+  cloudflareTokenSlug?: string;
   collapsedSections: Record<string, boolean>;
   fundingRequirementHref?: string;
   fundingRequirementLabel: string;
@@ -24,6 +26,8 @@ type SessionWizardIntroStatusRailProps = {
 
 const SessionWizardIntroStatusRail = ({
   activeNormalModeIndex,
+  cloudflareTokenAccountId = '',
+  cloudflareTokenSlug = '',
   collapsedSections,
   fundingRequirementHref = '',
   fundingRequirementLabel,
@@ -41,6 +45,8 @@ const SessionWizardIntroStatusRail = ({
   <>
     {showNewSessionRequirementsBanner ? (
       <SessionWizardRequirementsBanner
+        cloudflareTokenAccountId={cloudflareTokenAccountId}
+        cloudflareTokenSlug={cloudflareTokenSlug}
         fundingRequirementHref={fundingRequirementHref}
         fundingRequirementLabel={fundingRequirementLabel}
         newSessionRequiresLitCredential={newSessionRequiresLitCredential}

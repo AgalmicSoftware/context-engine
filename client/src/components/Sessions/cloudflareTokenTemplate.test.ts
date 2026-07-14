@@ -1,4 +1,5 @@
 import {
+  buildTokenName,
   buildCloudflareTokenTemplateUrl,
   buildCloudflareTokenTemplatePermissions,
   CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS,
@@ -77,5 +78,24 @@ describe('cloudflareTokenTemplate', () => {
     expect(url.searchParams.get('name')).toMatch(
       /^contextEngine-corsSessionWorker-general-[A-Z]{3}\d{2}-\d{4}-\d{4}(AM|PM)$/,
     );
+  });
+
+  test.each([70, 71, 128])('keeps a %i-character valid session slug within Cloudflare token-name limits', (slugLength) => {
+    const slug = 'a'.repeat(slugLength);
+    const tokenName = buildTokenName(slug);
+
+    expect(tokenName).toHaveLength(120);
+    if (slugLength === 70) {
+      expect(tokenName).toContain(`-${slug}-`);
+    } else {
+      expect(tokenName).not.toContain(slug);
+      expect(tokenName).toMatch(/^contextEngine-corsSessionWorker-a{61}-[0-9a-f]{8}-/);
+    }
+  });
+
+  test('retains a distinguishing hash when long slugs share the same visible prefix', () => {
+    const commonPrefix = 'a'.repeat(71);
+
+    expect(buildTokenName(`${commonPrefix}x`)).not.toBe(buildTokenName(`${commonPrefix}y`));
   });
 });

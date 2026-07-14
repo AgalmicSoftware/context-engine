@@ -20,6 +20,8 @@ export const CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS = Object.freeze({
 });
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'] as const;
+const CLOUDFLARE_TOKEN_NAME_PREFIX = 'contextEngine-corsSessionWorker-';
+const CLOUDFLARE_TOKEN_NAME_MAX_LENGTH = 120;
 
 const formatTokenTimestamp = (date: Date = new Date()): string => {
   const dd = String(date.getDate()).padStart(2, '0');
@@ -32,9 +34,29 @@ const formatTokenTimestamp = (date: Date = new Date()): string => {
   return `${mon}${dd}-${yyyy}-${hh}${mm}${meridiem}`;
 };
 
-const buildTokenName = (slug?: unknown): string => {
+const hashTokenNameSlug = (value: string): string => {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+};
+
+const compactTokenNameSlug = (slug: string, maxLength: number): string => {
+  if (slug.length <= maxLength) return slug;
+  const hash = hashTokenNameSlug(slug);
+  const visibleLength = Math.max(0, maxLength - hash.length - 1);
+  return `${slug.slice(0, visibleLength)}-${hash}`.slice(0, maxLength);
+};
+
+export const buildTokenName = (slug?: unknown): string => {
   const safeSlug = toStr(slug).trim() || 'general';
-  return `contextEngine-corsSessionWorker-${safeSlug}-${formatTokenTimestamp()}`;
+  const timestamp = formatTokenTimestamp();
+  // Cloudflare caps user-token names at 120 characters; keep a hash when a valid long session slug must be shortened.
+  const maxSlugLength = CLOUDFLARE_TOKEN_NAME_MAX_LENGTH - CLOUDFLARE_TOKEN_NAME_PREFIX.length - timestamp.length - 1;
+  const tokenSlug = compactTokenNameSlug(safeSlug, maxSlugLength);
+  return `${CLOUDFLARE_TOKEN_NAME_PREFIX}${tokenSlug}-${timestamp}`;
 };
 
 export const buildCloudflareTokenTemplatePermissions = ({

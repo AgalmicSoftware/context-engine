@@ -100,6 +100,10 @@ const WorkerDeploySection = ({
     deployStatusText: '',
     isError: false,
   };
+  const cloudflareTokenTemplateHref = buildCloudflareTokenTemplateUrl({
+    accountId: deployForm.accountId,
+    slug: cloudflareTokenSlug,
+  });
   const updateApiToken = (nextApiToken: string) => {
     setDeployForm((prev) => {
       const previousToken = String(prev?.apiToken ?? '');
@@ -293,24 +297,19 @@ const WorkerDeploySection = ({
                 </div>
               )}
               <div className={styles.helperText}>
-                <Button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={() =>
-                    window.open(
-                      buildCloudflareTokenTemplateUrl({
-                        accountId: deployForm.accountId,
-                        slug: cloudflareTokenSlug,
-                      }),
-                      '_blank',
-                    )
-                  }
+                <a
+                  href={cloudflareTokenTemplateHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${styles.secondaryButton} btn btn-secondary`}
+                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_CREATE_LINK}
                 >
                   Create prefilled API token
-                </Button>
+                </a>
               </div>
               <div className={styles.helperText}>
-                You must be logged into Cloudflare before using the prefilled API token button.
+                You must be logged into Cloudflare before using the prefilled API token link. Create the token, copy its
+                generated value, then paste it into the field above.
               </div>
               {!deployForm.accountId && (
                 <div className={styles.helperText}>

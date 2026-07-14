@@ -68,7 +68,6 @@ describe('WorkerDeploySection', () => {
     const setBundleMode = jest.fn();
     const setDeployForm = jest.fn();
     const handleDeployWorker = jest.fn();
-    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
 
     renderWorkerDeploySection({
       setDeployHelperUrl,
@@ -93,9 +92,12 @@ describe('WorkerDeploySection', () => {
     });
     expect(setDeployForm).toHaveBeenCalledWith(expect.any(Function));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create prefilled API token' }));
-    expect(openSpy).toHaveBeenCalledWith(expect.stringContaining('demo-worker'), '_blank');
-    const tokenUrl = new URL(String(openSpy.mock.calls[0][0]));
+    const tokenLink = screen.getByRole('link', { name: 'Create prefilled API token' });
+    expect(tokenLink).toHaveAttribute('target', '_blank');
+    expect(tokenLink).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(tokenLink).toHaveAttribute('data-testid', E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_CREATE_LINK);
+    const tokenUrl = new URL(String(tokenLink.getAttribute('href')));
+    expect(tokenUrl.searchParams.get('name')).toContain('demo-worker');
     expect(tokenUrl.searchParams.get('accountId')).toBe('*');
     expect(JSON.parse(tokenUrl.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
       { key: 'workers_scripts', type: 'edit' },
@@ -106,13 +108,9 @@ describe('WorkerDeploySection', () => {
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
     expect(handleDeployWorker).toHaveBeenCalledTimes(1);
-
-    openSpy.mockRestore();
   });
 
   it('scopes the prefilled token link to a known Cloudflare account', () => {
-    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
-
     renderWorkerDeploySection({
       deployForm: {
         workerName: 'demo-worker',
@@ -123,13 +121,11 @@ describe('WorkerDeploySection', () => {
       },
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create prefilled API token' }));
-
-    const tokenUrl = new URL(String(openSpy.mock.calls[0][0]));
+    const tokenUrl = new URL(
+      String(screen.getByRole('link', { name: 'Create prefilled API token' }).getAttribute('href')),
+    );
     expect(tokenUrl.searchParams.get('accountId')).toBe('cf-account-1');
     expect(screen.queryByText(/Cloudflare may preselect All accounts/i)).not.toBeInTheDocument();
-
-    openSpy.mockRestore();
   });
 
   it('describes the least-privilege default Cloudflare token scopes', () => {

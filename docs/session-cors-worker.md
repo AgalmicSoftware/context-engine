@@ -68,10 +68,13 @@ The route-shell bundle is intentionally still a large boundary object because it
 For the default `Fast & Cheap (Cloudflare)` preset:
 
 1) Fill in the Cloudflare API token and one key for the selected AI provider.
-   - The "Create API token" link opens a prefilled Cloudflare token template with the required
+   - The "Create prefilled API token" link opens a Cloudflare token template with the required
      `Workers Scripts: Edit` and `Workers KV Storage: Edit` permissions used by the default
      deploy-helper path. The helper's workers.dev subdomain calls are also covered by
      `Workers Scripts: Edit`.
+   - The first onboarding requirements banner uses the same prefilled link. Cloudflare only
+     pre-fills the form: create the token, copy its generated value, and paste it into the
+     password field in the Worker step.
    - CLI equivalent for agents/local setup: `npm run -s cloudflare:token-link -- --slug <session-slug>`
      Add `--include-r2-storage` only for an advanced deployment that manages an existing R2 bucket;
      the flag does not create the bucket.

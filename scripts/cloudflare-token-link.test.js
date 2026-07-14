@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const {
   CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS,
   CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS,
+  buildTokenName,
   buildCloudflareTokenTemplatePermissions,
   buildCloudflareTokenTemplateUrl,
   parseArgs,
@@ -75,6 +76,27 @@ test('buildCloudflareTokenTemplateUrl falls back to the general slug when none i
     url.searchParams.get('name'),
     /^contextEngine-corsSessionWorker-general-[A-Z]{3}\d{2}-\d{4}-\d{4}(AM|PM)$/
   );
+});
+
+for (const slugLength of [70, 71, 128]) {
+  test(`buildTokenName keeps a ${slugLength}-character valid session slug within Cloudflare limits`, () => {
+    const slug = 'a'.repeat(slugLength);
+    const tokenName = buildTokenName(slug);
+
+    assert.equal(tokenName.length, 120);
+    if (slugLength === 70) {
+      assert.equal(tokenName.includes(`-${slug}-`), true);
+    } else {
+      assert.equal(tokenName.includes(slug), false);
+      assert.match(tokenName, /^contextEngine-corsSessionWorker-a{61}-[0-9a-f]{8}-/);
+    }
+  });
+}
+
+test('buildTokenName retains a distinguishing hash for long slugs with the same visible prefix', () => {
+  const commonPrefix = 'a'.repeat(71);
+
+  assert.notEqual(buildTokenName(`${commonPrefix}x`), buildTokenName(`${commonPrefix}y`));
 });
 
 test('parseArgs accepts the explicit R2 storage scope flag', () => {

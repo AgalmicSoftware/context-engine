@@ -393,6 +393,8 @@ const SessionWizardShell = ({
 
       <SessionWizardIntroStatusRail
         activeNormalModeIndex={activeNormalModeIndex}
+        cloudflareTokenAccountId={deployForm?.accountId}
+        cloudflareTokenSlug={draft.slug}
         collapsedSections={collapsedSections}
         fundingRequirementHref={newSessionFundingRequirementHref}
         fundingRequirementLabel={newSessionFundingRequirementLabel}

@@ -149,6 +149,8 @@ const E2E_TESTIDS = Object.freeze({
   WIZARD_SECRET_LIT_PAYER_ADDRESS: 'ce-wizard-secret-lit-payer-address',
   WIZARD_COPY_LIT_PAYER_ADDRESS: 'ce-wizard-copy-lit-payer-address',
   WIZARD_DEPLOY_HELPER_URL: 'ce-wizard-deploy-helper-url',
+  WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK: 'ce-wizard-cloudflare-token-onboarding-link',
+  WIZARD_CLOUDFLARE_TOKEN_CREATE_LINK: 'ce-wizard-cloudflare-token-create-link',
   WIZARD_CLOUDFLARE_API_TOKEN: 'ce-wizard-cloudflare-api-token',
   WIZARD_BUNDLE_MODE_UPLOAD: 'ce-wizard-bundle-mode-upload',
   WIZARD_BUNDLE_MODE_URL: 'ce-wizard-bundle-mode-url',
