@@ -58,6 +58,22 @@ const hashTokenNameSlug = (value) => {
   return (hash >>> 0).toString(16).padStart(8, '0');
 };
 
+const compactTokenNameSlug = (slug, maxLength) => {
+  if (slug.length <= maxLength) return slug;
+  const hash = hashTokenNameSlug(slug);
+  const visibleLength = Math.max(0, maxLength - hash.length - 1);
+  return `${slug.slice(0, visibleLength)}-${hash}`.slice(0, maxLength);
+};
+
+const buildTokenName = (slug) => {
+  const safeSlug = toStr(slug).trim() || 'general';
+  const timestamp = formatTokenTimestamp();
+  // Cloudflare caps user-token names at 120 characters; keep a hash when a valid long session slug must be shortened.
+  const maxSlugLength = CLOUDFLARE_TOKEN_NAME_MAX_LENGTH - CLOUDFLARE_TOKEN_NAME_PREFIX.length - timestamp.length - 1;
+  const tokenSlug = compactTokenNameSlug(safeSlug, maxSlugLength);
+  return `${CLOUDFLARE_TOKEN_NAME_PREFIX}${tokenSlug}-${timestamp}`;
+};
+
 const buildCloudflareTokenTemplatePermissions = ({
   includeWorkersDevSubdomainSetup = false,
   includeDocStorage = true,

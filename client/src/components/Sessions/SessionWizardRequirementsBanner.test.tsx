@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SessionWizardRequirementsBanner, { SESSION_WIZARD_REQUIREMENT_LINKS } from './SessionWizardRequirementsBanner';
 
 describe('SessionWizardRequirementsBanner', () => {
@@ -85,20 +86,8 @@ describe('SessionWizardRequirementsBanner', () => {
       { key: 'workers_scripts', type: 'edit' },
       { key: 'workers_kv_storage', type: 'edit' },
     ]);
-    expect(
-      screen.getByText(/if you're already logged into Cloudflare, this link opens a token form/i),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/permissions prefilled/i)).toBeInTheDocument();
-    expect(screen.getByText(/copy it into the Worker step/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Under Account Resources, choose only the account/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/earliest expiration Cloudflare permits/i)).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(/revoke it after deployment succeeds or you abandon the attempt/i),
-    ).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Token setup and security guide' })).toHaveAttribute(
-      'href',
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
-    );
+    expect(screen.getByText(/copy the generated token, and paste it into the Worker step/i)).toBeInTheDocument();
+    expect(screen.getByText(/restrict Account Resources to the account/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'AI provider key' })).toBeInTheDocument();
     expect(screen.queryByText(/Arweave|Lit|RPC|wallet|faucet|funding|gas/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/not required/i)).not.toBeInTheDocument();

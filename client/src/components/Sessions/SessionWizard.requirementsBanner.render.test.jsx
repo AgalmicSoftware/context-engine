@@ -40,7 +40,28 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
   });
 
-  it('renders the new-session requirements copy and contact link on /session/new', async () => {
+  it('offers the least-privilege Cloudflare token template from the Fast & Cheap onboarding banner', async () => {
+    window.history.replaceState({}, '', '/session/new');
+
+    renderSessionWizard();
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectCloudflarePreset();
+
+    const tokenLink = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK);
+    const tokenUrl = new URL(tokenLink.getAttribute('href'));
+
+    expect(tokenUrl.origin).toBe('https://dash.cloudflare.com');
+    expect(tokenUrl.pathname).toBe('/profile/api-tokens');
+    expect(tokenUrl.searchParams.get('accountId')).toBe('*');
+    expect(tokenUrl.searchParams.get('zoneId')).toBe('all');
+    expect(JSON.parse(tokenUrl.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
+      { key: 'workers_scripts', type: 'edit' },
+      { key: 'workers_kv_storage', type: 'edit' },
+    ]);
+    expect(screen.getByText(/copy the generated token, and paste it into the Worker step/i)).toBeInTheDocument();
+  });
+
+  it('renders the decentralized requirements copy and contact link on /session/new', async () => {
     window.history.replaceState({}, '', '/session/new');
 
     renderSessionWizard({ network: null });

@@ -325,7 +325,7 @@ describe('WorkerDeploySection', () => {
     expect(handleDeployWorker).toHaveBeenCalledTimes(1);
   });
 
-  it('does not let hidden legacy account state scope the token template', () => {
+  it('scopes the prefilled token link to a known Cloudflare account', () => {
     renderWorkerDeploySection({
       deployForm: {
         workerName: 'demo-worker',
@@ -339,7 +339,7 @@ describe('WorkerDeploySection', () => {
     const tokenUrl = new URL(
       String(screen.getByRole('link', { name: 'Create prefilled API token' }).getAttribute('href')),
     );
-    expect(tokenUrl.searchParams.get('accountId')).toBe('*');
+    expect(tokenUrl.searchParams.get('accountId')).toBe('cf-account-1');
     expect(screen.queryByText(/Cloudflare may preselect All accounts/i)).not.toBeInTheDocument();
   });
 

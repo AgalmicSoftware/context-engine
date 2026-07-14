@@ -129,9 +129,9 @@ You need:
 
 - A Cloudflare account: <https://dash.cloudflare.com/>
 - An API token with Workers-related permissions. The wizard expects the same scope used by the deploy-helper flow described in [session-cors-worker.md](session-cors-worker.md).
-- Cloudflare token templates reference: <https://developers.cloudflare.com/fundamentals/api/reference/template/>
+- Cloudflare token templates reference: <https://developers.cloudflare.com/fundamentals/api/how-to/account-owned-token-template/>
 
-In practice, the deploy flow needs least-privilege permission to manage Workers scripts, Workers KV, R2 buckets/objects for CE payload blobs, D1 or KV metadata/index resources where configured, and Durable Objects only for signer/runtime coordination. `Account Settings: Edit` is needed only if the helper must create or change the account-level `workers.dev` subdomain; omit it when the account already has a workers.dev subdomain and the helper only enables a script URL. Do not put real account IDs, bucket names, API tokens, or production config in committed files.
+The default deploy flow needs exactly `Workers Scripts: Edit` and `Workers KV Storage: Edit`. [Create a token with those permissions prefilled](https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22edit%22%7D%5D&accountId=%2A&zoneId=all&name=Context%20Engine%20Session%20Worker), or use the equivalent link in the wizard onboarding banner. Those scopes cover the worker script and secrets, workers.dev setup, the canonical session config, encrypted payload envelopes and indexes, groups, audit rows, and deploy state stored in KV. Add `R2: Edit` only for an advanced deployment that explicitly manages an existing R2 bucket; the token link does not create that bucket. D1, Durable Objects, Account Settings, Workers AI, and Queues permissions are not required by the default path. When Cloudflare preselects `All accounts`, restrict Account Resources to the one account where the worker will run before creating the token. Cloudflare only pre-fills the creation form: create the token, copy its generated value, and paste it into the wizard's Worker step. Do not put real account IDs, bucket names, API tokens, or production config in committed files.
 
 The deploy helper consumes the direct `/new` Cloudflare token in the deploy
 request and does not return or persist it. A successfully published session URL
@@ -406,8 +406,11 @@ This is the default path exposed in `/new`.
 
 High-level flow:
 
-1. Enter the Cloudflare API token and one AI-provider key. Normal mode
-   automatically derives the worker name and uses the GitHub-hosted
+1. Click the onboarding banner's `Cloudflare API token` link. Cloudflare opens
+   the token form with the two required permissions prefilled. Restrict Account
+   Resources to the intended account, create the token, copy its generated
+   value, and paste it into the Worker step with one AI-provider key. Normal
+   mode automatically derives the worker name and uses the GitHub-hosted
    `sessionCorsWorker.bundle.js` release asset.
 2. Click `Deploy worker`
 3. Wait for the helper to create an isolated physical worker, persist its

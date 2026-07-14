@@ -417,8 +417,13 @@ const SessionWizardShell = ({
 
     {sessionModeProfileControl}
 
-    {(!isNormalMode || !collapsedSections.encryption) && (
-      <EncryptionPanel
+      <SessionWizardIntroStatusRail
+        activeNormalModeIndex={activeNormalModeIndex}
+        cloudflareTokenAccountId={deployForm?.accountId}
+        cloudflareTokenSlug={draft.slug}
+        collapsedSections={collapsedSections}
+        fundingRequirementHref={newSessionFundingRequirementHref}
+        fundingRequirementLabel={newSessionFundingRequirementLabel}
         isNormalMode={isNormalMode}
         newSessionRequiresLitCredential={newSessionRequiresLitCredential}
         normalModeCards={normalModeCards}
