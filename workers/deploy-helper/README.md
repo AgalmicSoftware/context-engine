@@ -101,6 +101,13 @@ Wrangler is the preferred deploy path. The checked-in `worker.js` imports `../sh
     response-loss retries, and rejects reuse of the ID with a conflicting
     immutable identity. Coordinator and journal state contain no raw tokens,
     secrets, or bundle bytes
+  - if Cloudflare definitively rejects an uploaded bundle after the stable KV
+    namespace is staged, the helper retains a separate non-secret recovery
+    marker. The same request may retry corrected bundle bytes while every
+    non-bundle deploy field remains fixed. Visible Workers must still match all
+    ownership/binding markers, and replacement uploads preserve secret-text
+    bindings. Recovery remains pending until terminal receipt persistence and
+    recovery-marker cleanup both succeed
 - `GET /admin/origins`
   - requires `Authorization: Bearer <ADMIN_SECRET>`
   - returns `{ origins, source }`

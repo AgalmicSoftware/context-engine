@@ -10,7 +10,9 @@ Group-level secrets now live in worker secrets (not in Arweave metadata):
 - Arweave wallet JWK → worker secret.
 - Faucet private key → worker secret.
 - Lit payer private key (+ derived payer address/status) → worker secret / admin worker status route.
-- RPC gateway key (PATH) → worker secret (if/when enabled).
+- Custom RPC URL, including any provider credential embedded in its path →
+  worker session secret (`customRpcUrl`). A separate bare RPC key is not
+  injected into JSON-RPC requests.
 
 Legacy metadata fields (`ai.providers.*.apiKey`, `rpc.providers.path.apiKey`,
 `arweave.jwk`, `faucet.privateKey`) are still tolerated on read for older
@@ -49,8 +51,14 @@ Per request, the client resolves keys in this order:
 ## RPC key routing
 
 Session-level Custom RPC URL values that are supplied as worker secrets stay
-worker-private during session publish/deploy. Browser read providers only use
-explicit browser-visible registry `rpcUrl` / `rpcUrlsByChainId` values.
+worker-private during session publish/deploy. For worker-canonical sessions, the
+worker attaches that URL only to an in-memory, non-serializable request config
+for same-network SBT association/storage-gate checks and faucet execution. It is
+loaded lazily for Cloudflare storage, so public/group/role reads do not depend on
+the secret store. The Worker verifies `eth_chainId` before protected contract
+reads and masks private endpoint details in errors and logs. Browser read
+providers only use explicit browser-visible registry `rpcUrl` /
+`rpcUrlsByChainId` values.
 
 Standalone RPC API-key injection without a URL template is still unsupported.
 The JSON-RPC proxy format (Authorization header vs URL template) needs a

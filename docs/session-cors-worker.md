@@ -390,7 +390,7 @@ The worker still read-normalizes legacy `payloadAccessControl.mode`, `cloudflare
 
 Where older clients still need one string, the worker and client derive the legacy `payloadAccessMode` from the v2 object.
 
-- `gate: "sbt_gate"` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain using the configured RPC before upload, list, or read bytes are exposed.
+- `gate: "sbt_gate"` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain before upload, list, or read bytes are exposed. Worker-canonical same-network checks prefer the private `customRpcUrl` session secret; Cloudflare storage loads that secret lazily only when an SBT condition or policy is evaluated. Public/group/role reads do not read it, and an unavailable secret store fails closed only for the affected SBT check. Before a contract read, the Worker calls `eth_chainId` and rejects an endpoint that cannot prove the expected chain.
 - `gate: "group_gate"` checks worker-native group membership before upload, list, or read bytes are exposed. The gate reads group ids from `storageProfile.payloadAccessControl.groupId`/`groupIds`, or from payload metadata for per-payload group storage refs. Missing, deleted, or unreadable groups fail closed.
 - `gate: "none"` keeps canonical payloads in Cloudflare but serves read/list requests without wallet auth. Uploads still require authenticated session worker requests unless the caller is already on an anonymous read/list route. Use this for public question prompts or public response summaries that should render identically across Arweave, Cloudflare, Telegram, Mini App, and the CE client.
 - `encryption: "lit"` keeps the existing Lit scaffold. Cloudflare stores only caller-supplied encrypted payload envelopes and Lit governs decrypt. The worker rejects plaintext Cloudflare uploads in this mode until the client/session path supplies `payloadEncrypted=true` with a Lit-encrypted envelope.
@@ -938,24 +938,44 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   `config.rpcUrl` normalization, mapped `rpcUrlsByChainId` lookup,
   registry-chain merge + dedupe behavior, and the existing caller contracts
   used by login gate evaluation, Arweave SBT association, and faucet RPC
-  selection.
+  selection. Worker-canonical runtime callers may attach the same-network
+  `customRpcUrl` secret on a private non-enumerable request object; it is never
+  copied into KV, a public config projection, or JSON output.
 - Shared registry/faucet RPC resolution now routes through
   `workers/sessionCorsWorker/registryFaucetRpcResolution.js`, preserving
-  registry-chain mapped + direct fallback ordering, explicit faucet `rpcUrl`
-  precedence, `faucet.chainId -> networkChainId -> registryChainId`
+  registry-chain mapped + direct fallback ordering,
+  `faucet.chainId -> networkChainId -> registryChainId`
   selection, Base Sepolia special ordering, Base mainnet fallbacks, and the
   existing caller contracts used by login/admin/anonymous registry reads,
   Arweave association checks, and authenticated faucet RPC selection.
+  Worker-canonical faucet execution now prefers the attached same-network
+  session secret, then legacy explicit `faucet.rpcUrl`, then mapped/public
+  fallbacks; decentralized-session ordering is unchanged. Contract and faucet
+  proof reads attest `eth_chainId` first. Registry-authority reads use
+  `registryChainId` as the expected chain, with `networkChainId` retained only as
+  the legacy fallback when `registryChainId` is absent or zero. A malformed
+  explicit `registryChainId` does not fall through; authority reads fail closed.
+  Before SessionRegistry reads used by login preflight/resource gates, anonymous
+  routes, faucet eligibility/gate lookup, storage gate fallback, bootstrap
+  ownership, and Arweave session association, the Worker attests `eth_chainId`.
+  Attestation is memoized only within the current request; mismatches or
+  unavailable identity deny the read. Worker-canonical paths that do not use
+  SessionRegistry remain off-chain. Diagnostics identify private endpoints only
+  as `[private-session-rpc]` and never return their host, path, query, or raw
+  upstream error message.
 - Shared RPC URL list normalization now routes through
   `workers/sessionCorsWorker/rpcUrlListNormalization.js`, preserving trimmed
   scalar/array normalization plus first-seen dedupe ordering across merged
   URL lists for the extracted gate, registry, faucet, and bootstrap-admin
   helper paths.
 - Shared chain-id normalization now routes through
-  `workers/sessionCorsWorker/chainIdNormalization.js`, preserving the
-  existing Number-based chain-id coercion and `0` fallback behavior used by
-  the extracted gate, registry/faucet, login-scope, session-gate, Arweave,
-  and faucet helper paths.
+  `workers/sessionCorsWorker/chainIdNormalization.js`. It accepts only positive
+  safe-integer numbers, whole decimal strings, or complete `0x` hex strings.
+  Signed, fractional, scientific-notation, partial-hex, non-finite, and
+  precision-losing values normalize to `0` and therefore fail closed across the
+  extracted gate, registry/faucet, login-scope, session-gate, storage SBT,
+  Arweave, Lit Chipotle, and faucet helper paths. Only absent or legacy zero
+  sentinels advance through documented chain fallback precedence.
 - Shared base string coercion plus deps-aware trimmed-string normalization
   now route through `workers/sessionCorsWorker/stringCoercion.js`,
   preserving the existing `string -> same`, `nullish -> ''`, and
@@ -1084,9 +1104,12 @@ Never return secrets in responses.
   mode, and normalized `sessionId`/`sessionIdHex` identity are immutable. Attempts
   to retarget that Worker return `409`.
 - The first signed worker-canonical publish carrying a `configRevision` finalizes
-  that publication server-side. An exact same-revision retry is an idempotent
-  no-op; a different revision returns `409`. Revision-free signed Admin patches
-  remain supported, and the publication marker itself is server-managed.
+  that publication in the server-managed KV record. A sequential exact
+  same-revision retry is an idempotent no-op; a different revision returns
+  `409`. This marker is best-effort replay protection, not a linearizable
+  concurrency boundary: signed config writes and storage-envelope writes still
+  update the same KV record independently. Revision-free signed Admin patches
+  remain supported.
 - A successful worker-canonical publish is terminal in `/new`, including after a
   reload or another open tab observes the settlement record. Use **Create another
   session** to clear the settled local wizard state and begin a new session.
@@ -1100,7 +1123,8 @@ Never return secrets in responses.
   and still switches to on-chain admin authorization once the registry proves the slug exists.
 - Configured admin authorization now also routes through a shared helper:
   it preserves direct `adminAddress` authorization, uses config-derived RPC URLs for optional Hats `isWearerOfHat(...)`
-  checks, and still fails closed when Hats config is incomplete or no configured RPC can prove the wearer.
+  checks, attests each candidate endpoint against the exact registry chain first,
+  and still fails closed when Hats config is incomplete or no configured RPC can prove the wearer.
 - Signed admin request authority now also routes through a shared helper:
   it preserves signed slug resolution, address/message/slug preconditions,
   existing-session CORS passthrough, SIWE/signature/nonce validation,
@@ -1142,7 +1166,9 @@ Never return secrets in responses.
   - `check` / `decrypt` derive RPC from worker-approved config, secrets, or
     defaults. Request `rpcUrl` / `customRpcUrl` is rejected unless it exactly
     matches that allowlist, and the Lit Action rejects endpoints whose reported
-    chain ID does not match the gate chain.
+    chain ID does not match the gate chain. Gate-chain inputs use the same strict
+    parser as worker authority reads, so malformed explicit values cannot fall
+    through to a different configured chain.
   - stored Chipotle metadata omits RPC URLs; legacy v1 / bare-hex Chipotle
     wrapped keys are rejected by default and must be recreated with v2 metadata
   - admin `POST /admin/lit-chipotle-status` to query worker-mediated Chipotle
@@ -1472,14 +1498,22 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   changed, cannot be verified, or script deletion fails, the helper retains and
   reports that KV; do not delete it until the live binding is recovered or
   independently verified.
-- Local Cloudflare E2E finalizers serialize only narrow KV-only or
-  prior-verified Worker-delete-failed recovery handoffs. Each handoff contains a
-  domain-separated HMAC-SHA256 proof made with the cleanup token; it never stores
-  that token. The proof binds the recovery type, Worker name, token-derived
+- Local Cloudflare E2E finalizers serialize only narrow KV-only,
+  prior-verified Worker-delete-failed, or verify-later ownership recovery
+  handoffs. The last form is emitted whenever account or Worker-settings
+  ownership cannot be verified; transient reads use bounded retries first. It
+  requires exact live deployment and KV binding markers before either resource
+  is deleted. Each handoff contains a domain-separated HMAC-SHA256 proof made
+  with the cleanup token; it never stores that token. The proof binds the
+  recovery type, Worker name, token-derived
   account ID, KV namespace, deployment marker, and cleanup status. The private
   E2E runbook documents the stripped operator-only recovery command. Recovery
   re-derives the account before settings or delete calls and fails closed if the
-  selected token now exposes a different account.
+  selected token now exposes a different account. The CLI atomically reserves a
+  distinct writable result before any Cloudflare request. An incomplete attempt
+  persists only a validated signed handoff, advanced to a successor when cleanup
+  state changes. That result is valid input for the next recovery invocation; a
+  final write failure leaves the preflight handoff reserved.
 - Concurrent deploys with different request IDs may reuse the same requested
   prefix; each receives a distinct physical worker name and isolated KV
   namespace. Stable same-ID requests are serialized by
@@ -1487,6 +1521,15 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   is retryable, conflicting immutable identities fail closed, and terminal safe
   receipts replay without repeating deployment side effects. The KV journal
   remains the resumable per-step record after coordination.
+- A definitive bundle-upload rejection after stable staging writes a separate,
+  non-secret recovery marker that outlives the ordinary replay journals until
+  terminal success. A same-ID retry may change only the bundle source/bytes (and
+  rotate the request-only token); every infrastructure-affecting field remains
+  bound. A visible Worker must match the exact deployment, KV, Durable Object,
+  storage, admin, slug, and helper-mode bindings before replacement. Both
+  visible and temporarily hidden replacements preserve `secret_text` bindings,
+  and any later non-success remains pending. The helper returns/replays success
+  only after the terminal receipt commits and the rejection marker is removed.
 - Optional: pass `subdomain` (or `workersSubdomain`) to set the account-level workers.dev subdomain
   when none exists yet (falls back to a deterministic `ce-<accountId>` name). Account-level and
   script-level workers.dev setup are both covered by `Workers Scripts: Edit`.
