@@ -333,9 +333,9 @@ Common combinations:
 What happens during deploy:
 
 - The deploy-helper calls Cloudflare’s Workers API
-- For a worker-canonical publish, it creates an isolated physical worker name
-  by appending a random deployment suffix to the requested display name. A
-  retry cannot overwrite an earlier same-name worker.
+- For every fresh publish, it creates an isolated physical worker name by
+  appending a random deployment suffix to the requested display name. A retry
+  allocates another physical worker instead of overwriting an earlier one.
 - It fetches the account `workers.dev` subdomain and creates/changes it only when explicitly needed
 - It returns the final worker URL
 - The wizard auto-fills `corsWorkerUrl`
@@ -344,16 +344,12 @@ What happens during deploy:
 - Cleanup deletes a failed deployment only when the deploy helper can prove the
   script still carries that deployment's ownership marker. It preserves
   pre-existing or ownership-ambiguous scripts and reports any orphaned resource.
-- Legacy/custom deploys that insist on an exact physical Worker name are
-  serialized within one helper isolate and checked again immediately before
-  upload. Cloudflare does not provide a create-only conditional script upload,
-  so a narrow cross-isolate race remains between that final lookup and the PUT.
-  The helper verifies its ownership marker after upload and stops before
-  hostname/secret activation if ownership changed. That readback cannot detect
-  or undo a foreign create that lands after the final lookup but before this
-  deployment's PUT, because this deployment would then be the last writer.
-  Operators should therefore use unique names. Worker-canonical publishes avoid
-  this residual by using the random physical suffix described above.
+- The requested Worker name is always a readable prefix rather than an exact
+  physical script name. The random suffix is allocated before existence checks
+  or mutable Cloudflare operations, so independent deploy-helper isolates do not
+  race on a shared caller-chosen name. The helper still verifies its ownership
+  marker after upload and stops before hostname/secret activation if ownership
+  does not match.
 
 What gets stored where:
 

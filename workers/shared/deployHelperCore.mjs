@@ -219,7 +219,6 @@ export const cfFetch = async (
 
 const NEW_KV_NAMESPACE_RETRY_DELAYS_MS = Object.freeze([250, 500, 1000]);
 const FINAL_CONFIG_READBACK_RETRY_DELAYS_MS = Object.freeze([250, 500, 1000]);
-const deploymentNameLocks = new Map();
 
 // A newly created namespace can briefly return 404/10013. Retry only the two
 // idempotent seed writes; every later deploy write remains fail-closed.
@@ -242,26 +241,6 @@ const putFreshKvNamespaceValue = async ({ apiToken, path, options, cfFetchOption
     result = await cfFetch(apiToken, path, options, cfFetchOptions);
   }
   return result;
-};
-
-const withDeploymentNameLock = async (workerName, operation) => {
-  const lockKey = toStr(workerName).trim().toLowerCase();
-  if (!lockKey) return operation();
-  const previous = deploymentNameLocks.get(lockKey) || Promise.resolve();
-  let release;
-  const current = new Promise((resolve) => {
-    release = resolve;
-  });
-  deploymentNameLocks.set(lockKey, current);
-  await previous.catch(() => {});
-  try {
-    return await operation();
-  } finally {
-    release();
-    if (deploymentNameLocks.get(lockKey) === current) {
-      deploymentNameLocks.delete(lockKey);
-    }
-  }
 };
 
 export const lookupCloudflareAccount = async ({
@@ -290,7 +269,7 @@ export const lookupCloudflareAccount = async ({
   if (accounts.length > 1 || totalCount > 1) {
     return {
       ok: false,
-      error: 'Multiple accounts are available for this token. Choose an account explicitly or restrict the token to one account.',
+      error: 'Multiple accounts are available for this token. Restrict the token to exactly one account and retry.',
       detail: undefined,
       status: 409,
       fallbackEligible: false,
@@ -497,7 +476,7 @@ const workerAuthorityPoliciesMatch = (expected, actual) => (
   JSON.stringify(expected || null) === JSON.stringify(actual || null)
 );
 
-const buildWorkerCanonicalDeploymentName = (requestedName, deploymentId) => {
+const buildFreshDeploymentName = (requestedName, deploymentId) => {
   const base = toStr(requestedName)
     .trim()
     .toLowerCase()
@@ -922,7 +901,7 @@ const resolveDeploymentAccountId = async ({
   return lookup;
 };
 
-const executeDeployHelperRequestUnlocked = async ({
+const executeDeployHelperRequestCore = async ({
   body,
   env,
   requestOrigin = '',
@@ -943,7 +922,6 @@ const executeDeployHelperRequestUnlocked = async ({
   const apiBaseUrl = resolveCloudflareApiBaseUrl({ env });
   const cfFetchOptions = { fetchImpl, apiBaseUrl };
   const requestedWorkerName = toStr(body?.workerName).trim();
-  let workerName = requestedWorkerName;
   const defaultSlug = normalizeSlug(env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG ?? '');
   const sessionSlug = body?.sessionSlug != null ? sessionSlugCheck.slug : defaultSlug;
   const displaySlug = sessionSlug || 'general';
@@ -1009,9 +987,19 @@ const executeDeployHelperRequestUnlocked = async ({
     return buildFailure(400, { error: workerCanonicalAuthority.error });
   }
   const deploymentId = randomSecret();
-  if (workerCanonicalRequested) {
-    workerName = buildWorkerCanonicalDeploymentName(requestedWorkerName, deploymentId);
-  }
+  // Treat the caller-supplied name as a readable prefix. Cloudflare's script
+  // upload API has no create-only conditional, so every fresh deploy receives
+  // a random physical name before any existence check or mutable operation.
+  // Independent helper isolates therefore no longer share the deterministic
+  // caller-chosen script name.
+  const workerName = buildFreshDeploymentName(requestedWorkerName, deploymentId);
+  const buildDeploymentFailure = (status, payload, options) => buildFailure(status, {
+    ...payload,
+    // This is the non-secret marker embedded in CE_DEPLOYMENT_ID. Preserve it
+    // on partial-deploy failures so a caller can verify ownership before
+    // retrying cleanup of any reported orphan resources.
+    ...(Object.hasOwn(payload || {}, 'orphanResources') ? { deploymentId } : {}),
+  }, options);
   const workerNamePreflight = await cfFetch(
     apiToken,
     `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
@@ -1035,7 +1023,7 @@ const executeDeployHelperRequestUnlocked = async ({
   // script name until an explicit state-migration workflow exists.
   if (workerNamePreflight.ok) {
     return buildFailure(409, {
-      error: `Worker name "${workerName}" already exists. In-place redeploy is disabled to protect existing worker state. Choose a new worker name before retrying.`,
+      error: `Generated worker name "${workerName}" already exists. In-place redeploy is disabled to protect existing worker state. Retry to allocate a new physical worker name.`,
     });
   }
   const rpcUrl = toStr(body?.rpcUrl).trim();
@@ -1178,7 +1166,7 @@ const executeDeployHelperRequestUnlocked = async ({
   });
   if (!configPut.ok) {
     const orphanKv = await cleanupStagedKv();
-    return buildFailure(502, {
+    return buildDeploymentFailure(502, {
       error: configPut.error,
       detail: configPut.detail,
       orphanResources: { ...orphanKv, workerName: '' },
@@ -1202,7 +1190,7 @@ const executeDeployHelperRequestUnlocked = async ({
   });
   if (!secretsPut.ok) {
     const orphanKv = await cleanupStagedKv();
-    return buildFailure(502, {
+    return buildDeploymentFailure(502, {
       error: secretsPut.error,
       detail: secretsPut.detail,
       orphanResources: { ...orphanKv, workerName: '' },
@@ -1305,13 +1293,9 @@ const executeDeployHelperRequestUnlocked = async ({
   form.append('worker.mjs', new Blob([bundleSource], { type: 'application/javascript+module' }), 'worker.mjs');
 
   const scriptUploadPath = `/accounts/${accountId}/workers/scripts/${workerName}`;
-  // The account/name lock serializes requests handled by this isolate. Repeat
-  // the authoritative lookup after staging KV as a second, cross-isolate guard.
-  // Cloudflare's script upload endpoint has no create-only conditional, so a
-  // narrow lookup-to-PUT race remains for legacy explicit names. If a foreign
-  // create lands in that gap, our PUT can overwrite it; the ownership readback
-  // below can stop later activation but cannot reconstruct the overwritten
-  // script. Worker-canonical deploys avoid the shared name by randomizing it.
+  // Recheck the randomized physical name after staging KV. The random suffix
+  // prevents independent helper isolates from sharing a caller-selected name;
+  // this second lookup covers the remaining generated-name collision case.
   const finalWorkerNamePreflight = await cfFetch(
     apiToken,
     `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
@@ -1320,14 +1304,14 @@ const executeDeployHelperRequestUnlocked = async ({
   );
   if (finalWorkerNamePreflight.ok) {
     const orphanKv = await cleanupStagedKv();
-    return buildFailure(409, {
-      error: `Worker name "${workerName}" became unavailable during deployment. No script was uploaded; choose a new worker name before retrying.`,
+    return buildDeploymentFailure(409, {
+      error: `Generated worker name "${workerName}" became unavailable during deployment. No script was uploaded; retry to allocate a new physical worker name.`,
       orphanResources: { ...orphanKv, workerName: '' },
     });
   }
   if (Number(finalWorkerNamePreflight.status || 0) !== 404) {
     const orphanKv = await cleanupStagedKv();
-    return buildFailure(502, {
+    return buildDeploymentFailure(502, {
       error: finalWorkerNamePreflight.error || 'Failed to re-verify worker-name availability.',
       detail: finalWorkerNamePreflight.detail,
       orphanResources: { ...orphanKv, workerName: '' },
@@ -1349,7 +1333,7 @@ const executeDeployHelperRequestUnlocked = async ({
     }));
     const bundleSummary = formatBundleDiagnostics(bundleDiagnostics);
     const orphanResources = await cleanupDeploymentResources();
-    return buildFailure(502, {
+    return buildDeploymentFailure(502, {
       error: `${scriptUpload.error} Bundle diagnostics: ${bundleSummary}`,
       detail: scriptUpload.detail,
       bundleDiagnostics,
@@ -1378,7 +1362,7 @@ const executeDeployHelperRequestUnlocked = async ({
   ));
   if (!uploadedWorkerStillOwned) {
     const orphanResources = await cleanupDeploymentResources();
-    return buildFailure(uploadedWorkerSettings.ok ? 409 : 502, {
+    return buildDeploymentFailure(uploadedWorkerSettings.ok ? 409 : 502, {
       error: uploadedWorkerSettings.ok
         ? 'Worker ownership changed during deployment; runtime activation was stopped.'
         : uploadedWorkerSettings.error || 'Failed to verify worker ownership after upload.',
@@ -1432,7 +1416,7 @@ const executeDeployHelperRequestUnlocked = async ({
   };
   if (!workerUrl) {
     const orphanResources = await cleanupDeploymentResources();
-    return buildFailure(502, {
+    return buildDeploymentFailure(502, {
       error: subdomainError || scriptSubdomainError || 'Cloudflare did not return a shareable worker URL.',
       orphanResources,
     });
@@ -1449,7 +1433,7 @@ const executeDeployHelperRequestUnlocked = async ({
     }, cfFetchOptions);
     if (!configUpdate.ok) {
       const orphanResources = await cleanupDeploymentResources();
-      return buildFailure(502, {
+      return buildDeploymentFailure(502, {
         error: configUpdate.error || 'Failed to persist the final worker config.',
         detail: configUpdate.detail,
         orphanResources,
@@ -1510,7 +1494,7 @@ const executeDeployHelperRequestUnlocked = async ({
     const verified = readbackMatches(configReadback);
     if (!verified) {
       const orphanResources = await cleanupDeploymentResources();
-      return buildFailure(502, {
+      return buildDeploymentFailure(502, {
         error: 'Worker config verification failed after deployment.',
         orphanResources,
       });
@@ -1534,7 +1518,7 @@ const executeDeployHelperRequestUnlocked = async ({
       }, cfFetchOptions);
       if (!envelopeKekResp.ok) {
         const orphanResources = await cleanupDeploymentResources();
-        return buildFailure(502, {
+        return buildDeploymentFailure(502, {
           error: envelopeKekResp.error,
           detail: envelopeKekResp.detail,
           orphanResources,
@@ -1555,7 +1539,7 @@ const executeDeployHelperRequestUnlocked = async ({
     }, cfFetchOptions);
     if (!secretResp.ok) {
       const orphanResources = await cleanupDeploymentResources();
-      return buildFailure(502, {
+      return buildDeploymentFailure(502, {
         error: secretResp.error,
         detail: secretResp.detail,
         orphanResources,
@@ -1569,7 +1553,4 @@ const executeDeployHelperRequestUnlocked = async ({
   return buildSuccess(200, deploymentPayload);
 };
 
-export const executeDeployHelperRequest = async (options = {}) => withDeploymentNameLock(
-  options?.body?.workerName,
-  () => executeDeployHelperRequestUnlocked(options),
-);
+export const executeDeployHelperRequest = async (options = {}) => executeDeployHelperRequestCore(options);

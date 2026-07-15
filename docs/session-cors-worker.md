@@ -1391,23 +1391,23 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
     Cloudflare using the API token and fails on zero or multiple accounts.
   - Provide either `bundleUrl` (release asset) or `bundleText` (raw bundle contents) from the `/new` UI.
 - The helper fetches the latest bundled worker asset and configures KV + bindings.
-- Worker-canonical deploys use a unique physical script suffix and require an
-  authoritative preflight `404` before creating it. Rollback deletes only
-  resources that still prove ownership by the current deployment id.
-- Every deploy requires the resolved physical script name to be absent. If a
-  legacy or custom named worker already exists, the helper returns `409` before
-  creating KV, uploading a script, or changing runtime secrets. Choose a fresh
-  worker name; preserving an existing worker requires a separate explicit
-  state-migration workflow because its KV may contain auth markers, groups,
-  storage indexes, and wrapped envelope keys that are not in the deploy request.
+- Every fresh deploy treats the requested worker name as a readable prefix and
+  appends a random physical suffix before the first existence check. It requires
+  authoritative preflight `404` responses before staging and immediately before
+  upload. This prevents independent helper isolates from sharing a mutable
+  caller-chosen script name. Rollback deletes only resources that still prove
+  ownership by the current deployment id.
+- In-place redeploy remains disabled. Preserving or replacing an existing
+  physical worker requires a separate explicit state-migration workflow because
+  its KV may contain auth markers, groups, storage indexes, and wrapped envelope
+  keys that are not present in a fresh deploy request.
 - Rollback deletes a staged KV namespace only after the uploaded script is
   confirmed absent or the exact deployment-id owner is deleted. If ownership
   changed, cannot be verified, or script deletion fails, the helper retains and
   reports that KV; do not delete it until the live binding is recovered or
   independently verified.
-- Concurrent low-level deploys using the same custom/legacy worker name are not
-  supported; serialize them or choose unique names. First-party
-  worker-canonical deploys avoid that race with a random physical-name suffix.
+- Concurrent deploys may reuse the same requested prefix; each receives a
+  distinct generated physical worker name and isolated KV namespace.
 - Optional: pass `subdomain` (or `workersSubdomain`) to set the account-level workers.dev subdomain
   when none exists yet (falls back to a deterministic `ce-<accountId>` name). Account-level and
   script-level workers.dev setup are both covered by `Workers Scripts: Edit`.

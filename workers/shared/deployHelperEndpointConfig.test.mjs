@@ -90,6 +90,9 @@ test('lookupCloudflareAccount rejects an ambiguous multi-account token', async (
 
   assert.equal(result.ok, false);
   assert.equal(result.status, 409);
-  assert.match(result.error, /multiple accounts/i);
+  assert.equal(
+    result.error,
+    'Multiple accounts are available for this token. Restrict the token to exactly one account and retry.'
+  );
   assert.equal(result.fallbackEligible, false);
 });

@@ -164,7 +164,7 @@ const expectBundleDiagnosticsLog = (consoleLogSpy, source) => {
   });
   const payload = parseConsolePayload(call);
   expect(payload).toEqual(expect.objectContaining({
-    workerName: 'test-worker',
+    workerName: expect.stringMatching(/^test-worker-[0-9a-f]{12}$/),
     sessionSlug: 'alpha-session',
     diagnostics: expect.objectContaining({ source }),
   }));
@@ -182,7 +182,7 @@ const expectScriptUploadFailureLog = (consoleErrorSpy, source) => {
   });
   const payload = parseConsolePayload(call);
   expect(payload).toEqual(expect.objectContaining({
-    workerName: 'test-worker',
+    workerName: expect.stringMatching(/^test-worker-[0-9a-f]{12}$/),
     sessionSlug: 'alpha-session',
     error: expect.stringContaining('no registered event handlers'),
     diagnostics: expect.objectContaining({ source }),
@@ -265,7 +265,7 @@ describe('deploy-helper worker', () => {
       expect(uploadForm.get('worker.mjs')).toBeTruthy();
       expect(uploadForm.get('worker.js')).toBeNull();
       const workerSecretWrites = fetchMock.calls
-        .filter(([url]) => String(url).endsWith('/workers/scripts/test-worker/secrets'))
+        .filter(([url]) => String(url).endsWith(`/workers/scripts/${payload.workerName}/secrets`))
         .map(([, init]) => JSON.parse(init.body));
       expect(workerSecretWrites.map((secret) => secret.name)).toEqual(['TOKEN_HMAC_SECRET']);
 
@@ -296,7 +296,7 @@ describe('deploy-helper worker', () => {
       ));
       expect(String(configRewrite[0])).toMatch(/\/storage\/kv\/namespaces\/kv-123\/values\/session:alpha-session:config$/);
       expect(JSON.parse(configRewrite[1].body).corsWorkerUrl).toBe(
-        'https://test-worker.tenant-subdomain.workers.dev/' // intentional: real URL — tests worker URL construction
+        `https://${payload.workerName}.tenant-subdomain.workers.dev/` // intentional: real URL — tests worker URL construction
       );
     } finally {
       consoleLogSpy.mockRestore();
@@ -547,7 +547,7 @@ describe('deploy-helper worker', () => {
       ))).toHaveLength(1);
       expect(fetchMock.calls.some(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'PUT' &&
-        /\/workers\/scripts\/test-worker$/.test(String(url))
+        /\/workers\/scripts\/test-worker-[0-9a-f]{12}$/.test(String(url))
       ))).toBe(false);
     } finally {
       consoleLogSpy.mockRestore();
@@ -620,7 +620,7 @@ describe('deploy-helper worker', () => {
       ]));
 
       const workerSecretWrites = fetchMock.calls
-        .filter(([url]) => String(url).endsWith('/workers/scripts/test-worker/secrets'))
+        .filter(([url]) => String(url).endsWith(`/workers/scripts/${payload.workerName}/secrets`))
         .map(([, init]) => JSON.parse(init.body));
       expect(workerSecretWrites.map((secret) => secret.name)).toEqual([
         'CE_STORAGE_ENVELOPE_KEK',
@@ -673,7 +673,7 @@ describe('deploy-helper worker', () => {
       expect(response.status).toBe(502);
       expect(payload?.error).toBe('envelope KEK write failed');
       const runtimeSecrets = fetchMock.calls
-        .filter(([url]) => String(url).endsWith('/workers/scripts/test-worker/secrets'))
+        .filter(([url]) => /\/workers\/scripts\/test-worker-[0-9a-f]{12}\/secrets$/.test(String(url)))
         .map(([, init]) => JSON.parse(init.body).name);
       expect(runtimeSecrets).toEqual(['CE_STORAGE_ENVELOPE_KEK']);
       expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
@@ -715,7 +715,7 @@ describe('deploy-helper worker', () => {
       expect(response.status).toBe(502);
       expect(payload?.error).toBe('HMAC activation failed');
       const runtimeSecrets = fetchMock.calls
-        .filter(([url]) => String(url).endsWith('/workers/scripts/test-worker/secrets'))
+        .filter(([url]) => /\/workers\/scripts\/test-worker-[0-9a-f]{12}\/secrets$/.test(String(url)))
         .map(([, init]) => JSON.parse(init.body).name);
       expect(runtimeSecrets).toEqual(['CE_STORAGE_ENVELOPE_KEK', 'TOKEN_HMAC_SECRET']);
       expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
@@ -951,7 +951,7 @@ describe('deploy-helper worker', () => {
     expect(fetchMock.calls).toHaveLength(0);
   });
 
-  it('rejects an existing legacy worker before creating KV or overwriting state', async () => {
+  it('randomizes a legacy physical worker name before checking for an existing script', async () => {
     const fetchMock = makeFetchSequence([]);
     fetchMock.workerNamePreflightOverride = cfSuccess({ compatibility_date: '2024-09-02' });
     global.fetch = fetchMock;
@@ -974,6 +974,9 @@ describe('deploy-helper worker', () => {
     expect(payload?.error).toContain('In-place redeploy is disabled');
     expect(payload?.error).toContain('protect existing worker state');
     expect(fetchMock.workerNamePreflightCalls).toHaveLength(1);
+    expect(String(fetchMock.workerNamePreflightCalls[0][0])).toMatch(
+      /\/workers\/scripts\/existing-worker-[0-9a-f]{12}\/settings$/
+    );
     expect(fetchMock.calls).toHaveLength(0);
   });
 
@@ -1067,7 +1070,7 @@ describe('deploy-helper worker', () => {
       ));
       const configRewrite = JSON.parse(finalConfigWrite[1].body);
       expect(configRewrite.storageProfile.payloadAccessControl.mode).toBe('public_read');
-      expect(configRewrite.corsWorkerUrl).toBe('https://test-worker.tenant-subdomain.workers.dev/');
+      expect(configRewrite.corsWorkerUrl).toBe(`https://${payload.workerName}.tenant-subdomain.workers.dev/`);
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -1206,7 +1209,7 @@ describe('deploy-helper worker', () => {
 
   it('returns a structured 502 when fetching the worker bundle fails', async () => {
     global.fetch = async (url) => {
-      if (String(url).endsWith('/workers/scripts/test-worker/settings')) {
+      if (/\/workers\/scripts\/test-worker-[0-9a-f]{12}\/settings$/.test(String(url))) {
         return cfFailure(404, 'Worker not found.');
       }
       throw new TypeError('fetch failed');
@@ -1293,7 +1296,7 @@ describe('deploy-helper worker', () => {
       expect(payload?.error).toMatch(/did not enable workers\.dev/i);
       expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
       expect(fetchMock.calls.some(([url, init = {}]) => (
-        String(url).endsWith('/workers/scripts/test-worker') && init.method === 'DELETE'
+        /\/workers\/scripts\/test-worker-[0-9a-f]{12}$/.test(String(url)) && init.method === 'DELETE'
       ))).toBe(true);
       expect(fetchMock.calls.some(([url, init = {}]) => (
         String(url).endsWith('/storage/kv/namespaces/kv-123') && init.method === 'DELETE'
@@ -1589,7 +1592,7 @@ describe('deploy-helper worker', () => {
       expect(payload?.error).toBe('secrets write failed');
       expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
       expect(fetchMock.calls.some(([url, init = {}]) => (
-        /\/workers\/scripts\/test-worker(?:\?|$)/.test(String(url)) && init.method === 'PUT'
+        /\/workers\/scripts\/test-worker-[0-9a-f]{12}(?:\?|$)/.test(String(url)) && init.method === 'PUT'
       ))).toBe(false);
       expect(fetchMock.calls.some(([url, init = {}]) => (
         String(url).endsWith('/storage/kv/namespaces/kv-123') && init.method === 'DELETE'
@@ -1661,6 +1664,7 @@ describe('deploy-helper worker', () => {
       const payload = await response.json();
 
       expect(response.status).toBe(502);
+      expect(payload?.deploymentId).toMatch(/^[0-9a-f]{64}$/);
       expect(payload?.orphanResources).toEqual({
         kvNamespaceId: 'kv-123',
         kvCleanupStatus: 'retained-live-worker',
@@ -1668,7 +1672,7 @@ describe('deploy-helper worker', () => {
         workerCleanupStatus: 'ownership-changed',
       });
       expect(fetchMock.calls.some(([url, init = {}]) => (
-        String(url).endsWith('/workers/scripts/test-worker') && init.method === 'DELETE'
+        /\/workers\/scripts\/test-worker-[0-9a-f]{12}$/.test(String(url)) && init.method === 'DELETE'
       ))).toBe(false);
       expect(fetchMock.calls.some(([url, init = {}]) => (
         String(url).endsWith('/storage/kv/namespaces/kv-123') && init.method === 'DELETE'
@@ -1811,7 +1815,7 @@ describe('deploy-helper worker', () => {
       expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
       expect(fetchMock.calls.some(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'PUT' &&
-        /\/workers\/scripts\/test-worker$/.test(String(url))
+        /\/workers\/scripts\/test-worker-[0-9a-f]{12}$/.test(String(url))
       ))).toBe(false);
       expect(fetchMock.calls.filter(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'DELETE' &&
@@ -1822,16 +1826,18 @@ describe('deploy-helper worker', () => {
     }
   });
 
-  it('serializes concurrent same-name deploys so only one can provision resources', async () => {
+  it('gives concurrent same-prefix deploys distinct physical worker names', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
-    let workerBindings = null;
+    const workerBindingsByName = new Map();
     let kvCreates = 0;
     let scriptUploads = 0;
     const kvValues = new Map();
     global.fetch = jest.fn(async (url, init = {}) => {
       const normalizedUrl = String(url);
       const method = String(init.method || 'GET').toUpperCase();
-      if (method === 'GET' && normalizedUrl.endsWith('/workers/scripts/test-worker/settings')) {
+      const settingsMatch = normalizedUrl.match(/\/workers\/scripts\/([^/]+)\/settings$/);
+      if (method === 'GET' && settingsMatch) {
+        const workerBindings = workerBindingsByName.get(settingsMatch[1]);
         return workerBindings
           ? cfSuccess({ bindings: workerBindings })
           : cfFailure(404, 'Worker not found.');
@@ -1852,19 +1858,20 @@ describe('deploy-helper worker', () => {
           });
         }
       }
-      if (method === 'PUT' && normalizedUrl.endsWith('/workers/scripts/test-worker')) {
+      const scriptMatch = normalizedUrl.match(/\/workers\/scripts\/([^/]+)$/);
+      if (method === 'PUT' && scriptMatch && init.body instanceof FormData) {
         scriptUploads += 1;
         const metadata = JSON.parse(await new Response(init.body.get('metadata')).text());
-        workerBindings = metadata.bindings;
+        workerBindingsByName.set(scriptMatch[1], metadata.bindings);
         return cfSuccess({ id: 'worker-uploaded' });
       }
       if (method === 'GET' && normalizedUrl.endsWith('/workers/subdomain')) {
         return cfSuccess({ subdomain: 'tenant-subdomain', status: 'active' });
       }
-      if (method === 'POST' && normalizedUrl.endsWith('/workers/scripts/test-worker/subdomain')) {
+      if (method === 'POST' && /\/workers\/scripts\/[^/]+\/subdomain$/.test(normalizedUrl)) {
         return cfSuccess({ enabled: true });
       }
-      if (method === 'PUT' && normalizedUrl.endsWith('/workers/scripts/test-worker/secrets')) {
+      if (method === 'PUT' && /\/workers\/scripts\/[^/]+\/secrets$/.test(normalizedUrl)) {
         return cfSuccess({});
       }
       throw new Error(`Unexpected Cloudflare mock call: ${method} ${normalizedUrl}`);
@@ -1878,14 +1885,19 @@ describe('deploy-helper worker', () => {
         sessionSlug: 'alpha-session',
         bundleText: 'export default { fetch() {} };',
       };
-      const [first, second] = await Promise.all([
+      const [firstResponse, secondResponse] = await Promise.all([
         deployHelperWorker.fetch(makeJsonRequest('/deploy', body), {}, {}),
         deployHelperWorker.fetch(makeJsonRequest('/deploy', body), {}, {}),
       ]);
+      const [first, second] = await Promise.all([firstResponse.json(), secondResponse.json()]);
 
-      expect([first.status, second.status].sort()).toEqual([200, 409]);
-      expect(kvCreates).toBe(1);
-      expect(scriptUploads).toBe(1);
+      expect(firstResponse.status).toBe(200);
+      expect(secondResponse.status).toBe(200);
+      expect(first.workerName).toMatch(/^test-worker-[0-9a-f]{12}$/);
+      expect(second.workerName).toMatch(/^test-worker-[0-9a-f]{12}$/);
+      expect(first.workerName).not.toBe(second.workerName);
+      expect(kvCreates).toBe(2);
+      expect(scriptUploads).toBe(2);
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -1926,7 +1938,7 @@ describe('deploy-helper worker', () => {
       expect(fetchMock.calls.some(([url]) => String(url).endsWith('/secrets'))).toBe(false);
       expect(fetchMock.calls.some(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'DELETE' &&
-        (String(url).endsWith('/workers/scripts/test-worker') ||
+        (/\/workers\/scripts\/test-worker-[0-9a-f]{12}$/.test(String(url)) ||
           String(url).endsWith('/storage/kv/namespaces/kv-123'))
       ))).toBe(false);
     } finally {
