@@ -122,6 +122,37 @@ const buildQuestionSummaries = (report = {}) => {
   });
 };
 
+const buildIssueAreaTargets = (report = {}, questionSummaries = []) => {
+  const questionById = new Map(questionSummaries.map((question) => [question.id, question]));
+  return (Array.isArray(report.debateAtlas?.topicCircles) ? report.debateAtlas.topicCircles : []).map((topic) => {
+    const questionIds = Array.isArray(topic.questionIds) ? topic.questionIds : [];
+    const linkedQuestions = questionIds.map((id) => questionById.get(id)).filter(Boolean);
+    const suggestedTags = Array.from(new Set(linkedQuestions.flatMap((question) => [
+      ...(Array.isArray(question.subtopics) ? question.subtopics : []),
+      ...(Array.isArray(question.riskFacets) ? question.riskFacets : []),
+    ]))).slice(0, 8);
+    const differenceScores = linkedQuestions
+      .map((question) => question.modelDifference)
+      .filter(Number.isFinite);
+    const consistencyScores = linkedQuestions
+      .map((question) => question.aggregate?.winningResponseConsistency?.rate)
+      .filter(Number.isFinite);
+    return {
+      id: topic.id,
+      label: topic.label || topic.id,
+      questionIds,
+      suggestedTags,
+      averageStance: Number.isFinite(topic.averageStance) ? topic.averageStance : null,
+      averageModelDifference: differenceScores.length
+        ? round(differenceScores.reduce((sum, value) => sum + value, 0) / differenceScores.length)
+        : null,
+      averageWinningResponseConsistency: consistencyScores.length
+        ? round(consistencyScores.reduce((sum, value) => sum + value, 0) / consistencyScores.length)
+        : null,
+    };
+  });
+};
+
 export const buildSecondPassAnalysisInput = (report = {}) => {
   const questionSummaries = buildQuestionSummaries(report);
   const inputReportHash = buildReportFingerprint(report);
@@ -160,9 +191,11 @@ export const buildSecondPassAnalysisInput = (report = {}) => {
     questions: questionSummaries,
     debateAtlas: {
       currentTopicCircles: report.debateAtlas?.topicCircles || [],
+      issueAreaTargets: buildIssueAreaTargets(report, questionSummaries),
       inputs: report.rawMaterial?.debateAtlasInputs || [],
       requestedOutputs: {
         topicCircles: 'Replace or enrich currentTopicCircles with AI-generated debate topics, labels, summaries, and linked question ids.',
+        issueAreas: 'Generate modal-ready issue analysis keyed to topic ids, with tags, grounded findings, linked questions, and optional freeform titled sections.',
         topicEdges: 'Optional links between topic ids with relation labels such as reinforces, conflicts, or depends-on.',
         compasses: 'Optional 2-axis maps with x/y axis labels, endpoint labels, and topic/question placements.',
       },
@@ -212,6 +245,29 @@ export const buildSecondPassAnalysisInput = (report = {}) => {
             summary: 'string',
           },
         ],
+        issueAreas: [
+          {
+            id: 'topic-id',
+            title: 'Optional issue-area title',
+            summary: 'Report-ready overview grounded in benchmark results.',
+            tags: ['governance', 'evaluation'],
+            keyTensions: ['short grounded tension'],
+            pointsOfAgreement: ['short convergence finding'],
+            pointsOfDisagreement: ['short divergence finding'],
+            openQuestions: ['unresolved question'],
+            implications: ['bounded implication'],
+            linkedQuestionIds: ['aidb_0001'],
+            confidence: 'low | medium | high',
+            analysisSections: [
+              {
+                title: 'Freeform section title',
+                body: 'One or more concise paragraphs.',
+                bullets: ['optional bullet'],
+                linkedQuestionIds: ['aidb_0001'],
+              },
+            ],
+          },
+        ],
         compasses: [
           {
             id: 'compass-id',
@@ -257,6 +313,7 @@ export const buildSecondPassAnalysisInput = (report = {}) => {
 export const attachAnalysisOverlay = (report = {}, overlay = {}) => {
   const errors = validateAnalysisOverlay(overlay, {
     questionIds: new Set((report.questions || []).map((question) => question.id)),
+    topicIds: new Set((report.debateAtlas?.topicCircles || []).map((topic) => topic.id)),
   });
   const expectedHash = buildReportFingerprint(report);
   if (overlay?.provenance?.inputReportHash && overlay.provenance.inputReportHash !== expectedHash) {

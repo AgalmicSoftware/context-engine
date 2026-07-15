@@ -30,6 +30,7 @@ Output only valid JSON with this top-level shape:
   "debateAtlas": {
     "topicCircles": [],
     "topicEdges": [],
+    "issueAreas": [],
     "compasses": []
   },
   "riskMatrix": {
@@ -64,6 +65,17 @@ Requirements:
 - For `debateAtlas.topicEdges`, add only meaningful relationships between
   generated topic ids. Use relation labels such as `conflicts`, `reinforces`,
   `depends-on`, or `frames`.
+- For `debateAtlas.issueAreas`, generate one modal-ready analysis object for
+  each useful topic id. Every issue-area id must match an id in generated
+  `topicCircles` or `debateAtlas.issueAreaTargets` so circle clicks resolve
+  directly. Each object may include `title`, `summary`, `tags`,
+  `keyTensions`, `pointsOfAgreement`, `pointsOfDisagreement`, `openQuestions`,
+  `implications`, `linkedQuestionIds`, `confidence`, and `analysisSections`.
+- `analysisSections` is the freeform extension point. Each section must have a
+  concise `title`; it may include a paragraph-style `body`, `bullets`, and
+  `linkedQuestionIds`. Generate 2-4 useful sections rather than generic filler.
+- Keep issue-area tags short and reusable across topics. Use them for browsing
+  and filtering, not as prose summaries.
 - For `debateAtlas.compasses`, create two-axis maps that help interpret model
   disagreement. Include axis endpoint labels and placements with x/y values
   normalized from -1 to 1.

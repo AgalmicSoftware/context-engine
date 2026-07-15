@@ -631,6 +631,111 @@ const normalizeAnalysisTopicCircles = (report) => {
   });
 };
 
+const averageFiniteValues = (values = []) => {
+  const finiteValues = values.filter(Number.isFinite);
+  if (!finiteValues.length) return null;
+  return finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length;
+};
+
+const questionModelDifference = (report, questionId) => {
+  const scores = Object.values(report.polisReport?.byModelQuestion || {})
+    .map((modelQuestions) => modelQuestions?.[questionId]?.meanScore)
+    .filter(Number.isFinite);
+  if (scores.length < 2) return null;
+  return Math.max(...scores) - Math.min(...scores);
+};
+
+const normalizeIssueAnalysisSections = (sections, questionById) => (
+  Array.isArray(sections)
+    ? sections.map((section, index) => {
+      if (!section || typeof section !== 'object') return null;
+      const title = String(section.title || '').trim();
+      const body = String(section.body || '').trim();
+      const bullets = normalizeOverlayList(section.bullets);
+      const linkedQuestionIds = Array.isArray(section.linkedQuestionIds)
+        ? section.linkedQuestionIds.filter((id) => questionById.has(id))
+        : [];
+      if (!title || (!body && !bullets.length && !linkedQuestionIds.length)) return null;
+      return {
+        id: `analysis-section-${index + 1}`,
+        title,
+        body,
+        bullets,
+        linkedQuestionIds,
+      };
+    }).filter(Boolean)
+    : []
+);
+
+const normalizeAnalysisIssueAreas = (report, topics = normalizeAnalysisTopicCircles(report)) => {
+  const questions = getQuestions(report);
+  const questionById = new Map(questions.map((question) => [question.id, question]));
+  const byQuestion = report.polisReport?.byQuestion || {};
+  const overlayIssueAreas = Array.isArray(report.analysisOverlay?.debateAtlas?.issueAreas)
+    ? report.analysisOverlay.debateAtlas.issueAreas
+    : [];
+  const overlayById = new Map(overlayIssueAreas
+    .filter((issueArea) => issueArea && typeof issueArea === 'object' && issueArea.id)
+    .map((issueArea) => [String(issueArea.id), issueArea]));
+
+  return topics.map((topic, index) => {
+    const overlay = overlayById.get(String(topic.id)) || null;
+    const linkedQuestionIds = Array.from(new Set([
+      ...(Array.isArray(topic.questionIds) ? topic.questionIds : []),
+      ...(Array.isArray(overlay?.linkedQuestionIds) ? overlay.linkedQuestionIds : []),
+    ])).filter((id) => questionById.has(id));
+    const linkedQuestions = linkedQuestionIds.map((questionId) => {
+      const question = questionById.get(questionId);
+      const summary = byQuestion[questionId] || {};
+      return {
+        ...question,
+        modelDifference: questionModelDifference(report, questionId),
+        winningResponseConsistency: Number.isFinite(summary.winningResponseConsistency?.rate)
+          ? summary.winningResponseConsistency.rate
+          : null,
+        meanScore: Number.isFinite(summary.meanScore) ? summary.meanScore : null,
+      };
+    });
+    const tags = [];
+    const seenTags = new Set();
+    [
+      ...(Array.isArray(overlay?.tags) ? overlay.tags : []),
+      ...(Array.isArray(topic.tags) ? topic.tags : []),
+      ...linkedQuestions.flatMap((question) => (Array.isArray(question.subtopics) ? question.subtopics : [])),
+    ].forEach((value) => {
+      const tag = String(value || '').trim();
+      const key = tag.toLowerCase();
+      if (!tag || seenTags.has(key) || tags.length >= 8) return;
+      seenTags.add(key);
+      tags.push(tag);
+    });
+    const averageModelDifference = averageFiniteValues(linkedQuestions.map((question) => question.modelDifference));
+    const averageWinningResponseConsistency = averageFiniteValues(
+      linkedQuestions.map((question) => question.winningResponseConsistency),
+    );
+    const title = String(overlay?.title || topic.label || topic.id || `Issue Area ${index + 1}`).trim();
+    const measuredSummary = `${linkedQuestions.length} benchmark statement${linkedQuestions.length === 1 ? '' : 's'} map this issue area. The available model responses show ${scoreLabel({ meanScore: topic.averageStance })} on average (mean ${formatScore(topic.averageStance)})${Number.isFinite(averageModelDifference) ? `, with mean model-to-model difference ${formatScore(averageModelDifference)}` : ''}.`;
+    return {
+      ...topic,
+      title,
+      summary: String(overlay?.summary || topic.summary || measuredSummary).trim(),
+      tags,
+      linkedQuestionIds,
+      linkedQuestions,
+      averageModelDifference,
+      averageWinningResponseConsistency,
+      keyTensions: normalizeOverlayList(overlay?.keyTensions),
+      pointsOfAgreement: normalizeOverlayList(overlay?.pointsOfAgreement),
+      pointsOfDisagreement: normalizeOverlayList(overlay?.pointsOfDisagreement),
+      openQuestions: normalizeOverlayList(overlay?.openQuestions),
+      implications: normalizeOverlayList(overlay?.implications),
+      confidence: ['low', 'medium', 'high'].includes(overlay?.confidence) ? overlay.confidence : null,
+      analysisSections: normalizeIssueAnalysisSections(overlay?.analysisSections, questionById),
+      hasGeneratedAnalysis: !!overlay,
+    };
+  });
+};
+
 const normalizeCompassAxis = (axis = {}, fallbackLeft = 'Left', fallbackRight = 'Right') => ({
   label: axis.label || axis.name || '',
   left: axis.left || axis.bottom || axis.negative || axis.low || fallbackLeft,
@@ -2513,13 +2618,141 @@ const renderAnalysisCompasses = (report) => {
   </div>`;
 };
 
+const renderAtlasModalCollapse = ({ id, title, count = null, content, open = false }) => {
+  const bodyId = `ce-atlas-modal-${toTestIdFragment(id)}-body`;
+  return `<section class="atlasIssueCollapse" data-ce-atlas-modal-collapse-section>
+    <button
+      type="button"
+      class="atlasIssueCollapseHeader"
+      data-ce-atlas-modal-collapse
+      aria-expanded="${open ? 'true' : 'false'}"
+      aria-controls="${escapeHtml(bodyId)}"
+    >
+      ${renderFontAwesomeIcon('caret-up', 'atlasIssueCollapseCaret', `data-ce-atlas-modal-caret-open${open ? '' : ' hidden'}`)}
+      ${renderFontAwesomeIcon('caret-down', 'atlasIssueCollapseCaret', `data-ce-atlas-modal-caret-closed${open ? ' hidden' : ''}`)}
+      <span>${escapeHtml(title)}</span>
+      ${Number.isFinite(count) ? `<span class="atlasIssueCollapseCount">(${escapeHtml(count)})</span>` : ''}
+      <span class="atlasIssueCollapseToggle" data-ce-atlas-modal-collapse-label>${open ? 'Hide' : 'Show'}</span>
+    </button>
+    <div class="atlasIssueCollapseContent" id="${escapeHtml(bodyId)}" data-ce-atlas-modal-collapse-body${open ? '' : ' hidden'}>
+      ${content}
+    </div>
+  </section>`;
+};
+
+const renderAtlasIssueFindingGroup = (title, items) => {
+  if (!items.length) return '';
+  return `<div class="atlasIssueFindingGroup">
+    <h4>${escapeHtml(title)}</h4>
+    <ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+  </div>`;
+};
+
+const renderAtlasIssueQuestionLinks = (questionIds) => {
+  if (!questionIds.length) return '';
+  return `<div class="atlasIssueSectionLinks">
+    <span>Linked questions</span>
+    ${questionIds.map((questionId) => `<a href="#question-${escapeHtml(questionId)}" data-ce-atlas-question-link>${escapeHtml(questionId)}</a>`).join('')}
+  </div>`;
+};
+
+const renderAtlasIssueTemplate = (issueArea, index) => {
+  const depthClass = ['depth0', 'depth1', 'depth2'][index % 3];
+  const findingGroups = [
+    renderAtlasIssueFindingGroup('Key tensions', issueArea.keyTensions),
+    renderAtlasIssueFindingGroup('Points of agreement', issueArea.pointsOfAgreement),
+    renderAtlasIssueFindingGroup('Points of disagreement', issueArea.pointsOfDisagreement),
+    renderAtlasIssueFindingGroup('Open questions', issueArea.openQuestions),
+    renderAtlasIssueFindingGroup('Implications', issueArea.implications),
+  ].join('');
+  const findings = findingGroups
+    ? renderAtlasModalCollapse({
+      id: `${issueArea.id}-analysis`,
+      title: 'Issue Analysis',
+      count: [
+        issueArea.keyTensions,
+        issueArea.pointsOfAgreement,
+        issueArea.pointsOfDisagreement,
+        issueArea.openQuestions,
+        issueArea.implications,
+      ].reduce((sum, items) => sum + items.length, 0),
+      content: `<div class="atlasIssueFindingGrid">${findingGroups}</div>`,
+      open: true,
+    })
+    : '';
+  const freeformSections = issueArea.analysisSections.map((section, sectionIndex) => renderAtlasModalCollapse({
+    id: `${issueArea.id}-${section.id}`,
+    title: section.title,
+    count: section.bullets.length || null,
+    content: `<div class="atlasIssueFreeform">
+      ${section.body ? `<p>${escapeHtml(section.body)}</p>` : ''}
+      ${section.bullets.length ? `<ul>${section.bullets.map((bullet) => `<li>${escapeHtml(bullet)}</li>`).join('')}</ul>` : ''}
+      ${renderAtlasIssueQuestionLinks(section.linkedQuestionIds)}
+    </div>`,
+    open: sectionIndex === 0,
+  })).join('');
+  const questions = issueArea.linkedQuestions.map((question) => {
+    const difference = Number.isFinite(question.modelDifference)
+      ? formatScore(question.modelDifference)
+      : 'unavailable';
+    const consistency = Number.isFinite(question.winningResponseConsistency)
+      ? formatPercent(question.winningResponseConsistency)
+      : 'unavailable';
+    return `<a class="atlasIssueQuestion" href="#question-${escapeHtml(question.id)}" data-ce-atlas-question-link>
+      <span class="atlasIssueQuestionId">${escapeHtml(question.id)}</span>
+      <strong>${escapeHtml(question.prompt || question.id)}</strong>
+      <span class="atlasIssueQuestionMeta">Model difference ${escapeHtml(difference)} | Repeat consistency ${escapeHtml(consistency)}</span>
+    </a>`;
+  }).join('');
+  const questionSection = renderAtlasModalCollapse({
+    id: `${issueArea.id}-questions`,
+    title: 'Questions',
+    count: issueArea.linkedQuestions.length,
+    content: `<div class="atlasIssueQuestions">${questions || '<p class="atlasIssueEmpty">No linked benchmark questions.</p>'}</div>`,
+    open: false,
+  });
+  const sourceLabel = issueArea.hasGeneratedAnalysis ? 'Second-pass AI analysis' : 'Measured benchmark evidence';
+  const modalMeta = `${issueArea.linkedQuestions.length} question${issueArea.linkedQuestions.length === 1 ? '' : 's'} | ${sourceLabel}`;
+  return `<template
+    data-ce-atlas-issue-template
+    data-ce-atlas-topic-id="${escapeHtml(issueArea.id)}"
+    data-ce-atlas-topic-title="${escapeHtml(issueArea.title)}"
+    data-ce-atlas-topic-meta="${escapeHtml(modalMeta)}"
+  >
+    <div class="atlasIssueModalTags">
+      <span class="atlasIssueDepthTag ${escapeHtml(depthClass)}">Issue area</span>
+      ${issueArea.tags.map((tag) => `<button type="button" class="atlasIssueTag" data-ce-atlas-modal-tag="${escapeHtml(tag)}" title="Filter the Debate Map by ${escapeHtml(tag)}">${escapeHtml(formatDisplayLabel(tag) || tag)}</button>`).join('')}
+      ${issueArea.confidence ? `<span class="atlasIssueTag atlasIssueConfidence">AI confidence: ${escapeHtml(issueArea.confidence)}</span>` : ''}
+    </div>
+    <div class="atlasIssueOverview">
+      <p>${escapeHtml(issueArea.summary)}</p>
+      <div class="atlasIssueMetricGrid" aria-label="Issue area benchmark metrics">
+        <div><span>Questions</span><strong>${escapeHtml(issueArea.linkedQuestions.length)}</strong></div>
+        <div><span>Mean stance</span><strong>${escapeHtml(formatScore(issueArea.averageStance))}</strong><small>${escapeHtml(scoreLabel({ meanScore: issueArea.averageStance }))}</small></div>
+        <div><span>Model difference</span><strong>${escapeHtml(Number.isFinite(issueArea.averageModelDifference) ? formatScore(issueArea.averageModelDifference) : 'N/A')}</strong><small>mean spread</small></div>
+        <div><span>Repeat consistency</span><strong>${escapeHtml(Number.isFinite(issueArea.averageWinningResponseConsistency) ? formatPercent(issueArea.averageWinningResponseConsistency) : 'N/A')}</strong><small>winning response share</small></div>
+      </div>
+      ${issueArea.hasGeneratedAnalysis ? '' : '<p class="atlasIssueAnalysisNotice"><strong>Measured view.</strong> Add a provenance-bound second-pass analysis overlay for generated tensions, implications, and freeform sections.</p>'}
+    </div>
+    ${findings}
+    ${freeformSections}
+    ${questionSection}
+  </template>`;
+};
+
 const renderDebateAtlas = (report) => {
   const topics = normalizeAnalysisTopicCircles(report);
-  const packedTopics = computeStaticPackedTopicLayout(topics);
+  const issueAreas = normalizeAnalysisIssueAreas(report, topics);
+  const packedTopics = computeStaticPackedTopicLayout(issueAreas);
   const packedTitle = report.debateAtlas?.title || 'AI Discourse Topic Atlas';
   const analysisCompasses = renderAnalysisCompasses(report);
-  const topDebateRows = [...topics]
-    .sort((left, right) => Number(right.questionCount || 0) - Number(left.questionCount || 0))
+  const tagOptions = Array.from(new Set(issueAreas.flatMap((issueArea) => issueArea.tags)))
+    .sort((left, right) => left.localeCompare(right));
+  const topDebateRows = [...issueAreas]
+    .sort((left, right) => (
+      (Number.isFinite(right.averageModelDifference) ? right.averageModelDifference : -1)
+      - (Number.isFinite(left.averageModelDifference) ? left.averageModelDifference : -1)
+    ) || Number(right.questionCount || 0) - Number(left.questionCount || 0))
     .slice(0, 3)
     .map((topic) => {
       const rawLabel = topic.label || 'uncategorized';
@@ -2528,12 +2761,13 @@ const renderDebateAtlas = (report) => {
         type="button"
         class="topNodeItem"
         data-ce-node-id="${escapeHtml(topic.id || rawLabel)}"
+        data-ce-atlas-open="${escapeHtml(topic.id || rawLabel)}"
         data-ce-searchable
       >
         <span class="nodeTitle">${escapeHtml(label)}</span>
         <span class="nodeStats">
           <span>${escapeHtml(String(topic.questionCount || 0))} questions</span>
-          <span>${escapeHtml(scoreLabel({ meanScore: topic.averageStance }))}</span>
+          <span>difference ${escapeHtml(Number.isFinite(topic.averageModelDifference) ? formatScore(topic.averageModelDifference) : 'N/A')}</span>
         </span>
       </button>`;
     }).join('');
@@ -2545,11 +2779,21 @@ const renderDebateAtlas = (report) => {
     const longestSegment = String(label).split(/[-\s]+/).reduce((maxLength, segment) => Math.max(maxLength, segment.length), 0);
     const fontSize = clamp((11.8 + (scale * 1.4)) - Math.max(0, longestSegment - 11) * 0.42, 9.2, 13.4);
     const mobileFontSize = clamp(fontSize * (Number(node.mobileDiameterPx || node.diameterPx || 1) / Math.max(1, Number(node.diameterPx || 1))) * 1.04, 7.2, fontSize);
-    return `<div
+    return `<button
+      type="button"
+      id="debate-atlas-${escapeHtml(topic.id || rawLabel)}"
       class="atlasNode packedAtlasNode ${escapeHtml(depthClass)}"
       data-ce-searchable
       data-testid="ce-atlas-node"
       data-ce-node-id="${escapeHtml(topic.id || rawLabel)}"
+      data-ce-atlas-open="${escapeHtml(topic.id || rawLabel)}"
+      data-ce-atlas-label="${escapeHtml(label)}"
+      data-ce-atlas-tags="${escapeHtml(JSON.stringify(topic.tags || []))}"
+      data-ce-atlas-difference="${escapeHtml(Number.isFinite(topic.averageModelDifference) ? topic.averageModelDifference : '')}"
+      data-ce-atlas-stance="${escapeHtml(Number.isFinite(topic.averageStance) ? topic.averageStance : '')}"
+      data-ce-atlas-question-count="${escapeHtml(topic.questionCount || 0)}"
+      data-ce-atlas-order="${escapeHtml(index)}"
+      data-ce-atlas-scale="${escapeHtml(scale.toFixed(4))}"
       data-ce-node-layout="packed"
       style="z-index:${20 + index}; --atlas-left:${escapeHtml(node.x.toFixed(2))}%; --atlas-top:${escapeHtml(node.y.toFixed(2))}%; --atlas-mobile-left:${escapeHtml(node.mobileX.toFixed(2))}%; --atlas-mobile-top:${escapeHtml(node.mobileY.toFixed(2))}%; --topic-color:${escapeHtml(stanceColor(topic.averageStance))}; --topic-scale:${escapeHtml(scale.toFixed(2))}; --topic-diameter:${escapeHtml(node.diameterPx.toFixed(1))}px; --topic-mobile-diameter:${escapeHtml(node.mobileDiameterPx.toFixed(1))}px; --topic-mobile-font-size:${escapeHtml(mobileFontSize.toFixed(1))}px;"
       aria-label="${escapeHtml(`${label}: ${topic.questionCount || 0} questions, ${scoreLabel({ meanScore: topic.averageStance })}`)}"
@@ -2560,8 +2804,9 @@ const renderDebateAtlas = (report) => {
           ${escapeHtml(label)}
         </div>
       </div>
-    </div>`;
+    </button>`;
   }).join('');
+  const issueTemplates = issueAreas.map(renderAtlasIssueTemplate).join('');
   return renderModePane({
     id: 'debate-atlas',
     title: 'Debate Map',
@@ -2586,6 +2831,25 @@ const renderDebateAtlas = (report) => {
             </div>
             <div class="secondaryControls">
               <div class="controlGroup"><label><input type="checkbox" checked> Demo Mode</label></div>
+              <div class="atlasBrowseControls" aria-label="Browse issue areas">
+                <label>Tag
+                  <select data-ce-atlas-tag-filter aria-label="Filter issue areas by tag">
+                    <option value="">All tags</option>
+                    ${tagOptions.map((tag) => `<option value="${escapeHtml(tag)}">${escapeHtml(formatDisplayLabel(tag) || tag)}</option>`).join('')}
+                  </select>
+                </label>
+                <label>Sort
+                  <select data-ce-atlas-sort aria-label="Sort issue areas">
+                    <option value="atlas">Atlas order</option>
+                    <option value="tag">Tag</option>
+                    <option value="difference-desc">Most contested</option>
+                    <option value="difference-asc">Most consensus</option>
+                    <option value="questions">Most questions</option>
+                    <option value="label">A-Z</option>
+                  </select>
+                </label>
+                <span class="atlasBrowseStatus" data-ce-atlas-browser-status aria-live="polite">${escapeHtml(issueAreas.length)} issue areas</span>
+              </div>
             </div>
           </div>
           <div class="nodesContainer">
@@ -2622,6 +2886,26 @@ const renderDebateAtlas = (report) => {
           </div>
           ${analysisCompasses}
         </div>
+      </div>
+    </div>
+    ${issueTemplates}
+    <div class="atlasIssueModalOverlay" data-ce-atlas-issue-modal hidden role="dialog" aria-modal="true" aria-labelledby="ce-atlas-issue-modal-title">
+      <div class="atlasIssueModalContent" data-ce-atlas-issue-modal-content tabindex="-1">
+        <div class="atlasIssueModalHeader">
+          <div class="atlasIssueModalTitleSection">
+            <div>
+              <h2 class="atlasIssueModalTitle" id="ce-atlas-issue-modal-title" data-ce-atlas-issue-modal-title>Issue area</h2>
+              <p class="atlasIssueModalMeta" data-ce-atlas-issue-modal-meta></p>
+            </div>
+            <button type="button" class="atlasIssueModalLinkButton" data-ce-atlas-issue-copy-link aria-label="Copy issue area deep link" title="Copy deep link">
+              ${renderFontAwesomeIcon('external-link-alt')}
+            </button>
+          </div>
+          <button type="button" class="atlasIssueModalClose" data-ce-atlas-issue-close aria-label="Close issue area">
+            ${renderFontAwesomeIcon('times')}
+          </button>
+        </div>
+        <div class="atlasIssueModalBody" data-ce-atlas-issue-modal-body></div>
       </div>
     </div>`,
   });
@@ -3300,6 +3584,12 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .debateMap .controlGroup label { display: flex; align-items: center; gap: 8px; color: #94a3b8; cursor: pointer; font-size: 0.9rem; transition: color 0.2s; }
     .debateMap .controlGroup label:hover { color: var(--ce-color-white); }
     .debateMap .controlGroup input { accent-color: #38bdf8; cursor: pointer; height: 16px; width: 16px; }
+    .debateMap .atlasBrowseControls { display: flex; align-items: flex-end; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+    .debateMap .atlasBrowseControls label { display: grid; gap: 4px; color: rgba(226, 232, 240, 0.72); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
+    .debateMap .atlasBrowseControls select { min-width: 132px; height: 34px; padding: 4px 30px 4px 9px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: var(--ce-radius-6); background: #111827; color: #f1f5f9; font: inherit; font-size: 0.78rem; text-transform: none; cursor: pointer; }
+    .debateMap .atlasBrowseControls select:hover,
+    .debateMap .atlasBrowseControls select:focus-visible { border-color: #38bdf8; outline: none; box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14); }
+    .debateMap .atlasBrowseStatus { align-self: center; color: rgba(148, 163, 184, 0.9); font-size: 0.74rem; white-space: nowrap; }
     .debateMap .nodesContainer { position: relative; min-height: 60vh; }
     .debateMap .atlasViewContainer { position: relative; width: 100%; height: 85vh; overflow: hidden; cursor: grab; touch-action: none; border-radius: var(--ce-radius-16); }
     .debateMap .atlasViewContainer:active { cursor: grabbing; }
@@ -3328,7 +3618,10 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .debateMap .topNodeItem:focus-visible { background: rgba(255, 255, 255, 0.1); border-color: #38bdf8; transform: translateX(-5px); outline: none; }
     .debateMap .nodeTitle { display: block; margin-bottom: 4px; font-size: 0.9rem; font-weight: 700; }
     .debateMap .nodeStats { display: flex; flex-wrap: wrap; gap: 10px; color: #94a3b8; font-size: 0.8rem; }
-    .debateMap .atlasNode { position: absolute; left: var(--atlas-left, 50%); top: var(--atlas-top, 50%); transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); z-index: 10; }
+    .debateMap .atlasNode { appearance: none; position: absolute; left: var(--atlas-left, 50%); top: var(--atlas-top, 50%); transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; transition: left 0.35s ease, top 0.35s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease; z-index: 10; }
+    .debateMap .atlasNode[hidden] { display: none !important; }
+    .debateMap .atlasNode:focus-visible { outline: none; }
+    .debateMap .atlasNode:focus-visible .nodeDot { outline: 3px solid #38bdf8; outline-offset: 4px; }
     .debateMap .atlasNode .nodeDot { position: relative; border-radius: var(--ce-radius-round); background-color: #0b1120; display: flex; align-items: center; justify-content: center; transition: transform 0.3s, background-color 0.3s, border-color 0.3s, color 0.3s; border: 2px solid rgba(255, 255, 255, 0.3); box-shadow: 0 0 10px rgba(0, 0, 0, 0.2); }
     .debateMap .atlasNode .nodeLabel { position: absolute; top: 110%; font-size: 0.75rem; color: #94a3b8; text-shadow: 0 2px 4px var(--ce-color-black); white-space: nowrap; pointer-events: none; transition: opacity 0.2s, transform 0.2s, color 0.2s, background-color 0.2s; opacity: 0; transform: scale(0.9); font-family: var(--ce-font-mono); letter-spacing: 0.5px; background: transparent; padding: 0; border: none; z-index: 30; }
     .debateMap .atlasNode .nodeLabel.alwaysVisible { opacity: 0.8; transform: scale(1); }
@@ -3355,6 +3648,79 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .debateMap .atlasNode.packedAtlasNode.hovered .packedNodeDot { transform: scale(1.03); }
     .debateMap .atlasNode.packedAtlasNode:hover .packedNodeLabel,
     .debateMap .atlasNode.packedAtlasNode.hovered .packedNodeLabel { background: transparent; padding: 0; transform: scale(1); }
+    body[data-ce-atlas-modal-open="true"] { overflow: hidden; }
+    .atlasIssueModalOverlay { position: fixed; inset: 0; z-index: 2000; display: flex; align-items: flex-start; justify-content: center; padding: 24px 16px; overflow-y: auto; overscroll-behavior: contain; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+    .atlasIssueModalOverlay[hidden] { display: none !important; }
+    .atlasIssueModalContent { position: relative; width: min(95%, 800px); max-height: calc(100vh - 48px); margin: 0 auto; padding: 30px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: var(--ce-radius-12); background: #111827; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); color: #f1f5f9; font-family: var(--ce-font-mono); }
+    .atlasIssueModalContent:focus { outline: none; }
+    .atlasIssueModalContent::-webkit-scrollbar { width: 8px; }
+    .atlasIssueModalContent::-webkit-scrollbar-thumb { border-radius: var(--ce-radius-4); background: rgba(255, 255, 255, 0.2); }
+    .atlasIssueModalHeader { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+    .atlasIssueModalTitleSection { display: flex; flex: 1 1 auto; align-items: flex-start; gap: 10px; min-width: 0; }
+    .atlasIssueModalTitleSection > div { min-width: 0; }
+    .atlasIssueModalTitle { margin: 0; color: var(--ce-color-white); font-family: var(--ce-font-mono); font-size: 1.6rem; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+    .atlasIssueModalMeta { margin: 6px 0 0; color: #94a3b8; font-size: 0.78rem; line-height: 1.35; }
+    .atlasIssueModalLinkButton,
+    .atlasIssueModalClose { appearance: none; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; padding: 5px; border: 0; background: transparent; color: #94a3b8; cursor: pointer; transition: color 0.2s, opacity 0.2s, transform 0.2s, background-color 0.2s; }
+    .atlasIssueModalLinkButton { margin-top: 1px; border-radius: var(--ce-radius-4); opacity: 0.5; }
+    .atlasIssueModalLinkButton svg { width: 1rem; height: 1rem; }
+    .atlasIssueModalClose { font-size: 1.5rem; }
+    .atlasIssueModalClose svg { width: 1em; height: 1em; }
+    .atlasIssueModalLinkButton:hover,
+    .atlasIssueModalLinkButton:focus-visible { color: #38bdf8; opacity: 1; outline: none; background: rgba(255, 255, 255, 0.05); }
+    .atlasIssueModalClose:hover,
+    .atlasIssueModalClose:focus-visible { color: var(--ce-color-white); outline: none; transform: scale(1.1); }
+    .atlasIssueModalTags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 25px; }
+    .atlasIssueTag,
+    .atlasIssueDepthTag { display: inline-flex; align-items: center; min-height: 26px; padding: 4px 10px; font-family: inherit; font-size: 0.72rem; line-height: 1.1; text-transform: uppercase; }
+    .atlasIssueTag { appearance: none; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--ce-radius-20); background: rgba(255, 255, 255, 0.05); color: #94a3b8; cursor: pointer; transition: background-color 0.2s, border-color 0.2s, color 0.2s; }
+    .atlasIssueTag:hover,
+    .atlasIssueTag:focus-visible { border-color: rgba(255, 255, 255, 0.3); background: rgba(255, 255, 255, 0.15); color: var(--ce-color-white); outline: none; }
+    .atlasIssueTag.atlasIssueConfidence { cursor: default; }
+    .atlasIssueDepthTag { border: 1px solid transparent; border-radius: var(--ce-radius-4); color: #0b1120; font-weight: 800; letter-spacing: 1px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); }
+    .atlasIssueDepthTag.depth0 { background: #3b82f6; box-shadow: 0 0 10px rgba(59, 130, 246, 0.3); }
+    .atlasIssueDepthTag.depth1 { background: #2dd4bf; box-shadow: 0 0 10px rgba(45, 212, 191, 0.3); }
+    .atlasIssueDepthTag.depth2 { background: #4ade80; box-shadow: 0 0 10px rgba(74, 222, 128, 0.3); }
+    .atlasIssueOverview { margin-bottom: 16px; }
+    .atlasIssueOverview > p:first-child { margin: 0 0 18px; color: rgba(226, 232, 240, 0.9); font-family: var(--ce-font-body); font-size: 1rem; line-height: 1.65; }
+    .atlasIssueMetricGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+    .atlasIssueMetricGrid > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 13px 12px; border-right: 1px solid rgba(255, 255, 255, 0.08); }
+    .atlasIssueMetricGrid > div:last-child { border-right: 0; }
+    .atlasIssueMetricGrid span { color: rgba(148, 163, 184, 0.86); font-size: 0.66rem; font-weight: 700; text-transform: uppercase; }
+    .atlasIssueMetricGrid strong { color: #f8fafc; font-size: 1.15rem; line-height: 1.15; }
+    .atlasIssueMetricGrid small { color: #64748b; font-size: 0.68rem; line-height: 1.2; }
+    .atlasIssueAnalysisNotice { margin: 0; padding: 10px 0 0; border-left: 2px solid rgba(56, 189, 248, 0.65); color: #94a3b8; font-family: var(--ce-font-body); font-size: 0.84rem; line-height: 1.5; padding-left: 12px; }
+    .atlasIssueCollapse { margin-bottom: 12px; background: transparent; }
+    .atlasIssueCollapseHeader { appearance: none; display: flex; align-items: center; width: 100%; margin: 0 0 8px; padding: 8px 0; border: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; user-select: none; }
+    .atlasIssueCollapseHeader:hover,
+    .atlasIssueCollapseHeader:focus-visible { outline: none; border-bottom-color: rgba(56, 189, 248, 0.45); }
+    .atlasIssueCollapseCaret { width: 14px; margin-right: 6px; color: rgba(255, 255, 255, 0.5); }
+    .atlasIssueCollapseCaret[hidden] { display: none !important; }
+    .atlasIssueCollapseHeader > span:first-of-type { color: rgba(255, 255, 255, 0.75); font-size: 1.1rem; font-weight: 600; }
+    .atlasIssueCollapseCount { margin-left: 6px; color: rgba(255, 255, 255, 0.4); font-size: 0.8rem; }
+    .atlasIssueCollapseToggle { margin-left: auto; color: rgba(255, 255, 255, 0.35); font-size: 0.7rem; text-transform: uppercase; }
+    .atlasIssueCollapseContent { padding: 4px 0 8px; }
+    .atlasIssueCollapseContent[hidden] { display: none !important; }
+    .atlasIssueFindingGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
+    .atlasIssueFindingGroup { min-width: 0; padding: 10px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+    .atlasIssueFindingGroup h4 { margin: 0 0 8px; color: #38bdf8; font-size: 0.76rem; text-transform: uppercase; }
+    .atlasIssueFindingGroup ul,
+    .atlasIssueFreeform ul { margin: 0; padding-left: 20px; color: rgba(226, 232, 240, 0.86); font-family: var(--ce-font-body); line-height: 1.55; }
+    .atlasIssueFindingGroup li + li,
+    .atlasIssueFreeform li + li { margin-top: 6px; }
+    .atlasIssueFreeform p { margin: 0 0 12px; white-space: pre-line; color: rgba(226, 232, 240, 0.88); font-family: var(--ce-font-body); line-height: 1.65; }
+    .atlasIssueSectionLinks { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 12px; color: #64748b; font-size: 0.74rem; }
+    .atlasIssueSectionLinks a { color: #7dd3fc; text-decoration: none; }
+    .atlasIssueSectionLinks a:hover,
+    .atlasIssueSectionLinks a:focus-visible { color: #bae6fd; text-decoration: underline; outline: none; }
+    .atlasIssueQuestions { display: grid; gap: 10px; }
+    .atlasIssueQuestion { display: grid; gap: 5px; padding: 12px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--ce-radius-8); background: rgba(255, 255, 255, 0.03); color: inherit; text-decoration: none; }
+    .atlasIssueQuestion:hover,
+    .atlasIssueQuestion:focus-visible { border-color: rgba(56, 189, 248, 0.42); background: rgba(56, 189, 248, 0.08); outline: none; }
+    .atlasIssueQuestionId { color: #38bdf8; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
+    .atlasIssueQuestion strong { color: rgba(241, 245, 249, 0.96); font-family: var(--ce-font-body); font-size: 0.9rem; line-height: 1.4; }
+    .atlasIssueQuestionMeta { color: #64748b; font-size: 0.7rem; line-height: 1.35; }
+    .atlasIssueEmpty { color: #94a3b8; font-family: var(--ce-font-body); }
     .debateMap .collapseSection { margin-bottom: 12px; background: transparent; border-radius: var(--ce-radius-6); }
     .debateMap .collapseHeader { display: flex; align-items: center; cursor: pointer; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); margin-bottom: 8px; user-select: none; }
     .debateMap .collapseHeader > svg { color: rgba(255, 255, 255, 0.5); width: 14px; margin-right: 6px; }
@@ -3787,11 +4153,24 @@ export const renderHtmlReport = (report) => `<!doctype html>
       .debateMap .viewModeSeparator { display: none; }
       .debateMap .inlineLegendItem { flex: 1 1 42%; margin: 2px 0; white-space: normal; line-height: 1.15; }
       .debateMap .secondaryControls { margin-left: 0; }
+      .debateMap .atlasBrowseControls { width: 100%; justify-content: flex-start; }
+      .debateMap .atlasBrowseControls label { flex: 1 1 130px; }
+      .debateMap .atlasBrowseControls select { width: 100%; min-width: 0; }
+      .debateMap .atlasBrowseStatus { flex: 1 1 100%; }
       .debateMap .atlasViewContainer { height: 75vh; }
       .debateMap .packedAtlasTitleRow { top: 70px; left: 20px; right: 20px; transform: none; width: auto; text-align: left; }
       .debateMap .packedAtlasTitleButton { max-width: min(100%, 320px); min-width: 0; }
       .debateMap .packedAtlasTitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .debateMap .topNodesOverlay { width: calc(100% - 40px); top: 60px; }
+      .atlasIssueModalOverlay { padding: 16px 10px; }
+      .atlasIssueModalContent { width: 94%; max-height: calc(100vh - 32px); padding: 20px; }
+      .atlasIssueModalHeader { align-items: flex-start; }
+      .atlasIssueModalTitle { font-size: 1.35rem; }
+      .atlasIssueModalClose { position: fixed; right: 25px; bottom: 25px; z-index: 2005; width: 50px; height: 50px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: var(--ce-radius-round); background: #1e293b; color: var(--ce-color-white); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); }
+      .atlasIssueMetricGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .atlasIssueMetricGrid > div:nth-child(2) { border-right: 0; }
+      .atlasIssueMetricGrid > div:nth-child(-n + 2) { border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+      .atlasIssueFindingGrid { grid-template-columns: 1fr; }
     }
     @media only screen and (min-width: 768px) and (max-width: 1024px) {
       .onePageDemoContainer { font-size: 1.15rem; padding: 15px 25px; padding-top: 0 !important; }
@@ -4022,6 +4401,30 @@ export const renderHtmlReport = (report) => `<!doctype html>
       var atlasTopDebatesButton = document.querySelector('[data-ce-atlas-top-debates-toggle]');
       var atlasTopDebatesOverlay = document.querySelector('[data-ce-atlas-top-debates-overlay]');
       var atlasTopDebatesCloseButton = document.querySelector('[data-ce-atlas-top-debates-close]');
+      var atlasIssueModal = document.querySelector('[data-ce-atlas-issue-modal]');
+      var atlasIssueModalContent = document.querySelector('[data-ce-atlas-issue-modal-content]');
+      var atlasIssueModalTitle = document.querySelector('[data-ce-atlas-issue-modal-title]');
+      var atlasIssueModalMeta = document.querySelector('[data-ce-atlas-issue-modal-meta]');
+      var atlasIssueModalBody = document.querySelector('[data-ce-atlas-issue-modal-body]');
+      var atlasIssueModalCloseButtons = Array.from(document.querySelectorAll('[data-ce-atlas-issue-close]'));
+      var atlasIssueCopyLinkButton = document.querySelector('[data-ce-atlas-issue-copy-link]');
+      var atlasIssueTemplates = Array.from(document.querySelectorAll('[data-ce-atlas-issue-template]'));
+      var atlasOpenButtons = Array.from(document.querySelectorAll('[data-ce-atlas-open]'));
+      var atlasNodes = Array.from(document.querySelectorAll('[data-testid="ce-atlas-node"][data-ce-atlas-open]'));
+      var atlasTagFilter = document.querySelector('[data-ce-atlas-tag-filter]');
+      var atlasSortSelect = document.querySelector('[data-ce-atlas-sort]');
+      var atlasBrowseStatus = document.querySelector('[data-ce-atlas-browser-status]');
+      var atlasLayoutSlots = atlasNodes.map(function (node) {
+        return {
+          left: node.style.getPropertyValue('--atlas-left'),
+          top: node.style.getPropertyValue('--atlas-top'),
+          mobileLeft: node.style.getPropertyValue('--atlas-mobile-left'),
+          mobileTop: node.style.getPropertyValue('--atlas-mobile-top'),
+          zIndex: node.style.zIndex
+        };
+      });
+      var activeAtlasIssueId = '';
+      var atlasIssueLastFocus = null;
       var modeSections = Array.from(document.querySelectorAll('[data-ce-report-mode-section]'));
       var staticCollapsibles = Array.from(document.querySelectorAll('[data-ce-static-collapsible]'));
       var knownModes = ['report', 'debate-atlas', 'breakdown', 'risk-matrix', 'snapshot-json'];
@@ -4301,6 +4704,252 @@ export const renderHtmlReport = (report) => `<!doctype html>
         var nextOpen = !!isOpen;
         atlasTopDebatesOverlay.classList.toggle('visible', nextOpen);
         atlasTopDebatesButton.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+      }
+      function getAtlasNodeTags(node) {
+        if (!node) return [];
+        try {
+          var tags = JSON.parse(node.getAttribute('data-ce-atlas-tags') || '[]');
+          return Array.isArray(tags) ? tags.map(String) : [];
+        } catch (error) {
+          return [];
+        }
+      }
+      function getAtlasNodeNumber(node, attribute, fallback) {
+        var raw = node ? node.getAttribute(attribute) : '';
+        if (raw === null || raw === '') return fallback;
+        var value = Number(raw);
+        return Number.isFinite(value) ? value : fallback;
+      }
+      function compareAtlasNodes(left, right, sortMode) {
+        var leftLabel = String(left.getAttribute('data-ce-atlas-label') || '');
+        var rightLabel = String(right.getAttribute('data-ce-atlas-label') || '');
+        if (sortMode === 'difference-desc') {
+          return getAtlasNodeNumber(right, 'data-ce-atlas-difference', -1)
+            - getAtlasNodeNumber(left, 'data-ce-atlas-difference', -1)
+            || leftLabel.localeCompare(rightLabel);
+        }
+        if (sortMode === 'difference-asc') {
+          return getAtlasNodeNumber(left, 'data-ce-atlas-difference', Number.POSITIVE_INFINITY)
+            - getAtlasNodeNumber(right, 'data-ce-atlas-difference', Number.POSITIVE_INFINITY)
+            || leftLabel.localeCompare(rightLabel);
+        }
+        if (sortMode === 'questions') {
+          return getAtlasNodeNumber(right, 'data-ce-atlas-question-count', 0)
+            - getAtlasNodeNumber(left, 'data-ce-atlas-question-count', 0)
+            || leftLabel.localeCompare(rightLabel);
+        }
+        if (sortMode === 'tag') {
+          var leftTag = getAtlasNodeTags(left)[0] || '';
+          var rightTag = getAtlasNodeTags(right)[0] || '';
+          return leftTag.localeCompare(rightTag) || leftLabel.localeCompare(rightLabel);
+        }
+        if (sortMode === 'label') return leftLabel.localeCompare(rightLabel);
+        return getAtlasNodeNumber(left, 'data-ce-atlas-order', 0)
+          - getAtlasNodeNumber(right, 'data-ce-atlas-order', 0);
+      }
+      function computeAtlasBrowseSlots(nodes) {
+        var goldenAngle = Math.PI * (3 - Math.sqrt(5));
+        var packed = nodes.map(function (node, index) {
+          var scale = Math.max(0.38, Math.min(1, getAtlasNodeNumber(node, 'data-ce-atlas-scale', 1)));
+          var radius = 4.8 + (scale * 2.9);
+          var angle = index * goldenAngle;
+          var ring = Math.sqrt(index) * 5.9;
+          return {
+            index: index,
+            radius: radius,
+            x: 50 + (Math.cos(angle) * ring * 1.24),
+            y: 53 + (Math.sin(angle) * ring * 0.86)
+          };
+        });
+        for (var iteration = 0; iteration < 120; iteration += 1) {
+          for (var leftIndex = 0; leftIndex < packed.length; leftIndex += 1) {
+            for (var rightIndex = leftIndex + 1; rightIndex < packed.length; rightIndex += 1) {
+              var left = packed[leftIndex];
+              var right = packed[rightIndex];
+              var dx = right.x - left.x;
+              var dy = right.y - left.y;
+              var distance = Math.sqrt((dx * dx) + (dy * dy)) || 0.001;
+              var minDistance = left.radius + right.radius + 0.65;
+              if (distance >= minDistance) continue;
+              var push = (minDistance - distance) * 0.5;
+              var nx = dx / distance;
+              var ny = dy / distance;
+              left.x -= nx * push;
+              left.y -= ny * push;
+              right.x += nx * push;
+              right.y += ny * push;
+            }
+          }
+          packed.forEach(function (slot) {
+            slot.x += (50 - slot.x) * 0.01;
+            slot.y += (54 - slot.y) * 0.006;
+            slot.x = Math.max(8 + slot.radius, Math.min(92 - slot.radius, slot.x));
+            slot.y = Math.max(16 + slot.radius, Math.min(90 - slot.radius, slot.y));
+          });
+        }
+        var mobileColumns = Math.max(1, Math.min(3, packed.length || 1));
+        var mobileRows = Math.max(1, Math.ceil(packed.length / mobileColumns));
+        return packed.map(function (slot) {
+          var mobileColumn = slot.index % mobileColumns;
+          var mobileRow = Math.floor(slot.index / mobileColumns);
+          return {
+            left: slot.x.toFixed(2) + '%',
+            top: slot.y.toFixed(2) + '%',
+            mobileLeft: (((mobileColumn + 0.5) / mobileColumns) * 100).toFixed(2) + '%',
+            mobileTop: (15 + (((mobileRow + 0.5) / mobileRows) * 76)).toFixed(2) + '%',
+            zIndex: String(20 + slot.index)
+          };
+        });
+      }
+      function updateAtlasBrowse() {
+        if (!atlasNodes.length) return;
+        var selectedTag = atlasTagFilter ? String(atlasTagFilter.value || '') : '';
+        var sortMode = atlasSortSelect ? String(atlasSortSelect.value || 'atlas') : 'atlas';
+        var visibleNodes = atlasNodes.filter(function (node) {
+          return !selectedTag || getAtlasNodeTags(node).indexOf(selectedTag) !== -1;
+        }).sort(function (left, right) {
+          return compareAtlasNodes(left, right, sortMode);
+        });
+        var useOriginalLayout = !selectedTag && sortMode === 'atlas';
+        var visibleSlots = useOriginalLayout ? atlasLayoutSlots : computeAtlasBrowseSlots(visibleNodes);
+        atlasNodes.forEach(function (node) { node.hidden = true; });
+        visibleNodes.forEach(function (node, index) {
+          var slot = visibleSlots[index] || visibleSlots[visibleSlots.length - 1];
+          if (slot) {
+            node.style.setProperty('--atlas-left', slot.left);
+            node.style.setProperty('--atlas-top', slot.top);
+            node.style.setProperty('--atlas-mobile-left', slot.mobileLeft);
+            node.style.setProperty('--atlas-mobile-top', slot.mobileTop);
+            node.style.zIndex = slot.zIndex || String(20 + index);
+          }
+          node.hidden = false;
+        });
+        if (atlasBrowseStatus) {
+          var label = visibleNodes.length + ' of ' + atlasNodes.length + ' issue area' + (atlasNodes.length === 1 ? '' : 's');
+          atlasBrowseStatus.textContent = selectedTag ? label + ' tagged ' + selectedTag : label;
+        }
+      }
+      function findAtlasIssueTemplate(topicId) {
+        return atlasIssueTemplates.find(function (template) {
+          return String(template.getAttribute('data-ce-atlas-topic-id') || '') === String(topicId || '');
+        }) || null;
+      }
+      function atlasIssueIdFromHash() {
+        var raw = String(window.location.hash || '').replace(/^#/, '');
+        try { raw = decodeURIComponent(raw); } catch (error) { /* Keep the raw hash. */ }
+        var prefix = 'debate-atlas-';
+        return raw.indexOf(prefix) === 0 ? raw.slice(prefix.length) : '';
+      }
+      function setAtlasModalCollapse(button, isOpen) {
+        if (!button) return;
+        var section = button.closest('[data-ce-atlas-modal-collapse-section]');
+        if (!section) return;
+        var body = section.querySelector('[data-ce-atlas-modal-collapse-body]');
+        var label = section.querySelector('[data-ce-atlas-modal-collapse-label]');
+        var openCaret = section.querySelector('[data-ce-atlas-modal-caret-open]');
+        var closedCaret = section.querySelector('[data-ce-atlas-modal-caret-closed]');
+        var nextOpen = !!isOpen;
+        button.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+        if (body) body.hidden = !nextOpen;
+        if (label) label.textContent = nextOpen ? 'Hide' : 'Show';
+        if (openCaret) openCaret.hidden = !nextOpen;
+        if (closedCaret) closedCaret.hidden = nextOpen;
+      }
+      function getAtlasModalFocusableElements() {
+        if (!atlasIssueModalContent) return [];
+        return Array.from(atlasIssueModalContent.querySelectorAll('a[href], button:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'))
+          .filter(function (element) { return !element.hidden && element.offsetParent !== null; });
+      }
+      function closeAtlasIssueModal(options) {
+        if (!atlasIssueModal) return;
+        var updateHash = !options || options.updateHash !== false;
+        var restoreFocus = !options || options.restoreFocus !== false;
+        atlasIssueModal.hidden = true;
+        document.body.removeAttribute('data-ce-atlas-modal-open');
+        if (atlasIssueModalBody) atlasIssueModalBody.innerHTML = '';
+        activeAtlasIssueId = '';
+        if (updateHash && atlasIssueIdFromHash()) {
+          if (window.history && window.history.replaceState) {
+            window.history.replaceState(null, '', '#debate-atlas');
+          } else {
+            window.location.hash = 'debate-atlas';
+          }
+          setReportViewMode('debate-atlas', { scroll: false });
+        }
+        if (restoreFocus && atlasIssueLastFocus && atlasIssueLastFocus.focus) {
+          var focusTarget = atlasIssueLastFocus;
+          window.setTimeout(function () { focusTarget.focus(); }, 0);
+        }
+        atlasIssueLastFocus = null;
+      }
+      function openAtlasIssueModal(topicId, options) {
+        if (!atlasIssueModal || !atlasIssueModalBody) return false;
+        var template = findAtlasIssueTemplate(topicId);
+        if (!template) return false;
+        if (atlasIssueModal.hidden || activeAtlasIssueId !== topicId) {
+          var activeElement = document.activeElement;
+          if (activeElement && (!atlasIssueModal.contains || !atlasIssueModal.contains(activeElement))) {
+            atlasIssueLastFocus = activeElement;
+          }
+        }
+        activeAtlasIssueId = String(topicId || '');
+        atlasIssueModalTitle.textContent = template.getAttribute('data-ce-atlas-topic-title') || activeAtlasIssueId;
+        atlasIssueModalMeta.textContent = template.getAttribute('data-ce-atlas-topic-meta') || '';
+        atlasIssueModalBody.innerHTML = template.innerHTML;
+        setAtlasTopDebatesOpen(false);
+        closeRiskMatrixModal();
+        atlasIssueModal.hidden = false;
+        document.body.setAttribute('data-ce-atlas-modal-open', 'true');
+        var updateHash = !options || options.updateHash !== false;
+        if (updateHash) {
+          var nextHash = '#debate-atlas-' + encodeURIComponent(activeAtlasIssueId);
+          if (window.location.hash !== nextHash) {
+            if (window.history && window.history.pushState) {
+              window.history.pushState(null, '', nextHash);
+            } else {
+              window.location.hash = nextHash;
+            }
+          }
+        }
+        setReportViewMode('debate-atlas', { scroll: false });
+        var closeButton = atlasIssueModal.querySelector('[data-ce-atlas-issue-close]');
+        if (closeButton && closeButton.focus) closeButton.focus();
+        else if (atlasIssueModalContent && atlasIssueModalContent.focus) atlasIssueModalContent.focus();
+        return true;
+      }
+      function syncAtlasIssueModalWithHash() {
+        var topicId = atlasIssueIdFromHash();
+        if (topicId) {
+          openAtlasIssueModal(topicId, { updateHash: false });
+        } else if (atlasIssueModal && !atlasIssueModal.hidden) {
+          closeAtlasIssueModal({ updateHash: false, restoreFocus: false });
+        }
+      }
+      function copyAtlasIssueDeepLink() {
+        if (!activeAtlasIssueId || !atlasIssueCopyLinkButton) return;
+        var url = new URL(window.location.href);
+        url.hash = 'debate-atlas-' + encodeURIComponent(activeAtlasIssueId);
+        var markCopied = function () {
+          atlasIssueCopyLinkButton.setAttribute('aria-label', 'Deep link copied');
+          atlasIssueCopyLinkButton.title = 'Copied';
+          window.setTimeout(function () {
+            atlasIssueCopyLinkButton.setAttribute('aria-label', 'Copy issue area deep link');
+            atlasIssueCopyLinkButton.title = 'Copy deep link';
+          }, 1400);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(url.toString()).then(markCopied).catch(function () {});
+          return;
+        }
+        var input = document.createElement('textarea');
+        input.value = url.toString();
+        input.setAttribute('readonly', '');
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.select();
+        try { document.execCommand('copy'); markCopied(); } catch (error) { /* Clipboard unavailable. */ }
+        document.body.removeChild(input);
       }
       function setRawDemoViewActive(mode) {
         var activeMode = knownModes.indexOf(mode) === -1 || mode === 'snapshot-json' ? 'report' : mode;
@@ -4662,6 +5311,61 @@ export const renderHtmlReport = (report) => `<!doctype html>
           }
         });
       });
+      atlasOpenButtons.forEach(function (button) {
+        button.addEventListener('click', function (event) {
+          event.preventDefault();
+          openAtlasIssueModal(button.getAttribute('data-ce-atlas-open') || '');
+        });
+      });
+      if (atlasTagFilter) atlasTagFilter.addEventListener('change', updateAtlasBrowse);
+      if (atlasSortSelect) atlasSortSelect.addEventListener('change', updateAtlasBrowse);
+      atlasIssueModalCloseButtons.forEach(function (button) {
+        button.addEventListener('click', function (event) {
+          event.preventDefault();
+          closeAtlasIssueModal();
+        });
+      });
+      if (atlasIssueModal) {
+        atlasIssueModal.addEventListener('click', function (event) {
+          if (event.target === atlasIssueModal) closeAtlasIssueModal();
+        });
+      }
+      if (atlasIssueCopyLinkButton) {
+        atlasIssueCopyLinkButton.addEventListener('click', function (event) {
+          event.preventDefault();
+          copyAtlasIssueDeepLink();
+        });
+      }
+      if (atlasIssueModalBody) {
+        atlasIssueModalBody.addEventListener('click', function (event) {
+          var collapseButton = event.target && event.target.closest
+            ? event.target.closest('[data-ce-atlas-modal-collapse]')
+            : null;
+          if (collapseButton && atlasIssueModalBody.contains(collapseButton)) {
+            event.preventDefault();
+            setAtlasModalCollapse(collapseButton, collapseButton.getAttribute('aria-expanded') !== 'true');
+            return;
+          }
+          var tagButton = event.target && event.target.closest
+            ? event.target.closest('[data-ce-atlas-modal-tag]')
+            : null;
+          if (tagButton && atlasIssueModalBody.contains(tagButton)) {
+            event.preventDefault();
+            var tag = tagButton.getAttribute('data-ce-atlas-modal-tag') || '';
+            if (atlasTagFilter) atlasTagFilter.value = tag;
+            updateAtlasBrowse();
+            closeAtlasIssueModal({ restoreFocus: false });
+            if (atlasTagFilter && atlasTagFilter.focus) atlasTagFilter.focus();
+            return;
+          }
+          var questionLink = event.target && event.target.closest
+            ? event.target.closest('[data-ce-atlas-question-link]')
+            : null;
+          if (questionLink && atlasIssueModalBody.contains(questionLink)) {
+            closeAtlasIssueModal({ updateHash: false, restoreFocus: false });
+          }
+        });
+      }
       riskMatrixCloseButtons.forEach(function (button) {
         button.addEventListener('click', function (event) {
           event.preventDefault();
@@ -4689,6 +5393,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
       });
       window.addEventListener('hashchange', function () {
         setReportViewMode(modeFromHash(), { scroll: true });
+        syncAtlasIssueModalWithHash();
       });
       if (settingsToggleButton && settingsRow) {
         settingsToggleButton.addEventListener('click', function () {
@@ -4732,6 +5437,25 @@ export const renderHtmlReport = (report) => `<!doctype html>
         if (event.key === 'Escape') {
           setAtlasTopDebatesOpen(false);
           closeRiskMatrixModal();
+          closeAtlasIssueModal();
+          return;
+        }
+        if (event.key === 'Tab' && atlasIssueModal && !atlasIssueModal.hidden) {
+          var focusable = getAtlasModalFocusableElements();
+          if (!focusable.length) {
+            event.preventDefault();
+            if (atlasIssueModalContent) atlasIssueModalContent.focus();
+            return;
+          }
+          var firstFocusable = focusable[0];
+          var lastFocusable = focusable[focusable.length - 1];
+          if (event.shiftKey && document.activeElement === firstFocusable) {
+            event.preventDefault();
+            lastFocusable.focus();
+          } else if (!event.shiftKey && document.activeElement === lastFocusable) {
+            event.preventDefault();
+            firstFocusable.focus();
+          }
         }
       });
       if (reportStyleSelect) {
@@ -5215,9 +5939,12 @@ export const renderHtmlReport = (report) => `<!doctype html>
       function syncInitialReportViewMode() {
         window.setTimeout(function () {
           setReportViewMode(modeFromHash(), { scroll: true });
+          syncAtlasIssueModalWithHash();
         }, 0);
       }
+      updateAtlasBrowse();
       setReportViewMode(modeFromHash(), { scroll: false });
+      syncAtlasIssueModalWithHash();
       syncInitialReportViewMode();
       setReportStyle(reportStyleSelect ? reportStyleSelect.value : 'original');
       window.addEventListener('load', syncInitialReportViewMode, { once: true });

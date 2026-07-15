@@ -98,7 +98,23 @@ test('analysis overlays require provenance tied to the exact report', () => {
       inputReportHash: input.inputReportHash,
       generatedAt: '2026-01-01T00:01:00.000Z',
     },
-    debateAtlas: { topicCircles: [{ id: 'topic', questionIds: ['q1'] }] },
+    debateAtlas: {
+      topicCircles: [{ id: 'topic', questionIds: ['q1'] }],
+      issueAreas: [{
+        id: 'topic',
+        title: 'Topic',
+        summary: 'Grounded issue-area summary.',
+        tags: ['governance'],
+        linkedQuestionIds: ['q1'],
+        confidence: 'medium',
+        analysisSections: [{
+          title: 'Tradeoffs',
+          body: 'A bounded freeform analysis section.',
+          bullets: ['A grounded finding.'],
+          linkedQuestionIds: ['q1'],
+        }],
+      }],
+    },
     riskMatrix: { cells: {} },
   };
 
@@ -121,5 +137,35 @@ test('analysis overlays require provenance tied to the exact report', () => {
       debateAtlas: { topicCircles: [{ id: 'topic', questionIds: 'q1' }] },
     }),
     /questionIds must be an array/
+  );
+  assert.throws(
+    () => attachAnalysisOverlay(report, {
+      ...overlay,
+      debateAtlas: {
+        ...overlay.debateAtlas,
+        issueAreas: [{ id: 'missing-topic', linkedQuestionIds: ['q1'] }],
+      },
+    }),
+    /issue area references unknown topic missing-topic/
+  );
+  assert.throws(
+    () => attachAnalysisOverlay(report, {
+      ...overlay,
+      debateAtlas: {
+        ...overlay.debateAtlas,
+        issueAreas: [{ id: 'topic', linkedQuestionIds: ['missing-question'] }],
+      },
+    }),
+    /references unknown question missing-question/
+  );
+  assert.throws(
+    () => attachAnalysisOverlay(report, {
+      ...overlay,
+      debateAtlas: {
+        ...overlay.debateAtlas,
+        issueAreas: [{ id: 'topic', tags: [42], analysisSections: [{ title: '', bullets: 'invalid' }] }],
+      },
+    }),
+    /tags\[0\] must be a non-empty string/
   );
 });

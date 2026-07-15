@@ -490,7 +490,7 @@ export const validateReleaseRunFile = (runsFile, {
   return errors;
 };
 
-export const validateAnalysisOverlay = (overlay, { questionIds = null } = {}) => {
+export const validateAnalysisOverlay = (overlay, { questionIds = null, topicIds = null } = {}) => {
   const errors = [];
   if (!isRecord(overlay)) return ['analysis overlay must be an object'];
   if (overlay.kind !== 'ai_discourse_bench_analysis_overlay') {
@@ -510,6 +510,8 @@ export const validateAnalysisOverlay = (overlay, { questionIds = null } = {}) =>
   if (cells !== undefined && !isRecord(cells)) errors.push('riskMatrix.cells must be an object');
   const topics = overlay.debateAtlas?.topicCircles;
   if (topics !== undefined && !Array.isArray(topics)) errors.push('debateAtlas.topicCircles must be an array');
+  const issueAreas = overlay.debateAtlas?.issueAreas;
+  if (issueAreas !== undefined && !Array.isArray(issueAreas)) errors.push('debateAtlas.issueAreas must be an array');
   const compasses = overlay.debateAtlas?.compasses;
   if (compasses !== undefined && !Array.isArray(compasses)) errors.push('debateAtlas.compasses must be an array');
   if (isRecord(cells)) {
@@ -540,9 +542,98 @@ export const validateAnalysisOverlay = (overlay, { questionIds = null } = {}) =>
       }
     });
   }
+  if (Array.isArray(issueAreas)) {
+    const issueAreaIds = new Set();
+    issueAreas.forEach((issueArea, index) => {
+      const path = `debateAtlas.issueAreas[${index}]`;
+      if (!isRecord(issueArea)) {
+        errors.push(`${path} must be an object`);
+        return;
+      }
+      requireString(errors, issueArea.id, `${path}.id`);
+      if (typeof issueArea.id === 'string' && issueArea.id.trim()) {
+        if (issueAreaIds.has(issueArea.id)) errors.push(`debateAtlas.issueAreas contains duplicate id ${issueArea.id}`);
+        issueAreaIds.add(issueArea.id);
+      }
+      for (const field of ['title', 'summary']) {
+        if (issueArea[field] !== undefined) requireString(errors, issueArea[field], `${path}.${field}`);
+      }
+      for (const field of [
+        'tags',
+        'keyTensions',
+        'pointsOfAgreement',
+        'pointsOfDisagreement',
+        'openQuestions',
+        'implications',
+        'linkedQuestionIds',
+        'analysisSections',
+      ]) {
+        if (issueArea[field] !== undefined && !Array.isArray(issueArea[field])) {
+          errors.push(`${path}.${field} must be an array`);
+        }
+      }
+      for (const field of [
+        'tags',
+        'keyTensions',
+        'pointsOfAgreement',
+        'pointsOfDisagreement',
+        'openQuestions',
+        'implications',
+        'linkedQuestionIds',
+      ]) {
+        if (!Array.isArray(issueArea[field])) continue;
+        issueArea[field].forEach((value, valueIndex) => {
+          requireString(errors, value, `${path}.${field}[${valueIndex}]`);
+        });
+      }
+      if (issueArea.confidence !== undefined && !['low', 'medium', 'high'].includes(issueArea.confidence)) {
+        errors.push(`${path}.confidence must be low, medium, or high`);
+      }
+      if (Array.isArray(issueArea.analysisSections)) {
+        issueArea.analysisSections.forEach((section, sectionIndex) => {
+          const sectionPath = `${path}.analysisSections[${sectionIndex}]`;
+          if (!isRecord(section)) {
+            errors.push(`${sectionPath} must be an object`);
+            return;
+          }
+          requireString(errors, section.title, `${sectionPath}.title`);
+          if (section.body !== undefined) requireString(errors, section.body, `${sectionPath}.body`);
+          if (section.bullets !== undefined && !Array.isArray(section.bullets)) {
+            errors.push(`${sectionPath}.bullets must be an array`);
+          }
+          if (section.linkedQuestionIds !== undefined && !Array.isArray(section.linkedQuestionIds)) {
+            errors.push(`${sectionPath}.linkedQuestionIds must be an array`);
+          }
+          for (const field of ['bullets', 'linkedQuestionIds']) {
+            if (!Array.isArray(section[field])) continue;
+            section[field].forEach((value, valueIndex) => {
+              requireString(errors, value, `${sectionPath}.${field}[${valueIndex}]`);
+            });
+          }
+        });
+      }
+    });
+  }
+  if (topicIds && Array.isArray(issueAreas)) {
+    const allowedTopicIds = new Set([
+      ...topicIds,
+      ...(Array.isArray(topics) ? topics.map((topic) => topic?.id).filter(Boolean) : []),
+    ]);
+    issueAreas.forEach((issueArea) => {
+      if (typeof issueArea?.id === 'string' && issueArea.id.trim() && !allowedTopicIds.has(issueArea.id)) {
+        errors.push(`analysis overlay issue area references unknown topic ${issueArea.id}`);
+      }
+    });
+  }
   if (questionIds) {
     const linkedIds = [
       ...(Array.isArray(topics) ? topics.flatMap((topic) => Array.isArray(topic?.questionIds) ? topic.questionIds : []) : []),
+      ...(Array.isArray(issueAreas) ? issueAreas.flatMap((issueArea) => [
+        ...(Array.isArray(issueArea?.linkedQuestionIds) ? issueArea.linkedQuestionIds : []),
+        ...(Array.isArray(issueArea?.analysisSections)
+          ? issueArea.analysisSections.flatMap((section) => Array.isArray(section?.linkedQuestionIds) ? section.linkedQuestionIds : [])
+          : []),
+      ]) : []),
       ...(isRecord(cells) ? Object.values(cells).flatMap((cell) => Array.isArray(cell?.linkedQuestionIds) ? cell.linkedQuestionIds : []) : []),
     ];
     linkedIds.forEach((questionId) => {

@@ -360,6 +360,16 @@ replace the deterministic circles, and
 `analysisOverlay.debateAtlas.compasses` render as DebateMap-style collapsible
 compass panels below the packed topic map.
 
+Every rendered topic also has an issue-area record. The deterministic fallback
+derives its tags, linked questions, mean stance, mean model difference, and
+winning-response repeat consistency from the report. A validated overlay may
+enrich the same topic id through `analysisOverlay.debateAtlas.issueAreas` with
+`title`, `summary`, `tags`, `keyTensions`, `pointsOfAgreement`,
+`pointsOfDisagreement`, `openQuestions`, `implications`, `confidence`, and
+freeform `analysisSections`. An issue-area id must resolve to a deterministic or
+generated topic circle, and every linked question id must resolve to the source
+report.
+
 The standalone Debate Map pane renders the selected topic circles inside an
 embedded DebateMap-style shell: view-mode controls, inline legend, a packed
 atlas title pill, the live `80vh` embedded scroll wrapper, live embedded atlas
@@ -373,6 +383,15 @@ compass collapse hooks should keep the same class vocabulary and motion behavior
 as the live DebateMap module.
 Every topic label should remain readable at the same viewport sizes used by the
 OnePageSession Results surface.
+
+Topic bubbles and Top Debates rows open one client-style modal with a dark
+backdrop, a copyable deep link, clickable tags, benchmark metrics, collapsible
+analysis, and linked question rows. The modal closes from its close control,
+backdrop, or Escape key, traps keyboard focus while open, restores focus on
+close, and uses the live floating close control on narrow screens. Tag filtering
+and sort controls deterministically re-pack visible topics so differently sized
+AI-generated circles do not inherit incompatible layout slots. Topic hashes use
+`#debate-atlas-<topic-id>` and must reopen the modal directly.
 
 The intended AI atlas generator input is the built report JSON, not private raw
 provider credentials or hidden model prompts.
@@ -388,11 +407,13 @@ node ./bin/ai-discourse-bench.mjs export-analysis-input \
 That artifact has `kind:
 ai_discourse_bench_second_pass_analysis_input` and contains participant summaries,
 question summaries, current deterministic topic circles, requested Debate Map
-outputs, risk-matrix target cells, the source report hash, and the expected
+outputs, modal-ready issue-area targets with suggested tags and measured
+metrics, risk-matrix target cells, the source report hash, and the expected
 overlay schema. The prompt
 for generating the overlay is `prompts/analysis-overlay-generator.md`; pass the
 result back to `render-report --analysis <overlay.json>` to render generated
-topic circles, compasses, and risk-matrix popup content.
+topic circles, issue-area modal analysis, compasses, and risk-matrix popup
+content.
 
 If the overlay includes `analysisOverlay.aiAnalysis`, the Report pane renders an
 optional AI Analysis section before Consensus and Difference. It accepts

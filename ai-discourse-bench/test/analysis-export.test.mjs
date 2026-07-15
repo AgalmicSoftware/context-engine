@@ -47,6 +47,14 @@ test('second-pass analysis input exposes report, risk popup, and debate atlas co
   assert.ok(capabilityLaborTarget.expectedOverlayFields.includes('scenarios'));
   assert.equal(capabilityLaborTarget.scenarioSchema.valence, 'risk | opportunity | mixed');
   assert.equal(analysisInput.outputSchema.kind, 'ai_discourse_bench_analysis_overlay');
+  assert.ok(Array.isArray(analysisInput.debateAtlas.issueAreaTargets));
+  assert.equal(analysisInput.debateAtlas.issueAreaTargets.length, 1);
+  assert.deepEqual(analysisInput.debateAtlas.issueAreaTargets[0].questionIds, [consensusQuestion.id, splitQuestion.id]);
+  assert.ok(analysisInput.debateAtlas.issueAreaTargets[0].suggestedTags.length > 0);
+  assert.equal(analysisInput.debateAtlas.issueAreaTargets[0].averageModelDifference, 1);
+  assert.ok(analysisInput.debateAtlas.requestedOutputs.issueAreas.includes('modal-ready'));
+  assert.ok(Array.isArray(analysisInput.outputSchema.debateAtlas.issueAreas));
+  assert.equal(analysisInput.outputSchema.debateAtlas.issueAreas[0].analysisSections[0].title, 'Freeform section title');
   assert.ok(Array.isArray(analysisInput.outputSchema.debateAtlas.compasses));
   assert.ok(Array.isArray(analysisInput.outputSchema.riskMatrix.cells.Capabilities_vs_Labor.scenarios));
   assert.ok(analysisInput.debateAtlas.requestedOutputs.compasses.includes('2-axis maps'));

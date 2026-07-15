@@ -38,6 +38,19 @@ test('report preserves raw atlas and risk-matrix material', async () => {
   assert.match(html, /Risk Matrix/);
   assert.match(html, /class="nodeLabel packedNodeLabel alwaysVisible" style="font-size:[^"]+">\s*AI R&amp;D Automation\s*<\/div>/);
   assert.match(html, /data-ce-node-id="ai-rd-automation"/);
+  assert.match(html, /id="debate-atlas-ai-rd-automation"[\s\S]*?data-ce-atlas-open="ai-rd-automation"/);
+  assert.match(html, /data-ce-atlas-tag-filter/);
+  assert.match(html, /data-ce-atlas-sort/);
+  assert.match(html, /data-ce-atlas-issue-template/);
+  assert.match(html, /data-ce-atlas-issue-modal hidden role="dialog" aria-modal="true"/);
+  assert.match(html, /Measured view\.<\/strong> Add a provenance-bound second-pass analysis overlay/);
+  assert.match(html, /function updateAtlasBrowse\(\)/);
+  assert.match(html, /function computeAtlasBrowseSlots\(nodes\)/);
+  assert.match(html, /var useOriginalLayout = !selectedTag && sortMode === 'atlas';/);
+  assert.match(html, /function openAtlasIssueModal\(topicId, options\)/);
+  assert.match(html, /function syncAtlasIssueModalWithHash\(\)/);
+  assert.match(html, /body\[data-ce-atlas-modal-open="true"\] \{ overflow: hidden; \}/);
+  assert.match(html, /\.atlasIssueModalOverlay \{ position: fixed; inset: 0; z-index: 2000;/);
   assert.match(html, /--topic-mobile-font-size:[0-9.]+px;/);
   assert.match(html, /\.debateMap \.atlasNode\.packedAtlasNode \.packedNodeLabel \{ font-size: var\(--topic-mobile-font-size, 9px\) !important; line-height: 1\.04; letter-spacing: 0; overflow-wrap: normal; word-break: normal; hyphens: none; \}/);
   assert.doesNotMatch(html, /\.debateMap \.atlasNode\.packedAtlasNode \.packedNodeLabel \{ overflow-wrap: anywhere; \}/);
@@ -377,6 +390,29 @@ test('analysis overlay populates risk matrix popups and Debate Map generated sur
             averageStance: 0.5,
           },
         ],
+        issueAreas: [
+          {
+            id: 'labor-transition',
+            title: 'Labor Transition Analysis',
+            summary: 'A modal-ready synthesis of the benchmark evidence on labor transition policy.',
+            tags: ['labor', 'automation'],
+            keyTensions: ['Deployment speed can outpace adjustment capacity.'],
+            pointsOfAgreement: ['Models favor some form of transition support.'],
+            pointsOfDisagreement: ['Models differ on the timing and scale of intervention.'],
+            openQuestions: ['Which institution should fund adjustment programs?'],
+            implications: ['Policy sequencing may matter as much as policy selection.'],
+            linkedQuestionIds: ['aidb_0001'],
+            confidence: 'medium',
+            analysisSections: [
+              {
+                title: 'Policy Pathways',
+                body: 'The second pass can provide freeform analysis without changing measured benchmark outputs.',
+                bullets: ['Compare anticipatory and reactive transition policy.'],
+                linkedQuestionIds: ['aidb_0001'],
+              },
+            ],
+          },
+        ],
         compasses: [
           {
             id: 'governance-speed',
@@ -461,6 +497,22 @@ test('analysis overlay populates risk matrix popups and Debate Map generated sur
   assert.match(html, /\.atlasScenarioHeaderMain/);
   assert.match(html, /\.riskMatrixAiSummary/);
   assert.match(html, /data-ce-node-id="labor-transition"/);
+  assert.match(html, /id="debate-atlas-labor-transition"/);
+  assert.match(html, /data-ce-atlas-open="labor-transition"/);
+  assert.match(html, /data-ce-atlas-topic-title="Labor Transition Analysis"/);
+  assert.match(html, /A modal-ready synthesis of the benchmark evidence on labor transition policy/);
+  assert.match(html, /Deployment speed can outpace adjustment capacity/);
+  assert.match(html, /Models favor some form of transition support/);
+  assert.match(html, /Models differ on the timing and scale of intervention/);
+  assert.match(html, /Which institution should fund adjustment programs/);
+  assert.match(html, /Policy sequencing may matter as much as policy selection/);
+  assert.match(html, /Policy Pathways/);
+  assert.match(html, /The second pass can provide freeform analysis without changing measured benchmark outputs/);
+  assert.match(html, /data-ce-atlas-modal-tag="labor"/);
+  assert.match(html, /data-ce-atlas-question-link/);
+  assert.match(html, /data-ce-atlas-issue-copy-link/);
+  assert.match(html, /atlasIssueModal\.addEventListener\('click'/);
+  assert.match(html, /if \(event\.key === 'Tab' && atlasIssueModal && !atlasIssueModal\.hidden\)/);
   assert.match(html, /class="nodeLabel packedNodeLabel alwaysVisible" style="font-size:[^"]+">\s*Labor Transition\s*<\/div>/);
   assert.match(html, /data-ce-analysis-compasses/);
   assert.match(html, /class="collapseSection aidb-analysis-compass" data-ce-static-compass data-ce-compass-id="governance-speed"/);
@@ -1005,7 +1057,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /if \(shouldScroll && target && target\.scrollIntoView\)/);
   assert.match(html, /function syncInitialReportViewMode/);
   assert.match(html, /setReportViewMode\(modeFromHash\(\), \{ scroll: false \}\)/);
-  assert.match(html, /setReportViewMode\(modeFromHash\(\), \{ scroll: false \}\);\s*syncInitialReportViewMode\(\);\s*setReportStyle/);
+  assert.match(html, /setReportViewMode\(modeFromHash\(\), \{ scroll: false \}\);\s*syncAtlasIssueModalWithHash\(\);\s*syncInitialReportViewMode\(\);\s*setReportStyle/);
   assert.match(html, /window\.addEventListener\('load', syncInitialReportViewMode, \{ once: true \}\)/);
   assert.doesNotMatch(html, /if \(document\.readyState === 'complete'\) \{\s*syncInitialReportViewMode\(\);/);
   assert.match(html, /resultsToggle\.addEventListener\('click', function \(\) \{\s*setResultsSectionOpen\(resultsSection && resultsSection\.getAttribute\('data-ce-results-open'\) === 'false'\);/);
@@ -1444,7 +1496,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /--atlas-left:[^;]+; --atlas-top:[^;]+; --atlas-mobile-left:[^;]+; --atlas-mobile-top:/);
   assert.match(html, /--topic-diameter:[^;]+px; --topic-mobile-diameter:[^;]+px/);
   assert.match(html, /--topic-mobile-font-size:[^;]+px/);
-  assert.match(html, /\.debateMap \.atlasNode \{ position: absolute; left: var\(--atlas-left, 50%\); top: var\(--atlas-top, 50%\); transform: translate\(-50%, -50%\);/);
+  assert.match(html, /\.debateMap \.atlasNode \{[^}]*position: absolute; left: var\(--atlas-left, 50%\); top: var\(--atlas-top, 50%\); transform: translate\(-50%, -50%\);/);
   assert.match(html, /\.debateMap \.atlasNode \{[^}]*cursor: pointer;/);
   assert.match(html, /\.debateMap \.atlasNode\.packedAtlasNode \.packedNodeDot/);
   assert.match(html, /\.debateMap \.atlasNode\.packedAtlasNode \.packedNodeDot \{ display: flex; align-items: center; justify-content: center; width: var\(--topic-diameter, 124px\); height: var\(--topic-diameter, 124px\); \}/);

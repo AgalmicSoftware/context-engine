@@ -322,7 +322,7 @@ node ./bin/ai-discourse-bench.mjs export-analysis-input \
 Feed that JSON plus `prompts/analysis-overlay-generator.md` to an analysis model
 to produce an `ai_discourse_bench_analysis_overlay`. Re-render with the overlay
 when you want generated risk-matrix popups, higher-level AI analysis, generated
-Debate Map topics, edges, or compasses:
+Debate Map topics, issue-area modal analysis, edges, or compasses:
 
 ```bash
 node ./bin/ai-discourse-bench.mjs render-report \
@@ -340,6 +340,13 @@ When `analysisOverlay.debateAtlas.topicCircles` is present, the standalone
 Debate Map renders those generated topics instead of the deterministic topic
 rollup. When `analysisOverlay.debateAtlas.compasses` is present, the same pane
 adds DebateMap-style collapsible compass panels below the packed topic map.
+Every topic circle opens a client-style issue-area modal. Without an overlay,
+the modal shows measured stance, model difference, repeat consistency, derived
+tags, and linked questions. `analysisOverlay.debateAtlas.issueAreas` can add a
+grounded summary, reusable tags, tensions, agreement/disagreement findings,
+implications, open questions, and freeform titled sections. Issue-area ids must
+match deterministic or generated topic-circle ids, and all question links are
+validated against the source report.
 Risk Matrix overlay cells can also include `scenarios` so clicking a matrix
 square opens live-style atlas scenario cards in a dedicated scenario rail before
 the generated summaries. Overlay provenance includes the exact source-report
@@ -430,6 +437,11 @@ generated Circles view plus any second-pass compass panels without adding
 standalone-only hover titles or disabled ARIA states to the live-style mode
 buttons; Atlas, Tree, and
 List remain live-session interactions.
+Circles and Top Debates entries open the same backdrop modal used for issue
+analysis. Its header, tags, collapsible sections, close behavior, narrow-screen
+floating close control, and question rows follow the live DebateMap modal
+vocabulary. Tag and sort controls re-pack the visible circles, and stable
+`#debate-atlas-<topic-id>` hashes reopen the matching modal.
 Breakdown uses the live DemoAnalysis-style order: a Compare Demographics
 selector adapted to model traits, comparison suggestions beside a
 world-results map, then a separate question-breakdown chart and
@@ -485,7 +497,8 @@ prompts/analysis-overlay-generator.md
 ```
 
 It asks an analysis model to return compact JSON for risk-matrix popups,
-generated Debate Map topics, topic edges, compasses, and report-level analysis.
+generated Debate Map topics, modal-ready issue areas, topic edges, compasses,
+and report-level analysis.
 
 ## Keeping Results Styling In Sync
 
