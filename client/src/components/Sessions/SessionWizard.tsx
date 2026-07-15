@@ -1827,6 +1827,7 @@ const SessionWizard = ({
 
   const handleRegisterGroup = async ({
     metadataUriOverride,
+    preservedPendingSbtDrafts,
     sessionFieldsOverride,
   }: SessionWizardRegisterGroupArgs = {}) => {
     try {
@@ -1876,8 +1877,11 @@ const SessionWizard = ({
       setSessionUrl(registerSuccessSettlement.sessionUrl);
       setAdminUrl(registerSuccessSettlement.adminUrl);
       setAdminUrlStatus(registerSuccessSettlement.adminUrlStatus);
+      // Regression guard: persist drafts suppressed by this publish plan before
+      // identity rotation or registry refresh can leave the page mid-settlement.
       const cacheClearResult = clearSessionWizardCache({
         expectedPublicationIdentity: { slug: draft.slug, sessionId },
+        ...(Array.isArray(preservedPendingSbtDrafts) ? { preservedPendingSbtDrafts } : {}),
       });
       // A successful clear releases the next generated identity to own this tab's cache.
       if (cacheClearResult.draft.ok && cacheClearResult.draft.status !== 'preserved-foreign-draft')

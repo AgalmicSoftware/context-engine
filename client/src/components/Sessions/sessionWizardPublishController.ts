@@ -303,6 +303,7 @@ export type SessionWizardRegisterStepRequestInput = {
 
 export type SessionWizardRegisterGroupArgs = {
   metadataUriOverride?: unknown;
+  preservedPendingSbtDrafts?: AnyRecord[];
   sessionFieldsOverride?: unknown;
 };
 

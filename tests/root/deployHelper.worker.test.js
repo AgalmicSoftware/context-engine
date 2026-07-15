@@ -2311,7 +2311,7 @@ describe('deploy-helper worker', () => {
     }
   });
 
-  it('replays a committed terminal deploy journal result and rejects a changed request body', async () => {
+  it('reuses terminal infrastructure across mutable drift and rejects immutable identity drift', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeDeploymentRequestFetchSequence([
       cfSuccess({ id: 'kv-request-1' }),
@@ -2365,7 +2365,10 @@ describe('deploy-helper worker', () => {
         ok: true,
         workerName: expect.stringMatching(/^test-worker-[0-9a-f]{12}$/),
         kvNamespaceId: 'kv-request-1',
+        writesSessionConfig: true,
+        writesSessionSecrets: true,
       }));
+      expect(replay.partial).toBeUndefined();
       expect(fetchMock.calls).toHaveLength(cloudflareCallsAfterCommit);
       expect(fetchMock.calls.filter(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'POST' &&
@@ -2394,7 +2397,12 @@ describe('deploy-helper worker', () => {
       }), env, {});
       const driftReplay = await driftReplayResponse.json();
       expect(driftReplayResponse.status).toBe(200);
-      expect(driftReplay.workerName).toBe(replay.workerName);
+      expect(driftReplay).toEqual(expect.objectContaining({
+        workerName: replay.workerName,
+        partial: true,
+        writesSessionConfig: false,
+        writesSessionSecrets: false,
+      }));
       expect(fetchMock.calls).toHaveLength(cloudflareCallsAfterCommit);
 
       const changedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {

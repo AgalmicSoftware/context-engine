@@ -224,7 +224,11 @@ export const createSessionWizardPublishRuntimeController = ({
       const registerStepRequest = resolveSessionWizardRegisterStepRequest({ publishExecutionPlan, uploadResult });
       await runEffect({
         effect: 'registerSession',
-        run: () => handleRegisterGroup(registerStepRequest.registerGroupArgs),
+        run: () =>
+          handleRegisterGroup({
+            ...registerStepRequest.registerGroupArgs,
+            ...(Array.isArray(preservedPendingSbtDrafts) ? { preservedPendingSbtDrafts } : {}),
+          }),
       });
       if (publishExecutionPlan.shouldRefreshRegistryCache) {
         markSessionPublishEffectSucceeded(dispatch, 'refreshRegistryCache');

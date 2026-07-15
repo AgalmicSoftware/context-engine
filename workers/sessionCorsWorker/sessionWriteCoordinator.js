@@ -54,6 +54,23 @@ const isTerminalDeployResult = (result = {}) => (
   result?.ok === true || result?.body?.deploymentRequestTerminal === true
 );
 
+const buildDirectDeployTerminalReplay = ({ result, requestDigestMatches } = {}) => {
+  if (requestDigestMatches || result?.ok !== true) return result;
+  return {
+    ...result,
+    body: {
+      ...((result?.body && typeof result.body === 'object') ? result.body : {}),
+      // Infrastructure identity is already terminal, but this response did not
+      // apply the retry's mutable config or session-secret payload. Force the
+      // signed post-deploy recovery path instead of replaying historical write
+      // claims as if they described the current request.
+      partial: true,
+      writesSessionConfig: false,
+      writesSessionSecrets: false,
+    },
+  };
+};
+
 const createAttemptId = (cryptoImpl = globalThis.crypto) => {
   if (typeof cryptoImpl?.randomUUID === 'function') return cryptoImpl.randomUUID();
   const bytes = new Uint8Array(16);
@@ -154,7 +171,11 @@ export class SessionWriteCoordinator {
         // A stable deployment identity is consumed after terminal success. A
         // later token or mutable-config edit replays that deployment instead
         // of silently creating or overwriting infrastructure.
-        return { kind: 'terminal', result: existing.result };
+        return {
+          kind: 'terminal',
+          result: existing.result,
+          requestDigestMatches: toTrimmedString(existing.requestDigest) === requestDigest,
+        };
       }
       if (
         existing?.state === 'running' &&
@@ -247,7 +268,8 @@ export class SessionWriteCoordinator {
     const accountId = toTrimmedString(account.accountId);
     const reservation = await this.reserveDirectDeploy({ requestDigest, immutableIdentityDigest, accountId });
     if (reservation.kind === 'terminal') {
-      return jsonResponse(reservation.result, Number(reservation.result?.status || 0) || 200);
+      const replayResult = buildDirectDeployTerminalReplay(reservation);
+      return jsonResponse(replayResult, Number(replayResult?.status || 0) || 200);
     }
     if (reservation.kind === 'account-conflict') {
       return jsonResponse({

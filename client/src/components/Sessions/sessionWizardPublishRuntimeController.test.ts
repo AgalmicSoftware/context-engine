@@ -203,8 +203,15 @@ describe('sessionWizardPublishRuntimeController', () => {
 
   it('preserves register-then-refresh ordering for decentralized publication', async () => {
     const harness = createControllerHarness();
+    const preservedPendingSbtDrafts = [
+      {
+        predictedAddress: '0x00000000000000000000000000000000000000cc',
+        deployed: false,
+      },
+    ];
 
     await harness.controller.settleRegistration({
+      preservedPendingSbtDrafts,
       publishExecutionPlan: {
         shouldRegisterSession: true,
         shouldRefreshRegistryCache: true,
@@ -224,6 +231,7 @@ describe('sessionWizardPublishRuntimeController', () => {
 
     expect(harness.handleRegisterGroup).toHaveBeenCalledWith({
       metadataUriOverride: 'ar://metadata',
+      preservedPendingSbtDrafts,
       sessionFieldsOverride: { sessionName: 'Example' },
     });
     expect(harness.events).toEqual([

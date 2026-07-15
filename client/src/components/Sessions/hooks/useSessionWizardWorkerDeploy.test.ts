@@ -414,6 +414,56 @@ describe('useSessionWizardWorkerDeploy', () => {
     });
   });
 
+  it('syncs current config and secrets after a terminal mutable-drift recovery response', async () => {
+    global.fetch = jest.fn(async (url: RequestInfo | URL) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            partial: true,
+            writesSessionConfig: false,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      } as Response;
+    });
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current.draft = {
+      ...options.refs.runtimeRef.current.draft,
+      sessionName: 'Current mutable recovery config',
+    };
+    options.refs.runtimeRef.current.workerSecretsEnabled = true;
+    options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'sk-current-mutable-recovery' });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let deployResult: Record<string, unknown> = {};
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker();
+    });
+
+    expect(deployResult.ok).toBe(true);
+    const fetchCalls = (global.fetch as jest.Mock).mock.calls;
+    const configSyncCalls = fetchCalls.filter(([url]) => String(url).endsWith('/admin/set-config'));
+    const secretsSyncCalls = fetchCalls.filter(([url]) => String(url).endsWith('/admin/set-secrets'));
+    expect(configSyncCalls).toHaveLength(1);
+    expect(secretsSyncCalls).toHaveLength(1);
+    expect(JSON.parse(String(configSyncCalls[0][1]?.body || '{}')).config).toEqual(
+      expect.objectContaining({ sessionName: 'Current mutable recovery config' }),
+    );
+    expect(JSON.parse(String(secretsSyncCalls[0][1]?.body || '{}')).secrets).toEqual({
+      openaiKey: 'sk-current-mutable-recovery',
+    });
+  });
+
   it('reuses the deploy identity after the hook is unmounted and remounted', async () => {
     const deployBodies: Record<string, unknown>[] = [];
     let deployCalls = 0;

@@ -1,7 +1,11 @@
 import {
   E2E_TESTIDS,
   act,
+  createPendingFeaturedDraft,
   fireEvent,
+  mockCreateSBT,
+  mockFetchSessionFromRegistry,
+  mockPendingSbtAddress,
   mockRegisterSessionOnChain,
   renderLoggedInSessionWizard,
   resetSessionWizardWorkerPanelTestState,
@@ -299,6 +303,57 @@ describe('SessionWizard publish boundary rendering', () => {
       expect(currentTabDraft.sessionId).not.toBe(publishedSessionId);
       expect(currentTabDraft.draft).toEqual(expect.objectContaining({ sessionName: 'Next Tab Session' }));
       expect(JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}')).toEqual(foreignDraft);
+    });
+  });
+
+  it('preserves suppressed pending SBT drafts while post-registration refresh is still pending', async () => {
+    const manualMetadataUri = `ar://${'g'.repeat(43)}`;
+    const customRegistryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    customRegistryProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    customRegistryProfile.authorization = { mechanisms: [] };
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          sessionModeProfile: customRegistryProfile,
+          storageProfile: { backend: 'arweave' },
+        },
+      }),
+    );
+    let resolveRegistryRefresh = () => {};
+    const registryRefreshPromise = new Promise((resolve) => {
+      resolveRegistryRefresh = resolve;
+    });
+    mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
+    mockFetchSessionFromRegistry.mockImplementation(() => registryRefreshPromise);
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Deferred Group Registry Session' },
+    });
+    await chooseCustomWorkerWithoutDeploy();
+    await createPendingFeaturedDraft();
+
+    const publishButton = await openPublishSection();
+    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+      target: { value: manualMetadataUri },
+    });
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+    fireEvent.click(publishButton);
+
+    await waitFor(() => {
+      expect(mockFetchSessionFromRegistry).toHaveBeenCalledTimes(1);
+    });
+    expect(mockCreateSBT).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toContain(mockPendingSbtAddress);
+
+    await act(async () => {
+      resolveRegistryRefresh(null);
+      await registryRefreshPromise;
     });
   });
 

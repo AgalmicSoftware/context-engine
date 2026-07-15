@@ -510,7 +510,16 @@ test('SessionWriteCoordinator binds direct deployment recovery to account and im
     executeDeployHelperRequest: async () => {
       deployCalls += 1;
       await canFinish;
-      return { ok: true, status: 200, body: { ok: true, workerName: 'worker-a' } };
+      return {
+        ok: true,
+        status: 200,
+        body: {
+          ok: true,
+          workerName: 'worker-a',
+          writesSessionConfig: true,
+          writesSessionSecrets: true,
+        },
+      };
     },
     crypto: { randomUUID: () => 'direct-attempt' },
   });
@@ -532,13 +541,23 @@ test('SessionWriteCoordinator binds direct deployment recovery to account and im
   release();
   assert.equal((await firstPromise).status, 200);
 
+  const exactReplay = await readResponse(await coordinator.fetch(createCoordinatorRequest('/deploy-helper', payload)));
+  assert.equal(exactReplay.status, 200);
+  assert.equal(exactReplay.body.body.writesSessionConfig, true);
+  assert.equal(exactReplay.body.body.writesSessionSecrets, true);
+  assert.equal(exactReplay.body.body.partial, undefined);
+
   const mutableReplay = await coordinator.fetch(createCoordinatorRequest('/deploy-helper', {
     ...payload,
     requestDigest: 'full-digest-config-drift',
     deployBody: { ...payload.deployBody, apiToken: 'rotated-token', sessionName: 'Updated' },
     sensitiveValues: ['rotated-token'],
   }));
-  assert.equal(mutableReplay.status, 200);
+  const mutableReplayResult = await readResponse(mutableReplay);
+  assert.equal(mutableReplayResult.status, 200);
+  assert.equal(mutableReplayResult.body.body.partial, true);
+  assert.equal(mutableReplayResult.body.body.writesSessionConfig, false);
+  assert.equal(mutableReplayResult.body.body.writesSessionSecrets, false);
   assert.equal(deployCalls, 1);
 
   const identityConflict = await coordinator.fetch(createCoordinatorRequest('/deploy-helper', {
