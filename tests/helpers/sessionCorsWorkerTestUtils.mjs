@@ -118,6 +118,7 @@ const isOwnerSelector = (data) => (
 export const buildRpcFetchMock = ({
   rpcUrl,
   registryAddress,
+  chainId = 84532,
   sessionExists = true,
   onChainGatesByResource = {},
   balancesByToken = {},
@@ -133,6 +134,9 @@ export const buildRpcFetchMock = ({
 
   if (method === 'eth_getCode') {
     return jsonRpcResponse({ jsonrpc: '2.0', id: 1, result: '0x1234' });
+  }
+  if (method === 'eth_chainId') {
+    return jsonRpcResponse({ jsonrpc: '2.0', id: 1, result: `0x${Number(chainId).toString(16)}` });
   }
   if (method !== 'eth_call') {
     return jsonRpcResponse({ jsonrpc: '2.0', id: 1, result: '0x1' });

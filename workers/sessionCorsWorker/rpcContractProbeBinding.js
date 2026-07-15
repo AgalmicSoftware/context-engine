@@ -1,3 +1,6 @@
+import { createSafeRpcError } from './rpcDiagnosticSafety.js';
+import { toChainId } from './chainIdNormalization.js';
+
 export const createRpcContractProbeHelpersWithWorkerDeps = ({
   deps,
 } = {}) => {
@@ -33,11 +36,15 @@ export const createRpcContractProbeHelpersWithWorkerDeps = ({
     if (!url) return '';
     try {
       const parsed = new URLWithCtor(url);
-      return `${parsed.origin}${parsed.pathname}`;
+      return parsed.origin;
     } catch {
-      return url.split('?')[0];
+      return '[invalid-rpc-url]';
     }
   };
+
+  const describeRpcProbeError = (error) => (
+    error?.rpcBlocked === true ? 'Blocked RPC URL' : 'RPC probe failed'
+  );
 
   const assertRpcUrlAllowed = (target) => {
     if (isBlockedOutboundUrl(target)) {
@@ -59,16 +66,16 @@ export const createRpcContractProbeHelpersWithWorkerDeps = ({
     try {
       payload = JSON.parse(text);
     } catch {
-      const err = new Error(`RPC non-JSON response (${res.status})`);
-      err.rpcStatus = res.status;
-      err.rpcBody = text.slice(0, 200);
-      throw err;
+      throw createSafeRpcError(
+        { rpcStatus: res.status },
+        'RPC returned a non-JSON response.',
+      );
     }
     if (!res.ok || payload?.error) {
-      const err = new Error(payload?.error?.message || `RPC error (${res.status})`);
-      err.rpcStatus = res.status;
-      err.rpcError = payload?.error || null;
-      throw err;
+      throw createSafeRpcError(
+        { rpcStatus: res.status, rpcError: payload?.error },
+        'RPC request failed.',
+      );
     }
     return payload?.result;
   };
@@ -112,20 +119,21 @@ export const createRpcContractProbeHelpersWithWorkerDeps = ({
       } catch {
         parsed = null;
       }
+      const safeChainId = parsed ? toChainId(parsed?.result) : 0;
       log('[rpc-probe] response', {
         label,
         rpcUrl: maskRpcUrl(target),
         status: res.status,
         ok: res.ok,
         durationMs: now() - startedAt,
-        result: parsed?.result || '',
-        bodyPreview: parsed ? '' : text.slice(0, 160),
+        result: parsed ? (safeChainId || '[invalid-chain-id]') : '',
+        bodyPreview: parsed ? '' : '[non-JSON response omitted]',
       });
     } catch (err) {
       warn('[rpc-probe] failed', {
         label,
         rpcUrl: maskRpcUrl(target),
-        error: toStr(err?.message || err).trim(),
+        error: describeRpcProbeError(err),
       });
     }
   };

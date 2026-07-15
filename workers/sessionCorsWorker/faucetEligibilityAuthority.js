@@ -1,4 +1,6 @@
 import { toTrimmedString } from './stringCoercion.js';
+import { resolveSessionSecretRpcUrlListForGateRuntime } from './gateRpcResolution.js';
+import { sanitizeRpcFailureDetails } from './rpcDiagnosticSafety.js';
 
 const ZERO_BYTES32_FALLBACK = `0x${'0'.repeat(64)}`;
 
@@ -42,12 +44,20 @@ export const resolveFaucetEligibilityAuthority = async ({
     sbtAddress,
   });
   if (!validationState.ok) {
+    const privateRpcUrls = resolveSessionSecretRpcUrlListForGateRuntime({
+      config,
+      gateChainId: gateMatch.gate?.chainId,
+    });
     return {
       ok: false,
       status: 403,
       error: anonymousGateUnavailableError,
       reason: 'sbt-validation-unavailable',
-      details: validationState.errors || [],
+      details: sanitizeRpcFailureDetails(validationState.errors, {
+        maskRpcUrl: deps?.maskRpcUrl,
+        privateRpcUrls,
+        errorLabel: 'SBT validation RPC request failed.',
+      }),
     };
   }
 
@@ -64,12 +74,20 @@ export const resolveFaucetEligibilityAuthority = async ({
       hashedPassword,
     });
     if (!passwordCheck.ok) {
+      const privateRpcUrls = resolveSessionSecretRpcUrlListForGateRuntime({
+        config,
+        gateChainId: gateMatch.gate?.chainId,
+      });
       return {
         ok: false,
         status: 403,
         error: anonymousGateUnavailableError,
         reason: 'password-validation-unavailable',
-        details: passwordCheck.errors || [],
+        details: sanitizeRpcFailureDetails(passwordCheck.errors, {
+          maskRpcUrl: deps?.maskRpcUrl,
+          privateRpcUrls,
+          errorLabel: 'SBT password validation RPC request failed.',
+        }),
       };
     }
     if (!passwordCheck.isValid) {

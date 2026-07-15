@@ -1,13 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { toChainId } from './chainIdNormalization.js';
 import { readResourceGateOnChain } from './sessionResourceGateRead.js';
 
 const createDeps = (overrides = {}) => ({
   callRegistryFunction: async () => [['0xabc'], 84532, 0],
   maskRpcUrl: (value) => `masked:${value}`,
+  rpcRequest: async ({ method }) => {
+    assert.equal(method, 'eth_chainId');
+    return '0x14a34';
+  },
   toStr: (value) => `${value ?? ''}`,
-  toChainId: (value) => Number(value || 0),
+  toChainId,
   ...overrides,
 });
 
@@ -19,6 +24,8 @@ test('readResourceGateOnChain returns the first successful decoded gate and pres
     registryRpcUrls: ['https://rpc-a.example', 'https://rpc-b.example', 'https://rpc-c.example'],
     registrySlug: 'session-a',
     resourceKey: 'default',
+    expectedChainId: 84532,
+    chainAttestationCache: new Map(),
     deps: createDeps({
       callRegistryFunction: async (value) => {
         calls.push(value);
@@ -62,8 +69,8 @@ test('readResourceGateOnChain returns the first successful decoded gate and pres
       {
         rpcUrl: 'masked:https://rpc-a.example',
         status: 503,
-        error: 'rpc-a failed',
-        rpcError: { code: -32000 },
+        code: -32000,
+        error: 'Registry gate lookup RPC request failed.',
       },
     ],
   });
@@ -75,6 +82,8 @@ test('readResourceGateOnChain returns an error string and masked rpc errors when
     registryRpcUrls: ['https://rpc-a.example', 'https://rpc-b.example'],
     registrySlug: 'session-b',
     resourceKey: 'ai',
+    expectedChainId: 84532,
+    chainAttestationCache: new Map(),
     deps: createDeps({
       callRegistryFunction: async ({ rpcUrl }) => {
         if (rpcUrl === 'https://rpc-a.example') {
@@ -93,20 +102,69 @@ test('readResourceGateOnChain returns an error string and masked rpc errors when
 
   assert.deepEqual(result, {
     ok: false,
-    error: 'rpc-b unavailable',
+    error: 'Registry gate lookup failed.',
     errors: [
       {
         rpcUrl: 'masked:https://rpc-a.example',
         status: 502,
-        error: 'rpc-a unavailable',
-        rpcError: 'bad gateway',
+        error: 'Registry gate lookup RPC request failed.',
       },
       {
         rpcUrl: 'masked:https://rpc-b.example',
         status: 429,
-        error: 'rpc-b unavailable',
-        rpcError: { code: -32005 },
+        code: -32005,
+        error: 'Registry gate lookup RPC request failed.',
       },
     ],
   });
+  assert.equal(JSON.stringify(result).includes('unavailable'), false);
+  assert.equal(JSON.stringify(result).includes('rpcError'), false);
+});
+
+test('readResourceGateOnChain rejects a wrong-chain endpoint before the registry read', async () => {
+  let registryReads = 0;
+  const result = await readResourceGateOnChain({
+    registryAddress: '0x0000000000000000000000000000000000000001',
+    registryRpcUrls: ['https://wrong-chain.example'],
+    registrySlug: 'session-c',
+    resourceKey: 'default',
+    expectedChainId: 31337,
+    chainAttestationCache: new Map(),
+    deps: createDeps({
+      rpcRequest: async () => '0x14a34',
+      callRegistryFunction: async () => {
+        registryReads += 1;
+        return [[], 31337, 0];
+      },
+    }),
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(registryReads, 0);
+  assert.deepEqual(result.errors, [{
+    rpcUrl: 'masked:https://wrong-chain.example',
+    status: null,
+    error: 'Registry gate lookup RPC chain attestation failed.',
+  }]);
+});
+
+test('readResourceGateOnChain strictly normalizes an ethers-v5 BigNumber chain at the ABI boundary', async () => {
+  const decodedChainId = {
+    _isBigNumber: true,
+    toString: () => '84532',
+  };
+  const result = await readResourceGateOnChain({
+    registryAddress: '0x0000000000000000000000000000000000000001',
+    registryRpcUrls: ['https://rpc.example'],
+    registrySlug: 'session-d',
+    resourceKey: 'default',
+    expectedChainId: 84532,
+    chainAttestationCache: new Map(),
+    deps: createDeps({
+      callRegistryFunction: async () => [['0xabc'], decodedChainId, 0],
+    }),
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.gate.chainId, 84532);
 });

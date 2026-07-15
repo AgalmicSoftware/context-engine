@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resolveRpcUrlListForGate } from './gateRpcResolution.js';
+import {
+  attachSessionSecretRpcForGateRuntime,
+  resolveRpcUrlListForGate,
+} from './gateRpcResolution.js';
 
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 
@@ -144,6 +147,19 @@ test('resolveRpcUrlListForGate merges mapped and direct RPC URLs when the gate c
   ]);
 });
 
+test('resolveRpcUrlListForGate treats legacy networkChainId as the registry chain when registryChainId is absent', () => {
+  const result = resolveRpcUrlListForGate({
+    config: {
+      networkChainId: 84532,
+      rpcUrl: 'https://legacy-direct.example',
+    },
+    gateChainId: 84532,
+    deps,
+  });
+
+  assert.deepEqual(result, ['https://legacy-direct.example']);
+});
+
 test('resolveRpcUrlListForGate accepts both numeric-style and string chain-id keys', () => {
   const numericKeyResult = resolveRpcUrlListForGate({
     config: {
@@ -187,4 +203,92 @@ test('resolveRpcUrlListForGate preserves existing dedupe semantics when merging 
     'https://mapped-only.example',
     'https://direct-only.example',
   ]);
+});
+
+test('resolveRpcUrlListForGate uses the authenticated session-secret RPC for an unknown worker-canonical chain', () => {
+  const publicConfig = {
+    networkChainId: 31337,
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+  };
+  const runtimeConfig = attachSessionSecretRpcForGateRuntime({
+    config: publicConfig,
+    secrets: { customRpcUrl: ' https://private-rpc.example.test/eth ' },
+  });
+
+  const result = resolveRpcUrlListForGate({
+    config: runtimeConfig,
+    gateChainId: 31337,
+    deps,
+  });
+
+  assert.deepEqual(result, ['https://private-rpc.example.test/eth']);
+  assert.equal(JSON.stringify(runtimeConfig).includes('private-rpc.example.test'), false);
+  assert.deepEqual(publicConfig, {
+    networkChainId: 31337,
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+  });
+});
+
+test('resolveRpcUrlListForGate prefers the authenticated session-secret RPC over known-chain public fallbacks', () => {
+  const runtimeConfig = attachSessionSecretRpcForGateRuntime({
+    config: {
+      networkChainId: 11155420,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    },
+    secrets: { customRpcUrl: 'https://private-op-rpc.example.test' },
+  });
+
+  const result = resolveRpcUrlListForGate({
+    config: runtimeConfig,
+    gateChainId: 11155420,
+    deps,
+  });
+
+  assert.deepEqual(result, ['https://private-op-rpc.example.test']);
+});
+
+test('attachSessionSecretRpcForGateRuntime does not bind one secret RPC to a different gate chain', () => {
+  const runtimeConfig = attachSessionSecretRpcForGateRuntime({
+    config: {
+      networkChainId: 31337,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    },
+    secrets: { customRpcUrl: 'https://private-rpc.example.test' },
+  });
+
+  const result = resolveRpcUrlListForGate({
+    config: runtimeConfig,
+    gateChainId: 31338,
+    deps,
+  });
+
+  assert.deepEqual(result, []);
+});
+
+test('attachSessionSecretRpcForGateRuntime keeps runtime credentials isolated per config object', () => {
+  const baseConfigA = {
+    networkChainId: 31337,
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+  };
+  const baseConfigB = {
+    networkChainId: 31337,
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+  };
+  const runtimeA = attachSessionSecretRpcForGateRuntime({
+    config: baseConfigA,
+    secrets: { customRpcUrl: 'https://session-a-rpc.example.test' },
+  });
+  const runtimeB = attachSessionSecretRpcForGateRuntime({
+    config: baseConfigB,
+    secrets: { customRpcUrl: 'https://session-b-rpc.example.test' },
+  });
+
+  assert.deepEqual(resolveRpcUrlListForGate({ config: runtimeA, gateChainId: 31337, deps }), [
+    'https://session-a-rpc.example.test',
+  ]);
+  assert.deepEqual(resolveRpcUrlListForGate({ config: runtimeB, gateChainId: 31337, deps }), [
+    'https://session-b-rpc.example.test',
+  ]);
+  assert.deepEqual(resolveRpcUrlListForGate({ config: baseConfigA, gateChainId: 31337, deps }), []);
+  assert.deepEqual(resolveRpcUrlListForGate({ config: baseConfigB, gateChainId: 31337, deps }), []);
 });

@@ -5,6 +5,10 @@ import {
   authorizeArweaveSbtAssociation,
   resolveArweaveSessionIdAssociation,
 } from './arweaveAssociationAuthority.js';
+import {
+  attachSessionSecretRpcForGateRuntime,
+  resolveRpcUrlListForGate,
+} from './gateRpcResolution.js';
 
 const SESSION_ID = '0x11111111111111111111111111111111';
 const RPC_URL = 'https://rpc.example';
@@ -44,6 +48,7 @@ const createDeps = (overrides = {}) => ({
   readSessionBySlugOnChain: async () => ({ ok: true, tuple: ['', 0, '', '', '', 0, 0, SESSION_ID] }),
   resolveRegistryRpcUrls: () => [RPC_URL],
   resolveRpcUrlListForGate: () => [RPC_URL],
+  rpcRequest: async () => '0x14a34',
   toChainId: (value) => Number(value) || 0,
   toRegistrySessionSlug: (slug) => toStr(slug).trim() || 'general',
   toStr,
@@ -53,11 +58,16 @@ const createDeps = (overrides = {}) => ({
 test('resolveArweaveSessionIdAssociation canonicalizes CE-SessionId using the shared tuple reader', async () => {
   const tags = [{ name: 'CE-SessionId', value: '11111111111111111111111111111111' }];
   const reads = [];
+  const chainAttestationCache = new Map();
 
   const result = await resolveArweaveSessionIdAssociation({
     tags,
     slug: 'session-a',
-    config: { registryAddress: '0x0000000000000000000000000000000000000001' },
+    config: {
+      registryAddress: '0x0000000000000000000000000000000000000001',
+      registryChainId: 84532,
+    },
+    chainAttestationCache,
     deps: createDeps({
       readSessionBySlugOnChain: async (value) => {
         reads.push(value);
@@ -71,6 +81,8 @@ test('resolveArweaveSessionIdAssociation canonicalizes CE-SessionId using the sh
     registryAddress: '0x0000000000000000000000000000000000000001',
     registryRpcUrls: [RPC_URL],
     registrySlug: 'session-a',
+    expectedChainId: 84532,
+    chainAttestationCache,
   }]);
   assert.deepEqual(tags, [{ name: 'CE-SessionId', value: SESSION_ID }]);
 });
@@ -81,7 +93,10 @@ test('resolveArweaveSessionIdAssociation preserves CE-SessionId mismatch failure
   const result = await resolveArweaveSessionIdAssociation({
     tags,
     slug: 'session-b',
-    config: { registryAddress: '0x0000000000000000000000000000000000000001' },
+    config: {
+      registryAddress: '0x0000000000000000000000000000000000000001',
+      registryChainId: 84532,
+    },
     deps: createDeps(),
   });
 
@@ -136,6 +151,89 @@ test('authorizeArweaveSbtAssociation canonicalizes accepted CE-SbtChainId and CE
     { name: 'CE-SbtChainId', value: '84532' },
     { name: 'CE-SbtAddress', value: SBT_ADDRESS.toLowerCase() },
   ]);
+});
+
+test('authorizeArweaveSbtAssociation reads an unknown-chain SBT through the bound session-secret RPC', async () => {
+  const secretRpcUrl = 'https://private-rpc.example.test/eth';
+  const tags = [
+    { name: 'CE-SbtChainId', value: '31337' },
+    { name: 'CE-SbtAddress', value: SBT_ADDRESS },
+  ];
+  const runtimeConfig = attachSessionSecretRpcForGateRuntime({
+    config: {
+      networkChainId: 31337,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    },
+    secrets: { customRpcUrl: secretRpcUrl },
+  });
+  const contractRpcUrls = [];
+
+  const result = await authorizeArweaveSbtAssociation({
+    tags,
+    config: runtimeConfig,
+    uploaderAddress: UPLOADER_ADDRESS,
+    deps: createDeps({
+      resolveRpcUrlListForGate: (config, gateChainId) => resolveRpcUrlListForGate({
+        config,
+        gateChainId,
+      }),
+      rpcRequest: async () => '0x7a69',
+      callContractFunction: async ({ rpcUrl, method }) => {
+        contractRpcUrls.push(rpcUrl);
+        if (method === 'balanceOf') return [1n];
+        throw new Error(`Unexpected contract method: ${method}`);
+      },
+    }),
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(contractRpcUrls, [secretRpcUrl]);
+});
+
+test('authorizeArweaveSbtAssociation rejects a private session RPC on the wrong chain before contract reads', async () => {
+  const secretRpcUrl = 'https://TENANT_SECRET.rpc.example/v2/ALCHEMY_SECRET';
+  const tags = [
+    { name: 'CE-SbtChainId', value: '31337' },
+    { name: 'CE-SbtAddress', value: SBT_ADDRESS },
+  ];
+  const runtimeConfig = attachSessionSecretRpcForGateRuntime({
+    config: {
+      networkChainId: 31337,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    },
+    secrets: { customRpcUrl: secretRpcUrl },
+  });
+  const rpcCalls = [];
+  let contractCalls = 0;
+
+  const result = await authorizeArweaveSbtAssociation({
+    tags,
+    config: runtimeConfig,
+    uploaderAddress: UPLOADER_ADDRESS,
+    deps: createDeps({
+      resolveRpcUrlListForGate: (config, gateChainId) => resolveRpcUrlListForGate({
+        config,
+        gateChainId,
+      }),
+      rpcRequest: async (value) => {
+        rpcCalls.push(value);
+        return '0x14a34';
+      },
+      callContractFunction: async () => {
+        contractCalls += 1;
+        return [1n];
+      },
+    }),
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 403);
+  assert.equal(contractCalls, 0);
+  assert.deepEqual(rpcCalls, [{
+    rpcUrl: secretRpcUrl,
+    method: 'eth_chainId',
+    params: [],
+  }]);
 });
 
 test('authorizeArweaveSbtAssociation preserves admin fallback authorization when balance is zero', async () => {

@@ -46,6 +46,9 @@ export const computeLoginScopes = async ({
       checkSbtGate: deps?.checkSbtGate,
       probeRpcUrls: deps?.probeRpcUrls,
       readRegistryCodeOnChain: deps?.readRegistryCodeOnChain,
+      ...(deps?.chainAttestationCache instanceof Map
+        ? { chainAttestationCache: deps.chainAttestationCache }
+        : {}),
       maskRpcUrl: deps?.maskRpcUrl,
       toChainId: deps?.toChainId,
       toStr: deps?.toStr,

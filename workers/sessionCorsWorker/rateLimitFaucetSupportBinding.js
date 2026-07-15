@@ -66,6 +66,7 @@ export const createRateLimitFaucetSupportWithWorkerDeps = ({
       readResourceGateOnChain: deps?.readResourceGateOnChain,
       resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
       toChainId: deps?.toChainId,
+      rpcRequest: deps?.rpcRequest,
       getFaucetSbtGateInterface: deps?.getFaucetSbtGateInterface,
       callContractFunction: deps?.callContractFunction,
     },

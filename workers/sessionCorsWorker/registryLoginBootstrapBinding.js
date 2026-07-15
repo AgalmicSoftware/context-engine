@@ -30,7 +30,9 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
       deps: {
         callRegistryFunction: deps?.callRegistryFunction,
         maskRpcUrl: deps?.maskRpcUrl,
+        rpcRequest: deps?.rpcRequest,
         toStr: deps?.toStr,
+        toChainId: deps?.toChainId,
       },
     })
   );
@@ -41,7 +43,9 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
       deps: {
         callRegistryFunction: deps?.callRegistryFunction,
         maskRpcUrl: deps?.maskRpcUrl,
+        rpcRequest: deps?.rpcRequest,
         toStr: deps?.toStr,
+        toChainId: deps?.toChainId,
       },
     })
   );
@@ -52,6 +56,7 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
       deps: {
         callRegistryFunction: deps?.callRegistryFunction,
         maskRpcUrl: deps?.maskRpcUrl,
+        rpcRequest: deps?.rpcRequest,
         toStr: deps?.toStr,
         toChainId: deps?.toChainId,
       },
@@ -65,6 +70,7 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
         rpcRequest: deps?.rpcRequest,
         maskRpcUrl: deps?.maskRpcUrl,
         toStr: deps?.toStr,
+        toChainId: deps?.toChainId,
       },
     })
   );
@@ -75,6 +81,9 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
     address,
     config,
   } = {}) => {
+    // Endpoint identity is memoized only for this login request. A shared cache
+    // would let a later request trust an endpoint that has since changed chain.
+    const chainAttestationCache = new Map();
     const {
       authorityMode,
       registryAddress,
@@ -91,6 +100,7 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
         resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
         toRegistrySessionSlug: deps?.toRegistrySessionSlug,
         readSessionExistsOnChain,
+        chainAttestationCache,
         maskRpcUrl: deps?.maskRpcUrl,
         warn: deps?.warn || console.warn,
       },
@@ -112,6 +122,7 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
         checkSbtGate: deps?.checkSbtGate,
         probeRpcUrls: deps?.probeRpcUrls,
         readRegistryCodeOnChain,
+        chainAttestationCache,
         maskRpcUrl: deps?.maskRpcUrl,
         toChainId: deps?.toChainId,
         toStr: deps?.toStr,
@@ -131,6 +142,7 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
         toRegistrySessionSlug: deps?.toRegistrySessionSlug,
         readSessionExistsOnChain,
         readSessionBySlugOnChain,
+        toChainId: deps?.toChainId,
       },
     })
   );

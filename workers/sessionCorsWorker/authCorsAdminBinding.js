@@ -62,6 +62,8 @@ export const createAuthCorsAdminAdaptersWithWorkerDeps = ({
         toStr: deps?.toStr,
         isAddress: deps?.isAddress,
         resolveRegistryRpcUrls: deps?.resolveRegistryRpcUrls,
+        rpcRequest: deps?.rpcRequest,
+        toChainId: deps?.toChainId,
         getHatsInterface: deps?.getHatsInterface,
         callContractFunction: deps?.callContractFunction,
       },

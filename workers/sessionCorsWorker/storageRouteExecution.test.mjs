@@ -12,6 +12,9 @@ import {
   rewrapStorageEnvelopeSessionKeyForDeployment,
   rotateStorageEnvelopeKeys,
 } from './storageEnvelopeEncryption.js';
+import { resolveRpcUrlListForGate } from './gateRpcResolution.js';
+import { createEthersInterfaceProviderGateHelpersWithWorkerDeps } from './ethersInterfaceProviderGateBinding.js';
+import { PRIVATE_SESSION_RPC_LABEL } from './rpcDiagnosticSafety.js';
 import {
   addWorkerGroupMember,
   createWorkerGroup,
@@ -1152,6 +1155,68 @@ test('storageRoute accepts Cloudflare document tags that look like ordinary file
   assert.doesNotMatch(JSON.stringify(body), /account|bucket|token|secret|r2:\/\//i);
 });
 
+test('storageRoute attests on-chain storage gates against the configured registry chain', async () => {
+  const r2 = createMockR2();
+  const kv = createMockKv();
+  const gateReads = [];
+  const config = {
+    registryAddress: '0x0000000000000000000000000000000000000001',
+    registryChainId: 84532,
+    rpcUrl: 'https://registry.example',
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { mode: 'worker_sbt_gate' },
+    },
+  };
+
+  const response = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'on-chain-gated', contentType: 'text/plain', resource: 'docsContext' }),
+    }),
+    env: { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv },
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0xabc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+      resolveRegistryRpcUrls: () => ['https://registry.example'],
+      toRegistrySessionSlug: (value) => value,
+      readResourceGateOnChain: async (value) => {
+        gateReads.push(value);
+        return {
+          ok: true,
+          gate: { sbtAddresses: [], chainId: 84532, mode: 0 },
+          rpcUrl: 'https://registry.example',
+          errors: [],
+        };
+      },
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(gateReads.length, 1);
+  assert.equal(gateReads[0].expectedChainId, 84532);
+  assert.ok(gateReads[0].chainAttestationCache instanceof Map);
+  assert.deepEqual({
+    registryAddress: gateReads[0].registryAddress,
+    registryRpcUrls: gateReads[0].registryRpcUrls,
+    registrySlug: gateReads[0].registrySlug,
+    resourceKey: gateReads[0].resourceKey,
+  }, {
+    registryAddress: config.registryAddress,
+    registryRpcUrls: ['https://registry.example'],
+    registrySlug: 'session-a',
+    resourceKey: 'docUploads',
+  });
+});
+
 test('storageRoute denies Cloudflare worker_sbt_gate reads when SBT gate check fails', async () => {
   const r2 = createMockR2();
   const kv = createMockKv();
@@ -1215,11 +1280,422 @@ test('storageRoute denies Cloudflare worker_sbt_gate reads when SBT gate check f
   assert.equal(denied.error, 'Access denied: Cloudflare worker SBT gate failed.');
 });
 
+test('storageRoute consumes the session-secret RPC for worker-canonical SBT gates without adding it to public config', async () => {
+  const r2 = createMockR2();
+  const kv = createMockKv();
+  const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
+  const secretRpcUrl = 'https://private-rpc.example.test/eth';
+  const config = {
+    networkChainId: 31337,
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { mode: 'worker_sbt_gate' },
+    },
+    __registry: {
+      gatesByResource: {
+        docUploads: {
+          sbtAddresses: ['0x00000000000000000000000000000000000000aa'],
+          chainId: 31337,
+          mode: 'all',
+        },
+      },
+    },
+  };
+  const checkedRpcUrls = [];
+
+  const response = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'gated', contentType: 'text/plain', resource: 'docsContext' }),
+    }),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000abc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+      getSessionSecrets: async (receivedEnv, receivedSlug) => {
+        assert.equal(receivedEnv, env);
+        assert.equal(receivedSlug, 'session-a');
+        return { customRpcUrl: secretRpcUrl };
+      },
+      resolveRpcUrlListForGate: (runtimeConfig, gateChainId) => resolveRpcUrlListForGate({
+        config: runtimeConfig,
+        gateChainId,
+      }),
+      checkSbtGate: async ({ rpcUrl }) => {
+        checkedRpcUrls.push(rpcUrl);
+        return true;
+      },
+    },
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(checkedRpcUrls, [secretRpcUrl]);
+  assert.equal(JSON.stringify(config).includes(secretRpcUrl), false);
+});
+
+test('storageRoute fails closed when an SBT gate cannot load worker-canonical RPC secrets', async () => {
+  const r2 = createMockR2();
+  const kv = createMockKv();
+  const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
+  const config = {
+    networkChainId: 31337,
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { mode: 'worker_sbt_gate' },
+    },
+    __registry: {
+      gatesByResource: {
+        docUploads: {
+          sbtAddresses: ['0x00000000000000000000000000000000000000aa'],
+          chainId: 31337,
+          mode: 'all',
+        },
+      },
+    },
+  };
+  let gateChecks = 0;
+
+  const response = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'gated', contentType: 'text/plain', resource: 'docsContext' }),
+    }),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000abc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      getSessionSecrets: async () => {
+        throw new Error('secret store unavailable');
+      },
+      resolveRpcUrlListForGate: () => ['https://public-rpc.example.test'],
+      checkSbtGate: async () => {
+        gateChecks += 1;
+        return true;
+      },
+    },
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal((await readJson(response)).reason, 'sbt_rpc_secret_unavailable');
+  assert.equal(gateChecks, 0);
+});
+
+test('storageRoute rejects a private session RPC on the wrong chain before any SBT contract read', async () => {
+  const r2 = createMockR2();
+  const kv = createMockKv();
+  const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
+  const secretRpcUrl = 'https://TENANT_SECRET.rpc.example/v2/ALCHEMY_SECRET';
+  const config = {
+    networkChainId: 31337,
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { mode: 'worker_sbt_gate' },
+    },
+    __registry: {
+      gatesByResource: {
+        docUploads: {
+          sbtAddresses: ['0x00000000000000000000000000000000000000aa'],
+          chainId: 31337,
+          mode: 'all',
+        },
+      },
+    },
+  };
+  const logs = [];
+  const rpcCalls = [];
+  let contractCalls = 0;
+  const { checkSbtGate } = createEthersInterfaceProviderGateHelpersWithWorkerDeps({
+    deps: {
+      getEthersInterfaceCtor: () => class InterfaceStub {},
+      isAddress: (value) => /^0x[0-9a-fA-F]{40}$/.test(String(value).trim()),
+      callContractFunction: async () => {
+        contractCalls += 1;
+        return [1n];
+      },
+      rpcRequest: async (value) => {
+        rpcCalls.push(value);
+        return '0x14a34';
+      },
+      toChainId: (value) => {
+        if (typeof value === 'string' && value.startsWith('0x')) return parseInt(value, 16) || 0;
+        return Number(value) || 0;
+      },
+      maskRpcUrl: (value) => new URL(value).origin,
+      log: (...args) => logs.push(args),
+    },
+    constants: { erc721Abi: ['erc721'] },
+  });
+
+  const response = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'gated', contentType: 'text/plain', resource: 'docsContext' }),
+    }),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000abc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      getSessionSecrets: async () => ({ customRpcUrl: secretRpcUrl }),
+      resolveRpcUrlListForGate: (runtimeConfig, gateChainId) => resolveRpcUrlListForGate({
+        config: runtimeConfig,
+        gateChainId,
+      }),
+      checkSbtGate,
+    },
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal(contractCalls, 0);
+  assert.deepEqual(rpcCalls, [{
+    rpcUrl: secretRpcUrl,
+    method: 'eth_chainId',
+    params: [],
+  }]);
+  assert.deepEqual(logs, [[
+    '[gating] sbt rpc chain attestation failed',
+    {
+      address: '0x0000000000000000000000000000000000000abc',
+      rpcUrl: PRIVATE_SESSION_RPC_LABEL,
+      expectedChainId: 31337,
+      actualChainId: 84532,
+      reason: 'rpc-chain-mismatch',
+      status: null,
+      code: null,
+    },
+  ]]);
+  assert.equal(JSON.stringify(logs).includes('TENANT_SECRET'), false);
+  assert.equal(JSON.stringify(logs).includes('ALCHEMY_SECRET'), false);
+});
+
+test('storageRoute carries the session-secret RPC through explicit access conditions and upload policies', async () => {
+  const r2 = createMockR2();
+  const kv = createMockKv();
+  const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
+  const secretRpcUrl = 'https://private-rpc.example.test/eth';
+  const sbtAddress = '0x00000000000000000000000000000000000000aa';
+  const config = {
+    networkChainId: 31337,
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: {
+        gate: 'none',
+        encryption: 'none',
+        accessConditions: {
+          match: 'all',
+          conditions: [{
+            kind: 'sbt_onchain',
+            chainId: 31337,
+            contract: sbtAddress,
+            anyOrAll: 'any',
+          }],
+        },
+      },
+    },
+  };
+  const checkedRpcUrls = [];
+  let secretReads = 0;
+  const deps = {
+    json,
+    randomBytes: fixedRandomBytes,
+    now: () => Date.parse('2026-01-02T03:04:05.000Z'),
+    getSessionSecrets: async () => {
+      secretReads += 1;
+      return { customRpcUrl: secretRpcUrl };
+    },
+    resolveRpcUrlListForGate: (runtimeConfig, gateChainId) => resolveRpcUrlListForGate({
+      config: runtimeConfig,
+      gateChainId,
+    }),
+    checkSbtGate: async ({ rpcUrl }) => {
+      checkedRpcUrls.push(rpcUrl);
+      return true;
+    },
+  };
+
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: 'doubly gated',
+        contentType: 'text/plain',
+        resource: 'docsContext',
+        uploadPolicy: {
+          mode: 'sbt_allowlist',
+          contract: sbtAddress,
+          chainId: 31337,
+          anyOrAll: 'any',
+        },
+      }),
+    }),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000abc',
+    authScopes: {},
+    baseHeaders: {},
+    deps,
+  });
+  const uploadBody = await readJson(uploadResponse);
+
+  assert.equal(uploadResponse.status, 200);
+  assert.deepEqual(checkedRpcUrls, [secretRpcUrl, secretRpcUrl]);
+  assert.equal(secretReads, 1);
+
+  const readResponse = await storageRoute({
+    path: '/storage/read',
+    method: 'GET',
+    request: new Request(`https://worker.example/storage/read?id=${uploadBody.storageRef.id}`),
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000abc',
+    authScopes: {},
+    baseHeaders: {},
+    deps,
+  });
+
+  assert.equal(readResponse.status, 200);
+  assert.deepEqual(checkedRpcUrls, [secretRpcUrl, secretRpcUrl, secretRpcUrl]);
+  assert.equal(secretReads, 2);
+});
+
+test('storageRoute rejects non-canonical chain ids on direct gates, access conditions, and upload policies', async () => {
+  const invalidChainIds = [
+    '3.1337e4',
+    '31337.0',
+    '-31337',
+    '0x7a69junk',
+    '9007199254740993',
+  ];
+  const sbtAddress = '0x00000000000000000000000000000000000000aa';
+  let rpcResolutionCalls = 0;
+  let gateCheckCalls = 0;
+  const deps = {
+    json,
+    randomBytes: fixedRandomBytes,
+    resolveRpcUrlListForGate: () => {
+      rpcResolutionCalls += 1;
+      return ['https://rpc.example'];
+    },
+    checkSbtGate: async () => {
+      gateCheckCalls += 1;
+      return true;
+    },
+  };
+  const runUpload = ({ config, body }) => storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'strict chain id', ...body }),
+    }),
+    env: { CE_STORAGE_R2: createMockR2(), CE_STORAGE_INDEX_KV: createMockKv() },
+    config,
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000abc',
+    authScopes: {},
+    baseHeaders: {},
+    deps,
+  });
+
+  for (const chainId of invalidChainIds) {
+    const directResponse = await runUpload({
+      config: {
+        registryChainId: 31337,
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { mode: 'worker_sbt_gate' },
+        },
+        __registry: {
+          gatesByResource: {
+            docUploads: { sbtAddresses: [sbtAddress], chainId, mode: 'any' },
+          },
+        },
+      },
+      body: { resource: 'docsContext' },
+    });
+    assert.equal(directResponse.status, 403, `direct gate: ${chainId}`);
+    assert.equal((await readJson(directResponse)).reason, 'invalid_sbt_gate_chain');
+
+    const conditionResponse = await runUpload({
+      config: {
+        registryChainId: 31337,
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { gate: 'none', encryption: 'none' },
+        },
+      },
+      body: {
+        accessConditions: {
+          match: 'all',
+          conditions: [{ kind: 'sbt_onchain', chainId, contract: sbtAddress }],
+        },
+      },
+    });
+    assert.equal(conditionResponse.status, 403, `access condition: ${chainId}`);
+    assert.equal((await readJson(conditionResponse)).reason, 'invalid_sbt_chain');
+
+    const policyResponse = await runUpload({
+      config: {
+        registryChainId: 31337,
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { gate: 'none', encryption: 'none' },
+        },
+      },
+      body: {
+        uploadPolicy: {
+          mode: 'sbt_allowlist',
+          chainId,
+          contract: sbtAddress,
+        },
+      },
+    });
+    assert.equal(policyResponse.status, 400, `upload policy: ${chainId}`);
+    assert.equal((await readJson(policyResponse)).reason, 'invalid_sbt_upload_policy_chain');
+  }
+
+  assert.equal(rpcResolutionCalls, 0);
+  assert.equal(gateCheckCalls, 0);
+});
+
 test('storageRoute allows public_read Cloudflare reads and lists without requester auth', async () => {
   const r2 = createMockR2();
   const kv = createMockKv();
   const env = { CE_STORAGE_R2: r2, CE_STORAGE_INDEX_KV: kv };
   const publicConfig = {
+    networkChainId: 31337,
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
     storageProfile: {
       backend: 'cloudflare',
       payloadAccessControl: { mode: 'public_read' },
@@ -1246,6 +1722,14 @@ test('storageRoute allows public_read Cloudflare reads and lists without request
     },
   });
   const uploadBody = await readJson(uploadResponse);
+  let secretReads = 0;
+  const publicReadDeps = {
+    json,
+    getSessionSecrets: async () => {
+      secretReads += 1;
+      throw new Error('public reads must not depend on the secret store');
+    },
+  };
 
   const readResponse = await storageRoute({
     path: '/storage/read',
@@ -1256,7 +1740,7 @@ test('storageRoute allows public_read Cloudflare reads and lists without request
     slug: 'session-a',
     uploaderAddress: '',
     baseHeaders: {},
-    deps: { json },
+    deps: publicReadDeps,
   });
   assert.equal(readResponse.status, 200);
   assert.equal(readResponse.headers.get('X-CE-Payload-Access-Mode'), 'public_read');
@@ -1271,12 +1755,13 @@ test('storageRoute allows public_read Cloudflare reads and lists without request
     slug: 'session-a',
     uploaderAddress: '',
     baseHeaders: {},
-    deps: { json },
+    deps: publicReadDeps,
   });
   const listed = await readJson(listResponse);
   assert.equal(listResponse.status, 200);
   assert.equal(listed.items.length, 1);
   assert.equal(listed.items[0].metadata.payloadAccessMode, 'public_read');
+  assert.equal(secretReads, 0);
 });
 
 test('storageRoute enforces worker group gates and group upload allowlists', async () => {

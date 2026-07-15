@@ -3,6 +3,7 @@ import { normalizeArweaveCeTags } from './arweaveCeTagNormalization.js';
 import { resolveArweaveUploadJwk } from './arweaveJwkNormalization.js';
 import { readArweaveUploadRequestPayload } from './arweaveUploadRequestNormalization.js';
 import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
+import { attachSessionSecretRpcForGateRuntime } from './gateRpcResolution.js';
 
 const ARWEAVE_UNAVAILABLE_ERROR = 'Arweave library not available in this runtime (check bundling and try arweave/web).';
 
@@ -147,11 +148,15 @@ export const arweaveUpload = async ({
   }
   const tags = tagCheck?.tags || [];
 
+  const runtimeConfig = attachSessionSecretRpcForGateRuntime({ config, secrets });
+  // Session-registry and SBT reads share attestation only within this upload.
+  const chainAttestationCache = new Map();
   const association = await (deps?.normalizeArweaveAssociationTags || normalizeArweaveAssociationTags)({
     tags,
     slug,
-    config,
+    config: runtimeConfig,
     uploaderAddress,
+    chainAttestationCache,
     deps,
   });
   if (!association?.ok) {

@@ -1,15 +1,14 @@
-import { toTrimmedString } from './stringCoercion.js';
-
-const maskRpcUrl = (value, deps) => {
-  const mask = typeof deps?.maskRpcUrl === 'function'
-    ? deps.maskRpcUrl
-    : (candidate) => toTrimmedString(candidate, deps);
-  return mask(value);
-};
+import {
+  buildSafeRpcFailure,
+  createSafeRpcError,
+} from './rpcDiagnosticSafety.js';
+import { attestRpcEndpointChain } from './rpcChainAttestation.js';
 
 export const readRegistryCodeOnChain = async ({
   registryAddress,
   registryRpcUrls,
+  expectedChainId,
+  chainAttestationCache,
   deps,
 } = {}) => {
   let lastError = null;
@@ -17,6 +16,22 @@ export const readRegistryCodeOnChain = async ({
   const rpcRequest = deps?.rpcRequest;
 
   for (const rpcUrl of Array.isArray(registryRpcUrls) ? registryRpcUrls : []) {
+    const attestation = await attestRpcEndpointChain({
+      rpcUrl,
+      expectedChainId,
+      rpcRequest,
+      toChainId: deps?.toChainId,
+      cache: chainAttestationCache,
+    });
+    if (!attestation.ok) {
+      errors.push(buildSafeRpcFailure({
+        rpcUrl,
+        error: { rpcStatus: attestation.status, rpcCode: attestation.code },
+        errorLabel: 'Registry code RPC chain attestation failed.',
+        maskRpcUrl: deps?.maskRpcUrl,
+      }));
+      continue;
+    }
     try {
       const code = await rpcRequest({
         rpcUrl,
@@ -27,14 +42,18 @@ export const readRegistryCodeOnChain = async ({
       return { size, rpcUrl, errors };
     } catch (err) {
       lastError = err;
-      errors.push({
-        rpcUrl: maskRpcUrl(rpcUrl, deps),
-        status: err?.rpcStatus ?? null,
-        error: toTrimmedString(err?.message || err, deps),
-        rpcError: err?.rpcError || null,
-      });
+      errors.push(buildSafeRpcFailure({
+        rpcUrl,
+        error: err,
+        errorLabel: 'Registry code RPC request failed.',
+        maskRpcUrl: deps?.maskRpcUrl,
+      }));
     }
   }
 
-  return { size: null, error: lastError, errors };
+  return {
+    size: null,
+    error: lastError ? createSafeRpcError(lastError, 'Registry code RPC request failed.') : null,
+    errors,
+  };
 };

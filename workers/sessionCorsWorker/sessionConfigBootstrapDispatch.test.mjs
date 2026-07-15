@@ -9,6 +9,7 @@ import {
   findForbiddenCloudflareDeploymentTokenPath,
   findForbiddenWorkerConfigSecretPath,
 } from '../shared/workerSessionConfig.mjs';
+import { attachSessionSecretRpcForGateRuntime } from './gateRpcResolution.js';
 
 const buildWorkerCanonicalConfig = () => ({
   slug: 'session-a',
@@ -121,6 +122,27 @@ test('projectPublicWorkerSessionConfig omits the complete persisted Lit descript
 
   assert.equal(Object.prototype.hasOwnProperty.call(projected, 'litCredentials'), false);
   assert.equal(JSON.stringify(projected).includes('bafy123'), false);
+});
+
+test('projectPublicWorkerSessionConfig cannot expose the non-enumerable runtime gate RPC credential', () => {
+  const secretRpcUrl = 'https://private-rpc.example.test/eth';
+  const runtimeConfig = attachSessionSecretRpcForGateRuntime({
+    config: {
+      slug: 'session-a',
+      networkChainId: 31337,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    },
+    secrets: { customRpcUrl: secretRpcUrl },
+  });
+
+  const projected = projectPublicWorkerSessionConfig(runtimeConfig);
+
+  assert.deepEqual(projected, {
+    slug: 'session-a',
+    networkChainId: 31337,
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+  });
+  assert.equal(JSON.stringify(projected).includes(secretRpcUrl), false);
 });
 
 test('projectPublicWorkerSessionConfig keeps worker-canonical editable text metadata reload-safe', () => {

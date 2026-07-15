@@ -2,11 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { validateAdmin } from './adminAuthorizationValidation.js';
+import { toChainId } from './chainIdNormalization.js';
 
 const createDeps = (overrides = {}) => ({
   toStr: (value) => `${value ?? ''}`,
   isAddress: (value) => /^0x[a-fA-F0-9]+$/.test(`${value ?? ''}`),
   resolveRegistryRpcUrls: () => [],
+  rpcRequest: async () => '0x14a34',
+  toChainId,
   getHatsInterface: () => 'hats-iface',
   callContractFunction: async () => [false],
   ...overrides,
@@ -113,6 +116,7 @@ test('validateAdmin uses config-derived RPC urls for hat checks and continues af
     config: {
       hatsAddress: '0x999999',
       adminHatId: '7',
+      registryChainId: 84532,
       rpcUrl: 'https://safe.example',
     },
     body: {
@@ -123,6 +127,7 @@ test('validateAdmin uses config-derived RPC urls for hat checks and continues af
         assert.deepEqual(config, {
           hatsAddress: '0x999999',
           adminHatId: '7',
+          registryChainId: 84532,
           rpcUrl: 'https://safe.example',
         });
         return ['https://safe.example', 'https://backup.example'];
@@ -154,4 +159,65 @@ test('validateAdmin uses config-derived RPC urls for hat checks and continues af
     },
   ]);
   assert.equal(result, true);
+});
+
+test('validateAdmin rejects wrong-chain Hat grants before the protected contract read', async () => {
+  const rpcMethods = [];
+  let contractCalls = 0;
+  const result = await validateAdmin({
+    env: { GROUP_KV: {} },
+    slug: 'session-a',
+    address: '0xabc123',
+    config: {
+      hatsAddress: '0x999999',
+      adminHatId: '7',
+      registryChainId: 84532,
+      rpcUrl: 'https://wrong-chain.example',
+    },
+    body: {},
+    deps: createDeps({
+      resolveRegistryRpcUrls: () => ['https://wrong-chain.example'],
+      rpcRequest: async ({ method }) => {
+        rpcMethods.push(method);
+        return '0xaa36a7';
+      },
+      callContractFunction: async () => {
+        contractCalls += 1;
+        return [true];
+      },
+    }),
+  });
+
+  assert.equal(result, false);
+  assert.deepEqual(rpcMethods, ['eth_chainId']);
+  assert.equal(contractCalls, 0);
+});
+
+test('validateAdmin re-attests Hat RPC identity on each admin request', async () => {
+  let chainChecks = 0;
+  const deps = createDeps({
+    resolveRegistryRpcUrls: () => ['https://safe.example'],
+    rpcRequest: async () => {
+      chainChecks += 1;
+      return '0x14a34';
+    },
+    callContractFunction: async () => [true],
+  });
+  const request = {
+    env: { GROUP_KV: {} },
+    slug: 'session-a',
+    address: '0xabc123',
+    config: {
+      hatsAddress: '0x999999',
+      adminHatId: '7',
+      registryChainId: 84532,
+      rpcUrl: 'https://safe.example',
+    },
+    body: {},
+    deps,
+  };
+
+  assert.equal(await validateAdmin(request), true);
+  assert.equal(await validateAdmin(request), true);
+  assert.equal(chainChecks, 2);
 });

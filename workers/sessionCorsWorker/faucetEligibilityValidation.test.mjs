@@ -70,12 +70,14 @@ test('validateFaucetEligibilityRequest preserves authenticated-token fallback wh
 });
 
 test('validateFaucetEligibilityRequest allows same-wallet requests without token scope when current txGas gate is open', async () => {
+  let chainAttestationCache;
   const result = await validateFaucetEligibilityRequest({
     payload: {
       address: REQUESTER,
     },
     config: {
       registryAddress: '0x0000000000000000000000000000000000000001',
+      registryChainId: 84532,
     },
     slug: 'session-open',
     requesterAddress: REQUESTER,
@@ -83,21 +85,30 @@ test('validateFaucetEligibilityRequest allows same-wallet requests without token
     deps: createDeps({
       resolveRegistryRpcUrls: () => ['https://registry.example'],
       toRegistrySessionSlug: (value) => toStr(value).trim().toLowerCase() || 'general',
-      readSessionExistsOnChain: async () => ({
-        exists: true,
-        rpcUrl: 'https://registry.example',
-        errors: [],
-      }),
-      readResourceGateOnChain: async () => ({
-        ok: true,
-        gate: {
-          sbtAddresses: [],
-          chainId: 84532,
-          mode: 0,
-        },
-        rpcUrl: 'https://registry.example',
-        errors: [],
-      }),
+      readSessionExistsOnChain: async (value) => {
+        assert.equal(value.expectedChainId, 84532);
+        assert.ok(value.chainAttestationCache instanceof Map);
+        chainAttestationCache = value.chainAttestationCache;
+        return {
+          exists: true,
+          rpcUrl: 'https://registry.example',
+          errors: [],
+        };
+      },
+      readResourceGateOnChain: async (value) => {
+        assert.equal(value.expectedChainId, 84532);
+        assert.equal(value.chainAttestationCache, chainAttestationCache);
+        return {
+          ok: true,
+          gate: {
+            sbtAddresses: [],
+            chainId: 84532,
+            mode: 0,
+          },
+          rpcUrl: 'https://registry.example',
+          errors: [],
+        };
+      },
       resolveRpcUrlListForGate: () => ['https://rpc.example'],
       checkSbtGate: async () => false,
       maskRpcUrl: (value) => `masked:${value}`,
@@ -119,6 +130,7 @@ test('validateFaucetEligibilityRequest denies same-wallet requests without token
     },
     config: {
       registryAddress: '0x0000000000000000000000000000000000000001',
+      registryChainId: 84532,
     },
     slug: 'session-locked',
     requesterAddress: REQUESTER,
@@ -307,7 +319,11 @@ test('validateFaucetEligibilityRequest preserves gate and validation-state failu
       status: 403,
       error: 'Requested resource gate is unavailable.',
       reason: 'sbt-validation-unavailable',
-      details: [{ rpcUrl: 'https://rpc.example', error: 'boom' }],
+      details: [{
+        rpcUrl: 'https://rpc.example',
+        status: null,
+        error: 'SBT validation RPC request failed.',
+      }],
     }
   );
 });
@@ -370,7 +386,11 @@ test('validateFaucetEligibilityRequest preserves password-mint validation branch
       status: 403,
       error: 'Requested resource gate is unavailable.',
       reason: 'password-validation-unavailable',
-      details: [{ rpcUrl: 'https://rpc.example', error: 'bad rpc' }],
+      details: [{
+        rpcUrl: 'https://rpc.example',
+        status: null,
+        error: 'SBT password validation RPC request failed.',
+      }],
     }
   );
 

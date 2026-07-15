@@ -14,15 +14,18 @@ test('createRpcContractProbeHelpersWithWorkerDeps returns the expected helper fu
   assert.equal(typeof helpers.probeRpcUrls, 'function');
 });
 
-test('createRpcContractProbeHelpersWithWorkerDeps preserves rpc url masking rules', () => {
+test('createRpcContractProbeHelpersWithWorkerDeps reduces rpc diagnostics to a safe origin', () => {
   const { maskRpcUrl } = createRpcContractProbeHelpersWithWorkerDeps({
     deps: {
       toStr: (value) => (typeof value === 'string' ? value : value == null ? '' : String(value)),
     },
   });
 
-  assert.equal(maskRpcUrl(' https://rpc.example/path/to/node?apiKey=secret '), 'https://rpc.example/path/to/node');
-  assert.equal(maskRpcUrl('not-a-valid-url?secret=yes'), 'not-a-valid-url');
+  assert.equal(
+    maskRpcUrl(' https://eth-mainnet.g.alchemy.com/v2/SECRET?apiKey=also-secret '),
+    'https://eth-mainnet.g.alchemy.com',
+  );
+  assert.equal(maskRpcUrl('not-a-valid-url/v2/SECRET?secret=yes'), '[invalid-rpc-url]');
   assert.equal(maskRpcUrl(''), '');
 });
 
@@ -76,9 +79,9 @@ test('createRpcContractProbeHelpersWithWorkerDeps preserves rpc request payloads
       params: [],
     }),
     (err) => {
-      assert.equal(err.message, 'RPC non-JSON response (502)');
+      assert.equal(err.message, 'RPC returned a non-JSON response.');
       assert.equal(err.rpcStatus, 502);
-      assert.equal(err.rpcBody, '<html>bad gateway</html>');
+      assert.equal(Object.hasOwn(err, 'rpcBody'), false);
       return true;
     },
   );
@@ -89,7 +92,13 @@ test('createRpcContractProbeHelpersWithWorkerDeps preserves rpc request payloads
       fetch: async () => ({
         ok: true,
         status: 200,
-        text: async () => JSON.stringify({ error: { code: -32000, message: 'upstream down' } }),
+        text: async () => JSON.stringify({
+          error: {
+            code: -32000,
+            message: 'upstream down at https://TENANT_SECRET.rpc.example/v2/ALCHEMY_SECRET',
+            data: { endpoint: 'https://TENANT_SECRET.rpc.example/v2/ALCHEMY_SECRET' },
+          },
+        }),
       }),
     },
   });
@@ -100,9 +109,12 @@ test('createRpcContractProbeHelpersWithWorkerDeps preserves rpc request payloads
       params: [],
     }),
     (err) => {
-      assert.equal(err.message, 'upstream down');
+      assert.equal(err.message, 'RPC request failed.');
       assert.equal(err.rpcStatus, 200);
-      assert.deepEqual(err.rpcError, { code: -32000, message: 'upstream down' });
+      assert.equal(err.rpcCode, -32000);
+      assert.equal(Object.hasOwn(err, 'rpcError'), false);
+      assert.equal(JSON.stringify(err).includes('TENANT_SECRET'), false);
+      assert.equal(JSON.stringify(err).includes('ALCHEMY_SECRET'), false);
       return true;
     },
   );
@@ -252,29 +264,31 @@ test('createRpcContractProbeHelpersWithWorkerDeps rejects blocked rpc probe targ
     '[rpc-probe] failed',
     {
       label: 'metadata',
-      rpcUrl: 'http://metadata.google.internal/computeMetadata/v1',
+      rpcUrl: 'http://metadata.google.internal',
       error: 'Blocked RPC URL',
     },
   ]]);
 });
 
-test('createRpcContractProbeHelpersWithWorkerDeps preserves rpc probe logging and sequential iteration', async () => {
+test('createRpcContractProbeHelpersWithWorkerDeps never logs credential-bearing rpc paths on response or failure', async () => {
   const fetchCalls = [];
   const logs = [];
   const nowValues = [100, 112, 200, 240];
+  const responseRpcUrl = 'https://eth-mainnet.g.alchemy.com/v2/SECRET_RESPONSE';
+  const failureRpcUrl = 'https://eth-mainnet.g.alchemy.com/v2/SECRET_FAILURE';
   const helpers = createRpcContractProbeHelpersWithWorkerDeps({
     deps: {
       toStr: (value) => (typeof value === 'string' ? value : value == null ? '' : String(value)),
       fetch: async (url) => {
         fetchCalls.push(url);
-        if (url === 'https://rpc-a.example') {
+        if (url === responseRpcUrl) {
           return {
-            ok: true,
-            status: 200,
-            text: async () => JSON.stringify({ result: '0x14a34' }),
+            ok: false,
+            status: 502,
+            text: async () => `upstream rejected ${responseRpcUrl}`,
           };
         }
-        throw new Error('network down');
+        throw new Error(`request to ${failureRpcUrl} failed`);
       },
       now: () => nowValues.shift() ?? 0,
       log: (...args) => {
@@ -284,28 +298,55 @@ test('createRpcContractProbeHelpersWithWorkerDeps preserves rpc probe logging an
   });
 
   await helpers.probeRpcUrls({
-    rpcUrls: ['https://rpc-a.example', 'https://rpc-b.example'],
+    rpcUrls: [responseRpcUrl, failureRpcUrl],
     label: 'registry',
   });
 
   assert.deepEqual(fetchCalls, [
-    'https://rpc-a.example',
-    'https://rpc-b.example',
+    responseRpcUrl,
+    failureRpcUrl,
   ]);
   assert.deepEqual(logs, [
     ['[rpc-probe] response', {
       label: 'registry',
-      rpcUrl: 'https://rpc-a.example/',
-      status: 200,
-      ok: true,
+      rpcUrl: 'https://eth-mainnet.g.alchemy.com',
+      status: 502,
+      ok: false,
       durationMs: 12,
-      result: '0x14a34',
-      bodyPreview: '',
+      result: '',
+      bodyPreview: '[non-JSON response omitted]',
     }],
     ['[rpc-probe] failed', {
       label: 'registry',
-      rpcUrl: 'https://rpc-b.example/',
-      error: 'network down',
+      rpcUrl: 'https://eth-mainnet.g.alchemy.com',
+      error: 'RPC probe failed',
     }],
   ]);
+  const serializedLogs = JSON.stringify(logs);
+  assert.equal(serializedLogs.includes('/v2/'), false);
+  assert.equal(serializedLogs.includes('SECRET_RESPONSE'), false);
+  assert.equal(serializedLogs.includes('SECRET_FAILURE'), false);
+});
+
+test('createRpcContractProbeHelpersWithWorkerDeps never logs arbitrary upstream chain-id results', async () => {
+  const logs = [];
+  const resultValues = ['0x14a34', 'TENANT_SECRET_FROM_UPSTREAM'];
+  const helpers = createRpcContractProbeHelpersWithWorkerDeps({
+    deps: {
+      fetch: async () => ({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({ result: resultValues.shift() }),
+      }),
+      now: () => 0,
+      log: (...args) => logs.push(args),
+    },
+  });
+
+  await helpers.probeRpcUrl({ rpcUrl: 'https://rpc.example', label: 'registry' });
+  await helpers.probeRpcUrl({ rpcUrl: 'https://rpc.example', label: 'registry' });
+
+  assert.equal(logs[0][1].result, 84532);
+  assert.equal(logs[1][1].result, '[invalid-chain-id]');
+  assert.equal(JSON.stringify(logs).includes('TENANT_SECRET_FROM_UPSTREAM'), false);
 });

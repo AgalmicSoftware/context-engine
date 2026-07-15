@@ -1,4 +1,5 @@
 import { toTrimmedString } from './stringCoercion.js';
+import { resolveRegistryChainId } from './chainIdNormalization.js';
 import {
   evaluateWorkerCanonicalAnonymousAccess,
   isWorkerCanonicalSessionConfig,
@@ -78,6 +79,7 @@ export const evaluateAnonymousRouteAccess = async ({
   }
 
   const registryAddress = toTrimmedString(config?.registryAddress, deps);
+  const registryChainId = resolveRegistryChainId(config);
   const registryRpcUrls = resolveRegistryRpcUrls(config);
   const registrySlug = toRegistrySessionSlug(slug);
   if (!isAddress(registryAddress) || !registryRpcUrls.length) {
@@ -90,7 +92,16 @@ export const evaluateAnonymousRouteAccess = async ({
     return { ok: false, status: 403, error: anonymousGateUnavailableError };
   }
 
-  const sessionCheck = await readSessionExistsOnChain({ registryAddress, registryRpcUrls, registrySlug });
+  // Keep endpoint attestation request-local so chain identity cannot go stale
+  // across separate anonymous requests.
+  const chainAttestationCache = new Map();
+  const sessionCheck = await readSessionExistsOnChain({
+    registryAddress,
+    registryRpcUrls,
+    registrySlug,
+    expectedChainId: registryChainId,
+    chainAttestationCache,
+  });
   if (sessionCheck.exists !== true) {
     const reason = sessionCheck.exists === false ? 'session-not-registered' : 'session-check-unavailable';
     warn('[gating] anonymous access denied: on-chain authority unavailable', {
@@ -110,6 +121,8 @@ export const evaluateAnonymousRouteAccess = async ({
     registryRpcUrls,
     registrySlug,
     resourceKey: 'default',
+    expectedChainId: registryChainId,
+    chainAttestationCache,
   });
   if (!defaultGate.ok) {
     warn('[gating] anonymous access denied: default gate lookup failed', {
@@ -127,6 +140,8 @@ export const evaluateAnonymousRouteAccess = async ({
     registryRpcUrls,
     registrySlug,
     resourceKey: 'ai',
+    expectedChainId: registryChainId,
+    chainAttestationCache,
   });
   if (!aiGate.ok) {
     warn('[gating] anonymous access denied: ai gate lookup failed', {

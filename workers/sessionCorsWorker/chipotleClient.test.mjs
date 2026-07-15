@@ -627,6 +627,45 @@ test('executeSessionLitChipotleAction validates source code and executes the con
   }));
 });
 
+test('executeSessionLitChipotleAction rejects malformed explicit gate chains instead of falling through', async () => {
+  for (const chainId of ['3.1337e4', '11155420.0', false]) {
+    let actionCalls = 0;
+    const fetchImpl = async (url) => {
+      if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+        return jsonResponse(TEST_ACTION_CID);
+      }
+      actionCalls += 1;
+      return jsonResponse({ has_error: false, response: { ok: true } });
+    };
+
+    await assert.rejects(
+      () => executeSessionLitChipotleAction({
+        config: {
+          networkChainId: 11155420,
+          litCredentials: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+            litActionCid: TEST_ACTION_CID,
+            litPkpId: TEST_PKP_ID,
+          },
+        },
+        secrets: { litUsageApiKey: 'usage-key' },
+        request: {
+          actionCode: 'async function main() { return { ok: true }; }',
+          op: 'encrypt',
+          sbtAddresses: [TEST_GATE_ADDRESS],
+          chainId,
+          message: `0x${'12'.repeat(32)}`,
+        },
+        requesterAddress: TEST_REQUESTER,
+        fetchImpl,
+      }),
+      /requires a gate chain ID/i,
+      String(chainId),
+    );
+    assert.equal(actionCalls, 0, String(chainId));
+  }
+});
+
 test('executeSessionLitChipotleAction submits verified source code when configured action CID is not cached yet', async () => {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {

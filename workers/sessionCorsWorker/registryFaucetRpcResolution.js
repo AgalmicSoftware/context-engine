@@ -3,7 +3,12 @@ import {
   mergeRpcUrlLists as defaultMergeRpcUrlLists,
   normalizeRpcUrlList as defaultNormalizeRpcUrlList,
 } from './rpcUrlListNormalization.js';
-import { toChainId as defaultToChainId } from './chainIdNormalization.js';
+import {
+  resolveChainIdWithLegacyFallback,
+  resolveRegistryChainId,
+  toChainId as defaultToChainId,
+} from './chainIdNormalization.js';
+import { resolveSessionSecretRpcUrlListForGateRuntime } from './gateRpcResolution.js';
 
 const { getFaucetFallbackRpcUrls } = rpcDefaults;
 const fallbackToString = (value) => (
@@ -17,6 +22,16 @@ const fallbackToString = (value) => (
 const BASE_SEPOLIA_FAUCET_FALLBACKS = Object.freeze(getFaucetFallbackRpcUrls(84532));
 const OP_SEPOLIA_FAUCET_FALLBACKS = Object.freeze(getFaucetFallbackRpcUrls(11155420));
 const BASE_MAINNET_FAUCET_FALLBACKS = Object.freeze(getFaucetFallbackRpcUrls(8453));
+const isWorkerCanonicalConfig = (config) => (
+  config?.sessionModeProfile?.authority?.mode === 'worker_canonical'
+);
+const resolveFaucetChainId = (config, faucetCfg) => resolveChainIdWithLegacyFallback(
+  faucetCfg?.chainId,
+  resolveChainIdWithLegacyFallback(
+    config?.networkChainId,
+    resolveChainIdWithLegacyFallback(config?.registryChainId, 0),
+  ),
+);
 
 export const resolveRegistryRpcUrls = ({
   config,
@@ -32,7 +47,7 @@ export const resolveRegistryRpcUrls = ({
     ? deps.toChainId
     : defaultToChainId;
 
-  const registryChainId = toChainId(config?.registryChainId);
+  const registryChainId = resolveRegistryChainId(config);
   const map = config?.rpcUrlsByChainId;
   const mapped = registryChainId && map && typeof map === 'object'
     ? normalizeRpcUrlList(map[registryChainId] || map[String(registryChainId)])
@@ -57,10 +72,17 @@ export const resolveFaucetRpcUrl = ({
     ? deps.resolveRpcUrlListForGate
     : () => [];
 
+  const chainId = resolveFaucetChainId(config, faucetCfg);
+  const runtimeSecret = resolveSessionSecretRpcUrlListForGateRuntime({
+    config,
+    gateChainId: chainId,
+    deps: { normalizeRpcUrlList, toChainId },
+  });
+  if (runtimeSecret.length) return runtimeSecret[0];
+
   const explicit = toStr(faucetCfg?.rpcUrl).trim();
   if (explicit) return explicit;
 
-  const chainId = toChainId(faucetCfg?.chainId || config?.networkChainId || config?.registryChainId);
   const mapped = chainId ? resolveRpcUrlListForGate(config, chainId) : [];
   const fallback = normalizeRpcUrlList(config?.rpcUrl);
   const specialFallbacks = chainId === 84532
@@ -93,14 +115,34 @@ export const resolveFaucetRpcUrls = ({
     : () => [];
 
   const explicit = normalizeRpcUrlList(faucetCfg?.rpcUrl);
-  const chainId = toChainId(faucetCfg?.chainId || config?.networkChainId || config?.registryChainId);
+  const chainId = resolveFaucetChainId(config, faucetCfg);
   const mapped = chainId ? resolveRpcUrlListForGate(config, chainId) : [];
+  const runtimeSecret = resolveSessionSecretRpcUrlListForGateRuntime({
+    config,
+    gateChainId: chainId,
+    deps: { normalizeRpcUrlList, toChainId },
+  });
   const fallback = normalizeRpcUrlList(config?.rpcUrl);
   const specialFallbacks = chainId === 84532
     ? BASE_SEPOLIA_FAUCET_FALLBACKS
     : chainId === 11155420
       ? OP_SEPOLIA_FAUCET_FALLBACKS
       : [];
+
+  if (isWorkerCanonicalConfig(config)) {
+    const baseMainnetFallbacks = chainId === 8453 ? BASE_MAINNET_FAUCET_FALLBACKS : [];
+    // Worker-managed credentials are authoritative for this deployment. Keep
+    // the legacy explicit value as the next fallback, ahead of every public RPC.
+    return mergeRpcUrlLists(
+      runtimeSecret,
+      explicit,
+      mapped,
+      specialFallbacks,
+      fallback,
+      baseMainnetFallbacks,
+      [defaultFaucetRpcUrl],
+    );
+  }
 
   if (specialFallbacks.length) {
     return mergeRpcUrlLists(

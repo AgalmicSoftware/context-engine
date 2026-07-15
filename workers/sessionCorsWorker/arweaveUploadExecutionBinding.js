@@ -16,6 +16,7 @@ export const createArweaveUploadWithWorkerDeps = ({
         resolveArweaveUploadJwk: deps?.resolveArweaveUploadJwk,
         normalizeArweaveCeTags: deps?.normalizeArweaveCeTags,
         normalizeArweaveAssociationTags: deps?.normalizeArweaveAssociationTags,
+        rpcRequest: deps?.rpcRequest,
         callContractFunction: deps?.callContractFunction,
         readSessionBySlugOnChain: deps?.readSessionBySlugOnChain,
         getErc721Interface: deps?.getErc721Interface,

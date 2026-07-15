@@ -29,8 +29,20 @@ import {
   rejectKvValueOverLimit,
   resolveMaxUploadBytes,
 } from './uploadSizeLimits.js';
+import {
+  attachSessionSecretRpcForGateRuntime,
+  canUseSessionSecretRpcForGateRuntime,
+  isSessionSecretRpcUrlForGateRuntime,
+} from './gateRpcResolution.js';
+import {
+  resolveChainIdWithLegacyFallback,
+  resolveRegistryChainId,
+  toChainId,
+} from './chainIdNormalization.js';
 
 const encoder = new TextEncoder();
+const RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol('resolve-storage-gate-runtime-config');
+const STORAGE_RPC_CHAIN_ATTESTATION_CACHE = Symbol('storage-rpc-chain-attestation-cache');
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const trim = (value) => toStr(value).trim();
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -156,7 +168,10 @@ const normalizeUploadPolicy = (policyInput) => {
       raw.contract,
       raw.address,
     ].map(trim).filter(Boolean),
-    chainId: Number(raw.chainId || raw.networkChainId || 0) || null,
+    chainId: resolveChainIdWithLegacyFallback(
+      raw.chainId,
+      resolveChainIdWithLegacyFallback(raw.networkChainId, 0),
+    ) || null,
     anyOrAll: normalizeGateMode(raw.anyOrAll || raw.match || raw.gateMode),
   };
 };
@@ -305,7 +320,7 @@ const normalizeDirectGate = (gate) => {
   const sbtAddresses = Array.isArray(gate.sbtAddresses) ? gate.sbtAddresses.filter(Boolean) : [];
   return {
     sbtAddresses,
-    chainId: Number(gate.chainId || 0) || null,
+    chainId: toChainId(gate.chainId) || null,
     mode: normalizeGateMode(gate.mode),
   };
 };
@@ -331,6 +346,8 @@ const readStorageGate = async ({ config, slug, resource, deps }) => {
     registryRpcUrls,
     registrySlug,
     resourceKey,
+    expectedChainId: resolveRegistryChainId(config),
+    chainAttestationCache: deps?.[STORAGE_RPC_CHAIN_ATTESTATION_CACHE],
   });
   if (!result?.ok) {
     return {
@@ -436,9 +453,25 @@ const evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress
     condition.address,
   ].map(trim).filter(Boolean);
   if (!sbtAddresses.length) return { ok: false, reason: 'missing_sbt_condition_contract' };
-  const chainId = Number(condition.chainId || condition.networkChainId || config?.registryChainId || 0) || null;
+  const chainId = resolveChainIdWithLegacyFallback(
+    condition.chainId,
+    resolveChainIdWithLegacyFallback(condition.networkChainId, resolveRegistryChainId(config)),
+  ) || null;
+  if (!chainId) {
+    return {
+      ok: false,
+      reason: 'invalid_sbt_chain',
+      condition: { kind: 'sbt_onchain', chainId: null },
+    };
+  }
+  let gateConfig = config;
+  try {
+    gateConfig = await resolveStorageGateRuntimeConfig({ config, deps });
+  } catch {
+    return { ok: false, reason: 'sbt_rpc_secret_unavailable' };
+  }
   const rpcUrls = typeof deps?.resolveRpcUrlListForGate === 'function'
-    ? deps.resolveRpcUrlListForGate(config, chainId)
+    ? deps.resolveRpcUrlListForGate(gateConfig, chainId)
     : [];
   if (!rpcUrls.length || typeof deps?.checkSbtGate !== 'function') {
     return { ok: false, reason: 'missing_sbt_rpc' };
@@ -452,6 +485,12 @@ const evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress
       rpcUrl,
       mode,
       chainId,
+      rpcUrlIsPrivate: isSessionSecretRpcUrlForGateRuntime({
+        config: gateConfig,
+        gateChainId: chainId,
+        rpcUrl,
+      }),
+      chainAttestationCache: deps?.[STORAGE_RPC_CHAIN_ATTESTATION_CACHE],
     });
     if (ok) {
       return {
@@ -763,8 +802,29 @@ const authorizeCloudflareStorageAccess = async ({
       conditionMatched: { source: 'gate_fallback', kind: 'sbt_onchain', resourceKey: gateRead.resourceKey, emptyGate: true },
     };
   }
+  if (!gate.chainId) {
+    return {
+      ok: false,
+      response: responseJson(deps, {
+        error: 'Invalid chain ID for Cloudflare worker SBT gate.',
+        reason: 'invalid_sbt_gate_chain',
+      }, 403, baseHeaders),
+    };
+  }
+  let gateConfig = config;
+  try {
+    gateConfig = await resolveStorageGateRuntimeConfig({ config, deps });
+  } catch {
+    return {
+      ok: false,
+      response: responseJson(deps, {
+        error: 'Cloudflare worker SBT gate RPC credentials unavailable.',
+        reason: 'sbt_rpc_secret_unavailable',
+      }, 403, baseHeaders),
+    };
+  }
   const rpcUrls = typeof deps?.resolveRpcUrlListForGate === 'function'
-    ? deps.resolveRpcUrlListForGate(config, gate.chainId)
+    ? deps.resolveRpcUrlListForGate(gateConfig, gate.chainId)
     : [];
   if (!rpcUrls.length || typeof deps?.checkSbtGate !== 'function') {
     return {
@@ -780,6 +840,12 @@ const authorizeCloudflareStorageAccess = async ({
       rpcUrl,
       mode: gate.mode,
       chainId: gate.chainId,
+      rpcUrlIsPrivate: isSessionSecretRpcUrlForGateRuntime({
+        config: gateConfig,
+        gateChainId: gate.chainId,
+        rpcUrl,
+      }),
+      chainAttestationCache: deps?.[STORAGE_RPC_CHAIN_ATTESTATION_CACHE],
     });
     if (ok) {
       return {
@@ -829,8 +895,29 @@ const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, reque
       };
     }
     const chainId = policy.chainId || null;
+    if (!chainId) {
+      return {
+        ok: false,
+        response: responseJson(deps, {
+          error: 'Invalid SBT upload policy chain ID.',
+          reason: 'invalid_sbt_upload_policy_chain',
+        }, 400, baseHeaders),
+      };
+    }
+    let gateConfig = config;
+    try {
+      gateConfig = await resolveStorageGateRuntimeConfig({ config, deps });
+    } catch {
+      return {
+        ok: false,
+        response: responseJson(deps, {
+          error: 'SBT upload policy RPC credentials unavailable.',
+          reason: 'sbt_rpc_secret_unavailable',
+        }, 403, baseHeaders),
+      };
+    }
     const rpcUrls = typeof deps?.resolveRpcUrlListForGate === 'function'
-      ? deps.resolveRpcUrlListForGate(config, chainId)
+      ? deps.resolveRpcUrlListForGate(gateConfig, chainId)
       : [];
     if (!rpcUrls.length || typeof deps?.checkSbtGate !== 'function') {
       return {
@@ -846,6 +933,12 @@ const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, reque
         rpcUrl,
         mode: policy.anyOrAll,
         chainId,
+        rpcUrlIsPrivate: isSessionSecretRpcUrlForGateRuntime({
+          config: gateConfig,
+          gateChainId: chainId,
+          rpcUrl,
+        }),
+        chainAttestationCache: deps?.[STORAGE_RPC_CHAIN_ATTESTATION_CACHE],
       });
       if (ok) return { ok: true };
     }
@@ -861,6 +954,45 @@ const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, reque
 };
 
 const responseJson = (deps, body, status, headers) => deps?.json?.(body, status, headers) || new Response(JSON.stringify(body), { status, headers });
+
+const attachStorageGateRuntimeRpc = async ({ config, env, slug, deps }) => {
+  if (
+    !canUseSessionSecretRpcForGateRuntime(config) ||
+    typeof deps?.getSessionSecrets !== 'function'
+  ) {
+    return config;
+  }
+  const secrets = (await deps.getSessionSecrets(env, slug)) || {};
+  return attachSessionSecretRpcForGateRuntime({ config, secrets });
+};
+
+const resolveStorageGateRuntimeConfig = async ({ config, deps }) => {
+  const resolver = deps?.[RESOLVE_STORAGE_GATE_RUNTIME_CONFIG];
+  return typeof resolver === 'function' ? resolver() : config;
+};
+
+const createStorageRouteGateDeps = ({ config, env, slug, deps }) => {
+  let runtimeConfigPromise = null;
+  const routeDeps = { ...(deps || {}) };
+  Object.defineProperty(routeDeps, RESOLVE_STORAGE_GATE_RUNTIME_CONFIG, {
+    configurable: false,
+    enumerable: false,
+    writable: false,
+    value: () => {
+      if (!runtimeConfigPromise) {
+        runtimeConfigPromise = attachStorageGateRuntimeRpc({ config, env, slug, deps: routeDeps });
+      }
+      return runtimeConfigPromise;
+    },
+  });
+  Object.defineProperty(routeDeps, STORAGE_RPC_CHAIN_ATTESTATION_CACHE, {
+    configurable: false,
+    enumerable: false,
+    writable: false,
+    value: new Map(),
+  });
+  return routeDeps;
+};
 
 const parseArweaveUploadResponse = async (response) => {
   let body = {};
@@ -1466,7 +1598,8 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
     if (isArweaveStorageBackend(backend)) {
       return handleArweaveStorageUpload({ request, env, config, slug, uploaderAddress, backend, payload, baseHeaders, deps });
     }
-    return handleCloudflareUpload({ env, config, slug, uploaderAddress, authScopes, payload, baseHeaders, deps });
+    const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+    return handleCloudflareUpload({ env, config, slug, uploaderAddress, authScopes, payload, baseHeaders, deps: routeDeps });
   }
 
   const configuredBackend = resolveConfiguredStorageBackend({ config });
@@ -1474,10 +1607,12 @@ export const storageRoute = async ({ path, method, request, env, config, slug, u
     return responseJson(deps, { error: 'Storage route read/list is only available for Cloudflare storage.' }, 400, baseHeaders);
   }
   if (path === '/storage/read' && (method === 'GET' || method === 'POST')) {
-    return handleCloudflareRead({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps });
+    const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+    return handleCloudflareRead({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps });
   }
   if (path === '/storage/list' && (method === 'GET' || method === 'POST')) {
-    return handleCloudflareList({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps });
+    const routeDeps = createStorageRouteGateDeps({ config, env, slug, deps });
+    return handleCloudflareList({ request, env, config, slug, uploaderAddress, authScopes, baseHeaders, deps: routeDeps });
   }
   if (path === '/storage/export-envelopes' && (method === 'GET' || method === 'POST')) {
     if (!isEnvelopeExportAuthorized({ config, requesterAddress: uploaderAddress, authScopes })) {

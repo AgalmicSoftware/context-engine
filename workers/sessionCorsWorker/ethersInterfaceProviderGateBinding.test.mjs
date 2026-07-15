@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createEthersInterfaceProviderGateHelpersWithWorkerDeps } from './ethersInterfaceProviderGateBinding.js';
+import { PRIVATE_SESSION_RPC_LABEL } from './rpcDiagnosticSafety.js';
 
 test('createEthersInterfaceProviderGateHelpersWithWorkerDeps returns the expected helper functions', () => {
   const helpers = createEthersInterfaceProviderGateHelpersWithWorkerDeps();
@@ -166,6 +167,7 @@ test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves positive-
 test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves SBT gate any/all evaluation and failure logging', async () => {
   const logs = [];
   const iface = { name: 'erc721' };
+  const secretRpcUrl = 'https://TENANT_SECRET.rpc.example/v2/ALCHEMY_SECRET';
   const helpers = createEthersInterfaceProviderGateHelpersWithWorkerDeps({
     deps: {
       getEthersInterfaceCtor: () => class InterfaceStub {
@@ -177,14 +179,22 @@ test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves SBT gate 
       callContractFunction: async ({ contractAddress }) => {
         if (contractAddress === '0x00000000000000000000000000000000000000aa') return [1n];
         if (contractAddress === '0x00000000000000000000000000000000000000bb') {
-          const err = new Error('balance failed');
+          const err = new Error(`balance failed at ${secretRpcUrl}`);
           err.rpcStatus = 502;
-          err.rpcError = { code: -32000 };
+          err.rpcError = { code: -32000, message: `upstream echoed ${secretRpcUrl}` };
           throw err;
         }
         return [0n];
       },
       maskRpcUrl: (value) => `masked:${String(value).trim()}`,
+      rpcRequest: async ({ method }) => {
+        assert.equal(method, 'eth_chainId');
+        return '0x14a34';
+      },
+      toChainId: (value) => {
+        if (typeof value === 'string' && value.startsWith('0x')) return parseInt(value, 16) || 0;
+        return Number(value) || 0;
+      },
       toStr: (value) => (typeof value === 'string' ? value : value == null ? '' : String(value)),
       log: (...args) => {
         logs.push(args);
@@ -201,6 +211,7 @@ test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves SBT gate 
       address: '0x00000000000000000000000000000000000000cc',
       rpcUrl: 'https://rpc.example',
       mode: 0,
+      chainId: 84532,
     }),
     true,
   );
@@ -211,6 +222,7 @@ test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves SBT gate 
       address: '0x00000000000000000000000000000000000000cc',
       rpcUrl: 'https://rpc.example',
       mode: 'all',
+      chainId: 84532,
     }),
     false,
   );
@@ -220,8 +232,10 @@ test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves SBT gate 
     await helpers.checkSbtGate({
       sbtAddresses: ['0x00000000000000000000000000000000000000bb'],
       address: '0x00000000000000000000000000000000000000cc',
-      rpcUrl: 'https://rpc.example',
+      rpcUrl: secretRpcUrl,
       mode: 0,
+      chainId: 84532,
+      rpcUrlIsPrivate: true,
     }),
     false,
   );
@@ -229,12 +243,12 @@ test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves SBT gate 
     '[gating] sbt balanceOf failed',
     {
       address: '0x00000000000000000000000000000000000000cc',
-      rpcUrl: 'masked:https://rpc.example',
+      rpcUrl: PRIVATE_SESSION_RPC_LABEL,
       errors: [{
         sbt: '0x00000000000000000000000000000000000000bb',
         status: 502,
-        error: 'balance failed',
-        rpcError: { code: -32000 },
+        code: -32000,
+        error: 'SBT balance check failed.',
       }],
     },
   ]]);
@@ -254,7 +268,11 @@ test('createEthersInterfaceProviderGateHelpersWithWorkerDeps preserves SBT gate 
       address: '0x00000000000000000000000000000000000000cc',
       rpcUrl: '',
       mode: 0,
+      chainId: 84532,
     }),
     false,
   );
+  assert.equal(JSON.stringify(logs).includes('TENANT_SECRET'), false);
+  assert.equal(JSON.stringify(logs).includes('ALCHEMY_SECRET'), false);
+  assert.equal(JSON.stringify(logs).includes('rpcError'), false);
 });

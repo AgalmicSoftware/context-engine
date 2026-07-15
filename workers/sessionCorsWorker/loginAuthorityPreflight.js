@@ -1,5 +1,6 @@
 import { toTrimmedString } from './stringCoercion.js';
 import { isWorkerCanonicalSessionConfig } from './workerCanonicalAuthority.js';
+import { resolveRegistryChainId } from './chainIdNormalization.js';
 
 export const resolveLoginAuthorityContext = async ({
   slug,
@@ -49,6 +50,8 @@ export const resolveLoginAuthorityContext = async ({
     registryAddress,
     registryRpcUrls,
     registrySlug,
+    expectedChainId: resolveRegistryChainId(config),
+    chainAttestationCache: deps?.chainAttestationCache,
   });
   if (sessionCheck?.exists !== true) {
     const reason = sessionCheck?.exists === false ? 'session-not-registered' : 'session-check-unavailable';

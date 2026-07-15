@@ -73,6 +73,7 @@ export const createWorkerLowLevelHelpersWithWorkerDeps = ({
       isAddress: ethersPrimitiveHelpers.isAddress,
       resolveRegistryRpcUrl: registryFaucetRpcHelpers.resolveRegistryRpcUrl,
       callContractFunction: (...args) => rpcContractProbeHelpers?.callContractFunction?.(...args),
+      rpcRequest: (...args) => rpcContractProbeHelpers?.rpcRequest?.(...args),
       maskRpcUrl: (...args) => rpcContractProbeHelpers?.maskRpcUrl?.(...args),
       log: deps?.log,
     },

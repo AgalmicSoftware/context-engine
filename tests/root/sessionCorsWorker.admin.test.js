@@ -225,6 +225,7 @@ describe('sessionCorsWorker admin routes', () => {
         config: {
           adminAddress: adminWallet.address,
           allowOrigins: ['https://app.example'],
+          networkChainId: 84532,
           scopes: { ai: true },
         },
       },
@@ -244,10 +245,11 @@ describe('sessionCorsWorker admin routes', () => {
 
     expect(response.status).toBe(200);
     expect(payload).toEqual({ ok: true });
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual({
       adminAddress: adminWallet.address,
       allowOrigins: ['https://app.example'],
+      networkChainId: 84532,
       scopes: { ai: true },
       limits: {},
     });
@@ -293,6 +295,7 @@ describe('sessionCorsWorker admin routes', () => {
     const existingConfig = {
       hatsAddress: '0x00000000000000000000000000000000000000aa',
       adminHatId: '7',
+      registryChainId: 84532,
       rpcUrl: safeRpcUrl,
       sessionName: 'Existing Session',
     };
@@ -315,6 +318,13 @@ describe('sessionCorsWorker admin routes', () => {
 
     global.fetch = jest.fn(async (url, options = {}) => {
       const payload = JSON.parse(options.body || '{}');
+      if (payload?.method === 'eth_chainId') {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ jsonrpc: '2.0', id: 1, result: '0x14a34' }),
+        };
+      }
       expect(payload?.method).toBe('eth_call');
       const canWearHat = url === attackerRpcUrl;
       return {
@@ -337,8 +347,9 @@ describe('sessionCorsWorker admin routes', () => {
 
     expect(response.status).toBe(403);
     expect(payload?.error).toBe('Admin authorization failed.');
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(global.fetch).toHaveBeenCalledWith(safeRpcUrl, expect.any(Object));
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch).toHaveBeenNthCalledWith(1, safeRpcUrl, expect.any(Object));
+    expect(global.fetch).toHaveBeenNthCalledWith(2, safeRpcUrl, expect.any(Object));
     expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual(existingConfig);
   });
 

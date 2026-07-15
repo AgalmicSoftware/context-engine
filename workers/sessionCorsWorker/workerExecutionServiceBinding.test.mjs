@@ -136,6 +136,7 @@ test('createWorkerExecutionServicesWithWorkerDeps preserves worker-local service
         assert.equal(value.deps.resolveArweaveUploadJwk, 'resolveArweaveUploadJwk');
         assert.equal(value.deps.normalizeArweaveCeTags, 'normalizeArweaveCeTags');
         assert.equal(value.deps.normalizeArweaveAssociationTags, 'normalizeArweaveAssociationTags');
+        assert.equal(value.deps.rpcRequest, 'rpcRequest');
         assert.equal(value.deps.callContractFunction, 'callContractFunction');
         assert.equal(value.deps.readSessionBySlugOnChain, 'readSessionBySlugOnChain');
         assert.equal(value.deps.getErc721Interface, 'getErc721Interface');

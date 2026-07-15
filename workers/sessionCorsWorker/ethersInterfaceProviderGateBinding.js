@@ -1,3 +1,10 @@
+import { attestRpcEndpointChain } from './rpcChainAttestation.js';
+import { resolveRegistryChainId } from './chainIdNormalization.js';
+import {
+  buildSafeRpcFailure,
+  createRpcDiagnosticMasker,
+} from './rpcDiagnosticSafety.js';
+
 const toStr = (value, deps) => (
   typeof deps?.toStr === 'function'
     ? deps.toStr(value)
@@ -98,14 +105,43 @@ export const createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
     if (!deps?.isAddress?.(registryAddress)) return null;
     const rpcUrl = deps?.resolveRegistryRpcUrl?.(config) || '';
     if (!rpcUrl) return null;
-    const provider = getJsonRpcProvider(rpcUrl, config?.registryChainId);
+    const provider = getJsonRpcProvider(rpcUrl, resolveRegistryChainId(config));
     return new deps.ethers.Contract(registryAddress, constants?.sessionRegistryAbi, provider);
   };
 
-  const checkSbtGate = async ({ sbtAddresses, address, rpcUrl, mode, chainId: _chainId }) => {
-    void _chainId;
+  const checkSbtGate = async ({
+    sbtAddresses,
+    address,
+    rpcUrl,
+    mode,
+    chainId,
+    rpcUrlIsPrivate = false,
+    chainAttestationCache,
+  }) => {
     if (!Array.isArray(sbtAddresses) || sbtAddresses.length === 0) return true;
     if (!rpcUrl) return false;
+    const log = deps?.log || console.log;
+    const maskRpcUrl = createRpcDiagnosticMasker({ maskRpcUrl: deps?.maskRpcUrl });
+    const rpcUrlDiagnostic = maskRpcUrl(rpcUrl, { isPrivate: rpcUrlIsPrivate });
+    const attestation = await attestRpcEndpointChain({
+      rpcUrl,
+      expectedChainId: chainId,
+      rpcRequest: deps?.rpcRequest,
+      toChainId: deps?.toChainId,
+      cache: chainAttestationCache,
+    });
+    if (!attestation.ok) {
+      log('[gating] sbt rpc chain attestation failed', {
+        address,
+        rpcUrl: rpcUrlDiagnostic,
+        expectedChainId: attestation.expectedChainId,
+        actualChainId: attestation.actualChainId,
+        reason: attestation.reason,
+        status: attestation.status,
+        code: attestation.code,
+      });
+      return false;
+    }
     const iface = getErc721Interface();
     const errors = [];
     const checks = await Promise.all(
@@ -122,20 +158,27 @@ export const createEthersInterfaceProviderGateHelpersWithWorkerDeps = ({
           const bal = Array.isArray(decoded) ? decoded[0] : decoded;
           return isPositiveBalance(bal);
         } catch (err) {
+          const safeFailure = buildSafeRpcFailure({
+            rpcUrl,
+            error: err,
+            errorLabel: 'SBT balance check failed.',
+            maskRpcUrl: deps?.maskRpcUrl,
+            isPrivate: rpcUrlIsPrivate,
+          });
           errors.push({
             sbt,
-            status: err?.rpcStatus ?? null,
-            error: toStr(err?.message || err, deps).trim(),
-            rpcError: err?.rpcError || null,
+            status: safeFailure.status,
+            ...(safeFailure.code != null ? { code: safeFailure.code } : {}),
+            error: safeFailure.error,
           });
           return false;
         }
       })
     );
     if (!checks.some(Boolean) && errors.length) {
-      (deps?.log || console.log)('[gating] sbt balanceOf failed', {
+      log('[gating] sbt balanceOf failed', {
         address,
-        rpcUrl: deps?.maskRpcUrl?.(rpcUrl),
+        rpcUrl: rpcUrlDiagnostic,
         errors,
       });
     }

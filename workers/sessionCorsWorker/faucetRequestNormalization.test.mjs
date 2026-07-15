@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { normalizeFaucetRequest } from './faucetRequestNormalization.js';
+import { toChainId } from './chainIdNormalization.js';
 
 const DEFAULTS = {
   defaultRpcUrl: 'https://default-rpc.example',
@@ -275,4 +276,48 @@ test('normalizeFaucetRequest preserves missing private key preflight failure', (
       thresholdEth: '0.001',
     },
   });
+});
+
+test('normalizeFaucetRequest does not let malformed explicit chain ids fall through to another authority chain', () => {
+  const base = {
+    payload: { to: '0x1111111111111111111111111111111111111111' },
+    secrets: { faucetPrivateKey: '0xabc123' },
+    deps: { ...deps, toChainId },
+    defaults: DEFAULTS,
+  };
+
+  const malformedFaucet = normalizeFaucetRequest({
+    ...base,
+    config: {
+      registryChainId: 8453,
+      networkChainId: 84532,
+      faucet: { chainId: '3.1337e4' },
+    },
+  });
+  assert.equal(malformedFaucet.ok, true);
+  assert.equal(malformedFaucet.normalized.expectedChainId, 0);
+
+  const malformedNetwork = normalizeFaucetRequest({
+    ...base,
+    config: {
+      registryChainId: 8453,
+      networkChainId: false,
+      faucet: {},
+    },
+  });
+  assert.equal(malformedNetwork.ok, true);
+  assert.equal(malformedNetwork.normalized.expectedChainId, 0);
+
+  for (const faucetChainId of [undefined, 0, '0x0']) {
+    const legacyFallback = normalizeFaucetRequest({
+      ...base,
+      config: {
+        registryChainId: 8453,
+        networkChainId: 84532,
+        faucet: { chainId: faucetChainId },
+      },
+    });
+    assert.equal(legacyFallback.ok, true);
+    assert.equal(legacyFallback.normalized.expectedChainId, 84532);
+  }
 });

@@ -48,15 +48,18 @@ test('resolveLoginAuthorityContext fails before session reads when registry conf
 
 test('resolveLoginAuthorityContext returns the canonical registry context when session authority exists', async () => {
   const calls = [];
+  const chainAttestationCache = new Map();
 
   const result = await resolveLoginAuthorityContext({
     slug: 'debate',
     address: '0xabc123',
     config: {
       registryAddress: REGISTRY_ADDRESS,
+      registryChainId: 84532,
       rpcUrl: 'https://rpc.example',
     },
     deps: createDeps({
+      chainAttestationCache,
       readSessionExistsOnChain: async (value) => {
         calls.push(value);
         return {
@@ -73,6 +76,8 @@ test('resolveLoginAuthorityContext returns the canonical registry context when s
     registryAddress: REGISTRY_ADDRESS,
     registryRpcUrls: ['https://rpc.example'],
     registrySlug: 'rxc',
+    expectedChainId: 84532,
+    chainAttestationCache,
   }]);
   assert.deepEqual(result, {
     registryAddress: REGISTRY_ADDRESS,

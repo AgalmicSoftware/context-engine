@@ -1,11 +1,24 @@
 import { toChainId as defaultToChainId } from './chainIdNormalization.js';
-import { toTrimmedString } from './stringCoercion.js';
+import { buildSafeRpcFailure } from './rpcDiagnosticSafety.js';
+import { attestRpcEndpointChain } from './rpcChainAttestation.js';
 
-const maskRpcUrl = (value, deps) => {
-  const mask = typeof deps?.maskRpcUrl === 'function'
-    ? deps.maskRpcUrl
-    : (candidate) => toTrimmedString(candidate, deps);
-  return mask(value);
+const normalizeDecodedChainId = (value, toChainId) => {
+  let candidate = value;
+  // ethers v5 decodes uint256 values as BigNumber objects. Convert only here,
+  // at the trusted ABI boundary; the public chain parser must reject lookalikes.
+  if (
+    candidate &&
+    typeof candidate === 'object' &&
+    candidate._isBigNumber === true &&
+    typeof candidate.toString === 'function'
+  ) {
+    try {
+      candidate = candidate.toString();
+    } catch {
+      return 0;
+    }
+  }
+  return toChainId(candidate);
 };
 
 export const readResourceGateOnChain = async ({
@@ -13,9 +26,10 @@ export const readResourceGateOnChain = async ({
   registryRpcUrls,
   registrySlug,
   resourceKey,
+  expectedChainId,
+  chainAttestationCache,
   deps,
 } = {}) => {
-  let lastError = null;
   const errors = [];
   const callRegistryFunction = deps?.callRegistryFunction;
   const toChainId = typeof deps?.toChainId === 'function'
@@ -23,6 +37,22 @@ export const readResourceGateOnChain = async ({
     : defaultToChainId;
 
   for (const rpcUrl of Array.isArray(registryRpcUrls) ? registryRpcUrls : []) {
+    const attestation = await attestRpcEndpointChain({
+      rpcUrl,
+      expectedChainId,
+      rpcRequest: deps?.rpcRequest,
+      toChainId,
+      cache: chainAttestationCache,
+    });
+    if (!attestation.ok) {
+      errors.push(buildSafeRpcFailure({
+        rpcUrl,
+        error: { rpcStatus: attestation.status, rpcCode: attestation.code },
+        errorLabel: 'Registry gate lookup RPC chain attestation failed.',
+        maskRpcUrl: deps?.maskRpcUrl,
+      }));
+      continue;
+    }
     try {
       const res = await callRegistryFunction({
         rpcUrl,
@@ -31,23 +61,22 @@ export const readResourceGateOnChain = async ({
         args: [registrySlug, resourceKey],
       });
       const sbtAddresses = Array.isArray(res?.[0]) ? res[0].filter(Boolean) : [];
-      const chainId = toChainId(res?.[1] || 0);
+      const chainId = normalizeDecodedChainId(res?.[1], toChainId);
       const mode = Number(res?.[2] || 0);
       return { ok: true, gate: { sbtAddresses, chainId, mode }, rpcUrl, errors };
     } catch (err) {
-      lastError = err;
-      errors.push({
-        rpcUrl: maskRpcUrl(rpcUrl, deps),
-        status: err?.rpcStatus ?? null,
-        error: toTrimmedString(err?.message || err, deps),
-        rpcError: err?.rpcError || null,
-      });
+      errors.push(buildSafeRpcFailure({
+        rpcUrl,
+        error: err,
+        errorLabel: 'Registry gate lookup RPC request failed.',
+        maskRpcUrl: deps?.maskRpcUrl,
+      }));
     }
   }
 
   return {
     ok: false,
-    error: toTrimmedString(lastError?.message || lastError || 'Registry gate lookup failed.', deps),
+    error: 'Registry gate lookup failed.',
     errors,
   };
 };
