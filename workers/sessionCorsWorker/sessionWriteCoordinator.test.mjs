@@ -10,10 +10,18 @@ const createTransactionalState = () => {
   const store = new Map();
   let tail = Promise.resolve();
   const transaction = (callback) => {
-    const run = tail.then(() => callback({
-      get: async (key) => store.get(key),
-      put: async (key, value) => store.set(key, structuredClone(value)),
-    }));
+    const run = tail.then(async () => {
+      const staged = new Map([...store].map(([key, value]) => (
+        [key, structuredClone(value)]
+      )));
+      const result = await callback({
+        get: async (key) => staged.get(key),
+        put: async (key, value) => staged.set(key, structuredClone(value)),
+      });
+      store.clear();
+      for (const [key, value] of staged) store.set(key, value);
+      return result;
+    });
     tail = run.catch(() => undefined);
     return run;
   };
@@ -56,6 +64,213 @@ const createCoordinatorRequest = (path, payload) => new Request(
     body: JSON.stringify(payload),
   },
 );
+
+const createWrappedCandidate = (suffix) => ({
+  version: 1,
+  keyProvider: 'worker_secret',
+  keyId: 'session:session-a:2026-07-15T12:00:00.000Z',
+  createdAt: '2026-07-15T12:00:00.000Z',
+  alg: 'AES-256-GCM',
+  wrapAlg: 'AES-GCM-KW-v1',
+  iv: suffix.repeat(16).slice(0, 16),
+  wrappedKey: suffix.repeat(64).slice(0, 64),
+});
+
+const createSessionConfigRequest = ({ path, candidateRecord, mutation } = {}) => (
+  createCoordinatorRequest(path, {
+    slug: 'session-a',
+    baseConfig: {
+      slug: 'session-a',
+      adminAddress: '0x0000000000000000000000000000000000000abc',
+      storageProfile: {
+        backend: 'cloudflare',
+        payloadAccessControl: { encryption: 'worker_envelope' },
+      },
+    },
+    ...(candidateRecord ? { candidateRecord } : {}),
+    ...(mutation ? { mutation } : {}),
+  })
+);
+
+test('SessionWriteCoordinator atomically chooses and projects one wrapped session-key candidate', async () => {
+  const { state, store } = createTransactionalState();
+  await assert.rejects(state.storage.transaction(async (transaction) => {
+    await transaction.put('rollback-sentinel', { shouldPersist: false });
+    throw new Error('rollback');
+  }), /rollback/);
+  assert.equal(store.has('rollback-sentinel'), false);
+  const projections = [];
+  const coordinator = new SessionWriteCoordinator(state, {}, {
+    putSessionConfig: async (_env, _slug, config) => { projections.push(config); },
+  });
+  const candidates = [createWrappedCandidate('A'), createWrappedCandidate('B')];
+
+  const responses = await Promise.all(candidates.map((candidateRecord) => coordinator.fetch(
+    createSessionConfigRequest({
+      path: '/session-config/storage-envelope-key/get-or-create',
+      candidateRecord,
+    }),
+  )));
+  const bodies = await Promise.all(responses.map((response) => response.json()));
+
+  assert.deepEqual(responses.map((response) => response.status), [200, 200]);
+  assert.equal(new Set(bodies.map((body) => body.sessionKey.wrappedKey)).size, 1);
+  assert.equal(projections.length, 1);
+  assert.equal(
+    projections[0].storageEnvelope.sessionKey.wrappedKey,
+    bodies[0].sessionKey.wrappedKey,
+  );
+  const serialized = JSON.stringify([...store.values()]);
+  assert.match(serialized, new RegExp(bodies[0].sessionKey.wrappedKey));
+  assert.doesNotMatch(
+    serialized,
+    /raw-session-key|deployment-kek|plaintext-payload|raw-dek|requestBody|credentials/i,
+  );
+});
+
+test('SessionWriteCoordinator rejects candidate records with raw key material', async () => {
+  const { state, store } = createTransactionalState();
+  const coordinator = new SessionWriteCoordinator(state, {}, {
+    putSessionConfig: async () => undefined,
+  });
+  const response = await coordinator.fetch(createSessionConfigRequest({
+    path: '/session-config/storage-envelope-key/get-or-create',
+    candidateRecord: {
+      ...createWrappedCandidate('C'),
+      rawKey: 'raw-session-key-sentinel',
+    },
+  }));
+  const invalidBaseResponse = await coordinator.fetch(createCoordinatorRequest(
+    '/session-config/storage-envelope-key/get-or-create',
+    {
+      slug: 'session-a',
+      baseConfig: null,
+      candidateRecord: createWrappedCandidate('C'),
+    },
+  ));
+
+  assert.equal(response.status, 400);
+  assert.equal(invalidBaseResponse.status, 400);
+  assert.equal(store.size, 0);
+  assert.doesNotMatch(JSON.stringify([...store.values()]), /raw-session-key-sentinel/);
+});
+
+test('SessionWriteCoordinator rejects session keys introduced through generic config mutation', async () => {
+  const { state, store } = createTransactionalState();
+  const coordinator = new SessionWriteCoordinator(state, {}, {
+    putSessionConfig: async () => undefined,
+  });
+  const response = await coordinator.fetch(createSessionConfigRequest({
+    path: '/session-config/mutate',
+    mutation: {
+      kind: 'set-config',
+      incomingConfig: {
+        storageEnvelope: { sessionKey: createWrappedCandidate('G') },
+      },
+    },
+  }));
+
+  assert.equal(response.status, 409);
+  assert.equal(store.size, 0);
+});
+
+test('SessionWriteCoordinator repairs a pending key projection after restart without adopting a new candidate', async () => {
+  const { state, store } = createTransactionalState();
+  const firstCandidate = createWrappedCandidate('D');
+  const secondCandidate = createWrappedCandidate('E');
+  const interrupted = new SessionWriteCoordinator(state, {}, {
+    putSessionConfig: async () => { throw new Error('projection interrupted'); },
+  });
+  const firstResponse = await interrupted.fetch(createSessionConfigRequest({
+    path: '/session-config/storage-envelope-key/get-or-create',
+    candidateRecord: firstCandidate,
+  }));
+  assert.equal(firstResponse.status, 503);
+
+  const projections = [];
+  const restarted = new SessionWriteCoordinator(state, {}, {
+    putSessionConfig: async (_env, _slug, config) => { projections.push(config); },
+  });
+  const retryResponse = await restarted.fetch(createSessionConfigRequest({
+    path: '/session-config/storage-envelope-key/get-or-create',
+    candidateRecord: secondCandidate,
+  }));
+  const retryBody = await retryResponse.json();
+
+  assert.equal(retryResponse.status, 200);
+  assert.equal(retryBody.sessionKey.wrappedKey, firstCandidate.wrappedKey);
+  assert.equal(projections.length, 1);
+  assert.equal(projections[0].storageEnvelope.sessionKey.wrappedKey, firstCandidate.wrappedKey);
+  assert.equal([...store.values()][0].projectionPending, false);
+});
+
+test('SessionWriteCoordinator applies stale admin mutations to the authoritative key projection', async () => {
+  const { state } = createTransactionalState();
+  const projections = [];
+  const coordinator = new SessionWriteCoordinator(state, {}, {
+    putSessionConfig: async (_env, _slug, config) => { projections.push(config); },
+  });
+  const candidate = createWrappedCandidate('F');
+  await coordinator.fetch(createSessionConfigRequest({
+    path: '/session-config/storage-envelope-key/get-or-create',
+    candidateRecord: candidate,
+  }));
+  const mutationResponse = await coordinator.fetch(createSessionConfigRequest({
+    path: '/session-config/mutate',
+    mutation: { kind: 'set-limits', incomingLimits: { perIpPerHour: 8 } },
+  }));
+
+  assert.equal(mutationResponse.status, 200);
+  assert.equal(projections.length, 2);
+  assert.equal(projections[1].limits.perIpPerHour, 8);
+  assert.equal(projections[1].storageEnvelope.sessionKey.wrappedKey, candidate.wrappedKey);
+});
+
+test('SessionWriteCoordinator keeps an activated wrapped key authoritative over later stale mutations', async () => {
+  const { state } = createTransactionalState();
+  const projections = [];
+  const coordinator = new SessionWriteCoordinator(state, {}, {
+    putSessionConfig: async (_env, _slug, config) => { projections.push(config); },
+  });
+  const firstCandidate = createWrappedCandidate('H');
+  const activatedCandidate = {
+    ...createWrappedCandidate('I'),
+    keyId: 'session:session-a:2026-07-15T13:00:00.000Z',
+    createdAt: '2026-07-15T13:00:00.000Z',
+  };
+  await coordinator.fetch(createSessionConfigRequest({
+    path: '/session-config/storage-envelope-key/get-or-create',
+    candidateRecord: firstCandidate,
+  }));
+  const activatedConfig = {
+    ...projections.at(-1),
+    storageEnvelope: {
+      ...projections.at(-1).storageEnvelope,
+      sessionKey: activatedCandidate,
+      rotatedAt: activatedCandidate.createdAt,
+    },
+  };
+  const activationResponse = await coordinator.fetch(createCoordinatorRequest(
+    '/session-config/storage-envelope-key/activate',
+    {
+      slug: 'session-a',
+      baseConfig: activatedConfig,
+      candidateRecord: activatedCandidate,
+    },
+  ));
+  const mutationResponse = await coordinator.fetch(createSessionConfigRequest({
+    path: '/session-config/mutate',
+    mutation: { kind: 'set-config', incomingConfig: { sessionName: 'After rotation' } },
+  }));
+
+  assert.equal(activationResponse.status, 200);
+  assert.equal(mutationResponse.status, 200);
+  assert.equal(projections.at(-1).sessionName, 'After rotation');
+  assert.equal(
+    projections.at(-1).storageEnvelope.sessionKey.wrappedKey,
+    activatedCandidate.wrappedKey,
+  );
+});
 
 test('SessionWriteCoordinator chooses one payload before concurrent sponsored deploy mutation', async () => {
   const { state, store } = createTransactionalState();

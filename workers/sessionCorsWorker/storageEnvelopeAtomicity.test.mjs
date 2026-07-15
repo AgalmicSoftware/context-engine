@@ -87,7 +87,15 @@ const createCoordinatedEnv = (bindings = {}, { coordinatorDeps = {} } = {}) => {
         const deps = typeof coordinatorDeps === 'function'
           ? coordinatorDeps(id)
           : coordinatorDeps;
-        const instance = new SessionWriteCoordinator({ storage: memory.storage }, env, deps);
+        const instance = new SessionWriteCoordinator({ storage: memory.storage }, env, {
+          ...deps,
+          putSessionConfig: deps.putSessionConfig || ((...args) => {
+            if (typeof env.__testProjectSessionConfig !== 'function') {
+              throw new Error('Test session config projection is unavailable.');
+            }
+            return env.__testProjectSessionConfig(...args);
+          }),
+        });
         objects.set(id, {
           fetch: (input, init) => instance.fetch(
             input instanceof Request ? input : new Request(input, init),
@@ -98,6 +106,10 @@ const createCoordinatedEnv = (bindings = {}, { coordinatorDeps = {} } = {}) => {
     },
   };
   return env;
+};
+
+const bindConfigProjection = (env, project) => {
+  env.__testProjectSessionConfig = async (_env, _slug, nextConfig) => project(nextConfig);
 };
 
 const classifyStorageKey = (key) => {
@@ -218,22 +230,26 @@ const createUploadRequest = ({
   }),
 });
 
-const upload = ({ env, config, request, randomBytes, putSessionConfig }) => storageRoute({
-  path: '/storage/upload',
-  method: 'POST',
-  request,
-  env,
-  config,
-  slug: 'session-a',
-  uploaderAddress: ADMIN_ADDRESS,
-  baseHeaders: {},
-  deps: {
-    json,
-    randomBytes,
-    now: () => FIXED_NOW,
-    ...(putSessionConfig ? { putSessionConfig } : {}),
-  },
-});
+const upload = ({ env, config, request, randomBytes, putSessionConfig }) => {
+  if (putSessionConfig) {
+    bindConfigProjection(env, (nextConfig) => putSessionConfig(env, 'session-a', nextConfig));
+  }
+  return storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request,
+    env,
+    config,
+    slug: 'session-a',
+    uploaderAddress: ADMIN_ADDRESS,
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes,
+      now: () => FIXED_NOW,
+    },
+  });
+};
 
 const attemptUpload = async (options) => {
   try {
@@ -280,6 +296,7 @@ const adminConfigWriters = [
 ];
 
 const dispatchAdminConfigWriter = async ({ writer, env, snapshot, persist }) => (
+  bindConfigProjection(env, persist),
   dispatchAdminRequest({
     request: { json: async () => writer.body },
     env,
@@ -295,7 +312,6 @@ const dispatchAdminConfigWriter = async ({ writer, env, snapshot, persist }) => 
         headers: {},
         targetSlug: 'session-a',
       }),
-      putSessionConfig: async (_env, _slug, nextConfig) => persist(nextConfig),
       getSessionSecrets: async () => ({}),
       putSessionSecrets: async () => undefined,
       bootstrapLitChipotleSession: async () => ({
@@ -594,6 +610,7 @@ test('worker-envelope retry repairs an R2 index failure at the original readable
     CE_STORAGE_ENVELOPE_KEK: DEPLOYMENT_KEK,
   });
   let durableConfig = createCloudflareConfig({ encryption: 'worker_envelope' });
+  bindConfigProjection(env, (nextConfig) => { durableConfig = nextConfig; });
   await encryptPayloadWithStorageEnvelope({
     env,
     config: durableConfig,
@@ -747,6 +764,13 @@ test('interrupted rotation preserves readability and succeeds on retry', async (
   });
   const uploadBody = await readJson(uploadResponse);
   let configFaultFired = false;
+  bindConfigProjection(env, (nextConfig) => {
+    if (!configFaultFired) {
+      configFaultFired = true;
+      throw new Error('injected config before-write failure');
+    }
+    durableConfig = nextConfig;
+  });
   try {
     await rotateStorageEnvelopeKeys({
       env,
@@ -755,13 +779,6 @@ test('interrupted rotation preserves readability and succeeds on retry', async (
       deps: {
         randomBytes: createSequenceRandomBytes(201),
         now: () => Date.parse('2026-07-15T13:00:00.000Z'),
-        putSessionConfig: async (_env, _slug, nextConfig) => {
-          if (!configFaultFired) {
-            configFaultFired = true;
-            throw new Error('injected config before-write failure');
-          }
-          durableConfig = nextConfig;
-        },
       },
     });
   } catch {
@@ -782,7 +799,6 @@ test('interrupted rotation preserves readability and succeeds on retry', async (
       deps: {
         randomBytes: createSequenceRandomBytes(221),
         now: () => Date.parse('2026-07-15T14:00:00.000Z'),
-        putSessionConfig: async (_env, _slug, nextConfig) => { durableConfig = nextConfig; },
       },
     });
   } catch {
@@ -819,6 +835,7 @@ test('whole-config writers preserve first-use envelope keys and their own update
 
     const afterEnv = createCoordinatedEnv({ CE_STORAGE_ENVELOPE_KEK: DEPLOYMENT_KEK });
     let afterConfig = initialConfig;
+    bindConfigProjection(afterEnv, (nextConfig) => { afterConfig = nextConfig; });
     const afterPayloadId = `admin-after-first-use-${index}`;
     const afterEncrypted = await encryptPayloadWithStorageEnvelope({
       env: afterEnv,
@@ -910,6 +927,7 @@ test('minimal legacy envelope records remain readable through the previous deplo
   const encryptEnv = createCoordinatedEnv({ CE_STORAGE_ENVELOPE_KEK: oldKek });
   const initialConfig = createCloudflareConfig({ encryption: 'worker_envelope' });
   let persistedConfig = initialConfig;
+  bindConfigProjection(encryptEnv, (nextConfig) => { persistedConfig = nextConfig; });
   const encrypted = await encryptPayloadWithStorageEnvelope({
     env: encryptEnv,
     config: initialConfig,

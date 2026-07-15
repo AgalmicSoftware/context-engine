@@ -20,6 +20,7 @@ import {
   createWorkerGroup,
   deleteWorkerGroup,
 } from './workerGroups.js';
+import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
 
 const TX_ID = 'abc123abc123abc123abc123abc123abc123abc1230';
 const CF_ID = 'AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA';
@@ -113,6 +114,51 @@ const createMockKv = () => {
   };
 };
 
+const attachSessionCoordinator = (env, setConfig) => {
+  env.__testProjectSessionConfig = setConfig;
+  if (env.CE_SESSION_COORDINATOR) return;
+  const instances = new Map();
+  env.CE_SESSION_COORDINATOR = {
+    idFromName: (name) => `test-coordinator:${name}`,
+    get: (id) => {
+      if (!instances.has(id)) {
+        const values = new Map();
+        let tail = Promise.resolve();
+        const storage = {
+          get: async (key) => structuredClone(values.get(key)),
+          transaction: (callback) => {
+            const run = tail.then(async () => {
+              const staged = new Map([...values].map(([key, value]) => (
+                [key, structuredClone(value)]
+              )));
+              const result = await callback({
+                get: async (key) => structuredClone(staged.get(key)),
+                put: async (key, value) => { staged.set(key, structuredClone(value)); },
+              });
+              values.clear();
+              for (const [key, value] of staged) values.set(key, value);
+              return result;
+            });
+            tail = run.catch(() => undefined);
+            return run;
+          },
+        };
+        const coordinator = new SessionWriteCoordinator({ storage }, env, {
+          putSessionConfig: async (_env, _slug, nextConfig) => (
+            env.__testProjectSessionConfig(nextConfig)
+          ),
+        });
+        instances.set(id, {
+          fetch: (input, init) => coordinator.fetch(
+            input instanceof Request ? input : new Request(input, init),
+          ),
+        });
+      }
+      return instances.get(id);
+    },
+  };
+};
+
 const readStorageIndexMetadata = async (kv, slug, resource, id) => JSON.parse(
   await kv.get(`ce-storage:${slug}:${resource}:${id}`)
 );
@@ -152,6 +198,7 @@ const uploadEnvelopePayload = async ({
   uploaderAddress = '0x0000000000000000000000000000000000000abc',
   deps = {},
 } = {}) => {
+  attachSessionCoordinator(env, setConfig);
   const response = await storageRoute({
     path: '/storage/upload',
     method: 'POST',
@@ -169,7 +216,6 @@ const uploadEnvelopePayload = async ({
       json,
       randomBytes: createSequenceRandomBytes(),
       now: () => Date.parse('2026-01-02T03:04:05.000Z'),
-      putSessionConfig: async (_env, _slug, nextConfig) => setConfig(nextConfig),
       ...deps,
     },
   });
@@ -631,6 +677,7 @@ test('storageRoute applies the final KV value cap after worker-envelope expansio
     CE_MAX_UPLOAD_BYTES: '4096',
   };
   let config = createEnvelopeConfig();
+  attachSessionCoordinator(env, (nextConfig) => { config = nextConfig; });
   const response = await storageRoute({
     path: '/storage/upload',
     method: 'POST',
@@ -2284,6 +2331,67 @@ test('storageRoute worker_envelope stores ciphertext only and audits successful 
     [...kv.store.keys()].some((key) => key.startsWith(`ce-storage-audit:session-a:${body.storageRef.id}:`)),
     true
   );
+});
+
+test('storageRoute lazily upgrades a legacy wrapped session key before a new envelope write', async () => {
+  const kv = createMockKv();
+  const firstEnv = {
+    CE_STORAGE_INDEX_KV: kv,
+    CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
+  };
+  let firstConfig = createEnvelopeConfig();
+  const first = await uploadEnvelopePayload({
+    env: firstEnv,
+    config: firstConfig,
+    setConfig: (nextConfig) => { firstConfig = nextConfig; },
+    data: 'legacy source payload',
+  });
+  assert.equal(first.response.status, 200);
+
+  const legacyKey = firstConfig.storageEnvelope.sessionKey;
+  let legacyConfig = {
+    ...firstConfig,
+    storageEnvelope: {
+      sessionKey: {
+        iv: legacyKey.iv,
+        wrappedKey: legacyKey.wrappedKey,
+      },
+    },
+  };
+  const freshEnv = {
+    CE_STORAGE_INDEX_KV: kv,
+    CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
+  };
+  const upgraded = await uploadEnvelopePayload({
+    env: freshEnv,
+    config: legacyConfig,
+    setConfig: (nextConfig) => { legacyConfig = nextConfig; },
+    data: 'post-legacy payload',
+    deps: { randomBytes: createSequenceRandomBytes(91) },
+  });
+
+  assert.equal(upgraded.response.status, 200);
+  assert.equal(legacyConfig.storageEnvelope.sessionKey.version, 1);
+  assert.equal(legacyConfig.storageEnvelope.sessionKey.keyProvider, 'worker_secret');
+  const read = (id, auditId) => storageRoute({
+    path: '/storage/read',
+    method: 'GET',
+    request: new Request(`https://worker.example/storage/read?id=${id}`),
+    env: freshEnv,
+    config: legacyConfig,
+    slug: 'session-a',
+    uploaderAddress: '',
+    baseHeaders: {},
+    deps: { json, randomUUID: () => auditId },
+  });
+  const [oldRead, newRead] = await Promise.all([
+    read(first.body.id, 'legacy-source-read'),
+    read(upgraded.body.id, 'legacy-upgrade-read'),
+  ]);
+  assert.equal(oldRead.status, 200);
+  assert.equal(await oldRead.text(), 'legacy source payload');
+  assert.equal(newRead.status, 200);
+  assert.equal(await newRead.text(), 'post-legacy payload');
 });
 
 test('storageRoute worker_envelope denies conditions before key unwrap', async () => {

@@ -147,10 +147,11 @@ deleted speculatively.
   `503`; terminal safe receipts replay without repeating the side effect.
   Missing coordination fails closed for those deployment and faucet paths. A
   worker created before this binding was introduced must be redeployed before it
-  can use them. Signed Admin/publication config mutations still validate a fresh
-  KV record and write their result directly to KV; they are not serialized with
-  storage-envelope key creation/rotation or payload/index uploads. Whole-config
-  and storage-envelope write atomicity therefore remain separate work.
+  can use them. The same per-session coordinator now chooses the first wrapped
+  worker-envelope session key and serializes signed `set-config`, `set-limits`,
+  and Lit-descriptor mutations against one authoritative public config record.
+  Missing coordination fails closed for those writes as well. Payload/index
+  recovery and resumable envelope-key rotation remain separate work.
 - Operating modes:
   - CE-hosted: use the default `CLOUDFLARE_DEPLOY_HELPER_URL` (`https://ce-deploy-helper.agalmic.workers.dev/`) and let Context Engine operate the shared helper.
   - Self-hosted: deploy `workers/deploy-helper/worker.js` with your own Wrangler config (`wrangler.toml` or equivalent), bind `DEPLOY_HELPER_KV` and `CE_SESSION_COORDINATOR`, install the `ce-session-write-coordinator-v1` SQLite-class migration, set `ALLOWED_ORIGINS`, and set `ADMIN_SECRET` with Wrangler secrets. The checked-in example and direct CLI automation include both bindings and the migration.
@@ -403,7 +404,7 @@ Lit credentials are required only for `lit-arweave` storage or Cloudflare `encry
 `worker_envelope` uses WebCrypto AES-256-GCM and the existing session config/index stores:
 
 - Deployment KEK: read from the Worker secret `CE_STORAGE_ENVELOPE_KEK` through the `worker_secret` key provider. The plaintext KEK is never stored in KV, D1, or R2. `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` is optional during deployment-key rotation so old session KEKs can be unwrapped and rewrapped under the current secret.
-- Session KEK: generated on the first envelope write for a session, wrapped by the deployment KEK, and stored in `session:{slug}:config` under `storageEnvelope.sessionKey`.
+- Session KEK: generated locally on the first envelope write for a session and wrapped by the deployment KEK before coordination. The per-session `SessionWriteCoordinator` adopts one wrapped candidate, keeps that wrapped record authoritative, and projects it to `session:{slug}:config` under `storageEnvelope.sessionKey`. Raw session keys and the deployment KEK never pass through coordinator state. A missing coordinator binding fails closed instead of falling back to a racing KV write.
 - Payload DEK: generated per payload, used to encrypt the stored bytes, wrapped by the session KEK, and stored in payload metadata with the envelope algorithm, IVs, key id, and condition reference.
 
 Reads authorize first, then unwrap the DEK, decrypt the payload, return `Cache-Control: private, no-store`, and write one key-release audit event. The audit store is D1 when a `CE_STORAGE_AUDIT_D1`/`STORAGE_AUDIT_D1`/`DB` binding is present; otherwise it uses `CE_STORAGE_AUDIT_KV` or the storage index KV. If no audit store is available, key release fails closed.
@@ -469,15 +470,16 @@ R2/D1:
 - D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
 - `CE_SESSION_COORDINATOR` binds the SQLite-backed `SessionWriteCoordinator`
   class for direct/sponsored deploy idempotency, one-shot sponsored faucet
-  receipts. One-click deploy metadata installs migration tag
+  receipts, atomic wrapped session-key selection, and versioned public session
+  config mutation. One-click deploy metadata installs migration tag
   `ce-session-write-coordinator-v1`; a repeated upload retries without
   reapplying an already-installed migration. Coordinator state contains only
-  credential-redacted deploy/faucet request digests, progress, and safe terminal
-  receipts, never deployment credentials, worker bundle bytes, session config,
-  or ordinary session payload blobs. Signed Admin/publication config mutations
-  continue to validate a fresh KV record and write directly to KV; this binding
-  does not make those writes, storage-envelope key creation/rotation, or
-  payload-plus-index uploads atomic across independent writers.
+  credential-redacted deploy/faucet records, normalized public session config,
+  revisions, and wrapped session-key records. It never stores deployment
+  credentials, raw session keys, deployment KEKs, raw DEKs, request bodies,
+  worker bundle bytes, or ordinary session payload blobs. The binding serializes
+  first-use key selection with signed Admin config mutations; it does not yet
+  make envelope-key rotation or payload-plus-index uploads failure-atomic.
 
 Vars:
 - `TOKEN_HMAC_SECRET` (HMAC secret for session tokens)
@@ -1106,10 +1108,10 @@ Never return secrets in responses.
 - The first signed worker-canonical publish carrying a `configRevision` finalizes
   that publication in the server-managed KV record. A sequential exact
   same-revision retry is an idempotent no-op; a different revision returns
-  `409`. This marker is best-effort replay protection, not a linearizable
-  concurrency boundary: signed config writes and storage-envelope writes still
-  update the same KV record independently. Revision-free signed Admin patches
-  remain supported.
+  `409`. Session config writes are serialized by the per-session coordinator
+  with first-use worker-envelope key selection. Revision-free signed Admin
+  patches remain supported; payload/index journaling and resumable key rotation
+  are not implied by this config boundary.
 - A successful worker-canonical publish is terminal in `/new`, including after a
   reload or another open tab observes the settlement record. Use **Create another
   session** to clear the settled local wizard state and begin a new session.

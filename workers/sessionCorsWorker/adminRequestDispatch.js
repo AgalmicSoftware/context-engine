@@ -35,7 +35,7 @@ import {
   findForbiddenCloudflareDeploymentTokenPath,
   findForbiddenWorkerConfigSecretPath,
 } from '../shared/workerSessionConfig.mjs';
-import { applySessionConfigMutation as applySessionConfigMutationBoundary } from './sessionConfigMutation.js';
+import { executeCoordinatedSessionConfigMutation } from './sessionWriteCoordinator.js';
 
 const ALLOWED_SECRET_KEYS = [
   'openaiKey',
@@ -121,29 +121,9 @@ const executeDirectSessionConfigMutation = async ({
   mutation,
   deps,
 } = {}) => {
-  const result = (deps?.applySessionConfigMutation || applySessionConfigMutationBoundary)({
-    existingConfig,
-    mutation,
-    slug,
-  });
-  if (!result?.ok) {
-    return {
-      ok: false,
-      status: result?.status || 400,
-      body: { error: result?.error || 'Session config mutation failed.' },
-    };
-  }
-  if (!result.skipPersistence) {
-    if (typeof deps?.putSessionConfig !== 'function') {
-      return {
-        ok: false,
-        status: 503,
-        body: { error: 'Session config persistence is unavailable; config was not changed.' },
-      };
-    }
-    await deps.putSessionConfig(env, slug, result.config);
-  }
-  return { ok: true, status: 200, body: { ok: true } };
+  const coordinate = deps?.executeCoordinatedSessionConfigMutation ||
+    executeCoordinatedSessionConfigMutation;
+  return coordinate({ env, slug, existingConfig, mutation });
 };
 
 export const dispatchAdminRequest = async ({

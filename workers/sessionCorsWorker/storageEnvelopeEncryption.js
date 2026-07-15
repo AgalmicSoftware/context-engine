@@ -1,3 +1,8 @@
+import {
+  activateCoordinatedStorageEnvelopeSessionKey,
+  getOrCreateCoordinatedStorageEnvelopeSessionKey,
+} from './sessionWriteCoordinator.js';
+
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -150,6 +155,23 @@ const readSessionKeyRecord = (config = {}) => {
   return isObj(envelope.sessionKey) ? envelope.sessionKey : null;
 };
 
+const isCoordinatorWrappedSessionKeyRecord = (record, slug) => {
+  if (!isObj(record)) return false;
+  const createdAt = trim(record.createdAt);
+  const createdAtMs = Date.parse(createdAt);
+  return (
+    record.version === ENVELOPE_VERSION &&
+    record.keyProvider === 'worker_secret' &&
+    record.alg === AES_256_GCM &&
+    record.wrapAlg === 'AES-GCM-KW-v1' &&
+    Number.isFinite(createdAtMs) &&
+    new Date(createdAtMs).toISOString() === createdAt &&
+    trim(record.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` &&
+    /^[A-Za-z0-9_-]{16}$/.test(trim(record.iv)) &&
+    /^[A-Za-z0-9_-]{64}$/.test(trim(record.wrappedKey))
+  );
+};
+
 const buildSessionEnvelopeConfig = ({ config, sessionKeyRecord, rotatedAt }) => ({
   ...cloneJson(config),
   storageEnvelope: {
@@ -183,35 +205,44 @@ const unwrapSessionKeyBytes = async ({ env, config, slug, deps = {} }) => {
 
 export const ensureStorageEnvelopeSessionKey = async ({ env, config, slug, deps = {} }) => {
   const existing = readSessionKeyRecord(config);
-  if (existing) {
-    return {
-      keyBytes: await unwrapSessionKeyBytes({ env, config, slug, deps }),
-      config,
-      created: false,
+  let candidateRecord = existing;
+  if (!isCoordinatorWrappedSessionKeyRecord(candidateRecord, slug)) {
+    const keyBytes = existing
+      ? await unwrapSessionKeyBytes({ env, config, slug, deps })
+      : randomBytes(32, deps);
+    const deploymentKey = await importDeploymentKek({ env, deps });
+    const createdAt = nowIso(deps);
+    candidateRecord = {
+      version: ENVELOPE_VERSION,
+      keyProvider: 'worker_secret',
+      keyId: `session:${safeSlugPart(slug)}:${createdAt}`,
+      createdAt,
+      ...await wrapBytesWithKey({
+        wrappingKey: deploymentKey,
+        plaintextBytes: keyBytes,
+        aad: `ce-storage-envelope:session:${safeSlugPart(slug)}`,
+        deps,
+      }),
     };
   }
 
-  const keyBytes = randomBytes(32, deps);
-  const deploymentKey = await importDeploymentKek({ env, deps });
-  const createdAt = nowIso(deps);
-  const sessionKeyRecord = {
-    version: ENVELOPE_VERSION,
-    keyProvider: 'worker_secret',
-    keyId: `session:${safeSlugPart(slug)}:${createdAt}`,
-    createdAt,
-    ...await wrapBytesWithKey({
-      wrappingKey: deploymentKey,
-      plaintextBytes: keyBytes,
-      aad: `ce-storage-envelope:session:${safeSlugPart(slug)}`,
-      deps,
-    }),
-  };
-  const nextConfig = buildSessionEnvelopeConfig({ config, sessionKeyRecord });
-  if (typeof deps.putSessionConfig !== 'function') {
-    throw new Error('Session config store is required for storage envelope session keys.');
+  const coordinate = deps.getOrCreateCoordinatedStorageEnvelopeSessionKey ||
+    getOrCreateCoordinatedStorageEnvelopeSessionKey;
+  const coordinated = await coordinate({
+    env,
+    slug,
+    baseConfig: config,
+    candidateRecord,
+  });
+  const nextConfig = coordinated?.config;
+  if (!isObj(nextConfig) || !readSessionKeyRecord(nextConfig)) {
+    throw new Error('Session config coordination returned no wrapped session key.');
   }
-  await deps.putSessionConfig(env, slug, nextConfig);
-  return { keyBytes, config: nextConfig, created: true };
+  return {
+    keyBytes: await unwrapSessionKeyBytes({ env, config: nextConfig, slug, deps }),
+    config: nextConfig,
+    created: !existing && coordinated.created === true,
+  };
 };
 
 export const encryptPayloadWithStorageEnvelope = async ({
@@ -327,9 +358,6 @@ export const rotateStorageEnvelopeKeys = async ({ env = {}, slug, config, deps =
   if (!index || typeof index.list !== 'function' || typeof index.get !== 'function' || typeof index.put !== 'function') {
     throw new Error('Storage index KV is required for envelope key rotation.');
   }
-  if (typeof deps.putSessionConfig !== 'function') {
-    throw new Error('Session config store is required for envelope key rotation.');
-  }
   const oldSessionKeyBytes = await unwrapSessionKeyBytes({ env, config, slug, deps });
   const oldSessionKey = await importAesKey(oldSessionKeyBytes, ['decrypt'], deps);
   const newSessionKeyBytes = randomBytes(32, deps);
@@ -389,12 +417,19 @@ export const rotateStorageEnvelopeKeys = async ({ env = {}, slug, config, deps =
     }
   }
   const nextConfig = buildSessionEnvelopeConfig({ config, sessionKeyRecord, rotatedAt });
-  await deps.putSessionConfig(env, slug, nextConfig);
+  const activate = deps.activateCoordinatedStorageEnvelopeSessionKey ||
+    activateCoordinatedStorageEnvelopeSessionKey;
+  const coordinated = await activate({
+    env,
+    slug,
+    config: nextConfig,
+    candidateRecord: sessionKeyRecord,
+  });
   return {
     ok: true,
     rotatedAt,
     payloadsRewrapped: rows.length,
-    config: nextConfig,
+    config: coordinated.config,
   };
 };
 
@@ -405,9 +440,6 @@ export const rewrapStorageEnvelopeSessionKeyForDeployment = async ({
   newDeploymentKek,
   deps = {},
 } = {}) => {
-  if (typeof deps.putSessionConfig !== 'function') {
-    throw new Error('Session config store is required for envelope deployment re-wrap.');
-  }
   const sessionKeyBytes = await unwrapSessionKeyBytes({ env, config, slug, deps });
   const nextDeploymentKey = await importDeploymentKekFromSecret({ secret: newDeploymentKek, deps });
   const rewrappedAt = nowIso(deps);
@@ -424,11 +456,18 @@ export const rewrapStorageEnvelopeSessionKeyForDeployment = async ({
     }),
   };
   const nextConfig = buildSessionEnvelopeConfig({ config, sessionKeyRecord, rotatedAt: rewrappedAt });
-  await deps.putSessionConfig(env, slug, nextConfig);
+  const activate = deps.activateCoordinatedStorageEnvelopeSessionKey ||
+    activateCoordinatedStorageEnvelopeSessionKey;
+  const coordinated = await activate({
+    env,
+    slug,
+    config: nextConfig,
+    candidateRecord: sessionKeyRecord,
+  });
   return {
     ok: true,
     rewrappedAt,
-    config: nextConfig,
+    config: coordinated.config,
     keyProvider: 'worker_secret',
   };
 };

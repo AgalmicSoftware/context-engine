@@ -96,6 +96,25 @@ const createAdminDeps = (overrides = {}) => {
       return { ...applied, config: nextConfig };
     };
   }
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'executeCoordinatedSessionConfigMutation')) {
+    deps.executeCoordinatedSessionConfigMutation = async ({
+      env,
+      slug,
+      existingConfig,
+      mutation,
+    }) => {
+      const result = deps.applySessionConfigMutation({ existingConfig, mutation, slug });
+      if (!result?.ok) {
+        return {
+          ok: false,
+          status: result?.status || 400,
+          body: { error: result?.error || 'Session config mutation failed.' },
+        };
+      }
+      if (!result.skipPersistence) await deps.putSessionConfig(env, slug, result.config);
+      return { ok: true, status: 200, body: { ok: true } };
+    };
+  }
   return deps;
 };
 
@@ -128,9 +147,10 @@ test('dispatchAdminRequest preserves invalid-json failure before signed request 
   });
 });
 
-test('dispatchAdminRequest persists config without a coordinator binding', async () => {
+test('dispatchAdminRequest fails closed without a coordinator binding', async () => {
   let putCalls = 0;
   const deps = createAdminDeps({
+    executeCoordinatedSessionConfigMutation: null,
     putSessionConfig: async () => { putCalls += 1; },
   });
 
@@ -147,9 +167,9 @@ test('dispatchAdminRequest persists config without a coordinator binding', async
     deps,
   });
 
-  assert.equal(result.status, 200);
-  assert.deepEqual(result.body, { ok: true });
-  assert.equal(putCalls, 1);
+  assert.equal(result.status, 503);
+  assert.match(result.body.error, /coordination is unavailable/i);
+  assert.equal(putCalls, 0);
 });
 
 test('dispatchAdminRequest merges config and persists the result after authority resolution', async () => {
