@@ -61,7 +61,21 @@ export const deleteSponsoredGrantRecord = async (env, token) => (
   env?.GROUP_KV?.delete?.(buildSponsoredGrantKvKey(token))
 );
 
-const buildSafeSponsoredReceiptBody = (incoming = {}) => {
+const normalizeSensitiveValues = (values = []) => Array.from(new Set(
+  (Array.isArray(values) ? values : [])
+    .map((value) => toTrimmedString(value))
+    .filter((value) => value.length >= 4),
+)).sort((left, right) => right.length - left.length);
+
+export const redactSponsoredSensitiveText = (value, sensitiveValues = []) => {
+  let redacted = toTrimmedString(value);
+  normalizeSensitiveValues(sensitiveValues).forEach((secret) => {
+    redacted = redacted.split(secret).join('[REDACTED]');
+  });
+  return redacted;
+};
+
+export const buildSafeSponsoredReceiptBody = (incoming = {}, sensitiveValues = []) => {
   const body = {};
   [
     'ok',
@@ -89,17 +103,54 @@ const buildSafeSponsoredReceiptBody = (incoming = {}) => {
     'configVerified',
     'deploymentRequestPending',
     'deploymentRequestTerminal',
+    'deploymentRequestConflict',
+    'sponsoredGrantPayloadConflict',
     'txHash',
     'status',
     'to',
     'amountEth',
     'chainId',
   ].forEach((key) => {
-    const value = incoming?.[key];
+    const rawValue = incoming?.[key];
+    const value = key === 'error' && typeof rawValue === 'string'
+      ? redactSponsoredSensitiveText(rawValue, sensitiveValues)
+      : rawValue;
     if (typeof value === 'string' || typeof value === 'boolean' || Number.isFinite(value)) {
       body[key] = value;
     }
   });
+  if (incoming?.orphanResources && typeof incoming.orphanResources === 'object') {
+    const orphanResources = {};
+    ['kvNamespaceId', 'kvCleanupStatus', 'workerName', 'workerCleanupStatus'].forEach((key) => {
+      const value = incoming.orphanResources[key];
+      if (typeof value === 'string') {
+        orphanResources[key] = redactSponsoredSensitiveText(value, sensitiveValues);
+      }
+    });
+    if (Object.keys(orphanResources).length) body.orphanResources = orphanResources;
+  }
+  if (incoming?.bundleDiagnostics && typeof incoming.bundleDiagnostics === 'object') {
+    const bundleDiagnostics = {};
+    [
+      'source',
+      'length',
+      'sha256',
+      'hasAnyExport',
+      'hasExportDefault',
+      'hasNamedDefaultExport',
+      'hasStringExportWrapper',
+      'hasFetchHandler',
+      'hasServiceWorkerFetch',
+    ].forEach((key) => {
+      const value = incoming.bundleDiagnostics[key];
+      if (typeof value === 'string') {
+        bundleDiagnostics[key] = redactSponsoredSensitiveText(value, sensitiveValues);
+      } else if (typeof value === 'boolean' || Number.isFinite(value)) {
+        bundleDiagnostics[key] = value;
+      }
+    });
+    if (Object.keys(bundleDiagnostics).length) body.bundleDiagnostics = bundleDiagnostics;
+  }
   return body;
 };
 
@@ -150,6 +201,7 @@ export const writeSponsoredGrantReceipt = async ({
   grantRecord,
   requestDigest,
   response,
+  sensitiveValues = [],
   nowMs = Date.now(),
 } = {}) => {
   const expiresAt = toTrimmedString(grantRecord?.expiresAt);
@@ -164,7 +216,7 @@ export const writeSponsoredGrantReceipt = async ({
     }),
     receipt: {
       status: Number(response?.status || 0) || 200,
-      body: buildSafeSponsoredReceiptBody(response?.body),
+      body: buildSafeSponsoredReceiptBody(response?.body, sensitiveValues),
     },
   };
   await writeSponsoredGrantRecord(env, token, safeRecord, ttlSeconds);

@@ -39,14 +39,27 @@ const createDeployRequest = (body = {}, origin = 'https://allowed.example.test')
   json: async () => body,
 });
 
-const createDeployDeps = (overrides = {}) => ({
-  json: createJsonStub(),
-  getCorsContext: async () => ({
-    ok: true,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
-  }),
-  ...overrides,
-});
+const createDeployDeps = (overrides = {}) => {
+  const deps = {
+    json: createJsonStub(),
+    getCorsContext: async () => ({
+      ok: true,
+      headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+    }),
+    ...overrides,
+  };
+  if (!deps.executeCoordinatedSponsoredDeploy && overrides.executeDeployHelperRequest) {
+    deps.executeCoordinatedSponsoredDeploy = ({ deployBody, env, requestOrigin }) => (
+      overrides.executeDeployHelperRequest({
+        body: deployBody,
+        env,
+        requestOrigin,
+        consoleImpl: console,
+      })
+    );
+  }
+  return deps;
+};
 
 test('dispatchSponsoredBootstrapRedeem rejects invalid JSON before reading grant records', async () => {
   const { env } = createKvEnv();
@@ -185,6 +198,112 @@ test('dispatchSponsoredBootstrapRedeem returns retryable embedded deploy failure
   });
 });
 
+test('dispatchSponsoredBootstrapRedeem fails closed before deploy when the coordinator binding is absent', async () => {
+  const { env, store } = createKvEnv({
+    type: 'deploy-worker',
+    sourceSessionSlug: 'source-session',
+    sourceConfig: { allowOrigins: ['https://allowed.example.test'] },
+    cloudflareApiToken: 'cf-must-not-run',
+  }, {
+    DEPLOY_HELPER_ENABLED: '1',
+  });
+
+  const result = await dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest({
+      deployGrantToken: 'deploy-grant-without-coordinator',
+      deployPayload: { workerName: 'must-not-exist', sessionSlug: 'must-not-exist' },
+    }),
+    env,
+    baseHeaders: {},
+    action: 'deploy',
+    deps: createDeployDeps(),
+  });
+
+  assert.equal(result.status, 503);
+  assert.equal(result.body.deploymentRequestPending, true);
+  assert.match(result.body.error, /no Cloudflare action was attempted/i);
+  assert.doesNotMatch([...store.values()][0], /redeeming|redeemed/);
+});
+
+test('dispatchSponsoredBootstrapRedeem cannot let a losing concurrent payload replace the winning grant receipt', async () => {
+  const { env, store } = createKvEnv({
+    type: 'deploy-worker',
+    sourceSessionSlug: 'source-session',
+    sourceConfig: { allowOrigins: ['https://allowed.example.test'] },
+    cloudflareApiToken: 'cf-winning-grant-token',
+  }, {
+    DEPLOY_HELPER_ENABLED: '1',
+  });
+
+  const result = await dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest({
+      deployGrantToken: 'shared-grant',
+      deployPayload: { workerName: 'losing-worker', sessionSlug: 'losing-session' },
+    }),
+    env,
+    baseHeaders: {},
+    action: 'deploy',
+    deps: createDeployDeps({
+      executeCoordinatedSponsoredDeploy: async () => ({
+        ok: false,
+        status: 409,
+        body: {
+          error: 'Sponsored grant was already reserved with a different request payload.',
+          sponsoredGrantPayloadConflict: true,
+        },
+      }),
+    }),
+  });
+
+  assert.equal(result.status, 409);
+  assert.equal(result.body.sponsoredGrantPayloadConflict, true);
+  const storedGrant = JSON.parse([...store.values()][0]);
+  assert.equal(storedGrant.cloudflareApiToken, 'cf-winning-grant-token');
+  assert.equal(storedGrant.state, undefined);
+  assert.equal(storedGrant.receipt, undefined);
+});
+
+test('dispatchSponsoredBootstrapRedeem binds the normalized request origin into coordination identity', async () => {
+  const requestDigests = [];
+  const runFromOrigin = async (origin) => {
+    const { env } = createKvEnv({
+      type: 'deploy-worker',
+      sourceSessionSlug: 'source-session',
+      sourceConfig: { allowOrigins: ['https://allowed.example.test', 'https://second.example.test'] },
+      cloudflareApiToken: 'cf-origin-token',
+    }, {
+      DEPLOY_HELPER_ENABLED: '1',
+    });
+    return dispatchSponsoredBootstrapRedeem({
+      request: createDeployRequest({
+        deployGrantToken: 'origin-bound-grant',
+        deployPayload: { workerName: 'origin-worker', sessionSlug: 'origin-session' },
+      }, origin),
+      env,
+      baseHeaders: {},
+      action: 'deploy',
+      deps: createDeployDeps({
+        executeCoordinatedSponsoredDeploy: async (request) => {
+          requestDigests.push([request.requestDigest, request.requestOrigin]);
+          return {
+            ok: false,
+            status: 503,
+            body: { error: 'Retry.', deploymentRequestPending: true },
+          };
+        },
+      }),
+    });
+  };
+
+  await runFromOrigin('https://allowed.example.test/path');
+  await runFromOrigin('https://second.example.test/other');
+  assert.deepEqual(requestDigests.map(([, origin]) => origin), [
+    'https://allowed.example.test',
+    'https://second.example.test',
+  ]);
+  assert.notEqual(requestDigests[0][0], requestDigests[1][0]);
+});
+
 test('dispatchSponsoredBootstrapRedeem replays a committed safe receipt and rejects changed deploy payloads', async () => {
   const { env, store } = createKvEnv({
     type: 'deploy-worker',
@@ -305,6 +424,7 @@ test('dispatchSponsoredBootstrapRedeem replaces a terminal helper failure with a
       workerName: 'terminal-worker',
       sessionSlug: 'terminal-session',
       bundleText: 'raw bundle must not persist',
+      secrets: { openaiKey: 'sk-terminal-provider-secret' },
     },
   };
   const deps = createDeployDeps({
@@ -314,7 +434,7 @@ test('dispatchSponsoredBootstrapRedeem replaces a terminal helper failure with a
         ok: false,
         status: 409,
         body: {
-          error: 'Existing worker bindings do not match this deployment request.',
+          error: 'Existing worker bindings do not match: cf-terminal-token sk-terminal-provider-secret deploy-terminal-grant.',
           deploymentRequestTerminal: true,
           leakedToken: 'cf-terminal-token',
         },
@@ -331,9 +451,16 @@ test('dispatchSponsoredBootstrapRedeem replaces a terminal helper failure with a
   });
   assert.equal(first.status, 409);
   assert.equal(first.body.deploymentRequestTerminal, true);
+  assert.equal(
+    first.body.error,
+    'Existing worker bindings do not match: [REDACTED] [REDACTED] [REDACTED].',
+  );
   assert.equal(embeddedCalls, 1);
   const stored = [...store.values()][0];
-  assert.doesNotMatch(stored, /cf-terminal-token|raw bundle must not persist|caller-terminal/);
+  assert.doesNotMatch(
+    stored,
+    /cf-terminal-token|sk-terminal-provider-secret|deploy-terminal-grant|raw bundle must not persist|caller-terminal/,
+  );
   assert.equal(JSON.parse(stored).state, 'redeemed');
 
   const replay = await dispatchSponsoredBootstrapRedeem({

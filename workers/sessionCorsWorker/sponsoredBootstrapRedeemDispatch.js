@@ -2,15 +2,19 @@ import {
   deleteSponsoredGrantRecord,
   readSponsoredGrantRecord,
   SPONSORED_GRANT_TYPES,
+  redactSponsoredSensitiveText,
   writeSponsoredGrantRedemptionReservation,
   writeSponsoredGrantReceipt,
 } from './sponsoredBootstrapGrantStore.js';
 import {
-  executeDeployHelperRequest as executeDeployHelperRequestBoundary,
   normalizeEmbeddedDeployHelperEnabled,
+  normalizeOrigin,
   sha256Hex,
   stableCanonicalSerialize,
 } from '../shared/deployHelperCore.mjs';
+import {
+  executeCoordinatedSponsoredDeploy as executeCoordinatedSponsoredDeployBoundary,
+} from './sessionWriteCoordinator.js';
 
 const INVALID_GRANT_ERROR = 'Invalid, expired, or already used sponsored bootstrap grant.';
 
@@ -64,8 +68,8 @@ const buildDeployExecutionFailure = (error) => ({
   },
 });
 
-const buildSponsoredRequestDigest = async (action, payload) => sha256Hex(
-  stableCanonicalSerialize({ action, payload }),
+const buildSponsoredRequestDigest = async (action, payload, requestOrigin = '') => sha256Hex(
+  stableCanonicalSerialize({ action, payload, requestOrigin: normalizeOrigin(requestOrigin) }),
 );
 
 const buildSponsoredDeploymentRequestId = async (grantToken) => (
@@ -75,6 +79,44 @@ const buildSponsoredDeploymentRequestId = async (grantToken) => (
 const buildSponsoredConfigRevision = async (grantToken) => (
   `sponsored-revision-${(await sha256Hex(`sponsored-config:${grantToken}`)).slice(0, 32)}`
 );
+
+const SENSITIVE_FIELD_PATTERN = /(token|secret|password|privatekey|apikey|bundletext|arweavejwk)/i;
+
+const collectSponsoredSensitiveValues = (value, parentSensitive = false, output = new Set()) => {
+  if (typeof value === 'string') {
+    if (parentSensitive && value.trim().length >= 4) output.add(value.trim());
+    return output;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectSponsoredSensitiveValues(entry, parentSensitive, output));
+    return output;
+  }
+  if (!value || typeof value !== 'object') return output;
+  Object.entries(value).forEach(([key, entry]) => {
+    collectSponsoredSensitiveValues(
+      entry,
+      parentSensitive || SENSITIVE_FIELD_PATTERN.test(key.replace(/[^a-z0-9]/gi, '')),
+      output,
+    );
+  });
+  return output;
+};
+
+const buildSponsoredSensitiveValues = ({ body, grantRecord, effectiveDeployPayload } = {}) => Array.from(
+  collectSponsoredSensitiveValues({ body, grantRecord, effectiveDeployPayload }),
+);
+
+const redactSponsoredDeployFailure = (result, sensitiveValues = []) => ({
+  ...result,
+  body: result?.body && typeof result.body === 'object'
+    ? {
+        ...result.body,
+        ...(typeof result.body.error === 'string'
+          ? { error: redactSponsoredSensitiveText(result.body.error, sensitiveValues) }
+          : {}),
+      }
+    : result?.body,
+});
 
 const resolveSponsoredRedemptionReplay = ({ grantRecord, requestDigest, deps, headers } = {}) => {
   if (grantRecord?.state !== 'redeemed' && grantRecord?.state !== 'redeeming') return null;
@@ -151,7 +193,6 @@ export const dispatchSponsoredBootstrapRedeem = async ({
     if (!deployPayload) {
       return buildGrantErrorResponse(deps, headers, 400, 'Missing deployPayload.');
     }
-    const executeDeployHelperRequest = deps?.executeDeployHelperRequest || executeDeployHelperRequestBoundary;
     const embeddedDeployHelperEnabled = normalizeEmbeddedDeployHelperEnabled(
       env?.DEPLOY_HELPER_ENABLED,
       true
@@ -184,7 +225,17 @@ export const dispatchSponsoredBootstrapRedeem = async ({
       deploymentRequestId,
       configRevision,
     };
-    const requestDigest = await buildSponsoredRequestDigest('deploy', effectiveDeployPayload);
+    const sensitiveValues = buildSponsoredSensitiveValues({
+      body,
+      grantRecord,
+      effectiveDeployPayload,
+    });
+    const requestOrigin = normalizeOrigin(request?.headers?.get?.('Origin') || '');
+    const requestDigest = await buildSponsoredRequestDigest(
+      'deploy',
+      effectiveDeployPayload,
+      requestOrigin,
+    );
     const replayResponse = resolveSponsoredRedemptionReplay({
       grantRecord,
       requestDigest,
@@ -194,17 +245,26 @@ export const dispatchSponsoredBootstrapRedeem = async ({
     if (replayResponse) return replayResponse;
 
     try {
-      embeddedResult = await executeDeployHelperRequest({
-        body: {
+      const executeCoordinatedSponsoredDeploy = (
+        deps?.executeCoordinatedSponsoredDeploy || executeCoordinatedSponsoredDeployBoundary
+      );
+      embeddedResult = await executeCoordinatedSponsoredDeploy({
+        env,
+        grantToken,
+        requestDigest,
+        deployBody: {
           ...effectiveDeployPayload,
           apiToken: toTrimmedString(grantRecord?.cloudflareApiToken),
         },
-        env,
-        requestOrigin: request?.headers?.get?.('Origin') || '',
-        consoleImpl: deps?.console || console,
+        requestOrigin,
+        sensitiveValues,
       });
     } catch (error) {
       embeddedResult = buildDeployExecutionFailure(error);
+    }
+
+    if (embeddedResult?.body?.sponsoredGrantPayloadConflict === true) {
+      return deps?.json?.(embeddedResult.body, embeddedResult.status || 409, headers);
     }
 
     if (embeddedResult?.ok || embeddedResult?.body?.deploymentRequestTerminal === true) {
@@ -214,14 +274,16 @@ export const dispatchSponsoredBootstrapRedeem = async ({
         grantRecord,
         requestDigest,
         response: embeddedResult,
+        sensitiveValues,
         nowMs: deps?.now?.() ?? Date.now(),
       });
       return deps?.json?.(receipt.body, receipt.status, headers);
     }
 
+    const safeEmbeddedResult = redactSponsoredDeployFailure(embeddedResult, sensitiveValues);
     return deps?.json?.(
-      embeddedResult?.body && Object.keys(embeddedResult.body).length
-        ? embeddedResult.body
+      safeEmbeddedResult?.body && Object.keys(safeEmbeddedResult.body).length
+        ? safeEmbeddedResult.body
         : { error: `Worker deploy failed (${embeddedResult?.status || 502}).` },
       embeddedResult?.status || 502,
       headers,

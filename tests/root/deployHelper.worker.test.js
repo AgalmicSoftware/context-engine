@@ -82,7 +82,7 @@ const makeFetchSequence = (responses = []) => {
       if (fetchMock.workerSecretPutOverride) return fetchMock.workerSecretPutOverride;
       return cfSuccess({});
     }
-    if (method === 'DELETE' && /\/workers\/scripts\/[^/]+$/.test(normalizedUrl)) {
+    if (method === 'DELETE' && /\/workers\/scripts\/[^/?]+\?force=true$/.test(normalizedUrl)) {
       if (fetchMock.workerDeleteOverride) return fetchMock.workerDeleteOverride;
     }
     if (method === 'PUT' && /\/values\/session:[^/]+:config$/.test(normalizedUrl)) {
@@ -184,21 +184,36 @@ const makeResumableDeploymentFetch = () => {
   const kvValues = new Map();
   const workerBindings = new Map();
   const workerSecretBodies = [];
+  const scriptUploadMetadata = [];
   let namespaceCreates = 0;
   let scriptUploads = 0;
   let finalConfigPuts = 0;
+  let bundleFetches = 0;
   const fetchMock = jest.fn(async (url, init = {}) => {
     const normalizedUrl = String(url);
     const method = String(init.method || 'GET').toUpperCase();
+    if (normalizedUrl === 'https://bundles.example.test/sessionCorsWorker.bundle.js') {
+      bundleFetches += 1;
+      if (fetchMock.bundleFetchMustFail) throw new TypeError('bundle host is unavailable');
+      return new Response('export default { fetch() {} };', { status: 200 });
+    }
     if (method === 'GET' && /\/accounts\?per_page=5$/.test(normalizedUrl)) {
       return cfSuccess([{ id: 'acc-123', name: 'Derived test account' }]);
     }
     const settingsMatch = normalizedUrl.match(/\/workers\/scripts\/([^/]+)\/settings$/);
     if (method === 'GET' && settingsMatch) {
       const bindings = workerBindings.get(settingsMatch[1]);
-      return bindings ? cfSuccess({ bindings }) : cfFailure(404, 'Worker not found.');
+      if (bindings && fetchMock.workerSettingsHiddenReads > 0) {
+        fetchMock.workerSettingsHiddenReads -= 1;
+        return cfFailure(404, 'Worker not found.');
+      }
+      return bindings ? cfSuccess({ bindings, main_module: 'worker.mjs' }) : cfFailure(404, 'Worker not found.');
     }
     if (method === 'GET' && /\/storage\/kv\/namespaces\?/.test(normalizedUrl)) {
+      if (namespaces.length && fetchMock.namespaceListHiddenReads > 0) {
+        fetchMock.namespaceListHiddenReads -= 1;
+        return cfSuccess([]);
+      }
       return cfSuccess(namespaces);
     }
     if (method === 'POST' && normalizedUrl.endsWith('/storage/kv/namespaces')) {
@@ -232,12 +247,16 @@ const makeResumableDeploymentFetch = () => {
         headers: { 'Content-Type': 'application/json' },
       });
     }
-    const scriptMatch = normalizedUrl.match(/\/workers\/scripts\/([^/]+)$/);
-    if (method === 'PUT' && scriptMatch && init.body instanceof FormData) {
+    const scriptUploadMatch = normalizedUrl.match(/\/workers\/scripts\/([^/?]+)$/);
+    if (method === 'PUT' && scriptUploadMatch && init.body instanceof FormData) {
       scriptUploads += 1;
       const metadata = JSON.parse(await new Response(init.body.get('metadata')).text());
-      workerBindings.set(scriptMatch[1], metadata.bindings || []);
-      return cfSuccess({ id: 'worker-uploaded' });
+      scriptUploadMetadata.push(metadata);
+      const response = Array.isArray(fetchMock.scriptUploadResponses) && fetchMock.scriptUploadResponses.length
+        ? fetchMock.scriptUploadResponses.shift()
+        : cfSuccess({ id: 'worker-uploaded' });
+      if (response.ok) workerBindings.set(scriptUploadMatch[1], metadata.bindings || []);
+      return response;
     }
     if (method === 'GET' && normalizedUrl.endsWith('/workers/subdomain')) {
       if (fetchMock.subdomainFailures > 0) {
@@ -253,8 +272,9 @@ const makeResumableDeploymentFetch = () => {
       workerSecretBodies.push(JSON.parse(String(init.body || '{}')));
       return cfSuccess({});
     }
-    if (method === 'DELETE' && scriptMatch) {
-      workerBindings.delete(scriptMatch[1]);
+    const forcedScriptDeleteMatch = normalizedUrl.match(/\/workers\/scripts\/([^/?]+)\?force=true$/);
+    if (method === 'DELETE' && forcedScriptDeleteMatch) {
+      workerBindings.delete(forcedScriptDeleteMatch[1]);
       return cfSuccess({});
     }
     const namespaceDeleteMatch = normalizedUrl.match(/\/storage\/kv\/namespaces\/([^/?]+)$/);
@@ -268,13 +288,19 @@ const makeResumableDeploymentFetch = () => {
   fetchMock.finalConfigPutFailures = 0;
   fetchMock.configReadbackFailures = 0;
   fetchMock.subdomainFailures = 0;
+  fetchMock.bundleFetchMustFail = false;
+  fetchMock.workerSettingsHiddenReads = 0;
+  fetchMock.namespaceListHiddenReads = 0;
   fetchMock.namespaces = namespaces;
   fetchMock.kvValues = kvValues;
   fetchMock.workerBindings = workerBindings;
   fetchMock.workerSecretBodies = workerSecretBodies;
+  fetchMock.scriptUploadMetadata = scriptUploadMetadata;
+  fetchMock.scriptUploadResponses = [];
   fetchMock.getNamespaceCreateCount = () => namespaceCreates;
   fetchMock.getScriptUploadCount = () => scriptUploads;
   fetchMock.getFinalConfigPutCount = () => finalConfigPuts;
+  fetchMock.getBundleFetchCount = () => bundleFetches;
   return fetchMock;
 };
 
@@ -407,6 +433,16 @@ describe('deploy-helper worker', () => {
       const uploadForm = scriptUpload[1].body;
       const uploadMetadata = await readScriptUploadMetadata(scriptUpload);
       expect(uploadMetadata.main_module).toBe('worker.mjs');
+      expect(uploadMetadata.bindings).toContainEqual({
+        name: 'CE_SESSION_COORDINATOR',
+        type: 'durable_object_namespace',
+        class_name: 'SessionWriteCoordinator',
+      });
+      expect(uploadMetadata.migrations).toEqual({
+        old_tag: '',
+        new_tag: 'ce-session-write-coordinator-v1',
+        new_sqlite_classes: ['SessionWriteCoordinator'],
+      });
       expect(uploadMetadata.bindings.some((binding) => binding.name === 'CE_STORAGE_INDEX_KV')).toBe(false);
       expect(uploadForm.get('worker.mjs')).toBeTruthy();
       expect(uploadForm.get('worker.js')).toBeNull();
@@ -1467,7 +1503,7 @@ describe('deploy-helper worker', () => {
       expect(payload?.error).toMatch(/did not enable workers\.dev/i);
       expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
       expect(fetchMock.calls.some(([url, init = {}]) => (
-        /\/workers\/scripts\/test-worker-[0-9a-f]{12}$/.test(String(url)) && init.method === 'DELETE'
+        /\/workers\/scripts\/test-worker-[0-9a-f]{12}\?force=true$/.test(String(url)) && init.method === 'DELETE'
       ))).toBe(true);
       expect(fetchMock.calls.some(([url, init = {}]) => (
         String(url).endsWith('/storage/kv/namespaces/kv-123') && init.method === 'DELETE'
@@ -1843,7 +1879,7 @@ describe('deploy-helper worker', () => {
         workerCleanupStatus: 'ownership-changed',
       });
       expect(fetchMock.calls.some(([url, init = {}]) => (
-        /\/workers\/scripts\/test-worker-[0-9a-f]{12}$/.test(String(url)) && init.method === 'DELETE'
+        /\/workers\/scripts\/test-worker-[0-9a-f]{12}\?force=true$/.test(String(url)) && init.method === 'DELETE'
       ))).toBe(false);
       expect(fetchMock.calls.some(([url, init = {}]) => (
         String(url).endsWith('/storage/kv/namespaces/kv-123') && init.method === 'DELETE'
@@ -1952,7 +1988,7 @@ describe('deploy-helper worker', () => {
         expect(payload?.orphanResources).toEqual(expectedOrphans);
       }
       const scriptDeleteCalls = fetchMock.calls.filter(([url, init = {}]) => (
-        /\/workers\/scripts\/canonical-worker-[0-9a-f]{12}$/.test(String(url)) && init.method === 'DELETE'
+        /\/workers\/scripts\/canonical-worker-[0-9a-f]{12}\?force=true$/.test(String(url)) && init.method === 'DELETE'
       ));
       expect(scriptDeleteCalls).toHaveLength(shouldDeleteScript ? 1 : 0);
       expect(fetchMock.calls.some(([url, init = {}]) => (
@@ -2082,6 +2118,43 @@ describe('deploy-helper worker', () => {
     }
   });
 
+  it('retries an already-applied coordinator migration without dropping its binding', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    fetchMock.scriptUploadResponses = [
+      cfFailure(412, 'Migration tag precondition failed: tag already applied.'),
+      cfSuccess({ id: 'worker-uploaded' }),
+    ];
+    global.fetch = fetchMock;
+    const env = { DEPLOY_HELPER_KV: makeKvBinding() };
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        deploymentRequestId: 'request-coordinator-migration-0001',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleText: 'export default { fetch() {} };',
+      }), env, {});
+
+      expect(response.status).toBe(200);
+      expect(fetchMock.getScriptUploadCount()).toBe(2);
+      expect(fetchMock.scriptUploadMetadata[0].migrations).toEqual({
+        old_tag: '',
+        new_tag: 'ce-session-write-coordinator-v1',
+        new_sqlite_classes: ['SessionWriteCoordinator'],
+      });
+      expect(fetchMock.scriptUploadMetadata[1].migrations).toBeUndefined();
+      expect(fetchMock.scriptUploadMetadata[1].bindings).toContainEqual({
+        name: 'CE_SESSION_COORDINATOR',
+        type: 'durable_object_namespace',
+        class_name: 'SessionWriteCoordinator',
+      });
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
   it('replays a committed terminal deploy journal result and rejects a changed request body', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeDeploymentRequestFetchSequence([
@@ -2095,7 +2168,9 @@ describe('deploy-helper worker', () => {
     const journalKv = makeKvBinding();
     const normalPut = journalKv.put.bind(journalKv);
     let loseTerminalWriteResponse = true;
+    const journalPutKeys = [];
     journalKv.put = async (key, value, options) => {
+      journalPutKeys.push(key);
       await normalPut(key, value, options);
       const parsed = JSON.parse(value);
       if (parsed?.state === 'terminal' && loseTerminalWriteResponse) {
@@ -2147,13 +2222,23 @@ describe('deploy-helper worker', () => {
       expect(JSON.stringify([...journalKv.store.values()])).not.toContain('cf-token');
       expect(JSON.stringify([...journalKv.store.values()])).not.toContain('export default');
       expect(JSON.stringify([...journalKv.store.values()])).not.toContain('sk-journal-secret');
+      expect(journalPutKeys).toHaveLength(3);
+      expect(new Set(journalPutKeys).size).toBe(journalPutKeys.length);
+      expect([...journalKv.store.values()].map((value) => JSON.parse(value).state).sort()).toEqual([
+        'reserved',
+        'terminal',
+        'upload_started',
+      ]);
 
       const changedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
         ...body,
         sessionSlug: 'changed-session',
       }), env, {});
       expect(changedResponse.status).toBe(409);
-      expect((await changedResponse.json()).error).toMatch(/different request payload/i);
+      expect(await changedResponse.json()).toEqual(expect.objectContaining({
+        error: expect.stringMatching(/different request payload/i),
+        deploymentRequestConflict: true,
+      }));
       expect(fetchMock.calls).toHaveLength(cloudflareCallsAfterCommit);
     } finally {
       consoleLogSpy.mockRestore();
@@ -2192,7 +2277,7 @@ describe('deploy-helper worker', () => {
       await expect(
         deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
       ).rejects.toThrow('terminal journal did not commit');
-      expect(JSON.parse([...journalKv.store.values()][0]).state).toBe('mutation_started');
+      expect(JSON.parse([...journalKv.store.values()][0]).state).toBe('reserved');
       expect(fetchMock.getNamespaceCreateCount()).toBe(1);
       expect(fetchMock.getScriptUploadCount()).toBe(1);
       expect(fetchMock.workerSecretBodies).toHaveLength(2);
@@ -2221,6 +2306,186 @@ describe('deploy-helper worker', () => {
     }
   });
 
+  it('labels a changed-payload conflict while an upload journal is still non-terminal', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const normalPut = journalKv.put.bind(journalKv);
+    let failTerminalWriteBeforeCommit = true;
+    journalKv.put = async (key, value, options) => {
+      const parsed = JSON.parse(value);
+      if (parsed?.state === 'terminal' && failTerminalWriteBeforeCommit) {
+        failTerminalWriteBeforeCommit = false;
+        throw new TypeError('terminal journal did not commit');
+      }
+      await normalPut(key, value, options);
+    };
+    const env = { DEPLOY_HELPER_KV: journalKv };
+    const body = {
+      apiToken: 'cf-resume-secret-token',
+      deploymentRequestId: 'request-upload-conflict-0001',
+      workerName: 'resume-worker',
+      sessionSlug: 'resume-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+
+    try {
+      await expect(
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
+      ).rejects.toThrow('terminal journal did not commit');
+      const cloudflareCallsBeforeConflict = fetchMock.mock.calls.length;
+
+      const conflictResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        sessionSlug: 'changed-session',
+      }), env, {});
+
+      expect(conflictResponse.status).toBe(409);
+      expect(await conflictResponse.json()).toEqual(expect.objectContaining({
+        error: 'deploymentRequestId was already used with a different request payload.',
+        deploymentRequestConflict: true,
+      }));
+      expect(fetchMock).toHaveBeenCalledTimes(cloudflareCallsBeforeConflict);
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('resumes an exactly owned worker without refetching its unavailable bundle URL', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const normalPut = journalKv.put.bind(journalKv);
+    let failTerminalWriteBeforeCommit = true;
+    journalKv.put = async (key, value, options) => {
+      const parsed = JSON.parse(value);
+      if (parsed?.state === 'terminal' && failTerminalWriteBeforeCommit) {
+        failTerminalWriteBeforeCommit = false;
+        throw new TypeError('terminal journal did not commit');
+      }
+      await normalPut(key, value, options);
+    };
+    const env = { DEPLOY_HELPER_KV: journalKv };
+    const body = {
+      apiToken: 'cf-resume-secret-token',
+      deploymentRequestId: 'request-resume-bundle-url-0001',
+      workerName: 'resume-worker',
+      sessionSlug: 'resume-session',
+      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+    };
+
+    try {
+      await expect(
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
+      ).rejects.toThrow('terminal journal did not commit');
+      expect(fetchMock.getBundleFetchCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+
+      fetchMock.bundleFetchMustFail = true;
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+
+      expect(retryResponse.status).toBe(200);
+      expect((await retryResponse.json()).configVerified).toBe(true);
+      expect(fetchMock.getBundleFetchCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('keeps temporarily invisible exact Worker and KV state pending until it can resume', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const normalPut = journalKv.put.bind(journalKv);
+    let failTerminalWriteBeforeCommit = true;
+    journalKv.put = async (key, value, options) => {
+      const parsed = JSON.parse(value);
+      if (parsed?.state === 'terminal' && failTerminalWriteBeforeCommit) {
+        failTerminalWriteBeforeCommit = false;
+        throw new TypeError('terminal journal did not commit');
+      }
+      await normalPut(key, value, options);
+    };
+    const env = { DEPLOY_HELPER_KV: journalKv };
+    const body = {
+      apiToken: 'cf-resume-secret-token',
+      deploymentRequestId: 'request-resume-visibility-0001',
+      workerName: 'resume-worker',
+      sessionSlug: 'resume-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+
+    try {
+      await expect(
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
+      ).rejects.toThrow('terminal journal did not commit');
+      fetchMock.namespaceListHiddenReads = 1;
+
+      const hiddenKvResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(hiddenKvResponse.status).toBe(503);
+      expect((await hiddenKvResponse.json()).deploymentRequestPending).toBe(true);
+      expect([...journalKv.store.values()].some((value) => JSON.parse(value).state === 'terminal')).toBe(false);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+
+      fetchMock.workerSettingsHiddenReads = 1;
+      const resumedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(resumedResponse.status).toBe(200);
+      expect((await resumedResponse.json()).configVerified).toBe(true);
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('resumes an exactly owned worker when the non-terminal journal reservation has expired', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const normalPut = journalKv.put.bind(journalKv);
+    let failTerminalWriteBeforeCommit = true;
+    journalKv.put = async (key, value, options) => {
+      const parsed = JSON.parse(value);
+      if (parsed?.state === 'terminal' && failTerminalWriteBeforeCommit) {
+        failTerminalWriteBeforeCommit = false;
+        throw new TypeError('terminal journal did not commit');
+      }
+      await normalPut(key, value, options);
+    };
+    const env = { DEPLOY_HELPER_KV: journalKv };
+    const body = {
+      apiToken: 'cf-resume-secret-token',
+      deploymentRequestId: 'request-resume-expired-journal-0001',
+      workerName: 'resume-worker',
+      sessionSlug: 'resume-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+
+    try {
+      await expect(
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
+      ).rejects.toThrow('terminal journal did not commit');
+      for (const [key, value] of journalKv.store.entries()) {
+        if (JSON.parse(value).state !== 'terminal') journalKv.store.delete(key);
+      }
+
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(retryResponse.status).toBe(200);
+      expect((await retryResponse.json()).configVerified).toBe(true);
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
   it.each([
     {
       label: 'deployment marker',
@@ -2229,9 +2494,59 @@ describe('deploy-helper worker', () => {
       )),
     },
     {
+      label: 'request digest',
+      mutateBindings: (bindings) => bindings.map((binding) => (
+        binding.name === 'CE_DEPLOYMENT_REQUEST_DIGEST' ? { ...binding, text: '0'.repeat(64) } : binding
+      )),
+    },
+    {
       label: 'GROUP_KV namespace',
       mutateBindings: (bindings) => bindings.map((binding) => (
         binding.name === 'GROUP_KV' ? { ...binding, namespace_id: 'kv-foreign' } : binding
+      )),
+    },
+    {
+      label: 'bundle identity',
+      mutateBindings: (bindings) => bindings.map((binding) => (
+        binding.name === 'CE_BUNDLE_SHA256' ? { ...binding, text: '0'.repeat(64) } : binding
+      )),
+    },
+    {
+      label: 'storage index namespace',
+      mutateBindings: (bindings) => bindings.map((binding) => (
+        binding.name === 'CE_STORAGE_INDEX_KV' ? { ...binding, namespace_id: 'kv-foreign' } : binding
+      )),
+    },
+    {
+      label: 'R2 bucket',
+      mutateBindings: (bindings) => bindings.map((binding) => (
+        binding.name === 'CE_STORAGE_R2' ? { ...binding, bucket_name: 'foreign-bucket' } : binding
+      )),
+    },
+    {
+      label: 'bootstrap admin',
+      mutateBindings: (bindings) => bindings.map((binding) => (
+        binding.name === 'BOOTSTRAP_ADMIN_ADDRESS' ? { ...binding, text: '0x2222222222222222222222222222222222222222' } : binding
+      )),
+    },
+    {
+      label: 'session slug',
+      mutateBindings: (bindings) => bindings.map((binding) => (
+        binding.name === 'DEFAULT_SESSION_SLUG' ? { ...binding, text: 'foreign-session' } : binding
+      )),
+    },
+    {
+      label: 'deploy-helper flag',
+      mutateBindings: (bindings) => bindings.map((binding) => (
+        binding.name === 'DEPLOY_HELPER_ENABLED' ? { ...binding, text: '1' } : binding
+      )),
+    },
+    {
+      label: 'session coordinator',
+      mutateBindings: (bindings) => bindings.map((binding) => (
+        binding.name === 'CE_SESSION_COORDINATOR'
+          ? { ...binding, class_name: 'ForeignCoordinator' }
+          : binding
       )),
     },
   ])('refuses to resume when the existing worker has a mismatched $label binding', async ({ mutateBindings }) => {
@@ -2256,6 +2571,14 @@ describe('deploy-helper worker', () => {
       workerName: 'resume-worker',
       sessionSlug: 'resume-session',
       bundleText: 'export default { fetch() {} };',
+      adminAddress: '0x1111111111111111111111111111111111111111',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      embeddedDeployHelperEnabled: false,
+      storageProfile: {
+        backend: 'cloudflare',
+        r2BucketName: 'ce-session-payloads',
+        payloadAccessControl: { gate: 'none', encryption: 'none' },
+      },
     };
 
     try {
@@ -2267,9 +2590,13 @@ describe('deploy-helper worker', () => {
 
       const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
       expect(retryResponse.status).toBe(409);
-      expect((await retryResponse.json()).error).toMatch(/does not match this deployment request/i);
+      expect(await retryResponse.json()).toEqual(expect.objectContaining({
+        error: expect.stringMatching(/does not match this deployment request/i),
+        deploymentRequestPending: true,
+      }));
       expect(fetchMock.getNamespaceCreateCount()).toBe(1);
       expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect([...journalKv.store.values()].some((value) => JSON.parse(value).state === 'terminal')).toBe(false);
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -2294,7 +2621,7 @@ describe('deploy-helper worker', () => {
       const firstResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
       expect(firstResponse.status).toBe(502);
       expect((await firstResponse.json()).deploymentRequestPending).toBe(true);
-      expect(JSON.parse([...journalKv.store.values()][0]).state).toBe('mutation_started');
+      expect(JSON.parse([...journalKv.store.values()][0]).state).toBe('reserved');
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -2311,14 +2638,14 @@ describe('deploy-helper worker', () => {
     fetchMock.commitNamespaceCreateThenThrow = true;
     global.fetch = fetchMock;
     const env = { DEPLOY_HELPER_KV: makeKvBinding() };
-    const longSlug = 'a'.repeat(600);
+    const boundarySlug = 'a'.repeat(128);
 
     try {
       const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
         apiToken: 'cf-token',
         deploymentRequestId: 'request-loss-0002',
         workerName: 'test-worker',
-        sessionSlug: longSlug,
+        sessionSlug: boundarySlug,
         bundleText: 'export default { fetch() {} };',
       }), env, {});
       const payload = await response.json();
@@ -2327,7 +2654,8 @@ describe('deploy-helper worker', () => {
       expect(payload.kvNamespaceId).toBe('kv-1');
       expect(fetchMock.namespaces).toHaveLength(1);
       expect(fetchMock.namespaces[0].title).toMatch(/req-[0-9a-f]{16}$/);
-      expect(fetchMock.namespaces[0].title).toHaveLength(512);
+      expect(fetchMock.namespaces[0].title).toContain(boundarySlug);
+      expect(fetchMock.namespaces[0].title.length).toBeLessThanOrEqual(512);
       expect(fetchMock.calls.filter(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'POST' &&
         String(url).endsWith('/storage/kv/namespaces')
@@ -2335,6 +2663,57 @@ describe('deploy-helper worker', () => {
     } finally {
       consoleLogSpy.mockRestore();
     }
+  });
+
+  it('rejects session slugs longer than the 128-character canonical limit before Cloudflare access', async () => {
+    const fetchMock = jest.fn(async () => {
+      throw new Error('Cloudflare must not be called for an invalid slug');
+    });
+    global.fetch = fetchMock;
+
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'cf-token',
+      workerName: 'test-worker',
+      sessionSlug: 'a'.repeat(129),
+      bundleText: 'export default { fetch() {} };',
+    }), {}, {});
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toMatch(/at most 128/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('redacts known request credentials from terminal journal errors and their replay', async () => {
+    const apiToken = 'cf-sensitive-token-value';
+    const providerSecret = 'provider-sensitive-secret';
+    global.fetch = jest.fn(async (url) => {
+      if (String(url).endsWith('/accounts?per_page=5')) {
+        return cfFailure(400, `rejected ${apiToken} with ${providerSecret}`);
+      }
+      throw new Error(`Unexpected Cloudflare mock call: ${url}`);
+    });
+    const journalKv = makeKvBinding();
+    const env = { DEPLOY_HELPER_KV: journalKv };
+    const body = {
+      apiToken,
+      deploymentRequestId: 'request-redacted-error-0001',
+      workerName: 'test-worker',
+      sessionSlug: 'alpha-session',
+      bundleText: 'export default { fetch() {} };',
+      secrets: { providerApiKey: providerSecret },
+    };
+
+    const firstResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+    const firstPayload = await firstResponse.json();
+    expect(firstResponse.status).toBe(502);
+    expect(firstPayload.error).toBe('rejected [REDACTED] with [REDACTED]');
+    expect(JSON.stringify([...journalKv.store.values()])).not.toContain(apiToken);
+    expect(JSON.stringify([...journalKv.store.values()])).not.toContain(providerSecret);
+
+    const cloudflareCallCount = global.fetch.mock.calls.length;
+    const replayResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+    expect(await replayResponse.json()).toEqual(firstPayload);
+    expect(global.fetch).toHaveBeenCalledTimes(cloudflareCallCount);
   });
 
   it('reconciles delayed KV-title visibility on a same-id retry without a second namespace', async () => {
@@ -2450,7 +2829,7 @@ describe('deploy-helper worker', () => {
       expect(fetchMock.calls.some(([url]) => String(url).endsWith('/secrets'))).toBe(false);
       expect(fetchMock.calls.some(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'DELETE' &&
-        (/\/workers\/scripts\/test-worker-[0-9a-f]{12}$/.test(String(url)) ||
+        (/\/workers\/scripts\/test-worker-[0-9a-f]{12}\?force=true$/.test(String(url)) ||
           String(url).endsWith('/storage/kv/namespaces/kv-123'))
       ))).toBe(false);
     } finally {
