@@ -1480,13 +1480,30 @@ const executeDeployHelperRequestUnlocked = async ({
       const expectedRevision = toStr(configWithWorkerUrl.configRevision).trim();
       const observedRevision = toStr(readbackConfig.configRevision).trim();
       // Retry only an otherwise valid API read that is demonstrably an older
-      // revision or the narrow fresh-namespace 404/10013. Same-revision
-      // identity/policy mismatches and unrelated API errors remain fail-closed.
+      // revision, the exact staged pre-URL identity, or the narrow fresh-
+      // namespace 404/10013. The staged and final writes intentionally share a
+      // configRevision, so revision comparison alone cannot recognize that
+      // normal propagation state. Foreign same-revision identities and
+      // unrelated API errors remain fail-closed.
       const staleRevision = (
         configReadback.ok && expectedRevision && observedRevision && observedRevision !== expectedRevision
       );
+      const stagedConfigPending = (
+        configReadback.ok &&
+        toStr(readbackConfig.slug).trim() === toStr(config.slug).trim() &&
+        toStr(readbackConfig.corsWorkerUrl).trim() === toStr(config.corsWorkerUrl).trim() &&
+        toStr(readbackConfig.corsWorkerUrl).trim() !== toStr(configWithWorkerUrl.corsWorkerUrl).trim() &&
+        (!config.configRevision || observedRevision === toStr(config.configRevision).trim()) &&
+        (!config.sessionId || toStr(readbackConfig.sessionId).trim() === toStr(config.sessionId).trim()) &&
+        (!config.adminAddress ||
+          toStr(readbackConfig.adminAddress).trim().toLowerCase() === toStr(config.adminAddress).trim().toLowerCase()) &&
+        (!expectedAuthorityMode ||
+          toStr(readbackConfig?.sessionModeProfile?.authority?.mode).trim() === expectedAuthorityMode) &&
+        (!workerCanonicalRequested ||
+          workerAuthorityPoliciesMatch(config.workerAuthority, readbackConfig.workerAuthority))
+      );
       const freshNamespacePending = isNewKvNamespacePropagationFailure(configReadback);
-      if (!staleRevision && !freshNamespacePending) break;
+      if (!staleRevision && !stagedConfigPending && !freshNamespacePending) break;
       await new Promise((resolve) => setTimeout(resolve, delayMs));
       configReadback = await cfFetch(apiToken, configReadbackPath, { method: 'GET' }, cfFetchOptions);
     }

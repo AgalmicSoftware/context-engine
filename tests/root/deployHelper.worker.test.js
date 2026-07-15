@@ -1376,6 +1376,41 @@ describe('deploy-helper worker', () => {
     }
   });
 
+  it('retries the known staged config when the final URL write shares its revision', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+    ]);
+    fetchMock.kvReadbackResponses = [new Response(JSON.stringify({
+      slug: 'alpha-session',
+      configRevision: 'revision-same',
+      adminAddress: '',
+      corsWorkerUrl: '',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })];
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        configRevision: 'revision-same',
+        bundleText: 'export default { fetch() {} };',
+      }), {}, {});
+
+      expect(response.status).toBe(200);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || 'GET').toUpperCase() === 'GET' && String(url).endsWith(':config')
+      ))).toHaveLength(2);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
   it('retries the narrow fresh-namespace 404 during final config readback', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
