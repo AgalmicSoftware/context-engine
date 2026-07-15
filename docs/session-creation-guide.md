@@ -131,6 +131,9 @@ The deploy helper consumes the direct `/new` Cloudflare token in the deploy
 request and does not return or persist it. A successfully published session URL
 contains only the public worker origin, never the token. This request-only rule
 is distinct from the existing sponsored deploy-grant workflow documented above.
+You do not need to paste or configure a Cloudflare account ID: the deploy helper
+uses the token to look up exactly one visible account through Cloudflare and
+stops if the token exposes zero or multiple accounts.
 
 ### 2. AI provider key
 
@@ -416,7 +419,9 @@ High-level flow:
 4. If the helper cannot fetch the release asset, keep the default GitHub release URL and either paste a direct bundle URL override or run `nvm use 20 && npm run worker:bundle` and upload `dist/sessionCorsWorker.bundle.js`
 5. Publish only after the wizard verifies the public config readback
 
-The first-party wizard now infers the Cloudflare account from the API token during deploy instead of asking for account ID separately.
+The first-party wizard does not ask for an account ID. During deploy, the helper
+discovers exactly one visible Cloudflare account using the API token and stops on
+zero or multiple accounts.
 
 Reference: [session-cors-worker.md](session-cors-worker.md)
 

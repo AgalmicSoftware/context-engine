@@ -81,9 +81,10 @@ For the default `Fast & Cheap (Cloudflare)` preset:
    - When the template preselects `All accounts`, restrict Account Resources to the one account
      where the session worker will run before creating the token.
    - The template auto-names the token as `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMAM` or `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMPM` (local time).
-   - The first-party wizard derives the worker name and no longer asks for a
-     Cloudflare account ID; the deploy-helper resolves the account from the API
-     token.
+   - The first-party wizard derives the worker name and does not ask for a
+     Cloudflare account ID. The deploy-helper resolves exactly one visible
+     account from the API token and stops when the token exposes zero or multiple
+     accounts.
    - On the direct default `/new` path, the token is deploy-helper request input
      only. It is rejected from canonical session config and must not appear in
      worker config/secrets, URLs, metadata, logs, analytics, or browser/durable
@@ -1385,7 +1386,9 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   address, session identity/profile, authority policy, public canonical config,
   and the AI secret selected by the profile. Registry/RPC/Hats fields are
   profile-dependent and are omitted for the default worker-canonical deploy.
-  - `accountId` remains optional for low-level callers, but the first-party wizard now omits it and lets the helper resolve the account from the API token.
+  - `accountId` remains optional for low-level callers, but the first-party
+    wizard omits it. The helper discovers exactly one visible account through
+    Cloudflare using the API token and fails on zero or multiple accounts.
   - Provide either `bundleUrl` (release asset) or `bundleText` (raw bundle contents) from the `/new` UI.
 - The helper fetches the latest bundled worker asset and configures KV + bindings.
 - Worker-canonical deploys use a unique physical script suffix and require an
