@@ -36,9 +36,6 @@ import {
   findForbiddenWorkerConfigSecretPath,
 } from '../shared/workerSessionConfig.mjs';
 import { applySessionConfigMutation as applySessionConfigMutationBoundary } from './sessionConfigMutation.js';
-import {
-  executeCoordinatedSessionConfigMutation as executeCoordinatedSessionConfigMutationBoundary,
-} from './sessionWriteCoordinator.js';
 
 const ALLOWED_SECRET_KEYS = [
   'openaiKey',
@@ -149,29 +146,6 @@ const executeDirectSessionConfigMutation = async ({
   return { ok: true, status: 200, body: { ok: true } };
 };
 
-const executeSessionConfigMutation = async ({
-  env,
-  slug,
-  existingConfig,
-  mutation,
-  deps,
-} = {}) => {
-  const coordinator = env?.CE_SESSION_COORDINATOR;
-  if (coordinator == null) {
-    return executeDirectSessionConfigMutation({ env, slug, existingConfig, mutation, deps });
-  }
-  if (!coordinator?.idFromName || !coordinator?.get) {
-    return {
-      ok: false,
-      status: 503,
-      body: { error: 'Session config coordination is unavailable; config was not changed.' },
-    };
-  }
-  return (
-    deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutationBoundary
-  )({ env, slug, mutation });
-};
-
 export const dispatchAdminRequest = async ({
   request,
   env,
@@ -262,7 +236,7 @@ export const dispatchAdminRequest = async ({
       }, 400, headers);
     }
 
-    const mutationResult = await executeSessionConfigMutation({
+    const mutationResult = await executeDirectSessionConfigMutation({
       env,
       slug: targetSlug,
       existingConfig,
@@ -345,7 +319,7 @@ export const dispatchAdminRequest = async ({
         ...(result?.litPkpId ? { litPkpId: result.litPkpId } : {}),
       } : null;
       if (litCredentials) {
-        const mutationResult = await executeSessionConfigMutation({
+        const mutationResult = await executeDirectSessionConfigMutation({
           env,
           slug: targetSlug,
           existingConfig,
@@ -390,7 +364,7 @@ export const dispatchAdminRequest = async ({
         typeof result.litCredentials === 'object'
       ) ? result.litCredentials : null;
       if (litCredentials) {
-        const mutationResult = await executeSessionConfigMutation({
+        const mutationResult = await executeDirectSessionConfigMutation({
           env,
           slug: targetSlug,
           existingConfig,
@@ -418,7 +392,7 @@ export const dispatchAdminRequest = async ({
     const incoming = body?.limits && typeof body.limits === 'object' ? body.limits : null;
     if (!incoming) return deps?.json?.({ error: 'Missing limits.' }, 400, headers);
 
-    const mutationResult = await executeSessionConfigMutation({
+    const mutationResult = await executeDirectSessionConfigMutation({
       env,
       slug: targetSlug,
       existingConfig,

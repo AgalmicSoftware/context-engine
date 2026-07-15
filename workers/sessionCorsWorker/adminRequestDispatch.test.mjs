@@ -10,7 +10,6 @@ import {
 } from './sessionConfigSecretsStore.js';
 import { mergeWorkerConfigRecords } from './sessionConfigNormalization.js';
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
-import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
 
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
@@ -28,23 +27,6 @@ const createMemoryKv = () => {
     put: async (key, value) => {
       values.set(key, value);
     },
-  };
-};
-
-const createCoordinatorBinding = ({ env, deps } = {}) => {
-  const instances = new Map();
-  return {
-    idFromName: (name) => name,
-    get: (id) => ({
-      fetch: (request, init) => {
-        if (!instances.has(id)) {
-          instances.set(id, new SessionWriteCoordinator({ storage: {} }, env, deps));
-        }
-        return instances.get(id).fetch(
-          request instanceof Request ? request : new Request(request, init),
-        );
-      },
-    }),
   };
 };
 
@@ -168,56 +150,6 @@ test('dispatchAdminRequest persists config without a coordinator binding', async
   assert.equal(result.status, 200);
   assert.deepEqual(result.body, { ok: true });
   assert.equal(putCalls, 1);
-});
-
-test('dispatchAdminRequest does not bypass a bound coordinator after coordination fails', async () => {
-  let putCalls = 0;
-  const result = await dispatchAdminRequest({
-    request: {
-      json: async () => createSignedBody({
-        config: { sessionName: 'Must not persist outside the coordinator' },
-      }),
-    },
-    env: {
-      GROUP_KV: {},
-      CE_SESSION_COORDINATOR: {
-        idFromName: (name) => name,
-        get: () => ({ fetch: async () => { throw new Error('coordinator unavailable'); } }),
-      },
-    },
-    baseHeaders: {},
-    slug: 'session-a',
-    action: 'set-config',
-    deps: createAdminDeps({
-      putSessionConfig: async () => { putCalls += 1; },
-    }),
-  });
-
-  assert.equal(result.status, 503);
-  assert.match(result.body.error, /persistence is pending/i);
-  assert.equal(putCalls, 0);
-});
-
-test('dispatchAdminRequest fails closed for a malformed coordinator binding', async () => {
-  let putCalls = 0;
-  const result = await dispatchAdminRequest({
-    request: {
-      json: async () => createSignedBody({
-        config: { sessionName: 'Must not persist through a malformed binding' },
-      }),
-    },
-    env: { GROUP_KV: {}, CE_SESSION_COORDINATOR: {} },
-    baseHeaders: {},
-    slug: 'session-a',
-    action: 'set-config',
-    deps: createAdminDeps({
-      putSessionConfig: async () => { putCalls += 1; },
-    }),
-  });
-
-  assert.equal(result.status, 503);
-  assert.match(result.body.error, /coordination is unavailable.*not changed/i);
-  assert.equal(putCalls, 0);
 });
 
 test('dispatchAdminRequest merges config and persists the result after authority resolution', async () => {
@@ -517,86 +449,6 @@ test('dispatchAdminRequest finalizes the first canonical publication revision an
   assert.equal((await runSetConfig(firstPublishConfig)).status, 200);
   assert.equal(writeCount, writesAfterAdminPatch);
   assert.deepEqual(persistedConfig.allowOrigins, ['https://admin.example.test']);
-});
-
-test('dispatchAdminRequest serializes concurrent first publications against fresh worker config', async () => {
-  const env = { GROUP_KV: createMemoryKv() };
-  const deploymentConfig = {
-    slug: 'session-a',
-    sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    configRevision: 'deployment-seed',
-    corsWorkerUrl: 'https://session-a.workers.dev',
-    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
-    sessionName: 'Deployment seed',
-  };
-  const storageEnvelope = {
-    version: 1,
-    keyProvider: 'worker_secret',
-    sessionKey: {
-      version: 1,
-      keyId: 'session:session-a:fresh-runtime-envelope',
-      wrappedKey: 'encrypted-key-material',
-    },
-  };
-  await putSessionConfig(env, 'session-a', { ...deploymentConfig, storageEnvelope });
-  env.CE_SESSION_COORDINATOR = createCoordinatorBinding({
-    env,
-    deps: { getSessionConfig, putSessionConfig, sleep: async () => {} },
-  });
-
-  let directWrites = 0;
-  let authorityCalls = 0;
-  const runPublish = (config) => dispatchAdminRequest({
-    request: { json: async () => createSignedBody({ config }) },
-    env,
-    baseHeaders: {},
-    slug: 'session-a',
-    action: 'set-config',
-    deps: createAdminDeps({
-      resolveAdminRequestAuthority: async () => {
-        authorityCalls += 1;
-        return {
-          ok: true,
-          existingConfig: deploymentConfig,
-          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
-          targetSlug: 'session-a',
-        };
-      },
-      putSessionConfig: async (...args) => {
-        directWrites += 1;
-        await putSessionConfig(...args);
-      },
-    }),
-  });
-
-  const publications = [
-    { sessionName: 'Published from tab A', configRevision: 'publication-a' },
-    { sessionName: 'Published from tab B', configRevision: 'publication-b' },
-  ];
-  const results = await Promise.all(publications.map(runPublish));
-
-  assert.equal(authorityCalls, 2);
-  assert.deepEqual(results.map(({ status }) => status).sort(), [200, 409]);
-  results.forEach((result) => {
-    assert.equal(
-      result.headers['Access-Control-Allow-Origin'],
-      'https://allowed.example.test',
-    );
-  });
-  assert.equal(directWrites, 0);
-
-  const persisted = await getSessionConfig(env, 'session-a');
-  const winner = publications.find(({ configRevision }) => (
-    configRevision === persisted.workerCanonicalPublicationRevision
-  ));
-  assert.ok(winner);
-  assert.equal(persisted.configRevision, winner.configRevision);
-  assert.equal(persisted.sessionName, winner.sessionName);
-  assert.deepEqual(persisted.storageEnvelope, storageEnvelope);
-
-  const replay = await runPublish(winner);
-  assert.equal(replay.status, 200);
-  assert.deepEqual((await getSessionConfig(env, 'session-a')).storageEnvelope, storageEnvelope);
 });
 
 test('dispatchAdminRequest permits non-identity updates to an initialized worker-canonical session', async () => {
