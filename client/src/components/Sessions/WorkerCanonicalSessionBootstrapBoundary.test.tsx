@@ -5,6 +5,7 @@ import WorkerCanonicalSessionBootstrapBoundary from './WorkerCanonicalSessionBoo
 import {
   fetchWorkerCanonicalSessionBootstrap,
   validateWorkerCanonicalSessionBootstrap,
+  WorkerSessionBootstrapRequestError,
 } from '../../utilities/session/sessionWorkerDiscovery';
 import {
   markWorkerCanonicalSessionBootstrapVerified,
@@ -74,6 +75,9 @@ const deferred = <T,>() => {
 describe('WorkerCanonicalSessionBootstrapBoundary', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFetchBootstrap.mockReset();
+    mockUpsertBootstrap.mockReset();
+    mockMarkBootstrapVerified.mockReset();
     mockFetchBootstrap.mockResolvedValue(bootstrap);
     mockUpsertBootstrap.mockReturnValue(cachedResult);
     mockMarkBootstrapVerified.mockReturnValue(true);
@@ -331,6 +335,8 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     expect(mockUpsertBootstrap).toHaveBeenCalledTimes(1);
     expect(mockMarkBootstrapVerified).not.toHaveBeenCalled();
     expect(onResolved).not.toHaveBeenCalled();
+    expect(mockFetchBootstrap).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Retry worker session' })).not.toBeInTheDocument();
   });
 
   it('fails closed when cache insertion is invalid', async () => {
@@ -390,6 +396,89 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     expect(mockUpsertBootstrap).not.toHaveBeenCalled();
     expect(mockMarkBootstrapVerified).not.toHaveBeenCalled();
     expect(onResolved).not.toHaveBeenCalled();
+  });
+
+  it('retries a bounded transient network failure before resolving', async () => {
+    mockFetchBootstrap.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(bootstrap);
+    const onResolved = jest.fn();
+
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        onResolved={onResolved}
+        retryDelaysMs={[0]}
+      />,
+    );
+
+    await waitFor(() => expect(onResolved).toHaveBeenCalledWith(bootstrap));
+    expect(mockFetchBootstrap).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers a semantic manual Retry after transient retries are exhausted', async () => {
+    mockFetchBootstrap.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(bootstrap);
+    const onResolved = jest.fn();
+
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        onResolved={onResolved}
+        retryDelaysMs={[]}
+      />,
+    );
+
+    const retry = await screen.findByRole('button', { name: 'Retry worker session' });
+    expect(screen.getByRole('alert')).toHaveTextContent('Failed to fetch');
+    await act(async () => retry.click());
+
+    await waitFor(() => expect(onResolved).toHaveBeenCalledWith(bootstrap));
+    expect(mockFetchBootstrap).toHaveBeenCalledTimes(2);
+  });
+
+  it('caps automatic retries before offering the manual Retry action', async () => {
+    mockFetchBootstrap.mockRejectedValue(new WorkerSessionBootstrapRequestError('Worker is activating.', {
+      retryable: true,
+      status: 503,
+    }));
+
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        onResolved={jest.fn()}
+        retryDelaysMs={[0, 0, 0, 0]}
+      />,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Retry worker session' })).toBeInTheDocument();
+    expect(mockFetchBootstrap).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    [
+      'permanent HTTP authorization failure',
+      new WorkerSessionBootstrapRequestError('Worker bootstrap request failed with status 403.', {
+        retryable: false,
+        status: 403,
+      }),
+    ],
+    ['invalid canonical config', new Error('Worker bootstrap response slug does not match the requested session.')],
+  ])('does not retry or offer Retry for %s', async (_label, failure) => {
+    mockFetchBootstrap.mockRejectedValueOnce(failure);
+
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        onResolved={jest.fn()}
+        retryDelaysMs={[0, 0]}
+      />,
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(failure.message);
+    expect(screen.queryByRole('button', { name: 'Retry worker session' })).not.toBeInTheDocument();
+    expect(mockFetchBootstrap).toHaveBeenCalledTimes(1);
   });
 
   it('aborts in-flight discovery on unmount and ignores later completion', async () => {

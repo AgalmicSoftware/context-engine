@@ -26,6 +26,26 @@ export type WorkerCanonicalSessionBootstrap = {
   workerOrigin: string;
 };
 
+// Retry only activation/edge-transient statuses. Auth, redirect, and validated
+// identity/config failures remain permanent and fail closed.
+const RETRYABLE_BOOTSTRAP_HTTP_STATUSES = new Set([404, 408, 425, 429, 502, 503, 504]);
+
+export class WorkerSessionBootstrapRequestError extends Error {
+  readonly retryable: boolean;
+  readonly status: number | null;
+
+  constructor(message: string, { retryable = false, status = null }: { retryable?: boolean; status?: number | null } = {}) {
+    super(message);
+    this.name = 'WorkerSessionBootstrapRequestError';
+    this.retryable = retryable;
+    this.status = status;
+  }
+}
+
+export const isRetryableWorkerSessionBootstrapError = (error: unknown): boolean =>
+  error instanceof TypeError ||
+  (error instanceof WorkerSessionBootstrapRequestError && error.retryable);
+
 const WORKER_URL_KEYS = Object.freeze([
   'corsWorkerUrl',
   'corsWorkerURL',
@@ -397,7 +417,10 @@ export const fetchWorkerCanonicalSessionBootstrap = async ({
     signal,
   });
   if (!response.ok || response.redirected) {
-    throw new Error(`Worker bootstrap request failed with status ${response.status}.`);
+    throw new WorkerSessionBootstrapRequestError(`Worker bootstrap request failed with status ${response.status}.`, {
+      retryable: !response.redirected && RETRYABLE_BOOTSTRAP_HTTP_STATUSES.has(response.status),
+      status: response.status,
+    });
   }
 
   let payload: unknown;

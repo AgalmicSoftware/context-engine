@@ -6,6 +6,7 @@ import {
   parseSessionWorkerDiscoveryOrigin,
   parseSessionWorkerDiscoveryQuery,
   validateWorkerCanonicalSessionBootstrap,
+  WorkerSessionBootstrapRequestError,
 } from './sessionWorkerDiscovery';
 
 const SESSION_ID = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -326,5 +327,30 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
         environment: 'production',
       }),
     ).rejects.toThrow(/valid JSON/);
+  });
+
+  it('marks only recognized activation HTTP statuses as retryable request failures', async () => {
+    const request = (status: number) =>
+      fetchWorkerCanonicalSessionBootstrap({
+        fetchImpl: jest.fn(async () => new Response('no', { status })),
+        sessionSlug: 'session-a',
+        workerQueryValue: 'https://session-a.example.workers.dev',
+        environment: 'production',
+      });
+
+    const transient = await request(503).catch((error) => error);
+    expect(transient).toBeInstanceOf(WorkerSessionBootstrapRequestError);
+    expect(transient).toMatchObject({
+      name: 'WorkerSessionBootstrapRequestError',
+      retryable: true,
+      status: 503,
+    });
+    const permanent = await request(403).catch((error) => error);
+    expect(permanent).toBeInstanceOf(WorkerSessionBootstrapRequestError);
+    expect(permanent).toMatchObject({
+      name: 'WorkerSessionBootstrapRequestError',
+      retryable: false,
+      status: 403,
+    });
   });
 });

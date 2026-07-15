@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import {
   fetchWorkerCanonicalSessionBootstrap,
+  isRetryableWorkerSessionBootstrapError,
   type DiscoveryEnvironment,
   type WorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerDiscovery';
@@ -17,12 +18,34 @@ type WorkerCanonicalSessionBootstrapBoundaryProps = {
   environment?: DiscoveryEnvironment;
   fetchImpl?: typeof fetch;
   confirmRepin?: ((message: string) => boolean | Promise<boolean>) | null;
+  retryDelaysMs?: readonly number[];
 };
 
 type BootstrapViewState = {
   kind: 'loading' | 'ready' | 'error';
   message: string;
+  canRetry?: boolean;
 };
+
+const DEFAULT_RETRY_DELAYS_MS = [250, 750] as const;
+// Keep activation recovery bounded even when a test or future caller supplies a longer schedule.
+const MAX_AUTOMATIC_RETRY_ATTEMPTS = 2;
+
+const waitForRetryDelay = (delayMs: number, signal: AbortSignal): Promise<void> =>
+  new Promise((resolve) => {
+    if (delayMs <= 0 || signal.aborted) {
+      resolve();
+      return;
+    }
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const finish = () => {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      signal.removeEventListener('abort', finish);
+      resolve();
+    };
+    timeoutId = setTimeout(finish, delayMs);
+    signal.addEventListener('abort', finish, { once: true });
+  });
 
 const cacheBootstrap = (bootstrap: WorkerCanonicalSessionBootstrap, allowRepin: boolean) =>
   upsertWorkerCanonicalSessionBootstrap({
@@ -50,7 +73,9 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
   environment,
   fetchImpl,
   confirmRepin,
+  retryDelaysMs = DEFAULT_RETRY_DELAYS_MS,
 }: WorkerCanonicalSessionBootstrapBoundaryProps) => {
+  const [retryNonce, setRetryNonce] = useState(0);
   const [viewState, setViewState] = useState<BootstrapViewState>({
     kind: 'loading',
     message: 'Loading worker session…',
@@ -64,13 +89,24 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
 
     const resolveBootstrap = async () => {
       try {
-        const bootstrap = await fetchWorkerCanonicalSessionBootstrap({
-          sessionSlug,
-          workerQueryValue,
-          environment,
-          fetchImpl,
-          signal: abortController.signal,
-        });
+        let bootstrap: WorkerCanonicalSessionBootstrap | null = null;
+        for (let attempt = 0; bootstrap === null; attempt += 1) {
+          try {
+            bootstrap = await fetchWorkerCanonicalSessionBootstrap({
+              sessionSlug,
+              workerQueryValue,
+              environment,
+              fetchImpl,
+              signal: abortController.signal,
+            });
+          } catch (error) {
+            const retryCount = Math.min(retryDelaysMs.length, MAX_AUTOMATIC_RETRY_ATTEMPTS);
+            if (!isRetryableWorkerSessionBootstrapError(error) || attempt >= retryCount) throw error;
+            if (active) setViewState({ kind: 'loading', message: 'Worker is still activating… Retrying…' });
+            await waitForRetryDelay(Number(retryDelaysMs[attempt]) || 0, abortController.signal);
+            if (!active || abortController.signal.aborted) return;
+          }
+        }
         if (!active) return;
 
         let cacheResult = cacheBootstrap(bootstrap, false);
@@ -119,6 +155,7 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
         setViewState({
           kind: 'error',
           message: error instanceof Error && error.message ? error.message : 'Worker session bootstrap failed.',
+          canRetry: isRetryableWorkerSessionBootstrapError(error),
         });
       }
     };
@@ -129,12 +166,17 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
       active = false;
       abortController.abort();
     };
-  }, [confirmRepin, environment, fetchImpl, onResolved, sessionSlug, workerQueryValue]);
+  }, [confirmRepin, environment, fetchImpl, onResolved, retryDelaysMs, retryNonce, sessionSlug, workerQueryValue]);
 
   if (viewState.kind === 'error') {
     return (
       <div role="alert" aria-live="assertive" data-testid="ce-worker-canonical-bootstrap-error">
-        {viewState.message}
+        <div>{viewState.message}</div>
+        {viewState.canRetry && (
+          <button type="button" aria-label="Retry worker session" onClick={() => setRetryNonce((value) => value + 1)}>
+            Retry
+          </button>
+        )}
       </div>
     );
   }
