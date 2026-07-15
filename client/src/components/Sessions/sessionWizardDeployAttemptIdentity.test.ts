@@ -64,6 +64,26 @@ describe('sessionWizardDeployAttemptIdentity', () => {
     expect(localStorage.getItem(reloaded.storageKey)).toBe('{"version":1,"generation":0,"status":"completed"}');
   });
 
+  it('advances a completed generation only with explicit terminal-conflict authority', () => {
+    const completed = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
+    expect(markSessionWizardDeployAttemptCompleted(completed, { storage: localStorage })).toBe(true);
+
+    expect(advanceSessionWizardDeployAttemptGeneration(completed, { storage: localStorage })).toBe(true);
+    expect(resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage })).toEqual(
+      expect.objectContaining({ generation: 0, status: 'completed' }),
+    );
+
+    expect(
+      advanceSessionWizardDeployAttemptGeneration(completed, {
+        storage: localStorage,
+        allowCompletedTerminalConflict: true,
+      }),
+    ).toBe(true);
+    const next = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
+    expect(next).toEqual(expect.objectContaining({ generation: 1, status: 'active' }));
+    expect(next.deploymentRequestId).not.toBe(completed.deploymentRequestId);
+  });
+
   it('fails closed when the generation cannot be persisted', () => {
     const storage = {
       getItem: jest.fn(() => null),

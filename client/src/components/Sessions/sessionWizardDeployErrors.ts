@@ -6,6 +6,7 @@ type ResolveSessionWizardDeployStatusDisplayStateArgs = {
   deployInFlight?: unknown;
   deployStatus?: unknown;
   deployVerifiedInUi?: unknown;
+  workerCanonicalPublishCompleted?: unknown;
 };
 export type SessionWizardDeployStatusDisplayState = {
   deployButtonDisabled: boolean;
@@ -88,11 +89,12 @@ export const resolveSessionWizardDeployStatusDisplayState = ({
   deployInFlight = false,
   deployStatus = '',
   deployVerifiedInUi = false,
+  workerCanonicalPublishCompleted = false,
 }: ResolveSessionWizardDeployStatusDisplayStateArgs = {}): SessionWizardDeployStatusDisplayState => {
   const deployStatusText = toStr(deployStatus);
   const deployStatusLower = deployStatusText.toLowerCase();
   return {
-    deployButtonDisabled: !!deployInFlight,
+    deployButtonDisabled: !!deployInFlight || !!workerCanonicalPublishCompleted,
     deployStatusText,
     isError:
       !!deployStatusText && !deployInFlight && !deployVerifiedInUi && !deployStatusLower.includes('worker deployed'),
@@ -199,6 +201,8 @@ export const normalizeSessionWizardDeployErrorMessage = ({
   const statusCode = Number(error?.statusCode || 0);
   const responseError = toStr(error?.responseError).trim();
   const responseLower = responseError.toLowerCase();
+  const isTerminalDeploymentConflict =
+    error?.responseDeploymentRequestConflict === true && error?.responseDeploymentRequestTerminal === true;
   const bundleDiagnostics = error?.responseBundleDiagnostics;
   const diagnosticsSummary = bundleDiagnostics ? formatSessionWizardDeployBundleDiagnostics(bundleDiagnostics) : '';
   const orphanResourcesSummary = formatSessionWizardDeployOrphanResources(error?.responseOrphanResources);
@@ -238,6 +242,12 @@ export const normalizeSessionWizardDeployErrorMessage = ({
   ) {
     const base = raw || responseError || 'Worker deploy failed.';
     return withOrphanResources(`${base} Bundle diagnostics: ${diagnosticsSummary}`);
+  }
+  if (isTerminalDeploymentConflict) {
+    const base = raw || responseError || 'This deployment attempt cannot be reused.';
+    return withOrphanResources(
+      `${base} Review the account and session details, then click Deploy worker again to start a fresh deployment attempt.`,
+    );
   }
   if (raw) return withOrphanResources(raw);
   if (statusCode > 0) return withOrphanResources(`Worker deploy failed (${statusCode}).`);

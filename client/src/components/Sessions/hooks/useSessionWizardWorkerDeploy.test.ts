@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import { cryptoUtils } from '../../../utilities/crypto/cryptography.js';
 import { INVALID_SESSION_SLUG_FORMAT_ERROR } from '../sessionWizardSlugValidation';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../../utilities/session/sessionModeProfile';
+import { readSessionWorkerConfigCache } from '../../../utilities/session/sessionWorkerConfigCache.js';
 import useSessionWizardWorkerDeploy, { type SessionWizardWorkerDeployRuntime } from './useSessionWizardWorkerDeploy';
 
 jest.mock('../../../utilities/crypto/cryptography.js', () => ({
@@ -205,6 +206,53 @@ describe('useSessionWizardWorkerDeploy', () => {
     );
     expect(options.signTypedAdminAction).not.toHaveBeenCalled();
     expect(cryptoUtils._getProvider).not.toHaveBeenCalled();
+  });
+
+  it('blocks deployment after terminal worker publication even when the form has rotated to a fresh session ID', async () => {
+    const options = buildDeployHookOptions();
+    const runtime = options.refs.runtimeRef.current as SessionWizardWorkerDeployRuntime & {
+      workerCanonicalPublishCompleted?: boolean;
+    };
+    runtime.workerCanonicalPublishCompleted = true;
+    runtime.sessionId = '00000000-0000-0000-0000-000000000002';
+    runtime.sessionIdHex = '0x00000000000000000000000000000002';
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    let deployResult;
+
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker({ forceSponsoredAutoDeploy: true });
+    });
+
+    expect(deployResult).toEqual({
+      ok: false,
+      skipped: true,
+      error: expect.stringMatching(/already published/i),
+    });
+    expect(options.updateDeploymentState).toHaveBeenCalledWith({
+      deployStatus: expect.stringMatching(/create another session/i),
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('allows the initial publish controller to force sponsored auto-deploy before terminal settlement', async () => {
+    const options = buildDeployHookOptions();
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    let deployResult;
+
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker({ forceSponsoredAutoDeploy: true });
+    });
+
+    expect(deployResult).toEqual(
+      expect.objectContaining({
+        ok: true,
+        workerUrl: 'https://deployed.example.test',
+      }),
+    );
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(true);
   });
 
   it('skips a concurrent worker deploy while the first deploy is still resolving', async () => {
@@ -464,6 +512,40 @@ describe('useSessionWizardWorkerDeploy', () => {
     });
   });
 
+  it('does not cache a 200 partial deploy when signed config recovery fails', async () => {
+    global.fetch = jest.fn(async (url: RequestInfo | URL) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            partial: true,
+            writesSessionConfig: false,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      if (normalizedUrl.endsWith('/admin/set-config')) {
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({ error: 'Config recovery unavailable.' }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    expect(readSessionWorkerConfigCache().bySession).toEqual({});
+  });
+
   it('reuses the deploy identity after the hook is unmounted and remounted', async () => {
     const deployBodies: Record<string, unknown>[] = [];
     let deployCalls = 0;
@@ -549,6 +631,7 @@ describe('useSessionWizardWorkerDeploy', () => {
   it.each([
     {
       label: 'structured conflict',
+      status: 409,
       responseBody: {
         error: 'deploymentRequestId was already used with a different request payload.',
         deploymentRequestIdConflict: true,
@@ -556,20 +639,29 @@ describe('useSessionWizardWorkerDeploy', () => {
     },
     {
       label: 'legacy exact conflict error',
+      status: 409,
       responseBody: {
         error: 'deploymentRequestId was already used with a different request payload.',
       },
     },
+    {
+      label: 'structured pending response',
+      status: 503,
+      responseBody: {
+        error: 'Deployment request is already running; retry the same request later.',
+        deploymentRequestPending: true,
+      },
+    },
   ])(
     'never advances after a $label while another tab can still complete the owned request',
-    async ({ responseBody }) => {
+    async ({ responseBody, status }) => {
       const deployBodies: Record<string, unknown>[] = [];
       global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
         if (String(url).endsWith('/deploy')) {
           deployBodies.push(JSON.parse(String(init?.body || '{}')));
           return {
             ok: false,
-            status: 409,
+            status,
             json: async () => responseBody,
           } as Response;
         }
@@ -591,6 +683,110 @@ describe('useSessionWizardWorkerDeploy', () => {
       expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
     },
   );
+
+  it.each([
+    'This deployment request is already bound to a different Cloudflare account.',
+    'deploymentRequestId was already used for a different immutable deployment identity.',
+  ])('rotates only the next explicit attempt after a definitive conflict: %s', async (error) => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployCalls += 1;
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        if (deployCalls === 1) {
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              error,
+              deploymentRequestConflict: true,
+              deploymentRequestTerminal: true,
+            }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+
+    let firstResult: Record<string, unknown> = {};
+    await act(async () => {
+      firstResult = await result.current.handleDeployWorker();
+    });
+    expect(firstResult).toEqual({
+      ok: false,
+      error: expect.stringContaining('click Deploy worker again to start a fresh deployment attempt'),
+    });
+    expect(deployBodies).toHaveLength(1);
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[1].deploymentRequestId).not.toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).not.toBe(deployBodies[0].configRevision);
+  });
+
+  it('rotates after a server terminal conflict even when the local attempt was already completed', async () => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployCalls += 1;
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        if (deployCalls === 2) {
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              error: 'This deployment request is already bound to a different Cloudflare account.',
+              deploymentRequestConflict: true,
+              deploymentRequestTerminal: true,
+            }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+
+    await act(async () => {
+      expect((await result.current.handleDeployWorker()).ok).toBe(true);
+    });
+    await act(async () => {
+      expect((await result.current.handleDeployWorker()).ok).toBe(false);
+    });
+    await act(async () => {
+      expect((await result.current.handleDeployWorker()).ok).toBe(true);
+    });
+
+    expect(deployBodies).toHaveLength(3);
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[2].deploymentRequestId).not.toBe(deployBodies[1].deploymentRequestId);
+    expect(deployBodies[2].configRevision).not.toBe(deployBodies[1].configRevision);
+  });
 
   it('rotates the deploy identity across a remount after a structured terminal orphan response', async () => {
     const deployBodies: Record<string, unknown>[] = [];

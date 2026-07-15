@@ -49,6 +49,7 @@ const buildDirectDeployTerminalReplay = ({ result, requestDigestMatches } = {}) 
       // signed post-deploy recovery path instead of replaying historical write
       // claims as if they described the current request.
       partial: true,
+      configVerified: false,
       writesSessionConfig: false,
       writesSessionSecrets: false,
     },
@@ -257,6 +258,7 @@ export class SessionWriteCoordinator {
         body: {
           error: 'This deployment request is already bound to a different Cloudflare account.',
           deploymentRequestConflict: true,
+          deploymentRequestTerminal: true,
         },
       }, 409);
     }
@@ -267,6 +269,7 @@ export class SessionWriteCoordinator {
         body: {
           error: 'deploymentRequestId was already used for a different immutable deployment identity.',
           deploymentRequestConflict: true,
+          deploymentRequestTerminal: true,
         },
       }, 409);
     }

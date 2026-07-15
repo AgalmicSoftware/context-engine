@@ -396,16 +396,20 @@ describe('SessionWizard publish boundary rendering', () => {
     try {
       const firstView = renderLoggedInSessionWizard();
       enableAdvancedMode();
+      await chooseCustomWorkerWithoutDeploy();
       const publishButton = await openPublishSection();
+      const deployButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER);
 
       await waitFor(() => {
         expect(publishButton).not.toBeDisabled();
+        expect(deployButton).not.toBeDisabled();
       });
       fireEvent.click(publishButton);
 
       await waitFor(() => {
         expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
         expect(publishButton).toBeDisabled();
+        expect(deployButton).toBeDisabled();
       });
       expect(publishButton).toHaveTextContent('Session Created');
       expect(screen.getByRole('button', { name: 'Create another session' })).toBeInTheDocument();
@@ -427,9 +431,12 @@ describe('SessionWizard publish boundary rendering', () => {
       firstView.unmount();
       renderLoggedInSessionWizard();
       enableAdvancedMode();
+      await chooseCustomWorkerWithoutDeploy();
       const reloadedPublishButton = await openPublishSection();
+      const reloadedDeployButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER);
       await waitFor(() => {
         expect(reloadedPublishButton).toBeDisabled();
+        expect(reloadedDeployButton).toBeDisabled();
       });
       const restoredSessionUrl = `${window.location.origin}/session/single-worker-session?worker=${encodeURIComponent(workerUrl)}`;
       const restoredAdminUrl = `${window.location.origin}/admin?sessionId=0x00112233445566778899aabbccddeeff&sessionSlug=single-worker-session&worker=${encodeURIComponent(workerUrl)}`;

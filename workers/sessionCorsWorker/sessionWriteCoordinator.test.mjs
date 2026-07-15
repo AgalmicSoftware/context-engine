@@ -309,6 +309,7 @@ test('SessionWriteCoordinator binds direct deployment recovery to account and im
         body: {
           ok: true,
           workerName: 'worker-a',
+          configVerified: true,
           writesSessionConfig: true,
           writesSessionSecrets: true,
         },
@@ -336,6 +337,7 @@ test('SessionWriteCoordinator binds direct deployment recovery to account and im
 
   const exactReplay = await readResponse(await coordinator.fetch(createCoordinatorRequest('/deploy-helper', payload)));
   assert.equal(exactReplay.status, 200);
+  assert.equal(exactReplay.body.body.configVerified, true);
   assert.equal(exactReplay.body.body.writesSessionConfig, true);
   assert.equal(exactReplay.body.body.writesSessionSecrets, true);
   assert.equal(exactReplay.body.body.partial, undefined);
@@ -349,21 +351,24 @@ test('SessionWriteCoordinator binds direct deployment recovery to account and im
   const mutableReplayResult = await readResponse(mutableReplay);
   assert.equal(mutableReplayResult.status, 200);
   assert.equal(mutableReplayResult.body.body.partial, true);
+  assert.equal(mutableReplayResult.body.body.configVerified, false);
   assert.equal(mutableReplayResult.body.body.writesSessionConfig, false);
   assert.equal(mutableReplayResult.body.body.writesSessionSecrets, false);
   assert.equal(deployCalls, 1);
 
-  const identityConflict = await coordinator.fetch(createCoordinatorRequest('/deploy-helper', {
+  const identityConflict = await readResponse(await coordinator.fetch(createCoordinatorRequest('/deploy-helper', {
     ...payload,
     immutableIdentityDigest: 'immutable-digest-b',
-  }));
+  })));
   assert.equal(identityConflict.status, 409);
-  const accountConflict = await coordinator.fetch(createCoordinatorRequest('/deploy-helper', {
+  assert.equal(identityConflict.body.body.deploymentRequestTerminal, true);
+  const accountConflict = await readResponse(await coordinator.fetch(createCoordinatorRequest('/deploy-helper', {
     ...payload,
     deployBody: { ...payload.deployBody, apiToken: 'token-other-account' },
     sensitiveValues: ['token-other-account'],
-  }));
+  })));
   assert.equal(accountConflict.status, 409);
+  assert.equal(accountConflict.body.body.deploymentRequestTerminal, true);
   assert.equal(deployCalls, 1);
   assert.doesNotMatch(JSON.stringify([...store.values()]), /token-a|rotated-token|token-other-account|deployBody/);
 });

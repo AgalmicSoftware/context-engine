@@ -95,15 +95,24 @@ export type SessionWizardWorkerDeployRuntime = {
   latestChainBlock?: number | null;
   sessionId?: string | number | null;
   sessionIdHex?: string;
+  workerCanonicalPublishCompleted?: boolean;
   draft?: DraftLike | null;
   deployForm?: DeployFormLike | null;
 };
 
 const isRecord = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
 
+const isStructuredTerminalDeployConflict = (responseBody: unknown): boolean => {
+  const body = isRecord(responseBody) ? responseBody : {};
+  return body.deploymentRequestConflict === true && body.deploymentRequestTerminal === true;
+};
+
 const shouldRetainDeployAttemptIdentity = (status: number, responseBody: unknown): boolean => {
   const body = isRecord(responseBody) ? responseBody : {};
   if (body.deploymentRequestPending === true) return true;
+  // Regression guard: only a server-declared terminal conflict may rotate the next
+  // attempt. A generic conflict can still belong to an in-flight peer tab.
+  if (body.deploymentRequestTerminal === true) return false;
   if (body.deploymentRequestConflict === true || body.deploymentRequestIdConflict === true) return true;
   const errorMessage = toStr(body.error).trim();
   if (
@@ -116,7 +125,7 @@ const shouldRetainDeployAttemptIdentity = (status: number, responseBody: unknown
     return true;
   }
   const hasOrphanOutcome = isRecord(body.orphanResources) && Object.keys(body.orphanResources).length > 0;
-  if (body.deploymentRequestTerminal === true || hasOrphanOutcome) return false;
+  if (hasOrphanOutcome) return false;
   return status === 408 || status === 425 || status === 429 || status >= 500;
 };
 
@@ -271,6 +280,15 @@ const useSessionWizardWorkerDeploy = ({
 
   const handleDeployWorker = useCallback(
     async (options: { forceSponsoredAutoDeploy?: boolean } = {}) => {
+      const runtimeAtStart = readRuntime(runtimeRef);
+      if (runtimeAtStart.workerCanonicalPublishCompleted === true) {
+        // Regression guard: publication rotates the form session ID. Checking the
+        // live identity here would let that new ID provision an unpublishable orphan.
+        const terminalMessage =
+          'This worker-canonical session is already published. Choose Create another session before deploying a new worker.';
+        updateDeploymentState({ deployStatus: terminalMessage });
+        return { ok: false, skipped: true, error: terminalMessage };
+      }
       if (deployRequestInFlightRef.current) {
         const inFlightMessage = 'Worker deploy already in progress.';
         updateDeploymentState({ deployStatus: inFlightMessage });
@@ -498,7 +516,11 @@ const useSessionWizardWorkerDeploy = ({
             const nextData = await sponsoredDeployRes.json().catch(() => ({}));
             if (!sponsoredDeployRes.ok) {
               if (!shouldRetainDeployAttemptIdentity(sponsoredDeployRes.status, nextData)) {
-                advanceSessionWizardDeployAttemptGeneration(deployAttemptIdentity);
+                // Only the coordinator's structured terminal conflict may reopen
+                // a locally completed scope; generic failures can be stale peer callbacks.
+                advanceSessionWizardDeployAttemptGeneration(deployAttemptIdentity, {
+                  allowCompletedTerminalConflict: isStructuredTerminalDeployConflict(nextData),
+                });
               }
               const err = new Error(
                 nextData?.error || `Worker deploy failed (${sponsoredDeployRes.status}).`,
@@ -507,6 +529,8 @@ const useSessionWizardWorkerDeploy = ({
               err.responseError = nextData?.error || '';
               err.responseBundleDiagnostics = nextData?.bundleDiagnostics || null;
               err.responseOrphanResources = nextData?.orphanResources || null;
+              err.responseDeploymentRequestConflict = nextData?.deploymentRequestConflict === true;
+              err.responseDeploymentRequestTerminal = nextData?.deploymentRequestTerminal === true;
               throw err;
             }
             return {
@@ -532,13 +556,19 @@ const useSessionWizardWorkerDeploy = ({
           const nextData = await res.json().catch(() => ({}));
           if (!res.ok) {
             if (!shouldRetainDeployAttemptIdentity(res.status, nextData)) {
-              advanceSessionWizardDeployAttemptGeneration(deployAttemptIdentity);
+              // Keep direct and sponsored retries on the same narrow authority:
+              // both structured flags are required to supersede completed state.
+              advanceSessionWizardDeployAttemptGeneration(deployAttemptIdentity, {
+                allowCompletedTerminalConflict: isStructuredTerminalDeployConflict(nextData),
+              });
             }
             const err = new Error(nextData?.error || `Worker deploy failed (${res.status}).`) as Error & AnyRecord;
             err.statusCode = res.status;
             err.responseError = nextData?.error || '';
             err.responseBundleDiagnostics = nextData?.bundleDiagnostics || null;
             err.responseOrphanResources = nextData?.orphanResources || null;
+            err.responseDeploymentRequestConflict = nextData?.deploymentRequestConflict === true;
+            err.responseDeploymentRequestTerminal = nextData?.deploymentRequestTerminal === true;
             throw err;
           }
           return {
@@ -829,6 +859,7 @@ const useSessionWizardWorkerDeploy = ({
         }
         cacheSessionWorkerConfigAfterDeploy({
           deployStatusCode,
+          deployPartial: data?.partial === true,
           configSyncStatus,
           workerUrl: resolvedDeployWorkerUrl,
           slug,

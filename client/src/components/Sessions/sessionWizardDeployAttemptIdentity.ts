@@ -105,15 +105,25 @@ export const resolveSessionWizardDeployAttemptIdentity = ({
 
 export const advanceSessionWizardDeployAttemptGeneration = (
   identity: SessionWizardDeployAttemptIdentity,
-  { storage }: { storage?: StorageLike | null } = {},
+  {
+    storage,
+    allowCompletedTerminalConflict = false,
+  }: {
+    storage?: StorageLike | null;
+    allowCompletedTerminalConflict?: boolean;
+  } = {},
 ): boolean => {
   const storageRef = getStorage(storage);
   if (!storageRef) return false;
   const current = readAttemptRecord(storageRef, identity.storageKey);
   // A successful peer tab makes this scope terminal. A stale failure callback must
-  // never reopen it at a new generation and create a second set of Cloudflare resources.
-  if (current.status === 'completed') return true;
-  const next = Math.min(Math.max(current.generation, identity.generation + 1), MAX_GENERATION);
+  // never reopen it unless the server proves this ID is terminally bound elsewhere.
+  if (current.status === 'completed' && !allowCompletedTerminalConflict) return true;
+  const minimumNextGeneration =
+    current.status === 'completed' && allowCompletedTerminalConflict
+      ? current.generation + 1
+      : identity.generation + 1;
+  const next = Math.min(Math.max(current.generation, minimumNextGeneration), MAX_GENERATION);
   return writeAttemptRecord(storageRef, identity.storageKey, { generation: next, status: 'active' });
 };
 

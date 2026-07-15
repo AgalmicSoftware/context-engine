@@ -2307,6 +2307,7 @@ const SessionWizard = ({
     latestChainBlock,
     sessionId,
     sessionIdHex,
+    workerCanonicalPublishCompleted: workerCanonicalSettlement.publishCompleted,
     draft,
     deployForm,
   };
@@ -2621,6 +2622,7 @@ const SessionWizard = ({
     deployInFlight,
     deployStatus,
     deployVerifiedInUi,
+    workerCanonicalPublishCompleted: workerCanonicalSettlement.publishCompleted,
   });
   const pendingDraftCount = normalizedPendingSbtDrafts.length;
   const sessionDetailsComplete = !!toStr(draft?.sessionName).trim() && !!toStr(draft?.sessionInfo).trim();

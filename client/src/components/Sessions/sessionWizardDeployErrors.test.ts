@@ -67,6 +67,16 @@ describe('sessionWizardDeployErrors', () => {
     });
     expect(
       resolveSessionWizardDeployStatusDisplayState({
+        deployStatus: 'Worker deployed.',
+        workerCanonicalPublishCompleted: true,
+      }),
+    ).toEqual({
+      deployButtonDisabled: true,
+      deployStatusText: 'Worker deployed.',
+      isError: false,
+    });
+    expect(
+      resolveSessionWizardDeployStatusDisplayState({
         deployStatus: 'Missing API token.',
       }),
     ).toEqual({
@@ -175,6 +185,18 @@ describe('sessionWizardDeployErrors', () => {
     );
 
     expect(normalizeSessionWizardDeployErrorMessage()).toBe('Worker deploy failed.');
+
+    expect(
+      normalizeSessionWizardDeployErrorMessage({
+        err: {
+          message: 'This deployment request is already bound to a different Cloudflare account.',
+          responseDeploymentRequestConflict: true,
+          responseDeploymentRequestTerminal: true,
+        },
+      }),
+    ).toBe(
+      'This deployment request is already bound to a different Cloudflare account. Review the account and session details, then click Deploy worker again to start a fresh deployment attempt.',
+    );
   });
 
   it('surfaces only safe orphan identifiers after incomplete Cloudflare cleanup', () => {

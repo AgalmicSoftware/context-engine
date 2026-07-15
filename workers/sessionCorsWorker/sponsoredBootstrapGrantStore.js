@@ -88,6 +88,7 @@ export const buildSafeSponsoredReceiptBody = (incoming = {}, sensitiveValues = [
     'sessionConfigKey',
     'sessionSecretsKey',
     'sessionKvPrefix',
+    'partial',
     'writesSessionConfig',
     'writesSessionSecrets',
     'tokenSecretSet',

@@ -2400,6 +2400,7 @@ describe('deploy-helper worker', () => {
       expect(driftReplay).toEqual(expect.objectContaining({
         workerName: replay.workerName,
         partial: true,
+        configVerified: false,
         writesSessionConfig: false,
         writesSessionSecrets: false,
       }));
@@ -2413,8 +2414,84 @@ describe('deploy-helper worker', () => {
       expect(await changedResponse.json()).toEqual(expect.objectContaining({
         error: expect.stringMatching(/different immutable deployment identity/i),
         deploymentRequestConflict: true,
+        deploymentRequestTerminal: true,
       }));
       expect(fetchMock.calls).toHaveLength(cloudflareCallsAfterCommit);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('marks a changed first retry partial after a committed terminal journal response is lost', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeDeploymentRequestFetchSequence([
+      cfSuccess({ id: 'kv-request-1' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+    ]);
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const normalPut = journalKv.put.bind(journalKv);
+    let loseTerminalWriteResponse = true;
+    journalKv.put = async (key, value, options) => {
+      await normalPut(key, value, options);
+      const parsed = JSON.parse(value);
+      if (parsed?.state === 'terminal' && loseTerminalWriteResponse) {
+        loseTerminalWriteResponse = false;
+        throw new TypeError('terminal journal response lost');
+      }
+    };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
+    const body = {
+      apiToken: 'cf-token-before-terminal-loss',
+      deploymentRequestId: 'request-loss-first-drift-0001',
+      workerName: 'test-worker',
+      sessionSlug: 'alpha-session',
+      bundleText: 'export default { fetch() {} };',
+      sessionName: 'Original mutable config',
+      secrets: { openaiKey: 'sk-provider-before-terminal-loss' },
+    };
+
+    try {
+      await expectPendingDeploy(
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
+      );
+      const cloudflareCallsAfterCommit = fetchMock.calls.length;
+
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        apiToken: 'cf-token-after-terminal-loss',
+        sessionName: 'Changed mutable config',
+        limits: { requestsPerMinute: 99 },
+        secrets: { openaiKey: 'sk-provider-after-terminal-loss' },
+      }), env, {});
+      const retryPayload = await retryResponse.json();
+
+      expect(retryResponse.status).toBe(200);
+      expect(retryPayload).toEqual(expect.objectContaining({
+        ok: true,
+        partial: true,
+        configVerified: false,
+        writesSessionConfig: false,
+        writesSessionSecrets: false,
+      }));
+      expect(fetchMock.calls).toHaveLength(cloudflareCallsAfterCommit);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'POST' &&
+        String(url).endsWith('/storage/kv/namespaces')
+      ))).toHaveLength(1);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'PUT' &&
+        /\/workers\/scripts\/[^/?]+$/.test(String(url))
+      ))).toHaveLength(1);
+      const serializedJournal = JSON.stringify([...journalKv.store.values()]);
+      expect(serializedJournal).not.toContain(body.apiToken);
+      expect(serializedJournal).not.toContain('cf-token-after-terminal-loss');
+      expect(serializedJournal).not.toContain(body.bundleText);
+      expect(serializedJournal).not.toContain('sk-provider-before-terminal-loss');
+      expect(serializedJournal).not.toContain('sk-provider-after-terminal-loss');
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -2473,11 +2550,14 @@ describe('deploy-helper worker', () => {
         workerName: expect.stringMatching(/^resume-worker-[0-9a-f]{12}$/),
         tokenSecretPreserved: true,
         envelopeKekSecretPreserved: true,
+        partial: true,
+        configVerified: false,
+        writesSessionConfig: false,
         writesSessionSecrets: false,
       }));
       expect(fetchMock.getNamespaceCreateCount()).toBe(1);
       expect(fetchMock.getScriptUploadCount()).toBe(1);
-      expect(fetchMock.getFinalConfigPutCount()).toBe(1);
+      expect(fetchMock.getFinalConfigPutCount()).toBe(0);
       expect(fetchMock.workerSecretBodies).toHaveLength(2);
       const sessionSecretWrites = fetchMock.mock.calls.filter(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':secrets')
@@ -2501,11 +2581,96 @@ describe('deploy-helper worker', () => {
       expect(accountConflict.status).toBe(409);
       expect(await accountConflict.json()).toEqual(expect.objectContaining({
         deploymentRequestConflict: true,
+        deploymentRequestTerminal: true,
         error: expect.stringMatching(/different Cloudflare account/i),
       }));
       expect(fetchMock.getNamespaceCreateCount()).toBe(1);
       expect(fetchMock.getScriptUploadCount()).toBe(1);
       expect(fetchMock.workerSecretBodies).toHaveLength(2);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('never replaces runtime-managed config fields while resuming an identity-compatible worker', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const normalPut = journalKv.put.bind(journalKv);
+    let failTerminalWriteBeforeCommit = true;
+    journalKv.put = async (key, value, options) => {
+      const parsed = JSON.parse(value);
+      if (parsed?.state === 'terminal' && failTerminalWriteBeforeCommit) {
+        failTerminalWriteBeforeCommit = false;
+        throw new TypeError('terminal journal did not commit');
+      }
+      await normalPut(key, value, options);
+    };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
+    const body = {
+      apiToken: 'cf-runtime-config-before-resume',
+      deploymentRequestId: 'request-resume-runtime-config-0001',
+      workerName: 'resume-worker',
+      sessionSlug: 'resume-session',
+      sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      configRevision: 'revision-a',
+      sessionName: 'Original session name',
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      bundleText: 'export default { fetch() {} };',
+      storageProfile: {
+        backend: 'cloudflare',
+        payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' },
+      },
+      secrets: { openaiKey: 'sk-provider-before-runtime-resume' },
+    };
+
+    try {
+      await expectPendingDeploy(
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
+      );
+      const configKey = [...fetchMock.kvValues.keys()].find((key) => key.endsWith(':config'));
+      expect(configKey).toBeTruthy();
+      const runtimeConfig = {
+        ...JSON.parse(fetchMock.kvValues.get(configKey)),
+        storageEnvelope: {
+          version: 1,
+          activeKeyId: 'session-key-runtime',
+          wrappedSessionKeys: {
+            'session-key-runtime': 'wrapped-session-key-runtime',
+          },
+        },
+        workerCanonicalPublicationRevision: 'runtime-publication-revision',
+      };
+      fetchMock.kvValues.set(configKey, JSON.stringify(runtimeConfig));
+
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        apiToken: 'cf-runtime-config-after-resume',
+        sessionName: 'Changed mutable session name',
+        limits: { requestsPerMinute: 99 },
+        secrets: { openaiKey: 'sk-provider-after-runtime-resume' },
+      }), env, {});
+      const retryPayload = await retryResponse.json();
+
+      expect(retryResponse.status).toBe(200);
+      expect(retryPayload).toEqual(expect.objectContaining({
+        ok: true,
+        partial: true,
+        writesSessionConfig: false,
+        writesSessionSecrets: false,
+      }));
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.getFinalConfigPutCount()).toBe(0);
+      const persistedConfig = JSON.parse(fetchMock.kvValues.get(configKey));
+      expect(persistedConfig.storageEnvelope).toEqual(runtimeConfig.storageEnvelope);
+      expect(persistedConfig.workerCanonicalPublicationRevision).toBe(
+        'runtime-publication-revision',
+      );
+      expect(persistedConfig.sessionName).toBe('Original session name');
+      expect(JSON.stringify(persistedConfig)).not.toContain('Changed mutable session name');
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -2609,6 +2774,7 @@ describe('deploy-helper worker', () => {
       expect(await conflictResponse.json()).toEqual(expect.objectContaining({
         error: 'deploymentRequestId was already used for a different immutable deployment identity.',
         deploymentRequestConflict: true,
+        deploymentRequestTerminal: true,
       }));
       // The coordinator re-derives the current token account before comparing
       // immutable identity, but performs no deployment mutation.
@@ -2901,10 +3067,14 @@ describe('deploy-helper worker', () => {
         ok: true,
         tokenSecretSet: true,
         tokenSecretPreserved: false,
+        partial: true,
+        configVerified: false,
+        writesSessionConfig: false,
+        writesSessionSecrets: false,
       }));
       expect(fetchMock.getNamespaceCreateCount()).toBe(1);
       expect(fetchMock.getScriptUploadCount()).toBe(1);
-      expect(fetchMock.getFinalConfigPutCount()).toBe(1);
+      expect(fetchMock.getFinalConfigPutCount()).toBe(0);
       expect(fetchMock.workerSecretBodies).toHaveLength(1);
       expect(fetchMock.workerSecretBodies[0].name).toBe('TOKEN_HMAC_SECRET');
       expect(JSON.stringify([...journalKv.store.values()])).not.toMatch(

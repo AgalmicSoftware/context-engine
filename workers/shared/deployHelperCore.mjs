@@ -571,6 +571,7 @@ const buildSafeDeployJournalResult = (result = {}, credentials = []) => {
     'sessionConfigKey',
     'sessionSecretsKey',
     'sessionKvPrefix',
+    'partial',
     'writesSessionConfig',
     'writesSessionSecrets',
     'tokenSecretSet',
@@ -660,6 +661,9 @@ const buildDeploymentRequestContext = async ({ body, requestOrigin = '' } = {}) 
   return {
     deploymentRequestId,
     requestDigest,
+    // Keep the payload-specific digest even when coordinated recovery swaps
+    // requestDigest for a stable infrastructure identity below.
+    fullRequestDigest: requestDigest,
     immutableIdentityDigest,
     deploymentId,
     requestMarker: deploymentId.slice(0, 16),
@@ -2070,16 +2074,10 @@ const executeDeployHelperRequestCore = async ({
         stableCanonicalSerialize(readbackConfig) === stableCanonicalSerialize(configWithWorkerUrl);
     };
     const configReadbackPath = `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`;
-    const readbackIsRetryable = (result) => {
-      if (!result?.ok) {
-        return isNewKvNamespacePropagationFailure(result) || shouldAllowFallbackForCloudflareFailure(result);
-      }
+    const resumedReadbackHasCompatibleIdentity = (result) => {
+      if (!resumeUploadedWorker || !result?.ok) return false;
       const readbackConfig = result.data?.result || result.data || {};
-      if (Object.keys(readbackConfig).length === 0) return true;
-      if (!resumeUploadedWorker) return false;
-      // A pre-upgrade resumed worker can expose its older whole config while
-      // the one recovery write propagates. Retry only when immutable session
-      // identity still matches; foreign identity or authority fails closed.
+      if (Object.keys(readbackConfig).length === 0) return false;
       return (
         toStr(readbackConfig.slug).trim() === toStr(configWithWorkerUrl.slug).trim() &&
         (!configWithWorkerUrl.sessionId ||
@@ -2091,13 +2089,20 @@ const executeDeployHelperRequestCore = async ({
           workerAuthorityPoliciesMatch(configWithWorkerUrl.workerAuthority, readbackConfig.workerAuthority))
       );
     };
+    const readbackIsRetryable = (result) => {
+      if (!result?.ok) {
+        return isNewKvNamespacePropagationFailure(result) || shouldAllowFallbackForCloudflareFailure(result);
+      }
+      const readbackConfig = result.data?.result || result.data || {};
+      if (Object.keys(readbackConfig).length === 0) return true;
+      return false;
+    };
     const readConfigWithRetry = async () => {
       let result = await cfFetch(apiToken, configReadbackPath, { method: 'GET' }, cfFetchOptions);
       for (const delayMs of FINAL_CONFIG_READBACK_RETRY_DELAYS_MS) {
         if (readbackMatches(result)) break;
-        // Retry only a classified transport/API failure, an older revision, or
-        // the exact staged pre-URL identity. Foreign same-revision identities
-        // remain fail-closed.
+        // Retry only classified transport/API failures or an empty read while
+        // the initial KV write propagates. Non-empty config is evaluated once.
         if (!readbackIsRetryable(result)) break;
         await new Promise((resolve) => setTimeout(resolve, delayMs));
         result = await cfFetch(apiToken, configReadbackPath, { method: 'GET' }, cfFetchOptions);
@@ -2105,40 +2110,17 @@ const executeDeployHelperRequestCore = async ({
       return result;
     };
 
-    let configReadback = await readConfigWithRetry();
-    if (resumeUploadedWorker && !readbackMatches(configReadback)) {
-      const readbackConfig = configReadback?.data?.result || configReadback?.data || {};
-      const canUpdateKnownOlderConfig = configReadback?.ok &&
-        Object.keys(readbackConfig).length > 0 &&
-        readbackIsRetryable(configReadback);
-      if (canUpdateKnownOlderConfig) {
-        // Only an observed, identity-compatible older config is rewritten.
-        // Empty/error reads remain pending, which avoids a rapid same-key write
-        // after a prior invocation whose successful PUT is still propagating.
-        const configUpdate = await cfFetch(apiToken, configReadbackPath, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(configWithWorkerUrl),
-        }, cfFetchOptions);
-        if (!configUpdate.ok) {
-          return buildDeploymentFailure(502, {
-            error: configUpdate.error || 'Failed to persist the final worker config.',
-            detail: configUpdate.detail,
-            orphanResources: {
-              kvNamespaceId: kvId,
-              kvCleanupStatus: 'retained-pre-existing',
-              workerName,
-              workerCleanupStatus: 'retained-pre-existing',
-            },
-            deploymentRequestPending: shouldAllowFallbackForCloudflareFailure(configUpdate),
-          }, {
-            fallbackEligible: shouldAllowFallbackForCloudflareFailure(configUpdate),
-          });
-        }
-        configReadback = await readConfigWithRetry();
-      }
+    const configReadback = await readConfigWithRetry();
+    const configExactlyVerified = readbackMatches(configReadback);
+    const resumedCompatibleConfig = !configExactlyVerified &&
+      resumedReadbackHasCompatibleIdentity(configReadback);
+    if (resumedCompatibleConfig) {
+      // Never whole-replace a live identity-compatible config: runtime envelope
+      // keys and publication markers are merged later through signed admin APIs.
+      deploymentPayload.partial = true;
+      deploymentPayload.writesSessionConfig = false;
     }
-    const verified = readbackMatches(configReadback);
+    const verified = configExactlyVerified || resumedCompatibleConfig;
     if (!verified) {
       const propagationPending = readbackIsRetryable(configReadback);
       const orphanResources = propagationPending
@@ -2157,7 +2139,7 @@ const executeDeployHelperRequestCore = async ({
         fallbackEligible: propagationPending,
       });
     }
-    deploymentPayload.configVerified = true;
+    deploymentPayload.configVerified = configExactlyVerified;
   }
 
   // Runtime secrets are written only after the public worker URL and canonical
@@ -2284,6 +2266,27 @@ export const executeDeployHelperRequest = async (options = {}) => {
     error: 'deploymentRequestId was already used with a different request payload.',
     deploymentRequestConflict: true,
   });
+  const buildTerminalJournalReplay = (record) => {
+    const result = record?.result;
+    if (result?.ok !== true) return result;
+    const recordedFullRequestDigest = toStr(record?.fullRequestDigest).trim().toLowerCase();
+    const fullRequestDigestMatches = recordedFullRequestDigest
+      ? recordedFullRequestDigest === context.fullRequestDigest
+      : context.requestDigest === context.fullRequestDigest;
+    if (fullRequestDigestMatches) return result;
+    // The stable journal proves infrastructure success, not that this retry's
+    // mutable config or secrets were written. Force the signed recovery merge.
+    return {
+      ...result,
+      body: {
+        ...(isObj(result?.body) ? result.body : {}),
+        partial: true,
+        configVerified: false,
+        writesSessionConfig: false,
+        writesSessionSecrets: false,
+      },
+    };
+  };
 
   let existingRecord;
   let terminalRecord;
@@ -2307,7 +2310,7 @@ export const executeDeployHelperRequest = async (options = {}) => {
       return buildRequestDigestConflict();
     }
     if (terminalRecord.state === 'terminal' && isObj(terminalRecord.result)) {
-      return terminalRecord.result;
+      return buildTerminalJournalReplay(terminalRecord);
     }
     return buildFailure(409, { error: 'Deployment request terminal journal state is invalid.' });
   }
@@ -2333,7 +2336,7 @@ export const executeDeployHelperRequest = async (options = {}) => {
       return buildRequestDigestConflict();
     }
     if (existingRecord.state === 'terminal' && isObj(existingRecord.result)) {
-      return existingRecord.result;
+      return buildTerminalJournalReplay(existingRecord);
     }
     if (existingRecord.state !== 'reserved' && existingRecord.state !== 'mutation_started') {
       return buildFailure(409, { error: 'Deployment request journal state is invalid.' });
@@ -2418,6 +2421,7 @@ export const executeDeployHelperRequest = async (options = {}) => {
     version: DEPLOYMENT_JOURNAL_VERSION,
     state: 'terminal',
     requestDigest: context.requestDigest,
+    fullRequestDigest: context.fullRequestDigest,
     deploymentId: context.deploymentId,
     workerName: context.workerName,
     requestMarker: context.requestMarker,
