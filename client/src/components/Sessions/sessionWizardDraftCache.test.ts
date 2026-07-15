@@ -102,12 +102,16 @@ describe('sessionWizardDraftCache', () => {
 
   it('replaces a published draft with an identity-scoped terminal tombstone', () => {
     const storage = createMemoryStorage();
-    storage.setItem(SESSION_WIZARD_CACHE_KEY, JSON.stringify({ draft: { slug: 'published-session' } }));
     const workerSettlement = {
       workerUrl: 'https://published-worker.example.test',
       slug: 'published-session',
       sessionId: 'published-id',
     };
+    storage.setItem(SESSION_WIZARD_CACHE_KEY, JSON.stringify({
+      sessionId: workerSettlement.sessionId,
+      deployWorkerUrl: workerSettlement.workerUrl,
+      draft: { slug: workerSettlement.slug, corsWorkerUrl: workerSettlement.workerUrl },
+    }));
 
     expect(
       clearSessionWizardDraftCache({
@@ -131,6 +135,70 @@ describe('sessionWizardDraftCache', () => {
         sessionId: 'published-id',
       }),
     });
+    expect(storage.removeItem).not.toHaveBeenCalled();
+  });
+
+  it('preserves a newer foreign-tab draft when another identity finishes publishing', () => {
+    const storage = createMemoryStorage();
+    const foreignDraft = {
+      sessionId: 'foreign-id',
+      deployWorkerUrl: 'https://foreign-worker.example.test',
+      draft: {
+        slug: 'foreign-session',
+        corsWorkerUrl: 'https://foreign-worker.example.test',
+        sessionName: 'Keep me',
+      },
+    };
+    storage.setItem(SESSION_WIZARD_CACHE_KEY, JSON.stringify(foreignDraft));
+
+    const result = clearSessionWizardDraftCache({
+      storage,
+      workerSettlement: {
+        workerUrl: 'https://published-worker.example.test',
+        slug: 'published-session',
+        sessionId: 'published-id',
+      },
+      clearPendingSbtDrafts: () => ({ ok: true, removed: 0, failed: 0, status: 'ok' }),
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: true,
+      poisoned: false,
+      draft: { ok: true, removed: 0, failed: 0, status: 'preserved-foreign-draft' },
+    }));
+    expect(readSessionWizardDraftCache({ storage })).toEqual(foreignDraft);
+    expect(storage.removeItem).not.toHaveBeenCalled();
+  });
+
+  it('retains the matching draft and reports failure when the terminal tombstone cannot be written', () => {
+    const storage = createMemoryStorage();
+    const workerSettlement = {
+      workerUrl: 'https://published-worker.example.test',
+      slug: 'published-session',
+      sessionId: 'published-id',
+    };
+    const cachedDraft = {
+      sessionId: workerSettlement.sessionId,
+      deployWorkerUrl: workerSettlement.workerUrl,
+      draft: { slug: workerSettlement.slug, corsWorkerUrl: workerSettlement.workerUrl },
+    };
+    storage.setItem(SESSION_WIZARD_CACHE_KEY, JSON.stringify(cachedDraft));
+    storage.setItem.mockImplementationOnce(() => {
+      throw new Error('quota');
+    });
+
+    const result = clearSessionWizardDraftCache({
+      storage,
+      workerSettlement,
+      clearPendingSbtDrafts: () => ({ ok: true, removed: 0, failed: 0, status: 'ok' }),
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      ok: false,
+      poisoned: false,
+      draft: { ok: false, removed: 0, failed: 1, status: 'write-failed' },
+    }));
+    expect(readSessionWizardDraftCache({ storage })).toEqual(cachedDraft);
     expect(storage.removeItem).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { SESSION_WIZARD_CACHE_KEY } from '../sessionWizardDraftCache';
-import { clearSessionWizardCache, type SessionWizardCachedState } from '../sessionWizardLocalStateSupport';
+import {
+  clearSessionWizardCache,
+  startFreshSessionWizard,
+  type SessionWizardCachedState,
+} from '../sessionWizardLocalStateSupport';
+import { resolveSessionWizardWorkerPublishSuccessSettlementDescriptor } from '../sessionWizardPublishController';
 import {
   createSessionWizardWorkerSettlement,
   isSessionWizardWorkerSettlementForIdentity,
@@ -21,6 +26,15 @@ type CachedSettlementPayload = {
   terminalWorkerSettlement?: unknown;
 };
 
+type PublicationLifecycleOptions = {
+  currentIdentity?: SessionWizardWorkerSettlementInput | null;
+  isWorkerCanonical?: boolean;
+  publishStatus?: unknown;
+  setSessionUrl?: Dispatch<SetStateAction<string>>;
+  setAdminUrl?: Dispatch<SetStateAction<string>>;
+  startFreshSession?: typeof startFreshSessionWizard;
+};
+
 const readCachedPayload = (raw: string | null): CachedSettlementPayload | null => {
   if (!raw) return null;
   try {
@@ -34,18 +48,17 @@ const readCachedPayload = (raw: string | null): CachedSettlementPayload | null =
 const readTerminalSettlementFromCachedPayload = (raw: string | null): SessionWizardWorkerSettlement | null =>
   createSessionWizardWorkerSettlement(readCachedPayload(raw)?.terminalWorkerSettlement);
 
-const readRemovedDraftIdentity = (raw: string | null): SessionWizardWorkerSettlement | null => {
-  const value = readCachedPayload(raw);
-  if (!value || createSessionWizardWorkerSettlement(value.terminalWorkerSettlement)) return null;
-  if (value.draft?.sessionModeProfile?.authority?.mode !== 'worker_canonical') return null;
-  return createSessionWizardWorkerSettlement({
-    workerUrl: value.deployWorkerUrl || value.draft?.corsWorkerUrl,
-    slug: value.draft?.slug,
-    sessionId: value.sessionId,
-  });
-};
-
-const useSessionWizardWorkerSettlementLifecycle = (cachedWizard: SessionWizardCachedState | null) => {
+const useSessionWizardWorkerSettlementLifecycle = (
+  cachedWizard: SessionWizardCachedState | null,
+  {
+    currentIdentity = null,
+    isWorkerCanonical = false,
+    publishStatus,
+    setSessionUrl,
+    setAdminUrl,
+    startFreshSession = startFreshSessionWizard,
+  }: PublicationLifecycleOptions = {},
+) => {
   const cachedTerminalSettlement = useMemo(
     () => createSessionWizardWorkerSettlement(cachedWizard?.terminalWorkerSettlement),
     [cachedWizard?.terminalWorkerSettlement],
@@ -73,6 +86,8 @@ const useSessionWizardWorkerSettlementLifecycle = (cachedWizard: SessionWizardCa
   }, [cachedIdentity, cachedTerminalSettlement]);
   const [settlement, setSettlement] = useState<SessionWizardWorkerSettlement | null>(initialSettlement);
   const isSettled = !!settlement;
+  const isPublishedWorkerState = isWorkerCanonical && publishStatus === 'published';
+  const publishCompleted = isSettled || isPublishedWorkerState;
   const ref = useRef(isSettled);
   const setSettled = useCallback(
     (value: SessionWizardWorkerSettlementInput | boolean) => {
@@ -88,6 +103,18 @@ const useSessionWizardWorkerSettlementLifecycle = (cachedWizard: SessionWizardCa
     },
     [cachedIdentity],
   );
+  const preventDuplicatePublish = useCallback(
+    (onGuarded: (message: string) => void) => {
+      if (!ref.current && !isPublishedWorkerState) return false;
+      onGuarded('This worker already owns the published session. Open Create another session to start fresh.');
+      return true;
+    },
+    [isPublishedWorkerState],
+  );
+  const createAnotherSession = useCallback(
+    () => startFreshSession({ settlement: settlement || currentIdentity }),
+    [currentIdentity, settlement, startFreshSession],
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined' || !cachedIdentity) return undefined;
@@ -100,12 +127,9 @@ const useSessionWizardWorkerSettlementLifecycle = (cachedWizard: SessionWizardCa
       }
       if (event.key !== SESSION_WIZARD_CACHE_KEY) return;
 
-      const eventSettlement = event.newValue
-        ? readTerminalSettlementFromCachedPayload(event.newValue)
-        : readRemovedDraftIdentity(event.oldValue);
+      const eventSettlement = event.newValue ? readTerminalSettlementFromCachedPayload(event.newValue) : null;
       if (isSessionWizardWorkerSettlementForIdentity(eventSettlement, cachedIdentity)) {
-        // A tombstone (or removal fallback carrying the prior identity) can precede a marker write that later fails.
-        // Keep the event identity-scoped so settling one session cannot lock another live wizard tab.
+        // Keep cache events identity-scoped so settling one session cannot lock another live wizard tab.
         setSettled(eventSettlement as SessionWizardWorkerSettlement);
       }
     };
@@ -122,7 +146,26 @@ const useSessionWizardWorkerSettlementLifecycle = (cachedWizard: SessionWizardCa
     });
   }, [settlement]);
 
-  return { isSettled, ref, setSettled, settlement };
+  useEffect(() => {
+    if (!settlement || !setSessionUrl || !setAdminUrl) return;
+    const restoredLinks = resolveSessionWizardWorkerPublishSuccessSettlementDescriptor({
+      slug: settlement.slug,
+      sessionId: settlement.sessionId,
+      workerOrigin: settlement.workerUrl,
+    });
+    setSessionUrl((current) => current || restoredLinks.sessionUrl);
+    setAdminUrl((current) => current || restoredLinks.adminUrl);
+  }, [setAdminUrl, setSessionUrl, settlement]);
+
+  return {
+    isSettled,
+    onCreateAnotherSession: publishCompleted ? createAnotherSession : undefined,
+    preventDuplicatePublish,
+    publishCompleted,
+    ref,
+    setSettled,
+    settlement,
+  };
 };
 
 export default useSessionWizardWorkerSettlementLifecycle;

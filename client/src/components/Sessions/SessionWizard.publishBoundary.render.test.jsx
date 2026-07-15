@@ -317,6 +317,10 @@ describe('SessionWizard publish boundary rendering', () => {
       await waitFor(() => {
         expect(reloadedPublishButton).toBeDisabled();
       });
+      const restoredSessionUrl = `${window.location.origin}/session/single-worker-session?worker=${encodeURIComponent(workerUrl)}`;
+      const restoredAdminUrl = `${window.location.origin}/admin?sessionId=0x00112233445566778899aabbccddeeff&sessionSlug=single-worker-session&worker=${encodeURIComponent(workerUrl)}`;
+      expect(screen.getByRole('link', { name: restoredSessionUrl })).toHaveAttribute('href', restoredSessionUrl);
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_URL)).toHaveAttribute('href', restoredAdminUrl);
       fireEvent.click(reloadedPublishButton);
       expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
       expect(readWizardCache()).toEqual({

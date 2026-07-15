@@ -7,6 +7,7 @@ import {
 } from '../../utilities/cache/storageJson.js';
 import {
   createSessionWizardWorkerSettlement,
+  isSessionWizardWorkerSettlementForIdentity,
   type SessionWizardWorkerSettlementInput,
 } from './sessionWizardWorkerSettlement.js';
 
@@ -29,12 +30,19 @@ type SessionWizardDraftCacheWriteOptions = SessionWizardDraftCacheOptions & {
 
 type SessionWizardDraftCacheClearOptions = SessionWizardDraftCacheOptions & {
   clearPendingSbtDrafts?: (() => RemoveKeysResult) | null;
+  expectedWorkerIdentity?: SessionWizardWorkerSettlementInput | null;
   workerSettlement?: SessionWizardWorkerSettlementInput | null;
 };
 
 type SessionWizardDraftClearOutcome =
   | RemoveKeysResult
-  | { ok: true; removed: 0; failed: 0; status: 'poisoned' };
+  | { ok: true; removed: 0; failed: 0; status: 'poisoned' | 'preserved-foreign-draft' }
+  | {
+      ok: false;
+      removed: 0;
+      failed: 1;
+      status: 'missing-storage' | 'not-serializable' | 'too-large' | 'stringify-failed' | 'write-failed';
+    };
 
 export type SessionWizardDraftCacheClearResult = {
   ok: boolean;
@@ -53,6 +61,29 @@ const getLocalStorage = (storageIn?: StorageLike | null): StorageLike | null => 
   } catch (_) {}
   return null;
 };
+
+const readCachedWorkerIdentity = (value: unknown) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const cached = value as Record<string, unknown>;
+  const terminalSettlement = createSessionWizardWorkerSettlement(cached.terminalWorkerSettlement);
+  if (terminalSettlement) return terminalSettlement;
+  const draft = cached.draft && typeof cached.draft === 'object' && !Array.isArray(cached.draft)
+    ? cached.draft as Record<string, unknown>
+    : {};
+  return createSessionWizardWorkerSettlement({
+    workerUrl: cached.deployWorkerUrl || draft.corsWorkerUrl,
+    slug: draft.slug,
+    sessionId: cached.sessionId,
+    settledAt: 1,
+  });
+};
+
+const preserveForeignDraft = (): SessionWizardDraftClearOutcome => ({
+  ok: true,
+  removed: 0,
+  failed: 0,
+  status: 'preserved-foreign-draft',
+});
 
 export const readSessionWizardDraftCache = ({ storage }: SessionWizardDraftCacheOptions = {}): unknown | null => {
   const storageRef = getLocalStorage(storage);
@@ -81,24 +112,39 @@ export const writeSessionWizardDraftCache = (
 export const clearSessionWizardDraftCache = ({
   storage,
   clearPendingSbtDrafts,
+  expectedWorkerIdentity,
   workerSettlement,
 }: SessionWizardDraftCacheClearOptions = {}): SessionWizardDraftCacheClearResult => {
   const storageRef = getLocalStorage(storage);
   let poisoned = false;
   let draft: SessionWizardDraftClearOutcome;
   const terminalWorkerSettlement = createSessionWizardWorkerSettlement(workerSettlement);
-  if (storageRef && terminalWorkerSettlement) {
-    // Regression guard: publish settlement writes an identity-scoped tombstone instead of a blind removal, so
-    // other tabs can terminal-lock only the matching worker/session even if the later UX marker write fails.
-    const poisonResult = safeJsonWrite(
-      storageRef,
-      SESSION_WIZARD_CACHE_KEY,
-      { terminalWorkerSettlement },
-      { maxBytes: SESSION_WIZARD_DRAFT_CACHE_MAX_BYTES },
-    );
-    if (poisonResult.ok) {
-      poisoned = true;
-      draft = { ok: true, removed: 0, failed: 0, status: 'poisoned' };
+  const expectedIdentity = terminalWorkerSettlement || createSessionWizardWorkerSettlement(expectedWorkerIdentity);
+  if (storageRef && expectedIdentity) {
+    const cachedResult = safeJsonRead(storageRef, SESSION_WIZARD_CACHE_KEY);
+    const cacheIsMissing = !cachedResult.ok && cachedResult.status === 'missing';
+    const cachedIdentity = cachedResult.ok ? readCachedWorkerIdentity(cachedResult.value) : null;
+    const canMutateCache = cacheIsMissing || isSessionWizardWorkerSettlementForIdentity(cachedIdentity, expectedIdentity);
+
+    // The wizard cache is a legacy singleton shared by every tab. Treat its identity
+    // as a compare guard so publishing/clearing session X cannot erase a newer draft Y.
+    if (!canMutateCache) {
+      draft = preserveForeignDraft();
+    } else if (terminalWorkerSettlement) {
+      const poisonResult = safeJsonWrite(
+        storageRef,
+        SESSION_WIZARD_CACHE_KEY,
+        { terminalWorkerSettlement },
+        { maxBytes: SESSION_WIZARD_DRAFT_CACHE_MAX_BYTES },
+      );
+      if (poisonResult.ok) {
+        poisoned = true;
+        draft = { ok: true, removed: 0, failed: 0, status: 'poisoned' };
+      } else {
+        // Never fall back to deleting the draft. The durable per-identity marker is
+        // written first, so retaining a matching draft lets reload recover the lock.
+        draft = { ok: false, removed: 0, failed: 1, status: poisonResult.status };
+      }
     } else {
       draft = removeKeys(storageRef, SESSION_WIZARD_CACHE_KEY);
     }

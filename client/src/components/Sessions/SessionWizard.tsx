@@ -15,7 +15,6 @@ import {
 import {
   getChainById,
   getDefaultHttpRpc,
-  getSessionRegistryAddress,
   getSessionRegistryChains,
 } from '../../variables/chains.js';
 import type { SessionConfig, UnknownRecord } from '../../utilities/session/sessionTypes.js';
@@ -26,6 +25,7 @@ import { createLogger } from '../../utilities/logging';
 import {
   getSessionWizardContractDefaults,
   resolveSessionWizardContractViewerPlan,
+  resolveSessionWizardInitialRegistryChainId,
   resolveSessionWizardRegistryAddress,
 } from './sessionWizardContracts.js';
 import { resolveSessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
@@ -205,7 +205,6 @@ import {
 import {
   clearSessionWizardCache,
   readSessionWizardCache,
-  startFreshSessionWizard,
   useStableSerializedObject,
   writeSessionWizardCache,
 } from './sessionWizardLocalStateSupport';
@@ -564,22 +563,14 @@ const SessionWizard = ({
   const [sessionModeProfileStepComplete, setSessionModeProfileStepComplete] = useState(false);
   const publishBusy = resolveSessionWizardPublishReducerUiState({ state: sessionPublishState }).publishBusy;
   const publishRequestInFlightRef = useRef(false);
-  const workerCanonicalSettlement = useSessionWizardWorkerSettlementLifecycle(cachedWizard);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
   const [wizardMode, setWizardMode] = useState('normal');
-  const [registryChainId, setRegistryChainId] = useState<number>(() => {
-    const fromDraft = Number(draft.networkChainId || 0);
-    if (fromDraft && getSessionRegistryAddress(fromDraft)) return fromDraft;
-    const fromNetwork = Number(network?.id || 0);
-    if (fromNetwork && getSessionRegistryAddress(fromNetwork)) return fromNetwork;
-    const defaultRegistryChainId = Number(DEFAULT_CHAIN_ID || 0);
-    if (defaultRegistryChainId && getSessionRegistryAddress(defaultRegistryChainId)) {
-      return defaultRegistryChainId;
-    }
-    const available = getSessionRegistryChains();
-    if (available.length) return Number(available[0].id || 0) || 0;
-    return Number(DEFAULT_CHAIN_ID || 0) || 0;
-  });
+  const [registryChainId, setRegistryChainId] = useState<number>(() =>
+    resolveSessionWizardInitialRegistryChainId({
+      draftChainId: draft.networkChainId,
+      networkChainId: network?.id,
+    }),
+  );
   const checkSessionSlugExists = useCallback(
     async ({ registryChainId: chainId, slug }: SessionSlugExistsArgs): Promise<boolean> => {
       const registryRead = sessionRegistryPublishAdapter.getRegistryContract({
@@ -890,6 +881,13 @@ const SessionWizard = ({
   const cloudflareWorkerSbtGateMode = isWorkerSbtGateCloudflareStorageProfile(normalizedDraftStorageProfile);
   const sessionModeRequirements = resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile, {
     hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
+  });
+  const workerCanonicalSettlement = useSessionWizardWorkerSettlementLifecycle(cachedWizard, {
+    currentIdentity: { workerUrl: deployWorkerUrl || draft.corsWorkerUrl, slug: draft.slug, sessionId },
+    isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
+    publishStatus: sessionPublishState.status,
+    setSessionUrl,
+    setAdminUrl,
   });
   const visibleWorkerResourceKeys = workerResourceKeys.filter((key) =>
     sessionModeRequirements.selected
@@ -1956,13 +1954,7 @@ const SessionWizard = ({
       setStatus('Publish already in progress.');
       return;
     }
-    if (
-      workerCanonicalSettlement.ref.current ||
-      (sessionModeRequirements.isWorkerCanonical && sessionPublishState.status === 'published')
-    ) {
-      setStatus('This worker already owns the published session. Open Create another session to start fresh.');
-      return;
-    }
+    if (workerCanonicalSettlement.preventDuplicatePublish(setStatus)) return;
     publishRequestInFlightRef.current = true;
     try {
       const publishStartPreflightDescriptor = resolveSessionWizardPublishStartPreflightDescriptor({
@@ -2650,7 +2642,7 @@ const SessionWizard = ({
     hasPendingDrafts: hasUndeployedPendingSbtDrafts,
     isNormalMode,
     publishAdvancedOpen,
-    publishCompleted: workerCanonicalSettlement.isSettled || (sessionModeRequirements.isWorkerCanonical && sessionPublishState.status === 'published'),
+    publishCompleted: workerCanonicalSettlement.publishCompleted,
     publishStepElapsedMs,
     sbtsLabel: t('sbts'),
     sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
@@ -2859,15 +2851,7 @@ const SessionWizard = ({
       onCloseDisplaySettings={() => setWizardDisplaySettingsOpen(false)}
       onCloseSessionHeaderPreviewModal={() => setSessionHeaderPreviewModalOpen(false)}
       onCopyDraftJson={handleCopyDraftJson}
-      onCreateAnotherSession={(workerCanonicalSettlement.isSettled || (sessionModeRequirements.isWorkerCanonical && sessionPublishState.status === 'published'))
-        ? () => startFreshSessionWizard({
-          settlement: workerCanonicalSettlement.settlement || {
-            workerUrl: deployWorkerUrl || draft.corsWorkerUrl,
-            slug: draft.slug,
-            sessionId,
-          },
-        })
-        : undefined}
+      onCreateAnotherSession={workerCanonicalSettlement.onCreateAnotherSession}
       onDismissNewSessionRequirementsBanner={handleDismissNewSessionRequirementsBanner}
       onEnterAdvancedMode={handleEnterAdvancedMode}
       onEnterNormalMode={handleEnterNormalMode}

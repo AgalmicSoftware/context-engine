@@ -1,6 +1,6 @@
 import {
   advanceSessionWizardDeployAttemptGeneration,
-  clearSessionWizardDeployAttemptIdentity,
+  markSessionWizardDeployAttemptCompleted,
   resolveSessionWizardDeployAttemptIdentity,
 } from './sessionWizardDeployAttemptIdentity';
 
@@ -21,7 +21,7 @@ describe('sessionWizardDeployAttemptIdentity', () => {
 
     expect(second).toEqual(first);
     expect(JSON.stringify(localStorage)).not.toContain('cf-secret-token');
-    expect(localStorage.getItem(first.storageKey)).toBe('{"version":1,"generation":0}');
+    expect(localStorage.getItem(first.storageKey)).toBe('{"version":1,"generation":0,"status":"active"}');
   });
 
   it('isolates unrelated draft and worker scopes', () => {
@@ -39,7 +39,7 @@ describe('sessionWizardDeployAttemptIdentity', () => {
     expect(otherWorker.deploymentRequestId).not.toBe(first.deploymentRequestId);
   });
 
-  it('advances after a terminal outcome and clears only the completed generation', () => {
+  it('advances after a terminal failure outcome', () => {
     const first = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
     expect(advanceSessionWizardDeployAttemptGeneration(first, { storage: localStorage })).toBe(true);
 
@@ -47,10 +47,23 @@ describe('sessionWizardDeployAttemptIdentity', () => {
     expect(next.generation).toBe(1);
     expect(next.deploymentRequestId).not.toBe(first.deploymentRequestId);
     expect(next.configRevision).not.toBe(first.configRevision);
-    expect(clearSessionWizardDeployAttemptIdentity(first, { storage: localStorage })).toBe(true);
-    expect(resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage })).toEqual(next);
-    expect(clearSessionWizardDeployAttemptIdentity(next, { storage: localStorage })).toBe(true);
-    expect(localStorage.getItem(next.storageKey)).toBeNull();
+    expect(next.status).toBe('active');
+  });
+
+  it('keeps a successful generation terminal when a stale peer tab later tries to advance it', () => {
+    const firstTab = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
+    const stalePeerTab = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
+
+    expect(markSessionWizardDeployAttemptCompleted(firstTab, { storage: localStorage })).toBe(true);
+    expect(advanceSessionWizardDeployAttemptGeneration(stalePeerTab, { storage: localStorage })).toBe(true);
+
+    const reloaded = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
+    expect(reloaded).toEqual(expect.objectContaining({ generation: 0, status: 'completed' }));
+    expect(reloaded.deploymentRequestId).toBe(firstTab.deploymentRequestId);
+    expect(reloaded.configRevision).toBe(firstTab.configRevision);
+    expect(localStorage.getItem(reloaded.storageKey)).toBe(
+      '{"version":1,"generation":0,"status":"completed"}',
+    );
   });
 
   it('fails closed when the generation cannot be persisted', () => {

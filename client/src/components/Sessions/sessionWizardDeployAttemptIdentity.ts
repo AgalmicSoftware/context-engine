@@ -12,8 +12,11 @@ export type SessionWizardDeployAttemptIdentity = {
   deploymentRequestId: string;
   configRevision: string;
   generation: number;
+  status: 'active' | 'completed';
   storageKey: string;
 };
+
+type SessionWizardDeployAttemptRecord = Pick<SessionWizardDeployAttemptIdentity, 'generation' | 'status'>;
 
 const STORAGE_KEY_PREFIX = 'ce:sessionWizardDeployAttempt:v1:';
 const MAX_GENERATION = Number.MAX_SAFE_INTEGER - 1;
@@ -42,22 +45,29 @@ const getStorage = (storage?: StorageLike | null): StorageLike | null => {
   }
 };
 
-const readGeneration = (storage: StorageLike, storageKey: string): number => {
+const readAttemptRecord = (storage: StorageLike, storageKey: string): SessionWizardDeployAttemptRecord => {
   try {
     const raw = storage.getItem?.(storageKey);
-    if (!raw) return 0;
-    const parsed = JSON.parse(raw) as { generation?: unknown };
+    if (!raw) return { generation: 0, status: 'active' };
+    const parsed = JSON.parse(raw) as { generation?: unknown; status?: unknown };
     const generation = Number(parsed?.generation);
-    return Number.isSafeInteger(generation) && generation >= 0 ? Math.min(generation, MAX_GENERATION) : 0;
+    return {
+      generation: Number.isSafeInteger(generation) && generation >= 0 ? Math.min(generation, MAX_GENERATION) : 0,
+      status: parsed?.status === 'completed' ? 'completed' : 'active',
+    };
   } catch (_) {
-    return 0;
+    return { generation: 0, status: 'active' };
   }
 };
 
-const writeGeneration = (storage: StorageLike, storageKey: string, generation: number): boolean => {
+const writeAttemptRecord = (
+  storage: StorageLike,
+  storageKey: string,
+  record: SessionWizardDeployAttemptRecord,
+): boolean => {
   try {
     if (typeof storage.setItem !== 'function') return false;
-    storage.setItem(storageKey, JSON.stringify({ version: 1, generation }));
+    storage.setItem(storageKey, JSON.stringify({ version: 1, ...record }));
     return true;
   } catch (_) {
     return false;
@@ -75,14 +85,20 @@ export const resolveSessionWizardDeployAttemptIdentity = ({
   if (!storageRef) throw new Error('Durable browser storage is required for safe worker deployment retries.');
   const scopeDigest = digest('context-engine:worker-deploy-scope:v1', scope);
   const storageKey = `${STORAGE_KEY_PREFIX}${scopeDigest}`;
-  const generation = readGeneration(storageRef, storageKey);
-  if (!writeGeneration(storageRef, storageKey, generation)) {
+  const record = readAttemptRecord(storageRef, storageKey);
+  if (!writeAttemptRecord(storageRef, storageKey, record)) {
     throw new Error('Durable browser storage is required for safe worker deployment retries.');
   }
   return {
-    deploymentRequestId: `deploy:${digest('context-engine:worker-deploy-attempt:v1', { scopeDigest, generation })}`,
-    configRevision: `revision:${digest('context-engine:worker-deploy-config:v1', { scopeDigest, generation })}`,
-    generation,
+    deploymentRequestId: `deploy:${digest('context-engine:worker-deploy-attempt:v1', {
+      scopeDigest,
+      generation: record.generation,
+    })}`,
+    configRevision: `revision:${digest('context-engine:worker-deploy-config:v1', {
+      scopeDigest,
+      generation: record.generation,
+    })}`,
+    ...record,
     storageKey,
   };
 };
@@ -93,22 +109,24 @@ export const advanceSessionWizardDeployAttemptGeneration = (
 ): boolean => {
   const storageRef = getStorage(storage);
   if (!storageRef) return false;
-  const current = readGeneration(storageRef, identity.storageKey);
-  const next = Math.min(Math.max(current, identity.generation + 1), MAX_GENERATION);
-  return writeGeneration(storageRef, identity.storageKey, next);
+  const current = readAttemptRecord(storageRef, identity.storageKey);
+  // A successful peer tab makes this scope terminal. A stale failure callback must
+  // never reopen it at a new generation and create a second set of Cloudflare resources.
+  if (current.status === 'completed') return true;
+  const next = Math.min(Math.max(current.generation, identity.generation + 1), MAX_GENERATION);
+  return writeAttemptRecord(storageRef, identity.storageKey, { generation: next, status: 'active' });
 };
 
-export const clearSessionWizardDeployAttemptIdentity = (
+export const markSessionWizardDeployAttemptCompleted = (
   identity: SessionWizardDeployAttemptIdentity,
   { storage }: { storage?: StorageLike | null } = {},
 ): boolean => {
   const storageRef = getStorage(storage);
-  if (!storageRef || typeof storageRef.removeItem !== 'function') return false;
-  if (readGeneration(storageRef, identity.storageKey) !== identity.generation) return true;
-  try {
-    storageRef.removeItem(identity.storageKey);
-    return true;
-  } catch (_) {
-    return false;
-  }
+  if (!storageRef) return false;
+  const current = readAttemptRecord(storageRef, identity.storageKey);
+  if (current.status === 'completed') return true;
+  return writeAttemptRecord(storageRef, identity.storageKey, {
+    generation: identity.generation,
+    status: 'completed',
+  });
 };

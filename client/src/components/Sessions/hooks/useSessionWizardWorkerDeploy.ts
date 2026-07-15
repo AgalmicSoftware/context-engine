@@ -46,7 +46,7 @@ import { getSessionWizardWorkerDeployValidationError } from '../sessionWizardWor
 import { resolveSessionWizardModeRequirements } from '../sessionWizardModeRequirements';
 import {
   advanceSessionWizardDeployAttemptGeneration,
-  clearSessionWizardDeployAttemptIdentity,
+  markSessionWizardDeployAttemptCompleted,
   resolveSessionWizardDeployAttemptIdentity,
 } from '../sessionWizardDeployAttemptIdentity';
 import {
@@ -104,6 +104,17 @@ const isRecord = (value: unknown): value is AnyRecord => !!value && typeof value
 const shouldRetainDeployAttemptIdentity = (status: number, responseBody: unknown): boolean => {
   const body = isRecord(responseBody) ? responseBody : {};
   if (body.deploymentRequestPending === true) return true;
+  if (body.deploymentRequestConflict === true || body.deploymentRequestIdConflict === true) return true;
+  const errorMessage = toStr(body.error).trim();
+  if (
+    status === 409 &&
+    /^deploymentRequestId was already used with a different request payload\.?$/i.test(errorMessage)
+  ) {
+    // Compatibility for helpers deployed before the structured conflict field.
+    // The ID is owned by another in-flight payload, so generation rotation here
+    // can race its success and create a second set of resources.
+    return true;
+  }
   const hasOrphanOutcome = isRecord(body.orphanResources) && Object.keys(body.orphanResources).length > 0;
   if (body.deploymentRequestTerminal === true || hasOrphanOutcome) return false;
   return status === 408 || status === 425 || status === 429 || status >= 500;
@@ -536,6 +547,11 @@ const useSessionWizardWorkerDeploy = ({
         let deployStatusCode = 0;
         let data: AnyRecord = {};
         ({ deployStatusCode, data } = await submitDeployPayload(payload));
+        // The helper's successful response makes this scope terminal. Persist that
+        // fact before any later config/secret synchronization can yield or fail.
+        if (!markSessionWizardDeployAttemptCompleted(deployAttemptIdentity)) {
+          throw new Error('Could not durably record the completed worker deployment.');
+        }
         const {
           resolvedDeployWorkerUrl,
           displayWorkerUrl,
@@ -855,9 +871,6 @@ const useSessionWizardWorkerDeploy = ({
         // later URL-mode deploys and sponsored publish flows don't reuse stale bytes.
         clearSelectedBundleFile();
         clearCachedWorkerSecretsAfterDeploy();
-        // A completed deploy no longer needs an active generation record. A
-        // server replay of generation zero remains safe if this draft reappears.
-        clearSessionWizardDeployAttemptIdentity(deployAttemptIdentity);
         return {
           ok: true,
           workerUrl: resolvedDeployWorkerUrl,

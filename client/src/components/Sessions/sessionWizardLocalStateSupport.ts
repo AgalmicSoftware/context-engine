@@ -56,6 +56,7 @@ type WriteCacheDeps = {
 type ClearCacheDeps = {
   clearDraftCache?: typeof clearSessionWizardDraftCache;
   clearPendingSbtDrafts?: typeof clearSessionWizardPendingSbtDraftsCache;
+  expectedWorkerIdentity?: SessionWizardWorkerSettlementInput | null;
   logger?: LoggerLike;
   preservedPendingSbtDrafts?: PendingSbtDraft[];
   retainPendingSbtDrafts?: boolean;
@@ -122,6 +123,7 @@ export const writeSessionWizardCache = (
 export const clearSessionWizardCache = ({
   clearDraftCache = clearSessionWizardDraftCache,
   clearPendingSbtDrafts = clearSessionWizardPendingSbtDraftsCache,
+  expectedWorkerIdentity,
   logger = log,
   preservedPendingSbtDrafts,
   retainPendingSbtDrafts = false,
@@ -147,6 +149,7 @@ export const clearSessionWizardCache = ({
   };
   const result = clearDraftCache({
     clearPendingSbtDrafts: persistPendingSbtDrafts,
+    expectedWorkerIdentity,
     workerSettlement,
   });
   if (!result.ok && result.status !== 'missing-storage') {
@@ -161,7 +164,7 @@ export const startFreshSessionWizard = ({
   navigate = (target) => window.location.assign(target),
   settlement,
 }: FreshSessionWizardDeps = {}) => {
-  const clearResult = clearCache();
+  const clearResult = clearCache({ expectedWorkerIdentity: settlement });
   if (!clearResult.ok) return clearResult;
   const settlementClearResult = clearWorkerSettlement(settlement || {});
   if (!settlementClearResult.ok) return settlementClearResult;

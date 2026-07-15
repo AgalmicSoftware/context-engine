@@ -119,7 +119,14 @@ describe('sessionWizardLocalStateSupport', () => {
   });
 
   it('poisons the published draft while atomically retaining undeployed pending SBT drafts', () => {
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({ draft: { slug: 'published-session' } }));
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
+      sessionId: 'published-id',
+      deployWorkerUrl: 'https://published-worker.example.test',
+      draft: {
+        slug: 'published-session',
+        corsWorkerUrl: 'https://published-worker.example.test',
+      },
+    }));
     const pendingDraft = {
       predictedAddress: '0x00000000000000000000000000000000000000a1',
       displayName: 'Still pending',
@@ -231,5 +238,32 @@ describe('sessionWizardLocalStateSupport', () => {
     expect(clearCache).toHaveBeenCalledTimes(1);
     expect(clearWorkerSettlement).toHaveBeenCalledWith(settlement);
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('Create Another clears only its marker and preserves a different tab identity in the singleton cache', () => {
+    const navigate = jest.fn();
+    const settlement = {
+      workerUrl: 'https://published-worker.example.test',
+      slug: 'published-session',
+      sessionId: 'published-id',
+    };
+    const foreignDraft = {
+      sessionId: 'foreign-id',
+      deployWorkerUrl: 'https://foreign-worker.example.test',
+      draft: {
+        slug: 'foreign-session',
+        corsWorkerUrl: 'https://foreign-worker.example.test',
+        sessionName: 'Keep this newer draft',
+      },
+    };
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify(foreignDraft));
+    writeSessionWizardWorkerSettlement({ ...settlement, settledAt: 1 });
+
+    const result = startFreshSessionWizard({ navigate, settlement });
+
+    expect(result).toEqual(expect.objectContaining({ ok: true }));
+    expect(readSessionWizardCache()).toEqual(foreignDraft);
+    expect(localStorage.getItem(getSessionWizardWorkerSettlementStorageKey(settlement))).toBeNull();
+    expect(navigate).toHaveBeenCalledWith('/new');
   });
 });

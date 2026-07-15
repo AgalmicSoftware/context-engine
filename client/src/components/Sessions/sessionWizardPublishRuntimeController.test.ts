@@ -181,8 +181,8 @@ describe('sessionWizardPublishRuntimeController', () => {
     expect(harness.events.slice(2)).toEqual([
       'admin-status:',
       'publish-settled',
-      'clear-cache',
       'write-settlement',
+      'clear-cache',
       'session-id:next-session-id',
       'session-id-status:Generated a new session ID for your next session.',
     ]);
@@ -277,11 +277,16 @@ describe('sessionWizardPublishRuntimeController', () => {
       slug: 'worker-session',
       sessionId: SESSION_ID,
     });
-    expect(harness.callbacks.writeSessionWizardWorkerSettlement).not.toHaveBeenCalled();
+    expect(harness.callbacks.writeSessionWizardWorkerSettlement).toHaveBeenCalledWith({
+      workerUrl: WORKER_ORIGIN,
+      slug: 'worker-session',
+      sessionId: SESSION_ID,
+    });
+    expect(harness.events.indexOf('write-settlement')).toBeLessThan(harness.events.indexOf('clear-cache-failed'));
     expect(harness.callbacks.setSessionId).not.toHaveBeenCalled();
   });
 
-  it('clears every publishable draft before a failed UX marker write and refuses identity rotation', async () => {
+  it('preserves the publishable draft when the durable marker write fails and refuses identity rotation', async () => {
     const harness = createControllerHarness();
     harness.callbacks.writeSessionWizardWorkerSettlement.mockImplementationOnce(() => {
       harness.events.push('write-settlement-failed');
@@ -307,14 +312,7 @@ describe('sessionWizardPublishRuntimeController', () => {
       slug: 'worker-session',
       sessionId: SESSION_ID,
     });
-    expect(harness.callbacks.clearSessionWizardCache).toHaveBeenCalledWith({
-      workerSettlement: {
-        workerUrl: WORKER_ORIGIN,
-        slug: 'worker-session',
-        sessionId: SESSION_ID,
-      },
-    });
-    expect(harness.events.indexOf('clear-cache')).toBeLessThan(harness.events.indexOf('write-settlement-failed'));
+    expect(harness.callbacks.clearSessionWizardCache).not.toHaveBeenCalled();
     expect(harness.callbacks.setSessionId).not.toHaveBeenCalled();
   });
 });

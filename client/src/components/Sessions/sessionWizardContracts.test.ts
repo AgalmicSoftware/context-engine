@@ -4,6 +4,7 @@ import {
   getSessionWizardContractDefaults,
   getVisibleSessionWizardContractKeys,
   resolveSessionWizardContractViewerPlan,
+  resolveSessionWizardInitialRegistryChainId,
   resolveSessionWizardRegistryAddress,
   sanitizeSessionWizardContracts,
 } from './sessionWizardContracts.js';
@@ -24,6 +25,15 @@ describe('sessionWizardContracts', () => {
   test('defaults omit session registry when chains config has none', () => {
     const defaults = getSessionWizardContractDefaults(84532);
     expect(defaults).toEqual({});
+  });
+
+  test('initial registry chain skips unsupported draft chains before using the connected default', () => {
+    expect(
+      resolveSessionWizardInitialRegistryChainId({
+        draftChainId: 84532,
+        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
+      }),
+    ).toBe(Number(DEFAULT_CONFIG_CHAIN_ID));
   });
 
   test('visible contract keys include session registry row', () => {

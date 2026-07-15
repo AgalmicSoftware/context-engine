@@ -43,6 +43,82 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
     expect(localStorage.getItem(getSessionWizardWorkerSettlementStorageKey(identity))).not.toBeNull();
   });
 
+  it('restores terminal publication links without overwriting links already shown in the tab', async () => {
+    writeSessionWizardWorkerSettlement({ ...identity, settledAt: 1 });
+    const setSessionUrl = jest.fn();
+    const setAdminUrl = jest.fn();
+
+    renderHook(() =>
+      useSessionWizardWorkerSettlementLifecycle(cachedWizard, { setSessionUrl, setAdminUrl }),
+    );
+
+    await waitFor(() => expect(setSessionUrl).toHaveBeenCalledTimes(1));
+    expect(setAdminUrl).toHaveBeenCalledTimes(1);
+    const restoreSessionUrl = setSessionUrl.mock.calls[0][0];
+    const restoreAdminUrl = setAdminUrl.mock.calls[0][0];
+    expect(restoreSessionUrl('')).toContain('/session/published-session?worker=');
+    expect(restoreAdminUrl('')).toContain('/admin?sessionId=published-id&sessionSlug=published-session&worker=');
+    expect(restoreSessionUrl('https://current.example/session')).toBe('https://current.example/session');
+    expect(restoreAdminUrl('https://current.example/admin')).toBe('https://current.example/admin');
+  });
+
+  it('guards only worker-canonical published state and creates another session with its fallback identity', () => {
+    const startFreshSession = jest.fn(() => ({ ok: true }));
+    const { result, rerender } = renderHook(
+      ({ isWorkerCanonical }) =>
+        useSessionWizardWorkerSettlementLifecycle(cachedWizard, {
+          currentIdentity: {
+            workerUrl: 'https://fallback-worker.example.test',
+            slug: 'fallback-session',
+            sessionId: 'fallback-id',
+          },
+          isWorkerCanonical,
+          publishStatus: 'published',
+          startFreshSession,
+        }),
+      { initialProps: { isWorkerCanonical: false } },
+    );
+
+    expect(result.current.publishCompleted).toBe(false);
+    expect(result.current.preventDuplicatePublish(jest.fn())).toBe(false);
+    expect(result.current.onCreateAnotherSession).toBeUndefined();
+
+    rerender({ isWorkerCanonical: true });
+    expect(result.current.publishCompleted).toBe(true);
+    const onGuarded = jest.fn();
+    expect(result.current.preventDuplicatePublish(onGuarded)).toBe(true);
+    expect(onGuarded).toHaveBeenCalledWith(expect.stringContaining('already owns the published session'));
+    act(() => result.current.onCreateAnotherSession?.());
+    expect(startFreshSession).toHaveBeenCalledWith({
+      settlement: {
+        workerUrl: 'https://fallback-worker.example.test',
+        slug: 'fallback-session',
+        sessionId: 'fallback-id',
+      },
+    });
+  });
+
+  it('creates another session from the exact terminal identity instead of a newer fallback draft', async () => {
+    writeSessionWizardWorkerSettlement({ ...identity, settledAt: 1 });
+    const startFreshSession = jest.fn(() => ({ ok: true }));
+    const { result } = renderHook(() =>
+      useSessionWizardWorkerSettlementLifecycle(cachedWizard, {
+        currentIdentity: {
+          workerUrl: 'https://foreign-worker.example.test',
+          slug: 'foreign-session',
+          sessionId: 'foreign-id',
+        },
+        startFreshSession,
+      }),
+    );
+
+    await waitFor(() => expect(result.current.onCreateAnotherSession).toBeDefined());
+    act(() => result.current.onCreateAnotherSession?.());
+    expect(startFreshSession).toHaveBeenCalledWith({
+      settlement: expect.objectContaining(identity),
+    });
+  });
+
   it('does not restore a record for a different session on the same worker', () => {
     writeSessionWizardWorkerSettlement({ ...identity, slug: 'other-session', settledAt: 1 });
 
@@ -135,7 +211,8 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
       sessionId: '0x00112233445566778899aabbccddeeff',
       settledAt: 10,
     };
-    localStorage.setItem(SESSION_WIZARD_CACHE_KEY, JSON.stringify(cachedWizard));
+    const matchingCachedWizard = { ...cachedWizard, sessionId: terminalWorkerSettlement.sessionId };
+    localStorage.setItem(SESSION_WIZARD_CACHE_KEY, JSON.stringify(matchingCachedWizard));
     expect(
       clearSessionWizardDraftCache({
         workerSettlement: terminalWorkerSettlement,
@@ -156,7 +233,7 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
     );
   });
 
-  it('terminal-locks from a worker-canonical removal fallback when tombstone writing fails', async () => {
+  it('does not invent a terminal settlement from a draft removal without a marker or tombstone', () => {
     const otherTab = renderHook(() => useSessionWizardWorkerSettlementLifecycle(cachedWizard));
     const workerCanonicalDraft = {
       ...cachedWizard,
@@ -177,7 +254,7 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
       );
     });
 
-    await waitFor(() => expect(otherTab.result.current.isSettled).toBe(true));
+    expect(otherTab.result.current.isSettled).toBe(false);
   });
 
   it('does not terminal-lock a decentralized draft removal', () => {

@@ -366,6 +366,11 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(deployBodies[0].deploymentRequestId).toEqual(expect.any(String));
     expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
     expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
+    const attemptKey = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+      .find((key) => key?.startsWith('ce:sessionWizardDeployAttempt:v1:'));
+    expect(JSON.parse(localStorage.getItem(attemptKey || '') || '{}')).toEqual(
+      expect.objectContaining({ generation: 0, status: 'completed' }),
+    );
   });
 
   it('reuses the deploy identity after the hook is unmounted and remounted', async () => {
@@ -443,6 +448,49 @@ describe('useSessionWizardWorkerDeploy', () => {
     });
     await act(async () => {
       await result.current.handleDeployWorker();
+    });
+
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
+  });
+
+  it.each([
+    {
+      label: 'structured conflict',
+      responseBody: {
+        error: 'deploymentRequestId was already used with a different request payload.',
+        deploymentRequestIdConflict: true,
+      },
+    },
+    {
+      label: 'legacy exact conflict error',
+      responseBody: {
+        error: 'deploymentRequestId was already used with a different request payload.',
+      },
+    },
+  ])('never advances after a $label while another tab can still complete the owned request', async ({ responseBody }) => {
+    const deployBodies: Record<string, unknown>[] = [];
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        return {
+          ok: false,
+          status: 409,
+          json: async () => responseBody,
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const firstTab = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+
+    await act(async () => {
+      await firstTab.result.current.handleDeployWorker();
+    });
+    firstTab.unmount();
+    const retryingTab = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+    await act(async () => {
+      await retryingTab.result.current.handleDeployWorker();
     });
 
     expect(deployBodies).toHaveLength(2);

@@ -250,18 +250,19 @@ export const createSessionWizardPublishRuntimeController = ({
       sessionId: toStr(runtime.sessionIdHex || runtime.sessionId).trim(),
     };
     callbacks.setWorkerCanonicalPublishSettled(settlementIdentity);
-    // Regression guard: remote persistence is terminal. Clear or poison both draft stores before the UX marker;
-    // otherwise a marker quota failure leaves an already-published identity available to publish again.
+    requireSuccessfulDurableStorageOperation(
+      callbacks.writeSessionWizardWorkerSettlement(settlementIdentity),
+      'Could not durably record the published worker identity',
+    );
+    // Remote persistence is terminal. Record the per-identity marker before touching
+    // the legacy singleton cache: if tombstone storage fails, the retained matching
+    // draft can still discover this marker and reload in the terminal state.
     requireSuccessfulDurableStorageOperation(
       callbacks.clearSessionWizardCache({
         ...(Array.isArray(preservedPendingSbtDrafts) ? { preservedPendingSbtDrafts } : {}),
         workerSettlement: settlementIdentity,
       }),
       'Could not durably clear the published session draft',
-    );
-    requireSuccessfulDurableStorageOperation(
-      callbacks.writeSessionWizardWorkerSettlement(settlementIdentity),
-      'Could not durably record the published worker identity',
     );
     callbacks.setSessionId(generateSessionId());
     callbacks.setSessionIdStatus(workerSettlement.nextSessionIdStatus);
