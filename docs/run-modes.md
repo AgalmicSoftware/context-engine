@@ -66,6 +66,11 @@ live gas for every repeated validation.
 These developer modes do not select a production session-infrastructure
 profile. That choice happens separately in `/new`.
 
+The older `hosted/onchain` label grouped several production choices together.
+It is retained as a documentation alias only: use Hosted & Fast for the
+worker-canonical Cloudflare path, or Trustless & Slower for the public
+EVM-and-Arweave path described below.
+
 ## Session Infrastructure Profiles
 
 The `/new` chooser initially selects nothing. **Hosted & Fast** is the default
