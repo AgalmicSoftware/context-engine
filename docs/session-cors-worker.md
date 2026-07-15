@@ -139,22 +139,7 @@ orphans are reported for operator cleanup rather than deleted speculatively.
 - The checked-in deploy-helper source imports shared modules from `workers/shared/`. If you deploy outside Wrangler, bundle it first; do not paste raw `workers/deploy-helper/worker.js` into the Cloudflare dashboard as a standalone script.
 - `workers/deploy-helper/README.md` is the quick public reference for bindings, env vars, trust boundaries, and endpoint behavior.
 - Every newly deployed `sessionCorsWorker` now also ships with embedded deploy-helper capability enabled by default. Sponsored bootstrap deploys target the sponsoring `sessionCorsWorker` first, and that worker runs the same Cloudflare deploy core locally. Grant-backed sponsored deploys now require that embedded path and no longer fall back to a standalone helper URL.
-- New deployments bind `CE_SESSION_COORDINATOR` to the SQLite-backed
-  `SessionWriteCoordinator` class. It reserves stable direct and sponsored
-  deployments before any Cloudflare mutation and makes sponsored faucet
-  transfers one-shot before the non-idempotent transfer begins. Concurrent
-  conflicting payloads receive `409`; matching in-flight work receives retryable
-  `503`; terminal safe receipts replay without repeating the side effect.
-  Missing coordination fails closed for those deployment and faucet paths. A
-  worker created before this binding was introduced must be redeployed before it
-  can use them. The same per-session coordinator now chooses the first wrapped
-  worker-envelope session key and serializes signed `set-config`, `set-limits`,
-  and Lit-descriptor mutations against one authoritative public config record.
-  Missing coordination fails closed for those writes as well. Payload/index
-  uploads remain intentionally at-least-once: a failed or ambiguous attempt may
-  leave an invisible orphan or a readable duplicate, but the worker returns
-  success only after its payload and index writes finish. The worker does not
-  expose session-key rotation or deployment-key re-wrap actions.
+- New deployments bind `CE_SESSION_COORDINATOR` to the SQLite-backed `SessionWriteCoordinator` class. Sponsored deploy redemption chooses one request digest inside the per-grant Durable Object before any Cloudflare mutation; a concurrent different payload receives `409`, an identical in-flight payload receives retryable `503`, and a terminal safe receipt is replayed without running the helper again. A sponsoring worker created before this binding was introduced must be redeployed before it can redeem new deploy grants; redemption otherwise fails closed before a Cloudflare API call.
 - Operating modes:
   - CE-hosted: use the default `CLOUDFLARE_DEPLOY_HELPER_URL` (`https://ce-deploy-helper.agalmic.workers.dev/`) and let Context Engine operate the shared helper.
   - Self-hosted: deploy `workers/deploy-helper/worker.js` with your own Wrangler config (`wrangler.toml` or equivalent), bind `DEPLOY_HELPER_KV` and `CE_SESSION_COORDINATOR`, install the `ce-session-write-coordinator-v1` SQLite-class migration, set `ALLOWED_ORIGINS`, and set `ADMIN_SECRET` with Wrangler secrets. The checked-in example and direct CLI automation include both bindings and the migration.
@@ -210,7 +195,7 @@ orphans are reported for operator cleanup rather than deleted speculatively.
   - `/new` can use that key during redemption/bootstrap to mint a fresh group / PKP / usage key for the new session
   - scoped runtime bundles keep using `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`
 - The manual `/new` Lit card now exposes only `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; scoped runtime identifiers stay worker-side and are derived during bootstrap or supplied through admin/sponsored-bundle paths.
-- The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry.
+- The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry. The per-grant coordinator stores only the request digest, attempt state, and a credential-redacted safe result. A successful deploy replaces the credential-bearing KV grant record with a secret-free terminal receipt so a lost browser response can be replayed without deploying again.
 - The uploaded Arweave envelope is:
   - `type: "contextengine-sponsored-bundle"`
   - `version: 1`
@@ -448,7 +433,7 @@ KV:
 R2/D1:
 - `CE_STORAGE_R2` (or `STORAGE_R2` / `R2_BUCKET`) for preferred Cloudflare payload blobs. One-click deploys bind this only when the request supplies an existing R2 bucket name.
 - D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
-- Durable Objects are for signer/runtime coordination only, not ordinary session payload blobs.
+- `CE_SESSION_COORDINATOR` binds the SQLite-backed `SessionWriteCoordinator` class for sponsored-deploy runtime coordination. One-click deploy metadata installs migration tag `ce-session-write-coordinator-v1`; a repeated upload retries without reapplying an already-installed migration. Durable Objects coordinate state transitions and do not store ordinary session payload blobs.
 
 Vars:
 
