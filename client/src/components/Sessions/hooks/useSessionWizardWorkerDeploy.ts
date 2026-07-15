@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
 import { normalizeSparseSponsoredBundlePayload } from '../../../utilities/arweave/sponsoredBundles.js';
 import { normalizeBlockLimitsForConfig } from '../../../utilities/session/blockLimits.js';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../../utilities/session/sponsoredFlags.js';
@@ -34,14 +34,27 @@ import {
   normalizeSessionWizardDeployErrorMessage,
   withSessionWizardDeployHelperWorkersDevStatus,
 } from '../sessionWizardDeployErrors';
-import { resolveDeployWorkerState } from '../sessionWizardWorkerState';
+import { publishVerifiedRuntime, resolveDeployWorkerState } from '../sessionWizardWorkerState';
 import { getSessionSlugValidationError } from '../sessionWizardSlugValidation';
 import {
   cacheSessionWorkerConfigAfterDeploy,
   resolveSponsoredBundleBootstrapWorkerUrl,
 } from '../sessionWizardSponsoredBundleSupport';
-import { sanitizeSessionWizardWorkerSecretsForLitMode } from '../sessionWizardWorkerSecretSupport';
-import { resolveSessionWizardResourceSecretFields } from '../sessionWizardResourceConfig';
+import {
+  resolveSessionWizardWorkerRuntimeReadiness,
+  sanitizeSessionWizardWorkerSecretsForLitMode,
+} from '../sessionWizardWorkerSecretSupport';
+import {
+  buildSessionWizardWorkerRequirementProof,
+  resolveSessionWizardWorkerSecretSelection,
+  type SessionWizardWorkerRequirementProof,
+} from '../sessionWizardWorkerRequirementProof';
+import {
+  buildSessionWizardLitBootstrapRecovery, createSessionWizardEnsureWorkerSessionConfig,
+  matchesSessionWizardLitBootstrapRecovery, mergeRecoveredSessionWizardLitRuntime,
+  resolveCompleteSessionWizardLitRuntime,
+  syncSessionWizardLitRuntimeConfigAfterDeploy, type SessionWizardLitBootstrapRecovery,
+} from '../sessionWizardWorkerDeployLitRuntime';
 import { getSessionWizardWorkerDeployValidationError } from '../sessionWizardWorkerRpc';
 import { resolveSessionWizardModeRequirements } from '../sessionWizardModeRequirements';
 import {
@@ -49,20 +62,15 @@ import {
   markSessionWizardDeployAttemptCompleted,
   resolveSessionWizardDeployAttemptIdentity,
 } from '../sessionWizardDeployAttemptIdentity';
-import {
-  normalizeSessionWizardSlug as normalizeSlug,
-  normalizeSessionWizardWorkerUrl as normalizeWorkerUrl,
-} from '../sessionWizardUrlSupport';
+import { normalizeSessionWizardSlug as normalizeSlug,
+  normalizeSessionWizardWorkerUrl as normalizeWorkerUrl } from '../sessionWizardUrlSupport';
 import type { AnyRecord, ChainIdLike, NetworkLike, WorkerSecretSyncResult, WorkerSecretsLike } from '../../shellTypes';
-import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
-
 type DeployFormLike = AnyRecord & {
   apiToken?: string;
   workerName?: string;
   adminAddress?: string;
   bundleUrl?: string;
 };
-
 type DraftLike = AnyRecord & {
   slug?: string;
   corsWorkerUrl?: string;
@@ -96,6 +104,9 @@ export type SessionWizardWorkerDeployRuntime = {
   sessionId?: string | number | null;
   sessionIdHex?: string;
   workerCanonicalPublishCompleted?: boolean;
+  deployComplete?: boolean;
+  deployWorkerUrl?: string;
+  workerRequirementProof?: SessionWizardWorkerRequirementProof | null;
   draft?: DraftLike | null;
   deployForm?: DeployFormLike | null;
 };
@@ -184,6 +195,7 @@ type SessionWizardWorkerDeployStateUpdate = {
   workerUrlAutoFilled?: boolean;
   workerMode?: string;
   deployWorkerUrl?: string;
+  workerRequirementProof?: SessionWizardWorkerRequirementProof | null;
   provisionedSponsoredContext?: AnyRecord;
   forceManualBundleFile?: boolean;
   normalModeBundleUrlOverride?: string;
@@ -243,6 +255,7 @@ const useSessionWizardWorkerDeploy = ({
 }: UseSessionWizardWorkerDeployOptions = {}) => {
   const { runtimeRef, resolvedWalletAccountRef, sponsoredBundleAppliedBundleRef } = refs;
   const deployRequestInFlightRef = useRef(false);
+  const litBootstrapRecoveryRef = useRef<SessionWizardLitBootstrapRecovery | null>(null);
 
   const resolveConnectedAdminAddress = useCallback(async () => {
     const runtime = readRuntime(runtimeRef);
@@ -393,36 +406,12 @@ const useSessionWizardWorkerDeploy = ({
           bundleUrl: requestedBundleUrl,
         });
         const allDeploySecrets = runtime.workerSecretsEnabled ? buildWorkerSecretsPayload(currentWorkerSecrets) : {};
-        const selectedAiSecretFields = new Set(
-          resolveSessionWizardResourceSecretFields('ai', currentDraft.ai).map((field) => field.key),
-        );
-        const deploySecrets = modeRequirements.isWorkerCanonical
-          ? Object.entries(allDeploySecrets).reduce<AnyRecord>((acc, [key, value]) => {
-              const allowed =
-                selectedAiSecretFields.has(key) ||
-                (modeRequirements.requiresArweave && key === 'arweaveJwk') ||
-                (modeRequirements.requiresLit && key.startsWith('lit')) ||
-                (modeRequirements.requiresRpc && (key === 'customRpcUrl' || key === 'customRpcKey'));
-              if (allowed) acc[key] = value;
-              return acc;
-            }, {})
-          : allDeploySecrets;
-        const requiredWorkerSecretFields = modeRequirements.isWorkerCanonical
-          ? Array.from(
-              new Set([
-                ...selectedAiSecretFields,
-                ...(modeRequirements.requiresArweave && toStr(deploySecrets.arweaveJwk).trim()
-                  ? ['arweaveJwk']
-                  : []),
-                ...(modeRequirements.requiresLit
-                  ? Object.keys(deploySecrets).filter((key) => key.startsWith('lit'))
-                  : []),
-                ...(modeRequirements.requiresRpc
-                  ? ['customRpcUrl', 'customRpcKey'].filter((key) => toStr(deploySecrets[key]).trim())
-                  : []),
-              ]),
-            )
-          : [];
+        const { selectedSecrets: deploySecrets, requiredSecretFields: requiredWorkerSecretFields } =
+          resolveSessionWizardWorkerSecretSelection({
+            sessionModeProfile: currentDraft.sessionModeProfile,
+            sessionAi: currentDraft.ai,
+            workerSecrets: allDeploySecrets,
+          });
         const deployBlockLimits = normalizeBlockLimitsForConfig(currentDraft?.blockLimits, runtime.latestChainBlock);
         const deployStorageProfile = buildDeployStorageProfilePayload(currentDraft, {});
         const normalizedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
@@ -633,33 +622,11 @@ const useSessionWizardWorkerDeploy = ({
           }),
           corsWorkerUrl: resolvedDeployWorkerUrl,
         };
-        const ensureWorkerSessionConfig = async ({ workerUrl, slug: targetSlug }: AnyRecord) => {
-          const requestBody = {
-            sessionSlug: targetSlug,
-            adminAddress: workerConfigPayload.adminAddress || runtime.account || '',
-            config: workerConfigPayload,
-          };
-          const auth = await signTypedAdminAction({
-            action: 'set-config',
-            body: requestBody,
-            targetSlug,
-            workerUrl,
-            accountOverride: resolvedAdmin,
-          });
-          const configRes = await fetch(`${workerUrl}/admin/set-config`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              ...requestBody,
-              adminAddress: requestBody.adminAddress || auth.address,
-              ...auth,
-            }),
-          });
-          const configData = await configRes.json().catch(() => ({}));
-          if (!configRes.ok) {
-            throw new Error(configData?.error || 'Failed to sync worker config after deploy.');
-          }
-        };
+        const ensureWorkerSessionConfig = createSessionWizardEnsureWorkerSessionConfig({
+          getWorkerConfig: () => workerConfigPayload,
+          getAdminAddress: () => toStr(runtime.account).trim(),
+          signTypedAdminAction: (input) => signTypedAdminAction({ ...input, accountOverride: resolvedAdmin }),
+        });
         let configSyncStatus: WorkerSecretSyncResult = { warning: '', note: '', synced: false, skipped: true };
         if (resolvedDeployWorkerUrl) {
           configSyncStatus = await syncWorkerConfigAfterPartialDeploy({
@@ -677,12 +644,27 @@ const useSessionWizardWorkerDeploy = ({
             skipped: true,
           };
         }
+        const litRuntimeConfigSyncStatus = await syncSessionWizardLitRuntimeConfigAfterDeploy({
+          requiresLit: modeRequirements.requiresLit,
+          workerUrl: resolvedDeployWorkerUrl,
+          slug,
+          litCredentials: workerConfigPayload?.litCredentials,
+          ensureSessionConfig: ensureWorkerSessionConfig,
+        });
         // Regression guard: hidden stale Lit credentials must not provision
         // resources for a selected non-Lit mode; profile-less legacy flows remain supported.
         const shouldSyncLitAfterDeploy = !modeRequirements.selected || modeRequirements.requiresLit;
         let litBootstrapStatus: WorkerSecretSyncResult = { warning: '', note: '', synced: false, skipped: true };
         if (resolvedDeployWorkerUrl && shouldSyncLitAfterDeploy) {
-          litBootstrapStatus = await syncWorkerLitSessionBootstrapAfterDeploy({
+          const recoveredBootstrap = matchesSessionWizardLitBootstrapRecovery({
+            recovery: litBootstrapRecoveryRef.current,
+            workerUrl: resolvedDeployWorkerUrl,
+            slug,
+            litCredentials: currentWorkerSecrets,
+          });
+          litBootstrapStatus = recoveredBootstrap
+            ? { warning: '', note: 'Lit bootstrap recovery verified.', synced: true, skipped: true }
+            : await syncWorkerLitSessionBootstrapAfterDeploy({
             workerUrl: resolvedDeployWorkerUrl,
             account: resolvedAdmin,
             slug,
@@ -715,41 +697,30 @@ const useSessionWizardWorkerDeploy = ({
             },
             ensureSessionConfig: ensureWorkerSessionConfig,
             applyBootstrappedConfig: async ({ apiBase, litActionCid, litGroupId, litPkpId, result }) => {
-              const nextApiBase = toStr(apiBase || result?.apiBase || result?.litCredentials?.litApiBase).trim();
-              const nextActionCid = toStr(litActionCid).trim();
-              const nextGroupId = toStr(litGroupId).trim();
-              const nextPkpId = toStr(litPkpId).trim();
-              if (!(nextActionCid && nextGroupId && nextPkpId)) return;
+              const recoveredLitCredentials = resolveCompleteSessionWizardLitRuntime({
+                ...(workerConfigPayload?.litCredentials || {}),
+                litApiBase: apiBase || result?.apiBase || result?.litCredentials?.litApiBase,
+                litActionCid,
+                litGroupId,
+                litPkpId,
+              });
+              if (!recoveredLitCredentials) return;
               workerConfigPayload = {
                 ...workerConfigPayload,
-                litCredentials: {
-                  ...(workerConfigPayload?.litCredentials && typeof workerConfigPayload.litCredentials === 'object'
-                    ? workerConfigPayload.litCredentials
-                    : {}),
-                  ...(nextApiBase ? { litApiBase: nextApiBase } : {}),
-                  litGroupId: nextGroupId,
-                  litPkpId: nextPkpId,
-                  litActionCid: nextActionCid,
-                },
+                litCredentials: recoveredLitCredentials,
               };
-              currentWorkerSecrets = {
-                ...currentWorkerSecrets,
-                litAccountApiKey: '',
-                litUsageApiKey: '',
-                ...(nextApiBase ? { litApiBase: nextApiBase } : {}),
-                litGroupId: nextGroupId,
-                litPkpId: nextPkpId,
-                litActionCid: nextActionCid,
-              };
-              applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({
-                ...prev,
-                litAccountApiKey: '',
-                litUsageApiKey: '',
-                ...(nextApiBase ? { litApiBase: nextApiBase } : {}),
-                litGroupId: nextGroupId,
-                litPkpId: nextPkpId,
-                litActionCid: nextActionCid,
-              }));
+              currentWorkerSecrets = mergeRecoveredSessionWizardLitRuntime(
+                currentWorkerSecrets,
+                recoveredLitCredentials,
+              );
+              litBootstrapRecoveryRef.current = buildSessionWizardLitBootstrapRecovery({
+                workerUrl: resolvedDeployWorkerUrl,
+                slug,
+                litCredentials: recoveredLitCredentials,
+              });
+              applyWorkerSecretsUpdate((prev: WorkerSecretsLike) =>
+                mergeRecoveredSessionWizardLitRuntime(prev, recoveredLitCredentials),
+              );
             },
           });
         }
@@ -874,17 +845,48 @@ const useSessionWizardWorkerDeploy = ({
             },
           });
         }
-        const requiredWorkerSecretValuesPresent = requiredWorkerSecretFields.every((key) =>
-          toStr(deploySecrets[key]).trim(),
-        );
-        const requiredWorkerSecretsReady =
-          requiredWorkerSecretFields.length === 0 ||
-          (requiredWorkerSecretValuesPresent &&
-            (helperWritesSecrets || secretsSyncStatus?.synced === true || secretsSyncStatus?.deferred === true));
+        const { requiredLitRuntimeReady, requiredWorkerSecretsReady } =
+          resolveSessionWizardWorkerRuntimeReadiness({
+            requiredWorkerSecretFields, deploySecrets, helperWritesSecrets, secretsSyncStatus,
+            requiresLit: modeRequirements.requiresLit, litCredentials: workerConfigPayload?.litCredentials,
+            litRuntimeConfigSynced: litRuntimeConfigSyncStatus?.synced === true,
+            litBootstrapSynced: litBootstrapStatus?.synced === true, litProvisionSynced: litProvisionStatus?.synced === true,
+          });
         // Regression guard: manual and forced deploys must keep the publish step
         // open until selected-profile secrets are remote; the same terminal request
         // ID then resumes signed sync without provisioning a second worker.
-        const publishSafeDeployComplete = isDeployVerified && requiredWorkerSecretsReady;
+        const remoteWorkerReady = isDeployVerified && requiredWorkerSecretsReady;
+        const workerRequirementProof =
+          remoteWorkerReady && modeRequirements.isWorkerCanonical
+            ? buildSessionWizardWorkerRequirementProof({
+                workerUrl: resolvedDeployWorkerUrl,
+                sessionSlug: slug,
+                sessionId: runtime.sessionId || runtime.sessionIdHex,
+                sessionModeProfile: currentDraft.sessionModeProfile,
+                sessionAi: currentDraft.ai,
+                workerSecrets: deploySecrets,
+                requiredSecretFields: requiredWorkerSecretFields,
+                remoteManagedSecretFields: litBootstrapStatus?.synced === true ? ['litAccountApiKey'] : [],
+                litRuntimeConfig: workerConfigPayload?.litCredentials,
+              })
+            : null;
+        // A worker-canonical deploy is publish-safe only when the exact remote
+        // secret/requirement evidence can be compared against later edits.
+        const publishSafeDeployComplete = remoteWorkerReady && (!modeRequirements.isWorkerCanonical || !!workerRequirementProof);
+        if (publishSafeDeployComplete && litBootstrapStatus?.synced === true) {
+          // Keep bootstrap authority through every post-deploy write. Clearing it
+          // earlier makes a failed AI/RPC secret sync impossible to resume safely.
+          const verifiedLitCredentials =
+            workerConfigPayload?.litCredentials && typeof workerConfigPayload.litCredentials === 'object'
+              ? workerConfigPayload.litCredentials
+              : {};
+          applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({
+            ...prev,
+            ...verifiedLitCredentials,
+            litAccountApiKey: '',
+            litUsageApiKey: '',
+          }));
+        }
         cacheSessionWorkerConfigAfterDeploy({
           deployStatusCode,
           deployPartial: data?.partial === true,
@@ -920,13 +922,16 @@ const useSessionWizardWorkerDeploy = ({
           withLitBootstrapSyncStatus(baseDeployStatus, litBootstrapStatus),
           litProvisionStatus,
         );
+        publishVerifiedRuntime(runtimeRef, currentDraft, resolvedDeployWorkerUrl, displayWorkerUrl,
+          publishSafeDeployComplete, workerRequirementProof);
         updateDeploymentState({
           deployWorkerUrl: displayWorkerUrl,
           deployStatus: withWorkerConfigSyncWarning(
             withSecretsSyncStatus(litDeployStatus, secretsSyncStatus),
-            configSyncStatus.warning,
+            litRuntimeConfigSyncStatus.warning || configSyncStatus.warning,
           ),
           deployComplete: publishSafeDeployComplete,
+          workerRequirementProof,
           forceManualBundleFile: false,
           normalModeBundleUrlOverride: '',
         });
@@ -938,8 +943,10 @@ const useSessionWizardWorkerDeploy = ({
           ok: true,
           workerUrl: resolvedDeployWorkerUrl,
           deployComplete: publishSafeDeployComplete,
+          requiredLitRuntimeReady,
           requiredWorkerSecretsReady,
           requiredWorkerSecretFields,
+          workerRequirementProof,
         };
       } catch (err) {
         const runtime = readRuntime(runtimeRef);

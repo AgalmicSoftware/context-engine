@@ -6,6 +6,8 @@ import {
   mergeSponsoredBundleDeployForm,
   mergeSponsoredBundleWorkerSecrets,
   normalizeWorkerSecrets,
+  resolveSessionWizardLitCredentialPathReadiness,
+  resolveSessionWizardWorkerRuntimeReadiness,
   resolveSessionWizardEnabledWorkerSecrets,
   resolveSessionWizardChipotleHookConfig,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
@@ -47,6 +49,103 @@ describe('sessionWizardWorkerSecretSupport', () => {
       litActionCid: 'bafy123',
     });
     expect(CHIPOTLE_LIT_CONFIG_FIELDS).toEqual(['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid']);
+  });
+
+  it('distinguishes Lit bootstrap authority from an already-complete runtime path', () => {
+    expect(resolveSessionWizardLitCredentialPathReadiness({ litAccountApiKey: 'account-key' })).toEqual({
+      canBootstrap: true,
+      hasRuntimeConfig: false,
+      hasUsageCredential: false,
+      hasDeployCredentialPath: true,
+    });
+    expect(
+      resolveSessionWizardLitCredentialPathReadiness({
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group-1',
+        litPkpId: 'pkp-1',
+        litActionCid: 'action-1',
+        litUsageApiKey: 'usage-key',
+      }),
+    ).toEqual({
+      canBootstrap: false,
+      hasRuntimeConfig: true,
+      hasUsageCredential: true,
+      hasDeployCredentialPath: true,
+    });
+    expect(resolveSessionWizardLitCredentialPathReadiness({ litApiBase: 'https://lit.example' })).toEqual(
+      expect.objectContaining({ hasDeployCredentialPath: false }),
+    );
+  });
+
+  it.each([
+    [
+      'rejects an account key without a completed tuple',
+      {
+        requiredWorkerSecretFields: ['openaiKey', 'litAccountApiKey'],
+        deploySecrets: { openaiKey: 'sk-ai', litAccountApiKey: 'account-key' },
+        helperWritesSecrets: true,
+        requiresLit: true,
+      },
+      false,
+    ],
+    [
+      'accepts existing credentials only after a tuple-specific config write',
+      {
+        requiredWorkerSecretFields: ['openaiKey', 'litUsageApiKey'],
+        deploySecrets: { openaiKey: 'sk-ai', litUsageApiKey: 'usage-key' },
+        helperWritesSecrets: true,
+        requiresLit: true,
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: 'group-1',
+          litPkpId: 'pkp-1',
+          litActionCid: 'action-1',
+        },
+        litRuntimeConfigSynced: true,
+      },
+      true,
+    ],
+    [
+      'accepts a worker-confirmed bootstrap write',
+      {
+        requiredWorkerSecretFields: ['openaiKey', 'litAccountApiKey'],
+        deploySecrets: { openaiKey: 'sk-ai', litAccountApiKey: 'account-key' },
+        helperWritesSecrets: true,
+        requiresLit: true,
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: 'group-1',
+          litPkpId: 'pkp-1',
+          litActionCid: 'action-1',
+        },
+        litBootstrapSynced: true,
+      },
+      true,
+    ],
+    [
+      'rejects existing credentials without config-write proof',
+      {
+        requiredWorkerSecretFields: ['openaiKey', 'litUsageApiKey'],
+        deploySecrets: { openaiKey: 'sk-ai', litUsageApiKey: 'usage-key' },
+        helperWritesSecrets: true,
+        requiresLit: true,
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: 'group-1',
+          litPkpId: 'pkp-1',
+          litActionCid: 'action-1',
+        },
+      },
+      false,
+    ],
+  ])('%s', (_label, input, expectedReady) => {
+    expect(resolveSessionWizardWorkerRuntimeReadiness(input)).toEqual(
+      expect.objectContaining({
+        requiredLitRuntimeReady: expectedReady,
+        requiredWorkerSecretsDelivered: true,
+        requiredWorkerSecretsReady: expectedReady,
+      }),
+    );
   });
 
   it('builds the Chipotle hook config only when the worker URL and required Lit fields are complete', () => {
@@ -125,6 +224,28 @@ describe('sessionWizardWorkerSecretSupport', () => {
         litActionCid: '',
         litAccountApiKey: 'account-secret',
         litUsageApiKey: '',
+      }),
+    );
+  });
+
+  it('preserves a returned bootstrap tuple with account authority for same-worker recovery', () => {
+    expect(
+      sanitizeSessionWizardWorkerSecretsForLitMode({
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group_123',
+        litPkpId: 'pkp_123',
+        litActionCid: 'bafy123',
+        litRuntimeRecovered: 'bootstrap',
+        litAccountApiKey: ' account-secret ',
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group_123',
+        litPkpId: 'pkp_123',
+        litActionCid: 'bafy123',
+        litRuntimeRecovered: 'bootstrap',
+        litAccountApiKey: 'account-secret',
       }),
     );
   });

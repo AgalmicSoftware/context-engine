@@ -78,6 +78,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             stepNumbers: {
               'deploy-worker': 3,
@@ -109,6 +110,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldAutoDeployWorker: false,
             stepNumbers: {
@@ -156,6 +158,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldDeployPendingSbts: true,
             stepNumbers: {
@@ -196,6 +199,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldAutoDeployWorker: false,
             shouldDeployPendingSbts: true,
@@ -242,6 +246,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldPersistWorkerConfig: true,
             stepNumbers: {
@@ -285,6 +290,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldAutoDeployWorker: false,
             shouldPersistWorkerConfig: true,
@@ -300,6 +306,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan(),
         },
         ports: {
@@ -321,6 +328,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldPersistWorkerConfig: true,
           }),
@@ -352,6 +360,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan(),
         },
         ports: {
@@ -370,6 +379,7 @@ describe('runSessionWizardPublishController', () => {
     await expect(
       runSessionWizardPublishController({
         input: {
+          publishAllowed: true,
           publishExecutionPlan: buildPlan({
             shouldAutoDeployWorker: false,
             shouldDeployPendingSbts: true,

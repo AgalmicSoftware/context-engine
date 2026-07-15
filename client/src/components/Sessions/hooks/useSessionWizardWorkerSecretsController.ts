@@ -23,6 +23,7 @@ import {
 } from '../sessionWizardWorkerRuntimeSupport';
 import {
   CHIPOTLE_LIT_CONFIG_FIELDS,
+  resolveSessionWizardLitCredentialPathReadiness,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from '../sessionWizardWorkerSecretSupport';
@@ -210,6 +211,7 @@ const useSessionWizardWorkerSecretsController = ({
       }
       const rpcUrl = resolveWorkerRpcUrl();
       if ((!modeRequirements.selected || modeRequirements.requiresRpc) && !rpcUrl) missing.push('Worker RPC URL');
+      const litCredentialPath = resolveSessionWizardLitCredentialPathReadiness(secretsSnapshot);
       const hasAnyChipotleField =
         CHIPOTLE_LIT_CONFIG_FIELDS.some((key) => !!toStr(secretsSnapshot?.[key]).trim()) ||
         !!toStr(secretsSnapshot?.litAccountApiKey).trim() ||
@@ -222,11 +224,11 @@ const useSessionWizardWorkerSecretsController = ({
           !toStr(secretsSnapshot?.litPkpId).trim() &&
           !toStr(secretsSnapshot?.litActionCid).trim() &&
           !toStr(secretsSnapshot?.litUsageApiKey).trim());
-      if (
-        (!modeRequirements.selected || modeRequirements.requiresLit) &&
-        hasAnyChipotleField &&
-        !bootstrapOnlyChipotleConfig
-      ) {
+      if (modeRequirements.selected && modeRequirements.requiresLit && !litCredentialPath.hasDeployCredentialPath) {
+        // The account key can create the runtime; without it, all public tuple
+        // fields plus a usage key must already exist as one credential path.
+        missing.push('Lit API key or complete Lit runtime credentials');
+      } else if (!modeRequirements.selected && hasAnyChipotleField && !bootstrapOnlyChipotleConfig) {
         const requiredChipotleFields = [
           ['litApiBase', 'Lit API base'],
           ['litGroupId', 'Lit group ID'],

@@ -27,6 +27,38 @@ const openPublishSection = async () => {
   return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
 };
 
+const deployVerifiedCustomWorker = async ({ sessionName, sessionInfo, openaiKey }) => {
+  const fastPreset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
+  if (fastPreset) {
+    const previousConfirm = window.confirm;
+    window.confirm = jest.fn(() => true);
+    fireEvent.click(fastPreset);
+    window.confirm = previousConfirm;
+  }
+  const continueButton = screen.queryByTestId('ce-new-preset-continue');
+  if (continueButton && !continueButton.disabled) fireEvent.click(continueButton);
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+    target: { value: sessionName },
+  });
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO), {
+    target: { value: sessionInfo },
+  });
+  await chooseCustomWorkerWithoutDeploy();
+  fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL), {
+    target: { value: 'https://deploy-helper.example.test' },
+  });
+  const tokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+  const reactPropsKey = Object.keys(tokenInput).find((key) => key.startsWith('__reactProps$'));
+  act(() => tokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } }));
+  const openAiKeyInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY);
+  fireEvent.change(openAiKeyInput, { target: { value: openaiKey } });
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+  await waitFor(() => {
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+  });
+  return openAiKeyInput;
+};
+
 const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test', overrides = {}) => {
   const draft = {
     corsWorkerUrl: workerUrl,
@@ -357,6 +389,65 @@ describe('SessionWizard publish boundary rendering', () => {
     });
   });
 
+  it('blocks the actual worker-canonical publish action after secret, provider, or profile requirement edits', async () => {
+    const originalFetch = global.fetch;
+    const workerUrl = 'https://requirement-proof-worker.example.test';
+    global.fetch = jest.fn(async (url) => {
+      if (String(url).endsWith('/deploy')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl,
+            configVerified: true,
+            writesSessionConfig: true,
+            writesSessionSecrets: true,
+          }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true, nonce: 'wizard-admin-nonce' }) };
+    });
+
+    try {
+      renderLoggedInSessionWizard();
+      enableAdvancedMode();
+      const openAiKeyInput = await deployVerifiedCustomWorker({
+        sessionName: 'Requirement Proof Session',
+        sessionInfo: 'Verified custom worker requirement snapshot.',
+        openaiKey: 'sk-remotely-verified',
+      });
+      const publishButton = await openPublishSection();
+      await waitFor(() => expect(publishButton).not.toBeDisabled());
+
+      fireEvent.change(openAiKeyInput, { target: { value: 'sk-locally-edited' } });
+      await waitFor(() => expect(publishButton).toBeDisabled());
+      fireEvent.click(publishButton);
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(0);
+
+      fireEvent.change(openAiKeyInput, { target: { value: 'sk-remotely-verified' } });
+      await waitFor(() => expect(publishButton).not.toBeDisabled());
+      fireEvent.click(screen.getByRole('button', { name: 'ai expand' }));
+      const fastModelGroup = screen.getByText('fast').parentElement?.parentElement;
+      const fastProviderSelect = within(fastModelGroup).getAllByRole('combobox')[1];
+      fireEvent.change(fastProviderSelect, { target: { value: 'anthropic' } });
+      await waitFor(() => expect(publishButton).toBeDisabled());
+
+      fireEvent.change(fastProviderSelect, { target: { value: 'openai' } });
+      await waitFor(() => expect(publishButton).not.toBeDisabled());
+      fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
+      const encryptionOptions = within(screen.getByRole('radiogroup', { name: /encryption/i }));
+      fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
+      await waitFor(() => expect(publishButton).toBeDisabled());
+      fireEvent.click(publishButton);
+
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(0);
+      expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
   it('locks a completed worker-canonical session against a second publish to the same worker', async () => {
     const originalFetch = global.fetch;
     const workerUrl = 'https://single-session-worker.example.test';
@@ -364,6 +455,19 @@ describe('SessionWizard publish boundary rendering', () => {
     window.history.replaceState({}, '', '/new');
     global.fetch = jest.fn(async (url, init = {}) => {
       const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl,
+            configVerified: true,
+            writesSessionConfig: true,
+            writesSessionSecrets: true,
+          }),
+        };
+      }
       if (normalizedUrl.endsWith('/admin/set-config')) {
         persistedConfig = JSON.parse(String(init.body || '{}')).config;
         return { ok: true, status: 200, json: async () => ({ ok: true }) };
@@ -375,28 +479,15 @@ describe('SessionWizard publish boundary rendering', () => {
       }
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
     });
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        sessionId: '0x00112233445566778899aabbccddeeff',
-        deployComplete: true,
-        deployWorkerUrl: workerUrl,
-        workerSecretsEnabled: false,
-        draft: {
-          slug: 'single-worker-session',
-          sessionName: 'Single Worker Session',
-          sessionInfo: 'One canonical session per worker.',
-          corsWorkerUrl: workerUrl,
-          storageProfile: { backend: 'cloudflare' },
-          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-        },
-      }),
-    );
 
     try {
       const firstView = renderLoggedInSessionWizard();
       enableAdvancedMode();
-      await chooseCustomWorkerWithoutDeploy();
+      await deployVerifiedCustomWorker({
+        sessionName: 'Single Worker Session',
+        sessionInfo: 'One canonical session per worker.',
+        openaiKey: 'sk-existing-worker',
+      });
       const publishButton = await openPublishSection();
       const deployButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER);
 
@@ -413,10 +504,11 @@ describe('SessionWizard publish boundary rendering', () => {
       });
       expect(publishButton).toHaveTextContent('Session Created');
       expect(screen.getByRole('button', { name: 'Create another session' })).toBeInTheDocument();
+      const publishedSessionId = persistedConfig.sessionId;
       const expectedSettlement = {
         workerUrl,
         slug: 'single-worker-session',
-        sessionId: '0x00112233445566778899aabbccddeeff',
+        sessionId: publishedSessionId,
       };
       expect(readWizardCache()).toEqual({
         terminalWorkerSettlement: expect.objectContaining(expectedSettlement),
@@ -439,7 +531,7 @@ describe('SessionWizard publish boundary rendering', () => {
         expect(reloadedDeployButton).toBeDisabled();
       });
       const restoredSessionUrl = `${window.location.origin}/session/single-worker-session?worker=${encodeURIComponent(workerUrl)}`;
-      const restoredAdminUrl = `${window.location.origin}/admin?sessionId=0x00112233445566778899aabbccddeeff&sessionSlug=single-worker-session&worker=${encodeURIComponent(workerUrl)}`;
+      const restoredAdminUrl = `${window.location.origin}/admin?sessionId=${publishedSessionId}&sessionSlug=single-worker-session&worker=${encodeURIComponent(workerUrl)}`;
       expect(screen.getByRole('link', { name: restoredSessionUrl })).toHaveAttribute('href', restoredSessionUrl);
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_URL)).toHaveAttribute('href', restoredAdminUrl);
       fireEvent.click(reloadedPublishButton);

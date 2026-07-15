@@ -65,6 +65,15 @@ describe('useSessionWizardWorkerState', () => {
         persistWorkerSecrets: false,
         deployComplete: true,
         deployWorkerUrl: 'worker.example/path///',
+        workerRequirementProof: {
+          version: 1,
+          verificationKind: 'remote-deploy-verification',
+          workerIdentityFingerprint: 'a'.repeat(64),
+          requirementsFingerprint: 'b'.repeat(64),
+          requiredSecretFields: ['openaiKey'],
+          secretValueFingerprints: { openaiKey: 'c'.repeat(64) },
+          remoteManagedSecretFields: [],
+        },
         deployForm: {
           apiToken: ' token ',
           workerName: ' worker ',
@@ -88,8 +97,9 @@ describe('useSessionWizardWorkerState', () => {
 
     expect(result.current.workerSecretsEnabled).toBe(false);
     expect(result.current.persistWorkerSecrets).toBe(false);
-    expect(result.current.deployComplete).toBe(true);
+    expect(result.current.deployComplete).toBe(false);
     expect(result.current.deployWorkerUrl).toBe('https://worker.example/path');
+    expect(result.current.workerRequirementProof).toBeNull();
     expect(result.current.deployForm).toEqual({
       apiToken: 'token',
       workerName: 'worker',

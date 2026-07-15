@@ -40,6 +40,19 @@ describe('sessionWizardWorkerRuntimeSupport', () => {
       }),
     ).toEqual({
       deployWorkerMatchesConfiguredUrl: false,
+      usesDefaultWorkerUrl: false,
+      workerUrlSource: 'custom worker URL (not verified in this run)',
+    });
+
+    expect(
+      resolveSessionWizardWorkerUrlSourceState({
+        defaultWorkerUrl: 'https://default.example',
+        resolvedWorkerBaseUrl: 'https://default.example',
+        visibleConfiguredWorkerUrl: 'https://default.example',
+        workerMode: 'default',
+      }),
+    ).toEqual({
+      deployWorkerMatchesConfiguredUrl: false,
       usesDefaultWorkerUrl: true,
       workerUrlSource: 'default worker',
     });

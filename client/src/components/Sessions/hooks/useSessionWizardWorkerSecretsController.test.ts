@@ -100,6 +100,13 @@ const baseDraft = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const buildWorkerCanonicalLitProfile = () => {
+  const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+  profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+  profile.encryption = { mode: 'lit' };
+  return profile;
+};
+
 const createControllerHarness = (overrides: Record<string, unknown> = {}) => {
   const {
     draft: draftOverride,
@@ -199,6 +206,37 @@ describe('useSessionWizardWorkerSecretsController', () => {
     });
 
     expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['OpenAI key']);
+  });
+
+  it('requires a bootstrap key or a complete existing runtime for selected Lit encryption', () => {
+    const commonDraft = baseDraft({
+      sessionModeProfile: buildWorkerCanonicalLitProfile(),
+    });
+    const missing = createControllerHarness({
+      draft: commonDraft,
+      workerSecrets: baseWorkerSecrets({ openaiKey: 'sk-ai' }),
+    });
+    const bootstrap = createControllerHarness({
+      draft: commonDraft,
+      workerSecrets: baseWorkerSecrets({ openaiKey: 'sk-ai', litAccountApiKey: 'lit-account' }),
+    });
+    const existingRuntime = createControllerHarness({
+      draft: commonDraft,
+      workerSecrets: baseWorkerSecrets({
+        openaiKey: 'sk-ai',
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group-1',
+        litPkpId: 'pkp-1',
+        litActionCid: 'bafy-action',
+        litUsageApiKey: 'lit-usage',
+      }),
+    });
+
+    expect(missing.result.current.getMissingWorkerSecretsForDeploy()).toContain(
+      'Lit API key or complete Lit runtime credentials',
+    );
+    expect(bootstrap.result.current.getMissingWorkerSecretsForDeploy()).toEqual([]);
+    expect(existingRuntime.result.current.getMissingWorkerSecretsForDeploy()).toEqual([]);
   });
 
   it.each(['anthropicKey', 'openrouterKey'])(

@@ -115,6 +115,7 @@ import {
 } from './sessionWizardPublishController';
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
 import { createSessionWizardPublishRuntimeController } from './sessionWizardPublishRuntimeController';
+import { resolveSessionWizardWorkerPublishEvidence } from './sessionWizardWorkerPublishEvidence';
 import {
   resolveSessionWizardPublishRequestDescriptor,
   resolveSessionWizardPublishUiPlan,
@@ -684,6 +685,8 @@ const SessionWizard = ({
     setDeployComplete,
     deployWorkerUrl,
     setDeployWorkerUrl,
+    workerRequirementProof,
+    setWorkerRequirementProof,
     provisionedSponsoredContext,
     setProvisionedSponsoredContext,
     workerSecrets,
@@ -707,8 +710,10 @@ const SessionWizard = ({
   const advancedBundleFileInputRef = useRef<HTMLInputElement | null>(null);
   const normalModeRetryBundleFileInputRef = useRef<HTMLInputElement | null>(null);
   const sponsoredPublishBundleFileInputRef = useRef<HTMLInputElement | null>(null);
-  const deployCompleteRef = useRef(!!cachedWizard?.deployComplete);
+  const deployCompleteRef = useRef(deployComplete);
   const deployWorkerUrlRef = useRef(normalizeBaseUrl(toStr(cachedWizard?.deployWorkerUrl).trim()));
+  deployCompleteRef.current = deployComplete;
+  deployWorkerUrlRef.current = deployWorkerUrl;
   const provisionedSponsoredContextRef = useRef<ProvisionedSponsoredContextState>(
     buildProvisionedSponsoredContextState(cachedWizard?.provisionedSponsoredContext),
   );
@@ -788,6 +793,7 @@ const SessionWizard = ({
     setDeployComplete,
     setWorkerMode,
     setDeployWorkerUrl,
+    setWorkerRequirementProof,
     setProvisionedSponsoredContext,
     setForceManualBundleFile,
     setNormalModeBundleUrlOverride,
@@ -797,6 +803,10 @@ const SessionWizard = ({
     setBundleFile,
     buildProvisionedSponsoredContextState,
   });
+  const getWorkerPublishEvidence = () =>
+    resolveSessionWizardWorkerPublishEvidence({
+      runtime: workerDeployRuntimeRef.current, workerSecrets: getCurrentWorkerSecrets(), defaultWorkerUrl: getSessionWizardDefaultWorkerUrl(),
+    });
   const {
     sessionHeaderMode,
     setSessionHeaderMode,
@@ -938,7 +948,7 @@ const SessionWizard = ({
   }, []);
 
   useEffect(() => {
-    // Default: redact secret values so refresh requires re-entry (security: no keys in localStorage).
+    // Redact secret values; live deployment evidence never enters localStorage.
     if (workerCanonicalSettlement.isSettled) return;
     const cachePayload = buildSessionWizardCacheWritePayload({
       sessionId,
@@ -961,6 +971,7 @@ const SessionWizard = ({
       deployForm,
       deployComplete,
       deployWorkerUrl,
+      workerRequirementProof,
       provisionedSponsoredContext,
     });
     const result = writeSessionWizardCache(cachePayload, { expectedCachedPayload: wizardCacheSnapshotRef.current });
@@ -986,6 +997,7 @@ const SessionWizard = ({
     deployForm,
     deployComplete,
     deployWorkerUrl,
+    workerRequirementProof,
     provisionedSponsoredContext,
     workerCanonicalSettlement.isSettled,
   ]);
@@ -1980,6 +1992,8 @@ const SessionWizard = ({
       try {
         const pendingDraftSnapshot = normalizePendingSbtDrafts(pendingSbtDrafts);
         const currentWorkerSecrets = getCurrentWorkerSecrets();
+        const liveRuntime = workerDeployRuntimeRef.current;
+        const liveDraft = liveRuntime?.draft || draftRef.current;
         const sponsoredAutoDeployState = resolveSessionWizardSponsoredAutoDeployReadiness({
           wizardMode,
           sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
@@ -1993,22 +2007,37 @@ const SessionWizard = ({
         const publishRequestDescriptor = resolveSessionWizardPublishRequestDescriptor({
           pendingDraftSnapshot,
           manualMetadataUrl,
-          workerMode,
+          workerMode: liveRuntime?.workerMode || workerMode,
           sponsoredAutoDeployReady: sponsoredAutoDeployState.ready,
-          deployComplete,
+          deployComplete: deployCompleteRef.current,
           canUploadMetadataNow,
-          sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
+          sessionModeProfile: liveDraft.sessionModeProfile as SessionModeProfile,
         });
+        const liveWorkerEvidence = getWorkerPublishEvidence();
         const { publishExecutionPlan } = publishRequestDescriptor;
+        const publishAllowed =
+          publishUiPlan.publishReadiness.canPublishNow &&
+          (!publishExecutionPlan.shouldPersistWorkerConfig ||
+            publishExecutionPlan.shouldAutoDeployWorker ||
+            liveWorkerEvidence?.verified === true);
+        if (!publishAllowed) {
+          setStatus('Deploy and verify the selected worker before publishing.');
+          return;
+        }
         beginSessionPublishReducerAttempt(dispatchSessionPublish, publishExecutionPlan);
         let uploadResult = null;
         let workerUrlOverride = '';
         let deployedPendingDrafts = [];
         const publishControllerResult = await sessionWizardPublishRuntimeController.runPreparation({
+          publishAllowed,
           publishExecutionPlan,
           signerAccountOverride,
           runTrackedPublishEffect,
         });
+        if (publishControllerResult.status === 'blocked') {
+          dispatchSessionPublish({ type: 'edit' });
+          return;
+        }
         workerUrlOverride = publishControllerResult.workerUrlOverride;
         deployedPendingDrafts = publishControllerResult.deployedPendingDrafts;
         const metadataUploadRequest = resolveSessionWizardPublishMetadataUploadRequest({
@@ -2308,6 +2337,9 @@ const SessionWizard = ({
     sessionId,
     sessionIdHex,
     workerCanonicalPublishCompleted: workerCanonicalSettlement.publishCompleted,
+    deployComplete,
+    deployWorkerUrl,
+    workerRequirementProof,
     draft,
     deployForm,
   };
@@ -2339,8 +2371,7 @@ const SessionWizard = ({
     getErrorMessage: getSessionWizardErrorMessage,
     deployWorker: () => handleDeployWorker({ forceSponsoredAutoDeploy: true }),
     deployPendingSbts: deployPendingSbtDrafts,
-    getCurrentWorkerSecrets,
-    resolveWorkerBaseUrl,
+    getWorkerPublishEvidence,
     resolveWorkerRpcUrl,
     resolveWorkerRpcUrlMap,
     parseAllowOriginsInput,
@@ -2469,13 +2500,18 @@ const SessionWizard = ({
   const defaultWorkerUrl = normalizeWorkerUrl(getSessionWizardDefaultWorkerUrl());
   const deployedWorkerUrl = normalizeWorkerUrl(toStr(deployWorkerUrl).trim());
   const normalModeRequiresCustomWorker = isNormalMode && !NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED;
-  const { deployVerifiedInUi, effectiveConfiguredWorkerUrl } = resolveSessionWizardWorkerVerificationUiState({
-    configuredWorkerUrl,
-    deployWorkerUrl: deployedWorkerUrl,
-    defaultWorkerUrl,
-    deployComplete,
-    normalModeRequiresCustomWorker,
-  });
+  const { deployVerifiedInUi: deployIdentityVerifiedInUi, effectiveConfiguredWorkerUrl } =
+    resolveSessionWizardWorkerVerificationUiState({
+      configuredWorkerUrl,
+      deployWorkerUrl: deployedWorkerUrl,
+      defaultWorkerUrl,
+      deployComplete,
+      normalModeRequiresCustomWorker,
+    });
+  const currentWorkerSecrets = getCurrentWorkerSecrets();
+  const deployRequirementsVerified = workerRequirementProof ? getWorkerPublishEvidence()?.verified === true : !sessionModeRequirements.isWorkerCanonical;
+  // Derive current publish authority from the selected worker, profile, provider, and secrets.
+  const deployVerifiedInUi = deployIdentityVerifiedInUi && deployRequirementsVerified;
   const customWorkerSelected = normalModeRequiresCustomWorker || workerMode !== 'default';
   const hideNormalModeDefaultWorkerUrl =
     normalModeRequiresCustomWorker &&
@@ -2496,7 +2532,6 @@ const SessionWizard = ({
       visibleConfiguredWorkerUrl,
       workerMode,
     });
-  const currentWorkerSecrets = getCurrentWorkerSecrets();
   const sponsoredAutoDeployState = resolveSessionWizardSponsoredAutoDeployReadiness({
     wizardMode,
     sponsoredBundle: sponsoredBundleAppliedBundleRef.current,

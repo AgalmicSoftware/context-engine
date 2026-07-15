@@ -8,6 +8,7 @@ import {
 } from './sessionWizardUrlSupport';
 import { getSessionSlugValidationError } from './sessionWizardSlugValidation';
 import type { PublishedPendingSbtLink } from './sessionWizardPublishLinks';
+import type { SessionWizardWorkerPublishEvidence } from './sessionWizardWorkerPublishEvidence';
 
 export type SessionWizardPublishExecutionPlanLike = {
   shouldAutoDeployWorker?: boolean;
@@ -23,6 +24,7 @@ export type SessionWizardPublishDeployWorkerResult = {
   ok?: boolean;
   deployComplete?: boolean;
   workerUrl?: string;
+  requiredLitRuntimeReady?: boolean;
   requiredWorkerSecretsReady?: boolean;
   requiredWorkerSecretFields?: string[];
   error?: string;
@@ -47,6 +49,9 @@ export type SessionWizardPublishPersistWorkerConfigResult = {
   workerUrl?: string;
   configRevision?: string;
   publicConfig?: AnyRecord;
+  workerPublishEvidence?: SessionWizardWorkerPublishEvidence;
+  workerConfigFingerprint?: string;
+  signerAccount?: string;
 };
 
 export type SessionWizardPublishControllerCallbacks = {
@@ -352,7 +357,7 @@ export const runSessionWizardPublishController = async ({
   ports: SessionWizardPublishControllerPorts;
   callbacks: SessionWizardPublishControllerCallbacks;
 }): Promise<SessionWizardPublishControllerResult> => {
-  if (input.publishAllowed === false) {
+  if (input.publishAllowed !== true) {
     return {
       status: 'blocked',
       workerUrlOverride: '',

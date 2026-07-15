@@ -328,13 +328,28 @@ describe('sessionWizardDraftState', () => {
       workerSecrets: {
         apiToken: 'secret',
         optional: '',
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group-1',
+        litPkpId: 'pkp-1',
+        litActionCid: 'bafy-action-1',
       },
+      deployComplete: true,
       deployForm: {
         apiToken: 'cf-secret',
         workerName: ' worker ',
         adminAddress: ' 0xAdmin ',
         accountId: ' account ',
         bundleUrl: ' https://bundle.example/worker.js ',
+      },
+      workerRequirementProof: {
+        version: 1,
+        secretFingerprintSalt: 'd'.repeat(64),
+        workerIdentityFingerprint: 'a'.repeat(64),
+        requirementsFingerprint: 'b'.repeat(64),
+        requiredSecretFields: ['openaiKey'],
+        secretValueFingerprints: { openaiKey: 'c'.repeat(64) },
+        remoteManagedSecretFields: [],
+        litRuntimeFingerprint: '',
       },
     });
 
@@ -347,7 +362,12 @@ describe('sessionWizardDraftState', () => {
         workerSecrets: {
           apiToken: '[redacted]',
           optional: '',
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: 'group-1',
+          litPkpId: 'pkp-1',
+          litActionCid: 'bafy-action-1',
         },
+        deployComplete: false,
         deployForm: {
           workerName: 'worker',
           adminAddress: '0xAdmin',
@@ -357,6 +377,8 @@ describe('sessionWizardDraftState', () => {
     );
     expect(payload.deployForm.apiToken).toBeUndefined();
     expect(payload.deployForm.accountId).toBeUndefined();
+    expect(payload.workerRequirementProof).toBeUndefined();
+    expect(JSON.stringify(payload)).not.toContain('cf-secret');
   });
 
   it('keeps multi-gate resource selections in the cache write payload', () => {

@@ -357,6 +357,15 @@ describe('sessionWizardWriteNormalization', () => {
         contracts: {
           surveys: { address: '0x111', chainId: DEFAULT_CONFIG_CHAIN_ID },
         },
+        ai: {
+          models: {
+            fast: { provider: 'openai', model: 'gpt-4o-mini' },
+            thinking: { provider: 'openai', model: 'gpt-4o' },
+            // The default wizard draft always carries this browser-only key,
+            // even when its value is empty. It must not reach worker config.
+            transcription: { provider: 'openai', model: 'whisper-1', rpcUrl: '' },
+          },
+        },
         sessionModeProfile,
       },
       deployPayload: {
@@ -401,6 +410,8 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.rpcUrlsByChainId).toBeUndefined();
     expect(payload.faucet).toBeUndefined();
     expect(payload.litCredentials).toBeUndefined();
+    expect(payload.ai.models.transcription).toEqual({ provider: 'openai', model: 'whisper-1' });
+    expect(payload.ai.models.transcription).not.toHaveProperty('rpcUrl');
     expect(JSON.stringify(payload)).not.toMatch(/must-never-persist|0xRegistry|rpc\.example|faucet\.example/i);
   });
 

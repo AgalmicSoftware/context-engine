@@ -72,7 +72,10 @@ export const resolveSessionWizardWorkerUrlSourceState = ({
   workerMode = '',
 }: ResolveSessionWizardWorkerUrlSourceStateArgs = {}): SessionWizardWorkerUrlSourceState => {
   const usesDefaultWorkerUrl =
-    !!visibleConfiguredWorkerUrl && !!defaultWorkerUrl && visibleConfiguredWorkerUrl === defaultWorkerUrl;
+    workerMode === 'default' &&
+    !!visibleConfiguredWorkerUrl &&
+    !!defaultWorkerUrl &&
+    visibleConfiguredWorkerUrl === defaultWorkerUrl;
   const deployWorkerMatchesConfiguredUrl =
     !!visibleConfiguredWorkerUrl && !!deployedWorkerUrl && visibleConfiguredWorkerUrl === deployedWorkerUrl;
   const workerUrlSource = !resolvedWorkerBaseUrl
