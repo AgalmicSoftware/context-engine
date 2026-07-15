@@ -26,6 +26,11 @@ export const DEFAULT_ALLOWED_ORIGINS = [
   'http://localhost:3000',
 ];
 export const DEPLOY_HELPER_ORIGINS_KEY = 'deploy-helper:origins';
+const DEPLOYMENT_JOURNAL_PREFIX = 'deploy-helper:deployment:';
+const DEPLOYMENT_JOURNAL_VERSION = 1;
+const DEPLOYMENT_JOURNAL_TTL_SECONDS = 7 * 24 * 60 * 60;
+const DEPLOYMENT_REQUEST_ID_RE = /^[a-z0-9._:-]{8,128}$/i;
+const KV_NAMESPACE_TITLE_MAX_LENGTH = 512;
 
 const TRUE_STRINGS = new Set(['1', 'true', 'yes', 'on']);
 const FALSE_STRINGS = new Set(['0', 'false', 'no', 'off']);
@@ -304,6 +309,31 @@ export const sha256Hex = async (value) => {
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
 };
+
+const deriveIdempotentRuntimeSecret = async ({ apiToken, deploymentId, purpose }) => sha256Hex(
+  `context-engine:deploy-runtime-secret:v1:${purpose}\u0000${deploymentId}\u0000${apiToken}`,
+);
+
+const canonicalizeJsonValue = (value, arrayEntry = false) => {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (Array.isArray(value)) {
+    return value.map((entry) => canonicalizeJsonValue(entry, true));
+  }
+  if (value && typeof value === 'object') {
+    return Object.keys(value)
+      .sort()
+      .reduce((out, key) => {
+        const entry = value[key];
+        if (entry === undefined || typeof entry === 'function' || typeof entry === 'symbol') return out;
+        out[key] = canonicalizeJsonValue(entry);
+        return out;
+      }, Object.create(null));
+  }
+  return arrayEntry ? null : undefined;
+};
+
+export const stableCanonicalSerialize = (value) => JSON.stringify(canonicalizeJsonValue(value));
 export const buildBundleDiagnostics = async (bundleSource, sourceKind) => {
   const normalized = toStr(bundleSource);
   return {
@@ -485,6 +515,128 @@ const buildFreshDeploymentName = (requestedName, deploymentId) => {
     .slice(0, 50) || 'ce-session-worker';
   return `${base}-${toStr(deploymentId).slice(0, 12)}`;
 };
+
+const normalizeDeploymentRequestId = (value) => {
+  const normalized = toStr(value).trim();
+  return DEPLOYMENT_REQUEST_ID_RE.test(normalized) ? normalized : '';
+};
+
+const buildSafeDeployJournalResult = (result = {}) => {
+  const incomingBody = isObj(result?.body) ? result.body : {};
+  const body = {};
+  [
+    'ok',
+    'error',
+    'workerName',
+    'workerUrl',
+    'resolvedSlug',
+    'kvNamespaceId',
+    'deploymentId',
+    'sessionConfigKey',
+    'sessionSecretsKey',
+    'sessionKvPrefix',
+    'writesSessionConfig',
+    'writesSessionSecrets',
+    'tokenSecretSet',
+    'tokenSecretPreserved',
+    'envelopeKekSecretSet',
+    'envelopeKekSecretPreserved',
+    'subdomain',
+    'subdomainStatus',
+    'subdomainEnabled',
+    'subdomainError',
+    'scriptSubdomainEnabled',
+    'scriptSubdomainError',
+    'configVerified',
+    'deploymentRequestPending',
+  ].forEach((key) => {
+    const value = incomingBody[key];
+    if (typeof value === 'string' || typeof value === 'boolean' || Number.isFinite(value)) {
+      body[key] = value;
+    }
+  });
+  if (isObj(incomingBody.orphanResources)) {
+    body.orphanResources = {};
+    ['kvNamespaceId', 'kvCleanupStatus', 'workerName', 'workerCleanupStatus'].forEach((key) => {
+      const value = incomingBody.orphanResources[key];
+      if (typeof value === 'string') body.orphanResources[key] = value;
+    });
+  }
+  if (isObj(incomingBody.bundleDiagnostics)) {
+    body.bundleDiagnostics = {};
+    [
+      'source',
+      'length',
+      'sha256',
+      'hasAnyExport',
+      'hasExportDefault',
+      'hasNamedDefaultExport',
+      'hasStringExportWrapper',
+      'hasFetchHandler',
+      'hasServiceWorkerFetch',
+    ].forEach((key) => {
+      const value = incomingBody.bundleDiagnostics[key];
+      if (typeof value === 'string' || typeof value === 'boolean' || Number.isFinite(value)) {
+        body.bundleDiagnostics[key] = value;
+      }
+    });
+  }
+  if (result?.ok !== true) body.deploymentRequestTerminal = true;
+  return {
+    ok: result?.ok === true,
+    status: Number(result?.status || 0) || 500,
+    body,
+    fallbackEligible: result?.fallbackEligible === true,
+  };
+};
+
+const resolveDeployJournalBinding = (env) => {
+  for (const binding of [env?.DEPLOY_HELPER_KV, env?.GROUP_KV]) {
+    if (typeof binding?.get === 'function' && typeof binding?.put === 'function') return binding;
+  }
+  return null;
+};
+
+const buildDeploymentRequestContext = async ({ body, requestOrigin = '' } = {}) => {
+  const deploymentRequestId = normalizeDeploymentRequestId(body?.deploymentRequestId);
+  if (!deploymentRequestId) return null;
+  const digestBody = { ...(isObj(body) ? body : {}) };
+  delete digestBody.deploymentRequestId;
+  delete digestBody.accountId;
+  digestBody.apiToken = toStr(digestBody.apiToken || digestBody.token).trim();
+  delete digestBody.token;
+  const requestDigest = await sha256Hex(stableCanonicalSerialize({
+    body: digestBody,
+    requestOrigin: normalizeOrigin(requestOrigin) || toStr(requestOrigin).trim(),
+  }));
+  const deploymentId = await sha256Hex(`context-engine-deployment:${deploymentRequestId}`);
+  return {
+    deploymentRequestId,
+    requestDigest,
+    deploymentId,
+    requestMarker: deploymentId.slice(0, 16),
+    workerName: buildFreshDeploymentName(body?.workerName, deploymentId),
+    journalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}`,
+    isReplay: false,
+  };
+};
+
+const readDeployJournalRecord = async (binding, key) => {
+  const raw = await binding.get(key);
+  if (!raw) return null;
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return isObj(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeDeployJournalRecord = async (binding, key, record) => binding.put(
+  key,
+  JSON.stringify(record),
+  { expirationTtl: DEPLOYMENT_JOURNAL_TTL_SECONDS },
+);
 
 const normalizeResourceStage = (value, fallback) => {
   const normalized = toStr(value).trim().toLowerCase();
@@ -808,6 +960,7 @@ export const ensureWorkersDevSubdomain = async ({
   let subdomainError = '';
   let scriptSubdomainEnabled = false;
   let scriptSubdomainError = '';
+  const activationFailures = [];
 
   const fallbackSubdomain = accountId
     ? `ce-${toStr(accountId).replace(/[^a-z0-9-]/gi, '').slice(0, 10)}`
@@ -820,6 +973,7 @@ export const ensureWorkersDevSubdomain = async ({
     subdomain = subdomainResp.data?.result?.subdomain || null;
     subdomainStatus = subdomainResp.data?.result?.status || '';
   } else {
+    activationFailures.push(subdomainResp);
     subdomainError = subdomainResp.error || subdomainError;
   }
 
@@ -836,6 +990,7 @@ export const ensureWorkersDevSubdomain = async ({
       subdomainEnabled = true;
       subdomainError = '';
     } else {
+      activationFailures.push(enableResp);
       subdomainError = enableResp.error || 'Failed to enable workers.dev subdomain.';
     }
   };
@@ -855,14 +1010,18 @@ export const ensureWorkersDevSubdomain = async ({
     if (scriptSubdomainResp.ok) {
       scriptSubdomainEnabled = scriptSubdomainResp.data?.result?.enabled === true;
       if (!scriptSubdomainEnabled) {
+        activationFailures.push({ status: 503 });
         scriptSubdomainError = 'Cloudflare did not enable workers.dev for this Worker.';
       }
     } else {
+      activationFailures.push(scriptSubdomainResp);
       scriptSubdomainError = scriptSubdomainResp.error || 'Failed to enable workers.dev for script.';
     }
   }
 
   const workerUrl = subdomain && scriptSubdomainEnabled ? `https://${workerName}.${subdomain}.workers.dev/` : '';
+  const fallbackEligible = !workerUrl && activationFailures.length > 0 &&
+    activationFailures.every((failure) => shouldAllowFallbackForCloudflareFailure(failure));
   return {
     subdomain,
     subdomainStatus,
@@ -871,6 +1030,7 @@ export const ensureWorkersDevSubdomain = async ({
     scriptSubdomainEnabled,
     scriptSubdomainError,
     workerUrl,
+    fallbackEligible,
   };
 };
 
@@ -880,15 +1040,8 @@ const resolveDeploymentAccountId = async ({
   apiBaseUrl = '',
   env = null,
 } = {}) => {
-  const explicitAccountId = toStr(body?.accountId).trim();
-  if (explicitAccountId) {
-    return {
-      ok: true,
-      accountId: explicitAccountId,
-      accountName: '',
-    };
-  }
-
+  // Account selection is a property of the token, never caller input. This
+  // keeps embedded and sponsored deploys inside the token's single-account scope.
   const lookup = await lookupCloudflareAccount({
     apiToken: toStr(body?.apiToken || body?.token).trim(),
     fetchImpl,
@@ -907,6 +1060,7 @@ const executeDeployHelperRequestCore = async ({
   requestOrigin = '',
   fetchImpl = globalThis.fetch,
   consoleImpl = console,
+  idempotencyContext = null,
 } = {}) => {
   const sessionSlugCheck = validateInboundSlug(body?.sessionSlug);
   if (!sessionSlugCheck.ok) {
@@ -986,13 +1140,12 @@ const executeDeployHelperRequestCore = async ({
   if (!workerCanonicalAuthority.ok) {
     return buildFailure(400, { error: workerCanonicalAuthority.error });
   }
-  const deploymentId = randomSecret();
-  // Treat the caller-supplied name as a readable prefix. Cloudflare's script
-  // upload API has no create-only conditional, so every fresh deploy receives
-  // a random physical name before any existence check or mutable operation.
-  // Independent helper isolates therefore no longer share the deterministic
-  // caller-chosen script name.
-  const workerName = buildFreshDeploymentName(requestedWorkerName, deploymentId);
+  const deploymentId = toStr(idempotencyContext?.deploymentId).trim() || randomSecret();
+  // Treat the caller-supplied name as a readable prefix. Legacy requests get a
+  // random suffix; stable request IDs derive one deterministic suffix so lost
+  // responses converge on the same physical script instead of creating peers.
+  const workerName = toStr(idempotencyContext?.workerName).trim()
+    || buildFreshDeploymentName(requestedWorkerName, deploymentId);
   const buildDeploymentFailure = (status, payload, options) => buildFailure(status, {
     ...payload,
     // This is the non-secret marker embedded in CE_DEPLOYMENT_ID. Preserve it
@@ -1007,6 +1160,7 @@ const executeDeployHelperRequestCore = async ({
     cfFetchOptions,
   );
   const workerNameConfirmedAbsent = !workerNamePreflight.ok && Number(workerNamePreflight.status || 0) === 404;
+  const mayResumeExistingWorker = workerNamePreflight.ok && idempotencyContext?.isReplay === true;
   // A non-404 lookup failure cannot distinguish an available name from a live
   // worker, so every deploy mode fails closed before provisioning resources.
   if (!workerNamePreflight.ok && !workerNameConfirmedAbsent) {
@@ -1021,7 +1175,7 @@ const executeDeployHelperRequestCore = async ({
   // namespace may contain auth markers, groups, storage indexes, and wrapped
   // envelope keys that are not part of this deploy request. Require a fresh
   // script name until an explicit state-migration workflow exists.
-  if (workerNamePreflight.ok) {
+  if (workerNamePreflight.ok && !mayResumeExistingWorker) {
     return buildFailure(409, {
       error: `Generated worker name "${workerName}" already exists. In-place redeploy is disabled to protect existing worker state. Retry to allocate a new physical worker name.`,
     });
@@ -1122,22 +1276,155 @@ const executeDeployHelperRequestCore = async ({
   const secrets = sanitizeSecrets(body?.secrets || {});
   const secretsEnvelope = buildSessionSecretsEnvelope(secrets);
 
-  const kvCreate = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: `ContextEngineSessionCorsWorker:${displaySlug}` }),
-  }, cfFetchOptions);
-  if (!kvCreate.ok) {
-    return buildFailure(502, {
-      error: kvCreate.error,
-      detail: kvCreate.detail,
-    }, {
-      fallbackEligible: shouldAllowFallbackForCloudflareFailure(kvCreate),
-    });
+  const requestMarker = toStr(idempotencyContext?.requestMarker).trim();
+  const kvTitleSuffix = requestMarker ? `:req-${requestMarker}` : '';
+  const kvTitlePrefix = `ContextEngineSessionCorsWorker:${displaySlug}`
+    .slice(0, KV_NAMESPACE_TITLE_MAX_LENGTH - kvTitleSuffix.length);
+  const kvNamespaceTitle = `${kvTitlePrefix}${kvTitleSuffix}`;
+  const findRequestMarkedKvNamespaces = async () => {
+    const matches = [];
+    let page = 1;
+    let totalPages = 1;
+    do {
+      const listResult = await cfFetch(
+        apiToken,
+        `/accounts/${accountId}/storage/kv/namespaces?per_page=100&page=${page}`,
+        { method: 'GET' },
+        cfFetchOptions,
+      );
+      if (!listResult.ok) return { ok: false, result: listResult, matches: [] };
+      const namespaces = Array.isArray(listResult.data?.result) ? listResult.data.result : [];
+      matches.push(...namespaces.filter((namespace) => (
+        toStr(namespace?.title).trim() === kvNamespaceTitle && toStr(namespace?.id).trim()
+      )));
+      const reportedTotalPages = Number(listResult.data?.result_info?.total_pages || 1) || 1;
+      if (reportedTotalPages > 1000) {
+        return {
+          ok: false,
+          result: { error: 'KV namespace inventory is too large to reconcile safely.', status: 409 },
+          matches: [],
+        };
+      }
+      totalPages = Math.max(1, reportedTotalPages);
+      page += 1;
+    } while (page <= totalPages);
+    return { ok: true, matches };
+  };
+
+  const workerSettingsMatchDeployment = (settingsResult, namespaceId) => {
+    if (!settingsResult?.ok || !namespaceId) return false;
+    const bindings = Array.isArray(settingsResult.data?.result?.bindings)
+      ? settingsResult.data.result.bindings
+      : [];
+    const deploymentBindings = bindings.filter((binding) => (
+      toStr(binding?.name).trim() === DEPLOYMENT_ID_BINDING_NAME
+    ));
+    const groupKvBindings = bindings.filter((binding) => toStr(binding?.name).trim() === 'GROUP_KV');
+    return (
+      deploymentBindings.length === 1 &&
+      toStr(deploymentBindings[0]?.type).trim() === 'plain_text' &&
+      toStr(deploymentBindings[0]?.text).trim() === deploymentId &&
+      groupKvBindings.length === 1 &&
+      toStr(groupKvBindings[0]?.type).trim() === 'kv_namespace' &&
+      toStr(groupKvBindings[0]?.namespace_id).trim() === namespaceId
+    );
+  };
+
+  let kvId = '';
+  let resumeUploadedWorker = false;
+  if (requestMarker) {
+    const existingMarkedNamespaces = await findRequestMarkedKvNamespaces();
+    if (!existingMarkedNamespaces.ok) {
+      return buildFailure(502, {
+        error: existingMarkedNamespaces.result?.error || 'Failed to reconcile deployment KV namespace.',
+        detail: existingMarkedNamespaces.result?.detail,
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(existingMarkedNamespaces.result),
+      });
+    }
+    if (existingMarkedNamespaces.matches.length > 1) {
+      return buildFailure(409, {
+        error: 'Multiple KV namespaces share this deployment request marker; deployment stopped.',
+      });
+    }
+    if (mayResumeExistingWorker && existingMarkedNamespaces.matches.length === 0) {
+      return buildFailure(409, {
+        error: 'Existing worker does not have exactly one request-marked KV namespace; deployment resume stopped.',
+      });
+    }
+    if (existingMarkedNamespaces.matches.length === 1) {
+      if (idempotencyContext?.isReplay !== true) {
+        return buildFailure(409, {
+          error: 'A KV namespace already uses this new deployment request marker; deployment stopped.',
+          deploymentRequestPending: true,
+        });
+      }
+      kvId = toStr(existingMarkedNamespaces.matches[0]?.id).trim();
+    }
   }
-  const kvId = kvCreate.data?.result?.id;
+
+  if (mayResumeExistingWorker) {
+    if (!workerSettingsMatchDeployment(workerNamePreflight, kvId)) {
+      return buildFailure(409, {
+        error: 'Existing worker does not match this deployment request; required bindings differ and resume stopped.',
+      });
+    }
+    resumeUploadedWorker = true;
+  }
+
+  let kvCreate = null;
   if (!kvId) {
-    return buildFailure(502, { error: 'Failed to create KV namespace.' }, { fallbackEligible: true });
+    try {
+      // Keep the durable stage transition immediately adjacent to the first
+      // mutation. Reserved requests may retry preflight; started requests only
+      // re-POST the same uniqueness-enforced title and reconcile its result.
+      await idempotencyContext?.markMutationStarted?.();
+    } catch (error) {
+      return buildFailure(503, {
+        error: `Failed to advance deployment request journal: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
+      }, { fallbackEligible: true });
+    }
+    kvCreate = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: kvNamespaceTitle }),
+    }, cfFetchOptions);
+    kvId = toStr(kvCreate.data?.result?.id).trim();
+    if (!kvId && requestMarker) {
+      for (let attempt = 0; attempt <= NEW_KV_NAMESPACE_RETRY_DELAYS_MS.length; attempt += 1) {
+        const reconciled = await findRequestMarkedKvNamespaces();
+        if (!reconciled.ok) break;
+        if (reconciled.matches.length > 1) {
+          return buildFailure(409, {
+            error: 'Multiple KV namespaces share this deployment request marker; deployment stopped.',
+          });
+        }
+        if (reconciled.matches.length === 1) {
+          kvId = toStr(reconciled.matches[0]?.id).trim();
+          break;
+        }
+        const delayMs = NEW_KV_NAMESPACE_RETRY_DELAYS_MS[attempt];
+        if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    if (!kvId) {
+      const createStatus = Number(kvCreate?.status || 0);
+      const createMayHaveCommitted = (
+        requestMarker && (
+          kvCreate?.ok === true ||
+          createStatus === 400 ||
+          createStatus === 409 ||
+          shouldAllowFallbackForCloudflareFailure(kvCreate)
+        )
+      );
+      return buildFailure(createMayHaveCommitted ? 503 : 502, {
+        error: kvCreate?.error || 'Failed to create or reconcile KV namespace.',
+        detail: kvCreate?.detail,
+        ...(createMayHaveCommitted ? { deploymentRequestPending: true } : {}),
+      }, {
+        fallbackEligible: kvCreate ? shouldAllowFallbackForCloudflareFailure(kvCreate) : true,
+      });
+    }
   }
   const cleanupStagedKv = async () => {
     const kvCleanup = await cfFetch(
@@ -1151,57 +1438,65 @@ const executeDeployHelperRequestCore = async ({
       : { kvNamespaceId: kvId, kvCleanupStatus: 'delete-failed' };
   };
 
-  // Establish the signed admin binding before the runnable script can ever be
-  // attached to this namespace. Otherwise a redeployed workers.dev hostname
-  // has a first-write interval where an unrelated signer can claim the slug.
-  const configPut = await putFreshKvNamespaceValue({
-    apiToken,
-    path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`,
-    options: {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config),
-    },
-    cfFetchOptions,
-  });
-  if (!configPut.ok) {
-    const orphanKv = await cleanupStagedKv();
-    return buildDeploymentFailure(502, {
-      error: configPut.error,
-      detail: configPut.detail,
-      orphanResources: { ...orphanKv, workerName: '' },
-    }, {
-      fallbackEligible: shouldAllowFallbackForCloudflareFailure(configPut),
+  if (!resumeUploadedWorker) {
+    // Establish the signed admin binding before the runnable script can ever be
+    // attached to this namespace. Otherwise a redeployed workers.dev hostname
+    // has a first-write interval where an unrelated signer can claim the slug.
+    const configPut = await putFreshKvNamespaceValue({
+      apiToken,
+      path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`,
+      options: {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config),
+      },
+      cfFetchOptions,
     });
-  }
+    if (!configPut.ok) {
+      const orphanKv = await cleanupStagedKv();
+      return buildDeploymentFailure(502, {
+        error: configPut.error,
+        detail: configPut.detail,
+        orphanResources: { ...orphanKv, workerName: '' },
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(configPut),
+      });
+    }
 
-  // Stage both canonical records before a new script can become reachable.
-  // This avoids a first-write or missing-secret interval during fresh deploys.
-  const secretsEnvelopeBody = JSON.stringify(secretsEnvelope);
-  const secretsPut = await putFreshKvNamespaceValue({
-    apiToken,
-    path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`,
-    options: {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: secretsEnvelopeBody,
-    },
-    cfFetchOptions,
-  });
-  if (!secretsPut.ok) {
-    const orphanKv = await cleanupStagedKv();
-    return buildDeploymentFailure(502, {
-      error: secretsPut.error,
-      detail: secretsPut.detail,
-      orphanResources: { ...orphanKv, workerName: '' },
-    }, {
-      fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretsPut),
+    // Stage both canonical records before a new script can become reachable.
+    // This avoids a first-write or missing-secret interval during fresh deploys.
+    const secretsEnvelopeBody = JSON.stringify(secretsEnvelope);
+    const secretsPut = await putFreshKvNamespaceValue({
+      apiToken,
+      path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`,
+      options: {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: secretsEnvelopeBody,
+      },
+      cfFetchOptions,
     });
+    if (!secretsPut.ok) {
+      const orphanKv = await cleanupStagedKv();
+      return buildDeploymentFailure(502, {
+        error: secretsPut.error,
+        detail: secretsPut.detail,
+        orphanResources: { ...orphanKv, workerName: '' },
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretsPut),
+      });
+    }
   }
 
   const envelopeKekSecretRequired = deployStorageRequiresEnvelopeKek(storageProfile);
-  const tokenSecret = randomSecret();
-  const envelopeKekSecret = envelopeKekSecretRequired ? randomSecret() : '';
+  const tokenSecret = idempotencyContext
+    ? await deriveIdempotentRuntimeSecret({ apiToken, deploymentId, purpose: 'token-hmac' })
+    : randomSecret();
+  const envelopeKekSecret = envelopeKekSecretRequired
+    ? (idempotencyContext
+      ? await deriveIdempotentRuntimeSecret({ apiToken, deploymentId, purpose: 'storage-envelope-kek' })
+      : randomSecret())
+    : '';
   const metadata = {
     main_module: 'worker.mjs',
     bindings: [
@@ -1222,28 +1517,32 @@ const executeDeployHelperRequestCore = async ({
     compatibility_date: toStr(env?.WORKER_COMPATIBILITY_DATE || DEFAULT_COMPAT_DATE),
     compatibility_flags: ['nodejs_compat'],
   };
-  const cleanupDeploymentResources = async () => {
-    let removableWorkerName = '';
-    let workerCleanupStatus = '';
-    const cleanupWorkerIfOwned = async () => {
-      const settingsResp = await cfFetch(
+  const readWorkerSettingsAfterUpload = async () => {
+    let settingsResp = null;
+    // Settings can briefly lag an accepted upload. Re-read before classifying
+    // ownership, but never reinterpret a persistent 404 as proof that an
+    // upload attempt had no effect.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      settingsResp = await cfFetch(
         apiToken,
         `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
         { method: 'GET' },
         cfFetchOptions,
       );
+      if (settingsResp.ok) break;
+    }
+    return settingsResp;
+  };
+  const cleanupDeploymentResources = async () => {
+    let removableWorkerName = workerName;
+    let workerCleanupStatus = '';
+    const cleanupWorkerIfOwned = async () => {
+      const settingsResp = await readWorkerSettingsAfterUpload();
       if (!settingsResp.ok) {
-        if (Number(settingsResp.status || 0) === 404) return true;
         workerCleanupStatus = 'ownership-unverified';
         return false;
       }
-      const bindings = Array.isArray(settingsResp.data?.result?.bindings)
-        ? settingsResp.data.result.bindings
-        : [];
-      const deploymentStillOwned = bindings.some((binding) => (
-        toStr(binding?.name).trim() === DEPLOYMENT_ID_BINDING_NAME &&
-        toStr(binding?.text).trim() === deploymentId
-      ));
+      const deploymentStillOwned = workerSettingsMatchDeployment(settingsResp, kvId);
       if (!deploymentStillOwned) {
         workerCleanupStatus = 'ownership-changed';
         return false;
@@ -1255,10 +1554,10 @@ const executeDeployHelperRequestCore = async ({
         cfFetchOptions,
       );
       if (!scriptCleanup.ok) {
-        removableWorkerName = workerName;
         workerCleanupStatus = 'owned-delete-failed';
         return false;
       }
+      removableWorkerName = '';
       return true;
     };
     // The uploaded script may have been applied even when Cloudflare's response
@@ -1293,73 +1592,75 @@ const executeDeployHelperRequestCore = async ({
   form.append('worker.mjs', new Blob([bundleSource], { type: 'application/javascript+module' }), 'worker.mjs');
 
   const scriptUploadPath = `/accounts/${accountId}/workers/scripts/${workerName}`;
-  // Recheck the randomized physical name after staging KV. The random suffix
-  // prevents independent helper isolates from sharing a caller-selected name;
-  // this second lookup covers the remaining generated-name collision case.
-  const finalWorkerNamePreflight = await cfFetch(
-    apiToken,
-    `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
-    { method: 'GET' },
-    cfFetchOptions,
-  );
-  if (finalWorkerNamePreflight.ok) {
-    const orphanKv = await cleanupStagedKv();
-    return buildDeploymentFailure(409, {
-      error: `Generated worker name "${workerName}" became unavailable during deployment. No script was uploaded; retry to allocate a new physical worker name.`,
-      orphanResources: { ...orphanKv, workerName: '' },
-    });
-  }
-  if (Number(finalWorkerNamePreflight.status || 0) !== 404) {
-    const orphanKv = await cleanupStagedKv();
-    return buildDeploymentFailure(502, {
-      error: finalWorkerNamePreflight.error || 'Failed to re-verify worker-name availability.',
-      detail: finalWorkerNamePreflight.detail,
-      orphanResources: { ...orphanKv, workerName: '' },
-    }, {
-      fallbackEligible: shouldAllowFallbackForCloudflareFailure(finalWorkerNamePreflight),
-    });
-  }
-  const scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
-    method: 'PUT',
-    body: form,
-  }, cfFetchOptions);
-  if (!scriptUpload.ok) {
-    consoleImpl?.error?.('[deploy-helper] script upload failed', JSON.stringify({
-      workerName,
-      sessionSlug: displaySlug,
-      error: scriptUpload.error,
-      detail: scriptUpload.detail,
-      diagnostics: bundleDiagnostics,
-    }));
-    const bundleSummary = formatBundleDiagnostics(bundleDiagnostics);
-    const orphanResources = await cleanupDeploymentResources();
-    return buildDeploymentFailure(502, {
-      error: `${scriptUpload.error} Bundle diagnostics: ${bundleSummary}`,
-      detail: scriptUpload.detail,
-      bundleDiagnostics,
-      orphanResources,
-    }, {
-      fallbackEligible: shouldAllowFallbackForCloudflareFailure(scriptUpload),
-    });
+  if (!resumeUploadedWorker) {
+    // Recheck the allocated physical name after staging KV. Legacy random names
+    // guard caller-prefix collisions; stable request names intentionally converge
+    // and must retain their request-marked namespace if another call advances first.
+    const finalWorkerNamePreflight = await cfFetch(
+      apiToken,
+      `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
+      { method: 'GET' },
+      cfFetchOptions,
+    );
+    if (finalWorkerNamePreflight.ok) {
+      if (requestMarker) {
+        return buildDeploymentFailure(503, {
+          error: 'This deployment request is already advancing in another invocation. Retry the same request ID.',
+          deploymentRequestPending: true,
+          orphanResources: {
+            kvNamespaceId: kvId,
+            kvCleanupStatus: 'retained-live-worker',
+            workerName,
+          },
+        });
+      }
+      const orphanKv = await cleanupStagedKv();
+      return buildDeploymentFailure(409, {
+        error: `Generated worker name "${workerName}" became unavailable during deployment. No script was uploaded; retry to allocate a new physical worker name.`,
+        orphanResources: { ...orphanKv, workerName: '' },
+      });
+    }
+    if (Number(finalWorkerNamePreflight.status || 0) !== 404) {
+      const orphanKv = await cleanupStagedKv();
+      return buildDeploymentFailure(502, {
+        error: finalWorkerNamePreflight.error || 'Failed to re-verify worker-name availability.',
+        detail: finalWorkerNamePreflight.detail,
+        orphanResources: { ...orphanKv, workerName: '' },
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(finalWorkerNamePreflight),
+      });
+    }
+    const scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
+      method: 'PUT',
+      body: form,
+    }, cfFetchOptions);
+    if (!scriptUpload.ok) {
+      consoleImpl?.error?.('[deploy-helper] script upload failed', JSON.stringify({
+        workerName,
+        sessionSlug: displaySlug,
+        error: scriptUpload.error,
+        detail: scriptUpload.detail,
+        diagnostics: bundleDiagnostics,
+      }));
+      const bundleSummary = formatBundleDiagnostics(bundleDiagnostics);
+      const orphanResources = await cleanupDeploymentResources();
+      return buildDeploymentFailure(502, {
+        error: `${scriptUpload.error} Bundle diagnostics: ${bundleSummary}`,
+        detail: scriptUpload.detail,
+        bundleDiagnostics,
+        orphanResources,
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(scriptUpload),
+      });
+    }
   }
 
   // Confirm that the uploaded script still carries this deployment's marker
   // before enabling its hostname or writing runtime secrets. If another writer
   // replaced it, preserve both resources for an operator rather than deleting
   // a script that is no longer ours or activating a mixed deployment.
-  const uploadedWorkerSettings = await cfFetch(
-    apiToken,
-    `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
-    { method: 'GET' },
-    cfFetchOptions,
-  );
-  const uploadedBindings = Array.isArray(uploadedWorkerSettings.data?.result?.bindings)
-    ? uploadedWorkerSettings.data.result.bindings
-    : [];
-  const uploadedWorkerStillOwned = uploadedWorkerSettings.ok && uploadedBindings.some((binding) => (
-    toStr(binding?.name).trim() === DEPLOYMENT_ID_BINDING_NAME &&
-    toStr(binding?.text).trim() === deploymentId
-  ));
+  const uploadedWorkerSettings = await readWorkerSettingsAfterUpload();
+  const uploadedWorkerStillOwned = workerSettingsMatchDeployment(uploadedWorkerSettings, kvId);
   if (!uploadedWorkerStillOwned) {
     const orphanResources = await cleanupDeploymentResources();
     return buildDeploymentFailure(uploadedWorkerSettings.ok ? 409 : 502, {
@@ -1383,6 +1684,7 @@ const executeDeployHelperRequestCore = async ({
     scriptSubdomainEnabled,
     scriptSubdomainError,
     workerUrl,
+    fallbackEligible: activationFallbackEligible,
   } = await ensureWorkersDevSubdomain({
     apiToken,
     accountId,
@@ -1419,6 +1721,8 @@ const executeDeployHelperRequestCore = async ({
     return buildDeploymentFailure(502, {
       error: subdomainError || scriptSubdomainError || 'Cloudflare did not return a shareable worker URL.',
       orphanResources,
+    }, {
+      fallbackEligible: activationFallbackEligible,
     });
   }
   if (workerUrl) {
@@ -1437,6 +1741,8 @@ const executeDeployHelperRequestCore = async ({
         error: configUpdate.error || 'Failed to persist the final worker config.',
         detail: configUpdate.detail,
         orphanResources,
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(configUpdate),
       });
     }
     const expectedAuthorityMode = toStr(configWithWorkerUrl?.sessionModeProfile?.authority?.mode).trim();
@@ -1457,23 +1763,15 @@ const executeDeployHelperRequestCore = async ({
       );
     };
     const configReadbackPath = `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`;
-    let configReadback = await cfFetch(apiToken, configReadbackPath, { method: 'GET' }, cfFetchOptions);
-    for (const delayMs of FINAL_CONFIG_READBACK_RETRY_DELAYS_MS) {
-      if (readbackMatches(configReadback)) break;
-      const readbackConfig = configReadback.data?.result || configReadback.data || {};
+    const readbackIsRetryable = (result) => {
+      if (!result?.ok) {
+        return isNewKvNamespacePropagationFailure(result) || shouldAllowFallbackForCloudflareFailure(result);
+      }
+      const readbackConfig = result.data?.result || result.data || {};
       const expectedRevision = toStr(configWithWorkerUrl.configRevision).trim();
       const observedRevision = toStr(readbackConfig.configRevision).trim();
-      // Retry only an otherwise valid API read that is demonstrably an older
-      // revision, the exact staged pre-URL identity, or the narrow fresh-
-      // namespace 404/10013. The staged and final writes intentionally share a
-      // configRevision, so revision comparison alone cannot recognize that
-      // normal propagation state. Foreign same-revision identities and
-      // unrelated API errors remain fail-closed.
-      const staleRevision = (
-        configReadback.ok && expectedRevision && observedRevision && observedRevision !== expectedRevision
-      );
+      const staleRevision = expectedRevision && observedRevision && observedRevision !== expectedRevision;
       const stagedConfigPending = (
-        configReadback.ok &&
         toStr(readbackConfig.slug).trim() === toStr(config.slug).trim() &&
         toStr(readbackConfig.corsWorkerUrl).trim() === toStr(config.corsWorkerUrl).trim() &&
         toStr(readbackConfig.corsWorkerUrl).trim() !== toStr(configWithWorkerUrl.corsWorkerUrl).trim() &&
@@ -1486,8 +1784,15 @@ const executeDeployHelperRequestCore = async ({
         (!workerCanonicalRequested ||
           workerAuthorityPoliciesMatch(config.workerAuthority, readbackConfig.workerAuthority))
       );
-      const freshNamespacePending = isNewKvNamespacePropagationFailure(configReadback);
-      if (!staleRevision && !stagedConfigPending && !freshNamespacePending) break;
+      return !!staleRevision || stagedConfigPending;
+    };
+    let configReadback = await cfFetch(apiToken, configReadbackPath, { method: 'GET' }, cfFetchOptions);
+    for (const delayMs of FINAL_CONFIG_READBACK_RETRY_DELAYS_MS) {
+      if (readbackMatches(configReadback)) break;
+      // Retry only a classified transport/API failure, an older revision, or
+      // the exact staged pre-URL identity. Foreign same-revision identities
+      // remain fail-closed.
+      if (!readbackIsRetryable(configReadback)) break;
       await new Promise((resolve) => setTimeout(resolve, delayMs));
       configReadback = await cfFetch(apiToken, configReadbackPath, { method: 'GET' }, cfFetchOptions);
     }
@@ -1497,6 +1802,8 @@ const executeDeployHelperRequestCore = async ({
       return buildDeploymentFailure(502, {
         error: 'Worker config verification failed after deployment.',
         orphanResources,
+      }, {
+        fallbackEligible: readbackIsRetryable(configReadback),
       });
     }
     deploymentPayload.configVerified = true;
@@ -1553,4 +1860,112 @@ const executeDeployHelperRequestCore = async ({
   return buildSuccess(200, deploymentPayload);
 };
 
-export const executeDeployHelperRequest = async (options = {}) => executeDeployHelperRequestCore(options);
+export const executeDeployHelperRequest = async (options = {}) => {
+  const rawRequestId = toStr(options?.body?.deploymentRequestId).trim();
+  if (!rawRequestId) return executeDeployHelperRequestCore(options);
+
+  const context = await buildDeploymentRequestContext({
+    body: options?.body,
+    requestOrigin: options?.requestOrigin,
+  });
+  if (!context) {
+    return buildFailure(400, {
+      error: 'deploymentRequestId must contain 8-128 safe identifier characters.',
+    });
+  }
+  const journalBinding = resolveDeployJournalBinding(options?.env);
+  if (!journalBinding) {
+    return buildFailure(503, {
+      error: 'DEPLOY_HELPER_KV or GROUP_KV is required for idempotent deployment requests.',
+    }, { fallbackEligible: true });
+  }
+
+  let existingRecord;
+  try {
+    existingRecord = await readDeployJournalRecord(journalBinding, context.journalKey);
+  } catch (error) {
+    return buildFailure(503, {
+      error: `Failed to read deployment request journal: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
+    }, { fallbackEligible: true });
+  }
+  if (existingRecord) {
+    if (
+      Number(existingRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION ||
+      toStr(existingRecord.requestDigest).trim() !== context.requestDigest
+    ) {
+      return buildFailure(409, {
+        error: 'deploymentRequestId was already used with a different request payload.',
+      });
+    }
+    if (existingRecord.state === 'terminal' && isObj(existingRecord.result)) {
+      return existingRecord.result;
+    }
+    if (existingRecord.state !== 'reserved' && existingRecord.state !== 'mutation_started') {
+      return buildFailure(409, { error: 'Deployment request journal state is invalid.' });
+    }
+    context.isReplay = true;
+    context.mutationStarted = existingRecord.state === 'mutation_started';
+  } else {
+    try {
+      // Regression guard: this non-secret digest/marker record must commit
+      // before any Cloudflare mutation can be attempted for a stable request ID.
+      await writeDeployJournalRecord(journalBinding, context.journalKey, {
+        version: DEPLOYMENT_JOURNAL_VERSION,
+        state: 'reserved',
+        requestDigest: context.requestDigest,
+        deploymentId: context.deploymentId,
+        workerName: context.workerName,
+        requestMarker: context.requestMarker,
+      });
+    } catch (error) {
+      return buildFailure(503, {
+        error: `Failed to initialize deployment request journal: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
+      }, { fallbackEligible: true });
+    }
+  }
+
+  context.markMutationStarted = async () => {
+    if (context.mutationStarted) return;
+    await writeDeployJournalRecord(journalBinding, context.journalKey, {
+      version: DEPLOYMENT_JOURNAL_VERSION,
+      state: 'mutation_started',
+      requestDigest: context.requestDigest,
+      deploymentId: context.deploymentId,
+      workerName: context.workerName,
+      requestMarker: context.requestMarker,
+    });
+    context.mutationStarted = true;
+  };
+
+  const result = await executeDeployHelperRequestCore({
+    ...options,
+    idempotencyContext: context,
+  });
+  if (result?.body?.deploymentRequestPending === true) return result;
+  if (result?.ok !== true && result?.fallbackEligible === true) {
+    if (context.mutationStarted === true) {
+      return {
+        ...result,
+        body: {
+          ...(isObj(result?.body) ? result.body : {}),
+          deploymentRequestPending: true,
+        },
+      };
+    }
+    return result;
+  }
+
+  const safeResult = buildSafeDeployJournalResult(result);
+  // Terminal persistence intentionally precedes the HTTP response. If this put
+  // commits and its response is lost, the next call replays the stored receipt.
+  await writeDeployJournalRecord(journalBinding, context.journalKey, {
+    version: DEPLOYMENT_JOURNAL_VERSION,
+    state: 'terminal',
+    requestDigest: context.requestDigest,
+    deploymentId: context.deploymentId,
+    workerName: context.workerName,
+    requestMarker: context.requestMarker,
+    result: safeResult,
+  });
+  return safeResult;
+};

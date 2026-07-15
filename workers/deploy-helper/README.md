@@ -50,7 +50,8 @@ Typical first-worker bootstrap:
 Required binding:
 
 - `DEPLOY_HELPER_KV`
-  - used for the optional `/admin/origins` KV override
+  - stores the optional `/admin/origins` override and the secret-free deploy
+    request journal used for response-loss recovery
 
 Recommended env vars / secrets:
 
@@ -74,16 +75,23 @@ Wrangler is the preferred deploy path. The checked-in `worker.js` imports `../sh
   - input: `{ apiToken }`
   - output: `{ accountId, accountName }`
 - `POST /deploy`
-  - input: Cloudflare token, worker name, worker bundle (`bundleUrl` or `bundleText`), and initial session config/secrets
+  - input: Cloudflare token, worker name, worker bundle (`bundleUrl` or
+    `bundleText`), initial session config/secrets, and optional
+    `deploymentRequestId` (the first-party wizard always supplies one)
   - output: absolute `workerUrl`, the non-secret `deploymentId` ownership marker,
     and `subdomainStatus`, `subdomainEnabled`, `subdomainError`,
     `scriptSubdomainEnabled`, and `scriptSubdomainError` so callers can surface
     `workers.dev` activation state and clean up only exactly owned test resources
   - the requested worker name is a readable prefix, not an exact physical
-    script name. Every fresh deploy appends a random deployment suffix before
-    checking or creating resources, then rechecks that generated name before
-    upload. Independent helper isolates therefore do not share a caller-chosen
-    mutable script name
+    script name. Requests with `deploymentRequestId` derive a stable suffix and
+    KV title marker; legacy requests without it use a random suffix. The helper
+    journals a canonical request digest before mutation, replays a terminal
+    receipt for sequential response-loss retries, and rejects reuse of the ID
+    with a changed payload. The journal contains no raw tokens, secrets, or
+    bundle bytes and expires terminal receipts after seven days
+  - simultaneous same-ID execution is not claimed to be exactly once because
+    Workers KV is not an atomic compare-and-set lock; callers should serialize
+    one attempt and use the same ID only for retries
 - `GET /admin/origins`
   - requires `Authorization: Bearer <ADMIN_SECRET>`
   - returns `{ origins, source }`

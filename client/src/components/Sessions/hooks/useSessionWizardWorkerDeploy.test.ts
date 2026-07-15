@@ -68,6 +68,8 @@ const buildDeployHookOptions = () => {
     workerSecretsEnabled: false,
     embeddedDeployHelperEnabled: true,
     network: { id: 11155420 },
+    sessionId: '00000000-0000-0000-0000-000000000001',
+    sessionIdHex: '0x00000000000000000000000000000001',
   } as SessionWizardWorkerDeployRuntime;
   options.resolveWorkerRpcUrl.mockReturnValue('https://rpc.example.test');
   options.resolveWorkerRpcUrlMap.mockReturnValue({ '11155420': ['https://rpc.example.test'] });
@@ -106,6 +108,7 @@ describe('useSessionWizardWorkerDeploy', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    localStorage.clear();
     global.fetch = originalFetch;
   });
 
@@ -318,6 +321,187 @@ describe('useSessionWizardWorkerDeploy', () => {
     const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
     expect(deployPayload.apiToken).toBe('fresh-token');
     expect(deployPayload.accountId).toBeUndefined();
+  });
+
+  it('reuses one deployment request id and config revision after a lost deploy response', async () => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployCalls += 1;
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        if (deployCalls === 1) throw new TypeError('Failed to fetch');
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      } as Response;
+    });
+    const options = buildDeployHookOptions();
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let firstResult: Record<string, unknown> = {};
+    let retryResult: Record<string, unknown> = {};
+    await act(async () => {
+      firstResult = await result.current.handleDeployWorker();
+    });
+    await act(async () => {
+      retryResult = await result.current.handleDeployWorker();
+    });
+
+    expect(firstResult.ok).toBe(false);
+    expect(retryResult.ok).toBe(true);
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[0].deploymentRequestId).toEqual(expect.any(String));
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
+  });
+
+  it('reuses the deploy identity after the hook is unmounted and remounted', async () => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        deployCalls += 1;
+        if (deployCalls === 1) throw new TypeError('Failed to fetch');
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+
+    const firstHook = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+    await act(async () => {
+      await firstHook.result.current.handleDeployWorker();
+    });
+    firstHook.unmount();
+    const remountedHook = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+    await act(async () => {
+      await remountedHook.result.current.handleDeployWorker();
+    });
+
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
+  });
+
+  it.each([502, 504])('retains the deploy identity across an unstructured gateway %s', async (status) => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployCalls += 1;
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        if (deployCalls === 1) {
+          return {
+            ok: false,
+            status,
+            json: async () => ({}),
+          } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      } as Response;
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
+  });
+
+  it('rotates the deploy identity across a remount after a structured terminal orphan response', async () => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployCalls += 1;
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        if (deployCalls === 1) {
+          return {
+            ok: false,
+            status: 502,
+            json: async () => ({
+              error: 'Worker activation failed.',
+              deploymentRequestTerminal: true,
+              orphanResources: {
+                workerName: 'failed-worker',
+                kvNamespaceId: 'kv-failed',
+              },
+            }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      } as Response;
+    });
+    const firstHook = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+
+    await act(async () => {
+      await firstHook.result.current.handleDeployWorker();
+    });
+    firstHook.unmount();
+    const remountedHook = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+    await act(async () => {
+      await remountedHook.result.current.handleDeployWorker();
+    });
+
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[1].deploymentRequestId).not.toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).not.toBe(deployBodies[0].configRevision);
   });
 
   it('surfaces incomplete Cloudflare cleanup identifiers from deploy-helper failures', async () => {

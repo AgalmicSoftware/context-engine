@@ -2,10 +2,14 @@ import {
   deleteSponsoredGrantRecord,
   readSponsoredGrantRecord,
   SPONSORED_GRANT_TYPES,
+  writeSponsoredGrantRedemptionReservation,
+  writeSponsoredGrantReceipt,
 } from './sponsoredBootstrapGrantStore.js';
 import {
   executeDeployHelperRequest as executeDeployHelperRequestBoundary,
   normalizeEmbeddedDeployHelperEnabled,
+  sha256Hex,
+  stableCanonicalSerialize,
 } from '../shared/deployHelperCore.mjs';
 
 const INVALID_GRANT_ERROR = 'Invalid, expired, or already used sponsored bootstrap grant.';
@@ -34,6 +38,20 @@ const readJsonRequestBody = async (request) => {
   }
 };
 
+const readReceiptResponse = async (response) => {
+  if (response?.body && typeof response.body === 'object' && typeof response?.clone !== 'function') {
+    return response;
+  }
+  if (typeof response?.clone === 'function') {
+    const body = await response.clone().json().catch(() => ({}));
+    return {
+      status: Number(response.status || 0) || 200,
+      body: body && typeof body === 'object' ? body : {},
+    };
+  }
+  return { status: Number(response?.status || 0) || 200, body: {} };
+};
+
 const buildGrantErrorResponse = (deps, headers, status, error) => (
   deps?.json?.({ error }, status, headers)
 );
@@ -45,6 +63,46 @@ const buildDeployExecutionFailure = (error) => ({
     error: toTrimmedString(error?.message || error) || 'Failed to run embedded sponsored deploy.',
   },
 });
+
+const buildSponsoredRequestDigest = async (action, payload) => sha256Hex(
+  stableCanonicalSerialize({ action, payload }),
+);
+
+const buildSponsoredDeploymentRequestId = async (grantToken) => (
+  `sponsored-${(await sha256Hex(`sponsored-deploy:${grantToken}`)).slice(0, 32)}`
+);
+
+const buildSponsoredConfigRevision = async (grantToken) => (
+  `sponsored-revision-${(await sha256Hex(`sponsored-config:${grantToken}`)).slice(0, 32)}`
+);
+
+const resolveSponsoredRedemptionReplay = ({ grantRecord, requestDigest, deps, headers } = {}) => {
+  if (grantRecord?.state !== 'redeemed' && grantRecord?.state !== 'redeeming') return null;
+  if (toTrimmedString(grantRecord?.requestDigest) !== requestDigest) {
+    return buildGrantErrorResponse(
+      deps,
+      headers,
+      409,
+      'Sponsored grant was already reserved or redeemed with a different request payload.',
+    );
+  }
+  if (grantRecord.state === 'redeeming') {
+    return buildGrantErrorResponse(
+      deps,
+      headers,
+      503,
+      'Sponsored grant redemption is pending; the action will not be repeated.',
+    );
+  }
+  const receipt = grantRecord?.receipt && typeof grantRecord.receipt === 'object'
+    ? grantRecord.receipt
+    : {};
+  return deps?.json?.(
+    receipt?.body && typeof receipt.body === 'object' ? receipt.body : {},
+    Number(receipt?.status || 0) || 200,
+    headers,
+  );
+};
 
 export const dispatchSponsoredBootstrapRedeem = async ({
   request,
@@ -93,9 +151,7 @@ export const dispatchSponsoredBootstrapRedeem = async ({
     if (!deployPayload) {
       return buildGrantErrorResponse(deps, headers, 400, 'Missing deployPayload.');
     }
-    const executeDeployHelperRequest = (
-      deps?.executeDeployHelperRequest || executeDeployHelperRequestBoundary
-    );
+    const executeDeployHelperRequest = deps?.executeDeployHelperRequest || executeDeployHelperRequestBoundary;
     const embeddedDeployHelperEnabled = normalizeEmbeddedDeployHelperEnabled(
       env?.DEPLOY_HELPER_ENABLED,
       true
@@ -111,10 +167,36 @@ export const dispatchSponsoredBootstrapRedeem = async ({
       );
     }
 
+    // A grant chooses credentials, not an account. The deploy helper must
+    // derive the sponsor token's one visible account itself.
+    const {
+      accountId: _discardedAccountId,
+      deploymentRequestId: _discardedDeploymentRequestId,
+      configRevision: _discardedConfigRevision,
+      ...accountIndependentDeployPayload
+    } = deployPayload;
+    // Regression guard: the one-shot grant, not a page-lifetime hook ref,
+    // owns both deploy identities so reload retries converge on one resource set.
+    const deploymentRequestId = await buildSponsoredDeploymentRequestId(grantToken);
+    const configRevision = await buildSponsoredConfigRevision(grantToken);
+    const effectiveDeployPayload = {
+      ...accountIndependentDeployPayload,
+      deploymentRequestId,
+      configRevision,
+    };
+    const requestDigest = await buildSponsoredRequestDigest('deploy', effectiveDeployPayload);
+    const replayResponse = resolveSponsoredRedemptionReplay({
+      grantRecord,
+      requestDigest,
+      deps,
+      headers,
+    });
+    if (replayResponse) return replayResponse;
+
     try {
       embeddedResult = await executeDeployHelperRequest({
         body: {
-          ...deployPayload,
+          ...effectiveDeployPayload,
           apiToken: toTrimmedString(grantRecord?.cloudflareApiToken),
         },
         env,
@@ -125,9 +207,16 @@ export const dispatchSponsoredBootstrapRedeem = async ({
       embeddedResult = buildDeployExecutionFailure(error);
     }
 
-    if (embeddedResult?.ok) {
-      await deleteSponsoredGrantRecord(env, grantToken);
-      return deps?.json?.(embeddedResult.body, embeddedResult.status || 200, headers);
+    if (embeddedResult?.ok || embeddedResult?.body?.deploymentRequestTerminal === true) {
+      const receipt = await writeSponsoredGrantReceipt({
+        env,
+        token: grantToken,
+        grantRecord,
+        requestDigest,
+        response: embeddedResult,
+        nowMs: deps?.now?.() ?? Date.now(),
+      });
+      return deps?.json?.(receipt.body, receipt.status, headers);
     }
 
     return deps?.json?.(
@@ -143,6 +232,27 @@ export const dispatchSponsoredBootstrapRedeem = async ({
   if (!recipientAddress) {
     return buildGrantErrorResponse(deps, headers, 400, 'Missing address.');
   }
+  const requestDigest = await buildSponsoredRequestDigest('faucet', {
+    recipientAddress: recipientAddress.toLowerCase(),
+  });
+  const replayResponse = resolveSponsoredRedemptionReplay({
+    grantRecord,
+    requestDigest,
+    deps,
+    headers,
+  });
+  if (replayResponse) return replayResponse;
+
+  // Regression guard: reserve the one-shot grant without its private key
+  // before the non-idempotent transfer. An uncertain receipt write must never
+  // authorize a second transaction.
+  await writeSponsoredGrantRedemptionReservation({
+    env,
+    token: grantToken,
+    grantRecord,
+    requestDigest,
+    nowMs: deps?.now?.() ?? Date.now(),
+  });
 
   let faucetResponse;
   try {
@@ -173,6 +283,14 @@ export const dispatchSponsoredBootstrapRedeem = async ({
     return faucetResponse;
   }
 
-  await deleteSponsoredGrantRecord(env, grantToken);
-  return faucetResponse;
+  const receiptResponse = await readReceiptResponse(faucetResponse);
+  const receipt = await writeSponsoredGrantReceipt({
+    env,
+    token: grantToken,
+    grantRecord,
+    requestDigest,
+    response: receiptResponse,
+    nowMs: deps?.now?.() ?? Date.now(),
+  });
+  return deps?.json?.(receipt.body, receipt.status, headers);
 };

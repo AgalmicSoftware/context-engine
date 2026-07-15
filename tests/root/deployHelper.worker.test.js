@@ -38,6 +38,11 @@ const makeFetchSequence = (responses = []) => {
     const [url, init = {}] = args;
     const normalizedUrl = String(url);
     const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET' && /\/accounts\?per_page=5$/.test(normalizedUrl)) {
+      return fetchMock.accountLookupOverride || cfSuccess([
+        { id: 'acc-123', name: 'Derived test account' },
+      ]);
+    }
     if (method === 'GET' && /\/workers\/scripts\/[^/]+\/settings$/.test(normalizedUrl)) {
       workerNamePreflightCalls.push(args);
       if (workerNamePreflightCalls.length === 1) {
@@ -129,6 +134,147 @@ const makeFetchSequence = (responses = []) => {
   };
   fetchMock.calls = calls;
   fetchMock.workerNamePreflightCalls = workerNamePreflightCalls;
+  return fetchMock;
+};
+
+const makeDeploymentRequestFetchSequence = (responses = []) => {
+  const baseFetch = makeFetchSequence(responses);
+  const namespaces = [];
+  const fetchMock = async (...args) => {
+    const [url, init = {}] = args;
+    const normalizedUrl = String(url);
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET' && /\/storage\/kv\/namespaces\?/.test(normalizedUrl)) {
+      baseFetch.calls.push(args);
+      if (namespaces.length && fetchMock.namespaceListHiddenReads > 0) {
+        fetchMock.namespaceListHiddenReads -= 1;
+        return cfSuccess([]);
+      }
+      return cfSuccess(namespaces);
+    }
+    if (
+      method === 'POST' &&
+      normalizedUrl.endsWith('/storage/kv/namespaces') &&
+      fetchMock.commitNamespaceCreateThenThrow
+    ) {
+      baseFetch.calls.push(args);
+      const { title } = JSON.parse(String(init.body || '{}'));
+      namespaces.push({ id: `kv-${namespaces.length + 1}`, title });
+      fetchMock.commitNamespaceCreateThenThrow = false;
+      throw new TypeError('namespace create response lost');
+    }
+    const response = await baseFetch(...args);
+    if (method === 'POST' && normalizedUrl.endsWith('/storage/kv/namespaces') && response?.ok) {
+      const payload = await response.clone().json();
+      const { title } = JSON.parse(String(init.body || '{}'));
+      namespaces.push({ id: payload?.result?.id, title });
+    }
+    return response;
+  };
+  fetchMock.calls = baseFetch.calls;
+  fetchMock.workerNamePreflightCalls = baseFetch.workerNamePreflightCalls;
+  fetchMock.namespaces = namespaces;
+  fetchMock.commitNamespaceCreateThenThrow = false;
+  fetchMock.namespaceListHiddenReads = 0;
+  return fetchMock;
+};
+
+const makeResumableDeploymentFetch = () => {
+  const namespaces = [];
+  const kvValues = new Map();
+  const workerBindings = new Map();
+  const workerSecretBodies = [];
+  let namespaceCreates = 0;
+  let scriptUploads = 0;
+  let finalConfigPuts = 0;
+  const fetchMock = jest.fn(async (url, init = {}) => {
+    const normalizedUrl = String(url);
+    const method = String(init.method || 'GET').toUpperCase();
+    if (method === 'GET' && /\/accounts\?per_page=5$/.test(normalizedUrl)) {
+      return cfSuccess([{ id: 'acc-123', name: 'Derived test account' }]);
+    }
+    const settingsMatch = normalizedUrl.match(/\/workers\/scripts\/([^/]+)\/settings$/);
+    if (method === 'GET' && settingsMatch) {
+      const bindings = workerBindings.get(settingsMatch[1]);
+      return bindings ? cfSuccess({ bindings }) : cfFailure(404, 'Worker not found.');
+    }
+    if (method === 'GET' && /\/storage\/kv\/namespaces\?/.test(normalizedUrl)) {
+      return cfSuccess(namespaces);
+    }
+    if (method === 'POST' && normalizedUrl.endsWith('/storage/kv/namespaces')) {
+      namespaceCreates += 1;
+      const { title } = JSON.parse(String(init.body || '{}'));
+      const namespace = { id: `kv-resume-${namespaceCreates}`, title };
+      namespaces.push(namespace);
+      return cfSuccess({ id: namespace.id });
+    }
+    const valueMatch = normalizedUrl.match(/\/storage\/kv\/namespaces\/([^/]+)\/values\/(.+)$/);
+    if (valueMatch && method === 'PUT') {
+      const valueKey = `${valueMatch[1]}/${valueMatch[2]}`;
+      if (valueMatch[2].endsWith(':config') && kvValues.has(valueKey)) {
+        finalConfigPuts += 1;
+        if (fetchMock.finalConfigPutFailures > 0) {
+          fetchMock.finalConfigPutFailures -= 1;
+          return cfFailure(503, 'Final config temporarily unavailable.');
+        }
+      }
+      kvValues.set(valueKey, String(init.body || ''));
+      return cfSuccess({});
+    }
+    if (valueMatch && method === 'GET') {
+      const valueKey = `${valueMatch[1]}/${valueMatch[2]}`;
+      if (fetchMock.configReadbackFailures > 0) {
+        fetchMock.configReadbackFailures -= 1;
+        return cfFailure(503, 'Config readback temporarily unavailable.');
+      }
+      return new Response(kvValues.get(valueKey) || '{}', {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    const scriptMatch = normalizedUrl.match(/\/workers\/scripts\/([^/]+)$/);
+    if (method === 'PUT' && scriptMatch && init.body instanceof FormData) {
+      scriptUploads += 1;
+      const metadata = JSON.parse(await new Response(init.body.get('metadata')).text());
+      workerBindings.set(scriptMatch[1], metadata.bindings || []);
+      return cfSuccess({ id: 'worker-uploaded' });
+    }
+    if (method === 'GET' && normalizedUrl.endsWith('/workers/subdomain')) {
+      if (fetchMock.subdomainFailures > 0) {
+        fetchMock.subdomainFailures -= 1;
+        return cfFailure(503, 'Subdomain temporarily unavailable.');
+      }
+      return cfSuccess({ subdomain: 'tenant-subdomain', status: 'active' });
+    }
+    if (method === 'POST' && /\/workers\/scripts\/[^/]+\/subdomain$/.test(normalizedUrl)) {
+      return cfSuccess({ enabled: true });
+    }
+    if (method === 'PUT' && /\/workers\/scripts\/[^/]+\/secrets$/.test(normalizedUrl)) {
+      workerSecretBodies.push(JSON.parse(String(init.body || '{}')));
+      return cfSuccess({});
+    }
+    if (method === 'DELETE' && scriptMatch) {
+      workerBindings.delete(scriptMatch[1]);
+      return cfSuccess({});
+    }
+    const namespaceDeleteMatch = normalizedUrl.match(/\/storage\/kv\/namespaces\/([^/?]+)$/);
+    if (method === 'DELETE' && namespaceDeleteMatch) {
+      const index = namespaces.findIndex(({ id }) => id === namespaceDeleteMatch[1]);
+      if (index >= 0) namespaces.splice(index, 1);
+      return cfSuccess({});
+    }
+    throw new Error(`Unexpected resumable Cloudflare mock call: ${method} ${normalizedUrl}`);
+  });
+  fetchMock.finalConfigPutFailures = 0;
+  fetchMock.configReadbackFailures = 0;
+  fetchMock.subdomainFailures = 0;
+  fetchMock.namespaces = namespaces;
+  fetchMock.kvValues = kvValues;
+  fetchMock.workerBindings = workerBindings;
+  fetchMock.workerSecretBodies = workerSecretBodies;
+  fetchMock.getNamespaceCreateCount = () => namespaceCreates;
+  fetchMock.getScriptUploadCount = () => scriptUploads;
+  fetchMock.getFinalConfigPutCount = () => finalConfigPuts;
   return fetchMock;
 };
 
@@ -301,6 +447,28 @@ describe('deploy-helper worker', () => {
     } finally {
       consoleLogSpy.mockRestore();
     }
+  });
+
+  it('derives the deploy account from the token even when a caller injects accountId', async () => {
+    const fetchMock = makeFetchSequence([]);
+    fetchMock.accountLookupOverride = cfSuccess([
+      { id: 'account-a', name: 'Account A' },
+      { id: 'account-b', name: 'Account B' },
+    ]);
+    global.fetch = fetchMock;
+
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'cf-token',
+      accountId: 'attacker-selected-account',
+      workerName: 'test-worker',
+      sessionSlug: 'alpha-session',
+      bundleText: 'export default { fetch() {} };',
+    }), {}, {});
+    const payload = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(payload?.error).toMatch(/restrict the token to exactly one account/i);
+    expect(fetchMock.calls).toHaveLength(0);
   });
 
   it('retries the first config write while a new KV namespace is propagating', async () => {
@@ -1209,6 +1377,9 @@ describe('deploy-helper worker', () => {
 
   it('returns a structured 502 when fetching the worker bundle fails', async () => {
     global.fetch = async (url) => {
+      if (/\/accounts\?per_page=5$/.test(String(url))) {
+        return cfSuccess([{ id: 'acc-123', name: 'Derived test account' }]);
+      }
       if (/\/workers\/scripts\/test-worker-[0-9a-f]{12}\/settings$/.test(String(url))) {
         return cfFailure(404, 'Worker not found.');
       }
@@ -1668,7 +1839,7 @@ describe('deploy-helper worker', () => {
       expect(payload?.orphanResources).toEqual({
         kvNamespaceId: 'kv-123',
         kvCleanupStatus: 'retained-live-worker',
-        workerName: '',
+        workerName: expect.stringMatching(/^test-worker-[0-9a-f]{12}$/),
         workerCleanupStatus: 'ownership-changed',
       });
       expect(fetchMock.calls.some(([url, init = {}]) => (
@@ -1698,11 +1869,16 @@ describe('deploy-helper worker', () => {
       shouldDeleteKv: false,
     },
     {
-      label: 'treats a confirmed 404 as already absent',
+      label: 'retains KV when post-upload ownership remains hidden behind 404',
       settingsOverride: cfFailure(404, 'Worker not found.'),
-      expectedOrphans: { kvNamespaceId: '', workerName: '' },
+      expectedOrphans: {
+        kvNamespaceId: 'kv-123',
+        kvCleanupStatus: 'retained-live-worker',
+        workerName: expect.stringMatching(/^canonical-worker-[0-9a-f]{12}$/),
+        workerCleanupStatus: 'ownership-unverified',
+      },
       shouldDeleteScript: false,
-      shouldDeleteKv: true,
+      shouldDeleteKv: false,
     },
     {
       label: 'preserves a changed deployment owner',
@@ -1712,19 +1888,19 @@ describe('deploy-helper worker', () => {
       expectedOrphans: {
         kvNamespaceId: 'kv-123',
         kvCleanupStatus: 'retained-live-worker',
-        workerName: '',
+        workerName: expect.stringMatching(/^canonical-worker-[0-9a-f]{12}$/),
         workerCleanupStatus: 'ownership-changed',
       },
       shouldDeleteScript: false,
       shouldDeleteKv: false,
     },
     {
-      label: 'reports indeterminate ownership without removal instructions',
+      label: 'reports indeterminate ownership with an exact retryable physical name',
       settingsOverride: cfFailure(503, 'Settings unavailable.'),
       expectedOrphans: {
         kvNamespaceId: 'kv-123',
         kvCleanupStatus: 'retained-live-worker',
-        workerName: '',
+        workerName: expect.stringMatching(/^canonical-worker-[0-9a-f]{12}$/),
         workerCleanupStatus: 'ownership-unverified',
       },
       shouldDeleteScript: false,
@@ -1835,6 +2011,9 @@ describe('deploy-helper worker', () => {
     global.fetch = jest.fn(async (url, init = {}) => {
       const normalizedUrl = String(url);
       const method = String(init.method || 'GET').toUpperCase();
+      if (method === 'GET' && /\/accounts\?per_page=5$/.test(normalizedUrl)) {
+        return cfSuccess([{ id: 'acc-123', name: 'Derived test account' }]);
+      }
       const settingsMatch = normalizedUrl.match(/\/workers\/scripts\/([^/]+)\/settings$/);
       if (method === 'GET' && settingsMatch) {
         const workerBindings = workerBindingsByName.get(settingsMatch[1]);
@@ -1903,6 +2082,339 @@ describe('deploy-helper worker', () => {
     }
   });
 
+  it('replays a committed terminal deploy journal result and rejects a changed request body', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeDeploymentRequestFetchSequence([
+      cfSuccess({ id: 'kv-request-1' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+    ]);
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const normalPut = journalKv.put.bind(journalKv);
+    let loseTerminalWriteResponse = true;
+    journalKv.put = async (key, value, options) => {
+      await normalPut(key, value, options);
+      const parsed = JSON.parse(value);
+      if (parsed?.state === 'terminal' && loseTerminalWriteResponse) {
+        loseTerminalWriteResponse = false;
+        throw new TypeError('terminal journal response lost');
+      }
+    };
+    const env = { DEPLOY_HELPER_KV: journalKv };
+    const body = {
+      apiToken: 'cf-token',
+      deploymentRequestId: 'request-loss-0001',
+      workerName: 'test-worker',
+      sessionSlug: 'alpha-session',
+      bundleText: 'export default { fetch() {} };',
+      secrets: { openaiKey: 'sk-journal-secret' },
+    };
+
+    try {
+      await expect(
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
+      ).rejects.toThrow('terminal journal response lost');
+
+      const cloudflareCallsAfterCommit = fetchMock.calls.length;
+      const replayResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        secrets: body.secrets,
+        bundleText: body.bundleText,
+        sessionSlug: body.sessionSlug,
+        workerName: body.workerName,
+        deploymentRequestId: body.deploymentRequestId,
+        apiToken: body.apiToken,
+      }), env, {});
+      const replay = await replayResponse.json();
+
+      expect(replayResponse.status).toBe(200);
+      expect(replay).toEqual(expect.objectContaining({
+        ok: true,
+        workerName: expect.stringMatching(/^test-worker-[0-9a-f]{12}$/),
+        kvNamespaceId: 'kv-request-1',
+      }));
+      expect(fetchMock.calls).toHaveLength(cloudflareCallsAfterCommit);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'POST' &&
+        String(url).endsWith('/storage/kv/namespaces')
+      ))).toHaveLength(1);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'PUT' &&
+        /\/workers\/scripts\/[^/?]+$/.test(String(url))
+      ))).toHaveLength(1);
+      expect(JSON.stringify([...journalKv.store.values()])).not.toContain('cf-token');
+      expect(JSON.stringify([...journalKv.store.values()])).not.toContain('export default');
+      expect(JSON.stringify([...journalKv.store.values()])).not.toContain('sk-journal-secret');
+
+      const changedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        sessionSlug: 'changed-session',
+      }), env, {});
+      expect(changedResponse.status).toBe(409);
+      expect((await changedResponse.json()).error).toMatch(/different request payload/i);
+      expect(fetchMock.calls).toHaveLength(cloudflareCallsAfterCommit);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('resumes an exactly owned uploaded worker after the terminal journal write fails before commit', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const normalPut = journalKv.put.bind(journalKv);
+    let failTerminalWriteBeforeCommit = true;
+    journalKv.put = async (key, value, options) => {
+      const parsed = JSON.parse(value);
+      if (parsed?.state === 'terminal' && failTerminalWriteBeforeCommit) {
+        failTerminalWriteBeforeCommit = false;
+        throw new TypeError('terminal journal did not commit');
+      }
+      await normalPut(key, value, options);
+    };
+    const env = { DEPLOY_HELPER_KV: journalKv };
+    const body = {
+      apiToken: 'cf-resume-secret-token',
+      deploymentRequestId: 'request-resume-0001',
+      workerName: 'resume-worker',
+      sessionSlug: 'resume-session',
+      bundleText: 'export default { fetch() {} };',
+      storageProfile: {
+        backend: 'cloudflare',
+        payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' },
+      },
+    };
+
+    try {
+      await expect(
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
+      ).rejects.toThrow('terminal journal did not commit');
+      expect(JSON.parse([...journalKv.store.values()][0]).state).toBe('mutation_started');
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.workerSecretBodies).toHaveLength(2);
+
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      const retryPayload = await retryResponse.json();
+
+      expect(retryResponse.status).toBe(200);
+      expect(retryPayload).toEqual(expect.objectContaining({
+        ok: true,
+        kvNamespaceId: 'kv-resume-1',
+        workerName: expect.stringMatching(/^resume-worker-[0-9a-f]{12}$/),
+      }));
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.workerSecretBodies).toHaveLength(4);
+      expect(fetchMock.workerSecretBodies.slice(0, 2)).toEqual(fetchMock.workerSecretBodies.slice(2));
+      expect(fetchMock.workerSecretBodies.map(({ text }) => text)).toEqual(
+        expect.arrayContaining([expect.stringMatching(/^[0-9a-f]{64}$/)]),
+      );
+      const serializedJournal = JSON.stringify([...journalKv.store.values()]);
+      expect(serializedJournal).not.toContain('cf-resume-secret-token');
+      fetchMock.workerSecretBodies.forEach(({ text }) => expect(serializedJournal).not.toContain(text));
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it.each([
+    {
+      label: 'deployment marker',
+      mutateBindings: (bindings) => bindings.map((binding) => (
+        binding.name === 'CE_DEPLOYMENT_ID' ? { ...binding, text: 'foreign-deployment' } : binding
+      )),
+    },
+    {
+      label: 'GROUP_KV namespace',
+      mutateBindings: (bindings) => bindings.map((binding) => (
+        binding.name === 'GROUP_KV' ? { ...binding, namespace_id: 'kv-foreign' } : binding
+      )),
+    },
+  ])('refuses to resume when the existing worker has a mismatched $label binding', async ({ mutateBindings }) => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const normalPut = journalKv.put.bind(journalKv);
+    let failTerminalWriteBeforeCommit = true;
+    journalKv.put = async (key, value, options) => {
+      const parsed = JSON.parse(value);
+      if (parsed?.state === 'terminal' && failTerminalWriteBeforeCommit) {
+        failTerminalWriteBeforeCommit = false;
+        throw new TypeError('terminal journal did not commit');
+      }
+      await normalPut(key, value, options);
+    };
+    const env = { DEPLOY_HELPER_KV: journalKv };
+    const body = {
+      apiToken: 'cf-resume-secret-token',
+      deploymentRequestId: 'request-resume-mismatch-0001',
+      workerName: 'resume-worker',
+      sessionSlug: 'resume-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+
+    try {
+      await expect(
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
+      ).rejects.toThrow('terminal journal did not commit');
+      const [[workerName, bindings]] = [...fetchMock.workerBindings.entries()];
+      fetchMock.workerBindings.set(workerName, mutateBindings(bindings));
+
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(retryResponse.status).toBe(409);
+      expect((await retryResponse.json()).error).toMatch(/does not match this deployment request/i);
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('keeps a retryable post-upload final-config failure pending instead of terminalizing its journal', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    fetchMock.finalConfigPutFailures = 1;
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const env = { DEPLOY_HELPER_KV: journalKv };
+    const body = {
+      apiToken: 'cf-token',
+      deploymentRequestId: 'request-final-config-0001',
+      workerName: 'resume-worker',
+      sessionSlug: 'resume-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+
+    try {
+      const firstResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(firstResponse.status).toBe(502);
+      expect((await firstResponse.json()).deploymentRequestPending).toBe(true);
+      expect(JSON.parse([...journalKv.store.values()][0]).state).toBe('mutation_started');
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('reconciles an ambiguous request-marked KV create without provisioning a second namespace', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeDeploymentRequestFetchSequence([
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+    ]);
+    fetchMock.commitNamespaceCreateThenThrow = true;
+    global.fetch = fetchMock;
+    const env = { DEPLOY_HELPER_KV: makeKvBinding() };
+    const longSlug = 'a'.repeat(600);
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        deploymentRequestId: 'request-loss-0002',
+        workerName: 'test-worker',
+        sessionSlug: longSlug,
+        bundleText: 'export default { fetch() {} };',
+      }), env, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload.kvNamespaceId).toBe('kv-1');
+      expect(fetchMock.namespaces).toHaveLength(1);
+      expect(fetchMock.namespaces[0].title).toMatch(/req-[0-9a-f]{16}$/);
+      expect(fetchMock.namespaces[0].title).toHaveLength(512);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'POST' &&
+        String(url).endsWith('/storage/kv/namespaces')
+      ))).toHaveLength(1);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('reconciles delayed KV-title visibility on a same-id retry without a second namespace', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeDeploymentRequestFetchSequence([
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+    ]);
+    fetchMock.commitNamespaceCreateThenThrow = true;
+    fetchMock.namespaceListHiddenReads = 4;
+    global.fetch = fetchMock;
+    const env = { DEPLOY_HELPER_KV: makeKvBinding() };
+    const body = {
+      apiToken: 'cf-token',
+      deploymentRequestId: 'request-loss-0003',
+      workerName: 'test-worker',
+      sessionSlug: 'alpha-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+
+    try {
+      const firstResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(firstResponse.status).toBe(503);
+      expect((await firstResponse.json()).deploymentRequestPending).toBe(true);
+
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(retryResponse.status).toBe(200);
+      expect((await retryResponse.json()).kvNamespaceId).toBe('kv-1');
+      expect(fetchMock.namespaces).toHaveLength(1);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'POST' &&
+        String(url).endsWith('/storage/kv/namespaces')
+      ))).toHaveLength(1);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('retries a transient pre-mutation bundle failure with the same reserved request id', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeDeploymentRequestFetchSequence([
+      async () => { throw new TypeError('bundle unavailable'); },
+      new Response('export default { fetch() {} };', { status: 200 }),
+      cfSuccess({ id: 'kv-request-4' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+    ]);
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const env = { DEPLOY_HELPER_KV: journalKv };
+    const body = {
+      apiToken: 'cf-token',
+      deploymentRequestId: 'request-loss-0004',
+      workerName: 'test-worker',
+      sessionSlug: 'alpha-session',
+      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+    };
+
+    try {
+      const firstResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(firstResponse.status).toBe(502);
+      expect((await firstResponse.json()).error).toMatch(/bundle unavailable/);
+      expect(JSON.parse([...journalKv.store.values()][0]).state).toBe('reserved');
+
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(retryResponse.status).toBe(200);
+      expect((await retryResponse.json()).kvNamespaceId).toBe('kv-request-4');
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'POST' &&
+        String(url).endsWith('/storage/kv/namespaces')
+      ))).toHaveLength(1);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
   it('stops activation and preserves ambiguous resources when ownership changes after upload', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const foreignSettings = cfSuccess({
@@ -1932,7 +2444,7 @@ describe('deploy-helper worker', () => {
       expect(payload?.orphanResources).toEqual({
         kvNamespaceId: 'kv-123',
         kvCleanupStatus: 'retained-live-worker',
-        workerName: '',
+        workerName: expect.stringMatching(/^test-worker-[0-9a-f]{12}$/),
         workerCleanupStatus: 'ownership-changed',
       });
       expect(fetchMock.calls.some(([url]) => String(url).endsWith('/secrets'))).toBe(false);
@@ -1940,6 +2452,43 @@ describe('deploy-helper worker', () => {
         String(init.method || '').toUpperCase() === 'DELETE' &&
         (/\/workers\/scripts\/test-worker-[0-9a-f]{12}$/.test(String(url)) ||
           String(url).endsWith('/storage/kv/namespaces/kv-123'))
+      ))).toBe(false);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('retains KV when an accepted upload remains temporarily invisible to settings reads', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const hiddenSettings = cfFailure(404, 'Worker not found.');
+    const fetchMock = makeFetchSequence([
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+    ]);
+    fetchMock.workerPostUploadSettingsOverride = hiddenSettings;
+    fetchMock.workerCleanupSettingsOverride = hiddenSettings.clone();
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleText: 'export default { fetch() {} };',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(payload?.orphanResources).toEqual({
+        kvNamespaceId: 'kv-123',
+        kvCleanupStatus: 'retained-live-worker',
+        workerName: expect.stringMatching(/^test-worker-[0-9a-f]{12}$/),
+        workerCleanupStatus: 'ownership-unverified',
+      });
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        String(url).endsWith('/storage/kv/namespaces/kv-123')
       ))).toBe(false);
     } finally {
       consoleLogSpy.mockRestore();

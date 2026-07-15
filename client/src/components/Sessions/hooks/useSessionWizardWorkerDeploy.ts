@@ -45,6 +45,11 @@ import { resolveSessionWizardResourceSecretFields } from '../sessionWizardResour
 import { getSessionWizardWorkerDeployValidationError } from '../sessionWizardWorkerRpc';
 import { resolveSessionWizardModeRequirements } from '../sessionWizardModeRequirements';
 import {
+  advanceSessionWizardDeployAttemptGeneration,
+  clearSessionWizardDeployAttemptIdentity,
+  resolveSessionWizardDeployAttemptIdentity,
+} from '../sessionWizardDeployAttemptIdentity';
+import {
   normalizeSessionWizardSlug as normalizeSlug,
   normalizeSessionWizardWorkerUrl as normalizeWorkerUrl,
 } from '../sessionWizardUrlSupport';
@@ -95,6 +100,14 @@ export type SessionWizardWorkerDeployRuntime = {
 };
 
 const isRecord = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
+
+const shouldRetainDeployAttemptIdentity = (status: number, responseBody: unknown): boolean => {
+  const body = isRecord(responseBody) ? responseBody : {};
+  if (body.deploymentRequestPending === true) return true;
+  const hasOrphanOutcome = isRecord(body.orphanResources) && Object.keys(body.orphanResources).length > 0;
+  if (body.deploymentRequestTerminal === true || hasOrphanOutcome) return false;
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+};
 
 const firstTrimmed = (...values: unknown[]): string => {
   for (const value of values) {
@@ -366,7 +379,31 @@ const useSessionWizardWorkerDeploy = ({
           : allDeploySecrets;
         const deployBlockLimits = normalizeBlockLimitsForConfig(currentDraft?.blockLimits, runtime.latestChainBlock);
         const deployStorageProfile = buildDeployStorageProfilePayload(currentDraft, {});
+        const normalizedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
+          sponsoredBundleAppliedBundleRef?.current,
+        );
+        const sponsoredDeployGrantToken = toStr(normalizedSponsoredBundle?.deployGrantToken || '').trim();
+        const sponsoredBootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedSponsoredBundle);
+        const usesSponsoredDeploy =
+          (forceSponsoredAutoDeploy || sponsoredAutoDeployReady) &&
+          !!sponsoredDeployGrantToken &&
+          !!sponsoredBootstrapWorkerUrl;
+        // Persist only a digest-keyed generation counter. The scope deliberately
+        // excludes tokens, secrets, and mutable config so an ambiguous response
+        // cannot become a second deployment merely because the draft was edited.
+        const deployAttemptIdentity = resolveSessionWizardDeployAttemptIdentity({
+          scope: {
+            slug,
+            sessionId: toStr(runtime.sessionIdHex || runtime.sessionId).trim().toLowerCase(),
+            workerName: toStr(currentDeployForm.workerName).trim().toLowerCase(),
+            adminAddress: resolvedAdmin.toLowerCase(),
+            deployTarget: usesSponsoredDeploy
+              ? sponsoredBootstrapWorkerUrl
+              : normalizeWorkerUrl(runtime.deployHelperUrl),
+          },
+        });
         const payload: AnyRecord = {
+          deploymentRequestId: deployAttemptIdentity.deploymentRequestId,
           workerName: currentDeployForm.workerName,
           sessionSlug: slug,
           bundleUrl,
@@ -408,10 +445,7 @@ const useSessionWizardWorkerDeploy = ({
         ].forEach((key) => {
           if (canonicalSeedConfig[key] !== undefined) payload[key] = canonicalSeedConfig[key];
         });
-        payload.configRevision =
-          typeof globalThis.crypto?.randomUUID === 'function'
-            ? globalThis.crypto.randomUUID()
-            : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+        payload.configRevision = deployAttemptIdentity.configRevision;
         if (deployBlockLimits) {
           payload.blockLimits = deployBlockLimits;
         }
@@ -432,11 +466,6 @@ const useSessionWizardWorkerDeploy = ({
         if (Object.keys(deploySecrets).length) {
           payload.secrets = deploySecrets;
         }
-        const normalizedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
-          sponsoredBundleAppliedBundleRef?.current,
-        );
-        const sponsoredDeployGrantToken = toStr(normalizedSponsoredBundle?.deployGrantToken || '').trim();
-        const sponsoredBootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedSponsoredBundle);
         const submitDeployPayload = async (deployPayload: AnyRecord) => {
           if (
             (forceSponsoredAutoDeploy || sponsoredAutoDeployReady) &&
@@ -455,6 +484,9 @@ const useSessionWizardWorkerDeploy = ({
             const nextDeployStatusCode = sponsoredDeployRes.status;
             const nextData = await sponsoredDeployRes.json().catch(() => ({}));
             if (!sponsoredDeployRes.ok) {
+              if (!shouldRetainDeployAttemptIdentity(sponsoredDeployRes.status, nextData)) {
+                advanceSessionWizardDeployAttemptGeneration(deployAttemptIdentity);
+              }
               const err = new Error(
                 nextData?.error || `Worker deploy failed (${sponsoredDeployRes.status}).`,
               ) as Error & AnyRecord;
@@ -486,6 +518,9 @@ const useSessionWizardWorkerDeploy = ({
           const nextDeployStatusCode = res.status;
           const nextData = await res.json().catch(() => ({}));
           if (!res.ok) {
+            if (!shouldRetainDeployAttemptIdentity(res.status, nextData)) {
+              advanceSessionWizardDeployAttemptGeneration(deployAttemptIdentity);
+            }
             const err = new Error(nextData?.error || `Worker deploy failed (${res.status}).`) as Error & AnyRecord;
             err.statusCode = res.status;
             err.responseError = nextData?.error || '';
@@ -820,6 +855,9 @@ const useSessionWizardWorkerDeploy = ({
         // later URL-mode deploys and sponsored publish flows don't reuse stale bytes.
         clearSelectedBundleFile();
         clearCachedWorkerSecretsAfterDeploy();
+        // A completed deploy no longer needs an active generation record. A
+        // server replay of generation zero remains safe if this draft reappears.
+        clearSessionWizardDeployAttemptIdentity(deployAttemptIdentity);
         return {
           ok: true,
           workerUrl: resolvedDeployWorkerUrl,

@@ -142,6 +142,13 @@ orphans are reported for operator cleanup rather than deleted speculatively.
   - `env.ALLOWED_ORIGINS`
   - fallback `http://localhost:3000`
 - `ALLOWED_ORIGINS` accepts comma- or newline-delimited origins. Stored admin values are normalized to origins before they are written back to KV.
+- `DEPLOY_HELPER_KV` also stores the deploy request journal. The first-party
+  wizard sends a stable `deploymentRequestId` and `configRevision` for one
+  attempt. The helper durably reserves the non-secret request digest before its
+  first Cloudflare mutation, replays a terminal receipt after an ambiguous lost
+  response, and returns `409` if the same ID is reused with a different payload.
+  Raw Cloudflare/provider tokens, secrets, and worker bundle bytes are never
+  written to this journal. Terminal receipts expire after seven days.
 - Deploy-helper origin configuration:
   - CE-hosted mode should set `ALLOWED_ORIGINS` explicitly to the public app origins it serves. Current hosted example: `https://contextengine.xyz,https://www.contextengine.xyz,http://localhost:3000`.
   - Self-hosted mode should replace that list with the origins for your own app/admin hosts. Leaving `ALLOWED_ORIGINS` unset is intentionally restrictive and only allows `http://localhost:3000` until you configure it.
@@ -180,7 +187,7 @@ orphans are reported for operator cleanup rather than deleted speculatively.
   - `/new` can use that key during redemption/bootstrap to mint a fresh group / PKP / usage key for the new session
   - scoped runtime bundles keep using `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`
 - The manual `/new` Lit card now exposes only `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; scoped runtime identifiers stay worker-side and are derived during bootstrap or supplied through admin/sponsored-bundle paths.
-- The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry.
+- The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry. A successful deploy replaces that credential-bearing record with a secret-free terminal receipt so a lost browser response can be replayed without deploying again.
 - The uploaded Arweave envelope is:
   - `type: "contextengine-sponsored-bundle"`
   - `version: 1`
@@ -204,6 +211,10 @@ orphans are reported for operator cleanup rather than deleted speculatively.
     decentralized profile keeps the existing metadata upload and on-chain
     registration steps. Both paths default to the hosted GitHub release asset
     URL.
+- Sponsored faucet redemption writes a secret-free `redeeming` reservation
+  before it can broadcast the one-shot transfer. If the transfer or receipt is
+  ambiguous, the grant remains pending and the action is not repeated; inspect
+  the first attempt and issue a new grant instead of retrying the same bearer.
 
 - The worker KV config now keeps a mirrored `embeddedDeployHelperEnabled` boolean so the frontend can reopen the wizard with the current deploy-time toggle state, but runtime behavior still comes from the worker's `DEPLOY_HELPER_ENABLED` binding.
   - If the hosted release-asset fetch fails, the normal-mode worker step or sponsored normal-mode Publish panel keeps the GitHub release asset URL as the default path and offers either a manual bundle URL override or `nvm use 20 && npm run worker:bundle` plus `/dist/sessionCorsWorker.bundle.js` as an optional local upload override.
@@ -1040,6 +1051,16 @@ Never return secrets in responses.
 
 `/admin/set-config` notes:
 - The session slug is taken from the signed request context, not trusted from `config.slug`.
+- After a worker-canonical session is initialized, its slug, worker URL, authority
+  mode, and normalized `sessionId`/`sessionIdHex` identity are immutable. Attempts
+  to retarget that Worker return `409`.
+- The first signed worker-canonical publish carrying a `configRevision` finalizes
+  that publication server-side. An exact same-revision retry is an idempotent
+  no-op; a different revision returns `409`. Revision-free signed Admin patches
+  remain supported, and the publication marker itself is server-managed.
+- A successful worker-canonical publish is terminal in `/new`, including after a
+  reload or another open tab observes the settlement record. Use **Create another
+  session** to clear the settled local wizard state and begin a new session.
 - Legacy string `allowOrigins` payloads are accepted and normalized into arrays.
 - `limits` and `scopes` only merge from object payloads; malformed non-object patches are ignored rather than corrupting stored branches.
 - Signed request validation is shared with login/bootstrap flows:
@@ -1386,17 +1407,25 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   address, session identity/profile, authority policy, public canonical config,
   and the AI secret selected by the profile. Registry/RPC/Hats fields are
   profile-dependent and are omitted for the default worker-canonical deploy.
-  - `accountId` remains optional for low-level callers, but the first-party
-    wizard omits it. The helper discovers exactly one visible account through
-    Cloudflare using the API token and fails on zero or multiple accounts.
+  - `accountId` is not a deploy selection input. The helper always discovers
+    exactly one visible account through Cloudflare using the API token and fails
+    on zero or multiple accounts; caller-supplied account IDs are ignored.
+  - Creator onboarding sends that one deployment token only. The separate
+    `CLOUDFLARE_API_TOKEN` with `API Tokens: Read` used by the two-key live E2E is
+    an E2E-only policy auditor: it reads the dedicated token's policy details but
+    is never included in a deploy request or required from a session creator.
+  - First-party callers include `deploymentRequestId` (8-128 safe identifier
+    characters). Sequential retries after a lost or gateway-shaped response
+    must reuse both that ID and `configRevision`; a definitive terminal response
+    or an explicit new attempt rotates them.
   - Provide either `bundleUrl` (release asset) or `bundleText` (raw bundle contents) from the `/new` UI.
 - The helper fetches the latest bundled worker asset and configures KV + bindings.
-- Every fresh deploy treats the requested worker name as a readable prefix and
-  appends a random physical suffix before the first existence check. It requires
-  authoritative preflight `404` responses before staging and immediately before
-  upload. This prevents independent helper isolates from sharing a mutable
-  caller-chosen script name. Rollback deletes only resources that still prove
-  ownership by the current deployment id.
+- Every fresh deploy treats the requested worker name as a readable prefix. An
+  idempotent request derives a stable physical suffix and KV title marker from
+  `deploymentRequestId`; a legacy request without that ID receives a random
+  suffix. The helper requires authoritative preflight `404` responses before
+  staging and immediately before upload. Rollback deletes only resources that
+  still prove ownership by the current deployment id.
 - In-place redeploy remains disabled. Preserving or replacing an existing
   physical worker requires a separate explicit state-migration workflow because
   its KV may contain auth markers, groups, storage indexes, and wrapped envelope
@@ -1406,8 +1435,16 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   changed, cannot be verified, or script deletion fails, the helper retains and
   reports that KV; do not delete it until the live binding is recovered or
   independently verified.
-- Concurrent deploys may reuse the same requested prefix; each receives a
-  distinct generated physical worker name and isolated KV namespace.
+- Local Cloudflare E2E finalizers serialize only narrow KV-only or
+  prior-verified Worker-delete-failed recovery handoffs. Each handoff contains a
+  domain-separated HMAC-SHA256 proof made with the cleanup token; it never stores
+  that token. `npm run -s ai:cleanup-cf-e2e-recovery -- --report <failed-report.json>`
+  verifies the exact recovery type, Worker name, KV namespace, deployment marker,
+  and cleanup status in constant time before making a Cloudflare request.
+- Concurrent deploys with different request IDs may reuse the same requested
+  prefix; each receives a distinct physical worker name and isolated KV
+  namespace. The KV journal closes sequential response-loss retries; it is not
+  an atomic compare-and-set lock for simultaneous same-ID requests.
 - Optional: pass `subdomain` (or `workersSubdomain`) to set the account-level workers.dev subdomain
   when none exists yet (falls back to a deterministic `ce-<accountId>` name). Account-level and
   script-level workers.dev setup are both covered by `Workers Scripts: Edit`.
