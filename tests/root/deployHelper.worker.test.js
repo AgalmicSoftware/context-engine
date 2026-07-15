@@ -31,6 +31,9 @@ const makeFetchSequence = (responses = []) => {
   const queue = [...responses];
   const calls = [];
   const workerNamePreflightCalls = [];
+  let scriptUploadAttempted = false;
+  let scriptUploadSucceeded = false;
+  let postUploadOwnershipChecked = false;
   const fetchMock = async (...args) => {
     const [url, init = {}] = args;
     const normalizedUrl = String(url);
@@ -40,7 +43,15 @@ const makeFetchSequence = (responses = []) => {
       if (workerNamePreflightCalls.length === 1) {
         return fetchMock.workerNamePreflightOverride || cfFailure(404, 'Worker not found.');
       }
-      if (fetchMock.workerCleanupSettingsOverride) return fetchMock.workerCleanupSettingsOverride;
+      if (!scriptUploadAttempted) {
+        return fetchMock.workerSecondPreflightOverride || cfFailure(404, 'Worker not found.');
+      }
+      if (scriptUploadSucceeded && !postUploadOwnershipChecked) {
+        postUploadOwnershipChecked = true;
+        if (fetchMock.workerPostUploadSettingsOverride) return fetchMock.workerPostUploadSettingsOverride;
+      } else if (fetchMock.workerCleanupSettingsOverride) {
+        return fetchMock.workerCleanupSettingsOverride;
+      }
       const scriptUpload = [...calls].reverse().find(([candidateUrl, candidateInit = {}]) => (
         String(candidateInit.method || '').toUpperCase() === 'PUT' &&
         /\/workers\/scripts\/[^/?]+$/.test(String(candidateUrl))
@@ -60,6 +71,9 @@ const makeFetchSequence = (responses = []) => {
       return cfSuccess({ enabled: true });
     }
     if (method === 'PUT' && /\/workers\/scripts\/[^/]+\/secrets$/.test(normalizedUrl)) {
+      if (Array.isArray(fetchMock.workerSecretPutResponses) && fetchMock.workerSecretPutResponses.length) {
+        return fetchMock.workerSecretPutResponses.shift();
+      }
       if (fetchMock.workerSecretPutOverride) return fetchMock.workerSecretPutOverride;
       return cfSuccess({});
     }
@@ -76,10 +90,16 @@ const makeFetchSequence = (responses = []) => {
       if (priorConfigPut && fetchMock.finalConfigPutOverride) return fetchMock.finalConfigPutOverride;
     }
     if (method === 'PUT' && /\/values\/session:[^/]+:secrets$/.test(normalizedUrl)) {
+      if (Array.isArray(fetchMock.secretsPutResponses) && fetchMock.secretsPutResponses.length) {
+        return fetchMock.secretsPutResponses.shift();
+      }
       if (fetchMock.secretsPutOverride) return fetchMock.secretsPutOverride;
       return cfSuccess({});
     }
     if (method === 'GET' && /\/values\/session:[^/]+:config$/.test(normalizedUrl)) {
+      if (Array.isArray(fetchMock.kvReadbackResponses) && fetchMock.kvReadbackResponses.length) {
+        return fetchMock.kvReadbackResponses.shift();
+      }
       if (fetchMock.kvReadbackOverride) return fetchMock.kvReadbackOverride;
       const latestConfigWrite = [...calls]
         .reverse()
@@ -100,10 +120,12 @@ const makeFetchSequence = (responses = []) => {
       });
     }
     const next = queue.shift();
-    if (typeof next === 'function') {
-      return next(...args);
+    const response = typeof next === 'function' ? await next(...args) : next;
+    if (method === 'PUT' && /\/workers\/scripts\/[^/?]+$/.test(normalizedUrl)) {
+      scriptUploadAttempted = true;
+      scriptUploadSucceeded = response?.ok === true;
     }
-    return next;
+    return response;
   };
   fetchMock.calls = calls;
   fetchMock.workerNamePreflightCalls = workerNamePreflightCalls;
@@ -444,6 +466,122 @@ describe('deploy-helper worker', () => {
     }
   });
 
+  it('retries the adjacent secrets envelope with an identical body while fresh KV propagates', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const propagationFailure = cfFailure(404, "get namespace: 'namespace not found'", [
+      { code: 10013, message: "get namespace: 'namespace not found'" },
+    ]);
+    const fetchMock = makeFetchSequence([
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+    ]);
+    fetchMock.secretsPutResponses = [propagationFailure, cfSuccess({})];
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleText: 'export default { fetch() {} };',
+        secrets: { openaiKey: 'sk-retry-once' },
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload?.configVerified).toBe(true);
+      const secretWrites = fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':secrets')
+      ));
+      expect(secretWrites).toHaveLength(2);
+      expect(secretWrites[0][1].body).toBe(secretWrites[1][1].body);
+      expect(JSON.parse(secretWrites[1][1].body).secrets.openaiKey).toBe('sk-retry-once');
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        String(url).endsWith('/storage/kv/namespaces/kv-123')
+      ))).toBe(false);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('cleans up after fresh-KV secrets envelope propagation retries are exhausted', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const propagationFailure = () => cfFailure(404, "get namespace: 'namespace not found'", [
+      { code: 10013, message: "get namespace: 'namespace not found'" },
+    ]);
+    const fetchMock = makeFetchSequence([
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    fetchMock.secretsPutResponses = [
+      propagationFailure(),
+      propagationFailure(),
+      propagationFailure(),
+      propagationFailure(),
+    ];
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleText: 'export default { fetch() {} };',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(payload?.error).toBe("get namespace: 'namespace not found'");
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':secrets')
+      ))).toHaveLength(4);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        String(url).endsWith('/storage/kv/namespaces/kv-123')
+      ))).toHaveLength(1);
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'PUT' &&
+        /\/workers\/scripts\/test-worker$/.test(String(url))
+      ))).toBe(false);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('does not retry an unrelated secrets envelope write error', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    fetchMock.secretsPutResponses = [cfFailure(404, 'KV value path was not found.')];
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleText: 'export default { fetch() {} };',
+      }), {}, {});
+
+      expect(response.status).toBe(502);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':secrets')
+      ))).toHaveLength(1);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
   it('provisions an envelope KEK for worker-envelope storage without leaking it', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -485,11 +623,11 @@ describe('deploy-helper worker', () => {
         .filter(([url]) => String(url).endsWith('/workers/scripts/test-worker/secrets'))
         .map(([, init]) => JSON.parse(init.body));
       expect(workerSecretWrites.map((secret) => secret.name)).toEqual([
-        'TOKEN_HMAC_SECRET',
         'CE_STORAGE_ENVELOPE_KEK',
+        'TOKEN_HMAC_SECRET',
       ]);
-      const tokenSecret = workerSecretWrites[0].text;
-      const envelopeKek = workerSecretWrites[1].text;
+      const envelopeKek = workerSecretWrites[0].text;
+      const tokenSecret = workerSecretWrites[1].text;
       expect(envelopeKek).toMatch(/^[0-9a-f]{64}$/);
       expect(envelopeKek).not.toBe(tokenSecret);
 
@@ -501,6 +639,87 @@ describe('deploy-helper worker', () => {
       expect(JSON.stringify(consoleErrorSpy.mock.calls)).not.toContain(envelopeKek);
     } finally {
       consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('keeps login inactive when envelope KEK provisioning fails', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    fetchMock.workerSecretPutResponses = [cfFailure(500, 'envelope KEK write failed')];
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleText: 'export default { fetch() {} };',
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' },
+        },
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(payload?.error).toBe('envelope KEK write failed');
+      const runtimeSecrets = fetchMock.calls
+        .filter(([url]) => String(url).endsWith('/workers/scripts/test-worker/secrets'))
+        .map(([, init]) => JSON.parse(init.body).name);
+      expect(runtimeSecrets).toEqual(['CE_STORAGE_ENVELOPE_KEK']);
+      expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('writes TOKEN_HMAC_SECRET last and rolls back if the final activation gate fails', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    fetchMock.workerSecretPutResponses = [
+      cfSuccess({}),
+      cfFailure(500, 'HMAC activation failed'),
+    ];
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleText: 'export default { fetch() {} };',
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' },
+        },
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(payload?.error).toBe('HMAC activation failed');
+      const runtimeSecrets = fetchMock.calls
+        .filter(([url]) => String(url).endsWith('/workers/scripts/test-worker/secrets'))
+        .map(([, init]) => JSON.parse(init.body).name);
+      expect(runtimeSecrets).toEqual(['CE_STORAGE_ENVELOPE_KEK', 'TOKEN_HMAC_SECRET']);
+      expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
+    } finally {
       consoleLogSpy.mockRestore();
     }
   });
@@ -937,6 +1156,54 @@ describe('deploy-helper worker', () => {
     expect(payload?.error || '').toMatch(/socket hang up/);
   });
 
+  it.each([
+    { status: 404, result: cfSuccess([]), label: 'no visible account' },
+    {
+      status: 409,
+      result: new Response(JSON.stringify({
+        success: true,
+        result: [{ id: 'account-a' }, { id: 'account-b' }],
+        result_info: { total_count: 2 },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } }),
+      label: 'ambiguous account set',
+    },
+  ])('preserves the safe $status account lookup status for /account and /deploy ($label)', async ({ status, result }) => {
+    const fetchMock = jest.fn(async () => result.clone());
+    global.fetch = fetchMock;
+
+    const accountResponse = await deployHelperWorker.fetch(makeJsonRequest('/account', {
+      apiToken: 'cf-token',
+    }), {}, {});
+    const deployResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'cf-token',
+      workerName: 'test-worker',
+      sessionSlug: 'alpha-session',
+      bundleText: 'export default { fetch() {} };',
+    }), {}, {});
+
+    expect(accountResponse.status).toBe(status);
+    expect(deployResponse.status).toBe(status);
+    expect((await accountResponse.json()).error).toBeTruthy();
+    expect((await deployResponse.json()).error).toBeTruthy();
+  });
+
+  it('continues to map Cloudflare account 5xx responses to the helper 502 boundary', async () => {
+    global.fetch = jest.fn(async () => cfFailure(503, 'Cloudflare accounts unavailable.'));
+
+    const accountResponse = await deployHelperWorker.fetch(makeJsonRequest('/account', {
+      apiToken: 'cf-token',
+    }), {}, {});
+    const deployResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'cf-token',
+      workerName: 'test-worker',
+      sessionSlug: 'alpha-session',
+      bundleText: 'export default { fetch() {} };',
+    }), {}, {});
+
+    expect(accountResponse.status).toBe(502);
+    expect(deployResponse.status).toBe(502);
+  });
+
   it('returns a structured 502 when fetching the worker bundle fails', async () => {
     global.fetch = async (url) => {
       if (String(url).endsWith('/workers/scripts/test-worker/settings')) {
@@ -1068,6 +1335,149 @@ describe('deploy-helper worker', () => {
       expect(response.status).toBe(502);
       expect(payload?.workerUrl).toBeUndefined();
       expect(payload?.error).toBe('Worker config verification failed after deployment.');
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('retries an older config revision and accepts the fresh canonical readback', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+    ]);
+    fetchMock.kvReadbackResponses = [new Response(JSON.stringify({
+      slug: 'alpha-session',
+      configRevision: 'revision-old',
+      corsWorkerUrl: 'https://test-worker.tenant-subdomain.workers.dev/',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })];
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        configRevision: 'revision-new',
+        bundleText: 'export default { fetch() {} };',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload?.configVerified).toBe(true);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || 'GET').toUpperCase() === 'GET' && String(url).endsWith(':config')
+      ))).toHaveLength(2);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('retries the narrow fresh-namespace 404 during final config readback', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+    ]);
+    fetchMock.kvReadbackResponses = [cfFailure(404, "get namespace: 'namespace not found'", [
+      { code: 10013, message: "get namespace: 'namespace not found'" },
+    ])];
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        configRevision: 'revision-new',
+        bundleText: 'export default { fetch() {} };',
+      }), {}, {});
+
+      expect(response.status).toBe(200);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || 'GET').toUpperCase() === 'GET' && String(url).endsWith(':config')
+      ))).toHaveLength(2);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('bounds stale revision retries and rolls back when the fresh revision never appears', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    fetchMock.kvReadbackResponses = Array.from({ length: 4 }, () => new Response(JSON.stringify({
+      slug: 'alpha-session',
+      configRevision: 'revision-old',
+      corsWorkerUrl: 'https://test-worker.tenant-subdomain.workers.dev/',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        configRevision: 'revision-new',
+        bundleText: 'export default { fetch() {} };',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(502);
+      expect(payload?.error).toBe('Worker config verification failed after deployment.');
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || 'GET').toUpperCase() === 'GET' && String(url).endsWith(':config')
+      ))).toHaveLength(4);
+      expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('does not retry a same-revision identity mismatch', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    fetchMock.kvReadbackOverride = new Response(JSON.stringify({
+      slug: 'foreign-session',
+      configRevision: 'revision-new',
+      corsWorkerUrl: 'https://foreign.example.test/',
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        configRevision: 'revision-new',
+        bundleText: 'export default { fetch() {} };',
+      }), {}, {});
+
+      expect(response.status).toBe(502);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || 'GET').toUpperCase() === 'GET' && String(url).endsWith(':config')
+      ))).toHaveLength(1);
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -1335,6 +1745,156 @@ describe('deploy-helper worker', () => {
       ))).toBe(shouldDeleteKv);
     } finally {
       consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('aborts and removes staged KV when an explicit worker name is claimed before upload', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeFetchSequence([
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({}),
+    ]);
+    fetchMock.workerSecondPreflightOverride = cfSuccess({
+      bindings: [{ name: 'CE_DEPLOYMENT_ID', type: 'plain_text', text: 'other-deployment' }],
+    });
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleText: 'export default { fetch() {} };',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(payload?.error).toMatch(/became unavailable/i);
+      expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'PUT' &&
+        /\/workers\/scripts\/test-worker$/.test(String(url))
+      ))).toBe(false);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        String(url).endsWith('/storage/kv/namespaces/kv-123')
+      ))).toHaveLength(1);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('serializes concurrent same-name deploys so only one can provision resources', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    let workerBindings = null;
+    let kvCreates = 0;
+    let scriptUploads = 0;
+    const kvValues = new Map();
+    global.fetch = jest.fn(async (url, init = {}) => {
+      const normalizedUrl = String(url);
+      const method = String(init.method || 'GET').toUpperCase();
+      if (method === 'GET' && normalizedUrl.endsWith('/workers/scripts/test-worker/settings')) {
+        return workerBindings
+          ? cfSuccess({ bindings: workerBindings })
+          : cfFailure(404, 'Worker not found.');
+      }
+      if (method === 'POST' && normalizedUrl.endsWith('/storage/kv/namespaces')) {
+        kvCreates += 1;
+        return cfSuccess({ id: `kv-${kvCreates}` });
+      }
+      if (/\/storage\/kv\/namespaces\/kv-\d+\/values\//.test(normalizedUrl)) {
+        if (method === 'PUT') {
+          kvValues.set(normalizedUrl, init.body);
+          return cfSuccess({});
+        }
+        if (method === 'GET') {
+          return new Response(kvValues.get(normalizedUrl) || '{}', {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      if (method === 'PUT' && normalizedUrl.endsWith('/workers/scripts/test-worker')) {
+        scriptUploads += 1;
+        const metadata = JSON.parse(await new Response(init.body.get('metadata')).text());
+        workerBindings = metadata.bindings;
+        return cfSuccess({ id: 'worker-uploaded' });
+      }
+      if (method === 'GET' && normalizedUrl.endsWith('/workers/subdomain')) {
+        return cfSuccess({ subdomain: 'tenant-subdomain', status: 'active' });
+      }
+      if (method === 'POST' && normalizedUrl.endsWith('/workers/scripts/test-worker/subdomain')) {
+        return cfSuccess({ enabled: true });
+      }
+      if (method === 'PUT' && normalizedUrl.endsWith('/workers/scripts/test-worker/secrets')) {
+        return cfSuccess({});
+      }
+      throw new Error(`Unexpected Cloudflare mock call: ${method} ${normalizedUrl}`);
+    });
+
+    try {
+      const body = {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleText: 'export default { fetch() {} };',
+      };
+      const [first, second] = await Promise.all([
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), {}, {}),
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), {}, {}),
+      ]);
+
+      expect([first.status, second.status].sort()).toEqual([200, 409]);
+      expect(kvCreates).toBe(1);
+      expect(scriptUploads).toBe(1);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('stops activation and preserves ambiguous resources when ownership changes after upload', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const foreignSettings = cfSuccess({
+      bindings: [{ name: 'CE_DEPLOYMENT_ID', type: 'plain_text', text: 'other-deployment' }],
+    });
+    const fetchMock = makeFetchSequence([
+      cfSuccess({ id: 'kv-123' }),
+      cfSuccess({}),
+      cfSuccess({ id: 'worker-uploaded' }),
+    ]);
+    fetchMock.workerPostUploadSettingsOverride = foreignSettings;
+    fetchMock.workerCleanupSettingsOverride = foreignSettings.clone();
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleText: 'export default { fetch() {} };',
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(409);
+      expect(payload?.error).toMatch(/ownership changed/i);
+      expect(payload?.orphanResources).toEqual({
+        kvNamespaceId: 'kv-123',
+        kvCleanupStatus: 'retained-live-worker',
+        workerName: '',
+        workerCleanupStatus: 'ownership-changed',
+      });
+      expect(fetchMock.calls.some(([url]) => String(url).endsWith('/secrets'))).toBe(false);
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        (String(url).endsWith('/workers/scripts/test-worker') ||
+          String(url).endsWith('/storage/kv/namespaces/kv-123'))
+      ))).toBe(false);
+    } finally {
       consoleLogSpy.mockRestore();
     }
   });

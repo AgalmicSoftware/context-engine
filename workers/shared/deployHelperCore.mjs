@@ -218,9 +218,11 @@ export const cfFetch = async (
 };
 
 const NEW_KV_NAMESPACE_RETRY_DELAYS_MS = Object.freeze([250, 500, 1000]);
+const FINAL_CONFIG_READBACK_RETRY_DELAYS_MS = Object.freeze([250, 500, 1000]);
+const deploymentNameLocks = new Map();
 
-// A newly created namespace can briefly return 404/10013. Retry only the
-// first idempotent config write; every later deploy write remains fail-closed.
+// A newly created namespace can briefly return 404/10013. Retry only the two
+// idempotent seed writes; every later deploy write remains fail-closed.
 const isNewKvNamespacePropagationFailure = (result) => {
   if (!result || result.ok || Number(result.status || 0) !== 404) return false;
   const detail = Array.isArray(result.detail) ? result.detail : [];
@@ -240,6 +242,26 @@ const putFreshKvNamespaceValue = async ({ apiToken, path, options, cfFetchOption
     result = await cfFetch(apiToken, path, options, cfFetchOptions);
   }
   return result;
+};
+
+const withDeploymentNameLock = async (workerName, operation) => {
+  const lockKey = toStr(workerName).trim().toLowerCase();
+  if (!lockKey) return operation();
+  const previous = deploymentNameLocks.get(lockKey) || Promise.resolve();
+  let release;
+  const current = new Promise((resolve) => {
+    release = resolve;
+  });
+  deploymentNameLocks.set(lockKey, current);
+  await previous.catch(() => {});
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (deploymentNameLocks.get(lockKey) === current) {
+      deploymentNameLocks.delete(lockKey);
+    }
+  }
 };
 
 export const lookupCloudflareAccount = async ({
@@ -900,7 +922,7 @@ const resolveDeploymentAccountId = async ({
   return lookup;
 };
 
-export const executeDeployHelperRequest = async ({
+const executeDeployHelperRequestUnlocked = async ({
   body,
   env,
   requestOrigin = '',
@@ -955,7 +977,9 @@ export const executeDeployHelperRequest = async ({
     apiBaseUrl,
   });
   if (!accountLookup.ok) {
-    return buildFailure(502, {
+    const lookupStatus = Number(accountLookup.status || 0);
+    const responseStatus = lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502;
+    return buildFailure(responseStatus, {
       error: accountLookup.error || 'Failed to resolve Cloudflare account.',
       detail: accountLookup.detail,
     }, {
@@ -1165,11 +1189,17 @@ export const executeDeployHelperRequest = async ({
 
   // Stage both canonical records before a new script can become reachable.
   // This avoids a first-write or missing-secret interval during fresh deploys.
-  const secretsPut = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(secretsEnvelope),
-  }, cfFetchOptions);
+  const secretsEnvelopeBody = JSON.stringify(secretsEnvelope);
+  const secretsPut = await putFreshKvNamespaceValue({
+    apiToken,
+    path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`,
+    options: {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: secretsEnvelopeBody,
+    },
+    cfFetchOptions,
+  });
   if (!secretsPut.ok) {
     const orphanKv = await cleanupStagedKv();
     return buildFailure(502, {
@@ -1275,6 +1305,36 @@ export const executeDeployHelperRequest = async ({
   form.append('worker.mjs', new Blob([bundleSource], { type: 'application/javascript+module' }), 'worker.mjs');
 
   const scriptUploadPath = `/accounts/${accountId}/workers/scripts/${workerName}`;
+  // The account/name lock serializes requests handled by this isolate. Repeat
+  // the authoritative lookup after staging KV as a second, cross-isolate guard.
+  // Cloudflare's script upload endpoint has no create-only conditional, so a
+  // narrow lookup-to-PUT race remains for legacy explicit names. If a foreign
+  // create lands in that gap, our PUT can overwrite it; the ownership readback
+  // below can stop later activation but cannot reconstruct the overwritten
+  // script. Worker-canonical deploys avoid the shared name by randomizing it.
+  const finalWorkerNamePreflight = await cfFetch(
+    apiToken,
+    `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
+    { method: 'GET' },
+    cfFetchOptions,
+  );
+  if (finalWorkerNamePreflight.ok) {
+    const orphanKv = await cleanupStagedKv();
+    return buildFailure(409, {
+      error: `Worker name "${workerName}" became unavailable during deployment. No script was uploaded; choose a new worker name before retrying.`,
+      orphanResources: { ...orphanKv, workerName: '' },
+    });
+  }
+  if (Number(finalWorkerNamePreflight.status || 0) !== 404) {
+    const orphanKv = await cleanupStagedKv();
+    return buildFailure(502, {
+      error: finalWorkerNamePreflight.error || 'Failed to re-verify worker-name availability.',
+      detail: finalWorkerNamePreflight.detail,
+      orphanResources: { ...orphanKv, workerName: '' },
+    }, {
+      fallbackEligible: shouldAllowFallbackForCloudflareFailure(finalWorkerNamePreflight),
+    });
+  }
   const scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
     method: 'PUT',
     body: form,
@@ -1296,6 +1356,36 @@ export const executeDeployHelperRequest = async ({
       orphanResources,
     }, {
       fallbackEligible: shouldAllowFallbackForCloudflareFailure(scriptUpload),
+    });
+  }
+
+  // Confirm that the uploaded script still carries this deployment's marker
+  // before enabling its hostname or writing runtime secrets. If another writer
+  // replaced it, preserve both resources for an operator rather than deleting
+  // a script that is no longer ours or activating a mixed deployment.
+  const uploadedWorkerSettings = await cfFetch(
+    apiToken,
+    `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
+    { method: 'GET' },
+    cfFetchOptions,
+  );
+  const uploadedBindings = Array.isArray(uploadedWorkerSettings.data?.result?.bindings)
+    ? uploadedWorkerSettings.data.result.bindings
+    : [];
+  const uploadedWorkerStillOwned = uploadedWorkerSettings.ok && uploadedBindings.some((binding) => (
+    toStr(binding?.name).trim() === DEPLOYMENT_ID_BINDING_NAME &&
+    toStr(binding?.text).trim() === deploymentId
+  ));
+  if (!uploadedWorkerStillOwned) {
+    const orphanResources = await cleanupDeploymentResources();
+    return buildFailure(uploadedWorkerSettings.ok ? 409 : 502, {
+      error: uploadedWorkerSettings.ok
+        ? 'Worker ownership changed during deployment; runtime activation was stopped.'
+        : uploadedWorkerSettings.error || 'Failed to verify worker ownership after upload.',
+      detail: uploadedWorkerSettings.detail,
+      orphanResources,
+    }, {
+      fallbackEligible: !uploadedWorkerSettings.ok && shouldAllowFallbackForCloudflareFailure(uploadedWorkerSettings),
     });
   }
 
@@ -1323,6 +1413,7 @@ export const executeDeployHelperRequest = async ({
     workerUrl,
     resolvedSlug: displaySlug,
     kvNamespaceId: kvId,
+    deploymentId,
     sessionConfigKey,
     sessionSecretsKey,
     sessionKvPrefix: 'session',
@@ -1364,27 +1455,42 @@ export const executeDeployHelperRequest = async ({
         orphanResources,
       });
     }
-    const configReadback = await cfFetch(
-      apiToken,
-      `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`,
-      { method: 'GET' },
-      cfFetchOptions,
-    );
-    const readbackConfig = configReadback.data?.result || configReadback.data || {};
     const expectedAuthorityMode = toStr(configWithWorkerUrl?.sessionModeProfile?.authority?.mode).trim();
-    const verified = (
-      configReadback.ok &&
-      toStr(readbackConfig.slug).trim() === toStr(configWithWorkerUrl.slug).trim() &&
-      toStr(readbackConfig.corsWorkerUrl).trim() === toStr(configWithWorkerUrl.corsWorkerUrl).trim() &&
-      (!configWithWorkerUrl.configRevision ||
-        toStr(readbackConfig.configRevision).trim() === toStr(configWithWorkerUrl.configRevision).trim()) &&
-      (!configWithWorkerUrl.sessionId ||
-        toStr(readbackConfig.sessionId).trim() === toStr(configWithWorkerUrl.sessionId).trim()) &&
-      (!expectedAuthorityMode ||
-        toStr(readbackConfig?.sessionModeProfile?.authority?.mode).trim() === expectedAuthorityMode) &&
-      (!workerCanonicalRequested ||
-        workerAuthorityPoliciesMatch(configWithWorkerUrl.workerAuthority, readbackConfig.workerAuthority))
-    );
+    const readbackMatches = (result) => {
+      const readbackConfig = result?.data?.result || result?.data || {};
+      return (
+        result?.ok &&
+        toStr(readbackConfig.slug).trim() === toStr(configWithWorkerUrl.slug).trim() &&
+        toStr(readbackConfig.corsWorkerUrl).trim() === toStr(configWithWorkerUrl.corsWorkerUrl).trim() &&
+        (!configWithWorkerUrl.configRevision ||
+          toStr(readbackConfig.configRevision).trim() === toStr(configWithWorkerUrl.configRevision).trim()) &&
+        (!configWithWorkerUrl.sessionId ||
+          toStr(readbackConfig.sessionId).trim() === toStr(configWithWorkerUrl.sessionId).trim()) &&
+        (!expectedAuthorityMode ||
+          toStr(readbackConfig?.sessionModeProfile?.authority?.mode).trim() === expectedAuthorityMode) &&
+        (!workerCanonicalRequested ||
+          workerAuthorityPoliciesMatch(configWithWorkerUrl.workerAuthority, readbackConfig.workerAuthority))
+      );
+    };
+    const configReadbackPath = `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`;
+    let configReadback = await cfFetch(apiToken, configReadbackPath, { method: 'GET' }, cfFetchOptions);
+    for (const delayMs of FINAL_CONFIG_READBACK_RETRY_DELAYS_MS) {
+      if (readbackMatches(configReadback)) break;
+      const readbackConfig = configReadback.data?.result || configReadback.data || {};
+      const expectedRevision = toStr(configWithWorkerUrl.configRevision).trim();
+      const observedRevision = toStr(readbackConfig.configRevision).trim();
+      // Retry only an otherwise valid API read that is demonstrably an older
+      // revision or the narrow fresh-namespace 404/10013. Same-revision
+      // identity/policy mismatches and unrelated API errors remain fail-closed.
+      const staleRevision = (
+        configReadback.ok && expectedRevision && observedRevision && observedRevision !== expectedRevision
+      );
+      const freshNamespacePending = isNewKvNamespacePropagationFailure(configReadback);
+      if (!staleRevision && !freshNamespacePending) break;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      configReadback = await cfFetch(apiToken, configReadbackPath, { method: 'GET' }, cfFetchOptions);
+    }
+    const verified = readbackMatches(configReadback);
     if (!verified) {
       const orphanResources = await cleanupDeploymentResources();
       return buildFailure(502, {
@@ -1396,26 +1502,8 @@ export const executeDeployHelperRequest = async ({
   }
 
   // Runtime secrets are written only after the public worker URL and canonical
-  // config have both been verified. Existing scripts never reach this path.
-  if (!deploymentPayload.tokenSecretSet) {
-    const secretResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'TOKEN_HMAC_SECRET', type: 'secret_text', text: tokenSecret }),
-    }, cfFetchOptions);
-    if (!secretResp.ok) {
-      const orphanResources = await cleanupDeploymentResources();
-      return buildFailure(502, {
-        error: secretResp.error,
-        detail: secretResp.detail,
-        orphanResources,
-      }, {
-        fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretResp),
-      });
-    }
-    deploymentPayload.tokenSecretSet = true;
-  }
-
+  // config have both been verified. Storage readiness comes first; the HMAC
+  // secret is the final activation gate that makes login possible.
   if (envelopeKekSecretRequired) {
     if (!deploymentPayload.envelopeKekSecretPreserved) {
       const envelopeKekResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
@@ -1442,5 +1530,29 @@ export const executeDeployHelperRequest = async ({
     deploymentPayload.envelopeKekSecretSet = true;
   }
 
+  if (!deploymentPayload.tokenSecretSet) {
+    const secretResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'TOKEN_HMAC_SECRET', type: 'secret_text', text: tokenSecret }),
+    }, cfFetchOptions);
+    if (!secretResp.ok) {
+      const orphanResources = await cleanupDeploymentResources();
+      return buildFailure(502, {
+        error: secretResp.error,
+        detail: secretResp.detail,
+        orphanResources,
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretResp),
+      });
+    }
+    deploymentPayload.tokenSecretSet = true;
+  }
+
   return buildSuccess(200, deploymentPayload);
 };
+
+export const executeDeployHelperRequest = async (options = {}) => withDeploymentNameLock(
+  options?.body?.workerName,
+  () => executeDeployHelperRequestUnlocked(options),
+);

@@ -344,6 +344,16 @@ What happens during deploy:
 - Cleanup deletes a failed deployment only when the deploy helper can prove the
   script still carries that deployment's ownership marker. It preserves
   pre-existing or ownership-ambiguous scripts and reports any orphaned resource.
+- Legacy/custom deploys that insist on an exact physical Worker name are
+  serialized within one helper isolate and checked again immediately before
+  upload. Cloudflare does not provide a create-only conditional script upload,
+  so a narrow cross-isolate race remains between that final lookup and the PUT.
+  The helper verifies its ownership marker after upload and stops before
+  hostname/secret activation if ownership changed. That readback cannot detect
+  or undo a foreign create that lands after the final lookup but before this
+  deployment's PUT, because this deployment would then be the last writer.
+  Operators should therefore use unique names. Worker-canonical publishes avoid
+  this residual by using the random physical suffix described above.
 
 What gets stored where:
 

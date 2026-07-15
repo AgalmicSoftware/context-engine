@@ -75,7 +75,16 @@ Wrangler is the preferred deploy path. The checked-in `worker.js` imports `../sh
   - output: `{ accountId, accountName }`
 - `POST /deploy`
   - input: Cloudflare token, worker name, worker bundle (`bundleUrl` or `bundleText`), and initial session config/secrets
-  - output: absolute `workerUrl` plus `subdomainStatus`, `subdomainEnabled`, `subdomainError`, `scriptSubdomainEnabled`, and `scriptSubdomainError` so callers can surface `workers.dev` activation state
+  - output: absolute `workerUrl`, the non-secret `deploymentId` ownership marker,
+    and `subdomainStatus`, `subdomainEnabled`, `subdomainError`,
+    `scriptSubdomainEnabled`, and `scriptSubdomainError` so callers can surface
+    `workers.dev` activation state and clean up only exactly owned test resources
+  - exact-name legacy deploys are serialized within one helper isolate and
+    rechecked before upload. Cloudflare exposes no create-only conditional PUT,
+    so a foreign create in the remaining lookup-to-PUT gap can still be
+    overwritten and cannot be reconstructed by the later ownership check.
+    Callers should choose unique names; worker-canonical deploys append a random
+    physical suffix and do not rely on an exact shared name
 - `GET /admin/origins`
   - requires `Authorization: Bearer <ADMIN_SECRET>`
   - returns `{ origins, source }`
