@@ -400,12 +400,29 @@ const useSessionWizardWorkerDeploy = ({
           ? Object.entries(allDeploySecrets).reduce<AnyRecord>((acc, [key, value]) => {
               const allowed =
                 selectedAiSecretFields.has(key) ||
+                (modeRequirements.requiresArweave && key === 'arweaveJwk') ||
                 (modeRequirements.requiresLit && key.startsWith('lit')) ||
                 (modeRequirements.requiresRpc && (key === 'customRpcUrl' || key === 'customRpcKey'));
               if (allowed) acc[key] = value;
               return acc;
             }, {})
           : allDeploySecrets;
+        const requiredWorkerSecretFields = modeRequirements.isWorkerCanonical
+          ? Array.from(
+              new Set([
+                ...selectedAiSecretFields,
+                ...(modeRequirements.requiresArweave && toStr(deploySecrets.arweaveJwk).trim()
+                  ? ['arweaveJwk']
+                  : []),
+                ...(modeRequirements.requiresLit
+                  ? Object.keys(deploySecrets).filter((key) => key.startsWith('lit'))
+                  : []),
+                ...(modeRequirements.requiresRpc
+                  ? ['customRpcUrl', 'customRpcKey'].filter((key) => toStr(deploySecrets[key]).trim())
+                  : []),
+              ]),
+            )
+          : [];
         const deployBlockLimits = normalizeBlockLimitsForConfig(currentDraft?.blockLimits, runtime.latestChainBlock);
         const deployStorageProfile = buildDeployStorageProfilePayload(currentDraft, {});
         const normalizedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
@@ -857,6 +874,17 @@ const useSessionWizardWorkerDeploy = ({
             },
           });
         }
+        const requiredWorkerSecretValuesPresent = requiredWorkerSecretFields.every((key) =>
+          toStr(deploySecrets[key]).trim(),
+        );
+        const requiredWorkerSecretsReady =
+          requiredWorkerSecretFields.length === 0 ||
+          (requiredWorkerSecretValuesPresent &&
+            (helperWritesSecrets || secretsSyncStatus?.synced === true || secretsSyncStatus?.deferred === true));
+        // Regression guard: manual and forced deploys must keep the publish step
+        // open until selected-profile secrets are remote; the same terminal request
+        // ID then resumes signed sync without provisioning a second worker.
+        const publishSafeDeployComplete = isDeployVerified && requiredWorkerSecretsReady;
         cacheSessionWorkerConfigAfterDeploy({
           deployStatusCode,
           deployPartial: data?.partial === true,
@@ -898,7 +926,7 @@ const useSessionWizardWorkerDeploy = ({
             withSecretsSyncStatus(litDeployStatus, secretsSyncStatus),
             configSyncStatus.warning,
           ),
-          deployComplete: isDeployVerified,
+          deployComplete: publishSafeDeployComplete,
           forceManualBundleFile: false,
           normalModeBundleUrlOverride: '',
         });
@@ -909,7 +937,9 @@ const useSessionWizardWorkerDeploy = ({
         return {
           ok: true,
           workerUrl: resolvedDeployWorkerUrl,
-          deployComplete: isDeployVerified,
+          deployComplete: publishSafeDeployComplete,
+          requiredWorkerSecretsReady,
+          requiredWorkerSecretFields,
         };
       } catch (err) {
         const runtime = readRuntime(runtimeRef);

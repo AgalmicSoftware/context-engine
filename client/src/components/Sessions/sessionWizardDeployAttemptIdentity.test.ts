@@ -64,6 +64,60 @@ describe('sessionWizardDeployAttemptIdentity', () => {
     expect(localStorage.getItem(reloaded.storageKey)).toBe('{"version":1,"generation":0,"status":"completed"}');
   });
 
+  it('keeps a newer active generation when an older success finishes late', () => {
+    const firstAttempt = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
+    expect(advanceSessionWizardDeployAttemptGeneration(firstAttempt, { storage: localStorage })).toBe(true);
+    const nextAttempt = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
+
+    expect(markSessionWizardDeployAttemptCompleted(firstAttempt, { storage: localStorage })).toBe(true);
+    expect(resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage })).toEqual(
+      expect.objectContaining({ generation: 1, status: 'active' }),
+    );
+
+    expect(markSessionWizardDeployAttemptCompleted(nextAttempt, { storage: localStorage })).toBe(true);
+    expect(resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage })).toEqual(
+      expect.objectContaining({ generation: 1, status: 'completed' }),
+    );
+  });
+
+  it('keeps a newer completed generation when an older success is replayed', () => {
+    const firstAttempt = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
+    expect(advanceSessionWizardDeployAttemptGeneration(firstAttempt, { storage: localStorage })).toBe(true);
+    const nextAttempt = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
+    expect(markSessionWizardDeployAttemptCompleted(nextAttempt, { storage: localStorage })).toBe(true);
+
+    expect(markSessionWizardDeployAttemptCompleted(firstAttempt, { storage: localStorage })).toBe(true);
+    expect(resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage })).toEqual(
+      expect.objectContaining({ generation: 1, status: 'completed' }),
+    );
+  });
+
+  it('idempotently completes the current generation', () => {
+    const currentAttempt = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
+
+    expect(markSessionWizardDeployAttemptCompleted(currentAttempt, { storage: localStorage })).toBe(true);
+    expect(markSessionWizardDeployAttemptCompleted(currentAttempt, { storage: localStorage })).toBe(true);
+    expect(localStorage.getItem(currentAttempt.storageKey)).toBe(
+      '{"version":1,"generation":0,"status":"completed"}',
+    );
+  });
+
+  it('lets a newer identity repair an older completed record', () => {
+    const firstAttempt = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
+    expect(advanceSessionWizardDeployAttemptGeneration(firstAttempt, { storage: localStorage })).toBe(true);
+    const nextAttempt = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
+    // Model a stale peer write from an older client after this tab already captured generation 1.
+    localStorage.setItem(
+      nextAttempt.storageKey,
+      '{"version":1,"generation":0,"status":"completed"}',
+    );
+
+    expect(markSessionWizardDeployAttemptCompleted(nextAttempt, { storage: localStorage })).toBe(true);
+    expect(resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage })).toEqual(
+      expect.objectContaining({ generation: 1, status: 'completed' }),
+    );
+  });
+
   it('advances a completed generation only with explicit terminal-conflict authority', () => {
     const completed = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
     expect(markSessionWizardDeployAttemptCompleted(completed, { storage: localStorage })).toBe(true);

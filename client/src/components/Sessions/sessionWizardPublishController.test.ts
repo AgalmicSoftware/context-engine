@@ -315,6 +315,37 @@ describe('runSessionWizardPublishController', () => {
     ).rejects.toThrow('Worker deploy failed upstream.');
   });
 
+  it('stops forced publication when required worker secrets were not confirmed remotely', async () => {
+    const persistWorkerConfig = jest.fn();
+
+    await expect(
+      runSessionWizardPublishController({
+        input: {
+          publishExecutionPlan: buildPlan({
+            shouldPersistWorkerConfig: true,
+          }),
+        },
+        ports: {
+          deployWorker: jest.fn().mockResolvedValue({
+            ok: true,
+            deployComplete: false,
+            workerUrl: 'https://deployed-worker.example',
+            requiredWorkerSecretsReady: false,
+            requiredWorkerSecretFields: ['openaiKey'],
+          }),
+          persistWorkerConfig,
+        },
+        callbacks: {
+          setPublishStep: jest.fn(),
+        },
+      }),
+    ).rejects.toThrow(
+      'Required worker secrets were not confirmed after deploy. Retry session creation to resume secret sync.',
+    );
+
+    expect(persistWorkerConfig).not.toHaveBeenCalled();
+  });
+
   it('preserves thrown deploy errors', async () => {
     const error = new Error('network refused deploy request');
 

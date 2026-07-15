@@ -134,7 +134,11 @@ export const markSessionWizardDeployAttemptCompleted = (
   const storageRef = getStorage(storage);
   if (!storageRef) return false;
   const current = readAttemptRecord(storageRef, identity.storageKey);
-  if (current.status === 'completed') return true;
+  // Peer tabs may finish out of order. Never let an older success move durable
+  // state backward, while still allowing a newer success to repair/supersede an
+  // older completed record left by a stale callback or previous client version.
+  if (current.generation > identity.generation) return true;
+  if (current.generation === identity.generation && current.status === 'completed') return true;
   return writeAttemptRecord(storageRef, identity.storageKey, {
     generation: identity.generation,
     status: 'completed',

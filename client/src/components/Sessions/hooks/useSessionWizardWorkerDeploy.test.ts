@@ -1,8 +1,9 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { cryptoUtils } from '../../../utilities/crypto/cryptography.js';
 import { INVALID_SESSION_SLUG_FORMAT_ERROR } from '../sessionWizardSlugValidation';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../../utilities/session/sessionModeProfile';
 import { readSessionWorkerConfigCache } from '../../../utilities/session/sessionWorkerConfigCache.js';
+import { buildSessionWizardPublishExecutionPlan } from '../sessionWizardPublishFlow';
 import useSessionWizardWorkerDeploy, { type SessionWizardWorkerDeployRuntime } from './useSessionWizardWorkerDeploy';
 
 jest.mock('../../../utilities/crypto/cryptography.js', () => ({
@@ -422,6 +423,83 @@ describe('useSessionWizardWorkerDeploy', () => {
     );
   });
 
+  it('keeps a newer deploy generation when an older tab succeeds after a terminal conflict', async () => {
+    let resolveFirstDeploy!: (response: Response) => void;
+    const firstDeployResponse = new Promise<Response>((resolve) => {
+      resolveFirstDeploy = resolve;
+    });
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    const successfulDeployResponse = () =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          ok: true,
+          workerUrl: 'https://deployed.example.test',
+          writesSessionConfig: true,
+          writesSessionSecrets: false,
+        }),
+      }) as Response;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployCalls += 1;
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        if (deployCalls === 1) return firstDeployResponse;
+        if (deployCalls === 2) {
+          return {
+            ok: false,
+            status: 409,
+            json: async () => ({
+              error: 'This deployment request is already bound to a different Cloudflare account.',
+              deploymentRequestConflict: true,
+              deploymentRequestTerminal: true,
+            }),
+          } as Response;
+        }
+        return successfulDeployResponse();
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const firstTab = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+    const secondTab = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+    let firstAttemptPromise!: ReturnType<typeof firstTab.result.current.handleDeployWorker>;
+
+    act(() => {
+      firstAttemptPromise = firstTab.result.current.handleDeployWorker();
+    });
+    await waitFor(() => expect(deployBodies).toHaveLength(1));
+    await act(async () => {
+      expect((await secondTab.result.current.handleDeployWorker()).ok).toBe(false);
+    });
+
+    const attemptKey = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).find((key) =>
+      key?.startsWith('ce:sessionWizardDeployAttempt:v1:'),
+    );
+    expect(JSON.parse(localStorage.getItem(attemptKey || '') || '{}')).toEqual(
+      expect.objectContaining({ generation: 1, status: 'active' }),
+    );
+
+    resolveFirstDeploy(successfulDeployResponse());
+    await act(async () => {
+      expect((await firstAttemptPromise).ok).toBe(true);
+    });
+    expect(JSON.parse(localStorage.getItem(attemptKey || '') || '{}')).toEqual(
+      expect.objectContaining({ generation: 1, status: 'active' }),
+    );
+
+    await act(async () => {
+      expect((await secondTab.result.current.handleDeployWorker()).ok).toBe(true);
+    });
+    expect(deployBodies).toHaveLength(3);
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[2].deploymentRequestId).not.toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[2].configRevision).not.toBe(deployBodies[0].configRevision);
+    expect(JSON.parse(localStorage.getItem(attemptKey || '') || '{}')).toEqual(
+      expect.objectContaining({ generation: 1, status: 'completed' }),
+    );
+  });
+
   it('treats explicit writesSessionSecrets false as authoritative on a resumed helper response', async () => {
     global.fetch = jest.fn(async (url: RequestInfo | URL) => {
       const normalizedUrl = String(url);
@@ -510,6 +588,103 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(JSON.parse(String(secretsSyncCalls[0][1]?.body || '{}')).secrets).toEqual({
       openaiKey: 'sk-current-mutable-recovery',
     });
+  });
+
+  it('keeps manual deploy incomplete so publish retries required secrets on the same deployment identity', async () => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let secretsSyncCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            partial: true,
+            writesSessionConfig: false,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      if (normalizedUrl.endsWith('/admin/set-config')) {
+        return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        secretsSyncCalls += 1;
+        if (secretsSyncCalls === 1) {
+          return {
+            ok: false,
+            status: 503,
+            json: async () => ({ error: 'Required session secret sync was rejected.' }),
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const options = buildDeployHookOptions();
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      registryAddress: '',
+      registryChainId: 0,
+      draft: {
+        slug: 'required-secret-recovery',
+        sessionModeProfile,
+      },
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'sk-required-recovery' });
+    options.resolveWorkerRpcUrl.mockReturnValue('');
+    options.resolveWorkerRpcUrlMap.mockReturnValue({});
+    options.resolveWorkerFaucetConfig.mockReturnValue({});
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let firstResult: Record<string, unknown> = {};
+    let retryResult: Record<string, unknown> = {};
+    await act(async () => {
+      firstResult = await result.current.handleDeployWorker();
+    });
+    const retryPublishPlan = buildSessionWizardPublishExecutionPlan({
+      workerMode: 'custom',
+      sponsoredAutoDeployReady: true,
+      deployComplete: firstResult.deployComplete === true,
+      sessionModeProfile,
+    });
+    await act(async () => {
+      retryResult = await result.current.handleDeployWorker({ forceSponsoredAutoDeploy: true });
+    });
+
+    expect(firstResult).toEqual(
+      expect.objectContaining({
+        ok: true,
+        deployComplete: false,
+        requiredWorkerSecretsReady: false,
+        requiredWorkerSecretFields: ['openaiKey'],
+      }),
+    );
+    expect(retryResult).toEqual(
+      expect.objectContaining({
+        ok: true,
+        deployComplete: true,
+        requiredWorkerSecretsReady: true,
+        requiredWorkerSecretFields: ['openaiKey'],
+      }),
+    );
+    expect(retryPublishPlan.shouldAutoDeployWorker).toBe(true);
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
+    expect(secretsSyncCalls).toBe(2);
+    expect(options.updateDeploymentState).toHaveBeenCalledWith(
+      expect.objectContaining({ deployComplete: false }),
+    );
+    expect(options.updateDeploymentState).toHaveBeenCalledWith(
+      expect.objectContaining({ deployComplete: true }),
+    );
   });
 
   it('does not cache a 200 partial deploy when signed config recovery fails', async () => {
@@ -953,8 +1128,9 @@ describe('useSessionWizardWorkerDeploy', () => {
     options.resolveWorkerFaucetConfig.mockReturnValue({});
     const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
 
+    let deployResult: Record<string, unknown> = {};
     await act(async () => {
-      await result.current.handleDeployWorker();
+      deployResult = await result.current.handleDeployWorker();
     });
 
     const requestedUrls = fetchMock.mock.calls.map(([url]) => String(url));
@@ -963,6 +1139,12 @@ describe('useSessionWizardWorkerDeploy', () => {
     const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
     const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
     expect(deployPayload.secrets).toEqual({ openaiKey: 'sk-ai' });
+    expect(deployResult).toEqual(
+      expect.objectContaining({
+        requiredWorkerSecretsReady: true,
+        requiredWorkerSecretFields: ['openaiKey'],
+      }),
+    );
   });
 
   it('routes explicit-Lit RPC inputs through session secrets without duplicating them in canonical config', async () => {
@@ -994,8 +1176,9 @@ describe('useSessionWizardWorkerDeploy', () => {
     });
     const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
 
+    let deployResult: Record<string, unknown> = {};
     await act(async () => {
-      await result.current.handleDeployWorker();
+      deployResult = await result.current.handleDeployWorker();
     });
 
     const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
@@ -1008,6 +1191,12 @@ describe('useSessionWizardWorkerDeploy', () => {
       customRpcKey: 'rpc-secret',
       litUsageApiKey: 'lit-secret',
     });
+    expect(deployResult).toEqual(
+      expect.objectContaining({
+        requiredWorkerSecretsReady: true,
+        requiredWorkerSecretFields: ['openaiKey', 'litUsageApiKey', 'customRpcUrl', 'customRpcKey'],
+      }),
+    );
   });
 
   it.each([
@@ -1046,14 +1235,21 @@ describe('useSessionWizardWorkerDeploy', () => {
       options.resolveWorkerRpcUrlMap.mockReturnValue({});
       const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
 
+      let deployResult: Record<string, unknown> = {};
       await act(async () => {
-        await result.current.handleDeployWorker();
+        deployResult = await result.current.handleDeployWorker();
       });
 
       const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
       const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
       expect(deployPayload.secrets).toEqual({ [key]: 'provider-secret', openaiKey: 'transcription-secret' });
       expect(JSON.stringify(deployPayload)).not.toMatch(/must-not-send/);
+      expect(deployResult).toEqual(
+        expect.objectContaining({
+          requiredWorkerSecretsReady: true,
+          requiredWorkerSecretFields: [key, 'openaiKey'],
+        }),
+      );
     },
   );
 

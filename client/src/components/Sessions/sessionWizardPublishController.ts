@@ -23,6 +23,8 @@ export type SessionWizardPublishDeployWorkerResult = {
   ok?: boolean;
   deployComplete?: boolean;
   workerUrl?: string;
+  requiredWorkerSecretsReady?: boolean;
+  requiredWorkerSecretFields?: string[];
   error?: string;
 };
 
@@ -322,6 +324,13 @@ const assertVerifiedWorkerDeploy = (
 ): string => {
   if (!deployResult?.ok) {
     throw new Error(deployResult?.error || 'Worker deploy failed.');
+  }
+  // Regression guard: config persistence cannot prove that provider keys reached
+  // the worker. Keep forced publication retryable until signed secret sync does.
+  if (deployResult.requiredWorkerSecretsReady === false) {
+    throw new Error(
+      'Required worker secrets were not confirmed after deploy. Retry session creation to resume secret sync.',
+    );
   }
   if (!deployResult?.deployComplete || !deployResult?.workerUrl) {
     throw new Error('Worker deploy did not return a verified worker URL.');
