@@ -105,10 +105,6 @@ Wrangler is the preferred deploy path. The checked-in `worker.js` imports `../sh
     response-loss retries, and rejects reuse of the ID with a conflicting
     immutable identity. Coordinator and journal state contain no raw tokens,
     secrets, or bundle bytes
-  - release-manifest provenance is resolved before request coordination, so
-    the expected digest is part of the stable request identity. The manifest
-    and downloaded bytes are rechecked before account lookup or resource
-    mutation; a moved `latest` pointer cannot silently change retry bytes
   - if Cloudflare definitively rejects an uploaded bundle after the stable KV
     namespace is staged, the helper retains a separate non-secret recovery
     marker. The same request may retry corrected bundle bytes while every

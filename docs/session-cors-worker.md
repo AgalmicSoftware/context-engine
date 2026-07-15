@@ -381,7 +381,8 @@ The worker still read-normalizes legacy `payloadAccessControl.mode`, `cloudflare
 
 Where older clients still need one string, the worker and client derive the legacy `payloadAccessMode` from the v2 object.
 
-- `gate: "sbt_gate"` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain using the configured RPC before upload, list, or read bytes are exposed.
+- `gate: "sbt_gate"` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain before upload, list, or read bytes are exposed. Worker-canonical same-network checks prefer the private `customRpcUrl` session secret; Cloudflare storage loads that secret lazily only when an SBT condition or policy is evaluated. Public/group/role reads do not read it, and an unavailable secret store fails closed only for the affected SBT check. Before a contract read, the Worker calls `eth_chainId` and rejects an endpoint that cannot prove the expected chain.
+- `gate: "group_gate"` checks worker-native group membership before upload, list, or read bytes are exposed. The gate reads group ids from `storageProfile.payloadAccessControl.groupId`/`groupIds`, or from payload metadata for per-payload group storage refs. Missing, deleted, or unreadable groups fail closed.
 - `gate: "none"` keeps canonical payloads in Cloudflare but serves read/list requests without wallet auth. Uploads still require authenticated session worker requests unless the caller is already on an anonymous read/list route. Use this for public question prompts or public response summaries that should render identically across Arweave, Cloudflare, Telegram, Mini App, and the CE client.
 - `encryption: "lit"` keeps the existing Lit scaffold. Cloudflare stores only caller-supplied encrypted payload envelopes and Lit governs decrypt. The worker rejects plaintext Cloudflare uploads in this mode until the client/session path supplies `payloadEncrypted=true` with a Lit-encrypted envelope.
 - `encryption: "worker_envelope"` encrypts payload bytes at rest inside the session worker trust domain, then releases keys only after worker-evaluated conditions pass. The operator and Cloudflare runtime can decrypt. This mode protects against storage-layer dumps of R2/KV/D1 data, backups, or bucket/index misconfiguration; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime. Audience removal stops future key release, but cannot un-read plaintext already fetched.
@@ -1104,10 +1105,10 @@ Never return secrets in responses.
 - The first signed worker-canonical publish carrying a `configRevision` finalizes
   that publication in the server-managed KV record. A sequential exact
   same-revision retry is an idempotent no-op; a different revision returns
-  `409`. Session config writes are serialized by the per-session coordinator
-  with first-use worker-envelope key selection. Revision-free signed Admin
-  patches remain supported; upload retry receipts and key-changing maintenance
-  actions are not part of this config boundary.
+  `409`. This marker is best-effort replay protection, not a linearizable
+  concurrency boundary: signed config writes and storage-envelope writes still
+  update the same KV record independently. Revision-free signed Admin patches
+  remain supported.
 - A successful worker-canonical publish is terminal in `/new`, including after a
   reload or another open tab observes the settlement record. Use **Create another
   session** to clear the settled local wizard state and begin a new session.
@@ -1164,7 +1165,9 @@ Never return secrets in responses.
   - `check` / `decrypt` derive RPC from worker-approved config, secrets, or
     defaults. Request `rpcUrl` / `customRpcUrl` is rejected unless it exactly
     matches that allowlist, and the Lit Action rejects endpoints whose reported
-    chain ID does not match the gate chain.
+    chain ID does not match the gate chain. Gate-chain inputs use the same strict
+    parser as worker authority reads, so malformed explicit values cannot fall
+    through to a different configured chain.
   - stored Chipotle metadata omits RPC URLs; legacy v1 / bare-hex Chipotle
     wrapped keys are rejected by default and must be recreated with v2 metadata
   - admin `POST /admin/lit-chipotle-status` to query worker-mediated Chipotle
@@ -1497,9 +1500,38 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
   changed, cannot be verified, or script deletion fails, the helper retains and
   reports that KV; do not delete it until the live binding is recovered or
   independently verified.
-- Concurrent low-level deploys using the same custom/legacy worker name are not
-  supported; serialize them or choose unique names. First-party
-  worker-canonical deploys avoid that race with a random physical-name suffix.
+- Local Cloudflare E2E finalizers serialize only narrow KV-only,
+  prior-verified Worker-delete-failed, or verify-later ownership recovery
+  handoffs. The last form is emitted whenever account or Worker-settings
+  ownership cannot be verified; transient reads use bounded retries first. It
+  requires exact live deployment and KV binding markers before either resource
+  is deleted. Each handoff contains a domain-separated HMAC-SHA256 proof made
+  with the cleanup token; it never stores that token. The proof binds the
+  recovery type, Worker name, token-derived
+  account ID, KV namespace, deployment marker, and cleanup status. The private
+  E2E runbook documents the stripped operator-only recovery command. Recovery
+  re-derives the account before settings or delete calls and fails closed if the
+  selected token now exposes a different account. The CLI atomically reserves a
+  distinct writable result before any Cloudflare request. An incomplete attempt
+  persists only a validated signed handoff, advanced to a successor when cleanup
+  state changes. That result is valid input for the next recovery invocation; a
+  final write failure leaves the preflight handoff reserved.
+- Concurrent deploys with different request IDs may reuse the same requested
+  prefix; each receives a distinct physical worker name and isolated KV
+  namespace. Stable same-ID requests are serialized by
+  `SessionWriteCoordinator` before Cloudflare mutation; matching in-flight work
+  is retryable, conflicting immutable identities fail closed, and terminal safe
+  receipts replay without repeating deployment side effects. The KV journal
+  remains the resumable per-step record after coordination.
+- A definitive bundle-upload rejection after stable staging writes a separate,
+  non-secret recovery marker that outlives the ordinary replay journals until
+  terminal success. A same-ID retry may change only the bundle source/bytes (and
+  rotate the request-only token); every infrastructure-affecting field remains
+  bound. A visible Worker must match the exact deployment, KV, Durable Object,
+  storage, admin, slug, and helper-mode bindings before replacement. Both
+  visible and temporarily hidden replacements preserve `secret_text` bindings,
+  and any later non-success remains pending. The helper returns/replays success
+  only after the terminal receipt commits and the rejection marker is removed.
 - Optional: pass `subdomain` (or `workersSubdomain`) to set the account-level workers.dev subdomain
   when none exists yet (falls back to a deterministic `ce-<accountId>` name). This is the only
   deploy-helper path that needs `Account Settings: Edit`; script-level Workers.dev enablement uses

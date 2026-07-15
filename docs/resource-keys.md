@@ -51,8 +51,14 @@ Per request, the client resolves keys in this order:
 ## RPC key routing
 
 Session-level Custom RPC URL values that are supplied as worker secrets stay
-worker-private during session publish/deploy. Browser read providers only use
-explicit browser-visible registry `rpcUrl` / `rpcUrlsByChainId` values.
+worker-private during session publish/deploy. For worker-canonical sessions, the
+worker attaches that URL only to an in-memory, non-serializable request config
+for same-network SBT association/storage-gate checks and faucet execution. It is
+loaded lazily for Cloudflare storage, so public/group/role reads do not depend on
+the secret store. The Worker verifies `eth_chainId` before protected contract
+reads and masks private endpoint details in errors and logs. Browser read
+providers only use explicit browser-visible registry `rpcUrl` /
+`rpcUrlsByChainId` values.
 
 Standalone RPC API-key injection without a URL template is still unsupported.
 The JSON-RPC proxy format (Authorization header vs URL template) needs a

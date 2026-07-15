@@ -349,9 +349,44 @@ What happens during deploy:
 - The wizard auto-fills `corsWorkerUrl`
 - The wizard signs the canonical config with the passkey-derived EOA, persists
   it, and verifies `/session-config` before it reports success.
+- A custom Worker is publish-ready only while that verified deployment still
+  matches the selected Worker identity, the complete canonical session-mode
+  profile, each effective AI provider/model assignment, and every required
+  secret value. Changing any of them requires a new deploy/sync verification.
+  Sponsored auto-deploy writes this verified tuple to the live publish runtime
+  before its promise resolves, so the same publish attempt can consume it without
+  depending on a React render. This proof is kept in memory only: secret values
+  and secret verifiers are not written to the wizard cache. After a reload, the
+  wizard may retain the safe public Lit runtime descriptor, but it must replay
+  deployment/synchronization checks before a custom Worker becomes publish-ready
+  again. The shared default Worker and a deploy-ready sponsored flow keep their
+  separate readiness paths.
+- Worker config persistence captures one immutable draft/identity/secrets
+  snapshot. After the signed write and `/session-config` readback, the wizard
+  compares the live publish inputs and rebuilt canonical config with that exact
+  snapshot, then repeats that comparison immediately before writing settlement
+  markers or clearing the cache. Any edit made before settlement stops the flow
+  and leaves the draft intact for an explicit retry; an unchanged publish settles
+  and clears only the captured verified session identity.
+- For Lit profiles, an account key authorizes bootstrap but is not runtime
+  readiness evidence. Publish stays blocked until the Worker has a usage key
+  and the complete Lit runtime descriptor, and failed post-deploy synchronization
+  retains enough local bootstrap authority for an exact retry.
 - Cleanup deletes a failed deployment only when the deploy helper can prove the
   script still carries that deployment's ownership marker. It preserves
   pre-existing or ownership-ambiguous scripts and reports any orphaned resource.
+- If a remote bundle is definitively rejected after stable resources were
+  staged, the manual-file fallback reuses the same deployment request, Worker,
+  and KV namespace. Only corrected bundle bytes may change; all non-bundle
+  deployment fields stay bound, existing secret bindings are preserved, and
+  the request remains recoverable until its terminal receipt is durable.
+- The requested Worker name is always a readable prefix rather than an exact
+  physical script name. The suffix is derived before existence checks or
+  mutable Cloudflare operations: first-party callers with different request
+  generations receive different deterministic names, while legacy callers
+  without `deploymentRequestId` receive random names. The helper still verifies
+  its ownership marker after upload and stops before hostname/secret activation
+  if ownership does not match.
 
 What gets stored where:
 
