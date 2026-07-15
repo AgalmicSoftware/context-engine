@@ -151,6 +151,8 @@ export instead of as extra visible or hidden mode panes.
 - `byModelQuestion`: model-by-question matrix with repeats nested in each cell.
 - `similarityMatrix`: pairwise distributional similarity over shared questions.
 - `similarityEdges`: graph-friendly similarity/difference edges with overlap.
+- `winningResponseConsistency`: the share of attempted runs matching each
+  model/question cell's modal normalized answer, pooled at question level.
 - stance and similarity summaries include deterministic 95% bootstrap
   intervals; polarity summaries include signed and absolute wording sensitivity.
 
@@ -164,23 +166,37 @@ the graph can be read like the live participant graph rather than a generic
 scatterplot. The post-graph cluster actions keep the live `pdfIgnore` wrapper
 and inline button margins (`Collapse Clusters`, `Expand Clusters`, and
 `Analyze clusters`) rather than a benchmark-specific flex helper class.
-Embedding, opinion-group count, and Auto controls remain functionally disabled
-in static exports, but their CSS keeps live-style opacity, native select
-padding, and undecorated cluster-number input colors instead of standalone
-dimmed chrome.
+The embedding selector remains disabled because a self-contained artifact has
+one generated MDS embedding. Opinion-group controls are functional: entering a
+count or using the stepper applies deterministic K-medoids assignments over the
+embedded report similarity matrix, updates participant colors and outlines,
+and shows model membership for the preview groups. `Auto` restores the
+canonical connected-component groups and their generated representative
+statements. Manual grouping changes only the visualization and never rewrites
+the embedded benchmark aggregates.
 
 The standalone renderer uses these aggregates to draw a beeswarm-style chart:
 each question is positioned horizontally by model-to-model answer spread,
-scaled across the report's observed spread range, with low-spread consensus on
-the left and the highest observed model disagreement on the live-style
-`Difference` edge. Stance polarity remains separate from position: positive means are
+mapped to a fixed zero-to-one scale, with low-spread consensus on the left and
+maximum model disagreement on the live-style `Difference` edge. The vertical
+axis shows winning-response consistency from 0% to 100%. For each
+model/question cell, the winner is that model's most frequent normalized
+`Agree`, `Unsure`, or `Disagree` answer; question-level consistency is the
+number of repeated runs matching those within-model winners divided by all
+attempted runs. Invalid attempts remain in the denominator. This is a
+descriptive repeat-stability parameter, not a calibrated confidence
+probability or population confidence interval. Stance polarity remains
+separate from position: positive means are
 labeled as statement-relative `net support`, negative means as `net opposition`,
 and near-zero or uncertain distributions as `mixed / unsure`. The rendered chart
 uses the live Polis report swarm frame (`swarmLayoutContainer`,
-`swarmContainer`, `swarmScrollControls`, and 700x200 `beeswarmSvg`) so it
+`swarmContainer`, `swarmScrollControls`, and 700x250 `beeswarmSvg`) so it
 visually aligns with the client Results report, including the live mobile
 breakpoint where `swarmContainer` becomes horizontally scrollable and hides the
-native scrollbar. The wrapper and scroll controls should retain the live
+native scrollbar. Points use deterministic collision packing around their
+metric coordinates, and large banks use smaller circles, so repeated metric
+pairs remain separately focusable instead of hiding later questions. The
+wrapper and scroll controls should retain the live
 spacing and 30px circular button sizing rather than adding benchmark-specific
 margin or padded controls. Sparse or unanswered questions are retained as
 no-data report rows. The visible
@@ -188,7 +204,8 @@ Consensus and Difference section intentionally stays chart-only like the live
 `PolisReport`; top-difference inspection remains available through All
 Questions, Raw Results, and the CE export rather than adding an extra table to
 the report section. Hovering or focusing a beeswarm point shows the question
-prompt, aggregate counts, mean score, and model-disagreement score while
+prompt, aggregate counts, mean score, model-disagreement score, and the exact
+winning/attempted repeat counts behind the consistency axis while
 toggling the live `beeswarmCircleHover` class for the orange statement-dot
 state instead of adding standalone-only SVG hover effects.
 The All Questions list mirrors the live `PolisReport` question rows by using
@@ -262,7 +279,10 @@ follow the live compiled CSS rather than the visually intended text in inline
 Sass comments; for example, `questionVoteRow` stays at the browser-emitted
 `display: flex; flex-direction: column` rule instead of adding standalone-only
 alignment or gap declarations. This keeps the standalone spacing aligned with
-the client report.
+the client report. Selecting a manual count applies deterministic K-medoids to
+eligible participants only; insufficient-overlap participants stay separate.
+These manual clusters are display alternatives, while the connected-component
+groups embedded in `participantGraph.nodes` remain the canonical report output.
 
 ## Participants List
 

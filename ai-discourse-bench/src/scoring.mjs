@@ -115,6 +115,32 @@ const summarizeModelQuestionRuns = (runs, seed) => ({
   polarity: summarizePolarity(runs, seed),
 });
 
+const summarizeWinningResponseConsistency = (cells = []) => {
+  let winningResponses = 0;
+  let attemptedRuns = 0;
+  let validRuns = 0;
+  let contributingModels = 0;
+
+  cells.forEach((cell) => {
+    const attempts = Number(cell?.total || 0);
+    if (!Number.isFinite(attempts) || attempts <= 0) return;
+    const answerCounts = ANSWER_VALUES.map((answer) => Number(cell?.counts?.[answer] || 0));
+    winningResponses += Math.max(0, ...answerCounts);
+    validRuns += answerCounts.reduce((sum, count) => sum + count, 0);
+    attemptedRuns += attempts;
+    contributingModels += 1;
+  });
+
+  return {
+    method: 'pooled-within-model-modal-share',
+    rate: attemptedRuns ? round(winningResponses / attemptedRuns) : null,
+    winningResponses,
+    attemptedRuns,
+    validRuns,
+    contributingModels,
+  };
+};
+
 const summarizeCellForm = (cells, formKey, seed) => {
   const counts = emptyCounts();
   const values = [];
@@ -174,6 +200,7 @@ const summarizeCells = (cells, rawRuns, seed) => {
     invalidRate: cells.length ? round(invalid / cells.length) : null,
     responseEntropy: entropy(counts),
     runSummary: summarizeRuns(rawRuns, `${seed}:runs`),
+    winningResponseConsistency: summarizeWinningResponseConsistency(cells),
     polarity: {
       canonical: summarizeCellForm(cells, 'canonical', `${seed}:canonical`),
       reversedNormalized: summarizeCellForm(cells, 'reversedNormalized', `${seed}:reversed`),

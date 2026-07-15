@@ -44,6 +44,20 @@ pairwise distances. Opinion groups are connected components over a documented
 similarity threshold. Models without enough overlap are shown separately and
 are not assigned misleading similarity positions.
 
+The HTML report also supports manual opinion-group counts as an exploratory
+view. Those alternatives use deterministic K-medoids over the same similarity
+matrix and do not change the canonical connected-component assignments in the
+report data. Models without sufficient overlap remain unassigned in both
+modes.
+
+Question points include a winning-response consistency parameter. Within each
+model/question cell, the most frequent normalized response is the winner; the
+parameter is the share of attempted runs across model cells that match those
+within-model winners. Invalid attempts stay in the denominator. This separates
+stable model-to-model disagreement from instability across repeated calls. It
+is descriptive repeat stability, not a calibrated probability that an answer
+is correct and not a population confidence interval.
+
 Stance means and pairwise similarity means include deterministic 95% percentile
 bootstrap intervals. The report records the 1,000-iteration method and
 resampling unit. Single observations receive a degenerate interval and should

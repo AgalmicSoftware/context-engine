@@ -59,6 +59,15 @@ test('distributional similarity distinguishes oscillation from consistent uncert
 
   assert.equal(report.polisReport.byModelQuestion['model-a'].q1.meanScore, 0);
   assert.equal(report.polisReport.byModelQuestion['model-b'].q1.meanScore, 0);
+  assert.deepEqual(report.polisReport.byQuestion.q1.winningResponseConsistency, {
+    method: 'pooled-within-model-modal-share',
+    rate: 0.75,
+    winningResponses: 30,
+    attemptedRuns: 40,
+    validRuns: 40,
+    contributingModels: 2,
+  });
+  assert.equal(report.polisReport.byQuestion.q2.winningResponseConsistency.rate, 1);
   assert.equal(report.polisReport.similarityMatrix['model-a']['model-b'], 0.5);
   const similarity = report.polisReport.similarityDetails['model-a']['model-b'];
   assert.equal(similarity.similarity, 0.5);

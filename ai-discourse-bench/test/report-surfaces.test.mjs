@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import test from 'node:test';
+import vm from 'node:vm';
 
 import { buildResultsReport } from '../src/scoring.mjs';
 import { renderHtmlReport } from '../src/render-html.mjs';
@@ -27,6 +28,9 @@ test('report preserves raw atlas and risk-matrix material', async () => {
   assert.equal(report.rawMaterial.riskMatrixInputs.length, 200);
 
   const html = renderHtmlReport(report);
+  const runtimeScript = html.match(/<script>\s*(\(function \(\) \{[\s\S]*?\}\(\)\);)\s*<\/script>/)?.[1];
+  assert.ok(runtimeScript, 'expected a self-contained report runtime');
+  assert.doesNotThrow(() => new vm.Script(runtimeScript));
   assert.match(html, /data-testid="ce-session-results-view-nav"/);
   assert.match(html, /Consensus and Difference/);
   assert.match(html, /All Questions/);
@@ -116,7 +120,7 @@ test('report HTML keeps model-generated markup inert', async () => {
 test('report beeswarm places model-to-model difference on the right axis', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
-    3
+    4
   );
   const modelRoster = {
     schemaVersion: 1,
@@ -125,7 +129,7 @@ test('report beeswarm places model-to-model difference on the right axis', async
       { id: 'model-b', label: 'Model B', model: 'provider/model-b', provider: 'mock', traits: {} },
     ],
   };
-  const [consensusQuestion, splitQuestion, unsureQuestion] = questionBank.questions;
+  const [consensusQuestion, splitQuestion, unsureQuestion, volatileQuestion] = questionBank.questions;
   const runsFile = {
     schemaVersion: 1,
     benchmarkId: questionBank.benchmarkId,
@@ -137,6 +141,10 @@ test('report beeswarm places model-to-model difference on the right axis', async
       { modelId: 'model-b', questionId: splitQuestion.id, polarity: 'canonical', normalizedAnswer: 'Disagree' },
       { modelId: 'model-a', questionId: unsureQuestion.id, polarity: 'canonical', normalizedAnswer: 'Unsure' },
       { modelId: 'model-b', questionId: unsureQuestion.id, polarity: 'canonical', normalizedAnswer: 'Unsure' },
+      { modelId: 'model-a', questionId: volatileQuestion.id, polarity: 'canonical', normalizedAnswer: 'Agree' },
+      { modelId: 'model-a', questionId: volatileQuestion.id, polarity: 'canonical', normalizedAnswer: 'Disagree' },
+      { modelId: 'model-b', questionId: volatileQuestion.id, polarity: 'canonical', normalizedAnswer: 'Agree' },
+      { modelId: 'model-b', questionId: volatileQuestion.id, polarity: 'canonical', normalizedAnswer: 'Disagree' },
     ],
   };
 
@@ -147,19 +155,58 @@ test('report beeswarm places model-to-model difference on the right axis', async
     points.set(match[1], { x: Number(match[2]), y: Number(match[3]) });
   }
 
-  assert.equal(points.size, 3);
+  assert.equal(points.size, 4);
   assert.ok(points.get(consensusQuestion.id).x < 100);
   assert.ok(points.get(splitQuestion.id).x > 600);
   assert.ok(points.get(unsureQuestion.id).x < 100);
-  for (const { y } of points.values()) {
-    assert.ok(y >= 70 && y <= 130, `expected live-style centerline y lane, got ${y}`);
-  }
+  assert.ok(points.get(consensusQuestion.id).y <= 30);
+  assert.ok(points.get(splitQuestion.id).y <= 30);
+  assert.ok(points.get(unsureQuestion.id).y <= 30);
+  assert.ok(points.get(volatileQuestion.id).y >= 100 && points.get(volatileQuestion.id).y <= 115);
   assert.match(html, /data-question-difference="0\.00"/);
   assert.match(html, /data-question-difference="1\.00"/);
+  assert.match(html, /data-question-winning-response-consistency="0\.50"/);
+  assert.match(html, /data-question-winning-responses="2"/);
+  assert.match(html, /data-question-attempted-runs="4"/);
+  assert.match(html, /Repeat consistency<\/text>/);
   assert.match(html, /Consensus<\/text>/);
   assert.match(html, /Difference<\/text>/);
   assert.match(html, /<strong>Model disagreement:<\/strong>/);
   assert.doesNotMatch(html, /<strong>Model difference:<\/strong>/);
+});
+
+test('report beeswarm collision-packs repeated metric pairs into reachable points', async () => {
+  const questionBank = limitQuestionBank(
+    await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
+    24
+  );
+  const modelRoster = {
+    schemaVersion: 1,
+    models: [
+      { id: 'model-a', label: 'Model A', model: 'provider/model-a', provider: 'mock', traits: {} },
+      { id: 'model-b', label: 'Model B', model: 'provider/model-b', provider: 'mock', traits: {} },
+    ],
+  };
+  const runs = questionBank.questions.flatMap((question) => modelRoster.models.map((entry) => ({
+    modelId: entry.id,
+    questionId: question.id,
+    polarity: 'canonical',
+    normalizedAnswer: 'Agree',
+  })));
+
+  const report = buildResultsReport({ questionBank, modelRoster, runsFile: { runs } });
+  const html = renderHtmlReport(report);
+  const coordinates = Array.from(html.matchAll(
+    /data-ce-beeswarm-point[\s\S]*?<circle class="beeswarmCircle" cx="([^"]+)" cy="([^"]+)" r="5" \/>/g
+  )).map((match) => ({ x: Number(match[1]), y: Number(match[2]) }));
+
+  assert.equal(coordinates.length, 24);
+  assert.equal(new Set(coordinates.map(({ x, y }) => `${x},${y}`)).size, 24);
+  coordinates.forEach((left, leftIndex) => {
+    coordinates.slice(leftIndex + 1).forEach((right) => {
+      assert.ok(Math.hypot(left.x - right.x, left.y - right.y) >= 11);
+    });
+  });
 });
 
 test('All Questions gives each model one averaged vote and preserves invalid raw runs separately', async () => {
@@ -983,19 +1030,25 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /statements: '\.graph-statement'/);
   assert.match(html, /'radial-axes': '\.graph-radial-axes'/);
   assert.match(html, /node\.toggleAttribute\('hidden', !input\.checked\)/);
-  assert.match(html, /<svg width="700" height="200" class="beeswarmSvg" role="img" aria-label="Consensus and difference beeswarm chart">/);
-  assert.doesNotMatch(html, /class="beeswarmSvg" viewBox="0 0 700 200" preserveAspectRatio="none"/);
+  assert.match(html, /<svg width="700" height="250" class="beeswarmSvg" role="img" aria-label="Questions by model disagreement and repeat consistency">/);
+  assert.doesNotMatch(html, /class="beeswarmSvg" viewBox="0 0 700 250" preserveAspectRatio="none"/);
   assert.match(html, /class="beeswarmSvg"/);
   assert.match(html, /\.beeswarmSvg \{ border: 1px solid #ddd; background: var\(--ce-color-white\); overflow: scroll; \}/);
   assert.doesNotMatch(html, /\.beeswarmSvg \{[^}]*width: 100%/);
-  assert.match(html, /<text x="0" y="185" font-size="14" fill="black">Consensus<\/text>/);
-  assert.match(html, /<text x="700" y="185" font-size="14" fill="black" text-anchor="end">Difference<\/text>/);
+  assert.match(html, /class="beeswarmAxisTitle"[^>]*>Repeat consistency<\/text>/);
+  assert.match(html, /class="beeswarmTickLabel"[^>]*>100%<\/text>/);
+  assert.match(html, /class="beeswarmTickLabel"[^>]*>0%<\/text>/);
+  assert.match(html, /<text class="beeswarmAxisLabel" x="62" y="232">Consensus<\/text>/);
+  assert.match(html, /<text class="beeswarmAxisLabel" x="680" y="232" text-anchor="end">Difference<\/text>/);
   assert.match(html, /data-ce-beeswarm-point/);
   assert.equal((html.match(/data-question-has-votes="true"/g) || []).length, 1);
   assert.equal((html.match(/data-question-has-votes="false"/g) || []).length, 0);
   assert.match(html, /data-question-status="2 modeled responses"/);
   assert.match(html, /data-question-extremity=/);
   assert.match(html, /data-question-difference=/);
+  assert.match(html, /data-question-winning-response-consistency="1\.00"/);
+  assert.match(html, /data-question-winning-responses=/);
+  assert.match(html, /data-question-attempted-runs=/);
   assert.match(html, /data-question-prompt="Frontier AI developers should be required to disclose serious pre-deployment evaluation results to an independent regulator\."/);
   assert.match(html, /<circle class="beeswarmCircle" cx="[^"]+" cy="[^"]+" r="5" \/>/);
   assert.doesNotMatch(html, /<circle class="beeswarmCircle"[^>]+fill="/);
@@ -1016,6 +1069,8 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /'<div style="font-weight: bold; margin-bottom: 4px;">' \+ escapeText\(point\.dataset\.questionId\) \+ ': ' \+ escapeText\(point\.dataset\.questionPrompt\) \+ '<\/div>',/);
   assert.match(html, /'<div style="font-size: 0\.85rem; margin-bottom: 6px;"><strong>Agree:<\/strong> ' \+ escapeText\(point\.dataset\.questionAgree\)/);
   assert.match(html, /'<div style="font-size: 0\.85rem; margin-bottom: 6px;"><strong>Mean:<\/strong> ' \+ escapeText\(point\.dataset\.questionMean\)/);
+  assert.match(html, /<strong>Winning-response consistency:<\/strong>/);
+  assert.match(html, /point\.dataset\.questionAttemptedRuns/);
   assert.doesNotMatch(html, /\.beeTooltip strong \{ display: block;/);
   assert.doesNotMatch(html, /\.tooltipPrompt \{/);
   assert.doesNotMatch(html, /class="tooltipStats"/);
@@ -1026,7 +1081,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /beeswarmTooltip\.style\.left = \(pageX \+ Math\.max\(padding, left\)\) \+ 'px';/);
   assert.match(html, /id="embedding-choice-select"/);
   assert.match(html, /<option value="UMAP">UMAP<\/option>\s*<option value="SVD">SVD\/PCA<\/option>\s*<option value="POLIS" selected>Polis Auto<\/option>/);
-  assert.match(html, /<input id="cluster-count-input" class="clusterNumberInput" type="number" value="[1-9][0-9]*" min="1" disabled aria-disabled="true" title="Static benchmark exports preserve the generated participant embedding\./);
+  assert.match(html, /<input id="cluster-count-input" class="clusterNumberInput" data-ce-cluster-count-input type="number" value="[1-9][0-9]*" min="1" max="2" aria-label="Opinion-group count" title="Choose a deterministic K-medoids grouping/);
   assert.match(html, /Opinion Group/);
   assert.match(html, /Polis Auto/);
   assert.match(html, /id="embedding-choice-select" disabled aria-disabled="true" title="Static benchmark exports preserve the generated participant embedding\./);
@@ -1046,11 +1101,13 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /id="participant-graph"[\s\S]*<span id="participants-graph" class="aidb-anchor-alias" aria-hidden="true"><\/span>/);
   assert.match(html, /\.aidb-anchor-alias \{ display: block; height: 0; overflow: hidden; scroll-margin-top: 24px; \}/);
   assert.match(html, /<label for="embedding-choice-select">Embedding:<span class="pdfIgnore aidb-inline-tooltip-reference" style="display: inline-flex;" title="Polis Auto is the closest live control vocabulary for this static export\./);
-  assert.match(html, /<label for="cluster-count-input">Opinion groups:<span class="pdfIgnore aidb-inline-tooltip-reference" style="display: inline-flex;" title="Static exports use the generated connected-component groups\./);
+  assert.match(html, /<label for="cluster-count-input">Opinion groups:<span class="pdfIgnore aidb-inline-tooltip-reference" style="display: inline-flex;" title="Choose a deterministic K-medoids grouping over the report similarity matrix\./);
   assert.match(html, /class="numberInputWrapper"/);
-  assert.match(html, /class="stepperButton" aria-label="Decrease cluster count" disabled aria-disabled="true"/);
+  assert.match(html, /class="stepperButton" data-ce-cluster-step="-1" aria-label="Decrease opinion-group count"/);
+  assert.match(html, /class="stepperButton" data-ce-cluster-step="1" aria-label="Increase opinion-group count"/);
   assert.match(html, /class="clusterNumberInput"/);
-  assert.match(html, /class="clusterAutoButton" disabled aria-disabled="true" title="Static benchmark exports preserve the generated participant embedding\./);
+  assert.match(html, /class="clusterAutoButton clusterAutoButtonActive" data-ce-cluster-auto aria-pressed="true" title="Choose a deterministic K-medoids grouping/);
+  assert.match(html, /data-ce-opinion-group-status aria-live="polite"/);
   assert.match(html, /\.controlGroup \{ display: flex; align-items: center; gap: 8px; flex-wrap: wrap; \}/);
   assert.match(html, /\.controlGroup select \{ padding: 4px; \}/);
   assert.doesNotMatch(html, /\.controlGroup \{[^}]*display: inline-flex/);
@@ -1065,7 +1122,8 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /\.stepperButton \{ width: 30px; height: 30px; border: none; background-color: #f7f7f7;/);
   assert.match(html, /\.controlGroup select:disabled, \.clusterNumberInput:disabled, \.stepperButton:disabled, \.clusterAutoButton:disabled \{ opacity: 1; cursor: default; color: inherit; -webkit-text-fill-color: currentColor; \}/);
   assert.doesNotMatch(html, /\.controlGroup select:disabled, \.clusterNumberInput:disabled, \.stepperButton:disabled, \.clusterAutoButton:disabled \{ opacity: 0\.7; cursor: not-allowed; \}/);
-  assert.match(html, /\.clusterAutoButton \{ margin-left: 6px; \}/);
+  assert.match(html, /\.clusterAutoButton \{ margin-left: 6px; cursor: pointer; \}/);
+  assert.match(html, /\.clusterAutoButtonActive \{ background: #e5e7eb; box-shadow: inset 0 0 0 1px #9ca3af; \}/);
   assert.match(html, /class="graphSection aidb-graph-layout"/);
   assert.match(html, /<div class="graphItem">\s*<svg width="500" height="400"/);
   assert.doesNotMatch(html, /aidb-participant-graph-item/);
@@ -1140,6 +1198,15 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /function setClusterSectionOpen/);
   assert.match(html, /var omitted = section\.querySelector\('\[data-ce-cluster-omitted\]'\);\s*if \(omitted\) omitted\.hidden = nextOpen;/);
   assert.match(html, /document\.querySelectorAll\('\[data-ce-cluster-section\]'\)\.forEach/);
+  assert.match(html, /id="ce-ai-discourse-bench-participant-clusters">\s*\{\s*"method": "deterministic-k-medoids"/);
+  assert.match(html, /"assignmentsByCount": \{\s*"1": \{/);
+  assert.match(html, /function applyOpinionGroupCount\(requestedCount\)/);
+  assert.match(html, /function restoreAutoOpinionGroups\(\)/);
+  assert.match(html, /function renderOpinionGroupOutlines\(\)/);
+  assert.match(html, /function renderManualClusterLegend\(assignments, clusterCount\)/);
+  assert.match(html, /clusterLegendItems\.addEventListener\('click', toggleClusterFromEvent\)/);
+  assert.match(html, /clusterAutoButton\.addEventListener\('click', restoreAutoOpinionGroups\)/);
+  assert.match(html, /applyOpinionGroupCount\(activeOpinionGroupCount \+ Number/);
   assert.doesNotMatch(html, /<details class="clusterSectionDiv"/);
   assert.match(html, /Most Similar Participant Pairs/);
   assert.match(html, /<span class="aidb-section-title">All Questions<\/span>/);

@@ -114,6 +114,7 @@ const buildQuestionSummaries = (report = {}) => {
         counts: countsFromSummary(aggregate),
         validResponses: validVoteCount(aggregate),
         invalid: Number(aggregate.invalid || 0),
+        winningResponseConsistency: aggregate.winningResponseConsistency || null,
       },
       modelDifference: modelDifference(participantStances),
       participantStances,

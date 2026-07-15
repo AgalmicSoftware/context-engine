@@ -1,5 +1,6 @@
 import { buildSecondPassAnalysisInput } from './analysis-export.mjs';
 import { buildContextEnginePolisExport } from './ce-export.mjs';
+import { clusterBySimilarity } from './opinion-groups.mjs';
 import {
   WORLD_MAP_GEOGRAPHIES,
   WORLD_MAP_GRATICULE_PATH,
@@ -519,9 +520,9 @@ const selectDefaultRiskMatrixIntersection = (comments = [], heatmap = new Map())
 };
 
 const REPORT_DEFAULT_EMBEDDING_LABEL = 'Polis Auto';
-const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This static diagram uses distributional answer similarity and places models with classical MDS. ${REPORT_DEFAULT_EMBEDDING_LABEL} assigns connected opinion groups while preserving insufficient-overlap participants separately.`;
+const PARTICIPANTS_GRAPH_TOOLTIP_TEXT = `This static diagram uses distributional answer similarity and places models with classical MDS. ${REPORT_DEFAULT_EMBEDDING_LABEL} assigns connected opinion groups while preserving insufficient-overlap participants separately; the opinion-group control can preview deterministic K-medoids alternatives without changing the report data.`;
 const REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT = "Polis Auto is the closest live control vocabulary for this static export. The generated position is classical MDS over Jensen-Shannon answer-distribution distance, and opinion groups are connected components over the report threshold. This is Polis-inspired analysis inside Context Engine, not an official Polis/Pol.is integration or endorsement.";
-const OPINION_GROUPS_TOOLTIP_TEXT = "Static exports use the generated connected-component groups. Re-run the report after new benchmark data to update them.";
+const OPINION_GROUPS_TOOLTIP_TEXT = "Choose a deterministic K-medoids grouping over the report similarity matrix. Auto restores the generated connected-component opinion groups.";
 const D3_CATEGORY10 = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
 const WORLD_MAP_ANSWER_COLORS = Object.freeze({
   Agree: '#4dffa4',
@@ -1079,6 +1080,51 @@ const normalizeSeries = (values, minOut, maxOut, fallback = (minOut + maxOut) / 
   ));
 };
 
+const questionWinningResponseConsistency = (report, questionId, summary = {}) => {
+  const declared = summary.winningResponseConsistency;
+  if (Number.isFinite(declared?.rate)) {
+    return {
+      method: declared.method || 'pooled-within-model-modal-share',
+      rate: clamp(Number(declared.rate), 0, 1),
+      winningResponses: Number(declared.winningResponses || 0),
+      attemptedRuns: Number(declared.attemptedRuns || 0),
+      validRuns: Number(declared.validRuns || 0),
+      contributingModels: Number(declared.contributingModels || 0),
+    };
+  }
+
+  let winningResponses = 0;
+  let attemptedRuns = 0;
+  let validRuns = 0;
+  let contributingModels = 0;
+  Object.values(report.polisReport?.byModelQuestion || {}).forEach((questionsById) => {
+    const cell = questionsById?.[questionId];
+    if (!cell) return;
+    const counts = [
+      Number(cell.counts?.Agree || 0),
+      Number(cell.counts?.Unsure || 0),
+      Number(cell.counts?.Disagree || 0),
+    ];
+    const cellValidRuns = counts.reduce((sum, count) => sum + count, 0);
+    const cellAttempts = Number.isFinite(Number(cell.total))
+      ? Number(cell.total)
+      : cellValidRuns + Number(cell.invalid || 0);
+    if (cellAttempts <= 0) return;
+    winningResponses += Math.max(0, ...counts);
+    attemptedRuns += cellAttempts;
+    validRuns += cellValidRuns;
+    contributingModels += 1;
+  });
+  return {
+    method: 'pooled-within-model-modal-share',
+    rate: attemptedRuns ? clamp(winningResponses / attemptedRuns, 0, 1) : null,
+    winningResponses,
+    attemptedRuns,
+    validRuns,
+    contributingModels,
+  };
+};
+
 const buildQuestionBeeswarmPoints = (report) => {
   const questions = getQuestions(report);
   return questions
@@ -1092,6 +1138,7 @@ const buildQuestionBeeswarmPoints = (report) => {
         ? clamp(Math.abs(meanScore), 0, 1)
         : null;
       const difference = hasVotes ? clamp((spreadMetric || 0) / 2, 0, 1) : null;
+      const winningResponseConsistency = questionWinningResponseConsistency(report, question.id, summary);
       return {
         id: question.id,
         prompt: question.prompt || question.id,
@@ -1100,10 +1147,11 @@ const buildQuestionBeeswarmPoints = (report) => {
         spread: spreadMetric,
         extremity,
         difference,
+        winningResponseConsistency,
         hasVotes,
         noDataLane: index % 10,
         noDataJitter: hashNumber(`${question.id}:no-data`) - 0.5,
-        radius: hasVotes ? 5 : 3,
+        radius: hasVotes ? (questions.length > 100 ? 3 : 5) : 3,
         summary,
       };
     })
@@ -1113,35 +1161,73 @@ const buildQuestionBeeswarmPoints = (report) => {
 const renderBeeswarmChart = (report) => {
   const points = buildQuestionBeeswarmPoints(report);
   const width = 700;
-  const height = 200;
+  const height = 250;
+  const plotLeft = 62;
+  const plotRight = width - 20;
+  const plotTop = 24;
+  const plotBottom = 190;
   if (!points.length) {
     return '<p class="ce-report-muted">No answered statements are available for the beeswarm yet.</p>';
   }
-  const answeredPoints = points.filter((point) => point.hasVotes);
-  const answeredXs = normalizeSeries(answeredPoints.map((point) => point.xMetric), 40, width - 40, 40);
-  const centerY = height / 2;
-  const bucketCounts = new Map();
-  const answeredPositionById = new Map(answeredPoints.map((point, index) => {
-    const x = answeredXs[index];
-    const bucket = Math.round(x / 14);
-    const bucketCount = bucketCounts.get(bucket) || 0;
-    bucketCounts.set(bucket, bucketCount + 1);
-    const layer = Math.ceil(bucketCount / 2);
-    const direction = bucketCount % 2 === 0 ? -1 : 1;
-    const deterministicJitter = (hashNumber(`${point.id}:swarm-y`) - 0.5) * 3;
-    return [point.id, {
-      x,
-      y: clamp(centerY + (direction * layer * 13) + deterministicJitter, 24, height - 28),
-    }];
-  }));
+  const yTicks = [1, 0.75, 0.5, 0.25, 0];
+  const yGrid = yTicks.map((rate) => {
+    const y = plotBottom - rate * (plotBottom - plotTop);
+    return `<g class="beeswarmGridTick" aria-hidden="true">
+      <line class="beeswarmGridLine" x1="${plotLeft}" y1="${y}" x2="${plotRight}" y2="${y}" />
+      <text class="beeswarmTickLabel" x="${plotLeft - 8}" y="${y + 4}" text-anchor="end">${Math.round(rate * 100)}%</text>
+    </g>`;
+  }).join('');
+  const occupiedPositions = [];
+  const answeredPositionById = new Map();
+  points.filter((point) => (
+    point.hasVotes && Number.isFinite(point.winningResponseConsistency?.rate)
+  )).forEach((point) => {
+    const targetX = plotLeft + point.xMetric * (plotRight - plotLeft);
+    const targetY = plotBottom - point.winningResponseConsistency.rate * (plotBottom - plotTop);
+    const step = point.radius * 2 + 1;
+    const xDirection = hashNumber(`${point.id}:swarm-x-direction`) >= 0.5 ? 1 : -1;
+    const yDirection = hashNumber(`${point.id}:swarm-y-direction`) >= 0.5 ? 1 : -1;
+    const xOffsets = [0];
+    const yOffsets = [0];
+    for (let index = 1; index <= 20; index += 1) {
+      xOffsets.push(xDirection * index * step, -xDirection * index * step);
+    }
+    for (let index = 1; index <= 10; index += 1) {
+      yOffsets.push(yDirection * index * step, -yDirection * index * step);
+    }
+    let position = null;
+    for (const yOffset of yOffsets) {
+      for (const xOffset of xOffsets) {
+        const candidate = { x: targetX + xOffset, y: targetY + yOffset, radius: point.radius };
+        if (candidate.x < plotLeft || candidate.x > plotRight || candidate.y < plotTop || candidate.y > plotBottom) continue;
+        const hasCollision = occupiedPositions.some((occupied) => {
+          const minimumDistance = occupied.radius + candidate.radius + 1;
+          const xDistance = occupied.x - candidate.x;
+          const yDistance = occupied.y - candidate.y;
+          return xDistance * xDistance + yDistance * yDistance < minimumDistance * minimumDistance;
+        });
+        if (!hasCollision) {
+          position = candidate;
+          break;
+        }
+      }
+      if (position) break;
+    }
+    const finalPosition = position || { x: targetX, y: targetY, radius: point.radius };
+    occupiedPositions.push(finalPosition);
+    answeredPositionById.set(point.id, finalPosition);
+  });
   const circles = points.map((point, index) => {
+    const consistency = point.winningResponseConsistency || {};
+    const consistencyRate = Number.isFinite(consistency.rate) ? consistency.rate : null;
+    const consistencyLabel = consistencyRate === null ? 'repeat consistency unavailable' : `${formatPercent(consistencyRate)} repeat consistency`;
     const answeredPosition = answeredPositionById.get(point.id);
-    const x = point.hasVotes
+    const x = point.hasVotes && answeredPosition
       ? answeredPosition.x
-      : 32 + (point.noDataLane * 18) + (point.noDataJitter * 8);
-    const y = point.hasVotes
+      : plotLeft + (point.noDataLane * 18) + (point.noDataJitter * 8);
+    const y = point.hasVotes && answeredPosition
       ? answeredPosition.y
-      : clamp(36 + (Math.floor(index / 10) * 5) + (point.noDataJitter * 10), 24, height - 50);
+      : clamp(plotBottom + 9 + (Math.floor(index / 10) * 2) + (point.noDataJitter * 4), plotBottom + 5, height - 34);
     const totals = answerTotals(point.summary);
     const pointClassName = `beeswarmPoint${point.hasVotes ? '' : ' beeswarmPointNoData'}`;
     const circleClassName = `beeswarmCircle${point.hasVotes ? '' : ' beeswarmCircleNoData'}`;
@@ -1165,18 +1251,25 @@ const renderBeeswarmChart = (report) => {
       data-question-extremity="${escapeHtml(formatScore(point.extremity))}"
       data-question-difference="${escapeHtml(formatScore(point.difference))}"
       data-question-votes="${escapeHtml(validVoteCount(point.summary))}"
-      aria-label="${escapeHtml(`${point.id}: ${point.prompt} (${statusLabel})`)}"
+      data-question-winning-response-consistency="${escapeHtml(formatScore(consistencyRate))}"
+      data-question-winning-responses="${escapeHtml(consistency.winningResponses || 0)}"
+      data-question-attempted-runs="${escapeHtml(consistency.attemptedRuns || 0)}"
+      data-question-contributing-models="${escapeHtml(consistency.contributingModels || 0)}"
+      aria-label="${escapeHtml(`${point.id}: ${point.prompt} (${statusLabel}; ${consistencyLabel})`)}"
     >
       <circle class="${escapeHtml(circleClassName)}" cx="${x}" cy="${y}" r="${point.radius}" />
-      <title>${escapeHtml(`${point.id}: ${point.prompt} (${statusLabel})`)}</title>
+      <title>${escapeHtml(`${point.id}: ${point.prompt} (${statusLabel}; ${consistencyLabel})`)}</title>
     </a>`;
   }).join('');
   return `<div class="swarmLayoutContainer">
     <div class="swarmContainer" data-ce-beeswarm-scroll-viewport>
-      <svg width="${width}" height="${height}" class="beeswarmSvg" role="img" aria-label="Consensus and difference beeswarm chart">
-        <line x1="0" y1="${height - 10}" x2="${width}" y2="${height - 10}" stroke="black" />
-        <text x="0" y="${height - 15}" font-size="14" fill="black">Consensus</text>
-        <text x="${width}" y="${height - 15}" font-size="14" fill="black" text-anchor="end">Difference</text>
+      <svg width="${width}" height="${height}" class="beeswarmSvg" role="img" aria-label="Questions by model disagreement and repeat consistency">
+        ${yGrid}
+        <line class="beeswarmAxisLine" x1="${plotLeft}" y1="${plotTop}" x2="${plotLeft}" y2="${plotBottom}" />
+        <line class="beeswarmAxisLine" x1="${plotLeft}" y1="${plotBottom}" x2="${plotRight}" y2="${plotBottom}" />
+        <text class="beeswarmAxisTitle" x="14" y="${(plotTop + plotBottom) / 2}" transform="rotate(-90 14 ${(plotTop + plotBottom) / 2})" text-anchor="middle">Repeat consistency</text>
+        <text class="beeswarmAxisLabel" x="${plotLeft}" y="232">Consensus</text>
+        <text class="beeswarmAxisLabel" x="${plotRight}" y="232" text-anchor="end">Difference</text>
         ${circles}
       </svg>
     </div>
@@ -1448,6 +1541,7 @@ const renderParticipantGraph = (report) => {
   const width = 500;
   const height = 400;
   const staticEmbeddingControlTitle = 'Static benchmark exports preserve the generated participant embedding. Re-render the report after a new run to change this control.';
+  const manualClusterControlTitle = 'Choose a deterministic K-medoids grouping over the report similarity matrix. Auto restores the generated connected-component grouping.';
   const staticClusterAnalysisTitle = "Use AI to summarize each cluster's unique viewpoint";
   const embeddedNodes = buildParticipantEmbedding(report, width, height);
   const edges = report.participantGraph?.edges || [];
@@ -1470,7 +1564,20 @@ const renderParticipantGraph = (report) => {
   const discoveredClusters = Array.from(new Set(
     embeddedNodes.map((node) => node.cluster).filter((cluster) => Number(cluster) >= 0)
   ));
-  const activeClusterCount = Math.max(1, discoveredClusters.length);
+  const eligibleClusterNodeIds = embeddedNodes
+    .filter((node) => !node.insufficientOverlap)
+    .map((node) => node.id);
+  const activeClusterCount = discoveredClusters.length || (eligibleClusterNodeIds.length ? 1 : 0);
+  const manualClusterAssignments = Object.fromEntries(
+    Array.from({ length: eligibleClusterNodeIds.length }, (_, index) => index + 1).map((count) => {
+      const grouping = clusterBySimilarity({
+        participantIds: eligibleClusterNodeIds,
+        similarityMatrix: report.polisReport?.similarityMatrix || {},
+        count,
+      });
+      return [String(count), grouping.assignments];
+    }),
+  );
   const clusterAssignmentById = new Map(embeddedNodes.map((node) => [node.id, node.cluster]));
   const clusterColor = (clusterIndex) => (
     Number(clusterIndex) < 0
@@ -1481,6 +1588,19 @@ const renderParticipantGraph = (report) => {
   const centerY = height / 2;
   const graphX = (value) => Number(value) - centerX;
   const graphY = (value) => Number(value) - centerY;
+  const clusterControlPayload = {
+    method: 'deterministic-k-medoids',
+    autoClusterCount: activeClusterCount,
+    minClusterCount: eligibleClusterNodeIds.length ? 1 : 0,
+    maxClusterCount: eligibleClusterNodeIds.length,
+    autoAssignments: Object.fromEntries(embeddedNodes.map((node) => [node.id, node.cluster])),
+    assignmentsByCount: manualClusterAssignments,
+    participants: embeddedNodes.map((node) => ({
+      id: node.id,
+      label: node.label,
+      eligible: !node.insufficientOverlap,
+    })),
+  };
   const participantMetaById = new Map((report.participants || []).map((participant) => [
     participant.id,
     {
@@ -1638,6 +1758,7 @@ const renderParticipantGraph = (report) => {
     anchorAliases: ['participants-graph'],
     bodyClassName: 'aidb-participant-graph-section',
     body: `
+      <script type="application/json" id="ce-ai-discourse-bench-participant-clusters">${serializeJsonForHtmlScript(clusterControlPayload)}</script>
       <div class="participantGraphControls">
         <div class="controlGroup">
           <label for="embedding-choice-select">Embedding:${renderTooltipReference(REPORT_DEFAULT_EMBEDDING_TOOLTIP_TEXT)}</label>
@@ -1650,11 +1771,12 @@ const renderParticipantGraph = (report) => {
         <div class="controlGroup">
           <label for="cluster-count-input">Opinion groups:${renderTooltipReference(OPINION_GROUPS_TOOLTIP_TEXT)}</label>
           <div class="numberInputWrapper">
-            <button type="button" class="stepperButton" aria-label="Decrease cluster count" disabled aria-disabled="true" title="${escapeHtml(staticEmbeddingControlTitle)}">-</button>
-            <input id="cluster-count-input" class="clusterNumberInput" type="number" value="${escapeHtml(activeClusterCount)}" min="1" disabled aria-disabled="true" title="${escapeHtml(staticEmbeddingControlTitle)}">
-            <button type="button" class="stepperButton" aria-label="Increase cluster count" disabled aria-disabled="true" title="${escapeHtml(staticEmbeddingControlTitle)}">+</button>
-            <button type="button" class="clusterAutoButton" disabled aria-disabled="true" title="${escapeHtml(staticEmbeddingControlTitle)}">Auto</button>
+            <button type="button" class="stepperButton" data-ce-cluster-step="-1" aria-label="Decrease opinion-group count" aria-disabled="false" title="${escapeHtml(manualClusterControlTitle)}">-</button>
+            <input id="cluster-count-input" class="clusterNumberInput" data-ce-cluster-count-input type="number" value="${escapeHtml(activeClusterCount)}" min="${eligibleClusterNodeIds.length ? 1 : 0}" max="${escapeHtml(eligibleClusterNodeIds.length)}" aria-label="Opinion-group count" title="${escapeHtml(manualClusterControlTitle)}" ${eligibleClusterNodeIds.length ? '' : 'disabled aria-disabled="true"'}>
+            <button type="button" class="stepperButton" data-ce-cluster-step="1" aria-label="Increase opinion-group count" aria-disabled="false" title="${escapeHtml(manualClusterControlTitle)}">+</button>
+            <button type="button" class="clusterAutoButton clusterAutoButtonActive" data-ce-cluster-auto aria-pressed="true" title="${escapeHtml(manualClusterControlTitle)}">Auto</button>
           </div>
+          <span class="aidb-sr-only" data-ce-opinion-group-status aria-live="polite"></span>
         </div>
         <div class="controlGroup aidb-layer-toggles" aria-label="Participant graph layers">
           <label><input type="checkbox" data-ce-graph-toggle="statements"> Statements</label>
@@ -1664,7 +1786,7 @@ const renderParticipantGraph = (report) => {
           <label><input type="checkbox" data-ce-graph-toggle="radial-axes" checked> Radial Axes</label>
         </div>
       </div>
-      <div class="graphSection aidb-graph-layout">
+      <div class="graphSection aidb-graph-layout" data-ce-participant-graph>
         <div class="graphItem">
           <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" class="participantSvg graph" role="img" aria-label="participant similarity graph">
           <g transform="translate(${centerX}, ${centerY})">
@@ -1691,7 +1813,7 @@ const renderParticipantGraph = (report) => {
       </div>
       <div class="clusterLegendSection">
         <strong class="clusterLegendTitle">Opinion Groups${renderTooltipReference('Groups are made of participants who voted similarly on statements.')}: </strong>
-        <div class="clusterLegendItems">${clusterLegend || '<p class="ce-report-muted">No opinion groups yet.</p>'}</div>
+        <div class="clusterLegendItems" data-ce-cluster-legend-items>${clusterLegend || '<p class="ce-report-muted">No opinion groups yet.</p>'}</div>
         <details class="aidb-similarity-details">
           <summary>Most Similar Participant Pairs</summary>
           <ol>${strongestEdges || '<li>No similarity edges yet.</li>'}</ol>
@@ -3061,7 +3183,9 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .stepperButton:disabled:hover { background-color: #f7f7f7; }
     .stepperButton:first-child { border-right: 1px solid var(--ce-color-border-light); }
     .stepperButton:last-of-type { border-left: 1px solid var(--ce-color-border-light); }
-    .clusterAutoButton { margin-left: 6px; }
+    .clusterAutoButton { margin-left: 6px; cursor: pointer; }
+    .clusterAutoButtonActive { background: #e5e7eb; box-shadow: inset 0 0 0 1px #9ca3af; }
+    .aidb-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
     .aidb-layer-toggles { flex: 1 1 100%; flex-wrap: wrap; }
     .aidb-layer-toggles label { cursor: pointer; }
     .aidb-layer-toggles input { margin-right: 4px; }
@@ -3077,6 +3201,11 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .beeswarmSvg { border: 1px solid #ddd; background: var(--ce-color-white); overflow: scroll; }
     .beeswarmSvg text { font-size: 14px; font-weight: 400; fill: #000; }
     .beeswarmSvg line { stroke: #000; }
+    .beeswarmSvg .beeswarmGridLine { stroke: #e2e8f0; stroke-width: 1; }
+    .beeswarmSvg .beeswarmAxisLine { stroke: #111827; stroke-width: 1; }
+    .beeswarmSvg .beeswarmTickLabel { fill: #64748b; font-size: 11px; }
+    .beeswarmSvg .beeswarmAxisTitle { fill: #475569; font-size: 11px; font-weight: 600; }
+    .beeswarmSvg .beeswarmAxisLabel { fill: #111827; font-size: 14px; }
     .beeswarmPoint { cursor: pointer; outline: none; }
     .beeswarmCircle { fill: steelblue; }
     .beeswarmCircleNoData { fill: #cbd5e1; opacity: 0.42; stroke: #94a3b8; stroke-width: 1; }
@@ -3823,6 +3952,13 @@ export const renderHtmlReport = (report) => `<!doctype html>
       var beeswarmViewport = document.querySelector('[data-ce-beeswarm-scroll-viewport]');
       var beeswarmScrollControls = document.querySelector('[data-ce-beeswarm-scroll-controls]');
       var beeswarmScrollButtons = Array.from(document.querySelectorAll('[data-ce-beeswarm-scroll]'));
+      var participantClusterPayloadEl = document.getElementById('ce-ai-discourse-bench-participant-clusters');
+      var participantGraph = document.querySelector('[data-ce-participant-graph]');
+      var clusterCountInput = document.querySelector('[data-ce-cluster-count-input]');
+      var clusterStepButtons = Array.from(document.querySelectorAll('[data-ce-cluster-step]'));
+      var clusterAutoButton = document.querySelector('[data-ce-cluster-auto]');
+      var clusterLegendItems = document.querySelector('[data-ce-cluster-legend-items]');
+      var opinionGroupStatus = document.querySelector('[data-ce-opinion-group-status]');
       var riskMatrixPayloadEl = document.getElementById('ce-ai-discourse-bench-risk-matrix-analysis');
       var riskMatrixModal = document.querySelector('[data-ce-risk-matrix-modal]');
       var riskMatrixBackdrop = document.querySelector('[data-ce-risk-matrix-backdrop]');
@@ -3885,6 +4021,8 @@ export const renderHtmlReport = (report) => `<!doctype html>
           return null;
         }
       }
+      var participantClusterPayload = parseEmbeddedJson(participantClusterPayloadEl);
+      var autoClusterLegendHtml = clusterLegendItems ? clusterLegendItems.innerHTML : '';
       var riskMatrixPayload = parseEmbeddedJson(riskMatrixPayloadEl) || { cells: {} };
       function riskMatrixIcon(name, className) {
         var icons = {
@@ -4138,6 +4276,15 @@ export const renderHtmlReport = (report) => `<!doctype html>
         var votes = Number(point.dataset.questionVotes || 0);
         var invalid = Number(point.dataset.questionInvalid || 0);
         var total = votes + invalid;
+        var consistencyRate = Number(point.dataset.questionWinningResponseConsistency);
+        var attemptedRuns = Number(point.dataset.questionAttemptedRuns || 0);
+        var winningResponses = Number(point.dataset.questionWinningResponses || 0);
+        var consistencyLabel = Number.isFinite(consistencyRate)
+          ? String(Math.round(consistencyRate * 100)) + '%'
+          : 'Unavailable';
+        var consistencyDetail = attemptedRuns > 0
+          ? ' (' + String(winningResponses) + ' of ' + String(attemptedRuns) + ' attempted runs)'
+          : '';
         beeswarmTooltip.innerHTML = [
           '<div style="font-weight: bold; margin-bottom: 4px;">' + escapeText(point.dataset.questionId) + ': ' + escapeText(point.dataset.questionPrompt) + '</div>',
           '<div style="font-size: 0.85rem; margin-bottom: 6px;"><strong>Agree:</strong> ' + escapeText(point.dataset.questionAgree) + ', ' +
@@ -4145,6 +4292,9 @@ export const renderHtmlReport = (report) => `<!doctype html>
             '<strong>Unsure:</strong> ' + escapeText(point.dataset.questionUnsure) + '</div>',
           '<div style="font-size: 0.85rem; margin-bottom: 6px;"><strong>Mean:</strong> ' + escapeText(point.dataset.questionMean) + ', ' +
             '<strong>Model disagreement:</strong> ' + escapeText(point.dataset.questionDifference) + '</div>',
+          point.dataset.questionHasVotes === 'false'
+            ? ''
+            : '<div style="font-size: 0.85rem; margin-bottom: 6px;"><strong>Winning-response consistency:</strong> ' + escapeText(consistencyLabel + consistencyDetail) + '</div>',
           point.dataset.questionHasVotes === 'false'
             ? '<div class="ce-report-muted" style="margin-bottom: 6px;">' + escapeText(point.dataset.questionStatus || 'No model responses yet') + '</div>'
             : '',
@@ -4678,6 +4828,237 @@ export const renderHtmlReport = (report) => `<!doctype html>
           });
         });
       });
+      var opinionGroupPalette = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
+      var activeOpinionGroupCount = Number(participantClusterPayload && participantClusterPayload.autoClusterCount || 0);
+      function opinionGroupColor(clusterIndex) {
+        var index = Number(clusterIndex);
+        return index < 0 || !Number.isFinite(index)
+          ? '#94a3b8'
+          : opinionGroupPalette[Math.abs(index) % opinionGroupPalette.length];
+      }
+      function setGraphParticipantCluster(point, clusterIndex) {
+        if (!point) return;
+        var cluster = Number.isInteger(Number(clusterIndex)) ? Number(clusterIndex) : -1;
+        var clusterLabel = cluster < 0 ? 'Insufficient overlap' : 'Opinion Group ' + String(cluster + 1);
+        var participantLabel = point.dataset.participantLabel || point.dataset.participantId || 'Participant';
+        point.setAttribute('data-ce-graph-cluster', String(cluster));
+        point.setAttribute('data-participant-group', clusterLabel);
+        point.setAttribute('aria-label', participantLabel + ': ' + clusterLabel);
+        var circle = point.querySelector('circle');
+        if (circle) circle.setAttribute('fill', opinionGroupColor(cluster));
+        var title = point.querySelector('title');
+        if (title) title.textContent = participantLabel + ': ' + clusterLabel;
+      }
+      function renderOpinionGroupOutlines() {
+        if (!participantGraph) return;
+        var outlineLayer = participantGraph.querySelector('.graph-outlines');
+        if (!outlineLayer) return;
+        while (outlineLayer.firstChild) outlineLayer.removeChild(outlineLayer.firstChild);
+        var groups = {};
+        participantGraph.querySelectorAll('[data-ce-graph-participant-point]').forEach(function (point) {
+          var circle = point.querySelector('circle');
+          if (!circle) return;
+          var cluster = String(point.getAttribute('data-ce-graph-cluster') || '-1');
+          groups[cluster] = groups[cluster] || [];
+          groups[cluster].push({
+            x: Number(circle.getAttribute('cx')),
+            y: Number(circle.getAttribute('cy'))
+          });
+        });
+        var outlineToggle = document.querySelector('[data-ce-graph-toggle="outline"]');
+        Object.keys(groups).forEach(function (cluster) {
+          var points = groups[cluster].filter(function (point) {
+            return Number.isFinite(point.x) && Number.isFinite(point.y);
+          });
+          if (points.length < 3) return;
+          var xValues = points.map(function (point) { return point.x; });
+          var yValues = points.map(function (point) { return point.y; });
+          var minX = Math.min.apply(Math, xValues);
+          var maxX = Math.max.apply(Math, xValues);
+          var minY = Math.min.apply(Math, yValues);
+          var maxY = Math.max.apply(Math, yValues);
+          var ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+          var color = opinionGroupColor(Number(cluster));
+          ellipse.setAttribute('class', 'graph-outline');
+          ellipse.setAttribute('data-ce-graph-cluster', cluster);
+          ellipse.setAttribute('cx', String((minX + maxX) / 2));
+          ellipse.setAttribute('cy', String((minY + maxY) / 2));
+          ellipse.setAttribute('rx', String(Math.max(18, (maxX - minX) / 2 + 24)));
+          ellipse.setAttribute('ry', String(Math.max(18, (maxY - minY) / 2 + 24)));
+          ellipse.setAttribute('fill', color);
+          ellipse.setAttribute('fill-opacity', '0.1');
+          ellipse.setAttribute('stroke', color);
+          ellipse.setAttribute('stroke-opacity', '0.7');
+          ellipse.setAttribute('stroke-width', '1');
+          if (outlineToggle && !outlineToggle.checked) ellipse.setAttribute('hidden', '');
+          outlineLayer.appendChild(ellipse);
+        });
+      }
+      function appendManualClusterLegendSection(clusterIndex, label, members, description) {
+        if (!clusterLegendItems) return;
+        var section = document.createElement('div');
+        section.className = 'clusterSectionDiv';
+        section.setAttribute('data-ce-cluster-section', '');
+        section.setAttribute('data-ce-cluster-open', 'false');
+        section.setAttribute('data-ce-cluster-source', 'manual');
+        var header = document.createElement('div');
+        header.className = 'clusterLegendHeader';
+        header.setAttribute('data-ce-cluster-toggle', '');
+        header.setAttribute('role', 'button');
+        header.setAttribute('tabindex', '0');
+        header.setAttribute('aria-expanded', 'false');
+        var labelWrap = document.createElement('div');
+        labelWrap.className = 'clusterLegendLabel';
+        var swatch = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        swatch.setAttribute('width', '16');
+        swatch.setAttribute('height', '16');
+        swatch.setAttribute('class', 'clusterSwatchSvg');
+        swatch.setAttribute('aria-hidden', 'true');
+        var swatchCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        swatchCircle.setAttribute('cx', '8');
+        swatchCircle.setAttribute('cy', '8');
+        swatchCircle.setAttribute('r', '6');
+        swatchCircle.setAttribute('fill', opinionGroupColor(clusterIndex));
+        swatch.appendChild(swatchCircle);
+        var name = document.createElement('span');
+        name.className = 'clusterLegendName';
+        name.textContent = label;
+        labelWrap.appendChild(swatch);
+        labelWrap.appendChild(name);
+        var icon = document.createElement('span');
+        icon.className = 'clusterLegendToggleIcon';
+        icon.setAttribute('aria-hidden', 'true');
+        var openIcon = document.createElement('span');
+        openIcon.className = 'clusterToggleSvgIcon clusterToggleSvgIconOpen';
+        openIcon.textContent = '-';
+        var closedIcon = document.createElement('span');
+        closedIcon.className = 'clusterToggleSvgIcon clusterToggleSvgIconClosed';
+        closedIcon.textContent = '+';
+        icon.appendChild(openIcon);
+        icon.appendChild(closedIcon);
+        header.appendChild(labelWrap);
+        header.appendChild(icon);
+        var body = document.createElement('div');
+        body.className = 'clusterLegendBody';
+        body.setAttribute('data-ce-cluster-body', '');
+        body.hidden = true;
+        var method = document.createElement('p');
+        method.className = 'ce-report-muted';
+        method.textContent = description;
+        body.appendChild(method);
+        var list = document.createElement('ul');
+        members.forEach(function (member) {
+          var item = document.createElement('li');
+          item.textContent = member.label || member.id;
+          list.appendChild(item);
+        });
+        body.appendChild(list);
+        var omitted = document.createElement('div');
+        omitted.className = 'clusterLegendOmitted';
+        omitted.setAttribute('data-ce-cluster-omitted', '');
+        var omittedText = document.createElement('em');
+        omittedText.className = 'showWhenPdf';
+        omittedText.textContent = 'Omitted';
+        omitted.appendChild(omittedText);
+        section.appendChild(header);
+        section.appendChild(body);
+        section.appendChild(omitted);
+        clusterLegendItems.appendChild(section);
+        setClusterSectionOpen(section, false);
+      }
+      function renderManualClusterLegend(assignments, clusterCount) {
+        if (!clusterLegendItems || !participantClusterPayload) return;
+        while (clusterLegendItems.firstChild) clusterLegendItems.removeChild(clusterLegendItems.firstChild);
+        var participants = Array.isArray(participantClusterPayload.participants)
+          ? participantClusterPayload.participants
+          : [];
+        for (var cluster = 0; cluster < clusterCount; cluster += 1) {
+          var members = participants.filter(function (participant) {
+            return participant.eligible && Number(assignments[participant.id]) === cluster;
+          });
+          appendManualClusterLegendSection(
+            cluster,
+            'Opinion Group ' + String(cluster + 1),
+            members,
+            'Manual preview: deterministic K-medoids over the report similarity matrix.'
+          );
+        }
+        var ineligible = participants.filter(function (participant) { return !participant.eligible; });
+        if (ineligible.length) {
+          appendManualClusterLegendSection(
+            -1,
+            'Insufficient overlap',
+            ineligible,
+            'These participants do not have enough shared question coverage for similarity grouping.'
+          );
+        }
+      }
+      function syncOpinionGroupControls(clusterCount, isAuto) {
+        if (!participantClusterPayload) return;
+        var min = Number(participantClusterPayload.minClusterCount || 0);
+        var max = Number(participantClusterPayload.maxClusterCount || 0);
+        if (clusterCountInput) {
+          clusterCountInput.value = String(clusterCount);
+          clusterCountInput.disabled = max < 1;
+          clusterCountInput.setAttribute('aria-disabled', max < 1 ? 'true' : 'false');
+        }
+        clusterStepButtons.forEach(function (button) {
+          var delta = Number(button.getAttribute('data-ce-cluster-step') || 0);
+          var disabled = max < 1 || clusterCount + delta < min || clusterCount + delta > max;
+          button.disabled = disabled;
+          button.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+        });
+        if (clusterAutoButton) {
+          clusterAutoButton.disabled = max < 1;
+          clusterAutoButton.setAttribute('aria-disabled', max < 1 ? 'true' : 'false');
+          clusterAutoButton.setAttribute('aria-pressed', isAuto ? 'true' : 'false');
+          clusterAutoButton.classList.toggle('clusterAutoButtonActive', isAuto);
+        }
+        if (opinionGroupStatus) {
+          opinionGroupStatus.textContent = isAuto
+            ? 'Showing ' + String(clusterCount) + ' automatically generated opinion groups.'
+            : 'Showing ' + String(clusterCount) + ' manual K-medoids opinion groups.';
+        }
+      }
+      function applyOpinionGroupAssignments(assignments, clusterCount, isAuto) {
+        if (!participantGraph || !participantClusterPayload) return;
+        participantGraph.querySelectorAll('[data-ce-graph-participant-point]').forEach(function (point) {
+          var participantId = point.getAttribute('data-participant-id') || '';
+          var cluster = Object.prototype.hasOwnProperty.call(assignments || {}, participantId)
+            ? Number(assignments[participantId])
+            : -1;
+          setGraphParticipantCluster(point, cluster);
+        });
+        activeOpinionGroupCount = clusterCount;
+        renderOpinionGroupOutlines();
+        if (isAuto) {
+          if (clusterLegendItems) clusterLegendItems.innerHTML = autoClusterLegendHtml;
+          initializeClusterSections();
+        } else {
+          renderManualClusterLegend(assignments || {}, clusterCount);
+        }
+        syncOpinionGroupControls(clusterCount, isAuto);
+      }
+      function applyOpinionGroupCount(requestedCount) {
+        if (!participantClusterPayload) return;
+        var min = Number(participantClusterPayload.minClusterCount || 0);
+        var max = Number(participantClusterPayload.maxClusterCount || 0);
+        if (max < 1) return;
+        var clusterCount = Math.max(min, Math.min(max, Math.round(Number(requestedCount) || min)));
+        var assignments = participantClusterPayload.assignmentsByCount
+          ? participantClusterPayload.assignmentsByCount[String(clusterCount)]
+          : null;
+        if (!assignments) return;
+        applyOpinionGroupAssignments(assignments, clusterCount, false);
+      }
+      function restoreAutoOpinionGroups() {
+        if (!participantClusterPayload) return;
+        applyOpinionGroupAssignments(
+          participantClusterPayload.autoAssignments || {},
+          Number(participantClusterPayload.autoClusterCount || 0),
+          true
+        );
+      }
       function setClusterSectionOpen(section, isOpen) {
         if (!section) return;
         var nextOpen = !!isOpen;
@@ -4689,21 +5070,51 @@ export const renderHtmlReport = (report) => `<!doctype html>
         var toggle = section.querySelector('[data-ce-cluster-toggle]');
         if (toggle) toggle.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
       }
-      document.querySelectorAll('[data-ce-cluster-section]').forEach(function (section) {
-        setClusterSectionOpen(section, section.getAttribute('data-ce-cluster-open') !== 'false');
-        var toggle = section.querySelector('[data-ce-cluster-toggle]');
-        if (!toggle) return;
-        var toggleCluster = function () {
-          setClusterSectionOpen(section, section.getAttribute('data-ce-cluster-open') === 'false');
-        };
-        toggle.addEventListener('click', toggleCluster);
-        toggle.addEventListener('keydown', function (event) {
+      function initializeClusterSections() {
+        document.querySelectorAll('[data-ce-cluster-section]').forEach(function (section) {
+          setClusterSectionOpen(section, section.getAttribute('data-ce-cluster-open') !== 'false');
+        });
+      }
+      function toggleClusterFromEvent(event) {
+        var toggle = event.target && event.target.closest
+          ? event.target.closest('[data-ce-cluster-toggle]')
+          : null;
+        if (!toggle || !clusterLegendItems || !clusterLegendItems.contains(toggle)) return;
+        var section = toggle.closest('[data-ce-cluster-section]');
+        setClusterSectionOpen(section, section && section.getAttribute('data-ce-cluster-open') === 'false');
+      }
+      initializeClusterSections();
+      if (clusterLegendItems) {
+        clusterLegendItems.addEventListener('click', toggleClusterFromEvent);
+        clusterLegendItems.addEventListener('keydown', function (event) {
           if (event.key === 'Enter' || event.key === ' ') {
+            var toggle = event.target && event.target.closest
+              ? event.target.closest('[data-ce-cluster-toggle]')
+              : null;
+            if (!toggle) return;
             event.preventDefault();
-            toggleCluster();
+            toggleClusterFromEvent(event);
           }
         });
+      }
+      clusterStepButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+          applyOpinionGroupCount(activeOpinionGroupCount + Number(button.getAttribute('data-ce-cluster-step') || 0));
+        });
       });
+      if (clusterCountInput) {
+        clusterCountInput.addEventListener('change', function () {
+          applyOpinionGroupCount(clusterCountInput.value);
+        });
+        clusterCountInput.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            applyOpinionGroupCount(clusterCountInput.value);
+          }
+        });
+      }
+      if (clusterAutoButton) clusterAutoButton.addEventListener('click', restoreAutoOpinionGroups);
+      if (participantClusterPayload) restoreAutoOpinionGroups();
       document.querySelectorAll('[data-ce-clusters-action]').forEach(function (button) {
         button.addEventListener('click', function () {
           var shouldOpen = button.getAttribute('data-ce-clusters-action') === 'expand';

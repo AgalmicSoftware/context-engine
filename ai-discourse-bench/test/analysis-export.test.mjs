@@ -40,6 +40,7 @@ test('second-pass analysis input exposes report, risk popup, and debate atlas co
   assert.equal(analysisInput.participants.length, 2);
   assert.equal(analysisInput.questions.length, 2);
   assert.equal(analysisInput.questions[0].aggregate.stanceLabel, 'net support');
+  assert.equal(analysisInput.questions[0].aggregate.winningResponseConsistency.rate, 1);
   assert.equal(analysisInput.questions[1].modelDifference, 2);
   const capabilityLaborTarget = analysisInput.riskMatrix.aggregateCellTargets.find((cell) => cell.id === 'Capabilities_vs_Labor');
   assert.ok(capabilityLaborTarget);
