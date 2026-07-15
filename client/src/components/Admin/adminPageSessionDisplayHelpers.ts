@@ -19,8 +19,30 @@ type AdminChainRegistryDisplayArgs = {
   registryChainId?: unknown;
 };
 
+type AdminPageSessionIdentityArgs = {
+  initialSessionId?: unknown;
+  initialRegistryChainId?: unknown;
+  initialSessionConfig?: unknown;
+};
+
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+export const buildAdminPageSessionIdentityKey = ({
+  initialSessionId,
+  initialRegistryChainId,
+  initialSessionConfig,
+}: AdminPageSessionIdentityArgs = {}): string => {
+  const config = asRecord(initialSessionConfig);
+  const registry = asRecord(config.__registry);
+  return [
+    toStr(initialSessionId).trim().toLowerCase(),
+    normalizeSlug(config.slug),
+    toStr(config.sessionId ?? registry.sessionIdHex).trim().toLowerCase(),
+    toStr(config.corsWorkerUrl ?? config.workerUrl).trim().replace(/\/+$/, '').toLowerCase(),
+    toStr(initialRegistryChainId ?? registry.registryChainId ?? registry.chainId ?? config.networkChainId).trim(),
+  ].join('|');
+};
 
 const buildStableComparableValue = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(buildStableComparableValue);

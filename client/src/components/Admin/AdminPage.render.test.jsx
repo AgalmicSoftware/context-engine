@@ -277,6 +277,68 @@ describe('AdminPage rendered interactions', () => {
     expect(mockFetchSessionFromRegistry).not.toHaveBeenCalled();
   });
 
+  it('rebinds worker actions across route-only worker session navigation A to B to A', async () => {
+    sessionEntries = [];
+    global.fetch = jest.fn((url) =>
+      Promise.resolve(
+        String(url).endsWith('/health')
+          ? { ok: false, status: 401, json: async () => ({ error: 'auth required' }) }
+          : { ok: true, status: 200, json: async () => ({ ok: true }) },
+      ),
+    );
+    const buildWorkerConfig = (slug) => ({
+      slug,
+      sessionId: slug === 'worker-a' ? '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' : '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      sessionName: `Session ${slug}`,
+      corsWorkerUrl: `https://${slug}.example.test`,
+      adminAddress: ADMIN_ADDRESS,
+      configRevision: `revision-${slug}`,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    });
+    const props = {
+      account: ADMIN_ADDRESS,
+      network: { id: 84532 },
+      loginComplete: true,
+      toggleLoginModal: jest.fn(),
+    };
+    mockResolveCorsProxyUrl.mockImplementation(async ({ sessionConfig }) => ({
+      url: sessionConfig.corsWorkerUrl,
+      source: 'session-config',
+      status: 'ok',
+    }));
+    mockFetchWorkerWithAuth.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ ts: '2026-07-14T00:00:00.000Z' }),
+    });
+
+    const view = render(<AdminPage {...props} initialSessionConfig={buildWorkerConfig('worker-a')} />);
+
+    const probeCurrentSession = async (slug) => {
+      expect(await screen.findByTestId(E2E_TESTIDS.ADMIN_SESSION_SELECT)).toHaveValue(slug);
+      expect(await screen.findByDisplayValue(`https://${slug}.example.test`)).toBeInTheDocument();
+      await clickAndSettle(screen.getByRole('button', { name: 'Test' }));
+      const testsPanel = screen.getByText('Tests').closest('section');
+      await clickAndSettle(within(testsPanel).getByTitle('Click to test /health'));
+      await waitFor(() =>
+        expect(mockFetchWorkerWithAuth).toHaveBeenLastCalledWith(
+          `https://${slug}.example.test/health`,
+          { method: 'GET' },
+          expect.objectContaining({
+            sessionSlug: slug,
+            workerUrl: `https://${slug}.example.test`,
+          }),
+        ),
+      );
+    };
+
+    await probeCurrentSession('worker-a');
+    view.rerender(<AdminPage {...props} initialSessionConfig={buildWorkerConfig('worker-b')} />);
+    await probeCurrentSession('worker-b');
+    view.rerender(<AdminPage {...props} initialSessionConfig={buildWorkerConfig('worker-a')} />);
+    await probeCurrentSession('worker-a');
+  });
+
   it('reveals the tests section only after the worker Test button is clicked', async () => {
     await renderAdminPage();
     await waitForResolvedWorkerUrl();

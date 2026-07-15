@@ -2,6 +2,7 @@ import {
   areAdminEncryptedEntriesEquivalent,
   buildAdminChainRegistryDisplay,
   buildAdminEncryptedEntrySignature,
+  buildAdminPageSessionIdentityKey,
   buildSessionUrl,
   collectEncryptedEntries,
   getAdminSessionDisplayUrl,
@@ -10,6 +11,67 @@ import {
 import { getChainName } from './adminPageHelpers';
 
 describe('adminPageSessionDisplayHelpers', () => {
+  it('keys worker-canonical admin state by the route and canonical worker identity', () => {
+    const first = buildAdminPageSessionIdentityKey({
+      initialSessionId: 'session-a',
+      initialRegistryChainId: 84532,
+      initialSessionConfig: {
+        slug: 'session-a',
+        sessionId: '0xaaa',
+        configRevision: 'revision-a',
+        corsWorkerUrl: 'https://worker-a.example.test/',
+      },
+    });
+    const second = buildAdminPageSessionIdentityKey({
+      initialSessionId: 'session-b',
+      initialRegistryChainId: 84532,
+      initialSessionConfig: {
+        slug: 'session-b',
+        sessionId: '0xbbb',
+        configRevision: 'revision-b',
+        corsWorkerUrl: 'https://worker-b.example.test',
+      },
+    });
+
+    expect(first).not.toBe(second);
+    expect(
+      buildAdminPageSessionIdentityKey({
+        initialSessionId: 'session-b',
+        initialRegistryChainId: 84532,
+        initialSessionConfig: {
+          slug: 'session-a',
+          sessionId: '0xaaa',
+          corsWorkerUrl: 'https://worker-a.example.test',
+        },
+      }),
+    ).not.toBe(first);
+    expect(
+      buildAdminPageSessionIdentityKey({
+        initialSessionId: ' SESSION-A ',
+        initialRegistryChainId: '84532',
+        initialSessionConfig: {
+          slug: 'session-a',
+          sessionId: '0xAAA',
+          configRevision: 'revision-a',
+          corsWorkerUrl: 'https://worker-a.example.test',
+        },
+      }),
+    ).toBe(first);
+    expect(
+      buildAdminPageSessionIdentityKey({
+        initialSessionId: 'session-a',
+        initialRegistryChainId: 84532,
+        initialSessionConfig: {
+          slug: 'session-a',
+          sessionId: '0xaaa',
+          configRevision: 'ordinary-metadata-update',
+          adminAddress: '0x0000000000000000000000000000000000000001',
+          corsWorkerUrl: 'https://worker-a.example.test',
+        },
+      }),
+    ).toBe(first);
+  });
+
   it('builds session URLs using normalized slugs and general-session fallback', () => {
     expect(buildSessionUrl(' Edge Session ')).toBe(`${window.location.origin}/session/edgesession`);
     expect(buildSessionUrl('general')).toBe('');

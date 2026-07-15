@@ -77,6 +77,7 @@ import {
 import {
   areAdminEncryptedEntriesEquivalent,
   buildAdminChainRegistryDisplay,
+  buildAdminPageSessionIdentityKey,
   buildSessionUrl,
   collectEncryptedEntries,
   getAdminSessionDisplayUrl,
@@ -183,7 +184,7 @@ const buildSecretPresenceTargetKey = ({ slug, workerUrl }: { slug?: unknown; wor
 const asAdminSessionConfig = (value: unknown): AdminSessionConfigLike =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as AdminSessionConfigLike) : {};
 
-const AdminPage = ({
+const AdminPageRuntime = ({
   account,
   provider,
   network,
@@ -2928,5 +2929,11 @@ const AdminPage = ({
     </div>
   );
 };
+
+// Regression guard: route-only navigation reuses this element; remount the runtime so
+// no action can retain the previous canonical worker identity.
+const AdminPage = (props: AdminPageProps) => (
+  <AdminPageRuntime key={buildAdminPageSessionIdentityKey(props)} {...props} />
+);
 
 export default AdminPage;
