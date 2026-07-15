@@ -5,11 +5,15 @@ import {
   stableCanonicalSerialize,
 } from '../shared/deployHelperCore.mjs';
 import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js';
+import { applySessionConfigMutation } from './sessionConfigMutation.js';
+import { getSessionConfig, putSessionConfig } from './sessionConfigSecretsStore.js';
+import { validateInboundWorkerSessionSlug } from './sessionSlugResolution.js';
 
 const SPONSORED_DEPLOY_RECORD_KEY = 'sponsored-deploy';
 const DIRECT_DEPLOY_RECORD_KEY = 'direct-deploy';
 const SPONSORED_FAUCET_RECORD_KEY = 'sponsored-faucet';
 const RUNNING_LEASE_MS = 65_000;
+const KV_SAME_KEY_WRITE_INTERVAL_MS = 1_050;
 
 const toTrimmedString = (value) => (
   typeof value === 'string'
@@ -18,6 +22,17 @@ const toTrimmedString = (value) => (
       ? ''
       : String(value).trim()
 );
+
+const resolveCoordinatedSessionSlug = (rawSlug) => {
+  if (typeof rawSlug !== 'string') return null;
+  if (rawSlug !== '' && !rawSlug.trim()) return null;
+  const result = validateInboundWorkerSessionSlug(rawSlug);
+  if (!result.ok) return null;
+  return {
+    slug: result.slug,
+    identitySlug: result.slug || 'general',
+  };
+};
 
 const jsonResponse = (body, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -69,10 +84,16 @@ export class SessionWriteCoordinator {
     this.env = env;
     this.executeDeployHelperRequest = deps.executeDeployHelperRequest || executeDeployHelperRequest;
     this.lookupCloudflareAccount = deps.lookupCloudflareAccount || lookupCloudflareAccount;
+    this.getSessionConfig = deps.getSessionConfig || getSessionConfig;
+    this.putSessionConfig = deps.putSessionConfig || putSessionConfig;
+    this.applySessionConfigMutation = deps.applySessionConfigMutation || applySessionConfigMutation;
+    this.sleep = deps.sleep || ((delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)));
     this.now = deps.now || Date.now;
     this.crypto = deps.crypto || globalThis.crypto;
     this.activeAttemptId = '';
     this.activeDirectAttemptId = '';
+    this.configMutationTail = Promise.resolve();
+    this.lastConfigWriteAtMs = 0;
   }
 
   async reserveSponsoredDeploy(requestDigest) {
@@ -374,6 +395,72 @@ export class SessionWriteCoordinator {
     });
   }
 
+  async waitForConfigWriteInterval() {
+    const elapsedMs = (Number(this.now()) || Date.now()) - Number(this.lastConfigWriteAtMs || 0);
+    const waitMs = Math.max(0, KV_SAME_KEY_WRITE_INTERVAL_MS - elapsedMs);
+    if (waitMs) await this.sleep(waitMs);
+  }
+
+  async persistSessionConfigWithRetry({ slug, config }) {
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        await this.putSessionConfig(this.env, slug, config);
+        this.lastConfigWriteAtMs = Number(this.now()) || Date.now();
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) await this.sleep(KV_SAME_KEY_WRITE_INTERVAL_MS);
+      }
+    }
+    throw lastError;
+  }
+
+  async executeSessionConfigMutation(payload) {
+    const run = async () => {
+      const slugResolution = resolveCoordinatedSessionSlug(payload?.slug);
+      const mutation = payload?.mutation && typeof payload.mutation === 'object'
+        ? payload.mutation
+        : null;
+      if (!slugResolution || !mutation) {
+        return jsonResponse({ error: 'Invalid session config mutation request.' }, 400);
+      }
+
+      try {
+        // Regression guard: queueing is not enough. Re-read KV inside every
+        // critical section so runtime-managed fields never come from a stale DO snapshot.
+        await this.waitForConfigWriteInterval();
+        const existingConfig = await this.getSessionConfig(this.env, slugResolution.slug);
+        const result = this.applySessionConfigMutation({
+          existingConfig,
+          mutation,
+          slug: slugResolution.slug,
+        });
+        if (!result?.ok) {
+          return jsonResponse(
+            { error: result?.error || 'Session config mutation failed.' },
+            result?.status || 400,
+          );
+        }
+        if (!result.skipPersistence) {
+          await this.persistSessionConfigWithRetry({
+            slug: slugResolution.slug,
+            config: result.config,
+          });
+        }
+        return jsonResponse({ ok: true }, 200);
+      } catch {
+        return jsonResponse({
+          error: 'Session config persistence is pending; retry the signed mutation.',
+        }, 503);
+      }
+    };
+
+    const queued = this.configMutationTail.then(run, run);
+    this.configMutationTail = queued.catch(() => undefined);
+    return queued;
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
     if (request.method !== 'POST') {
@@ -382,6 +469,7 @@ export class SessionWriteCoordinator {
 
     const payload = await request.json().catch(() => null);
     if (url.pathname === '/deploy-helper') return this.executeDirectDeploy(payload);
+    if (url.pathname === '/session-config-mutation') return this.executeSessionConfigMutation(payload);
     if (url.pathname === '/sponsored-faucet/reserve') {
       const requestDigest = toTrimmedString(payload?.requestDigest);
       if (!requestDigest) return jsonResponse({ error: 'Invalid sponsored faucet reservation.' }, 400);
@@ -516,6 +604,46 @@ const resolveCoordinatorStub = async (env, identity) => {
   if (!coordinator?.idFromName || !coordinator?.get) return null;
   const name = await sha256Hex(identity);
   return coordinator.get(coordinator.idFromName(name));
+};
+
+export const executeCoordinatedSessionConfigMutation = async ({
+  env,
+  slug,
+  mutation,
+} = {}) => {
+  const slugResolution = resolveCoordinatedSessionSlug(slug);
+  if (!slugResolution || !mutation || typeof mutation !== 'object') {
+    return { ok: false, status: 400, body: { error: 'Invalid session config mutation.' } };
+  }
+  const stub = await resolveCoordinatorStub(
+    env,
+    `session-config:${slugResolution.identitySlug}`,
+  );
+  if (!stub) {
+    return {
+      ok: false,
+      status: 503,
+      body: { error: 'Session config coordination is unavailable; config was not changed.' },
+    };
+  }
+  try {
+    const response = await stub.fetch('https://session-coordinator.internal/session-config-mutation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slug: slugResolution.slug, mutation }),
+    });
+    return {
+      ok: response.ok,
+      status: response.status,
+      body: await response.json().catch(() => ({})),
+    };
+  } catch {
+    return {
+      ok: false,
+      status: 503,
+      body: { error: 'Session config persistence is pending; retry the signed mutation.' },
+    };
+  }
 };
 
 export const reserveCoordinatedSponsoredFaucet = async ({ env, grantToken, requestDigest } = {}) => {
