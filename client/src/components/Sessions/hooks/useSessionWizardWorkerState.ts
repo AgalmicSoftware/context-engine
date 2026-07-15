@@ -9,7 +9,6 @@ type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
   apiToken?: string;
   workerName?: string;
   adminAddress?: string;
-  accountId?: string;
   bundleUrl?: string;
 };
 
@@ -64,7 +63,6 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
     apiToken: toStr(cachedDeployForm.apiToken || '').trim(),
     workerName: toStr(cachedDeployForm.workerName || '').trim(),
     adminAddress: toStr(cachedDeployForm.adminAddress || '').trim() || undefined,
-    accountId: toStr(cachedDeployForm.accountId || '').trim(),
     bundleUrl: toStr(cachedDeployForm.bundleUrl || normalizedWorkerBundleUrlDefault),
   });
   const [bundleMode, setBundleMode] = useState(() => (normalizedWorkerBundleUrlDefault ? 'url' : 'upload'));

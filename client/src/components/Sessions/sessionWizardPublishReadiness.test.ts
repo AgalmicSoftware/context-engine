@@ -565,6 +565,20 @@ describe('resolveSessionWizardPublishReadiness', () => {
       publishButtonLabel: 'Publish',
       settingsButtonActive: false,
     });
+
+    expect(
+      resolveSessionWizardPublishActionDisplayState({
+        canPublishNow: true,
+        isNormalMode: true,
+        publishCompleted: true,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        publishBusy: false,
+        publishButtonDisabled: true,
+        publishButtonLabel: 'Session Created',
+      }),
+    );
   });
 });
 

@@ -32,7 +32,6 @@ describe('cloudflareTokenTemplate', () => {
   test('adds only R2 when an advanced deployment explicitly opts into R2 storage', () => {
     const url = new URL(
       buildCloudflareTokenTemplateUrl({
-        accountId: 'cf-account-1',
         slug: 'alpha-session',
         includeR2Storage: true,
       }),
@@ -45,7 +44,7 @@ describe('cloudflareTokenTemplate', () => {
       { key: 'workers_r2', type: 'edit' },
     ]);
     expect(buildCloudflareTokenTemplatePermissions({ includeR2Storage: true })).toEqual(permissions);
-    expect(url.searchParams.get('accountId')).toBe('cf-account-1');
+    expect(url.searchParams.get('accountId')).toBe('*');
   });
 
   test('does not request unrelated Cloudflare product scopes by default', () => {

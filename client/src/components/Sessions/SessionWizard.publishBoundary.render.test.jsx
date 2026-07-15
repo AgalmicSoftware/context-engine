@@ -10,6 +10,7 @@ import {
   within,
   enableAdvancedMode,
 } from './SessionWizard.workerPanel.testUtils';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const chooseCustomWorkerWithoutDeploy = async () => {
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
@@ -239,6 +240,63 @@ describe('SessionWizard publish boundary rendering', () => {
     await waitFor(() => {
       expect(publishButton).not.toBeDisabled();
     });
+  });
+
+  it('locks a completed worker-canonical session against a second publish to the same worker', async () => {
+    const originalFetch = global.fetch;
+    const workerUrl = 'https://single-session-worker.example.test';
+    let persistedConfig = null;
+    global.fetch = jest.fn(async (url, init = {}) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/admin/set-config')) {
+        persistedConfig = JSON.parse(String(init.body || '{}')).config;
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      if (normalizedUrl.endsWith('/session-config')) {
+        return { ok: true, status: 200, json: async () => ({ config: persistedConfig }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    });
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        sessionId: '0x00112233445566778899aabbccddeeff',
+        deployComplete: true,
+        deployWorkerUrl: workerUrl,
+        workerSecretsEnabled: false,
+        draft: {
+          slug: 'single-worker-session',
+          sessionName: 'Single Worker Session',
+          sessionInfo: 'One canonical session per worker.',
+          corsWorkerUrl: workerUrl,
+          storageProfile: { backend: 'cloudflare' },
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        },
+      }),
+    );
+
+    try {
+      renderLoggedInSessionWizard();
+      enableAdvancedMode();
+      const publishButton = await openPublishSection();
+
+      await waitFor(() => {
+        expect(publishButton).not.toBeDisabled();
+      });
+      fireEvent.click(publishButton);
+
+      await waitFor(() => {
+        expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
+        expect(publishButton).toBeDisabled();
+      });
+      expect(publishButton).toHaveTextContent('Session Created');
+      expect(screen.getByRole('button', { name: 'Create another session' })).toBeInTheDocument();
+
+      fireEvent.click(publishButton);
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 
   it('passes manual metadata through the register boundary with pinned register args', async () => {

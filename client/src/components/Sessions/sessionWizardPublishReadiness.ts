@@ -41,6 +41,7 @@ export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput
   isNormalMode?: boolean;
   publishAdvancedOpen?: boolean;
   publishBusy?: boolean;
+  publishCompleted?: boolean;
   publishStep?: number;
   publishStepElapsedMs?: number;
   sbtsLabel?: unknown;
@@ -73,7 +74,7 @@ export type SessionWizardPublishActionDisplayState = {
   publishAdvancedOpen: boolean;
   publishBusy: boolean;
   publishButtonDisabled: boolean;
-  publishButtonLabel: 'Deploy Session' | 'Publish';
+  publishButtonLabel: 'Deploy Session' | 'Publish' | 'Session Created';
   settingsButtonActive: boolean;
 };
 
@@ -251,19 +252,21 @@ export function resolveSessionWizardPublishActionDisplayState({
   isNormalMode = false,
   publishAdvancedOpen = false,
   publishBusy = false,
+  publishCompleted = false,
 }: {
   canPublishNow?: boolean;
   isNormalMode?: boolean;
   publishAdvancedOpen?: boolean;
   publishBusy?: boolean;
+  publishCompleted?: boolean;
 } = {}): SessionWizardPublishActionDisplayState {
   return {
     canPublishNow,
     displayMode: isNormalMode ? 'normal' : 'advanced',
     publishAdvancedOpen,
     publishBusy,
-    publishButtonDisabled: publishBusy || !canPublishNow,
-    publishButtonLabel: isNormalMode ? 'Deploy Session' : 'Publish',
+    publishButtonDisabled: publishCompleted || publishBusy || !canPublishNow,
+    publishButtonLabel: publishCompleted ? 'Session Created' : isNormalMode ? 'Deploy Session' : 'Publish',
     settingsButtonActive: publishAdvancedOpen,
   };
 }
@@ -277,6 +280,7 @@ export function resolveSessionWizardPublishUiPlan({
   isNormalMode = false,
   publishAdvancedOpen = false,
   publishBusy = false,
+  publishCompleted = false,
   publishStep = 0,
   publishStepElapsedMs = 0,
   sbtsLabel = 'SBTs',
@@ -316,6 +320,7 @@ export function resolveSessionWizardPublishUiPlan({
     isNormalMode,
     publishAdvancedOpen,
     publishBusy,
+    publishCompleted,
   });
 
   return {

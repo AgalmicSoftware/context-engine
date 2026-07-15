@@ -110,7 +110,7 @@ describe('WorkerDeploySection', () => {
     expect(handleDeployWorker).toHaveBeenCalledTimes(1);
   });
 
-  it('scopes the prefilled token link to a known Cloudflare account', () => {
+  it('does not let hidden legacy account state scope the token template', () => {
     renderWorkerDeploySection({
       deployForm: {
         workerName: 'demo-worker',
@@ -124,8 +124,8 @@ describe('WorkerDeploySection', () => {
     const tokenUrl = new URL(
       String(screen.getByRole('link', { name: 'Create prefilled API token' }).getAttribute('href')),
     );
-    expect(tokenUrl.searchParams.get('accountId')).toBe('cf-account-1');
-    expect(screen.queryByText(/Cloudflare may preselect All accounts/i)).not.toBeInTheDocument();
+    expect(tokenUrl.searchParams.get('accountId')).toBe('*');
+    expect(screen.getByText(/Cloudflare may preselect All accounts/i)).toBeInTheDocument();
   });
 
   it('describes the least-privilege default Cloudflare token scopes', () => {
@@ -141,7 +141,7 @@ describe('WorkerDeploySection', () => {
     );
   });
 
-  it('keeps a cached Cloudflare account id when first filling the API token', () => {
+  it('drops a stale cached Cloudflare account id whenever the API token is filled', () => {
     const setDeployForm = jest.fn();
 
     renderWorkerDeploySection({
@@ -171,12 +171,11 @@ describe('WorkerDeploySection', () => {
     ).toEqual({
       workerName: 'demo-worker',
       apiToken: 'new-token',
-      accountId: 'cf-account-1',
       adminAddress: '',
     });
   });
 
-  it('clears the cached Cloudflare account id when replacing an API token', () => {
+  it('keeps the account id absent when replacing an API token', () => {
     const setDeployForm = jest.fn();
 
     renderWorkerDeploySection({
@@ -206,7 +205,6 @@ describe('WorkerDeploySection', () => {
     ).toEqual({
       workerName: 'demo-worker',
       apiToken: 'new-token',
-      accountId: '',
       adminAddress: '',
     });
     expect(
@@ -219,7 +217,6 @@ describe('WorkerDeploySection', () => {
     ).toEqual({
       workerName: 'demo-worker',
       apiToken: 'new-token',
-      accountId: 'cf-account-1',
       adminAddress: '',
     });
   });

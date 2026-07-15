@@ -351,12 +351,12 @@ describe('sessionWizardDraftState', () => {
         deployForm: {
           workerName: 'worker',
           adminAddress: '0xAdmin',
-          accountId: 'account',
           bundleUrl: 'https://bundle.example/worker.js',
         },
       }),
     );
     expect(payload.deployForm.apiToken).toBeUndefined();
+    expect(payload.deployForm.accountId).toBeUndefined();
   });
 
   it('keeps multi-gate resource selections in the cache write payload', () => {

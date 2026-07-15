@@ -15,7 +15,6 @@ export const SESSION_WIZARD_REQUIREMENT_LINKS = Object.freeze({
 });
 
 type SessionWizardRequirementsBannerProps = {
-  cloudflareTokenAccountId?: string;
   cloudflareTokenSlug?: string;
   fundingRequirementHref?: string;
   fundingRequirementLabel: string;
@@ -25,7 +24,6 @@ type SessionWizardRequirementsBannerProps = {
 };
 
 const SessionWizardRequirementsBanner = ({
-  cloudflareTokenAccountId = '',
   cloudflareTokenSlug = '',
   fundingRequirementHref = '',
   fundingRequirementLabel,
@@ -41,7 +39,6 @@ const SessionWizardRequirementsBanner = ({
     ? 'A connected wallet for on-chain SBT publishing'
     : 'A connected wallet for on-chain registration';
   const cloudflareTokenTemplateHref = buildCloudflareTokenTemplateUrl({
-    accountId: cloudflareTokenAccountId,
     slug: cloudflareTokenSlug,
   });
 

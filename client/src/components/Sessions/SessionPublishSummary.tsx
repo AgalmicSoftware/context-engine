@@ -59,6 +59,7 @@ export type SessionPublishSummaryProps = {
   sessionUrl: string;
   adminUrl: string;
   publishedPendingSbtLinks: PublishedPendingSbtLink[];
+  onCreateAnotherSession?: () => void;
   onCopyAdminUrl: () => void;
   adminUrlStatus: string;
   status: string;
@@ -101,6 +102,7 @@ const SessionPublishSummary = ({
   sessionUrl,
   adminUrl,
   publishedPendingSbtLinks,
+  onCreateAnotherSession,
   onCopyAdminUrl,
   adminUrlStatus,
   status,
@@ -190,6 +192,7 @@ const SessionPublishSummary = ({
           <SessionPublishResultLinks
             adminUrl={adminUrl}
             adminUrlStatus={adminUrlStatus}
+            onCreateAnotherSession={onCreateAnotherSession}
             onCopyAdminUrl={onCopyAdminUrl}
             publishMetadataDisplayState={publishMetadataDisplayState}
             publishedPendingSbtLinks={publishedPendingSbtLinks}

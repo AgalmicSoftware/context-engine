@@ -399,7 +399,6 @@ export const buildSessionWizardCacheWritePayload = ({
   const durableDeployForm = {
     workerName: toStr(deployFormRecord.workerName || '').trim(),
     adminAddress: toStr(deployFormRecord.adminAddress || '').trim() || undefined,
-    accountId: toStr(deployFormRecord.accountId || '').trim(),
     bundleUrl: toStr(deployFormRecord.bundleUrl || '').trim(),
   };
 

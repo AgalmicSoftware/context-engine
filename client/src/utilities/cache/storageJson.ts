@@ -251,7 +251,7 @@ export const removeKeys = (
   let failed = 0;
   normalizedKeys.forEach((key) => {
     try {
-      removeItem(key);
+      removeItem.call(storage, key);
       removed += 1;
     } catch (_) {
       failed += 1;

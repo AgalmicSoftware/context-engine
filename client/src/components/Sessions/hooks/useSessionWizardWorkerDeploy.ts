@@ -55,7 +55,6 @@ type DeployFormLike = AnyRecord & {
   apiToken?: string;
   workerName?: string;
   adminAddress?: string;
-  accountId?: string;
   bundleUrl?: string;
 };
 
@@ -482,7 +481,6 @@ const useSessionWizardWorkerDeploy = ({
             body: JSON.stringify({
               ...deployPayload,
               apiToken: currentDeployForm.apiToken,
-              accountId: toStr(currentDeployForm.accountId || '').trim() || undefined,
             }),
           });
           const nextDeployStatusCode = res.status;

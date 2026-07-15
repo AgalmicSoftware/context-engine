@@ -115,6 +115,7 @@ export type SessionWizardShellProps = {
   onCloseDisplaySettings: HeaderProps['onCloseDisplaySettings'];
   onCloseSessionHeaderPreviewModal: WizardModalsProps['onCloseSessionHeaderPreviewModal'];
   onCopyDraftJson: MetadataEditorProps['onCopyDraftJson'];
+  onCreateAnotherSession?: PublishSectionProps['onCreateAnotherSession'];
   onDismissNewSessionRequirementsBanner: IntroStatusRailProps['onDismissRequirements'];
   onEnterAdvancedMode: HeaderProps['onEnterAdvancedMode'];
   onEnterNormalMode: HeaderProps['onEnterNormalMode'];
@@ -278,6 +279,7 @@ const SessionWizardShell = ({
   onCloseDisplaySettings,
   onCloseSessionHeaderPreviewModal,
   onCopyDraftJson,
+  onCreateAnotherSession,
   onDismissNewSessionRequirementsBanner,
   onEnterAdvancedMode,
   onEnterNormalMode,
@@ -393,7 +395,6 @@ const SessionWizardShell = ({
 
       <SessionWizardIntroStatusRail
         activeNormalModeIndex={activeNormalModeIndex}
-        cloudflareTokenAccountId={deployForm?.accountId}
         cloudflareTokenSlug={draft.slug}
         collapsedSections={collapsedSections}
         fundingRequirementHref={newSessionFundingRequirementHref}
@@ -537,6 +538,7 @@ const SessionWizardShell = ({
           isNormalMode={isNormalMode}
           onToggleCollapsed={() => toggleSection('publish')}
           normalModePublishSummary={normalModePublishSummary}
+          onCreateAnotherSession={onCreateAnotherSession}
           onPublish={onPublish}
           onTogglePublishAdvanced={() => onTogglePublishAdvanced()}
           showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}

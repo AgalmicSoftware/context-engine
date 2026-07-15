@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { createLogger } from '../../utilities/logging';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import {
   clearSessionWizardDraftCache,
   readSessionWizardDraftCache,
@@ -48,6 +49,11 @@ type ClearCacheDeps = {
   clearDraftCache?: typeof clearSessionWizardDraftCache;
   clearPendingSbtDrafts?: typeof clearSessionWizardPendingSbtDraftsCache;
   logger?: LoggerLike;
+};
+
+type FreshSessionWizardDeps = {
+  clearCache?: typeof clearSessionWizardCache;
+  navigate?: (target: string) => void;
 };
 
 export type SessionWizardCachedState = Record<string, unknown> & {
@@ -111,4 +117,14 @@ export const clearSessionWizardCache = ({
     logger.warn?.('SessionWizard: fallback', result.status);
   }
   return result;
+};
+
+export const startFreshSessionWizard = ({
+  clearCache = clearSessionWizardCache,
+  navigate = (target) => window.location.assign(target),
+}: FreshSessionWizardDeps = {}) => {
+  const clearResult = clearCache();
+  if (!clearResult.ok && clearResult.status !== 'missing-storage') return clearResult;
+  navigate(buildPublicRoute('/new'));
+  return clearResult;
 };

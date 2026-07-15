@@ -46,7 +46,6 @@ describe('useSessionWizardWorkerState', () => {
       apiToken: '',
       workerName: '',
       adminAddress: undefined,
-      accountId: '',
       bundleUrl: 'https://bundle.example/session-worker.js',
     });
     expect(result.current.bundleMode).toBe('url');
@@ -95,9 +94,9 @@ describe('useSessionWizardWorkerState', () => {
       apiToken: 'token',
       workerName: 'worker',
       adminAddress: '0xAdmin',
-      accountId: 'account',
       bundleUrl: 'https://cached.example/worker.js',
     });
+    expect(result.current.deployForm.accountId).toBeUndefined();
     expect(result.current.provisionedSponsoredContext).toEqual({
       sessionSlug: 'cached-session',
       workerUrl: 'https://cached-worker.example',

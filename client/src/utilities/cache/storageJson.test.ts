@@ -106,6 +106,24 @@ describe('storageJson primitives', () => {
     });
   });
 
+  it('calls native-style remove methods with their storage receiver', () => {
+    const storage = {
+      removed: false,
+      removeItem(this: { removed: boolean }, key: string) {
+        if (this !== storage || key !== 'draft') throw new Error('illegal invocation');
+        this.removed = true;
+      },
+    };
+
+    expect(removeKeys(storage, 'draft')).toEqual({
+      ok: true,
+      removed: 1,
+      failed: 0,
+      status: 'ok',
+    });
+    expect(storage.removed).toBe(true);
+  });
+
   it('creates stable versioned namespace keys', () => {
     const namespace = createStorageNamespace({ prefix: 'ce:surveyDraft', version: '2' });
 

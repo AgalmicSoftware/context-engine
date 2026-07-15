@@ -3,6 +3,7 @@ import { render } from '@testing-library/react';
 import {
   clearSessionWizardCache,
   readSessionWizardCache,
+  startFreshSessionWizard,
   useStableSerializedObject,
   writeSessionWizardCache,
 } from './sessionWizardLocalStateSupport';
@@ -84,5 +85,40 @@ describe('sessionWizardLocalStateSupport', () => {
     clearSessionWizardCache({ clearDraftCache, clearPendingSbtDrafts, logger });
     expect(clearPendingSbtDrafts).toHaveBeenCalledTimes(1);
     expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it('clears the published worker identity before navigating to a fresh wizard', () => {
+    const navigate = jest.fn();
+    localStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        deployComplete: true,
+        deployWorkerUrl: 'https://published-worker.example.test',
+        draft: { corsWorkerUrl: 'https://published-worker.example.test' },
+      }),
+    );
+    sessionStorage.setItem('ce:sessionWizardPendingSbtDrafts:v1', '[{"predictedAddress":"0x1"}]');
+
+    const result = startFreshSessionWizard({ navigate });
+
+    expect(result.ok).toBe(true);
+    expect(readSessionWizardCache()).toBeNull();
+    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
+    expect(navigate).toHaveBeenCalledWith('/new');
+  });
+
+  it('does not navigate when durable cache clearing fails', () => {
+    const navigate = jest.fn();
+    const clearCache = jest.fn(() => ({
+      ok: false as const,
+      removed: 0,
+      failed: 1,
+      status: 'partial-failure' as const,
+    }));
+
+    expect(startFreshSessionWizard({ clearCache, navigate })).toEqual(
+      expect.objectContaining({ ok: false, status: 'partial-failure' }),
+    );
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

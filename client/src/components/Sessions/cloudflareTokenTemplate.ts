@@ -72,11 +72,9 @@ export const buildCloudflareTokenTemplatePermissions = ({
 };
 
 export const buildCloudflareTokenTemplateUrl = ({
-  accountId,
   slug,
   includeR2Storage = false,
 }: {
-  accountId?: unknown;
   slug?: unknown;
   includeR2Storage?: boolean;
 } = {}): string => {
@@ -89,7 +87,9 @@ export const buildCloudflareTokenTemplateUrl = ({
       }),
     ),
   );
-  params.set('accountId', toStr(accountId).trim() || '*');
+  // Account selection stays operator-controlled in Cloudflare; deploy resolves
+  // the one token-visible account and never trusts browser-cached account IDs.
+  params.set('accountId', '*');
   params.set('zoneId', 'all');
   params.set('name', buildTokenName(slug));
   return `https://dash.cloudflare.com/profile/api-tokens?${params.toString()}`;

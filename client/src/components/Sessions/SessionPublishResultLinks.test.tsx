@@ -18,11 +18,13 @@ const metadataDisplayState = {
 describe('SessionPublishResultLinks', () => {
   it('renders metadata, register, session, admin, pending SBT, and status links', () => {
     const onCopyAdminUrl = jest.fn();
+    const onCreateAnotherSession = jest.fn();
 
     render(
       <SessionPublishResultLinks
         adminUrl="https://context.example.test/admin/readiness-session"
         adminUrlStatus="Admin URL copied."
+        onCreateAnotherSession={onCreateAnotherSession}
         onCopyAdminUrl={onCopyAdminUrl}
         publishMetadataDisplayState={metadataDisplayState}
         publishedPendingSbtLinks={[
@@ -71,15 +73,20 @@ describe('SessionPublishResultLinks', () => {
     expect(screen.getByText('Admin URL copied.')).toBeInTheDocument();
     expect(screen.getByText('Published session readiness-session.')).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Create another session' }));
+    expect(onCreateAnotherSession).toHaveBeenCalledTimes(1);
+
     fireEvent.click(screen.getByRole('button', { name: /Copy/i }));
     expect(onCopyAdminUrl).toHaveBeenCalledTimes(1);
   });
 
   it('renders manual metadata and raw register hashes when no explorer base is available', () => {
+    const onCreateAnotherSession = jest.fn();
     render(
       <SessionPublishResultLinks
         adminUrl=""
         adminUrlStatus=""
+        onCreateAnotherSession={onCreateAnotherSession}
         onCopyAdminUrl={jest.fn()}
         publishMetadataDisplayState={{
           ...metadataDisplayState,
@@ -103,5 +110,7 @@ describe('SessionPublishResultLinks', () => {
     expect(screen.getByText('Manual metadata URI:')).toBeInTheDocument();
     expect(screen.getByText('ar://manual-tx')).toBeInTheDocument();
     expect(screen.getByText('0xregister1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create another session' }));
+    expect(onCreateAnotherSession).toHaveBeenCalledTimes(1);
   });
 });

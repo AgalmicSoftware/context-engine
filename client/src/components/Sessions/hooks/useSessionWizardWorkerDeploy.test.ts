@@ -300,6 +300,26 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(deployPayload.storageProfile.resources.responses).toBe('active');
   });
 
+  it('never sends a stale cached account id with a newly supplied token', async () => {
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current.deployForm = {
+      ...options.refs.runtimeRef.current.deployForm,
+      apiToken: 'fresh-token',
+      accountId: 'stale-account-id',
+    };
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+    const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
+    expect(deployPayload.apiToken).toBe('fresh-token');
+    expect(deployPayload.accountId).toBeUndefined();
+  });
+
   it('surfaces incomplete Cloudflare cleanup identifiers from deploy-helper failures', async () => {
     global.fetch = jest.fn(async () => ({
       ok: false,

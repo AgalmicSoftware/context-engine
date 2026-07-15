@@ -202,6 +202,7 @@ import {
 import {
   clearSessionWizardCache,
   readSessionWizardCache,
+  startFreshSessionWizard,
   useStableSerializedObject,
   writeSessionWizardCache,
 } from './sessionWizardLocalStateSupport';
@@ -334,7 +335,6 @@ export const resolveSessionWizardChipotleHookConfig = ({
 };
 
 type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
-  accountId?: string;
   bundleUrl?: string;
 };
 
@@ -591,6 +591,7 @@ const SessionWizard = ({
   const [sessionModeProfileStepComplete, setSessionModeProfileStepComplete] = useState(false);
   const publishBusy = resolveSessionWizardPublishReducerUiState({ state: sessionPublishState }).publishBusy;
   const publishRequestInFlightRef = useRef(false);
+  const workerCanonicalPublishSettledRef = useRef(false);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
   const [wizardMode, setWizardMode] = useState('normal');
   const [registryChainId, setRegistryChainId] = useState<number>(() => {
@@ -1979,6 +1980,13 @@ const SessionWizard = ({
       setStatus('Publish already in progress.');
       return;
     }
+    if (
+      workerCanonicalPublishSettledRef.current ||
+      (sessionModeRequirements.isWorkerCanonical && sessionPublishState.status === 'published')
+    ) {
+      setStatus('This worker already owns the published session. Open Create another session to start fresh.');
+      return;
+    }
     publishRequestInFlightRef.current = true;
     try {
       const publishStartPreflightDescriptor = resolveSessionWizardPublishStartPreflightDescriptor({
@@ -2096,6 +2104,9 @@ const SessionWizard = ({
           publishControllerResult,
           runTrackedPublishEffect,
         });
+        if (sessionModeRequirements.isWorkerCanonical) {
+          workerCanonicalPublishSettledRef.current = true;
+        }
         const completionRequest = resolveSessionWizardPublishCompletionRequest({
           publishExecutionPlan,
           deployedPendingDrafts,
@@ -2657,6 +2668,7 @@ const SessionWizard = ({
     hasPendingDrafts: hasUndeployedPendingSbtDrafts,
     isNormalMode,
     publishAdvancedOpen,
+    publishCompleted: workerCanonicalPublishSettledRef.current || (sessionModeRequirements.isWorkerCanonical && sessionPublishState.status === 'published'),
     publishStepElapsedMs,
     sbtsLabel: t('sbts'),
     sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
@@ -2865,6 +2877,7 @@ const SessionWizard = ({
       onCloseDisplaySettings={() => setWizardDisplaySettingsOpen(false)}
       onCloseSessionHeaderPreviewModal={() => setSessionHeaderPreviewModalOpen(false)}
       onCopyDraftJson={handleCopyDraftJson}
+      onCreateAnotherSession={(workerCanonicalPublishSettledRef.current || (sessionModeRequirements.isWorkerCanonical && sessionPublishState.status === 'published')) ? startFreshSessionWizard : undefined}
       onDismissNewSessionRequirementsBanner={handleDismissNewSessionRequirementsBanner}
       onEnterAdvancedMode={handleEnterAdvancedMode}
       onEnterNormalMode={handleEnterNormalMode}

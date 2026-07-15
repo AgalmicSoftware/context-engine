@@ -19,7 +19,6 @@ type DeployForm = {
   workerName?: string;
   bundleUrl?: string;
   apiToken?: string;
-  accountId?: string;
   adminAddress?: string;
 };
 
@@ -101,17 +100,16 @@ const WorkerDeploySection = ({
     isError: false,
   };
   const cloudflareTokenTemplateHref = buildCloudflareTokenTemplateUrl({
-    accountId: deployForm.accountId,
     slug: cloudflareTokenSlug,
   });
   const updateApiToken = (nextApiToken: string) => {
     setDeployForm((prev) => {
-      const previousToken = String(prev?.apiToken ?? '');
-      const shouldClearAccountId = !!previousToken && previousToken !== nextApiToken;
+      const { accountId: _discardedAccountId, ...accountIndependentForm } = (prev || {}) as DeployForm & {
+        accountId?: string;
+      };
       return {
-        ...prev,
+        ...accountIndependentForm,
         apiToken: nextApiToken,
-        ...(shouldClearAccountId ? { accountId: '' } : {}),
       };
     });
   };
@@ -311,12 +309,10 @@ const WorkerDeploySection = ({
                 You must be logged into Cloudflare before using the prefilled API token link. Create the token, copy its
                 generated value, then paste it into the field above.
               </div>
-              {!deployForm.accountId && (
-                <div className={styles.helperText}>
-                  Cloudflare may preselect All accounts. Before creating the token, restrict Account Resources to the
-                  one account where this worker will run.
-                </div>
-              )}
+              <div className={styles.helperText}>
+                Cloudflare may preselect All accounts. Before creating the token, restrict Account Resources to the
+                one account where this worker will run.
+              </div>
               <div className={styles.helperText}>
                 Account is inferred during deploy only when the token can see exactly one account.
               </div>

@@ -16,6 +16,7 @@ type RegisterTxEntry = {
 type SessionPublishResultLinksProps = {
   adminUrl: string;
   adminUrlStatus: string;
+  onCreateAnotherSession?: () => void;
   onCopyAdminUrl: () => void;
   publishMetadataDisplayState: SessionWizardPublishMetadataDisplayState;
   publishedPendingSbtLinks: PublishedPendingSbtLink[];
@@ -28,6 +29,7 @@ type SessionPublishResultLinksProps = {
 const SessionPublishResultLinks = ({
   adminUrl,
   adminUrlStatus,
+  onCreateAnotherSession,
   onCopyAdminUrl,
   publishMetadataDisplayState,
   publishedPendingSbtLinks,
@@ -92,6 +94,13 @@ const SessionPublishResultLinks = ({
         <a href={sessionUrl} target="_blank" rel="noopener noreferrer">
           {sessionUrl}
         </a>
+      </div>
+    ) : null}
+    {onCreateAnotherSession ? (
+      <div className={styles.linkRow}>
+        <Button type="button" className={styles.secondaryButton} onClick={() => onCreateAnotherSession()}>
+          Create another session
+        </Button>
       </div>
     ) : null}
     {adminUrl ? (
