@@ -123,6 +123,38 @@ test('projectPublicWorkerSessionConfig omits the complete persisted Lit descript
   assert.equal(JSON.stringify(projected).includes('bafy123'), false);
 });
 
+test('projectPublicWorkerSessionConfig keeps worker-canonical editable text metadata reload-safe', () => {
+  const projected = projectPublicWorkerSessionConfig({
+    defaultTags: 'worker, canonical',
+    defaultSbtTags: 'member',
+    questionsGenPrompt: 'Ask a worker-owned question',
+    defaultFilterState: { sort: 'recent' },
+    defaultFeaturedSBTs: ['0x0000000000000000000000000000000000000001'],
+    autoFeatureSBTsBySessionSlug: true,
+    HIGHLIGHTED_QUESTION_IDS: ['q1'],
+    BLOCKED_QUESTION_IDS: ['q2'],
+    HIGHLIGHTED_SURVEY_IDS: ['s1'],
+    BLOCKED_SURVEY_IDS: ['s2'],
+    ignored_SBTs_LIST: ['0x0000000000000000000000000000000000000002'],
+    featured_SBTs_LIST: ['0x0000000000000000000000000000000000000003'],
+  });
+
+  assert.deepEqual(projected, {
+    defaultTags: 'worker, canonical',
+    defaultSbtTags: 'member',
+    questionsGenPrompt: 'Ask a worker-owned question',
+    defaultFilterState: { sort: 'recent' },
+    defaultFeaturedSBTs: ['0x0000000000000000000000000000000000000001'],
+    autoFeatureSBTsBySessionSlug: true,
+    HIGHLIGHTED_QUESTION_IDS: ['q1'],
+    BLOCKED_QUESTION_IDS: ['q2'],
+    HIGHLIGHTED_SURVEY_IDS: ['s1'],
+    BLOCKED_SURVEY_IDS: ['s2'],
+    ignored_SBTs_LIST: ['0x0000000000000000000000000000000000000002'],
+    featured_SBTs_LIST: ['0x0000000000000000000000000000000000000003'],
+  });
+});
+
 test('Cloudflare deployment-token detection covers aliases and nested Cloudflare token fields', () => {
   assert.equal(findForbiddenCloudflareDeploymentTokenPath({ cfApiToken: 'secret' }), 'config.cfApiToken');
   assert.equal(

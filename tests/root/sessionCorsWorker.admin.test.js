@@ -1,6 +1,8 @@
 import { ethers } from 'ethers';
 import { webcrypto } from 'crypto';
-import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
+import sessionCorsWorker, {
+  SessionWriteCoordinator,
+} from '../../workers/sessionCorsWorker/worker.js';
 import {
   buildRpcFetchMock,
   createMemoryKv,
@@ -18,6 +20,41 @@ const hatsIface = new ethers.utils.Interface(HATS_ABI);
 const readStoredJson = (kv, key) => {
   const raw = kv._dump().get(key);
   return raw ? JSON.parse(raw) : null;
+};
+
+const createCoordinatorEnv = (kv, overrides = {}) => {
+  const env = { GROUP_KV: kv, ...overrides };
+  const instances = new Map();
+  const clone = (value) => JSON.parse(JSON.stringify(value));
+  env.CE_SESSION_COORDINATOR = {
+    idFromName: (name) => `coordinator:${name}`,
+    get: (id) => {
+      if (!instances.has(id)) {
+        const values = new Map();
+        let tail = Promise.resolve();
+        const storage = {
+          get: async (key) => values.get(key),
+          put: async (key, value) => values.set(key, clone(value)),
+          transaction: (callback) => {
+            const run = tail.then(() => callback({
+              get: async (key) => values.get(key),
+              put: async (key, value) => values.set(key, clone(value)),
+            }));
+            tail = run.catch(() => undefined);
+            return run;
+          },
+        };
+        const coordinator = new SessionWriteCoordinator({ storage }, env);
+        instances.set(id, {
+          fetch: (input, init) => coordinator.fetch(
+            input instanceof Request ? input : new Request(input, init),
+          ),
+        });
+      }
+      return instances.get(id);
+    },
+  };
+  return env;
 };
 
 describe('sessionCorsWorker admin routes', () => {
@@ -48,7 +85,7 @@ describe('sessionCorsWorker admin routes', () => {
 
   it('bootstraps worker config when no config exists and the signer matches the requested admin', async () => {
     const kv = createMemoryKv();
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -70,7 +107,6 @@ describe('sessionCorsWorker admin routes', () => {
       {}
     );
     const payload = await response.json();
-
     expect(response.status).toBe(200);
     expect(payload).toEqual({ ok: true });
     expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual({
@@ -81,13 +117,42 @@ describe('sessionCorsWorker admin routes', () => {
     });
   });
 
+  it('fails a signed config mutation closed when the session coordinator binding is absent', async () => {
+    const kv = createMemoryKv();
+    const env = { GROUP_KV: kv };
+    const body = await createSignedSiweBody({
+      worker: sessionCorsWorker,
+      env,
+      wallet: adminWallet,
+      sessionSlug,
+      body: {
+        adminAddress: adminWallet.address,
+        config: {
+          adminAddress: adminWallet.address,
+          sessionName: 'Must not persist',
+        },
+      },
+    });
+
+    const response = await sessionCorsWorker.fetch(
+      makeJsonRequest('/admin/set-config', body),
+      env,
+      {},
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(payload?.error).toMatch(/coordination is unavailable.*not changed/i);
+    expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toBeNull();
+  });
+
   it('rejects set-config when the config payload is missing', async () => {
     const kv = createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify({
         adminAddress: adminWallet.address,
       }),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -112,7 +177,7 @@ describe('sessionCorsWorker admin routes', () => {
 
   it('rejects bootstrap set-config when the signer does not match the requested admin', async () => {
     const kv = createMemoryKv();
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -141,11 +206,10 @@ describe('sessionCorsWorker admin routes', () => {
 
   it('bootstraps worker config when the registry is configured but the slug is not registered on-chain yet', async () => {
     const kv = createMemoryKv();
-    const env = {
-      GROUP_KV: kv,
+    const env = createCoordinatorEnv(kv, {
       REGISTRY_ADDRESS,
       RPC_URL,
-    };
+    });
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -193,7 +257,7 @@ describe('sessionCorsWorker admin routes', () => {
     const kv = createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify(existingConfig),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -230,7 +294,7 @@ describe('sessionCorsWorker admin routes', () => {
     const kv = createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify(existingConfig),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -290,7 +354,7 @@ describe('sessionCorsWorker admin routes', () => {
     const kv = createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify(existingConfig),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -340,7 +404,7 @@ describe('sessionCorsWorker admin routes', () => {
         adminAddress: adminWallet.address,
       }),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -384,7 +448,7 @@ describe('sessionCorsWorker admin routes', () => {
     const kv = createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify(existingConfig),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -424,7 +488,7 @@ describe('sessionCorsWorker admin routes', () => {
         adminAddress: adminWallet.address,
       }),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -468,7 +532,7 @@ describe('sessionCorsWorker admin routes', () => {
         adminAddress: adminWallet.address,
       }),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -514,7 +578,7 @@ describe('sessionCorsWorker admin routes', () => {
       }),
       [SESSION_SECRETS_KEY(sessionSlug)]: JSON.stringify(existingSecrets),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -551,7 +615,7 @@ describe('sessionCorsWorker admin routes', () => {
         adminAddress: adminWallet.address,
       }),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -582,7 +646,7 @@ describe('sessionCorsWorker admin routes', () => {
       }),
       [SESSION_SECRETS_KEY(sessionSlug)]: JSON.stringify(existingSecrets),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -613,10 +677,9 @@ describe('sessionCorsWorker admin routes', () => {
         adminAddress: adminWallet.address,
       }),
     });
-    const env = {
-      GROUP_KV: kv,
+    const env = createCoordinatorEnv(kv, {
       DEFAULT_SESSION_SLUG: sessionSlug,
-    };
+    });
     const baseBody = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -649,7 +712,7 @@ describe('sessionCorsWorker admin routes', () => {
 
   it('rejects admin requests with invalid json bodies', async () => {
     const kv = createMemoryKv();
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
 
     const response = await sessionCorsWorker.fetch(
       new Request('https://worker.example/admin/set-config', {
@@ -672,7 +735,7 @@ describe('sessionCorsWorker admin routes', () => {
 
   it('rejects admin requests when the signature fields are missing', async () => {
     const kv = createMemoryKv();
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
 
     const response = await sessionCorsWorker.fetch(
       makeJsonRequest('/admin/set-config', {
@@ -698,7 +761,7 @@ describe('sessionCorsWorker admin routes', () => {
         adminAddress: adminWallet.address,
       }),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const signedBody = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -739,7 +802,7 @@ describe('sessionCorsWorker admin routes', () => {
     const kv = createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify(existingConfig),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -782,7 +845,7 @@ describe('sessionCorsWorker admin routes', () => {
     const kv = createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify(existingConfig),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -829,7 +892,7 @@ describe('sessionCorsWorker admin routes', () => {
     const kv = createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify(existingConfig),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -856,7 +919,7 @@ describe('sessionCorsWorker admin routes', () => {
         adminAddress: adminWallet.address,
       }),
     });
-    const env = { GROUP_KV: kv };
+    const env = createCoordinatorEnv(kv);
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,

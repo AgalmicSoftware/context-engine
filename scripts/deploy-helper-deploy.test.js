@@ -131,12 +131,97 @@ test('buildDeployHelperUploadMetadata writes the expected bindings', async () =>
   assert.equal(metadata.main_module, 'worker.mjs');
   assert.deepEqual(metadata.bindings, [
     { name: 'DEPLOY_HELPER_KV', type: 'kv_namespace', namespace_id: 'kv-123' },
+    {
+      name: 'CE_SESSION_COORDINATOR',
+      type: 'durable_object_namespace',
+      class_name: 'SessionWriteCoordinator',
+    },
     { name: 'ALLOWED_ORIGINS', type: 'plain_text', text: 'https://app.example.test,http://localhost:3000' },
     { name: 'WORKER_BUNDLE_URL', type: 'plain_text', text: 'https://assets.example.test/sessionCorsWorker.bundle.js' },
     { name: 'WORKER_COMPATIBILITY_DATE', type: 'plain_text', text: '2025-02-02' },
     { name: 'DEFAULT_SESSION_SLUG', type: 'plain_text', text: 'alpha' },
   ]);
+  assert.deepEqual(metadata.migrations, {
+    old_tag: '',
+    new_tag: 'ce-session-write-coordinator-v1',
+    new_sqlite_classes: ['SessionWriteCoordinator'],
+  });
   assert.equal(metadata.compatibility_date, '2025-01-01');
+});
+
+test('deployDeployHelperWorker retries an already-applied coordinator migration without dropping its binding', async () => {
+  const { deployDeployHelperWorker } = await loadModule();
+  const migrationFailure = new Response(JSON.stringify({
+    success: false,
+    errors: [{ message: 'Migration tag precondition failed: tag already applied.' }],
+  }), {
+    status: 412,
+    headers: { 'Content-Type': 'application/json' },
+  });
+  const fetchMock = makeFetchSequence([
+    cfSuccess([{ id: 'account-123', name: 'Test Account' }]),
+    cfSuccess([{ id: 'kv-123', title: 'ContextEngineDeployHelper:ce-helper' }]),
+    migrationFailure,
+    cfSuccess({ id: 'worker-uploaded' }),
+    cfSuccess({}),
+    cfSuccess({ subdomain: 'tenant-subdomain', status: 'active' }),
+    cfSuccess({ enabled: true }),
+  ]);
+
+  const result = await deployDeployHelperWorker({
+    apiToken: 'cf-token',
+    workerName: 'ce-helper',
+    bundleSource: 'export default { async fetch() { return new Response("ok"); } };',
+    fetchImpl: fetchMock,
+    adminSecret: 'top-secret',
+  });
+
+  assert.equal(result.ok, true);
+  const uploadCalls = fetchMock.calls.filter(([url, init]) => (
+    String(url).endsWith('/workers/scripts/ce-helper') && init?.method === 'PUT'
+  ));
+  assert.equal(uploadCalls.length, 2);
+  const firstMetadata = JSON.parse(await new Response(uploadCalls[0][1].body.get('metadata')).text());
+  const retryMetadata = JSON.parse(await new Response(uploadCalls[1][1].body.get('metadata')).text());
+  assert.deepEqual(firstMetadata.migrations, {
+    old_tag: '',
+    new_tag: 'ce-session-write-coordinator-v1',
+    new_sqlite_classes: ['SessionWriteCoordinator'],
+  });
+  assert.equal(Object.hasOwn(retryMetadata, 'migrations'), false);
+  assert.deepEqual(retryMetadata.bindings.find(({ name }) => name === 'CE_SESSION_COORDINATOR'), {
+    name: 'CE_SESSION_COORDINATOR',
+    type: 'durable_object_namespace',
+    class_name: 'SessionWriteCoordinator',
+  });
+});
+
+test('deployDeployHelperWorker does not mask an unrelated upload precondition failure', async () => {
+  const { deployDeployHelperWorker } = await loadModule();
+  const uploadFailure = new Response(JSON.stringify({
+    success: false,
+    errors: [{ message: 'Worker binding precondition failed.' }],
+  }), {
+    status: 412,
+    headers: { 'Content-Type': 'application/json' },
+  });
+  const fetchMock = makeFetchSequence([
+    cfSuccess([{ id: 'account-123', name: 'Test Account' }]),
+    cfSuccess([{ id: 'kv-123', title: 'ContextEngineDeployHelper:ce-helper' }]),
+    uploadFailure,
+  ]);
+
+  await assert.rejects(
+    deployDeployHelperWorker({
+      apiToken: 'cf-token',
+      workerName: 'ce-helper',
+      bundleSource: 'export default { async fetch() { return new Response("ok"); } };',
+      fetchImpl: fetchMock,
+      adminSecret: 'top-secret',
+    }),
+    /worker binding precondition failed/i,
+  );
+  assert.equal(fetchMock.calls.length, 3);
 });
 
 test('deployDeployHelperWorker generates an ADMIN_SECRET when one is not provided', async () => {
@@ -206,7 +291,17 @@ test('deployDeployHelperWorker uploads the bundled helper, reuses matching KV, a
     type: 'kv_namespace',
     namespace_id: 'kv-123',
   });
-  assert.equal(metadata.bindings[1].name, 'ALLOWED_ORIGINS');
+  assert.deepEqual(metadata.bindings.find(({ name }) => name === 'CE_SESSION_COORDINATOR'), {
+    name: 'CE_SESSION_COORDINATOR',
+    type: 'durable_object_namespace',
+    class_name: 'SessionWriteCoordinator',
+  });
+  assert.equal(metadata.bindings.some(({ name }) => name === 'ALLOWED_ORIGINS'), true);
+  assert.deepEqual(metadata.migrations, {
+    old_tag: '',
+    new_tag: 'ce-session-write-coordinator-v1',
+    new_sqlite_classes: ['SessionWriteCoordinator'],
+  });
 
   const secretWrite = fetchMock.calls[3];
   assert.match(String(secretWrite[0]), /\/workers\/scripts\/ce-helper\/secrets$/);

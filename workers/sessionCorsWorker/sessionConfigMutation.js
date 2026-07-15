@@ -1,0 +1,178 @@
+import { stableCanonicalSerialize } from '../shared/deployHelperCore.mjs';
+import {
+  findForbiddenCloudflareDeploymentTokenPath,
+  findForbiddenWorkerConfigSecretPath,
+} from '../shared/workerSessionConfig.mjs';
+import {
+  mergeWorkerConfigRecords,
+  mergeWorkerLimitRecords,
+  normalizeWorkerConfigRecord,
+} from './sessionConfigNormalization.js';
+
+const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
+
+const toTrimmedString = (value) => (
+  typeof value === 'string'
+    ? value.trim()
+    : value == null
+      ? ''
+      : String(value).trim()
+);
+
+const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+
+const getWorkerAuthorityMode = (config) => toTrimmedString(
+  config?.sessionModeProfile?.authority?.mode,
+).toLowerCase();
+
+const normalizeCanonicalSessionId = (value) => {
+  const raw = toTrimmedString(value).toLowerCase();
+  if (!raw) return '';
+  const normalized = raw.replace(/^0x/, '').replace(/-/g, '');
+  return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? normalized : '';
+};
+
+const resolveCanonicalSessionIdentity = (config) => {
+  const rawValues = ['sessionId', 'sessionIdHex']
+    .filter((key) => hasOwn(config, key) && toTrimmedString(config?.[key]))
+    .map((key) => config[key]);
+  const normalizedValues = rawValues.map(normalizeCanonicalSessionId);
+  const uniqueValues = new Set(normalizedValues.filter(Boolean));
+  return {
+    invalid: normalizedValues.some((value) => !value) || uniqueValues.size > 1,
+    value: uniqueValues.size === 1 ? [...uniqueValues][0] : '',
+  };
+};
+
+const normalizeConfigRevision = (value) => {
+  if (typeof value !== 'string' || value !== value.trim()) return '';
+  return /^[a-z0-9._:-]{1,128}$/i.test(value) ? value : '';
+};
+
+const changesInitializedWorkerCanonicalIdentity = ({ existingConfig, mergedConfig } = {}) => {
+  if (getWorkerAuthorityMode(existingConfig) !== 'worker_canonical') return false;
+  if (getWorkerAuthorityMode(mergedConfig) !== 'worker_canonical') return true;
+
+  const existingSessionIdentity = resolveCanonicalSessionIdentity(existingConfig);
+  const mergedSessionIdentity = resolveCanonicalSessionIdentity(mergedConfig);
+  if (existingSessionIdentity.invalid || mergedSessionIdentity.invalid) return true;
+  if (existingSessionIdentity.value && mergedSessionIdentity.value !== existingSessionIdentity.value) return true;
+
+  return ['slug', 'corsWorkerUrl'].some((key) => {
+    const existingValue = toTrimmedString(existingConfig?.[key]);
+    return !!existingValue && toTrimmedString(mergedConfig?.[key]) !== existingValue;
+  });
+};
+
+const resolveWorkerCanonicalPublicationWrite = ({
+  existingConfig,
+  incomingConfig,
+  mergedConfig,
+} = {}) => {
+  if (hasOwn(incomingConfig, WORKER_CANONICAL_PUBLICATION_REVISION_KEY)) {
+    return { ok: false, status: 400, error: 'Worker-canonical publication state is server-managed.' };
+  }
+  if (getWorkerAuthorityMode(mergedConfig) !== 'worker_canonical') {
+    return { ok: true, config: mergedConfig };
+  }
+
+  const existingPublicationRevision = normalizeConfigRevision(
+    existingConfig?.[WORKER_CANONICAL_PUBLICATION_REVISION_KEY],
+  );
+  const incomingHasRevision = hasOwn(incomingConfig, 'configRevision');
+  const incomingRevision = incomingHasRevision ? normalizeConfigRevision(incomingConfig?.configRevision) : '';
+  if (incomingHasRevision && !incomingRevision) {
+    return { ok: false, status: 400, error: 'Worker config revision is invalid.' };
+  }
+  if (existingPublicationRevision && incomingHasRevision && incomingRevision !== existingPublicationRevision) {
+    return { ok: false, status: 409, error: 'Worker-canonical publication is already finalized.' };
+  }
+  if (existingPublicationRevision && incomingRevision === existingPublicationRevision) {
+    if (stableCanonicalSerialize(mergedConfig) !== stableCanonicalSerialize(existingConfig)) {
+      return {
+        ok: false,
+        status: 409,
+        error: 'Worker-canonical publication revision was reused with different config.',
+      };
+    }
+    return { ok: true, skipPersistence: true, config: existingConfig };
+  }
+
+  const publicationRevision = existingPublicationRevision || incomingRevision;
+  if (!publicationRevision) return { ok: true, config: mergedConfig };
+  return {
+    ok: true,
+    config: {
+      ...mergedConfig,
+      [WORKER_CANONICAL_PUBLICATION_REVISION_KEY]: publicationRevision,
+    },
+  };
+};
+
+export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
+  const authorityExisting = normalizeWorkerConfigRecord(existingConfig) || {};
+  const existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
+  const kind = toTrimmedString(mutation?.kind);
+  let incomingConfig;
+  let mergedConfig;
+
+  if (kind === 'set-config') {
+    incomingConfig = mutation?.incomingConfig && typeof mutation.incomingConfig === 'object'
+      ? mutation.incomingConfig
+      : null;
+    if (!incomingConfig) return { ok: false, status: 400, error: 'Missing config.' };
+    if (findForbiddenCloudflareDeploymentTokenPath(incomingConfig)) {
+      return { ok: false, status: 400, error: 'Cloudflare deployment tokens are not allowed in session config.' };
+    }
+    if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
+      return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
+    }
+    mergedConfig = mergeWorkerConfigRecords({ existingConfig: existing, incomingConfig, slug });
+  } else if (kind === 'set-limits') {
+    const incomingLimits = mutation?.incomingLimits && typeof mutation.incomingLimits === 'object'
+      ? mutation.incomingLimits
+      : null;
+    if (!incomingLimits) return { ok: false, status: 400, error: 'Missing limits.' };
+    incomingConfig = { limits: incomingLimits };
+    mergedConfig = mergeWorkerLimitRecords({ existingConfig: existing, incomingLimits, slug });
+  } else if (kind === 'merge-lit-credentials') {
+    const litCredentials = mutation?.litCredentials && typeof mutation.litCredentials === 'object'
+      ? mutation.litCredentials
+      : null;
+    if (!litCredentials) return { ok: false, status: 400, error: 'Missing Lit credentials.' };
+    incomingConfig = {
+      litCredentials: {
+        ...((existing.litCredentials && typeof existing.litCredentials === 'object')
+          ? existing.litCredentials
+          : {}),
+        ...litCredentials,
+      },
+    };
+    mergedConfig = mergeWorkerConfigRecords({ existingConfig: existing, incomingConfig, slug });
+  } else {
+    return { ok: false, status: 400, error: 'Unsupported session config mutation.' };
+  }
+
+  // Validate the complete merged record before the coordinator durably stages
+  // it. This covers limit and Lit-descriptor mutations as well as set-config,
+  // so a rejected secret-like value never lands in either KV or DO storage.
+  if (findForbiddenCloudflareDeploymentTokenPath(mergedConfig)) {
+    return { ok: false, status: 400, error: 'Cloudflare deployment tokens are not allowed in session config.' };
+  }
+  if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
+    return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
+  }
+
+  if (changesInitializedWorkerCanonicalIdentity({ existingConfig: authorityExisting, mergedConfig })) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'Worker-canonical session identity cannot be changed after initialization.',
+    };
+  }
+  return resolveWorkerCanonicalPublicationWrite({
+    existingConfig: authorityExisting,
+    incomingConfig,
+    mergedConfig,
+  });
+};

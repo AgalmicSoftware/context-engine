@@ -122,9 +122,11 @@ For the default `Fast & Cheap (Cloudflare)` preset:
      window.
 
 Failed worker-canonical deployments are rollback-safe. The helper deletes a
-script only after its deployment-id binding proves that the helper still owns
-that exact deployment. Existing/ambiguous scripts are preserved, and KV/script
-orphans are reported for operator cleanup rather than deleted speculatively.
+script only when the current invocation uploaded it and its deployment-id
+binding proves that the helper still owns that exact deployment. Resources
+recovered from an earlier invocation, and all existing or ambiguous scripts,
+are preserved. KV/script orphans are reported for operator cleanup rather than
+deleted speculatively.
 
 ## Deploy Helper
 
@@ -133,23 +135,32 @@ orphans are reported for operator cleanup rather than deleted speculatively.
 - The checked-in deploy-helper source imports shared modules from `workers/shared/`. If you deploy outside Wrangler, bundle it first; do not paste raw `workers/deploy-helper/worker.js` into the Cloudflare dashboard as a standalone script.
 - `workers/deploy-helper/README.md` is the quick public reference for bindings, env vars, trust boundaries, and endpoint behavior.
 - Every newly deployed `sessionCorsWorker` now also ships with embedded deploy-helper capability enabled by default. Sponsored bootstrap deploys target the sponsoring `sessionCorsWorker` first, and that worker runs the same Cloudflare deploy core locally. Grant-backed sponsored deploys now require that embedded path and no longer fall back to a standalone helper URL.
-- New deployments bind `CE_SESSION_COORDINATOR` to the SQLite-backed `SessionWriteCoordinator` class. Sponsored deploy redemption chooses one request digest inside the per-grant Durable Object before any Cloudflare mutation; a concurrent different payload receives `409`, an identical in-flight payload receives retryable `503`, and a terminal safe receipt is replayed without running the helper again. A sponsoring worker created before this binding was introduced must be redeployed before it can redeem new deploy grants; redemption otherwise fails closed before a Cloudflare API call.
+- New deployments bind `CE_SESSION_COORDINATOR` to the SQLite-backed
+  `SessionWriteCoordinator` class. It serializes whole-config mutations for each
+  session slug, reserves stable direct and sponsored deployments before any
+  Cloudflare mutation, and makes sponsored faucet transfers one-shot before the
+  non-idempotent transfer begins. Concurrent conflicting payloads receive
+  `409`; matching in-flight work receives retryable `503`; terminal safe
+  receipts replay without repeating the side effect. Missing coordination fails
+  closed. A worker created before this binding was introduced must be redeployed
+  before it can use these coordinated write paths.
 - Operating modes:
   - CE-hosted: use the default `CLOUDFLARE_DEPLOY_HELPER_URL` (`https://ce-deploy-helper.agalmic.workers.dev/`) and let Context Engine operate the shared helper.
-  - Self-hosted: deploy `workers/deploy-helper/worker.js` with your own Wrangler config (`wrangler.toml` or equivalent), bind `DEPLOY_HELPER_KV`, set `ALLOWED_ORIGINS`, and set `ADMIN_SECRET` with Wrangler secrets.
+  - Self-hosted: deploy `workers/deploy-helper/worker.js` with your own Wrangler config (`wrangler.toml` or equivalent), bind `DEPLOY_HELPER_KV` and `CE_SESSION_COORDINATOR`, install the `ce-session-write-coordinator-v1` SQLite-class migration, set `ALLOWED_ORIGINS`, and set `ADMIN_SECRET` with Wrangler secrets. The checked-in example and direct CLI automation include both bindings and the migration.
   - No helper: leave the helper out entirely and deploy `sessionCorsWorker` manually with Wrangler/dashboard steps from the `Self-deploy` section below.
 - Origin allowlist resolution is now:
   - `DEPLOY_HELPER_KV["deploy-helper:origins"]`
   - `env.ALLOWED_ORIGINS`
   - fallback `http://localhost:3000`
 - `ALLOWED_ORIGINS` accepts comma- or newline-delimited origins. Stored admin values are normalized to origins before they are written back to KV.
-- `DEPLOY_HELPER_KV` also stores the deploy request journal. The first-party
-  wizard sends a stable `deploymentRequestId` and `configRevision` for one
-  attempt. The helper durably reserves the non-secret request digest before its
-  first Cloudflare mutation, replays a terminal receipt after an ambiguous lost
-  response, and returns `409` if the same ID is reused with a different payload.
-  Raw Cloudflare/provider tokens, secrets, and worker bundle bytes are never
-  written to this journal. Terminal receipts expire after seven days.
+- The first-party wizard sends a stable `deploymentRequestId` and
+  `configRevision`. The per-request Durable Object binds that ID to the derived
+  Cloudflare account and immutable session/worker identity, while
+  `DEPLOY_HELPER_KV` keeps the step journal used to resume a partially completed
+  deployment. A terminal safe receipt survives KV journal expiry; a conflicting
+  identity receives `409`. Raw Cloudflare/provider tokens, secrets, request
+  bodies, and worker bundle bytes are not written to either coordinator state or
+  the journal. KV journal records expire after seven days.
 - Deploy-helper origin configuration:
   - CE-hosted mode should set `ALLOWED_ORIGINS` explicitly to the public app origins it serves. Current hosted example: `https://contextengine.xyz,https://www.contextengine.xyz,http://localhost:3000`.
   - Self-hosted mode should replace that list with the origins for your own app/admin hosts. Leaving `ALLOWED_ORIGINS` unset is intentionally restrictive and only allows `http://localhost:3000` until you configure it.
@@ -449,7 +460,14 @@ R2/D1:
 - `CE_STORAGE_AUDIT_D1` (or `STORAGE_AUDIT_D1` / `DB`) for worker-envelope key-release audit events when the deployment wants a queryable audit table.
 - `CE_WORKER_GROUPS_D1` (optional) for queryable worker-native group records and membership rows. If absent, group storage can use the same D1 aliases as envelope audit; any D1 group store is preferred over KV.
 - D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
-- `CE_SESSION_COORDINATOR` binds the SQLite-backed `SessionWriteCoordinator` class for sponsored-deploy runtime coordination. One-click deploy metadata installs migration tag `ce-session-write-coordinator-v1`; a repeated upload retries without reapplying an already-installed migration. Durable Objects coordinate state transitions and do not store ordinary session payload blobs.
+- `CE_SESSION_COORDINATOR` binds the SQLite-backed `SessionWriteCoordinator`
+  class for direct/sponsored deploy idempotency, one-shot sponsored faucet
+  receipts, and serialized whole-session config mutations. One-click deploy
+  metadata installs migration tag `ce-session-write-coordinator-v1`; a repeated
+  upload retries without reapplying an already-installed migration. Coordinator
+  state may contain sanitized public config needed to recover a pending KV
+  write, but never deployment credentials, worker bundle bytes, or ordinary
+  session payload blobs.
 
 Vars:
 - `TOKEN_HMAC_SECRET` (HMAC secret for session tokens)
@@ -1402,6 +1420,13 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   - If you insist on dashboard/manual upload instead of Wrangler, pre-bundle the helper first because the checked-in source imports `../shared/*.mjs`.
 - Or publish it directly with the repo automation helper:
   - `nvm use 20 && npm run deploy-helper:deploy -- --worker-name <your-helper-name> --api-token <cloudflare-token> --allowed-origins https://your-app.example,http://localhost:3000`
+  - The CLI upload binds `CE_SESSION_COORDINATOR` and installs migration tag
+    `ce-session-write-coordinator-v1`. Re-running it against a helper that already
+    has that migration retries the same module and binding without replaying the
+    one-time migration.
+  - The helper still needs only one deployment token containing `Workers
+    Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
+    binding and migration are part of the Worker script upload.
   - If you omit `--allowed-origins`, the CLI seeds the stable hosted/local defaults only. Unlike `/new`, it does not know your current self-hosted browser origin, so custom hosts still need an explicit `--allowed-origins`.
   - If you omit `--admin-secret`, the script generates one and prints it after deploy so you can still manage `/admin/origins`.
 - `POST /deploy` with CF API token, requested worker name, passkey-derived admin
@@ -1413,7 +1438,8 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
     on zero or multiple accounts; caller-supplied account IDs are ignored.
   - Creator onboarding sends that one deployment token only. The separate
     `CLOUDFLARE_API_TOKEN` with `API Tokens: Read` used by the two-key live E2E is
-    an E2E-only policy auditor: it reads the dedicated token's policy details but
+    a separate same-user, E2E-only policy auditor: it reads the dedicated token's
+    policy and permission-group catalog, compares immutable permission IDs, and
     is never included in a deploy request or required from a session creator.
   - First-party callers include `deploymentRequestId` (8-128 safe identifier
     characters). Sequential retries after a lost or gateway-shaped response
@@ -1439,13 +1465,18 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
 - Local Cloudflare E2E finalizers serialize only narrow KV-only or
   prior-verified Worker-delete-failed recovery handoffs. Each handoff contains a
   domain-separated HMAC-SHA256 proof made with the cleanup token; it never stores
-  that token. `npm run -s ai:cleanup-cf-e2e-recovery -- --report <failed-report.json>`
-  verifies the exact recovery type, Worker name, KV namespace, deployment marker,
-  and cleanup status in constant time before making a Cloudflare request.
+  that token. The proof binds the recovery type, Worker name, token-derived
+  account ID, KV namespace, deployment marker, and cleanup status. The private
+  E2E runbook documents the stripped operator-only recovery command. Recovery
+  re-derives the account before settings or delete calls and fails closed if the
+  selected token now exposes a different account.
 - Concurrent deploys with different request IDs may reuse the same requested
   prefix; each receives a distinct physical worker name and isolated KV
-  namespace. The KV journal closes sequential response-loss retries; it is not
-  an atomic compare-and-set lock for simultaneous same-ID requests.
+  namespace. Stable same-ID requests are serialized by
+  `SessionWriteCoordinator` before Cloudflare mutation; matching in-flight work
+  is retryable, conflicting immutable identities fail closed, and terminal safe
+  receipts replay without repeating deployment side effects. The KV journal
+  remains the resumable per-step record after coordination.
 - Optional: pass `subdomain` (or `workersSubdomain`) to set the account-level workers.dev subdomain
   when none exists yet (falls back to a deterministic `ce-<accountId>` name). Account-level and
   script-level workers.dev setup are both covered by `Workers Scripts: Edit`.

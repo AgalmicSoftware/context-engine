@@ -20,6 +20,9 @@ export const DEFAULT_DEPLOY_HELPER_BUNDLE_PATH = WORKER_BUNDLE_TARGETS.deployHel
 export const DEFAULT_SESSION_WORKER_BUNDLE_URL = 'https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js';
 export const DEFAULT_DEPLOY_HELPER_NAMESPACE_TITLE_PREFIX = 'ContextEngineDeployHelper';
 export const DEFAULT_DEPLOY_HELPER_ALLOWED_ORIGINS = normalizeOriginList(DEFAULT_WORKER_ALLOWED_ORIGINS);
+const DEPLOY_HELPER_SESSION_COORDINATOR_BINDING = 'CE_SESSION_COORDINATOR';
+const DEPLOY_HELPER_SESSION_COORDINATOR_CLASS = 'SessionWriteCoordinator';
+const DEPLOY_HELPER_SESSION_COORDINATOR_MIGRATION_TAG = 'ce-session-write-coordinator-v1';
 
 const BOOLEAN_FLAGS = new Set(['help', 'skip-build']);
 
@@ -250,6 +253,11 @@ export const buildDeployHelperUploadMetadata = ({
 } = {}) => {
   const bindings = [
     { name: 'DEPLOY_HELPER_KV', type: 'kv_namespace', namespace_id: kvNamespaceId },
+    {
+      name: DEPLOY_HELPER_SESSION_COORDINATOR_BINDING,
+      type: 'durable_object_namespace',
+      class_name: DEPLOY_HELPER_SESSION_COORDINATOR_CLASS,
+    },
   ];
   const normalizedOrigins = normalizeOriginList(allowedOrigins);
   if (normalizedOrigins.length) {
@@ -283,10 +291,38 @@ export const buildDeployHelperUploadMetadata = ({
   return {
     main_module: 'worker.mjs',
     bindings,
+    migrations: {
+      old_tag: '',
+      new_tag: DEPLOY_HELPER_SESSION_COORDINATOR_MIGRATION_TAG,
+      new_sqlite_classes: [DEPLOY_HELPER_SESSION_COORDINATOR_CLASS],
+    },
     compatibility_date: toStr(compatibilityDate).trim() || DEFAULT_COMPAT_DATE,
     compatibility_flags: ['nodejs_compat'],
   };
 };
+
+const buildDeployHelperUploadForm = ({
+  metadata,
+  bundleSource,
+  omitMigrations = false,
+} = {}) => {
+  const uploadMetadata = { ...(metadata || {}) };
+  if (omitMigrations) delete uploadMetadata.migrations;
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(uploadMetadata)], { type: 'application/json' }), 'metadata.json');
+  form.append('worker.mjs', new Blob([toStr(bundleSource)], { type: 'application/javascript+module' }), 'worker.mjs');
+  return form;
+};
+
+const isAlreadyAppliedCoordinatorMigration = (result) => (
+  Number(result?.status || 0) === 412 &&
+  /migration tag precondition failed/i.test([
+    result?.error,
+    ...(Array.isArray(result?.detail)
+      ? result.detail.map((entry) => toStr(entry?.message || entry))
+      : [result?.detail]),
+  ].filter(Boolean).join('\n'))
+);
 
 export const deployDeployHelperWorker = async ({
   apiToken,
@@ -340,14 +376,24 @@ export const deployDeployHelperWorker = async ({
     defaultSessionSlug,
   });
 
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }), 'metadata.json');
-  form.append('worker.mjs', new Blob([resolvedBundleSource], { type: 'application/javascript+module' }), 'worker.mjs');
-
-  const scriptUpload = await cfFetch(apiToken, `/accounts/${resolvedAccountId}/workers/scripts/${resolvedWorkerName}`, {
+  const scriptUploadPath = `/accounts/${resolvedAccountId}/workers/scripts/${resolvedWorkerName}`;
+  let scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
     method: 'PUT',
-    body: form,
+    body: buildDeployHelperUploadForm({ metadata, bundleSource: resolvedBundleSource }),
   }, { fetchImpl });
+  if (isAlreadyAppliedCoordinatorMigration(scriptUpload)) {
+    // Re-deploying the same helper can encounter the already-installed v1 tag.
+    // Keep the Durable Object binding and retry only the module upload without
+    // replaying the one-time class migration.
+    scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
+      method: 'PUT',
+      body: buildDeployHelperUploadForm({
+        metadata,
+        bundleSource: resolvedBundleSource,
+        omitMigrations: true,
+      }),
+    }, { fetchImpl });
+  }
   if (!scriptUpload.ok) {
     throw new Error(scriptUpload.error || 'Failed to upload the deploy-helper worker.');
   }

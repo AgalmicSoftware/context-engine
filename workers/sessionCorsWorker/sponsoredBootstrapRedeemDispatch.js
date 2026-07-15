@@ -1,9 +1,9 @@
 import {
+  buildSafeSponsoredReceiptBody,
   deleteSponsoredGrantRecord,
   readSponsoredGrantRecord,
   SPONSORED_GRANT_TYPES,
   redactSponsoredSensitiveText,
-  writeSponsoredGrantRedemptionReservation,
   writeSponsoredGrantReceipt,
 } from './sponsoredBootstrapGrantStore.js';
 import {
@@ -14,6 +14,8 @@ import {
 } from '../shared/deployHelperCore.mjs';
 import {
   executeCoordinatedSponsoredDeploy as executeCoordinatedSponsoredDeployBoundary,
+  finalizeCoordinatedSponsoredFaucet as finalizeCoordinatedSponsoredFaucetBoundary,
+  reserveCoordinatedSponsoredFaucet as reserveCoordinatedSponsoredFaucetBoundary,
 } from './sessionWriteCoordinator.js';
 
 const INVALID_GRANT_ERROR = 'Invalid, expired, or already used sponsored bootstrap grant.';
@@ -80,7 +82,7 @@ const buildSponsoredConfigRevision = async (grantToken) => (
   `sponsored-revision-${(await sha256Hex(`sponsored-config:${grantToken}`)).slice(0, 32)}`
 );
 
-const SENSITIVE_FIELD_PATTERN = /(token|secret|password|privatekey|apikey|bundletext|arweavejwk)/i;
+const SENSITIVE_FIELD_PATTERN = /(token|secret|password|privatekey|apikey|rpcurl|bundletext|arweavejwk)/i;
 
 const collectSponsoredSensitiveValues = (value, parentSensitive = false, output = new Set()) => {
   if (typeof value === 'string') {
@@ -294,6 +296,7 @@ export const dispatchSponsoredBootstrapRedeem = async ({
   if (!recipientAddress) {
     return buildGrantErrorResponse(deps, headers, 400, 'Missing address.');
   }
+  const faucetSensitiveValues = buildSponsoredSensitiveValues({ grantRecord });
   const requestDigest = await buildSponsoredRequestDigest('faucet', {
     recipientAddress: recipientAddress.toLowerCase(),
   });
@@ -305,16 +308,59 @@ export const dispatchSponsoredBootstrapRedeem = async ({
   });
   if (replayResponse) return replayResponse;
 
-  // Regression guard: reserve the one-shot grant without its private key
-  // before the non-idempotent transfer. An uncertain receipt write must never
-  // authorize a second transaction.
-  await writeSponsoredGrantRedemptionReservation({
+  const reserveCoordinatedSponsoredFaucet = (
+    deps?.reserveCoordinatedSponsoredFaucet || reserveCoordinatedSponsoredFaucetBoundary
+  );
+  const faucetReservation = await reserveCoordinatedSponsoredFaucet({
     env,
-    token: grantToken,
-    grantRecord,
+    grantToken,
     requestDigest,
-    nowMs: deps?.now?.() ?? Date.now(),
   });
+  if (faucetReservation?.kind === 'terminal' && faucetReservation.receipt) {
+    try {
+      await writeSponsoredGrantReceipt({
+        env,
+        token: grantToken,
+        grantRecord,
+        requestDigest,
+        response: faucetReservation.receipt,
+        nowMs: deps?.now?.() ?? Date.now(),
+      });
+    } catch {
+      // The Durable Object receipt is authoritative. KV compaction removes the
+      // original credential when available, but its failure cannot authorize
+      // or trigger a second non-idempotent transfer.
+    }
+    return deps?.json?.(
+      faucetReservation.receipt.body || {},
+      Number(faucetReservation.receipt.status || 0) || 200,
+      headers,
+    );
+  }
+  if (faucetReservation?.kind === 'conflict') {
+    return buildGrantErrorResponse(
+      deps,
+      headers,
+      409,
+      'Sponsored grant was already reserved or redeemed with a different request payload.',
+    );
+  }
+  if (faucetReservation?.kind === 'pending') {
+    return buildGrantErrorResponse(
+      deps,
+      headers,
+      503,
+      'Sponsored faucet redemption is pending; the transfer will not be repeated.',
+    );
+  }
+  if (faucetReservation?.kind !== 'execute') {
+    return buildGrantErrorResponse(
+      deps,
+      headers,
+      503,
+      'Sponsored faucet coordination is unavailable; no transfer was attempted.',
+    );
+  }
 
   let faucetResponse;
   try {
@@ -333,26 +379,54 @@ export const dispatchSponsoredBootstrapRedeem = async ({
       tokenHasFaucetScope: true,
     });
   } catch (error) {
+    // Faucet/RPC providers may include request objects or signer material in
+    // thrown messages. Once the one-shot reservation exists, expose only a
+    // fixed recovery-safe error and never authorize a second transfer.
+    faucetResponse = {
+      status: 502,
+      body: {
+        error: 'Sponsored faucet redemption was interrupted; transfer status is unknown and it will not be repeated.',
+      },
+    };
+  }
+
+  const rawReceiptResponse = await readReceiptResponse(faucetResponse);
+  const receiptResponse = {
+    status: rawReceiptResponse.status,
+    // A faucet service can return provider errors containing the configured RPC
+    // credential or signer input without throwing. Sanitize before either the
+    // Durable Object or the best-effort KV receipt can observe the response.
+    body: buildSafeSponsoredReceiptBody(rawReceiptResponse.body, faucetSensitiveValues),
+  };
+  const finalizeCoordinatedSponsoredFaucet = (
+    deps?.finalizeCoordinatedSponsoredFaucet || finalizeCoordinatedSponsoredFaucetBoundary
+  );
+  const durableReceipt = await finalizeCoordinatedSponsoredFaucet({
+    env,
+    grantToken,
+    requestDigest,
+    receipt: receiptResponse,
+  });
+  if (!durableReceipt) {
     return buildGrantErrorResponse(
       deps,
       headers,
-      502,
-      toTrimmedString(error?.message || error) || 'Failed to redeem sponsored faucet grant.',
+      503,
+      'Sponsored faucet receipt could not be confirmed; the transfer will not be repeated.',
     );
   }
-
-  if (Number(faucetResponse?.status || 0) < 200 || Number(faucetResponse?.status || 0) >= 300) {
-    return faucetResponse;
+  try {
+    await writeSponsoredGrantReceipt({
+      env,
+      token: grantToken,
+      grantRecord,
+      requestDigest,
+      response: durableReceipt,
+      nowMs: deps?.now?.() ?? Date.now(),
+    });
+  } catch {
+    // Durable terminal receipt already committed; a failed best-effort KV
+    // compaction must not convert success into a retry that could repeat gas.
   }
-
-  const receiptResponse = await readReceiptResponse(faucetResponse);
-  const receipt = await writeSponsoredGrantReceipt({
-    env,
-    token: grantToken,
-    grantRecord,
-    requestDigest,
-    response: receiptResponse,
-    nowMs: deps?.now?.() ?? Date.now(),
-  });
-  return deps?.json?.(receipt.body, receipt.status, headers);
+  return deps?.json?.(durableReceipt.body, durableReceipt.status, headers);
 };

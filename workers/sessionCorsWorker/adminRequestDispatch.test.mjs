@@ -9,6 +9,7 @@ import {
   putSessionSecrets,
 } from './sessionConfigSecretsStore.js';
 import { mergeWorkerConfigRecords } from './sessionConfigNormalization.js';
+import { applySessionConfigMutation } from './sessionConfigMutation.js';
 
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
@@ -29,34 +30,76 @@ const createMemoryKv = () => {
   };
 };
 
-const createAdminDeps = (overrides = {}) => ({
-  json: createJsonStub(),
-  resolveAdminRequestAuthority: async () => ({
-    ok: true,
-    address: '0xabc',
-    existingConfig: { adminAddress: '0xabc' },
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
-    targetSlug: 'session-a',
-  }),
-  mergeWorkerConfigRecords: ({ existingConfig, incomingConfig, slug }) => ({
+const createAdminDeps = (overrides = {}) => {
+  const defaultMergeConfig = ({ existingConfig, incomingConfig, slug }) => ({
     existingConfig,
     incomingConfig,
     slug,
     merged: true,
-  }),
-  mergeWorkerLimitRecords: ({ existingConfig, incomingLimits, slug }) => ({
+  });
+  const defaultMergeLimits = ({ existingConfig, incomingLimits, slug }) => ({
     existingConfig,
     incomingLimits,
     slug,
     merged: true,
-  }),
-  putSessionConfig: async () => {},
-  getSessionSecrets: async () => ({ openaiKey: 'sk-existing' }),
-  normalizeSecretValue: (value) => value,
-  putSessionSecrets: async () => {},
-  MISSING_SLUG_ERROR: 'Missing sessionSlug.',
-  ...overrides,
-});
+  });
+  const deps = {
+    json: createJsonStub(),
+    resolveAdminRequestAuthority: async () => ({
+      ok: true,
+      address: '0xabc',
+      existingConfig: { adminAddress: '0xabc' },
+      headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+      targetSlug: 'session-a',
+    }),
+    mergeWorkerConfigRecords: defaultMergeConfig,
+    mergeWorkerLimitRecords: defaultMergeLimits,
+    putSessionConfig: async () => {},
+    getSessionSecrets: async () => ({ openaiKey: 'sk-existing' }),
+    normalizeSecretValue: (value) => value,
+    putSessionSecrets: async () => {},
+    MISSING_SLUG_ERROR: 'Missing sessionSlug.',
+    ...overrides,
+  };
+  if (!overrides.executeCoordinatedSessionConfigMutation) {
+    deps.executeCoordinatedSessionConfigMutation = async ({ env, slug, observedConfig, mutation }) => {
+      const applied = applySessionConfigMutation({ existingConfig: observedConfig, mutation, slug });
+      if (!applied.ok) return { ok: false, status: applied.status, body: { error: applied.error } };
+      if (!applied.skipPersistence) {
+        let nextConfig = applied.config;
+        if (mutation.kind === 'set-config' && deps.mergeWorkerConfigRecords !== mergeWorkerConfigRecords) {
+          nextConfig = deps.mergeWorkerConfigRecords({
+            existingConfig: observedConfig,
+            incomingConfig: mutation.incomingConfig,
+            slug,
+          });
+        } else if (mutation.kind === 'set-limits') {
+          nextConfig = deps.mergeWorkerLimitRecords({
+            existingConfig: observedConfig,
+            incomingLimits: mutation.incomingLimits,
+            slug,
+          });
+        } else if (mutation.kind === 'merge-lit-credentials' && deps.mergeWorkerConfigRecords !== mergeWorkerConfigRecords) {
+          nextConfig = deps.mergeWorkerConfigRecords({
+            existingConfig: observedConfig,
+            incomingConfig: {
+              litCredentials: {
+                ...((observedConfig?.litCredentials && typeof observedConfig.litCredentials === 'object')
+                  ? observedConfig.litCredentials
+                  : {}),
+                ...mutation.litCredentials,
+              },
+            },
+            slug,
+          });
+        }
+        await deps.putSessionConfig(env, slug, nextConfig);
+      }
+      return { ok: true, status: 200, body: { ok: true } };
+    };
+  }
+  return deps;
+};
 
 test('dispatchAdminRequest preserves invalid-json failure before signed request handling', async () => {
   let authorityCalled = false;
@@ -85,6 +128,31 @@ test('dispatchAdminRequest preserves invalid-json failure before signed request 
     status: 400,
     headers: { 'Access-Control-Allow-Origin': '*' },
   });
+});
+
+test('dispatchAdminRequest fails config mutation closed when the coordinator binding is absent', async () => {
+  let putCalls = 0;
+  const deps = createAdminDeps({
+    putSessionConfig: async () => { putCalls += 1; },
+  });
+  delete deps.executeCoordinatedSessionConfigMutation;
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        config: { sessionName: 'Must not persist' },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps,
+  });
+
+  assert.equal(result.status, 503);
+  assert.match(result.body.error, /coordination is unavailable.*not changed/i);
+  assert.equal(putCalls, 0);
 });
 
 test('dispatchAdminRequest merges config and persists the result after authority resolution', async () => {

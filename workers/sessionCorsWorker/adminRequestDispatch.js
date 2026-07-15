@@ -16,7 +16,6 @@ import {
 } from './sponsoredBootstrapGrantStore.js';
 import {
   normalizeEmbeddedDeployHelperEnabled,
-  stableCanonicalSerialize,
 } from '../shared/deployHelperCore.mjs';
 import {
   rewrapStorageEnvelopeSessionKeyForDeployment,
@@ -36,6 +35,9 @@ import {
   findForbiddenCloudflareDeploymentTokenPath,
   findForbiddenWorkerConfigSecretPath,
 } from '../shared/workerSessionConfig.mjs';
+import {
+  executeCoordinatedSessionConfigMutation as executeCoordinatedSessionConfigMutationBoundary,
+} from './sessionWriteCoordinator.js';
 
 const ALLOWED_SECRET_KEYS = [
   'openaiKey',
@@ -112,115 +114,6 @@ const mergeAdminSecrets = ({
     if (value !== undefined) nextSecrets[key] = value;
   });
   return nextSecrets;
-};
-
-const getWorkerAuthorityMode = (config) => toTrimmedString(
-  config?.sessionModeProfile?.authority?.mode,
-).toLowerCase();
-
-const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
-const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-
-const normalizeCanonicalSessionId = (value) => {
-  const raw = toTrimmedString(value).toLowerCase();
-  if (!raw) return '';
-  const normalized = raw.replace(/^0x/, '').replace(/-/g, '');
-  return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? normalized : '';
-};
-
-const resolveCanonicalSessionIdentity = (config) => {
-  const rawValues = ['sessionId', 'sessionIdHex']
-    .filter((key) => hasOwn(config, key) && toTrimmedString(config?.[key]))
-    .map((key) => config[key]);
-  const normalizedValues = rawValues.map(normalizeCanonicalSessionId);
-  const uniqueValues = new Set(normalizedValues.filter(Boolean));
-  return {
-    invalid: normalizedValues.some((value) => !value) || uniqueValues.size > 1,
-    value: uniqueValues.size === 1 ? [...uniqueValues][0] : '',
-  };
-};
-
-const normalizeConfigRevision = (value) => {
-  if (typeof value !== 'string' || value !== value.trim()) return '';
-  return /^[a-z0-9._:-]{1,128}$/i.test(value) ? value : '';
-};
-
-// Regression guard: once a Worker owns a canonical session identity, later
-// config patches must not retarget the same deployed secrets to another session.
-const changesInitializedWorkerCanonicalIdentity = ({
-  existingConfig,
-  mergedConfig,
-} = {}) => {
-  if (getWorkerAuthorityMode(existingConfig) !== 'worker_canonical') return false;
-  if (getWorkerAuthorityMode(mergedConfig) !== 'worker_canonical') return true;
-
-  const existingSessionIdentity = resolveCanonicalSessionIdentity(existingConfig);
-  const mergedSessionIdentity = resolveCanonicalSessionIdentity(mergedConfig);
-  if (existingSessionIdentity.invalid || mergedSessionIdentity.invalid) return true;
-  if (
-    existingSessionIdentity.value &&
-    mergedSessionIdentity.value !== existingSessionIdentity.value
-  ) {
-    return true;
-  }
-
-  return ['slug', 'corsWorkerUrl'].some((key) => {
-    const existingValue = toTrimmedString(existingConfig?.[key]);
-    if (!existingValue) return false;
-    return toTrimmedString(mergedConfig?.[key]) !== existingValue;
-  });
-};
-
-const resolveWorkerCanonicalPublicationWrite = ({
-  existingConfig,
-  incomingConfig,
-  mergedConfig,
-} = {}) => {
-  if (hasOwn(incomingConfig, WORKER_CANONICAL_PUBLICATION_REVISION_KEY)) {
-    return { ok: false, status: 400, error: 'Worker-canonical publication state is server-managed.' };
-  }
-  if (getWorkerAuthorityMode(mergedConfig) !== 'worker_canonical') {
-    return { ok: true, config: mergedConfig };
-  }
-
-  const existingPublicationRevision = normalizeConfigRevision(
-    existingConfig?.[WORKER_CANONICAL_PUBLICATION_REVISION_KEY],
-  );
-  const incomingHasRevision = hasOwn(incomingConfig, 'configRevision');
-  const incomingRevision = incomingHasRevision ? normalizeConfigRevision(incomingConfig?.configRevision) : '';
-  if (incomingHasRevision && !incomingRevision) {
-    return { ok: false, status: 400, error: 'Worker config revision is invalid.' };
-  }
-  if (existingPublicationRevision && incomingHasRevision && incomingRevision !== existingPublicationRevision) {
-    return {
-      ok: false,
-      status: 409,
-      error: 'Worker-canonical publication is already finalized.',
-    };
-  }
-  if (existingPublicationRevision && incomingRevision === existingPublicationRevision) {
-    if (stableCanonicalSerialize(mergedConfig) !== stableCanonicalSerialize(existingConfig)) {
-      return {
-        ok: false,
-        status: 409,
-        error: 'Worker-canonical publication revision was reused with different config.',
-      };
-    }
-    return { ok: true, skipPersistence: true };
-  }
-
-  const publicationRevision = existingPublicationRevision || incomingRevision;
-  if (!publicationRevision) return { ok: true, config: mergedConfig };
-
-  // Regression guard: deployment seeding has no publication marker. The first
-  // revision-bearing signed write claims it; exact replays and revision-free admin patches remain valid.
-  return {
-    ok: true,
-    config: {
-      ...mergedConfig,
-      [WORKER_CANONICAL_PUBLICATION_REVISION_KEY]: publicationRevision,
-    },
-  };
 };
 
 export const dispatchAdminRequest = async ({
@@ -313,31 +206,19 @@ export const dispatchAdminRequest = async ({
       }, 400, headers);
     }
 
-    const merged = deps?.mergeWorkerConfigRecords?.({
-      existingConfig,
-      incomingConfig: incoming,
+    const mutationResult = await (
+      deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutationBoundary
+    )({
+      env,
       slug: targetSlug,
+      observedConfig: existingConfig,
+      mutation: { kind: 'set-config', incomingConfig: incoming },
     });
-    if (changesInitializedWorkerCanonicalIdentity({
-      existingConfig,
-      mergedConfig: merged,
-    })) {
-      return deps?.json?.({
-        error: 'Worker-canonical session identity cannot be changed after initialization.',
-      }, 409, headers);
-    }
-    const publicationWrite = resolveWorkerCanonicalPublicationWrite({
-      existingConfig,
-      incomingConfig: incoming,
-      mergedConfig: merged,
-    });
-    if (!publicationWrite.ok) {
-      return deps?.json?.({ error: publicationWrite.error }, publicationWrite.status, headers);
-    }
-    if (!publicationWrite.skipPersistence) {
-      await deps?.putSessionConfig?.(env, targetSlug, publicationWrite.config);
-    }
-    return deps?.json?.({ ok: true }, 200, headers);
+    return deps?.json?.(
+      mutationResult?.body || { error: 'Session config coordination failed.' },
+      mutationResult?.status || 503,
+      headers,
+    );
   }
 
   if (action === 'set-secrets') {
@@ -409,12 +290,21 @@ export const dispatchAdminRequest = async ({
         ...(result?.litPkpId ? { litPkpId: result.litPkpId } : {}),
       } : null;
       if (litCredentials) {
-        const mergedConfig = deps?.mergeWorkerConfigRecords?.({
-          existingConfig,
-          incomingConfig: { litCredentials },
+        const mutationResult = await (
+          deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutationBoundary
+        )({
+          env,
           slug: targetSlug,
+          observedConfig: existingConfig,
+          mutation: { kind: 'merge-lit-credentials', litCredentials },
         });
-        await deps?.putSessionConfig?.(env, targetSlug, mergedConfig);
+        if (!mutationResult?.ok) {
+          return deps?.json?.(
+            mutationResult?.body || { error: 'Session config coordination failed.' },
+            mutationResult?.status || 503,
+            headers,
+          );
+        }
       }
       return deps?.json?.(result, 200, headers);
     } catch (error) {
@@ -446,19 +336,21 @@ export const dispatchAdminRequest = async ({
         typeof result.litCredentials === 'object'
       ) ? result.litCredentials : null;
       if (litCredentials) {
-        const mergedConfig = deps?.mergeWorkerConfigRecords?.({
-          existingConfig,
-          incomingConfig: {
-            litCredentials: {
-              ...((existingConfig?.litCredentials && typeof existingConfig.litCredentials === 'object')
-                ? existingConfig.litCredentials
-                : {}),
-              ...litCredentials,
-            },
-          },
+        const mutationResult = await (
+          deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutationBoundary
+        )({
+          env,
           slug: targetSlug,
+          observedConfig: existingConfig,
+          mutation: { kind: 'merge-lit-credentials', litCredentials },
         });
-        await deps?.putSessionConfig?.(env, targetSlug, mergedConfig);
+        if (!mutationResult?.ok) {
+          return deps?.json?.(
+            mutationResult?.body || { error: 'Session config coordination failed.' },
+            mutationResult?.status || 503,
+            headers,
+          );
+        }
       }
       const responseBody = { ...result };
       delete responseBody.secretOutputs;
@@ -473,13 +365,19 @@ export const dispatchAdminRequest = async ({
     const incoming = body?.limits && typeof body.limits === 'object' ? body.limits : null;
     if (!incoming) return deps?.json?.({ error: 'Missing limits.' }, 400, headers);
 
-    const merged = deps?.mergeWorkerLimitRecords?.({
-      existingConfig,
-      incomingLimits: incoming,
+    const mutationResult = await (
+      deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutationBoundary
+    )({
+      env,
       slug: targetSlug,
+      observedConfig: existingConfig,
+      mutation: { kind: 'set-limits', incomingLimits: incoming },
     });
-    await deps?.putSessionConfig?.(env, targetSlug, merged);
-    return deps?.json?.({ ok: true }, 200, headers);
+    return deps?.json?.(
+      mutationResult?.body || { error: 'Session config coordination failed.' },
+      mutationResult?.status || 503,
+      headers,
+    );
   }
 
   if (action === 'rotate-envelope-keys') {

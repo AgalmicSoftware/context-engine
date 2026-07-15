@@ -58,6 +58,33 @@ const createDeployDeps = (overrides = {}) => {
       })
     );
   }
+  if (!deps.reserveCoordinatedSponsoredFaucet) {
+    deps.reserveCoordinatedSponsoredFaucet = async ({ env, grantToken, requestDigest }) => {
+      const records = env.__testFaucetCoordinator || new Map();
+      env.__testFaucetCoordinator = records;
+      const existing = records.get(grantToken);
+      if (existing && existing.requestDigest !== requestDigest) return { kind: 'conflict' };
+      if (existing?.state === 'terminal') return { kind: 'terminal', receipt: existing.receipt };
+      if (existing?.state === 'running') return { kind: 'pending' };
+      records.set(grantToken, { state: 'running', requestDigest });
+      return { kind: 'execute' };
+    };
+  }
+  if (!deps.finalizeCoordinatedSponsoredFaucet) {
+    deps.finalizeCoordinatedSponsoredFaucet = async ({ env, grantToken, requestDigest, receipt }) => {
+      const records = env.__testFaucetCoordinator || new Map();
+      env.__testFaucetCoordinator = records;
+      const existing = records.get(grantToken);
+      if (!existing || existing.requestDigest !== requestDigest) return null;
+      if (existing.state === 'terminal') return existing.receipt;
+      const safeReceipt = {
+        status: Number(receipt?.status || 0) || 502,
+        body: receipt?.body && typeof receipt.body === 'object' ? receipt.body : {},
+      };
+      records.set(grantToken, { state: 'terminal', requestDigest, receipt: safeReceipt });
+      return safeReceipt;
+    };
+  }
   return deps;
 };
 
@@ -73,9 +100,9 @@ test('dispatchSponsoredBootstrapRedeem rejects invalid JSON before reading grant
     env,
     baseHeaders: { 'Access-Control-Allow-Origin': '*' },
     action: 'deploy',
-    deps: {
+    deps: createDeployDeps({
       json: createJsonStub(),
-    },
+    }),
   });
 
   assert.deepEqual(result, {
@@ -591,7 +618,7 @@ test('dispatchSponsoredBootstrapRedeem runs faucet grants through the faucet ser
     env,
     baseHeaders: { 'Access-Control-Allow-Origin': '*' },
     action: 'faucet',
-    deps: {
+    deps: createDeployDeps({
       json: createJsonStub(),
       getCorsContext: async () => ({
         ok: true,
@@ -604,7 +631,7 @@ test('dispatchSponsoredBootstrapRedeem runs faucet grants through the faucet ser
           headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
         });
       },
-    },
+    }),
   });
 
   assert.deepEqual(faucetCalls, [{
@@ -649,7 +676,7 @@ test('dispatchSponsoredBootstrapRedeem replays a lost faucet success without sen
     }
   };
   let faucetCalls = 0;
-  const deps = {
+  const deps = createDeployDeps({
     json: createJsonStub(),
     getCorsContext: async () => ({
       ok: true,
@@ -665,22 +692,20 @@ test('dispatchSponsoredBootstrapRedeem replays a lost faucet success without sen
         rpcUrl: 'https://rpc.example.test/provider-secret-key',
       }), { status: 200 });
     },
-  };
+  });
   const requestBody = {
     faucetGrantToken: 'faucet-grant-2',
     to: '0x1111111111111111111111111111111111111111',
   };
 
-  await assert.rejects(
-    dispatchSponsoredBootstrapRedeem({
-      request: createDeployRequest(requestBody),
-      env,
-      baseHeaders: {},
-      action: 'faucet',
-      deps,
-    }),
-    /faucet receipt response lost/,
-  );
+  const first = await dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest(requestBody),
+    env,
+    baseHeaders: {},
+    action: 'faucet',
+    deps,
+  });
+  assert.equal(first.status, 200);
   const replay = await dispatchSponsoredBootstrapRedeem({
     request: createDeployRequest(requestBody),
     env,
@@ -707,7 +732,7 @@ test('dispatchSponsoredBootstrapRedeem replays a lost faucet success without sen
   assert.equal(faucetCalls, 1);
 });
 
-test('dispatchSponsoredBootstrapRedeem fails closed when a faucet receipt write does not commit', async () => {
+test('dispatchSponsoredBootstrapRedeem replays the DO receipt when KV receipt compaction does not commit', async () => {
   const { env, store } = createKvEnv({
     type: 'faucet-tx',
     sourceSessionSlug: 'source-session',
@@ -723,7 +748,7 @@ test('dispatchSponsoredBootstrapRedeem fails closed when a faucet receipt write 
     await normalPut(key, value, options);
   };
   let faucetCalls = 0;
-  const deps = {
+  const deps = createDeployDeps({
     json: createJsonStub(),
     getCorsContext: async () => ({
       ok: true,
@@ -733,24 +758,22 @@ test('dispatchSponsoredBootstrapRedeem fails closed when a faucet receipt write 
       faucetCalls += 1;
       return new Response(JSON.stringify({ txHash: '0xfaucet789' }), { status: 200 });
     },
-  };
+  });
   const requestBody = {
     faucetGrantToken: 'faucet-grant-3',
     to: '0x1111111111111111111111111111111111111111',
   };
 
-  await assert.rejects(
-    dispatchSponsoredBootstrapRedeem({
-      request: createDeployRequest(requestBody),
-      env,
-      baseHeaders: {},
-      action: 'faucet',
-      deps,
-    }),
-    /faucet receipt did not commit/,
-  );
-  assert.equal(JSON.parse([...store.values()][0]).state, 'redeeming');
-  assert.doesNotMatch([...store.values()][0], /0xfaucet-private/);
+  const first = await dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest(requestBody),
+    env,
+    baseHeaders: {},
+    action: 'faucet',
+    deps,
+  });
+  assert.equal(first.status, 200);
+  assert.equal(first.body.txHash, '0xfaucet789');
+  assert.equal(JSON.parse([...store.values()][0]).state, undefined);
 
   const retry = await dispatchSponsoredBootstrapRedeem({
     request: createDeployRequest(requestBody),
@@ -759,8 +782,8 @@ test('dispatchSponsoredBootstrapRedeem fails closed when a faucet receipt write 
     action: 'faucet',
     deps,
   });
-  assert.equal(retry.status, 503);
-  assert.match(retry.body.error, /will not be repeated/i);
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.txHash, '0xfaucet789');
   assert.equal(faucetCalls, 1);
 
   const changed = await dispatchSponsoredBootstrapRedeem({
@@ -775,4 +798,181 @@ test('dispatchSponsoredBootstrapRedeem fails closed when a faucet receipt write 
   });
   assert.equal(changed.status, 409);
   assert.equal(faucetCalls, 1);
+});
+
+test('dispatchSponsoredBootstrapRedeem permits exactly one faucet call under concurrent redemption', async () => {
+  const { env, store } = createKvEnv({
+    type: 'faucet-tx',
+    sourceSessionSlug: 'source-session',
+    sourceConfig: { allowOrigins: ['https://allowed.example.test'] },
+    faucetPrivateKey: '0xfaucet-concurrency-private',
+  });
+  let faucetCalls = 0;
+  let releaseFaucet;
+  let markFaucetStarted;
+  const faucetStarted = new Promise((resolve) => { markFaucetStarted = resolve; });
+  const faucetBlocked = new Promise((resolve) => { releaseFaucet = resolve; });
+  const deps = createDeployDeps({
+    faucet: async () => {
+      faucetCalls += 1;
+      markFaucetStarted();
+      await faucetBlocked;
+      return new Response(JSON.stringify({ txHash: '0xconcurrent-faucet' }), { status: 200 });
+    },
+  });
+  const requestBody = {
+    faucetGrantToken: 'faucet-concurrent-grant',
+    to: '0x1111111111111111111111111111111111111111',
+  };
+
+  const firstPromise = dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest(requestBody),
+    env,
+    baseHeaders: {},
+    action: 'faucet',
+    deps,
+  });
+  await faucetStarted;
+
+  const concurrent = await dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest(requestBody),
+    env,
+    baseHeaders: {},
+    action: 'faucet',
+    deps,
+  });
+  assert.equal(concurrent.status, 503);
+  assert.match(concurrent.body.error, /pending.*will not be repeated/i);
+  assert.equal(faucetCalls, 1);
+
+  releaseFaucet();
+  const first = await firstPromise;
+  assert.equal(first.status, 200);
+  assert.equal(first.body.txHash, '0xconcurrent-faucet');
+
+  const replay = await dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest(requestBody),
+    env,
+    baseHeaders: {},
+    action: 'faucet',
+    deps,
+  });
+  assert.equal(replay.status, 200);
+  assert.equal(replay.body.txHash, '0xconcurrent-faucet');
+  assert.equal(faucetCalls, 1);
+  assert.doesNotMatch(JSON.stringify([...store.values()]), /0xfaucet-concurrency-private/);
+  assert.doesNotMatch(
+    JSON.stringify([...env.__testFaucetCoordinator.values()]),
+    /0xfaucet-concurrency-private/,
+  );
+});
+
+test('dispatchSponsoredBootstrapRedeem redacts faucet exceptions and terminally replays the generic failure', async () => {
+  const privateKey = '0xfaucet-exception-private';
+  const providerCredential = 'provider-rpc-secret';
+  const { env, store } = createKvEnv({
+    type: 'faucet-tx',
+    sourceSessionSlug: 'source-session',
+    sourceConfig: { allowOrigins: ['https://allowed.example.test'] },
+    faucetPrivateKey: privateKey,
+  });
+  let faucetCalls = 0;
+  const deps = createDeployDeps({
+    faucet: async () => {
+      faucetCalls += 1;
+      throw new Error(`RPC rejected signer ${privateKey} at https://rpc.example/${providerCredential}`);
+    },
+  });
+  const requestBody = {
+    faucetGrantToken: 'faucet-exception-grant',
+    to: '0x1111111111111111111111111111111111111111',
+  };
+
+  const first = await dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest(requestBody),
+    env,
+    baseHeaders: {},
+    action: 'faucet',
+    deps,
+  });
+  assert.equal(first.status, 502);
+  assert.equal(
+    first.body.error,
+    'Sponsored faucet redemption was interrupted; transfer status is unknown and it will not be repeated.',
+  );
+
+  const replay = await dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest(requestBody),
+    env,
+    baseHeaders: {},
+    action: 'faucet',
+    deps,
+  });
+  assert.deepEqual(replay.body, first.body);
+  assert.equal(replay.status, 502);
+  assert.equal(faucetCalls, 1);
+
+  const persisted = JSON.stringify([
+    ...store.values(),
+    ...env.__testFaucetCoordinator.values(),
+  ]);
+  assert.doesNotMatch(persisted, new RegExp(privateKey));
+  assert.doesNotMatch(persisted, new RegExp(providerCredential));
+});
+
+test('dispatchSponsoredBootstrapRedeem redacts secret-bearing faucet error responses before durable replay', async () => {
+  const privateKey = '0xfaucet-response-private';
+  const rpcUrl = 'https://rpc.example.test/provider-response-secret';
+  const { env, store } = createKvEnv({
+    type: 'faucet-tx',
+    sourceSessionSlug: 'source-session',
+    sourceConfig: {
+      allowOrigins: ['https://allowed.example.test'],
+      faucet: { rpcUrl },
+    },
+    faucetPrivateKey: privateKey,
+  });
+  let faucetCalls = 0;
+  const deps = createDeployDeps({
+    faucet: async () => {
+      faucetCalls += 1;
+      return new Response(JSON.stringify({
+        error: `RPC ${rpcUrl} rejected signer ${privateKey}`,
+        privateKey,
+        rpcUrl,
+      }), { status: 502 });
+    },
+  });
+  const requestBody = {
+    faucetGrantToken: 'faucet-response-error-grant',
+    to: '0x1111111111111111111111111111111111111111',
+  };
+
+  const first = await dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest(requestBody),
+    env,
+    baseHeaders: {},
+    action: 'faucet',
+    deps,
+  });
+  const replay = await dispatchSponsoredBootstrapRedeem({
+    request: createDeployRequest(requestBody),
+    env,
+    baseHeaders: {},
+    action: 'faucet',
+    deps,
+  });
+
+  assert.equal(first.status, 502);
+  assert.deepEqual(replay, first);
+  assert.equal(faucetCalls, 1);
+  const exposed = JSON.stringify([first, replay]);
+  const persisted = JSON.stringify([
+    ...store.values(),
+    ...env.__testFaucetCoordinator.values(),
+  ]);
+  assert.doesNotMatch(exposed, new RegExp(privateKey));
+  assert.doesNotMatch(exposed, new RegExp(rpcUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.doesNotMatch(persisted, new RegExp(privateKey));
+  assert.doesNotMatch(persisted, /provider-response-secret/);
 });

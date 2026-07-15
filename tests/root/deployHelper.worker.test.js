@@ -1,5 +1,6 @@
 const { webcrypto } = require('crypto');
 const deployHelperWorker = require('../../workers/deploy-helper/worker.js').default;
+const { SessionWriteCoordinator } = require('../../workers/sessionCorsWorker/sessionWriteCoordinator.js');
 
 const makeJsonRequest = (path, body, init = {}) => new Request(`https://helper.example.test${path}`, {
   method: init.method || 'POST',
@@ -183,6 +184,7 @@ const makeResumableDeploymentFetch = () => {
   const namespaces = [];
   const kvValues = new Map();
   const workerBindings = new Map();
+  const workerSecretBindings = new Map();
   const workerSecretBodies = [];
   const scriptUploadMetadata = [];
   let namespaceCreates = 0;
@@ -198,7 +200,19 @@ const makeResumableDeploymentFetch = () => {
       return new Response('export default { fetch() {} };', { status: 200 });
     }
     if (method === 'GET' && /\/accounts\?per_page=5$/.test(normalizedUrl)) {
-      return cfSuccess([{ id: 'acc-123', name: 'Derived test account' }]);
+      const authorization = init.headers instanceof Headers
+        ? init.headers.get('Authorization')
+        : init.headers?.Authorization;
+      const token = String(authorization || '').replace(/^Bearer\s+/i, '');
+      const accountId = fetchMock.accountIdsByToken.get(token) || 'acc-123';
+      return cfSuccess([{ id: accountId, name: 'Derived test account' }]);
+    }
+    const secretListMatch = normalizedUrl.match(/\/workers\/scripts\/([^/]+)\/secrets$/);
+    if (method === 'GET' && secretListMatch) {
+      if (Array.isArray(fetchMock.secretListResponses) && fetchMock.secretListResponses.length) {
+        return fetchMock.secretListResponses.shift();
+      }
+      return cfSuccess([...(workerSecretBindings.get(secretListMatch[1])?.values() || [])]);
     }
     const settingsMatch = normalizedUrl.match(/\/workers\/scripts\/([^/]+)\/settings$/);
     if (method === 'GET' && settingsMatch) {
@@ -269,12 +283,28 @@ const makeResumableDeploymentFetch = () => {
       return cfSuccess({ enabled: true });
     }
     if (method === 'PUT' && /\/workers\/scripts\/[^/]+\/secrets$/.test(normalizedUrl)) {
-      workerSecretBodies.push(JSON.parse(String(init.body || '{}')));
-      return cfSuccess({});
+      const secretBody = JSON.parse(String(init.body || '{}'));
+      workerSecretBodies.push(secretBody);
+      let response;
+      if (Array.isArray(fetchMock.workerSecretPutResponses) && fetchMock.workerSecretPutResponses.length) {
+        response = fetchMock.workerSecretPutResponses.shift();
+      } else {
+        response = cfSuccess({});
+      }
+      if (response.ok) {
+        const workerName = normalizedUrl.match(/\/workers\/scripts\/([^/]+)\/secrets$/)?.[1];
+        if (!workerSecretBindings.has(workerName)) workerSecretBindings.set(workerName, new Map());
+        workerSecretBindings.get(workerName).set(secretBody.name, {
+          name: secretBody.name,
+          type: secretBody.type,
+        });
+      }
+      return response;
     }
     const forcedScriptDeleteMatch = normalizedUrl.match(/\/workers\/scripts\/([^/?]+)\?force=true$/);
     if (method === 'DELETE' && forcedScriptDeleteMatch) {
       workerBindings.delete(forcedScriptDeleteMatch[1]);
+      workerSecretBindings.delete(forcedScriptDeleteMatch[1]);
       return cfSuccess({});
     }
     const namespaceDeleteMatch = normalizedUrl.match(/\/storage\/kv\/namespaces\/([^/?]+)$/);
@@ -294,9 +324,13 @@ const makeResumableDeploymentFetch = () => {
   fetchMock.namespaces = namespaces;
   fetchMock.kvValues = kvValues;
   fetchMock.workerBindings = workerBindings;
+  fetchMock.workerSecretBindings = workerSecretBindings;
   fetchMock.workerSecretBodies = workerSecretBodies;
   fetchMock.scriptUploadMetadata = scriptUploadMetadata;
   fetchMock.scriptUploadResponses = [];
+  fetchMock.workerSecretPutResponses = [];
+  fetchMock.secretListResponses = [];
+  fetchMock.accountIdsByToken = new Map();
   fetchMock.getNamespaceCreateCount = () => namespaceCreates;
   fetchMock.getScriptUploadCount = () => scriptUploads;
   fetchMock.getFinalConfigPutCount = () => finalConfigPuts;
@@ -318,6 +352,43 @@ const makeKvBinding = (initial = {}) => {
       store.delete(key);
     },
   };
+};
+
+const makeCoordinatorEnv = (baseEnv = {}) => {
+  const env = { ...baseEnv };
+  const instances = new Map();
+  const clone = (value) => JSON.parse(JSON.stringify(value));
+  env.CE_SESSION_COORDINATOR = {
+    idFromName: (name) => `coordinator:${name}`,
+    get: (id) => {
+      if (!instances.has(id)) {
+        const store = new Map();
+        let tail = Promise.resolve();
+        const storage = {
+          get: async (key) => store.get(key),
+          put: async (key, value) => store.set(key, clone(value)),
+          transaction: (callback) => {
+            const run = tail.then(() => callback({
+              get: async (key) => store.get(key),
+              put: async (key, value) => store.set(key, clone(value)),
+            }));
+            tail = run.catch(() => undefined);
+            return run;
+          },
+        };
+        const coordinator = new SessionWriteCoordinator({ storage }, env);
+        instances.set(id, {
+          fetch: (input, init) => coordinator.fetch(
+            input instanceof Request ? input : new Request(input, init),
+          ),
+          store,
+        });
+      }
+      return instances.get(id);
+    },
+  };
+  env.__coordinatorInstances = instances;
+  return env;
 };
 
 const parseConsolePayload = (call) => {
@@ -367,6 +438,22 @@ const readScriptUploadMetadata = async (scriptUploadCall) => {
   const metadataBlob = uploadForm.get('metadata');
   const metadataText = await new Response(metadataBlob).text();
   return JSON.parse(metadataText);
+};
+
+const findScriptUploadCall = (fetchMock) => fetchMock.calls.find(([url, init = {}]) => (
+  String(init.method || '').toUpperCase() === 'PUT' &&
+  /\/workers\/scripts\/[^/?]+$/.test(String(url)) &&
+  init.body instanceof FormData
+));
+
+const findConfigWriteCall = (fetchMock) => fetchMock.calls.find(([url, init = {}]) => (
+  String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':config')
+));
+
+const expectPendingDeploy = async (responsePromise) => {
+  const response = await responsePromise;
+  expect(response.status).toBe(503);
+  expect((await response.json()).deploymentRequestPending).toBe(true);
 };
 
 describe('deploy-helper worker', () => {
@@ -426,10 +513,10 @@ describe('deploy-helper worker', () => {
       expect(response.status).toBe(200);
       expect(payload?.ok).toBe(true);
       expect(payload?.configVerified).toBe(true);
-      expect(fetchMock.calls.length).toBe(10);
+      expect(fetchMock.calls.length).toBe(9);
       expectBundleDiagnosticsLog(consoleLogSpy, 'bundleUrl');
 
-      const scriptUpload = fetchMock.calls[4];
+      const scriptUpload = findScriptUploadCall(fetchMock);
       const uploadForm = scriptUpload[1].body;
       const uploadMetadata = await readScriptUploadMetadata(scriptUpload);
       expect(uploadMetadata.main_module).toBe('worker.mjs');
@@ -451,7 +538,7 @@ describe('deploy-helper worker', () => {
         .map(([, init]) => JSON.parse(init.body));
       expect(workerSecretWrites.map((secret) => secret.name)).toEqual(['TOKEN_HMAC_SECRET']);
 
-      const configWrite = fetchMock.calls[2];
+      const configWrite = findConfigWriteCall(fetchMock);
       expect(JSON.parse(configWrite[1].body).allowOrigins).toEqual([
         'http://localhost:3000',
       ]);
@@ -552,7 +639,7 @@ describe('deploy-helper worker', () => {
         fetchMock.calls.filter(([url, init = {}]) =>
           String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':config'),
         ),
-      ).toHaveLength(3);
+      ).toHaveLength(2);
       expect(
         fetchMock.calls.some(
           ([url, init = {}]) =>
@@ -818,7 +905,7 @@ describe('deploy-helper worker', () => {
       const payload = await response.json();
 
       expect(response.status).toBe(200);
-      const uploadMetadata = await readScriptUploadMetadata(fetchMock.calls[4]);
+      const uploadMetadata = await readScriptUploadMetadata(findScriptUploadCall(fetchMock));
       expect(uploadMetadata.bindings).toEqual(expect.arrayContaining([
         { name: 'CE_STORAGE_INDEX_KV', type: 'kv_namespace', namespace_id: 'kv-123' },
       ]));
@@ -835,7 +922,7 @@ describe('deploy-helper worker', () => {
       expect(envelopeKek).toMatch(/^[0-9a-f]{64}$/);
       expect(envelopeKek).not.toBe(tokenSecret);
 
-      const configWrite = JSON.parse(fetchMock.calls[2][1].body);
+      const configWrite = JSON.parse(findConfigWriteCall(fetchMock)[1].body);
       expect(configWrite.storageProfile.payloadAccessControl.encryption).toBe('worker_envelope');
       expect(JSON.stringify(payload)).not.toContain(envelopeKek);
       expect(JSON.stringify(configWrite)).not.toContain(envelopeKek);
@@ -979,7 +1066,7 @@ describe('deploy-helper worker', () => {
 
       expect(response.status).toBe(200);
       expect(payload?.workerName).toMatch(/^test-worker-[0-9a-f]{12}$/);
-      const configWrite = JSON.parse(fetchMock.calls[2][1].body);
+      const configWrite = JSON.parse(findConfigWriteCall(fetchMock)[1].body);
       const serialized = JSON.stringify(configWrite);
       expect(configWrite).toEqual(expect.objectContaining({
         sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
@@ -1008,7 +1095,7 @@ describe('deploy-helper worker', () => {
       expect(configWrite.faucet).toBeUndefined();
       expect(configWrite.blockLimits).toBeUndefined();
 
-      const scriptUploadMetadata = await readScriptUploadMetadata(fetchMock.calls[4]);
+      const scriptUploadMetadata = await readScriptUploadMetadata(findScriptUploadCall(fetchMock));
       expect(scriptUploadMetadata.bindings).toContainEqual({
         name: 'BOOTSTRAP_ADMIN_ADDRESS',
         type: 'plain_text',
@@ -1084,7 +1171,7 @@ describe('deploy-helper worker', () => {
 
       expect(response.status).toBe(200);
       expect(payload?.ok).toBe(true);
-      const configWrite = JSON.parse(fetchMock.calls[2][1].body);
+      const configWrite = JSON.parse(findConfigWriteCall(fetchMock)[1].body);
       expect(configWrite.rpcUrl).toBeUndefined();
       expect(configWrite.rpcUrlsByChainId).toBeUndefined();
       expect(configWrite.sessionModeProfile.encryption).toEqual({ mode: 'lit' });
@@ -1244,14 +1331,14 @@ describe('deploy-helper worker', () => {
       expect(response.status).toBe(200);
       expect(payload?.ok).toBe(true);
 
-      const uploadMetadata = await readScriptUploadMetadata(fetchMock.calls[4]);
+      const uploadMetadata = await readScriptUploadMetadata(findScriptUploadCall(fetchMock));
       expect(uploadMetadata.bindings).toEqual(expect.arrayContaining([
         { name: 'GROUP_KV', type: 'kv_namespace', namespace_id: 'kv-123' },
         { name: 'CE_STORAGE_INDEX_KV', type: 'kv_namespace', namespace_id: 'kv-123' },
       ]));
       expect(uploadMetadata.bindings.some((binding) => binding.name === 'CE_STORAGE_R2')).toBe(false);
 
-      const configWrite = JSON.parse(fetchMock.calls[2][1].body);
+      const configWrite = JSON.parse(findConfigWriteCall(fetchMock)[1].body);
       expect(configWrite.storageProfile).toEqual(expect.objectContaining({
         backend: 'cloudflare',
         sessionOwned: true,
@@ -1312,13 +1399,13 @@ describe('deploy-helper worker', () => {
       }), {}, {});
 
       expect(response.status).toBe(200);
-      const uploadMetadata = await readScriptUploadMetadata(fetchMock.calls[4]);
+      const uploadMetadata = await readScriptUploadMetadata(findScriptUploadCall(fetchMock));
       expect(uploadMetadata.bindings).toEqual(expect.arrayContaining([
         { name: 'CE_STORAGE_INDEX_KV', type: 'kv_namespace', namespace_id: 'kv-123' },
         { name: 'CE_STORAGE_R2', type: 'r2_bucket', bucket_name: 'ce-session-payloads' },
       ]));
 
-      const configWrite = JSON.parse(fetchMock.calls[2][1].body);
+      const configWrite = JSON.parse(findConfigWriteCall(fetchMock)[1].body);
       expect(configWrite.storageProfile.backend).toBe('cloudflare');
       expect(JSON.stringify(configWrite)).not.toContain('ce-session-payloads');
     } finally {
@@ -1419,6 +1506,9 @@ describe('deploy-helper worker', () => {
       if (/\/workers\/scripts\/test-worker-[0-9a-f]{12}\/settings$/.test(String(url))) {
         return cfFailure(404, 'Worker not found.');
       }
+      if (/\/accounts\/acc-123\/workers\/subdomain$/.test(String(url))) {
+        return cfSuccess({ subdomain: 'tenant-subdomain', status: 'active' });
+      }
       throw new TypeError('fetch failed');
     };
 
@@ -1435,7 +1525,7 @@ describe('deploy-helper worker', () => {
     expect(payload?.error).toBe('Failed to fetch bundle: fetch failed');
   });
 
-  it('fails without surfacing a worker URL when the final config rewrite fails', async () => {
+  it('seeds the URL-bearing final config once before attaching the script', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
       new Response('export default { fetch() {} };', { status: 200 }),
@@ -1461,13 +1551,13 @@ describe('deploy-helper worker', () => {
       }), {}, {});
       const payload = await response.json();
 
-      expect(response.status).toBe(502);
-      expect(payload?.workerUrl).toBeUndefined();
-      expect(payload?.error).toBe('final config rewrite failed');
-      expect(fetchMock.calls.length).toBe(10);
-      expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
+      expect(response.status).toBe(200);
+      expect(payload?.workerUrl).toMatch(/\.tenant-subdomain\.workers\.dev\/$/);
+      expect(fetchMock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':config')
+      ))).toHaveLength(1);
       expect(fetchMock.calls.some(([url]) => String(url).endsWith(':secrets'))).toBe(true);
-      expect(fetchMock.calls.some(([url]) => String(url).endsWith('/secrets'))).toBe(false);
+      expect(fetchMock.calls.some(([url]) => String(url).endsWith('/secrets'))).toBe(true);
       expectBundleDiagnosticsLog(consoleLogSpy, 'bundleUrl');
     } finally {
       consoleLogSpy.mockRestore();
@@ -1550,12 +1640,14 @@ describe('deploy-helper worker', () => {
     }
   });
 
-  it('retries an older config revision and accepts the fresh canonical readback', async () => {
+  it('does not treat a nonempty foreign revision as fresh-namespace propagation lag', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
       cfSuccess({ id: 'kv-123' }),
       cfSuccess({}),
       cfSuccess({ id: 'worker-uploaded' }),
+      cfSuccess({}),
+      cfSuccess({}),
       cfSuccess({}),
     ]);
     fetchMock.kvReadbackResponses = [new Response(JSON.stringify({
@@ -1576,17 +1668,17 @@ describe('deploy-helper worker', () => {
       }), {}, {});
       const payload = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(payload?.configVerified).toBe(true);
+      expect(response.status).toBe(502);
+      expect(payload?.configVerified).toBeUndefined();
       expect(fetchMock.calls.filter(([url, init = {}]) => (
         String(init.method || 'GET').toUpperCase() === 'GET' && String(url).endsWith(':config')
-      ))).toHaveLength(2);
+      ))).toHaveLength(1);
     } finally {
       consoleLogSpy.mockRestore();
     }
   });
 
-  it('retries the known staged config when the final URL write shares its revision', async () => {
+  it('retries an empty readback while the single final config write propagates', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
       cfSuccess({ id: 'kv-123' }),
@@ -1594,12 +1686,10 @@ describe('deploy-helper worker', () => {
       cfSuccess({ id: 'worker-uploaded' }),
       cfSuccess({}),
     ]);
-    fetchMock.kvReadbackResponses = [new Response(JSON.stringify({
-      slug: 'alpha-session',
-      configRevision: 'revision-same',
-      adminAddress: '',
-      corsWorkerUrl: '',
-    }), { status: 200, headers: { 'Content-Type': 'application/json' } })];
+    fetchMock.kvReadbackResponses = [new Response('{}', {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })];
     global.fetch = fetchMock;
 
     try {
@@ -1653,7 +1743,7 @@ describe('deploy-helper worker', () => {
     }
   });
 
-  it('bounds stale revision retries and rolls back when the fresh revision never appears', async () => {
+  it('fails closed on a nonempty foreign revision instead of treating it as propagation lag', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
       cfSuccess({ id: 'kv-123' }),
@@ -1685,7 +1775,7 @@ describe('deploy-helper worker', () => {
       expect(payload?.error).toBe('Worker config verification failed after deployment.');
       expect(fetchMock.calls.filter(([url, init = {}]) => (
         String(init.method || 'GET').toUpperCase() === 'GET' && String(url).endsWith(':config')
-      ))).toHaveLength(4);
+      ))).toHaveLength(1);
       expect(payload?.orphanResources).toEqual({ kvNamespaceId: '', workerName: '' });
     } finally {
       consoleLogSpy.mockRestore();
@@ -2118,6 +2208,72 @@ describe('deploy-helper worker', () => {
     }
   });
 
+  it('fails a stable deployment closed before Cloudflare access when its coordinator binding is absent', async () => {
+    global.fetch = jest.fn(async () => {
+      throw new Error('Cloudflare must not be called without deployment coordination');
+    });
+
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'cf-token-must-not-run',
+      deploymentRequestId: 'request-without-coordinator-0001',
+      workerName: 'test-worker',
+      sessionSlug: 'alpha-session',
+      bundleText: 'export default { fetch() {} };',
+    }), { DEPLOY_HELPER_KV: makeKvBinding() }, {});
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual(expect.objectContaining({
+      deploymentRequestPending: true,
+      error: expect.stringMatching(/CE_SESSION_COORDINATOR.*no Cloudflare mutation/i),
+    }));
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('globally serializes concurrent stable deployments and stores no request credentials in the coordinator', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    global.fetch = fetchMock;
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
+    const body = {
+      apiToken: 'cf-concurrent-secret-token',
+      deploymentRequestId: 'request-concurrent-coordinator-0001',
+      workerName: 'coordinated-worker',
+      sessionSlug: 'coordinated-session',
+      bundleText: 'export default { fetch() { return new Response("secret bundle"); } };',
+      secrets: { openaiKey: 'sk-concurrent-provider-secret' },
+    };
+
+    try {
+      const responses = await Promise.all([
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
+      ]);
+      const statuses = responses.map(({ status }) => status).sort((left, right) => left - right);
+      expect(statuses).toEqual([200, 503]);
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+
+      const replay = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        apiToken: 'cf-rotated-same-account-token',
+        sessionName: 'Mutable replay drift',
+      }), env, {});
+      expect(replay.status).toBe(200);
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+
+      const coordinatorState = JSON.stringify(
+        [...env.__coordinatorInstances.values()].flatMap(({ store }) => [...store.values()]),
+      );
+      expect(coordinatorState).not.toContain(body.apiToken);
+      expect(coordinatorState).not.toContain('cf-rotated-same-account-token');
+      expect(coordinatorState).not.toContain(body.bundleText);
+      expect(coordinatorState).not.toContain('sk-concurrent-provider-secret');
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
   it('retries an already-applied coordinator migration without dropping its binding', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeResumableDeploymentFetch();
@@ -2126,7 +2282,7 @@ describe('deploy-helper worker', () => {
       cfSuccess({ id: 'worker-uploaded' }),
     ];
     global.fetch = fetchMock;
-    const env = { DEPLOY_HELPER_KV: makeKvBinding() };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
 
     try {
       const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
@@ -2178,7 +2334,7 @@ describe('deploy-helper worker', () => {
         throw new TypeError('terminal journal response lost');
       }
     };
-    const env = { DEPLOY_HELPER_KV: journalKv };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
     const body = {
       apiToken: 'cf-token',
       deploymentRequestId: 'request-loss-0001',
@@ -2189,9 +2345,9 @@ describe('deploy-helper worker', () => {
     };
 
     try {
-      await expect(
+      await expectPendingDeploy(
         deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
-      ).rejects.toThrow('terminal journal response lost');
+      );
 
       const cloudflareCallsAfterCommit = fetchMock.calls.length;
       const replayResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
@@ -2230,13 +2386,24 @@ describe('deploy-helper worker', () => {
         'upload_started',
       ]);
 
+      const driftReplayResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        apiToken: 'cf-rotated-token-for-same-account',
+        sessionName: 'Mutable fields do not redeploy terminal infrastructure',
+        limits: { requestsPerMinute: 99 },
+      }), env, {});
+      const driftReplay = await driftReplayResponse.json();
+      expect(driftReplayResponse.status).toBe(200);
+      expect(driftReplay.workerName).toBe(replay.workerName);
+      expect(fetchMock.calls).toHaveLength(cloudflareCallsAfterCommit);
+
       const changedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
         ...body,
         sessionSlug: 'changed-session',
       }), env, {});
       expect(changedResponse.status).toBe(409);
       expect(await changedResponse.json()).toEqual(expect.objectContaining({
-        error: expect.stringMatching(/different request payload/i),
+        error: expect.stringMatching(/different immutable deployment identity/i),
         deploymentRequestConflict: true,
       }));
       expect(fetchMock.calls).toHaveLength(cloudflareCallsAfterCommit);
@@ -2245,7 +2412,7 @@ describe('deploy-helper worker', () => {
     }
   });
 
-  it('resumes an exactly owned uploaded worker after the terminal journal write fails before commit', async () => {
+  it('resumes after secrets with mutable/token drift without rotating existing runtime secrets', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeResumableDeploymentFetch();
     global.fetch = fetchMock;
@@ -2260,7 +2427,7 @@ describe('deploy-helper worker', () => {
       }
       await normalPut(key, value, options);
     };
-    const env = { DEPLOY_HELPER_KV: journalKv };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
     const body = {
       apiToken: 'cf-resume-secret-token',
       deploymentRequestId: 'request-resume-0001',
@@ -2271,18 +2438,24 @@ describe('deploy-helper worker', () => {
         backend: 'cloudflare',
         payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' },
       },
+      secrets: { openaiKey: 'sk-provider-before-resume' },
     };
 
     try {
-      await expect(
+      await expectPendingDeploy(
         deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
-      ).rejects.toThrow('terminal journal did not commit');
+      );
       expect(JSON.parse([...journalKv.store.values()][0]).state).toBe('reserved');
       expect(fetchMock.getNamespaceCreateCount()).toBe(1);
       expect(fetchMock.getScriptUploadCount()).toBe(1);
       expect(fetchMock.workerSecretBodies).toHaveLength(2);
 
-      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        apiToken: 'cf-rotated-resume-token',
+        sessionName: 'Recovered mutable config',
+        secrets: { openaiKey: 'sk-provider-after-resume' },
+      }), env, {});
       const retryPayload = await retryResponse.json();
 
       expect(retryResponse.status).toBe(200);
@@ -2290,17 +2463,100 @@ describe('deploy-helper worker', () => {
         ok: true,
         kvNamespaceId: 'kv-resume-1',
         workerName: expect.stringMatching(/^resume-worker-[0-9a-f]{12}$/),
+        tokenSecretPreserved: true,
+        envelopeKekSecretPreserved: true,
+        writesSessionSecrets: false,
       }));
       expect(fetchMock.getNamespaceCreateCount()).toBe(1);
       expect(fetchMock.getScriptUploadCount()).toBe(1);
-      expect(fetchMock.workerSecretBodies).toHaveLength(4);
-      expect(fetchMock.workerSecretBodies.slice(0, 2)).toEqual(fetchMock.workerSecretBodies.slice(2));
+      expect(fetchMock.getFinalConfigPutCount()).toBe(1);
+      expect(fetchMock.workerSecretBodies).toHaveLength(2);
+      const sessionSecretWrites = fetchMock.mock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':secrets')
+      ));
+      expect(sessionSecretWrites).toHaveLength(1);
+      expect(sessionSecretWrites[0][1].body).toContain('sk-provider-before-resume');
+      expect(sessionSecretWrites[0][1].body).not.toContain('sk-provider-after-resume');
       expect(fetchMock.workerSecretBodies.map(({ text }) => text)).toEqual(
         expect.arrayContaining([expect.stringMatching(/^[0-9a-f]{64}$/)]),
       );
       const serializedJournal = JSON.stringify([...journalKv.store.values()]);
       expect(serializedJournal).not.toContain('cf-resume-secret-token');
+      expect(serializedJournal).not.toContain('cf-rotated-resume-token');
       fetchMock.workerSecretBodies.forEach(({ text }) => expect(serializedJournal).not.toContain(text));
+
+      fetchMock.accountIdsByToken.set('cf-token-for-other-account', 'acc-other');
+      const accountConflict = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        apiToken: 'cf-token-for-other-account',
+      }), env, {});
+      expect(accountConflict.status).toBe(409);
+      expect(await accountConflict.json()).toEqual(expect.objectContaining({
+        deploymentRequestConflict: true,
+        error: expect.stringMatching(/different Cloudflare account/i),
+      }));
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.workerSecretBodies).toHaveLength(2);
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('never deletes resumed Worker or KV resources after journal loss and a later activation failure', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const normalPut = journalKv.put.bind(journalKv);
+    let failTerminalWriteBeforeCommit = true;
+    journalKv.put = async (key, value, options) => {
+      const parsed = JSON.parse(value);
+      if (parsed?.state === 'terminal' && failTerminalWriteBeforeCommit) {
+        failTerminalWriteBeforeCommit = false;
+        throw new TypeError('terminal journal did not commit');
+      }
+      await normalPut(key, value, options);
+    };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
+    const body = {
+      apiToken: 'cf-resume-resource-owner-token',
+      deploymentRequestId: 'request-resume-preserve-resources-0001',
+      workerName: 'preserve-worker',
+      sessionSlug: 'preserve-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+
+    try {
+      await expectPendingDeploy(
+        deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
+      );
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+
+      // Model expiration/loss of every inner KV journal key. The DO still
+      // permits a same-identity retry, but recovered infrastructure is never
+      // considered created by this invocation.
+      journalKv.store.clear();
+      fetchMock.secretListResponses.push(cfFailure(503, 'Secret inventory unavailable.'));
+
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      const retryPayload = await retryResponse.json();
+      expect(retryResponse.status).toBe(502);
+      expect(retryPayload.deploymentRequestPending).toBe(true);
+      expect(retryPayload.orphanResources).toEqual(expect.objectContaining({
+        kvNamespaceId: 'kv-resume-1',
+        kvCleanupStatus: 'retained-pre-existing',
+        workerCleanupStatus: 'retained-pre-existing',
+      }));
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.mock.calls.filter(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        (/\/workers\/scripts\//.test(String(url)) || /\/storage\/kv\/namespaces\//.test(String(url)))
+      ))).toHaveLength(0);
+      expect(fetchMock.namespaces).toHaveLength(1);
+      expect(fetchMock.workerBindings).toHaveProperty('size', 1);
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -2321,7 +2577,7 @@ describe('deploy-helper worker', () => {
       }
       await normalPut(key, value, options);
     };
-    const env = { DEPLOY_HELPER_KV: journalKv };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
     const body = {
       apiToken: 'cf-resume-secret-token',
       deploymentRequestId: 'request-upload-conflict-0001',
@@ -2331,9 +2587,9 @@ describe('deploy-helper worker', () => {
     };
 
     try {
-      await expect(
+      await expectPendingDeploy(
         deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
-      ).rejects.toThrow('terminal journal did not commit');
+      );
       const cloudflareCallsBeforeConflict = fetchMock.mock.calls.length;
 
       const conflictResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
@@ -2343,10 +2599,12 @@ describe('deploy-helper worker', () => {
 
       expect(conflictResponse.status).toBe(409);
       expect(await conflictResponse.json()).toEqual(expect.objectContaining({
-        error: 'deploymentRequestId was already used with a different request payload.',
+        error: 'deploymentRequestId was already used for a different immutable deployment identity.',
         deploymentRequestConflict: true,
       }));
-      expect(fetchMock).toHaveBeenCalledTimes(cloudflareCallsBeforeConflict);
+      // The coordinator re-derives the current token account before comparing
+      // immutable identity, but performs no deployment mutation.
+      expect(fetchMock).toHaveBeenCalledTimes(cloudflareCallsBeforeConflict + 1);
       expect(fetchMock.getNamespaceCreateCount()).toBe(1);
       expect(fetchMock.getScriptUploadCount()).toBe(1);
     } finally {
@@ -2369,7 +2627,7 @@ describe('deploy-helper worker', () => {
       }
       await normalPut(key, value, options);
     };
-    const env = { DEPLOY_HELPER_KV: journalKv };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
     const body = {
       apiToken: 'cf-resume-secret-token',
       deploymentRequestId: 'request-resume-bundle-url-0001',
@@ -2379,9 +2637,9 @@ describe('deploy-helper worker', () => {
     };
 
     try {
-      await expect(
+      await expectPendingDeploy(
         deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
-      ).rejects.toThrow('terminal journal did not commit');
+      );
       expect(fetchMock.getBundleFetchCount()).toBe(1);
       expect(fetchMock.getScriptUploadCount()).toBe(1);
 
@@ -2412,7 +2670,7 @@ describe('deploy-helper worker', () => {
       }
       await normalPut(key, value, options);
     };
-    const env = { DEPLOY_HELPER_KV: journalKv };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
     const body = {
       apiToken: 'cf-resume-secret-token',
       deploymentRequestId: 'request-resume-visibility-0001',
@@ -2422,9 +2680,9 @@ describe('deploy-helper worker', () => {
     };
 
     try {
-      await expect(
+      await expectPendingDeploy(
         deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
-      ).rejects.toThrow('terminal journal did not commit');
+      );
       fetchMock.namespaceListHiddenReads = 1;
 
       const hiddenKvResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
@@ -2459,7 +2717,7 @@ describe('deploy-helper worker', () => {
       }
       await normalPut(key, value, options);
     };
-    const env = { DEPLOY_HELPER_KV: journalKv };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
     const body = {
       apiToken: 'cf-resume-secret-token',
       deploymentRequestId: 'request-resume-expired-journal-0001',
@@ -2469,9 +2727,9 @@ describe('deploy-helper worker', () => {
     };
 
     try {
-      await expect(
+      await expectPendingDeploy(
         deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
-      ).rejects.toThrow('terminal journal did not commit');
+      );
       for (const [key, value] of journalKv.store.entries()) {
         if (JSON.parse(value).state !== 'terminal') journalKv.store.delete(key);
       }
@@ -2564,7 +2822,7 @@ describe('deploy-helper worker', () => {
       }
       await normalPut(key, value, options);
     };
-    const env = { DEPLOY_HELPER_KV: journalKv };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
     const body = {
       apiToken: 'cf-resume-secret-token',
       deploymentRequestId: 'request-resume-mismatch-0001',
@@ -2582,9 +2840,9 @@ describe('deploy-helper worker', () => {
     };
 
     try {
-      await expect(
+      await expectPendingDeploy(
         deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {}),
-      ).rejects.toThrow('terminal journal did not commit');
+      );
       const [[workerName, bindings]] = [...fetchMock.workerBindings.entries()];
       fetchMock.workerBindings.set(workerName, mutateBindings(bindings));
 
@@ -2602,13 +2860,13 @@ describe('deploy-helper worker', () => {
     }
   });
 
-  it('keeps a retryable post-upload final-config failure pending instead of terminalizing its journal', async () => {
+  it('recovers a partial upload after mutable/token drift without duplicating infrastructure', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeResumableDeploymentFetch();
-    fetchMock.finalConfigPutFailures = 1;
+    fetchMock.configReadbackFailures = 4;
     global.fetch = fetchMock;
     const journalKv = makeKvBinding();
-    const env = { DEPLOY_HELPER_KV: journalKv };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
     const body = {
       apiToken: 'cf-token',
       deploymentRequestId: 'request-final-config-0001',
@@ -2622,6 +2880,28 @@ describe('deploy-helper worker', () => {
       expect(firstResponse.status).toBe(502);
       expect((await firstResponse.json()).deploymentRequestPending).toBe(true);
       expect(JSON.parse([...journalKv.store.values()][0]).state).toBe('reserved');
+      expect(fetchMock.workerSecretBodies).toHaveLength(0);
+
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        apiToken: 'cf-token-after-partial-upload',
+        sessionName: 'Recovered after partial upload',
+      }), env, {});
+      const retryPayload = await retryResponse.json();
+      expect(retryResponse.status).toBe(200);
+      expect(retryPayload).toEqual(expect.objectContaining({
+        ok: true,
+        tokenSecretSet: true,
+        tokenSecretPreserved: false,
+      }));
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.getFinalConfigPutCount()).toBe(1);
+      expect(fetchMock.workerSecretBodies).toHaveLength(1);
+      expect(fetchMock.workerSecretBodies[0].name).toBe('TOKEN_HMAC_SECRET');
+      expect(JSON.stringify([...journalKv.store.values()])).not.toMatch(
+        /cf-token-after-partial-upload|Recovered after partial upload/,
+      );
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -2637,7 +2917,7 @@ describe('deploy-helper worker', () => {
     ]);
     fetchMock.commitNamespaceCreateThenThrow = true;
     global.fetch = fetchMock;
-    const env = { DEPLOY_HELPER_KV: makeKvBinding() };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
     const boundarySlug = 'a'.repeat(128);
 
     try {
@@ -2693,7 +2973,7 @@ describe('deploy-helper worker', () => {
       throw new Error(`Unexpected Cloudflare mock call: ${url}`);
     });
     const journalKv = makeKvBinding();
-    const env = { DEPLOY_HELPER_KV: journalKv };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
     const body = {
       apiToken,
       deploymentRequestId: 'request-redacted-error-0001',
@@ -2713,7 +2993,7 @@ describe('deploy-helper worker', () => {
     const cloudflareCallCount = global.fetch.mock.calls.length;
     const replayResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
     expect(await replayResponse.json()).toEqual(firstPayload);
-    expect(global.fetch).toHaveBeenCalledTimes(cloudflareCallCount);
+    expect(global.fetch).toHaveBeenCalledTimes(cloudflareCallCount + 1);
   });
 
   it('reconciles delayed KV-title visibility on a same-id retry without a second namespace', async () => {
@@ -2727,7 +3007,7 @@ describe('deploy-helper worker', () => {
     fetchMock.commitNamespaceCreateThenThrow = true;
     fetchMock.namespaceListHiddenReads = 4;
     global.fetch = fetchMock;
-    const env = { DEPLOY_HELPER_KV: makeKvBinding() };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
     const body = {
       apiToken: 'cf-token',
       deploymentRequestId: 'request-loss-0003',
@@ -2754,7 +3034,7 @@ describe('deploy-helper worker', () => {
     }
   });
 
-  it('retries a transient pre-mutation bundle failure with the same reserved request id', async () => {
+  it('retries a pre-mutation bundle failure after mutable/token drift', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeDeploymentRequestFetchSequence([
       async () => { throw new TypeError('bundle unavailable'); },
@@ -2767,7 +3047,7 @@ describe('deploy-helper worker', () => {
     ]);
     global.fetch = fetchMock;
     const journalKv = makeKvBinding();
-    const env = { DEPLOY_HELPER_KV: journalKv };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
     const body = {
       apiToken: 'cf-token',
       deploymentRequestId: 'request-loss-0004',
@@ -2782,13 +3062,20 @@ describe('deploy-helper worker', () => {
       expect((await firstResponse.json()).error).toMatch(/bundle unavailable/);
       expect(JSON.parse([...journalKv.store.values()][0]).state).toBe('reserved');
 
-      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        apiToken: 'cf-token-after-bundle-failure',
+        sessionName: 'Retry with mutable drift',
+      }), env, {});
       expect(retryResponse.status).toBe(200);
       expect((await retryResponse.json()).kvNamespaceId).toBe('kv-request-4');
       expect(fetchMock.calls.filter(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'POST' &&
         String(url).endsWith('/storage/kv/namespaces')
       ))).toHaveLength(1);
+      expect(JSON.stringify([...journalKv.store.values()])).not.toMatch(
+        /cf-token-after-bundle-failure|Retry with mutable drift/,
+      );
     } finally {
       consoleLogSpy.mockRestore();
     }

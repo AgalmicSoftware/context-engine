@@ -11,6 +11,7 @@ import {
   resolveDeployHelperAllowList,
   resolveDeployHelperFallbackAllowList,
 } from '../shared/deployHelperOrigins.mjs';
+export { SessionWriteCoordinator } from '../sessionCorsWorker/sessionWriteCoordinator.js';
 const isAdminAuthorized = (request, env) => {
   const adminSecret = toStr(env?.ADMIN_SECRET).trim();
   const authHeader = toStr(request.headers.get('Authorization')).trim();

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   SessionWriteCoordinator,
+  executeCoordinatedSessionConfigMutation,
   executeCoordinatedSponsoredDeploy,
 } from './sessionWriteCoordinator.js';
 
@@ -17,7 +18,16 @@ const createTransactionalState = () => {
     tail = run.catch(() => undefined);
     return run;
   };
-  return { state: { storage: { transaction } }, store };
+  return {
+    state: {
+      storage: {
+        transaction,
+        get: async (key) => store.get(key),
+        put: async (key, value) => store.set(key, structuredClone(value)),
+      },
+    },
+    store,
+  };
 };
 
 const createRequest = ({ requestDigest, deployBody = {}, sensitiveValues = [] } = {}) => new Request(
@@ -38,6 +48,15 @@ const readResponse = async (response) => ({
   status: response.status,
   body: await response.json(),
 });
+
+const createCoordinatorRequest = (path, payload) => new Request(
+  `https://session-coordinator.internal${path}`,
+  {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  },
+);
 
 test('SessionWriteCoordinator chooses one payload before concurrent sponsored deploy mutation', async () => {
   const { state, store } = createTransactionalState();
@@ -242,4 +261,381 @@ test('executeCoordinatedSponsoredDeploy routes one grant identity to its coordin
     status: 200,
     body: { ok: true, workerName: 'coordinated-worker' },
   });
+});
+
+test('SessionWriteCoordinator serializes whole-config publication and limit mutations without clobbering', async () => {
+  const { state, store } = createTransactionalState();
+  const writes = [];
+  let nowMs = 10_000;
+  const initialConfig = {
+    slug: 'session-a',
+    sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    corsWorkerUrl: 'https://session-a.example.test/',
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    configRevision: 'deployment-seed',
+    limits: { perWalletPerDay: 3 },
+  };
+  const coordinator = new SessionWriteCoordinator(state, { GROUP_KV: {} }, {
+    now: () => nowMs,
+    sleep: async (delayMs) => { nowMs += delayMs; },
+    getSessionConfig: async () => structuredClone(initialConfig),
+    putSessionConfig: async (_env, slug, config) => {
+      writes.push({ slug, config: structuredClone(config), at: nowMs });
+    },
+  });
+  const publishPayload = {
+    slug: 'session-a',
+    requestDigest: 'publish-digest',
+    observedConfig: initialConfig,
+    mutation: {
+      kind: 'set-config',
+      incomingConfig: { sessionName: 'Published', configRevision: 'publication-a' },
+    },
+  };
+  const limitPayload = {
+    slug: 'session-a',
+    requestDigest: 'limits-digest',
+    observedConfig: initialConfig,
+    mutation: { kind: 'set-limits', incomingLimits: { perIpPerHour: 8 } },
+  };
+
+  const [published, limited] = await Promise.all([
+    coordinator.fetch(createCoordinatorRequest('/session-config-mutation', publishPayload)),
+    coordinator.fetch(createCoordinatorRequest('/session-config-mutation', limitPayload)),
+  ]);
+  assert.equal(published.status, 200);
+  assert.equal(limited.status, 200);
+  assert.equal(writes.length, 2);
+  assert.ok(writes[1].at - writes[0].at >= 1_050);
+  assert.equal(writes[1].config.sessionName, 'Published');
+  assert.equal(writes[1].config.configRevision, 'publication-a');
+  assert.equal(writes[1].config.workerCanonicalPublicationRevision, 'publication-a');
+  assert.deepEqual(writes[1].config.limits, { perWalletPerDay: 3, perIpPerHour: 8 });
+
+  const replay = await coordinator.fetch(createCoordinatorRequest('/session-config-mutation', publishPayload));
+  assert.equal(replay.status, 200);
+  assert.equal(writes.length, 2);
+  const durableText = JSON.stringify([...store.values()]);
+  assert.doesNotMatch(durableText, /apiToken|privateKey|secretOutputs/);
+});
+
+test('SessionWriteCoordinator reapplies a repeated mutation after intervening config changes', async () => {
+  const { state } = createTransactionalState();
+  const writes = [];
+  let nowMs = 15_000;
+  const coordinator = new SessionWriteCoordinator(state, { GROUP_KV: {} }, {
+    now: () => nowMs,
+    sleep: async (delayMs) => { nowMs += delayMs; },
+    getSessionConfig: async () => ({ slug: 'session-a', limits: { perIpPerHour: 1 } }),
+    putSessionConfig: async (_env, _slug, config) => {
+      writes.push(structuredClone(config));
+    },
+  });
+  const setLimit = (requestDigest, perIpPerHour) => coordinator.fetch(createCoordinatorRequest(
+    '/session-config-mutation',
+    {
+      slug: 'session-a',
+      requestDigest,
+      mutation: { kind: 'set-limits', incomingLimits: { perIpPerHour } },
+    },
+  ));
+
+  assert.equal((await setLimit('limit-two-digest', 2)).status, 200);
+  assert.equal((await setLimit('limit-three-digest', 3)).status, 200);
+  // The logical mutation digest is intentionally stable across newly signed
+  // retries. Once another mutation changes the config, an old receipt must not
+  // turn this legitimate request into a false-success no-op.
+  assert.equal((await setLimit('limit-two-digest', 2)).status, 200);
+
+  assert.equal(writes.length, 3);
+  assert.equal(writes.at(-1).limits.perIpPerHour, 2);
+});
+
+test('SessionWriteCoordinator retries one whole-config KV write at realistic same-key intervals', async () => {
+  const { state } = createTransactionalState();
+  let nowMs = 20_000;
+  const attempts = [];
+  const coordinator = new SessionWriteCoordinator(state, { GROUP_KV: {} }, {
+    now: () => nowMs,
+    sleep: async (delayMs) => { nowMs += delayMs; },
+    getSessionConfig: async () => ({ slug: 'session-a', limits: {}, scopes: {} }),
+    putSessionConfig: async (_env, _slug, config) => {
+      attempts.push({ at: nowMs, config: structuredClone(config) });
+      if (attempts.length === 1) throw new Error('KV write rate limited');
+    },
+  });
+  const response = await coordinator.fetch(createCoordinatorRequest('/session-config-mutation', {
+    slug: 'session-a',
+    requestDigest: 'rate-retry-digest',
+    mutation: { kind: 'set-limits', incomingLimits: { perIpPerHour: 2 } },
+  }));
+  assert.equal(response.status, 200);
+  assert.equal(attempts.length, 2);
+  assert.ok(attempts[1].at - attempts[0].at >= 1_050);
+  assert.deepEqual(attempts[0].config, attempts[1].config);
+});
+
+test('SessionWriteCoordinator persists a canonical general-session mutation', async () => {
+  const { state } = createTransactionalState();
+  const writes = [];
+  const coordinator = new SessionWriteCoordinator(state, { GROUP_KV: {} }, {
+    getSessionConfig: async (_env, slug) => {
+      assert.equal(slug, '');
+      return { slug: '', limits: { perIpPerHour: 1 } };
+    },
+    putSessionConfig: async (_env, slug, config) => {
+      writes.push({ slug, config: structuredClone(config) });
+    },
+  });
+
+  const response = await coordinator.fetch(createCoordinatorRequest('/session-config-mutation', {
+    slug: '',
+    requestDigest: 'general-limit-digest',
+    mutation: { kind: 'set-limits', incomingLimits: { perIpPerHour: 2 } },
+  }));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(writes, [{
+    slug: '',
+    config: { slug: '', limits: { perIpPerHour: 2 } },
+  }]);
+});
+
+test('executeCoordinatedSessionConfigMutation gives empty and general aliases one identity and rejects malformed slugs', async () => {
+  const identities = [];
+  const fetchPayloads = [];
+  const env = {
+    CE_SESSION_COORDINATOR: {
+      idFromName: (name) => {
+        identities.push(name);
+        return name;
+      },
+      get: () => ({
+        fetch: async (_url, init) => {
+          fetchPayloads.push(JSON.parse(init.body));
+          return new Response(JSON.stringify({ ok: true }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        },
+      }),
+    },
+  };
+  const mutation = { kind: 'set-limits', incomingLimits: { perIpPerHour: 2 } };
+
+  const empty = await executeCoordinatedSessionConfigMutation({ env, slug: '', mutation });
+  const alias = await executeCoordinatedSessionConfigMutation({ env, slug: 'general', mutation });
+  const malformed = await executeCoordinatedSessionConfigMutation({ env, slug: 'bad slug!', mutation });
+
+  assert.equal(empty.status, 200);
+  assert.equal(alias.status, 200);
+  assert.equal(malformed.status, 400);
+  assert.equal(identities.length, 2);
+  assert.equal(identities[0], identities[1]);
+  assert.deepEqual(fetchPayloads.map(({ slug }) => slug), ['', '']);
+});
+
+test('SessionWriteCoordinator rejects secret-like merged mutations before durable staging', async () => {
+  const { state, store } = createTransactionalState();
+  let writes = 0;
+  const coordinator = new SessionWriteCoordinator(state, { GROUP_KV: {} }, {
+    getSessionConfig: async () => ({ slug: 'session-a', limits: {}, scopes: {} }),
+    putSessionConfig: async () => { writes += 1; },
+  });
+
+  const invalidLimit = await coordinator.fetch(createCoordinatorRequest('/session-config-mutation', {
+    slug: 'session-a',
+    requestDigest: 'invalid-limit-secret',
+    mutation: {
+      kind: 'set-limits',
+      incomingLimits: { providerApiKey: 'limit-secret-must-not-persist' },
+    },
+  }));
+  assert.equal(invalidLimit.status, 400);
+
+  const invalidLit = await coordinator.fetch(createCoordinatorRequest('/session-config-mutation', {
+    slug: 'session-a',
+    requestDigest: 'invalid-lit-secret',
+    mutation: {
+      kind: 'merge-lit-credentials',
+      litCredentials: { litAccountApiKey: 'lit-secret-must-not-persist' },
+    },
+  }));
+  assert.equal(invalidLit.status, 400);
+  assert.equal(writes, 0);
+  assert.doesNotMatch(
+    JSON.stringify([...store.values()]),
+    /limit-secret-must-not-persist|lit-secret-must-not-persist/,
+  );
+});
+
+test('SessionWriteCoordinator reserves one faucet transfer and durably replays its safe terminal receipt', async () => {
+  const { state, store } = createTransactionalState();
+  const coordinator = new SessionWriteCoordinator(state, {});
+  const reserve = () => coordinator.fetch(createCoordinatorRequest('/sponsored-faucet/reserve', {
+    requestDigest: 'faucet-digest',
+  }));
+  const [first, second] = await Promise.all([reserve(), reserve()]);
+  const firstBody = await first.json();
+  const secondBody = await second.json();
+  assert.deepEqual(new Set([firstBody.kind, secondBody.kind]), new Set(['execute', 'pending']));
+
+  const finalized = await coordinator.fetch(createCoordinatorRequest('/sponsored-faucet/finalize', {
+    requestDigest: 'faucet-digest',
+    receipt: {
+      status: 200,
+      body: { txHash: `0x${'12'.repeat(32)}`, privateKey: 'must-not-persist' },
+    },
+  }));
+  assert.equal(finalized.status, 200);
+  const replay = await reserve();
+  const replayBody = await replay.json();
+  assert.equal(replayBody.kind, 'terminal');
+  assert.equal(replayBody.receipt.body.txHash, `0x${'12'.repeat(32)}`);
+  assert.doesNotMatch(JSON.stringify([...store.values()]), /must-not-persist|privateKey/);
+});
+
+test('SessionWriteCoordinator binds direct deployment recovery to account and immutable identity', async () => {
+  const { state, store } = createTransactionalState();
+  let release;
+  const canFinish = new Promise((resolve) => { release = resolve; });
+  let deployCalls = 0;
+  let nowMs = 30_000;
+  const coordinator = new SessionWriteCoordinator(state, {}, {
+    now: () => nowMs,
+    lookupCloudflareAccount: async ({ apiToken }) => ({
+      ok: true,
+      accountId: apiToken === 'token-other-account' ? 'account-b' : 'account-a',
+    }),
+    executeDeployHelperRequest: async () => {
+      deployCalls += 1;
+      await canFinish;
+      return { ok: true, status: 200, body: { ok: true, workerName: 'worker-a' } };
+    },
+    crypto: { randomUUID: () => 'direct-attempt' },
+  });
+  const payload = {
+    requestDigest: 'full-digest-a',
+    immutableIdentityDigest: 'immutable-digest-a',
+    deployBody: { apiToken: 'token-a', deploymentRequestId: 'request-a' },
+    sensitiveValues: ['token-a'],
+  };
+  const firstPromise = coordinator.fetch(createCoordinatorRequest('/deploy-helper', payload));
+  // Direct coordination hashes its stable identity before invoking the helper.
+  // Yield a full event-loop turn so Web Crypto can settle; a microtask-only
+  // spin would starve the digest callback and make this concurrency probe hang.
+  while (deployCalls === 0) await new Promise((resolve) => setImmediate(resolve));
+  nowMs += 70_000;
+  const pending = await coordinator.fetch(createCoordinatorRequest('/deploy-helper', payload));
+  assert.equal(pending.status, 503);
+  assert.equal(deployCalls, 1);
+  release();
+  assert.equal((await firstPromise).status, 200);
+
+  const mutableReplay = await coordinator.fetch(createCoordinatorRequest('/deploy-helper', {
+    ...payload,
+    requestDigest: 'full-digest-config-drift',
+    deployBody: { ...payload.deployBody, apiToken: 'rotated-token', sessionName: 'Updated' },
+    sensitiveValues: ['rotated-token'],
+  }));
+  assert.equal(mutableReplay.status, 200);
+  assert.equal(deployCalls, 1);
+
+  const identityConflict = await coordinator.fetch(createCoordinatorRequest('/deploy-helper', {
+    ...payload,
+    immutableIdentityDigest: 'immutable-digest-b',
+  }));
+  assert.equal(identityConflict.status, 409);
+  const accountConflict = await coordinator.fetch(createCoordinatorRequest('/deploy-helper', {
+    ...payload,
+    deployBody: { ...payload.deployBody, apiToken: 'token-other-account' },
+    sensitiveValues: ['token-other-account'],
+  }));
+  assert.equal(accountConflict.status, 409);
+  assert.equal(deployCalls, 1);
+  assert.doesNotMatch(JSON.stringify([...store.values()]), /token-a|rotated-token|token-other-account|deployBody/);
+});
+
+test('SessionWriteCoordinator recovers an expired direct-deploy lease after an object crash', async () => {
+  const { state, store } = createTransactionalState();
+  store.set('direct-deploy', {
+    version: 1,
+    state: 'running',
+    requestDigest: 'pre-crash-digest',
+    immutableIdentityDigest: 'immutable-digest-a',
+    accountId: 'account-a',
+    attemptId: 'crashed-attempt',
+    startedAtMs: 1_000,
+  });
+  let deployCalls = 0;
+  const coordinator = new SessionWriteCoordinator(state, {}, {
+    now: () => 70_000,
+    crypto: { randomUUID: () => 'recovery-attempt' },
+    lookupCloudflareAccount: async () => ({ ok: true, accountId: 'account-a' }),
+    executeDeployHelperRequest: async () => {
+      deployCalls += 1;
+      return { ok: true, status: 200, body: { ok: true, workerName: 'reconciled-worker' } };
+    },
+  });
+
+  const recovered = await coordinator.fetch(createCoordinatorRequest('/deploy-helper', {
+    requestDigest: 'post-crash-digest',
+    immutableIdentityDigest: 'immutable-digest-a',
+    deployBody: { apiToken: 'rotated-after-crash', deploymentRequestId: 'request-a' },
+    sensitiveValues: ['rotated-after-crash'],
+  }));
+  assert.equal(recovered.status, 200);
+  assert.equal(deployCalls, 1);
+  assert.equal(store.get('direct-deploy').state, 'terminal');
+  assert.equal(store.get('direct-deploy').requestDigest, 'post-crash-digest');
+  assert.doesNotMatch(JSON.stringify([...store.values()]), /rotated-after-crash/);
+});
+
+test('SessionWriteCoordinator retries retryable direct deployment after mutable payload drift', async () => {
+  const { state, store } = createTransactionalState();
+  let deployCalls = 0;
+  const coordinatedRequestDigests = [];
+  const coordinator = new SessionWriteCoordinator(state, {}, {
+    now: () => 80_000 + deployCalls,
+    crypto: { randomUUID: () => `retry-attempt-${deployCalls + 1}` },
+    lookupCloudflareAccount: async () => ({ ok: true, accountId: 'account-a' }),
+    executeDeployHelperRequest: async ({ coordinatedRequestDigest }) => {
+      coordinatedRequestDigests.push(coordinatedRequestDigest);
+      deployCalls += 1;
+      return deployCalls === 1
+        ? {
+            ok: false,
+            status: 503,
+            body: { error: 'Propagation pending.', deploymentRequestPending: true },
+            fallbackEligible: true,
+          }
+        : { ok: true, status: 200, body: { ok: true, workerName: 'recovered-worker' } };
+    },
+  });
+  const basePayload = {
+    requestDigest: 'full-digest-before-drift',
+    immutableIdentityDigest: 'immutable-digest-a',
+    deployBody: { apiToken: 'token-before-drift', deploymentRequestId: 'request-a' },
+    sensitiveValues: ['token-before-drift'],
+  };
+
+  const first = await coordinator.fetch(createCoordinatorRequest('/deploy-helper', basePayload));
+  assert.equal(first.status, 503);
+  const retry = await coordinator.fetch(createCoordinatorRequest('/deploy-helper', {
+    ...basePayload,
+    requestDigest: 'full-digest-after-drift',
+    deployBody: {
+      ...basePayload.deployBody,
+      apiToken: 'token-after-drift',
+      sessionName: 'Mutable recovery edit',
+    },
+    sensitiveValues: ['token-after-drift'],
+  }));
+  assert.equal(retry.status, 200);
+  assert.equal(deployCalls, 2);
+  assert.equal(coordinatedRequestDigests.length, 2);
+  assert.match(coordinatedRequestDigests[0], /^[0-9a-f]{64}$/);
+  assert.equal(coordinatedRequestDigests[1], coordinatedRequestDigests[0]);
+  assert.equal(store.get('direct-deploy').state, 'terminal');
+  assert.doesNotMatch(JSON.stringify([...store.values()]), /token-before-drift|token-after-drift/);
 });

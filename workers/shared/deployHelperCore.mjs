@@ -648,10 +648,19 @@ const buildDeploymentRequestContext = async ({ body, requestOrigin = '' } = {}) 
     body: digestBody,
     requestOrigin: normalizeOrigin(requestOrigin) || toStr(requestOrigin).trim(),
   }));
+  const immutableIdentityDigest = await sha256Hex(stableCanonicalSerialize({
+    requestOrigin: normalizeOrigin(requestOrigin) || toStr(requestOrigin).trim(),
+    requestedWorkerName: toStr(body?.workerName).trim(),
+    sessionSlug: toStr(body?.sessionSlug).trim(),
+    sessionId: toStr(body?.sessionId).trim().toLowerCase(),
+    sessionIdHex: toStr(body?.sessionIdHex).trim().toLowerCase(),
+    adminAddress: toStr(body?.adminAddress).trim().toLowerCase(),
+  }));
   const deploymentId = await sha256Hex(`context-engine-deployment:${deploymentRequestId}`);
   return {
     deploymentRequestId,
     requestDigest,
+    immutableIdentityDigest,
     deploymentId,
     requestMarker: deploymentId.slice(0, 16),
     workerName: buildFreshDeploymentName(body?.workerName, deploymentId),
@@ -986,10 +995,9 @@ const shouldAllowFallbackForCloudflareFailure = (result = {}) => {
   return status >= 500 || status === 429;
 };
 
-export const ensureWorkersDevSubdomain = async ({
+export const ensureWorkersDevAccountSubdomain = async ({
   apiToken,
   accountId,
-  workerName,
   requestedSubdomain = '',
   fetchImpl = globalThis.fetch,
   apiBaseUrl = '',
@@ -999,8 +1007,6 @@ export const ensureWorkersDevSubdomain = async ({
   let subdomainStatus = '';
   let subdomainEnabled = false;
   let subdomainError = '';
-  let scriptSubdomainEnabled = false;
-  let scriptSubdomainError = '';
   const activationFailures = [];
 
   const fallbackSubdomain = accountId
@@ -1041,6 +1047,47 @@ export const ensureWorkersDevSubdomain = async ({
   } else if (subdomainStatus && subdomainStatus !== 'active') {
     await ensureAccountSubdomain(subdomain);
   }
+
+  const fallbackEligible = !subdomain && activationFailures.length > 0 &&
+    activationFailures.every((failure) => shouldAllowFallbackForCloudflareFailure(failure));
+  return {
+    subdomain,
+    subdomainStatus,
+    subdomainEnabled,
+    subdomainError,
+    fallbackEligible,
+  };
+};
+
+export const ensureWorkersDevSubdomain = async ({
+  apiToken,
+  accountId,
+  workerName,
+  requestedSubdomain = '',
+  knownAccountSubdomain = null,
+  fetchImpl = globalThis.fetch,
+  apiBaseUrl = '',
+  env = null,
+} = {}) => {
+  const cfFetchOptions = { fetchImpl, apiBaseUrl, env };
+  const accountSubdomain = knownAccountSubdomain || await ensureWorkersDevAccountSubdomain({
+    apiToken,
+    accountId,
+    requestedSubdomain,
+    fetchImpl,
+    apiBaseUrl,
+    env,
+  });
+  const {
+    subdomain = null,
+    subdomainStatus = '',
+    subdomainEnabled = false,
+    subdomainError = '',
+  } = accountSubdomain;
+  let scriptSubdomainEnabled = false;
+  let scriptSubdomainError = '';
+  const activationFailures = [];
+  if (!subdomain && accountSubdomain?.fallbackEligible) activationFailures.push({ status: 503 });
 
   if (subdomain) {
     const scriptSubdomainResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/subdomain`, {
@@ -1102,6 +1149,7 @@ const executeDeployHelperRequestCore = async ({
   fetchImpl = globalThis.fetch,
   consoleImpl = console,
   idempotencyContext = null,
+  resolvedAccountId = '',
 } = {}) => {
   const sessionSlugCheck = validateInboundSlug(body?.sessionSlug);
   if (!sessionSlugCheck.ok) {
@@ -1147,14 +1195,17 @@ const executeDeployHelperRequestCore = async ({
     return buildFailure(400, { error: storageBindingPlan.error });
   }
 
-  const accountLookup = await resolveDeploymentAccountId({
-    body: {
-      ...body,
-      apiToken,
-    },
-    fetchImpl,
-    apiBaseUrl,
-  });
+  const accountLookup = toStr(resolvedAccountId).trim()
+    ? { ok: true, accountId: toStr(resolvedAccountId).trim() }
+    : await resolveDeploymentAccountId({
+        body: {
+          ...body,
+          apiToken,
+        },
+        fetchImpl,
+        apiBaseUrl,
+        env,
+      });
   if (!accountLookup.ok) {
     const lookupStatus = Number(accountLookup.status || 0);
     const responseStatus = lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502;
@@ -1227,6 +1278,25 @@ const executeDeployHelperRequestCore = async ({
       error: `Generated worker name "${workerName}" already exists. In-place redeploy is disabled to protect existing worker state. Retry to allocate a new physical worker name.`,
     });
   }
+  // Resolve the account workers.dev hostname before staging config. The URL is
+  // deterministic once the account subdomain is known, so a fresh namespace
+  // receives its complete canonical config in one same-key write.
+  const accountSubdomain = await ensureWorkersDevAccountSubdomain({
+    apiToken,
+    accountId,
+    requestedSubdomain: toStr(body?.subdomain || body?.workersSubdomain).trim(),
+    fetchImpl,
+    apiBaseUrl,
+    env,
+  });
+  if (!accountSubdomain.subdomain) {
+    return buildFailure(502, {
+      error: accountSubdomain.subdomainError || 'Cloudflare did not return a workers.dev account subdomain.',
+    }, {
+      fallbackEligible: accountSubdomain.fallbackEligible,
+    });
+  }
+  const anticipatedWorkerUrl = `https://${workerName}.${accountSubdomain.subdomain}.workers.dev/`;
   const rpcUrl = toStr(body?.rpcUrl).trim();
   const rpcUrlsByChainId = (body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === 'object')
     ? body.rpcUrlsByChainId
@@ -1258,6 +1328,7 @@ const executeDeployHelperRequestCore = async ({
     allowOrigins,
     limits,
     scopes,
+    corsWorkerUrl: anticipatedWorkerUrl,
     embeddedDeployHelperEnabled,
     ...(!workerCanonicalRequested
       ? {
@@ -1398,6 +1469,8 @@ const executeDeployHelperRequestCore = async ({
   let kvId = '';
   let resumeUploadedWorker = false;
   let resumeWorkerSettings = mayResumeExistingWorker ? workerNamePreflight : null;
+  let createdKvThisInvocation = false;
+  let uploadedWorkerThisInvocation = false;
   if (requestMarker) {
     const existingMarkedNamespaces = await findRequestMarkedKvNamespaces();
     if (!existingMarkedNamespaces.ok) {
@@ -1540,6 +1613,7 @@ const executeDeployHelperRequestCore = async ({
       body: JSON.stringify({ title: kvNamespaceTitle }),
     }, cfFetchOptions);
     kvId = toStr(kvCreate.data?.result?.id).trim();
+    createdKvThisInvocation = kvCreate.ok && !!kvId;
     if (!kvId && requestMarker) {
       for (let attempt = 0; attempt <= NEW_KV_NAMESPACE_RETRY_DELAYS_MS.length; attempt += 1) {
         const reconciled = await findRequestMarkedKvNamespaces();
@@ -1577,6 +1651,9 @@ const executeDeployHelperRequestCore = async ({
     }
   }
   const cleanupStagedKv = async () => {
+    if (!createdKvThisInvocation) {
+      return { kvNamespaceId: kvId, kvCleanupStatus: 'retained-pre-existing' };
+    }
     const kvCleanup = await cfFetch(
       apiToken,
       `/accounts/${accountId}/storage/kv/namespaces/${kvId}`,
@@ -1639,14 +1716,6 @@ const executeDeployHelperRequestCore = async ({
   }
 
   const envelopeKekSecretRequired = deployStorageRequiresEnvelopeKek(storageProfile);
-  const tokenSecret = idempotencyContext
-    ? await deriveIdempotentRuntimeSecret({ apiToken, deploymentId, purpose: 'token-hmac' })
-    : randomSecret();
-  const envelopeKekSecret = envelopeKekSecretRequired
-    ? (idempotencyContext
-      ? await deriveIdempotentRuntimeSecret({ apiToken, deploymentId, purpose: 'storage-envelope-kek' })
-      : randomSecret())
-    : '';
   const metadata = {
     main_module: 'worker.mjs',
     bindings: [
@@ -1701,6 +1770,10 @@ const executeDeployHelperRequestCore = async ({
     let removableWorkerName = workerName;
     let workerCleanupStatus = '';
     const cleanupWorkerIfOwned = async () => {
+      if (!uploadedWorkerThisInvocation) {
+        workerCleanupStatus = 'retained-pre-existing';
+        return false;
+      }
       const settingsResp = await readWorkerSettingsAfterUpload();
       if (!settingsResp.ok) {
         workerCleanupStatus = 'ownership-unverified';
@@ -1733,6 +1806,14 @@ const executeDeployHelperRequestCore = async ({
       return {
         kvNamespaceId: kvId,
         kvCleanupStatus: 'retained-live-worker',
+        workerName: removableWorkerName,
+        ...(workerCleanupStatus ? { workerCleanupStatus } : {}),
+      };
+    }
+    if (!createdKvThisInvocation) {
+      return {
+        kvNamespaceId: kvId,
+        kvCleanupStatus: 'retained-pre-existing',
         workerName: removableWorkerName,
         ...(workerCleanupStatus ? { workerCleanupStatus } : {}),
       };
@@ -1820,6 +1901,7 @@ const executeDeployHelperRequestCore = async ({
         },
       }, { fallbackEligible: true });
     }
+    uploadedWorkerThisInvocation = true;
     let scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
       method: 'PUT',
       body: buildScriptUploadForm(),
@@ -1881,7 +1963,48 @@ const executeDeployHelperRequestCore = async ({
     });
   }
 
+  let resumedSecretBindings = new Set();
+  if (resumeUploadedWorker) {
+    const secretList = await cfFetch(
+      apiToken,
+      `/accounts/${accountId}/workers/scripts/${workerName}/secrets`,
+      { method: 'GET' },
+      cfFetchOptions,
+    );
+    const listedSecrets = secretList?.data?.result;
+    if (!secretList.ok || !Array.isArray(listedSecrets)) {
+      return buildDeploymentFailure(502, {
+        error: secretList.error || 'Failed to verify existing Worker secret bindings during recovery.',
+        detail: secretList.detail,
+        deploymentRequestPending: true,
+        orphanResources: {
+          kvNamespaceId: kvId,
+          kvCleanupStatus: 'retained-pre-existing',
+          workerName,
+          workerCleanupStatus: 'retained-pre-existing',
+        },
+      }, { fallbackEligible: true });
+    }
+    resumedSecretBindings = new Set(listedSecrets
+      .filter((binding) => toStr(binding?.type).trim() === 'secret_text')
+      .map((binding) => toStr(binding?.name).trim())
+      .filter(Boolean));
+  }
+
   let envelopeKekSecretSet = false;
+  const tokenSecretPreserved = resumedSecretBindings.has('TOKEN_HMAC_SECRET');
+  const envelopeKekSecretPreserved = envelopeKekSecretRequired &&
+    resumedSecretBindings.has(STORAGE_ENVELOPE_KEK_SECRET_NAME);
+  const tokenSecret = tokenSecretPreserved
+    ? ''
+    : (idempotencyContext
+      ? await deriveIdempotentRuntimeSecret({ apiToken, deploymentId, purpose: 'token-hmac' })
+      : randomSecret());
+  const envelopeKekSecret = envelopeKekSecretRequired && !envelopeKekSecretPreserved
+    ? (idempotencyContext
+      ? await deriveIdempotentRuntimeSecret({ apiToken, deploymentId, purpose: 'storage-envelope-kek' })
+      : randomSecret())
+    : '';
 
   const {
     subdomain,
@@ -1897,8 +2020,10 @@ const executeDeployHelperRequestCore = async ({
     accountId,
     workerName,
     requestedSubdomain: toStr(body?.subdomain || body?.workersSubdomain).trim(),
+    knownAccountSubdomain: accountSubdomain,
     fetchImpl,
     apiBaseUrl,
+    env,
   });
   const deploymentPayload = {
     ok: true,
@@ -1911,11 +2036,13 @@ const executeDeployHelperRequestCore = async ({
     sessionSecretsKey,
     sessionKvPrefix: 'session',
     writesSessionConfig: true,
-    writesSessionSecrets: true,
+    // A resumed upload preserves the namespace's existing secret envelope.
+    // Mutable retry secrets must be applied by the signed post-deploy sync.
+    writesSessionSecrets: !resumeUploadedWorker,
     tokenSecretSet: false,
-    tokenSecretPreserved: false,
+    tokenSecretPreserved,
     envelopeKekSecretSet,
-    envelopeKekSecretPreserved: false,
+    envelopeKekSecretPreserved,
     subdomain,
     subdomainStatus,
     subdomainEnabled,
@@ -1937,37 +2064,10 @@ const executeDeployHelperRequestCore = async ({
       ...config,
       corsWorkerUrl: workerUrl,
     };
-    const configUpdate = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(configWithWorkerUrl),
-    }, cfFetchOptions);
-    if (!configUpdate.ok) {
-      const orphanResources = await cleanupDeploymentResources();
-      return buildDeploymentFailure(502, {
-        error: configUpdate.error || 'Failed to persist the final worker config.',
-        detail: configUpdate.detail,
-        orphanResources,
-      }, {
-        fallbackEligible: shouldAllowFallbackForCloudflareFailure(configUpdate),
-      });
-    }
-    const expectedAuthorityMode = toStr(configWithWorkerUrl?.sessionModeProfile?.authority?.mode).trim();
     const readbackMatches = (result) => {
       const readbackConfig = result?.data?.result || result?.data || {};
-      return (
-        result?.ok &&
-        toStr(readbackConfig.slug).trim() === toStr(configWithWorkerUrl.slug).trim() &&
-        toStr(readbackConfig.corsWorkerUrl).trim() === toStr(configWithWorkerUrl.corsWorkerUrl).trim() &&
-        (!configWithWorkerUrl.configRevision ||
-          toStr(readbackConfig.configRevision).trim() === toStr(configWithWorkerUrl.configRevision).trim()) &&
-        (!configWithWorkerUrl.sessionId ||
-          toStr(readbackConfig.sessionId).trim() === toStr(configWithWorkerUrl.sessionId).trim()) &&
-        (!expectedAuthorityMode ||
-          toStr(readbackConfig?.sessionModeProfile?.authority?.mode).trim() === expectedAuthorityMode) &&
-        (!workerCanonicalRequested ||
-          workerAuthorityPoliciesMatch(configWithWorkerUrl.workerAuthority, readbackConfig.workerAuthority))
-      );
+      return result?.ok &&
+        stableCanonicalSerialize(readbackConfig) === stableCanonicalSerialize(configWithWorkerUrl);
     };
     const configReadbackPath = `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`;
     const readbackIsRetryable = (result) => {
@@ -1975,42 +2075,86 @@ const executeDeployHelperRequestCore = async ({
         return isNewKvNamespacePropagationFailure(result) || shouldAllowFallbackForCloudflareFailure(result);
       }
       const readbackConfig = result.data?.result || result.data || {};
-      const expectedRevision = toStr(configWithWorkerUrl.configRevision).trim();
-      const observedRevision = toStr(readbackConfig.configRevision).trim();
-      const staleRevision = expectedRevision && observedRevision && observedRevision !== expectedRevision;
-      const stagedConfigPending = (
-        toStr(readbackConfig.slug).trim() === toStr(config.slug).trim() &&
-        toStr(readbackConfig.corsWorkerUrl).trim() === toStr(config.corsWorkerUrl).trim() &&
-        toStr(readbackConfig.corsWorkerUrl).trim() !== toStr(configWithWorkerUrl.corsWorkerUrl).trim() &&
-        (!config.configRevision || observedRevision === toStr(config.configRevision).trim()) &&
-        (!config.sessionId || toStr(readbackConfig.sessionId).trim() === toStr(config.sessionId).trim()) &&
-        (!config.adminAddress ||
-          toStr(readbackConfig.adminAddress).trim().toLowerCase() === toStr(config.adminAddress).trim().toLowerCase()) &&
-        (!expectedAuthorityMode ||
-          toStr(readbackConfig?.sessionModeProfile?.authority?.mode).trim() === expectedAuthorityMode) &&
+      if (Object.keys(readbackConfig).length === 0) return true;
+      if (!resumeUploadedWorker) return false;
+      // A pre-upgrade resumed worker can expose its older whole config while
+      // the one recovery write propagates. Retry only when immutable session
+      // identity still matches; foreign identity or authority fails closed.
+      return (
+        toStr(readbackConfig.slug).trim() === toStr(configWithWorkerUrl.slug).trim() &&
+        (!configWithWorkerUrl.sessionId ||
+          toStr(readbackConfig.sessionId).trim() === toStr(configWithWorkerUrl.sessionId).trim()) &&
+        (!configWithWorkerUrl.adminAddress ||
+          toStr(readbackConfig.adminAddress).trim().toLowerCase() ===
+            toStr(configWithWorkerUrl.adminAddress).trim().toLowerCase()) &&
         (!workerCanonicalRequested ||
-          workerAuthorityPoliciesMatch(config.workerAuthority, readbackConfig.workerAuthority))
+          workerAuthorityPoliciesMatch(configWithWorkerUrl.workerAuthority, readbackConfig.workerAuthority))
       );
-      return !!staleRevision || stagedConfigPending;
     };
-    let configReadback = await cfFetch(apiToken, configReadbackPath, { method: 'GET' }, cfFetchOptions);
-    for (const delayMs of FINAL_CONFIG_READBACK_RETRY_DELAYS_MS) {
-      if (readbackMatches(configReadback)) break;
-      // Retry only a classified transport/API failure, an older revision, or
-      // the exact staged pre-URL identity. Foreign same-revision identities
-      // remain fail-closed.
-      if (!readbackIsRetryable(configReadback)) break;
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-      configReadback = await cfFetch(apiToken, configReadbackPath, { method: 'GET' }, cfFetchOptions);
+    const readConfigWithRetry = async () => {
+      let result = await cfFetch(apiToken, configReadbackPath, { method: 'GET' }, cfFetchOptions);
+      for (const delayMs of FINAL_CONFIG_READBACK_RETRY_DELAYS_MS) {
+        if (readbackMatches(result)) break;
+        // Retry only a classified transport/API failure, an older revision, or
+        // the exact staged pre-URL identity. Foreign same-revision identities
+        // remain fail-closed.
+        if (!readbackIsRetryable(result)) break;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        result = await cfFetch(apiToken, configReadbackPath, { method: 'GET' }, cfFetchOptions);
+      }
+      return result;
+    };
+
+    let configReadback = await readConfigWithRetry();
+    if (resumeUploadedWorker && !readbackMatches(configReadback)) {
+      const readbackConfig = configReadback?.data?.result || configReadback?.data || {};
+      const canUpdateKnownOlderConfig = configReadback?.ok &&
+        Object.keys(readbackConfig).length > 0 &&
+        readbackIsRetryable(configReadback);
+      if (canUpdateKnownOlderConfig) {
+        // Only an observed, identity-compatible older config is rewritten.
+        // Empty/error reads remain pending, which avoids a rapid same-key write
+        // after a prior invocation whose successful PUT is still propagating.
+        const configUpdate = await cfFetch(apiToken, configReadbackPath, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(configWithWorkerUrl),
+        }, cfFetchOptions);
+        if (!configUpdate.ok) {
+          return buildDeploymentFailure(502, {
+            error: configUpdate.error || 'Failed to persist the final worker config.',
+            detail: configUpdate.detail,
+            orphanResources: {
+              kvNamespaceId: kvId,
+              kvCleanupStatus: 'retained-pre-existing',
+              workerName,
+              workerCleanupStatus: 'retained-pre-existing',
+            },
+            deploymentRequestPending: shouldAllowFallbackForCloudflareFailure(configUpdate),
+          }, {
+            fallbackEligible: shouldAllowFallbackForCloudflareFailure(configUpdate),
+          });
+        }
+        configReadback = await readConfigWithRetry();
+      }
     }
     const verified = readbackMatches(configReadback);
     if (!verified) {
-      const orphanResources = await cleanupDeploymentResources();
+      const propagationPending = readbackIsRetryable(configReadback);
+      const orphanResources = propagationPending
+        ? {
+            kvNamespaceId: kvId,
+            kvCleanupStatus: 'retained-config-propagation-pending',
+            workerName,
+            workerCleanupStatus: 'retained-config-propagation-pending',
+          }
+        : await cleanupDeploymentResources();
       return buildDeploymentFailure(502, {
         error: 'Worker config verification failed after deployment.',
         orphanResources,
+        ...(propagationPending ? { deploymentRequestPending: true } : {}),
       }, {
-        fallbackEligible: readbackIsRetryable(configReadback),
+        fallbackEligible: propagationPending,
       });
     }
     deploymentPayload.configVerified = true;
@@ -2040,12 +2184,12 @@ const executeDeployHelperRequestCore = async ({
           fallbackEligible: shouldAllowFallbackForCloudflareFailure(envelopeKekResp),
         });
       }
+      envelopeKekSecretSet = true;
+      deploymentPayload.envelopeKekSecretSet = true;
     }
-    envelopeKekSecretSet = true;
-    deploymentPayload.envelopeKekSecretSet = true;
   }
 
-  if (!deploymentPayload.tokenSecretSet) {
+  if (!deploymentPayload.tokenSecretSet && !deploymentPayload.tokenSecretPreserved) {
     const secretResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -2078,6 +2222,56 @@ export const executeDeployHelperRequest = async (options = {}) => {
   if (!context) {
     return buildFailure(400, {
       error: 'deploymentRequestId must contain 8-128 safe identifier characters.',
+    });
+  }
+  const coordinatedRequestDigest = toStr(options?.coordinatedRequestDigest).trim().toLowerCase();
+  if (options?.coordinationBypass === true && /^[0-9a-f]{64}$/.test(coordinatedRequestDigest)) {
+    // Direct stable-ID requests are already serialized and bound to immutable
+    // identity plus the token-derived account by the Durable Object. Use that
+    // non-secret identity digest for the inner recovery journal so rotating a
+    // token or editing mutable config cannot strand an otherwise safe retry.
+    context.requestDigest = coordinatedRequestDigest;
+  }
+  if (options?.coordinationBypass !== true) {
+    const coordinator = options?.env?.CE_SESSION_COORDINATOR;
+    if (!coordinator?.idFromName || !coordinator?.get) {
+      return buildFailure(503, {
+        error: 'CE_SESSION_COORDINATOR is required for stable deployment requests; no Cloudflare mutation was attempted.',
+        deploymentRequestPending: true,
+      }, { fallbackEligible: true });
+    }
+    const coordinatorName = await sha256Hex(`direct-deploy:${context.deploymentId}`);
+    const stub = coordinator.get(coordinator.idFromName(coordinatorName));
+    let response;
+    try {
+      response = await stub.fetch('https://session-coordinator.internal/deploy-helper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestDigest: context.requestDigest,
+          immutableIdentityDigest: context.immutableIdentityDigest,
+          deployBody: options.body,
+          requestOrigin: options.requestOrigin || '',
+          sensitiveValues: collectKnownRequestCredentials(options.body),
+        }),
+      });
+    } catch {
+      return buildFailure(503, {
+        error: 'Deployment coordination was interrupted; retry the same request.',
+        deploymentRequestPending: true,
+      }, { fallbackEligible: true });
+    }
+    const result = await response.json().catch(() => ({}));
+    if (isObj(result?.body) && Number(result?.status || 0)) {
+      return {
+        ok: result.ok === true,
+        status: Number(result.status),
+        body: result.body,
+        fallbackEligible: result.fallbackEligible === true,
+      };
+    }
+    return buildFailure(Number(response.status || 0) || 502, isObj(result) ? result : {
+      error: 'Deployment coordinator returned an invalid response.',
     });
   }
   const journalBinding = resolveDeployJournalBinding(options?.env);
