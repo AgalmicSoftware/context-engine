@@ -133,6 +133,7 @@ orphans are reported for operator cleanup rather than deleted speculatively.
 - The checked-in deploy-helper source imports shared modules from `workers/shared/`. If you deploy outside Wrangler, bundle it first; do not paste raw `workers/deploy-helper/worker.js` into the Cloudflare dashboard as a standalone script.
 - `workers/deploy-helper/README.md` is the quick public reference for bindings, env vars, trust boundaries, and endpoint behavior.
 - Every newly deployed `sessionCorsWorker` now also ships with embedded deploy-helper capability enabled by default. Sponsored bootstrap deploys target the sponsoring `sessionCorsWorker` first, and that worker runs the same Cloudflare deploy core locally. Grant-backed sponsored deploys now require that embedded path and no longer fall back to a standalone helper URL.
+- New deployments bind `CE_SESSION_COORDINATOR` to the SQLite-backed `SessionWriteCoordinator` class. Sponsored deploy redemption chooses one request digest inside the per-grant Durable Object before any Cloudflare mutation; a concurrent different payload receives `409`, an identical in-flight payload receives retryable `503`, and a terminal safe receipt is replayed without running the helper again. A sponsoring worker created before this binding was introduced must be redeployed before it can redeem new deploy grants; redemption otherwise fails closed before a Cloudflare API call.
 - Operating modes:
   - CE-hosted: use the default `CLOUDFLARE_DEPLOY_HELPER_URL` (`https://ce-deploy-helper.agalmic.workers.dev/`) and let Context Engine operate the shared helper.
   - Self-hosted: deploy `workers/deploy-helper/worker.js` with your own Wrangler config (`wrangler.toml` or equivalent), bind `DEPLOY_HELPER_KV`, set `ALLOWED_ORIGINS`, and set `ADMIN_SECRET` with Wrangler secrets.
@@ -187,7 +188,7 @@ orphans are reported for operator cleanup rather than deleted speculatively.
   - `/new` can use that key during redemption/bootstrap to mint a fresh group / PKP / usage key for the new session
   - scoped runtime bundles keep using `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`
 - The manual `/new` Lit card now exposes only `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; scoped runtime identifiers stay worker-side and are derived during bootstrap or supplied through admin/sponsored-bundle paths.
-- The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry. A successful deploy replaces that credential-bearing record with a secret-free terminal receipt so a lost browser response can be replayed without deploying again.
+- The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry. The per-grant coordinator stores only the request digest, attempt state, and a credential-redacted safe result. A successful deploy replaces the credential-bearing KV grant record with a secret-free terminal receipt so a lost browser response can be replayed without deploying again.
 - The uploaded Arweave envelope is:
   - `type: "contextengine-sponsored-bundle"`
   - `version: 1`
@@ -448,7 +449,7 @@ R2/D1:
 - `CE_STORAGE_AUDIT_D1` (or `STORAGE_AUDIT_D1` / `DB`) for worker-envelope key-release audit events when the deployment wants a queryable audit table.
 - `CE_WORKER_GROUPS_D1` (optional) for queryable worker-native group records and membership rows. If absent, group storage can use the same D1 aliases as envelope audit; any D1 group store is preferred over KV.
 - D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
-- Durable Objects are for signer/runtime coordination only, not ordinary session payload blobs.
+- `CE_SESSION_COORDINATOR` binds the SQLite-backed `SessionWriteCoordinator` class for sponsored-deploy runtime coordination. One-click deploy metadata installs migration tag `ce-session-write-coordinator-v1`; a repeated upload retries without reapplying an already-installed migration. Durable Objects coordinate state transitions and do not store ordinary session payload blobs.
 
 Vars:
 - `TOKEN_HMAC_SECRET` (HMAC secret for session tokens)
