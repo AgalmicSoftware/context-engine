@@ -90,6 +90,66 @@ test('persona reports visibly identify the weights-only public-figure lens', asy
   assert.match(html, /data-benchmark-persona="ada-lovelace"/);
 });
 
+test('participant opinion groups use client-style hulls and pair connectors', async () => {
+  const questionBank = limitQuestionBank(
+    await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
+    1
+  );
+  const modelRoster = {
+    schemaVersion: 1,
+    models: ['a', 'b', 'c', 'd'].map((id) => ({
+      id: `model-${id}`,
+      label: `Model ${id.toUpperCase()}`,
+      model: `provider/model-${id}`,
+      provider: 'mock',
+      traits: {},
+    })),
+  };
+  const runsFile = {
+    schemaVersion: 1,
+    benchmarkId: questionBank.benchmarkId,
+    mode: 'self',
+    runs: modelRoster.models.map((model, index) => ({
+      modelId: model.id,
+      questionId: questionBank.questions[0].id,
+      polarity: 'canonical',
+      normalizedAnswer: index < 2 ? 'Agree' : 'Disagree',
+    })),
+  };
+  const report = buildResultsReport({ questionBank, modelRoster, runsFile });
+  report.participants.forEach((participant) => {
+    participant.coverage.eligibleForSimilarity = true;
+  });
+  report.polisReport.similarityMatrix = {
+    'model-a': { 'model-a': 1, 'model-b': 0.9, 'model-c': 0.5, 'model-d': 0.2 },
+    'model-b': { 'model-a': 0.9, 'model-b': 1, 'model-c': 0.3, 'model-d': 0.6 },
+    'model-c': { 'model-a': 0.5, 'model-b': 0.3, 'model-c': 1, 'model-d': 0.8 },
+    'model-d': { 'model-a': 0.2, 'model-b': 0.6, 'model-c': 0.8, 'model-d': 1 },
+  };
+  report.participantGraph.nodes = report.participants.map((participant) => ({
+    id: participant.id,
+    label: participant.label,
+    opinionGroup: 0,
+  }));
+
+  const hullHtml = renderHtmlReport(report);
+  assert.match(hullHtml, /<path\s+class="graph-outline graph-group-hull"/);
+  assert.match(hullHtml, /class="graph-outline graph-group-hull"[\s\S]*?d="M[^\"]+ L[^\"]+ Z"/);
+  assert.doesNotMatch(hullHtml, /<ellipse\s+class="graph-outline"/);
+  assert.match(hullHtml, /function buildParticipantGraphHull\(points\)/);
+  assert.match(hullHtml, /document\.createElementNS\('http:\/\/www\.w3\.org\/2000\/svg', 'path'\)/);
+
+  report.participantGraph.nodes = report.participantGraph.nodes.map((node, index) => ({
+    ...node,
+    opinionGroup: index < 2 ? 0 : index,
+  }));
+  const connectorHtml = renderHtmlReport(report);
+  assert.match(connectorHtml, /<line\s+class="graph-outline graph-group-connector"/);
+  assert.equal((connectorHtml.match(/class="graph-outline graph-group-connector"/g) || []).length, 1);
+  assert.doesNotMatch(connectorHtml, /<path\s+class="graph-outline graph-group-hull"/);
+  assert.match(connectorHtml, /document\.createElementNS\('http:\/\/www\.w3\.org\/2000\/svg', 'line'\)/);
+});
+
 test('report HTML keeps model-generated markup inert', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),

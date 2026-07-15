@@ -173,7 +173,9 @@ embedded report similarity matrix, updates participant colors and outlines,
 and shows model membership for the preview groups. `Auto` restores the
 canonical connected-component groups and their generated representative
 statements. Manual grouping changes only the visualization and never rewrites
-the embedded benchmark aggregates.
+the embedded benchmark aggregates. Group outlines use the same straight-edged
+convex hull as the live client for three or more participants. A two-participant
+group receives a single colored connector; a singleton has no outline.
 
 The standalone renderer uses these aggregates to draw a beeswarm-style chart:
 each question is positioned horizontally by model-to-model answer spread,

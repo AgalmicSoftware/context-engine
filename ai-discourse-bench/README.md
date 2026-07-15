@@ -377,7 +377,10 @@ using the same tooltip surface as statement-level chart hovers. Opinion-group he
 collapsed like the live report; Expand Clusters reveals representative
 statements with same-row box-plot comparisons against the other opinion groups,
 and the layer toggles control real statement, participant, cluster-outline,
-axis, and radial-axis SVG layers.
+axis, and radial-axis SVG layers. Like the live client, groups of three or more
+participants use a filled convex-hull outline whose straight edges connect the
+outer points; two-participant groups use a single colored connector and
+singletons remain unoutlined.
 The precomputed embedding uses classical multidimensional scaling over
 distributional answer similarity; models without enough shared-question
 coverage are separated instead of receiving an invented position. Opinion

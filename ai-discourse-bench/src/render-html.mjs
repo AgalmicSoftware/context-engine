@@ -1365,6 +1365,40 @@ const buildParticipantEmbedding = (report, width = 680, height = 430) => {
   });
 };
 
+const uniqueGraphPoints = (points) => Array.from(new Map(
+  points
+    .filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.y))
+    .map((point) => [`${point.x}:${point.y}`, { x: Number(point.x), y: Number(point.y) }])
+).values());
+
+const buildConvexHull = (points) => {
+  const sorted = uniqueGraphPoints(points).sort((left, right) => (
+    left.x - right.x || left.y - right.y
+  ));
+  if (sorted.length < 3) return null;
+
+  const cross = (origin, left, right) => (
+    (left.x - origin.x) * (right.y - origin.y)
+      - (left.y - origin.y) * (right.x - origin.x)
+  );
+  const lower = [];
+  for (const point of sorted) {
+    while (lower.length >= 2 && cross(lower.at(-2), lower.at(-1), point) <= 0) lower.pop();
+    lower.push(point);
+  }
+  const upper = [];
+  for (const point of [...sorted].reverse()) {
+    while (upper.length >= 2 && cross(upper.at(-2), upper.at(-1), point) <= 0) upper.pop();
+    upper.push(point);
+  }
+  const hull = lower.slice(0, -1).concat(upper.slice(0, -1));
+  return hull.length >= 3 ? hull : null;
+};
+
+const graphHullPath = (points) => points.map((point, index) => (
+  `${index === 0 ? 'M' : 'L'}${point.x.toFixed(2)},${point.y.toFixed(2)}`
+)).join(' ') + ' Z';
+
 const renderCollapsibleSection = ({
   id,
   title,
@@ -1630,26 +1664,31 @@ const renderParticipantGraph = (report) => {
     groups[cluster].push(node);
     return groups;
   }, {})).map(([cluster, nodes]) => {
-    if (nodes.length < 3) return '';
-    const xValues = nodes.map((node) => node.x).filter(Number.isFinite);
-    const yValues = nodes.map((node) => node.y).filter(Number.isFinite);
-    if (!xValues.length || !yValues.length) return '';
-    const minX = Math.min(...xValues);
-    const maxX = Math.max(...xValues);
-    const minY = Math.min(...yValues);
-    const maxY = Math.max(...yValues);
-    const cx = graphX((minX + maxX) / 2);
-    const cy = graphY((minY + maxY) / 2);
-    const rx = Math.max(18, (maxX - minX) / 2 + 24);
-    const ry = Math.max(18, (maxY - minY) / 2 + 24);
+    const points = uniqueGraphPoints(nodes.map((node) => ({
+      x: graphX(node.x),
+      y: graphY(node.y),
+    })));
+    if (points.length < 2) return '';
     const color = clusterColor(cluster);
-    return `<ellipse
-      class="graph-outline"
+    if (points.length === 2) {
+      return `<line
+      class="graph-outline graph-group-connector"
       data-ce-graph-cluster="${escapeHtml(cluster)}"
-      cx="${escapeHtml(cx.toFixed(2))}"
-      cy="${escapeHtml(cy.toFixed(2))}"
-      rx="${escapeHtml(rx.toFixed(2))}"
-      ry="${escapeHtml(ry.toFixed(2))}"
+      x1="${escapeHtml(points[0].x.toFixed(2))}"
+      y1="${escapeHtml(points[0].y.toFixed(2))}"
+      x2="${escapeHtml(points[1].x.toFixed(2))}"
+      y2="${escapeHtml(points[1].y.toFixed(2))}"
+      stroke="${escapeHtml(color)}"
+      stroke-opacity="0.7"
+      stroke-width="1"
+    />`;
+    }
+    const hull = buildConvexHull(points);
+    if (!hull) return '';
+    return `<path
+      class="graph-outline graph-group-hull"
+      data-ce-graph-cluster="${escapeHtml(cluster)}"
+      d="${escapeHtml(graphHullPath(hull))}"
       fill="${escapeHtml(color)}"
       fill-opacity="0.1"
       stroke="${escapeHtml(color)}"
@@ -4849,6 +4888,50 @@ export const renderHtmlReport = (report) => `<!doctype html>
         var title = point.querySelector('title');
         if (title) title.textContent = participantLabel + ': ' + clusterLabel;
       }
+      function uniqueParticipantGraphPoints(points) {
+        var seen = {};
+        return points.filter(function (point) {
+          if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return false;
+          var key = String(point.x) + ':' + String(point.y);
+          if (seen[key]) return false;
+          seen[key] = true;
+          return true;
+        });
+      }
+      function buildParticipantGraphHull(points) {
+        var sorted = uniqueParticipantGraphPoints(points).slice().sort(function (left, right) {
+          return left.x - right.x || left.y - right.y;
+        });
+        if (sorted.length < 3) return null;
+        function cross(origin, left, right) {
+          return (left.x - origin.x) * (right.y - origin.y)
+            - (left.y - origin.y) * (right.x - origin.x);
+        }
+        var lower = [];
+        sorted.forEach(function (point) {
+          while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0) {
+            lower.pop();
+          }
+          lower.push(point);
+        });
+        var upper = [];
+        sorted.slice().reverse().forEach(function (point) {
+          while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0) {
+            upper.pop();
+          }
+          upper.push(point);
+        });
+        var hull = lower.slice(0, -1).concat(upper.slice(0, -1));
+        return hull.length >= 3 ? hull : null;
+      }
+      function participantGraphHullPath(points) {
+        return points.map(function (point, index) {
+          return (index === 0 ? 'M' : 'L') + String(point.x) + ',' + String(point.y);
+        }).join(' ') + ' Z';
+      }
+      function setOpinionGroupOutlineVisibility(outline, outlineToggle) {
+        if (outlineToggle && !outlineToggle.checked) outline.setAttribute('hidden', '');
+      }
       function renderOpinionGroupOutlines() {
         if (!participantGraph) return;
         var outlineLayer = participantGraph.querySelector('.graph-outlines');
@@ -4867,31 +4950,37 @@ export const renderHtmlReport = (report) => `<!doctype html>
         });
         var outlineToggle = document.querySelector('[data-ce-graph-toggle="outline"]');
         Object.keys(groups).forEach(function (cluster) {
-          var points = groups[cluster].filter(function (point) {
-            return Number.isFinite(point.x) && Number.isFinite(point.y);
-          });
-          if (points.length < 3) return;
-          var xValues = points.map(function (point) { return point.x; });
-          var yValues = points.map(function (point) { return point.y; });
-          var minX = Math.min.apply(Math, xValues);
-          var maxX = Math.max.apply(Math, xValues);
-          var minY = Math.min.apply(Math, yValues);
-          var maxY = Math.max.apply(Math, yValues);
-          var ellipse = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
+          var points = uniqueParticipantGraphPoints(groups[cluster]);
+          if (points.length < 2) return;
           var color = opinionGroupColor(Number(cluster));
-          ellipse.setAttribute('class', 'graph-outline');
-          ellipse.setAttribute('data-ce-graph-cluster', cluster);
-          ellipse.setAttribute('cx', String((minX + maxX) / 2));
-          ellipse.setAttribute('cy', String((minY + maxY) / 2));
-          ellipse.setAttribute('rx', String(Math.max(18, (maxX - minX) / 2 + 24)));
-          ellipse.setAttribute('ry', String(Math.max(18, (maxY - minY) / 2 + 24)));
-          ellipse.setAttribute('fill', color);
-          ellipse.setAttribute('fill-opacity', '0.1');
-          ellipse.setAttribute('stroke', color);
-          ellipse.setAttribute('stroke-opacity', '0.7');
-          ellipse.setAttribute('stroke-width', '1');
-          if (outlineToggle && !outlineToggle.checked) ellipse.setAttribute('hidden', '');
-          outlineLayer.appendChild(ellipse);
+          if (points.length === 2) {
+            var connector = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            connector.setAttribute('class', 'graph-outline graph-group-connector');
+            connector.setAttribute('data-ce-graph-cluster', cluster);
+            connector.setAttribute('x1', String(points[0].x));
+            connector.setAttribute('y1', String(points[0].y));
+            connector.setAttribute('x2', String(points[1].x));
+            connector.setAttribute('y2', String(points[1].y));
+            connector.setAttribute('stroke', color);
+            connector.setAttribute('stroke-opacity', '0.7');
+            connector.setAttribute('stroke-width', '1');
+            setOpinionGroupOutlineVisibility(connector, outlineToggle);
+            outlineLayer.appendChild(connector);
+            return;
+          }
+          var hull = buildParticipantGraphHull(points);
+          if (!hull) return;
+          var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('class', 'graph-outline graph-group-hull');
+          path.setAttribute('data-ce-graph-cluster', cluster);
+          path.setAttribute('d', participantGraphHullPath(hull));
+          path.setAttribute('fill', color);
+          path.setAttribute('fill-opacity', '0.1');
+          path.setAttribute('stroke', color);
+          path.setAttribute('stroke-opacity', '0.7');
+          path.setAttribute('stroke-width', '1');
+          setOpinionGroupOutlineVisibility(path, outlineToggle);
+          outlineLayer.appendChild(path);
         });
       }
       function appendManualClusterLegendSection(clusterIndex, label, members, description) {
