@@ -1499,8 +1499,8 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   reports that KV; do not delete it until the live binding is recovered or
   independently verified.
 - Local Cloudflare E2E finalizers serialize only narrow KV-only,
-  prior-verified Worker-delete-failed, or verify-later ownership recovery
-  handoffs. The last form is emitted whenever account or Worker-settings
+  owned-delete-ready, prior-verified Worker-delete-failed, or verify-later
+  ownership recovery handoffs. The last form is emitted whenever account or Worker-settings
   ownership cannot be verified; transient reads use bounded retries first. It
   requires exact live deployment and KV binding markers before either resource
   is deleted. Each handoff contains a domain-separated HMAC-SHA256 proof made
@@ -1510,10 +1510,13 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   E2E runbook documents the stripped operator-only recovery command. Recovery
   re-derives the account before settings or delete calls and fails closed if the
   selected token now exposes a different account. The CLI atomically reserves a
-  distinct writable result before any Cloudflare request. An incomplete attempt
-  persists only a validated signed handoff, advanced to a successor when cleanup
-  state changes. That result is valid input for the next recovery invocation; a
-  final write failure leaves the preflight handoff reserved.
+  distinct writable result before any Cloudflare request, then persists a signed
+  owned-delete-ready checkpoint after exact settings proof and before its first
+  Worker DELETE. A failed checkpoint write issues no DELETE. An incomplete
+  attempt persists only a validated signed handoff, advanced to a successor when
+  cleanup state changes. That result is valid input for the next recovery
+  invocation; a crash or final write failure leaves the latest durable handoff
+  reserved.
 - Concurrent deploys with different request IDs may reuse the same requested
   prefix; each receives a distinct physical worker name and isolated KV
   namespace. Stable same-ID requests are serialized by
