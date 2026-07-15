@@ -20,7 +20,6 @@ import { isRouteResponderAddress } from '../../utilities/session/mainSiteUtils.j
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { normalizeSessionSlug } from '../../domains/sessions/sessionConfig.js';
 import { DEFAULT_SESSION_SLUG_ALIAS } from '../../variables/appConfig.js';
-import { getChainById } from '../../variables/chains.js';
 import {
   composeMainSiteAuthViewProps,
   composeMainSiteLoginViewProps,
@@ -45,7 +44,10 @@ import {
   resolveMainSiteSessionRouteSourceSlug,
 } from './routeSessionResolution.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
-import { resolveValidatedWorkerCanonicalLitProfile } from './litSessionConfig';
+import {
+  resolveExplicitWorkerSessionConfig,
+  resolveExplicitWorkerSessionNetwork,
+} from './workerCanonicalSessionRouteContext';
 import {
   renderWorkerCanonicalRouteBootstrap,
   renderWorkerCanonicalRouteError,
@@ -148,38 +150,6 @@ const hasMainSiteRegistryIdentity = (sessionConfig: unknown): boolean => {
     registry.sessionIdHex ||
     registry.metadataURI
   );
-};
-
-const resolveExplicitWorkerSessionConfig = ({
-  workerOrigin,
-  sessionConfig,
-}: {
-  workerOrigin: string;
-  sessionConfig: SessionConfigLike;
-}): SessionConfigLike => {
-  if (!workerOrigin) return sessionConfig;
-  const validatedLitProfile = resolveValidatedWorkerCanonicalLitProfile(sessionConfig.sessionModeProfile);
-  const chainId = Number(validatedLitProfile?.evm.registryChainId || 0);
-  if (!Number.isSafeInteger(chainId) || chainId <= 0) return sessionConfig;
-  if (Number(sessionConfig.networkChainId || 0) === chainId) return sessionConfig;
-  // The validated Lit profile drives both hook construction and downstream
-  // response-gate/mint consumers; never leave a stale top-level chain override.
-  return { ...sessionConfig, networkChainId: chainId };
-};
-
-const resolveExplicitWorkerSessionNetwork = ({
-  workerOrigin,
-  sessionConfig,
-  fallbackNetwork,
-}: {
-  workerOrigin: string;
-  sessionConfig: SessionConfigLike;
-  fallbackNetwork: MainSiteRouteNetwork;
-}): MainSiteRouteNetwork => {
-  if (!workerOrigin) return fallbackNetwork;
-  const chainId = Number(sessionConfig.networkChainId || 0);
-  if (!Number.isSafeInteger(chainId) || chainId <= 0) return null;
-  return getChainById(chainId) || { id: chainId, chainId };
 };
 
 export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) => ({
