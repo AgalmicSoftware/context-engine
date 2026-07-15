@@ -108,6 +108,16 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('ai-discourse-corpus', 'corpuses', '_local_helper.js'), 'local helper script\n');
     writeFile(sourceDir, path.join('.tmp-review', 'review.js'), 'temporary review snapshot\n');
     writeFile(sourceDir, 'private-pack.manifest.json', 'tracked root manifest that should be replaced\n');
+    writeFile(
+      sourceDir,
+      path.join('outreach-and-applications', 'applications', 'draft.md'),
+      'private opportunity and application state\n',
+    );
+    writeFile(
+      sourceDir,
+      path.join('grant-applications', 'legacy-draft.md'),
+      'legacy private application state\n',
+    );
     writeFile(sourceDir, path.join('TODO', 'secret.md'), 'private planning\n');
     writeFile(sourceDir, path.join('TODO', `${'PR'}${'D'}s`, '123_private-roadmap.md'), 'private roadmap\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'private companion surface\n');
@@ -221,6 +231,8 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'AGENTS.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'ai-discourse-corpus', 'corpuses', '_local_helper.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'outreach-and-applications')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'grant-applications')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO', `${'PR'}${'D'}s`)), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc')), false);

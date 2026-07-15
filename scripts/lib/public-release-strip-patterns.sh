@@ -28,6 +28,8 @@ EOF
 ce_public_release_strip_patterns() {
   cat <<'EOF'
 contextEngine-cc
+outreach-and-applications
+grant-applications
 client/public/skill.md
 TODO
 local-private-version
@@ -99,6 +101,8 @@ ce_public_release_strip_assert_absent_patterns() {
   cat <<'EOF'
 TODO
 contextEngine-cc
+outreach-and-applications
+grant-applications
 CLAUDE.md
 .claude
 .codex
