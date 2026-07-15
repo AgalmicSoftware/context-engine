@@ -346,11 +346,14 @@ describe('surveyToolTopLevelHelpers', () => {
     expect(
       resolveSurveyToolResultsModalCloseState({
         pathname: '/session/edge/questions/results',
+        search: '?worker=https%3A%2F%2Fworker.example.test&session=edge',
+        hash: '#responses',
         hasExternalCloseHandler: false,
       }),
     ).toEqual({
       shouldTrimResultsPath: true,
       nextPathname: '/session/edge',
+      nextUrl: '/session/edge?worker=https%3A%2F%2Fworker.example.test&session=edge#responses',
       shouldCallExternalCloseHandler: false,
     });
     expect(
@@ -361,6 +364,7 @@ describe('surveyToolTopLevelHelpers', () => {
     ).toEqual({
       shouldTrimResultsPath: true,
       nextPathname: '/ce/session/edge',
+      nextUrl: '/ce/session/edge',
       shouldCallExternalCloseHandler: false,
     });
     expect(
@@ -371,6 +375,7 @@ describe('surveyToolTopLevelHelpers', () => {
     ).toEqual({
       shouldTrimResultsPath: true,
       nextPathname: '/session/edge',
+      nextUrl: '/session/edge',
       shouldCallExternalCloseHandler: false,
     });
     expect(
@@ -381,6 +386,7 @@ describe('surveyToolTopLevelHelpers', () => {
     ).toEqual({
       shouldTrimResultsPath: true,
       nextPathname: '/session/edge',
+      nextUrl: '/session/edge',
       shouldCallExternalCloseHandler: false,
     });
     expect(
@@ -391,6 +397,20 @@ describe('surveyToolTopLevelHelpers', () => {
     ).toEqual({
       shouldTrimResultsPath: true,
       nextPathname: '/questions',
+      nextUrl: '/questions',
+      shouldCallExternalCloseHandler: false,
+    });
+    expect(
+      resolveSurveyToolResultsModalCloseState({
+        pathname: '/ce/questions/RESULTS/',
+        search: '?session=edge',
+        hash: '#summary',
+        hasExternalCloseHandler: false,
+      }),
+    ).toEqual({
+      shouldTrimResultsPath: true,
+      nextPathname: '/ce/questions',
+      nextUrl: '/ce/questions?session=edge#summary',
       shouldCallExternalCloseHandler: false,
     });
     expect(
@@ -401,6 +421,7 @@ describe('surveyToolTopLevelHelpers', () => {
     ).toEqual({
       shouldTrimResultsPath: false,
       nextPathname: '/session/edge/questions/results',
+      nextUrl: '/session/edge/questions/results',
       shouldCallExternalCloseHandler: true,
     });
   });

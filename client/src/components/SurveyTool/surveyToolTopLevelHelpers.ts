@@ -177,23 +177,33 @@ export const shouldBumpSurveyToolQuestionsCacheNonce = ({
 
 export const resolveSurveyToolResultsModalCloseState = ({
   pathname = '',
+  search = '',
+  hash = '',
   hasExternalCloseHandler = false,
 }: ResolveSurveyToolResultsModalCloseStateArgs = {}): SurveyToolResultsModalCloseState => {
+  // Query and fragment carry worker/session discovery identity; trimming only
+  // the results pathname must never discard that routing context.
   const currentPathname = typeof pathname === 'string' ? pathname : '';
+  const currentSearch = typeof search === 'string' ? search : '';
+  const currentHash = typeof hash === 'string' ? hash : '';
   const shouldCallExternalCloseHandler = !!hasExternalCloseHandler;
   const sessionQuestionsResultsMatch = !shouldCallExternalCloseHandler
     ? currentPathname.match(/^(.*\/session\/[^/]+)\/questions\/results\/?$/i)
     : null;
+  const genericResultsMatch = !shouldCallExternalCloseHandler ? currentPathname.match(/\/results\/?$/i) : null;
   const shouldTrimResultsPath =
-    !shouldCallExternalCloseHandler && (!!sessionQuestionsResultsMatch || currentPathname.endsWith('/results'));
+    !shouldCallExternalCloseHandler && (!!sessionQuestionsResultsMatch || !!genericResultsMatch);
+
+  const nextPathname = shouldTrimResultsPath
+    ? sessionQuestionsResultsMatch
+      ? sessionQuestionsResultsMatch[1]
+      : currentPathname.slice(0, genericResultsMatch?.index ?? currentPathname.length)
+    : currentPathname;
 
   return {
     shouldTrimResultsPath,
-    nextPathname: shouldTrimResultsPath
-      ? sessionQuestionsResultsMatch
-        ? sessionQuestionsResultsMatch[1]
-        : currentPathname.slice(0, currentPathname.length - '/results'.length)
-      : currentPathname,
+    nextPathname,
+    nextUrl: `${nextPathname}${currentSearch}${currentHash}`,
     shouldCallExternalCloseHandler,
   };
 };
@@ -254,11 +264,14 @@ type ShouldOpenSurveyToolResultsOnPropsChangeArgs = SurveyToolPropsChangeArgs & 
 };
 type ResolveSurveyToolResultsModalCloseStateArgs = {
   pathname?: unknown;
+  search?: unknown;
+  hash?: unknown;
   hasExternalCloseHandler?: unknown;
 };
 type SurveyToolResultsModalCloseState = {
   shouldTrimResultsPath: boolean;
   nextPathname: string;
+  nextUrl: string;
   shouldCallExternalCloseHandler: boolean;
 };
 type SurveyCacheNetworkBucket = {

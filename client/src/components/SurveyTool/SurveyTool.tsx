@@ -542,10 +542,12 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
     const hasExternalCloseHandler = typeof instance.props.onResultsModalClose === 'function';
     const closeState = resolveSurveyToolResultsModalCloseState({
       pathname: window.location.pathname,
+      search: window.location.search,
+      hash: window.location.hash,
       hasExternalCloseHandler,
     });
     if (closeState.shouldTrimResultsPath) {
-      window.history.pushState({}, '', closeState.nextPathname);
+      window.history.pushState({}, '', closeState.nextUrl);
     }
     instance.setState(buildSurveyToolResultsModalStatePatch({ open: false }));
     if (closeState.shouldCallExternalCloseHandler && typeof instance.props.onResultsModalClose === 'function') {
@@ -1116,10 +1118,12 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
     const hasExternalCloseHandler = typeof onClose === 'function';
     const closeState = resolveSurveyToolResultsModalCloseState({
       pathname: window.location.pathname,
+      search: window.location.search,
+      hash: window.location.hash,
       hasExternalCloseHandler,
     });
     if (closeState.shouldTrimResultsPath) {
-      window.history.pushState({}, '', closeState.nextPathname);
+      window.history.pushState({}, '', closeState.nextUrl);
     }
     setShowResultsModal(false);
     if (closeState.shouldCallExternalCloseHandler && typeof onClose === 'function') {
