@@ -256,4 +256,44 @@ describe('sessionWizardDeployErrors', () => {
       }),
     ).toBe(' Worker ownership could not be verified, so no worker deletion was attempted.');
   });
+
+  it.each([
+    {
+      label: 'an upload journal retry',
+      resources: {
+        workerName: '',
+        kvNamespaceId: 'kv-upload-pending',
+        kvCleanupStatus: 'retained-upload-pending',
+      },
+      expected:
+        ' KV namespace kv-upload-pending was retained for safe deployment retry. Retry normally so Context Engine can recover the same deployment. Do not delete the namespace while recovery is pending.',
+    },
+    {
+      label: 'a pre-existing recovered deployment',
+      resources: {
+        workerName: 'recovered-worker',
+        kvNamespaceId: 'kv-pre-existing',
+        kvCleanupStatus: 'retained-pre-existing',
+        workerCleanupStatus: 'retained-pre-existing',
+      },
+      expected:
+        ' The existing worker and deployment state were preserved. KV namespace kv-pre-existing belongs to the existing deployment and was retained. Retry normally or inspect its Worker binding in Cloudflare. Do not delete the namespace before ownership is verified.',
+    },
+    {
+      label: 'worker config propagation',
+      resources: {
+        workerName: 'propagating-worker',
+        kvNamespaceId: 'kv-config-propagation',
+        kvCleanupStatus: 'retained-config-propagation-pending',
+        workerCleanupStatus: 'retained-config-propagation-pending',
+      },
+      expected:
+        ' Worker config propagation is still pending; the deployment was preserved for recovery. KV namespace kv-config-propagation remains bound while worker config propagation completes. Retry normally so Context Engine can finish verification. Do not delete the namespace.',
+    },
+  ])('never advises deleting a retained deploy-helper namespace during $label', ({ resources, expected }) => {
+    const message = formatSessionWizardDeployOrphanResources(resources);
+
+    expect(message).toBe(expected);
+    expect(message).not.toContain('remove KV namespace');
+  });
 });

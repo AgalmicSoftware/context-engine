@@ -115,19 +115,49 @@ export const formatSessionWizardDeployBundleDiagnostics = (bundleDiagnostics: un
   return parts.join(' ');
 };
 
+const RETAINED_KV_CLEANUP_STATUSES = new Set([
+  'retained-live-worker',
+  'retained-upload-pending',
+  'retained-pre-existing',
+  'retained-config-propagation-pending',
+]);
+
+const WORKER_MAY_STILL_OWN_KV_STATUSES = new Set([
+  'preserved-existing',
+  'retained-pre-existing',
+  'retained-config-propagation-pending',
+  'ownership-changed',
+  'ownership-unverified',
+]);
+
+const buildRetainedKvGuidance = ({
+  kvNamespaceId,
+  kvCleanupStatus,
+}: {
+  kvNamespaceId: string;
+  kvCleanupStatus: string;
+}): string => {
+  if (kvCleanupStatus === 'retained-upload-pending') {
+    return ` KV namespace ${kvNamespaceId} was retained for safe deployment retry. Retry normally so Context Engine can recover the same deployment. Do not delete the namespace while recovery is pending.`;
+  }
+  if (kvCleanupStatus === 'retained-pre-existing') {
+    return ` KV namespace ${kvNamespaceId} belongs to the existing deployment and was retained. Retry normally or inspect its Worker binding in Cloudflare. Do not delete the namespace before ownership is verified.`;
+  }
+  if (kvCleanupStatus === 'retained-config-propagation-pending') {
+    return ` KV namespace ${kvNamespaceId} remains bound while worker config propagation completes. Retry normally so Context Engine can finish verification. Do not delete the namespace.`;
+  }
+  return ` KV namespace ${kvNamespaceId} was retained because it remains or may remain bound to the live worker. Do not delete it before recovery or ownership verification.`;
+};
+
 export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): string => {
   const resources = asDeployRecord(value);
   const workerName = toStr(resources?.workerName).trim();
   const kvNamespaceId = toStr(resources?.kvNamespaceId).trim();
   const kvCleanupStatus = toStr(resources?.kvCleanupStatus).trim();
   const workerCleanupStatus = toStr(resources?.workerCleanupStatus).trim();
-  const workerMayStillOwnKv = [
-    'preserved-existing',
-    'ownership-changed',
-    'ownership-unverified',
-  ].includes(workerCleanupStatus);
+  const workerMayStillOwnKv = WORKER_MAY_STILL_OWN_KV_STATUSES.has(workerCleanupStatus);
   const retainedKv = !!kvNamespaceId && (
-    kvCleanupStatus === 'retained-live-worker' || (!kvCleanupStatus && workerMayStillOwnKv)
+    RETAINED_KV_CLEANUP_STATUSES.has(kvCleanupStatus) || (!kvCleanupStatus && workerMayStillOwnKv)
   );
   const labels = [
     workerName && workerCleanupStatus === 'owned-delete-failed' ? `worker ${workerName}` : '',
@@ -139,13 +169,17 @@ export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): s
   const ownershipNote =
     workerCleanupStatus === 'preserved-existing'
       ? ' The pre-existing worker was preserved.'
-      : workerCleanupStatus === 'ownership-changed'
-        ? ' A newer or foreign worker deployment was detected and preserved.'
-        : workerCleanupStatus === 'ownership-unverified'
-          ? ' Worker ownership could not be verified, so no worker deletion was attempted.'
-          : '';
+      : workerCleanupStatus === 'retained-pre-existing'
+        ? ' The existing worker and deployment state were preserved.'
+        : workerCleanupStatus === 'retained-config-propagation-pending'
+          ? ' Worker config propagation is still pending; the deployment was preserved for recovery.'
+          : workerCleanupStatus === 'ownership-changed'
+            ? ' A newer or foreign worker deployment was detected and preserved.'
+            : workerCleanupStatus === 'ownership-unverified'
+              ? ' Worker ownership could not be verified, so no worker deletion was attempted.'
+              : '';
   const retainedKvNote = retainedKv
-    ? ` KV namespace ${kvNamespaceId} was retained because it remains or may remain bound to the live worker. Do not delete it before recovery or ownership verification.`
+    ? buildRetainedKvGuidance({ kvNamespaceId, kvCleanupStatus })
     : '';
   return `${cleanupInstruction}${ownershipNote}${retainedKvNote}`;
 };

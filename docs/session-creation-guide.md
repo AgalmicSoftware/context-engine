@@ -333,9 +333,13 @@ Common combinations:
 What happens during deploy:
 
 - The deploy-helper calls Cloudflare’s Workers API
-- For every fresh publish, it creates an isolated physical worker name by
-  appending a random deployment suffix to the requested display name. A retry
-  allocates another physical worker instead of overwriting an earlier one.
+- For every first-party publish, it creates an isolated physical worker name by
+  deriving a deterministic suffix from the publish generation's stable
+  `deploymentRequestId`. A retry after a lost or gateway-shaped response reuses
+  that ID and resumes or replays the same physical deployment instead of
+  allocating another worker. Starting an explicit new generation produces a
+  new deterministic identity; only legacy requests without an ID receive a
+  random suffix.
 - It fetches the account `workers.dev` subdomain and creates/changes it only when explicitly needed
 - It returns the final worker URL
 - The wizard auto-fills `corsWorkerUrl`
@@ -345,11 +349,12 @@ What happens during deploy:
   script still carries that deployment's ownership marker. It preserves
   pre-existing or ownership-ambiguous scripts and reports any orphaned resource.
 - The requested Worker name is always a readable prefix rather than an exact
-  physical script name. The random suffix is allocated before existence checks
-  or mutable Cloudflare operations, so independent deploy-helper isolates do not
-  race on a shared caller-chosen name. The helper still verifies its ownership
-  marker after upload and stops before hostname/secret activation if ownership
-  does not match.
+  physical script name. The suffix is derived before existence checks or
+  mutable Cloudflare operations: first-party callers with different request
+  generations receive different deterministic names, while legacy callers
+  without `deploymentRequestId` receive random names. The helper still verifies
+  its ownership marker after upload and stops before hostname/secret activation
+  if ownership does not match.
 
 What gets stored where:
 
