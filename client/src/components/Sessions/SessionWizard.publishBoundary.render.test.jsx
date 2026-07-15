@@ -35,7 +35,7 @@ const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test', over
     corsWorkerUrl: workerUrl,
     ...(overrides.draft || {}),
   };
-  localStorage.setItem(
+  sessionStorage.setItem(
     'ce:sessionWizardDraft:v1',
     JSON.stringify({
       ...overrides,
@@ -400,120 +400,6 @@ describe('SessionWizard publish boundary rendering', () => {
     });
   });
 
-  it('preserves pending SBT drafts when an invalid registry authorization profile blocks publication', async () => {
-    const customRegistryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
-    customRegistryProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    customRegistryProfile.authorization = { mechanisms: [] };
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        draft: {
-          sessionModeProfile: customRegistryProfile,
-          storageProfile: { backend: 'arweave' },
-        },
-      }),
-    );
-    renderLoggedInSessionWizard();
-    enableAdvancedMode();
-    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
-      target: { value: 'Deferred Group Registry Session' },
-    });
-    await chooseCustomWorkerWithoutDeploy();
-    await createPendingFeaturedDraft();
-
-    const publishButton = await openPublishSection();
-
-    expect(publishButton).toBeDisabled();
-    expect(screen.queryByLabelText('Advanced publish settings')).not.toBeInTheDocument();
-    expect(mockCreateSBT).not.toHaveBeenCalled();
-    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
-    expect(mockFetchSessionFromRegistry).not.toHaveBeenCalled();
-    expect(readSessionWizardPendingSbtDraftsCache()).toEqual([
-      expect.objectContaining({ predictedAddress: mockPendingSbtAddress }),
-    ]);
-    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
-  });
-
-  it('blocks the actual worker-canonical publish action after secret, provider, or profile requirement edits', async () => {
-    const originalFetch = global.fetch;
-    const workerUrl = 'https://requirement-proof-worker.example.test';
-    let persistedConfig = null;
-    global.fetch = jest.fn(async (url, init = {}) => {
-      const normalizedUrl = String(url);
-      if (normalizedUrl.endsWith('/deploy')) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            ok: true,
-            workerUrl,
-            configVerified: true,
-            writesSessionConfig: true,
-            writesSessionSecrets: true,
-          }),
-        };
-      }
-      if (normalizedUrl.endsWith('/admin/set-config')) {
-        persistedConfig = JSON.parse(String(init.body || '{}')).config;
-        return { ok: true, status: 200, json: async () => ({ ok: true }) };
-      }
-      if (normalizedUrl.endsWith('/session-config')) {
-        const { litCredentials: _privateLitDescriptor, ...publicConfig } = persistedConfig || {};
-        if (publicConfig.ai) publicConfig.ai = { models: publicConfig.ai.models };
-        return { ok: true, status: 200, json: async () => ({ config: publicConfig }) };
-      }
-      return { ok: true, status: 200, json: async () => ({ ok: true, nonce: 'wizard-admin-nonce' }) };
-    });
-
-    try {
-      renderLoggedInSessionWizard();
-      enableAdvancedMode();
-      const openAiKeyInput = await deployVerifiedCustomWorker({
-        sessionName: 'Requirement Proof Session',
-        sessionInfo: 'Verified custom worker requirement snapshot.',
-        openaiKey: 'sk-remotely-verified',
-      });
-      const configWritesAfterDeploy = global.fetch.mock.calls.filter(([url]) =>
-        String(url).endsWith('/admin/set-config'),
-      ).length;
-      const publishButton = await openPublishSection();
-      await waitFor(() => expect(publishButton).not.toBeDisabled());
-
-      fireEvent.change(openAiKeyInput, { target: { value: 'sk-locally-edited' } });
-      await waitFor(() => expect(publishButton).toBeDisabled());
-      fireEvent.click(publishButton);
-      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
-        configWritesAfterDeploy,
-      );
-
-      fireEvent.change(openAiKeyInput, { target: { value: 'sk-remotely-verified' } });
-      await waitFor(() => expect(publishButton).not.toBeDisabled());
-      fireEvent.click(screen.getByRole('button', { name: 'ai expand' }));
-      const fastModelGroup = screen.getByText('fast').parentElement?.parentElement;
-      const fastProviderSelect = within(fastModelGroup).getAllByRole('combobox')[1];
-      fireEvent.change(fastProviderSelect, { target: { value: 'anthropic' } });
-      await waitFor(() => expect(publishButton).toBeDisabled());
-
-      fireEvent.change(fastProviderSelect, { target: { value: 'openai' } });
-      await waitFor(() => expect(publishButton).not.toBeDisabled());
-      enableAdvancedMode();
-      const encryptionOptions = within(screen.getByRole('radiogroup', { name: /encryption/i }));
-      fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
-      await waitFor(() =>
-        expect(encryptionOptions.getByRole('radio', { name: 'Lit' })).toHaveAttribute('aria-checked', 'true'),
-      );
-      await waitFor(() => expect(publishButton).toBeDisabled());
-      fireEvent.click(publishButton);
-
-      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
-        configWritesAfterDeploy,
-      );
-      expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
-    } finally {
-      global.fetch = originalFetch;
-    }
-  });
-
   it('locks a completed worker-canonical session against a second publish to the same worker', async () => {
     const originalFetch = global.fetch;
     const workerUrl = 'https://single-session-worker.example.test';
@@ -545,6 +431,23 @@ describe('SessionWizard publish boundary rendering', () => {
       }
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
     });
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        sessionId: '0x00112233445566778899aabbccddeeff',
+        deployComplete: true,
+        deployWorkerUrl: workerUrl,
+        workerSecretsEnabled: false,
+        draft: {
+          slug: 'single-worker-session',
+          sessionName: 'Single Worker Session',
+          sessionInfo: 'One canonical session per worker.',
+          corsWorkerUrl: workerUrl,
+          storageProfile: { backend: 'cloudflare' },
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        },
+      }),
+    );
 
     try {
       const firstView = renderLoggedInSessionWizard();

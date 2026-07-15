@@ -7,6 +7,7 @@ import {
   mergeSponsoredBundleWorkerSecrets,
   normalizeWorkerSecrets,
   resolveSessionWizardEnabledWorkerSecrets,
+  resolveSessionWizardChipotleHookConfig,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
@@ -46,6 +47,64 @@ describe('sessionWizardWorkerSecretSupport', () => {
       litActionCid: 'bafy123',
     });
     expect(CHIPOTLE_LIT_CONFIG_FIELDS).toEqual(['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid']);
+  });
+
+  it('builds the Chipotle hook config only when the worker URL and required Lit fields are complete', () => {
+    expect(
+      resolveSessionWizardChipotleHookConfig({
+        resolvedWorkerUrl: ' https://worker.example.test/ ',
+        draft: { slug: ' My Session ', title: 'Example' },
+        workerSecrets: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: 'group_123',
+          litPkpId: 'pkp_123',
+          litActionCid: 'bafy123',
+          litAccountApiKey: 'must-not-be-copied',
+        },
+      }),
+    ).toEqual({
+      enabled: true,
+      workerUrl: 'https://worker.example.test',
+      sessionSlug: 'My Session',
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group_123',
+        litPkpId: 'pkp_123',
+        litActionCid: 'bafy123',
+      },
+      sessionConfig: {
+        slug: ' My Session ',
+        title: 'Example',
+        corsWorkerUrl: 'https://worker.example.test',
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: 'group_123',
+          litPkpId: 'pkp_123',
+          litActionCid: 'bafy123',
+        },
+      },
+    });
+
+    expect(
+      resolveSessionWizardChipotleHookConfig({
+        resolvedWorkerUrl: 'https://worker.example.test',
+        workerSecrets: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litPkpId: 'pkp_123',
+        },
+      }),
+    ).toBeNull();
+    expect(
+      resolveSessionWizardChipotleHookConfig({
+        workerSecretsEnabled: false,
+        resolvedWorkerUrl: 'https://worker.example.test',
+        workerSecrets: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litPkpId: 'pkp_123',
+          litActionCid: 'bafy123',
+        },
+      }),
+    ).toBeNull();
   });
 
   it('normalizes worker secrets and strips hidden scoped Chipotle fields when account authority is present', () => {

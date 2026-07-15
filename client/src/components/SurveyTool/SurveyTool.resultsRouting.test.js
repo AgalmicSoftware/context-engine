@@ -126,6 +126,39 @@ describe('SurveyTool results routing', () => {
       subject.closeResultsModal();
 
       expect(subject.setState).toHaveBeenCalledWith({ showResultsModal: false });
+      expect(window.location.pathname).toBe(resultsPath.startsWith('/ce/') ? '/ce/session/edge' : '/session/edge');
+      expect(window.location.search).toBe('?worker=https%3A%2F%2Fworker.example.test&session=edge');
+      expect(window.location.hash).toBe('#responses');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
+
+  it('preserves query and hash through the functional results close path', async () => {
+    const priorUrl = window.location.href;
+
+    try {
+      window.history.pushState(
+        {},
+        '',
+        '/ce/session/edge/questions/results?worker=https%3A%2F%2Fworker.example.test&session=edge#responses',
+      );
+      render(
+        <SurveyTool autoOpenResults={true} preventUrlChange={true} activeSessionSlug="edge" network={{ id: 84532 }} />,
+      );
+      const subject = new SurveyTool({
+        autoOpenResults: false,
+        preventUrlChange: true,
+      });
+
+      subject.setState = jest.fn((next) => {
+        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+        subject.state = { ...subject.state, ...(patch || {}) };
+      });
+
+      subject.closeResultsModal();
+
+      expect(subject.setState).toHaveBeenCalledWith({ showResultsModal: false });
       expect(window.location.pathname).toBe('/session/edge');
     } finally {
       window.history.replaceState({}, '', priorUrl);

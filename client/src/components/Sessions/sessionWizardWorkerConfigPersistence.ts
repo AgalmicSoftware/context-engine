@@ -43,7 +43,38 @@ export type VerifiedSessionWizardWorkerConfig = {
   publicConfig: UnknownRecord;
 };
 
-const DEFAULT_RETRY_DELAYS_MS = Object.freeze([100, 250, 500]);
+// Cloudflare KV may serve a stale or missing value for roughly a minute after a
+// successful write. Keep the default horizon production-realistic while tests
+// inject bounded zero/small delays through the existing port.
+const DEFAULT_RETRY_DELAYS_MS = Object.freeze([250, 500, 1_000, 2_000, 4_000, 8_000, 12_000, 16_000, 17_000]);
+const RETRYABLE_CONFIG_READ_STATUSES = new Set([404, 408, 425, 429]);
+const isRetryableConfigReadStatus = (status: number): boolean =>
+  RETRYABLE_CONFIG_READ_STATUSES.has(status) || (status >= 500 && status <= 599);
+const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
+const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
+  'slug',
+  'sessionId',
+  'sessionIdHex',
+  'configRevision',
+  'sessionName',
+  'sessionInfo',
+  'sessionHeaderImg',
+  'adminAddress',
+  'adminAddresses',
+  'corsWorkerUrl',
+  'allowOrigins',
+  'sessionModeProfile',
+  'workerAuthority',
+  'storageProfile',
+  'ai',
+  'limits',
+  'scopes',
+  'blockLimits',
+  'contracts',
+  'registryChainId',
+  'networkChainId',
+  'embeddedDeployHelperEnabled',
+]);
 const SESSION_ID_PATTERN = /^0x[0-9a-f]{32}$/;
 const ADDRESS_PATTERN = /^0x[0-9a-f]{40}$/;
 const REVISION_PATTERN = /^[a-z0-9._:-]{1,128}$/i;
@@ -134,6 +165,62 @@ const defaultRandomRevision = (): string => {
   const randomPart = Math.random().toString(36).slice(2);
   return `${Date.now().toString(36)}-${randomPart}`;
 };
+
+const buildExpectedPublicConfig = (config: UnknownRecord): UnknownRecord =>
+  PUBLIC_WORKER_CONFIG_FIELDS.reduce<UnknownRecord>((expected, key) => {
+    if (!Object.prototype.hasOwnProperty.call(config, key)) return expected;
+    if (key === 'ai') {
+      const ai =
+        config.ai && typeof config.ai === 'object' && !Array.isArray(config.ai) ? (config.ai as UnknownRecord) : {};
+      expected.ai = Object.prototype.hasOwnProperty.call(ai, 'models') ? { models: ai.models } : {};
+      return expected;
+    }
+    expected[key] = config[key];
+    return expected;
+  }, {});
+
+const verifyExpectedPublicConfigValue = (expected: unknown, actual: unknown, path: string): void => {
+  if (Array.isArray(expected)) {
+    if (!Array.isArray(actual) || actual.length !== expected.length) {
+      throw new Error(`Worker config verification failed: public config mismatch at "${path}".`);
+    }
+    expected.forEach((entry, index) => verifyExpectedPublicConfigValue(entry, actual[index], `${path}[${index}]`));
+    return;
+  }
+  if (expected && typeof expected === 'object') {
+    if (!actual || typeof actual !== 'object' || Array.isArray(actual)) {
+      throw new Error(`Worker config verification failed: public config mismatch at "${path}".`);
+    }
+    const expectedKeys = Object.keys(expected as UnknownRecord).sort();
+    const actualKeys = Object.keys(actual as UnknownRecord).sort();
+    if (expectedKeys.length !== actualKeys.length || expectedKeys.some((key, index) => key !== actualKeys[index])) {
+      throw new Error(`Worker config verification failed: public config mismatch at "${path}".`);
+    }
+    Object.entries(expected as UnknownRecord).forEach(([key, entry]) => {
+      verifyExpectedPublicConfigValue(entry, (actual as UnknownRecord)[key], `${path}.${key}`);
+    });
+    return;
+  }
+  if (!Object.is(expected, actual)) {
+    throw new Error(`Worker config verification failed: public config mismatch at "${path}".`);
+  }
+};
+
+const buildComparableActualPublicConfig = (config: UnknownRecord, revision: string): UnknownRecord => {
+  const comparableConfig = { ...config };
+  if (Object.prototype.hasOwnProperty.call(comparableConfig, WORKER_CANONICAL_PUBLICATION_REVISION_KEY)) {
+    if (toTrimmedString(comparableConfig[WORKER_CANONICAL_PUBLICATION_REVISION_KEY]) !== revision) {
+      throw new Error('Worker config verification failed: publication revision mismatch.');
+    }
+    delete comparableConfig[WORKER_CANONICAL_PUBLICATION_REVISION_KEY];
+  }
+  return comparableConfig;
+};
+
+const deriveConfigRevision = (value: UnknownRecord): string =>
+  `config:${sha256(
+    `context-engine:worker-canonical-publication:v1:${JSON.stringify(canonicalizeRevisionInput(value))}`,
+  ).toString()}`;
 
 const resolveConfigRevision = ({
   configRevision,
@@ -254,6 +341,7 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
     corsWorkerUrl: workerOrigin,
     configRevision: revision,
   };
+  const expectedPublicConfig = buildExpectedPublicConfig(configToPersist);
   const requestBody: SessionWizardWorkerConfigWriteBody = {
     sessionSlug: normalizedSlug,
     adminAddress: normalizedAdminAddress,
@@ -289,18 +377,31 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
     ? retryDelaysMs.map((delay) => Math.max(0, Number(delay) || 0))
     : [...DEFAULT_RETRY_DELAYS_MS];
   for (let attempt = 0; attempt <= delays.length; attempt += 1) {
-    const readResponse = await fetchImpl(`${workerOrigin}/session-config`, {
-      method: 'GET',
-      credentials: 'omit',
-      redirect: 'error',
-      headers: {
-        Accept: 'application/json',
-        'X-Session-Slug': normalizedSlug,
-      },
-    });
+    let readResponse: Response;
+    try {
+      readResponse = await fetchImpl(`${workerOrigin}/session-config`, {
+        method: 'GET',
+        credentials: 'omit',
+        redirect: 'error',
+        headers: {
+          Accept: 'application/json',
+          'X-Session-Slug': normalizedSlug,
+        },
+      });
+    } catch (error) {
+      if (attempt >= delays.length) throw error;
+      if (typeof sleep !== 'function') throw new Error('Worker config retry sleep port is unavailable.');
+      await sleep(delays[attempt]);
+      continue;
+    }
     if (!readResponse.ok) {
       const readBody = await readResponseJson(readResponse);
       const detail = readResponseError(readBody);
+      if (isRetryableConfigReadStatus(readResponse.status) && attempt < delays.length) {
+        if (typeof sleep !== 'function') throw new Error('Worker config retry sleep port is unavailable.');
+        await sleep(delays[attempt]);
+        continue;
+      }
       throw new Error(`Worker config read failed (${readResponse.status})${detail ? `: ${detail}` : '.'}`);
     }
 
@@ -314,6 +415,14 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
       environment,
     });
     if (toTrimmedString(verifiedPublicConfig.configRevision) === revision) {
+      // A revision alone proves only that some write claimed this identity. Verify
+      // every public field this publication expected so a partial/foreign merge
+      // cannot be reported as a successful canonical publication.
+      verifyExpectedPublicConfigValue(
+        expectedPublicConfig,
+        buildComparableActualPublicConfig(verifiedPublicConfig, revision),
+        'config',
+      );
       return {
         workerOrigin,
         configRevision: revision,

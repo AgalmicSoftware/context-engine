@@ -136,6 +136,12 @@ describe('sessionWizardPublishRuntimeController', () => {
 
   it('settles worker-canonical publication only after verified persistence and rotates the draft identity', async () => {
     const harness = createControllerHarness();
+    const preservedPendingSbtDrafts = [
+      {
+        predictedAddress: '0x00000000000000000000000000000000000000aa',
+        deployed: false,
+      },
+    ];
 
     await harness.controller.settleRegistration({
       publishExecutionPlan: {

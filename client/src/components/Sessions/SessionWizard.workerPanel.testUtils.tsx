@@ -362,7 +362,7 @@ const enableAdvancedMode = () => {
 };
 const readCachedSessionWizardDraft = () => {
   try {
-    const cached = JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+    const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
     return cached?.draft && typeof cached.draft === 'object' ? cached.draft : {};
   } catch (_) {
     return {};

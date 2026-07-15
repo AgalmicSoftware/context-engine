@@ -37,8 +37,8 @@ describe('SessionWizard pending SBT tab-memory rendering', () => {
     });
   });
 
-  it('does not restore cached pending SBT drafts from localStorage', async () => {
-    localStorage.setItem(
+  it('does not restore pending SBT drafts embedded in the main wizard cache', async () => {
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         pendingSbtDrafts: [

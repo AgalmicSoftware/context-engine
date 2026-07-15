@@ -3,6 +3,7 @@ import { normalizeSponsoredFieldSnapshot } from '../../utilities/session/sponsor
 import { toStr } from '../../utilities/shared/primitives.js';
 import { workerAuthPublishAdapter } from '../../domains/sessions/publish/sessionPublishAdapters.js';
 import { DEFAULT_GATE_KEYS } from './sessionWizardGateUtils';
+import { normalizeSessionWizardSlug } from './sessionWizardUrlSupport';
 import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
 
 export const CHIPOTLE_LIT_CONFIG_FIELDS = Object.freeze(['litApiBase', 'litGroupId', 'litPkpId', 'litActionCid']);
@@ -77,6 +78,41 @@ export const buildWorkerLitCredentialsConfig = (
     },
     {} as Record<string, string>,
   );
+
+export const resolveSessionWizardChipotleHookConfig = ({
+  workerSecretsEnabled = true,
+  workerSecrets = {},
+  resolvedWorkerUrl = '',
+  draft = null,
+}: {
+  workerSecretsEnabled?: boolean;
+  workerSecrets?: WorkerSecretsLike | AnyRecord;
+  resolvedWorkerUrl?: string;
+  draft?: AnyRecord | null;
+} = {}) => {
+  if (!workerSecretsEnabled) return null;
+  const litCredentials = buildWorkerLitCredentialsConfig(workerSecrets);
+  const normalizedWorkerUrl = workerAuthPublishAdapter.normalizeWorkerUrl(resolvedWorkerUrl);
+  if (
+    !normalizedWorkerUrl ||
+    !toStr(litCredentials?.litApiBase).trim() ||
+    !toStr(litCredentials?.litPkpId).trim() ||
+    !toStr(litCredentials?.litActionCid).trim()
+  ) {
+    return null;
+  }
+  return {
+    enabled: true,
+    workerUrl: normalizedWorkerUrl,
+    sessionSlug: normalizeSessionWizardSlug(draft?.slug || ''),
+    litCredentials,
+    sessionConfig: {
+      ...(draft && typeof draft === 'object' ? draft : {}),
+      corsWorkerUrl: normalizedWorkerUrl,
+      litCredentials,
+    },
+  };
+};
 
 export const sanitizeSessionWizardWorkerSecretsForLitMode = (
   value: WorkerSecretsLike | AnyRecord = {},

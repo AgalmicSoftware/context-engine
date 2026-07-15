@@ -258,6 +258,122 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     expect(onResolved).not.toHaveBeenCalled();
   });
 
+  it.each([500, 598])('retries a bounded HTTP %i bootstrap failure before resolving', async (status) => {
+    mockFetchBootstrap
+      .mockRejectedValueOnce(
+        new WorkerSessionBootstrapRequestError(`Worker bootstrap request failed with status ${status}.`, {
+          retryable: true,
+          status,
+        }),
+      )
+      .mockResolvedValueOnce(bootstrap);
+    const onResolved = jest.fn();
+
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        onResolved={onResolved}
+        retryDelaysMs={[0]}
+      />,
+    );
+
+    await waitFor(() => expect(onResolved).toHaveBeenCalledWith(bootstrap));
+    expect(mockFetchBootstrap).toHaveBeenCalledTimes(2);
+  });
+
+  it('still retries a bounded transient network failure before resolving', async () => {
+    mockFetchBootstrap.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(bootstrap);
+    const onResolved = jest.fn();
+
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        onResolved={onResolved}
+        retryDelaysMs={[0]}
+      />,
+    );
+
+    await waitFor(() => expect(onResolved).toHaveBeenCalledWith(bootstrap));
+    expect(mockFetchBootstrap).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers a semantic manual Retry after a nonstandard 5xx failure exhausts automatic retries', async () => {
+    mockFetchBootstrap
+      .mockRejectedValueOnce(
+        new WorkerSessionBootstrapRequestError('Worker bootstrap request failed with status 599.', {
+          retryable: true,
+          status: 599,
+        }),
+      )
+      .mockResolvedValueOnce(bootstrap);
+    const onResolved = jest.fn();
+
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        onResolved={onResolved}
+        retryDelaysMs={[]}
+      />,
+    );
+
+    const retry = await screen.findByRole('button', { name: 'Retry worker session' });
+    expect(screen.getByRole('alert')).toHaveTextContent('status 599');
+    await act(async () => retry.click());
+
+    await waitFor(() => expect(onResolved).toHaveBeenCalledWith(bootstrap));
+    expect(mockFetchBootstrap).toHaveBeenCalledTimes(2);
+  });
+
+  it('caps automatic retries before offering the manual Retry action', async () => {
+    mockFetchBootstrap.mockRejectedValue(
+      new WorkerSessionBootstrapRequestError('Worker is activating.', {
+        retryable: true,
+        status: 503,
+      }),
+    );
+
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        onResolved={jest.fn()}
+        retryDelaysMs={[0, 0, 0, 0]}
+      />,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Retry worker session' })).toBeInTheDocument();
+    expect(mockFetchBootstrap).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    [
+      'permanent HTTP authorization failure',
+      new WorkerSessionBootstrapRequestError('Worker bootstrap request failed with status 403.', {
+        retryable: false,
+        status: 403,
+      }),
+    ],
+    ['invalid canonical config', new Error('Worker bootstrap response slug does not match the requested session.')],
+  ])('does not retry or offer Retry for %s', async (_label, failure) => {
+    mockFetchBootstrap.mockRejectedValueOnce(failure);
+
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        onResolved={jest.fn()}
+        retryDelaysMs={[0, 0]}
+      />,
+    );
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(failure.message);
+    expect(screen.queryByRole('button', { name: 'Retry worker session' })).not.toBeInTheDocument();
+    expect(mockFetchBootstrap).toHaveBeenCalledTimes(1);
+  });
+
   it('aborts in-flight discovery on unmount and ignores later completion', async () => {
     const pendingBootstrap = deferred<typeof bootstrap>();
     mockFetchBootstrap.mockReturnValueOnce(pendingBootstrap.promise);

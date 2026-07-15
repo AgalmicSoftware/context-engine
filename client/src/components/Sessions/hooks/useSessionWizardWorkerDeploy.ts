@@ -369,6 +369,31 @@ const useSessionWizardWorkerDeploy = ({
           : allDeploySecrets;
         const deployBlockLimits = normalizeBlockLimitsForConfig(currentDraft?.blockLimits, runtime.latestChainBlock);
         const deployStorageProfile = buildDeployStorageProfilePayload(currentDraft, {});
+        const normalizedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
+          sponsoredBundleAppliedBundleRef?.current,
+        );
+        const sponsoredDeployGrantToken = toStr(normalizedSponsoredBundle?.deployGrantToken || '').trim();
+        const sponsoredBootstrapWorkerUrl = resolveSponsoredBundleBootstrapWorkerUrl(normalizedSponsoredBundle);
+        const usesSponsoredDeploy =
+          (forceSponsoredAutoDeploy || sponsoredAutoDeployReady) &&
+          !!sponsoredDeployGrantToken &&
+          !!sponsoredBootstrapWorkerUrl;
+        // Persist only a digest-keyed generation counter. The scope deliberately
+        // excludes tokens, secrets, and mutable config so an ambiguous response
+        // cannot become a second deployment merely because the draft was edited.
+        const deployAttemptIdentity = resolveSessionWizardDeployAttemptIdentity({
+          scope: {
+            slug,
+            sessionId: toStr(runtime.sessionIdHex || runtime.sessionId)
+              .trim()
+              .toLowerCase(),
+            workerName: toStr(currentDeployForm.workerName).trim().toLowerCase(),
+            adminAddress: resolvedAdmin.toLowerCase(),
+            deployTarget: usesSponsoredDeploy
+              ? sponsoredBootstrapWorkerUrl
+              : normalizeWorkerUrl(runtime.deployHelperUrl),
+          },
+        });
         const payload: AnyRecord = {
           workerName: currentDeployForm.workerName,
           sessionSlug: slug,
@@ -723,7 +748,9 @@ const useSessionWizardWorkerDeploy = ({
         let helperWritesSecrets = false;
         if (resolvedDeployWorkerUrl && runtime.workerSecretsEnabled && Object.keys(deploySecrets).length) {
           helperWritesSecrets =
-            data?.writesSessionSecrets === true || toStr(data?.sessionSecretsKey).startsWith('session:');
+            typeof data?.writesSessionSecrets === 'boolean'
+              ? data.writesSessionSecrets
+              : toStr(data?.sessionSecretsKey).startsWith('session:');
           secretsSyncStatus = await syncWorkerSecretsAfterDeploy({
             workerUrl: resolvedDeployWorkerUrl,
             account: resolvedAdmin,

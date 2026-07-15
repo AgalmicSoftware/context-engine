@@ -296,11 +296,6 @@ const AdminPageWorkerSecretsPanel = ({
             );
           })}
         </div>
-        {visibleCardKeys.length < ADMIN_SECRET_CARDS.length ? (
-          <div className={styles.statusNote}>
-            Chain, Arweave, faucet, and Lit secrets appear only when an enabled Advanced hybrid capability needs them.
-          </div>
-        ) : null}
         {canAdminWorker && workerSecretsDirty && (
           <Button
             color="primary"

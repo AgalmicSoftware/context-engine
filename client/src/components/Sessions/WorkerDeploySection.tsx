@@ -459,7 +459,13 @@ const WorkerDeploySection = ({
                 You must be logged into Cloudflare before using the prefilled API token link. Create the token, copy its
                 generated value, then paste it into the field above.
               </div>
-              <div className={styles.helperText}>Account is inferred from the API token during deploy.</div>
+              <div className={styles.helperText}>
+                Cloudflare may preselect All accounts. Before creating the token, restrict Account Resources to the one
+                account where this worker will run.
+              </div>
+              <div className={styles.helperText}>
+                Account is inferred during deploy only when the token can see exactly one account.
+              </div>
             </FormGroup>
             <FormGroup>
               <Label>Admin address</Label>

@@ -125,6 +125,7 @@ import {
   applyAdminMetadataDraft,
   buildAdminMetadataDraft,
   buildEditableSessionMetadataPayload,
+  buildWorkerCanonicalMetadataConfigPatch,
   parseChainIdInput,
   resolveAutoFeatureBySessionSlug,
   shouldShowInlineResourceSummary,
@@ -1118,74 +1119,12 @@ const AdminPage = ({
   );
 
   const postSignedAdminRequest = useCallback(
-    async ({
-      action = 'set-config',
-      body = {},
-      path,
-      chainId: chainIdOverride = null,
-      workerUrl: overrideWorkerUrl,
-      retryAttempts = ADMIN_ACTION_NONCE_RETRY_ATTEMPTS,
-    }: any = {}) => {
-      const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
-      if (!baseUrl) throw new Error('Worker URL is missing.');
-
-      let lastError: any = null;
-      for (let attempt = 1; attempt <= retryAttempts; attempt += 1) {
-        const auth = await signAdminAction({
-          action,
-          body,
-          chainId: chainIdOverride,
-          workerUrl: baseUrl,
-        });
-        let res;
-        try {
-          res = await fetch(`${baseUrl}${path}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...body, ...auth }),
-          });
-        } catch (error) {
-          throw new Error(
-            normalizeAdminWorkerFetchError({
-              error,
-              workerBase: baseUrl,
-            }),
-          );
-        }
-
-        const data = await res.json().catch(() => ({}));
-        if (res.ok) {
-          return { baseUrl, response: res, data };
-        }
-
-        const responseError = data?.error || '';
-        if (
-          attempt < retryAttempts &&
-          isRetryableAdminNonceFailure({
-            responseStatus: res.status,
-            responseError,
-          })
-        ) {
-          // A concurrent admin action may have consumed the previous nonce.
-          // Re-sign with a fresh nonce instead of surfacing a transient failure.
-          // eslint-disable-next-line no-await-in-loop
-          await sleep(250 * attempt);
-          continue;
-        }
-
-        lastError = new Error(
-          normalizeAdminWorkerFetchError({
-            error: responseError || `Request failed (${res.status}).`,
-            workerBase: baseUrl,
-            responseStatus: res.status,
-            responseError,
-          }),
-        );
-        throw lastError;
-      }
-
-      throw lastError || new Error(`Failed admin action: ${action}`);
-    },
+    (args: AdminSignedWorkerRequestArgs = {}) =>
+      postSignedAdminWorkerRequest({
+        ...args,
+        workerUrl: args.workerUrl || workerUrl || selectedConfigWorkerUrl,
+        signAdminAction,
+      }),
     [selectedConfigWorkerUrl, signAdminAction, workerUrl],
   );
 
@@ -1500,36 +1439,37 @@ const AdminPage = ({
       });
       setSaveStatus(`Worker secrets saved for ${sessionLabel}.`);
 
-      const registryChainId =
-        Number(
-          selectedConfig?.__registry?.registryChainId ||
-            selectedConfig?.__registry?.chainId ||
-            selectedConfig?.networkChainId ||
-            network?.id ||
-            0,
-        ) || 0;
-      const shouldPreserveSponsoredLit =
-        currentSponsoredLit &&
-        !clearedSecretKeys.has('litAccountApiKey') &&
-        !clearedSecretKeys.has('litUsageApiKey') &&
-        !Object.prototype.hasOwnProperty.call(secretsPayload, 'litAccountApiKey') &&
-        !Object.prototype.hasOwnProperty.call(secretsPayload, 'litUsageApiKey');
-      const sponsoredFields = adminSessionRegistryPorts.writes.buildRegistrySessionFields({
-        sponsoredFields: buildSponsoredSessionFlagFields({
-          secrets: secretsPayload,
-          fallbackFields: shouldPreserveSponsoredLit ? { sponsored_lit: '1' } : {},
-          includeCustomRpcInAi: true,
-        }),
-      });
-      setChainStatus('Updating sponsored flags on-chain…');
-      await setSessionFieldsOnChain({
-        providerLike: provider,
-        chainId: registryChainId,
-        slug,
-        fields: sponsoredFields,
-      });
-      setChainStatus('Sponsored flags updated.');
-      await loadSessions();
+      if (canAdminRegistry) {
+        const registryChainId =
+          Number(selectedConfig?.__registry?.registryChainId || selectedConfig?.__registry?.chainId || 0) || 0;
+        const shouldPreserveSponsoredLit =
+          currentSponsoredLit &&
+          !clearedSecretKeys.has('litAccountApiKey') &&
+          !clearedSecretKeys.has('litUsageApiKey') &&
+          !Object.prototype.hasOwnProperty.call(secretsPayload, 'litAccountApiKey') &&
+          !Object.prototype.hasOwnProperty.call(secretsPayload, 'litUsageApiKey');
+        const sponsoredFields = adminSessionRegistryPorts.writes.buildRegistrySessionFields({
+          sponsoredFields: buildSponsoredSessionFlagFields({
+            secrets: secretsPayload,
+            fallbackFields: shouldPreserveSponsoredLit ? { sponsored_lit: '1' } : {},
+            includeCustomRpcInAi: true,
+          }),
+        });
+        setChainStatus('Updating sponsored flags on-chain…');
+        await adminSessionRegistryPorts.writes.setSessionFieldsOnChain({
+          providerLike: provider,
+          chainId: registryChainId,
+          slug,
+          fields: sponsoredFields,
+        });
+        setChainStatus('Sponsored flags updated.');
+        await loadSessions();
+      }
+      if (savedPresenceTargetKey === secretPresenceTargetKeyRef.current) {
+        secretPresenceRequestRef.current += 1;
+        mergeStoredSecretPresenceFromPayload(secretsPayload);
+        setSecretPresenceMessage('Stored secret status updated from saved changes.');
+      }
       setClearedSecretKeys(new Set());
       setWorkerSecretsDirty(false);
     } catch (err: any) {
@@ -1612,7 +1552,7 @@ const AdminPage = ({
     setGateSyncResult(null);
     try {
       if (!selectedConfig) throw new Error('Select a session first.');
-      if (!canAdmin) throw new Error('Connect the admin wallet to update gates.');
+      if (!canAdminRegistry) throw new Error('Connect the registry admin wallet to update gates.');
       const registryChainId =
         Number(
           selectedConfig?.__registry?.registryChainId ||
@@ -1663,8 +1603,6 @@ const AdminPage = ({
 
   const { isWorkerCanonicalSession, workerAdminAddress, hasRegistryEntry, canAdminWorker, canAdminRegistry } =
     resolveAdminCapabilities({ account, sessionConfig: selectedConfig });
-  const { showAdminWorkerGroups, workerGroupsPanelTitle, workerGroupsPanelDescription } = adminCapabilityRoute;
-  const sessionRecoveryMessage = resolveAdminSessionRecoveryMessage({ sessionCapabilities, hasRegistryEntry });
   const baseWorkerUrl = normalizeWorkerUrl(workerUrl);
   const canRunTests = !!baseWorkerUrl && !!account;
   const canRunHealthTest = !!baseWorkerUrl && (defaultGateIsEmpty || walletReady);
@@ -1676,7 +1614,12 @@ const AdminPage = ({
     ? { ...selectedConfig, corsWorkerUrl: baseWorkerUrl || selectedConfigWorkerUrl || '' }
     : null;
   const ensureWorkerSessionConfig = useCallback(
-    async ({ sessionConfigOverride, action = 'set-config', workerUrl: workerUrlOverride }: any = {}) => {
+    async ({
+      sessionConfigOverride,
+      configPayloadOverride,
+      action = 'set-config',
+      workerUrl: workerUrlOverride,
+    }: any = {}) => {
       const sessionConfigForSync = sessionConfigOverride || selectedConfig;
       if (!sessionConfigForSync) throw new Error('Select a session first.');
       if (!account) {
@@ -1687,11 +1630,13 @@ const AdminPage = ({
       const baseUrl = normalizeWorkerUrl(workerUrlOverride || baseWorkerUrl || selectedConfigWorkerUrl);
       if (!baseUrl) throw new Error('Worker URL is missing.');
 
-      const configPayload = buildWorkerSessionConfigPayload({
-        sessionConfig: sessionConfigForSync,
-        account,
-        fallbackChainId: testChainId,
-      });
+      const configPayload = configPayloadOverride
+        ? { ...asAdminSessionConfig(configPayloadOverride) }
+        : buildWorkerSessionConfigPayload({
+            sessionConfig: sessionConfigForSync,
+            account,
+            fallbackChainId: testChainId,
+          });
       const requestBody = {
         sessionSlug: slug,
         adminAddress: configPayload.adminAddress || account,
@@ -1704,13 +1649,11 @@ const AdminPage = ({
         chainId: testChainId,
         workerUrl: baseUrl,
       });
+      const existingCachedConfig = getCachedSessionWorkerConfig({ slug, sessionConfig: selectedConfig }) || {};
       upsertCachedSessionWorkerConfig({
         slug,
         sessionConfig: selectedConfig,
-        config: {
-          ...configPayload,
-          corsWorkerUrl: baseUrl,
-        },
+        config: { ...existingCachedConfig, ...configPayload, corsWorkerUrl: baseUrl },
       });
       return { data, configPayload };
     },
@@ -2117,9 +2060,9 @@ const AdminPage = ({
     setMetadataUpdateStatus(canAdminRegistry ? 'Uploading updated metadata…' : 'Updating worker metadata…');
     try {
       if (!groupMetadata) throw new Error('Select a session first.');
-      if (!canAdmin) throw new Error('Connect the admin wallet to update session metadata.');
-      if (!relevantRegistryChainId) throw new Error('Registry chain id is missing.');
-      if (!metadataContractsReadyForSave) {
+      if (!canAdminWorker && !canAdminRegistry) throw new Error('Connect the admin wallet to update session metadata.');
+      if (canAdminRegistry && !relevantRegistryChainId) throw new Error('Registry chain id is missing.');
+      if (canAdminRegistry && !metadataContractsReadyForSave) {
         throw new Error(
           'Session metadata contracts are currently synthesized defaults. Verify or edit the contract addresses before saving.',
         );
@@ -2133,7 +2076,6 @@ const AdminPage = ({
         hasAutoFeatureOverride: metadataAutoFeatureTouched,
         advancedDraft: metadataConfigDraft,
         requireBlockLimits: canAdminRegistry,
-        includeChainFields: sessionCapabilities.usesChainMetadata,
       });
       const nextConfig = { ...selectedConfig, ...metadata };
       if (!canAdminRegistry) {
@@ -2141,7 +2083,6 @@ const AdminPage = ({
           metadata,
           slug: selectedSlug,
           adminAddress: workerAdminAddress,
-          includeChainFields: sessionCapabilities.usesChainMetadata,
         });
         await ensureWorkerSessionConfig({
           sessionConfigOverride: nextConfig,
@@ -2194,22 +2135,22 @@ const AdminPage = ({
         const metadataSyncWorkerUrl = normalizeWorkerUrl(
           getUsableSessionWorkerUrl({
             slug: selectedSlug,
-            sessionConfig: nextConfig,
+            sessionConfig: nextRegistryConfig,
             allowSharedFallback: true,
           }) ||
             baseWorkerUrl ||
             selectedConfigWorkerUrl,
         );
-        if (typeof fetch === 'function' && metadataSyncWorkerUrl) {
+        if (canAdminWorker && typeof fetch === 'function' && metadataSyncWorkerUrl) {
           setMetadataUpdateStatus('Syncing worker config…');
           await ensureWorkerSessionConfig({
-            sessionConfigOverride: nextConfig,
+            sessionConfigOverride: nextRegistryConfig,
             action: 'set-config',
             workerUrl: metadataSyncWorkerUrl,
           });
           workerSyncSuffix = ' Worker config synced.';
         } else {
-          workerSyncSuffix = ' Worker config sync skipped (worker URL missing).';
+          workerSyncSuffix = ' Worker config sync skipped (worker admin or worker URL unavailable).';
         }
       } catch (syncError: any) {
         workerSyncSuffix = ` Worker config sync failed: ${getErrorMessage(syncError, 'unknown error')}`;
@@ -2590,8 +2531,10 @@ const AdminPage = ({
               </div>
             )}
             {corsPatchStatus && <div className={styles.statusNote}>{corsPatchStatus}</div>}
-            {selectedConfig && sessionRecoveryMessage && (
-              <div className={styles.warningNote}>{sessionRecoveryMessage}</div>
+            {selectedConfig && !hasRegistryEntry && !isWorkerCanonicalSession && (
+              <div className={styles.warningNote}>
+                Session is not registered on-chain yet. Register in /new before using worker actions.
+              </div>
             )}
           </div>
         </div>
@@ -2697,377 +2640,36 @@ const AdminPage = ({
                   chain defaults. Verify them before publishing any metadata update.
                 </div>
               )}
-              {canAdmin && (
-                <div className={styles.metadataEditorCard}>
-                  <div className={styles.metadataEditorIntro}>
-                    Publish session defaults and curation metadata here. Block limits, faucet settings, contracts, and
-                    registry/RPC context are also synced to worker config when a worker URL is available.
-                  </div>
-                  <div className={styles.metadataSectionGrid}>
-                    <div className={styles.metadataSectionCard}>
-                      <div className={styles.panelSubtitle}>Session defaults</div>
-                      <div className={styles.metadataEditorGrid}>
-                        <FormGroup>
-                          <Label>Default tags</Label>
-                          <Input
-                            value={metadataConfigDraft.defaultTags}
-                            placeholder="ai, governance, survey"
-                            onChange={(e: any) => updateMetadataConfigDraft('defaultTags', e.target.value)}
-                          />
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Default SBT tags</Label>
-                          <Input
-                            value={metadataConfigDraft.defaultSbtTags}
-                            placeholder="member, contributor"
-                            onChange={(e: any) => updateMetadataConfigDraft('defaultSbtTags', e.target.value)}
-                          />
-                        </FormGroup>
-                      </div>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Question generation prompt</Label>
-                        <Input
-                          type="textarea"
-                          rows={4}
-                          value={metadataConfigDraft.questionsGenPrompt}
-                          placeholder="Optional prompt used when auto-generating questions"
-                          onChange={(e: any) => updateMetadataConfigDraft('questionsGenPrompt', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Default filter state</Label>
-                        <Input
-                          type="textarea"
-                          rows={4}
-                          value={metadataConfigDraft.defaultFilterState}
-                          placeholder='{"sort":"recent"} or tag=ai&sort=recent'
-                          onChange={(e: any) => updateMetadataConfigDraft('defaultFilterState', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup check className={styles.metadataToggle}>
-                        <Label check className={styles.metadataToggleLabel}>
-                          <Input
-                            type="checkbox"
-                            checked={metadataAutoFeatureDraft}
-                            onChange={(e: any) => {
-                              setMetadataDraftTouched(true);
-                              setMetadataAutoFeatureTouched(true);
-                              setMetadataAutoFeatureDraft(!!e.target.checked);
-                            }}
-                          />
-                          Auto-feature by session slug
-                        </Label>
-                      </FormGroup>
-                      <FormGroup className={styles.metadataSelectorGroup}>
-                        <Label>Default featured SBTs</Label>
-                        <SBTSelector
-                          id="admin-default-featured-sbts"
-                          label=""
-                          selectedSBTs={metadataConfigDraft.defaultFeaturedSBTs}
-                          onAddSBT={(sbt: any) => {
-                            updateMetadataConfigDraft(
-                              'defaultFeaturedSBTs',
-                              dedupeSbtSelections([...(metadataConfigDraft.defaultFeaturedSBTs || []), sbt]),
-                            );
-                          }}
-                          onRemoveSBT={(address: any) => {
-                            updateMetadataConfigDraft(
-                              'defaultFeaturedSBTs',
-                              dedupeSbtSelections(metadataConfigDraft.defaultFeaturedSBTs || []).filter(
-                                (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase(),
-                              ),
-                            );
-                          }}
-                          network={network}
-                          chainId={relevantSessionChainId || network?.id || null}
-                          sessionSlug={normalizeSlug(selectedSlug)}
-                          variant="admin"
-                          ensureLightSbtUniverse={ensureLightSbtUniverse}
-                          defaultFeaturedSBTs={(metadataConfigDraft.defaultFeaturedSBTs || []).map(
-                            (entry: any) => entry.address,
-                          )}
-                        />
-                      </FormGroup>
-                    </div>
-
-                    <div className={styles.metadataSectionCard}>
-                      <div className={styles.panelSubtitle}>AI defaults</div>
-                      <div className={styles.metadataEditorGrid}>
-                        <FormGroup>
-                          <Label>Fast provider</Label>
-                          <Input
-                            type="select"
-                            value={metadataConfigDraft.aiFastProvider}
-                            onChange={(e: any) => updateMetadataConfigDraft('aiFastProvider', e.target.value)}
-                          >
-                            {ADMIN_AI_PROVIDER_OPTIONS.map((option: any) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </Input>
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Fast model</Label>
-                          <Input
-                            value={metadataConfigDraft.aiFastModel}
-                            onChange={(e: any) => updateMetadataConfigDraft('aiFastModel', e.target.value)}
-                          />
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Thinking provider</Label>
-                          <Input
-                            type="select"
-                            value={metadataConfigDraft.aiThinkingProvider}
-                            onChange={(e: any) => updateMetadataConfigDraft('aiThinkingProvider', e.target.value)}
-                          >
-                            {ADMIN_AI_PROVIDER_OPTIONS.map((option: any) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </Input>
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Thinking model</Label>
-                          <Input
-                            value={metadataConfigDraft.aiThinkingModel}
-                            onChange={(e: any) => updateMetadataConfigDraft('aiThinkingModel', e.target.value)}
-                          />
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Transcription provider</Label>
-                          <Input
-                            type="select"
-                            value={metadataConfigDraft.aiTranscriptionProvider}
-                            onChange={(e: any) => updateMetadataConfigDraft('aiTranscriptionProvider', e.target.value)}
-                          >
-                            <option value="openai">OpenAI</option>
-                          </Input>
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Transcription model</Label>
-                          <Input
-                            value={metadataConfigDraft.aiTranscriptionModel}
-                            onChange={(e: any) => updateMetadataConfigDraft('aiTranscriptionModel', e.target.value)}
-                          />
-                        </FormGroup>
-                      </div>
-                    </div>
-
-                    <div className={styles.metadataSectionCard}>
-                      <div className={styles.panelSubtitle}>Runtime sync</div>
-                      <div className={styles.metadataEditorGrid}>
-                        <FormGroup>
-                          <Label>Start block</Label>
-                          <Input
-                            type="number"
-                            value={metadataBlockLimitsDraft.start}
-                            onChange={(e: any) => {
-                              setMetadataDraftTouched(true);
-                              setMetadataBlockLimitsDraft((prev) => ({
-                                ...(prev || {}),
-                                start: e.target.value,
-                              }));
-                            }}
-                          />
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>End block</Label>
-                          <Input
-                            type="number"
-                            value={metadataBlockLimitsDraft.end}
-                            placeholder="Optional"
-                            onChange={(e: any) => {
-                              setMetadataDraftTouched(true);
-                              setMetadataBlockLimitsDraft((prev) => ({
-                                ...(prev || {}),
-                                end: e.target.value,
-                              }));
-                            }}
-                          />
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Faucet amount (ETH)</Label>
-                          <Input
-                            value={metadataConfigDraft.faucetAmountEth}
-                            placeholder="0.0002"
-                            onChange={(e: any) => updateMetadataConfigDraft('faucetAmountEth', e.target.value)}
-                          />
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>Faucet threshold (ETH)</Label>
-                          <Input
-                            value={metadataConfigDraft.faucetBalanceThresholdEth}
-                            placeholder="0.001"
-                            onChange={(e: any) =>
-                              updateMetadataConfigDraft('faucetBalanceThresholdEth', e.target.value)
-                            }
-                          />
-                        </FormGroup>
-                      </div>
-                      {currentBlockSummary && <div className={styles.statusNote}>{currentBlockSummary}</div>}
-                      <Button
-                        size="sm"
-                        color="secondary"
-                        outline
-                        className={styles.actionButton}
-                        onClick={handleUseCurrentBlockForMetadata}
-                        disabled={metadataUpdateBusy || !metadataLatestBlock}
-                      >
-                        Use current block
-                      </Button>
-                    </div>
-
-                    <div className={styles.metadataSectionCard}>
-                      <div className={styles.panelSubtitle}>Contracts</div>
-                      <div className={styles.metadataEditorGrid}>
-                        <FormGroup>
-                          <Label>Surveys contract</Label>
-                          <Input
-                            value={metadataConfigDraft.contractSurveysAddress}
-                            placeholder="0x..."
-                            onChange={(e: any) => updateMetadataConfigDraft('contractSurveysAddress', e.target.value)}
-                          />
-                          <FormText color="muted">Chain: {relevantSessionChainLabel || 'Uses session chain'}</FormText>
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>SBT factory contract</Label>
-                          <Input
-                            value={metadataConfigDraft.contractSbtFactoryAddress}
-                            placeholder="0x..."
-                            onChange={(e: any) =>
-                              updateMetadataConfigDraft('contractSbtFactoryAddress', e.target.value)
-                            }
-                          />
-                          <FormText color="muted">Chain: {relevantSessionChainLabel || 'Uses session chain'}</FormText>
-                        </FormGroup>
-                        <FormGroup>
-                          <Label>SessionRegistry contract</Label>
-                          <Input
-                            value={metadataConfigDraft.contractSessionRegistryAddress}
-                            placeholder="0x..."
-                            onChange={(e: any) =>
-                              updateMetadataConfigDraft('contractSessionRegistryAddress', e.target.value)
-                            }
-                          />
-                          <FormText color="muted">
-                            Chain: {relevantRegistryChainLabel || relevantSessionChainLabel || 'Uses registry chain'}
-                          </FormText>
-                        </FormGroup>
-                      </div>
-                      {metadataContractsNeedVerification && metadataDefaultedEditableContractKeys.length > 0 && (
-                        <FormGroup check className={styles.metadataToggle}>
-                          <Label check className={styles.metadataToggleLabel}>
-                            <Input
-                              type="checkbox"
-                              checked={metadataContractsVerified}
-                              onChange={(e: any) => setMetadataContractsVerified(!!e.target.checked)}
-                            />
-                            I verified these fallback defaults and want to publish them if I save metadata
-                          </Label>
-                        </FormGroup>
-                      )}
-                      {metadataContractsNeedVerification && !metadataContractsReadyForSave && (
-                        <div className={styles.warningNote}>
-                          Saving is blocked until you verify or edit the synthesized contract addresses above.
-                        </div>
-                      )}
-                      {readonlyMetadataContracts.length ? (
-                        <div className={styles.metadataReadonlyGrid}>
-                          {readonlyMetadataContracts.map(([key, value]: any) => (
-                            <div key={key} className={styles.metadataReadonlyItem}>
-                              <span>{key}</span>
-                              <strong>{toStr(value?.address).trim() || '—'}</strong>
-                              <span>{toStr(value?.chainId).trim() || '—'}</span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                      {!visibleMetadataContracts.length && (
-                        <div className={styles.statusNote}>No contract metadata found for this session.</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className={styles.metadataSectionCard}>
-                    <div className={styles.panelSubtitle}>Curated lists</div>
-                    <div className={styles.metadataSectionGrid}>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Highlighted question IDs</Label>
-                        <Input
-                          type="textarea"
-                          rows={3}
-                          value={metadataConfigDraft.highlightedQuestionIds}
-                          placeholder="One question id per line"
-                          onChange={(e: any) => updateMetadataConfigDraft('highlightedQuestionIds', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Blocked question IDs</Label>
-                        <Input
-                          type="textarea"
-                          rows={3}
-                          value={metadataConfigDraft.blockedQuestionIds}
-                          placeholder="One question id per line"
-                          onChange={(e: any) => updateMetadataConfigDraft('blockedQuestionIds', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Highlighted survey IDs</Label>
-                        <Input
-                          type="textarea"
-                          rows={3}
-                          value={metadataConfigDraft.highlightedSurveyIds}
-                          placeholder="One survey id per line"
-                          onChange={(e: any) => updateMetadataConfigDraft('highlightedSurveyIds', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Blocked survey IDs</Label>
-                        <Input
-                          type="textarea"
-                          rows={3}
-                          value={metadataConfigDraft.blockedSurveyIds}
-                          placeholder="One survey id per line"
-                          onChange={(e: any) => updateMetadataConfigDraft('blockedSurveyIds', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Ignored SBT list</Label>
-                        <Input
-                          type="textarea"
-                          rows={3}
-                          value={metadataConfigDraft.ignoredSbtsList}
-                          placeholder="One SBT address per line"
-                          onChange={(e: any) => updateMetadataConfigDraft('ignoredSbtsList', e.target.value)}
-                        />
-                      </FormGroup>
-                      <FormGroup className={styles.metadataTextAreaGroup}>
-                        <Label>Featured SBT list</Label>
-                        <Input
-                          type="textarea"
-                          rows={3}
-                          value={metadataConfigDraft.featuredSbtsList}
-                          placeholder="One SBT address per line"
-                          onChange={(e: any) => updateMetadataConfigDraft('featuredSbtsList', e.target.value)}
-                        />
-                      </FormGroup>
-                    </div>
-                  </div>
-
-                  <div className={styles.metadataEditorActions}>
-                    <Button
-                      color="primary"
-                      className={styles.actionButton}
-                      onClick={handleSaveSessionMetadata}
-                      disabled={metadataUpdateBusy}
-                    >
-                      {metadataUpdateBusy ? 'Updating metadata…' : 'Update metadata'}
-                    </Button>
-                  </div>
-                  {metadataUpdateStatus && <div className={styles.statusNote}>{metadataUpdateStatus}</div>}
-                </div>
+              {(canAdminWorker || canAdminRegistry) && (
+                <AdminPageMetadataEditor
+                  metadataConfigDraft={metadataConfigDraft}
+                  updateMetadataConfigDraft={updateMetadataConfigDraft}
+                  metadataAutoFeatureDraft={metadataAutoFeatureDraft}
+                  setMetadataDraftTouched={setMetadataDraftTouched}
+                  setMetadataAutoFeatureTouched={setMetadataAutoFeatureTouched}
+                  setMetadataAutoFeatureDraft={setMetadataAutoFeatureDraft}
+                  network={network}
+                  relevantSessionChainId={relevantSessionChainId}
+                  relevantSessionChainLabel={relevantSessionChainLabel}
+                  relevantRegistryChainLabel={relevantRegistryChainLabel}
+                  selectedSlug={selectedSlug}
+                  ensureLightSbtUniverse={ensureLightSbtUniverse}
+                  metadataBlockLimitsDraft={metadataBlockLimitsDraft}
+                  setMetadataBlockLimitsDraft={setMetadataBlockLimitsDraft}
+                  currentBlockSummary={currentBlockSummary}
+                  handleUseCurrentBlockForMetadata={handleUseCurrentBlockForMetadata}
+                  metadataUpdateBusy={metadataUpdateBusy}
+                  metadataLatestBlock={metadataLatestBlock}
+                  metadataContractsNeedVerification={metadataContractsNeedVerification}
+                  metadataDefaultedEditableContractKeys={metadataDefaultedEditableContractKeys}
+                  metadataContractsVerified={metadataContractsVerified}
+                  setMetadataContractsVerified={setMetadataContractsVerified}
+                  metadataContractsReadyForSave={metadataContractsReadyForSave}
+                  readonlyMetadataContracts={readonlyMetadataContracts}
+                  visibleMetadataContracts={visibleMetadataContracts}
+                  handleSaveSessionMetadata={handleSaveSessionMetadata}
+                  metadataUpdateStatus={metadataUpdateStatus}
+                />
               )}
               <div className={styles.metadataJsonSection}>
                 <div className={styles.resultBoxLabel}>Raw metadata</div>
@@ -3214,7 +2816,7 @@ const AdminPage = ({
                 className={styles.actionButton}
                 onClick={handleSyncDefaultGate}
                 data-testid={E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON}
-                disabled={!canAdmin || gateSyncBusy}
+                disabled={!canAdminRegistry || gateSyncBusy}
                 style={{ opacity: gateConfigDirty ? 1 : 0.5 }}
               >
                 Update default gate on-chain
@@ -3229,180 +2831,35 @@ const AdminPage = ({
           )}
         </section>
 
-        <section className={`${styles.panel} ${styles.secretsPanel}`}>
-          <div className={styles.panelHeader}>
-            <div className={styles.panelTitleGroup}>
-              <div className={styles.panelTitleRow}>
-                <div className={styles.panelTitle}>Worker secrets</div>
-                {renderInfoTooltip(
-                  'admin-worker-secrets-tip',
-                  'Edit operator credentials without revealing what is already stored in the worker.',
-                )}
-              </div>
-            </div>
-            <Button
-              size="sm"
-              color="secondary"
-              outline
-              className={styles.collapseToggle}
-              onClick={() => toggleSection('workerSecrets')}
-              aria-label="Toggle Worker secrets section"
-            >
-              <FontAwesomeIcon icon={workerSecretsOpen ? faCaretUp : faCaretDown} />
-            </Button>
-          </div>
-          {workerSecretsOpen && (
-            <>
-              <div className={styles.secretStatusBar}>
-                <div className={styles.statusNote}>
-                  {secretPresenceMessage ||
-                    'Stored secret status not checked. Refresh to verify worker-managed secrets without revealing values.'}
-                </div>
-                <Button
-                  size="sm"
-                  color="secondary"
-                  outline
-                  className={styles.subtleActionButton}
-                  onClick={refreshSecretPresence}
-                  disabled={
-                    secretPresenceStatus === 'loading' ||
-                    !selectedConfig ||
-                    !normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl)
-                  }
-                >
-                  <FontAwesomeIcon icon={faSync} style={{ marginRight: 6 }} />
-                  {secretPresenceStatus === 'loading' ? 'Checking...' : 'Refresh secret status'}
-                </Button>
-              </div>
-              <div className={styles.secretOptionsGrid}>
-                {ADMIN_SECRET_CARDS.map((card: any) => {
-                  const isOpen = openSecretCards[card.key];
-                  const cardStatus = getAdminSecretCardStatus({
-                    fields: card.fields,
-                    secrets,
-                    clearedSecretKeys,
-                    storedSecretPresence,
-                    secretPresenceStatus,
-                    workerSecretsDirty,
-                  });
-                  return (
-                    <div
-                      key={card.key}
-                      className={`${styles.secretOptionCard}${isOpen ? ` ${styles.activeOption}` : ''}`}
-                    >
-                      <button
-                        type="button"
-                        className={styles.secretOptionHeader}
-                        aria-label={card.label}
-                        onClick={() => setOpenSecretCards((p) => ({ ...p, [card.key]: !p[card.key] }))}
-                        aria-expanded={isOpen}
-                      >
-                        <FontAwesomeIcon
-                          icon={cardStatus.iconLocked ? faLock : faLockOpen}
-                          style={{ opacity: cardStatus.iconLocked ? 0.9 : 0.4, marginRight: 8 }}
-                        />
-                        <span className={styles.secretOptionText}>
-                          <span>{card.label}</span>
-                          <span className={styles.secretOptionMeta}>{cardStatus.label}</span>
-                        </span>
-                        <FontAwesomeIcon icon={isOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 'auto' }} />
-                      </button>
-                      {isOpen && (
-                        <div className={styles.secretOptionBody}>
-                          {card.fields.map((fieldKey: any) => {
-                            const secretFieldKey = String(fieldKey);
-                            const inputType = getAdminSecretFieldInputType(secretFieldKey);
-                            const isTextarea = inputType === 'textarea';
-                            const label = getAdminSecretFieldLabel(secretFieldKey);
-                            return (
-                              <FormGroup key={secretFieldKey}>
-                                <Label>{label}</Label>
-                                <div
-                                  className={`${styles.secretInputRow}${isTextarea ? ` ${styles.secretInputRowMultiline}` : ''}`}
-                                >
-                                  <Input
-                                    type={inputType}
-                                    rows={getAdminSecretFieldRows(secretFieldKey)}
-                                    value={secrets[secretFieldKey]}
-                                    onChange={(e: any) => handleSecretChange(secretFieldKey, e.target.value)}
-                                    className={styles.secretInput}
-                                  />
-                                  <button
-                                    type="button"
-                                    className={`${styles.secretRemoveButton}${clearedSecretKeys.has(secretFieldKey) ? ` ${styles.secretRemoveButtonActive}` : ''}`}
-                                    onClick={() => handleClearSecret(secretFieldKey)}
-                                    title={`Clear ${label} on next save`}
-                                    aria-label={`Clear ${label}`}
-                                    data-testid={buildAdminSecretRemoveTestId(secretFieldKey)}
-                                  >
-                                    <FontAwesomeIcon icon={faTimes} />
-                                  </button>
-                                </div>
-                                <div className={styles.secretFieldStatus}>
-                                  {getAdminSecretFieldStatusLabel({
-                                    fieldKey: secretFieldKey,
-                                    secrets,
-                                    clearedSecretKeys,
-                                    storedSecretPresence,
-                                    secretPresenceStatus,
-                                    workerSecretsDirty,
-                                  })}
-                                </div>
-                                {secretFieldKey === 'litAccountApiKey' ? (
-                                  <div className={styles.warningNote}>
-                                    Anyone with this key can create new Lit groups, PKPs, usage keys, and actions inside
-                                    that bundle-owned Lit account. Use disposable per-bundle accounts instead of a
-                                    shared deployment account.
-                                  </div>
-                                ) : null}
-                              </FormGroup>
-                            );
-                          })}
-                          {card.key === 'arweave' &&
-                            renderInlineResourceSummary({
-                              key: 'arweave-resource',
-                              label: 'Arweave balance',
-                              resource: arweaveResource,
-                              onRefresh: refreshArweaveResource,
-                              refreshLabel: 'Refresh Arweave balance',
-                            })}
-                          {card.key === 'faucet' &&
-                            renderInlineResourceSummary({
-                              key: 'faucet-resource',
-                              label: 'Faucet balance',
-                              resource: faucetResource,
-                              onRefresh: refreshFaucetResource,
-                              refreshLabel: 'Refresh faucet balance',
-                            })}
-                          {card.key === 'lit' &&
-                            renderInlineResourceSummary({
-                              key: 'lit-resource',
-                              label: litResourceLabel,
-                              resource: litResource,
-                              onRefresh: () => refreshLitResource({ includeSignedStatus: true }),
-                              refreshLabel: 'Refresh Lit status',
-                            })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {canAdmin && workerSecretsDirty && (
-                <Button
-                  color="primary"
-                  className={styles.actionButton}
-                  onClick={handleSaveWorkerSecrets}
-                  disabled={!canAdmin}
-                >
-                  Save worker secrets
-                </Button>
-              )}
-              {saveStatus && <div className={styles.statusNote}>{saveStatus}</div>}
-              {chainStatus && <div className={styles.statusNote}>{chainStatus}</div>}
-            </>
-          )}
-        </section>
+        <AdminPageWorkerSecretsPanel
+          workerSecretsOpen={workerSecretsOpen}
+          onToggle={() => toggleSection('workerSecrets')}
+          canAdminWorker={canAdminWorker}
+          selectedConfig={selectedConfig}
+          workerUrl={workerUrl}
+          selectedConfigWorkerUrl={selectedConfigWorkerUrl}
+          secretPresenceMessage={secretPresenceMessage}
+          secretPresenceStatus={secretPresenceStatus}
+          refreshSecretPresence={refreshSecretPresence}
+          openSecretCards={openSecretCards}
+          setOpenSecretCards={setOpenSecretCards}
+          secrets={secrets}
+          clearedSecretKeys={clearedSecretKeys}
+          storedSecretPresence={storedSecretPresence}
+          workerSecretsDirty={workerSecretsDirty}
+          handleSecretChange={handleSecretChange}
+          handleClearSecret={handleClearSecret}
+          arweaveResource={arweaveResource}
+          faucetResource={faucetResource}
+          litResource={litResource}
+          litResourceLabel={litResourceLabel}
+          refreshArweaveResource={refreshArweaveResource}
+          refreshFaucetResource={refreshFaucetResource}
+          refreshLitResource={refreshLitResource}
+          handleSaveWorkerSecrets={handleSaveWorkerSecrets}
+          saveStatus={saveStatus}
+          chainStatus={chainStatus}
+        />
 
         {showTestsPanel && (
           <section className={`${styles.panel} ${styles.testsPanel}`}>

@@ -6,7 +6,7 @@ import { normalizeWorkerUrl as normalizeWorkerBaseUrl } from '../../utilities/wo
 type AdminCapabilitySessionConfig = {
   adminAddress?: unknown;
   __registry?: { registryChainId?: unknown; chainId?: unknown; adminAddress?: unknown } | null;
-  sessionModeProfile?: unknown;
+  sessionModeProfile?: { authority?: { mode?: unknown } | null } | null;
 };
 
 export const getErrorMessage = (error: unknown, fallback = 'Unknown error'): string => {
@@ -54,10 +54,9 @@ export const resolveAdminCapabilities = ({
   const accountLower = toStr(account).trim().toLowerCase();
   const workerAdminAddress = toStr(sessionConfig?.adminAddress).trim().toLowerCase();
   const registryAdminAddress = toStr(sessionConfig?.__registry?.adminAddress).trim().toLowerCase();
-  const capabilities = resolveSessionCapabilityProjection(sessionConfig);
-  const isWorkerCanonicalSession = capabilities.isWorkerCanonical;
+  const isWorkerCanonicalSession =
+    toStr(sessionConfig?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === 'worker_canonical';
   const hasRegistryEntry =
-    capabilities.isRegistryCanonical &&
     Number(sessionConfig?.__registry?.registryChainId || sessionConfig?.__registry?.chainId || 0) > 0;
   const isWorkerAdmin = !!accountLower && accountLower === workerAdminAddress;
   const isRegistryAdmin = !!accountLower && accountLower === registryAdminAddress;
@@ -67,8 +66,7 @@ export const resolveAdminCapabilities = ({
     isWorkerCanonicalSession,
     workerAdminAddress,
     hasRegistryEntry,
-    canAdminWorker:
-      !!sessionConfig && (capabilities.usesWorkerAuthority ? isWorkerAdmin : hasRegistryEntry && isRegistryAdmin),
+    canAdminWorker: !!sessionConfig && (isWorkerCanonicalSession ? isWorkerAdmin : hasRegistryEntry && isRegistryAdmin),
     canAdminRegistry: !!sessionConfig && hasRegistryEntry && isRegistryAdmin,
   };
 };

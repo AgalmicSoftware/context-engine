@@ -47,13 +47,7 @@ import {
   CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED,
   DEFAULT_CHAIN_ID,
 } from '../../variables/appConfig.js';
-import {
-  getChainById,
-  getChainBlockTimeMs,
-  getDefaultHttpRpc,
-  getSessionRegistryAddress,
-  getSessionRegistryChains,
-} from '../../variables/chains.js';
+import { getChainById, getDefaultHttpRpc, getSessionRegistryChains } from '../../variables/chains.js';
 import type { SessionConfig, UnknownRecord } from '../../utilities/session/sessionTypes.js';
 import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
@@ -214,11 +208,8 @@ import {
 } from './sessionWizardSponsoredBundleSupport';
 import { __test__resetSessionWizardSponsoredBundleCacheKey } from './sessionWizardSponsoredBundleCache';
 import {
-  CHIPOTLE_LIT_CONFIG_FIELDS,
-  DEFAULT_WORKER_SECRETS,
-  buildWorkerLitCredentialsConfig,
   getSessionWizardWorkerResourceKeys,
-  resolveSessionWizardEnabledWorkerSecrets,
+  resolveSessionWizardChipotleHookConfig,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
@@ -364,85 +355,6 @@ export {
   resolveFallbackRpcUrl,
   resolveSessionWizardWorkerRpcUrl,
 } from './sessionWizardWorkerRpc';
-
-type PublishedPendingSbtLink = {
-  address: string;
-  label: string;
-  href: string;
-};
-
-export const buildPublishedPendingSbtLinks = ({
-  deployedDrafts = [],
-  pendingDraftSnapshot = [],
-  sessionSlug = '',
-}: {
-  deployedDrafts?: unknown[];
-  pendingDraftSnapshot?: unknown[];
-  sessionSlug?: string;
-} = {}): PublishedPendingSbtLink[] => {
-  const normalizedDeployedDrafts = normalizePendingSbtDrafts(deployedDrafts);
-  const newlyDeployedAddressSet = new Set(
-    normalizedDeployedDrafts
-      .map((entry) => toStr(entry?.predictedAddress || entry?.deployedAddress || entry?.address).trim().toLowerCase())
-      .filter(Boolean)
-  );
-  const finalizedDrafts = normalizePendingSbtDrafts([
-    ...normalizedDeployedDrafts,
-    ...normalizePendingSbtDrafts(pendingDraftSnapshot).filter((entry) => (
-      entry?.deployed === true &&
-      !newlyDeployedAddressSet.has(
-        toStr(entry?.predictedAddress || entry?.deployedAddress || entry?.address).trim().toLowerCase()
-      )
-    )),
-  ]);
-
-  return finalizedDrafts
-    .map((entry: PendingSbtDraft) => {
-      const address = toStr(entry?.deployedAddress || entry?.predictedAddress || entry?.address).trim();
-      if (!address) return null;
-      return {
-        address,
-        label: toStr(entry?.displayName || entry?.name || address).trim() || address,
-        href: buildSbtDetailPath(address, sessionSlug),
-      };
-    })
-    .filter((entry): entry is PublishedPendingSbtLink => !!entry && entry.href !== '#');
-};
-
-export const resolveSessionWizardChipotleHookConfig = ({
-  workerSecretsEnabled = true,
-  workerSecrets = {},
-  resolvedWorkerUrl = '',
-  draft = null,
-}: {
-  workerSecretsEnabled?: boolean;
-  workerSecrets?: WorkerSecretsLike | UnknownRecord;
-  resolvedWorkerUrl?: string;
-  draft?: UnknownRecord | null;
-} = {}) => {
-  if (!workerSecretsEnabled) return null;
-  const litCredentials = buildWorkerLitCredentialsConfig(workerSecrets);
-  const normalizedWorkerUrl = normalizeWorkerAuthUrl(resolvedWorkerUrl);
-  if (
-    !normalizedWorkerUrl ||
-    !toStr(litCredentials?.litApiBase).trim() ||
-    !toStr(litCredentials?.litPkpId).trim() ||
-    !toStr(litCredentials?.litActionCid).trim()
-  ) {
-    return null;
-  }
-  return {
-    enabled: true,
-    workerUrl: normalizedWorkerUrl,
-    sessionSlug: normalizeSlug(draft?.slug || ''),
-    litCredentials,
-    sessionConfig: {
-      ...(draft && typeof draft === 'object' ? draft : {}),
-      corsWorkerUrl: normalizedWorkerUrl,
-      litCredentials,
-    },
-  };
-};
 
 type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
   accountId?: string;
@@ -592,6 +504,7 @@ const SessionWizard = ({
     typeof window === 'undefined' || !window.location ? '' : window.location.pathname;
   const isNewSessionWizardRoute = isNewSessionWizardPathname(currentSessionWizardPathname);
   const cachedWizard = useMemo(() => readSessionWizardCache(), []);
+  const wizardCacheSnapshotRef = useRef<unknown>(cachedWizard);
   const cachedDraftHasEmbeddedDeployHelperEnabled =
     typeof cachedWizard?.draft?.embeddedDeployHelperEnabled === 'boolean';
   const sourceEmbeddedDeployHelperDefault = useMemo(() => {
@@ -729,8 +642,7 @@ const SessionWizard = ({
     isReservedSlug: isReservedSessionSlug,
     sessionExists: checkSessionSlugExists,
   });
-  const initialGateRef = useRef(initialGates[0]);
-  const [encryptionGates, setEncryptionGates] = useState(() => initialGates);
+  const [encryptionGates, setEncryptionGates] = useState<EncryptionGateState[]>(() => cachedInitialState.initialGates);
   // Pending SBT drafts carry deploy secrets and claim codes, so keep them out
   // of localStorage while still surviving same-tab refreshes via sessionStorage.
   const { pendingSbtDrafts, setPendingSbtDrafts, normalizedPendingSbtDrafts, hasUndeployedPendingSbtDrafts } =
@@ -1201,99 +1113,33 @@ const SessionWizard = ({
   }, []);
 
   useEffect(() => {
-    const desiredChain = Number(initialRegistryChainId || 0) || null;
-    if (!desiredChain) return;
-    // For now we assume session chain === registry chain; if this diverges, split these values.
-    setRegistryChainId((prev) => (Number(prev || 0) === desiredChain ? prev : desiredChain));
-  }, [initialRegistryChainId]);
-
-  useEffect(() => {
-    const raw = toStr(initialSessionId).trim();
-    if (!raw) return;
-    const parsedSessionId = sessionRegistryUtils.formatSessionId(raw);
-    if (parsedSessionId) {
-      setSessionId(parsedSessionId);
-      return;
-    }
-    const desiredSlug = normalizeSlug(raw);
-    setDraft((prev) => {
-      if (toStr(prev.slug).trim()) return prev;
-      const next = deepClone(prev);
-      next.slug = desiredSlug;
-      return next;
-    });
-  }, [initialSessionId]);
-
-  useEffect(() => {
-    if (slugPinnedByPendingSbtDrafts) return;
-    if (!privateSlugMode) return;
-    const desiredSlug = sessionRegistryUtils.formatSessionId(sessionId) || toStr(sessionId).trim();
-    if (!desiredSlug) return;
-    setDraft((prev) => {
-      if (toStr(prev.slug).trim() === desiredSlug) return prev;
-      const next = deepClone(prev);
-      next.slug = desiredSlug;
-      return next;
-    });
-  }, [privateSlugMode, sessionId, slugPinnedByPendingSbtDrafts]);
-
-  // Auto-generate slug from sessionName when not in private URL mode.
-  useEffect(() => {
-    if (slugPinnedByPendingSbtDrafts) return;
-    if (privateSlugMode) return;
-    const name = toStr(draft?.sessionName).trim();
-    if (!name) return;
-    const autoSlug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').slice(0, 48);
-    if (!autoSlug) return;
-    const currentSlug = toStr(draft?.slug).trim();
-    if (currentSlug && currentSlug === lastManualSlugRef.current && currentSlug !== autoSlug) return;
-    if (autoSlug === toStr(draft?.slug).trim()) return;
-    setDraft((prev) => {
-      const next = deepClone(prev);
-      next.slug = autoSlug;
-      return next;
-    });
-  }, [draft?.sessionName, draft?.slug, privateSlugMode, slugPinnedByPendingSbtDrafts]);
-
-  useEffect(() => {
-    const prev = lastHasPrivateSbtNameRef.current;
-    lastHasPrivateSbtNameRef.current = hasPrivateSbtName;
-    if (!hasPrivateSbtName || prev) return;
-    if (privateSlugModeRef.current) return;
-    togglePrivateSlugModeRef.current?.();
-  }, [hasPrivateSbtName]);
-
-  useEffect(() => {
-    // Persist wizard state between refreshes until deploy/upload clears them.
     // Default: redact secret values so refresh requires re-entry (security: no keys in localStorage).
-    // Pending SBT drafts use sessionStorage so same-tab refresh can recover
-    // queued CREATE2 drafts without turning them into long-lived local secrets.
-    // Dev toggle: optionally persist secrets locally for faster iteration.
-    writeSessionWizardCache(
-      buildSessionWizardCacheWritePayload({
-        sessionId,
-        draft,
-        privateSlugMode,
-        lastManualSlug: lastManualSlugRef.current,
-        encryptionGates,
-        encryptedFieldGates,
-        gateSelections,
-        defaultGateId,
-        featuredDraftGateAutoLink,
-        resourceGateMap,
-        manualGasLimit,
-        manualGasPriceGwei,
-        manualMaxFeePerGasGwei,
-        manualMaxPriorityFeePerGasGwei,
-        workerSecretsEnabled,
-        effectivePersistWorkerSecrets,
-        workerSecrets,
-        deployForm,
-        deployComplete,
-        deployWorkerUrl,
-        provisionedSponsoredContext,
-      }),
-    );
+    if (workerCanonicalSettlement.isSettled) return;
+    const cachePayload = buildSessionWizardCacheWritePayload({
+      sessionId,
+      draft,
+      privateSlugMode,
+      lastManualSlug: lastManualSlugRef.current,
+      encryptionGates,
+      encryptedFieldGates,
+      gateSelections,
+      defaultGateId,
+      featuredDraftGateAutoLink,
+      resourceGateMap,
+      manualGasLimit,
+      manualGasPriceGwei,
+      manualMaxFeePerGasGwei,
+      manualMaxPriorityFeePerGasGwei,
+      workerSecretsEnabled,
+      effectivePersistWorkerSecrets,
+      workerSecrets,
+      deployForm,
+      deployComplete,
+      deployWorkerUrl,
+      provisionedSponsoredContext,
+    });
+    const result = writeSessionWizardCache(cachePayload, { expectedCachedPayload: wizardCacheSnapshotRef.current });
+    if (result.ok && result.status !== 'preserved-foreign-draft') wizardCacheSnapshotRef.current = cachePayload;
   }, [
     sessionId,
     draft,
@@ -3728,11 +3574,8 @@ const SessionWizard = ({
       setSessionUrl(registerSuccessSettlement.sessionUrl);
       setAdminUrl(registerSuccessSettlement.adminUrl);
       setAdminUrlStatus(registerSuccessSettlement.adminUrlStatus);
-      // Regression guard: persist drafts suppressed by this publish plan before
-      // identity rotation or registry refresh can leave the page mid-settlement.
       const cacheClearResult = clearSessionWizardCache({
         expectedPublicationIdentity: { slug: draft.slug, sessionId },
-        ...(Array.isArray(preservedPendingSbtDrafts) ? { preservedPendingSbtDrafts } : {}),
       });
       // A successful clear releases the next generated identity to own this tab's cache.
       if (cacheClearResult.draft.ok && cacheClearResult.draft.status !== 'preserved-foreign-draft')

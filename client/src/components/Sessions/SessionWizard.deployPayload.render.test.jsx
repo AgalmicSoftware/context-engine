@@ -25,7 +25,7 @@ describe('SessionWizard deploy payload rendering', () => {
       }),
     }));
     const verifyMessageSpy = jest.spyOn(ethers.utils, 'verifyMessage').mockReturnValue(TEST_ADMIN_ADDRESS);
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         deployForm: {

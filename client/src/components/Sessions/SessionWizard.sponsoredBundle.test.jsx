@@ -341,7 +341,7 @@ describe('SessionWizard sponsored bundle flow', () => {
     await expectSponsoredStatus('Sponsored resources applied.');
 
     await waitFor(() => {
-      const cachedRaw = localStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
+      const cachedRaw = sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
       expect(JSON.parse(cachedRaw)).toEqual(
         expect.objectContaining({
           deployComplete: false,

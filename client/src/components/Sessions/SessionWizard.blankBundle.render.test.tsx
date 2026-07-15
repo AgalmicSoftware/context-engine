@@ -297,7 +297,7 @@ describe('SessionWizard blank bundle render regression', () => {
     });
 
     window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -381,7 +381,7 @@ describe('SessionWizard blank bundle render regression', () => {
     });
 
     window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -463,7 +463,7 @@ describe('SessionWizard blank bundle render regression', () => {
     const staleAdvancedBundleUrl = 'https://assets.example.test/stale-advanced-sessionCorsWorker.bundle.js';
     const fallbackFetch = createDefaultFetchMock();
 
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         deployForm: {

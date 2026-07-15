@@ -52,7 +52,7 @@ describe('SessionWizard session header image controls', () => {
     const readText = jest.fn().mockResolvedValue('https://example.example.test/session-header.png');
 
     try {
-      localStorage.setItem(
+      sessionStorage.setItem(
         'ce:sessionWizardDraft:v1',
         JSON.stringify({
           draft: {
@@ -110,7 +110,7 @@ describe('SessionWizard session header image controls', () => {
     const readText = jest.fn().mockResolvedValue('assets/img/header.webp');
 
     try {
-      localStorage.setItem(
+      sessionStorage.setItem(
         'ce:sessionWizardDraft:v1',
         JSON.stringify({
           draft: {
@@ -164,7 +164,7 @@ describe('SessionWizard session header image controls', () => {
     URL.revokeObjectURL = jest.fn();
 
     try {
-      localStorage.setItem(
+      sessionStorage.setItem(
         'ce:sessionWizardDraft:v1',
         JSON.stringify({
           draft: {

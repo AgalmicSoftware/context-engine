@@ -43,32 +43,4 @@ describe('postSignedAdminWorkerRequest', () => {
       }),
     );
   });
-
-  it('preserves a structured failure reason for allowlisted domain handling without rendering it', async () => {
-    const request = postSignedAdminWorkerRequest({
-      action: 'groups/list',
-      body: { sessionId: '0x11111111111111111111111111111111' },
-      path: '/admin/groups/list',
-      workerUrl: 'https://worker.example.test',
-      retryAttempts: 1,
-      signAdminAction: async () => ({ nonce: 'nonce-1', signature: 'signature-1' }),
-      fetchImpl: async () =>
-        new Response(
-          JSON.stringify({
-            error: 'Worker group request failed.',
-            reason: 'worker_group_capacity_reconciliation_required',
-          }),
-          {
-            status: 503,
-            headers: { 'Content-Type': 'application/json' },
-          },
-        ),
-    });
-
-    await expect(request).rejects.toMatchObject({
-      message: 'Worker group request failed.',
-      reason: 'worker_group_capacity_reconciliation_required',
-      status: 503,
-    });
-  });
 });

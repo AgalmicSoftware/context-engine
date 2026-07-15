@@ -327,4 +327,33 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
       }),
     ).rejects.toThrow(/valid JSON/);
   });
+
+  it('marks every server failure retryable while keeping client failures permanent', async () => {
+    const request = (status: number) =>
+      fetchWorkerCanonicalSessionBootstrap({
+        fetchImpl: jest.fn(async () => new Response('no', { status })),
+        sessionSlug: 'session-a',
+        workerQueryValue: 'https://session-a.example.workers.dev',
+        environment: 'production',
+      });
+
+    for (const status of [404, 408, 425, 429, 500, 503, 598, 599]) {
+      const transient = await request(status).catch((error) => error);
+      expect(transient).toBeInstanceOf(WorkerSessionBootstrapRequestError);
+      expect(transient).toMatchObject({
+        name: 'WorkerSessionBootstrapRequestError',
+        retryable: true,
+        status,
+      });
+    }
+    for (const status of [400, 401, 403, 409]) {
+      const permanent = await request(status).catch((error) => error);
+      expect(permanent).toBeInstanceOf(WorkerSessionBootstrapRequestError);
+      expect(permanent).toMatchObject({
+        name: 'WorkerSessionBootstrapRequestError',
+        retryable: false,
+        status,
+      });
+    }
+  });
 });

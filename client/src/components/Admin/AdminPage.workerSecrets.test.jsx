@@ -102,7 +102,12 @@ jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-se
 
 const AdminPage = require('./AdminPage').default;
 
-const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, initialRegistryChainId } = {}) => {
+const renderAdminPage = async ({
+  account = ADMIN_ADDRESS,
+  initialSessionId,
+  initialRegistryChainId,
+  initialSessionConfig,
+} = {}) => {
   let utils;
   await act(async () => {
     utils = render(
@@ -113,6 +118,7 @@ const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, init
         toggleLoginModal={jest.fn()}
         initialSessionId={initialSessionId}
         initialRegistryChainId={initialRegistryChainId}
+        initialSessionConfig={initialSessionConfig}
       />,
     );
     await Promise.resolve();
@@ -212,7 +218,7 @@ describe('AdminPage worker secrets controls', () => {
       sessionName: 'Worker Admin Session',
       corsWorkerUrl: 'https://worker-admin.example.test',
       adminAddress: ADMIN_ADDRESS,
-      sessionModeProfile: buildWorkerProfile(),
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
     };
     mockResolveCorsProxyUrl.mockResolvedValue({
       url: initialSessionConfig.corsWorkerUrl,
@@ -226,11 +232,6 @@ describe('AdminPage worker secrets controls', () => {
     expect(screen.queryByText(/Register in \/new before using worker actions/i)).not.toBeInTheDocument();
 
     const workerSecretsPanel = await openWorkerSecretsPanel();
-    expect(within(workerSecretsPanel).getByRole('button', { name: 'AI' })).toBeInTheDocument();
-    expect(within(workerSecretsPanel).queryByRole('button', { name: 'RPC' })).not.toBeInTheDocument();
-    expect(within(workerSecretsPanel).queryByRole('button', { name: 'Arweave' })).not.toBeInTheDocument();
-    expect(within(workerSecretsPanel).queryByRole('button', { name: 'Faucet' })).not.toBeInTheDocument();
-    expect(within(workerSecretsPanel).queryByRole('button', { name: 'Lit' })).not.toBeInTheDocument();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
     fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
       target: { value: 'test-openai-key' },
@@ -252,7 +253,9 @@ describe('AdminPage worker secrets controls', () => {
     expect(mockUploadSessionMetadata).not.toHaveBeenCalled();
     expect(mockUpdateSessionMetadataOnChain).not.toHaveBeenCalled();
 
-    expect(screen.queryByText('On-chain default gate')).not.toBeInTheDocument();
+    const gatePanel = screen.getByText('On-chain default gate').closest('section');
+    await clickAndSettle(within(gatePanel).getByRole('button', { name: 'Toggle On-chain default gate section' }));
+    expect(screen.getByRole('button', { name: 'Update default gate on-chain' })).toBeDisabled();
   });
 
   it('does not grant registry mutations to a different worker-canonical top-level admin', async () => {
@@ -268,7 +271,7 @@ describe('AdminPage worker secrets controls', () => {
         chainId: 84532,
         adminAddress: '0x00000000000000000000000000000000000000bb',
       },
-      sessionModeProfile: buildWorkerProfile(),
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
     };
     mockResolveCorsProxyUrl.mockResolvedValue({
       url: initialSessionConfig.corsWorkerUrl,
@@ -280,7 +283,9 @@ describe('AdminPage worker secrets controls', () => {
     expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit worker URL' })).toBeInTheDocument();
 
-    expect(screen.queryByText('On-chain default gate')).not.toBeInTheDocument();
+    const gatePanel = screen.getByText('On-chain default gate').closest('section');
+    await clickAndSettle(within(gatePanel).getByRole('button', { name: 'Toggle On-chain default gate section' }));
+    expect(screen.getByRole('button', { name: 'Update default gate on-chain' })).toBeDisabled();
     expect(mockSetSessionFieldsOnChain).not.toHaveBeenCalled();
   });
 

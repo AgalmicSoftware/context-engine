@@ -420,6 +420,326 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(deployPayload.storageProfile.resources.responses).toBe('active');
   });
 
+  it('never sends a stale cached account id with a newly supplied token', async () => {
+    const fetchMock = mockSuccessfulWorkerDeployFetch();
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current.deployForm = {
+      ...options.refs.runtimeRef.current.deployForm,
+      apiToken: 'fresh-token',
+      accountId: 'stale-account-id',
+    };
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    const deployCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/deploy'));
+    const deployPayload = JSON.parse(String(deployCall?.[1]?.body || '{}'));
+    expect(deployPayload.apiToken).toBe('fresh-token');
+    expect(deployPayload.accountId).toBeUndefined();
+  });
+
+  it('reuses one deployment request id and config revision after a lost deploy response', async () => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployCalls += 1;
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        if (deployCalls === 1) throw new TypeError('Failed to fetch');
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      } as Response;
+    });
+    const options = buildDeployHookOptions();
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let firstResult: Record<string, unknown> = {};
+    let retryResult: Record<string, unknown> = {};
+    await act(async () => {
+      firstResult = await result.current.handleDeployWorker();
+    });
+    await act(async () => {
+      retryResult = await result.current.handleDeployWorker();
+    });
+
+    expect(firstResult.ok).toBe(false);
+    expect(retryResult.ok).toBe(true);
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[0].deploymentRequestId).toEqual(expect.any(String));
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
+    const attemptKey = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).find((key) =>
+      key?.startsWith('ce:sessionWizardDeployAttempt:v1:'),
+    );
+    expect(JSON.parse(localStorage.getItem(attemptKey || '') || '{}')).toEqual(
+      expect.objectContaining({ generation: 0, status: 'completed' }),
+    );
+  });
+
+  it('treats explicit writesSessionSecrets false as authoritative on a resumed helper response', async () => {
+    global.fetch = jest.fn(async (url: RequestInfo | URL) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+            sessionSecretsKey: 'session:deploy-storage-session:secrets',
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      } as Response;
+    });
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current.workerSecretsEnabled = true;
+    options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'sk-current-retry-secret' });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    const secretsSyncCall = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
+      String(url).endsWith('/admin/set-secrets'),
+    );
+    expect(secretsSyncCall).toBeDefined();
+    expect(JSON.parse(String(secretsSyncCall?.[1]?.body || '{}')).secrets).toEqual({
+      openaiKey: 'sk-current-retry-secret',
+    });
+  });
+
+  it('reuses the deploy identity after the hook is unmounted and remounted', async () => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        deployCalls += 1;
+        if (deployCalls === 1) throw new TypeError('Failed to fetch');
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+
+    const firstHook = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+    await act(async () => {
+      await firstHook.result.current.handleDeployWorker();
+    });
+    firstHook.unmount();
+    const remountedHook = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+    await act(async () => {
+      await remountedHook.result.current.handleDeployWorker();
+    });
+
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
+  });
+
+  it.each([502, 504])('retains the deploy identity across an unstructured gateway %s', async (status) => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployCalls += 1;
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        if (deployCalls === 1) {
+          return {
+            ok: false,
+            status,
+            json: async () => ({}),
+          } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      } as Response;
+    });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
+  });
+
+  it.each([
+    {
+      label: 'structured conflict',
+      responseBody: {
+        error: 'deploymentRequestId was already used with a different request payload.',
+        deploymentRequestIdConflict: true,
+      },
+    },
+    {
+      label: 'legacy exact conflict error',
+      responseBody: {
+        error: 'deploymentRequestId was already used with a different request payload.',
+      },
+    },
+  ])(
+    'never advances after a $label while another tab can still complete the owned request',
+    async ({ responseBody }) => {
+      const deployBodies: Record<string, unknown>[] = [];
+      global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+        if (String(url).endsWith('/deploy')) {
+          deployBodies.push(JSON.parse(String(init?.body || '{}')));
+          return {
+            ok: false,
+            status: 409,
+            json: async () => responseBody,
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+      });
+      const firstTab = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+
+      await act(async () => {
+        await firstTab.result.current.handleDeployWorker();
+      });
+      firstTab.unmount();
+      const retryingTab = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+      await act(async () => {
+        await retryingTab.result.current.handleDeployWorker();
+      });
+
+      expect(deployBodies).toHaveLength(2);
+      expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+      expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
+    },
+  );
+
+  it('rotates the deploy identity across a remount after a structured terminal orphan response', async () => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let deployCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployCalls += 1;
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        if (deployCalls === 1) {
+          return {
+            ok: false,
+            status: 502,
+            json: async () => ({
+              error: 'Worker activation failed.',
+              deploymentRequestTerminal: true,
+              orphanResources: {
+                workerName: 'failed-worker',
+                kvNamespaceId: 'kv-failed',
+              },
+            }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      } as Response;
+    });
+    const firstHook = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+
+    await act(async () => {
+      await firstHook.result.current.handleDeployWorker();
+    });
+    firstHook.unmount();
+    const remountedHook = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+    await act(async () => {
+      await remountedHook.result.current.handleDeployWorker();
+    });
+
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[1].deploymentRequestId).not.toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).not.toBe(deployBodies[0].configRevision);
+  });
+
+  it('surfaces incomplete Cloudflare cleanup identifiers from deploy-helper failures', async () => {
+    global.fetch = jest.fn(async () => ({
+      ok: false,
+      status: 502,
+      json: async () => ({
+        error: 'Worker script upload was not confirmed.',
+        orphanResources: {
+          workerName: 'ce-session-ab12',
+          kvNamespaceId: 'kv-public-id',
+          workerCleanupStatus: 'owned-delete-failed',
+        },
+      }),
+    })) as jest.Mock;
+    const options = buildDeployHookOptions();
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let deployResult;
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker();
+    });
+
+    const message =
+      'Worker script upload was not confirmed. Cleanup incomplete: remove worker ce-session-ab12 and KV namespace kv-public-id in Cloudflare before retrying.';
+    expect(deployResult).toEqual({ ok: false, error: message });
+    expect(options.updateDeploymentState).toHaveBeenCalledWith({ deployStatus: message });
+  });
+
   it('deploys the default worker-canonical profile without registry, RPC, faucet, or Arweave secrets', async () => {
     const fetchMock = mockSuccessfulWorkerDeployFetch();
     const options = buildDeployHookOptions();
