@@ -100,6 +100,7 @@ import {
   appendSessionWizardRegisterTxEntry,
   isSessionWizardRegisterDuplicatePreflightError,
   resolveSessionWizardPublishCompletionRequest,
+  resolveSessionWizardRemainingPendingDrafts,
   resolveSessionWizardPublishFailureSettlementDescriptor,
   resolveSessionWizardRegisterFailureSettlementDescriptor,
   resolveSessionWizardRegisterDuplicateCheckDescriptor,
@@ -2073,7 +2074,14 @@ const SessionWizard = ({
           callbacks: { setPublishStep: ignoreSessionPublishStep },
         });
         uploadResult = metadataUploadControllerResult.uploadResult;
+        const preservedPendingSbtDrafts = normalizePendingSbtDrafts(
+          resolveSessionWizardRemainingPendingDrafts({
+            deployedPendingDrafts: normalizePendingSbtDrafts(deployedPendingDrafts),
+            pendingDraftSnapshot: publishRequestDescriptor.pendingDraftSnapshot,
+          }),
+        );
         await sessionWizardPublishRuntimeController.settleRegistration({
+          preservedPendingSbtDrafts,
           publishExecutionPlan,
           uploadResult,
           publishControllerResult,
@@ -2851,7 +2859,15 @@ const SessionWizard = ({
       onCloseDisplaySettings={() => setWizardDisplaySettingsOpen(false)}
       onCloseSessionHeaderPreviewModal={() => setSessionHeaderPreviewModalOpen(false)}
       onCopyDraftJson={handleCopyDraftJson}
-      onCreateAnotherSession={(workerCanonicalSettlement.isSettled || (sessionModeRequirements.isWorkerCanonical && sessionPublishState.status === 'published')) ? startFreshSessionWizard : undefined}
+      onCreateAnotherSession={(workerCanonicalSettlement.isSettled || (sessionModeRequirements.isWorkerCanonical && sessionPublishState.status === 'published'))
+        ? () => startFreshSessionWizard({
+          settlement: workerCanonicalSettlement.settlement || {
+            workerUrl: deployWorkerUrl || draft.corsWorkerUrl,
+            slug: draft.slug,
+            sessionId,
+          },
+        })
+        : undefined}
       onDismissNewSessionRequirementsBanner={handleDismissNewSessionRequirementsBanner}
       onEnterAdvancedMode={handleEnterAdvancedMode}
       onEnterNormalMode={handleEnterNormalMode}

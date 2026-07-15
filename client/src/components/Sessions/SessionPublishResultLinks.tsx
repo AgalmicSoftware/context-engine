@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCopy } from '@fortawesome/free-solid-svg-icons';
@@ -16,7 +16,7 @@ type RegisterTxEntry = {
 type SessionPublishResultLinksProps = {
   adminUrl: string;
   adminUrlStatus: string;
-  onCreateAnotherSession?: () => void;
+  onCreateAnotherSession?: () => unknown;
   onCopyAdminUrl: () => void;
   publishMetadataDisplayState: SessionWizardPublishMetadataDisplayState;
   publishedPendingSbtLinks: PublishedPendingSbtLink[];
@@ -37,8 +37,26 @@ const SessionPublishResultLinks = ({
   registerTxs,
   sessionUrl,
   status,
-}: SessionPublishResultLinksProps): React.ReactElement => (
-  <>
+}: SessionPublishResultLinksProps): React.ReactElement => {
+  const [createAnotherError, setCreateAnotherError] = useState('');
+  const handleCreateAnotherSession = () => {
+    try {
+      const result = onCreateAnotherSession?.();
+      const failed = !!result && typeof result === 'object' && (result as { ok?: unknown }).ok === false;
+      setCreateAnotherError(
+        failed
+          ? 'Could not clear the completed session from this browser. Check browser storage access and try again.'
+          : '',
+      );
+    } catch (_) {
+      setCreateAnotherError(
+        'Could not clear the completed session from this browser. Check browser storage access and try again.',
+      );
+    }
+  };
+
+  return (
+    <>
     {publishMetadataDisplayState.showMetadataUri ? (
       <div className={styles.linkRow}>
         <span className={styles.linkLabel}>{publishMetadataDisplayState.metadataUriLabel}:</span>
@@ -98,9 +116,10 @@ const SessionPublishResultLinks = ({
     ) : null}
     {onCreateAnotherSession ? (
       <div className={styles.linkRow}>
-        <Button type="button" className={styles.secondaryButton} onClick={() => onCreateAnotherSession()}>
+        <Button type="button" className={styles.secondaryButton} onClick={handleCreateAnotherSession}>
           Create another session
         </Button>
+        {createAnotherError ? <div role="alert" className={styles.copyStatus}>{createAnotherError}</div> : null}
       </div>
     ) : null}
     {adminUrl ? (
@@ -129,7 +148,8 @@ const SessionPublishResultLinks = ({
     ))}
     {adminUrlStatus ? <div className={styles.copyStatus}>{adminUrlStatus}</div> : null}
     {status ? <div className={styles.statusNote}>{status}</div> : null}
-  </>
-);
+    </>
+  );
+};
 
 export default SessionPublishResultLinks;

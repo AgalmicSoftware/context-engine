@@ -24,6 +24,7 @@ import {
   persistAndVerifySessionWizardWorkerConfig,
   type SessionWizardWorkerConfigSignInput,
 } from './sessionWizardWorkerConfigPersistence';
+import type { SessionWizardWorkerSettlementInput } from './sessionWizardWorkerSettlement';
 
 type RuntimeRef = {
   current: SessionWizardWorkerDeployRuntime | null;
@@ -40,9 +41,12 @@ type PublishRuntimeCallbacks = {
   setSessionUrl: (value: string) => unknown;
   setAdminUrl: (value: string) => unknown;
   setAdminUrlStatus: (value: string) => unknown;
-  setWorkerCanonicalPublishSettled: (value: boolean) => unknown;
-  clearSessionWizardCache: () => unknown;
-  writeSessionWizardWorkerSettlement: (input: { workerUrl: string; slug: string; sessionId: string }) => unknown;
+  setWorkerCanonicalPublishSettled: (value: SessionWizardWorkerSettlementInput | false) => unknown;
+  clearSessionWizardCache: (options?: {
+    preservedPendingSbtDrafts?: AnyRecord[];
+    workerSettlement?: SessionWizardWorkerSettlementInput | null;
+  }) => unknown;
+  writeSessionWizardWorkerSettlement: (input: SessionWizardWorkerSettlementInput) => unknown;
   setSessionId: (value: string) => unknown;
   setSessionIdStatus: (value: string) => unknown;
 };
@@ -81,6 +85,7 @@ type RunPreparationInput = {
 };
 
 type SettleRegistrationInput = {
+  preservedPendingSbtDrafts?: AnyRecord[];
   publishExecutionPlan: PublishExecutionPlan;
   uploadResult: AnyRecord | null;
   publishControllerResult: SessionWizardPublishControllerResult;
@@ -206,6 +211,7 @@ export const createSessionWizardPublishRuntimeController = ({
   };
 
   const settleRegistration = async ({
+    preservedPendingSbtDrafts,
     publishExecutionPlan,
     uploadResult,
     publishControllerResult,
@@ -238,22 +244,24 @@ export const createSessionWizardPublishRuntimeController = ({
     callbacks.setSessionUrl(workerSettlement.sessionUrl);
     callbacks.setAdminUrl(workerSettlement.adminUrl);
     callbacks.setAdminUrlStatus(workerSettlement.adminUrlStatus);
-    // Verified remote persistence is terminal for this mounted draft. Lock first so local storage failures cannot
-    // reopen the publish button; the worker's immutable identity check is the cross-reload backstop.
-    callbacks.setWorkerCanonicalPublishSettled(true);
-    // Record the terminal identity before deleting the recoverable draft. If cache deletion is interrupted, the
-    // marker still makes a reload recognize and remove the stale deployed draft instead of reopening publication.
+    const settlementIdentity = {
+      workerUrl: verifiedWorkerUrl,
+      slug: toStr(runtime.draft?.slug).trim(),
+      sessionId: toStr(runtime.sessionIdHex || runtime.sessionId).trim(),
+    };
+    callbacks.setWorkerCanonicalPublishSettled(settlementIdentity);
+    // Regression guard: remote persistence is terminal. Clear or poison both draft stores before the UX marker;
+    // otherwise a marker quota failure leaves an already-published identity available to publish again.
     requireSuccessfulDurableStorageOperation(
-      callbacks.writeSessionWizardWorkerSettlement({
-        workerUrl: verifiedWorkerUrl,
-        slug: toStr(runtime.draft?.slug).trim(),
-        sessionId: toStr(runtime.sessionIdHex || runtime.sessionId).trim(),
+      callbacks.clearSessionWizardCache({
+        ...(Array.isArray(preservedPendingSbtDrafts) ? { preservedPendingSbtDrafts } : {}),
+        workerSettlement: settlementIdentity,
       }),
-      'Could not durably record the published worker identity',
+      'Could not durably clear the published session draft',
     );
     requireSuccessfulDurableStorageOperation(
-      callbacks.clearSessionWizardCache(),
-      'Could not durably clear the published session draft',
+      callbacks.writeSessionWizardWorkerSettlement(settlementIdentity),
+      'Could not durably record the published worker identity',
     );
     callbacks.setSessionId(generateSessionId());
     callbacks.setSessionIdStatus(workerSettlement.nextSessionIdStatus);

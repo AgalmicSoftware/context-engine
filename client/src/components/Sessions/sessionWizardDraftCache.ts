@@ -5,6 +5,10 @@ import {
   type RemoveKeysResult,
   type SafeJsonWriteResult,
 } from '../../utilities/cache/storageJson.js';
+import {
+  createSessionWizardWorkerSettlement,
+  type SessionWizardWorkerSettlementInput,
+} from './sessionWizardWorkerSettlement.js';
 
 export const SESSION_WIZARD_CACHE_KEY = 'ce:sessionWizardDraft:v1';
 export const SESSION_WIZARD_DRAFT_CACHE_MAX_BYTES = 4 * 1024 * 1024;
@@ -24,7 +28,22 @@ type SessionWizardDraftCacheWriteOptions = SessionWizardDraftCacheOptions & {
 };
 
 type SessionWizardDraftCacheClearOptions = SessionWizardDraftCacheOptions & {
-  clearPendingSbtDrafts?: (() => void) | null;
+  clearPendingSbtDrafts?: (() => RemoveKeysResult) | null;
+  workerSettlement?: SessionWizardWorkerSettlementInput | null;
+};
+
+type SessionWizardDraftClearOutcome =
+  | RemoveKeysResult
+  | { ok: true; removed: 0; failed: 0; status: 'poisoned' };
+
+export type SessionWizardDraftCacheClearResult = {
+  ok: boolean;
+  removed: number;
+  failed: number;
+  status: 'ok' | 'partial-failure' | 'missing-storage';
+  draft: SessionWizardDraftClearOutcome;
+  pendingSbtDrafts: RemoveKeysResult;
+  poisoned: boolean;
 };
 
 const getLocalStorage = (storageIn?: StorageLike | null): StorageLike | null => {
@@ -62,20 +81,57 @@ export const writeSessionWizardDraftCache = (
 export const clearSessionWizardDraftCache = ({
   storage,
   clearPendingSbtDrafts,
-}: SessionWizardDraftCacheClearOptions = {}): RemoveKeysResult => {
+  workerSettlement,
+}: SessionWizardDraftCacheClearOptions = {}): SessionWizardDraftCacheClearResult => {
   const storageRef = getLocalStorage(storage);
-  const result = storageRef
-    ? removeKeys(storageRef, SESSION_WIZARD_CACHE_KEY)
-    : {
-        ok: false,
-        removed: 0,
-        failed: 1,
-        status: 'missing-storage' as const,
-      };
-
-  if (typeof clearPendingSbtDrafts === 'function') {
-    clearPendingSbtDrafts();
+  let poisoned = false;
+  let draft: SessionWizardDraftClearOutcome;
+  const terminalWorkerSettlement = createSessionWizardWorkerSettlement(workerSettlement);
+  if (storageRef && terminalWorkerSettlement) {
+    // Regression guard: publish settlement writes an identity-scoped tombstone instead of a blind removal, so
+    // other tabs can terminal-lock only the matching worker/session even if the later UX marker write fails.
+    const poisonResult = safeJsonWrite(
+      storageRef,
+      SESSION_WIZARD_CACHE_KEY,
+      { terminalWorkerSettlement },
+      { maxBytes: SESSION_WIZARD_DRAFT_CACHE_MAX_BYTES },
+    );
+    if (poisonResult.ok) {
+      poisoned = true;
+      draft = { ok: true, removed: 0, failed: 0, status: 'poisoned' };
+    } else {
+      draft = removeKeys(storageRef, SESSION_WIZARD_CACHE_KEY);
+    }
+  } else {
+    draft = storageRef
+      ? removeKeys(storageRef, SESSION_WIZARD_CACHE_KEY)
+      : { ok: false, removed: 0, failed: 1, status: 'missing-storage' };
   }
 
-  return result;
+  let pendingSbtDrafts: RemoveKeysResult;
+  try {
+    const result = typeof clearPendingSbtDrafts === 'function' ? clearPendingSbtDrafts() : null;
+    pendingSbtDrafts =
+      result && typeof result === 'object' && typeof result.ok === 'boolean'
+        ? result
+        : { ok: false, removed: 0, failed: 1, status: 'missing-storage' };
+  } catch (_) {
+    pendingSbtDrafts = { ok: false, removed: 0, failed: 1, status: 'partial-failure' };
+  }
+
+  const ok = draft.ok && pendingSbtDrafts.ok;
+  const status = ok
+    ? 'ok'
+    : draft.status === 'missing-storage' && pendingSbtDrafts.status === 'missing-storage'
+      ? 'missing-storage'
+      : 'partial-failure';
+  return {
+    ok,
+    removed: draft.removed + pendingSbtDrafts.removed,
+    failed: draft.failed + pendingSbtDrafts.failed,
+    status,
+    draft,
+    pendingSbtDrafts,
+    poisoned,
+  };
 };

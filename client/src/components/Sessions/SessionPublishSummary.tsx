@@ -59,7 +59,7 @@ export type SessionPublishSummaryProps = {
   sessionUrl: string;
   adminUrl: string;
   publishedPendingSbtLinks: PublishedPendingSbtLink[];
-  onCreateAnotherSession?: () => void;
+  onCreateAnotherSession?: () => unknown;
   onCopyAdminUrl: () => void;
   adminUrlStatus: string;
   status: string;

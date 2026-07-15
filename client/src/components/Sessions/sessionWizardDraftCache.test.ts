@@ -79,16 +79,58 @@ describe('sessionWizardDraftCache', () => {
 
   it('clears the draft key and delegates pending SBT draft cleanup', () => {
     const storage = createMemoryStorage();
-    const clearPendingSbtDrafts = jest.fn();
+    const clearPendingSbtDrafts = jest.fn(() => ({
+      ok: true,
+      removed: 1,
+      failed: 0,
+      status: 'ok' as const,
+    }));
     storage.setItem(SESSION_WIZARD_CACHE_KEY, JSON.stringify({ draft: { slug: 'edge' } }));
 
     expect(clearSessionWizardDraftCache({ storage, clearPendingSbtDrafts })).toEqual({
       ok: true,
-      removed: 1,
+      removed: 2,
       failed: 0,
       status: 'ok',
+      draft: { ok: true, removed: 1, failed: 0, status: 'ok' },
+      pendingSbtDrafts: { ok: true, removed: 1, failed: 0, status: 'ok' },
+      poisoned: false,
     });
     expect(storage.getItem(SESSION_WIZARD_CACHE_KEY)).toBeNull();
     expect(clearPendingSbtDrafts).toHaveBeenCalledTimes(1);
+  });
+
+  it('replaces a published draft with an identity-scoped terminal tombstone', () => {
+    const storage = createMemoryStorage();
+    storage.setItem(SESSION_WIZARD_CACHE_KEY, JSON.stringify({ draft: { slug: 'published-session' } }));
+    const workerSettlement = {
+      workerUrl: 'https://published-worker.example.test',
+      slug: 'published-session',
+      sessionId: 'published-id',
+    };
+
+    expect(
+      clearSessionWizardDraftCache({
+        storage,
+        workerSettlement,
+        clearPendingSbtDrafts: () => ({ ok: true, removed: 1, failed: 0, status: 'ok' }),
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        ok: true,
+        status: 'ok',
+        poisoned: true,
+        draft: expect.objectContaining({ ok: true, status: 'poisoned' }),
+      }),
+    );
+    expect(readSessionWizardDraftCache({ storage })).toEqual({
+      terminalWorkerSettlement: expect.objectContaining({
+        version: 2,
+        workerUrl: 'https://published-worker.example.test',
+        slug: 'published-session',
+        sessionId: 'published-id',
+      }),
+    });
+    expect(storage.removeItem).not.toHaveBeenCalled();
   });
 });

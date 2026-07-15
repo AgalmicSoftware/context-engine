@@ -198,6 +198,142 @@ test('dispatchAdminRequest rejects changes to an initialized worker-canonical id
   }
 });
 
+test('dispatchAdminRequest treats sessionId and sessionIdHex as one immutable canonical identity', async () => {
+  const existingConfig = {
+    slug: 'session-a',
+    sessionIdHex: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    corsWorkerUrl: 'https://session-a.workers.dev',
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+  };
+
+  for (const config of [
+    { sessionIdHex: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+    { sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+  ]) {
+    let writes = 0;
+    const result = await dispatchAdminRequest({
+      request: { json: async () => createSignedBody({ config }) },
+      env: { GROUP_KV: {} },
+      baseHeaders: {},
+      slug: 'session-a',
+      action: 'set-config',
+      deps: createAdminDeps({
+        resolveAdminRequestAuthority: async () => ({
+          ok: true,
+          existingConfig,
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+          targetSlug: 'session-a',
+        }),
+        mergeWorkerConfigRecords,
+        putSessionConfig: async () => { writes += 1; },
+      }),
+    });
+
+    assert.equal(result.status, 409);
+    assert.equal(writes, 0);
+  }
+
+  const writes = [];
+  const equivalentResult = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        config: { sessionId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      mergeWorkerConfigRecords,
+      putSessionConfig: async (...args) => { writes.push(args); },
+    }),
+  });
+
+  assert.equal(equivalentResult.status, 200);
+  assert.equal(writes.length, 1);
+});
+
+test('dispatchAdminRequest finalizes the first canonical publication revision and rejects stale wizard revisions', async () => {
+  const deploymentConfig = {
+    slug: 'session-a',
+    sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    configRevision: 'deployment-seed',
+    corsWorkerUrl: 'https://session-a.workers.dev',
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    sessionName: 'Deployment seed',
+  };
+  let persistedConfig = deploymentConfig;
+  let writeCount = 0;
+  const runSetConfig = async (config) => dispatchAdminRequest({
+    request: { json: async () => createSignedBody({ config }) },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: persistedConfig,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      mergeWorkerConfigRecords,
+      putSessionConfig: async (_env, _slug, nextConfig) => {
+        writeCount += 1;
+        persistedConfig = nextConfig;
+      },
+    }),
+  });
+
+  const firstPublishConfig = {
+    sessionName: 'Published session',
+    configRevision: 'publication-a',
+  };
+  assert.equal((await runSetConfig(firstPublishConfig)).status, 200);
+  assert.equal(persistedConfig.configRevision, 'publication-a');
+  assert.equal(persistedConfig.workerCanonicalPublicationRevision, 'publication-a');
+
+  // An exact transport replay is idempotent and cannot reapply stale fields.
+  const writesAfterPublish = writeCount;
+  assert.equal((await runSetConfig(firstPublishConfig)).status, 200);
+  assert.equal(writeCount, writesAfterPublish);
+  assert.equal(persistedConfig.workerCanonicalPublicationRevision, 'publication-a');
+
+  const sameRevisionConflict = await runSetConfig({
+    sessionName: 'Conflicting same-revision payload',
+    configRevision: 'publication-a',
+  });
+  assert.equal(sameRevisionConflict.status, 409);
+  assert.equal(writeCount, writesAfterPublish);
+  assert.equal(persistedConfig.sessionName, 'Published session');
+
+  const beforeStaleWrite = structuredClone(persistedConfig);
+  const staleResult = await runSetConfig({
+    sessionName: 'Stale tab overwrite',
+    configRevision: 'publication-b',
+  });
+  assert.equal(staleResult.status, 409);
+  assert.deepEqual(persistedConfig, beforeStaleWrite);
+
+  // Later admin patches omit configRevision and preserve the finalized revision.
+  assert.equal((await runSetConfig({ allowOrigins: ['https://admin.example.test'] })).status, 200);
+  assert.equal(persistedConfig.configRevision, 'publication-a');
+  assert.equal(persistedConfig.workerCanonicalPublicationRevision, 'publication-a');
+  assert.deepEqual(persistedConfig.allowOrigins, ['https://admin.example.test']);
+
+  const writesAfterAdminPatch = writeCount;
+  assert.equal((await runSetConfig(firstPublishConfig)).status, 200);
+  assert.equal(writeCount, writesAfterAdminPatch);
+  assert.deepEqual(persistedConfig.allowOrigins, ['https://admin.example.test']);
+});
+
 test('dispatchAdminRequest permits non-identity updates to an initialized worker-canonical session', async () => {
   const existingConfig = {
     slug: 'session-a',

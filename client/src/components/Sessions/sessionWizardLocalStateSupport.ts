@@ -6,8 +6,15 @@ import {
   readSessionWizardDraftCache,
   writeSessionWizardDraftCache,
 } from './sessionWizardDraftCache.js';
-import { clearSessionWizardPendingSbtDraftsCache } from './hooks/usePendingSbtDrafts.js';
-import { clearSessionWizardWorkerSettlement } from './sessionWizardWorkerSettlement.js';
+import {
+  clearSessionWizardPendingSbtDraftsCache,
+  writeSessionWizardPendingSbtDraftsCache,
+  type PendingSbtDraft,
+} from './hooks/usePendingSbtDrafts.js';
+import {
+  clearSessionWizardWorkerSettlement,
+  type SessionWizardWorkerSettlementInput,
+} from './sessionWizardWorkerSettlement.js';
 import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
 
 const log = createLogger('general');
@@ -50,12 +57,16 @@ type ClearCacheDeps = {
   clearDraftCache?: typeof clearSessionWizardDraftCache;
   clearPendingSbtDrafts?: typeof clearSessionWizardPendingSbtDraftsCache;
   logger?: LoggerLike;
+  preservedPendingSbtDrafts?: PendingSbtDraft[];
+  retainPendingSbtDrafts?: boolean;
+  workerSettlement?: SessionWizardWorkerSettlementInput | null;
 };
 
 type FreshSessionWizardDeps = {
   clearCache?: typeof clearSessionWizardCache;
   clearWorkerSettlement?: typeof clearSessionWizardWorkerSettlement;
   navigate?: (target: string) => void;
+  settlement?: SessionWizardWorkerSettlementInput | null;
 };
 
 export type SessionWizardCachedState = Record<string, unknown> & {
@@ -83,6 +94,7 @@ export type SessionWizardCachedState = Record<string, unknown> & {
     | null;
   resourceGateMap?: Record<string, string | string[]>;
   sessionId?: unknown;
+  terminalWorkerSettlement?: unknown;
   workerSecrets?: WorkerSecretsLike;
   workerSecretsEnabled?: unknown;
   persistWorkerSecrets?: unknown;
@@ -111,9 +123,31 @@ export const clearSessionWizardCache = ({
   clearDraftCache = clearSessionWizardDraftCache,
   clearPendingSbtDrafts = clearSessionWizardPendingSbtDraftsCache,
   logger = log,
+  preservedPendingSbtDrafts,
+  retainPendingSbtDrafts = false,
+  workerSettlement,
 }: ClearCacheDeps = {}) => {
+  const persistPendingSbtDrafts = () => {
+    if (preservedPendingSbtDrafts === undefined) {
+      return retainPendingSbtDrafts
+        ? { ok: true, removed: 0, failed: 0, status: 'ok' as const }
+        : clearPendingSbtDrafts();
+    }
+    const writeResult = writeSessionWizardPendingSbtDraftsCache(preservedPendingSbtDrafts);
+    return {
+      ok: writeResult.ok,
+      removed: writeResult.ok ? 1 : 0,
+      failed: writeResult.ok ? 0 : 1,
+      status: writeResult.ok
+        ? 'ok' as const
+        : writeResult.status === 'missing-storage'
+          ? 'missing-storage' as const
+          : 'partial-failure' as const,
+    };
+  };
   const result = clearDraftCache({
-    clearPendingSbtDrafts,
+    clearPendingSbtDrafts: persistPendingSbtDrafts,
+    workerSettlement,
   });
   if (!result.ok && result.status !== 'missing-storage') {
     logger.warn?.('SessionWizard: fallback', result.status);
@@ -125,11 +159,12 @@ export const startFreshSessionWizard = ({
   clearCache = clearSessionWizardCache,
   clearWorkerSettlement = clearSessionWizardWorkerSettlement,
   navigate = (target) => window.location.assign(target),
+  settlement,
 }: FreshSessionWizardDeps = {}) => {
   const clearResult = clearCache();
-  if (!clearResult.ok && clearResult.status !== 'missing-storage') return clearResult;
-  const settlementClearResult = clearWorkerSettlement();
-  if (!settlementClearResult.ok && settlementClearResult.status !== 'missing-storage') return settlementClearResult;
+  if (!clearResult.ok) return clearResult;
+  const settlementClearResult = clearWorkerSettlement(settlement || {});
+  if (!settlementClearResult.ok) return settlementClearResult;
   navigate(buildPublicRoute('/new'));
   return clearResult;
 };

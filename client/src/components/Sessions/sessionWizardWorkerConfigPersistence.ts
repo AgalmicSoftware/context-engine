@@ -1,3 +1,4 @@
+import sha256 from 'crypto-js/sha256';
 import {
   parseSessionWorkerDiscoveryOrigin,
   type DiscoveryEnvironment,
@@ -32,7 +33,6 @@ export type PersistAndVerifySessionWizardWorkerConfigInput = {
   signAdminAction: SessionWizardWorkerConfigSignPort;
   fetchImpl?: SessionWizardWorkerConfigFetchPort;
   configRevision?: unknown;
-  randomRevision?: (() => unknown) | null;
   sleep?: ((delayMs: number) => Promise<void>) | null;
   retryDelaysMs?: readonly number[];
   environment?: DiscoveryEnvironment;
@@ -160,19 +160,31 @@ const clonePublicConfig = (value: unknown): UnknownRecord => {
   return clonePublicConfigValue(value, 'config', new WeakSet()) as UnknownRecord;
 };
 
-const defaultRandomRevision = (): string => {
-  if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
-  const randomPart = Math.random().toString(36).slice(2);
-  return `${Date.now().toString(36)}-${randomPart}`;
+const canonicalizeRevisionInput = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(canonicalizeRevisionInput);
+  if (!value || typeof value !== 'object') return value;
+  return Object.keys(value as UnknownRecord)
+    .sort()
+    .reduce<UnknownRecord>((result, key) => {
+      const entry = (value as UnknownRecord)[key];
+      if (entry !== undefined) result[key] = canonicalizeRevisionInput(entry);
+      return result;
+    }, {});
 };
+
+const deriveConfigRevision = (value: UnknownRecord): string =>
+  `config:${sha256(
+    `context-engine:worker-canonical-publication:v1:${JSON.stringify(canonicalizeRevisionInput(value))}`,
+  ).toString()}`;
 
 const resolveConfigRevision = ({
   configRevision,
-  randomRevision,
-}: Pick<PersistAndVerifySessionWizardWorkerConfigInput, 'configRevision' | 'randomRevision'>): string => {
-  const revision = toTrimmedString(
-    configRevision || (typeof randomRevision === 'function' ? randomRevision() : defaultRandomRevision()),
-  );
+  derivedRevision,
+}: {
+  configRevision: unknown;
+  derivedRevision: string;
+}): string => {
+  const revision = toTrimmedString(configRevision || derivedRevision);
   if (!REVISION_PATTERN.test(revision)) {
     throw new Error('Worker config revision must be a non-secret identifier of 1-128 safe characters.');
   }
@@ -253,7 +265,6 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
   signAdminAction,
   fetchImpl = globalThis.fetch.bind(globalThis),
   configRevision,
-  randomRevision = null,
   sleep = defaultSleep,
   retryDelaysMs = DEFAULT_RETRY_DELAYS_MS,
   environment,
@@ -284,7 +295,22 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
     throw new Error('Prepared worker config must declare authority.mode "worker_canonical".');
   }
 
-  const revision = resolveConfigRevision({ configRevision, randomRevision });
+  const revisionConfig = { ...publicConfig };
+  delete revisionConfig.configRevision;
+  delete revisionConfig.workerCanonicalPublicationRevision;
+  // Regression guard: transport loss after the worker commits must be
+  // retryable across reloads. Hash the canonical public publication payload so
+  // independent invocations produce the same server-side revision marker.
+  const revision = resolveConfigRevision({
+    configRevision,
+    derivedRevision: deriveConfigRevision({
+      config: revisionConfig,
+      slug: normalizedSlug,
+      sessionId: normalizedSessionId,
+      adminAddress: normalizedAdminAddress,
+      corsWorkerUrl: workerOrigin,
+    }),
+  });
   const configToPersist: UnknownRecord = {
     ...publicConfig,
     slug: normalizedSlug,

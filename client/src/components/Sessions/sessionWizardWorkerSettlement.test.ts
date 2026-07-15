@@ -1,67 +1,124 @@
 import {
-  SESSION_WIZARD_WORKER_SETTLEMENT_KEY,
   clearSessionWizardWorkerSettlement,
-  isSessionWizardWorkerSettlementForWorker,
+  getSessionWizardWorkerSettlementStorageKey,
+  isSessionWizardWorkerSettlementForIdentity,
   readSessionWizardWorkerSettlement,
   writeSessionWizardWorkerSettlement,
 } from './sessionWizardWorkerSettlement';
 
+const publishedIdentity = {
+  workerUrl: 'https://published-worker.example.test/',
+  slug: 'published-session',
+  sessionId: '0x00112233445566778899aabbccddeeff',
+};
+
 describe('sessionWizardWorkerSettlement', () => {
   beforeEach(() => localStorage.clear());
 
-  it('persists only the durable worker-canonical settlement identity', () => {
+  it('persists independent durable records per worker and session identity', () => {
     const result = writeSessionWizardWorkerSettlement({
-      workerUrl: 'https://published-worker.example.test/',
-      slug: 'published-session',
-      sessionId: '0x00112233445566778899aabbccddeeff',
+      ...publishedIdentity,
       settledAt: 1_725_000_000_000,
     });
+    const secondIdentity = {
+      workerUrl: 'https://published-worker.example.test/',
+      slug: 'second-session',
+      sessionId: 'second-id',
+    };
+    expect(writeSessionWizardWorkerSettlement({ ...secondIdentity, settledAt: 1_725_000_000_001 }).ok).toBe(true);
 
     expect(result.ok).toBe(true);
-    expect(JSON.parse(localStorage.getItem(SESSION_WIZARD_WORKER_SETTLEMENT_KEY) || '{}')).toEqual({
-      version: 1,
+    const publishedKey = getSessionWizardWorkerSettlementStorageKey(publishedIdentity);
+    const secondKey = getSessionWizardWorkerSettlementStorageKey(secondIdentity);
+    expect(publishedKey).not.toBe(secondKey);
+    expect(JSON.parse(localStorage.getItem(publishedKey) || '{}')).toEqual({
+      version: 2,
       workerUrl: 'https://published-worker.example.test',
       slug: 'published-session',
       sessionId: '0x00112233445566778899aabbccddeeff',
       settledAt: 1_725_000_000_000,
     });
-    expect(readSessionWizardWorkerSettlement()).toEqual({
-      version: 1,
+    expect(readSessionWizardWorkerSettlement({ identity: publishedIdentity })).toEqual({
+      version: 2,
       workerUrl: 'https://published-worker.example.test',
       slug: 'published-session',
       sessionId: '0x00112233445566778899aabbccddeeff',
       settledAt: 1_725_000_000_000,
     });
+    expect(readSessionWizardWorkerSettlement({ identity: secondIdentity })).toEqual(
+      expect.objectContaining({ slug: 'second-session', sessionId: 'second-id' }),
+    );
   });
 
-  it('matches normalized worker URLs and rejects corrupt or foreign markers', () => {
+  it('uses one canonical record for equivalent UUID and bytes16 session identities', () => {
+    const uuidIdentity = {
+      ...publishedIdentity,
+      sessionId: '00112233-4455-6677-8899-aabbccddeeff',
+    };
+    const hexIdentity = {
+      ...publishedIdentity,
+      sessionId: '0x00112233445566778899aabbccddeeff',
+    };
+
+    expect(getSessionWizardWorkerSettlementStorageKey(uuidIdentity)).toBe(
+      getSessionWizardWorkerSettlementStorageKey(hexIdentity),
+    );
+    expect(writeSessionWizardWorkerSettlement({ ...uuidIdentity, settledAt: 10 }).ok).toBe(true);
+    expect(readSessionWizardWorkerSettlement({ identity: hexIdentity })).toEqual(
+      expect.objectContaining({
+        sessionId: hexIdentity.sessionId,
+        settledAt: 10,
+      }),
+    );
     expect(
-      isSessionWizardWorkerSettlementForWorker(
-        {
-          version: 1,
-          workerUrl: 'https://published-worker.example.test',
-          slug: 'published-session',
-          sessionId: 'session-id',
-          settledAt: 1,
-        },
-        'https://published-worker.example.test/',
+      isSessionWizardWorkerSettlementForIdentity(
+        readSessionWizardWorkerSettlement({ identity: hexIdentity }),
+        uuidIdentity,
       ),
     ).toBe(true);
+  });
+
+  it('matches the complete normalized identity and rejects corrupt or foreign markers', () => {
+    const settlement = {
+      version: 2 as const,
+      workerUrl: 'https://published-worker.example.test',
+      slug: 'published-session',
+      sessionId: 'session-id',
+      settledAt: 1,
+    };
     expect(
-      isSessionWizardWorkerSettlementForWorker(
-        {
-          version: 1,
-          workerUrl: 'https://published-worker.example.test',
-          slug: 'published-session',
-          sessionId: 'session-id',
-          settledAt: 1,
-        },
-        'https://other-worker.example.test',
-      ),
+      isSessionWizardWorkerSettlementForIdentity(settlement, {
+        workerUrl: 'https://published-worker.example.test/',
+        slug: 'published-session',
+        sessionId: 'session-id',
+      }),
+    ).toBe(true);
+    expect(
+      isSessionWizardWorkerSettlementForIdentity(settlement, {
+        workerUrl: 'https://published-worker.example.test',
+        slug: 'other-session',
+        sessionId: 'session-id',
+      }),
     ).toBe(false);
 
-    localStorage.setItem(SESSION_WIZARD_WORKER_SETTLEMENT_KEY, JSON.stringify({ workerUrl: 'javascript:bad' }));
-    expect(readSessionWizardWorkerSettlement()).toBeNull();
+    const corruptKey = getSessionWizardWorkerSettlementStorageKey(publishedIdentity);
+    localStorage.setItem(corruptKey, JSON.stringify({ version: 2, workerUrl: 'javascript:bad' }));
+    expect(readSessionWizardWorkerSettlement({ identity: publishedIdentity })).toBeNull();
+    expect(localStorage.getItem(corruptKey)).toBeNull();
+  });
+
+  it('clears only the requested settlement record', () => {
+    const secondIdentity = {
+      workerUrl: 'https://published-worker.example.test',
+      slug: 'second-session',
+      sessionId: 'second-id',
+    };
+    writeSessionWizardWorkerSettlement(publishedIdentity);
+    writeSessionWizardWorkerSettlement(secondIdentity);
+
+    expect(clearSessionWizardWorkerSettlement(publishedIdentity).ok).toBe(true);
+    expect(readSessionWizardWorkerSettlement({ identity: publishedIdentity })).toBeNull();
+    expect(readSessionWizardWorkerSettlement({ identity: secondIdentity })).not.toBeNull();
   });
 
   it('reports write and clear failures without throwing', () => {
@@ -74,7 +131,7 @@ describe('sessionWizardWorkerSettlement', () => {
     ).toEqual(expect.objectContaining({ ok: false, status: 'write-failed' }));
 
     const clearStorage = { removeItem: jest.fn(() => { throw new Error('denied'); }) };
-    expect(clearSessionWizardWorkerSettlement({ storage: clearStorage })).toEqual({
+    expect(clearSessionWizardWorkerSettlement(publishedIdentity, { storage: clearStorage })).toEqual({
       ok: false,
       removed: 0,
       failed: 1,

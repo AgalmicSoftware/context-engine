@@ -113,4 +113,30 @@ describe('SessionPublishResultLinks', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create another session' }));
     expect(onCreateAnotherSession).toHaveBeenCalledTimes(1);
   });
+
+  it('makes a failed durable reset visible instead of leaving the button silently inert', () => {
+    render(
+      <SessionPublishResultLinks
+        adminUrl=""
+        adminUrlStatus=""
+        onCreateAnotherSession={() => ({ ok: false, status: 'partial-failure' })}
+        onCopyAdminUrl={jest.fn()}
+        publishMetadataDisplayState={{
+          ...metadataDisplayState,
+          showArweaveTx: false,
+          showMetadataUri: false,
+        }}
+        publishedPendingSbtLinks={[]}
+        registerExplorerBaseUrl=""
+        registerTxs={[]}
+        sessionUrl=""
+        status=""
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create another session' }));
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Could not clear the completed session from this browser.',
+    );
+  });
 });

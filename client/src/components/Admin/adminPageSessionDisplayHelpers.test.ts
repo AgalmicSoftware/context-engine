@@ -70,6 +70,28 @@ describe('adminPageSessionDisplayHelpers', () => {
         },
       }),
     ).toBe(first);
+
+    const sessionIdHexOnlyKey = buildAdminPageSessionIdentityKey({
+      initialSessionId: '',
+      initialRegistryChainId: 84532,
+      initialSessionConfig: {
+        slug: 'session-a',
+        sessionIdHex: '0xAAA',
+        corsWorkerUrl: 'https://worker-a.example.test',
+      },
+    });
+    expect(sessionIdHexOnlyKey).toContain('|0xaaa|');
+    expect(
+      buildAdminPageSessionIdentityKey({
+        initialSessionId: '',
+        initialRegistryChainId: 84532,
+        initialSessionConfig: {
+          slug: 'session-a',
+          sessionIdHex: '0xBBB',
+          corsWorkerUrl: 'https://worker-a.example.test',
+        },
+      }),
+    ).not.toBe(sessionIdHexOnlyKey);
   });
 
   it('builds session URLs using normalized slugs and general-session fallback', () => {

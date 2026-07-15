@@ -1389,6 +1389,7 @@ describe('runSessionWizardPublishCompletionController', () => {
     ).toEqual({
       normalizedDeployedPendingDrafts: normalizedDeployedDrafts,
       publishedPendingSbtLinks: publishedLinks,
+      remainingPendingDrafts: [pendingDraftSnapshot[2]],
     });
 
     expect(events).toEqual([

@@ -28,7 +28,15 @@ const createControllerHarness = () => {
     setWorkerCanonicalPublishSettled: jest.fn(() => events.push('publish-settled')),
     clearSessionWizardCache: jest.fn(() => {
       events.push('clear-cache');
-      return { ok: true, removed: 1, failed: 0, status: 'ok' };
+      return {
+        ok: true,
+        removed: 2,
+        failed: 0,
+        status: 'ok',
+        draft: { ok: true, removed: 1, failed: 0, status: 'ok' },
+        pendingSbtDrafts: { ok: true, removed: 1, failed: 0, status: 'ok' },
+        poisoned: false,
+      };
     }),
     writeSessionWizardWorkerSettlement: jest.fn(() => {
       events.push('write-settlement');
@@ -144,8 +152,13 @@ describe('sessionWizardPublishRuntimeController', () => {
 
   it('settles worker-canonical publication only after verified persistence and rotates the draft identity', async () => {
     const harness = createControllerHarness();
+    const preservedPendingSbtDrafts = [{
+      predictedAddress: '0x00000000000000000000000000000000000000aa',
+      deployed: false,
+    }];
 
     await harness.controller.settleRegistration({
+      preservedPendingSbtDrafts,
       publishExecutionPlan: {
         shouldRegisterSession: false,
         shouldRefreshRegistryCache: false,
@@ -168,16 +181,22 @@ describe('sessionWizardPublishRuntimeController', () => {
     expect(harness.events.slice(2)).toEqual([
       'admin-status:',
       'publish-settled',
-      'write-settlement',
       'clear-cache',
+      'write-settlement',
       'session-id:next-session-id',
       'session-id-status:Generated a new session ID for your next session.',
     ]);
-    expect(harness.callbacks.writeSessionWizardWorkerSettlement).toHaveBeenCalledWith({
+    const workerSettlement = {
       workerUrl: WORKER_ORIGIN,
       slug: 'worker-session',
       sessionId: SESSION_ID,
+    };
+    expect(harness.callbacks.setWorkerCanonicalPublishSettled).toHaveBeenCalledWith(workerSettlement);
+    expect(harness.callbacks.clearSessionWizardCache).toHaveBeenCalledWith({
+      preservedPendingSbtDrafts,
+      workerSettlement,
     });
+    expect(harness.callbacks.writeSessionWizardWorkerSettlement).toHaveBeenCalledWith(workerSettlement);
   });
 
   it('preserves register-then-refresh ordering for decentralized publication', async () => {
@@ -253,12 +272,16 @@ describe('sessionWizardPublishRuntimeController', () => {
       }),
     ).rejects.toThrow('Could not durably clear the published session draft');
 
-    expect(harness.callbacks.setWorkerCanonicalPublishSettled).toHaveBeenCalledWith(true);
-    expect(harness.callbacks.writeSessionWizardWorkerSettlement).toHaveBeenCalledTimes(1);
+    expect(harness.callbacks.setWorkerCanonicalPublishSettled).toHaveBeenCalledWith({
+      workerUrl: WORKER_ORIGIN,
+      slug: 'worker-session',
+      sessionId: SESSION_ID,
+    });
+    expect(harness.callbacks.writeSessionWizardWorkerSettlement).not.toHaveBeenCalled();
     expect(harness.callbacks.setSessionId).not.toHaveBeenCalled();
   });
 
-  it('locks the current publish and refuses identity rotation when settlement marker persistence fails', async () => {
+  it('clears every publishable draft before a failed UX marker write and refuses identity rotation', async () => {
     const harness = createControllerHarness();
     harness.callbacks.writeSessionWizardWorkerSettlement.mockImplementationOnce(() => {
       harness.events.push('write-settlement-failed');
@@ -279,8 +302,19 @@ describe('sessionWizardPublishRuntimeController', () => {
       }),
     ).rejects.toThrow('Could not durably record the published worker identity');
 
-    expect(harness.callbacks.setWorkerCanonicalPublishSettled).toHaveBeenCalledWith(true);
-    expect(harness.callbacks.clearSessionWizardCache).not.toHaveBeenCalled();
+    expect(harness.callbacks.setWorkerCanonicalPublishSettled).toHaveBeenCalledWith({
+      workerUrl: WORKER_ORIGIN,
+      slug: 'worker-session',
+      sessionId: SESSION_ID,
+    });
+    expect(harness.callbacks.clearSessionWizardCache).toHaveBeenCalledWith({
+      workerSettlement: {
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+      },
+    });
+    expect(harness.events.indexOf('clear-cache')).toBeLessThan(harness.events.indexOf('write-settlement-failed'));
     expect(harness.callbacks.setSessionId).not.toHaveBeenCalled();
   });
 });

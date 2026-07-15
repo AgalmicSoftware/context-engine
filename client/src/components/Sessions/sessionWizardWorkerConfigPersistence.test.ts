@@ -42,15 +42,21 @@ const verifiedConfig = (revision: string, overrides: Record<string, unknown> = {
 
 describe('persistAndVerifySessionWizardWorkerConfig', () => {
   it('signs and writes non-secret config, then returns only an exactly verified public config', async () => {
+    let signedConfig: Record<string, unknown> | null = null;
     const signAdminAction = jest.fn(async () => ({
       address: ADMIN_ADDRESS,
       message: 'signed set-config message',
       signature: '0xsigned',
     }));
-    const fetchImpl = jest
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
-      .mockResolvedValueOnce(jsonResponse(200, { config: verifiedConfig('revision-1') }));
+    signAdminAction.mockImplementationOnce(async (input) => {
+      signedConfig = input.body.config;
+      return { address: ADMIN_ADDRESS, message: 'signed set-config message', signature: '0xsigned' };
+    });
+    const fetchImpl = jest.fn(async (_url, init) =>
+      init?.method === 'POST'
+        ? jsonResponse(200, { ok: true })
+        : jsonResponse(200, { config: signedConfig }),
+    );
 
     const result = await persistAndVerifySessionWizardWorkerConfig({
       workerUrl: `${WORKER_ORIGIN}/`,
@@ -60,16 +66,18 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       config: baseConfig(),
       signAdminAction,
       fetchImpl,
-      randomRevision: () => 'revision-1',
       retryDelaysMs: [],
     });
+
+    const revision = result.configRevision;
+    expect(revision).toMatch(/^config:[a-f0-9]{64}$/);
 
     expect(signAdminAction).toHaveBeenCalledWith({
       action: 'set-config',
       body: {
         sessionSlug: 'worker-session',
         adminAddress: ADMIN_ADDRESS,
-        config: verifiedConfig('revision-1'),
+        config: verifiedConfig(revision),
       },
       targetSlug: 'worker-session',
       workerUrl: WORKER_ORIGIN,
@@ -94,7 +102,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       signature: '0xsigned',
       sessionSlug: 'worker-session',
       adminAddress: ADMIN_ADDRESS,
-      config: verifiedConfig('revision-1'),
+      config: verifiedConfig(revision),
     });
 
     expect(fetchImpl.mock.calls[1]).toEqual([
@@ -111,9 +119,39 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     ]);
     expect(result).toEqual({
       workerOrigin: WORKER_ORIGIN,
-      configRevision: 'revision-1',
-      publicConfig: verifiedConfig('revision-1'),
+      configRevision: revision,
+      publicConfig: verifiedConfig(revision),
     });
+  });
+
+  it('emits the same deterministic revision from two independent persistence invocations', async () => {
+    const revisions: string[] = [];
+    const runPersistence = async () => {
+      let persistedConfig: Record<string, unknown> | null = null;
+      const result = await persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: baseConfig(),
+        signAdminAction: async (input) => {
+          persistedConfig = input.body.config;
+          return { signature: '0xsigned' };
+        },
+        fetchImpl: async (_url, init) =>
+          init?.method === 'POST'
+            ? jsonResponse(200, { ok: true })
+            : jsonResponse(200, { config: persistedConfig }),
+        retryDelaysMs: [],
+      });
+      revisions.push(result.configRevision);
+    };
+
+    await runPersistence();
+    await runPersistence();
+
+    expect(revisions).toHaveLength(2);
+    expect(revisions[1]).toBe(revisions[0]);
   });
 
   it('persists the real default worker-canonical draft without exposing its transcription RPC field', async () => {

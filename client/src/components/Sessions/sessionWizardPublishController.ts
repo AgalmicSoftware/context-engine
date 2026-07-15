@@ -126,6 +126,7 @@ export type SessionWizardPublishCompletionControllerCallbacks = {
 export type SessionWizardPublishCompletionControllerResult = {
   normalizedDeployedPendingDrafts: SessionWizardPendingDraftLike[];
   publishedPendingSbtLinks: PublishedPendingSbtLink[];
+  remainingPendingDrafts: SessionWizardPendingDraftLike[];
 };
 
 export type SessionWizardPublishFailureSettlementInput = {
@@ -794,6 +795,23 @@ export const resolveSessionWizardPublishFailureSettlementDescriptor = ({
   };
 };
 
+export const resolveSessionWizardRemainingPendingDrafts = ({
+  deployedPendingDrafts = [],
+  pendingDraftSnapshot = [],
+}: {
+  deployedPendingDrafts?: readonly SessionWizardPendingDraftLike[];
+  pendingDraftSnapshot?: readonly SessionWizardPendingDraftLike[];
+}): SessionWizardPendingDraftLike[] => {
+  const newlyDeployedPendingAddressSet = new Set(
+    deployedPendingDrafts.map((entry) => getPendingDraftAddressKey(entry)).filter(Boolean),
+  );
+  return pendingDraftSnapshot.filter((entry) => {
+    if (entry?.deployed === true) return false;
+    const addressKey = getPendingDraftAddressKey(entry);
+    return !addressKey || !newlyDeployedPendingAddressSet.has(addressKey);
+  });
+};
+
 export const runSessionWizardPublishCompletionController = ({
   input,
   ports,
@@ -826,10 +844,9 @@ export const runSessionWizardPublishCompletionController = ({
   callbacks.setPublishedPendingSbtLinks(publishedPendingSbtLinks);
   // Regression guard: a selected mode can suppress SBT deployment; only
   // drafts proven deployed may be removed from the author's pending state.
-  const remainingPendingDrafts = pendingDraftSnapshot.filter((entry) => {
-    if (entry?.deployed === true) return false;
-    const addressKey = getPendingDraftAddressKey(entry);
-    return !addressKey || !newlyDeployedPendingAddressSet.has(addressKey);
+  const remainingPendingDrafts = resolveSessionWizardRemainingPendingDrafts({
+    deployedPendingDrafts: normalizedDeployedPendingDrafts,
+    pendingDraftSnapshot,
   });
   callbacks.replacePendingSbtDrafts(remainingPendingDrafts);
   callbacks.setPublishStep(getPublishStepNumber(input.publishExecutionPlan, 'done'));
@@ -837,6 +854,7 @@ export const runSessionWizardPublishCompletionController = ({
   return {
     normalizedDeployedPendingDrafts,
     publishedPendingSbtLinks,
+    remainingPendingDrafts,
   };
 };
 
