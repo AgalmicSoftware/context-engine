@@ -35,9 +35,7 @@ import {
   findForbiddenCloudflareDeploymentTokenPath,
   findForbiddenWorkerConfigSecretPath,
 } from '../shared/workerSessionConfig.mjs';
-import {
-  executeCoordinatedSessionConfigMutation as executeCoordinatedSessionConfigMutationBoundary,
-} from './sessionWriteCoordinator.js';
+import { applySessionConfigMutation as applySessionConfigMutationBoundary } from './sessionConfigMutation.js';
 
 const ALLOWED_SECRET_KEYS = [
   'openaiKey',
@@ -114,6 +112,38 @@ const mergeAdminSecrets = ({
     if (value !== undefined) nextSecrets[key] = value;
   });
   return nextSecrets;
+};
+
+const executeDirectSessionConfigMutation = async ({
+  env,
+  slug,
+  existingConfig,
+  mutation,
+  deps,
+} = {}) => {
+  const result = (deps?.applySessionConfigMutation || applySessionConfigMutationBoundary)({
+    existingConfig,
+    mutation,
+    slug,
+  });
+  if (!result?.ok) {
+    return {
+      ok: false,
+      status: result?.status || 400,
+      body: { error: result?.error || 'Session config mutation failed.' },
+    };
+  }
+  if (!result.skipPersistence) {
+    if (typeof deps?.putSessionConfig !== 'function') {
+      return {
+        ok: false,
+        status: 503,
+        body: { error: 'Session config persistence is unavailable; config was not changed.' },
+      };
+    }
+    await deps.putSessionConfig(env, slug, result.config);
+  }
+  return { ok: true, status: 200, body: { ok: true } };
 };
 
 export const dispatchAdminRequest = async ({
@@ -206,16 +236,15 @@ export const dispatchAdminRequest = async ({
       }, 400, headers);
     }
 
-    const mutationResult = await (
-      deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutationBoundary
-    )({
+    const mutationResult = await executeDirectSessionConfigMutation({
       env,
       slug: targetSlug,
-      observedConfig: existingConfig,
+      existingConfig,
       mutation: { kind: 'set-config', incomingConfig: incoming },
+      deps,
     });
     return deps?.json?.(
-      mutationResult?.body || { error: 'Session config coordination failed.' },
+      mutationResult?.body || { error: 'Session config mutation failed.' },
       mutationResult?.status || 503,
       headers,
     );
@@ -290,17 +319,16 @@ export const dispatchAdminRequest = async ({
         ...(result?.litPkpId ? { litPkpId: result.litPkpId } : {}),
       } : null;
       if (litCredentials) {
-        const mutationResult = await (
-          deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutationBoundary
-        )({
+        const mutationResult = await executeDirectSessionConfigMutation({
           env,
           slug: targetSlug,
-          observedConfig: existingConfig,
+          existingConfig,
           mutation: { kind: 'merge-lit-credentials', litCredentials },
+          deps,
         });
         if (!mutationResult?.ok) {
           return deps?.json?.(
-            mutationResult?.body || { error: 'Session config coordination failed.' },
+            mutationResult?.body || { error: 'Session config mutation failed.' },
             mutationResult?.status || 503,
             headers,
           );
@@ -336,17 +364,16 @@ export const dispatchAdminRequest = async ({
         typeof result.litCredentials === 'object'
       ) ? result.litCredentials : null;
       if (litCredentials) {
-        const mutationResult = await (
-          deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutationBoundary
-        )({
+        const mutationResult = await executeDirectSessionConfigMutation({
           env,
           slug: targetSlug,
-          observedConfig: existingConfig,
+          existingConfig,
           mutation: { kind: 'merge-lit-credentials', litCredentials },
+          deps,
         });
         if (!mutationResult?.ok) {
           return deps?.json?.(
-            mutationResult?.body || { error: 'Session config coordination failed.' },
+            mutationResult?.body || { error: 'Session config mutation failed.' },
             mutationResult?.status || 503,
             headers,
           );
@@ -365,16 +392,15 @@ export const dispatchAdminRequest = async ({
     const incoming = body?.limits && typeof body.limits === 'object' ? body.limits : null;
     if (!incoming) return deps?.json?.({ error: 'Missing limits.' }, 400, headers);
 
-    const mutationResult = await (
-      deps?.executeCoordinatedSessionConfigMutation || executeCoordinatedSessionConfigMutationBoundary
-    )({
+    const mutationResult = await executeDirectSessionConfigMutation({
       env,
       slug: targetSlug,
-      observedConfig: existingConfig,
+      existingConfig,
       mutation: { kind: 'set-limits', incomingLimits: incoming },
+      deps,
     });
     return deps?.json?.(
-      mutationResult?.body || { error: 'Session config coordination failed.' },
+      mutationResult?.body || { error: 'Session config mutation failed.' },
       mutationResult?.status || 503,
       headers,
     );

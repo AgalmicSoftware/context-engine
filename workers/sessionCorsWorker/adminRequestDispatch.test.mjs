@@ -61,41 +61,39 @@ const createAdminDeps = (overrides = {}) => {
     MISSING_SLUG_ERROR: 'Missing sessionSlug.',
     ...overrides,
   };
-  if (!overrides.executeCoordinatedSessionConfigMutation) {
-    deps.executeCoordinatedSessionConfigMutation = async ({ env, slug, observedConfig, mutation }) => {
-      const applied = applySessionConfigMutation({ existingConfig: observedConfig, mutation, slug });
-      if (!applied.ok) return { ok: false, status: applied.status, body: { error: applied.error } };
-      if (!applied.skipPersistence) {
-        let nextConfig = applied.config;
-        if (mutation.kind === 'set-config' && deps.mergeWorkerConfigRecords !== mergeWorkerConfigRecords) {
-          nextConfig = deps.mergeWorkerConfigRecords({
-            existingConfig: observedConfig,
-            incomingConfig: mutation.incomingConfig,
-            slug,
-          });
-        } else if (mutation.kind === 'set-limits') {
-          nextConfig = deps.mergeWorkerLimitRecords({
-            existingConfig: observedConfig,
-            incomingLimits: mutation.incomingLimits,
-            slug,
-          });
-        } else if (mutation.kind === 'merge-lit-credentials' && deps.mergeWorkerConfigRecords !== mergeWorkerConfigRecords) {
-          nextConfig = deps.mergeWorkerConfigRecords({
-            existingConfig: observedConfig,
-            incomingConfig: {
-              litCredentials: {
-                ...((observedConfig?.litCredentials && typeof observedConfig.litCredentials === 'object')
-                  ? observedConfig.litCredentials
-                  : {}),
-                ...mutation.litCredentials,
-              },
+  if (!overrides.applySessionConfigMutation) {
+    deps.applySessionConfigMutation = ({ existingConfig, mutation, slug }) => {
+      const applied = applySessionConfigMutation({ existingConfig, mutation, slug });
+      if (!applied.ok || applied.skipPersistence) return applied;
+
+      let nextConfig = applied.config;
+      if (mutation.kind === 'set-config' && deps.mergeWorkerConfigRecords !== mergeWorkerConfigRecords) {
+        nextConfig = deps.mergeWorkerConfigRecords({
+          existingConfig,
+          incomingConfig: mutation.incomingConfig,
+          slug,
+        });
+      } else if (mutation.kind === 'set-limits') {
+        nextConfig = deps.mergeWorkerLimitRecords({
+          existingConfig,
+          incomingLimits: mutation.incomingLimits,
+          slug,
+        });
+      } else if (mutation.kind === 'merge-lit-credentials' && deps.mergeWorkerConfigRecords !== mergeWorkerConfigRecords) {
+        nextConfig = deps.mergeWorkerConfigRecords({
+          existingConfig,
+          incomingConfig: {
+            litCredentials: {
+              ...((existingConfig?.litCredentials && typeof existingConfig.litCredentials === 'object')
+                ? existingConfig.litCredentials
+                : {}),
+              ...mutation.litCredentials,
             },
-            slug,
-          });
-        }
-        await deps.putSessionConfig(env, slug, nextConfig);
+          },
+          slug,
+        });
       }
-      return { ok: true, status: 200, body: { ok: true } };
+      return { ...applied, config: nextConfig };
     };
   }
   return deps;
@@ -130,17 +128,16 @@ test('dispatchAdminRequest preserves invalid-json failure before signed request 
   });
 });
 
-test('dispatchAdminRequest fails config mutation closed when the coordinator binding is absent', async () => {
+test('dispatchAdminRequest persists config without a coordinator binding', async () => {
   let putCalls = 0;
   const deps = createAdminDeps({
     putSessionConfig: async () => { putCalls += 1; },
   });
-  delete deps.executeCoordinatedSessionConfigMutation;
 
   const result = await dispatchAdminRequest({
     request: {
       json: async () => createSignedBody({
-        config: { sessionName: 'Must not persist' },
+        config: { sessionName: 'Persist directly' },
       }),
     },
     env: { GROUP_KV: {} },
@@ -150,9 +147,9 @@ test('dispatchAdminRequest fails config mutation closed when the coordinator bin
     deps,
   });
 
-  assert.equal(result.status, 503);
-  assert.match(result.body.error, /coordination is unavailable.*not changed/i);
-  assert.equal(putCalls, 0);
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body, { ok: true });
+  assert.equal(putCalls, 1);
 });
 
 test('dispatchAdminRequest merges config and persists the result after authority resolution', async () => {
@@ -205,6 +202,58 @@ test('dispatchAdminRequest merges config and persists the result after authority
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
+});
+
+test('dispatchAdminRequest preserves a freshly stored storage envelope during the next config mutation', async () => {
+  const env = { GROUP_KV: createMemoryKv() };
+  const storageEnvelope = {
+    version: 1,
+    keyProvider: 'worker_secret',
+    sessionKey: {
+      version: 1,
+      alg: 'AES-256-GCM',
+      wrapAlg: 'AES-GCM-KW-v1',
+      keyId: 'session:session-a:fresh-envelope',
+      createdAt: '2026-07-15T00:00:00.000Z',
+      iv: 'public-iv',
+      wrappedKey: 'encrypted-key-material',
+    },
+  };
+  await putSessionConfig(env, 'session-a', {
+    slug: 'session-a',
+    adminAddress: '0xabc',
+    sessionName: 'Before mutation',
+    storageEnvelope,
+  });
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        config: { sessionName: 'After mutation' },
+      }),
+    },
+    env,
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        address: '0xabc',
+        existingConfig: await getSessionConfig(env, 'session-a'),
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      applySessionConfigMutation,
+      mergeWorkerConfigRecords,
+      putSessionConfig,
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  const persisted = await getSessionConfig(env, 'session-a');
+  assert.equal(persisted.sessionName, 'After mutation');
+  assert.deepEqual(persisted.storageEnvelope, storageEnvelope);
 });
 
 test('dispatchAdminRequest rejects changes to an initialized worker-canonical identity', async () => {
@@ -541,6 +590,64 @@ test('dispatchAdminRequest rejects secret-like values in open config subtrees be
     slug: 'session-a',
     action: 'set-config',
     deps: createAdminDeps({
+      putSessionConfig: async () => { writes += 1; },
+    }),
+  });
+
+  assert.equal(writes, 0);
+  assert.deepEqual(result, {
+    body: { error: 'Secret-like values are not allowed in public session config fields.' },
+    status: 400,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
+test('dispatchAdminRequest rejects secret-like limit mutations before config persistence', async () => {
+  let writes = 0;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        limits: { providerApiKey: 'limit-secret-must-not-persist' },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-limits',
+    deps: createAdminDeps({
+      applySessionConfigMutation,
+      putSessionConfig: async () => { writes += 1; },
+    }),
+  });
+
+  assert.equal(writes, 0);
+  assert.deepEqual(result, {
+    body: { error: 'Secret-like values are not allowed in public session config fields.' },
+    status: 400,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
+test('dispatchAdminRequest rejects secret-like Lit descriptor merges before config persistence', async () => {
+  let writes = 0;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({}),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'lit-chipotle-bootstrap-session',
+    deps: createAdminDeps({
+      getSessionSecrets: async () => ({}),
+      bootstrapLitChipotleSession: async () => ({
+        ok: true,
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litAccountApiKey: 'lit-secret-must-not-persist',
+        },
+      }),
+      applySessionConfigMutation,
       putSessionConfig: async () => { writes += 1; },
     }),
   });

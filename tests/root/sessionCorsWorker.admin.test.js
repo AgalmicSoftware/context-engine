@@ -117,7 +117,7 @@ describe('sessionCorsWorker admin routes', () => {
     });
   });
 
-  it('fails a signed config mutation closed when the session coordinator binding is absent', async () => {
+  it('persists a signed config mutation directly when the session coordinator binding is absent', async () => {
     const kv = createMemoryKv();
     const env = { GROUP_KV: kv };
     const body = await createSignedSiweBody({
@@ -129,7 +129,7 @@ describe('sessionCorsWorker admin routes', () => {
         adminAddress: adminWallet.address,
         config: {
           adminAddress: adminWallet.address,
-          sessionName: 'Must not persist',
+          sessionName: 'Persist directly',
         },
       },
     });
@@ -141,9 +141,14 @@ describe('sessionCorsWorker admin routes', () => {
     );
     const payload = await response.json();
 
-    expect(response.status).toBe(503);
-    expect(payload?.error).toMatch(/coordination is unavailable.*not changed/i);
-    expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toBeNull();
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ ok: true });
+    expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual({
+      adminAddress: adminWallet.address,
+      sessionName: 'Persist directly',
+      limits: {},
+      scopes: {},
+    });
   });
 
   it('rejects set-config when the config payload is missing', async () => {

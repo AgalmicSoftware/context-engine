@@ -98,9 +98,13 @@ For the default `Fast & Cheap (Cloudflare)` preset:
    - If the helper cannot fetch that release asset, the Worker step keeps the GitHub URL as the default path and reveals one-off retry overrides: paste a direct bundle URL or upload `dist/sessionCorsWorker.bundle.js` if you want to override the hosted URL.
    - The in-wizard deployment panel links to the GitHub worker source, deploy-helper source, and worker docs instead of shipping mirrored source snapshots inside the client bundle.
 3) The deploy-helper uses the Workers API to fetch or create the account
-   subdomain, derives a unique physical name from the requested display name
-   plus a random deployment suffix, enables its workers.dev subdomain, and
-   returns `https://<physical-worker-name>.<subdomain>.workers.dev/`.
+   subdomain and derives a unique physical name from the requested display-name
+   prefix. The first-party wizard supplies a stable `deploymentRequestId`, so
+   its suffix is deterministic and a same-ID retry resumes or replays that same
+   deployment. An explicit new request generation receives a new deterministic
+   identity; only a legacy request without an ID receives a random suffix. The
+   helper enables the workers.dev subdomain and returns
+   `https://<physical-worker-name>.<subdomain>.workers.dev/`.
    - When the session URL is empty, the deploy-helper reports the resolved slug as `general`.
 4) The deploy helper seeds the worker-canonical profile, passkey-derived admin
    address, authority policy, identity/content fields, storage profile, and
@@ -136,14 +140,17 @@ deleted speculatively.
 - `workers/deploy-helper/README.md` is the quick public reference for bindings, env vars, trust boundaries, and endpoint behavior.
 - Every newly deployed `sessionCorsWorker` now also ships with embedded deploy-helper capability enabled by default. Sponsored bootstrap deploys target the sponsoring `sessionCorsWorker` first, and that worker runs the same Cloudflare deploy core locally. Grant-backed sponsored deploys now require that embedded path and no longer fall back to a standalone helper URL.
 - New deployments bind `CE_SESSION_COORDINATOR` to the SQLite-backed
-  `SessionWriteCoordinator` class. It serializes whole-config mutations for each
-  session slug, reserves stable direct and sponsored deployments before any
-  Cloudflare mutation, and makes sponsored faucet transfers one-shot before the
-  non-idempotent transfer begins. Concurrent conflicting payloads receive
-  `409`; matching in-flight work receives retryable `503`; terminal safe
-  receipts replay without repeating the side effect. Missing coordination fails
-  closed. A worker created before this binding was introduced must be redeployed
-  before it can use these coordinated write paths.
+  `SessionWriteCoordinator` class. It reserves stable direct and sponsored
+  deployments before any Cloudflare mutation and makes sponsored faucet
+  transfers one-shot before the non-idempotent transfer begins. Concurrent
+  conflicting payloads receive `409`; matching in-flight work receives retryable
+  `503`; terminal safe receipts replay without repeating the side effect.
+  Missing coordination fails closed for those deployment and faucet paths. A
+  worker created before this binding was introduced must be redeployed before it
+  can use them. Signed Admin/publication config mutations still validate a fresh
+  KV record and write their result directly to KV; they are not serialized with
+  storage-envelope key creation/rotation or payload/index uploads. Whole-config
+  and storage-envelope write atomicity therefore remain separate work.
 - Operating modes:
   - CE-hosted: use the default `CLOUDFLARE_DEPLOY_HELPER_URL` (`https://ce-deploy-helper.agalmic.workers.dev/`) and let Context Engine operate the shared helper.
   - Self-hosted: deploy `workers/deploy-helper/worker.js` with your own Wrangler config (`wrangler.toml` or equivalent), bind `DEPLOY_HELPER_KV` and `CE_SESSION_COORDINATOR`, install the `ce-session-write-coordinator-v1` SQLite-class migration, set `ALLOWED_ORIGINS`, and set `ADMIN_SECRET` with Wrangler secrets. The checked-in example and direct CLI automation include both bindings and the migration.
@@ -462,12 +469,15 @@ R2/D1:
 - D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
 - `CE_SESSION_COORDINATOR` binds the SQLite-backed `SessionWriteCoordinator`
   class for direct/sponsored deploy idempotency, one-shot sponsored faucet
-  receipts, and serialized whole-session config mutations. One-click deploy
-  metadata installs migration tag `ce-session-write-coordinator-v1`; a repeated
-  upload retries without reapplying an already-installed migration. Coordinator
-  state may contain sanitized public config needed to recover a pending KV
-  write, but never deployment credentials, worker bundle bytes, or ordinary
-  session payload blobs.
+  receipts. One-click deploy metadata installs migration tag
+  `ce-session-write-coordinator-v1`; a repeated upload retries without
+  reapplying an already-installed migration. Coordinator state contains only
+  credential-redacted deploy/faucet request digests, progress, and safe terminal
+  receipts, never deployment credentials, worker bundle bytes, session config,
+  or ordinary session payload blobs. Signed Admin/publication config mutations
+  continue to validate a fresh KV record and write directly to KV; this binding
+  does not make those writes, storage-envelope key creation/rotation, or
+  payload-plus-index uploads atomic across independent writers.
 
 Vars:
 - `TOKEN_HMAC_SECRET` (HMAC secret for session tokens)

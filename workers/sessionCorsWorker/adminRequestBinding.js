@@ -44,7 +44,6 @@ export const dispatchAdminRequestWithWorkerDeps = async ({
       mergeWorkerConfigRecords: deps?.mergeWorkerConfigRecords,
       mergeWorkerLimitRecords: deps?.mergeWorkerLimitRecords,
       putSessionConfig: deps?.putSessionConfig,
-      executeCoordinatedSessionConfigMutation: deps?.executeCoordinatedSessionConfigMutation,
       getSessionSecrets: deps?.getSessionSecrets,
       normalizeSecretValue: deps?.normalizeSecretValue,
       putSessionSecrets: deps?.putSessionSecrets,

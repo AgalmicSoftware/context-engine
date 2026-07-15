@@ -153,9 +153,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     return { ok: false, status: 400, error: 'Unsupported session config mutation.' };
   }
 
-  // Validate the complete merged record before the coordinator durably stages
-  // it. This covers limit and Lit-descriptor mutations as well as set-config,
-  // so a rejected secret-like value never lands in either KV or DO storage.
+  // Validate the complete merged record before persistence. This covers limit
+  // and Lit-descriptor mutations as well as set-config, so a rejected
+  // secret-like value never lands in public config storage.
   if (findForbiddenCloudflareDeploymentTokenPath(mergedConfig)) {
     return { ok: false, status: 400, error: 'Cloudflare deployment tokens are not allowed in session config.' };
   }
