@@ -657,6 +657,17 @@ const buildDeploymentRequestContext = async ({ body, requestOrigin = '' } = {}) 
     sessionIdHex: toStr(body?.sessionIdHex).trim().toLowerCase(),
     adminAddress: toStr(body?.adminAddress).trim().toLowerCase(),
   }));
+  const bundleCorrectionBody = { ...(isObj(body) ? body : {}) };
+  delete bundleCorrectionBody.deploymentRequestId;
+  delete bundleCorrectionBody.accountId;
+  delete bundleCorrectionBody.apiToken;
+  delete bundleCorrectionBody.token;
+  delete bundleCorrectionBody.bundleText;
+  delete bundleCorrectionBody.bundleUrl;
+  const bundleCorrectionDigest = await sha256Hex(stableCanonicalSerialize({
+    body: bundleCorrectionBody,
+    requestOrigin: normalizeOrigin(requestOrigin) || toStr(requestOrigin).trim(),
+  }));
   const deploymentId = await sha256Hex(`context-engine-deployment:${deploymentRequestId}`);
   return {
     deploymentRequestId,
@@ -665,11 +676,13 @@ const buildDeploymentRequestContext = async ({ body, requestOrigin = '' } = {}) 
     // requestDigest for a stable infrastructure identity below.
     fullRequestDigest: requestDigest,
     immutableIdentityDigest,
+    bundleCorrectionDigest,
     deploymentId,
     requestMarker: deploymentId.slice(0, 16),
     workerName: buildFreshDeploymentName(body?.workerName, deploymentId),
     journalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}`,
     uploadJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:upload`,
+    uploadRejectedJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:upload-rejected`,
     terminalJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:terminal`,
     isReplay: false,
   };
@@ -690,6 +703,14 @@ const writeDeployJournalRecord = async (binding, key, record) => binding.put(
   key,
   JSON.stringify(record),
   { expirationTtl: DEPLOYMENT_JOURNAL_TTL_SECONDS },
+);
+
+// A rejected bundle may need correction after the ordinary replay journals
+// expire. Keep this non-secret authority until a terminal receipt commits;
+// using a distinct key also avoids Workers KV's same-key write-rate limit.
+const writeDurableDeployJournalRecord = async (binding, key, record) => binding.put(
+  key,
+  JSON.stringify(record),
 );
 
 const normalizeResourceStage = (value, fallback) => {
@@ -999,6 +1020,21 @@ const shouldAllowFallbackForCloudflareFailure = (result = {}) => {
   return status >= 500 || status === 429;
 };
 
+const isAmbiguousCloudflareMutationFailure = (result = {}) => {
+  const status = Number(result?.status || 0);
+  return !status || status >= 500 || [408, 409, 412, 425, 429, 499].includes(status);
+};
+
+const isDefinitiveWorkerUploadRejection = (result = {}) => {
+  const status = Number(result?.status || 0);
+  if (status < 400 || status >= 500) return false;
+  // Timeout, conflict, precondition, early-data, throttling, and client-closed
+  // responses can race a concurrent or partially observed mutation. Preserve
+  // staged resources for those ambiguous cases; ordinary validation/auth 4xx
+  // responses prove that this upload did not install the script.
+  return !new Set([408, 409, 412, 425, 429, 499]).has(status);
+};
+
 export const ensureWorkersDevAccountSubdomain = async ({
   apiToken,
   accountId,
@@ -1253,7 +1289,7 @@ const executeDeployHelperRequestCore = async ({
     // This is the non-secret marker embedded in CE_DEPLOYMENT_ID. Preserve it
     // on partial-deploy failures so a caller can verify ownership before
     // retrying cleanup of any reported orphan resources.
-    ...(Object.hasOwn(payload || {}, 'orphanResources') ? { deploymentId } : {}),
+    ...(Object.hasOwn(payload || {}, 'orphanResources') ? { accountId, deploymentId } : {}),
   }, options);
   const workerNamePreflight = await cfFetch(
     apiToken,
@@ -1325,6 +1361,44 @@ const executeDeployHelperRequestCore = async ({
   let bundleSource = hasBundleText ? bundleText : '';
   const bundleSourceKind = hasBundleText ? 'bundleText' : 'bundleUrl';
   let bundleDiagnostics = null;
+  const prepareBundleDiagnostics = async () => {
+    if (bundleDiagnostics) return { ok: true };
+    if (!bundleSource) {
+      let bundleResp;
+      try {
+        bundleResp = await fetchImpl(bundleUrl);
+      } catch (err) {
+        return {
+          ok: false,
+          result: buildFailure(502, {
+            error: `Failed to fetch bundle: ${toStr(err?.message || err).trim() || 'Unknown error.'}`,
+          }, { fallbackEligible: true }),
+        };
+      }
+      if (!bundleResp.ok) {
+        return {
+          ok: false,
+          result: buildFailure(502, {
+            error: `Failed to fetch bundle (${bundleResp.status}).`,
+          }, {
+            fallbackEligible: bundleResp.status >= 500 || bundleResp.status === 429,
+          }),
+        };
+      }
+      bundleSource = await bundleResp.text();
+    }
+    bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
+    consoleImpl?.log?.('[deploy-helper] bundle diagnostics', JSON.stringify({
+      workerName,
+      sessionSlug: displaySlug,
+      diagnostics: {
+        ...bundleDiagnostics,
+        prefix: bundleDiagnostics.prefix,
+        suffix: bundleDiagnostics.suffix,
+      },
+    }));
+    return { ok: true };
+  };
 
   const config = {
     slug: sessionSlug,
@@ -1404,7 +1478,11 @@ const executeDeployHelperRequestCore = async ({
     return { ok: true, matches };
   };
 
-  const workerSettingsMatchDeployment = (settingsResult, namespaceId) => {
+  const workerSettingsMatchDeployment = (
+    settingsResult,
+    namespaceId,
+    { ignoreBundleIdentity = false } = {},
+  ) => {
     if (!settingsResult?.ok || !namespaceId) return false;
     const settings = settingsResult.data?.result || {};
     const bindings = Array.isArray(settings?.bindings)
@@ -1451,9 +1529,11 @@ const executeDeployHelperRequestCore = async ({
       toStr(bundleIdentityBindings[0]?.type).trim() === 'plain_text'
       ? toStr(bundleIdentityBindings[0]?.text).trim().toLowerCase()
       : '';
-    const expectedBundleSha256 = expectedInlineBundleSha256 || toStr(idempotencyContext?.bundleSha256).trim().toLowerCase();
+    const expectedBundleSha256 = bundleDiagnostics?.sha256 ||
+      expectedInlineBundleSha256 ||
+      toStr(idempotencyContext?.bundleSha256).trim().toLowerCase();
     const bundleIdentityMatches = /^[0-9a-f]{64}$/.test(observedBundleSha256) &&
-      (!expectedBundleSha256 || observedBundleSha256 === expectedBundleSha256);
+      (ignoreBundleIdentity || !expectedBundleSha256 || observedBundleSha256 === expectedBundleSha256);
     const requestDigestMatches = requestMarker
       ? hasExactPlainText(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, toStr(idempotencyContext?.requestDigest).trim())
       : named(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME).length === 0;
@@ -1469,10 +1549,22 @@ const executeDeployHelperRequestCore = async ({
       hasExactPlainText('DEFAULT_SESSION_SLUG', sessionSlug) &&
       hasExactPlainText('DEPLOY_HELPER_ENABLED', embeddedDeployHelperEnabled ? '1' : '0');
   };
+  const readWorkerBundleSha256 = (settingsResult) => {
+    const bindings = Array.isArray(settingsResult?.data?.result?.bindings)
+      ? settingsResult.data.result.bindings
+      : [];
+    const matches = bindings.filter((binding) => (
+      toStr(binding?.name).trim() === BUNDLE_SHA256_BINDING_NAME &&
+      toStr(binding?.type).trim() === 'plain_text'
+    ));
+    const value = matches.length === 1 ? toStr(matches[0]?.text).trim().toLowerCase() : '';
+    return /^[0-9a-f]{64}$/.test(value) ? value : '';
+  };
 
   let kvId = '';
   let resumeUploadedWorker = false;
   let resumeWorkerSettings = mayResumeExistingWorker ? workerNamePreflight : null;
+  let replaceRejectedWorker = idempotencyContext?.definitiveUploadRejected === true;
   let createdKvThisInvocation = false;
   let uploadedWorkerThisInvocation = false;
   if (requestMarker) {
@@ -1544,59 +1636,48 @@ const executeDeployHelperRequestCore = async ({
   }
 
   if (resumeWorkerSettings) {
-    if (!workerSettingsMatchDeployment(resumeWorkerSettings, kvId)) {
+    if (idempotencyContext?.definitiveUploadRejected === true) {
+      const preparedBundle = await prepareBundleDiagnostics();
+      if (!preparedBundle.ok) return preparedBundle.result;
+      if (!workerSettingsMatchDeployment(resumeWorkerSettings, kvId, { ignoreBundleIdentity: true })) {
+        return buildFailure(409, {
+          error: 'Existing worker does not match this deployment request; required bindings differ and resume stopped.',
+          deploymentRequestPending: true,
+        });
+      }
+      if (readWorkerBundleSha256(resumeWorkerSettings) === bundleDiagnostics.sha256) {
+        resumeUploadedWorker = true;
+      } else {
+        replaceRejectedWorker = true;
+      }
+      idempotencyContext.mutationStarted = true;
+    } else if (!workerSettingsMatchDeployment(resumeWorkerSettings, kvId)) {
       return buildFailure(409, {
         error: 'Existing worker does not match this deployment request; required bindings differ and resume stopped.',
         deploymentRequestPending: true,
       });
+    } else {
+      resumeUploadedWorker = true;
+      idempotencyContext.mutationStarted = true;
     }
-    resumeUploadedWorker = true;
-    idempotencyContext.mutationStarted = true;
   }
 
   // An exactly owned uploaded Worker already contains the requested module.
   // Do not make recovery depend on the original bundle host still being
   // reachable; bundle acquisition belongs only to the upload path.
   if (!resumeUploadedWorker) {
-    if (!bundleSource) {
-      let bundleResp;
-      try {
-        bundleResp = await fetchImpl(bundleUrl);
-      } catch (err) {
-        return buildFailure(502, {
-          error: `Failed to fetch bundle: ${toStr(err?.message || err).trim() || 'Unknown error.'}`,
-        }, {
-          fallbackEligible: true,
-        });
-      }
-      if (!bundleResp.ok) {
-        return buildFailure(502, {
-          error: `Failed to fetch bundle (${bundleResp.status}).`,
-        }, {
-          fallbackEligible: bundleResp.status >= 500 || bundleResp.status === 429,
-        });
-      }
-      bundleSource = await bundleResp.text();
-    }
-    bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
+    const preparedBundle = await prepareBundleDiagnostics();
+    if (!preparedBundle.ok) return preparedBundle.result;
     if (
       idempotencyContext?.bundleSha256 &&
-      toStr(idempotencyContext.bundleSha256).trim().toLowerCase() !== bundleDiagnostics.sha256
+      toStr(idempotencyContext.bundleSha256).trim().toLowerCase() !== bundleDiagnostics.sha256 &&
+      idempotencyContext?.definitiveUploadRejected !== true
     ) {
       return buildFailure(409, {
         error: 'Deployment bundle content changed after this request started; upload was stopped.',
         deploymentRequestPending: true,
       });
     }
-    consoleImpl?.log?.('[deploy-helper] bundle diagnostics', JSON.stringify({
-      workerName,
-      sessionSlug: displaySlug,
-      diagnostics: {
-        ...bundleDiagnostics,
-        prefix: bundleDiagnostics.prefix,
-        suffix: bundleDiagnostics.suffix,
-      },
-    }));
   }
 
   let kvCreate = null;
@@ -1669,7 +1750,7 @@ const executeDeployHelperRequestCore = async ({
       : { kvNamespaceId: kvId, kvCleanupStatus: 'delete-failed' };
   };
 
-  if (!resumeUploadedWorker) {
+  if (!resumeUploadedWorker && idempotencyContext?.definitiveUploadRejected !== true) {
     // Establish the signed admin binding before the runnable script can ever be
     // attached to this namespace. Otherwise a redeployed workers.dev hostname
     // has a first-write interval where an unrelated signer can claim the slug.
@@ -1795,7 +1876,9 @@ const executeDeployHelperRequestCore = async ({
         cfFetchOptions,
       );
       if (!scriptCleanup.ok) {
-        workerCleanupStatus = 'owned-delete-failed';
+        workerCleanupStatus = isAmbiguousCloudflareMutationFailure(scriptCleanup)
+          ? 'owned-delete-failed'
+          : 'owned-delete-rejected';
         return false;
       }
       removableWorkerName = '';
@@ -1837,7 +1920,10 @@ const executeDeployHelperRequestCore = async ({
   };
 
   const buildScriptUploadForm = ({ omitMigrations = false } = {}) => {
-    const uploadMetadata = { ...metadata };
+    const uploadMetadata = {
+      ...metadata,
+      ...(replaceRejectedWorker ? { keep_bindings: ['secret_text'] } : {}),
+    };
     if (omitMigrations) delete uploadMetadata.migrations;
     const uploadForm = new FormData();
     uploadForm.append(
@@ -1865,7 +1951,25 @@ const executeDeployHelperRequestCore = async ({
       cfFetchOptions,
     );
     if (finalWorkerNamePreflight.ok) {
-      if (requestMarker) {
+      if (requestMarker && idempotencyContext?.definitiveUploadRejected === true) {
+        if (!workerSettingsMatchDeployment(finalWorkerNamePreflight, kvId, { ignoreBundleIdentity: true })) {
+          return buildDeploymentFailure(409, {
+            error: 'Existing worker does not match this deployment request; required bindings differ and resume stopped.',
+            deploymentRequestPending: true,
+            orphanResources: {
+              kvNamespaceId: kvId,
+              kvCleanupStatus: 'retained-upload-pending',
+              workerName,
+              workerCleanupStatus: 'ownership-changed',
+            },
+          });
+        }
+        if (readWorkerBundleSha256(finalWorkerNamePreflight) === bundleDiagnostics.sha256) {
+          resumeUploadedWorker = true;
+        } else {
+          replaceRejectedWorker = true;
+        }
+      } else if (requestMarker) {
         return buildDeploymentFailure(503, {
           error: 'This deployment request is already advancing in another invocation. Retry the same request ID.',
           deploymentRequestPending: true,
@@ -1875,14 +1979,15 @@ const executeDeployHelperRequestCore = async ({
             workerName,
           },
         });
+      } else {
+        const orphanKv = await cleanupStagedKv();
+        return buildDeploymentFailure(409, {
+          error: `Generated worker name "${workerName}" became unavailable during deployment. No script was uploaded; retry to allocate a new physical worker name.`,
+          orphanResources: { ...orphanKv, workerName: '' },
+        });
       }
-      const orphanKv = await cleanupStagedKv();
-      return buildDeploymentFailure(409, {
-        error: `Generated worker name "${workerName}" became unavailable during deployment. No script was uploaded; retry to allocate a new physical worker name.`,
-        orphanResources: { ...orphanKv, workerName: '' },
-      });
     }
-    if (Number(finalWorkerNamePreflight.status || 0) !== 404) {
+    if (!finalWorkerNamePreflight.ok && Number(finalWorkerNamePreflight.status || 0) !== 404) {
       const orphanKv = await cleanupStagedKv();
       return buildDeploymentFailure(502, {
         error: finalWorkerNamePreflight.error || 'Failed to re-verify worker-name availability.',
@@ -1892,56 +1997,97 @@ const executeDeployHelperRequestCore = async ({
         fallbackEligible: shouldAllowFallbackForCloudflareFailure(finalWorkerNamePreflight),
       });
     }
-    try {
-      await idempotencyContext?.markUploadStarted?.(bundleDiagnostics?.sha256);
-    } catch (error) {
-      return buildDeploymentFailure(503, {
-        error: `Failed to journal deployment upload identity: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
-        deploymentRequestPending: true,
-        orphanResources: {
-          kvNamespaceId: kvId,
-          kvCleanupStatus: 'retained-upload-pending',
-          workerName: '',
-        },
-      }, { fallbackEligible: true });
-    }
-    uploadedWorkerThisInvocation = true;
-    let scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
-      method: 'PUT',
-      body: buildScriptUploadForm(),
-    }, cfFetchOptions);
-    const migrationPreconditionFailure = Number(scriptUpload.status || 0) === 412 && /migration tag precondition failed/i.test([
-      scriptUpload.error,
-      ...(Array.isArray(scriptUpload.detail)
-        ? scriptUpload.detail.map((entry) => toStr(entry?.message || entry))
-        : [scriptUpload.detail]),
-    ].filter(Boolean).join('\n'));
-    if (migrationPreconditionFailure) {
-      // A prior deploy of this same script already applied the class migration.
-      // Retry the identical module and bindings without replaying that migration.
-      scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
+    if (!resumeUploadedWorker) {
+      try {
+        await idempotencyContext?.markUploadStarted?.(bundleDiagnostics?.sha256);
+      } catch (error) {
+        return buildDeploymentFailure(503, {
+          error: `Failed to journal deployment upload identity: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
+          deploymentRequestPending: true,
+          orphanResources: {
+            kvNamespaceId: kvId,
+            kvCleanupStatus: 'retained-upload-pending',
+            workerName,
+          },
+        }, { fallbackEligible: true });
+      }
+      uploadedWorkerThisInvocation = true;
+      let scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
         method: 'PUT',
-        body: buildScriptUploadForm({ omitMigrations: true }),
+        body: buildScriptUploadForm(),
       }, cfFetchOptions);
-    }
-    if (!scriptUpload.ok) {
-      consoleImpl?.error?.('[deploy-helper] script upload failed', JSON.stringify({
-        workerName,
-        sessionSlug: displaySlug,
-        error: scriptUpload.error,
-        detail: scriptUpload.detail,
-        diagnostics: bundleDiagnostics,
-      }));
-      const bundleSummary = formatBundleDiagnostics(bundleDiagnostics);
-      const orphanResources = await cleanupDeploymentResources();
-      return buildDeploymentFailure(502, {
-        error: `${scriptUpload.error} Bundle diagnostics: ${bundleSummary}`,
-        detail: scriptUpload.detail,
-        bundleDiagnostics,
-        orphanResources,
-      }, {
-        fallbackEligible: shouldAllowFallbackForCloudflareFailure(scriptUpload),
-      });
+      const migrationPreconditionFailure = Number(scriptUpload.status || 0) === 412 && /migration tag precondition failed/i.test([
+        scriptUpload.error,
+        ...(Array.isArray(scriptUpload.detail)
+          ? scriptUpload.detail.map((entry) => toStr(entry?.message || entry))
+          : [scriptUpload.detail]),
+      ].filter(Boolean).join('\n'));
+      if (migrationPreconditionFailure) {
+        // A prior deploy of this same script already applied the class migration.
+        // Retry the identical module and bindings without replaying that migration.
+        scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
+          method: 'PUT',
+          body: buildScriptUploadForm({ omitMigrations: true }),
+        }, cfFetchOptions);
+      }
+      if (!scriptUpload.ok) {
+        consoleImpl?.error?.('[deploy-helper] script upload failed', JSON.stringify({
+          workerName,
+          sessionSlug: displaySlug,
+          error: scriptUpload.error,
+          detail: scriptUpload.detail,
+          diagnostics: bundleDiagnostics,
+        }));
+        const bundleSummary = formatBundleDiagnostics(bundleDiagnostics);
+        const uploadWasDefinitivelyRejected = isDefinitiveWorkerUploadRejection(scriptUpload);
+        const stableUploadWasDefinitivelyRejected = (
+          uploadWasDefinitivelyRejected &&
+          !!requestMarker &&
+          !!kvId
+        );
+        const stableUploadMayHaveCommitted = (
+          !uploadWasDefinitivelyRejected &&
+          !!requestMarker &&
+          !!kvId
+        );
+        let rejectionJournalError = '';
+        if (stableUploadWasDefinitivelyRejected) {
+          try {
+            await idempotencyContext?.markDefinitiveUploadRejected?.(bundleDiagnostics?.sha256);
+          } catch (error) {
+            rejectionJournalError = toStr(error?.message || error).trim() || 'Unknown error.';
+          }
+        }
+        const orphanResources = stableUploadWasDefinitivelyRejected || stableUploadMayHaveCommitted
+          ? {
+              kvNamespaceId: kvId,
+              kvCleanupStatus: 'retained-upload-pending',
+              workerName,
+            }
+          : uploadWasDefinitivelyRejected
+            ? { ...(await cleanupStagedKv()), workerName: '' }
+            : await cleanupDeploymentResources();
+        return buildDeploymentFailure(rejectionJournalError ? 503 : 502, {
+          error: rejectionJournalError
+            ? `Failed to persist definitive upload rejection: ${rejectionJournalError}`
+            : `${scriptUpload.error} Bundle diagnostics: ${bundleSummary}`,
+          detail: scriptUpload.detail,
+          bundleDiagnostics,
+          orphanResources,
+          ...(stableUploadWasDefinitivelyRejected || stableUploadMayHaveCommitted
+            ? { deploymentRequestPending: true }
+            : {}),
+        }, {
+          fallbackEligible: rejectionJournalError
+            ? true
+            : shouldAllowFallbackForCloudflareFailure(scriptUpload),
+        });
+      }
+      if (idempotencyContext?.definitiveUploadRejected === true) {
+        // This retry reused already-staged KV state. Treat the corrected upload
+        // like a resume so secrets/config are preserved until signed sync.
+        resumeUploadedWorker = true;
+      }
     }
   }
 
@@ -2031,6 +2177,7 @@ const executeDeployHelperRequestCore = async ({
   });
   const deploymentPayload = {
     ok: true,
+    accountId,
     workerName,
     workerUrl,
     resolvedSlug: displaySlug,
@@ -2266,6 +2413,24 @@ export const executeDeployHelperRequest = async (options = {}) => {
     error: 'deploymentRequestId was already used with a different request payload.',
     deploymentRequestConflict: true,
   });
+  const clearRejectedBundleAuthority = async (required) => {
+    if (!required) return null;
+    if (typeof journalBinding.delete !== 'function') {
+      return buildFailure(503, {
+        error: 'Failed to clear rejected-bundle correction authority; retry the same deployment request.',
+        deploymentRequestPending: true,
+      }, { fallbackEligible: true });
+    }
+    try {
+      await journalBinding.delete(context.uploadRejectedJournalKey);
+      return null;
+    } catch {
+      return buildFailure(503, {
+        error: 'Failed to clear rejected-bundle correction authority; retry the same deployment request.',
+        deploymentRequestPending: true,
+      }, { fallbackEligible: true });
+    }
+  };
   const buildTerminalJournalReplay = (record) => {
     const result = record?.result;
     if (result?.ok !== true) return result;
@@ -2291,10 +2456,12 @@ export const executeDeployHelperRequest = async (options = {}) => {
   let existingRecord;
   let terminalRecord;
   let uploadRecord;
+  let uploadRejectedRecord;
   try {
-    [terminalRecord, uploadRecord, existingRecord] = await Promise.all([
+    [terminalRecord, uploadRecord, uploadRejectedRecord, existingRecord] = await Promise.all([
       readDeployJournalRecord(journalBinding, context.terminalJournalKey),
       readDeployJournalRecord(journalBinding, context.uploadJournalKey),
+      readDeployJournalRecord(journalBinding, context.uploadRejectedJournalKey),
       readDeployJournalRecord(journalBinding, context.journalKey),
     ]);
   } catch (error) {
@@ -2310,9 +2477,44 @@ export const executeDeployHelperRequest = async (options = {}) => {
       return buildRequestDigestConflict();
     }
     if (terminalRecord.state === 'terminal' && isObj(terminalRecord.result)) {
+      // Workers KV may expose the terminal receipt before a still-present
+      // rejected-bundle marker. Delete by deterministic key on every terminal
+      // replay; conditioning cleanup on a prior read can preserve stale bundle
+      // replacement authority after success.
+      const authorityCleanupFailure = await clearRejectedBundleAuthority(true);
+      if (authorityCleanupFailure) return authorityCleanupFailure;
       return buildTerminalJournalReplay(terminalRecord);
     }
     return buildFailure(409, { error: 'Deployment request terminal journal state is invalid.' });
+  }
+  if (uploadRejectedRecord) {
+    const rejectedBundleSha256 = toStr(uploadRejectedRecord.bundleSha256).trim().toLowerCase();
+    if (toStr(uploadRejectedRecord.requestDigest).trim() !== context.requestDigest) {
+      return buildRequestDigestConflict();
+    }
+    if (
+      Number(uploadRejectedRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION ||
+      uploadRejectedRecord.state !== 'definitive_upload_rejected' ||
+      !/^[0-9a-f]{64}$/.test(toStr(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase()) ||
+      toStr(uploadRejectedRecord.deploymentId).trim() !== context.deploymentId ||
+      toStr(uploadRejectedRecord.workerName).trim() !== context.workerName ||
+      toStr(uploadRejectedRecord.requestMarker).trim() !== context.requestMarker ||
+      !/^[0-9a-f]{64}$/.test(rejectedBundleSha256)
+    ) {
+      return buildFailure(409, { error: 'Deployment request upload-rejection journal state is invalid.' });
+    }
+    if (
+      toStr(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase() !==
+      context.bundleCorrectionDigest
+    ) {
+      return buildFailure(409, {
+        error: 'A rejected deployment bundle may be corrected only when every non-bundle deployment field is unchanged.',
+        deploymentRequestConflict: true,
+        deploymentRequestPending: true,
+      });
+    }
+    context.definitiveUploadRejected = true;
+    context.rejectedBundleSha256 = rejectedBundleSha256;
   }
   if (uploadRecord) {
     if (toStr(uploadRecord.requestDigest).trim() !== context.requestDigest) {
@@ -2327,6 +2529,19 @@ export const executeDeployHelperRequest = async (options = {}) => {
     }
     context.uploadStarted = true;
     context.bundleSha256 = toStr(uploadRecord.bundleSha256).trim().toLowerCase();
+  }
+  if (
+    context.definitiveUploadRejected === true &&
+    context.bundleSha256 &&
+    context.bundleSha256 !== context.rejectedBundleSha256
+  ) {
+    return buildFailure(409, { error: 'Deployment request upload journal conflicts with its rejection state.' });
+  }
+  if (context.definitiveUploadRejected === true && !context.bundleSha256) {
+    // The short-lived upload journal may have expired. The durable rejection
+    // record preserves its original non-secret bundle identity for recovery.
+    context.uploadStarted = true;
+    context.bundleSha256 = context.rejectedBundleSha256;
   }
   if (existingRecord) {
     if (
@@ -2361,6 +2576,7 @@ export const executeDeployHelperRequest = async (options = {}) => {
       }, { fallbackEligible: true });
     }
   }
+  if (context.definitiveUploadRejected === true) context.isReplay = true;
 
   context.markMutationStarted = async () => {
     if (context.mutationStarted) return;
@@ -2375,7 +2591,11 @@ export const executeDeployHelperRequest = async (options = {}) => {
     if (!/^[0-9a-f]{64}$/.test(normalizedBundleSha256)) {
       throw new TypeError('Cannot journal an invalid deployment bundle identity.');
     }
-    if (context.bundleSha256 && context.bundleSha256 !== normalizedBundleSha256) {
+    if (
+      context.bundleSha256 &&
+      context.bundleSha256 !== normalizedBundleSha256 &&
+      context.definitiveUploadRejected !== true
+    ) {
       throw new TypeError('Deployment bundle content changed after this request started.');
     }
     if (!context.uploadStarted) {
@@ -2392,11 +2612,39 @@ export const executeDeployHelperRequest = async (options = {}) => {
       context.bundleSha256 = normalizedBundleSha256;
     }
   };
+  context.markDefinitiveUploadRejected = async (bundleSha256) => {
+    const normalizedBundleSha256 = toStr(bundleSha256).trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(normalizedBundleSha256)) {
+      throw new TypeError('Cannot journal an invalid rejected bundle identity.');
+    }
+    if (context.definitiveUploadRejected === true) return;
+    await writeDurableDeployJournalRecord(journalBinding, context.uploadRejectedJournalKey, {
+      version: DEPLOYMENT_JOURNAL_VERSION,
+      state: 'definitive_upload_rejected',
+      requestDigest: context.requestDigest,
+      deploymentId: context.deploymentId,
+      workerName: context.workerName,
+      requestMarker: context.requestMarker,
+      bundleSha256: normalizedBundleSha256,
+      bundleCorrectionDigest: context.bundleCorrectionDigest,
+    });
+    context.definitiveUploadRejected = true;
+    context.rejectedBundleSha256 = normalizedBundleSha256;
+  };
 
   const result = await executeDeployHelperRequestCore({
     ...options,
     idempotencyContext: context,
   });
+  if (context.definitiveUploadRejected === true && result?.ok !== true) {
+    return {
+      ...result,
+      body: {
+        ...(isObj(result?.body) ? result.body : {}),
+        deploymentRequestPending: true,
+      },
+    };
+  }
   if (result?.body?.deploymentRequestPending === true) return result;
   if (result?.ok !== true && result?.fallbackEligible === true) {
     if (context.mutationStarted === true) {
@@ -2427,5 +2675,9 @@ export const executeDeployHelperRequest = async (options = {}) => {
     requestMarker: context.requestMarker,
     result: safeResult,
   });
+  const authorityCleanupFailure = await clearRejectedBundleAuthority(
+    context.definitiveUploadRejected === true,
+  );
+  if (authorityCleanupFailure) return authorityCleanupFailure;
   return safeResult;
 };

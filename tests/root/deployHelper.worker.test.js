@@ -197,6 +197,7 @@ const makeResumableDeploymentFetch = () => {
     if (normalizedUrl === 'https://bundles.example.test/sessionCorsWorker.bundle.js') {
       bundleFetches += 1;
       if (fetchMock.bundleFetchMustFail) throw new TypeError('bundle host is unavailable');
+      if (fetchMock.bundleFetchResponses.length) return fetchMock.bundleFetchResponses.shift();
       return new Response('export default { fetch() {} };', { status: 200 });
     }
     if (method === 'GET' && /\/accounts\?per_page=5$/.test(normalizedUrl)) {
@@ -319,6 +320,7 @@ const makeResumableDeploymentFetch = () => {
   fetchMock.configReadbackFailures = 0;
   fetchMock.subdomainFailures = 0;
   fetchMock.bundleFetchMustFail = false;
+  fetchMock.bundleFetchResponses = [];
   fetchMock.workerSettingsHiddenReads = 0;
   fetchMock.namespaceListHiddenReads = 0;
   fetchMock.namespaces = namespaces;
@@ -1995,6 +1997,19 @@ describe('deploy-helper worker', () => {
       shouldDeleteKv: false,
     },
     {
+      label: 'records a definitive owned script delete rejection without absence authority',
+      settingsOverride: null,
+      scriptDeleteResponse: cfFailure(403, 'Worker deletion was forbidden.'),
+      expectedOrphans: {
+        kvNamespaceId: 'kv-123',
+        kvCleanupStatus: 'retained-live-worker',
+        workerName: expect.stringMatching(/^canonical-worker-[0-9a-f]{12}$/),
+        workerCleanupStatus: 'owned-delete-rejected',
+      },
+      shouldDeleteScript: true,
+      shouldDeleteKv: false,
+    },
+    {
       label: 'retains KV when post-upload ownership remains hidden behind 404',
       settingsOverride: cfFailure(404, 'Worker not found.'),
       expectedOrphans: {
@@ -2307,6 +2322,571 @@ describe('deploy-helper worker', () => {
         class_name: 'SessionWriteCoordinator',
       });
     } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('recovers one stable KV after a lost upload journal response and repeated definitive bundle rejection', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const normalPut = journalKv.put.bind(journalKv);
+    let loseUploadJournalResponse = true;
+    journalKv.put = async (key, value, options) => {
+      await normalPut(key, value, options);
+      const parsed = JSON.parse(value);
+      if (parsed?.state === 'upload_started' && loseUploadJournalResponse) {
+        loseUploadJournalResponse = false;
+        throw new TypeError('upload journal response lost before script mutation');
+      }
+    };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
+    const body = {
+      apiToken: 'cf-stable-replay-token',
+      deploymentRequestId: 'request-upload-rejection-replay-0001',
+      workerName: 'rejected-worker',
+      sessionSlug: 'rejected-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+
+    try {
+      const firstResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(firstResponse.status).toBe(503);
+      expect((await firstResponse.json()).deploymentRequestPending).toBe(true);
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(0);
+
+      fetchMock.scriptUploadResponses.push(
+        cfFailure(400, 'The uploaded script has no registered event handlers.'),
+      );
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      const retryPayload = await retryResponse.json();
+
+      expect(retryResponse.status).toBe(502);
+      expect(retryPayload.deploymentRequestPending).toBe(true);
+      expect(retryPayload.orphanResources).toEqual({
+        kvNamespaceId: 'kv-resume-1',
+        kvCleanupStatus: 'retained-upload-pending',
+        workerName: expect.stringMatching(/^rejected-worker-[0-9a-f]{12}$/),
+      });
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.namespaces).toHaveLength(1);
+      expect(fetchMock.mock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        (/\/workers\/scripts\//.test(String(url)) || /\/storage\/kv\/namespaces\//.test(String(url)))
+      ))).toBe(false);
+      expect([...journalKv.store.values()].some((value) => JSON.parse(value).state === 'terminal')).toBe(false);
+
+      fetchMock.scriptUploadResponses.push(
+        cfFailure(400, 'The uploaded script has no registered event handlers.'),
+      );
+      const repeatedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(repeatedResponse.status).toBe(502);
+      expect((await repeatedResponse.json()).deploymentRequestPending).toBe(true);
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(2);
+      expect([...journalKv.store.values()].map((value) => JSON.parse(value).state)).toContain(
+        'definitive_upload_rejected',
+      );
+
+      // Settings may remain hidden even though prior runtime secret bindings
+      // exist. The corrected PUT must preserve them, then resume from the
+      // uploaded settings instead of rotating the secret.
+      fetchMock.workerSecretBindings.set(retryPayload.orphanResources.workerName, new Map([
+        ['TOKEN_HMAC_SECRET', { name: 'TOKEN_HMAC_SECRET', type: 'secret_text' }],
+      ]));
+
+      const correctedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        bundleText: 'export default { async fetch() { return new Response("ok"); } };',
+      }), env, {});
+      const correctedPayload = await correctedResponse.json();
+
+      expect(correctedResponse.status).toBe(200);
+      expect(correctedPayload).toEqual(expect.objectContaining({
+        ok: true,
+        kvNamespaceId: 'kv-resume-1',
+        configVerified: true,
+        tokenSecretPreserved: true,
+      }));
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(3);
+      expect(fetchMock.namespaces).toHaveLength(1);
+      expect(fetchMock.scriptUploadMetadata[1].keep_bindings).toEqual(['secret_text']);
+      expect(fetchMock.scriptUploadMetadata[2].keep_bindings).toEqual(['secret_text']);
+      expect(fetchMock.workerSecretBodies).toHaveLength(0);
+      expect(fetchMock.mock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        (/\/workers\/scripts\//.test(String(url)) || /\/storage\/kv\/namespaces\//.test(String(url)))
+      ))).toBe(false);
+      const terminalStates = [...journalKv.store.values()].map((value) => JSON.parse(value).state);
+      expect(terminalStates).toEqual(expect.arrayContaining(['upload_started', 'terminal']));
+      expect(terminalStates).not.toContain('definitive_upload_rejected');
+    } finally {
+      consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('recovers a corrected bundle after the expiring reservation and upload journals are gone', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    fetchMock.scriptUploadResponses.push(
+      cfFailure(400, 'The uploaded script has no registered event handlers.'),
+    );
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
+    const body = {
+      apiToken: 'cf-expired-rejection-token',
+      deploymentRequestId: 'request-expired-rejected-bundle-0001',
+      workerName: 'expired-rejected-worker',
+      sessionSlug: 'expired-rejected-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+
+    try {
+      const rejectedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(rejectedResponse.status).toBe(502);
+      expect((await rejectedResponse.json()).deploymentRequestPending).toBe(true);
+      for (const [key, value] of journalKv.store.entries()) {
+        const state = JSON.parse(value).state;
+        if (state === 'reserved' || state === 'upload_started') journalKv.store.delete(key);
+      }
+      expect([...journalKv.store.values()].map((value) => JSON.parse(value).state)).toEqual([
+        'definitive_upload_rejected',
+      ]);
+
+      const correctedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        bundleText: 'export default { async fetch() { return new Response("corrected"); } };',
+      }), env, {});
+      const correctedPayload = await correctedResponse.json();
+
+      expect(correctedResponse.status).toBe(200);
+      expect(correctedPayload).toEqual(expect.objectContaining({
+        ok: true,
+        kvNamespaceId: 'kv-resume-1',
+        configVerified: true,
+      }));
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(2);
+      expect(fetchMock.scriptUploadMetadata[1].keep_bindings).toEqual(['secret_text']);
+      expect(fetchMock.mock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        (/\/workers\/scripts\//.test(String(url)) || /\/storage\/kv\/namespaces\//.test(String(url)))
+      ))).toBe(false);
+      expect([...journalKv.store.values()].map((value) => JSON.parse(value).state)).toContain('terminal');
+    } finally {
+      consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('clears rejected-bundle authority before replaying terminal success after delete failure', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    fetchMock.scriptUploadResponses.push(
+      cfFailure(400, 'The uploaded script has no registered event handlers.'),
+    );
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const normalGet = journalKv.get.bind(journalKv);
+    const normalDelete = journalKv.delete.bind(journalKv);
+    let hideRejectedMarkerReadOnce = false;
+    let rejectedMarkerDeleteFailuresRemaining = 2;
+    journalKv.get = async (key) => {
+      if (key.endsWith(':upload-rejected') && hideRejectedMarkerReadOnce) {
+        hideRejectedMarkerReadOnce = false;
+        return null;
+      }
+      return normalGet(key);
+    };
+    journalKv.delete = async (key) => {
+      if (key.endsWith(':upload-rejected') && rejectedMarkerDeleteFailuresRemaining > 0) {
+        rejectedMarkerDeleteFailuresRemaining -= 1;
+        throw new TypeError('rejection marker delete did not commit');
+      }
+      await normalDelete(key);
+    };
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
+    const body = {
+      apiToken: 'cf-terminal-cleanup-token',
+      deploymentRequestId: 'request-terminal-cleanup-0001',
+      workerName: 'terminal-cleanup-worker',
+      sessionSlug: 'terminal-cleanup-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+    const correctedBody = {
+      ...body,
+      bundleText: 'export default { async fetch() { return new Response("corrected"); } };',
+    };
+
+    try {
+      const rejectedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(rejectedResponse.status).toBe(502);
+      expect((await rejectedResponse.json()).deploymentRequestPending).toBe(true);
+
+      const cleanupFailureResponse = await deployHelperWorker.fetch(
+        makeJsonRequest('/deploy', correctedBody),
+        env,
+        {},
+      );
+      const cleanupFailurePayload = await cleanupFailureResponse.json();
+
+      expect(cleanupFailureResponse.status).toBe(503);
+      expect(cleanupFailurePayload).toEqual(expect.objectContaining({
+        deploymentRequestPending: true,
+        error: expect.stringMatching(/correction authority/i),
+      }));
+      expect([...journalKv.store.values()].map((value) => JSON.parse(value).state)).toEqual(
+        expect.arrayContaining(['terminal', 'definitive_upload_rejected']),
+      );
+
+      // Workers KV may expose the terminal receipt before it exposes the
+      // still-present rejection marker. Terminal replay must clear the marker
+      // unconditionally instead of trusting this stale-null read.
+      hideRejectedMarkerReadOnce = true;
+      const staleReadCleanupFailureResponse = await deployHelperWorker.fetch(
+        makeJsonRequest('/deploy', correctedBody),
+        env,
+        {},
+      );
+      expect(staleReadCleanupFailureResponse.status).toBe(503);
+      expect(await staleReadCleanupFailureResponse.json()).toEqual(expect.objectContaining({
+        deploymentRequestPending: true,
+        error: expect.stringMatching(/correction authority/i),
+      }));
+      expect([...journalKv.store.values()].map((value) => JSON.parse(value).state)).toContain(
+        'definitive_upload_rejected',
+      );
+
+      hideRejectedMarkerReadOnce = true;
+      const replayResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', correctedBody), env, {});
+      expect(replayResponse.status).toBe(200);
+      expect((await replayResponse.json()).kvNamespaceId).toBe('kv-resume-1');
+      expect([...journalKv.store.values()].map((value) => JSON.parse(value).state)).not.toContain(
+        'definitive_upload_rejected',
+      );
+
+      // Model expiry of every short-lived inner journal plus loss of the
+      // coordinator receipt. The live corrected Worker remains authoritative;
+      // no stale rejection marker may authorize another bundle replacement.
+      journalKv.store.clear();
+      for (const { store } of env.__coordinatorInstances.values()) store.delete('direct-deploy');
+      const callsBeforeChangedBundle = fetchMock.mock.calls.length;
+      const changedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        bundleText: 'export default { async fetch() { return new Response("different"); } };',
+      }), env, {});
+      const changedPayload = await changedResponse.json();
+
+      expect(changedResponse.status).toBe(409);
+      expect(changedPayload).toEqual(expect.objectContaining({
+        deploymentRequestPending: true,
+        error: expect.stringMatching(/required bindings differ/i),
+      }));
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(2);
+      expect(fetchMock.mock.calls.slice(callsBeforeChangedBundle).filter(([, init = {}]) => (
+        ['PUT', 'POST', 'DELETE'].includes(String(init.method || 'GET').toUpperCase())
+      ))).toHaveLength(0);
+    } finally {
+      consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('keeps definitive rejection authority across a corrected bundle URL 404', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    fetchMock.scriptUploadResponses.push(
+      cfFailure(400, 'The uploaded script has no registered event handlers.'),
+    );
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
+    const body = {
+      apiToken: 'cf-rejected-url-token',
+      deploymentRequestId: 'request-rejected-url-0001',
+      workerName: 'rejected-url-worker',
+      sessionSlug: 'rejected-url-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+
+    try {
+      const rejectedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(rejectedResponse.status).toBe(502);
+      expect((await rejectedResponse.json()).deploymentRequestPending).toBe(true);
+
+      fetchMock.bundleFetchResponses.push(new Response('missing', { status: 404 }));
+      const missingResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        bundleText: '',
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+      }), env, {});
+      const missingPayload = await missingResponse.json();
+
+      expect(missingResponse.status).toBe(502);
+      expect(missingPayload.deploymentRequestPending).toBe(true);
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect([...journalKv.store.values()].map((value) => JSON.parse(value).state)).toContain(
+        'definitive_upload_rejected',
+      );
+
+      const correctedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        bundleText: 'export default { async fetch() { return new Response("corrected"); } };',
+      }), env, {});
+
+      expect(correctedResponse.status).toBe(200);
+      expect((await correctedResponse.json()).kvNamespaceId).toBe('kv-resume-1');
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(2);
+      expect(fetchMock.mock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        (/\/workers\/scripts\//.test(String(url)) || /\/storage\/kv\/namespaces\//.test(String(url)))
+      ))).toBe(false);
+    } finally {
+      consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('rejects non-bundle binding drift during hidden-worker bundle correction without mutation', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    fetchMock.scriptUploadResponses.push(
+      cfFailure(400, 'The uploaded script has no registered event handlers.'),
+    );
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
+    const body = {
+      apiToken: 'cf-rejected-binding-token',
+      deploymentRequestId: 'request-rejected-binding-0001',
+      workerName: 'rejected-binding-worker',
+      sessionSlug: 'rejected-binding-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+
+    try {
+      const rejectedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(rejectedResponse.status).toBe(502);
+      expect((await rejectedResponse.json()).deploymentRequestPending).toBe(true);
+      const callsBeforeDrift = fetchMock.mock.calls.length;
+
+      const driftResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        bundleText: 'export default { async fetch() { return new Response("corrected"); } };',
+        storageProfile: {
+          backend: 'cloudflare',
+          cloudflare: {
+            useR2: true,
+            r2BucketName: 'changed-session-bucket',
+          },
+        },
+      }), env, {});
+      const driftPayload = await driftResponse.json();
+
+      expect(driftResponse.status).toBe(409);
+      expect(driftPayload).toEqual(expect.objectContaining({
+        deploymentRequestConflict: true,
+        deploymentRequestPending: true,
+        error: expect.stringMatching(/only when every non-bundle deployment field is unchanged/i),
+      }));
+      expect(fetchMock.mock.calls.slice(callsBeforeDrift).filter(([, init = {}]) => (
+        ['PUT', 'POST', 'DELETE'].includes(String(init.method || 'GET').toUpperCase())
+      ))).toHaveLength(0);
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect([...journalKv.store.values()].map((value) => JSON.parse(value).state)).toContain(
+        'definitive_upload_rejected',
+      );
+
+      const correctedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        bundleText: 'export default { async fetch() { return new Response("corrected"); } };',
+      }), env, {});
+      expect(correctedResponse.status).toBe(200);
+      expect((await correctedResponse.json()).kvNamespaceId).toBe('kv-resume-1');
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(2);
+    } finally {
+      consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('keeps a stable deployment pending without cleanup after an ambiguous upload timeout', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    fetchMock.scriptUploadResponses.push(cfFailure(408, 'Worker upload timed out.'));
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
+    const body = {
+      apiToken: 'cf-ambiguous-upload-token',
+      deploymentRequestId: 'request-ambiguous-upload-0001',
+      workerName: 'ambiguous-upload-worker',
+      sessionSlug: 'ambiguous-upload-session',
+      bundleText: 'export default { async fetch() { return new Response("ok"); } };',
+    };
+
+    try {
+      const timeoutResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      const timeoutPayload = await timeoutResponse.json();
+
+      expect(timeoutResponse.status).toBe(502);
+      expect(timeoutPayload).toEqual(expect.objectContaining({
+        deploymentRequestPending: true,
+        orphanResources: expect.objectContaining({
+          kvNamespaceId: 'kv-resume-1',
+          kvCleanupStatus: 'retained-upload-pending',
+          workerName: expect.stringMatching(/^ambiguous-upload-worker-[0-9a-f]{12}$/),
+        }),
+      }));
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.mock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        (/\/workers\/scripts\//.test(String(url)) || /\/storage\/kv\/namespaces\//.test(String(url)))
+      ))).toBe(false);
+
+      const retryResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      expect(retryResponse.status).toBe(200);
+      expect((await retryResponse.json()).kvNamespaceId).toBe('kv-resume-1');
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(2);
+      expect(fetchMock.mock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        (/\/workers\/scripts\//.test(String(url)) || /\/storage\/kv\/namespaces\//.test(String(url)))
+      ))).toBe(false);
+    } finally {
+      consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('replaces a visible exactly-owned rejected bundle without rotating its secret bindings', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    fetchMock.scriptUploadResponses.push(
+      cfFailure(400, 'The uploaded script has no registered event handlers.'),
+    );
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
+    const body = {
+      apiToken: 'cf-visible-rejected-token',
+      deploymentRequestId: 'request-visible-rejected-bundle-0001',
+      workerName: 'visible-rejected-worker',
+      sessionSlug: 'visible-rejected-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+
+    try {
+      const rejectedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      const rejectedPayload = await rejectedResponse.json();
+      expect(rejectedResponse.status).toBe(502);
+      expect(rejectedPayload.deploymentRequestPending).toBe(true);
+
+      const workerName = rejectedPayload.orphanResources.workerName;
+      fetchMock.workerBindings.set(workerName, fetchMock.scriptUploadMetadata[0].bindings);
+      fetchMock.workerSecretBindings.set(workerName, new Map([
+        ['TOKEN_HMAC_SECRET', { name: 'TOKEN_HMAC_SECRET', type: 'secret_text' }],
+      ]));
+
+      const correctedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        bundleText: 'export default { async fetch() { return new Response("ok"); } };',
+      }), env, {});
+      const correctedPayload = await correctedResponse.json();
+
+      expect(correctedResponse.status).toBe(200);
+      expect(correctedPayload).toEqual(expect.objectContaining({
+        ok: true,
+        workerName,
+        kvNamespaceId: 'kv-resume-1',
+        tokenSecretPreserved: true,
+        configVerified: true,
+      }));
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(2);
+      expect(fetchMock.scriptUploadMetadata[1].keep_bindings).toEqual(['secret_text']);
+      expect(fetchMock.workerSecretBodies).toHaveLength(0);
+      expect(fetchMock.mock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        (/\/workers\/scripts\//.test(String(url)) || /\/storage\/kv\/namespaces\//.test(String(url)))
+      ))).toBe(false);
+    } finally {
+      consoleErrorSpy.mockRestore();
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('refuses a visible rejected-bundle retry when any stable Worker binding differs', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    fetchMock.scriptUploadResponses.push(
+      cfFailure(400, 'The uploaded script has no registered event handlers.'),
+    );
+    global.fetch = fetchMock;
+    const journalKv = makeKvBinding();
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: journalKv });
+    const body = {
+      apiToken: 'cf-foreign-rejected-token',
+      deploymentRequestId: 'request-foreign-rejected-bundle-0001',
+      workerName: 'foreign-rejected-worker',
+      sessionSlug: 'foreign-rejected-session',
+      bundleText: 'export default { fetch() {} };',
+    };
+
+    try {
+      const rejectedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', body), env, {});
+      const rejectedPayload = await rejectedResponse.json();
+      expect(rejectedResponse.status).toBe(502);
+      expect(rejectedPayload.deploymentRequestPending).toBe(true);
+
+      const workerName = rejectedPayload.orphanResources.workerName;
+      const foreignBindings = fetchMock.scriptUploadMetadata[0].bindings.map((binding) => (
+        binding.name === 'GROUP_KV'
+          ? { ...binding, namespace_id: 'kv-owned-by-someone-else' }
+          : binding
+      ));
+      fetchMock.workerBindings.set(workerName, foreignBindings);
+      const callsBeforeRetry = fetchMock.mock.calls.length;
+
+      const refusedResponse = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        ...body,
+        bundleText: 'export default { async fetch() { return new Response("ok"); } };',
+      }), env, {});
+      const refusedPayload = await refusedResponse.json();
+
+      expect(refusedResponse.status).toBe(409);
+      expect(refusedPayload).toEqual(expect.objectContaining({
+        deploymentRequestPending: true,
+        error: expect.stringMatching(/required bindings differ/i),
+      }));
+      expect(fetchMock.getNamespaceCreateCount()).toBe(1);
+      expect(fetchMock.getScriptUploadCount()).toBe(1);
+      expect(fetchMock.mock.calls.slice(callsBeforeRetry).filter(([, init = {}]) => (
+        ['PUT', 'POST', 'DELETE'].includes(String(init.method || 'GET').toUpperCase())
+      ))).toHaveLength(0);
+      expect(fetchMock.namespaces).toHaveLength(1);
+    } finally {
+      consoleErrorSpy.mockRestore();
       consoleLogSpy.mockRestore();
     }
   });
@@ -3372,6 +3952,18 @@ describe('deploy-helper worker', () => {
         hasFetchHandler: true,
         hasServiceWorkerFetch: false,
       }));
+      expect(payload?.orphanResources).toEqual({
+        kvNamespaceId: '',
+        workerName: '',
+      });
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        String(url).endsWith('/storage/kv/namespaces/kv-123')
+      ))).toBe(true);
+      expect(fetchMock.calls.some(([url, init = {}]) => (
+        String(init.method || '').toUpperCase() === 'DELETE' &&
+        String(url).includes('/workers/scripts/')
+      ))).toBe(false);
       expectBundleDiagnosticsLog(consoleLogSpy, 'bundleUrl');
       expectScriptUploadFailureLog(consoleErrorSpy, 'bundleUrl');
     } finally {
