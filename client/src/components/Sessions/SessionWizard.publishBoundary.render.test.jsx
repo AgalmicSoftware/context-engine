@@ -11,7 +11,7 @@ import {
   enableAdvancedMode,
 } from './SessionWizard.workerPanel.testUtils';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
-import { SESSION_WIZARD_WORKER_SETTLEMENT_KEY } from './sessionWizardWorkerSettlement';
+import { getSessionWizardWorkerSettlementStorageKey } from './sessionWizardWorkerSettlement';
 
 const chooseCustomWorkerWithoutDeploy = async () => {
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
@@ -293,14 +293,19 @@ describe('SessionWizard publish boundary rendering', () => {
       });
       expect(publishButton).toHaveTextContent('Session Created');
       expect(screen.getByRole('button', { name: 'Create another session' })).toBeInTheDocument();
-      expect(localStorage.getItem('ce:sessionWizardDraft:v1')).toBeNull();
-      expect(JSON.parse(localStorage.getItem(SESSION_WIZARD_WORKER_SETTLEMENT_KEY) || '{}')).toEqual(
-        expect.objectContaining({
-          workerUrl,
-          slug: 'single-worker-session',
-          sessionId: '0x00112233445566778899aabbccddeeff',
-        }),
-      );
+      const expectedSettlement = {
+        workerUrl,
+        slug: 'single-worker-session',
+        sessionId: '0x00112233445566778899aabbccddeeff',
+      };
+      expect(readWizardCache()).toEqual({
+        terminalWorkerSettlement: expect.objectContaining(expectedSettlement),
+      });
+      expect(
+        JSON.parse(
+          localStorage.getItem(getSessionWizardWorkerSettlementStorageKey(expectedSettlement)) || '{}',
+        ),
+      ).toEqual(expect.objectContaining(expectedSettlement));
 
       fireEvent.click(publishButton);
       expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
@@ -314,7 +319,9 @@ describe('SessionWizard publish boundary rendering', () => {
       });
       fireEvent.click(reloadedPublishButton);
       expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
-      expect(localStorage.getItem('ce:sessionWizardDraft:v1')).toBeNull();
+      expect(readWizardCache()).toEqual({
+        terminalWorkerSettlement: expect.objectContaining(expectedSettlement),
+      });
       expect(screen.getByRole('button', { name: 'Create another session' })).toBeInTheDocument();
     } finally {
       global.fetch = originalFetch;
