@@ -11,6 +11,7 @@ import {
   enableAdvancedMode,
 } from './SessionWizard.workerPanel.testUtils';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
+import { SESSION_WIZARD_WORKER_SETTLEMENT_KEY } from './sessionWizardWorkerSettlement';
 
 const chooseCustomWorkerWithoutDeploy = async () => {
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
@@ -246,6 +247,7 @@ describe('SessionWizard publish boundary rendering', () => {
     const originalFetch = global.fetch;
     const workerUrl = 'https://single-session-worker.example.test';
     let persistedConfig = null;
+    window.history.replaceState({}, '', '/new');
     global.fetch = jest.fn(async (url, init = {}) => {
       const normalizedUrl = String(url);
       if (normalizedUrl.endsWith('/admin/set-config')) {
@@ -276,7 +278,7 @@ describe('SessionWizard publish boundary rendering', () => {
     );
 
     try {
-      renderLoggedInSessionWizard();
+      const firstView = renderLoggedInSessionWizard();
       enableAdvancedMode();
       const publishButton = await openPublishSection();
 
@@ -291,9 +293,29 @@ describe('SessionWizard publish boundary rendering', () => {
       });
       expect(publishButton).toHaveTextContent('Session Created');
       expect(screen.getByRole('button', { name: 'Create another session' })).toBeInTheDocument();
+      expect(localStorage.getItem('ce:sessionWizardDraft:v1')).toBeNull();
+      expect(JSON.parse(localStorage.getItem(SESSION_WIZARD_WORKER_SETTLEMENT_KEY) || '{}')).toEqual(
+        expect.objectContaining({
+          workerUrl,
+          slug: 'single-worker-session',
+          sessionId: '0x00112233445566778899aabbccddeeff',
+        }),
+      );
 
       fireEvent.click(publishButton);
       expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
+
+      firstView.unmount();
+      renderLoggedInSessionWizard();
+      enableAdvancedMode();
+      const reloadedPublishButton = await openPublishSection();
+      await waitFor(() => {
+        expect(reloadedPublishButton).toBeDisabled();
+      });
+      fireEvent.click(reloadedPublishButton);
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
+      expect(localStorage.getItem('ce:sessionWizardDraft:v1')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Create another session' })).toBeInTheDocument();
     } finally {
       global.fetch = originalFetch;
     }

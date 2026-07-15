@@ -113,6 +113,26 @@ const mergeAdminSecrets = ({
   return nextSecrets;
 };
 
+const getWorkerAuthorityMode = (config) => toTrimmedString(
+  config?.sessionModeProfile?.authority?.mode,
+).toLowerCase();
+
+// Regression guard: once a Worker owns a canonical session identity, later
+// config patches must not retarget the same deployed secrets to another session.
+const changesInitializedWorkerCanonicalIdentity = ({
+  existingConfig,
+  mergedConfig,
+} = {}) => {
+  if (getWorkerAuthorityMode(existingConfig) !== 'worker_canonical') return false;
+  if (getWorkerAuthorityMode(mergedConfig) !== 'worker_canonical') return true;
+
+  return ['slug', 'sessionId', 'corsWorkerUrl'].some((key) => {
+    const existingValue = toTrimmedString(existingConfig?.[key]);
+    if (!existingValue) return false;
+    return toTrimmedString(mergedConfig?.[key]) !== existingValue;
+  });
+};
+
 export const dispatchAdminRequest = async ({
   request,
   env,
@@ -208,6 +228,14 @@ export const dispatchAdminRequest = async ({
       incomingConfig: incoming,
       slug: targetSlug,
     });
+    if (changesInitializedWorkerCanonicalIdentity({
+      existingConfig,
+      mergedConfig: merged,
+    })) {
+      return deps?.json?.({
+        error: 'Worker-canonical session identity cannot be changed after initialization.',
+      }, 409, headers);
+    }
     await deps?.putSessionConfig?.(env, targetSlug, merged);
     return deps?.json?.({ ok: true }, 200, headers);
   }

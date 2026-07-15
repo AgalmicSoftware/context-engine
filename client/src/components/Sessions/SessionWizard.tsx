@@ -54,6 +54,10 @@ import useSessionWizardSponsoredBundleController from './hooks/useSessionWizardS
 import useSessionWizardWorkerSecretsController from './hooks/useSessionWizardWorkerSecretsController';
 import useSessionWizardPendingSbtController from './hooks/useSessionWizardPendingSbtController';
 import useSessionWizardWorkerResourceRenderer from './hooks/useSessionWizardWorkerResourceRenderer';
+import useSessionWizardCachedInitialState, {
+  type SessionWizardEncryptionGateState as EncryptionGateState,
+} from './hooks/useSessionWizardCachedInitialState';
+import useSessionWizardWorkerSettlementLifecycle from './hooks/useSessionWizardWorkerSettlementLifecycle';
 import {
   arweavePublishAdapter,
   sbtFactoryReceiptPublishAdapter,
@@ -139,12 +143,10 @@ import {
   buildPendingSbtDeployContextSignature,
   deploySessionWizardPendingSbtDraft,
   finalizeSessionWizardPendingSbtDraft,
-  normalizeFeaturedDraftGateAutoLink,
   persistSessionWizardSbtRecoveryCodes,
 } from './sessionWizardPendingSbtPublish';
 import {
   areSbtSelectionsEqual,
-  buildDefaultGateState,
   buildEmptyProvisionedSponsoredContext,
   buildEncryptionGate,
   buildResourceGateMap,
@@ -206,6 +208,7 @@ import {
   useStableSerializedObject,
   writeSessionWizardCache,
 } from './sessionWizardLocalStateSupport';
+import { writeSessionWizardWorkerSettlement } from './sessionWizardWorkerSettlement';
 import {
   buildSessionWizardNewSessionBannerDismissalContextKey,
   isNewSessionWizardPathname,
@@ -348,16 +351,6 @@ type GateSelectionState = UnknownRecord & {
 };
 
 type GateSelectionsState = Record<string, GateSelectionState>;
-
-type EncryptionGateState = UnknownRecord & {
-  id: string;
-  label?: string;
-  color?: string;
-  mode?: string;
-  chainId?: ChainIdLike | null;
-  perMemberLimit?: unknown;
-  sbts?: unknown[];
-};
 
 type DraftState = UnknownRecord &
   NonNullable<WorkerPanelProps['draft']> & {
@@ -515,37 +508,16 @@ const SessionWizard = ({
     isNewSessionWizardRoute,
     sourceEmbeddedDeployHelperDefault,
   ]);
-  const initialGates = useMemo<EncryptionGateState[]>(() => {
-    const cachedGates = cachedWizard?.encryptionGates;
-    if (Array.isArray(cachedGates) && cachedGates.length) return cachedGates as EncryptionGateState[];
-    return [buildEncryptionGate(0) as EncryptionGateState];
-  }, [cachedWizard]);
-  const initialDefaultGateId = useMemo(() => {
-    const cachedId = toStr(cachedWizard?.defaultGateId).trim();
-    if (cachedId) return cachedId;
-    return initialGates[0]?.id || '';
-  }, [cachedWizard, initialGates]);
-  const initialGateSelections = useMemo(() => {
-    const cachedSelections = cachedWizard?.gateSelections;
-    if (cachedSelections && typeof cachedSelections === 'object') return cachedSelections;
-    return buildDefaultGateState(initialDraft.networkChainId || network?.id);
-  }, [cachedWizard, initialDraft.networkChainId, network?.id]);
-  const initialFeaturedDraftGateAutoLink = useMemo(
-    () =>
-      normalizeFeaturedDraftGateAutoLink(cachedWizard?.featuredDraftGateAutoLink as UnknownRecord | null | undefined),
-    [cachedWizard],
-  );
-  const initialSessionIdValue = useMemo(() => {
-    const fromQuery = sessionRegistryPublishAdapter.formatSessionId(initialSessionId);
-    if (fromQuery) return fromQuery;
-    const fromCache = sessionRegistryPublishAdapter.formatSessionId(cachedWizard?.sessionId);
-    if (fromCache) return fromCache;
-    return generateSessionId();
-  }, [cachedWizard?.sessionId, initialSessionId]);
+  const cachedInitialState = useSessionWizardCachedInitialState({
+    cachedWizard,
+    initialDraftNetworkChainId: initialDraft.networkChainId,
+    networkId: network?.id,
+    initialSessionId,
+  });
 
   const [draft, setDraft] = useState<DraftState>(() => initialDraft as DraftState);
   const draftRef = useRef<DraftState>(initialDraft as DraftState);
-  const [sessionId, setSessionId] = useState(() => initialSessionIdValue);
+  const [sessionId, setSessionId] = useState(() => cachedInitialState.initialSessionIdValue);
   const [sessionIdStatus, setSessionIdStatus] = useState('');
   const [isSessionIdRegenerating, setIsSessionIdRegenerating] = useState(false);
   const [privateSlugMode, setPrivateSlugMode] = useState(() => !!cachedWizard?.privateSlugMode);
@@ -591,7 +563,7 @@ const SessionWizard = ({
   const [sessionModeProfileStepComplete, setSessionModeProfileStepComplete] = useState(false);
   const publishBusy = resolveSessionWizardPublishReducerUiState({ state: sessionPublishState }).publishBusy;
   const publishRequestInFlightRef = useRef(false);
-  const workerCanonicalPublishSettledRef = useRef(false);
+  const workerCanonicalSettlement = useSessionWizardWorkerSettlementLifecycle(cachedWizard);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
   const [wizardMode, setWizardMode] = useState('normal');
   const [registryChainId, setRegistryChainId] = useState<number>(() => {
@@ -627,8 +599,9 @@ const SessionWizard = ({
     isReservedSlug: isReservedSessionSlug,
     sessionExists: checkSessionSlugExists,
   });
-  const initialGateRef = useRef<EncryptionGateState>(initialGates[0]);
-  const [encryptionGates, setEncryptionGates] = useState<EncryptionGateState[]>(() => initialGates);
+  const [encryptionGates, setEncryptionGates] = useState<EncryptionGateState[]>(
+    () => cachedInitialState.initialGates,
+  );
   // Pending SBT drafts carry deploy secrets and claim codes, so keep them out
   // of localStorage while still surviving same-tab refreshes via sessionStorage.
   const { pendingSbtDrafts, setPendingSbtDrafts, normalizedPendingSbtDrafts, hasUndeployedPendingSbtDrafts } =
@@ -638,7 +611,7 @@ const SessionWizard = ({
   const [createSbtModalState, setCreateSbtModalState] = useState<CreateSbtModalState>(() => ({
     open: false,
     targetType: 'gate',
-    gateId: initialDefaultGateId || initialGateRef.current?.id || '',
+    gateId: cachedInitialState.initialDefaultGateId,
     sessionSlug: '',
     arweaveJwkOverride: '',
   }));
@@ -655,20 +628,20 @@ const SessionWizard = ({
   }, [encryptionGates]);
   const lastHasPrivateSbtNameRef = useRef(false);
   const [gateSelections, setGateSelections] = useState<GateSelectionsState>(
-    () => initialGateSelections as GateSelectionsState,
+    () => cachedInitialState.initialGateSelections as GateSelectionsState,
   );
-  const [defaultGateId, setDefaultGateId] = useState(() => initialDefaultGateId || initialGateRef.current.id);
-  const [createSbtTargetGateId, setCreateSbtTargetGateId] = useState(
-    () => initialDefaultGateId || initialGateRef.current?.id || '',
+  const [defaultGateId, setDefaultGateId] = useState(() => cachedInitialState.initialDefaultGateId);
+  const [createSbtTargetGateId, setCreateSbtTargetGateId] = useState(() => cachedInitialState.initialDefaultGateId);
+  const [featuredDraftGateAutoLink, setFeaturedDraftGateAutoLink] = useState(
+    () => cachedInitialState.initialFeaturedDraftGateAutoLink,
   );
-  const [featuredDraftGateAutoLink, setFeaturedDraftGateAutoLink] = useState(() => initialFeaturedDraftGateAutoLink);
   // Gate selection is always per-resource when multiple gates exist (no toggle needed).
   const [resourceGateMap, setResourceGateMap] = useState<ResourceGateMapState>(() => {
     const cachedMap = cachedWizard?.resourceGateMap;
     if (cachedMap && typeof cachedMap === 'object') return cachedMap as ResourceGateMapState;
     return buildResourceGateMap(
-      initialGates,
-      initialDefaultGateId || initialGateRef.current.id,
+      cachedInitialState.initialGates,
+      cachedInitialState.initialDefaultGateId,
     ) as ResourceGateMapState;
   });
   const [jsonCopied, setJsonCopied] = useState(false);
@@ -1011,6 +984,7 @@ const SessionWizard = ({
     // Pending SBT drafts use sessionStorage so same-tab refresh can recover
     // queued CREATE2 drafts without turning them into long-lived local secrets.
     // Dev toggle: optionally persist secrets locally for faster iteration.
+    if (workerCanonicalSettlement.isSettled) return;
     writeSessionWizardCache(
       buildSessionWizardCacheWritePayload({
         sessionId,
@@ -1058,6 +1032,7 @@ const SessionWizard = ({
     deployComplete,
     deployWorkerUrl,
     provisionedSponsoredContext,
+    workerCanonicalSettlement.isSettled,
   ]);
 
   useEffect(() => {
@@ -1981,7 +1956,7 @@ const SessionWizard = ({
       return;
     }
     if (
-      workerCanonicalPublishSettledRef.current ||
+      workerCanonicalSettlement.ref.current ||
       (sessionModeRequirements.isWorkerCanonical && sessionPublishState.status === 'published')
     ) {
       setStatus('This worker already owns the published session. Open Create another session to start fresh.');
@@ -2104,9 +2079,6 @@ const SessionWizard = ({
           publishControllerResult,
           runTrackedPublishEffect,
         });
-        if (sessionModeRequirements.isWorkerCanonical) {
-          workerCanonicalPublishSettledRef.current = true;
-        }
         const completionRequest = resolveSessionWizardPublishCompletionRequest({
           publishExecutionPlan,
           deployedPendingDrafts,
@@ -2414,7 +2386,9 @@ const SessionWizard = ({
       setSessionUrl,
       setAdminUrl,
       setAdminUrlStatus,
+      setWorkerCanonicalPublishSettled: workerCanonicalSettlement.setSettled,
       clearSessionWizardCache,
+      writeSessionWizardWorkerSettlement,
       setSessionId,
       setSessionIdStatus,
     },
@@ -2668,7 +2642,7 @@ const SessionWizard = ({
     hasPendingDrafts: hasUndeployedPendingSbtDrafts,
     isNormalMode,
     publishAdvancedOpen,
-    publishCompleted: workerCanonicalPublishSettledRef.current || (sessionModeRequirements.isWorkerCanonical && sessionPublishState.status === 'published'),
+    publishCompleted: workerCanonicalSettlement.isSettled || (sessionModeRequirements.isWorkerCanonical && sessionPublishState.status === 'published'),
     publishStepElapsedMs,
     sbtsLabel: t('sbts'),
     sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
@@ -2877,7 +2851,7 @@ const SessionWizard = ({
       onCloseDisplaySettings={() => setWizardDisplaySettingsOpen(false)}
       onCloseSessionHeaderPreviewModal={() => setSessionHeaderPreviewModalOpen(false)}
       onCopyDraftJson={handleCopyDraftJson}
-      onCreateAnotherSession={(workerCanonicalPublishSettledRef.current || (sessionModeRequirements.isWorkerCanonical && sessionPublishState.status === 'published')) ? startFreshSessionWizard : undefined}
+      onCreateAnotherSession={(workerCanonicalSettlement.isSettled || (sessionModeRequirements.isWorkerCanonical && sessionPublishState.status === 'published')) ? startFreshSessionWizard : undefined}
       onDismissNewSessionRequirementsBanner={handleDismissNewSessionRequirementsBanner}
       onEnterAdvancedMode={handleEnterAdvancedMode}
       onEnterNormalMode={handleEnterNormalMode}

@@ -40,9 +40,18 @@ type PublishRuntimeCallbacks = {
   setSessionUrl: (value: string) => unknown;
   setAdminUrl: (value: string) => unknown;
   setAdminUrlStatus: (value: string) => unknown;
+  setWorkerCanonicalPublishSettled: (value: boolean) => unknown;
   clearSessionWizardCache: () => unknown;
+  writeSessionWizardWorkerSettlement: (input: { workerUrl: string; slug: string; sessionId: string }) => unknown;
   setSessionId: (value: string) => unknown;
   setSessionIdStatus: (value: string) => unknown;
+};
+
+const requireSuccessfulDurableStorageOperation = (result: unknown, message: string): void => {
+  if (result && typeof result === 'object' && (result as { ok?: unknown }).ok === true) return;
+  const status =
+    result && typeof result === 'object' && 'status' in result ? toStr((result as { status?: unknown }).status).trim() : '';
+  throw new Error(status ? `${message} (${status}).` : `${message}.`);
 };
 
 type PublishRuntimeControllerOptions = {
@@ -229,7 +238,23 @@ export const createSessionWizardPublishRuntimeController = ({
     callbacks.setSessionUrl(workerSettlement.sessionUrl);
     callbacks.setAdminUrl(workerSettlement.adminUrl);
     callbacks.setAdminUrlStatus(workerSettlement.adminUrlStatus);
-    callbacks.clearSessionWizardCache();
+    // Verified remote persistence is terminal for this mounted draft. Lock first so local storage failures cannot
+    // reopen the publish button; the worker's immutable identity check is the cross-reload backstop.
+    callbacks.setWorkerCanonicalPublishSettled(true);
+    // Record the terminal identity before deleting the recoverable draft. If cache deletion is interrupted, the
+    // marker still makes a reload recognize and remove the stale deployed draft instead of reopening publication.
+    requireSuccessfulDurableStorageOperation(
+      callbacks.writeSessionWizardWorkerSettlement({
+        workerUrl: verifiedWorkerUrl,
+        slug: toStr(runtime.draft?.slug).trim(),
+        sessionId: toStr(runtime.sessionIdHex || runtime.sessionId).trim(),
+      }),
+      'Could not durably record the published worker identity',
+    );
+    requireSuccessfulDurableStorageOperation(
+      callbacks.clearSessionWizardCache(),
+      'Could not durably clear the published session draft',
+    );
     callbacks.setSessionId(generateSessionId());
     callbacks.setSessionIdStatus(workerSettlement.nextSessionIdStatus);
   };

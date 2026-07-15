@@ -139,6 +139,103 @@ test('dispatchAdminRequest merges config and persists the result after authority
   });
 });
 
+test('dispatchAdminRequest rejects changes to an initialized worker-canonical identity', async () => {
+  const existingConfig = {
+    slug: 'session-a',
+    sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    corsWorkerUrl: 'https://session-a.workers.dev',
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    sessionName: 'Canonical Session',
+  };
+  const unsafePatches = [
+    {
+      label: 'slug',
+      config: { sessionName: 'Cross-slug update' },
+      targetSlug: 'session-b',
+    },
+    {
+      label: 'session id',
+      config: { sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+    },
+    {
+      label: 'authority mode',
+      config: { sessionModeProfile: { authority: { mode: 'registry' } } },
+    },
+    {
+      label: 'worker URL',
+      config: { corsWorkerUrl: 'https://replacement.workers.dev' },
+    },
+  ];
+
+  for (const { label, config, targetSlug = 'session-a' } of unsafePatches) {
+    let writes = 0;
+    const result = await dispatchAdminRequest({
+      request: {
+        json: async () => createSignedBody({ config }),
+      },
+      env: { GROUP_KV: {} },
+      baseHeaders: {},
+      slug: 'session-a',
+      action: 'set-config',
+      deps: createAdminDeps({
+        resolveAdminRequestAuthority: async () => ({
+          ok: true,
+          existingConfig,
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+          targetSlug,
+        }),
+        mergeWorkerConfigRecords,
+        putSessionConfig: async () => { writes += 1; },
+      }),
+    });
+
+    assert.equal(writes, 0, label);
+    assert.deepEqual(result, {
+      body: { error: 'Worker-canonical session identity cannot be changed after initialization.' },
+      status: 409,
+      headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+    }, label);
+  }
+});
+
+test('dispatchAdminRequest permits non-identity updates to an initialized worker-canonical session', async () => {
+  const existingConfig = {
+    slug: 'session-a',
+    sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    corsWorkerUrl: 'https://session-a.workers.dev',
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    sessionName: 'Canonical Session',
+  };
+  const writes = [];
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        config: { sessionName: 'Updated Canonical Session' },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      mergeWorkerConfigRecords,
+      putSessionConfig: async (...args) => { writes.push(args); },
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0][2].sessionName, 'Updated Canonical Session');
+  assert.equal(writes[0][2].sessionId, existingConfig.sessionId);
+});
+
 test('dispatchAdminRequest seeds bootstrap adminAddress from the top-level body when the first config patch omits it', async () => {
   const calls = [];
 

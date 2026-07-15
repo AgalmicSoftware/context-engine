@@ -25,7 +25,15 @@ const createControllerHarness = () => {
     setSessionUrl: jest.fn((value: string) => events.push(`session-url:${value}`)),
     setAdminUrl: jest.fn((value: string) => events.push(`admin-url:${value}`)),
     setAdminUrlStatus: jest.fn((value: string) => events.push(`admin-status:${value}`)),
-    clearSessionWizardCache: jest.fn(() => events.push('clear-cache')),
+    setWorkerCanonicalPublishSettled: jest.fn(() => events.push('publish-settled')),
+    clearSessionWizardCache: jest.fn(() => {
+      events.push('clear-cache');
+      return { ok: true, removed: 1, failed: 0, status: 'ok' };
+    }),
+    writeSessionWizardWorkerSettlement: jest.fn(() => {
+      events.push('write-settlement');
+      return { ok: true, bytes: 1, key: 'settlement', status: 'ok' };
+    }),
     setSessionId: jest.fn((value: string) => events.push(`session-id:${value}`)),
     setSessionIdStatus: jest.fn((value: string) => events.push(`session-id-status:${value}`)),
   };
@@ -153,16 +161,23 @@ describe('sessionWizardPublishRuntimeController', () => {
     });
 
     expect(harness.handleRegisterGroup).not.toHaveBeenCalled();
-    expect(harness.events).toHaveLength(6);
+    expect(harness.events).toHaveLength(8);
     expect(harness.events[0]).toContain('session-url:');
     expect(harness.events[0]).toContain('worker=');
     expect(harness.events[1]).toContain('admin-url:');
     expect(harness.events.slice(2)).toEqual([
       'admin-status:',
+      'publish-settled',
+      'write-settlement',
       'clear-cache',
       'session-id:next-session-id',
       'session-id-status:Generated a new session ID for your next session.',
     ]);
+    expect(harness.callbacks.writeSessionWizardWorkerSettlement).toHaveBeenCalledWith({
+      workerUrl: WORKER_ORIGIN,
+      slug: 'worker-session',
+      sessionId: SESSION_ID,
+    });
   });
 
   it('preserves register-then-refresh ordering for decentralized publication', async () => {
@@ -215,5 +230,57 @@ describe('sessionWizardPublishRuntimeController', () => {
       }),
     ).rejects.toThrow('Worker-canonical publish requires verified worker config persistence.');
     expect(harness.events).toEqual([]);
+  });
+
+  it('locks the current publish and refuses identity rotation when draft cache clearing fails', async () => {
+    const harness = createControllerHarness();
+    harness.callbacks.clearSessionWizardCache.mockImplementationOnce(() => {
+      harness.events.push('clear-cache-failed');
+      return { ok: false, removed: 0, failed: 1, status: 'partial-failure' };
+    });
+
+    await expect(
+      harness.controller.settleRegistration({
+        publishExecutionPlan: { shouldRegisterSession: false },
+        uploadResult: null,
+        publishControllerResult: {
+          status: 'completed',
+          workerUrlOverride: WORKER_ORIGIN,
+          deployedPendingDrafts: [],
+          verifiedWorkerConfig: { workerUrl: WORKER_ORIGIN },
+        },
+        runTrackedPublishEffect: harness.runTrackedPublishEffect,
+      }),
+    ).rejects.toThrow('Could not durably clear the published session draft');
+
+    expect(harness.callbacks.setWorkerCanonicalPublishSettled).toHaveBeenCalledWith(true);
+    expect(harness.callbacks.writeSessionWizardWorkerSettlement).toHaveBeenCalledTimes(1);
+    expect(harness.callbacks.setSessionId).not.toHaveBeenCalled();
+  });
+
+  it('locks the current publish and refuses identity rotation when settlement marker persistence fails', async () => {
+    const harness = createControllerHarness();
+    harness.callbacks.writeSessionWizardWorkerSettlement.mockImplementationOnce(() => {
+      harness.events.push('write-settlement-failed');
+      return { ok: false, status: 'write-failed', error: 'quota' };
+    });
+
+    await expect(
+      harness.controller.settleRegistration({
+        publishExecutionPlan: { shouldRegisterSession: false },
+        uploadResult: null,
+        publishControllerResult: {
+          status: 'completed',
+          workerUrlOverride: WORKER_ORIGIN,
+          deployedPendingDrafts: [],
+          verifiedWorkerConfig: { workerUrl: WORKER_ORIGIN },
+        },
+        runTrackedPublishEffect: harness.runTrackedPublishEffect,
+      }),
+    ).rejects.toThrow('Could not durably record the published worker identity');
+
+    expect(harness.callbacks.setWorkerCanonicalPublishSettled).toHaveBeenCalledWith(true);
+    expect(harness.callbacks.clearSessionWizardCache).not.toHaveBeenCalled();
+    expect(harness.callbacks.setSessionId).not.toHaveBeenCalled();
   });
 });

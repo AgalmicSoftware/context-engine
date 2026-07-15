@@ -7,6 +7,7 @@ import {
   useStableSerializedObject,
   writeSessionWizardCache,
 } from './sessionWizardLocalStateSupport';
+import { SESSION_WIZARD_WORKER_SETTLEMENT_KEY } from './sessionWizardWorkerSettlement';
 
 describe('sessionWizardLocalStateSupport', () => {
   it('keeps a stable object reference when the serialized value does not change', () => {
@@ -98,12 +99,23 @@ describe('sessionWizardLocalStateSupport', () => {
       }),
     );
     sessionStorage.setItem('ce:sessionWizardPendingSbtDrafts:v1', '[{"predictedAddress":"0x1"}]');
+    localStorage.setItem(
+      SESSION_WIZARD_WORKER_SETTLEMENT_KEY,
+      JSON.stringify({
+        version: 1,
+        workerUrl: 'https://published-worker.example.test',
+        slug: 'published-session',
+        sessionId: 'published-id',
+        settledAt: 1,
+      }),
+    );
 
     const result = startFreshSessionWizard({ navigate });
 
     expect(result.ok).toBe(true);
     expect(readSessionWizardCache()).toBeNull();
     expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
+    expect(localStorage.getItem(SESSION_WIZARD_WORKER_SETTLEMENT_KEY)).toBeNull();
     expect(navigate).toHaveBeenCalledWith('/new');
   });
 
@@ -119,6 +131,24 @@ describe('sessionWizardLocalStateSupport', () => {
     expect(startFreshSessionWizard({ clearCache, navigate })).toEqual(
       expect.objectContaining({ ok: false, status: 'partial-failure' }),
     );
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('does not navigate when the durable settlement marker cannot be cleared', () => {
+    const navigate = jest.fn();
+    const clearCache = jest.fn(() => ({ ok: true as const, removed: 1, failed: 0, status: 'ok' as const }));
+    const clearWorkerSettlement = jest.fn(() => ({
+      ok: false as const,
+      removed: 0,
+      failed: 1,
+      status: 'partial-failure' as const,
+    }));
+
+    expect(startFreshSessionWizard({ clearCache, clearWorkerSettlement, navigate })).toEqual(
+      expect.objectContaining({ ok: false, status: 'partial-failure' }),
+    );
+    expect(clearCache).toHaveBeenCalledTimes(1);
+    expect(clearWorkerSettlement).toHaveBeenCalledTimes(1);
     expect(navigate).not.toHaveBeenCalled();
   });
 });

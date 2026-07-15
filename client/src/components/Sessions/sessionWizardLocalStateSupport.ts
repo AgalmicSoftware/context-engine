@@ -7,6 +7,7 @@ import {
   writeSessionWizardDraftCache,
 } from './sessionWizardDraftCache.js';
 import { clearSessionWizardPendingSbtDraftsCache } from './hooks/usePendingSbtDrafts.js';
+import { clearSessionWizardWorkerSettlement } from './sessionWizardWorkerSettlement.js';
 import type { AnyRecord, WorkerSecretsLike } from '../shellTypes';
 
 const log = createLogger('general');
@@ -53,6 +54,7 @@ type ClearCacheDeps = {
 
 type FreshSessionWizardDeps = {
   clearCache?: typeof clearSessionWizardCache;
+  clearWorkerSettlement?: typeof clearSessionWizardWorkerSettlement;
   navigate?: (target: string) => void;
 };
 
@@ -121,10 +123,13 @@ export const clearSessionWizardCache = ({
 
 export const startFreshSessionWizard = ({
   clearCache = clearSessionWizardCache,
+  clearWorkerSettlement = clearSessionWizardWorkerSettlement,
   navigate = (target) => window.location.assign(target),
 }: FreshSessionWizardDeps = {}) => {
   const clearResult = clearCache();
   if (!clearResult.ok && clearResult.status !== 'missing-storage') return clearResult;
+  const settlementClearResult = clearWorkerSettlement();
+  if (!settlementClearResult.ok && settlementClearResult.status !== 'missing-storage') return settlementClearResult;
   navigate(buildPublicRoute('/new'));
   return clearResult;
 };
