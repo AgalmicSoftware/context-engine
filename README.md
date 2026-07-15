@@ -13,16 +13,20 @@ Context Engine is a toolkit for AI-enhanced deliberation, decision-making, and n
 ## Architecture At A Glance
 
 <p align="center">
-  <img src="client/src/assets/img/readme-architecture-deployment-modes.png" alt="Context Engine deployment modes diagram showing Web App and AI Agent access to a shared session, then Hosted and Fast, Trustless and Slower, and company-operated infrastructure options with their setup credentials." />
+  <img src="client/src/assets/img/readme-architecture-deployment-modes.png" alt="Context Engine deployment diagram showing Web App and AI Agent access to shared sessions across Hosted and Fast, Trustless and Slower, and planned Company-Operated infrastructure modes." />
 </p>
 
-Context Engine is designed to keep workflows and product-facing capability boundaries consistent while deployment adapters determine where identity, keys, compute, coordination, and records live. Current public/hosted profiles combine supported managed services and public networks; future company-operated profiles are intended to connect existing organizational infrastructure without changing session and survey semantics. The hosted public deployment currently uses Cloudflare Workers, Cloudflare or Arweave storage, optional Lit/Chipotle encryption paths, and EVM contracts. For the concrete runtime topology, see [docs/architecture-overview.md](docs/architecture-overview.md).
+Context Engine separates how the web app is hosted from how each session establishes authority and stores data. **EVM and Arweave are profile-specific options, not baseline dependencies.** The current Hosted & Fast profile uses a per-session Cloudflare Worker and Cloudflare storage as its canonical backend, so it can run public or private sessions without an EVM transaction, RPC endpoint, gas, Arweave, or Lit. The Trustless & Slower profile deliberately opts into public EVM contracts and Arweave, with Lit required only when that encryption path is selected. The planned Company-Operated edition is intended to connect internal identity and key management, storage, networking, AI, and observability services, and can be entirely off-chain. For current profile requirements and publish behavior, see the [session creation guide](docs/session-creation-guide.md).
 
 ## Deployment Modes
 
-- **Hosted public app — available:** use Context Engine at [contextengine.xyz](https://contextengine.xyz).
-- **Operator-managed public deployment — available:** host the static client, operate the Cloudflare worker in your account, and connect it to supported Arweave and public-EVM services.
-- **Company-operated edition — planned, with design work underway:** planning and adapter design are in progress for a packaged edition that runs on existing company hardware, on-premises environments, and private clouds. It will be made available after the adapter, packaging, security, and conformance work is complete, with support for connecting approved storage, identity and access, key-management, AI, and observability services. It is not yet generally available.
+| Mode | Availability | Infrastructure and setup |
+| --- | --- | --- |
+| **Hosted & Fast** | Available; default/recommended path after selection in `/new` | Public or private sessions use a per-session Cloudflare Worker and Cloudflare storage. The creator supplies a Cloudflare API token and one AI-provider key. No EVM network or transaction, RPC endpoint, gas, Arweave, or Lit is required by default. |
+| **Trustless & Slower** | Available; opt-in | Public or private sessions use Arweave plus an EVM registry and contracts. Setup requires an Arweave wallet/JWK, an EVM RPC URL and gas, and one AI-provider key; add Lit credentials only when Lit encryption is selected. |
+| **Company-Operated** | Planned; not yet generally available | Existing hardware, private clouds, or internal networks connect through adapters for company identity and key management, storage, AI gateways, and observability. Public EVM and Arweave are not architectural requirements, so this mode can be entirely off-chain. |
+
+[contextengine.xyz](https://contextengine.xyz) is the hosted public web interface, and the static client can also be self-hosted. App hosting, public/private session access, and the session infrastructure profile are separate choices. Participants never need deployer API keys.
 
 ## Quick Start
 
@@ -75,13 +79,13 @@ For testing, run modes, and deeper setup:
 ### User and Deployer UX: Passkey Sign-On
 
 - Users log in with a simple passkey / biometric flow (native PIN, fingerprint, or Face ID on phones)
-- Login flow generates or handles an Ethereum account, which can be used easily with cryptography features
-- Users do not need to know anything about Ethereum or crypto to use the app
+- Login supplies a signing account for session identity; EVM-backed profiles can also use it as a chain account
+- Hosted & Fast does not submit an EVM transaction, and its users do not need Ethereum, a wallet balance, or gas
 
 ### Deployer UX: Sponsored Bundles
 
-- Deployers can use and set up sponsored bundles of API keys (for storage, EVM transactions, encryption network, AI API)
-- Sensitive and organizational deployments can plug in existing AI keys and combine currently supported Cloudflare, Arweave, and public-EVM components; broader company-operated infrastructure adapters are planned
+- Setup requirements follow the selected profile: the default Cloudflare profile needs only a Cloudflare deploy token and one AI-provider key
+- Sponsored bundles and advanced configuration can supply Arweave, EVM/RPC, Lit, or other credentials only when the selected decentralized or encrypted profile needs them; planned company-operated adapters will connect internal services instead
 
 ## AI Discourse Corpus
 
