@@ -54,7 +54,9 @@ type PublishRuntimeCallbacks = {
 const requireSuccessfulDurableStorageOperation = (result: unknown, message: string): void => {
   if (result && typeof result === 'object' && (result as { ok?: unknown }).ok === true) return;
   const status =
-    result && typeof result === 'object' && 'status' in result ? toStr((result as { status?: unknown }).status).trim() : '';
+    result && typeof result === 'object' && 'status' in result
+      ? toStr((result as { status?: unknown }).status).trim()
+      : '';
   throw new Error(status ? `${message} (${status}).` : `${message}.`);
 };
 

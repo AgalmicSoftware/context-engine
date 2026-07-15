@@ -71,37 +71,59 @@ const useSessionWizardWorkerSettlementLifecycle = (
         sessionId: cachedWizard?.sessionId,
         settledAt: 1,
       }),
-    [cachedWizard?.deployWorkerUrl, cachedWizard?.draft?.corsWorkerUrl, cachedWizard?.draft?.slug, cachedWizard?.sessionId],
+    [
+      cachedWizard?.deployWorkerUrl,
+      cachedWizard?.draft?.corsWorkerUrl,
+      cachedWizard?.draft?.slug,
+      cachedWizard?.sessionId,
+    ],
+  );
+  const currentLiveIdentity = useMemo(
+    () =>
+      createSessionWizardWorkerSettlement({
+        workerUrl: currentIdentity?.workerUrl,
+        slug: currentIdentity?.slug,
+        sessionId: currentIdentity?.sessionId,
+        settledAt: 1,
+      }),
+    [currentIdentity?.sessionId, currentIdentity?.slug, currentIdentity?.workerUrl],
   );
   // Regression guard: after publication the tombstone intentionally replaces the entire draft. Its embedded
   // identity must therefore be sufficient to restore the terminal lock on the next page load.
-  const cachedIdentity = cachedTerminalSettlement || cachedDraftIdentity;
+  // A tombstone is already terminal and must survive the post-publish form reset. Otherwise the complete live
+  // form identity is authoritative: a stale cached draft cannot choose this tab's marker.
+  const liveIdentity = cachedTerminalSettlement || currentLiveIdentity || cachedDraftIdentity;
   const initialSettlement = useMemo(() => {
-    if (isSessionWizardWorkerSettlementForIdentity(cachedTerminalSettlement, cachedIdentity)) {
+    if (isSessionWizardWorkerSettlementForIdentity(cachedTerminalSettlement, liveIdentity)) {
       return cachedTerminalSettlement;
     }
-    return cachedIdentity
-      ? readSessionWizardWorkerSettlement({ identity: cachedIdentity })
-      : null;
-  }, [cachedIdentity, cachedTerminalSettlement]);
-  const [settlement, setSettlement] = useState<SessionWizardWorkerSettlement | null>(initialSettlement);
-  const isSettled = !!settlement;
+    return liveIdentity ? readSessionWizardWorkerSettlement({ identity: liveIdentity }) : null;
+  }, [cachedTerminalSettlement, liveIdentity]);
+  const [storedSettlement, setStoredSettlement] = useState<SessionWizardWorkerSettlement | null>(initialSettlement);
   const isPublishedWorkerState = isWorkerCanonical && publishStatus === 'published';
+  // Publishing rotates the form session ID for the next draft. Pin the just-completed settlement while the
+  // publish state is terminal so Create Another clears the published marker, not the newly generated identity.
+  const pinsPublishedSettlement = isPublishedWorkerState && !!storedSettlement;
+  const boundIdentity = pinsPublishedSettlement ? storedSettlement : liveIdentity;
+  const settlement = isSessionWizardWorkerSettlementForIdentity(storedSettlement, boundIdentity)
+    ? storedSettlement
+    : null;
+  const isSettled = !!settlement;
   const publishCompleted = isSettled || isPublishedWorkerState;
   const ref = useRef(isSettled);
   const setSettled = useCallback(
     (value: SessionWizardWorkerSettlementInput | boolean) => {
       if (value === false) {
         ref.current = false;
-        setSettlement(null);
+        setStoredSettlement(null);
         return;
       }
-      const nextSettlement = createSessionWizardWorkerSettlement(value === true ? cachedIdentity : value);
+      const nextSettlement = createSessionWizardWorkerSettlement(value === true ? boundIdentity : value);
       if (!nextSettlement) return;
       ref.current = true;
-      setSettlement(nextSettlement);
+      setStoredSettlement(nextSettlement);
     },
-    [cachedIdentity],
+    [boundIdentity],
   );
   const preventDuplicatePublish = useCallback(
     (onGuarded: (message: string) => void) => {
@@ -117,25 +139,44 @@ const useSessionWizardWorkerSettlementLifecycle = (
   );
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !cachedIdentity) return undefined;
+    if (!boundIdentity) {
+      ref.current = false;
+      setStoredSettlement(null);
+      return undefined;
+    }
+    const restoredSettlement = pinsPublishedSettlement
+      ? boundIdentity
+      : isSessionWizardWorkerSettlementForIdentity(cachedTerminalSettlement, boundIdentity)
+        ? cachedTerminalSettlement
+        : readSessionWizardWorkerSettlement({ identity: boundIdentity });
+    ref.current = !!restoredSettlement;
+    setStoredSettlement((current) =>
+      current?.workerUrl === restoredSettlement?.workerUrl &&
+      current?.slug === restoredSettlement?.slug &&
+      current?.sessionId === restoredSettlement?.sessionId &&
+      current?.settledAt === restoredSettlement?.settledAt
+        ? current
+        : restoredSettlement,
+    );
+    if (typeof window === 'undefined') return undefined;
     const handleStorage = (event: StorageEvent) => {
       if (event.storageArea && event.storageArea !== window.localStorage) return;
       const storedSettlement = parseSessionWizardWorkerSettlementStorageEvent(event);
-      if (isSessionWizardWorkerSettlementForIdentity(storedSettlement, cachedIdentity)) {
+      if (isSessionWizardWorkerSettlementForIdentity(storedSettlement, boundIdentity)) {
         setSettled(storedSettlement as SessionWizardWorkerSettlement);
         return;
       }
       if (event.key !== SESSION_WIZARD_CACHE_KEY) return;
 
       const eventSettlement = event.newValue ? readTerminalSettlementFromCachedPayload(event.newValue) : null;
-      if (isSessionWizardWorkerSettlementForIdentity(eventSettlement, cachedIdentity)) {
+      if (isSessionWizardWorkerSettlementForIdentity(eventSettlement, boundIdentity)) {
         // Keep cache events identity-scoped so settling one session cannot lock another live wizard tab.
         setSettled(eventSettlement as SessionWizardWorkerSettlement);
       }
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
-  }, [cachedIdentity, setSettled]);
+  }, [boundIdentity, cachedTerminalSettlement, pinsPublishedSettlement, setSettled]);
 
   useEffect(() => {
     if (!settlement) return;

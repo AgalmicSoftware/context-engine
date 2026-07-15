@@ -28,7 +28,7 @@ const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test', over
     corsWorkerUrl: workerUrl,
     ...(overrides.draft || {}),
   };
-  localStorage.setItem(
+  sessionStorage.setItem(
     'ce:sessionWizardDraft:v1',
     JSON.stringify({
       ...overrides,
@@ -66,7 +66,7 @@ const enableGeneralInfoLogging = () => {
   };
 };
 
-const readWizardCache = () => JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+const readWizardCache = () => JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
 
 describe('SessionWizard publish boundary rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
@@ -243,6 +243,65 @@ describe('SessionWizard publish boundary rendering', () => {
     });
   });
 
+  it('keeps stale legacy shared residue isolated from tab autosave after decentralized completion', async () => {
+    const manualMetadataUri = `ar://${'f'.repeat(43)}`;
+    let resolveRegister = () => {};
+    const registerPromise = new Promise((resolve) => {
+      resolveRegister = resolve;
+    });
+    mockRegisterSessionOnChain.mockImplementation(async () => registerPromise);
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Published Tab Session' },
+    });
+    await chooseCustomWorkerWithoutDeploy();
+    const publishButton = await openPublishSection();
+    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+      target: { value: manualMetadataUri },
+    });
+    await waitFor(() => {
+      expect(readWizardCache().draft?.slug).toBe('published-tab-session');
+      expect(publishButton).not.toBeDisabled();
+    });
+    const publishedSessionId = readWizardCache().sessionId;
+    expect(publishedSessionId).toEqual(expect.any(String));
+
+    fireEvent.click(publishButton);
+    await waitFor(() => expect(mockRegisterSessionOnChain).toHaveBeenCalledTimes(1));
+    const foreignDraft = {
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      draft: { slug: 'foreign-tab-session', sessionName: 'Keep this foreign draft' },
+    };
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify(foreignDraft));
+
+    await act(async () => {
+      resolveRegister({ txs: [] });
+      await registerPromise;
+    });
+
+    await waitFor(() => {
+      expect(JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}')).toEqual(foreignDraft);
+      const nextTabDraft = readWizardCache();
+      expect(nextTabDraft.sessionId).toEqual(expect.any(String));
+      expect(nextTabDraft.sessionId).not.toBe(publishedSessionId);
+    });
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Next Tab Session' },
+    });
+
+    await waitFor(() => {
+      const currentTabDraft = readWizardCache();
+      expect(currentTabDraft.sessionId).toEqual(expect.any(String));
+      expect(currentTabDraft.sessionId).not.toBe(publishedSessionId);
+      expect(currentTabDraft.draft).toEqual(expect.objectContaining({ sessionName: 'Next Tab Session' }));
+      expect(JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}')).toEqual(foreignDraft);
+    });
+  });
+
   it('locks a completed worker-canonical session against a second publish to the same worker', async () => {
     const originalFetch = global.fetch;
     const workerUrl = 'https://single-session-worker.example.test';
@@ -255,11 +314,13 @@ describe('SessionWizard publish boundary rendering', () => {
         return { ok: true, status: 200, json: async () => ({ ok: true }) };
       }
       if (normalizedUrl.endsWith('/session-config')) {
-        return { ok: true, status: 200, json: async () => ({ config: persistedConfig }) };
+        const { litCredentials: _privateLitDescriptor, ...publicConfig } = persistedConfig || {};
+        if (publicConfig.ai) publicConfig.ai = { models: publicConfig.ai.models };
+        return { ok: true, status: 200, json: async () => ({ config: publicConfig }) };
       }
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
     });
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         sessionId: '0x00112233445566778899aabbccddeeff',
@@ -302,9 +363,7 @@ describe('SessionWizard publish boundary rendering', () => {
         terminalWorkerSettlement: expect.objectContaining(expectedSettlement),
       });
       expect(
-        JSON.parse(
-          localStorage.getItem(getSessionWizardWorkerSettlementStorageKey(expectedSettlement)) || '{}',
-        ),
+        JSON.parse(localStorage.getItem(getSessionWizardWorkerSettlementStorageKey(expectedSettlement)) || '{}'),
       ).toEqual(expect.objectContaining(expectedSettlement));
 
       fireEvent.click(publishButton);

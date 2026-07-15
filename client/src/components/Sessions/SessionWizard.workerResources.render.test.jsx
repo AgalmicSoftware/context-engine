@@ -173,7 +173,7 @@ describe('SessionWizard worker resource rendering', () => {
   });
 
   it('blocks publishing worker resources with unrepresentable All gate groups', async () => {
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -226,7 +226,7 @@ describe('SessionWizard worker resource rendering', () => {
   });
 
   it('hides Lit worker inputs for Cloudflare worker SBT gate mode and restores them for Lit encrypted mode', async () => {
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -248,7 +248,7 @@ describe('SessionWizard worker resource rendering', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).not.toBeInTheDocument();
 
     firstRender.unmount();
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -366,7 +366,7 @@ describe('SessionWizard worker resource rendering', () => {
   it('waits for a worker URL before enabling Chipotle wizard hooks', async () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     litProtocol.createLitHooks.mockClear();
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         workerSecretsEnabled: true,
@@ -521,7 +521,7 @@ describe('SessionWizard worker resource rendering', () => {
   it('keeps Chipotle Lit UI visible while stripping cached legacy payer secrets from saved drafts', async () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     const cachedLitKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         workerSecretsEnabled: true,
@@ -554,7 +554,7 @@ describe('SessionWizard worker resource rendering', () => {
     });
 
     await waitFor(() => {
-      const cached = JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+      const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
       expect(cached.workerSecrets?.litPayerPrivateKey).toBeUndefined();
       expect(cached.workerSecrets?.litPayerAddress).toBeUndefined();
       expect(cached.provisionedSponsoredContext?.fields?.sponsored_lit).toBe('1');

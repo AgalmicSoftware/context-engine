@@ -26,15 +26,20 @@ export type WorkerCanonicalSessionBootstrap = {
   workerOrigin: string;
 };
 
-// Retry only activation/edge-transient statuses. Auth, redirect, and validated
-// identity/config failures remain permanent and fail closed.
-const RETRYABLE_BOOTSTRAP_HTTP_STATUSES = new Set([404, 408, 425, 429, 502, 503, 504]);
+// Retry activation/edge-transient client statuses and every server failure.
+// Auth, redirect, and validated identity/config failures remain permanent.
+const RETRYABLE_BOOTSTRAP_HTTP_STATUSES = new Set([404, 408, 425, 429]);
+const isRetryableBootstrapHttpStatus = (status: number): boolean =>
+  RETRYABLE_BOOTSTRAP_HTTP_STATUSES.has(status) || (status >= 500 && status <= 599);
 
 export class WorkerSessionBootstrapRequestError extends Error {
   readonly retryable: boolean;
   readonly status: number | null;
 
-  constructor(message: string, { retryable = false, status = null }: { retryable?: boolean; status?: number | null } = {}) {
+  constructor(
+    message: string,
+    { retryable = false, status = null }: { retryable?: boolean; status?: number | null } = {},
+  ) {
     super(message);
     this.name = 'WorkerSessionBootstrapRequestError';
     this.retryable = retryable;
@@ -43,8 +48,7 @@ export class WorkerSessionBootstrapRequestError extends Error {
 }
 
 export const isRetryableWorkerSessionBootstrapError = (error: unknown): boolean =>
-  error instanceof TypeError ||
-  (error instanceof WorkerSessionBootstrapRequestError && error.retryable);
+  error instanceof TypeError || (error instanceof WorkerSessionBootstrapRequestError && error.retryable);
 
 const WORKER_URL_KEYS = Object.freeze([
   'corsWorkerUrl',
@@ -418,7 +422,7 @@ export const fetchWorkerCanonicalSessionBootstrap = async ({
   });
   if (!response.ok || response.redirected) {
     throw new WorkerSessionBootstrapRequestError(`Worker bootstrap request failed with status ${response.status}.`, {
-      retryable: !response.redirected && RETRYABLE_BOOTSTRAP_HTTP_STATUSES.has(response.status),
+      retryable: !response.redirected && isRetryableBootstrapHttpStatus(response.status),
       status: response.status,
     });
   }

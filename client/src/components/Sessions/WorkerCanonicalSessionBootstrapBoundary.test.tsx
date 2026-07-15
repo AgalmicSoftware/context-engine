@@ -398,7 +398,31 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     expect(onResolved).not.toHaveBeenCalled();
   });
 
-  it('retries a bounded transient network failure before resolving', async () => {
+  it.each([500, 598])('retries a bounded HTTP %i bootstrap failure before resolving', async (status) => {
+    mockFetchBootstrap
+      .mockRejectedValueOnce(
+        new WorkerSessionBootstrapRequestError(`Worker bootstrap request failed with status ${status}.`, {
+          retryable: true,
+          status,
+        }),
+      )
+      .mockResolvedValueOnce(bootstrap);
+    const onResolved = jest.fn();
+
+    render(
+      <WorkerCanonicalSessionBootstrapBoundary
+        sessionSlug="worker-session"
+        workerQueryValue={WORKER_ORIGIN}
+        onResolved={onResolved}
+        retryDelaysMs={[0]}
+      />,
+    );
+
+    await waitFor(() => expect(onResolved).toHaveBeenCalledWith(bootstrap));
+    expect(mockFetchBootstrap).toHaveBeenCalledTimes(2);
+  });
+
+  it('still retries a bounded transient network failure before resolving', async () => {
     mockFetchBootstrap.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(bootstrap);
     const onResolved = jest.fn();
 
@@ -415,8 +439,15 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     expect(mockFetchBootstrap).toHaveBeenCalledTimes(2);
   });
 
-  it('offers a semantic manual Retry after transient retries are exhausted', async () => {
-    mockFetchBootstrap.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(bootstrap);
+  it('offers a semantic manual Retry after a nonstandard 5xx failure exhausts automatic retries', async () => {
+    mockFetchBootstrap
+      .mockRejectedValueOnce(
+        new WorkerSessionBootstrapRequestError('Worker bootstrap request failed with status 599.', {
+          retryable: true,
+          status: 599,
+        }),
+      )
+      .mockResolvedValueOnce(bootstrap);
     const onResolved = jest.fn();
 
     render(
@@ -429,7 +460,7 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     );
 
     const retry = await screen.findByRole('button', { name: 'Retry worker session' });
-    expect(screen.getByRole('alert')).toHaveTextContent('Failed to fetch');
+    expect(screen.getByRole('alert')).toHaveTextContent('status 599');
     await act(async () => retry.click());
 
     await waitFor(() => expect(onResolved).toHaveBeenCalledWith(bootstrap));
@@ -437,10 +468,12 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
   });
 
   it('caps automatic retries before offering the manual Retry action', async () => {
-    mockFetchBootstrap.mockRejectedValue(new WorkerSessionBootstrapRequestError('Worker is activating.', {
-      retryable: true,
-      status: 503,
-    }));
+    mockFetchBootstrap.mockRejectedValue(
+      new WorkerSessionBootstrapRequestError('Worker is activating.', {
+        retryable: true,
+        status: 503,
+      }),
+    );
 
     render(
       <WorkerCanonicalSessionBootstrapBoundary

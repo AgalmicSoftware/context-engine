@@ -23,7 +23,7 @@ describe('SessionWizard pending SBT persistence rendering', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
 
     await waitFor(() => {
-      const cachedRaw = localStorage.getItem('ce:sessionWizardDraft:v1') || '';
+      const cachedRaw = sessionStorage.getItem('ce:sessionWizardDraft:v1') || '';
       expect(cachedRaw).not.toContain('claim-code-1');
       expect(cachedRaw).not.toContain('shared-secret');
       expect(JSON.parse(cachedRaw).pendingSbtDrafts).toEqual([]);
@@ -39,8 +39,8 @@ describe('SessionWizard pending SBT persistence rendering', () => {
     });
   });
 
-  it('does not restore cached pending SBT drafts from localStorage', async () => {
-    localStorage.setItem(
+  it('does not restore pending SBT drafts embedded in the main wizard cache', async () => {
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         pendingSbtDrafts: [

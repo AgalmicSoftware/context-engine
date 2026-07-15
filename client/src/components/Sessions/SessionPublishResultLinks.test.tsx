@@ -135,8 +135,6 @@ describe('SessionPublishResultLinks', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Create another session' }));
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Could not clear the completed session from this browser.',
-    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not clear the completed session from this browser.');
   });
 });

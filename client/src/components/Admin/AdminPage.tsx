@@ -58,16 +58,15 @@ import {
   normalizeAiProvider,
   normalizeSlug,
   normalizeWorkerUrl,
+  resolveAdminCapabilities,
 } from './adminPageHelpers';
 import {
-  ADMIN_ACTION_NONCE_RETRY_ATTEMPTS,
   addSessionConfigHint,
   buildHealthAuthMismatchState,
-  isRetryableAdminNonceFailure,
   normalizeAdminWorkerFetchError,
   shouldSeedWorkerConfigFromError,
-  sleep,
 } from './adminPageWorkerErrorHelpers';
+import { postSignedAdminWorkerRequest, type AdminSignedWorkerRequestArgs } from './adminPageSignedWorkerRequest';
 import {
   buildUserPageUrl,
   formatAllowOriginsDraft,
@@ -122,6 +121,7 @@ import {
   applyAdminMetadataDraft,
   buildAdminMetadataDraft,
   buildEditableSessionMetadataPayload,
+  buildWorkerCanonicalMetadataConfigPatch,
   parseChainIdInput,
   resolveAutoFeatureBySessionSlug,
 } from './adminPageMetadataDraftHelpers';
@@ -702,7 +702,7 @@ const AdminPageRuntime = ({
     setMetadataContractDraftTouched(false);
     setMetadataContractsVerified(false);
     setMetadataAutoFeatureTouched(false);
-    setMetadataUpdateStatus('');
+    if (slugChanged) setMetadataUpdateStatus('');
     setMetadataBlockLimitsDraft({
       start: toStr(groupMetadata?.blockLimits?.start).trim(),
       end: toStr(groupMetadata?.blockLimits?.end).trim(),
@@ -1109,74 +1109,12 @@ const AdminPageRuntime = ({
   );
 
   const postSignedAdminRequest = useCallback(
-    async ({
-      action = 'set-config',
-      body = {},
-      path,
-      chainId: chainIdOverride = null,
-      workerUrl: overrideWorkerUrl,
-      retryAttempts = ADMIN_ACTION_NONCE_RETRY_ATTEMPTS,
-    }: any = {}) => {
-      const baseUrl = normalizeWorkerUrl(overrideWorkerUrl || workerUrl || selectedConfigWorkerUrl);
-      if (!baseUrl) throw new Error('Worker URL is missing.');
-
-      let lastError: any = null;
-      for (let attempt = 1; attempt <= retryAttempts; attempt += 1) {
-        const auth = await signAdminAction({
-          action,
-          body,
-          chainId: chainIdOverride,
-          workerUrl: baseUrl,
-        });
-        let res;
-        try {
-          res = await fetch(`${baseUrl}${path}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...body, ...auth }),
-          });
-        } catch (error) {
-          throw new Error(
-            normalizeAdminWorkerFetchError({
-              error,
-              workerBase: baseUrl,
-            }),
-          );
-        }
-
-        const data = await res.json().catch(() => ({}));
-        if (res.ok) {
-          return { baseUrl, response: res, data };
-        }
-
-        const responseError = data?.error || '';
-        if (
-          attempt < retryAttempts &&
-          isRetryableAdminNonceFailure({
-            responseStatus: res.status,
-            responseError,
-          })
-        ) {
-          // A concurrent admin action may have consumed the previous nonce.
-          // Re-sign with a fresh nonce instead of surfacing a transient failure.
-          // eslint-disable-next-line no-await-in-loop
-          await sleep(250 * attempt);
-          continue;
-        }
-
-        lastError = new Error(
-          normalizeAdminWorkerFetchError({
-            error: responseError || `Request failed (${res.status}).`,
-            workerBase: baseUrl,
-            responseStatus: res.status,
-            responseError,
-          }),
-        );
-        throw lastError;
-      }
-
-      throw lastError || new Error(`Failed admin action: ${action}`);
-    },
+    (args: AdminSignedWorkerRequestArgs = {}) =>
+      postSignedAdminWorkerRequest({
+        ...args,
+        workerUrl: args.workerUrl || workerUrl || selectedConfigWorkerUrl,
+        signAdminAction,
+      }),
     [selectedConfigWorkerUrl, signAdminAction, workerUrl],
   );
 
@@ -1408,7 +1346,7 @@ const AdminPageRuntime = ({
     let baseUrl = '';
     try {
       if (!selectedConfig) throw new Error('Select a session.');
-      if (!canAdmin) throw new Error('Connect the admin wallet to update worker config.');
+      if (!canAdminWorker) throw new Error('Connect the admin wallet to update worker config.');
       const slug = normalizeSlug(selectedSlug);
       baseUrl = normalizeWorkerUrl(workerUrl);
       if (!baseUrl) throw new Error('Worker URL is missing.');
@@ -1465,6 +1403,7 @@ const AdminPageRuntime = ({
       setChainStatus('');
       const slug = normalizeSlug(selectedSlug);
       if (!selectedConfig) throw new Error('Select a session.');
+      if (!canAdminWorker) throw new Error('Connect the admin wallet to update worker secrets.');
       const baseUrl = normalizeWorkerUrl(workerUrl);
       if (!baseUrl) throw new Error('Worker URL is missing.');
       const savedPresenceTargetKey = buildSecretPresenceTargetKey({ slug, workerUrl: baseUrl });
@@ -1490,36 +1429,32 @@ const AdminPageRuntime = ({
       });
       setSaveStatus(`Worker secrets saved for ${sessionLabel}.`);
 
-      const registryChainId =
-        Number(
-          selectedConfig?.__registry?.registryChainId ||
-            selectedConfig?.__registry?.chainId ||
-            selectedConfig?.networkChainId ||
-            network?.id ||
-            0,
-        ) || 0;
-      const shouldPreserveSponsoredLit =
-        currentSponsoredLit &&
-        !clearedSecretKeys.has('litAccountApiKey') &&
-        !clearedSecretKeys.has('litUsageApiKey') &&
-        !Object.prototype.hasOwnProperty.call(secretsPayload, 'litAccountApiKey') &&
-        !Object.prototype.hasOwnProperty.call(secretsPayload, 'litUsageApiKey');
-      const sponsoredFields = adminSessionRegistryPorts.writes.buildRegistrySessionFields({
-        sponsoredFields: buildSponsoredSessionFlagFields({
-          secrets: secretsPayload,
-          fallbackFields: shouldPreserveSponsoredLit ? { sponsored_lit: '1' } : {},
-          includeCustomRpcInAi: true,
-        }),
-      });
-      setChainStatus('Updating sponsored flags on-chain…');
-      await adminSessionRegistryPorts.writes.setSessionFieldsOnChain({
-        providerLike: provider,
-        chainId: registryChainId,
-        slug,
-        fields: sponsoredFields,
-      });
-      setChainStatus('Sponsored flags updated.');
-      await loadSessions();
+      if (canAdminRegistry) {
+        const registryChainId =
+          Number(selectedConfig?.__registry?.registryChainId || selectedConfig?.__registry?.chainId || 0) || 0;
+        const shouldPreserveSponsoredLit =
+          currentSponsoredLit &&
+          !clearedSecretKeys.has('litAccountApiKey') &&
+          !clearedSecretKeys.has('litUsageApiKey') &&
+          !Object.prototype.hasOwnProperty.call(secretsPayload, 'litAccountApiKey') &&
+          !Object.prototype.hasOwnProperty.call(secretsPayload, 'litUsageApiKey');
+        const sponsoredFields = adminSessionRegistryPorts.writes.buildRegistrySessionFields({
+          sponsoredFields: buildSponsoredSessionFlagFields({
+            secrets: secretsPayload,
+            fallbackFields: shouldPreserveSponsoredLit ? { sponsored_lit: '1' } : {},
+            includeCustomRpcInAi: true,
+          }),
+        });
+        setChainStatus('Updating sponsored flags on-chain…');
+        await adminSessionRegistryPorts.writes.setSessionFieldsOnChain({
+          providerLike: provider,
+          chainId: registryChainId,
+          slug,
+          fields: sponsoredFields,
+        });
+        setChainStatus('Sponsored flags updated.');
+        await loadSessions();
+      }
       if (savedPresenceTargetKey === secretPresenceTargetKeyRef.current) {
         secretPresenceRequestRef.current += 1;
         mergeStoredSecretPresenceFromPayload(secretsPayload);
@@ -1602,7 +1537,7 @@ const AdminPageRuntime = ({
     setGateSyncResult(null);
     try {
       if (!selectedConfig) throw new Error('Select a session first.');
-      if (!canAdmin) throw new Error('Connect the admin wallet to update gates.');
+      if (!canAdminRegistry) throw new Error('Connect the registry admin wallet to update gates.');
       const registryChainId =
         Number(
           selectedConfig?.__registry?.registryChainId ||
@@ -1651,11 +1586,8 @@ const AdminPageRuntime = ({
     }
   };
 
-  const adminAddress = toStr(selectedConfig?.__registry?.adminAddress || selectedConfig?.adminAddress).toLowerCase();
-  const accountLower = toStr(account).toLowerCase();
-  const hasRegistryEntry = !!selectedConfig?.__registry?.registryChainId || !!selectedConfig?.__registry?.adminAddress;
-  const isAdminForSelected = !!accountLower && !!adminAddress && adminAddress === accountLower;
-  const canAdmin = !!account && !!selectedConfig && isAdminForSelected && hasRegistryEntry;
+  const { isWorkerCanonicalSession, workerAdminAddress, hasRegistryEntry, canAdminWorker, canAdminRegistry } =
+    resolveAdminCapabilities({ account, sessionConfig: selectedConfig });
   const baseWorkerUrl = normalizeWorkerUrl(workerUrl);
   const canRunTests = !!baseWorkerUrl && !!account;
   const canRunHealthTest = !!baseWorkerUrl && (defaultGateIsEmpty || walletReady);
@@ -1667,7 +1599,12 @@ const AdminPageRuntime = ({
     ? { ...selectedConfig, corsWorkerUrl: baseWorkerUrl || selectedConfigWorkerUrl || '' }
     : null;
   const ensureWorkerSessionConfig = useCallback(
-    async ({ sessionConfigOverride, action = 'set-config', workerUrl: workerUrlOverride }: any = {}) => {
+    async ({
+      sessionConfigOverride,
+      configPayloadOverride,
+      action = 'set-config',
+      workerUrl: workerUrlOverride,
+    }: any = {}) => {
       const sessionConfigForSync = sessionConfigOverride || selectedConfig;
       if (!sessionConfigForSync) throw new Error('Select a session first.');
       if (!account) {
@@ -1678,11 +1615,13 @@ const AdminPageRuntime = ({
       const baseUrl = normalizeWorkerUrl(workerUrlOverride || baseWorkerUrl || selectedConfigWorkerUrl);
       if (!baseUrl) throw new Error('Worker URL is missing.');
 
-      const configPayload = buildWorkerSessionConfigPayload({
-        sessionConfig: sessionConfigForSync,
-        account,
-        fallbackChainId: testChainId,
-      });
+      const configPayload = configPayloadOverride
+        ? { ...asAdminSessionConfig(configPayloadOverride) }
+        : buildWorkerSessionConfigPayload({
+            sessionConfig: sessionConfigForSync,
+            account,
+            fallbackChainId: testChainId,
+          });
       const requestBody = {
         sessionSlug: slug,
         adminAddress: configPayload.adminAddress || account,
@@ -1695,13 +1634,11 @@ const AdminPageRuntime = ({
         chainId: testChainId,
         workerUrl: baseUrl,
       });
+      const existingCachedConfig = getCachedSessionWorkerConfig({ slug, sessionConfig: selectedConfig }) || {};
       upsertCachedSessionWorkerConfig({
         slug,
         sessionConfig: selectedConfig,
-        config: {
-          ...configPayload,
-          corsWorkerUrl: baseUrl,
-        },
+        config: { ...existingCachedConfig, ...configPayload, corsWorkerUrl: baseUrl },
       });
       return { data, configPayload };
     },
@@ -1772,7 +1709,7 @@ const AdminPageRuntime = ({
         }
       }
 
-      if (canAdmin) {
+      if (canAdminWorker) {
         try {
           await ensureWorkerSessionConfig();
         } catch (_) {
@@ -1828,7 +1765,7 @@ const AdminPageRuntime = ({
     setTestBusy(true);
     setTestStatus('Testing AI proxy…');
     try {
-      if (canAdmin) {
+      if (canAdminWorker) {
         try {
           await ensureWorkerSessionConfig();
         } catch (_) {
@@ -2105,12 +2042,12 @@ const AdminPageRuntime = ({
 
   const handleSaveSessionMetadata = async () => {
     setMetadataUpdateBusy(true);
-    setMetadataUpdateStatus('Uploading updated metadata…');
+    setMetadataUpdateStatus(canAdminRegistry ? 'Uploading updated metadata…' : 'Updating worker metadata…');
     try {
       if (!groupMetadata) throw new Error('Select a session first.');
-      if (!canAdmin) throw new Error('Connect the admin wallet to update session metadata.');
-      if (!relevantRegistryChainId) throw new Error('Registry chain id is missing.');
-      if (!metadataContractsReadyForSave) {
+      if (!canAdminWorker && !canAdminRegistry) throw new Error('Connect the admin wallet to update session metadata.');
+      if (canAdminRegistry && !relevantRegistryChainId) throw new Error('Registry chain id is missing.');
+      if (canAdminRegistry && !metadataContractsReadyForSave) {
         throw new Error(
           'Session metadata contracts are currently synthesized defaults. Verify or edit the contract addresses before saving.',
         );
@@ -2123,7 +2060,32 @@ const AdminPageRuntime = ({
         autoFeatureSBTsBySessionSlug: metadataAutoFeatureDraft,
         hasAutoFeatureOverride: metadataAutoFeatureTouched,
         advancedDraft: metadataConfigDraft,
+        requireBlockLimits: canAdminRegistry,
       });
+      const nextConfig = { ...selectedConfig, ...metadata };
+      if (!canAdminRegistry) {
+        const configPayload = buildWorkerCanonicalMetadataConfigPatch({
+          metadata,
+          slug: selectedSlug,
+          adminAddress: workerAdminAddress,
+        });
+        await ensureWorkerSessionConfig({
+          sessionConfigOverride: nextConfig,
+          configPayloadOverride: configPayload,
+          action: 'set-config',
+        });
+        // Keep the route-local canonical source aligned until the next verified
+        // worker bootstrap; otherwise a cache refresh can restore stale metadata.
+        initialWorkerCanonicalConfigRef.current = nextConfig;
+        setSessions((entries) =>
+          entries.map(([slug, config]) =>
+            slug === selectedSlug ? ([slug, nextConfig] as AdminSessionRegistryEntry) : [slug, config],
+          ),
+        );
+        setMetadataDraftTouched(false);
+        setMetadataUpdateStatus('Worker session metadata updated.');
+        return;
+      }
       const uploadResult = await adminSessionRegistryPorts.writes.uploadSessionMetadata(metadata, {
         sessionConfig: selectedConfig,
         sessionSlug: selectedSlug,
@@ -2139,7 +2101,7 @@ const AdminPageRuntime = ({
         metadataURI: uploadResult.metadataUri,
         encryptedMetadataURI: toStr(selectedConfig?.__registry?.encryptedMetadataURI).trim(),
       });
-      const nextConfig = {
+      const nextRegistryConfig = {
         ...selectedConfig,
         ...metadata,
         __registry: {
@@ -2148,7 +2110,7 @@ const AdminPageRuntime = ({
           encryptedMetadataURI: toStr(selectedConfig?.__registry?.encryptedMetadataURI).trim(),
         },
       };
-      adminSessionRegistryPorts.reads.upsertSessionRegistryCache({ config: nextConfig });
+      adminSessionRegistryPorts.reads.upsertSessionRegistryCache({ config: nextRegistryConfig });
       setSessions(adminSessionRegistryPorts.reads.getAllSessionEntries() || []);
       setMetadataDraftTouched(false);
       const txUrl = buildTxExplorerUrl(registryResult?.txHash, relevantRegistryChainId);
@@ -2158,22 +2120,22 @@ const AdminPageRuntime = ({
         const metadataSyncWorkerUrl = normalizeWorkerUrl(
           getUsableSessionWorkerUrl({
             slug: selectedSlug,
-            sessionConfig: nextConfig,
+            sessionConfig: nextRegistryConfig,
             allowSharedFallback: true,
           }) ||
             baseWorkerUrl ||
             selectedConfigWorkerUrl,
         );
-        if (typeof fetch === 'function' && metadataSyncWorkerUrl) {
+        if (canAdminWorker && typeof fetch === 'function' && metadataSyncWorkerUrl) {
           setMetadataUpdateStatus('Syncing worker config…');
           await ensureWorkerSessionConfig({
-            sessionConfigOverride: nextConfig,
+            sessionConfigOverride: nextRegistryConfig,
             action: 'set-config',
             workerUrl: metadataSyncWorkerUrl,
           });
           workerSyncSuffix = ' Worker config synced.';
         } else {
-          workerSyncSuffix = ' Worker config sync skipped (worker URL missing).';
+          workerSyncSuffix = ' Worker config sync skipped (worker admin or worker URL unavailable).';
         }
       } catch (syncError: any) {
         workerSyncSuffix = ` Worker config sync failed: ${getErrorMessage(syncError, 'unknown error')}`;
@@ -2450,7 +2412,7 @@ const AdminPageRuntime = ({
                             >
                               Test
                             </Button>
-                            {canAdmin && (
+                            {canAdminWorker && (
                               <button
                                 type="button"
                                 className={`${styles.heroCardInputActionButton} ${styles.heroCardInputIconButton}`}
@@ -2477,7 +2439,7 @@ const AdminPageRuntime = ({
                         >
                           Allowlist <FontAwesomeIcon icon={showAllowlistEditor ? faCaretUp : faCaretDown} />
                         </Button>
-                        {showAllowlistEditor && canAdmin && (
+                        {showAllowlistEditor && canAdminWorker && (
                           <>
                             <Button
                               size="sm"
@@ -2521,7 +2483,7 @@ const AdminPageRuntime = ({
                             type="textarea"
                             value={allowOriginsDraft}
                             onChange={handleAllowOriginsDraftChange}
-                            readOnly={!canAdmin}
+                            readOnly={!canAdminWorker}
                             placeholder={'https://app.example\nhttp://localhost:3001'}
                             className={styles.heroAllowlistInput}
                           />
@@ -2550,13 +2512,13 @@ const AdminPageRuntime = ({
             )}
             {sessionsRefreshStatus && <div className={styles.statusNote}>{sessionsRefreshStatus}</div>}
             {sessionLookupStatus && <div className={styles.warningNote}>{sessionLookupStatus}</div>}
-            {!!selectedConfig && account && !isAdminForSelected && (
+            {!!selectedConfig && account && !(canAdminWorker || canAdminRegistry) && (
               <div className={styles.warningNote} data-testid={E2E_TESTIDS.ADMIN_NOT_ADMIN_WARNING}>
                 You are not the admin for this session; actions are disabled.
               </div>
             )}
             {corsPatchStatus && <div className={styles.statusNote}>{corsPatchStatus}</div>}
-            {selectedConfig && !hasRegistryEntry && (
+            {selectedConfig && !hasRegistryEntry && !isWorkerCanonicalSession && (
               <div className={styles.warningNote}>
                 Session is not registered on-chain yet. Register in /new before using worker actions.
               </div>
@@ -2665,7 +2627,7 @@ const AdminPageRuntime = ({
                   chain defaults. Verify them before publishing any metadata update.
                 </div>
               )}
-              {canAdmin && (
+              {(canAdminWorker || canAdminRegistry) && (
                 <AdminPageMetadataEditor
                   metadataConfigDraft={metadataConfigDraft}
                   updateMetadataConfigDraft={updateMetadataConfigDraft}
@@ -2841,7 +2803,7 @@ const AdminPageRuntime = ({
                 className={styles.actionButton}
                 onClick={handleSyncDefaultGate}
                 data-testid={E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON}
-                disabled={!canAdmin || gateSyncBusy}
+                disabled={!canAdminRegistry || gateSyncBusy}
                 style={{ opacity: gateConfigDirty ? 1 : 0.5 }}
               >
                 Update default gate on-chain
@@ -2859,7 +2821,7 @@ const AdminPageRuntime = ({
         <AdminPageWorkerSecretsPanel
           workerSecretsOpen={workerSecretsOpen}
           onToggle={() => toggleSection('workerSecrets')}
-          canAdmin={canAdmin}
+          canAdminWorker={canAdminWorker}
           selectedConfig={selectedConfig}
           workerUrl={workerUrl}
           selectedConfigWorkerUrl={selectedConfigWorkerUrl}

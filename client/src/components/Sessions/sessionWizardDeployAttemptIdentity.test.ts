@@ -61,9 +61,7 @@ describe('sessionWizardDeployAttemptIdentity', () => {
     expect(reloaded).toEqual(expect.objectContaining({ generation: 0, status: 'completed' }));
     expect(reloaded.deploymentRequestId).toBe(firstTab.deploymentRequestId);
     expect(reloaded.configRevision).toBe(firstTab.configRevision);
-    expect(localStorage.getItem(reloaded.storageKey)).toBe(
-      '{"version":1,"generation":0,"status":"completed"}',
-    );
+    expect(localStorage.getItem(reloaded.storageKey)).toBe('{"version":1,"generation":0,"status":"completed"}');
   });
 
   it('fails closed when the generation cannot be persisted', () => {

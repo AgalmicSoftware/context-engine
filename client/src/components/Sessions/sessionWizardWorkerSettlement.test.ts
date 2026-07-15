@@ -122,7 +122,11 @@ describe('sessionWizardWorkerSettlement', () => {
   });
 
   it('reports write and clear failures without throwing', () => {
-    const writeStorage = { setItem: jest.fn(() => { throw new Error('quota'); }) };
+    const writeStorage = {
+      setItem: jest.fn(() => {
+        throw new Error('quota');
+      }),
+    };
     expect(
       writeSessionWizardWorkerSettlement(
         { workerUrl: 'https://published-worker.example.test', slug: 'published-session', sessionId: 'id' },
@@ -130,7 +134,11 @@ describe('sessionWizardWorkerSettlement', () => {
       ),
     ).toEqual(expect.objectContaining({ ok: false, status: 'write-failed' }));
 
-    const clearStorage = { removeItem: jest.fn(() => { throw new Error('denied'); }) };
+    const clearStorage = {
+      removeItem: jest.fn(() => {
+        throw new Error('denied');
+      }),
+    };
     expect(clearSessionWizardWorkerSettlement(publishedIdentity, { storage: clearStorage })).toEqual({
       ok: false,
       removed: 0,

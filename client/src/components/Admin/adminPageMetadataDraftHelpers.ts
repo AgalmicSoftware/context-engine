@@ -3,7 +3,7 @@ import { ethers } from 'ethers';
 import { normalizeBlockLimitsForConfig } from '../../utilities/session/blockLimits.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { sanitizeSessionWizardMetadataPayload } from '../Sessions/sessionWizardWriteNormalization.js';
-import { inferAiProviderFromModel, normalizeAiProvider } from './adminPageHelpers';
+import { inferAiProviderFromModel, normalizeAiProvider, normalizeSlug } from './adminPageHelpers';
 import {
   formatDefaultFilterStateDraft,
   formatDelimitedDraftList,
@@ -227,6 +227,52 @@ export const resolveAutoFeatureBySessionSlug = (metadata: any) =>
     ? metadata.autoFeatureSBTsBySessionSlug
     : metadata?.autoFeatureSBTsWithFeaturedSbtTags;
 
+const WORKER_CANONICAL_METADATA_PATCH_KEYS = Object.freeze([
+  'defaultTags',
+  'defaultSbtTags',
+  'questionsGenPrompt',
+  'defaultFilterState',
+  'defaultFeaturedSBTs',
+  'autoFeatureSBTsBySessionSlug',
+  'HIGHLIGHTED_QUESTION_IDS',
+  'BLOCKED_QUESTION_IDS',
+  'HIGHLIGHTED_SURVEY_IDS',
+  'BLOCKED_SURVEY_IDS',
+  'ignored_SBTs_LIST',
+  'featured_SBTs_LIST',
+  'ai',
+  'contracts',
+  'blockLimits',
+]);
+
+export const buildWorkerCanonicalMetadataConfigPatch = ({
+  metadata,
+  slug,
+  adminAddress,
+}: {
+  metadata?: unknown;
+  slug?: unknown;
+  adminAddress?: unknown;
+} = {}) => {
+  const source = metadata && typeof metadata === 'object' ? (metadata as Record<string, unknown>) : {};
+  const patch: Record<string, unknown> = {};
+  // Regression guard: this is a partial metadata mutation, so copy only fields
+  // owned by the editor instead of replaying stale authority/runtime config.
+  WORKER_CANONICAL_METADATA_PATCH_KEYS.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(source, key)) patch[key] = deepClone(source[key]);
+  });
+  const sourceFaucet =
+    source.faucet && typeof source.faucet === 'object' ? (source.faucet as Record<string, unknown>) : {};
+  const faucet = ['amountEth', 'balanceThresholdEth'].reduce<Record<string, unknown>>((next, key) => {
+    if (Object.prototype.hasOwnProperty.call(sourceFaucet, key)) next[key] = deepClone(sourceFaucet[key]);
+    return next;
+  }, {});
+  if (Object.keys(faucet).length) patch.faucet = faucet;
+  patch.slug = normalizeSlug(slug);
+  patch.adminAddress = toStr(adminAddress).trim();
+  return patch;
+};
+
 export const buildEditableSessionMetadataPayload = ({
   sessionConfig,
   blockLimits,
@@ -235,6 +281,7 @@ export const buildEditableSessionMetadataPayload = ({
   autoFeatureSBTsWithFeaturedSbtTags,
   hasAutoFeatureOverride = false,
   advancedDraft = null,
+  requireBlockLimits = true,
 }: any = {}) => {
   const metadata = deepClone(sessionConfig && typeof sessionConfig === 'object' ? sessionConfig : {});
   delete metadata.__registry;
@@ -243,10 +290,11 @@ export const buildEditableSessionMetadataPayload = ({
     blockLimits && typeof blockLimits === 'object' ? blockLimits : metadata.blockLimits,
     fallbackStart,
   );
-  if (!normalizedBlockLimits) {
+  if (!normalizedBlockLimits && requireBlockLimits) {
     throw new Error('Session metadata requires blockLimits.start (positive block number).');
   }
-  metadata.blockLimits = normalizedBlockLimits;
+  if (normalizedBlockLimits) metadata.blockLimits = normalizedBlockLimits;
+  else delete metadata.blockLimits;
   const existingAutoFeature = resolveAutoFeatureBySessionSlug(metadata);
   delete metadata.autoFeatureSBTsWithFeaturedSbtTags;
   if (hasAutoFeatureOverride) {

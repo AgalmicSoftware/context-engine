@@ -92,7 +92,12 @@ jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-se
 
 const AdminPage = require('./AdminPage').default;
 
-const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, initialRegistryChainId } = {}) => {
+const renderAdminPage = async ({
+  account = ADMIN_ADDRESS,
+  initialSessionId,
+  initialRegistryChainId,
+  initialSessionConfig,
+} = {}) => {
   let utils;
   await act(async () => {
     utils = render(
@@ -103,6 +108,7 @@ const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, init
         toggleLoginModal={jest.fn()}
         initialSessionId={initialSessionId}
         initialRegistryChainId={initialRegistryChainId}
+        initialSessionConfig={initialSessionConfig}
       />,
     );
     await Promise.resolve();
@@ -191,6 +197,86 @@ describe('AdminPage worker secrets controls', () => {
     expect(within(getSecretCardButton(workerSecretsPanel, 'Faucet')).getByText('Unknown')).toBeInTheDocument();
     expect(within(getSecretCardButton(workerSecretsPanel, 'Lit')).getByText('Unknown')).toBeInTheDocument();
     expect(within(workerSecretsPanel).queryByText('Empty')).not.toBeInTheDocument();
+  });
+
+  it('saves worker-canonical secrets without requiring or mutating an on-chain registry entry', async () => {
+    sessionEntries = [];
+    const initialSessionConfig = {
+      slug: 'worker-admin',
+      sessionId: '0x1234567890abcdef1234567890abcdef',
+      configRevision: 'worker-admin-revision',
+      sessionName: 'Worker Admin Session',
+      corsWorkerUrl: 'https://worker-admin.example.test',
+      adminAddress: ADMIN_ADDRESS,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    mockResolveCorsProxyUrl.mockResolvedValue({
+      url: initialSessionConfig.corsWorkerUrl,
+      source: 'session-config',
+      status: 'ok',
+    });
+
+    await renderAdminPage({ initialSessionConfig });
+    expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit worker URL' })).toBeInTheDocument();
+    expect(screen.queryByText(/Register in \/new before using worker actions/i)).not.toBeInTheDocument();
+
+    const workerSecretsPanel = await openWorkerSecretsPanel();
+    fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
+    fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
+      target: { value: 'test-openai-key' },
+    });
+    await clickAndSettle(await screen.findByRole('button', { name: 'Save worker secrets' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Worker secrets saved for worker-admin/)).toBeInTheDocument();
+    });
+    const workerWrite = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
+    expect(workerWrite).toBeTruthy();
+    expect(JSON.parse(workerWrite[1].body)).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'worker-admin',
+        secrets: { openaiKey: 'test-openai-key' },
+      }),
+    );
+    expect(mockSetSessionFieldsOnChain).not.toHaveBeenCalled();
+    expect(mockUploadSessionMetadata).not.toHaveBeenCalled();
+    expect(mockUpdateSessionMetadataOnChain).not.toHaveBeenCalled();
+
+    const gatePanel = screen.getByText('On-chain default gate').closest('section');
+    await clickAndSettle(within(gatePanel).getByRole('button', { name: 'Toggle On-chain default gate section' }));
+    expect(screen.getByRole('button', { name: 'Update default gate on-chain' })).toBeDisabled();
+  });
+
+  it('does not grant registry mutations to a different worker-canonical top-level admin', async () => {
+    sessionEntries = [];
+    const initialSessionConfig = {
+      slug: 'split-admins',
+      sessionId: '0xabcdefabcdefabcdefabcdefabcdefab',
+      configRevision: 'split-admins-revision',
+      corsWorkerUrl: 'https://split-admins.example.test',
+      adminAddress: ADMIN_ADDRESS,
+      __registry: {
+        registryChainId: 84532,
+        chainId: 84532,
+        adminAddress: '0x00000000000000000000000000000000000000bb',
+      },
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    mockResolveCorsProxyUrl.mockResolvedValue({
+      url: initialSessionConfig.corsWorkerUrl,
+      source: 'session-config',
+      status: 'ok',
+    });
+
+    await renderAdminPage({ initialSessionConfig });
+    expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit worker URL' })).toBeInTheDocument();
+
+    const gatePanel = screen.getByText('On-chain default gate').closest('section');
+    await clickAndSettle(within(gatePanel).getByRole('button', { name: 'Toggle On-chain default gate section' }));
+    expect(screen.getByRole('button', { name: 'Update default gate on-chain' })).toBeDisabled();
+    expect(mockSetSessionFieldsOnChain).not.toHaveBeenCalled();
   });
 
   it('loads worker secret presence through a signed admin action without exposing secret values', async () => {

@@ -37,14 +37,18 @@ export const buildAdminPageSessionIdentityKey = ({
   const registry = asRecord(config.__registry);
   // Regression guard: worker bootstrap accepts either canonical session-ID
   // field, so both must participate in route-driven Admin runtime remounts.
-  const canonicalSessionId = [config.sessionId, config.sessionIdHex, registry.sessionIdHex]
-    .map((value) => toStr(value).trim().toLowerCase())
-    .find(Boolean) || '';
+  const canonicalSessionId =
+    [config.sessionId, config.sessionIdHex, registry.sessionIdHex]
+      .map((value) => toStr(value).trim().toLowerCase())
+      .find(Boolean) || '';
   return [
     toStr(initialSessionId).trim().toLowerCase(),
     normalizeSlug(config.slug),
     canonicalSessionId,
-    toStr(config.corsWorkerUrl ?? config.workerUrl).trim().replace(/\/+$/, '').toLowerCase(),
+    toStr(config.corsWorkerUrl ?? config.workerUrl)
+      .trim()
+      .replace(/\/+$/, '')
+      .toLowerCase(),
     toStr(initialRegistryChainId ?? registry.registryChainId ?? registry.chainId ?? config.networkChainId).trim(),
   ].join('|');
 };

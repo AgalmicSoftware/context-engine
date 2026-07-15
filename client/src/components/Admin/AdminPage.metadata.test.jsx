@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { ethers } from 'ethers';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const SESSION_REGISTRY_CACHE_UPDATED_EVENT = 'ce:session-registry-cache-updated';
@@ -109,7 +110,12 @@ jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-se
 
 const AdminPage = require('./AdminPage').default;
 
-const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, initialRegistryChainId } = {}) => {
+const renderAdminPage = async ({
+  account = ADMIN_ADDRESS,
+  initialSessionId,
+  initialRegistryChainId,
+  initialSessionConfig,
+} = {}) => {
   let utils;
   await act(async () => {
     utils = render(
@@ -120,6 +126,7 @@ const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, init
         toggleLoginModal={jest.fn()}
         initialSessionId={initialSessionId}
         initialRegistryChainId={initialRegistryChainId}
+        initialSessionConfig={initialSessionConfig}
       />,
     );
     await Promise.resolve();
@@ -493,6 +500,96 @@ describe('AdminPage metadata controls', () => {
     await waitFor(() => {
       expect(screen.getByText(/Session metadata updated\./)).toBeInTheDocument();
     });
+  });
+
+  it('persists registry-free worker-canonical metadata directly to the worker without on-chain writes', async () => {
+    sessionEntries = [];
+    const initialSessionConfig = {
+      slug: 'worker-metadata',
+      sessionId: '0x1234567890abcdef1234567890abcdef',
+      configRevision: 'worker-metadata-revision',
+      sessionName: 'Worker Metadata Session',
+      corsWorkerUrl: 'https://worker-metadata.example.test',
+      adminAddress: ADMIN_ADDRESS,
+      sessionModeProfile: cloneSessionModePreset('fast_cheap_cloudflare'),
+      ai: { models: { fast: { provider: 'openai', model: 'gpt-5' } } },
+    };
+    mockResolveCorsProxyUrl.mockResolvedValue({
+      url: initialSessionConfig.corsWorkerUrl,
+      source: 'session-config',
+      status: 'ok',
+    });
+
+    await renderAdminPage({ initialSessionConfig });
+    expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
+    const metadataPanel = screen.getByText('Session metadata').closest('section');
+    fireEvent.click(within(metadataPanel).getByRole('button', { name: 'Toggle Session metadata section' }));
+    fireEvent.change(getFieldInputByLabel('Default tags'), {
+      target: { value: 'worker, canonical' },
+    });
+    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Worker session metadata updated.')).toBeInTheDocument();
+    });
+    const workerWrite = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
+    expect(workerWrite).toBeTruthy();
+    const workerPayload = JSON.parse(workerWrite[1].body);
+    expect(workerPayload.config).toEqual(
+      expect.objectContaining({
+        slug: 'worker-metadata',
+        adminAddress: ADMIN_ADDRESS,
+        defaultTags: 'worker, canonical',
+      }),
+    );
+    expect(workerPayload.config).not.toHaveProperty('configRevision');
+    expect(workerPayload.config).not.toHaveProperty('workerCanonicalPublicationRevision');
+    expect(mockUploadSessionMetadata).not.toHaveBeenCalled();
+    expect(mockUpdateSessionMetadataOnChain).not.toHaveBeenCalled();
+    expect(mockSetSessionFieldsOnChain).not.toHaveBeenCalled();
+  });
+
+  it('preserves on-chain metadata authority for a distinct worker-canonical registry admin', async () => {
+    const registryAdminAddress = '0x00000000000000000000000000000000000000bb';
+    const initialSessionConfig = {
+      slug: 'split-metadata-admins',
+      sessionId: '0xabcdefabcdefabcdefabcdefabcdefab',
+      configRevision: 'split-metadata-revision',
+      corsWorkerUrl: 'https://split-metadata.example.test',
+      adminAddress: ADMIN_ADDRESS,
+      blockLimits: { start: 123, end: null },
+      __registry: {
+        registryChainId: 84532,
+        chainId: 84532,
+        adminAddress: registryAdminAddress,
+      },
+      sessionModeProfile: cloneSessionModePreset('fast_cheap_cloudflare'),
+    };
+    sessionEntries = [['split-metadata-admins', initialSessionConfig]];
+    mockResolveCorsProxyUrl.mockResolvedValue({
+      url: initialSessionConfig.corsWorkerUrl,
+      source: 'session-config',
+      status: 'ok',
+    });
+
+    await renderAdminPage({ account: registryAdminAddress, initialSessionConfig });
+    expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
+    const metadataPanel = screen.getByText('Session metadata').closest('section');
+    fireEvent.click(within(metadataPanel).getByRole('button', { name: 'Toggle Session metadata section' }));
+    fireEvent.change(getFieldInputByLabel('Default tags'), {
+      target: { value: 'registry-owned' },
+    });
+    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
+
+    await waitFor(() => {
+      expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
+      expect(mockUpdateSessionMetadataOnChain).toHaveBeenCalledWith(
+        expect.objectContaining({ chainId: 84532, slug: 'split-metadata-admins' }),
+      );
+      expect(screen.getByText(/Session metadata updated\./)).toBeInTheDocument();
+    });
+    expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/set-config'))).toBe(false);
+    expect(mockSetSessionFieldsOnChain).not.toHaveBeenCalled();
   });
 
   it('requires explicit verification before saving synthesized fallback contract defaults', async () => {

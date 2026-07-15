@@ -366,11 +366,52 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(deployBodies[0].deploymentRequestId).toEqual(expect.any(String));
     expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
     expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
-    const attemptKey = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
-      .find((key) => key?.startsWith('ce:sessionWizardDeployAttempt:v1:'));
+    const attemptKey = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).find((key) =>
+      key?.startsWith('ce:sessionWizardDeployAttempt:v1:'),
+    );
     expect(JSON.parse(localStorage.getItem(attemptKey || '') || '{}')).toEqual(
       expect.objectContaining({ generation: 0, status: 'completed' }),
     );
+  });
+
+  it('treats explicit writesSessionSecrets false as authoritative on a resumed helper response', async () => {
+    global.fetch = jest.fn(async (url: RequestInfo | URL) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+            sessionSecretsKey: 'session:deploy-storage-session:secrets',
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      } as Response;
+    });
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current.workerSecretsEnabled = true;
+    options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'sk-current-retry-secret' });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    const secretsSyncCall = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
+      String(url).endsWith('/admin/set-secrets'),
+    );
+    expect(secretsSyncCall).toBeDefined();
+    expect(JSON.parse(String(secretsSyncCall?.[1]?.body || '{}')).secrets).toEqual({
+      openaiKey: 'sk-current-retry-secret',
+    });
   });
 
   it('reuses the deploy identity after the hook is unmounted and remounted', async () => {
@@ -469,34 +510,37 @@ describe('useSessionWizardWorkerDeploy', () => {
         error: 'deploymentRequestId was already used with a different request payload.',
       },
     },
-  ])('never advances after a $label while another tab can still complete the owned request', async ({ responseBody }) => {
-    const deployBodies: Record<string, unknown>[] = [];
-    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
-      if (String(url).endsWith('/deploy')) {
-        deployBodies.push(JSON.parse(String(init?.body || '{}')));
-        return {
-          ok: false,
-          status: 409,
-          json: async () => responseBody,
-        } as Response;
-      }
-      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
-    });
-    const firstTab = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+  ])(
+    'never advances after a $label while another tab can still complete the owned request',
+    async ({ responseBody }) => {
+      const deployBodies: Record<string, unknown>[] = [];
+      global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+        if (String(url).endsWith('/deploy')) {
+          deployBodies.push(JSON.parse(String(init?.body || '{}')));
+          return {
+            ok: false,
+            status: 409,
+            json: async () => responseBody,
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+      });
+      const firstTab = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
 
-    await act(async () => {
-      await firstTab.result.current.handleDeployWorker();
-    });
-    firstTab.unmount();
-    const retryingTab = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
-    await act(async () => {
-      await retryingTab.result.current.handleDeployWorker();
-    });
+      await act(async () => {
+        await firstTab.result.current.handleDeployWorker();
+      });
+      firstTab.unmount();
+      const retryingTab = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+      await act(async () => {
+        await retryingTab.result.current.handleDeployWorker();
+      });
 
-    expect(deployBodies).toHaveLength(2);
-    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
-    expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
-  });
+      expect(deployBodies).toHaveLength(2);
+      expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+      expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
+    },
+  );
 
   it('rotates the deploy identity across a remount after a structured terminal orphan response', async () => {
     const deployBodies: Record<string, unknown>[] = [];

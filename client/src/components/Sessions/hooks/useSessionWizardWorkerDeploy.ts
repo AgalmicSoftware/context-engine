@@ -405,7 +405,9 @@ const useSessionWizardWorkerDeploy = ({
         const deployAttemptIdentity = resolveSessionWizardDeployAttemptIdentity({
           scope: {
             slug,
-            sessionId: toStr(runtime.sessionIdHex || runtime.sessionId).trim().toLowerCase(),
+            sessionId: toStr(runtime.sessionIdHex || runtime.sessionId)
+              .trim()
+              .toLowerCase(),
             workerName: toStr(currentDeployForm.workerName).trim().toLowerCase(),
             adminAddress: resolvedAdmin.toLowerCase(),
             deployTarget: usesSponsoredDeploy
@@ -770,7 +772,9 @@ const useSessionWizardWorkerDeploy = ({
         let helperWritesSecrets = false;
         if (resolvedDeployWorkerUrl && runtime.workerSecretsEnabled && Object.keys(deploySecrets).length) {
           helperWritesSecrets =
-            data?.writesSessionSecrets === true || toStr(data?.sessionSecretsKey).startsWith('session:');
+            typeof data?.writesSessionSecrets === 'boolean'
+              ? data.writesSessionSecrets
+              : toStr(data?.sessionSecretsKey).startsWith('session:');
           secretsSyncStatus = await syncWorkerSecretsAfterDeploy({
             workerUrl: resolvedDeployWorkerUrl,
             account: resolvedAdmin,

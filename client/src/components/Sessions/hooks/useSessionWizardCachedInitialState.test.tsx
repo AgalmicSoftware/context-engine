@@ -26,9 +26,7 @@ describe('useSessionWizardCachedInitialState', () => {
   });
 
   it('builds the domain defaults when no cache values exist', () => {
-    const { result } = renderHook(() =>
-      useSessionWizardCachedInitialState({ initialDraftNetworkChainId: 11155420 }),
-    );
+    const { result } = renderHook(() => useSessionWizardCachedInitialState({ initialDraftNetworkChainId: 11155420 }));
 
     expect(result.current.initialGates[0]).toEqual(expect.objectContaining({ id: 'gate-1', mode: 'all' }));
     expect(result.current.initialDefaultGateId).toBe('gate-1');

@@ -5,6 +5,7 @@ import {
   clearSessionWizardDraftCache,
   readSessionWizardDraftCache,
   writeSessionWizardDraftCache,
+  type SessionWizardPublicationIdentityInput,
 } from './sessionWizardDraftCache.js';
 import {
   clearSessionWizardPendingSbtDraftsCache,
@@ -49,6 +50,7 @@ type LoggerLike = {
 };
 
 type WriteCacheDeps = {
+  expectedCachedPayload?: unknown;
   logger?: LoggerLike;
   writeDraftCache?: typeof writeSessionWizardDraftCache;
 };
@@ -56,6 +58,7 @@ type WriteCacheDeps = {
 type ClearCacheDeps = {
   clearDraftCache?: typeof clearSessionWizardDraftCache;
   clearPendingSbtDrafts?: typeof clearSessionWizardPendingSbtDraftsCache;
+  expectedPublicationIdentity?: SessionWizardPublicationIdentityInput | null;
   expectedWorkerIdentity?: SessionWizardWorkerSettlementInput | null;
   logger?: LoggerLike;
   preservedPendingSbtDrafts?: PendingSbtDraft[];
@@ -111,11 +114,11 @@ export const readSessionWizardCache = ({
   return isSessionWizardCachedState(cachedValue) ? cachedValue : null;
 };
 
-export const writeSessionWizardCache = (
-  payload: unknown,
-  { logger = log, writeDraftCache = writeSessionWizardDraftCache }: WriteCacheDeps = {},
-) => {
-  const result = writeDraftCache(payload);
+export const writeSessionWizardCache = (payload: unknown, options: WriteCacheDeps = {}) => {
+  const { expectedCachedPayload, logger = log, writeDraftCache = writeSessionWizardDraftCache } = options;
+  const result = Object.prototype.hasOwnProperty.call(options, 'expectedCachedPayload')
+    ? writeDraftCache(payload, { expectedCachedPayload })
+    : writeDraftCache(payload);
   if (!result.ok) logger.warn?.('SessionWizard: fallback', result.error || result.status);
   return result;
 };
@@ -123,6 +126,7 @@ export const writeSessionWizardCache = (
 export const clearSessionWizardCache = ({
   clearDraftCache = clearSessionWizardDraftCache,
   clearPendingSbtDrafts = clearSessionWizardPendingSbtDraftsCache,
+  expectedPublicationIdentity,
   expectedWorkerIdentity,
   logger = log,
   preservedPendingSbtDrafts,
@@ -141,14 +145,15 @@ export const clearSessionWizardCache = ({
       removed: writeResult.ok ? 1 : 0,
       failed: writeResult.ok ? 0 : 1,
       status: writeResult.ok
-        ? 'ok' as const
+        ? ('ok' as const)
         : writeResult.status === 'missing-storage'
-          ? 'missing-storage' as const
-          : 'partial-failure' as const,
+          ? ('missing-storage' as const)
+          : ('partial-failure' as const),
     };
   };
   const result = clearDraftCache({
     clearPendingSbtDrafts: persistPendingSbtDrafts,
+    expectedPublicationIdentity,
     expectedWorkerIdentity,
     workerSettlement,
   });

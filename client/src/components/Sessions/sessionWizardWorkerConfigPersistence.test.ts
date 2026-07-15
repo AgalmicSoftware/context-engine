@@ -53,9 +53,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       return { address: ADMIN_ADDRESS, message: 'signed set-config message', signature: '0xsigned' };
     });
     const fetchImpl = jest.fn(async (_url, init) =>
-      init?.method === 'POST'
-        ? jsonResponse(200, { ok: true })
-        : jsonResponse(200, { config: signedConfig }),
+      init?.method === 'POST' ? jsonResponse(200, { ok: true }) : jsonResponse(200, { config: signedConfig }),
     );
 
     const result = await persistAndVerifySessionWizardWorkerConfig({
@@ -139,9 +137,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
           return { signature: '0xsigned' };
         },
         fetchImpl: async (_url, init) =>
-          init?.method === 'POST'
-            ? jsonResponse(200, { ok: true })
-            : jsonResponse(200, { config: persistedConfig }),
+          init?.method === 'POST' ? jsonResponse(200, { ok: true }) : jsonResponse(200, { config: persistedConfig }),
         retryDelaysMs: [],
       });
       revisions.push(result.configRevision);
@@ -170,6 +166,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     const revision = 'revision-default-draft';
     const persistedConfig = {
       ...config,
+      ai: { models: config.ai.models },
       slug: 'worker-session',
       sessionId: SESSION_ID,
       adminAddress: ADMIN_ADDRESS,
@@ -238,6 +235,173 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     expect(result.configRevision).toBe('revision-2');
   });
 
+  it('retries every transient post-write read status until the committed config becomes visible', async () => {
+    const sleep = jest.fn(async () => undefined);
+    const transientStatuses = [404, 408, 425, 429, 500, 502, 503, 504, 520, 599];
+    const fetchImpl = jest.fn().mockResolvedValueOnce(jsonResponse(200, { ok: true }));
+    transientStatuses.forEach((status) => {
+      fetchImpl.mockResolvedValueOnce(jsonResponse(status, { error: `transient-${status}` }));
+    });
+    fetchImpl.mockResolvedValueOnce(jsonResponse(200, { config: verifiedConfig('revision-transient') }));
+
+    const result = await persistAndVerifySessionWizardWorkerConfig({
+      workerUrl: WORKER_ORIGIN,
+      slug: 'worker-session',
+      sessionId: SESSION_ID,
+      adminAddress: ADMIN_ADDRESS,
+      config: baseConfig(),
+      signAdminAction: async () => ({ signature: '0xsigned' }),
+      fetchImpl,
+      configRevision: 'revision-transient',
+      sleep,
+      retryDelaysMs: transientStatuses.map(() => 0),
+    });
+
+    expect(result.publicConfig).toEqual(verifiedConfig('revision-transient'));
+    expect(sleep).toHaveBeenCalledTimes(transientStatuses.length);
+    expect(fetchImpl).toHaveBeenCalledTimes(transientStatuses.length + 2);
+  });
+
+  it('retries a post-write GET transport exception without replaying the POST', async () => {
+    const sleep = jest.fn(async () => undefined);
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(jsonResponse(200, { config: verifiedConfig('revision-network-retry') }));
+
+    const result = await persistAndVerifySessionWizardWorkerConfig({
+      workerUrl: WORKER_ORIGIN,
+      slug: 'worker-session',
+      sessionId: SESSION_ID,
+      adminAddress: ADMIN_ADDRESS,
+      config: baseConfig(),
+      signAdminAction: async () => ({ signature: '0xsigned' }),
+      fetchImpl,
+      configRevision: 'revision-network-retry',
+      sleep,
+      retryDelaysMs: [0],
+    });
+
+    expect(result.configRevision).toBe('revision-network-retry');
+    expect(sleep).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it('fails closed when the matching revision exposes a different nested public config', async () => {
+    const sleep = jest.fn(async () => undefined);
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          config: verifiedConfig('revision-wrong-model', {
+            ai: { models: { fast: { provider: 'openai', model: 'wrong-model' } } },
+          }),
+        }),
+      );
+
+    await expect(
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: baseConfig(),
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl,
+        configRevision: 'revision-wrong-model',
+        sleep,
+        retryDelaysMs: [0],
+      }),
+    ).rejects.toThrow(/public config mismatch at "config\.ai\.models\.fast\.model"/i);
+    expect(sleep).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails closed when the matching revision contains an unexpected nested public field', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          config: verifiedConfig('revision-extra-limit', { limits: { perWalletPerDay: 1 } }),
+        }),
+      );
+
+    await expect(
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: { ...baseConfig(), limits: {} },
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl,
+        configRevision: 'revision-extra-limit',
+        retryDelaysMs: [],
+      }),
+    ).rejects.toThrow(/public config mismatch at "config\.limits"/i);
+  });
+
+  it('accepts the matching server publication marker while exactly verifying expected nested fields', async () => {
+    const revision = 'revision-server-marker';
+    const limits = { perWalletPerDay: 2 };
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          config: verifiedConfig(revision, {
+            limits,
+            workerCanonicalPublicationRevision: revision,
+          }),
+        }),
+      );
+
+    await expect(
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: { ...baseConfig(), limits },
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl,
+        configRevision: revision,
+        retryDelaysMs: [],
+      }),
+    ).resolves.toEqual(expect.objectContaining({ configRevision: revision }));
+  });
+
+  it('rejects a server publication marker that does not match the requested revision', async () => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
+      .mockResolvedValueOnce(
+        jsonResponse(200, {
+          config: verifiedConfig('revision-marker-mismatch', {
+            workerCanonicalPublicationRevision: 'different-revision',
+          }),
+        }),
+      );
+
+    await expect(
+      persistAndVerifySessionWizardWorkerConfig({
+        workerUrl: WORKER_ORIGIN,
+        slug: 'worker-session',
+        sessionId: SESSION_ID,
+        adminAddress: ADMIN_ADDRESS,
+        config: baseConfig(),
+        signAdminAction: async () => ({ signature: '0xsigned' }),
+        fetchImpl,
+        configRevision: 'revision-marker-mismatch',
+        retryDelaysMs: [],
+      }),
+    ).rejects.toThrow(/publication revision mismatch/i);
+  });
+
   it('signs the exact non-secret Lit descriptor fields for a worker-canonical Lit session', async () => {
     const litCredentials = {
       litApiBase: 'https://api.chipotle.litprotocol.com',
@@ -301,19 +465,15 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
       sessionId: SESSION_ID,
       workerUrl: WORKER_ORIGIN,
     });
-    const signAdminAction = jest.fn(async () => ({ signature: '0xsigned' }));
-    const fetchImpl = jest
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(200, { ok: true }))
-      .mockResolvedValueOnce(
-        jsonResponse(200, {
-          config: verifiedConfig('revision-lit-rpc', {
-            sessionName: 'Worker Lit Session',
-            sessionModeProfile,
-            networkChainId: 11155420,
-          }),
-        }),
-      );
+    let persistedPublicConfig: Record<string, unknown> = {};
+    const signAdminAction = jest.fn(async (input) => {
+      const { litCredentials: _privateDescriptor, ...publicConfig } = input.body.config;
+      persistedPublicConfig = publicConfig;
+      return { signature: '0xsigned' };
+    });
+    const fetchImpl = jest.fn(async (_url, init) =>
+      init?.method === 'POST' ? jsonResponse(200, { ok: true }) : jsonResponse(200, { config: persistedPublicConfig }),
+    );
 
     const result = await persistAndVerifySessionWizardWorkerConfig({
       workerUrl: WORKER_ORIGIN,

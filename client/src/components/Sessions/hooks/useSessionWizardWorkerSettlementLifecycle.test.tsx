@@ -28,7 +28,7 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
 
   it('restores a matching terminal settlement and removes the stale deployed draft', async () => {
     writeSessionWizardWorkerSettlement({ ...identity, settledAt: 1 });
-    localStorage.setItem(SESSION_WIZARD_CACHE_KEY, JSON.stringify(cachedWizard));
+    sessionStorage.setItem(SESSION_WIZARD_CACHE_KEY, JSON.stringify(cachedWizard));
 
     const { result } = renderHook(() => useSessionWizardWorkerSettlementLifecycle(cachedWizard));
 
@@ -36,7 +36,7 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
     expect(result.current.ref.current).toBe(true);
     expect(result.current.settlement).toEqual(expect.objectContaining(identity));
     await waitFor(() =>
-      expect(JSON.parse(localStorage.getItem(SESSION_WIZARD_CACHE_KEY) || '{}')).toEqual({
+      expect(JSON.parse(sessionStorage.getItem(SESSION_WIZARD_CACHE_KEY) || '{}')).toEqual({
         terminalWorkerSettlement: expect.objectContaining(identity),
       }),
     );
@@ -48,9 +48,7 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
     const setSessionUrl = jest.fn();
     const setAdminUrl = jest.fn();
 
-    renderHook(() =>
-      useSessionWizardWorkerSettlementLifecycle(cachedWizard, { setSessionUrl, setAdminUrl }),
-    );
+    renderHook(() => useSessionWizardWorkerSettlementLifecycle(cachedWizard, { setSessionUrl, setAdminUrl }));
 
     await waitFor(() => expect(setSessionUrl).toHaveBeenCalledTimes(1));
     expect(setAdminUrl).toHaveBeenCalledTimes(1);
@@ -99,10 +97,12 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
   });
 
   it('creates another session from the exact terminal identity instead of a newer fallback draft', async () => {
-    writeSessionWizardWorkerSettlement({ ...identity, settledAt: 1 });
+    const terminalCachedWizard = {
+      terminalWorkerSettlement: { version: 2, ...identity, settledAt: 1 },
+    };
     const startFreshSession = jest.fn(() => ({ ok: true }));
     const { result } = renderHook(() =>
-      useSessionWizardWorkerSettlementLifecycle(cachedWizard, {
+      useSessionWizardWorkerSettlementLifecycle(terminalCachedWizard, {
         currentIdentity: {
           workerUrl: 'https://foreign-worker.example.test',
           slug: 'foreign-session',
@@ -119,6 +119,31 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
     });
   });
 
+  it('keeps the completed publication identity pinned when the form rotates to its next session ID', async () => {
+    const nextIdentity = { ...identity, sessionId: 'next-session-id' };
+    const startFreshSession = jest.fn(() => ({ ok: true }));
+    const { result, rerender } = renderHook(
+      ({ currentIdentity, publishStatus }) =>
+        useSessionWizardWorkerSettlementLifecycle(cachedWizard, {
+          currentIdentity,
+          isWorkerCanonical: true,
+          publishStatus,
+          startFreshSession,
+        }),
+      { initialProps: { currentIdentity: identity, publishStatus: 'publishing' } },
+    );
+    act(() => {
+      result.current.setSettled({ ...identity, settledAt: 10 });
+      writeSessionWizardWorkerSettlement({ ...identity, settledAt: 10 });
+    });
+
+    rerender({ currentIdentity: nextIdentity, publishStatus: 'published' });
+
+    await waitFor(() => expect(result.current.settlement).toEqual(expect.objectContaining(identity)));
+    act(() => result.current.onCreateAnotherSession?.());
+    expect(startFreshSession).toHaveBeenCalledWith({ settlement: expect.objectContaining(identity) });
+  });
+
   it('does not restore a record for a different session on the same worker', () => {
     writeSessionWizardWorkerSettlement({ ...identity, slug: 'other-session', settledAt: 1 });
 
@@ -130,7 +155,61 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
     expect(result.current.ref.current).toBe(true);
   });
 
-  it('terminal-locks two live tabs from the per-identity storage event', async () => {
+  it('binds marker recovery when an initially incomplete cached identity becomes complete in the live form', async () => {
+    const incompleteCache = {
+      draft: { slug: identity.slug },
+      sessionId: identity.sessionId,
+    };
+    const { result, rerender } = renderHook(
+      ({ currentIdentity }) => useSessionWizardWorkerSettlementLifecycle(incompleteCache, { currentIdentity }),
+      {
+        initialProps: {
+          currentIdentity: { workerUrl: '', slug: identity.slug, sessionId: identity.sessionId },
+        },
+      },
+    );
+    expect(result.current.isSettled).toBe(false);
+    writeSessionWizardWorkerSettlement({ ...identity, settledAt: 5 });
+
+    rerender({ currentIdentity: identity });
+
+    await waitFor(() => expect(result.current.isSettled).toBe(true));
+    expect(result.current.settlement).toEqual(expect.objectContaining(identity));
+  });
+
+  it('drops stale identity X settlement state when the live form rerenders as identity Y', async () => {
+    const liveY = {
+      workerUrl: 'https://live-worker.example.test',
+      slug: 'live-session',
+      sessionId: 'live-id',
+    };
+    writeSessionWizardWorkerSettlement({ ...identity, settledAt: 5 });
+    const { result, rerender } = renderHook(
+      ({ currentIdentity }) => useSessionWizardWorkerSettlementLifecycle(cachedWizard, { currentIdentity }),
+      { initialProps: { currentIdentity: identity } },
+    );
+    expect(result.current.isSettled).toBe(true);
+
+    rerender({ currentIdentity: liveY });
+
+    await waitFor(() => expect(result.current.isSettled).toBe(false));
+    expect(result.current.ref.current).toBe(false);
+    writeSessionWizardWorkerSettlement({ ...liveY, settledAt: 10 });
+    const liveMarkerKey = getSessionWizardWorkerSettlementStorageKey(liveY);
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: liveMarkerKey,
+          newValue: localStorage.getItem(liveMarkerKey),
+          storageArea: localStorage,
+        }),
+      );
+    });
+    await waitFor(() => expect(result.current.isSettled).toBe(true));
+    expect(result.current.settlement).toEqual(expect.objectContaining(liveY));
+  });
+
+  it('terminal-locks two live tabs from the identity-scoped v2 localStorage event', async () => {
     const firstTab = renderHook(() => useSessionWizardWorkerSettlementLifecycle(cachedWizard));
     const secondTab = renderHook(() => useSessionWizardWorkerSettlementLifecycle(cachedWizard));
     expect(firstTab.result.current.isSettled).toBe(false);
@@ -138,6 +217,9 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
 
     writeSessionWizardWorkerSettlement({ ...identity, settledAt: 10 });
     const key = getSessionWizardWorkerSettlementStorageKey(identity);
+    expect(key).toMatch(/^ce:sessionWizardWorkerSettlement:v2:/);
+    expect(localStorage.getItem(key)).not.toBeNull();
+    expect(sessionStorage.getItem(key)).toBeNull();
     act(() => {
       window.dispatchEvent(
         new StorageEvent('storage', {
@@ -174,9 +256,7 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
     });
 
     await waitFor(() => expect(browserTab.result.current.isSettled).toBe(true));
-    expect(browserTab.result.current.settlement).toEqual(
-      expect.objectContaining({ sessionId: publishedSessionId }),
-    );
+    expect(browserTab.result.current.settlement).toEqual(expect.objectContaining({ sessionId: publishedSessionId }));
   });
 
   it('terminal-locks another tab from the tombstone without deleting its pending SBT drafts', async () => {
@@ -212,7 +292,7 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
       settledAt: 10,
     };
     const matchingCachedWizard = { ...cachedWizard, sessionId: terminalWorkerSettlement.sessionId };
-    localStorage.setItem(SESSION_WIZARD_CACHE_KEY, JSON.stringify(matchingCachedWizard));
+    sessionStorage.setItem(SESSION_WIZARD_CACHE_KEY, JSON.stringify(matchingCachedWizard));
     expect(
       clearSessionWizardDraftCache({
         workerSettlement: terminalWorkerSettlement,
@@ -227,7 +307,7 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
     expect(reloadedTab.result.current.isSettled).toBe(true);
     expect(reloadedTab.result.current.settlement).toEqual(terminalWorkerSettlement);
     await waitFor(() =>
-      expect(JSON.parse(localStorage.getItem(SESSION_WIZARD_CACHE_KEY) || '{}')).toEqual({
+      expect(JSON.parse(sessionStorage.getItem(SESSION_WIZARD_CACHE_KEY) || '{}')).toEqual({
         terminalWorkerSettlement,
       }),
     );

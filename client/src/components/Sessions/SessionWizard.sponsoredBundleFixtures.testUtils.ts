@@ -57,7 +57,7 @@ const seedWizardCache = ({
   deployComplete = false,
   deployWorkerUrl = '',
 } = {}) => {
-  localStorage.setItem(
+  sessionStorage.setItem(
     'ce:sessionWizardDraft:v1',
     JSON.stringify({
       draft: {

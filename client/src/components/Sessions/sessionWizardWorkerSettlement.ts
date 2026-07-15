@@ -42,8 +42,7 @@ export type SessionWizardWorkerSettlementInput = {
 };
 
 export type SessionWizardWorkerSettlementClearResult =
-  | RemoveKeysResult
-  | { ok: false; removed: 0; failed: 1; status: 'invalid-identity' };
+  RemoveKeysResult | { ok: false; removed: 0; failed: 1; status: 'invalid-identity' };
 
 const normalizeSettlementSessionId = (value: unknown): string => {
   const rawSessionId = toStr(value).trim();
@@ -60,9 +59,7 @@ const getLocalStorage = (storageIn?: StorageLike | null): StorageLike | null => 
   return null;
 };
 
-export const createSessionWizardWorkerSettlement = (
-  value: unknown,
-): SessionWizardWorkerSettlement | null => {
+export const createSessionWizardWorkerSettlement = (value: unknown): SessionWizardWorkerSettlement | null => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const candidate = value as Record<string, unknown>;
   const workerUrl = normalizeOrigin(candidate.workerUrl);
@@ -80,9 +77,7 @@ const normalizeStoredSettlement = (value: unknown): SessionWizardWorkerSettlemen
   return createSessionWizardWorkerSettlement(candidate);
 };
 
-export const getSessionWizardWorkerSettlementStorageKey = (
-  input: SessionWizardWorkerSettlementInput,
-): string => {
+export const getSessionWizardWorkerSettlementStorageKey = (input: SessionWizardWorkerSettlementInput): string => {
   const settlement = createSessionWizardWorkerSettlement(input);
   if (!settlement) return '';
   const identity = [settlement.workerUrl, settlement.slug, settlement.sessionId]
@@ -91,10 +86,7 @@ export const getSessionWizardWorkerSettlementStorageKey = (
   return `${SESSION_WIZARD_WORKER_SETTLEMENT_KEY_PREFIX}${identity}`;
 };
 
-const readSettlementAtKey = (
-  storage: StorageLike,
-  key: string,
-): SessionWizardWorkerSettlement | null => {
+const readSettlementAtKey = (storage: StorageLike, key: string): SessionWizardWorkerSettlement | null => {
   const result = safeJsonRead(storage, key, null, { clearInvalid: true });
   if (!result.ok) return null;
   const settlement = normalizeStoredSettlement(result.value);

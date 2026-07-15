@@ -114,38 +114,35 @@ describe('SurveyTool results routing', () => {
     '/session/edge/questions/results/',
     '/session/edge/QUESTIONS/RESULTS',
     '/ce/session/edge/questions/results',
-  ])(
-    'returns to the session root without dropping query or hash when closing results from %s',
-    (resultsPath) => {
-      const priorUrl = window.location.href;
+  ])('returns to the session root without dropping query or hash when closing results from %s', (resultsPath) => {
+    const priorUrl = window.location.href;
 
-      try {
-        window.history.pushState(
-          {},
-          '',
-          `${resultsPath}?worker=https%3A%2F%2Fworker.example.test&session=edge#responses`,
-        );
-        const subject = new SurveyTool({
-          autoOpenResults: false,
-          preventUrlChange: true,
-        });
+    try {
+      window.history.pushState(
+        {},
+        '',
+        `${resultsPath}?worker=https%3A%2F%2Fworker.example.test&session=edge#responses`,
+      );
+      const subject = new SurveyTool({
+        autoOpenResults: false,
+        preventUrlChange: true,
+      });
 
-        subject.setState = jest.fn((next) => {
-          const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
-          subject.state = { ...subject.state, ...(patch || {}) };
-        });
+      subject.setState = jest.fn((next) => {
+        const patch = typeof next === 'function' ? next(subject.state, subject.props) : next;
+        subject.state = { ...subject.state, ...(patch || {}) };
+      });
 
-        subject.closeResultsModal();
+      subject.closeResultsModal();
 
-        expect(subject.setState).toHaveBeenCalledWith({ showResultsModal: false });
-        expect(window.location.pathname).toBe(resultsPath.startsWith('/ce/') ? '/ce/session/edge' : '/session/edge');
-        expect(window.location.search).toBe('?worker=https%3A%2F%2Fworker.example.test&session=edge');
-        expect(window.location.hash).toBe('#responses');
-      } finally {
-        window.history.replaceState({}, '', priorUrl);
-      }
-    },
-  );
+      expect(subject.setState).toHaveBeenCalledWith({ showResultsModal: false });
+      expect(window.location.pathname).toBe(resultsPath.startsWith('/ce/') ? '/ce/session/edge' : '/session/edge');
+      expect(window.location.search).toBe('?worker=https%3A%2F%2Fworker.example.test&session=edge');
+      expect(window.location.hash).toBe('#responses');
+    } finally {
+      window.history.replaceState({}, '', priorUrl);
+    }
+  });
 
   it('preserves query and hash through the functional results close path', async () => {
     const priorUrl = window.location.href;
@@ -156,12 +153,7 @@ describe('SurveyTool results routing', () => {
         '/ce/session/edge/questions/results?worker=https%3A%2F%2Fworker.example.test&session=edge#responses',
       );
       render(
-        <SurveyTool
-          autoOpenResults={true}
-          preventUrlChange={true}
-          activeSessionSlug="edge"
-          network={{ id: 84532 }}
-        />,
+        <SurveyTool autoOpenResults={true} preventUrlChange={true} activeSessionSlug="edge" network={{ id: 84532 }} />,
       );
 
       fireEvent.click(await screen.findByRole('button', { name: 'Close functional results' }));

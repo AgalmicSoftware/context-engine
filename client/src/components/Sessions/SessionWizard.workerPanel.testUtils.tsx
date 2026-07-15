@@ -302,10 +302,10 @@ import SessionWizard, {
   finalizeSessionWizardPendingSbtDraft,
   persistSessionWizardSbtRecoveryCodes,
   promotePendingSbtSelectionsAfterDeploy,
-  resolveSessionWizardChipotleHookConfig,
   resolveSessionWizardSelectorSourceConfig,
   resolveSessionWizardWorkerBaseUrl,
 } from './SessionWizard';
+import { resolveSessionWizardChipotleHookConfig } from './sessionWizardWorkerSecretSupport';
 
 const renderSessionWizard = (props = {}) => {
   const view = render(<SessionWizard network={{ id: 84532 }} {...props} />);
@@ -351,7 +351,7 @@ const enableAdvancedMode = () => {
 };
 const readCachedSessionWizardDraft = () => {
   try {
-    const cached = JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+    const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
     return cached?.draft && typeof cached.draft === 'object' ? cached.draft : {};
   } catch (_) {
     return {};

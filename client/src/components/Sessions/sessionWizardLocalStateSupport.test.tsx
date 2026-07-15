@@ -63,6 +63,16 @@ describe('sessionWizardLocalStateSupport', () => {
     expect(logger.warn).toHaveBeenCalledWith('SessionWizard: fallback', 'limit reached');
   });
 
+  it('forwards the prior cache snapshot used to compare-and-swap an ordinary write', () => {
+    const previousPayload = { sessionId: 'previous-id', draft: { slug: 'previous-session' } };
+    const nextPayload = { sessionId: 'next-id', draft: { slug: 'next-session' } };
+    const writeDraftCache: any = jest.fn(() => ({ ok: true, bytes: 1, key: 'cache', status: 'ok' }));
+
+    writeSessionWizardCache(nextPayload, { expectedCachedPayload: previousPayload, writeDraftCache });
+
+    expect(writeDraftCache).toHaveBeenCalledWith(nextPayload, { expectedCachedPayload: previousPayload });
+  });
+
   it('clears pending sbt drafts and only warns for non-missing storage failures', () => {
     const logger = { warn: jest.fn() };
     const clearPendingSbtDrafts = jest.fn();
@@ -97,7 +107,7 @@ describe('sessionWizardLocalStateSupport', () => {
   });
 
   it('returns a combined failure when sessionStorage cleanup throws', () => {
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({ draft: { slug: 'published-session' } }));
+    sessionStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({ draft: { slug: 'published-session' } }));
     const logger = { warn: jest.fn() };
 
     const result = clearSessionWizardCache({
@@ -118,15 +128,30 @@ describe('sessionWizardLocalStateSupport', () => {
     expect(logger.warn).toHaveBeenCalledWith('SessionWizard: fallback', 'partial-failure');
   });
 
+  it('forwards the decentralized publication identity into the guarded cache clear', () => {
+    const expectedPublicationIdentity = {
+      slug: 'published-session',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+    };
+    const clearDraftCache: any = jest.fn(() => ({ ok: true, removed: 1, failed: 0, status: 'ok' }));
+
+    clearSessionWizardCache({ expectedPublicationIdentity, clearDraftCache });
+
+    expect(clearDraftCache).toHaveBeenCalledWith(expect.objectContaining({ expectedPublicationIdentity }));
+  });
+
   it('poisons the published draft while atomically retaining undeployed pending SBT drafts', () => {
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify({
-      sessionId: 'published-id',
-      deployWorkerUrl: 'https://published-worker.example.test',
-      draft: {
-        slug: 'published-session',
-        corsWorkerUrl: 'https://published-worker.example.test',
-      },
-    }));
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        sessionId: 'published-id',
+        deployWorkerUrl: 'https://published-worker.example.test',
+        draft: {
+          slug: 'published-session',
+          corsWorkerUrl: 'https://published-worker.example.test',
+        },
+      }),
+    );
     const pendingDraft = {
       predictedAddress: '0x00000000000000000000000000000000000000a1',
       displayName: 'Still pending',
@@ -163,7 +188,7 @@ describe('sessionWizardLocalStateSupport', () => {
       slug: 'other-session',
       sessionId: 'other-id',
     };
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         terminalWorkerSettlement: {
@@ -256,7 +281,7 @@ describe('sessionWizardLocalStateSupport', () => {
         sessionName: 'Keep this newer draft',
       },
     };
-    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify(foreignDraft));
+    sessionStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify(foreignDraft));
     writeSessionWizardWorkerSettlement({ ...settlement, settledAt: 1 });
 
     const result = startFreshSessionWizard({ navigate, settlement });

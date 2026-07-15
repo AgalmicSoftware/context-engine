@@ -626,7 +626,7 @@ describe('SessionWizard rendered validation', () => {
   });
 
   it('keeps block limits inside optional details in normal mode when the draft contains them', async () => {
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -655,7 +655,7 @@ describe('SessionWizard rendered validation', () => {
 
   it('keeps legacy sponsoredSbtAddress inside optional details in normal mode', async () => {
     const sponsoredSbtAddress = '0x00000000000000000000000000000000000000f1';
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -870,7 +870,7 @@ describe('SessionWizard rendered validation', () => {
   it.each(['/new', '/session/new'])(
     'shows only session mode on %s until a preset reveals the prefilled setup',
     async (pathname) => {
-      localStorage.setItem(
+      sessionStorage.setItem(
         'ce:sessionWizardDraft:v1',
         JSON.stringify({
           draft: {
