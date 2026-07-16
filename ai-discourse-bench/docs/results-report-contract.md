@@ -391,7 +391,10 @@ Agree, Unsure, and Disagree counts with a stacked model-vote bar, preserving the
 one-model-one-vote report aggregation even when models have different repeat
 counts. Questions are expanded by default; generated analysis sections appear
 only when the overlay provides content, with no empty analysis placeholder. The
-modal closes from its close control,
+overview must name models with valid answers, report their linked-question
+coverage and average stance, and pair aggregate values with plain-language
+definitions of the score, between-model difference, and repeat-stability
+scales. The modal closes from its close control,
 backdrop, or Escape key, traps keyboard focus while open, restores focus on
 close, and uses the live floating close control on narrow screens. Tag filtering
 and sort controls deterministically re-pack visible topics so differently sized

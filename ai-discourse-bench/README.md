@@ -443,7 +443,10 @@ floating close control, and question rows follow the live DebateMap modal
 vocabulary. Each linked question includes a participant-weighted Agree, Unsure,
 and Disagree count plus a stacked model-vote bar; repeated runs do not give one
 model extra weight. The question list is expanded when the modal opens, while
-analysis sections render only when real overlay content exists. Tag and sort
+analysis sections render only when real overlay content exists. The issue
+overview names every model contributing valid answers, shows each model's topic
+coverage and average stance, and explains aggregate stance, between-model
+difference, and repeat stability in plain language. Tag and sort
 controls re-pack the visible circles, and stable
 `#debate-atlas-<topic-id>` hashes reopen the matching modal.
 Breakdown uses the live DemoAnalysis-style order: a Compare Demographics

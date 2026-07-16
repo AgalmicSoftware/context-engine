@@ -47,6 +47,9 @@ test('report preserves raw atlas and risk-matrix material', async () => {
   assert.doesNotMatch(html, /benchmark statements? map this issue area/);
   assert.match(html, /data-ce-atlas-question-distribution/);
   assert.match(html, /data-ce-atlas-question-vote-bar/);
+  assert.doesNotMatch(html, /data-ce-atlas-model-roster/);
+  assert.match(html, /Answer coverage/);
+  assert.match(html, /No model answers/);
   assert.match(html, /aria-expanded="true"\s+aria-controls="ce-atlas-modal-ai-rd-automation-questions-body"/);
   assert.match(html, /id="ce-atlas-modal-ai-rd-automation-questions-body" data-ce-atlas-modal-collapse-body>/);
   assert.match(html, /function updateAtlasBrowse\(\)/);
@@ -60,6 +63,7 @@ test('report preserves raw atlas and risk-matrix material', async () => {
   assert.match(html, /\.debateMap \.atlasNode\.packedAtlasNode \.packedNodeLabel \{ font-size: var\(--topic-mobile-font-size, 9px\) !important; line-height: 1\.04; letter-spacing: 0; overflow-wrap: normal; word-break: normal; hyphens: none; \}/);
   assert.doesNotMatch(html, /\.debateMap \.atlasNode\.packedAtlasNode \.packedNodeLabel \{ overflow-wrap: anywhere; \}/);
   assert.match(html, /class="nodeLabel packedNodeLabel alwaysVisible" style="font-size:[^"]+">\s*Regulation and Coordination\s*<\/div>/);
+  assert.match(html, /data-ce-atlas-topic-title="Regulation and Coordination"/);
   assert.match(html, /class="nodeLabel packedNodeLabel alwaysVisible" style="font-size:[^"]+">\s*Copyright and Creative Markets\s*<\/div>/);
   assert.doesNotMatch(html, /Regulation And Coordination/);
   assert.doesNotMatch(html, /Copyright And Creative Markets/);
@@ -321,6 +325,64 @@ test('All Questions gives each model one averaged vote and preserves invalid raw
   assert.match(html, /data-ce-atlas-question-vote-count="Agree"><i class="aidb-answer-agree"><\/i><span>Agree<\/span><strong>1<\/strong>/);
   assert.match(html, /data-ce-atlas-question-vote-count="Unsure"><i class="aidb-answer-unsure"><\/i><span>Unsure<\/span><strong>0<\/strong>/);
   assert.match(html, /data-ce-atlas-question-vote-count="Disagree"><i class="aidb-answer-disagree"><\/i><span>Disagree<\/span><strong>0<\/strong>/);
+  assert.match(html, /data-ce-atlas-model-roster/);
+  assert.match(html, /data-ce-atlas-model-context/);
+  assert.match(html, /Models behind these results/);
+  assert.match(html, /data-ce-atlas-model-card="model-a"/);
+  assert.match(html, /Model A/);
+  assert.match(html, /1\/1 question answered/);
+  assert.match(html, /Answer coverage/);
+  assert.match(html, /1 of 1 model contributed/);
+  assert.match(html, /1 of 1 possible averaged model answer is available across 1 question\./);
+  assert.match(html, /1 averaged model answer from 1 of 1 benchmark model informs this issue area\. Each model counts once per question after its repeated runs are averaged\./);
+  assert.match(html, /Overall model stance/);
+  assert.match(html, /Models lean toward support/);
+  assert.match(html, /Average model score \+1\.00 \(-1 disagree, 0 unsure, \+1 agree\)\./);
+  assert.match(html, /No model comparison yet/);
+  assert.match(html, /Net Support \| average score \+1\.00/);
+});
+
+test('Debate Map contributor context distinguishes partial model coverage', async () => {
+  const questionBank = limitQuestionBank(
+    await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
+    1
+  );
+  const modelRoster = {
+    schemaVersion: 1,
+    models: [
+      { id: 'model-a', label: 'Model A', model: 'provider/model-a', provider: 'mock', traits: {} },
+      { id: 'model-b', label: 'Model B', model: 'provider/model-b', provider: 'mock', traits: {} },
+    ],
+  };
+  const [question] = questionBank.questions;
+  const report = buildResultsReport({
+    questionBank,
+    modelRoster,
+    runsFile: {
+      schemaVersion: 1,
+      benchmarkId: questionBank.benchmarkId,
+      mode: 'self',
+      runs: [
+        { modelId: 'model-a', questionId: question.id, polarity: 'canonical', normalizedAnswer: 'Agree' },
+      ],
+    },
+  });
+  const html = renderHtmlReport(report);
+  const topicId = report.debateAtlas.topicCircles.find((topic) => (
+    topic.questionIds.includes(question.id)
+  )).id;
+  const issueTemplate = Array.from(html.matchAll(/<template[\s\S]*?<\/template>/g))
+    .map((match) => match[0])
+    .find((template) => template.includes(`data-ce-atlas-topic-id="${topicId}"`));
+
+  assert.ok(issueTemplate);
+  assert.match(issueTemplate, /1 model \| 1 question \| Measured benchmark evidence/);
+  assert.match(issueTemplate, /1 averaged model answer from 1 of 2 benchmark models informs this issue area/);
+  assert.match(issueTemplate, /1 of 2 models contributed/);
+  assert.match(issueTemplate, /1 of 2 possible averaged model answers are available across 1 question\./);
+  assert.match(issueTemplate, /data-ce-atlas-model-card="model-a"/);
+  assert.doesNotMatch(issueTemplate, /data-ce-atlas-model-card="model-b"/);
+  assert.match(issueTemplate, /No model comparison yet/);
 });
 
 test('Summary stats count only concrete agree and disagree votes like live Polis', async () => {

@@ -142,6 +142,21 @@ const scoreLabel = (summary) => {
   return 'mixed / unsure';
 };
 
+const modelStanceLabel = (score) => {
+  if (!Number.isFinite(score)) return 'No model answers';
+  if (score > 0.25) return 'Models lean toward support';
+  if (score < -0.25) return 'Models lean toward opposition';
+  return 'Models are mixed or unsure';
+};
+
+const modelDifferenceLabel = (difference) => {
+  if (!Number.isFinite(difference)) return 'No model comparison yet';
+  if (difference < 0.25) return 'Models are closely aligned';
+  if (difference < 0.75) return 'Models differ somewhat';
+  if (difference < 1.25) return 'Models differ substantially';
+  return 'Models are far apart';
+};
+
 const scoreClass = (score) => {
   if (!Number.isFinite(score)) return 'aidb-score-empty';
   if (score > 0.25) return 'aidb-score-agree';
@@ -151,6 +166,10 @@ const scoreClass = (score) => {
 
 const formatScore = (value) => (
   Number.isFinite(value) ? value.toFixed(2) : 'no data'
+);
+
+const formatSignedScore = (value) => (
+  Number.isFinite(value) ? `${value > 0 ? '+' : ''}${value.toFixed(2)}` : 'no data'
 );
 
 const formatPercent = (value) => (
@@ -671,6 +690,8 @@ const normalizeAnalysisIssueAreas = (report, topics = normalizeAnalysisTopicCirc
   const questions = getQuestions(report);
   const questionById = new Map(questions.map((question) => [question.id, question]));
   const byQuestion = report.polisReport?.byQuestion || {};
+  const byModelQuestion = report.polisReport?.byModelQuestion || {};
+  const participants = Array.isArray(report.participants) ? report.participants : [];
   const overlayIssueAreas = Array.isArray(report.analysisOverlay?.debateAtlas?.issueAreas)
     ? report.analysisOverlay.debateAtlas.issueAreas
     : [];
@@ -721,7 +742,22 @@ const normalizeAnalysisIssueAreas = (report, topics = normalizeAnalysisTopicCirc
     const averageWinningResponseConsistency = averageFiniteValues(
       linkedQuestions.map((question) => question.winningResponseConsistency),
     );
-    const title = String(overlay?.title || topic.label || topic.id || `Issue Area ${index + 1}`).trim();
+    const answeringModels = participants.map((participant) => {
+      const modelQuestions = byModelQuestion[participant.id] || {};
+      const answeredQuestionIds = linkedQuestionIds.filter((questionId) => (
+        validVoteCount(modelQuestions[questionId]) > 0
+      ));
+      return {
+        id: participant.id,
+        label: participant.label || participant.id,
+        answeredQuestionCount: answeredQuestionIds.length,
+        averageStance: averageFiniteValues(answeredQuestionIds.map((questionId) => (
+          modelQuestions[questionId]?.meanScore
+        ))),
+      };
+    }).filter((participant) => participant.answeredQuestionCount > 0);
+    const fallbackTitle = topic.label || topic.id || `Issue Area ${index + 1}`;
+    const title = String(overlay?.title || formatDisplayLabel(fallbackTitle) || fallbackTitle).trim();
     return {
       ...topic,
       title,
@@ -729,6 +765,12 @@ const normalizeAnalysisIssueAreas = (report, topics = normalizeAnalysisTopicCirc
       tags,
       linkedQuestionIds,
       linkedQuestions,
+      answeringModels,
+      totalModelCount: participants.length,
+      answeredModelQuestionCount: answeringModels.reduce(
+        (sum, participant) => sum + participant.answeredQuestionCount,
+        0,
+      ),
       averageModelDifference,
       averageWinningResponseConsistency,
       keyTensions: normalizeOverlayList(overlay?.keyTensions),
@@ -2687,6 +2729,58 @@ const renderAtlasQuestionDistribution = (summary = {}) => {
 
 const renderAtlasIssueTemplate = (issueArea, index) => {
   const depthClass = ['depth0', 'depth1', 'depth2'][index % 3];
+  const questionCount = issueArea.linkedQuestions.length;
+  const answeringModelCount = issueArea.answeringModels.length;
+  const totalModelCount = Number(issueArea.totalModelCount || 0);
+  const possibleModelQuestionCount = totalModelCount * questionCount;
+  const answeredModelQuestionCount = Number(issueArea.answeredModelQuestionCount || 0);
+  const comparableQuestionCount = issueArea.linkedQuestions.filter((question) => (
+    Number.isFinite(question.modelDifference)
+  )).length;
+  const stabilityQuestionCount = issueArea.linkedQuestions.filter((question) => (
+    Number.isFinite(question.winningResponseConsistency)
+  )).length;
+  const hasModelAnswers = answeredModelQuestionCount > 0;
+  const modelCoverageValue = questionCount
+    ? `${answeringModelCount} of ${totalModelCount} model${totalModelCount === 1 ? '' : 's'} contributed`
+    : 'No linked questions';
+  const modelCoverageDetail = possibleModelQuestionCount
+    ? `${answeredModelQuestionCount} of ${possibleModelQuestionCount} possible averaged model answer${possibleModelQuestionCount === 1 ? ' is' : 's are'} available across ${questionCount} question${questionCount === 1 ? '' : 's'}.`
+    : 'No model-question answers are available.';
+  const stanceValue = hasModelAnswers
+    ? modelStanceLabel(issueArea.averageStance)
+    : 'No model answers';
+  const stanceDetail = hasModelAnswers && Number.isFinite(issueArea.averageStance)
+    ? `Average model score ${formatSignedScore(issueArea.averageStance)} (-1 disagree, 0 unsure, +1 agree).`
+    : 'A stance appears after at least one model provides a valid answer.';
+  const differenceValue = modelDifferenceLabel(issueArea.averageModelDifference);
+  const differenceDetail = Number.isFinite(issueArea.averageModelDifference)
+    ? `Across ${comparableQuestionCount} comparable question${comparableQuestionCount === 1 ? '' : 's'}, highest and lowest model scores are ${formatScore(issueArea.averageModelDifference)} apart on average (0 = same, 2 = opposite).`
+    : 'At least two models must answer the same question before a difference can be measured.';
+  const consistencyValue = Number.isFinite(issueArea.averageWinningResponseConsistency)
+    ? `${formatPercent(issueArea.averageWinningResponseConsistency)} repeat stability`
+    : 'No repeat-run data';
+  const consistencyDetail = Number.isFinite(issueArea.averageWinningResponseConsistency)
+    ? `Across ${stabilityQuestionCount} question${stabilityQuestionCount === 1 ? '' : 's'}, this is the average share of repeated runs matching each model's most common answer.`
+    : 'Repeated runs are required before response stability can be measured.';
+  const modelContext = hasModelAnswers
+    ? `${answeredModelQuestionCount} averaged model answer${answeredModelQuestionCount === 1 ? '' : 's'} from ${answeringModelCount} of ${totalModelCount} benchmark model${totalModelCount === 1 ? '' : 's'} ${answeredModelQuestionCount === 1 ? 'informs' : 'inform'} this issue area. Each model counts once per question after its repeated runs are averaged.`
+    : 'No benchmark models supplied valid answers for these questions.';
+  const modelRoster = answeringModelCount
+    ? `<section class="atlasIssueModelRoster" data-ce-atlas-model-roster aria-label="Models behind these results">
+      <div class="atlasIssueModelRosterHeader">
+        <strong>Models behind these results</strong>
+        <span>${escapeHtml(answeringModelCount)} model${answeringModelCount === 1 ? '' : 's'} with valid answers in this issue area</span>
+      </div>
+      <ul class="atlasIssueModelList">
+        ${issueArea.answeringModels.map((participant) => `<li class="atlasIssueModelCard" data-ce-atlas-model-card="${escapeHtml(participant.id)}">
+          <strong>${escapeHtml(participant.label)}</strong>
+          <span>${escapeHtml(participant.answeredQuestionCount)}/${escapeHtml(questionCount)} question${questionCount === 1 ? '' : 's'} answered</span>
+          <small>${escapeHtml(formatDisplayLabel(scoreLabel({ meanScore: participant.averageStance })))} | average score ${escapeHtml(formatSignedScore(participant.averageStance))}</small>
+        </li>`).join('')}
+      </ul>
+    </section>`
+    : '';
   const findingGroups = [
     renderAtlasIssueFindingGroup('Key tensions', issueArea.keyTensions),
     renderAtlasIssueFindingGroup('Points of agreement', issueArea.pointsOfAgreement),
@@ -2731,7 +2825,7 @@ const renderAtlasIssueTemplate = (issueArea, index) => {
       <span class="atlasIssueQuestionId">${escapeHtml(question.id)}</span>
       <strong>${escapeHtml(question.prompt || question.id)}</strong>
       ${renderAtlasQuestionDistribution(question.voteSummary)}
-      <span class="atlasIssueQuestionMeta">Model difference ${escapeHtml(difference)} | Repeat consistency ${escapeHtml(consistency)}</span>
+      <span class="atlasIssueQuestionMeta">Model score gap ${escapeHtml(difference)} | ${escapeHtml(consistency)} repeat stability</span>
     </a>`;
   }).join('');
   const questionSection = renderAtlasModalCollapse({
@@ -2742,7 +2836,7 @@ const renderAtlasIssueTemplate = (issueArea, index) => {
     open: true,
   });
   const sourceLabel = issueArea.hasGeneratedAnalysis ? 'Second-pass AI analysis' : 'Measured benchmark evidence';
-  const modalMeta = `${issueArea.linkedQuestions.length} question${issueArea.linkedQuestions.length === 1 ? '' : 's'} | ${sourceLabel}`;
+  const modalMeta = `${answeringModelCount} model${answeringModelCount === 1 ? '' : 's'} | ${questionCount} question${questionCount === 1 ? '' : 's'} | ${sourceLabel}`;
   return `<template
     data-ce-atlas-issue-template
     data-ce-atlas-topic-id="${escapeHtml(issueArea.id)}"
@@ -2756,11 +2850,13 @@ const renderAtlasIssueTemplate = (issueArea, index) => {
     </div>
     <div class="atlasIssueOverview">
       ${issueArea.summary ? `<p class="atlasIssueSummary">${escapeHtml(issueArea.summary)}</p>` : ''}
+      <p class="atlasIssueModelContext" data-ce-atlas-model-context>${escapeHtml(modelContext)}</p>
+      ${modelRoster}
       <div class="atlasIssueMetricGrid" aria-label="Issue area benchmark metrics">
-        <div><span>Questions</span><strong>${escapeHtml(issueArea.linkedQuestions.length)}</strong></div>
-        <div><span>Mean stance</span><strong>${escapeHtml(formatScore(issueArea.averageStance))}</strong><small>${escapeHtml(scoreLabel({ meanScore: issueArea.averageStance }))}</small></div>
-        <div><span>Model difference</span><strong>${escapeHtml(Number.isFinite(issueArea.averageModelDifference) ? formatScore(issueArea.averageModelDifference) : 'N/A')}</strong><small>mean spread</small></div>
-        <div><span>Repeat consistency</span><strong>${escapeHtml(Number.isFinite(issueArea.averageWinningResponseConsistency) ? formatPercent(issueArea.averageWinningResponseConsistency) : 'N/A')}</strong><small>winning response share</small></div>
+        <div><span>Answer coverage</span><strong>${escapeHtml(modelCoverageValue)}</strong><small>${escapeHtml(modelCoverageDetail)}</small></div>
+        <div><span>Overall model stance</span><strong>${escapeHtml(stanceValue)}</strong><small>${escapeHtml(stanceDetail)}</small></div>
+        <div><span>Between-model difference</span><strong>${escapeHtml(differenceValue)}</strong><small>${escapeHtml(differenceDetail)}</small></div>
+        <div><span>Repeat stability</span><strong>${escapeHtml(consistencyValue)}</strong><small>${escapeHtml(consistencyDetail)}</small></div>
       </div>
     </div>
     ${findings}
@@ -3712,12 +3808,23 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .atlasIssueDepthTag.depth2 { background: #4ade80; box-shadow: 0 0 10px rgba(74, 222, 128, 0.3); }
     .atlasIssueOverview { margin-bottom: 16px; }
     .atlasIssueSummary { margin: 0 0 18px; color: rgba(226, 232, 240, 0.9); font-family: var(--ce-font-body); font-size: 1rem; line-height: 1.65; }
-    .atlasIssueMetricGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
-    .atlasIssueMetricGrid > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 13px 12px; border-right: 1px solid rgba(255, 255, 255, 0.08); }
-    .atlasIssueMetricGrid > div:last-child { border-right: 0; }
-    .atlasIssueMetricGrid span { color: rgba(148, 163, 184, 0.86); font-size: 0.66rem; font-weight: 700; text-transform: uppercase; }
-    .atlasIssueMetricGrid strong { color: #f8fafc; font-size: 1.15rem; line-height: 1.15; }
-    .atlasIssueMetricGrid small { color: #64748b; font-size: 0.68rem; line-height: 1.2; }
+    .atlasIssueModelContext { margin: 0 0 14px; padding-left: 12px; border-left: 2px solid rgba(56, 189, 248, 0.7); color: #cbd5e1; font-family: var(--ce-font-body); font-size: 0.82rem; line-height: 1.55; }
+    .atlasIssueMetricGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+    .atlasIssueMetricGrid > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 15px 14px; border-right: 1px solid rgba(255, 255, 255, 0.08); }
+    .atlasIssueMetricGrid > div:nth-child(2n) { border-right: 0; }
+    .atlasIssueMetricGrid > div:nth-child(-n + 2) { border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+    .atlasIssueMetricGrid span { color: rgba(148, 163, 184, 0.9); font-size: 0.67rem; font-weight: 700; text-transform: uppercase; }
+    .atlasIssueMetricGrid strong { color: #f8fafc; font-family: var(--ce-font-body); font-size: 0.98rem; line-height: 1.3; }
+    .atlasIssueMetricGrid small { color: #94a3b8; font-family: var(--ce-font-body); font-size: 0.73rem; line-height: 1.45; }
+    .atlasIssueModelRoster { margin: 0 0 16px; padding: 14px; border: 1px solid rgba(56, 189, 248, 0.2); border-radius: var(--ce-radius-8); background: rgba(56, 189, 248, 0.05); }
+    .atlasIssueModelRosterHeader { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 11px; }
+    .atlasIssueModelRosterHeader strong { color: #e0f2fe; font-family: var(--ce-font-body); font-size: 0.9rem; }
+    .atlasIssueModelRosterHeader span { color: #7dd3fc; font-size: 0.69rem; line-height: 1.35; }
+    .atlasIssueModelList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+    .atlasIssueModelCard { display: grid; gap: 3px; min-width: 0; padding: 10px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--ce-radius-6); background: rgba(15, 23, 42, 0.48); }
+    .atlasIssueModelCard strong { color: #f8fafc; font-family: var(--ce-font-body); font-size: 0.8rem; line-height: 1.3; overflow-wrap: anywhere; }
+    .atlasIssueModelCard span { color: #cbd5e1; font-size: 0.68rem; line-height: 1.3; }
+    .atlasIssueModelCard small { color: #64748b; font-size: 0.66rem; line-height: 1.3; }
     .atlasIssueCollapse { margin-bottom: 12px; background: transparent; }
     .atlasIssueCollapseHeader { appearance: none; display: flex; align-items: center; width: 100%; margin: 0 0 8px; padding: 8px 0; border: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; user-select: none; }
     .atlasIssueCollapseHeader:hover,
@@ -4203,9 +4310,6 @@ export const renderHtmlReport = (report) => `<!doctype html>
       .atlasIssueModalHeader { align-items: flex-start; }
       .atlasIssueModalTitle { font-size: 1.35rem; }
       .atlasIssueModalClose { position: fixed; right: 25px; bottom: 25px; z-index: 2005; width: 50px; height: 50px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: var(--ce-radius-round); background: #1e293b; color: var(--ce-color-white); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); }
-      .atlasIssueMetricGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .atlasIssueMetricGrid > div:nth-child(2) { border-right: 0; }
-      .atlasIssueMetricGrid > div:nth-child(-n + 2) { border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
       .atlasIssueFindingGrid { grid-template-columns: 1fr; }
     }
     @media only screen and (min-width: 768px) and (max-width: 1024px) {
@@ -4249,6 +4353,10 @@ export const renderHtmlReport = (report) => `<!doctype html>
       .demoResultsViewButton { flex: 0 0 auto; justify-content: center; min-height: 34px; padding: 0.38rem 0.64rem; font-size: 0.84rem; }
     }
     @media (max-width: 640px) {
+      .atlasIssueMetricGrid { grid-template-columns: 1fr; }
+      .atlasIssueMetricGrid > div { border-right: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+      .atlasIssueMetricGrid > div:last-child { border-bottom: 0; }
+      .atlasIssueModelList { grid-template-columns: 1fr; }
       .demoAnalysisWorkspace .selectedQuestionFrame { padding: 1rem; }
       .demoAnalysisWorkspace .demoPanel { padding: 0.9rem; }
       .breakdownTraitGrid, .selectorLayout, .selectorLayout.breakdownTraitGrid { grid-template-columns: 1fr; }
