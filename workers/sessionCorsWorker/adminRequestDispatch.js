@@ -19,7 +19,7 @@ import {
 } from '../shared/deployHelperCore.mjs';
 import {
   rewrapStorageEnvelopeSessionKeyForDeployment,
-  rotateStorageEnvelopeKeys,
+  STORAGE_ENVELOPE_ROTATION_DISABLED_ERROR,
 } from './storageEnvelopeEncryption.js';
 import {
   exportCloudflareEncryptedPayloadEnvelopes,
@@ -347,26 +347,8 @@ export const dispatchAdminRequest = async ({
     );
   }
 
-  if (action === 'export-storage-envelopes') {
-    try {
-      const result = await (deps?.exportCloudflareEncryptedPayloadEnvelopes || exportCloudflareEncryptedPayloadEnvelopes)({
-        env,
-        slug: targetSlug,
-        config: existingConfig,
-        resource: toTrimmedString(body?.resource),
-        includeSessionEnvelope: true,
-        deps: {
-          now: deps?.now,
-        },
-      });
-      return deps?.json?.(
-        result?.ok ? result : { error: result?.error || 'Encrypted-envelope export failed.' },
-        result?.ok ? 200 : (result?.status || 500),
-        headers,
-      );
-    } catch (error) {
-      return deps?.json?.({ error: error?.message || 'Encrypted-envelope export failed.' }, 500, headers);
-    }
+  if (action === 'rotate-envelope-keys') {
+    return deps?.json?.({ error: STORAGE_ENVELOPE_ROTATION_DISABLED_ERROR }, 409, headers);
   }
 
   if (action === 'export-storage-envelopes') {

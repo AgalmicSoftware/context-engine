@@ -1406,6 +1406,46 @@ test('dispatchAdminRequest does not export envelopes when admin authority fails'
   assert.equal(exportCalled, false);
 });
 
+test('dispatchAdminRequest reports disabled session-key rotation before storage mutation', async () => {
+  let storageCalls = 0;
+  const trackStorageCall = () => {
+    storageCalls += 1;
+    throw new Error('storage must not be touched');
+  };
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody(),
+    },
+    env: {
+      CE_STORAGE_INDEX_KV: {
+        get: trackStorageCall,
+        put: trackStorageCall,
+        list: trackStorageCall,
+      },
+    },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: 'session-a',
+    action: 'rotate-envelope-keys',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: { storageEnvelope: { keyProvider: 'worker_secret' } },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+    }),
+  });
+
+  assert.deepEqual(result, {
+    body: {
+      error: 'Storage envelope session-key rotation is disabled until interrupted rotations can be resumed safely.',
+    },
+    status: 409,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+  assert.equal(storageCalls, 0);
+});
+
 test('dispatchAdminRequest rewraps deployment KEK without returning secret material', async () => {
   const calls = [];
   const result = await dispatchAdminRequest({

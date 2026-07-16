@@ -506,7 +506,20 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, payl
   });
   if (!access.ok) return access.response;
   const payloadAccess = resolvePayloadAccessControl(config);
-  if (payloadAccess.mode === PAYLOAD_ACCESS_MODES.LIT_ENCRYPTED && payload.payloadEncrypted !== true) {
+  if (
+    payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE &&
+    !canWriteKvPayload
+  ) {
+    // The wrapped DEK and readable index live in KV. Writing ciphertext to R2
+    // without that projection would return a reference that can never decrypt.
+    return responseJson(
+      deps,
+      { error: 'Cloudflare worker-envelope storage requires an index KV binding.' },
+      501,
+      baseHeaders,
+    );
+  }
+  if (payloadAccess.encryption === PAYLOAD_ENCRYPTION_MODES.LIT && payload.payloadEncrypted !== true) {
     return responseJson(deps, { error: 'Cloudflare lit_encrypted storage requires payloadEncrypted=true.' }, 400, baseHeaders);
   }
 
