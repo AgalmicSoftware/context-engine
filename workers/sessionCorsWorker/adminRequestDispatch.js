@@ -19,7 +19,7 @@ import {
 } from '../shared/deployHelperCore.mjs';
 import {
   rewrapStorageEnvelopeSessionKeyForDeployment,
-  rotateStorageEnvelopeKeys,
+  STORAGE_ENVELOPE_ROTATION_DISABLED_ERROR,
 } from './storageEnvelopeEncryption.js';
 import {
   exportCloudflareEncryptedPayloadEnvelopes,
@@ -387,28 +387,7 @@ export const dispatchAdminRequest = async ({
   }
 
   if (action === 'rotate-envelope-keys') {
-    try {
-      const result = await (deps?.rotateStorageEnvelopeKeys || rotateStorageEnvelopeKeys)({
-        env,
-        slug: targetSlug,
-        config: existingConfig,
-        deps: {
-          putSessionConfig: deps?.putSessionConfig,
-          now: deps?.now,
-          randomBytes: deps?.randomBytes,
-          getRandomValues: deps?.getRandomValues,
-          randomUUID: deps?.randomUUID,
-          getStorageEnvelopeKek: deps?.getStorageEnvelopeKek,
-        },
-      });
-      return deps?.json?.({
-        ok: true,
-        rotatedAt: result.rotatedAt,
-        payloadsRewrapped: result.payloadsRewrapped,
-      }, 200, headers);
-    } catch (error) {
-      return deps?.json?.({ error: error?.message || 'Storage envelope key rotation failed.' }, 500, headers);
-    }
+    return deps?.json?.({ error: STORAGE_ENVELOPE_ROTATION_DISABLED_ERROR }, 409, headers);
   }
 
   if (action === 'export-storage-envelopes') {

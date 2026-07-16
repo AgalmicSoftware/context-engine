@@ -151,7 +151,8 @@ deleted speculatively.
   worker-envelope session key and serializes signed `set-config`, `set-limits`,
   and Lit-descriptor mutations against one authoritative public config record.
   Missing coordination fails closed for those writes as well. Payload/index
-  recovery and resumable envelope-key rotation remain separate work.
+  recovery remains separate work. Session-key rotation is deliberately disabled
+  until an interrupted transition can retain and select both old and new keys.
 - Operating modes:
   - CE-hosted: use the default `CLOUDFLARE_DEPLOY_HELPER_URL` (`https://ce-deploy-helper.agalmic.workers.dev/`) and let Context Engine operate the shared helper.
   - Self-hosted: deploy `workers/deploy-helper/worker.js` with your own Wrangler config (`wrangler.toml` or equivalent), bind `DEPLOY_HELPER_KV` and `CE_SESSION_COORDINATOR`, install the `ce-session-write-coordinator-v1` SQLite-class migration, set `ALLOWED_ORIGINS`, and set `ADMIN_SECRET` with Wrangler secrets. The checked-in example and direct CLI automation include both bindings and the migration.
@@ -403,9 +404,13 @@ Lit credentials are required only for `lit-arweave` storage or Cloudflare `encry
 
 `worker_envelope` uses WebCrypto AES-256-GCM and the existing session config/index stores:
 
-- Deployment KEK: read from the Worker secret `CE_STORAGE_ENVELOPE_KEK` through the `worker_secret` key provider. The plaintext KEK is never stored in KV, D1, or R2. `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` is optional during deployment-key rotation so old session KEKs can be unwrapped and rewrapped under the current secret.
+- Deployment KEK: read from the Worker secret `CE_STORAGE_ENVELOPE_KEK` through the `worker_secret` key provider. The plaintext KEK is never stored in KV, D1, or R2. `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` is optional during deployment-secret replacement so old session KEKs can be unwrapped and rewrapped under the current secret.
 - Session KEK: generated locally on the first envelope write for a session and wrapped by the deployment KEK before coordination. The per-session `SessionWriteCoordinator` adopts one wrapped candidate, keeps that wrapped record authoritative, and projects it to `session:{slug}:config` under `storageEnvelope.sessionKey`. Raw session keys and the deployment KEK never pass through coordinator state. A missing coordinator binding fails closed instead of falling back to a racing KV write.
 - Payload DEK: generated per payload, used to encrypt the stored bytes, wrapped by the session KEK, and stored in payload metadata with the envelope algorithm, IVs, key id, and condition reference.
+
+Worker-envelope uploads require an index KV binding even when payload bytes use
+R2. The wrapped payload DEK and readable index live in KV, so an R2-only
+worker-envelope upload returns `501` before key creation or any R2 write.
 
 Reads authorize first, then unwrap the DEK, decrypt the payload, return `Cache-Control: private, no-store`, and write one key-release audit event. The audit store is D1 when a `CE_STORAGE_AUDIT_D1`/`STORAGE_AUDIT_D1`/`DB` binding is present; otherwise it uses `CE_STORAGE_AUDIT_KV` or the storage index KV. If no audit store is available, key release fails closed.
 
@@ -424,7 +429,11 @@ Access conditions may be attached per payload or at session level:
 
 `match: "any"` releases when any condition passes; `match: "all"` requires every condition. Empty or missing conditions fall back to the configured gate. Unknown condition kinds fail closed. `worker_group` checks canonical worker group membership and deleted groups fail closed.
 
-`POST /admin/rotate-envelope-keys` is admin-signed. It rewraps payload DEKs under a new session KEK and stores the session KEK wrapped by the current deployment KEK without re-encrypting payload bytes.
+`POST /admin/rotate-envelope-keys` remains admin-signed but currently returns
+`409` before changing envelope payload, index, or config state. Session-key
+rotation is disabled until
+the worker can retain both key versions and safely resume an interrupted
+transition. This does not disable deployment-secret rewrapping below.
 
 ### Envelope Export And Re-Host
 
@@ -432,7 +441,7 @@ Admin-signed `POST /admin/export-storage-envelopes` returns a re-hostable bundle
 
 The export manifest includes `exportScope: "encrypted_envelopes_only"`, `storageBackend`, `encryptedPayloadCount`, `partial`, `readErrors`, `wrappedKeysIncluded`, `keyProvider`, and `rewrapRequiredForNewDeployment: true`. Telegram response export honors the same scope by calling `/storage/export-envelopes?resource=responses` with a session export/admin principal; that route packages ciphertext and envelope metadata, omits session KEK material, and skips `/storage/read`.
 
-Admin-signed `POST /admin/rewrap-envelope-deployment-key` accepts `{ "newDeploymentKek": "<secret value>" }` and re-wraps the stored session KEK under that new deployment KEK without changing payload ciphertext or wrapped payload DEKs. Use this during an operator-controlled re-host to move a session to a worker with a different `CE_STORAGE_ENVELOPE_KEK`, then retire the old deployment secret after verification. Rotation or re-wrap stops future key release under retired keys; it cannot un-read plaintext that was already fetched.
+Admin-signed `POST /admin/rewrap-envelope-deployment-key` accepts `{ "newDeploymentKek": "<secret value>" }` and re-wraps the stored session KEK under that new deployment KEK without changing payload ciphertext or wrapped payload DEKs. Use this during an operator-controlled re-host to move a session to a worker with a different `CE_STORAGE_ENVELOPE_KEK`. Keep the new value available until the operation completes, update the Worker secret immediately, verify encrypted reads, and only then retire the old deployment secret. Re-wrapping cannot un-read plaintext that was already fetched.
 
 ### Worker-Native Groups
 
@@ -459,7 +468,7 @@ Upload policy `group_allowlist` may be supplied on Cloudflare storage uploads wi
 
 KV:
 - `GROUP_KV`
-- `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) when Cloudflare payload storage uses KV metadata/index rows, and required for KV-only payload fallback. The deploy helper aliases the same newly created namespace as `GROUP_KV` and `CE_STORAGE_INDEX_KV` for Cloudflare-backed sessions.
+- `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) when Cloudflare payload storage uses KV metadata/index rows, required for KV-only payload fallback, and required for `worker_envelope` even when payload bytes use R2. The deploy helper aliases the same newly created namespace as `GROUP_KV` and `CE_STORAGE_INDEX_KV` for Cloudflare-backed sessions.
 - `CE_STORAGE_AUDIT_KV` (optional) for worker-envelope key-release audit events. If omitted, the worker uses the storage index KV for audit rows when no D1 audit binding is present.
 - `CE_WORKER_GROUPS_KV` (optional) for worker-native group records and membership rows. If omitted, the worker uses the storage index KV aliases. Membership rows remain separate from group records.
 
@@ -478,13 +487,20 @@ R2/D1:
   revisions, and wrapped session-key records. It never stores deployment
   credentials, raw session keys, deployment KEKs, raw DEKs, request bodies,
   worker bundle bytes, or ordinary session payload blobs. The binding serializes
-  first-use key selection with signed Admin config mutations; it does not yet
-  make envelope-key rotation or payload-plus-index uploads failure-atomic.
+  first-use key selection with signed Admin config mutations. Once its authority
+  record exists, that record is canonical and KV is its readable projection;
+  manual KV edits are not imported and may be overwritten by the next
+  coordinated write. Use signed Admin routes for runtime config changes. The
+  deploy helper may seed a new isolated KV namespace before the Worker can run
+  and before coordinator authority exists, but it does not whole-replace a
+  compatible live config during resume. The coordinator does not yet make
+  payload-plus-index uploads retry-idempotent, and session-key rotation is
+  disabled pending a safe transition design.
 
 Vars:
 - `TOKEN_HMAC_SECRET` (HMAC secret for session tokens)
 - `CE_STORAGE_ENVELOPE_KEK` (Worker secret for `worker_envelope`; required only when sessions use `encryption: "worker_envelope"`. `/new` custom-worker deploys that select worker-envelope storage ask the deploy helper to generate and set this secret during Worker provisioning; manual deployments must set it themselves.)
-- `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` (optional Worker secret used only while rewrapping old session KEKs after deployment-key rotation)
+- `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` (optional Worker secret used only while rewrapping old session KEKs during deployment-secret replacement)
 - `CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION` (optional; defaults to `100`)
 - `CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP` (optional; defaults to `1000`)
 - `DEFAULT_SESSION_SLUG` (optional; canonical)
@@ -1110,8 +1126,8 @@ Never return secrets in responses.
   same-revision retry is an idempotent no-op; a different revision returns
   `409`. Session config writes are serialized by the per-session coordinator
   with first-use worker-envelope key selection. Revision-free signed Admin
-  patches remain supported; payload/index journaling and resumable key rotation
-  are not implied by this config boundary.
+  patches remain supported; upload retry receipts are not implied by this config
+  boundary, and session-key rotation currently returns `409` before mutation.
 - A successful worker-canonical publish is terminal in `/new`, including after a
   reload or another open tab observes the settlement record. Use **Create another
   session** to clear the settled local wizard state and begin a new session.

@@ -671,20 +671,25 @@ test('R2-only worker-envelope upload fails closed without creating an object', a
     ...persistence.bindings,
     CE_STORAGE_ENVELOPE_KEK: DEPLOYMENT_KEK,
   });
+  let configProjectionCount = 0;
   const response = await upload({
     env,
     config: createCloudflareConfig({ encryption: 'worker_envelope' }),
     request: createUploadRequest(),
     randomBytes: createSequenceRandomBytes(81),
-    putSessionConfig: async () => undefined,
+    putSessionConfig: async () => { configProjectionCount += 1; },
   });
 
   assert.deepEqual({
     failedClosed: response.status >= 500,
+    configProjectionCount,
     objectCount: persistence.r2Store.size,
+    persistenceWriteAttempts: persistence.attempts.length,
   }, {
     failedClosed: true,
+    configProjectionCount: 0,
     objectCount: 0,
+    persistenceWriteAttempts: 0,
   });
 });
 

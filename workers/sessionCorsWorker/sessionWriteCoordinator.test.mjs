@@ -5,6 +5,8 @@ import {
   SessionWriteCoordinator,
   executeCoordinatedSponsoredDeploy,
 } from './sessionWriteCoordinator.js';
+import { getSessionConfig } from './sessionConfigSecretsStore.js';
+import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 
 const createTransactionalState = () => {
   const store = new Map();
@@ -65,22 +67,31 @@ const createCoordinatorRequest = (path, payload) => new Request(
   },
 );
 
-const createWrappedCandidate = (suffix) => ({
+const createWrappedCandidate = (suffix, {
+  slug = 'session-a',
+  createdAt = '2026-07-15T12:00:00.000Z',
+} = {}) => ({
   version: 1,
   keyProvider: 'worker_secret',
-  keyId: 'session:session-a:2026-07-15T12:00:00.000Z',
-  createdAt: '2026-07-15T12:00:00.000Z',
+  keyId: `session:${slug}:${createdAt}`,
+  createdAt,
   alg: 'AES-256-GCM',
   wrapAlg: 'AES-GCM-KW-v1',
   iv: suffix.repeat(16).slice(0, 16),
   wrappedKey: suffix.repeat(64).slice(0, 64),
 });
 
-const createSessionConfigRequest = ({ path, candidateRecord, mutation } = {}) => (
+const createSessionConfigRequest = ({
+  path,
+  candidateRecord,
+  mutation,
+  slug = 'session-a',
+  baseConfig,
+} = {}) => (
   createCoordinatorRequest(path, {
-    slug: 'session-a',
-    baseConfig: {
-      slug: 'session-a',
+    slug,
+    baseConfig: baseConfig || {
+      slug,
       adminAddress: '0x0000000000000000000000000000000000000abc',
       storageProfile: {
         backend: 'cloudflare',
@@ -155,23 +166,147 @@ test('SessionWriteCoordinator rejects candidate records with raw key material', 
   assert.doesNotMatch(JSON.stringify([...store.values()]), /raw-session-key-sentinel/);
 });
 
-test('SessionWriteCoordinator rejects session keys introduced through generic config mutation', async () => {
-  const { state, store } = createTransactionalState();
-  const coordinator = new SessionWriteCoordinator(state, {}, {
-    putSessionConfig: async () => undefined,
-  });
-  const response = await coordinator.fetch(createSessionConfigRequest({
-    path: '/session-config/mutate',
-    mutation: {
-      kind: 'set-config',
-      incomingConfig: {
-        storageEnvelope: { sessionKey: createWrappedCandidate('G') },
-      },
+test('SessionWriteCoordinator projects the reserved tenant to the KV key used by readers', async () => {
+  const { state } = createTransactionalState();
+  const kvStore = new Map();
+  const env = {
+    GROUP_KV: {
+      get: async (key) => kvStore.get(key) || null,
+      put: async (key, value) => { kvStore.set(key, value); },
     },
+  };
+  const coordinator = new SessionWriteCoordinator(state, env);
+  const baseConfig = {
+    slug: 'general',
+    adminAddress: '0x0000000000000000000000000000000000000abc',
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { encryption: 'worker_envelope' },
+    },
+  };
+  const keyResponse = await coordinator.fetch(createSessionConfigRequest({
+    path: '/session-config/storage-envelope-key/get-or-create',
+    slug: 'general',
+    baseConfig,
+    candidateRecord: createWrappedCandidate('G', { slug: 'general' }),
+  }));
+  const mutationResponse = await coordinator.fetch(createSessionConfigRequest({
+    path: '/session-config/mutate',
+    slug: 'general',
+    baseConfig,
+    mutation: { kind: 'set-limits', incomingLimits: { perIpPerHour: 8 } },
   }));
 
-  assert.equal(response.status, 409);
-  assert.equal(store.size, 0);
+  assert.equal(keyResponse.status, 200);
+  assert.equal(mutationResponse.status, 200);
+  assert.deepEqual([...kvStore.keys()].sort(), ['session::config']);
+  assert.equal(kvStore.has('session:general:config'), false);
+  const readable = await getSessionConfig(env, normalizeWorkerSessionSlug('general'));
+  assert.equal(readable.limits.perIpPerHour, 8);
+  assert.equal(
+    readable.storageEnvelope.sessionKey.wrappedKey,
+    createWrappedCandidate('G', { slug: 'general' }).wrappedKey,
+  );
+});
+
+test('SessionWriteCoordinator preserves unchanged minimal legacy keys across config mutations', async () => {
+  const legacySessionKey = {
+    iv: 'legacy-iv-value1',
+    wrappedKey: 'L'.repeat(64),
+  };
+  const cases = [
+    {
+      name: 'set-config',
+      mutation: { kind: 'set-config', incomingConfig: { sessionName: 'Legacy session' } },
+      readValue: (config) => config.sessionName,
+      expected: 'Legacy session',
+    },
+    {
+      name: 'set-limits',
+      mutation: { kind: 'set-limits', incomingLimits: { perIpPerHour: 9 } },
+      readValue: (config) => config.limits?.perIpPerHour,
+      expected: 9,
+    },
+    {
+      name: 'merge-lit-credentials',
+      mutation: {
+        kind: 'merge-lit-credentials',
+        litCredentials: { litActionCid: 'bafy-legacy-action' },
+      },
+      readValue: (config) => config.litCredentials?.litActionCid,
+      expected: 'bafy-legacy-action',
+    },
+  ];
+
+  for (const testCase of cases) {
+    const { state } = createTransactionalState();
+    const projections = [];
+    const coordinator = new SessionWriteCoordinator(state, {}, {
+      putSessionConfig: async (_env, _slug, config) => { projections.push(config); },
+    });
+    const response = await coordinator.fetch(createSessionConfigRequest({
+      path: '/session-config/mutate',
+      baseConfig: {
+        slug: 'session-a',
+        adminAddress: '0x0000000000000000000000000000000000000abc',
+        storageEnvelope: { sessionKey: legacySessionKey },
+      },
+      mutation: testCase.mutation,
+    }));
+
+    assert.equal(response.status, 200, testCase.name);
+    assert.equal(projections.length, 1, testCase.name);
+    assert.deepEqual(projections[0].storageEnvelope.sessionKey, legacySessionKey, testCase.name);
+    assert.equal(testCase.readValue(projections[0]), testCase.expected, testCase.name);
+  }
+});
+
+test('SessionWriteCoordinator rejects generic mutation of uncoordinated session keys', async () => {
+  const legacySessionKey = {
+    iv: 'legacy-iv-value1',
+    wrappedKey: 'L'.repeat(64),
+  };
+  const changedLegacySessionKey = {
+    iv: 'legacy-iv-value2',
+    wrappedKey: 'M'.repeat(64),
+  };
+  const cases = [
+    {
+      name: 'introduction',
+      baseConfig: { slug: 'session-a' },
+      incomingStorageEnvelope: { sessionKey: legacySessionKey },
+    },
+    {
+      name: 'change',
+      baseConfig: { slug: 'session-a', storageEnvelope: { sessionKey: legacySessionKey } },
+      incomingStorageEnvelope: { sessionKey: changedLegacySessionKey },
+    },
+    {
+      name: 'removal',
+      baseConfig: { slug: 'session-a', storageEnvelope: { sessionKey: legacySessionKey } },
+      incomingStorageEnvelope: {},
+    },
+  ];
+
+  for (const testCase of cases) {
+    const { state, store } = createTransactionalState();
+    const projections = [];
+    const coordinator = new SessionWriteCoordinator(state, {}, {
+      putSessionConfig: async (_env, _slug, config) => { projections.push(config); },
+    });
+    const response = await coordinator.fetch(createSessionConfigRequest({
+      path: '/session-config/mutate',
+      baseConfig: testCase.baseConfig,
+      mutation: {
+        kind: 'set-config',
+        incomingConfig: { storageEnvelope: testCase.incomingStorageEnvelope },
+      },
+    }));
+
+    assert.equal(response.status, 409, testCase.name);
+    assert.equal(projections.length, 0, testCase.name);
+    assert.equal(store.size, 0, testCase.name);
+  }
 });
 
 test('SessionWriteCoordinator repairs a pending key projection after restart without adopting a new candidate', async () => {

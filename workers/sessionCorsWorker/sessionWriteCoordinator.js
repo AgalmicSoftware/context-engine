@@ -8,7 +8,10 @@ import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
 import { putSessionConfig } from './sessionConfigSecretsStore.js';
-import { validateInboundWorkerSessionSlug } from './sessionSlugResolution.js';
+import {
+  normalizeWorkerSessionSlug,
+  validateInboundWorkerSessionSlug,
+} from './sessionSlugResolution.js';
 import {
   findForbiddenCloudflareDeploymentTokenPath,
   findForbiddenWorkerConfigSecretPath,
@@ -176,7 +179,13 @@ export class SessionWriteCoordinator {
   }
 
   async projectSessionConfigAuthority(authority) {
-    await this.putSessionConfig(this.env, authority.slug, authority.config);
+    // The coordinator names the reserved tenant "general", while production
+    // readers address its KV projection with the canonical empty slug.
+    await this.putSessionConfig(
+      this.env,
+      normalizeWorkerSessionSlug(authority.slug),
+      authority.config,
+    );
     await this.finalizeSessionConfigProjection(authority.revision);
   }
 
@@ -362,9 +371,12 @@ export class SessionWriteCoordinator {
             status: result?.status || 400,
           };
         }
+        const priorSessionKey = authorityConfig?.storageEnvelope?.sessionKey ?? null;
+        const mutatedSessionKey = result.config?.storageEnvelope?.sessionKey ?? null;
         if (
           !activeSessionKey &&
-          isObjectRecord(result.config?.storageEnvelope?.sessionKey)
+          stableCanonicalSerialize(mutatedSessionKey) !==
+            stableCanonicalSerialize(priorSessionKey)
         ) {
           return {
             error: 'Storage envelope session keys must be created through the key coordinator.',

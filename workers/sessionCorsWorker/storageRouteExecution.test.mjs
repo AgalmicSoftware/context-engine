@@ -1048,6 +1048,52 @@ test('storageRoute rejects Cloudflare storage when neither R2 nor KV payload sto
   assert.equal((await readJson(response)).error, 'Cloudflare storage binding not configured.');
 });
 
+test('storageRoute rejects R2-only worker-envelope uploads before key or object writes', async () => {
+  const r2 = createMockR2();
+  let randomCalls = 0;
+  let coordinatorCalls = 0;
+  const response = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: 'must not be written', resource: 'docsContext' }),
+    }),
+    env: {
+      CE_STORAGE_R2: r2,
+      CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
+      CE_SESSION_COORDINATOR: {
+        idFromName: () => {
+          coordinatorCalls += 1;
+          return 'must-not-coordinate';
+        },
+        get: () => ({ fetch: async () => new Response(null, { status: 500 }) }),
+      },
+    },
+    config: createEnvelopeConfig(),
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000abc',
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: () => {
+        randomCalls += 1;
+        return fixedRandomBytes();
+      },
+    },
+  });
+
+  assert.equal(response.status, 501);
+  assert.equal(
+    (await readJson(response)).error,
+    'Cloudflare worker-envelope storage requires an index KV binding.',
+  );
+  assert.equal(randomCalls, 0);
+  assert.equal(coordinatorCalls, 0);
+  assert.equal(r2.store.size, 0);
+});
+
 test('storageRoute stores Cloudflare docs payloads behind opaque refs and reads them back', async () => {
   const r2 = createMockR2();
   const kv = createMockKv();
@@ -2792,7 +2838,7 @@ test('exportCloudflareEncryptedPayloadEnvelopes counts encrypted rows when paylo
   }]);
 });
 
-test('rotateStorageEnvelopeKeys rewraps keys without changing ciphertext bytes', async () => {
+test('rotateStorageEnvelopeKeys fails closed before changing payload or config state', async () => {
   const kv = createMockKv();
   const env = {
     CE_STORAGE_INDEX_KV: kv,
@@ -2800,65 +2846,44 @@ test('rotateStorageEnvelopeKeys rewraps keys without changing ciphertext bytes',
   };
   let config = createEnvelopeConfig();
   const setConfig = (nextConfig) => { config = nextConfig; };
-  const { body: firstBody } = await uploadEnvelopePayload({
+  const { body } = await uploadEnvelopePayload({
     env,
     config,
     setConfig,
     deps: { randomBytes: createSequenceRandomBytes(1) },
   });
-  const { body: secondBody } = await uploadEnvelopePayload({
-    env,
-    config,
-    setConfig,
-    data: 'second classified payload',
-    deps: { randomBytes: createSequenceRandomBytes(71) },
-  });
-  const firstPayloadKey = `ce-storage-payload:session-a:${firstBody.storageRef.id}`;
-  const secondPayloadKey = `ce-storage-payload:session-a:${secondBody.storageRef.id}`;
-  const firstBeforePayload = JSON.parse(kv.store.get(firstPayloadKey));
-  const secondBeforePayload = JSON.parse(kv.store.get(secondPayloadKey));
-  const firstBeforeMetadata = await readStorageIndexMetadata(kv, 'session-a', 'docsContext', firstBody.storageRef.id);
-  const secondBeforeMetadata = await readStorageIndexMetadata(kv, 'session-a', 'docsContext', secondBody.storageRef.id);
-  const originalList = kv.list.bind(kv);
-  kv.list = async ({ prefix = '', cursor = '' } = {}) => {
-    const allKeys = (await originalList({ prefix })).keys
-      .map((entry) => entry.name)
-      .sort();
-    const offset = cursor ? Number(cursor) : 0;
-    const pageKeys = allKeys.slice(offset, offset + 1);
-    const nextOffset = offset + pageKeys.length;
-    const complete = nextOffset >= allKeys.length;
-    return {
-      keys: pageKeys.map((name) => ({ name })),
-      list_complete: complete,
-      cursor: complete ? '' : String(nextOffset),
-    };
-  };
+  const configBefore = structuredClone(config);
+  const storageBefore = structuredClone([...kv.store.entries()]);
+  let projectionCalls = 0;
 
-  const rotation = await rotateStorageEnvelopeKeys({
-    env,
-    slug: 'session-a',
-    config,
-    deps: {
-      putSessionConfig: async (_env, _slug, nextConfig) => setConfig(nextConfig),
-      randomBytes: createSequenceRandomBytes(101),
-      now: () => Date.parse('2026-01-03T03:04:05.000Z'),
+  await assert.rejects(
+    rotateStorageEnvelopeKeys({
+      env,
+      slug: 'session-a',
+      config,
+      deps: {
+        putSessionConfig: async () => { projectionCalls += 1; },
+        randomBytes: createSequenceRandomBytes(101),
+        now: () => Date.parse('2026-01-03T03:04:05.000Z'),
+      },
+    }),
+    (error) => {
+      assert.equal(error.status, 409);
+      assert.equal(
+        error.message,
+        'Storage envelope session-key rotation is disabled until interrupted rotations can be resumed safely.',
+      );
+      return true;
     },
-  });
-  assert.equal(rotation.payloadsRewrapped, 2);
-  const firstAfterPayload = JSON.parse(kv.store.get(firstPayloadKey));
-  const secondAfterPayload = JSON.parse(kv.store.get(secondPayloadKey));
-  const firstAfterMetadata = await readStorageIndexMetadata(kv, 'session-a', 'docsContext', firstBody.storageRef.id);
-  const secondAfterMetadata = await readStorageIndexMetadata(kv, 'session-a', 'docsContext', secondBody.storageRef.id);
-  assert.equal(firstAfterPayload.payloadBase64url, firstBeforePayload.payloadBase64url);
-  assert.equal(secondAfterPayload.payloadBase64url, secondBeforePayload.payloadBase64url);
-  assert.notEqual(firstAfterMetadata.envelope.dek.wrappedKey, firstBeforeMetadata.envelope.dek.wrappedKey);
-  assert.notEqual(secondAfterMetadata.envelope.dek.wrappedKey, secondBeforeMetadata.envelope.dek.wrappedKey);
+  );
+  assert.equal(projectionCalls, 0);
+  assert.deepEqual(config, configBefore);
+  assert.deepEqual([...kv.store.entries()], storageBefore);
 
   const readResponse = await storageRoute({
     path: '/storage/read',
     method: 'GET',
-    request: new Request(`https://worker.example/storage/read?id=${firstBody.storageRef.id}`),
+    request: new Request(`https://worker.example/storage/read?id=${body.storageRef.id}`),
     env,
     config,
     slug: 'session-a',
@@ -2868,20 +2893,6 @@ test('rotateStorageEnvelopeKeys rewraps keys without changing ciphertext bytes',
   });
   assert.equal(readResponse.status, 200);
   assert.equal(await readResponse.text(), 'classified payload');
-
-  const secondReadResponse = await storageRoute({
-    path: '/storage/read',
-    method: 'GET',
-    request: new Request(`https://worker.example/storage/read?id=${secondBody.storageRef.id}`),
-    env,
-    config,
-    slug: 'session-a',
-    uploaderAddress: '',
-    baseHeaders: {},
-    deps: { json, randomUUID: () => 'audit-rotation-read-2' },
-  });
-  assert.equal(secondReadResponse.status, 200);
-  assert.equal(await secondReadResponse.text(), 'second classified payload');
 });
 
 test('rewrapStorageEnvelopeSessionKeyForDeployment changes no ciphertext bytes and retires the old KEK', async () => {
