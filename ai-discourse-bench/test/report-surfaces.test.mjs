@@ -44,6 +44,9 @@ test('report preserves raw atlas and risk-matrix material', async () => {
   assert.match(html, /data-ce-atlas-issue-template/);
   assert.match(html, /data-ce-atlas-issue-modal hidden role="dialog" aria-modal="true"/);
   assert.match(html, /Measured view\.<\/strong> Add a provenance-bound second-pass analysis overlay/);
+  assert.doesNotMatch(html, /benchmark statements? map this issue area/);
+  assert.match(html, /data-ce-atlas-question-distribution/);
+  assert.match(html, /data-ce-atlas-question-vote-bar/);
   assert.match(html, /function updateAtlasBrowse\(\)/);
   assert.match(html, /function computeAtlasBrowseSlots\(nodes\)/);
   assert.match(html, /var useOriginalLayout = !selectedTag && sortMode === 'atlas';/);
@@ -312,6 +315,10 @@ test('All Questions gives each model one averaged vote and preserves invalid raw
   assert.equal(report.polisReport.byQuestion[question.id].runSummary.total, 2);
   assert.equal(report.polisReport.byQuestion[question.id].runSummary.invalid, 1);
   assert.match(html, /<strong>Agree:<\/strong> 1 \/\s*<strong>Disagree:<\/strong> 0 \/\s*<strong>Unsure:<\/strong> 0 \/\s*\(Total: 1\)/);
+  assert.match(html, /data-ce-atlas-question-distribution aria-label="Model vote distribution: Agree 1, Unsure 0, Disagree 0"/);
+  assert.match(html, /data-ce-atlas-question-vote-count="Agree"><i class="aidb-answer-agree"><\/i><span>Agree<\/span><strong>1<\/strong>/);
+  assert.match(html, /data-ce-atlas-question-vote-count="Unsure"><i class="aidb-answer-unsure"><\/i><span>Unsure<\/span><strong>0<\/strong>/);
+  assert.match(html, /data-ce-atlas-question-vote-count="Disagree"><i class="aidb-answer-disagree"><\/i><span>Disagree<\/span><strong>0<\/strong>/);
 });
 
 test('Summary stats count only concrete agree and disagree votes like live Polis', async () => {

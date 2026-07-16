@@ -386,7 +386,10 @@ OnePageSession Results surface.
 
 Topic bubbles and Top Debates rows open one client-style modal with a dark
 backdrop, a copyable deep link, clickable tags, benchmark metrics, collapsible
-analysis, and linked question rows. The modal closes from its close control,
+analysis, and linked question rows. Each question row shows the participant-level
+Agree, Unsure, and Disagree counts with a stacked model-vote bar, preserving the
+one-model-one-vote report aggregation even when models have different repeat
+counts. The modal closes from its close control,
 backdrop, or Escape key, traps keyboard focus while open, restores focus on
 close, and uses the live floating close control on narrow screens. Tag filtering
 and sort controls deterministically re-pack visible topics so differently sized

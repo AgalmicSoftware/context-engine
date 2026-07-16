@@ -440,7 +440,9 @@ List remain live-session interactions.
 Circles and Top Debates entries open the same backdrop modal used for issue
 analysis. Its header, tags, collapsible sections, close behavior, narrow-screen
 floating close control, and question rows follow the live DebateMap modal
-vocabulary. Tag and sort controls re-pack the visible circles, and stable
+vocabulary. Each linked question includes a participant-weighted Agree, Unsure,
+and Disagree count plus a stacked model-vote bar; repeated runs do not give one
+model extra weight. Tag and sort controls re-pack the visible circles, and stable
 `#debate-atlas-<topic-id>` hashes reopen the matching modal.
 Breakdown uses the live DemoAnalysis-style order: a Compare Demographics
 selector adapted to model traits, comparison suggestions beside a

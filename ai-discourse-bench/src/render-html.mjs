@@ -689,6 +689,14 @@ const normalizeAnalysisIssueAreas = (report, topics = normalizeAnalysisTopicCirc
       const summary = byQuestion[questionId] || {};
       return {
         ...question,
+        voteSummary: {
+          counts: {
+            Agree: Number(summary.counts?.Agree || 0),
+            Unsure: Number(summary.counts?.Unsure || 0),
+            Disagree: Number(summary.counts?.Disagree || 0),
+          },
+          invalid: Number(summary.invalid || 0),
+        },
         modelDifference: questionModelDifference(report, questionId),
         winningResponseConsistency: Number.isFinite(summary.winningResponseConsistency?.rate)
           ? summary.winningResponseConsistency.rate
@@ -714,11 +722,10 @@ const normalizeAnalysisIssueAreas = (report, topics = normalizeAnalysisTopicCirc
       linkedQuestions.map((question) => question.winningResponseConsistency),
     );
     const title = String(overlay?.title || topic.label || topic.id || `Issue Area ${index + 1}`).trim();
-    const measuredSummary = `${linkedQuestions.length} benchmark statement${linkedQuestions.length === 1 ? '' : 's'} map this issue area. The available model responses show ${scoreLabel({ meanScore: topic.averageStance })} on average (mean ${formatScore(topic.averageStance)})${Number.isFinite(averageModelDifference) ? `, with mean model-to-model difference ${formatScore(averageModelDifference)}` : ''}.`;
     return {
       ...topic,
       title,
-      summary: String(overlay?.summary || topic.summary || measuredSummary).trim(),
+      summary: String(overlay?.summary || topic.summary || '').trim(),
       tags,
       linkedQuestionIds,
       linkedQuestions,
@@ -2656,6 +2663,28 @@ const renderAtlasIssueQuestionLinks = (questionIds) => {
   </div>`;
 };
 
+const renderAtlasQuestionDistribution = (summary = {}) => {
+  const { agree, unsure, disagree, invalid } = answerTotals(summary);
+  const total = agree + unsure + disagree + invalid;
+  const widthTotal = Math.max(1, total);
+  const entries = [
+    { label: 'Agree', count: agree, className: 'aidb-answer-agree' },
+    { label: 'Unsure', count: unsure, className: 'aidb-answer-unsure' },
+    { label: 'Disagree', count: disagree, className: 'aidb-answer-disagree' },
+    ...(invalid > 0 ? [{ label: 'Invalid', count: invalid, className: 'aidb-answer-invalid' }] : []),
+  ];
+  const ariaLabel = `Model vote distribution: ${entries.map((entry) => `${entry.label} ${entry.count}`).join(', ')}`;
+  return `<div class="atlasIssueQuestionDistribution" data-ce-atlas-question-distribution aria-label="${escapeHtml(ariaLabel)}">
+    <div class="atlasIssueQuestionBar" data-ce-atlas-question-vote-bar aria-hidden="true">
+      ${entries.map((entry) => `<i class="${escapeHtml(entry.className)}" style="width:${escapeHtml(((entry.count / widthTotal) * 100).toFixed(2))}%" title="${escapeHtml(`${entry.label}: ${entry.count} (${formatPercent(entry.count / widthTotal)})`)}"></i>`).join('')}
+    </div>
+    <div class="atlasIssueQuestionVoteLegend">
+      ${entries.map((entry) => `<span class="atlasIssueQuestionVoteItem" data-ce-atlas-question-vote-count="${escapeHtml(entry.label)}"><i class="${escapeHtml(entry.className)}"></i><span>${escapeHtml(entry.label)}</span><strong>${escapeHtml(entry.count)}</strong></span>`).join('')}
+      <span class="atlasIssueQuestionVoteTotal">${escapeHtml(total)} model vote${total === 1 ? '' : 's'}</span>
+    </div>
+  </div>`;
+};
+
 const renderAtlasIssueTemplate = (issueArea, index) => {
   const depthClass = ['depth0', 'depth1', 'depth2'][index % 3];
   const findingGroups = [
@@ -2701,6 +2730,7 @@ const renderAtlasIssueTemplate = (issueArea, index) => {
     return `<a class="atlasIssueQuestion" href="#question-${escapeHtml(question.id)}" data-ce-atlas-question-link>
       <span class="atlasIssueQuestionId">${escapeHtml(question.id)}</span>
       <strong>${escapeHtml(question.prompt || question.id)}</strong>
+      ${renderAtlasQuestionDistribution(question.voteSummary)}
       <span class="atlasIssueQuestionMeta">Model difference ${escapeHtml(difference)} | Repeat consistency ${escapeHtml(consistency)}</span>
     </a>`;
   }).join('');
@@ -2725,7 +2755,7 @@ const renderAtlasIssueTemplate = (issueArea, index) => {
       ${issueArea.confidence ? `<span class="atlasIssueTag atlasIssueConfidence">AI confidence: ${escapeHtml(issueArea.confidence)}</span>` : ''}
     </div>
     <div class="atlasIssueOverview">
-      <p>${escapeHtml(issueArea.summary)}</p>
+      ${issueArea.summary ? `<p class="atlasIssueSummary">${escapeHtml(issueArea.summary)}</p>` : ''}
       <div class="atlasIssueMetricGrid" aria-label="Issue area benchmark metrics">
         <div><span>Questions</span><strong>${escapeHtml(issueArea.linkedQuestions.length)}</strong></div>
         <div><span>Mean stance</span><strong>${escapeHtml(formatScore(issueArea.averageStance))}</strong><small>${escapeHtml(scoreLabel({ meanScore: issueArea.averageStance }))}</small></div>
@@ -3682,7 +3712,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .atlasIssueDepthTag.depth1 { background: #2dd4bf; box-shadow: 0 0 10px rgba(45, 212, 191, 0.3); }
     .atlasIssueDepthTag.depth2 { background: #4ade80; box-shadow: 0 0 10px rgba(74, 222, 128, 0.3); }
     .atlasIssueOverview { margin-bottom: 16px; }
-    .atlasIssueOverview > p:first-child { margin: 0 0 18px; color: rgba(226, 232, 240, 0.9); font-family: var(--ce-font-body); font-size: 1rem; line-height: 1.65; }
+    .atlasIssueSummary { margin: 0 0 18px; color: rgba(226, 232, 240, 0.9); font-family: var(--ce-font-body); font-size: 1rem; line-height: 1.65; }
     .atlasIssueMetricGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 16px; border-top: 1px solid rgba(255, 255, 255, 0.08); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
     .atlasIssueMetricGrid > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 13px 12px; border-right: 1px solid rgba(255, 255, 255, 0.08); }
     .atlasIssueMetricGrid > div:last-child { border-right: 0; }
@@ -3719,6 +3749,14 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .atlasIssueQuestion:focus-visible { border-color: rgba(56, 189, 248, 0.42); background: rgba(56, 189, 248, 0.08); outline: none; }
     .atlasIssueQuestionId { color: #38bdf8; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; }
     .atlasIssueQuestion strong { color: rgba(241, 245, 249, 0.96); font-family: var(--ce-font-body); font-size: 0.9rem; line-height: 1.4; }
+    .atlasIssueQuestionDistribution { display: grid; gap: 7px; margin-top: 4px; }
+    .atlasIssueQuestionBar { display: flex; width: 100%; height: 10px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: var(--ce-radius-pill); background: rgba(148, 163, 184, 0.12); }
+    .atlasIssueQuestionBar i { display: block; height: 100%; }
+    .atlasIssueQuestionVoteLegend { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; color: #94a3b8; font-size: 0.7rem; line-height: 1.2; }
+    .atlasIssueQuestionVoteItem { display: inline-flex; align-items: center; gap: 5px; }
+    .atlasIssueQuestionVoteItem > i { width: 8px; height: 8px; flex: 0 0 auto; border-radius: var(--ce-radius-round); }
+    .atlasIssueQuestionVoteItem strong { color: #e2e8f0; font-family: var(--ce-font-mono); font-size: 0.72rem; }
+    .atlasIssueQuestionVoteTotal { margin-left: auto; color: #64748b; white-space: nowrap; }
     .atlasIssueQuestionMeta { color: #64748b; font-size: 0.7rem; line-height: 1.35; }
     .atlasIssueEmpty { color: #94a3b8; font-family: var(--ce-font-body); }
     .debateMap .collapseSection { margin-bottom: 12px; background: transparent; border-radius: var(--ce-radius-6); }
