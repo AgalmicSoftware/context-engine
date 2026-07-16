@@ -2739,7 +2739,7 @@ const renderAtlasIssueTemplate = (issueArea, index) => {
     title: 'Questions',
     count: issueArea.linkedQuestions.length,
     content: `<div class="atlasIssueQuestions">${questions || '<p class="atlasIssueEmpty">No linked benchmark questions.</p>'}</div>`,
-    open: false,
+    open: true,
   });
   const sourceLabel = issueArea.hasGeneratedAnalysis ? 'Second-pass AI analysis' : 'Measured benchmark evidence';
   const modalMeta = `${issueArea.linkedQuestions.length} question${issueArea.linkedQuestions.length === 1 ? '' : 's'} | ${sourceLabel}`;
@@ -2762,7 +2762,6 @@ const renderAtlasIssueTemplate = (issueArea, index) => {
         <div><span>Model difference</span><strong>${escapeHtml(Number.isFinite(issueArea.averageModelDifference) ? formatScore(issueArea.averageModelDifference) : 'N/A')}</strong><small>mean spread</small></div>
         <div><span>Repeat consistency</span><strong>${escapeHtml(Number.isFinite(issueArea.averageWinningResponseConsistency) ? formatPercent(issueArea.averageWinningResponseConsistency) : 'N/A')}</strong><small>winning response share</small></div>
       </div>
-      ${issueArea.hasGeneratedAnalysis ? '' : '<p class="atlasIssueAnalysisNotice"><strong>Measured view.</strong> Add a provenance-bound second-pass analysis overlay for generated tensions, implications, and freeform sections.</p>'}
     </div>
     ${findings}
     ${freeformSections}
@@ -3719,7 +3718,6 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .atlasIssueMetricGrid span { color: rgba(148, 163, 184, 0.86); font-size: 0.66rem; font-weight: 700; text-transform: uppercase; }
     .atlasIssueMetricGrid strong { color: #f8fafc; font-size: 1.15rem; line-height: 1.15; }
     .atlasIssueMetricGrid small { color: #64748b; font-size: 0.68rem; line-height: 1.2; }
-    .atlasIssueAnalysisNotice { margin: 0; padding: 10px 0 0; border-left: 2px solid rgba(56, 189, 248, 0.65); color: #94a3b8; font-family: var(--ce-font-body); font-size: 0.84rem; line-height: 1.5; padding-left: 12px; }
     .atlasIssueCollapse { margin-bottom: 12px; background: transparent; }
     .atlasIssueCollapseHeader { appearance: none; display: flex; align-items: center; width: 100%; margin: 0 0 8px; padding: 8px 0; border: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; user-select: none; }
     .atlasIssueCollapseHeader:hover,

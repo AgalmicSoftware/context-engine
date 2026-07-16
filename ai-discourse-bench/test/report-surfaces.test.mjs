@@ -43,10 +43,12 @@ test('report preserves raw atlas and risk-matrix material', async () => {
   assert.match(html, /data-ce-atlas-sort/);
   assert.match(html, /data-ce-atlas-issue-template/);
   assert.match(html, /data-ce-atlas-issue-modal hidden role="dialog" aria-modal="true"/);
-  assert.match(html, /Measured view\.<\/strong> Add a provenance-bound second-pass analysis overlay/);
+  assert.doesNotMatch(html, /Measured view\.|atlasIssueAnalysisNotice/);
   assert.doesNotMatch(html, /benchmark statements? map this issue area/);
   assert.match(html, /data-ce-atlas-question-distribution/);
   assert.match(html, /data-ce-atlas-question-vote-bar/);
+  assert.match(html, /aria-expanded="true"\s+aria-controls="ce-atlas-modal-ai-rd-automation-questions-body"/);
+  assert.match(html, /id="ce-atlas-modal-ai-rd-automation-questions-body" data-ce-atlas-modal-collapse-body>/);
   assert.match(html, /function updateAtlasBrowse\(\)/);
   assert.match(html, /function computeAtlasBrowseSlots\(nodes\)/);
   assert.match(html, /var useOriginalLayout = !selectedTag && sortMode === 'atlas';/);
