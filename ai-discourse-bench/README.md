@@ -457,7 +457,11 @@ strongest available suggestion selected so the selected-question banner, country
 map, cohort distributions, and comparison report are populated immediately.
 Suggestion buttons apply pre-rendered templates so the selected statement,
 model-cohort pills, distribution rows, and comparison report update in-place
-without React. The selector action controls preserve their live pill shape on
+without React. The comparison report's similarity-and-difference spectrum uses
+the same question-level beeswarm interaction as the main report: cohort
+difference runs left to right, repeat consistency runs bottom to top, and every
+point exposes the question and response details on hover or keyboard focus.
+The selector action controls preserve their live pill shape on
 narrow viewports so button labels do not wrap into stacked text. Field-like
 selector controls use the live DemoAnalysis breakpoints: six columns at 1280px
 and wider, two columns at 980px and narrower, and one column at 640px and

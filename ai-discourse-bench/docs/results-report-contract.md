@@ -340,7 +340,13 @@ The lower comparison report should continue to follow
 `DemoAnalysis/ComparisonReport.module.scss`: comparison cards show the statement
 and group distribution candlesticks, without injecting a benchmark-only
 response-pill or score row, and they keep the live agree/unsure/disagree
-distribution gradients rather than benchmark-specific color substitutions.
+distribution gradients rather than benchmark-specific color substitutions. Its
+similarity-and-difference spectrum is a question-level beeswarm: normalized
+cohort difference occupies the horizontal axis, winning-response consistency
+pooled only across models in the selected cohorts occupies the vertical axis,
+overlapping points are
+deterministically packed, and each point links to the full question while
+sharing the main report's hover and keyboard-focus tooltip.
 Because the static report flattens CSS-module class names into global CSS,
 mobile rules copied from neighboring modules must not target
 `.comparisonReportContainer` unless the live comparison report module itself

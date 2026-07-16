@@ -1036,13 +1036,22 @@ const comparisonRowsForGroups = (report, groups, limit = 10) => getQuestions(rep
     ));
     const divergence = Math.max(...means) - Math.min(...means);
     const averageMean = means.reduce((sum, value) => sum + value, 0) / means.length;
+    const comparisonModelIds = Array.from(new Set(groupSummaries.flatMap((group) => group.ids || [])));
+    const summary = aggregateQuestionSummaryForModels(report, question.id, comparisonModelIds);
     return {
       question,
       groupSummaries,
       divergence,
       similarity: 1 - Math.min(1, Math.abs(divergence) / 2),
-      responseText: strongestAnswerForSummary(report.polisReport?.byQuestion?.[question.id] || {}),
+      responseText: strongestAnswerForSummary(summary),
       averageMean,
+      summary,
+      winningResponseConsistency: questionWinningResponseConsistency(
+        report,
+        question.id,
+        summary,
+        comparisonModelIds,
+      ),
     };
   })
   .filter(Boolean)
@@ -1061,32 +1070,140 @@ const renderComparisonAnalysisItem = (row, type) => {
   </li>`;
 };
 
+const renderInteractiveQuestionBeeswarmPoint = ({
+  question,
+  summary = {},
+  x,
+  y,
+  radius = 5,
+  spread = null,
+  extremity = null,
+  difference = null,
+  winningResponseConsistency = {},
+  hasVotes = validVoteCount(summary) > 0,
+  comparison = false,
+  differenceLabel = 'Model disagreement',
+}) => {
+  const consistencyRate = Number.isFinite(winningResponseConsistency.rate)
+    ? winningResponseConsistency.rate
+    : null;
+  const consistencyLabel = consistencyRate === null
+    ? 'repeat consistency unavailable'
+    : `${formatPercent(consistencyRate)} repeat consistency`;
+  const totals = answerTotals(summary);
+  const noRepeatData = hasVotes && consistencyRate === null;
+  const pointClassName = `beeswarmPoint${hasVotes ? '' : ' beeswarmPointNoData'}${noRepeatData ? ' beeswarmPointNoRepeat' : ''}`;
+  const circleClassName = `beeswarmCircle${hasVotes ? '' : ' beeswarmCircleNoData'}${noRepeatData ? ' beeswarmCircleNoRepeat' : ''}`;
+  const statusLabel = hasVotes ? `${validVoteCount(summary)} modeled responses` : 'No model responses yet';
+  const questionId = question.id;
+  const prompt = question.prompt || question.id;
+  const topic = question.topic || 'uncategorized';
+  return `<a
+    href="#question-${escapeHtml(questionId)}"
+    class="${escapeHtml(pointClassName)}"
+    data-ce-searchable
+    data-ce-beeswarm-point
+    ${comparison ? 'data-ce-comparison-beeswarm-point' : ''}
+    data-question-id="${escapeHtml(questionId)}"
+    data-question-prompt="${escapeHtml(prompt)}"
+    data-question-topic="${escapeHtml(topic)}"
+    data-question-has-votes="${hasVotes ? 'true' : 'false'}"
+    data-question-status="${escapeHtml(statusLabel)}"
+    data-question-agree="${escapeHtml(totals.agree)}"
+    data-question-disagree="${escapeHtml(totals.disagree)}"
+    data-question-unsure="${escapeHtml(totals.unsure)}"
+    data-question-invalid="${escapeHtml(totals.invalid)}"
+    data-question-mean="${escapeHtml(formatScore(summary.meanScore))}"
+    data-question-spread="${escapeHtml(formatScore(spread))}"
+    data-question-extremity="${escapeHtml(formatScore(extremity))}"
+    data-question-difference="${escapeHtml(formatScore(difference))}"
+    data-question-difference-label="${escapeHtml(differenceLabel)}"
+    data-question-votes="${escapeHtml(validVoteCount(summary))}"
+    data-question-winning-response-consistency="${escapeHtml(formatScore(consistencyRate))}"
+    data-question-winning-responses="${escapeHtml(winningResponseConsistency.winningResponses || 0)}"
+    data-question-attempted-runs="${escapeHtml(winningResponseConsistency.attemptedRuns || 0)}"
+    data-question-contributing-models="${escapeHtml(winningResponseConsistency.contributingModels || 0)}"
+    aria-label="${escapeHtml(`${questionId}: ${prompt} (${statusLabel}; ${consistencyLabel})`)}"
+  >
+    <circle class="${escapeHtml(circleClassName)}" cx="${escapeHtml(x)}" cy="${escapeHtml(y)}" r="${escapeHtml(radius)}" />
+    <title>${escapeHtml(`${questionId}: ${prompt} (${statusLabel}; ${consistencyLabel})`)}</title>
+  </a>`;
+};
+
 const renderComparisonBeeswarm = (rows = []) => {
   if (!rows.length) {
     return '<p class="noData">No data available to generate a beeswarm plot for the current filter.</p>';
   }
   const width = 700;
-  const height = 220;
-  const circles = rows.map((row, index) => {
-    const x = 20 + (Math.min(1, Math.max(0, row.divergence / 2)) * (width - 40));
-    const lane = index % 4;
-    const y = 44 + (lane * 30) + (Math.floor(index / 4) * 6);
-    return `<circle
-      cx="${escapeHtml(x.toFixed(2))}"
-      cy="${escapeHtml(y.toFixed(2))}"
-      r="5"
-      class="beeswarmCircle"
-    >
-      <title>${escapeHtml(`${row.question.prompt || row.question.id} (${row.divergence.toFixed(2)} difference)`)}</title>
-    </circle>`;
+  const height = 250;
+  const plotLeft = 62;
+  const plotRight = width - 20;
+  const plotTop = 24;
+  const plotBottom = 190;
+  const points = rows.map((row) => ({
+    ...row,
+    id: row.question.id,
+    xMetric: clamp(row.divergence / 2, 0, 1),
+    yMetric: Number.isFinite(row.winningResponseConsistency?.rate)
+      ? clamp(row.winningResponseConsistency.rate, 0, 1)
+      : null,
+    radius: rows.length > 100 ? 3 : 5,
+  }));
+  const positionById = packBeeswarmPositions(points, {
+    plotLeft,
+    plotRight,
+    plotTop,
+    plotBottom,
+    seedPrefix: 'comparison-swarm',
+    getXMetric: (point) => point.xMetric,
+    getYMetric: (point) => point.yMetric,
+  });
+  const yTicks = [1, 0.75, 0.5, 0.25, 0];
+  const yGrid = yTicks.map((rate) => {
+    const y = plotBottom - rate * (plotBottom - plotTop);
+    return `<g class="beeswarmGridTick" aria-hidden="true">
+      <line class="beeswarmGridLine" x1="${plotLeft}" y1="${y}" x2="${plotRight}" y2="${y}" />
+      <text class="beeswarmTickLabel" x="${plotLeft - 8}" y="${y + 4}" text-anchor="end">${Math.round(rate * 100)}%</text>
+    </g>`;
   }).join('');
-  return `<div class="swarmLayoutContainer">
-    <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" class="beeswarmSvg comparisonBeeswarmSvg" role="img" aria-label="Similarity and difference spectrum">
-      <line x1="20" y1="176" x2="${width - 20}" y2="176" stroke="#aaa"></line>
-      <text x="20" y="206" font-size="12" fill="#555" text-anchor="start">More Similarity</text>
-      <text x="${width - 20}" y="206" font-size="12" fill="#555" text-anchor="end">More Difference</text>
-      ${circles}
-    </svg>
+  const circles = points.map((point, index) => {
+    const position = positionById.get(point.id);
+    const x = position
+      ? position.x
+      : plotLeft + point.xMetric * (plotRight - plotLeft);
+    const y = position
+      ? position.y
+      : clamp(plotBottom + 8 + ((index % 3) * 5), plotBottom + 5, height - 34);
+    return renderInteractiveQuestionBeeswarmPoint({
+      question: point.question,
+      summary: point.summary,
+      x,
+      y,
+      radius: point.radius,
+      spread: point.divergence,
+      extremity: Math.abs(point.averageMean),
+      difference: point.xMetric,
+      winningResponseConsistency: point.winningResponseConsistency,
+      comparison: true,
+      differenceLabel: 'Cohort difference',
+    });
+  }).join('');
+  return `<div class="swarmLayoutContainer" data-ce-comparison-beeswarm>
+    <div class="swarmContainer" data-ce-beeswarm-scroll-viewport>
+      <svg width="${width}" height="${height}" class="beeswarmSvg comparisonBeeswarmSvg" role="img" aria-label="Questions by model-cohort difference and repeat consistency">
+        ${yGrid}
+        <line class="beeswarmAxisLine" x1="${plotLeft}" y1="${plotTop}" x2="${plotLeft}" y2="${plotBottom}" />
+        <line class="beeswarmAxisLine" x1="${plotLeft}" y1="${plotBottom}" x2="${plotRight}" y2="${plotBottom}" />
+        <text class="beeswarmAxisTitle" x="14" y="${(plotTop + plotBottom) / 2}" transform="rotate(-90 14 ${(plotTop + plotBottom) / 2})" text-anchor="middle">Repeat consistency</text>
+        <text class="beeswarmAxisLabel" x="${plotLeft}" y="232">Similarity</text>
+        <text class="beeswarmAxisLabel" x="${plotRight}" y="232" text-anchor="end">Difference</text>
+        ${circles}
+      </svg>
+    </div>
+    <div class="swarmScrollControls" data-ce-beeswarm-scroll-controls hidden>
+      <button type="button" class="scrollButton" data-ce-beeswarm-scroll="left" title="Scroll to Start" aria-label="Scroll comparison spectrum to start">${renderFontAwesomeIcon('chevron-left')}</button>
+      <button type="button" class="scrollButton" data-ce-beeswarm-scroll="right" title="Scroll to End" aria-label="Scroll comparison spectrum to end">${renderFontAwesomeIcon('chevron-right')}</button>
+    </div>
   </div>`;
 };
 
@@ -1162,6 +1279,59 @@ const hashNumber = (value) => {
   return (hash >>> 0) / 4294967295;
 };
 
+const packBeeswarmPositions = (points, {
+  plotLeft,
+  plotRight,
+  plotTop,
+  plotBottom,
+  seedPrefix = 'swarm',
+  getXMetric = (point) => point.xMetric,
+  getYMetric = (point) => point.yMetric,
+}) => {
+  const occupiedPositions = [];
+  const positionById = new Map();
+  points.filter((point) => (
+    Number.isFinite(getXMetric(point)) && Number.isFinite(getYMetric(point))
+  )).forEach((point) => {
+    const targetX = plotLeft + getXMetric(point) * (plotRight - plotLeft);
+    const targetY = plotBottom - getYMetric(point) * (plotBottom - plotTop);
+    const radius = Number(point.radius || 5);
+    const step = radius * 2 + 1;
+    const xDirection = hashNumber(`${point.id}:${seedPrefix}-x-direction`) >= 0.5 ? 1 : -1;
+    const yDirection = hashNumber(`${point.id}:${seedPrefix}-y-direction`) >= 0.5 ? 1 : -1;
+    const xOffsets = [0];
+    const yOffsets = [0];
+    for (let index = 1; index <= 20; index += 1) {
+      xOffsets.push(xDirection * index * step, -xDirection * index * step);
+    }
+    for (let index = 1; index <= 10; index += 1) {
+      yOffsets.push(yDirection * index * step, -yDirection * index * step);
+    }
+    let position = null;
+    for (const yOffset of yOffsets) {
+      for (const xOffset of xOffsets) {
+        const candidate = { x: targetX + xOffset, y: targetY + yOffset, radius };
+        if (candidate.x < plotLeft || candidate.x > plotRight || candidate.y < plotTop || candidate.y > plotBottom) continue;
+        const hasCollision = occupiedPositions.some((occupied) => {
+          const minimumDistance = occupied.radius + candidate.radius + 1;
+          const xDistance = occupied.x - candidate.x;
+          const yDistance = occupied.y - candidate.y;
+          return xDistance * xDistance + yDistance * yDistance < minimumDistance * minimumDistance;
+        });
+        if (!hasCollision) {
+          position = candidate;
+          break;
+        }
+      }
+      if (position) break;
+    }
+    const finalPosition = position || { x: targetX, y: targetY, radius };
+    occupiedPositions.push(finalPosition);
+    positionById.set(point.id, finalPosition);
+  });
+  return positionById;
+};
+
 const hashSeed = (value) => {
   const text = String(value || '');
   let hash = 2166136261 >>> 0;
@@ -1234,9 +1404,10 @@ const normalizeSeries = (values, minOut, maxOut, fallback = (minOut + maxOut) / 
   ));
 };
 
-const questionWinningResponseConsistency = (report, questionId, summary = {}) => {
+const questionWinningResponseConsistency = (report, questionId, summary = {}, modelIds = null) => {
   const declared = summary.winningResponseConsistency;
-  if (Number.isFinite(declared?.rate)) {
+  const hasModelScope = Array.isArray(modelIds);
+  if (!hasModelScope && Number.isFinite(declared?.rate)) {
     return {
       method: declared.method || 'pooled-within-model-modal-share',
       rate: clamp(Number(declared.rate), 0, 1),
@@ -1251,7 +1422,11 @@ const questionWinningResponseConsistency = (report, questionId, summary = {}) =>
   let attemptedRuns = 0;
   let validRuns = 0;
   let contributingModels = 0;
-  Object.values(report.polisReport?.byModelQuestion || {}).forEach((questionsById) => {
+  const byModelQuestion = report.polisReport?.byModelQuestion || {};
+  const questionsByModel = hasModelScope
+    ? Array.from(new Set(modelIds)).map((modelId) => byModelQuestion[modelId])
+    : Object.values(byModelQuestion);
+  questionsByModel.forEach((questionsById) => {
     const cell = questionsById?.[questionId];
     if (!cell) return;
     const counts = [
@@ -1331,50 +1506,17 @@ const renderBeeswarmChart = (report) => {
       <text class="beeswarmTickLabel" x="${plotLeft - 8}" y="${y + 4}" text-anchor="end">${Math.round(rate * 100)}%</text>
     </g>`;
   }).join('');
-  const occupiedPositions = [];
-  const answeredPositionById = new Map();
-  points.filter((point) => (
-    point.hasVotes && Number.isFinite(point.winningResponseConsistency?.rate)
-  )).forEach((point) => {
-    const targetX = plotLeft + point.xMetric * (plotRight - plotLeft);
-    const targetY = plotBottom - point.winningResponseConsistency.rate * (plotBottom - plotTop);
-    const step = point.radius * 2 + 1;
-    const xDirection = hashNumber(`${point.id}:swarm-x-direction`) >= 0.5 ? 1 : -1;
-    const yDirection = hashNumber(`${point.id}:swarm-y-direction`) >= 0.5 ? 1 : -1;
-    const xOffsets = [0];
-    const yOffsets = [0];
-    for (let index = 1; index <= 20; index += 1) {
-      xOffsets.push(xDirection * index * step, -xDirection * index * step);
-    }
-    for (let index = 1; index <= 10; index += 1) {
-      yOffsets.push(yDirection * index * step, -yDirection * index * step);
-    }
-    let position = null;
-    for (const yOffset of yOffsets) {
-      for (const xOffset of xOffsets) {
-        const candidate = { x: targetX + xOffset, y: targetY + yOffset, radius: point.radius };
-        if (candidate.x < plotLeft || candidate.x > plotRight || candidate.y < plotTop || candidate.y > plotBottom) continue;
-        const hasCollision = occupiedPositions.some((occupied) => {
-          const minimumDistance = occupied.radius + candidate.radius + 1;
-          const xDistance = occupied.x - candidate.x;
-          const yDistance = occupied.y - candidate.y;
-          return xDistance * xDistance + yDistance * yDistance < minimumDistance * minimumDistance;
-        });
-        if (!hasCollision) {
-          position = candidate;
-          break;
-        }
-      }
-      if (position) break;
-    }
-    const finalPosition = position || { x: targetX, y: targetY, radius: point.radius };
-    occupiedPositions.push(finalPosition);
-    answeredPositionById.set(point.id, finalPosition);
+  const answeredPositionById = packBeeswarmPositions(points.filter((point) => point.hasVotes), {
+    plotLeft,
+    plotRight,
+    plotTop,
+    plotBottom,
+    seedPrefix: 'swarm',
+    getXMetric: (point) => point.xMetric,
+    getYMetric: (point) => point.winningResponseConsistency?.rate,
   });
   const circles = points.map((point, index) => {
     const consistency = point.winningResponseConsistency || {};
-    const consistencyRate = Number.isFinite(consistency.rate) ? consistency.rate : null;
-    const consistencyLabel = consistencyRate === null ? 'repeat consistency unavailable' : `${formatPercent(consistencyRate)} repeat consistency`;
     const answeredPosition = answeredPositionById.get(point.id);
     const x = point.hasVotes && answeredPosition
       ? answeredPosition.x
@@ -1382,38 +1524,18 @@ const renderBeeswarmChart = (report) => {
     const y = point.hasVotes && answeredPosition
       ? answeredPosition.y
       : clamp(plotBottom + 9 + (Math.floor(index / 10) * 2) + (point.noDataJitter * 4), plotBottom + 5, height - 34);
-    const totals = answerTotals(point.summary);
-    const pointClassName = `beeswarmPoint${point.hasVotes ? '' : ' beeswarmPointNoData'}`;
-    const circleClassName = `beeswarmCircle${point.hasVotes ? '' : ' beeswarmCircleNoData'}`;
-    const statusLabel = point.hasVotes ? `${validVoteCount(point.summary)} modeled responses` : 'No model responses yet';
-    return `<a
-      href="#question-${escapeHtml(point.id)}"
-      class="${escapeHtml(pointClassName)}"
-      data-ce-searchable
-      data-ce-beeswarm-point
-      data-question-id="${escapeHtml(point.id)}"
-      data-question-prompt="${escapeHtml(point.prompt)}"
-      data-question-topic="${escapeHtml(point.topic)}"
-      data-question-has-votes="${point.hasVotes ? 'true' : 'false'}"
-      data-question-status="${escapeHtml(statusLabel)}"
-      data-question-agree="${escapeHtml(totals.agree)}"
-      data-question-disagree="${escapeHtml(totals.disagree)}"
-      data-question-unsure="${escapeHtml(totals.unsure)}"
-      data-question-invalid="${escapeHtml(totals.invalid)}"
-      data-question-mean="${escapeHtml(formatScore(point.summary.meanScore))}"
-      data-question-spread="${escapeHtml(formatScore(point.spread))}"
-      data-question-extremity="${escapeHtml(formatScore(point.extremity))}"
-      data-question-difference="${escapeHtml(formatScore(point.difference))}"
-      data-question-votes="${escapeHtml(validVoteCount(point.summary))}"
-      data-question-winning-response-consistency="${escapeHtml(formatScore(consistencyRate))}"
-      data-question-winning-responses="${escapeHtml(consistency.winningResponses || 0)}"
-      data-question-attempted-runs="${escapeHtml(consistency.attemptedRuns || 0)}"
-      data-question-contributing-models="${escapeHtml(consistency.contributingModels || 0)}"
-      aria-label="${escapeHtml(`${point.id}: ${point.prompt} (${statusLabel}; ${consistencyLabel})`)}"
-    >
-      <circle class="${escapeHtml(circleClassName)}" cx="${x}" cy="${y}" r="${point.radius}" />
-      <title>${escapeHtml(`${point.id}: ${point.prompt} (${statusLabel}; ${consistencyLabel})`)}</title>
-    </a>`;
+    return renderInteractiveQuestionBeeswarmPoint({
+      question: point,
+      summary: point.summary,
+      x,
+      y,
+      radius: point.radius,
+      spread: point.spread,
+      extremity: point.extremity,
+      difference: point.difference,
+      winningResponseConsistency: consistency,
+      hasVotes: point.hasVotes,
+    });
   }).join('');
   return `<div class="swarmLayoutContainer">
     <div class="swarmContainer" data-ce-beeswarm-scroll-viewport>
@@ -3641,7 +3763,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .analysisWandIcon { width: 1em; height: 1em; display: inline-block; overflow: visible; vertical-align: -0.125em; flex: 0 0 auto; }
     .analyzeClustersBtn:disabled { opacity: 0.7; cursor: not-allowed; }
     .swarmLayoutContainer { width: 100%; max-width: 100%; min-width: 0; flex: 1 1 100%; box-sizing: border-box; }
-    .swarmContainer { position: relative; }
+    .swarmContainer { position: relative; overflow-x: auto; overflow-y: hidden; }
     .swarmScrollControls { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 5px; }
     .swarmScrollControls[hidden] { display: none !important; }
     .scrollButton { background: #f0f0f0; border: 1px solid var(--ce-color-border-light); border-radius: var(--ce-radius-round); width: 30px; height: 30px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s; }
@@ -3657,6 +3779,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .beeswarmPoint { cursor: pointer; outline: none; }
     .beeswarmCircle { fill: steelblue; }
     .beeswarmCircleNoData { fill: #cbd5e1; opacity: 0.42; stroke: #94a3b8; stroke-width: 1; }
+    .beeswarmCircleNoRepeat { fill: #94a3b8; opacity: 0.62; stroke: #64748b; stroke-width: 1; }
     .beeswarmPointNoData:hover .beeswarmCircleNoData,
     .beeswarmPointNoData:focus-visible .beeswarmCircleNoData { opacity: 0.78; }
     .beeswarmCircleHover { fill: #ff9900; }
@@ -4031,7 +4154,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .comparisonReportSectionCollapse .sectionHeaderRow:hover { background-color: var(--ce-color-surface-light, #f8f9fa); }
     .comparisonReportSectionCollapse .sectionTitle { margin: 0; font-size: 1.1rem; font-weight: 500; color: var(--ce-color-dark, #212529); line-height: 1.2; }
     .comparisonReportSectionCollapse .sectionTitle svg { margin-right: 10px; width: 1em; height: 1em; display: inline-block; overflow: visible; vertical-align: -0.125em; }
-    .comparisonBeeswarmSvg { width: 100%; min-width: 0; }
+    .comparisonBeeswarmSvg { width: 700px; min-width: 700px; max-width: none; }
     .comparisonReportContainer .beeswarmCircle { fill: steelblue; transition: fill 0.2s ease-in-out, filter 0.2s ease-in-out; cursor: pointer; }
     .comparisonReportContainer .beeswarmCircle:hover { fill: #ff9900; filter: brightness(1.2); }
     .comparisonReportContainer .analysisListItem { padding: 1rem 1.25rem; justify-content: space-between; }
@@ -4511,9 +4634,6 @@ export const renderHtmlReport = (report) => `<!doctype html>
       var resultsToggle = document.querySelector('[data-ce-results-toggle]');
       var resultsTooltip = document.querySelector('[data-ce-results-tooltip]');
       var beeswarmTooltip = document.querySelector('[data-ce-beeswarm-tooltip]');
-      var beeswarmViewport = document.querySelector('[data-ce-beeswarm-scroll-viewport]');
-      var beeswarmScrollControls = document.querySelector('[data-ce-beeswarm-scroll-controls]');
-      var beeswarmScrollButtons = Array.from(document.querySelectorAll('[data-ce-beeswarm-scroll]'));
       var participantClusterPayloadEl = document.getElementById('ce-ai-discourse-bench-participant-clusters');
       var participantGraph = document.querySelector('[data-ce-participant-graph]');
       var clusterCountInput = document.querySelector('[data-ce-cluster-count-input]');
@@ -5114,6 +5234,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
         var consistencyLabel = Number.isFinite(consistencyRate)
           ? String(Math.round(consistencyRate * 100)) + '%'
           : 'Unavailable';
+        var differenceLabel = point.dataset.questionDifferenceLabel || 'Model disagreement';
         var consistencyDetail = attemptedRuns > 0
           ? ' (' + String(winningResponses) + ' of ' + String(attemptedRuns) + ' attempted runs)'
           : '';
@@ -5123,7 +5244,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
             '<strong>Disagree:</strong> ' + escapeText(point.dataset.questionDisagree) + ', ' +
             '<strong>Unsure:</strong> ' + escapeText(point.dataset.questionUnsure) + '</div>',
           '<div style="font-size: 0.85rem; margin-bottom: 6px;"><strong>Mean:</strong> ' + escapeText(point.dataset.questionMean) + ', ' +
-            '<strong>Model disagreement:</strong> ' + escapeText(point.dataset.questionDifference) + '</div>',
+            '<strong>' + escapeText(differenceLabel) + ':</strong> ' + escapeText(point.dataset.questionDifference) + '</div>',
           point.dataset.questionHasVotes === 'false'
             ? ''
             : '<div style="font-size: 0.85rem; margin-bottom: 6px;"><strong>Winning-response consistency:</strong> ' + escapeText(consistencyLabel + consistencyDetail) + '</div>',
@@ -5180,8 +5301,11 @@ export const renderHtmlReport = (report) => `<!doctype html>
         beeswarmTooltip.hidden = false;
       }
       function updateBeeswarmScrollControls() {
-        if (!beeswarmViewport || !beeswarmScrollControls) return;
-        beeswarmScrollControls.hidden = beeswarmViewport.scrollWidth <= beeswarmViewport.clientWidth + 2;
+        document.querySelectorAll('[data-ce-beeswarm-scroll-controls]').forEach(function (controls) {
+          var layout = controls.closest ? controls.closest('.swarmLayoutContainer') : null;
+          var viewport = layout ? layout.querySelector('[data-ce-beeswarm-scroll-viewport]') : null;
+          controls.hidden = !viewport || viewport.scrollWidth <= viewport.clientWidth + 2;
+        });
       }
       function setStaticSectionOpen(section, isOpen) {
         if (!section) return;
@@ -5221,6 +5345,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
         if (breakdownSelectedPills && pills) breakdownSelectedPills.innerHTML = pills.innerHTML;
         if (breakdownList && list) breakdownList.innerHTML = list.innerHTML;
         if (breakdownComparisonReport && comparison) breakdownComparisonReport.innerHTML = comparison.innerHTML;
+        updateBeeswarmScrollControls();
         breakdownSuggestionButtons.forEach(function (button) {
           var isActive = button === sourceButton;
           button.classList.toggle('suggestionButtonActive', isActive);
@@ -5247,14 +5372,16 @@ export const renderHtmlReport = (report) => `<!doctype html>
           }
         });
       });
-      beeswarmScrollButtons.forEach(function (button) {
-        button.addEventListener('click', function () {
-          if (!beeswarmViewport) return;
-          var direction = button.getAttribute('data-ce-beeswarm-scroll') === 'left' ? 'left' : 'right';
-          beeswarmViewport.scrollTo({
-            left: direction === 'left' ? 0 : beeswarmViewport.scrollWidth,
-            behavior: 'smooth'
-          });
+      document.addEventListener('click', function (event) {
+        var button = event.target && event.target.closest ? event.target.closest('[data-ce-beeswarm-scroll]') : null;
+        if (!button) return;
+        var layout = button.closest ? button.closest('.swarmLayoutContainer') : null;
+        var viewport = layout ? layout.querySelector('[data-ce-beeswarm-scroll-viewport]') : null;
+        if (!viewport) return;
+        var direction = button.getAttribute('data-ce-beeswarm-scroll') === 'left' ? 'left' : 'right';
+        viewport.scrollTo({
+          left: direction === 'left' ? 0 : viewport.scrollWidth,
+          behavior: 'smooth'
         });
       });
       window.addEventListener('resize', updateBeeswarmScrollControls);

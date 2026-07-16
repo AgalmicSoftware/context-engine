@@ -253,7 +253,8 @@ test('report beeswarm places model-to-model difference on the right axis', async
   assert.match(html, /Repeat consistency<\/text>/);
   assert.match(html, /Consensus<\/text>/);
   assert.match(html, /Difference<\/text>/);
-  assert.match(html, /<strong>Model disagreement:<\/strong>/);
+  assert.match(html, /data-question-difference-label="Model disagreement"/);
+  assert.match(html, /var differenceLabel = point\.dataset\.questionDifferenceLabel \|\| 'Model disagreement';/);
   assert.doesNotMatch(html, /<strong>Model difference:<\/strong>/);
 });
 
@@ -289,6 +290,122 @@ test('report beeswarm collision-packs repeated metric pairs into reachable point
       assert.ok(Math.hypot(left.x - right.x, left.y - right.y) >= 11);
     });
   });
+});
+
+test('Breakdown comparison beeswarm plots cohort difference against repeat consistency', async () => {
+  const questionBank = limitQuestionBank(
+    await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
+    2
+  );
+  const [splitQuestion, similarQuestion] = questionBank.questions;
+  const modelRoster = {
+    schemaVersion: 1,
+    models: [
+      {
+        id: 'model-a',
+        label: 'Model A',
+        model: 'provider/model-a',
+        provider: 'mock',
+        traits: { parameterClass: 'large' },
+      },
+      {
+        id: 'model-b',
+        label: 'Model B',
+        model: 'provider/model-b',
+        provider: 'mock',
+        traits: { parameterClass: 'small' },
+      },
+      {
+        id: 'model-c',
+        label: 'Model C',
+        model: 'provider/model-c',
+        provider: 'mock',
+        traits: {},
+      },
+    ],
+  };
+  const runs = [
+    ...Array.from({ length: 2 }, () => ({
+      modelId: 'model-a',
+      questionId: splitQuestion.id,
+      polarity: 'canonical',
+      normalizedAnswer: 'Agree',
+    })),
+    ...Array.from({ length: 2 }, () => ({
+      modelId: 'model-b',
+      questionId: splitQuestion.id,
+      polarity: 'canonical',
+      normalizedAnswer: 'Disagree',
+    })),
+    {
+      modelId: 'model-a',
+      questionId: similarQuestion.id,
+      polarity: 'canonical',
+      normalizedAnswer: 'Agree',
+    },
+    {
+      modelId: 'model-a',
+      questionId: similarQuestion.id,
+      polarity: 'canonical',
+      normalizedAnswer: 'Disagree',
+    },
+    ...Array.from({ length: 2 }, () => ({
+      modelId: 'model-b',
+      questionId: similarQuestion.id,
+      polarity: 'canonical',
+      normalizedAnswer: 'Unsure',
+    })),
+    ...Array.from({ length: 2 }, () => ({
+      modelId: 'model-c',
+      questionId: splitQuestion.id,
+      polarity: 'canonical',
+      normalizedAnswer: 'Agree',
+    })),
+    ...Array.from({ length: 2 }, () => ({
+      modelId: 'model-c',
+      questionId: similarQuestion.id,
+      polarity: 'canonical',
+      normalizedAnswer: 'Disagree',
+    })),
+  ];
+  const report = buildResultsReport({ questionBank, modelRoster, runsFile: { runs } });
+  const html = renderHtmlReport(report);
+  const chartStart = html.indexOf('<div class="swarmLayoutContainer" data-ce-comparison-beeswarm>');
+  const chartEnd = html.indexOf('</svg>', chartStart);
+
+  assert.ok(chartStart >= 0);
+  assert.ok(chartEnd > chartStart);
+  const chart = html.slice(chartStart, chartEnd + '</svg>'.length);
+  const points = new Map(Array.from(chart.matchAll(
+    /<a[\s\S]*?data-ce-comparison-beeswarm-point[\s\S]*?<\/a>/g
+  )).map((match) => {
+    const markup = match[0];
+    const id = markup.match(/data-question-id="([^"]+)"/)?.[1];
+    const coordinates = markup.match(/<circle class="beeswarmCircle" cx="([^"]+)" cy="([^"]+)" r="5" \/>/);
+    return [id, {
+      x: Number(coordinates?.[1]),
+      y: Number(coordinates?.[2]),
+      markup,
+    }];
+  }));
+
+  assert.equal(points.size, 2);
+  assert.ok(points.get(splitQuestion.id).x > 600);
+  assert.ok(points.get(splitQuestion.id).y <= 30);
+  assert.ok(points.get(similarQuestion.id).x < 100);
+  assert.ok(points.get(similarQuestion.id).y > 60 && points.get(similarQuestion.id).y < 70);
+  assert.match(points.get(splitQuestion.id).markup, /data-question-difference="1\.00"/);
+  assert.match(points.get(splitQuestion.id).markup, /data-question-winning-response-consistency="1\.00"/);
+  assert.match(points.get(similarQuestion.id).markup, /data-question-difference="0\.00"/);
+  assert.match(points.get(similarQuestion.id).markup, /data-question-winning-response-consistency="0\.75"/);
+  assert.match(points.get(similarQuestion.id).markup, /data-question-attempted-runs="4"/);
+  assert.match(points.get(similarQuestion.id).markup, /data-question-contributing-models="2"/);
+  assert.match(points.get(similarQuestion.id).markup, /data-question-difference-label="Cohort difference"/);
+  assert.match(points.get(similarQuestion.id).markup, new RegExp(`href="#question-${similarQuestion.id}"`));
+  assert.match(chart, /aria-label="Questions by model-cohort difference and repeat consistency"/);
+  assert.match(chart, /class="beeswarmAxisTitle"[^>]*>Repeat consistency<\/text>/);
+  assert.match(chart, /<text class="beeswarmAxisLabel" x="62" y="232">Similarity<\/text>/);
+  assert.match(chart, /<text class="beeswarmAxisLabel" x="680" y="232" text-anchor="end">Difference<\/text>/);
 });
 
 test('All Questions gives each model one averaged vote and preserves invalid raw runs separately', async () => {
@@ -1198,8 +1315,8 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /\.swarmLayoutContainer \{ width: 100%; max-width: 100%; min-width: 0; flex: 1 1 100%; box-sizing: border-box; \}/);
   assert.doesNotMatch(html, /\.swarmLayoutContainer \{[^}]*margin-bottom: 18px;/);
   assert.match(html, /class="swarmContainer"/);
-  assert.match(html, /\.swarmContainer \{ position: relative; \}/);
-  assert.doesNotMatch(html, /\.swarmContainer \{ position: relative; width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; overflow-y: hidden; \}/);
+  assert.match(html, /\.swarmContainer \{ position: relative; overflow-x: auto; overflow-y: hidden; \}/);
+  assert.doesNotMatch(html, /\.swarmContainer \{[^}]*width: 100%/);
   assert.match(html, /@media \(max-width: 768px\) \{[\s\S]*\.swarmContainer \{ overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; \}/);
   assert.match(html, /@media \(max-width: 768px\) \{[\s\S]*\.swarmContainer::-webkit-scrollbar \{ display: none; \}/);
   assert.match(html, /data-ce-beeswarm-scroll-viewport/);
@@ -1224,8 +1341,12 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /<text class="beeswarmAxisLabel" x="62" y="232">Consensus<\/text>/);
   assert.match(html, /<text class="beeswarmAxisLabel" x="680" y="232" text-anchor="end">Difference<\/text>/);
   assert.match(html, /data-ce-beeswarm-point/);
-  assert.equal((html.match(/data-question-has-votes="true"/g) || []).length, 1);
-  assert.equal((html.match(/data-question-has-votes="false"/g) || []).length, 0);
+  const mainBeeswarm = html.match(
+    /<svg width="700" height="250" class="beeswarmSvg" role="img" aria-label="Questions by model disagreement and repeat consistency">[\s\S]*?<\/svg>/
+  )?.[0];
+  assert.ok(mainBeeswarm);
+  assert.equal((mainBeeswarm.match(/data-question-has-votes="true"/g) || []).length, 1);
+  assert.equal((mainBeeswarm.match(/data-question-has-votes="false"/g) || []).length, 0);
   assert.match(html, /data-question-status="2 modeled responses"/);
   assert.match(html, /data-question-extremity=/);
   assert.match(html, /data-question-difference=/);
@@ -1252,6 +1373,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /'<div style="font-weight: bold; margin-bottom: 4px;">' \+ escapeText\(point\.dataset\.questionId\) \+ ': ' \+ escapeText\(point\.dataset\.questionPrompt\) \+ '<\/div>',/);
   assert.match(html, /'<div style="font-size: 0\.85rem; margin-bottom: 6px;"><strong>Agree:<\/strong> ' \+ escapeText\(point\.dataset\.questionAgree\)/);
   assert.match(html, /'<div style="font-size: 0\.85rem; margin-bottom: 6px;"><strong>Mean:<\/strong> ' \+ escapeText\(point\.dataset\.questionMean\)/);
+  assert.match(html, /'<strong>' \+ escapeText\(differenceLabel\) \+ ':<\/strong> ' \+ escapeText\(point\.dataset\.questionDifference\)/);
   assert.match(html, /<strong>Winning-response consistency:<\/strong>/);
   assert.match(html, /point\.dataset\.questionAttemptedRuns/);
   assert.doesNotMatch(html, /\.beeTooltip strong \{ display: block;/);
@@ -1672,6 +1794,18 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /class="legendPills"/);
   assert.match(html, /class="sectionCollapse comparisonReportSectionCollapse"/);
   assert.match(html, /Similarity &amp; Difference Spectrum/);
+  assert.match(html, /data-ce-comparison-beeswarm/);
+  assert.match(html, /data-ce-comparison-beeswarm-point/);
+  assert.match(html, /data-question-difference-label="Cohort difference"/);
+  assert.match(html, /aria-label="Questions by model-cohort difference and repeat consistency"/);
+  assert.match(html, /data-ce-comparison-beeswarm[\s\S]*?class="beeswarmAxisTitle"[^>]*>Repeat consistency<\/text>/);
+  assert.match(html, /data-ce-comparison-beeswarm[\s\S]*?<text class="beeswarmAxisLabel" x="62" y="232">Similarity<\/text>/);
+  assert.match(html, /data-ce-comparison-beeswarm[\s\S]*?<text class="beeswarmAxisLabel" x="680" y="232" text-anchor="end">Difference<\/text>/);
+  assert.match(html, /aria-label="Scroll comparison spectrum to start"/);
+  assert.match(html, /aria-label="Scroll comparison spectrum to end"/);
+  assert.match(html, /document\.querySelectorAll\('\[data-ce-beeswarm-scroll-controls\]'\)\.forEach/);
+  assert.match(html, /event\.target\.closest\('\[data-ce-beeswarm-scroll\]'\)/);
+  assert.match(html, /var viewport = layout \? layout\.querySelector\('\[data-ce-beeswarm-scroll-viewport\]'\) : null;/);
   assert.match(html, /Top Similar Items/);
   assert.match(html, /Top Divergent Items/);
   assert.match(html, /class="analysisListItem"/);
@@ -1684,6 +1818,8 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /Divergence score \d/);
   assert.match(html, /\.analysisCandleSegmentUnsure \{ background: linear-gradient\(90deg, #9b8016, #f5c84e\); \}/);
   assert.match(html, /\.analysisCandleSegmentDisagree \{ background: linear-gradient\(90deg, #96364a, #ff6b6b\); \}/);
+  assert.match(html, /\.comparisonBeeswarmSvg \{ width: 700px; min-width: 700px; max-width: none; \}/);
+  assert.match(html, /\.beeswarmCircleNoRepeat \{ fill: #94a3b8; opacity: 0\.62; stroke: #64748b; stroke-width: 1; \}/);
   assert.doesNotMatch(html, /\.analysisCandleSegmentUnsure \{ background: linear-gradient\(90deg, #d69f03, #ffd166\); \}/);
   assert.doesNotMatch(html, /\.analysisCandleSegmentDisagree \{ background: linear-gradient\(90deg, #b42318, #f97066\); \}/);
   assert.doesNotMatch(html, /Model Cohorts/);
