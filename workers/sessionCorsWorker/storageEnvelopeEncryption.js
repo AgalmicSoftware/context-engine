@@ -5,9 +5,6 @@ const textDecoder = new TextDecoder();
 
 export const STORAGE_ENVELOPE_KEK_SECRET_NAME = 'CE_STORAGE_ENVELOPE_KEK';
 export const STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME = 'CE_STORAGE_ENVELOPE_PREVIOUS_KEK';
-export const STORAGE_ENVELOPE_ROTATION_DISABLED_ERROR =
-  'Storage envelope session-key rotation is disabled until interrupted rotations can be resumed safely.';
-
 const ENVELOPE_VERSION = 1;
 const AES_GCM = 'AES-GCM';
 const AES_256_GCM = 'AES-256-GCM';
@@ -95,11 +92,6 @@ const readDeploymentSecret = ({ env = {}, previous = false, deps = {} } = {}) =>
 
 const importDeploymentKek = async ({ env = {}, previous = false, deps = {} } = {}) => {
   const secret = readDeploymentSecret({ env, previous, deps });
-  const keyBytes = await deriveDeploymentKeyBytes(secret, deps);
-  return importAesKey(keyBytes, ['encrypt', 'decrypt'], deps);
-};
-
-const importDeploymentKekFromSecret = async ({ secret, deps = {} } = {}) => {
   const keyBytes = await deriveDeploymentKeyBytes(secret, deps);
   return importAesKey(keyBytes, ['encrypt', 'decrypt'], deps);
 };
@@ -323,50 +315,6 @@ export const decryptPayloadWithStorageEnvelope = async ({
     aad,
     deps,
   });
-};
-
-export const rotateStorageEnvelopeKeys = async () => {
-  // Rewriting many payload DEKs before activating their new session key can
-  // strand every rewritten payload after an interruption. Stay fail-closed
-  // until reads can safely retain and select both old and new keys.
-  const error = new Error(STORAGE_ENVELOPE_ROTATION_DISABLED_ERROR);
-  error.status = 409;
-  throw error;
-};
-
-export const rewrapStorageEnvelopeSessionKeyForDeployment = async ({
-  env = {},
-  slug,
-  config,
-  newDeploymentKek,
-  deps = {},
-} = {}) => {
-  if (typeof deps.putSessionConfig !== 'function') {
-    throw new Error('Session config store is required for envelope deployment re-wrap.');
-  }
-  const sessionKeyBytes = await unwrapSessionKeyBytes({ env, config, slug, deps });
-  const nextDeploymentKey = await importDeploymentKekFromSecret({ secret: newDeploymentKek, deps });
-  const rewrappedAt = nowIso(deps);
-  const sessionKeyRecord = {
-    version: ENVELOPE_VERSION,
-    keyProvider: 'worker_secret',
-    keyId: `session:${safeSlugPart(slug)}:${rewrappedAt}`,
-    createdAt: rewrappedAt,
-    ...await wrapBytesWithKey({
-      wrappingKey: nextDeploymentKey,
-      plaintextBytes: sessionKeyBytes,
-      aad: `ce-storage-envelope:session:${safeSlugPart(slug)}`,
-      deps,
-    }),
-  };
-  const nextConfig = buildSessionEnvelopeConfig({ config, sessionKeyRecord, rotatedAt: rewrappedAt });
-  await deps.putSessionConfig(env, slug, nextConfig);
-  return {
-    ok: true,
-    rewrappedAt,
-    config: nextConfig,
-    keyProvider: 'worker_secret',
-  };
 };
 
 const resolveAuditD1 = (env = {}) => env.CE_STORAGE_AUDIT_D1 || env.STORAGE_AUDIT_D1 || env.D1 || env.DB || null;

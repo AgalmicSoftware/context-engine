@@ -35,6 +35,18 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Serialized first-use worker-envelope keys and signed session-config writes
+  through one per-session coordinator, rejected unreadable R2-only envelope
+  writes, and removed unsafe unused key-changing Admin actions. Cloudflare
+  uploads retain documented at-least-once retry behavior.
+- Hardened the `Surveys` source contract and client preflight so zero survey or
+  question IDs, zero content or response hashes, and mismatched optional
+  survey-response pairs fail before ambiguous state or wallet submission.
+- Required configured deterministic SBT deployments to be submitted by the
+  configured SBT admin in both the source contract and ethers-v5 client
+  preflight, preventing public callers from front-running predicted addresses.
+  These immutable-contract fixes require a separate testnet redeploy before
+  they are live at configured addresses.
 - Fixed passkey survey-response uploads by preserving object-valued EIP-1193
   providers through worker authentication, kept SBT metadata and image reads on
   AR.IO while direct mode is enabled, and extended the shared RPC 429 probe

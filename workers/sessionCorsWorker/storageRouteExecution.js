@@ -1109,6 +1109,10 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
     ? JSON.parse(JSON.stringify(config.storageEnvelope))
     : null;
   const keyProvider = resolveEnvelopeExportManifestKeyProvider({ sessionEnvelope, payloads });
+  const deploymentKekContinuityRequired = (
+    !!trim(sessionEnvelope?.sessionKey?.wrappedKey) ||
+    payloads.some((entry) => entry.keyProvider === 'worker_secret' || entry.keyProvider === 'mixed')
+  );
   const manifest = {
     type: 'ce_storage_encrypted_envelopes_export',
     version: 1,
@@ -1129,7 +1133,10 @@ export const exportCloudflareEncryptedPayloadEnvelopes = async ({
     ],
     wrappedKeysIncluded: !!sessionEnvelope?.sessionKey?.wrappedKey || payloads.some((entry) => entry.wrappedKeysIncluded),
     keyProvider,
-    rewrapRequiredForNewDeployment: true,
+    deploymentKekContinuityRequired,
+    // Version-1 consumers still read this name. It is now a continuity warning,
+    // not an instruction to call a key-changing worker action.
+    rewrapRequiredForNewDeployment: deploymentKekContinuityRequired,
   };
   return {
     ok: true,

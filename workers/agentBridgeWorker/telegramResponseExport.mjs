@@ -740,7 +740,12 @@ export async function buildTelegramResponseExportArchive({
       encryptedPayloadCount: encryptedEnvelopeExport?.manifest?.encryptedPayloadCount ?? exportedPayloads.filter((entry) => entry.encryptedEnvelopeOnly).length,
       wrappedKeysIncluded: encryptedEnvelopeExport?.manifest?.wrappedKeysIncluded === true,
       keyProvider: safeString(encryptedEnvelopeExport?.manifest?.keyProvider),
-      rewrapRequiredForNewDeployment: encryptedEnvelopeExport?.manifest?.rewrapRequiredForNewDeployment === true,
+      deploymentKekContinuityRequired:
+        encryptedEnvelopeExport?.manifest?.deploymentKekContinuityRequired === true ||
+        encryptedEnvelopeExport?.manifest?.rewrapRequiredForNewDeployment === true,
+      rewrapRequiredForNewDeployment:
+        encryptedEnvelopeExport?.manifest?.deploymentKekContinuityRequired === true ||
+        encryptedEnvelopeExport?.manifest?.rewrapRequiredForNewDeployment === true,
       submitRecordCount: submitRecords.length,
       submitRecordsRedacted: !!encryptedEnvelopeExport,
       partial: partial === true,

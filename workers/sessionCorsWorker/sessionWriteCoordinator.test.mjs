@@ -398,10 +398,10 @@ test('SessionWriteCoordinator applies stale admin mutations to the authoritative
 		}),
 	);
 
-	assert.equal(mutationResponse.status, 200);
-	assert.equal(projections.length, 2);
-	assert.equal(projections[1].limits.perIpPerHour, 8);
-	assert.equal(projections[1].storageEnvelope.sessionKey.wrappedKey, candidate.wrappedKey);
+  assert.equal(mutationResponse.status, 200);
+  assert.equal(projections.length, 2);
+  assert.equal(projections[1].limits.perIpPerHour, 8);
+  assert.equal(projections[1].storageEnvelope.sessionKey.wrappedKey, candidate.wrappedKey);
 });
 
 test('SessionWriteCoordinator chooses one payload before concurrent sponsored deploy mutation', async () => {

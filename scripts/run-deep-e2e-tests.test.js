@@ -99,7 +99,6 @@ test('Cloudflare envelope package scripts point to tracked runner files', () => 
     'ai:test-cf-envelope:worker',
     'ai:test-cf-envelope:groups',
     'ai:test-cf-envelope:group-gates',
-    'ai:test-cf-envelope:key-lifecycle',
   ];
 
   if (!Object.prototype.hasOwnProperty.call(scripts, 'ai:test-cf-envelope:all')) {
