@@ -1,5 +1,29 @@
 # Results Report Contract
 
+## Publication Introduction
+
+The standalone artifact begins with a persistent, full-width benchmark
+introduction inside the Results section but outside its collapsible body. It
+must remain visible when Results View is closed, sit immediately below the
+Results header/navigation row for report-mode deep links, and state from report
+data rather than hard-coded run claims:
+
+- that this is a Context Engine AI discourse benchmark grounded in questions
+  drawn from or implied by the OSS `ai-discourse-corpus`;
+- that one model is one participant and repeated canonical/reversed responses
+  are nested observations averaged within model/question cells;
+- question count, model count, self/persona lens, declared versus planned repeat
+  depth, question-bank release status, benchmark id, and generation time; and
+- that the benchmark is descriptive rather than a leaderboard or factual
+  correctness score.
+
+Preview artifacts must visibly say that they are exploratory, use
+`noindex,nofollow`, and must not claim to be released benchmark results.
+Release-ready wording and `index,follow` are allowed only when
+`integrity.releaseReady` is true. The head includes matching description and
+Open Graph metadata for hosted publication. The introduction is part of print
+output and uses a light print treatment.
+
 `build-report` writes a JSON object with Context Engine-style result surfaces.
 It accepts a single run file/roster or comma-separated `--runs` and `--models`
 paths for compatible model-specific benchmark runs. Report schema version 2

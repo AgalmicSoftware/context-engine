@@ -1790,6 +1790,74 @@ const renderSummaryStats = (report) => {
   });
 };
 
+const benchmarkPublicationDescription = (report) => {
+  const questionCount = Number(report.counts?.questions || 0);
+  const modelCount = Number(report.counts?.models || 0);
+  return `A Context Engine AI discourse benchmark mapping agreement, disagreement, uncertainty, and wording sensitivity across ${questionCount} corpus-grounded question${questionCount === 1 ? '' : 's'} answered by ${modelCount} model participant${modelCount === 1 ? '' : 's'}.`;
+};
+
+const renderBenchmarkIntroduction = (report) => {
+  const releaseReady = report.integrity?.releaseReady === true;
+  const expectedRepeats = Number(report.integrity?.expectedRepeatsPerPolarity || 0);
+  const declaredRepeats = Array.from(new Set(
+    (report.integrity?.declaredRepeatValues || [])
+      .map(Number)
+      .filter((value) => Number.isFinite(value) && value > 0)
+  )).sort((left, right) => left - right);
+  const repeatDepth = declaredRepeats.length === 1
+    ? `${declaredRepeats[0]}${expectedRepeats ? ` of ${expectedRepeats} planned` : ''} per wording`
+    : declaredRepeats.length > 1
+      ? `Mixed (${declaredRepeats.join(', ')}) per wording`
+      : expectedRepeats
+        ? `${expectedRepeats} planned per wording`
+        : 'Not declared';
+  const bankStatus = formatDisplayLabel(report.integrity?.bankReleaseStatus || 'unvalidated');
+  const lens = report.mode === 'persona'
+    ? `Weights-only persona: ${report.personaProfile?.label || report.personaId || 'Unnamed figure'}`
+    : 'Models answer as themselves';
+  const statusLabel = releaseReady ? 'Release-ready result' : 'Publication preview';
+  const publicationNote = releaseReady
+    ? 'This artifact passed the validated-bank, model coverage, polarity pairing, repeat completion, validity, and provenance gates.'
+    : `Exploratory data: ${bankStatus} question bank and ${repeatDepth.toLowerCase()}. Review the report interface and measured patterns, but do not cite this artifact as a released benchmark result.`;
+  const modeExplanation = report.mode === 'persona'
+    ? '<p><strong>Persona lens.</strong> Models predict a named public figure using only information in their weights. The result measures model interpretation, not the figure\'s true views.</p>'
+    : '<p><strong>Model profiles.</strong> Similarity and opinion groups describe response patterns. They do not score model capability or factual accuracy.</p>';
+  return `<section
+    class="aidb-benchmark-intro"
+    data-ce-benchmark-intro
+    data-ce-benchmark-publication-status="${releaseReady ? 'release-ready' : 'preview'}"
+    aria-labelledby="aidb-benchmark-intro-title"
+  >
+    <div class="aidb-benchmark-intro-header">
+      <div>
+        <p class="aidb-benchmark-kicker">A Context Engine AI discourse benchmark</p>
+        <h1 id="aidb-benchmark-intro-title">${escapeHtml(report.title || 'AI Discourse Bench')}</h1>
+      </div>
+      <span class="aidb-publication-status ${releaseReady ? 'aidb-publication-status-ready' : 'aidb-publication-status-preview'}">${escapeHtml(statusLabel)}</span>
+    </div>
+    <p class="aidb-benchmark-lead">This benchmark maps where AI models agree, disagree, remain unsure, and change under reversed wording across questions drawn from or implied by the OSS <strong>ai-discourse-corpus</strong>. The first track focuses on AI policy and AI futures.</p>
+    <p class="aidb-benchmark-method-summary">Each model is one participant. Repeated canonical and reversed responses are normalized and averaged within each model-question cell before models are compared, so additional runs do not create additional participants. The benchmark is descriptive, not a leaderboard.</p>
+    <dl class="aidb-benchmark-facts" aria-label="Benchmark run summary">
+      <div><dt>Questions</dt><dd>${escapeHtml(report.counts?.questions ?? 0)}</dd></div>
+      <div><dt>Model participants</dt><dd>${escapeHtml(report.counts?.models ?? 0)}</dd></div>
+      <div><dt>Lens</dt><dd>${escapeHtml(lens)}</dd></div>
+      <div><dt>Run depth</dt><dd>${escapeHtml(repeatDepth)}</dd></div>
+      <div><dt>Question bank</dt><dd>${escapeHtml(bankStatus)}</dd></div>
+    </dl>
+    <details class="aidb-benchmark-reading-guide">
+      <summary>How to read these results</summary>
+      <div class="aidb-benchmark-reading-grid">
+        <p><strong>Stance.</strong> Agree, Unsure, and Disagree distributions summarize one equally weighted model position per question.</p>
+        <p><strong>Difference.</strong> The report compares model answer profiles and model-trait cohorts; it does not rank overall model quality.</p>
+        <p><strong>Repeat consistency.</strong> The vertical beeswarm axis shows how often attempted runs match each model's most common response. It is not confidence or correctness.</p>
+        ${modeExplanation}
+      </div>
+    </details>
+    <p class="aidb-publication-note"><strong>Publication status:</strong> ${escapeHtml(publicationNote)}</p>
+    <p class="aidb-benchmark-provenance">Benchmark ID: <code>${escapeHtml(report.benchmarkId || 'unknown')}</code> <span aria-hidden="true">|</span> Generated: ${escapeHtml(formatPolisUtcTimestamp(report.generatedAt))}</p>
+  </section>`;
+};
+
 const renderIntegrityNotice = (report) => {
   if (report.integrity?.releaseReady) return '';
   const warnings = Array.isArray(report.integrity?.warnings) ? report.integrity.warnings : [];
@@ -3344,6 +3412,12 @@ export const renderHtmlReport = (report) => `<!doctype html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="${escapeHtml(benchmarkPublicationDescription(report))}" />
+  <meta name="robots" content="${report.integrity?.releaseReady === true ? 'index,follow' : 'noindex,nofollow'}" />
+  <meta name="theme-color" content="#20204e" />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="${escapeHtml(report.title || 'AI Discourse Bench Report')}" />
+  <meta property="og:description" content="${escapeHtml(benchmarkPublicationDescription(report))}" />
   <title>${escapeHtml(report.title || 'AI Discourse Bench Report')} - Context Engine Results Report</title>
   <link href="https://fonts.googleapis.com/css?family=Poppins:200,300,400,600,700,800" rel="stylesheet" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -3547,6 +3621,31 @@ export const renderHtmlReport = (report) => `<!doctype html>
     .sectionContainer { box-sizing: border-box; max-width: 100%; min-width: 0; margin-bottom: 20px; margin-top: 20px; background-color: #5c58a630; border: 0 solid #af95db; padding: 20px; border-radius: var(--ce-radius-6); }
     .sectionExpanded { max-width: 100%; }
     .sectionsGrid { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; max-width: 100%; min-width: 0; }
+    .aidb-benchmark-intro { min-width: 0; margin: 0 0 24px; padding: 8px 10px 24px; border-bottom: 1px solid rgba(77, 255, 164, 0.26); color: var(--ce-color-panel-text); }
+    .aidb-benchmark-intro-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 18px; }
+    .aidb-benchmark-kicker { margin: 0 0 6px; color: #4dffa4; font-family: var(--ce-font-ui); font-size: 0.82rem; font-weight: 700; text-transform: uppercase; }
+    .aidb-benchmark-intro h1 { margin: 0; color: #ffffff; font-size: 2rem; line-height: 1.2; overflow-wrap: anywhere; }
+    .aidb-benchmark-lead { max-width: 82ch; margin: 18px 0 10px; color: #f4f7ff; font-size: 1.05rem; line-height: 1.65; }
+    .aidb-benchmark-method-summary { max-width: 92ch; margin: 0; color: rgba(244, 247, 255, 0.78); line-height: 1.65; }
+    .aidb-publication-status { align-self: start; padding: 6px 9px; border: 1px solid; border-radius: var(--ce-radius-4); font-family: var(--ce-font-ui); font-size: 0.8rem; font-weight: 700; line-height: 1.2; white-space: nowrap; }
+    .aidb-publication-status-preview { border-color: rgba(255, 214, 0, 0.58); background: rgba(255, 214, 0, 0.12); color: #ffe78a; }
+    .aidb-publication-status-ready { border-color: rgba(77, 255, 164, 0.58); background: rgba(77, 255, 164, 0.12); color: #8bffc2; }
+    .aidb-benchmark-facts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 20px 0 0; border-top: 1px solid rgba(255, 255, 255, 0.13); border-bottom: 1px solid rgba(255, 255, 255, 0.13); }
+    .aidb-benchmark-facts > div { min-width: 0; padding: 13px 14px; border-left: 1px solid rgba(255, 255, 255, 0.13); }
+    .aidb-benchmark-facts > div:first-child { border-left: 0; }
+    .aidb-benchmark-facts dt { color: rgba(244, 247, 255, 0.58); font-family: var(--ce-font-ui); font-size: 0.74rem; font-weight: 700; text-transform: uppercase; }
+    .aidb-benchmark-facts dd { margin: 4px 0 0; color: #ffffff; font-size: 0.93rem; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+    .aidb-benchmark-reading-guide { margin-top: 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.13); padding-bottom: 14px; }
+    .aidb-benchmark-reading-guide > summary { color: #f4f7ff; cursor: pointer; font-weight: 700; }
+    .aidb-benchmark-reading-guide > summary:focus-visible { outline: 2px solid #4dffa4; outline-offset: 4px; }
+    .aidb-benchmark-reading-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 24px; margin-top: 13px; }
+    .aidb-benchmark-reading-grid p { margin: 0; color: rgba(244, 247, 255, 0.76); line-height: 1.55; }
+    .aidb-benchmark-reading-grid strong { color: #ffffff; }
+    .aidb-publication-note { margin: 14px 0 0; color: rgba(244, 247, 255, 0.82); line-height: 1.55; }
+    .aidb-benchmark-intro[data-ce-benchmark-publication-status="preview"] .aidb-publication-note strong { color: #ffe78a; }
+    .aidb-benchmark-intro[data-ce-benchmark-publication-status="release-ready"] .aidb-publication-note strong { color: #8bffc2; }
+    .aidb-benchmark-provenance { margin: 9px 0 0; color: rgba(244, 247, 255, 0.52); font-family: var(--ce-font-mono); font-size: 0.76rem; overflow-wrap: anywhere; }
+    .aidb-benchmark-provenance code { color: rgba(244, 247, 255, 0.78); }
     @media (min-width: 768px) {
       .sectionsGrid { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
       .sectionsGridTwoUp { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -4336,6 +4435,20 @@ export const renderHtmlReport = (report) => `<!doctype html>
     @media print {
       .pdfIgnore { display: none !important; }
       .beeTooltip { display: none !important; }
+      .aidb-benchmark-intro { border-color: #aab5c8; background: #ffffff; color: #111827; }
+      .aidb-benchmark-intro h1,
+      .aidb-benchmark-lead,
+      .aidb-benchmark-reading-guide > summary,
+      .aidb-benchmark-reading-grid strong { color: #111827; }
+      .aidb-benchmark-method-summary,
+      .aidb-benchmark-reading-grid p,
+      .aidb-publication-note,
+      .aidb-benchmark-provenance,
+      .aidb-benchmark-provenance code { color: #475569; }
+      .aidb-benchmark-facts { border-color: #cbd5e1; }
+      .aidb-benchmark-facts > div { border-color: #cbd5e1; }
+      .aidb-benchmark-facts dt { color: #64748b; }
+      .aidb-benchmark-facts dd { color: #111827; }
     }
     .pdfMode .pdfIgnore { display: none !important; }
     .pdfMode .showWhenPdf { display: inline; }
@@ -4410,6 +4523,13 @@ export const renderHtmlReport = (report) => `<!doctype html>
       .selectedQuestionGroundingPills { justify-content: flex-start; margin-left: 0; max-width: 100%; }
     }
     @media (max-width: 768px) {
+      .aidb-benchmark-intro-header { grid-template-columns: 1fr; }
+      .aidb-publication-status { justify-self: start; }
+      .aidb-benchmark-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .aidb-benchmark-facts > div { border-left: 0; border-top: 1px solid rgba(255, 255, 255, 0.13); }
+      .aidb-benchmark-facts > div:nth-child(-n + 2) { border-top: 0; }
+      .aidb-benchmark-facts > div:nth-child(even) { border-left: 1px solid rgba(255, 255, 255, 0.13); }
+      .aidb-benchmark-reading-grid { grid-template-columns: 1fr; }
       .swarmContainer { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
       .swarmContainer::-webkit-scrollbar { display: none; }
       .debateMap { padding: 0; }
@@ -4507,6 +4627,13 @@ export const renderHtmlReport = (report) => `<!doctype html>
       .debateMap .voteInputGroup { animation: none !important; }
     }
     @media (max-width: 480px) {
+      .aidb-benchmark-intro { padding: 12px 15px 20px; }
+      .aidb-benchmark-intro h1 { font-size: 1.6rem; }
+      .aidb-benchmark-facts { grid-template-columns: 1fr; }
+      .aidb-benchmark-facts > div,
+      .aidb-benchmark-facts > div:nth-child(even),
+      .aidb-benchmark-facts > div:nth-child(-n + 2) { border-left: 0; border-top: 1px solid rgba(255, 255, 255, 0.13); }
+      .aidb-benchmark-facts > div:first-child { border-top: 0; }
       .participantAddressFull { display: none; }
       .participantAddressShort { display: inline; }
     }
@@ -4541,6 +4668,7 @@ export const renderHtmlReport = (report) => `<!doctype html>
           </div>
         </div>
       </div>
+      ${renderBenchmarkIntroduction(report)}
       <div class="miniSectionContent">
         <div>
         <div class="polisReportContainer ce-polis-report-shell" data-ce-report-shell="polis">

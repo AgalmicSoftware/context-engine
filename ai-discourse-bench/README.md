@@ -26,6 +26,11 @@ coverage, release, persona, and analysis-provenance rules.
 
 ## Result Views
 
+- **Publication introduction:** a persistent benchmark explainer identifies the
+  OSS corpus basis, model-as-participant unit of analysis, polarity/repeat
+  method, run depth, question-bank status, and whether the artifact passed the
+  release gates. Preview reports are marked `noindex` and cannot present
+  themselves as released benchmark results.
 - **Polis report:** question-level and model-level agreement/disagreement,
   including a beeswarm-style consensus/difference view.
 - **Participant graph:** models as participant nodes positioned by opinion

@@ -112,6 +112,94 @@ test('persona reports visibly identify the weights-only public-figure lens', asy
   assert.match(html, /data-benchmark-persona="ada-lovelace"/);
 });
 
+test('publication intro explains the benchmark and does not overstate preview artifacts', async () => {
+  const questionBank = limitQuestionBank(
+    await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
+    1
+  );
+  const fullRoster = await readJson(new URL('../data/model-roster.sample.json', import.meta.url));
+  const modelRoster = { ...fullRoster, models: fullRoster.models.slice(0, 2) };
+  const questionId = questionBank.questions[0].id;
+  const runs = modelRoster.models.flatMap((model) => [
+    {
+      modelId: model.id,
+      questionId,
+      polarity: 'canonical',
+      repeatIndex: 1,
+      normalizedAnswer: 'Agree',
+    },
+    {
+      modelId: model.id,
+      questionId,
+      polarity: 'reversed',
+      repeatIndex: 1,
+      normalizedAnswer: 'Agree',
+    },
+  ]);
+  const report = buildResultsReport({
+    questionBank,
+    modelRoster,
+    runsFile: {
+      schemaVersion: 1,
+      benchmarkId: questionBank.benchmarkId,
+      mode: 'self',
+      repeats: 1,
+      runs,
+    },
+  });
+  const html = renderHtmlReport(report);
+  const introStart = html.indexOf('data-ce-benchmark-intro');
+  const resultsStart = html.indexOf('data-ce-results-section');
+  const resultsHeaderStart = html.indexOf('<div class="sectionHeaderRow">', resultsStart);
+  const miniSectionStart = html.indexOf('<div class="miniSectionContent">', resultsHeaderStart);
+
+  assert.ok(introStart >= 0);
+  assert.ok(resultsStart >= 0 && introStart > resultsStart);
+  assert.ok(resultsHeaderStart >= 0 && introStart > resultsHeaderStart);
+  assert.ok(miniSectionStart > introStart);
+  assert.match(html, /<meta name="description" content="A Context Engine AI discourse benchmark mapping agreement, disagreement, uncertainty, and wording sensitivity across 1 corpus-grounded question answered by 2 model participants\." \/>/);
+  assert.match(html, /<meta name="robots" content="noindex,nofollow" \/>/);
+  assert.match(html, /data-ce-benchmark-publication-status="preview"/);
+  assert.match(html, />Publication preview<\/span>/);
+  assert.match(html, /A Context Engine AI discourse benchmark/);
+  assert.match(html, /drawn from or implied by the OSS <strong>ai-discourse-corpus<\/strong>/);
+  assert.match(html, /Each model is one participant\./);
+  assert.match(html, /The benchmark is descriptive, not a leaderboard\./);
+  assert.match(html, /<dt>Questions<\/dt><dd>1<\/dd>/);
+  assert.match(html, /<dt>Model participants<\/dt><dd>2<\/dd>/);
+  assert.match(html, /<dt>Lens<\/dt><dd>Models answer as themselves<\/dd>/);
+  assert.match(html, /<dt>Run depth<\/dt><dd>1 of 10 planned per wording<\/dd>/);
+  assert.match(html, /<dt>Question bank<\/dt><dd>Development Seed<\/dd>/);
+  assert.match(html, /Repeat consistency\.<\/strong> The vertical beeswarm axis/);
+  assert.match(html, /do not cite this artifact as a released benchmark result/);
+
+  const releaseHtml = renderHtmlReport({
+    ...report,
+    status: 'release-ready',
+    integrity: {
+      ...report.integrity,
+      releaseReady: true,
+      bankReleaseStatus: 'validated',
+      bankValidated: true,
+      repeatConfigurationValid: true,
+      declaredRepeatValues: [10],
+    },
+  });
+  assert.match(releaseHtml, /<meta name="robots" content="index,follow" \/>/);
+  assert.match(releaseHtml, /data-ce-benchmark-publication-status="release-ready"/);
+  assert.match(releaseHtml, />Release-ready result<\/span>/);
+  assert.match(releaseHtml, /<dt>Run depth<\/dt><dd>10 of 10 planned per wording<\/dd>/);
+  assert.match(releaseHtml, /<dt>Question bank<\/dt><dd>Validated<\/dd>/);
+  assert.match(releaseHtml, /This artifact passed the validated-bank, model coverage, polarity pairing, repeat completion, validity, and provenance gates\./);
+  assert.doesNotMatch(releaseHtml, /do not cite this artifact as a released benchmark result/);
+
+  const hostileTitle = '<img src=x onerror=alert(1)>';
+  const hostileHtml = renderHtmlReport({ ...report, title: hostileTitle });
+  assert.match(hostileHtml, /<meta property="og:title" content="&lt;img src=x onerror=alert\(1\)&gt;" \/>/);
+  assert.match(hostileHtml, /<h1 id="aidb-benchmark-intro-title">&lt;img src=x onerror=alert\(1\)&gt;<\/h1>/);
+  assert.doesNotMatch(hostileHtml, /<h1 id="aidb-benchmark-intro-title"><img/);
+});
+
 test('participant opinion groups use client-style hulls and pair connectors', async () => {
   const questionBank = limitQuestionBank(
     await readJson(new URL('../data/question-bank.sample.json', import.meta.url)),
@@ -885,7 +973,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.match(html, /\.aidb-similarity-details, \.htmlReportJsonDetails \{ border: 1px solid #d9dee8; border-radius: 8px; background: #fff; padding: 10px 12px; margin: 10px 0; \}/);
   assert.doesNotMatch(html, /nav a, button \{/);
   assert.match(html, /class="sectionContainer sectionExpanded ce-session-results-section"/);
-  assert.match(html, /<div class="sectionsGrid">\s*<div class="sectionContainer sectionExpanded ce-session-results-section"/);
+  assert.match(html, /<div class="sectionsGrid">\s*<div class="sectionContainer sectionExpanded ce-session-results-section"[^>]*>\s*<div class="sectionHeaderRow">[\s\S]*?<\/div>\s*<section[\s\S]*?data-ce-benchmark-intro[\s\S]*?<\/section>\s*<div class="miniSectionContent">/);
   assert.match(html, /\.sectionsGrid \{ display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; max-width: 100%; min-width: 0; \}/);
   assert.match(html, /@media \(min-width: 768px\) \{\s*\.sectionsGrid \{ grid-template-columns: repeat\(3, minmax\(0, 1fr\)\); align-items: start; \}\s*\.sectionsGridTwoUp \{ grid-template-columns: repeat\(2, minmax\(0, 1fr\)\); \}\s*\.sectionsGrid \.sectionExpanded \{ grid-column: 1 \/ -1; \}/);
   assert.match(html, /class="sectionContainer sectionExpanded ce-session-results-section" data-ce-results-section data-ce-results-open="true"/);
@@ -1132,7 +1220,7 @@ test('report renders models as participants in a OnePageSession-style results sh
   assert.doesNotMatch(html, /\.settingsActionButton/);
   assert.match(html, /@media \(max-width: 768px\) \{[\s\S]*?\.settingsRow \{ flex-wrap: wrap; justify-content: flex-start; gap: 10px; \}/);
   assert.match(html, /\.pdfIgnore \{ display: block; \}/);
-  assert.match(html, /@media print \{\s*\.pdfIgnore \{ display: none !important; \}\s*\.beeTooltip \{ display: none !important; \}\s*\}/);
+  assert.match(html, /@media print \{[\s\S]*?\.pdfIgnore \{ display: none !important; \}[\s\S]*?\.beeTooltip \{ display: none !important; \}[\s\S]*?\.aidb-benchmark-intro \{ border-color: #aab5c8; background: #ffffff; color: #111827; \}/);
   assert.match(html, /\.pdfMode \.pdfIgnore \{ display: none !important; \}/);
   assert.match(html, /\.pdfMode \.showWhenPdf \{ display: inline; \}/);
   assert.match(html, /\.pdfMode \.beeTooltip \{ display: none !important; \}/);
