@@ -934,43 +934,6 @@ describe('sessionCorsWorker admin routes', () => {
     expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual(existingConfig);
   });
 
-  it('fails session-key rotation closed without changing stored config', async () => {
-    const existingConfig = {
-      adminAddress: adminWallet.address,
-      storageEnvelope: {
-        keyProvider: 'worker_secret',
-        sessionKey: {
-          iv: 'legacy-iv-value1',
-          wrappedKey: 'L'.repeat(64),
-        },
-      },
-    };
-    const kv = createMemoryKv({
-      [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify(existingConfig),
-    });
-    const env = createCoordinatorEnv(kv);
-    const body = await createSignedSiweBody({
-      worker: sessionCorsWorker,
-      env,
-      wallet: adminWallet,
-      sessionSlug,
-      adminAction: 'rotate-envelope-keys',
-    });
-
-    const response = await sessionCorsWorker.fetch(
-      makeJsonRequest('/admin/rotate-envelope-keys', body),
-      env,
-      {},
-    );
-    const payload = await response.json();
-
-    expect(response.status).toBe(409);
-    expect(payload?.error).toBe(
-      'Storage envelope session-key rotation is disabled until interrupted rotations can be resumed safely.',
-    );
-    expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual(existingConfig);
-  });
-
   it('returns an explicit error for unknown admin actions', async () => {
     const kv = createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify({

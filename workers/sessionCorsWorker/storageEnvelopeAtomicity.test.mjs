@@ -6,7 +6,6 @@ import { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
 import {
   decryptPayloadWithStorageEnvelope,
   encryptPayloadWithStorageEnvelope,
-  rotateStorageEnvelopeKeys,
 } from './storageEnvelopeEncryption.js';
 import { storageRoute } from './storageRouteExecution.js';
 
@@ -120,8 +119,6 @@ const classifyStorageKey = (key) => {
   return 'other';
 };
 
-const storageIdFromKey = (key) => String(key).split(/[/:]/).at(-1);
-
 const createFaultablePersistence = ({ topology, fault = null }) => {
   const r2Store = new Map();
   const kvStore = new Map();
@@ -189,17 +186,6 @@ const createFaultablePersistence = ({ topology, fault = null }) => {
     kvStore,
     r2Store,
     get faultFired() { return faultFired; },
-    armFault(nextFault) {
-      activeFault = nextFault;
-      faultFired = false;
-    },
-    firstTargetId() {
-      const target = attempts.find((attempt) => (
-        attempt.binding === activeFault?.binding &&
-        attempt.keyKind === activeFault?.keyKind
-      ));
-      return target ? storageIdFromKey(target.key) : '';
-    },
   };
 };
 
@@ -217,16 +203,13 @@ const createCloudflareConfig = ({ encryption = 'none' } = {}) => ({
 
 const createUploadRequest = ({
   data = 'atomic payload',
-  resource = 'docsContext',
-  idempotencyKey = 'upload-attempt-a',
 } = {}) => new Request('https://worker.example/storage/upload', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     data,
     contentType: 'text/plain',
-    resource,
-    idempotencyKey,
+    resource: 'docsContext',
   }),
 });
 
@@ -410,14 +393,14 @@ test('concurrent first worker-envelope uploads remain readable through the produ
     upload({
       env,
       config: initialConfig,
-      request: createUploadRequest({ data: 'route alpha', idempotencyKey: 'route-alpha' }),
+      request: createUploadRequest({ data: 'route alpha' }),
       randomBytes: createSequenceRandomBytes(41),
       putSessionConfig,
     }),
     upload({
       env,
       config: initialConfig,
-      request: createUploadRequest({ data: 'route beta', idempotencyKey: 'route-beta' }),
+      request: createUploadRequest({ data: 'route beta' }),
       randomBytes: createSequenceRandomBytes(141),
       putSessionConfig,
     }),
@@ -442,58 +425,7 @@ test('concurrent first worker-envelope uploads remain readable through the produ
   });
 });
 
-test('same-key replay is idempotent and a different key creates a new payload', async () => {
-  const persistence = createFaultablePersistence({ topology: 'r2-and-kv' });
-  const env = createCoordinatedEnv(persistence.bindings);
-  const config = createCloudflareConfig();
-  const randomBytes = createSequenceRandomBytes(11);
-
-  const firstResponse = await upload({
-    env,
-    config,
-    request: createUploadRequest({ resource: 'questions' }),
-    randomBytes,
-  });
-  const firstBody = await readJson(firstResponse);
-  const replayResponse = await upload({
-    env,
-    config,
-    request: createUploadRequest({ resource: 'questions' }),
-    randomBytes,
-  });
-  const replayBody = await readJson(replayResponse);
-  const differentResponse = await upload({
-    env,
-    config,
-    request: createUploadRequest({
-      resource: 'questions',
-      idempotencyKey: 'upload-attempt-b',
-    }),
-    randomBytes,
-  });
-  const differentBody = await readJson(differentResponse);
-  const indexKeys = [...persistence.kvStore.keys()].filter((key) => (
-    key.startsWith('ce-storage:session-a:questions:')
-  ));
-
-  assert.deepEqual({
-    statuses: [firstResponse.status, replayResponse.status, differentResponse.status],
-    replayId: replayBody.id,
-    firstId: firstBody.id,
-    differentKeyIsDistinct: differentBody.id !== firstBody.id,
-    objectCount: persistence.r2Store.size,
-    indexCount: indexKeys.length,
-  }, {
-    statuses: [200, 200, 200],
-    replayId: firstBody.id,
-    firstId: firstBody.id,
-    differentKeyIsDistinct: true,
-    objectCount: 2,
-    indexCount: 2,
-  });
-});
-
-const supportedUploadFaultScenarios = [
+const atLeastOnceFaultScenarios = [
   ...['before', 'after'].map((phase) => ({
     topology: 'kv-only',
     binding: 'kv',
@@ -517,153 +449,86 @@ const supportedUploadFaultScenarios = [
     binding: 'kv',
     keyKind: 'index',
     phase,
+    encryption: 'worker_envelope',
   })),
 ];
 
-for (const scenario of supportedUploadFaultScenarios) {
+for (const scenario of atLeastOnceFaultScenarios) {
   const label = `${scenario.topology} ${scenario.keyKind} ${scenario.phase}`;
-  test(`same-key retry repairs ${label}-write failure`, async () => {
+  test(`at-least-once retry is readable after ${label}-write failure`, async () => {
     const persistence = createFaultablePersistence({
       topology: scenario.topology,
       fault: scenario,
     });
-    const env = createCoordinatedEnv(persistence.bindings);
-    const config = createCloudflareConfig();
+    const env = createCoordinatedEnv({
+      ...persistence.bindings,
+      ...(scenario.encryption === 'worker_envelope'
+        ? { CE_STORAGE_ENVELOPE_KEK: DEPLOYMENT_KEK }
+        : {}),
+    });
+    const initialConfig = createCloudflareConfig({ encryption: scenario.encryption || 'none' });
+    let durableConfig = initialConfig;
+    const putSessionConfig = async (_env, _slug, nextConfig) => {
+      durableConfig = nextConfig;
+    };
     const randomBytes = createSequenceRandomBytes(61);
 
-    await attemptUpload({
+    await assert.rejects(upload({
       env,
-      config,
-      request: createUploadRequest({ resource: 'questions' }),
+      config: durableConfig,
+      request: createUploadRequest(),
       randomBytes,
-    });
-    const firstId = persistence.firstTargetId();
+      ...(scenario.encryption === 'worker_envelope' ? { putSessionConfig } : {}),
+    }), /injected .* failure/);
     assert.equal(persistence.faultFired, true);
-    assert.match(firstId, /^[A-Za-z0-9_-]{43}$/);
 
     const retryResponse = await upload({
       env,
-      config,
-      request: createUploadRequest({ resource: 'questions' }),
+      config: durableConfig,
+      request: createUploadRequest(),
       randomBytes,
+      ...(scenario.encryption === 'worker_envelope' ? { putSessionConfig } : {}),
     });
     const retryBody = await readJson(retryResponse);
-    const objectKeys = [...persistence.r2Store.keys()].filter((key) => key.startsWith('sessions/'));
-    const payloadKeys = [...persistence.kvStore.keys()].filter((key) => (
-      key.startsWith('ce-storage-payload:')
-    ));
-    const indexKeys = [...persistence.kvStore.keys()].filter((key) => (
-      key.startsWith('ce-storage:')
-    ));
-    const physicalIds = new Set(
-      [...objectKeys, ...payloadKeys, ...indexKeys].map(storageIdFromKey),
-    );
-    const readResponse = await readStoredPayload({ env, config, id: firstId });
-    const listResponse = await storageRoute({
-      path: '/storage/list',
-      method: 'GET',
-      request: new Request('https://worker.example/storage/list?resource=questions'),
+    const visibleRows = [...persistence.kvStore]
+      .filter(([key]) => classifyStorageKey(key) === 'index')
+      .map(([, value]) => JSON.parse(value));
+    const visibleReads = await Promise.all(visibleRows.map((row, index) => readStoredPayload({
       env,
-      config,
-      slug: 'session-a',
-      uploaderAddress: ADMIN_ADDRESS,
-      baseHeaders: {},
-      deps: { json },
-    });
-    const listed = await readJson(listResponse);
+      config: durableConfig,
+      id: row.id,
+      suffix: `-${scenario.keyKind}-${scenario.phase}-${index}`,
+    })));
+    const plaintexts = await Promise.all(visibleReads.map(async (response) => (
+      response.status === 200 ? response.text() : '<unreadable>'
+    )));
+    const physicalPayloadCount = scenario.topology === 'kv-only'
+      ? [...persistence.kvStore.keys()].filter((key) => classifyStorageKey(key) === 'payload').length
+      : persistence.r2Store.size;
+    const firstPayloadWasDurable = !['payload', 'object'].includes(scenario.keyKind) ||
+      scenario.phase === 'after';
+    const expectedPhysicalPayloadCount = firstPayloadWasDurable ? 2 : 1;
+    const expectedVisibleCount = scenario.keyKind === 'index' && scenario.phase === 'after' ? 2 : 1;
 
     assert.deepEqual({
       retryStatus: retryResponse.status,
-      returnedId: retryBody.id,
-      physicalIds: [...physicalIds],
-      payloadCount: scenario.topology === 'kv-only' ? payloadKeys.length : objectKeys.length,
-      indexCount: indexKeys.length,
-      readStatus: readResponse.status,
-      plaintext: readResponse.status === 200 ? await readResponse.text() : '<unreadable>',
-      listedIds: listed.items?.map((item) => item.storageRef?.id),
+      retryIsVisible: visibleRows.some((row) => row.id === retryBody.id),
+      visibleCount: visibleRows.length,
+      readableCount: visibleReads.filter((response) => response.status === 200).length,
+      plaintexts,
+      physicalPayloadCount,
+      orphanCount: physicalPayloadCount - visibleRows.length,
     }, {
       retryStatus: 200,
-      returnedId: firstId,
-      physicalIds: [firstId],
-      payloadCount: 1,
-      indexCount: 1,
-      readStatus: 200,
-      plaintext: 'atomic payload',
-      listedIds: [firstId],
+      retryIsVisible: true,
+      visibleCount: expectedVisibleCount,
+      readableCount: expectedVisibleCount,
+      plaintexts: Array(expectedVisibleCount).fill('atomic payload'),
+      physicalPayloadCount: expectedPhysicalPayloadCount,
+      orphanCount: expectedPhysicalPayloadCount - expectedVisibleCount,
     });
   });
 }
-
-test('worker-envelope retry repairs an R2 index failure at the original readable ID', async () => {
-  const scenario = {
-    topology: 'r2-and-kv',
-    binding: 'kv',
-    keyKind: 'index',
-    phase: 'before',
-  };
-  const persistence = createFaultablePersistence({
-    topology: scenario.topology,
-    fault: scenario,
-  });
-  const env = createCoordinatedEnv({
-    ...persistence.bindings,
-    CE_STORAGE_ENVELOPE_KEK: DEPLOYMENT_KEK,
-  });
-  let durableConfig = createCloudflareConfig({ encryption: 'worker_envelope' });
-  bindConfigProjection(env, (nextConfig) => { durableConfig = nextConfig; });
-  await encryptPayloadWithStorageEnvelope({
-    env,
-    config: durableConfig,
-    slug: 'session-a',
-    payloadId: 'key-primer',
-    plaintextBytes: new TextEncoder().encode('key primer'),
-    contentType: 'text/plain',
-    deps: {
-      randomBytes: createSequenceRandomBytes(221),
-      putSessionConfig: async (_env, _slug, nextConfig) => { durableConfig = nextConfig; },
-    },
-  });
-  const randomBytes = createSequenceRandomBytes(231);
-  await attemptUpload({
-    env,
-    config: durableConfig,
-    request: createUploadRequest({ data: 'encrypted recovery' }),
-    randomBytes,
-    putSessionConfig: async (_env, _slug, nextConfig) => { durableConfig = nextConfig; },
-  });
-  const firstId = persistence.firstTargetId();
-  const retryResponse = await upload({
-    env,
-    config: durableConfig,
-    request: createUploadRequest({ data: 'encrypted recovery' }),
-    randomBytes,
-    putSessionConfig: async (_env, _slug, nextConfig) => { durableConfig = nextConfig; },
-  });
-  const retryBody = await readJson(retryResponse);
-  const readResponse = await readStoredPayload({
-    env,
-    config: durableConfig,
-    id: firstId,
-    suffix: '-encrypted',
-  });
-
-  assert.deepEqual({
-    retryStatus: retryResponse.status,
-    returnedId: retryBody.id,
-    objectCount: persistence.r2Store.size,
-    indexCount: [...persistence.kvStore.keys()]
-      .filter((key) => key.startsWith('ce-storage:')).length,
-    readStatus: readResponse.status,
-    plaintext: readResponse.status === 200 ? await readResponse.text() : '<unreadable>',
-  }, {
-    retryStatus: 200,
-    returnedId: firstId,
-    objectCount: 1,
-    indexCount: 1,
-    readStatus: 200,
-    plaintext: 'encrypted recovery',
-  });
-});
 
 test('R2-only worker-envelope upload fails closed without creating an object', async () => {
   const persistence = createFaultablePersistence({ topology: 'r2-only' });
@@ -750,86 +615,6 @@ test('first-use config projection failure leaves a readable retry', async () => 
     indexCount: 1,
     readStatus: 200,
     plaintext: 'atomic payload',
-  });
-});
-
-test('interrupted rotation preserves readability and succeeds on retry', async () => {
-  const persistence = createFaultablePersistence({ topology: 'kv-only' });
-  const env = createCoordinatedEnv({
-    ...persistence.bindings,
-    CE_STORAGE_ENVELOPE_KEK: DEPLOYMENT_KEK,
-  });
-  let durableConfig = createCloudflareConfig({ encryption: 'worker_envelope' });
-  const uploadResponse = await upload({
-    env,
-    config: durableConfig,
-    request: createUploadRequest({ data: 'rotation payload' }),
-    randomBytes: createSequenceRandomBytes(241),
-    putSessionConfig: async (_env, _slug, nextConfig) => { durableConfig = nextConfig; },
-  });
-  const uploadBody = await readJson(uploadResponse);
-  let configFaultFired = false;
-  bindConfigProjection(env, (nextConfig) => {
-    if (!configFaultFired) {
-      configFaultFired = true;
-      throw new Error('injected config before-write failure');
-    }
-    durableConfig = nextConfig;
-  });
-  try {
-    await rotateStorageEnvelopeKeys({
-      env,
-      slug: 'session-a',
-      config: durableConfig,
-      deps: {
-        randomBytes: createSequenceRandomBytes(201),
-        now: () => Date.parse('2026-07-15T13:00:00.000Z'),
-      },
-    });
-  } catch {
-    // The durable invariant below is the contract, independent of error shape.
-  }
-  const immediate = await readStoredPayload({
-    env,
-    config: durableConfig,
-    id: uploadBody.id,
-    suffix: '-interrupted',
-  });
-  let retrySucceeded = true;
-  try {
-    await rotateStorageEnvelopeKeys({
-      env,
-      slug: 'session-a',
-      config: durableConfig,
-      deps: {
-        randomBytes: createSequenceRandomBytes(221),
-        now: () => Date.parse('2026-07-15T14:00:00.000Z'),
-      },
-    });
-  } catch {
-    retrySucceeded = false;
-  }
-  const recovered = await readStoredPayload({
-    env,
-    config: durableConfig,
-    id: uploadBody.id,
-    suffix: '-recovered',
-  });
-
-  assert.deepEqual({
-    configFaultFired,
-    immediateStatus: immediate.status,
-    immediatePlaintext: immediate.status === 200 ? await immediate.text() : '<unreadable>',
-    retrySucceeded,
-    recoveredStatus: recovered.status,
-    recoveredPlaintext: recovered.status === 200 ? await recovered.text() : '<unreadable>',
-  }, {
-    configFaultFired: true,
-    immediateStatus: 200,
-    immediatePlaintext: 'rotation payload',
-    retrySucceeded: true,
-    recoveredStatus: 200,
-    recoveredPlaintext: 'rotation payload',
   });
 });
 
@@ -927,7 +712,7 @@ test('whole-config writers preserve first-use envelope keys and their own update
   })));
 });
 
-test('minimal legacy envelope records remain readable through the previous deployment KEK', async () => {
+test('previous deployment KEK preserves wrapped key bytes across new legacy-envelope writes', async () => {
   const oldKek = 'storage-atomicity-test-legacy-old-kek';
   const encryptEnv = createCoordinatedEnv({ CE_STORAGE_ENVELOPE_KEK: oldKek });
   const initialConfig = createCloudflareConfig({ encryption: 'worker_envelope' });
@@ -946,18 +731,53 @@ test('minimal legacy envelope records remain readable through the previous deplo
       putSessionConfig: async (_env, _slug, nextConfig) => { persistedConfig = nextConfig; },
     },
   });
-  const decryptEnv = createCoordinatedEnv({
+  const legacyConfig = minimalLegacySessionConfig(persistedConfig);
+  const fallbackEnv = createCoordinatedEnv({
     CE_STORAGE_ENVELOPE_KEK: 'storage-atomicity-test-legacy-new-kek',
     CE_STORAGE_ENVELOPE_PREVIOUS_KEK: oldKek,
   });
+  let projectedConfig = null;
+  bindConfigProjection(fallbackEnv, (nextConfig) => { projectedConfig = nextConfig; });
+  const laterEncrypted = await encryptPayloadWithStorageEnvelope({
+    env: fallbackEnv,
+    config: legacyConfig,
+    slug: 'session-a',
+    payloadId: 'later-legacy-payload',
+    plaintextBytes: new TextEncoder().encode('later legacy payload'),
+    contentType: 'text/plain',
+    deps: {
+      randomBytes: createSequenceRandomBytes(231),
+      now: () => Date.parse('2025-01-02T00:00:00.000Z'),
+    },
+  });
+  assert.equal(
+    laterEncrypted.config.storageEnvelope.sessionKey.iv,
+    legacyConfig.storageEnvelope.sessionKey.iv,
+  );
+  assert.equal(
+    laterEncrypted.config.storageEnvelope.sessionKey.wrappedKey,
+    legacyConfig.storageEnvelope.sessionKey.wrappedKey,
+  );
+  assert.deepEqual(projectedConfig, laterEncrypted.config);
+
+  const restoredEnv = createCoordinatedEnv({ CE_STORAGE_ENVELOPE_KEK: oldKek });
   const plaintext = await decryptPayloadWithStorageEnvelope({
-    env: decryptEnv,
-    config: minimalLegacySessionConfig(persistedConfig),
+    env: restoredEnv,
+    config: laterEncrypted.config,
     slug: 'session-a',
     payloadId: 'legacy-payload',
     ciphertextBytes: encrypted.ciphertextBytes,
     envelope: minimalLegacyPayloadEnvelope(encrypted.envelope),
   });
+  const laterPlaintext = await decryptPayloadWithStorageEnvelope({
+    env: restoredEnv,
+    config: laterEncrypted.config,
+    slug: 'session-a',
+    payloadId: 'later-legacy-payload',
+    ciphertextBytes: laterEncrypted.ciphertextBytes,
+    envelope: minimalLegacyPayloadEnvelope(laterEncrypted.envelope),
+  });
 
   assert.equal(new TextDecoder().decode(plaintext), 'legacy readable payload');
+  assert.equal(new TextDecoder().decode(laterPlaintext), 'later legacy payload');
 });

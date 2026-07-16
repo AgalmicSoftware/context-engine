@@ -4,5 +4,6 @@ TOKEN_HMAC_SECRET=""
 # Required only for storageProfile.payloadAccessControl.encryption = "worker_envelope".
 CE_STORAGE_ENVELOPE_KEK=""
 
-# Optional during deployment-secret replacement while old session KEKs are rewrapped.
+# Temporary break-glass unwrap fallback after a mistaken deployment-secret replacement.
+# Restore the original CE_STORAGE_ENVELOPE_KEK, verify reads, then remove this value.
 # CE_STORAGE_ENVELOPE_PREVIOUS_KEK=""

@@ -361,52 +361,6 @@ test('SessionWriteCoordinator applies stale admin mutations to the authoritative
   assert.equal(projections[1].storageEnvelope.sessionKey.wrappedKey, candidate.wrappedKey);
 });
 
-test('SessionWriteCoordinator keeps an activated wrapped key authoritative over later stale mutations', async () => {
-  const { state } = createTransactionalState();
-  const projections = [];
-  const coordinator = new SessionWriteCoordinator(state, {}, {
-    putSessionConfig: async (_env, _slug, config) => { projections.push(config); },
-  });
-  const firstCandidate = createWrappedCandidate('H');
-  const activatedCandidate = {
-    ...createWrappedCandidate('I'),
-    keyId: 'session:session-a:2026-07-15T13:00:00.000Z',
-    createdAt: '2026-07-15T13:00:00.000Z',
-  };
-  await coordinator.fetch(createSessionConfigRequest({
-    path: '/session-config/storage-envelope-key/get-or-create',
-    candidateRecord: firstCandidate,
-  }));
-  const activatedConfig = {
-    ...projections.at(-1),
-    storageEnvelope: {
-      ...projections.at(-1).storageEnvelope,
-      sessionKey: activatedCandidate,
-      rotatedAt: activatedCandidate.createdAt,
-    },
-  };
-  const activationResponse = await coordinator.fetch(createCoordinatorRequest(
-    '/session-config/storage-envelope-key/activate',
-    {
-      slug: 'session-a',
-      baseConfig: activatedConfig,
-      candidateRecord: activatedCandidate,
-    },
-  ));
-  const mutationResponse = await coordinator.fetch(createSessionConfigRequest({
-    path: '/session-config/mutate',
-    mutation: { kind: 'set-config', incomingConfig: { sessionName: 'After rotation' } },
-  }));
-
-  assert.equal(activationResponse.status, 200);
-  assert.equal(mutationResponse.status, 200);
-  assert.equal(projections.at(-1).sessionName, 'After rotation');
-  assert.equal(
-    projections.at(-1).storageEnvelope.sessionKey.wrappedKey,
-    activatedCandidate.wrappedKey,
-  );
-});
-
 test('SessionWriteCoordinator chooses one payload before concurrent sponsored deploy mutation', async () => {
   const { state, store } = createTransactionalState();
   let releaseFirst;

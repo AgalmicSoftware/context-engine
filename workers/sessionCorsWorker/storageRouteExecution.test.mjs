@@ -8,10 +8,6 @@ import {
 import { dispatchAuthenticatedSecretPathRoute } from './authenticatedSecretPathRouteDispatch.js';
 import { getSessionSecrets } from './sessionConfigSecretsStore.js';
 import { createWorkerExecutionServicesWithWorkerDeps } from './workerExecutionServiceBinding.js';
-import {
-  rewrapStorageEnvelopeSessionKeyForDeployment,
-  rotateStorageEnvelopeKeys,
-} from './storageEnvelopeEncryption.js';
 import { resolveRpcUrlListForGate } from './gateRpcResolution.js';
 import { createEthersInterfaceProviderGateHelpersWithWorkerDeps } from './ethersInterfaceProviderGateBinding.js';
 import { PRIVATE_SESSION_RPC_LABEL } from './rpcDiagnosticSafety.js';
@@ -2379,7 +2375,7 @@ test('storageRoute worker_envelope stores ciphertext only and audits successful 
   );
 });
 
-test('storageRoute lazily upgrades a legacy wrapped session key before a new envelope write', async () => {
+test('storageRoute normalizes legacy key metadata without rewrapping before a new envelope write', async () => {
   const kv = createMockKv();
   const firstEnv = {
     CE_STORAGE_INDEX_KV: kv,
@@ -2419,6 +2415,8 @@ test('storageRoute lazily upgrades a legacy wrapped session key before a new env
   assert.equal(upgraded.response.status, 200);
   assert.equal(legacyConfig.storageEnvelope.sessionKey.version, 1);
   assert.equal(legacyConfig.storageEnvelope.sessionKey.keyProvider, 'worker_secret');
+  assert.equal(legacyConfig.storageEnvelope.sessionKey.iv, legacyKey.iv);
+  assert.equal(legacyConfig.storageEnvelope.sessionKey.wrappedKey, legacyKey.wrappedKey);
   const read = (id, auditId) => storageRoute({
     path: '/storage/read',
     method: 'GET',
@@ -2709,6 +2707,7 @@ test('exportCloudflareEncryptedPayloadEnvelopes emits ciphertext and envelope me
   assert.equal(exported.manifest.encryptedPayloadCount, 2, JSON.stringify(exported, null, 2));
   assert.equal(exported.manifest.wrappedKeysIncluded, true);
   assert.equal(exported.manifest.keyProvider, 'mixed');
+  assert.equal(exported.manifest.deploymentKekContinuityRequired, true);
   assert.equal(exported.manifest.rewrapRequiredForNewDeployment, true);
   assert.ok(exported.sessionEnvelope.sessionKey.wrappedKey);
   const dump = JSON.stringify(exported);
@@ -2727,6 +2726,28 @@ test('exportCloudflareEncryptedPayloadEnvelopes emits ciphertext and envelope me
   assert.equal(litEntry.keyProvider, 'lit');
   assert.equal(litEntry.ciphertextBase64url, 'bGl0IGNpcGhlcnRleHQgYm9keQ');
   assert.equal(litEntry.wrappedKeysIncluded, false);
+
+  const litOnly = await exportCloudflareEncryptedPayloadEnvelopes({
+    env,
+    config: litConfig,
+    slug: 'session-a',
+    resource: 'responses',
+    includeSessionEnvelope: false,
+    deps: { now: () => Date.parse('2026-01-02T03:06:00.000Z') },
+  });
+  assert.equal(litOnly.manifest.keyProvider, 'lit');
+  assert.equal(litOnly.manifest.deploymentKekContinuityRequired, false);
+  assert.equal(litOnly.manifest.rewrapRequiredForNewDeployment, false);
+
+  const emptyLit = await exportCloudflareEncryptedPayloadEnvelopes({
+    env,
+    config: litConfig,
+    slug: 'session-a',
+    resource: 'missing-resource',
+    includeSessionEnvelope: false,
+  });
+  assert.equal(emptyLit.manifest.deploymentKekContinuityRequired, false);
+  assert.equal(emptyLit.manifest.rewrapRequiredForNewDeployment, false);
 });
 
 test('storageRoute /storage/export-envelopes omits session key material', async () => {
@@ -2836,133 +2857,6 @@ test('exportCloudflareEncryptedPayloadEnvelopes counts encrypted rows when paylo
     id: body.storageRef.id,
     error: 'payload_bytes_missing',
   }]);
-});
-
-test('rotateStorageEnvelopeKeys fails closed before changing payload or config state', async () => {
-  const kv = createMockKv();
-  const env = {
-    CE_STORAGE_INDEX_KV: kv,
-    CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
-  };
-  let config = createEnvelopeConfig();
-  const setConfig = (nextConfig) => { config = nextConfig; };
-  const { body } = await uploadEnvelopePayload({
-    env,
-    config,
-    setConfig,
-    deps: { randomBytes: createSequenceRandomBytes(1) },
-  });
-  const configBefore = structuredClone(config);
-  const storageBefore = structuredClone([...kv.store.entries()]);
-  let projectionCalls = 0;
-
-  await assert.rejects(
-    rotateStorageEnvelopeKeys({
-      env,
-      slug: 'session-a',
-      config,
-      deps: {
-        putSessionConfig: async () => { projectionCalls += 1; },
-        randomBytes: createSequenceRandomBytes(101),
-        now: () => Date.parse('2026-01-03T03:04:05.000Z'),
-      },
-    }),
-    (error) => {
-      assert.equal(error.status, 409);
-      assert.equal(
-        error.message,
-        'Storage envelope session-key rotation is disabled until interrupted rotations can be resumed safely.',
-      );
-      return true;
-    },
-  );
-  assert.equal(projectionCalls, 0);
-  assert.deepEqual(config, configBefore);
-  assert.deepEqual([...kv.store.entries()], storageBefore);
-
-  const readResponse = await storageRoute({
-    path: '/storage/read',
-    method: 'GET',
-    request: new Request(`https://worker.example/storage/read?id=${body.storageRef.id}`),
-    env,
-    config,
-    slug: 'session-a',
-    uploaderAddress: '',
-    baseHeaders: {},
-    deps: { json, randomUUID: () => 'audit-rotation-read' },
-  });
-  assert.equal(readResponse.status, 200);
-  assert.equal(await readResponse.text(), 'classified payload');
-});
-
-test('rewrapStorageEnvelopeSessionKeyForDeployment changes no ciphertext bytes and retires the old KEK', async () => {
-  const kv = createMockKv();
-  const env = {
-    CE_STORAGE_INDEX_KV: kv,
-    CE_STORAGE_ENVELOPE_KEK: 'test deployment envelope kek',
-  };
-  let config = createEnvelopeConfig();
-  const setConfig = (nextConfig) => { config = nextConfig; };
-  const { body } = await uploadEnvelopePayload({
-    env,
-    config,
-    setConfig,
-    data: 'rehomed classified payload',
-    deps: { randomBytes: createSequenceRandomBytes(151) },
-  });
-  const payloadKey = `ce-storage-payload:session-a:${body.storageRef.id}`;
-  const beforePayload = JSON.parse(kv.store.get(payloadKey));
-  const beforeMetadata = await readStorageIndexMetadata(kv, 'session-a', 'docsContext', body.storageRef.id);
-  const beforeSessionWrappedKey = config.storageEnvelope.sessionKey.wrappedKey;
-
-  const rewrapped = await rewrapStorageEnvelopeSessionKeyForDeployment({
-    env,
-    slug: 'session-a',
-    config,
-    newDeploymentKek: 'new deployment envelope kek',
-    deps: {
-      putSessionConfig: async (_env, _slug, nextConfig) => setConfig(nextConfig),
-      now: () => Date.parse('2026-01-04T03:04:05.000Z'),
-    },
-  });
-  assert.equal(rewrapped.ok, true);
-  assert.equal(rewrapped.keyProvider, 'worker_secret');
-  assert.notEqual(config.storageEnvelope.sessionKey.wrappedKey, beforeSessionWrappedKey);
-
-  const afterPayload = JSON.parse(kv.store.get(payloadKey));
-  const afterMetadata = await readStorageIndexMetadata(kv, 'session-a', 'docsContext', body.storageRef.id);
-  assert.equal(afterPayload.payloadBase64url, beforePayload.payloadBase64url);
-  assert.equal(afterMetadata.envelope.dek.wrappedKey, beforeMetadata.envelope.dek.wrappedKey);
-
-  const oldReadResponse = await storageRoute({
-    path: '/storage/read',
-    method: 'GET',
-    request: new Request(`https://worker.example/storage/read?id=${body.storageRef.id}`),
-    env,
-    config,
-    slug: 'session-a',
-    uploaderAddress: '',
-    baseHeaders: {},
-    deps: { json, randomUUID: () => 'audit-old-kek-read' },
-  });
-  assert.equal(oldReadResponse.status, 403);
-
-  const newReadResponse = await storageRoute({
-    path: '/storage/read',
-    method: 'GET',
-    request: new Request(`https://worker.example/storage/read?id=${body.storageRef.id}`),
-    env: {
-      CE_STORAGE_INDEX_KV: kv,
-      CE_STORAGE_ENVELOPE_KEK: 'new deployment envelope kek',
-    },
-    config,
-    slug: 'session-a',
-    uploaderAddress: '',
-    baseHeaders: {},
-    deps: { json, randomUUID: () => 'audit-new-kek-read' },
-  });
-  assert.equal(newReadResponse.status, 200);
-  assert.equal(await newReadResponse.text(), 'rehomed classified payload');
 });
 
 test('storageRoute lists Cloudflare refs from the metadata index without raw object keys', async () => {

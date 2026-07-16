@@ -140,10 +140,10 @@ test('buildTelegramResponseExportArchive exports envelopes without decrypting Te
   assert.equal(fetchCalls.some((url) => url.includes('/storage/export-envelopes?resource=responses')), true);
   assert.equal(fetchCalls.some((url) => url.includes('/storage/read')), false);
   assert.equal(fetchCalls.some((url) => url.includes('/storage/list')), false);
-  assert.doesNotMatch(
-    new TextDecoder().decode(archive.document.bytes),
-    /plaintext answer should not export/
-  );
+  const archiveText = new TextDecoder().decode(archive.document.bytes);
+  assert.doesNotMatch(archiveText, /plaintext answer should not export/);
+  assert.match(archiveText, /"deploymentKekContinuityRequired": true/);
+  assert.match(archiveText, /"rewrapRequiredForNewDeployment": true/);
 });
 
 test('buildTelegramResponseExportArchive fails closed when encrypted envelope export is unavailable', async () => {
@@ -244,7 +244,7 @@ test('buildTelegramResponseExportArchive does not synthesize plaintext for empty
           readErrors: [],
           wrappedKeysIncluded: false,
           keyProvider: 'worker_secret',
-          rewrapRequiredForNewDeployment: true,
+          deploymentKekContinuityRequired: true,
         },
         payloads: [],
       });

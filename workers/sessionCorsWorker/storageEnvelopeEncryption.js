@@ -1,16 +1,10 @@
-import {
-  activateCoordinatedStorageEnvelopeSessionKey,
-  getOrCreateCoordinatedStorageEnvelopeSessionKey,
-} from './sessionWriteCoordinator.js';
+import { getOrCreateCoordinatedStorageEnvelopeSessionKey } from './sessionWriteCoordinator.js';
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
 export const STORAGE_ENVELOPE_KEK_SECRET_NAME = 'CE_STORAGE_ENVELOPE_KEK';
 export const STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME = 'CE_STORAGE_ENVELOPE_PREVIOUS_KEK';
-export const STORAGE_ENVELOPE_ROTATION_DISABLED_ERROR =
-  'Storage envelope session-key rotation is disabled until interrupted rotations can be resumed safely.';
-
 const ENVELOPE_VERSION = 1;
 const AES_GCM = 'AES-GCM';
 const AES_256_GCM = 'AES-256-GCM';
@@ -102,11 +96,6 @@ const importDeploymentKek = async ({ env = {}, previous = false, deps = {} } = {
   return importAesKey(keyBytes, ['encrypt', 'decrypt'], deps);
 };
 
-const importDeploymentKekFromSecret = async ({ secret, deps = {} } = {}) => {
-  const keyBytes = await deriveDeploymentKeyBytes(secret, deps);
-  return importAesKey(keyBytes, ['encrypt', 'decrypt'], deps);
-};
-
 const aesEncrypt = async ({ keyBytes, plaintextBytes, aad = '', deps = {} }) => {
   const iv = randomBytes(12, deps);
   const key = await importAesKey(keyBytes, ['encrypt'], deps);
@@ -172,17 +161,6 @@ const isCoordinatorWrappedSessionKeyRecord = (record, slug) => {
   );
 };
 
-const buildSessionEnvelopeConfig = ({ config, sessionKeyRecord, rotatedAt }) => ({
-  ...cloneJson(config),
-  storageEnvelope: {
-    ...(isObj(config?.storageEnvelope) ? cloneJson(config.storageEnvelope) : {}),
-    version: ENVELOPE_VERSION,
-    keyProvider: 'worker_secret',
-    sessionKey: sessionKeyRecord,
-    ...(rotatedAt ? { rotatedAt } : {}),
-  },
-});
-
 const unwrapSessionKeyBytes = async ({ env, config, slug, deps = {} }) => {
   const record = readSessionKeyRecord(config);
   if (!record) throw new Error('Storage envelope session key is missing.');
@@ -206,10 +184,24 @@ const unwrapSessionKeyBytes = async ({ env, config, slug, deps = {} }) => {
 export const ensureStorageEnvelopeSessionKey = async ({ env, config, slug, deps = {} }) => {
   const existing = readSessionKeyRecord(config);
   let candidateRecord = existing;
-  if (!isCoordinatorWrappedSessionKeyRecord(candidateRecord, slug)) {
-    const keyBytes = existing
-      ? await unwrapSessionKeyBytes({ env, config, slug, deps })
-      : randomBytes(32, deps);
+  if (existing && !isCoordinatorWrappedSessionKeyRecord(existing, slug)) {
+    // Verify the legacy bytes with the current/fallback KEK, but never rewrap
+    // them during an upload. Rewrapping could silently bind the session to a
+    // mistaken current secret; only the coordinator metadata is normalized.
+    await unwrapSessionKeyBytes({ env, config, slug, deps });
+    const createdAt = nowIso(deps);
+    candidateRecord = {
+      version: ENVELOPE_VERSION,
+      keyProvider: 'worker_secret',
+      keyId: `session:${safeSlugPart(slug)}:${createdAt}`,
+      createdAt,
+      alg: AES_256_GCM,
+      wrapAlg: 'AES-GCM-KW-v1',
+      iv: existing.iv,
+      wrappedKey: existing.wrappedKey,
+    };
+  } else if (!candidateRecord) {
+    const keyBytes = randomBytes(32, deps);
     const deploymentKey = await importDeploymentKek({ env, deps });
     const createdAt = nowIso(deps);
     candidateRecord = {
@@ -323,54 +315,6 @@ export const decryptPayloadWithStorageEnvelope = async ({
     aad,
     deps,
   });
-};
-
-export const rotateStorageEnvelopeKeys = async () => {
-  // Rewriting many payload DEKs before activating their new session key can
-  // strand every rewritten payload after an interruption. Stay fail-closed
-  // until reads can safely retain and select both old and new keys.
-  const error = new Error(STORAGE_ENVELOPE_ROTATION_DISABLED_ERROR);
-  error.status = 409;
-  throw error;
-};
-
-export const rewrapStorageEnvelopeSessionKeyForDeployment = async ({
-  env = {},
-  slug,
-  config,
-  newDeploymentKek,
-  deps = {},
-} = {}) => {
-  const sessionKeyBytes = await unwrapSessionKeyBytes({ env, config, slug, deps });
-  const nextDeploymentKey = await importDeploymentKekFromSecret({ secret: newDeploymentKek, deps });
-  const rewrappedAt = nowIso(deps);
-  const sessionKeyRecord = {
-    version: ENVELOPE_VERSION,
-    keyProvider: 'worker_secret',
-    keyId: `session:${safeSlugPart(slug)}:${rewrappedAt}`,
-    createdAt: rewrappedAt,
-    ...await wrapBytesWithKey({
-      wrappingKey: nextDeploymentKey,
-      plaintextBytes: sessionKeyBytes,
-      aad: `ce-storage-envelope:session:${safeSlugPart(slug)}`,
-      deps,
-    }),
-  };
-  const nextConfig = buildSessionEnvelopeConfig({ config, sessionKeyRecord, rotatedAt: rewrappedAt });
-  const activate = deps.activateCoordinatedStorageEnvelopeSessionKey ||
-    activateCoordinatedStorageEnvelopeSessionKey;
-  const coordinated = await activate({
-    env,
-    slug,
-    config: nextConfig,
-    candidateRecord: sessionKeyRecord,
-  });
-  return {
-    ok: true,
-    rewrappedAt,
-    config: coordinated.config,
-    keyProvider: 'worker_secret',
-  };
 };
 
 const resolveAuditD1 = (env = {}) => env.CE_STORAGE_AUDIT_D1 || env.STORAGE_AUDIT_D1 || env.D1 || env.DB || null;

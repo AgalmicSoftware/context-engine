@@ -35,6 +35,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Serialized first-use worker-envelope keys and signed session-config writes
+  through one per-session coordinator, rejected unreadable R2-only envelope
+  writes, and removed unsafe unused key-changing Admin actions. Cloudflare
+  uploads retain documented at-least-once retry behavior.
 - Hardened the `Surveys` source contract and client preflight so zero survey or
   question IDs, zero content or response hashes, and mismatched optional
   survey-response pairs fail before ambiguous state or wallet submission.

@@ -271,68 +271,6 @@ export class SessionWriteCoordinator {
     });
   }
 
-  async executeStorageEnvelopeKeyActivation(payload) {
-    return this.serializeSessionConfigOperation(async () => {
-      const slug = normalizeSessionSlug(payload?.slug);
-      const incomingConfig = slug
-        ? normalizePublicSessionConfig(payload?.baseConfig, slug)
-        : null;
-      const candidate = normalizeWrappedSessionKeyRecord(payload?.candidateRecord, slug);
-      if (!slug || !incomingConfig || !candidate) {
-        return jsonResponse({ error: 'Invalid wrapped session-key activation.' }, 400);
-      }
-
-      try {
-        await this.repairPendingSessionConfigProjection();
-      } catch {
-        return jsonResponse({ error: 'Session config projection is pending; retry.' }, 503);
-      }
-
-      const reserved = await this.state.storage.transaction(async (transaction) => {
-        const existing = await transaction.get(SESSION_CONFIG_AUTHORITY_KEY);
-        if (existing && normalizeSessionSlug(existing.slug) !== slug) {
-          return { error: 'Session config authority identity conflict.', status: 409 };
-        }
-        const authorityConfig = existing?.config
-          ? normalizePublicSessionConfig(existing.config, slug)
-          : incomingConfig;
-        if (!authorityConfig) {
-          return { error: 'Invalid authoritative session config.', status: 409 };
-        }
-        const rotatedAt = toTrimmedString(incomingConfig?.storageEnvelope?.rotatedAt);
-        const nextConfig = {
-          ...authorityConfig,
-          storageEnvelope: {
-            ...(isObjectRecord(authorityConfig?.storageEnvelope)
-              ? authorityConfig.storageEnvelope
-              : {}),
-            version: 1,
-            keyProvider: 'worker_secret',
-            sessionKey: candidate,
-            ...(rotatedAt ? { rotatedAt } : {}),
-          },
-        };
-        const authority = {
-          schemaVersion: 1,
-          slug,
-          revision: Number(existing?.revision || 0) + 1,
-          config: nextConfig,
-          activeSessionKey: candidate,
-          projectionPending: true,
-        };
-        await transaction.put(SESSION_CONFIG_AUTHORITY_KEY, authority);
-        return { authority, config: nextConfig };
-      });
-      if (reserved?.error) return jsonResponse({ error: reserved.error }, reserved.status || 409);
-      try {
-        await this.projectSessionConfigAuthority(reserved.authority);
-      } catch {
-        return jsonResponse({ error: 'Session config projection is pending; retry.' }, 503);
-      }
-      return jsonResponse({ ok: true, config: reserved.config });
-    });
-  }
-
   async executeSessionConfigMutation(payload) {
     return this.serializeSessionConfigOperation(async () => {
       const slug = normalizeSessionSlug(payload?.slug);
@@ -722,9 +660,6 @@ export class SessionWriteCoordinator {
     if (url.pathname === '/session-config/storage-envelope-key/get-or-create') {
       return this.executeStorageEnvelopeKeyGetOrCreate(payload);
     }
-    if (url.pathname === '/session-config/storage-envelope-key/activate') {
-      return this.executeStorageEnvelopeKeyActivation(payload);
-    }
     if (url.pathname === '/session-config/mutate') {
       return this.executeSessionConfigMutation(payload);
     }
@@ -886,43 +821,6 @@ export const getOrCreateCoordinatedStorageEnvelopeSessionKey = async ({
         body: JSON.stringify({
           slug: normalizedSlug,
           baseConfig,
-          candidateRecord,
-        }),
-      },
-    );
-  } catch {
-    throw new Error('Session config coordination failed; retry.');
-  }
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok || result?.ok !== true) {
-    throw new Error(response.status === 503
-      ? 'Session config projection is pending; retry.'
-      : 'Session config coordination failed.');
-  }
-  return result;
-};
-
-export const activateCoordinatedStorageEnvelopeSessionKey = async ({
-  env,
-  slug,
-  config,
-  candidateRecord,
-} = {}) => {
-  const normalizedSlug = normalizeSessionSlug(slug);
-  const stub = normalizedSlug
-    ? await resolveCoordinatorStub(env, `session-config:${normalizedSlug}`)
-    : null;
-  if (!stub) throw new Error('Session config coordination is unavailable.');
-  let response;
-  try {
-    response = await stub.fetch(
-      'https://session-coordinator.internal/session-config/storage-envelope-key/activate',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          slug: normalizedSlug,
-          baseConfig: config,
           candidateRecord,
         }),
       },
