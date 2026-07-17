@@ -1567,6 +1567,40 @@ describe('SurveyResults question-mode polling and filter state', () => {
     // status-before-dispatch guarantee.
   });
 
+  it('reports a rejected manual survey refresh without leaking the state-callback rejection', async () => {
+    const surveyId = '0xABC';
+    mockPeekCacheSync(
+      buildPeekImpl({
+        surveysBucket: {
+          surveys: {},
+          surveyResponses: {},
+          surveyResponsesLatestBlock: { '0xabc': 100 },
+          surveysLatestBlock: 100,
+        },
+      }),
+    );
+    mockLatestBlock().mockResolvedValue(321);
+    const refreshSurveyResponsesByID = jest.fn().mockResolvedValue(undefined);
+    renderSurveyResults({
+      activeSessionSlug: 'edge',
+      isOpen: true,
+      preventUrlChange: true,
+      provider: {},
+      refreshSurveyResponsesByID,
+      surveyId,
+      viewMode: 'survey',
+    });
+    await flushAsync(10);
+
+    const error = new Error('atomic persistence failed');
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    refreshSurveyResponsesByID.mockRejectedValueOnce(error);
+
+    await clickManualRefresh();
+
+    expect(consoleError).toHaveBeenCalledWith('[surveys]', 'handleManualRefresh error:', error);
+  });
+
   it('manual refresh keeps missing latest block as a parent-owned status write', async () => {
     mockPeekCacheSync(
       buildPeekImpl({

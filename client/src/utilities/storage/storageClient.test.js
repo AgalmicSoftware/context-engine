@@ -1,4 +1,8 @@
-import { listSessionStorageRefs, readSessionStorageBlob, uploadDataToSessionStorage } from './storageClient.js';
+import {
+  listSessionStorageRefsPage,
+  readSessionStorageBlob,
+  uploadDataToSessionStorage,
+} from './storageClient.js';
 
 jest.mock('../arweave/arweaveClient.js', () => ({
   arweaveClient: {
@@ -145,17 +149,63 @@ describe('storageClient', () => {
       ),
     );
 
-    const items = await listSessionStorageRefs({
+    const page = await listSessionStorageRefsPage({
       sessionSlug: 'alpha',
       sessionConfig: { storageProfile: { backend: 'cloudflare' } },
       resource: 'questions',
     });
 
-    expect(items).toHaveLength(1);
+    expect(page.items).toHaveLength(1);
+    expect(page.listComplete).toBe(true);
     expect(fetchWorkerWithAuth).toHaveBeenCalledWith(
       'https://worker.example/storage/list?resource=questions',
       { method: 'GET' },
       expect.objectContaining({ preferAnonymous: true }),
     );
+  });
+
+  test('propagates Cloudflare list cursors through the typed page helper', async () => {
+    fetchWorkerWithAuth
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ items: [], cursor: 'page-two', listComplete: false }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [{ storageRef: { backend: 'cloudflare', id: 'cf_page_two' } }],
+            cursor: null,
+            listComplete: true,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+
+    const firstPage = await listSessionStorageRefsPage({
+      sessionSlug: 'alpha',
+      sessionConfig: { storageProfile: { backend: 'cloudflare' } },
+      resource: 'questions',
+      limit: 25,
+    });
+    const secondPage = await listSessionStorageRefsPage({
+      sessionSlug: 'alpha',
+      sessionConfig: { storageProfile: { backend: 'cloudflare' } },
+      resource: 'questions',
+      cursor: firstPage.cursor,
+      limit: 25,
+    });
+
+    expect(firstPage).toEqual({ items: [], cursor: 'page-two', listComplete: false });
+    expect(secondPage).toEqual({
+      items: [{ storageRef: { backend: 'cloudflare', id: 'cf_page_two' } }],
+      cursor: null,
+      listComplete: true,
+    });
+    expect(fetchWorkerWithAuth.mock.calls.map(([url]) => url)).toEqual([
+      'https://worker.example/storage/list?resource=questions&limit=25',
+      'https://worker.example/storage/list?resource=questions&cursor=page-two&limit=25',
+    ]);
   });
 });

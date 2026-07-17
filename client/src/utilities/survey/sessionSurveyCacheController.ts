@@ -4,9 +4,9 @@ import { normalizeArweaveFailureMeta, shouldStopPendingMetadataRetry } from '../
 import { prepareSurveyMetadataCacheEntry } from './metadataCacheEntryBuilders.js';
 import { resolveScopedMetadataSessionSlug } from '../session/metadataSessionBinding.js';
 import {
+  mergeSurveyResponseCacheSnapshot,
   normalizeSurveyResponseBatchResult,
   resolveSurveyResponseWatermark,
-  type SurveyResponseItem,
 } from './sessionSurveyResponseHelpers.js';
 import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
@@ -43,9 +43,10 @@ interface PendingSurveyMetadataEntry extends CacheRecord {
 }
 
 type PendingSurveyMetadataMap = Record<string, PendingSurveyMetadataEntry>;
-type SurveyResponseCacheByResponder = Record<string, unknown>;
-type SurveyResponsesBySurvey = Record<string, SurveyResponseCacheByResponder>;
+type SurveyResponsesBySurvey = Record<string, Record<string, unknown>>;
 type SurveyResponsesLatestBlock = Record<string, number>;
+type SurveysCache = Record<string, SurveyNetworkCache>;
+type SurveysCacheAtomicUpdater = (current: SurveysCache | null) => SurveysCache | Promise<SurveysCache>;
 
 interface SurveyNetworkCache extends CacheRecord {
   surveysLatestBlock: number;
@@ -133,6 +134,7 @@ export interface SessionSurveyCacheHost {
   isMounted?: () => boolean;
   dgRead?: (name: string, slug: string) => Record<string, unknown> | null | undefined;
   dgWrite?: (name: string, slug: string, value: Record<string, unknown>) => unknown;
+  updateSurveysCacheAtomic: (slug: string, updater: SurveysCacheAtomicUpdater) => Promise<boolean>;
   getActiveSessionSlug?: () => string;
   getSessionCfg?: (slug: string) => CacheRecord | null | undefined;
   getSessionChainId?: (slug: string) => string | number | null | undefined;
@@ -166,7 +168,7 @@ export interface SessionSurveyCacheController {
 const mainSiteLog = createLogger('mainSite');
 const surveyContractScripts = contractScripts as unknown as SurveyContractScripts;
 
-export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost = {}): SessionSurveyCacheController => {
+export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost): SessionSurveyCacheController => {
   let _surveyInitInFlight: Record<string, Promise<void> | undefined> = {};
   let _surveyInitPending: Record<string, SurveyInitOptions | undefined> = {};
   let _pendingSurveyMetadataRetryTimers: Record<string, ReturnType<typeof setTimeout> | undefined> = {};
@@ -934,6 +936,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
 
     const surveyIDLower = surveyID.toLowerCase();
     const surveyObj = surveysCache[netId].surveys[surveyIDLower];
+    const preFetchSurveyResponses = surveysCache[netId].surveyResponses[surveyIDLower] || {};
     const currentLocalBlock = Object.prototype.hasOwnProperty.call(
       surveysCache[netId].surveyResponsesLatestBlock,
       surveyIDLower,
@@ -956,20 +959,26 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
       await surveyContractScripts.fetchAllSurveyResponses('none', surveyIDLower, startBlock, latestChainBlock, slug),
     );
 
-    if (!surveysCache[netId].surveyResponses[surveyIDLower]) {
-      surveysCache[netId].surveyResponses[surveyIDLower] = {};
-    }
-    for (const item of surveyResponseBatch.responses) {
-      const responderAddr = item.responder.toLowerCase();
-      surveysCache[netId].surveyResponses[surveyIDLower][responderAddr] = item.response;
-    }
-    surveysCache[netId].surveyResponsesLatestBlock[surveyIDLower] = resolveSurveyResponseWatermark({
+    const safeResponseWatermark = resolveSurveyResponseWatermark({
       startBlock,
       latestBlock: latestChainBlock,
       hadPartialFailure: surveyResponseBatch.hadPartialFailure,
       lowestFailedBlock: surveyResponseBatch.lowestFailedBlock,
     });
-    dgWrite('surveysCache', slug, surveysCache);
+    const persisted = await host.updateSurveysCacheAtomic(slug, (current) =>
+      mergeSurveyResponseCacheSnapshot({
+        currentCache: current || {},
+        networkId: netId,
+        surveyId: surveyIDLower,
+        initialWatermark: initialLastBlockSurvey,
+        preFetchResponses: preFetchSurveyResponses,
+        fetchedResponses: surveyResponseBatch.responses,
+        safeResponseWatermark,
+      }),
+    );
+    if (!persisted) {
+      throw new Error(`Failed to persist survey responses for ${surveyIDLower}`);
+    }
     mainSiteLog.log('Survey responses updated for surveyID:', surveyIDLower);
     queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
   };

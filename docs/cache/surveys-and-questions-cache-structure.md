@@ -68,6 +68,10 @@ Semantics:
 - `surveys[surveyId].sessionSlugExplicit`: `true` when metadata authoritatively declared the session slug; `false` when the cache derived a slug from legacy name mapping or rebucketed unresolved metadata to general
 - `surveyResponses[surveyId][responder]`: latest known response payload for a survey responder
 - `pendingSurveyMetadata[surveyId]`: retry/backoff state for survey metadata that failed to hydrate from Arweave
+- Targeted survey-response refreshes atomically merge only the fetched responder delta into the
+  latest managed-cache snapshot. Trusted newer chain positions win same-responder conflicts;
+  older or equal positions stay unchanged. Unorderable concurrent values are preserved and leave
+  the frontier retryable. The client publishes its response revision only after the write succeeds.
 
 `pendingSurveyMetadata` entries may contain:
 

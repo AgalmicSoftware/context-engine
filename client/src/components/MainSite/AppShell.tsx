@@ -87,7 +87,7 @@ import {
 } from '../../utilities/survey/sessionResponseHydrationController.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
 import { t } from '../../utilities/ui/terminology.js';
-import { initCacheManager, subscribeCacheUpdates } from '../../utilities/cache/cacheScripts.js';
+import { initCacheManager, subscribeCacheUpdates, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import { createMainSiteDgStorage, type MainSiteDgStorage } from '../../utilities/cache/mainSiteDgStorage.js';
 import {
   createSessionCachePersistenceController,
@@ -801,6 +801,10 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     isMounted: () => this._mounted,
     dgRead: (name: string, slug: string) => this.readDgRecord(name, slug),
     dgWrite: (name: string, slug: string, value: Record<string, unknown>) => this.DG.write(name, slug, value),
+    updateSurveysCacheAtomic: async (slug, updater) => {
+      const updated = await updateCacheAtomic('surveysCache', slug, updater);
+      return updated !== null;
+    },
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
     getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),
     getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),

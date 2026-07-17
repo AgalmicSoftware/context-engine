@@ -35,6 +35,7 @@ const expectedLintCommand = [
   '"src/utilities/contracts/**/*.{ts,tsx}"',
   '"src/utilities/shared/**/*.{ts,tsx}"',
   '"src/utilities/ui/**/*.{ts,tsx}"',
+  '"src/utilities/storage/**/*.{ts,tsx}"',
   '"src/components/Shared/**/*.{ts,tsx}"',
   '"src/components/About/**/*.{ts,tsx}"',
   '"src/components/Footer/**/*.{ts,tsx}"',
@@ -117,6 +118,8 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("const typedTagsUtilityFiles = ['src/utilities/tags/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedContractsUtilityFiles = ['src/utilities/contracts/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedSharedUtilityFiles = ['src/utilities/shared/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedStorageUtilityFiles = ['src/utilities/storage/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain('files: typedStorageUtilityFiles');
     expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain(
       "const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']",

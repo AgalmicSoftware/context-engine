@@ -117,7 +117,7 @@ Arweave and Lit-Arweave listing is client-side via Arweave GraphQL:
 
 The client paginates via cursors and inserts newly uploaded txIds optimistically (to hide indexing lag).
 
-Cloudflare listing is session-scoped and worker-mediated via `GET /storage/list?resource=docsContext`. The returned items carry safe `storageRef` objects and tag-like metadata; raw R2 keys and bucket/account identifiers are not returned to the browser.
+Cloudflare listing is session-scoped and worker-mediated via `GET /storage/list?resource=docsContext`. Each request returns at most 100 raw index rows before per-item authorization filtering, plus an opaque `cursor` and `listComplete`. A filtered page can therefore contain no visible items and still require continuation; the document library keeps **Load more** available for that cursor and labels the page as having no accessible documents instead of silently draining later pages. Returned items carry safe `storageRef` objects and tag-like metadata; raw R2 keys and bucket/account identifiers are not returned to the browser.
 
 ## Encryption UX Rules (No Gate Fallback)
 

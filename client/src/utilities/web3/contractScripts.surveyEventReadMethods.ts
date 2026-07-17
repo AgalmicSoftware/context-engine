@@ -73,6 +73,7 @@ type LatestQuestionPair = {
 type LatestResponder = {
   responder: string;
   blockNumber: number;
+  transactionIndex: number;
   logIndex: number;
 };
 type SurveyResponseLookup = Record<string, Record<string, unknown>>;
@@ -800,17 +801,16 @@ export const createContractScriptsSurveyEventReadMethods = (
         surveyId: sId,
       });
       const rawLogs = await fetchLogsSmartWithProvider(provider, responseSubmittedEventTopic, fromBlockNum, toBlockNum);
-      const parsedEvents: Array<Pick<ParsedEventWithPosition, 'event' | 'blockNumber' | 'logIndex'>> = rawLogs.map(
-        (log: ContractLogLike) => ({
-          event: SURVEYS_INTERFACE.parseLog(log),
-          blockNumber: Number(log?.blockNumber || 0),
-          logIndex: Number(log?.logIndex || 0),
-        }),
-      );
+      const parsedEvents: ParsedEventWithPosition[] = rawLogs.map((log: ContractLogLike) => ({
+        event: SURVEYS_INTERFACE.parseLog(log),
+        blockNumber: Number(log?.blockNumber || 0),
+        transactionIndex: Number(log?.transactionIndex || 0),
+        logIndex: Number(log?.logIndex || 0),
+      }));
 
       // Deduplicate by responder; keep only the newest event to avoid repeated response fetches.
       const latestByResponder = new Map<string, LatestResponder>();
-      parsedEvents.forEach(({ event, blockNumber, logIndex }) => {
+      parsedEvents.forEach(({ event, blockNumber, transactionIndex, logIndex }) => {
         const responder = String(event?.args?.responder || '').toLowerCase();
         if (!responder) return;
         const prev = latestByResponder.get(responder);
@@ -819,13 +819,13 @@ export const createContractScriptsSurveyEventReadMethods = (
           blockNumber > Number(prev.blockNumber || 0) ||
           (blockNumber === Number(prev.blockNumber || 0) && logIndex > Number(prev.logIndex || 0));
         if (isNewer) {
-          latestByResponder.set(responder, { responder, blockNumber, logIndex });
+          latestByResponder.set(responder, { responder, blockNumber, transactionIndex, logIndex });
         }
       });
 
       const responderEntries = Array.from(latestByResponder.values());
       const responseReadResults = await Promise.all(
-        responderEntries.map(async ({ responder, blockNumber, logIndex }) => {
+        responderEntries.map(async ({ responder, blockNumber, transactionIndex, logIndex }) => {
           let blockTimestamp = 0;
           try {
             const blockData = await this.getBlockWithCaching(provider, blockNumber, providerName, String(chId));
@@ -853,6 +853,7 @@ export const createContractScriptsSurveyEventReadMethods = (
               response: surveyResponseData,
               timestamp: blockTimestamp,
               blockNumber,
+              transactionIndex,
               logIndex,
             },
           };

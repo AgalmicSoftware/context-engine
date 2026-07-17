@@ -42,6 +42,10 @@ trailing colon.
   - the cache layer does not immediately demote to localStorage on a single IndexedDB error
   - it falls back only after repeated consecutive IDB failures
 - Legacy localStorage keys are still migrated best-effort for older installs
+- Targeted per-survey response refreshes commit their managed-cache delta through the shared
+  serialized atomic updater. The updater receives the latest cache value, preserves unrelated
+  branches, and reports success only after persistence completes; this path does not publish a UI
+  revision when persistence fails.
 
 ## LocalStorage-only readiness flags
 

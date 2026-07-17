@@ -35,6 +35,18 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Made KV index rows authoritative for per-item Cloudflare R2 authorization
+  metadata: uploads now require a readable/writable index binding, and reads
+  fail closed without a valid matching row instead of falling back to weaker
+  object metadata.
+- Bounded Cloudflare storage listings to opaque-cursor pages and preserved
+  manual continuation in the Document Library when authorization filtering
+  produces an empty page with a later cursor.
+- Made targeted survey-response refreshes merge into the latest cache snapshot,
+  resolve concurrent same-responder updates without regressing newer or
+  unorderable values, keep scan watermarks monotonic, and publish their UI
+  revision only after durable cache persistence succeeds; detached initial
+  refresh failures are now caught and logged at the results lifecycle boundary.
 - Serialized first-use worker-envelope keys and signed session-config writes
   through one per-session coordinator, rejected unreadable R2-only envelope
   writes, and removed unsafe unused key-changing Admin actions. Cloudflare

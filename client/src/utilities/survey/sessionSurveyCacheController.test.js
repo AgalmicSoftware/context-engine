@@ -66,6 +66,20 @@ const createMockHost = (overrides = {}) => {
     ...deepClone(initialState || {}),
   };
   const storage = deepClone(initialStorage || {});
+  let atomicUpdateTail = Promise.resolve();
+
+  const updateSurveysCacheAtomic = jest.fn((slug, updater) => {
+    const operation = atomicUpdateTail.then(async () => {
+      await Promise.resolve();
+      const current = storage.surveysCache?.[slug] ?? null;
+      const next = await updater(deepClone(current));
+      if (!storage.surveysCache) storage.surveysCache = {};
+      storage.surveysCache[slug] = deepClone(next);
+      return true;
+    });
+    atomicUpdateTail = operation.catch(() => undefined);
+    return operation;
+  });
 
   return {
     setState: jest.fn((updater, cb) => {
@@ -81,11 +95,13 @@ const createMockHost = (overrides = {}) => {
       }
       return deepClone(bucket[slug]);
     }),
-    dgWrite: jest.fn((key, slug, value) => {
+    dgWrite: jest.fn(async (key, slug, value) => {
+      await Promise.resolve();
       if (!storage[key]) storage[key] = {};
       storage[key][slug] = deepClone(value);
       return true;
     }),
+    updateSurveysCacheAtomic,
     getActiveSessionSlug: jest.fn(() => activeSlug || 'test-slug'),
     getSessionCfg: jest.fn((slug) => ({
       slug,
@@ -708,6 +724,495 @@ describe('createSessionSurveyCacheController', () => {
       expect(host.queueLocalRevisionUpdate).toHaveBeenCalledWith({
         needsQuestionResponsesNonce: true,
       });
+    });
+
+    it('preserves old, concurrent, and fetched responders across an interleaved refresh', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 6,
+                surveys: { surv1: { creationBlock: 5 } },
+                surveyResponses: {
+                  surv1: {
+                    '0xold': { choice: 'old' },
+                  },
+                },
+                surveyResponsesLatestBlock: { surv1: 6 },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSurveyCacheController(host);
+      const fetchStarted = createDeferred();
+      const responseBatch = createDeferred();
+
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 10 });
+      contractScripts.fetchAllSurveyResponses.mockImplementation(() => {
+        fetchStarted.resolve();
+        return responseBatch.promise;
+      });
+
+      const refreshPromise = controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1');
+      await fetchStarted.promise;
+      await host.updateSurveysCacheAtomic('alpha', (current) => {
+        current['11155420'].surveyResponses.surv1['0xconcurrent'] = { choice: 'concurrent' };
+        return current;
+      });
+      responseBatch.resolve([{ responder: '0xFETCHED', response: { choice: 'fetched' } }]);
+      await refreshPromise;
+
+      expect(host.getStored('surveysCache', 'alpha')['11155420'].surveyResponses.surv1).toEqual({
+        '0xold': { choice: 'old' },
+        '0xconcurrent': { choice: 'concurrent' },
+        '0xfetched': { choice: 'fetched' },
+      });
+    });
+
+    it('does not move a fresher concurrent response watermark backward after a successful refresh', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 6,
+                surveys: { surv1: { creationBlock: 5 } },
+                surveyResponses: { surv1: {} },
+                surveyResponsesLatestBlock: { surv1: 6 },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSurveyCacheController(host);
+      const fetchStarted = createDeferred();
+      const responseBatch = createDeferred();
+
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 10 });
+      contractScripts.fetchAllSurveyResponses.mockImplementation(() => {
+        fetchStarted.resolve();
+        return responseBatch.promise;
+      });
+
+      const refreshPromise = controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1');
+      await fetchStarted.promise;
+      await host.updateSurveysCacheAtomic('alpha', (current) => {
+        current['11155420'].surveyResponsesLatestBlock.surv1 = 14;
+        return current;
+      });
+      responseBatch.resolve([]);
+      await refreshPromise;
+
+      expect(host.getStored('surveysCache', 'alpha')['11155420'].surveyResponsesLatestBlock.surv1).toBe(14);
+    });
+
+    it('does not let an older overlapping refresh replace a newer response from the same responder', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 6,
+                surveys: { surv1: { creationBlock: 5 } },
+                surveyResponses: {
+                  surv1: {
+                    '0xsame': { choice: 'initial' },
+                  },
+                },
+                surveyResponsesLatestBlock: { surv1: 6 },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSurveyCacheController(host);
+      const olderFetchStarted = createDeferred();
+      const olderResponseBatch = createDeferred();
+
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockResolvedValueOnce({ fromBlock: 1, toBlock: 10 })
+        .mockResolvedValueOnce({ fromBlock: 1, toBlock: 14 });
+      contractScripts.fetchAllSurveyResponses.mockImplementation((_provider, _surveyId, _startBlock, latestBlock) => {
+        if (latestBlock === 10) {
+          olderFetchStarted.resolve();
+          return olderResponseBatch.promise;
+        }
+        return Promise.resolve([{ responder: '0xSAME', response: { choice: 'newer' } }]);
+      });
+
+      const olderRefresh = controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1');
+      await olderFetchStarted.promise;
+      await controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1');
+      olderResponseBatch.resolve([{ responder: '0xSAME', response: { choice: 'older' } }]);
+      await olderRefresh;
+
+      const storedSurvey = host.getStored('surveysCache', 'alpha')['11155420'];
+      expect(storedSurvey.surveyResponses.surv1['0xsame']).toEqual({ choice: 'newer' });
+      expect(storedSurvey.surveyResponsesLatestBlock.surv1).toBe(14);
+    });
+
+    it('applies a newer in-flight scan after an older overlapping scan commits first', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 6,
+                surveys: { surv1: { creationBlock: 5 } },
+                surveyResponses: {
+                  surv1: {
+                    '0xsame': { choice: 'initial' },
+                  },
+                },
+                surveyResponsesLatestBlock: { surv1: 6 },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSurveyCacheController(host);
+      const newerFetchStarted = createDeferred();
+      const newerResponseBatch = createDeferred();
+
+      contractScripts.getRelevantBlockWindowForFilter
+        .mockResolvedValueOnce({ fromBlock: 1, toBlock: 14 })
+        .mockResolvedValueOnce({ fromBlock: 1, toBlock: 10 });
+      contractScripts.fetchAllSurveyResponses.mockImplementation((_provider, _surveyId, _startBlock, latestBlock) => {
+        if (latestBlock === 14) {
+          newerFetchStarted.resolve();
+          return newerResponseBatch.promise;
+        }
+        return Promise.resolve([
+          {
+            responder: '0xSAME',
+            response: { choice: 'older' },
+            blockNumber: 10,
+            transactionIndex: 1,
+            logIndex: 2,
+            timestamp: 100,
+          },
+        ]);
+      });
+
+      const newerRefresh = controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1');
+      await newerFetchStarted.promise;
+      await controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1');
+      newerResponseBatch.resolve([
+        {
+          responder: '0xSAME',
+          response: { choice: 'newer' },
+          blockNumber: 14,
+          transactionIndex: 2,
+          logIndex: 3,
+          timestamp: 140,
+        },
+      ]);
+      await newerRefresh;
+
+      const storedSurvey = host.getStored('surveysCache', 'alpha')['11155420'];
+      expect(storedSurvey.surveyResponses.surv1['0xsame']).toMatchObject({
+        choice: 'newer',
+        blockNumber: 14,
+        transactionIndex: 2,
+        logIndex: 3,
+        timestamp: 140,
+      });
+      expect(storedSurvey.surveyResponsesLatestBlock.surv1).toBe(14);
+    });
+
+    it('keeps a newer stamped post-submit response when an older fetched item arrives', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 6,
+                surveys: { surv1: { creationBlock: 5 } },
+                surveyResponses: {
+                  surv1: {
+                    '0xsame': { choice: 'initial' },
+                  },
+                },
+                surveyResponsesLatestBlock: { surv1: 6 },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSurveyCacheController(host);
+      const fetchStarted = createDeferred();
+      const responseBatch = createDeferred();
+
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 10 });
+      contractScripts.fetchAllSurveyResponses.mockImplementation(() => {
+        fetchStarted.resolve();
+        return responseBatch.promise;
+      });
+
+      const refreshPromise = controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1');
+      await fetchStarted.promise;
+      await host.updateSurveysCacheAtomic('alpha', (current) => {
+        current['11155420'].surveyResponses.surv1['0xsame'] = {
+          choice: 'submitted',
+          blockNumber: 12,
+          transactionIndex: 2,
+          logIndex: 4,
+          timestamp: 120,
+        };
+        return current;
+      });
+      responseBatch.resolve([
+        {
+          responder: '0xSAME',
+          response: { choice: 'older-chain-value' },
+          blockNumber: 10,
+          transactionIndex: 1,
+          logIndex: 2,
+          timestamp: 100,
+        },
+      ]);
+      await refreshPromise;
+
+      const storedSurvey = host.getStored('surveysCache', 'alpha')['11155420'];
+      expect(storedSurvey.surveyResponses.surv1['0xsame']).toMatchObject({
+        choice: 'submitted',
+        blockNumber: 12,
+      });
+      expect(storedSurvey.surveyResponsesLatestBlock.surv1).toBe(10);
+    });
+
+    it('keeps a pre-existing trusted response when an older fetched item arrives', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 6,
+                surveys: { surv1: { creationBlock: 5 } },
+                surveyResponses: {
+                  surv1: {
+                    '0xsame': {
+                      choice: 'submitted',
+                      blockNumber: 14,
+                      transactionIndex: 2,
+                      logIndex: 4,
+                      timestamp: 140,
+                    },
+                  },
+                },
+                surveyResponsesLatestBlock: { surv1: 6 },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSurveyCacheController(host);
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 10 });
+      contractScripts.fetchAllSurveyResponses.mockResolvedValue([
+        {
+          responder: '0xSAME',
+          response: { choice: 'older-chain-value' },
+          blockNumber: 10,
+          transactionIndex: 1,
+          logIndex: 2,
+          timestamp: 100,
+        },
+      ]);
+
+      await controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1');
+
+      const storedSurvey = host.getStored('surveysCache', 'alpha')['11155420'];
+      expect(storedSurvey.surveyResponses.surv1['0xsame']).toMatchObject({
+        choice: 'submitted',
+        blockNumber: 14,
+      });
+      expect(storedSurvey.surveyResponsesLatestBlock.surv1).toBe(10);
+    });
+
+    it('keeps an unorderable concurrent response conflict retryable', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 6,
+                surveys: { surv1: { creationBlock: 5 } },
+                surveyResponses: {
+                  surv1: {
+                    '0xsame': { choice: 'initial' },
+                  },
+                },
+                surveyResponsesLatestBlock: { surv1: 6 },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSurveyCacheController(host);
+      const fetchStarted = createDeferred();
+      const responseBatch = createDeferred();
+
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 10 });
+      contractScripts.fetchAllSurveyResponses.mockImplementation(() => {
+        fetchStarted.resolve();
+        return responseBatch.promise;
+      });
+
+      const refreshPromise = controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1');
+      await fetchStarted.promise;
+      await host.updateSurveysCacheAtomic('alpha', (current) => {
+        current['11155420'].surveyResponses.surv1['0xsame'] = { choice: 'submitted' };
+        return current;
+      });
+      responseBatch.resolve([{ responder: '0xSAME', response: { choice: 'older-chain-value' } }]);
+      await refreshPromise;
+
+      const storedSurvey = host.getStored('surveysCache', 'alpha')['11155420'];
+      expect(storedSurvey.surveyResponses.surv1['0xsame']).toEqual({ choice: 'submitted' });
+      expect(storedSurvey.surveyResponsesLatestBlock.surv1).toBe(6);
+    });
+
+    it('does not replace a newer valid frontier with a partial-failure safe frontier', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 6,
+                surveys: { surv1: { creationBlock: 5 } },
+                surveyResponses: { surv1: {} },
+                surveyResponsesLatestBlock: { surv1: 6 },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSurveyCacheController(host);
+      const fetchStarted = createDeferred();
+      const responseBatch = createDeferred();
+
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 20 });
+      contractScripts.fetchAllSurveyResponses.mockImplementation(() => {
+        fetchStarted.resolve();
+        return responseBatch.promise;
+      });
+
+      const refreshPromise = controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1');
+      await fetchStarted.promise;
+      await host.updateSurveysCacheAtomic('alpha', (current) => {
+        current['11155420'].surveyResponsesLatestBlock.surv1 = 15;
+        return current;
+      });
+      responseBatch.resolve({
+        responses: [{ responder: '0xFETCHED', response: { choice: 'fetched' } }],
+        hadPartialFailure: true,
+        lowestFailedBlock: 9,
+      });
+      await refreshPromise;
+
+      expect(host.getStored('surveysCache', 'alpha')['11155420'].surveyResponsesLatestBlock.surv1).toBe(15);
+    });
+
+    it('queues the UI revision only after persistence succeeds', async () => {
+      const persistenceStarted = createDeferred();
+      const persistence = createDeferred();
+      let host;
+      host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 6,
+                surveys: { surv1: { creationBlock: 5 } },
+                surveyResponses: { surv1: {} },
+                surveyResponsesLatestBlock: { surv1: 6 },
+              },
+            },
+          },
+        },
+        dgWrite: jest.fn(async () => {
+          persistenceStarted.resolve();
+          await persistence.promise;
+          return true;
+        }),
+        updateSurveysCacheAtomic: jest.fn(async (_slug, updater) => {
+          const next = await updater(host.getStored('surveysCache', 'alpha'));
+          persistenceStarted.resolve();
+          await persistence.promise;
+          return !!next;
+        }),
+      });
+      const controller = createSessionSurveyCacheController(host);
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 10 });
+      contractScripts.fetchAllSurveyResponses.mockResolvedValue([]);
+
+      const refreshPromise = controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1');
+      await persistenceStarted.promise;
+      const queuedBeforePersistence = host.queueLocalRevisionUpdate.mock.calls.length > 0;
+      persistence.resolve();
+      await refreshPromise;
+
+      expect(queuedBeforePersistence).toBe(false);
+      expect(host.queueLocalRevisionUpdate).toHaveBeenCalledWith({
+        needsQuestionResponsesNonce: true,
+      });
+    });
+
+    it('surfaces a false persistence result without queueing a success revision', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 6,
+                surveys: { surv1: { creationBlock: 5 } },
+                surveyResponses: { surv1: {} },
+                surveyResponsesLatestBlock: { surv1: 6 },
+              },
+            },
+          },
+        },
+        dgWrite: jest.fn(async () => false),
+        updateSurveysCacheAtomic: jest.fn(async () => false),
+      });
+      const controller = createSessionSurveyCacheController(host);
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 10 });
+      contractScripts.fetchAllSurveyResponses.mockResolvedValue([]);
+
+      await expect(controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1')).rejects.toThrow(
+        'Failed to persist survey responses',
+      );
+      expect(host.queueLocalRevisionUpdate).not.toHaveBeenCalled();
+    });
+
+    it('surfaces a rejected persistence operation without queueing a success revision', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 6,
+                surveys: { surv1: { creationBlock: 5 } },
+                surveyResponses: { surv1: {} },
+                surveyResponsesLatestBlock: { surv1: 6 },
+              },
+            },
+          },
+        },
+        updateSurveysCacheAtomic: jest.fn(async () => {
+          throw new Error('managed cache unavailable');
+        }),
+      });
+      const controller = createSessionSurveyCacheController(host);
+      contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 1, toBlock: 10 });
+      contractScripts.fetchAllSurveyResponses.mockResolvedValue([]);
+
+      await expect(controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1')).rejects.toThrow(
+        'managed cache unavailable',
+      );
+      expect(host.queueLocalRevisionUpdate).not.toHaveBeenCalled();
     });
   });
 });

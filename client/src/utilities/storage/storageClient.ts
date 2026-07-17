@@ -34,8 +34,16 @@ interface ReadSessionStorageBlobOptions extends StorageWorkerOptions {
   storageRef?: unknown;
 }
 
-interface ListSessionStorageRefsOptions extends StorageWorkerOptions {
+interface ListSessionStorageRefsPageOptions extends StorageWorkerOptions {
   resource?: unknown;
+  cursor?: unknown;
+  limit?: unknown;
+}
+
+interface SessionStorageRefsPage {
+  items: unknown[];
+  cursor: string | null;
+  listComplete: boolean;
 }
 
 const normalizeWorkerBaseUrl = (rawUrl: unknown): string => toStr(rawUrl).trim().replace(/\/+$/, '');
@@ -210,15 +218,22 @@ export const readSessionStorageBlob = async ({
   return response;
 };
 
-export const listSessionStorageRefs = async ({
+export const listSessionStorageRefsPage = async ({
   sessionSlug = '',
   sessionConfig = null,
   context = null,
   workerUrl = '',
   resource = 'docsContext',
-}: ListSessionStorageRefsOptions = {}): Promise<unknown[]> => {
+  cursor = null,
+  limit = null,
+}: ListSessionStorageRefsPageOptions = {}): Promise<SessionStorageRefsPage> => {
   const baseUrl = await resolveStorageWorkerUrl({ sessionSlug, sessionConfig, context, workerUrl });
-  const endpoint = `${baseUrl}/storage/list?resource=${encodeURIComponent(resource as string)}`;
+  const params = new URLSearchParams({ resource: toStr(resource).trim() || 'docsContext' });
+  const normalizedCursor = toStr(cursor).trim();
+  const normalizedLimit = Math.trunc(Number(limit));
+  if (normalizedCursor) params.set('cursor', normalizedCursor);
+  if (Number.isFinite(normalizedLimit) && normalizedLimit > 0) params.set('limit', String(normalizedLimit));
+  const endpoint = `${baseUrl}/storage/list?${params.toString()}`;
   const response = await fetchWorkerWithAuth(
     endpoint,
     { method: 'GET' },
@@ -233,5 +248,10 @@ export const listSessionStorageRefs = async ({
   );
   const body = (await response.json().catch(() => ({}))) as UnknownRecord;
   if (!response.ok) throw new Error((body?.error as string) || `Storage list failed (${response.status}).`);
-  return Array.isArray(body?.items) ? body.items : [];
+  const nextCursor = toStr(body?.cursor).trim() || null;
+  return {
+    items: Array.isArray(body?.items) ? body.items : [],
+    cursor: nextCursor,
+    listComplete: body?.listComplete === true || !nextCursor,
+  };
 };
