@@ -1,4 +1,4 @@
-import { compareResponseRecency, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency.js';
+import { isResponseRecencyNewer, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency.js';
 
 type CacheRecord = Record<string, unknown>;
 type SurveyResponsesByResponder = Record<string, unknown>;
@@ -164,7 +164,7 @@ const mergeSurveyResponseDeltaWithRecency = ({
     const existingIsTrusted = existingRecency.bn > 0;
 
     if (incomingIsTrusted && existingIsTrusted) {
-      if (compareResponseRecency(incoming.recency, existingRecency) > 0) {
+      if (isResponseRecencyNewer(incoming.recency, existingRecency)) {
         mergedResponses[responder] = stampSurveyResponseWithRecency(incoming.response, incoming.recency);
       }
       return;

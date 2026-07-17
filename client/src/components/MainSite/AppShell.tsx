@@ -85,6 +85,7 @@ import {
   type SessionResponseHydrationController,
   type SessionResponseHydrationHost,
 } from '../../utilities/survey/sessionResponseHydrationController.js';
+import { isResponseRecencyAtLeast, toResponseRecencyPair } from '../../utilities/survey/responseRecency.js';
 import { resolveSessionRegistryBootstrapChainIds } from '../../utilities/session/registryBootstrapChainIds.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { initCacheManager, subscribeCacheUpdates, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
@@ -596,6 +597,27 @@ type MainSiteProfileScanControllerBootstrap = SessionProfileScanController & {
   _registryBootstrapPromise?: Promise<unknown> | null;
   _registryBootstrapScopeKey?: string;
 };
+
+const createMainSiteSurveyNetworkCache = (initialLastBlock: number): MainSiteSurveyNetworkCache => ({
+  surveysLatestBlock: initialLastBlock,
+  surveys: {},
+  surveyResponses: {},
+  surveyResponsesLatestBlock: {},
+  pendingSurveyMetadata: {},
+});
+
+const createMainSiteQuestionNetworkCache = (initialLastBlock: number): MainSiteQuestionNetworkCache => ({
+  questionsLatestBlock: initialLastBlock,
+  questionsDiscoveryCheckpointBlock: initialLastBlock,
+  questions: {},
+  questionResponses: {},
+  questionResponsesMeta: {},
+  questionResponsesLatestBlock: initialLastBlock,
+  pendingQuestionMetadata: {},
+  arweaveTxCache: {},
+  arweaveTxFailureCache: {},
+  questionHydrationMeta: {},
+});
 
 const isMainSiteRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object';
@@ -1718,18 +1740,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     const questionsCache = (this.readDgRecord('questionsCache', slug) || {}) as MainSiteQuestionMetadataCache;
     this.mergeLegacyNumericNetworkKey(questionsCache, netKey);
     if (!questionsCache[netKey]) {
-      questionsCache[netKey] = {
-        questionsLatestBlock: 0,
-        questionsDiscoveryCheckpointBlock: 0,
-        questions: {},
-        questionResponses: {},
-        questionResponsesMeta: {},
-        pendingQuestionMetadata: {},
-        questionResponsesLatestBlock: 0,
-        arweaveTxCache: {},
-        arweaveTxFailureCache: {},
-        questionHydrationMeta: {},
-      };
+      questionsCache[netKey] = createMainSiteQuestionNetworkCache(0);
     }
     const networkCache = questionsCache[netKey] as MainSiteQuestionNetworkCache;
     if (!isMainSiteRecord(networkCache.questions)) {
@@ -1774,13 +1785,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     await updateMainSiteSurveyCacheAtomic(slug, (current) => {
       const next = (isMainSiteRecord(current) ? current : {}) as MainSiteSurveyMetadataCache;
       this.mergeLegacyNumericNetworkKey(next, netKey);
-      const networkCache = next[netKey] || {
-        surveysLatestBlock: 0,
-        surveys: {},
-        surveyResponses: {},
-        surveyResponsesLatestBlock: {},
-        pendingSurveyMetadata: {},
-      };
+      const networkCache = next[netKey] || createMainSiteSurveyNetworkCache(0);
       if (!isMainSiteRecord(networkCache.surveys)) networkCache.surveys = {};
       if (!isMainSiteRecord(networkCache.pendingSurveyMetadata)) networkCache.pendingSurveyMetadata = {};
       const existing = networkCache.surveys[sid];
@@ -1816,18 +1821,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     await updateMainSiteQuestionCacheAtomic(slug, (current) => {
       const next = (isMainSiteRecord(current) ? current : {}) as MainSiteQuestionMetadataCache;
       this.mergeLegacyNumericNetworkKey(next, netKey);
-      const networkCache = next[netKey] || {
-        questionsLatestBlock: 0,
-        questionsDiscoveryCheckpointBlock: 0,
-        questions: {},
-        questionResponses: {},
-        questionResponsesMeta: {},
-        pendingQuestionMetadata: {},
-        questionResponsesLatestBlock: 0,
-        arweaveTxCache: {},
-        arweaveTxFailureCache: {},
-        questionHydrationMeta: {},
-      };
+      const networkCache = next[netKey] || createMainSiteQuestionNetworkCache(0);
       if (!isMainSiteRecord(networkCache.questions)) networkCache.questions = {};
       if (!isMainSiteRecord(networkCache.pendingQuestionMetadata)) networkCache.pendingQuestionMetadata = {};
       ensureQuestionArweaveCacheBranches(networkCache);
@@ -3599,12 +3593,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     >;
     this.mergeLegacyNumericNetworkKey(surveysCache, networkID);
     if (!surveysCache[networkID]) {
-      surveysCache[networkID] = {
-        surveysLatestBlock: initialLastBlockDefault,
-        surveys: {},
-        surveyResponses: {},
-        surveyResponsesLatestBlock: {},
-      };
+      surveysCache[networkID] = createMainSiteSurveyNetworkCache(initialLastBlockDefault);
     }
     let currentSurveyNetworkCache = surveysCache[networkID] as MainSiteSurveyNetworkCache;
     if (
@@ -3621,18 +3610,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     >;
     this.mergeLegacyNumericNetworkKey(questionsCache, networkID);
     if (!questionsCache[networkID]) {
-      questionsCache[networkID] = {
-        questionsLatestBlock: initialLastBlockDefault,
-        questionsDiscoveryCheckpointBlock: initialLastBlockDefault,
-        questions: {},
-        questionResponses: {},
-        questionResponsesMeta: {}, // ensure meta map exists
-        questionResponsesLatestBlock: initialLastBlockDefault,
-        pendingQuestionMetadata: {},
-        arweaveTxCache: {},
-        arweaveTxFailureCache: {},
-        questionHydrationMeta: {},
-      };
+      questionsCache[networkID] = createMainSiteQuestionNetworkCache(initialLastBlockDefault);
     }
     let currentQuestionNetworkCache = questionsCache[networkID] as MainSiteQuestionNetworkCache;
     if (!currentQuestionNetworkCache.questions) currentQuestionNetworkCache.questions = {};
@@ -3776,13 +3754,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
             await updateMainSiteSurveyCacheAtomic(slug, (current) => {
               const next = (isMainSiteRecord(current) ? current : {}) as MainSiteSurveyMetadataCache;
               this.mergeLegacyNumericNetworkKey(next, networkID);
-              const targetNet = next[networkID] || {
-                surveysLatestBlock: initialLastBlockDefault,
-                surveys: {},
-                surveyResponses: {},
-                surveyResponsesLatestBlock: {},
-                pendingSurveyMetadata: {},
-              };
+              const targetNet = next[networkID] || createMainSiteSurveyNetworkCache(initialLastBlockDefault);
               if (!isMainSiteRecord(targetNet.surveys)) targetNet.surveys = {};
               if (!isMainSiteRecord(targetNet.pendingSurveyMetadata)) targetNet.pendingSurveyMetadata = {};
               if (targetSurveySlug === slug) {
@@ -3815,18 +3787,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
             await updateMainSiteQuestionCacheAtomic(slug, (current) => {
               const next = (isMainSiteRecord(current) ? current : {}) as MainSiteQuestionMetadataCache;
               this.mergeLegacyNumericNetworkKey(next, networkID);
-              const targetNet = next[networkID] || {
-                questionsLatestBlock: initialLastBlockDefault,
-                questionsDiscoveryCheckpointBlock: initialLastBlockDefault,
-                questions: {},
-                questionResponses: {},
-                questionResponsesMeta: {},
-                questionResponsesLatestBlock: initialLastBlockDefault,
-                pendingQuestionMetadata: {},
-                arweaveTxCache: {},
-                arweaveTxFailureCache: {},
-                questionHydrationMeta: {},
-              };
+              const targetNet = next[networkID] || createMainSiteQuestionNetworkCache(initialLastBlockDefault);
               ensureQuestionArweaveCacheBranches(targetNet);
               eventQuestionIds.forEach((qid) => {
                 const incoming = currentQuestionNetworkCache.questions[qid];
@@ -3962,18 +3923,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           await updateMainSiteQuestionCacheAtomic(slug, (current) => {
             const next = (isMainSiteRecord(current) ? current : {}) as MainSiteQuestionMetadataCache;
             this.mergeLegacyNumericNetworkKey(next, networkID);
-            const targetNet = next[networkID] || {
-              questionsLatestBlock: initialLastBlockDefault,
-              questionsDiscoveryCheckpointBlock: initialLastBlockDefault,
-              questions: {},
-              questionResponses: {},
-              questionResponsesMeta: {},
-              questionResponsesLatestBlock: initialLastBlockDefault,
-              pendingQuestionMetadata: {},
-              arweaveTxCache: {},
-              arweaveTxFailureCache: {},
-              questionHydrationMeta: {},
-            };
+            const targetNet = next[networkID] || createMainSiteQuestionNetworkCache(initialLastBlockDefault);
             ensureQuestionArweaveCacheBranches(targetNet);
             eventQuestionIds.forEach((qid) => {
               const incoming = currentQuestionNetworkCache.questions[qid];
@@ -4067,25 +4017,23 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       });
 
       const bn = Number(eventBlockNumber || 0);
+      const incomingResponseRecency = {
+        bn,
+        txi: eventTransactionIndex,
+        li: eventLogIndex,
+        ts: eventTimestamp,
+      };
       const qIdsToFetch: string[] = [];
       questionIdsFromEvent.forEach((qId: string) => {
         const responseMetaByResponder = currentQuestionNetworkCache.questionResponsesMeta[qId] || {};
         const prev = responseMetaByResponder[responderAddressLower] || {};
-        const prevBn = Number(prev.bn ?? prev.blockNumber ?? 0);
-        const prevTxi = Number(prev.txi ?? prev.transactionIndex ?? prev.txIndex ?? 0);
-        const prevLi = Number(prev.li ?? prev.logIndex ?? 0);
-        const prevTs = Number(prev.ts ?? prev.timestamp ?? 0);
-        const isNewer =
-          bn > prevBn ||
-          (bn === prevBn &&
-            (eventTransactionIndex > prevTxi ||
-              (eventTransactionIndex === prevTxi &&
-                (eventLogIndex > prevLi || (eventLogIndex === prevLi && eventTimestamp >= prevTs)))));
+        const previousResponseRecency = toResponseRecencyPair(prev);
+        const isNewer = isResponseRecencyAtLeast(incomingResponseRecency, prev);
         if (isNewer) {
           qIdsToFetch.push(qId);
         } else {
           mainSiteLog.log(
-            `[ResponsesSubmitted][recency-guard] STALE ignored for qId=${qId}, responder=${responderAddressLower} (prev bn/tx/li/ts=${prevBn}/${prevTxi}/${prevLi}/${prevTs}, incoming bn/tx/li/ts=${bn}/${eventTransactionIndex}/${eventLogIndex}/${eventTimestamp})`,
+            `[ResponsesSubmitted][recency-guard] STALE ignored for qId=${qId}, responder=${responderAddressLower} (prev bn/tx/li/ts=${previousResponseRecency.bn}/${previousResponseRecency.txi}/${previousResponseRecency.li}/${previousResponseRecency.ts}, incoming bn/tx/li/ts=${bn}/${eventTransactionIndex}/${eventLogIndex}/${eventTimestamp})`,
           );
         }
       });
@@ -4110,12 +4058,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           responseByResponder[responderAddressLower] = data;
           const responseMetaByResponder = currentQuestionNetworkCache.questionResponsesMeta[qId] || {};
           currentQuestionNetworkCache.questionResponsesMeta[qId] = responseMetaByResponder;
-          responseMetaByResponder[responderAddressLower] = {
-            bn,
-            txi: eventTransactionIndex,
-            li: eventLogIndex,
-            ts: eventTimestamp,
-          };
+          responseMetaByResponder[responderAddressLower] = incomingResponseRecency;
           acceptedAny = true;
           mainSiteLog.log(
             `[ResponsesSubmitted][recency-guard] ACCEPTED for qId=${qId}, responder=${responderAddressLower} (bn/tx/li/ts=${bn}/${eventTransactionIndex}/${eventLogIndex}/${eventTimestamp}).`,
@@ -4145,13 +4088,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         await updateMainSiteSurveyCacheAtomic(slug, (current) => {
           const next = (isMainSiteRecord(current) ? current : {}) as MainSiteSurveyMetadataCache;
           this.mergeLegacyNumericNetworkKey(next, networkID);
-          const targetNet = next[networkID] || {
-            surveysLatestBlock: initialLastBlockDefault,
-            surveys: {},
-            surveyResponses: {},
-            surveyResponsesLatestBlock: {},
-            pendingSurveyMetadata: {},
-          };
+          const targetNet = next[networkID] || createMainSiteSurveyNetworkCache(initialLastBlockDefault);
           if (!isMainSiteRecord(targetNet.surveyResponses)) targetNet.surveyResponses = {};
           if (!isMainSiteRecord(targetNet.surveyResponsesLatestBlock)) targetNet.surveyResponsesLatestBlock = {};
           const currentWatermark = Number(targetNet.surveyResponsesLatestBlock[surveyIdFromEvent]) || 0;
@@ -4176,18 +4113,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         await updateMainSiteQuestionCacheAtomic(slug, (current) => {
           const next = (isMainSiteRecord(current) ? current : {}) as MainSiteQuestionMetadataCache;
           this.mergeLegacyNumericNetworkKey(next, networkID);
-          const targetNet = next[networkID] || {
-            questionsLatestBlock: initialLastBlockDefault,
-            questionsDiscoveryCheckpointBlock: initialLastBlockDefault,
-            questions: {},
-            questionResponses: {},
-            questionResponsesMeta: {},
-            questionResponsesLatestBlock: initialLastBlockDefault,
-            pendingQuestionMetadata: {},
-            arweaveTxCache: {},
-            arweaveTxFailureCache: {},
-            questionHydrationMeta: {},
-          };
+          const targetNet = next[networkID] || createMainSiteQuestionNetworkCache(initialLastBlockDefault);
           ensureQuestionArweaveCacheBranches(targetNet);
           qIdsToFetch.forEach((qId) => {
             const incomingResponse = currentQuestionNetworkCache.questionResponses[qId]?.[responderAddressLower];
@@ -4196,17 +4122,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
             if (!isMainSiteRecord(targetNet.questionResponses[qId])) targetNet.questionResponses[qId] = {};
             if (!isMainSiteRecord(targetNet.questionResponsesMeta[qId])) targetNet.questionResponsesMeta[qId] = {};
             const existingMeta = targetNet.questionResponsesMeta[qId]?.[responderAddressLower] || {};
-            const existingBn = Number(existingMeta.bn ?? existingMeta.blockNumber ?? 0);
-            const existingTxi = Number(existingMeta.txi ?? existingMeta.transactionIndex ?? existingMeta.txIndex ?? 0);
-            const existingLi = Number(existingMeta.li ?? existingMeta.logIndex ?? 0);
-            const existingTs = Number(existingMeta.ts ?? existingMeta.timestamp ?? 0);
-            const incomingIsNewer =
-              bn > existingBn ||
-              (bn === existingBn &&
-                (eventTransactionIndex > existingTxi ||
-                  (eventTransactionIndex === existingTxi &&
-                    (eventLogIndex > existingLi || (eventLogIndex === existingLi && eventTimestamp >= existingTs)))));
-            if (!incomingIsNewer) return;
+            if (!isResponseRecencyAtLeast(incomingResponseRecency, existingMeta)) return;
             targetNet.questionResponses[qId]![responderAddressLower] = incomingResponse;
             targetNet.questionResponsesMeta[qId]![responderAddressLower] = incomingMeta;
             questionResponsePersisted = true;

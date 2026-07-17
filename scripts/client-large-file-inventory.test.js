@@ -20,7 +20,7 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/components/DocumentLibrary/DocumentLibraryPanel.tsx': 1697,
   'client/src/components/MainContent/RiskMatrix.tsx': 1220,
   // Event/cache atomic ports stay co-located to avoid an unrelated MainSite refactor.
-  'client/src/components/MainSite/AppShell.tsx': 4356,
+  'client/src/components/MainSite/AppShell.tsx': 4272,
   'client/src/components/MainSite/mainSiteProfileScanRuntime.ts': 1503,
   'client/src/components/MainSite/mainSiteRouteRenderers.tsx': 1372,
   'client/src/components/OnePageSession/OnePageSession.tsx': 2497,
@@ -71,8 +71,8 @@ const LARGE_CLIENT_FILE_BASELINE = Object.freeze({
   'client/src/utilities/survey/compareUsers.ts': 1118,
   'client/src/utilities/survey/consensusReportMath.ts': 1147,
   // Controller-owned atomic deltas stay beside their scan/retry state machines.
-  'client/src/utilities/survey/sessionQuestionCacheController.ts': 2362,
-  'client/src/utilities/survey/sessionResponseHydrationController.ts': 1792,
+  'client/src/utilities/survey/sessionQuestionCacheController.ts': 2348,
+  'client/src/utilities/survey/sessionResponseHydrationController.ts': 1780,
   'client/src/utilities/survey/sessionSurveyCacheController.ts': 1263,
   'client/src/utilities/web3/contractScripts.impl.ts': 1147,
   'client/src/utilities/web3/contractScripts.sbtRegistryMethods.ts': 1277,

@@ -8,7 +8,7 @@ import {
   normalizeSurveyResponseBatchResult,
   resolveSurveyResponseWatermark,
 } from './sessionSurveyResponseHelpers.js';
-import { compareResponseRecency, toResponseRecencyPair } from './responseRecency.js';
+import { isResponseRecencyNewer, toResponseRecencyPair } from './responseRecency.js';
 import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
 
@@ -314,7 +314,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
           const incomingRow = isCacheRecord(item) ? item : {};
           const existingRecency = toResponseRecencyPair(existing, existing.response);
           const incomingRecency = toResponseRecencyPair(incomingRow, incomingRow.response);
-          if (compareResponseRecency(incomingRecency, existingRecency) > 0) current[index] = item;
+          if (isResponseRecencyNewer(incomingRecency, existingRecency)) current[index] = item;
           return;
         }
         current[index] = item;
@@ -1073,10 +1073,10 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
                   } else {
                     const existingResponse = uData.surveyResponses[existingResponseIndex];
                     if (
-                      compareResponseRecency(
+                      isResponseRecencyNewer(
                         toResponseRecencyPair(nextUserResponse, nextUserResponse.response),
                         toResponseRecencyPair(existingResponse, existingResponse.response),
-                      ) > 0
+                      )
                     ) {
                       uData.surveyResponses[existingResponseIndex] = {
                         ...existingResponse,

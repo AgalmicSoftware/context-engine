@@ -2782,6 +2782,55 @@ describe('AppShell route render smoke', () => {
     expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
   });
 
+  it('fails closed on malformed cached response recency metadata', async () => {
+    const questionId = `0x${'a'.repeat(64)}`;
+    const responder = '0x00000000000000000000000000000000000000aa';
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    const dg = attachDgStore(subject, {
+      'questionsCache:edge': {
+        84532: {
+          questionsLatestBlock: 12,
+          questions: {},
+          questionResponses: { [questionId]: { [responder]: { answer: 'keep-existing' } } },
+          questionResponsesMeta: { [questionId]: { [responder]: { bn: 'invalid', txi: 0, li: 0, ts: 0 } } },
+          questionResponsesLatestBlock: 12,
+          pendingQuestionMetadata: {},
+          arweaveTxCache: {},
+          arweaveTxFailureCache: {},
+          questionHydrationMeta: {},
+        },
+      },
+    });
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const next = await updater(dg.read(name, slug) || {});
+      dg.write(name, slug, next);
+      return next;
+    });
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 20 });
+    contractScripts.getResponse.mockResolvedValue({ answer: 'do-not-apply' });
+
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'ResponsesSubmitted',
+      surveyId: `0x${'0'.repeat(64)}`,
+      questionIds: [questionId],
+      responder,
+      blockNumber: 30,
+      transactionIndex: 1,
+      logIndex: 1,
+      timestamp: 1,
+    });
+
+    const stored = dg.read('questionsCache', 'edge')['84532'];
+    expect(stored.questionResponses[questionId][responder]).toEqual({ answer: 'keep-existing' });
+    expect(contractScripts.getResponse).not.toHaveBeenCalled();
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
+  });
+
   it('does not publish response-event success when atomic persistence rejects', async () => {
     const questionId = `0x${'9'.repeat(64)}`;
     const responder = '0x00000000000000000000000000000000000000a9';

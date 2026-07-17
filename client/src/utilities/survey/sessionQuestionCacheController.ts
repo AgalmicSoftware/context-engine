@@ -26,7 +26,7 @@ import {
 } from '../session/mainSiteProgressHelpers.js';
 import { MASKED_Q_DECRYPT_BACKOFF_MAX, MASKED_Q_DECRYPT_BACKOFF_TTL_MS } from '../cache/sessionCacheConstants.js';
 import { isMaskedQuestionPayload, pickBetterQuestionPayload } from './questionRouting.js';
-import { compareResponseRecency, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency';
+import { isResponseRecencyAtLeast, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency';
 
 type CacheRecord = Record<string, unknown>;
 type StateRecord = {
@@ -812,20 +812,6 @@ export const createSessionQuestionCacheController = (
           const freshQR = freshNet && typeof freshNet.questionResponses === 'object' ? freshNet.questionResponses : {};
           const freshQRMeta =
             freshNet && typeof freshNet.questionResponsesMeta === 'object' ? freshNet.questionResponsesMeta : {};
-          const shouldApplyIncomingResponse = ({
-            existingMeta,
-            incomingMeta,
-            hasExistingResponse,
-          }: {
-            existingMeta: unknown;
-            incomingMeta: ResponseRecencyPair;
-            hasExistingResponse: boolean;
-          }): boolean => {
-            if (!hasExistingResponse) return true;
-            const existing = toResponseRecencyPair(existingMeta);
-            const incoming = toResponseRecencyPair(incomingMeta);
-            return compareResponseRecency(incoming, existing) >= 0;
-          };
           const freshQuestionIds = new Set([...Object.keys(freshQR || {}), ...Object.keys(freshQRMeta || {})]);
           freshQuestionIds.forEach((qIdRaw) => {
             const qId = String(qIdRaw || '')
@@ -873,11 +859,11 @@ export const createSessionQuestionCacheController = (
               const incomingMeta = freshMetaByResponder[responderRaw] ?? freshMetaByResponder[responder] ?? null;
               const hasExistingResponse = Object.prototype.hasOwnProperty.call(localResponsesByResponder, responder);
               if (
-                !shouldApplyIncomingResponse({
-                  existingMeta: localMetaByResponder[responder],
-                  incomingMeta: toResponseRecencyPair(incomingMeta, incomingResponse),
-                  hasExistingResponse,
-                })
+                hasExistingResponse &&
+                !isResponseRecencyAtLeast(
+                  toResponseRecencyPair(incomingMeta, incomingResponse),
+                  localMetaByResponder[responder],
+                )
               ) {
                 return;
               }

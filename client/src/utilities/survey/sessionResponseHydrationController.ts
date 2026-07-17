@@ -9,7 +9,12 @@ import {
 import { DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE, readSessionScanMaxBlockRange } from '../session/sessionScanScope.js';
 import { resolvePersistedQuestionResponsesWatermark } from './questionResponsesWatermark.js';
 import { shouldFlushCoalescedRun } from '../session/mainSiteProgressHelpers.js';
-import { compareResponseRecency, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency';
+import {
+  isResponseRecencyAtLeast,
+  isResponseRecencyNewer,
+  toResponseRecencyPair,
+  type ResponseRecencyPair,
+} from './responseRecency';
 
 type CacheRecord = Record<string, unknown>;
 type StateRecord = {
@@ -805,20 +810,6 @@ export const createSessionResponseHydrationController = (
         ensureQuestionArweaveCacheBranches(net);
         return cacheRef;
       };
-      const shouldApplyIncomingResponse = ({
-        existingMeta,
-        incomingMeta,
-        hasExistingResponse,
-      }: {
-        existingMeta: unknown;
-        incomingMeta: ResponseRecencyPair;
-        hasExistingResponse: boolean;
-      }): boolean => {
-        if (!hasExistingResponse) return true;
-        const existing = toResponseRecencyPair(existingMeta);
-        const incoming = toResponseRecencyPair(incomingMeta);
-        return compareResponseRecency(incoming, existing) > 0;
-      };
       const mergeResponseMapsByRecency = (
         targetNet: QuestionCacheNetworkNode,
         sourceNet: QuestionCacheNetworkNode,
@@ -867,11 +858,8 @@ export const createSessionResponseHydrationController = (
               sourceMeta?.[qid]?.[responder] ||
               null;
             if (
-              !shouldApplyIncomingResponse({
-                existingMeta,
-                incomingMeta: toResponseRecencyPair(incomingMeta, incomingResponse),
-                hasExistingResponse,
-              })
+              hasExistingResponse &&
+              !isResponseRecencyNewer(toResponseRecencyPair(incomingMeta, incomingResponse), existingMeta)
             )
               return;
             targetByResponder[responder] = incomingResponse;
@@ -1287,7 +1275,7 @@ export const createSessionResponseHydrationController = (
 
             const prev = toResponseRecencyPair(metaQR[qId][responderKey]);
             const incoming = toResponseRecencyPair({ bn, txi, li, ts }, respObj?.response);
-            const isNewer = compareResponseRecency(incoming, prev) > 0;
+            const isNewer = isResponseRecencyNewer(incoming, prev);
 
             if (isNewer) {
               currentQR[qId][responderKey] = respObj.response;
@@ -1697,7 +1685,7 @@ export const createSessionResponseHydrationController = (
               !hasExistingResponse ||
               hadLegacySyntheticLi ||
               !hasExistingRecency ||
-              (hasIncomingRecency && compareResponseRecency(incomingRecency, existingRecency) > 0);
+              (hasIncomingRecency && isResponseRecencyNewer(incomingRecency, existingRecency));
             if (!shouldReplaceResponse) {
               if (metadataChanged) updatedAny = true;
               return;
@@ -1740,7 +1728,7 @@ export const createSessionResponseHydrationController = (
               const existing = responses[existingIdx];
               const incomingRecency = toResponseRecencyPair(nextEntry, nextEntry.response);
               const existingRecency = toResponseRecencyPair(existing, existing?.response);
-              if (compareResponseRecency(incomingRecency, existingRecency) >= 0) {
+              if (isResponseRecencyAtLeast(incomingRecency, existingRecency)) {
                 responses[existingIdx] = { ...(existing || {}), ...nextEntry };
               }
             });
