@@ -47,6 +47,11 @@ All notable changes to this project will be documented in this file.
   unorderable values, keep scan watermarks monotonic, and publish their UI
   revision only after durable cache persistence succeeds; detached initial
   refresh failures are now caught and logged at the results lifecycle boundary.
+- Made the remaining survey and question discovery, response hydration, and
+  application event cache commits merge only their active deltas into the
+  latest managed-cache snapshot. Concurrent metadata, responder recency,
+  retry state, and monotonic watermarks are preserved, while readiness,
+  revisions, and awaited success are withheld when persistence fails.
 - Serialized first-use worker-envelope keys and signed session-config writes
   through one per-session coordinator, rejected unreadable R2-only envelope
   writes, and removed unsafe unused key-changing Admin actions. Cloudflare

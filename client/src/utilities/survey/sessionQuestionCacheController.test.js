@@ -185,6 +185,23 @@ const createMockHost = (overrides = {}) => {
     ...(initialState || {}),
   };
   const storage = deepClone(initialStorage || {});
+  let atomicUpdateTail = Promise.resolve();
+
+  const createAtomicUpdater = (key) =>
+    jest.fn((slug, updater) => {
+      const operation = atomicUpdateTail.then(async () => {
+        const current = storage[key]?.[slug] ?? null;
+        const next = await updater(deepClone(current));
+        if (!storage[key]) storage[key] = {};
+        storage[key][slug] = deepClone(next);
+        return true;
+      });
+      atomicUpdateTail = operation.catch(() => undefined);
+      return operation;
+    });
+
+  const updateQuestionsCacheAtomic = createAtomicUpdater('questionsCache');
+  const updateUserCacheAtomic = createAtomicUpdater('userCache');
 
   return {
     setState: jest.fn((updater, cb) => {
@@ -206,6 +223,8 @@ const createMockHost = (overrides = {}) => {
       storage[key][slug] = deepClone(value);
       return true;
     }),
+    updateQuestionsCacheAtomic,
+    updateUserCacheAtomic,
     getActiveSessionSlug: jest.fn(() => activeSlug || SESSION_SLUG),
     getSessionCfg: jest.fn(() =>
       Object.prototype.hasOwnProperty.call(overrides, 'sessionCfg')
@@ -499,7 +518,6 @@ describe('createSessionQuestionCacheController', () => {
       expect(stored?.[NETWORK_ID]).toEqual(
         expect.objectContaining({
           questionsLatestBlock: 12,
-          questionsDiscoveryCheckpointBlock: 12,
           questions: {},
           questionResponses: {},
           questionResponsesMeta: {},
@@ -510,6 +528,7 @@ describe('createSessionQuestionCacheController', () => {
           questionHydrationMeta: {},
         }),
       );
+      expect(stored?.[NETWORK_ID]?.questionsDiscoveryCheckpointBlock).toBeUndefined();
     });
 
     it('resets empty discovery watermarks when a gated empty recovery forces a rescan', async () => {
@@ -618,6 +637,51 @@ describe('createSessionQuestionCacheController', () => {
         fromBlock: 44967477,
         toBlock: 44967476,
       });
+      await initPromise;
+      controller.destroy();
+    });
+
+    it('does not replace concurrently hydrated metadata with a temporary demo fixture', async () => {
+      const windowDeferred = createDeferred();
+      const host = createMockHost({
+        activeSlug: 'demo-1',
+        sessionCfg: {
+          networkChainId: NETWORK_ID,
+          blockLimits: { start: 44967477, end: null },
+          demoCompatibilitySeed: { temporary: true },
+        },
+      });
+      const baseAtomicUpdate = host.updateQuestionsCacheAtomic;
+      host.updateQuestionsCacheAtomic = jest.fn((slug, updater) =>
+        baseAtomicUpdate(slug, (current) => {
+          const fresh = current || createQuestionsCacheEnvelope();
+          fresh[NETWORK_ID].questions['0xabcdef'] = createPlainQuestion('0xabcdef', {
+            prompt: 'Hydrated chain metadata',
+            temporaryDemoSeed: false,
+          });
+          return updater(fresh);
+        }),
+      );
+      const controller = createSessionQuestionCacheController(host);
+      getTemporaryDemoSessionQuestionFixtures.mockReturnValue([
+        {
+          id: '0xABCDEF',
+          type: 'binary',
+          prompt: 'Temporary fixture prompt',
+          sessionSlug: 'demo-1',
+          temporaryDemoSeed: true,
+        },
+      ]);
+      contractScripts.getRelevantBlockWindowForFilter.mockReturnValueOnce(windowDeferred.promise);
+
+      const initPromise = controller.initializeQuestionCacheForGroup('demo-1');
+      await flushMicrotasks(6);
+
+      expect(host.getStored('questionsCache', 'demo-1')[NETWORK_ID].questions['0xabcdef']).toEqual(
+        expect.objectContaining({ prompt: 'Hydrated chain metadata', temporaryDemoSeed: false }),
+      );
+
+      windowDeferred.resolve({ fromBlock: 44967477, toBlock: 44967476 });
       await initPromise;
       controller.destroy();
     });
@@ -917,19 +981,197 @@ describe('createSessionQuestionCacheController', () => {
       });
     });
 
+    it('atomically preserves a concurrent hydrated question at the terminal write boundary', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: createQuestionsCacheEnvelope(),
+          },
+        },
+      });
+      const controller = createSessionQuestionCacheController(host);
+      const metadata = createDeferred();
+
+      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([{ questionId: 'Q1', creationBlock: 11 }]);
+      contractScripts.getQuestionDataById.mockReturnValue(metadata.promise);
+
+      const initPromise = controller.initializeQuestionCacheForGroup(SESSION_SLUG);
+      await flushMicrotasks();
+      host.setStored(
+        'questionsCache',
+        SESSION_SLUG,
+        createQuestionsCacheEnvelope({
+          concurrent: createPlainQuestion('concurrent', { prompt: 'Concurrent event question' }),
+        }),
+      );
+      metadata.resolve({ creator: '0xCreator', prompt: 'Hydrated question' });
+      await initPromise;
+
+      const stored = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID];
+      expect(stored?.questions?.concurrent).toEqual(expect.objectContaining({ prompt: 'Concurrent event question' }));
+      expect(stored?.questions?.q1).toEqual(expect.objectContaining({ prompt: 'Hydrated question' }));
+      expect(host.updateQuestionsCacheAtomic).toHaveBeenCalled();
+    });
+
+    it('does not restore stale metadata for a hydrated question the active scan did not produce', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: createQuestionsCacheEnvelope({
+              existing: createPlainQuestion('existing', {
+                prompt: 'Metadata before the scan',
+                sessionSlugExplicit: true,
+              }),
+            }),
+          },
+        },
+      });
+      const controller = createSessionQuestionCacheController(host);
+      const metadata = createDeferred();
+
+      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([{ questionId: 'Q1', creationBlock: 11 }]);
+      contractScripts.getQuestionDataById.mockReturnValue(metadata.promise);
+
+      const initPromise = controller.initializeQuestionCacheForGroup(SESSION_SLUG);
+      await flushMicrotasks();
+      host.setStored(
+        'questionsCache',
+        SESSION_SLUG,
+        createQuestionsCacheEnvelope({
+          existing: createPlainQuestion('existing', {
+            prompt: 'Concurrently refreshed metadata',
+            sessionSlugExplicit: true,
+          }),
+        }),
+      );
+      metadata.resolve({ creator: '0xCreator', prompt: 'Hydrated question' });
+      await initPromise;
+
+      const stored = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID];
+      expect(stored?.questions?.existing).toEqual(
+        expect.objectContaining({ prompt: 'Concurrently refreshed metadata' }),
+      );
+      expect(stored?.questions?.q1).toEqual(expect.objectContaining({ prompt: 'Hydrated question' }));
+    });
+
+    it('preserves a concurrently added network branch at the terminal write boundary', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: createQuestionsCacheEnvelope(),
+          },
+        },
+      });
+      const controller = createSessionQuestionCacheController(host);
+      const metadata = createDeferred();
+      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([{ questionId: 'Q1', creationBlock: 11 }]);
+      contractScripts.getQuestionDataById.mockReturnValue(metadata.promise);
+
+      const initPromise = controller.initializeQuestionCacheForGroup(SESSION_SLUG);
+      await flushMicrotasks();
+      const concurrent = host.getStored('questionsCache', SESSION_SLUG);
+      concurrent['84532'] = createQuestionCacheNetworkNode({
+        questions: { other: createPlainQuestion('other', { prompt: 'Other network question' }) },
+      });
+      host.setStored('questionsCache', SESSION_SLUG, concurrent);
+      metadata.resolve({ creator: '0xCreator', prompt: 'Hydrated question' });
+      await initPromise;
+
+      expect(host.getStored('questionsCache', SESSION_SLUG)['84532'].questions.other).toEqual(
+        expect.objectContaining({ prompt: 'Other network question' }),
+      );
+    });
+
+    it('preserves concurrent question hydration metadata at the terminal write boundary', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: createQuestionsCacheEnvelope(),
+          },
+        },
+      });
+      const controller = createSessionQuestionCacheController(host);
+      const metadata = createDeferred();
+      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([{ questionId: 'Q1', creationBlock: 11 }]);
+      contractScripts.getQuestionDataById.mockReturnValue(metadata.promise);
+
+      const initPromise = controller.initializeQuestionCacheForGroup(SESSION_SLUG);
+      await flushMicrotasks();
+      const concurrent = host.getStored('questionsCache', SESSION_SLUG);
+      concurrent[NETWORK_ID].questionHydrationMeta = { concurrent: { status: 'ready' } };
+      host.setStored('questionsCache', SESSION_SLUG, concurrent);
+      metadata.resolve({ creator: '0xCreator', prompt: 'Hydrated question' });
+      await initPromise;
+
+      expect(host.getStored('questionsCache', SESSION_SLUG)[NETWORK_ID].questionHydrationMeta).toEqual({
+        concurrent: { status: 'ready' },
+      });
+    });
+
+    it('does not overwrite unrelated concurrent user-cache fields while adding a created question', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: createQuestionsCacheEnvelope(),
+          },
+        },
+      });
+      const controller = createSessionQuestionCacheController(host);
+      const metadata = createDeferred();
+      contractScripts.fetchUserSubmittedQuestionIDs.mockResolvedValue([{ questionId: 'Q1', creationBlock: 11 }]);
+      contractScripts.getQuestionDataById.mockReturnValue(metadata.promise);
+
+      const initPromise = controller.initializeQuestionCacheForGroup(SESSION_SLUG);
+      await flushMicrotasks();
+      host.setStored('userCache', SESSION_SLUG, {
+        '0xcreator': {
+          [NETWORK_ID]: {
+            lastBlockScanned: 15,
+            lastScanTimestamp: 15,
+            data: {
+              sbts: [{ address: '0xsbt' }],
+              createdSurveys: [{ id: 'survey-kept' }],
+              createdQuestions: [],
+              surveyResponses: [],
+              questionResponses: [],
+            },
+          },
+        },
+      });
+      metadata.resolve({ creator: '0xCreator', prompt: 'Hydrated question' });
+      await initPromise;
+
+      const userData = host.getStored('userCache', SESSION_SLUG)['0xcreator'][NETWORK_ID].data;
+      expect(userData.sbts).toEqual([{ address: '0xsbt' }]);
+      expect(userData.createdSurveys).toEqual([{ id: 'survey-kept' }]);
+      expect(userData.createdQuestions).toEqual([expect.objectContaining({ id: 'q1' })]);
+    });
+
+    it('does not publish question readiness when atomic persistence fails', async () => {
+      const host = createMockHost({
+        updateQuestionsCacheAtomic: jest.fn(async () => false),
+      });
+      const controller = createSessionQuestionCacheController(host);
+
+      await expect(controller.initializeQuestionCacheForGroup(SESSION_SLUG)).rejects.toThrow(
+        'Failed to persist questions cache',
+      );
+      expect(host.getStateSnapshot().isQuestionCacheReady).toBe(false);
+      expect(host.getStateSnapshot().questionResponsesNonce).toBe(0);
+    });
+
     it('persists incremental questionsDiscoveryCheckpointBlock frontiers before the final discovery write', async () => {
       const nowRef = { value: 1000 };
       jest.spyOn(Date, 'now').mockImplementation(() => nowRef.value);
       const host = createMockHost();
       const checkpointSnapshots = [];
-      const baseDgWrite = host.dgWrite;
-      host.dgWrite = jest.fn((key, slug, value) => {
-        checkpointSnapshots.push({
-          key,
-          slug,
-          value: deepClone(value),
+      const baseAtomicUpdate = host.updateQuestionsCacheAtomic;
+      host.updateQuestionsCacheAtomic = jest.fn((slug, updater) => {
+        return baseAtomicUpdate(slug, async (current) => {
+          const value = await updater(current);
+          checkpointSnapshots.push({ slug, value: deepClone(value) });
+          return value;
         });
-        return baseDgWrite(key, slug, value);
       });
       const controller = createSessionQuestionCacheController(host);
 
@@ -966,13 +1208,16 @@ describe('createSessionQuestionCacheController', () => {
       await controller.initializeQuestionCacheForGroup(SESSION_SLUG);
 
       const checkpointWrites = checkpointSnapshots
-        .filter(({ key, slug }) => key === 'questionsCache' && slug === SESSION_SLUG)
+        .filter(({ slug }) => slug === SESSION_SLUG)
         .map(({ value }) => Number(value?.[NETWORK_ID]?.questionsDiscoveryCheckpointBlock))
         .filter(Number.isFinite);
 
       expect(checkpointWrites).toEqual(expect.arrayContaining([10, 11, 12]));
       expect(checkpointWrites.indexOf(10)).toBeLessThan(checkpointWrites.indexOf(11));
       expect(checkpointWrites.indexOf(11)).toBeLessThan(checkpointWrites.indexOf(12));
+      expect(
+        host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionsDiscoveryCheckpointBlock,
+      ).toBeUndefined();
     });
 
     it('retries pending metadata once nextRetryAtMs has passed during a skipDiscoveryScan rerun', async () => {
@@ -1019,6 +1264,68 @@ describe('createSessionQuestionCacheController', () => {
       expect(stored?.pendingQuestionMetadata?.q1).toBeUndefined();
 
       controller.destroy();
+    });
+
+    it('does not swallow a pending-metadata atomic persistence failure', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: createQuestionsCacheEnvelope(
+              {},
+              {
+                questionsLatestBlock: 12,
+                questionsDiscoveryCheckpointBlock: 12,
+                pendingQuestionMetadata: {
+                  q1: { attempts: 1, nextRetryAtMs: 0, state: 'transient' },
+                },
+              },
+            ),
+          },
+        },
+      });
+      const baseAtomicUpdate = host.updateQuestionsCacheAtomic;
+      host.updateQuestionsCacheAtomic = jest
+        .fn()
+        .mockResolvedValueOnce(false)
+        .mockImplementation((...args) => baseAtomicUpdate(...args));
+      const controller = createSessionQuestionCacheController(host);
+      contractScripts.getQuestionDataById.mockResolvedValue({ creator: '0xRecovered', prompt: 'Recovered prompt' });
+
+      await expect(controller.initializeQuestionCacheForGroup(SESSION_SLUG)).rejects.toThrow(
+        'Failed to persist questions cache',
+      );
+      expect(host.getStateSnapshot().isQuestionCacheReady).toBe(false);
+    });
+
+    it('does not swallow a cross-slug pending-metadata persistence rejection', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: createQuestionsCacheEnvelope(
+              {},
+              {
+                questionsLatestBlock: 12,
+                questionsDiscoveryCheckpointBlock: 12,
+                pendingQuestionMetadata: {
+                  q1: { attempts: 1, nextRetryAtMs: 0, state: 'transient' },
+                },
+              },
+            ),
+          },
+        },
+        buildMetadataSessionCacheEnvelope: jest.fn((questionData) => ({
+          metadata: questionData,
+          targetSlug: 'other',
+        })),
+        writeQuestionMetadataToCache: jest.fn().mockRejectedValue(new Error('indexeddb unavailable')),
+      });
+      const controller = createSessionQuestionCacheController(host);
+      contractScripts.getQuestionDataById.mockResolvedValue({ creator: '0xRecovered', prompt: 'Recovered prompt' });
+
+      await expect(controller.initializeQuestionCacheForGroup(SESSION_SLUG)).rejects.toThrow(
+        'Failed to persist questions cache for other',
+      );
+      expect(host.getStateSnapshot().isQuestionCacheReady).toBe(false);
     });
 
     it('locks terminal pending metadata entries when retry policy stops further attempts', async () => {
@@ -1068,7 +1375,7 @@ describe('createSessionQuestionCacheController', () => {
       expect(host.getStateSnapshot()).toMatchObject({
         questionCacheInitializationError: true,
       });
-      expect(host.dgWrite).toHaveBeenCalled();
+      expect(host.updateQuestionsCacheAtomic).toHaveBeenCalled();
     });
   });
 
@@ -1204,9 +1511,7 @@ describe('createSessionQuestionCacheController', () => {
           promptDecrypted: true,
         }),
       );
-      expect(host.dgWrite).toHaveBeenCalledWith(
-        'questionsCache',
-        SESSION_SLUG,
+      expect(host.getStored('questionsCache', SESSION_SLUG)).toEqual(
         expect.objectContaining({
           [NETWORK_ID]: expect.objectContaining({
             questions: expect.objectContaining({

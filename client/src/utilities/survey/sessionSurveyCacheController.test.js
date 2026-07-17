@@ -81,6 +81,14 @@ const createMockHost = (overrides = {}) => {
     return operation;
   });
 
+  const updateUserCacheAtomic = jest.fn(async (slug, updater) => {
+    const current = storage.userCache?.[slug] ?? null;
+    const next = await updater(deepClone(current));
+    if (!storage.userCache) storage.userCache = {};
+    storage.userCache[slug] = deepClone(next);
+    return true;
+  });
+
   return {
     setState: jest.fn((updater, cb) => {
       const patch = typeof updater === 'function' ? updater(state) : updater;
@@ -102,6 +110,7 @@ const createMockHost = (overrides = {}) => {
       return true;
     }),
     updateSurveysCacheAtomic,
+    updateUserCacheAtomic,
     getActiveSessionSlug: jest.fn(() => activeSlug || 'test-slug'),
     getSessionCfg: jest.fn((slug) => ({
       slug,
@@ -126,6 +135,10 @@ const createMockHost = (overrides = {}) => {
         return null;
       }
       return deepClone(bucket[slug]);
+    },
+    setStored: (key, slug, value) => {
+      if (!storage[key]) storage[key] = {};
+      storage[key][slug] = deepClone(value);
     },
     ...rest,
   };
@@ -467,7 +480,7 @@ describe('createSessionSurveyCacheController', () => {
         creationBlock: 11,
         sessionSlugExplicit: true,
       });
-      expect(host.dgWrite).toHaveBeenCalled();
+      expect(host.updateSurveysCacheAtomic).toHaveBeenCalled();
     });
 
     it('marks pending survey metadata when metadata fetching fails', async () => {
@@ -602,7 +615,311 @@ describe('createSessionSurveyCacheController', () => {
       expect(host.getStateSnapshot()).toMatchObject({
         surveyCacheInitializationError: true,
       });
-      expect(host.dgWrite).toHaveBeenCalled();
+      expect(host.updateSurveysCacheAtomic).toHaveBeenCalled();
+    });
+
+    it('atomically preserves survey metadata and responses written while metadata hydration is in flight', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 9,
+                surveys: {},
+                surveyResponses: {},
+                surveyResponsesLatestBlock: {},
+                pendingSurveyMetadata: {},
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSurveyCacheController(host);
+      const metadataStarted = createDeferred();
+      const metadata = createDeferred();
+
+      contractScripts.fetchUserSubmittedSurveyIDs.mockResolvedValue([{ surveyId: 'NEW', creationBlock: 10 }]);
+      contractScripts.getSurveyDataById.mockImplementation(() => {
+        metadataStarted.resolve();
+        return metadata.promise;
+      });
+
+      const initPromise = controller.initializeSurveyCacheForGroup('alpha');
+      await metadataStarted.promise;
+      host.setStored('surveysCache', 'alpha', {
+        11155420: {
+          surveysLatestBlock: 15,
+          surveys: { concurrent: { surveyID: 'concurrent', creationBlock: 14 } },
+          surveyResponses: { concurrent: { '0xwriter': { choice: 'kept' } } },
+          surveyResponsesLatestBlock: { concurrent: 15 },
+          pendingSurveyMetadata: {},
+        },
+      });
+      metadata.resolve({ creator: '', title: 'New survey' });
+      await initPromise;
+
+      const stored = host.getStored('surveysCache', 'alpha')['11155420'];
+      expect(stored.surveys.concurrent).toEqual(expect.objectContaining({ surveyID: 'concurrent' }));
+      expect(stored.surveys.new).toEqual(expect.objectContaining({ surveyID: 'new' }));
+      expect(stored.surveyResponses.concurrent['0xwriter']).toEqual({ choice: 'kept' });
+      expect(stored.surveysLatestBlock).toBe(15);
+      expect(host.updateSurveysCacheAtomic).toHaveBeenCalled();
+    });
+
+    it('does not replay an already-persisted survey metadata delta over a later concurrent update', async () => {
+      const host = createMockHost();
+      const controller = createSessionSurveyCacheController(host);
+      const responsesStarted = createDeferred();
+      const responses = createDeferred();
+
+      contractScripts.fetchUserSubmittedSurveyIDs.mockResolvedValue([{ surveyId: 'SURV1', creationBlock: 11 }]);
+      contractScripts.getSurveyDataById.mockResolvedValue({ creator: '', title: 'Initial scan title' });
+      contractScripts.fetchAllSurveyResponses.mockImplementation(() => {
+        responsesStarted.resolve();
+        return responses.promise;
+      });
+
+      const initPromise = controller.initializeSurveyCacheForGroup('alpha');
+      await responsesStarted.promise;
+      const concurrent = host.getStored('surveysCache', 'alpha');
+      concurrent['11155420'].surveys.surv1.title = 'Concurrent event title';
+      concurrent['11155420'].surveysLatestBlock = 20;
+      host.setStored('surveysCache', 'alpha', concurrent);
+      responses.resolve([]);
+      await initPromise;
+
+      const stored = host.getStored('surveysCache', 'alpha')['11155420'];
+      expect(stored.surveys.surv1.title).toBe('Concurrent event title');
+      expect(stored.surveysLatestBlock).toBe(20);
+    });
+
+    it('preserves independent concurrent user scan flags while adding a created survey', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          userCache: {
+            alpha: {
+              '0xcreator': {
+                11155420: {
+                  lastBlockScanned: 5,
+                  lastScanTimestamp: 5,
+                  scanIncomplete: false,
+                  sbtLastBlockScanned: 5,
+                  data: {
+                    sbts: [],
+                    createdSurveys: [],
+                    createdQuestions: [],
+                    surveyResponses: [],
+                    questionResponses: [],
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSurveyCacheController(host);
+      const metadataStarted = createDeferred();
+      const metadata = createDeferred();
+      contractScripts.fetchUserSubmittedSurveyIDs.mockResolvedValue([{ surveyId: 'SURV1', creationBlock: 11 }]);
+      contractScripts.getSurveyDataById.mockImplementation(() => {
+        metadataStarted.resolve();
+        return metadata.promise;
+      });
+
+      const initPromise = controller.initializeSurveyCacheForGroup('alpha');
+      await metadataStarted.promise;
+      const concurrentUserCache = host.getStored('userCache', 'alpha');
+      concurrentUserCache['0xcreator']['11155420'].scanIncomplete = true;
+      concurrentUserCache['0xcreator']['11155420'].sbtLastBlockScanned = 50;
+      host.setStored('userCache', 'alpha', concurrentUserCache);
+      metadata.resolve({ creator: '0xCreator', title: 'Survey' });
+      await initPromise;
+
+      const storedNode = host.getStored('userCache', 'alpha')['0xcreator']['11155420'];
+      expect(storedNode.scanIncomplete).toBe(true);
+      expect(storedNode.sbtLastBlockScanned).toBe(50);
+      expect(storedNode.data.createdSurveys).toEqual([expect.objectContaining({ id: 'surv1' })]);
+    });
+
+    it('preserves a newer concurrent survey responder row in userCache', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 12,
+                surveys: {
+                  surv1: { surveyID: 'surv1', creationBlock: 10, sessionSlugExplicit: true },
+                },
+                surveyResponses: { surv1: {} },
+                surveyResponsesLatestBlock: { surv1: 9 },
+                pendingSurveyMetadata: {},
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSurveyCacheController(host);
+      const fetchStarted = createDeferred();
+      const responses = createDeferred();
+      contractScripts.fetchAllSurveyResponses.mockImplementation(() => {
+        fetchStarted.resolve();
+        return responses.promise;
+      });
+
+      const initPromise = controller.initializeSurveyCacheForGroup('alpha');
+      await fetchStarted.promise;
+      host.setStored('userCache', 'alpha', {
+        '0xresponder': {
+          11155420: {
+            lastBlockScanned: 15,
+            lastScanTimestamp: 15,
+            data: {
+              sbts: [],
+              createdSurveys: [],
+              createdQuestions: [],
+              surveyResponses: [
+                {
+                  surveyId: 'surv1',
+                  responder: '0xresponder',
+                  response: { choice: 'newer' },
+                  blockNumber: 15,
+                },
+              ],
+              questionResponses: [],
+            },
+          },
+        },
+      });
+      responses.resolve([
+        {
+          responder: '0xResponder',
+          response: { choice: 'older' },
+          blockNumber: 11,
+        },
+      ]);
+      await initPromise;
+
+      expect(host.getStored('userCache', 'alpha')['0xresponder']['11155420'].data.surveyResponses[0]).toEqual(
+        expect.objectContaining({ response: { choice: 'newer' }, blockNumber: 15 }),
+      );
+    });
+
+    it('updates an older survey responder row in userCache from a newer fetched event', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 12,
+                surveys: { surv1: { surveyID: 'surv1', creationBlock: 10, sessionSlugExplicit: true } },
+                surveyResponses: { surv1: {} },
+                surveyResponsesLatestBlock: { surv1: 9 },
+                pendingSurveyMetadata: {},
+              },
+            },
+          },
+          userCache: {
+            alpha: {
+              '0xresponder': {
+                11155420: {
+                  lastBlockScanned: 9,
+                  lastScanTimestamp: 9,
+                  data: {
+                    sbts: [],
+                    createdSurveys: [],
+                    createdQuestions: [],
+                    surveyResponses: [
+                      {
+                        surveyId: 'surv1',
+                        responder: '0xresponder',
+                        response: { choice: 'older' },
+                        blockNumber: 9,
+                      },
+                    ],
+                    questionResponses: [],
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionSurveyCacheController(host);
+      contractScripts.fetchAllSurveyResponses.mockResolvedValue([
+        {
+          responder: '0xResponder',
+          response: { choice: 'newer' },
+          blockNumber: 11,
+        },
+      ]);
+
+      await controller.initializeSurveyCacheForGroup('alpha');
+
+      expect(host.getStored('userCache', 'alpha')['0xresponder']['11155420'].data.surveyResponses[0]).toEqual(
+        expect.objectContaining({ response: { choice: 'newer' }, blockNumber: 11 }),
+      );
+    });
+
+    it('does not swallow a pending-metadata atomic persistence failure', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              11155420: {
+                surveysLatestBlock: 12,
+                surveys: {},
+                surveyResponses: {},
+                surveyResponsesLatestBlock: {},
+                pendingSurveyMetadata: {
+                  surv1: { attempts: 1, nextRetryAtMs: 0, creationBlock: 11 },
+                },
+              },
+            },
+          },
+        },
+      });
+      const baseAtomicUpdate = host.updateSurveysCacheAtomic;
+      host.updateSurveysCacheAtomic = jest
+        .fn()
+        .mockResolvedValueOnce(false)
+        .mockImplementation((...args) => baseAtomicUpdate(...args));
+      const controller = createSessionSurveyCacheController(host);
+      contractScripts.getSurveyDataById.mockResolvedValue({ creator: '', title: 'Recovered survey' });
+
+      await expect(controller.initializeSurveyCacheForGroup('alpha')).rejects.toThrow(
+        'Failed to persist surveys cache',
+      );
+      expect(host.getStateSnapshot().isSurveyCacheReady).not.toBe(true);
+    });
+
+    it('rejects when atomic survey persistence returns false', async () => {
+      const host = createMockHost({
+        updateSurveysCacheAtomic: jest.fn(async () => false),
+      });
+      const controller = createSessionSurveyCacheController(host);
+
+      await expect(controller.initializeSurveyCacheForGroup('alpha')).rejects.toThrow(
+        'Failed to persist surveys cache',
+      );
+      expect(host.getStateSnapshot()).toMatchObject({
+        surveyCacheInitializationError: true,
+      });
+    });
+
+    it('rejects when atomic survey persistence rejects even if a later retry could succeed', async () => {
+      const host = createMockHost();
+      const baseAtomicUpdate = host.updateSurveysCacheAtomic;
+      host.updateSurveysCacheAtomic = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('indexeddb unavailable'))
+        .mockImplementation((...args) => baseAtomicUpdate(...args));
+      const controller = createSessionSurveyCacheController(host);
+
+      await expect(controller.initializeSurveyCacheForGroup('alpha')).rejects.toThrow(
+        'Failed to persist surveys cache',
+      );
+      expect(host.getStateSnapshot()).toMatchObject({ surveyCacheInitializationError: true });
     });
   });
 
@@ -614,7 +931,7 @@ describe('createSessionSurveyCacheController', () => {
       await controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1');
 
       expect(contractScripts.getRelevantBlockWindowForFilter).not.toHaveBeenCalled();
-      expect(host.dgWrite).not.toHaveBeenCalled();
+      expect(host.updateSurveysCacheAtomic).not.toHaveBeenCalled();
     });
 
     it('skips refresh when the local watermark is already ahead of the chain window', async () => {
@@ -643,7 +960,7 @@ describe('createSessionSurveyCacheController', () => {
       await controller.refreshSurveyResponsesByIDForGroup('alpha', 'SURV1');
 
       expect(contractScripts.fetchAllSurveyResponses).not.toHaveBeenCalled();
-      expect(host.dgWrite).not.toHaveBeenCalled();
+      expect(host.updateSurveysCacheAtomic).not.toHaveBeenCalled();
       expect(host.queueLocalRevisionUpdate).not.toHaveBeenCalled();
     });
 

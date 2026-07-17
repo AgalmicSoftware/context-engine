@@ -99,10 +99,7 @@ import {
   type SessionCacheReadinessController,
   type SessionCacheReadinessHost,
 } from '../../utilities/cache/sessionCacheReadinessController.js';
-import {
-  ensureQuestionArweaveCacheBranches,
-  mergeQuestionArweaveCacheBranches,
-} from '../../domains/surveys/questionArweaveCacheBranches.js';
+import { ensureQuestionArweaveCacheBranches } from '../../domains/surveys/questionArweaveCacheBranches.js';
 import {
   shouldAutoStartCeRuntimeStats,
   startCeRuntimeStats,
@@ -603,6 +600,40 @@ type MainSiteProfileScanControllerBootstrap = SessionProfileScanController & {
 const isMainSiteRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object';
 
+class MainSiteCachePersistenceError extends Error {}
+
+const updateMainSiteSurveyCacheAtomic = async <TValue = MainSiteSurveyMetadataCache,>(
+  slug: string,
+  updater: (current: TValue | null) => TValue | Promise<TValue>,
+): Promise<TValue> => {
+  try {
+    const updated = await updateCacheAtomic<TValue>('surveysCache', slug, updater);
+    if (updated === null) throw new Error('managed survey cache namespace unavailable');
+    return updated;
+  } catch (error: unknown) {
+    if (error instanceof MainSiteCachePersistenceError) throw error;
+    throw new MainSiteCachePersistenceError(
+      `Failed to persist surveys cache for ${slug}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+};
+
+const updateMainSiteQuestionCacheAtomic = async <TValue = MainSiteQuestionMetadataCache,>(
+  slug: string,
+  updater: (current: TValue | null) => TValue | Promise<TValue>,
+): Promise<TValue> => {
+  try {
+    const updated = await updateCacheAtomic<TValue>('questionsCache', slug, updater);
+    if (updated === null) throw new Error('managed question cache namespace unavailable');
+    return updated;
+  } catch (error: unknown) {
+    if (error instanceof MainSiteCachePersistenceError) throw error;
+    throw new MainSiteCachePersistenceError(
+      `Failed to persist questions cache for ${slug}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+};
+
 const hasMainSiteRegistryIdentity = (sessionConfig: MainSiteSessionConfigLike | null | undefined): boolean => {
   if (!isMainSiteRecord(sessionConfig)) return false;
   const registry = isMainSiteRecord(sessionConfig.__registry) ? sessionConfig.__registry : {};
@@ -800,9 +831,12 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     getState: () => this.state,
     isMounted: () => this._mounted,
     dgRead: (name: string, slug: string) => this.readDgRecord(name, slug),
-    dgWrite: (name: string, slug: string, value: Record<string, unknown>) => this.DG.write(name, slug, value),
     updateSurveysCacheAtomic: async (slug, updater) => {
-      const updated = await updateCacheAtomic('surveysCache', slug, updater);
+      await updateMainSiteSurveyCacheAtomic(slug, updater);
+      return true;
+    },
+    updateUserCacheAtomic: async (slug, updater) => {
+      const updated = await updateCacheAtomic('userCache', slug, updater);
       return updated !== null;
     },
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
@@ -834,9 +868,16 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       networkID: string,
       opts?: Record<string, unknown>,
     ) =>
-      this.writeSurveyMetadataToCache(slug, surveyID, surveyData, creationBlock as number | string | null, networkID, {
-        enforceScopedIsolation: opts?.enforceScopedIsolation === true,
-      }),
+      this.writeSurveyMetadataToCacheAtomic(
+        slug,
+        surveyID,
+        surveyData,
+        creationBlock as number | string | null,
+        networkID,
+        {
+          enforceScopedIsolation: opts?.enforceScopedIsolation === true,
+        },
+      ),
     queueLocalRevisionUpdate: (opts?: Parameters<SessionCacheReadinessController['queueLocalRevisionUpdate']>[0]) =>
       this.queueLocalRevisionUpdate(opts),
     getSessionScanScope: () => this.getSessionScanScope(),
@@ -846,7 +887,14 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     getState: () => this.state,
     isMounted: () => this._mounted,
     dgRead: (name: string, slug: string, opts?: Record<string, unknown>) => this.readDgRecord(name, slug, opts),
-    dgWrite: (name: string, slug: string, value: Record<string, unknown>) => this.DG.write(name, slug, value),
+    updateQuestionsCacheAtomic: async (slug, updater) => {
+      await updateMainSiteQuestionCacheAtomic(slug, updater);
+      return true;
+    },
+    updateUserCacheAtomic: async (slug, updater) => {
+      const updated = await updateCacheAtomic('userCache', slug, updater);
+      return updated !== null;
+    },
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
     getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),
     getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
@@ -876,7 +924,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       networkID: string,
       opts?: Record<string, unknown>,
     ) =>
-      this.writeQuestionMetadataToCache(slug, questionID, questionData, networkID, {
+      this.writeQuestionMetadataToCacheAtomic(slug, questionID, questionData, networkID, {
         enforceScopedIsolation: opts?.enforceScopedIsolation === true,
       }),
     queueLocalRevisionUpdate: (opts?: Parameters<SessionCacheReadinessController['queueLocalRevisionUpdate']>[0]) =>
@@ -886,7 +934,14 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     setState: this.setCacheControllerState,
     isMounted: () => this._mounted,
     dgRead: (name: string, slug: string) => this.readDgRecord(name, slug),
-    dgWrite: (name: string, slug: string, value: Record<string, unknown>) => this.DG.write(name, slug, value),
+    updateQuestionsCacheAtomic: async (slug, updater) => {
+      await updateMainSiteQuestionCacheAtomic(slug, updater);
+      return true;
+    },
+    updateUserCacheAtomic: async (slug, updater) => {
+      const updated = await updateCacheAtomic('userCache', slug, updater);
+      return updated !== null;
+    },
     getActiveSessionSlug: () => this.getActiveSessionSlug(),
     getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),
     getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
@@ -1640,59 +1695,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   buildMetadataSessionCacheEnvelope = (metadata: unknown, fallbackSlug = '', options: BuildEnvelopeOptions = {}) =>
     buildMetadataSessionCacheEnvelopeFn(metadata, fallbackSlug, options);
 
-  writeSurveyMetadataToCache = (
-    slugIn: unknown,
-    surveyId: unknown,
-    surveyData: MetadataRecord | null | undefined,
-    creationBlock: number | string | null = null,
-    netKeyIn: unknown = null,
-    options: MainSiteMetadataWriterOptions = {},
-  ): boolean => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    const sid = String(surveyId || surveyData?.surveyID || surveyData?.id || '').toLowerCase();
-    const netKey = String(netKeyIn || this.getSessionChainId(slug) || '');
-    if (!sid || !netKey) return false;
-    const enforceScopedIsolation = options.enforceScopedIsolation === true;
-
-    const normalizedSurveyData = prepareSurveyMetadataCacheEntryFn({
-      surveyId: sid,
-      surveyData,
-      slug,
-      creationBlock,
-      enforceScopedIsolation,
-    });
-
-    const groupCache = (this.readDgRecord('surveysCache', slug) || {}) as MainSiteSurveyMetadataCache;
-    this.mergeLegacyNumericNetworkKey(groupCache, netKey);
-    if (!groupCache[netKey]) {
-      groupCache[netKey] = {
-        surveysLatestBlock: 0,
-        surveys: {},
-        surveyResponses: {},
-        surveyResponsesLatestBlock: {},
-        pendingSurveyMetadata: {},
-      };
-    }
-    const networkCache = groupCache[netKey] as MainSiteSurveyNetworkCache;
-    if (!isMainSiteRecord(networkCache.surveys)) {
-      networkCache.surveys = {};
-    }
-    if (!isMainSiteRecord(networkCache.pendingSurveyMetadata)) {
-      networkCache.pendingSurveyMetadata = {};
-    }
-
-    networkCache.surveys[sid] = normalizedSurveyData;
-    if (networkCache.pendingSurveyMetadata[sid]) {
-      try {
-        delete networkCache.pendingSurveyMetadata[sid];
-      } catch (e) {
-        mainSiteLog.warn('MainSite: fallback', e);
-      }
-    }
-    this.DG.write('surveysCache', slug, groupCache);
-    return true;
-  };
-
   writeQuestionMetadataToCache = (
     slugIn: unknown,
     questionId: unknown,
@@ -1747,6 +1749,97 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       }
     }
     this.DG.write('questionsCache', slug, questionsCache);
+    return true;
+  };
+
+  writeSurveyMetadataToCacheAtomic = async (
+    slugIn: unknown,
+    surveyId: unknown,
+    surveyData: MetadataRecord | null | undefined,
+    creationBlock: number | string | null = null,
+    netKeyIn: unknown = null,
+    options: MainSiteMetadataWriterOptions = {},
+  ): Promise<boolean> => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const sid = String(surveyId || surveyData?.surveyID || surveyData?.id || '').toLowerCase();
+    const netKey = String(netKeyIn || this.getSessionChainId(slug) || '');
+    if (!sid || !netKey) return false;
+    const normalizedSurveyData = prepareSurveyMetadataCacheEntryFn({
+      surveyId: sid,
+      surveyData,
+      slug,
+      creationBlock,
+      enforceScopedIsolation: options.enforceScopedIsolation === true,
+    });
+    await updateMainSiteSurveyCacheAtomic(slug, (current) => {
+      const next = (isMainSiteRecord(current) ? current : {}) as MainSiteSurveyMetadataCache;
+      this.mergeLegacyNumericNetworkKey(next, netKey);
+      const networkCache = next[netKey] || {
+        surveysLatestBlock: 0,
+        surveys: {},
+        surveyResponses: {},
+        surveyResponsesLatestBlock: {},
+        pendingSurveyMetadata: {},
+      };
+      if (!isMainSiteRecord(networkCache.surveys)) networkCache.surveys = {};
+      if (!isMainSiteRecord(networkCache.pendingSurveyMetadata)) networkCache.pendingSurveyMetadata = {};
+      const existing = networkCache.surveys[sid];
+      const existingBlock = Number(isMainSiteRecord(existing) ? existing.creationBlock : 0);
+      const incomingBlock = Number(normalizedSurveyData.creationBlock || 0);
+      if (!existing || existingBlock <= incomingBlock) {
+        networkCache.surveys[sid] = { ...(isMainSiteRecord(existing) ? existing : {}), ...normalizedSurveyData };
+      }
+      delete networkCache.pendingSurveyMetadata[sid];
+      next[netKey] = networkCache;
+      return next;
+    });
+    return true;
+  };
+
+  writeQuestionMetadataToCacheAtomic = async (
+    slugIn: unknown,
+    questionId: unknown,
+    questionData: MetadataRecord | null | undefined,
+    netKeyIn: unknown = null,
+    options: MainSiteMetadataWriterOptions = {},
+  ): Promise<boolean> => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const qid = String(questionId || questionData?.id || '').toLowerCase();
+    const netKey = String(netKeyIn || this.getSessionChainId(slug) || '');
+    if (!qid || !netKey) return false;
+    const normalizedQuestionData = prepareQuestionMetadataCacheEntryFn({
+      questionId: qid,
+      questionData,
+      slug,
+      enforceScopedIsolation: options.enforceScopedIsolation === true,
+    });
+    await updateMainSiteQuestionCacheAtomic(slug, (current) => {
+      const next = (isMainSiteRecord(current) ? current : {}) as MainSiteQuestionMetadataCache;
+      this.mergeLegacyNumericNetworkKey(next, netKey);
+      const networkCache = next[netKey] || {
+        questionsLatestBlock: 0,
+        questionsDiscoveryCheckpointBlock: 0,
+        questions: {},
+        questionResponses: {},
+        questionResponsesMeta: {},
+        pendingQuestionMetadata: {},
+        questionResponsesLatestBlock: 0,
+        arweaveTxCache: {},
+        arweaveTxFailureCache: {},
+        questionHydrationMeta: {},
+      };
+      if (!isMainSiteRecord(networkCache.questions)) networkCache.questions = {};
+      if (!isMainSiteRecord(networkCache.pendingQuestionMetadata)) networkCache.pendingQuestionMetadata = {};
+      ensureQuestionArweaveCacheBranches(networkCache);
+      const existing = networkCache.questions[qid];
+      networkCache.questions[qid] = {
+        ...(isMainSiteRecord(existing) ? existing : {}),
+        ...normalizedQuestionData,
+      };
+      delete networkCache.pendingQuestionMetadata[qid];
+      next[netKey] = networkCache;
+      return next;
+    });
     return true;
   };
 
@@ -2179,8 +2272,17 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
               if (!surveyData.slug) surveyData.slug = targetSlug;
               const targetNetKey = String(this.getSessionChainId(targetSlug) || netKey);
 
-              // C. Cache: Write directly to the target group's localStorage
-              this.writeSurveyMetadataToCache(targetSlug, sid, surveyData, null, targetNetKey);
+              // C. Cache: commit the resolved metadata against the latest managed snapshot.
+              const persisted = await this.writeSurveyMetadataToCacheAtomic(
+                targetSlug,
+                sid,
+                surveyData,
+                null,
+                targetNetKey,
+              );
+              if (!persisted) {
+                throw new MainSiteCachePersistenceError(`Failed to persist surveys cache for ${targetSlug}`);
+              }
 
               mainSiteLog.log(
                 `[MainSite] DeepLink: Data fetched and cached for survey ${sid} in group ${targetSlug}. Switching context.`,
@@ -3542,21 +3644,6 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       currentQuestionNetworkCache.questionResponsesMeta = {};
     }
     ensureQuestionArweaveCacheBranches(currentQuestionNetworkCache);
-    const mergeFreshQuestionArweaveBranches = () => {
-      try {
-        const freshCache = (this.readDgRecord('questionsCache', slug) || {}) as Record<
-          string,
-          MainSiteQuestionNetworkCache | undefined
-        >;
-        this.mergeLegacyNumericNetworkKey(freshCache, networkID);
-        const freshNet = freshCache[networkID];
-        if (!freshNet || typeof freshNet !== 'object') return;
-        mergeQuestionArweaveCacheBranches(currentQuestionNetworkCache, freshNet);
-      } catch (e) {
-        mainSiteLog.warn('MainSite: fallback', e);
-      }
-    };
-
     if (event.type === 'SurveyAdded') {
       if (eventBlockNumber > (currentSurveyNetworkCache.surveysLatestBlock || 0)) {
         this.setReadinessStateIfChanged({ isSurveyCacheReady: false, isQuestionCacheReady: false });
@@ -3572,6 +3659,8 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           )) as MainSiteMutableMetadata | null;
 
           if (surveyData) {
+            const eventQuestionIds = new Set<string>();
+            const rebucketedEventQuestionIds = new Set<string>();
             surveyData.surveyID = surveyID; // Ensure surveyID is present and lowercase
             if (!surveyData.questionIDs) surveyData.questionIDs = [];
             if (!surveyData.creator) surveyData.creator = '';
@@ -3594,7 +3683,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
               } catch (e) {
                 mainSiteLog.warn('MainSite: fallback', e);
               }
-              this.writeSurveyMetadataToCache(
+              const persisted = await this.writeSurveyMetadataToCacheAtomic(
                 targetSurveySlug,
                 surveyID,
                 preparedSurveyData,
@@ -3604,6 +3693,9 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
                   enforceScopedIsolation: true,
                 },
               );
+              if (!persisted) {
+                throw new MainSiteCachePersistenceError(`Failed to persist surveys cache for ${targetSurveySlug}`);
+              }
             }
             mainSiteLog.log(`Survey data for ${surveyID} fetched and added to local cache object.`);
 
@@ -3630,7 +3722,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
                   }),
                 );
 
-                results.forEach(({ qid, questionData }: MainSiteQuestionFetchResult) => {
+                for (const { qid, questionData } of results) {
                   if (questionData) {
                     questionData.id = qid;
                     const preparedQuestion = this.buildMetadataSessionCacheEnvelope(
@@ -3647,28 +3739,72 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
                     const targetQuestionSlug = preparedQuestion.targetSlug;
                     if (targetQuestionSlug === slug) {
                       currentQuestionNetworkCache.questions[qid] = preparedQuestionData;
+                      eventQuestionIds.add(qid);
                     } else {
                       try {
                         delete currentQuestionNetworkCache.questions[qid];
                       } catch (e) {
                         mainSiteLog.warn('MainSite: fallback', e);
                       }
-                      this.writeQuestionMetadataToCache(targetQuestionSlug, qid, preparedQuestionData, networkID, {
-                        enforceScopedIsolation: true,
-                      });
+                      rebucketedEventQuestionIds.add(qid);
+                      const persisted = await this.writeQuestionMetadataToCacheAtomic(
+                        targetQuestionSlug,
+                        qid,
+                        preparedQuestionData,
+                        networkID,
+                        {
+                          enforceScopedIsolation: true,
+                        },
+                      );
+                      if (!persisted) {
+                        throw new MainSiteCachePersistenceError(
+                          `Failed to persist questions cache for ${targetQuestionSlug}`,
+                        );
+                      }
                     }
                     mainSiteLog.log(`Question ${qid} data fetched and added to local cache object.`);
                   } else {
                     allQuestionsFetchedSuccessfully = false;
                   }
-                });
+                }
               }
             } else {
               mainSiteLog.log(`Survey ${surveyID} has no associated question IDs.`);
             }
 
             currentSurveyNetworkCache.surveysLatestBlock = eventBlockNumber;
-            this.DG.write('surveysCache', slug, surveysCache);
+            await updateMainSiteSurveyCacheAtomic(slug, (current) => {
+              const next = (isMainSiteRecord(current) ? current : {}) as MainSiteSurveyMetadataCache;
+              this.mergeLegacyNumericNetworkKey(next, networkID);
+              const targetNet = next[networkID] || {
+                surveysLatestBlock: initialLastBlockDefault,
+                surveys: {},
+                surveyResponses: {},
+                surveyResponsesLatestBlock: {},
+                pendingSurveyMetadata: {},
+              };
+              if (!isMainSiteRecord(targetNet.surveys)) targetNet.surveys = {};
+              if (!isMainSiteRecord(targetNet.pendingSurveyMetadata)) targetNet.pendingSurveyMetadata = {};
+              if (targetSurveySlug === slug) {
+                const existing = targetNet.surveys[surveyID];
+                const existingBlock = Number(isMainSiteRecord(existing) ? existing.creationBlock : 0);
+                if (!existing || existingBlock <= Number(eventBlockNumber || 0)) {
+                  targetNet.surveys[surveyID] = {
+                    ...(isMainSiteRecord(existing) ? existing : {}),
+                    ...preparedSurveyData,
+                  };
+                }
+                delete targetNet.pendingSurveyMetadata[surveyID];
+              } else {
+                delete targetNet.surveys[surveyID];
+              }
+              targetNet.surveysLatestBlock = Math.max(
+                Number(targetNet.surveysLatestBlock) || initialLastBlockDefault,
+                Number(eventBlockNumber) || 0,
+              );
+              next[networkID] = targetNet;
+              return next;
+            });
 
             if (surveyData.questionIDs && surveyData.questionIDs.length > 0) {
               currentQuestionNetworkCache.questionsLatestBlock = Math.max(
@@ -3676,8 +3812,42 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
                 eventBlockNumber,
               );
             }
-            mergeFreshQuestionArweaveBranches();
-            this.DG.write('questionsCache', slug, questionsCache);
+            await updateMainSiteQuestionCacheAtomic(slug, (current) => {
+              const next = (isMainSiteRecord(current) ? current : {}) as MainSiteQuestionMetadataCache;
+              this.mergeLegacyNumericNetworkKey(next, networkID);
+              const targetNet = next[networkID] || {
+                questionsLatestBlock: initialLastBlockDefault,
+                questionsDiscoveryCheckpointBlock: initialLastBlockDefault,
+                questions: {},
+                questionResponses: {},
+                questionResponsesMeta: {},
+                questionResponsesLatestBlock: initialLastBlockDefault,
+                pendingQuestionMetadata: {},
+                arweaveTxCache: {},
+                arweaveTxFailureCache: {},
+                questionHydrationMeta: {},
+              };
+              ensureQuestionArweaveCacheBranches(targetNet);
+              eventQuestionIds.forEach((qid) => {
+                const incoming = currentQuestionNetworkCache.questions[qid];
+                if (incoming) {
+                  targetNet.questions[qid] = {
+                    ...(isMainSiteRecord(targetNet.questions[qid]) ? targetNet.questions[qid] : {}),
+                    ...(isMainSiteRecord(incoming) ? incoming : {}),
+                  };
+                  if (targetNet.pendingQuestionMetadata) delete targetNet.pendingQuestionMetadata[qid];
+                }
+              });
+              rebucketedEventQuestionIds.forEach((qid) => delete targetNet.questions[qid]);
+              if (surveyData.questionIDs && surveyData.questionIDs.length > 0) {
+                targetNet.questionsLatestBlock = Math.max(
+                  Number(targetNet.questionsLatestBlock) || initialLastBlockDefault,
+                  Number(eventBlockNumber) || 0,
+                );
+              }
+              next[networkID] = targetNet;
+              return next;
+            });
 
             mainSiteLog.log(
               `SurveyAdded event fully processed for ${surveyID}. Caches updated. surveysLatestBlock: ${eventBlockNumber}, questionsLatestBlock: ${currentQuestionNetworkCache.questionsLatestBlock}.`,
@@ -3709,6 +3879,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           }
         } catch (error) {
           mainSiteLog.error(`Error processing SurveyAdded event for ${surveyID}:`, error);
+          if (error instanceof MainSiteCachePersistenceError) throw error;
           this.setReadinessStateIfChanged(
             { isSurveyCacheReady: true, isQuestionCacheReady: true },
             this.checkAllCachesReady,
@@ -3727,6 +3898,8 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         try {
           const idsLower = event.questionIds.map((hex: string) => hex.toLowerCase());
           const missing = idsLower.filter((qid: string) => !currentQuestionNetworkCache.questions[qid]);
+          const eventQuestionIds = new Set<string>();
+          const rebucketedEventQuestionIds = new Set<string>();
 
           let allNewQuestionsFetchedSuccessfully = true;
           if (missing.length > 0) {
@@ -3744,7 +3917,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
                 }
               }),
             );
-            results.forEach(({ qid, questionData }: MainSiteQuestionFetchResult) => {
+            for (const { qid, questionData } of results) {
               if (questionData) {
                 questionData.id = qid;
                 const preparedQuestion = this.buildMetadataSessionCacheEnvelope(questionData, slug, {
@@ -3757,26 +3930,68 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
                 const targetQuestionSlug = preparedQuestion.targetSlug;
                 if (targetQuestionSlug === slug) {
                   currentQuestionNetworkCache.questions[qid] = preparedQuestionData;
+                  eventQuestionIds.add(qid);
                 } else {
                   try {
                     delete currentQuestionNetworkCache.questions[qid];
                   } catch (e) {
                     mainSiteLog.warn('MainSite: fallback', e);
                   }
-                  this.writeQuestionMetadataToCache(targetQuestionSlug, qid, preparedQuestionData, networkID, {
-                    enforceScopedIsolation: true,
-                  });
+                  rebucketedEventQuestionIds.add(qid);
+                  const persisted = await this.writeQuestionMetadataToCacheAtomic(
+                    targetQuestionSlug,
+                    qid,
+                    preparedQuestionData,
+                    networkID,
+                    { enforceScopedIsolation: true },
+                  );
+                  if (!persisted) {
+                    throw new MainSiteCachePersistenceError(
+                      `Failed to persist questions cache for ${targetQuestionSlug}`,
+                    );
+                  }
                 }
                 mainSiteLog.log(`New question ${qid} data fetched and added to local cache object.`);
               } else {
                 allNewQuestionsFetchedSuccessfully = false;
               }
-            });
+            }
           }
 
           currentQuestionNetworkCache.questionsLatestBlock = eventBlockNumber;
-          mergeFreshQuestionArweaveBranches();
-          this.DG.write('questionsCache', slug, questionsCache);
+          await updateMainSiteQuestionCacheAtomic(slug, (current) => {
+            const next = (isMainSiteRecord(current) ? current : {}) as MainSiteQuestionMetadataCache;
+            this.mergeLegacyNumericNetworkKey(next, networkID);
+            const targetNet = next[networkID] || {
+              questionsLatestBlock: initialLastBlockDefault,
+              questionsDiscoveryCheckpointBlock: initialLastBlockDefault,
+              questions: {},
+              questionResponses: {},
+              questionResponsesMeta: {},
+              questionResponsesLatestBlock: initialLastBlockDefault,
+              pendingQuestionMetadata: {},
+              arweaveTxCache: {},
+              arweaveTxFailureCache: {},
+              questionHydrationMeta: {},
+            };
+            ensureQuestionArweaveCacheBranches(targetNet);
+            eventQuestionIds.forEach((qid) => {
+              const incoming = currentQuestionNetworkCache.questions[qid];
+              if (!incoming) return;
+              targetNet.questions[qid] = {
+                ...(isMainSiteRecord(targetNet.questions[qid]) ? targetNet.questions[qid] : {}),
+                ...(isMainSiteRecord(incoming) ? incoming : {}),
+              };
+              if (targetNet.pendingQuestionMetadata) delete targetNet.pendingQuestionMetadata[qid];
+            });
+            rebucketedEventQuestionIds.forEach((qid) => delete targetNet.questions[qid]);
+            targetNet.questionsLatestBlock = Math.max(
+              Number(targetNet.questionsLatestBlock) || initialLastBlockDefault,
+              Number(eventBlockNumber) || 0,
+            );
+            next[networkID] = targetNet;
+            return next;
+          });
           mainSiteLog.log(`QuestionsAdded event processed. questionsLatestBlock updated to ${eventBlockNumber}.`);
 
           // Increment nonce so downstream components (PileModeView, OnePageSession) detect the new questions
@@ -3792,6 +4007,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           }
         } catch (error) {
           mainSiteLog.error(`Error processing QuestionsAdded event:`, error);
+          if (error instanceof MainSiteCachePersistenceError) throw error;
           this.setReadinessStateIfChanged({ isQuestionCacheReady: true }, this.checkAllCachesReady);
         }
       } else {
@@ -3924,12 +4140,88 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         }
       }
 
-      if (surveyCacheUpdated) this.DG.write('surveysCache', slug, surveysCache);
-      if (questionCacheUpdated) {
-        mergeFreshQuestionArweaveBranches();
-        this.DG.write('questionsCache', slug, questionsCache);
+      let surveyResponsePersisted = false;
+      if (surveyCacheUpdated && surveyIdFromEvent) {
+        await updateMainSiteSurveyCacheAtomic(slug, (current) => {
+          const next = (isMainSiteRecord(current) ? current : {}) as MainSiteSurveyMetadataCache;
+          this.mergeLegacyNumericNetworkKey(next, networkID);
+          const targetNet = next[networkID] || {
+            surveysLatestBlock: initialLastBlockDefault,
+            surveys: {},
+            surveyResponses: {},
+            surveyResponsesLatestBlock: {},
+            pendingSurveyMetadata: {},
+          };
+          if (!isMainSiteRecord(targetNet.surveyResponses)) targetNet.surveyResponses = {};
+          if (!isMainSiteRecord(targetNet.surveyResponsesLatestBlock)) targetNet.surveyResponsesLatestBlock = {};
+          const currentWatermark = Number(targetNet.surveyResponsesLatestBlock[surveyIdFromEvent]) || 0;
+          if (Number(eventBlockNumber) > currentWatermark) {
+            if (!isMainSiteRecord(targetNet.surveyResponses[surveyIdFromEvent])) {
+              targetNet.surveyResponses[surveyIdFromEvent] = {};
+            }
+            targetNet.surveyResponses[surveyIdFromEvent]![responderAddressLower] =
+              currentSurveyNetworkCache.surveyResponses[surveyIdFromEvent]?.[responderAddressLower];
+            targetNet.surveyResponsesLatestBlock[surveyIdFromEvent] = Math.max(
+              currentWatermark,
+              Number(eventBlockNumber) || 0,
+            );
+            surveyResponsePersisted = true;
+          }
+          next[networkID] = targetNet;
+          return next;
+        });
       }
-      if (surveyCacheUpdated || questionCacheUpdated) {
+      let questionResponsePersisted = false;
+      if (questionCacheUpdated) {
+        await updateMainSiteQuestionCacheAtomic(slug, (current) => {
+          const next = (isMainSiteRecord(current) ? current : {}) as MainSiteQuestionMetadataCache;
+          this.mergeLegacyNumericNetworkKey(next, networkID);
+          const targetNet = next[networkID] || {
+            questionsLatestBlock: initialLastBlockDefault,
+            questionsDiscoveryCheckpointBlock: initialLastBlockDefault,
+            questions: {},
+            questionResponses: {},
+            questionResponsesMeta: {},
+            questionResponsesLatestBlock: initialLastBlockDefault,
+            pendingQuestionMetadata: {},
+            arweaveTxCache: {},
+            arweaveTxFailureCache: {},
+            questionHydrationMeta: {},
+          };
+          ensureQuestionArweaveCacheBranches(targetNet);
+          qIdsToFetch.forEach((qId) => {
+            const incomingResponse = currentQuestionNetworkCache.questionResponses[qId]?.[responderAddressLower];
+            const incomingMeta = currentQuestionNetworkCache.questionResponsesMeta[qId]?.[responderAddressLower];
+            if (!incomingResponse || !incomingMeta) return;
+            if (!isMainSiteRecord(targetNet.questionResponses[qId])) targetNet.questionResponses[qId] = {};
+            if (!isMainSiteRecord(targetNet.questionResponsesMeta[qId])) targetNet.questionResponsesMeta[qId] = {};
+            const existingMeta = targetNet.questionResponsesMeta[qId]?.[responderAddressLower] || {};
+            const existingBn = Number(existingMeta.bn ?? existingMeta.blockNumber ?? 0);
+            const existingTxi = Number(existingMeta.txi ?? existingMeta.transactionIndex ?? existingMeta.txIndex ?? 0);
+            const existingLi = Number(existingMeta.li ?? existingMeta.logIndex ?? 0);
+            const existingTs = Number(existingMeta.ts ?? existingMeta.timestamp ?? 0);
+            const incomingIsNewer =
+              bn > existingBn ||
+              (bn === existingBn &&
+                (eventTransactionIndex > existingTxi ||
+                  (eventTransactionIndex === existingTxi &&
+                    (eventLogIndex > existingLi || (eventLogIndex === existingLi && eventTimestamp >= existingTs)))));
+            if (!incomingIsNewer) return;
+            targetNet.questionResponses[qId]![responderAddressLower] = incomingResponse;
+            targetNet.questionResponsesMeta[qId]![responderAddressLower] = incomingMeta;
+            questionResponsePersisted = true;
+          });
+          if (questionResponsePersisted) {
+            targetNet.questionResponsesLatestBlock = Math.max(
+              Number(targetNet.questionResponsesLatestBlock) || initialLastBlockDefault,
+              bn,
+            );
+          }
+          next[networkID] = targetNet;
+          return next;
+        });
+      }
+      if (surveyResponsePersisted || questionResponsePersisted) {
         mainSiteLog.log('ResponsesSubmitted event processed; caches updated (survey and/or questions).');
         this.queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
       }

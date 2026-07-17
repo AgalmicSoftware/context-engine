@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { AppShell, appShellDispatchActions } from './AppShell';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
-import { initCacheManager } from '../../utilities/cache/cacheScripts.js';
+import { initCacheManager, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
@@ -337,6 +337,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
   initCacheManager: jest.fn(() => Promise.resolve()),
   subscribeCacheUpdates: jest.fn(() => jest.fn()),
+  updateCacheAtomic: jest.fn(),
 }));
 
 jest.mock('../../utilities/web3/sessionRegistry.js', () => {
@@ -623,6 +624,7 @@ describe('AppShell route render smoke', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     initCacheManager.mockResolvedValue(undefined);
+    updateCacheAtomic.mockReset();
     getSessionConfigBySlug.mockImplementation(() => null);
     normalizeSessionSlug.mockImplementation((value = '') =>
       String(value || '')
@@ -2532,6 +2534,11 @@ describe('AppShell route render smoke', () => {
         },
       },
     });
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const next = await updater(dg.read(name, slug));
+      dg.write(name, slug, next);
+      return next;
+    });
     subject.buildMetadataSessionCacheEnvelope = jest.fn((metadata, slug) => ({
       targetSlug: slug,
       metadata: {
@@ -2602,6 +2609,221 @@ describe('AppShell route render smoke', () => {
       needsQuestionResponsesNonce: true,
       checkAllCachesReady: true,
     });
+  });
+
+  it('merges event metadata into the latest cache and publishes readiness only after persistence', async () => {
+    const questionId = `0x${'5'.repeat(64)}`;
+    const concurrentId = `0x${'6'.repeat(64)}`;
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    const dg = attachDgStore(subject, {
+      'questionsCache:edge': {
+        84532: {
+          questionsLatestBlock: 12,
+          questionsDiscoveryCheckpointBlock: 12,
+          questions: {},
+          questionResponses: {},
+          questionResponsesMeta: {},
+          questionResponsesLatestBlock: 12,
+          pendingQuestionMetadata: {},
+          arweaveTxCache: {},
+          arweaveTxFailureCache: {},
+          questionHydrationMeta: {},
+        },
+      },
+    });
+    const persist = createDeferred();
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const current = dg.read(name, slug) || {};
+      if (name === 'questionsCache') {
+        current['84532'].questions[concurrentId] = { id: concurrentId, prompt: 'Concurrent' };
+        current['84532'].questionsLatestBlock = 40;
+      }
+      const next = await updater(current);
+      await persist.promise;
+      dg.write(name, slug, next);
+      return next;
+    });
+    subject.buildMetadataSessionCacheEnvelope = jest.fn((metadata, slug) => ({
+      targetSlug: slug,
+      metadata: { ...metadata, sessionSlug: slug, slug },
+    }));
+    subject.buildQuestionDecryptContext = jest.fn(() => ({ sessionSlug: 'edge' }));
+    subject.setReadinessStateIfChanged = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+    });
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 20 });
+    contractScripts.getQuestionData.mockResolvedValue({ prompt: 'Event question' });
+
+    const eventPromise = subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'QuestionsAdded',
+      questionIds: [questionId],
+      blockNumber: 30,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
+    persist.resolve();
+    await eventPromise;
+
+    const stored = dg.read('questionsCache', 'edge')['84532'];
+    expect(stored.questions[concurrentId]).toEqual(expect.objectContaining({ prompt: 'Concurrent' }));
+    expect(stored.questions[questionId]).toEqual(expect.objectContaining({ prompt: 'Event question' }));
+    expect(stored.questionsLatestBlock).toBe(40);
+    expect(subject.queueLocalRevisionUpdate).toHaveBeenCalledWith({
+      needsQuestionResponsesNonce: true,
+      checkAllCachesReady: true,
+    });
+  });
+
+  it('keeps event readiness closed and rejects when managed-cache persistence rejects', async () => {
+    const questionId = `0x${'7'.repeat(64)}`;
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    attachDgStore(subject, {
+      'questionsCache:edge': {
+        84532: {
+          questionsLatestBlock: 12,
+          questions: {},
+          questionResponses: {},
+          questionResponsesMeta: {},
+          pendingQuestionMetadata: {},
+          arweaveTxCache: {},
+          arweaveTxFailureCache: {},
+          questionHydrationMeta: {},
+        },
+      },
+    });
+    updateCacheAtomic.mockRejectedValue(new Error('indexeddb unavailable'));
+    subject.buildMetadataSessionCacheEnvelope = jest.fn((metadata, slug) => ({
+      targetSlug: slug,
+      metadata: { ...metadata, sessionSlug: slug, slug },
+    }));
+    subject.buildQuestionDecryptContext = jest.fn(() => ({ sessionSlug: 'edge' }));
+    subject.setReadinessStateIfChanged = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+    });
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 20 });
+    contractScripts.getQuestionData.mockResolvedValue({ prompt: 'Event question' });
+
+    await expect(
+      subject.onNewSurveyEventDetectedForGroup('edge', {
+        type: 'QuestionsAdded',
+        questionIds: [questionId],
+        blockNumber: 30,
+      }),
+    ).rejects.toThrow('Failed to persist questions cache');
+
+    expect(subject.state.isQuestionCacheReady).toBe(false);
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rechecks response-event recency inside the atomic updater before publishing a revision', async () => {
+    const questionId = `0x${'8'.repeat(64)}`;
+    const responder = '0x00000000000000000000000000000000000000a8';
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    const dg = attachDgStore(subject, {
+      'questionsCache:edge': {
+        84532: {
+          questionsLatestBlock: 12,
+          questions: {},
+          questionResponses: { [questionId]: {} },
+          questionResponsesMeta: { [questionId]: {} },
+          questionResponsesLatestBlock: 12,
+          pendingQuestionMetadata: {},
+          arweaveTxCache: {},
+          arweaveTxFailureCache: {},
+          questionHydrationMeta: {},
+        },
+      },
+    });
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const current = dg.read(name, slug) || {};
+      if (name === 'questionsCache') {
+        current['84532'].questionResponses[questionId][responder] = { answer: 'concurrent-newer' };
+        current['84532'].questionResponsesMeta[questionId][responder] = { bn: 40, txi: 1, li: 1, ts: 1 };
+        current['84532'].questionResponsesLatestBlock = 40;
+      }
+      const next = await updater(current);
+      dg.write(name, slug, next);
+      return next;
+    });
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 20 });
+    contractScripts.getResponse.mockResolvedValue({ answer: 'event-older' });
+
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'ResponsesSubmitted',
+      surveyId: `0x${'0'.repeat(64)}`,
+      questionIds: [questionId],
+      responder,
+      blockNumber: 30,
+      transactionIndex: 1,
+      logIndex: 1,
+      timestamp: 1,
+    });
+
+    const stored = dg.read('questionsCache', 'edge')['84532'];
+    expect(stored.questionResponses[questionId][responder]).toEqual({ answer: 'concurrent-newer' });
+    expect(stored.questionResponsesLatestBlock).toBe(40);
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
+  });
+
+  it('does not publish response-event success when atomic persistence rejects', async () => {
+    const questionId = `0x${'9'.repeat(64)}`;
+    const responder = '0x00000000000000000000000000000000000000a9';
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    attachDgStore(subject, {
+      'questionsCache:edge': {
+        84532: {
+          questionsLatestBlock: 12,
+          questions: {},
+          questionResponses: { [questionId]: {} },
+          questionResponsesMeta: { [questionId]: {} },
+          questionResponsesLatestBlock: 12,
+          pendingQuestionMetadata: {},
+          arweaveTxCache: {},
+          arweaveTxFailureCache: {},
+          questionHydrationMeta: {},
+        },
+      },
+    });
+    updateCacheAtomic.mockRejectedValue(new Error('indexeddb unavailable'));
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 20 });
+    contractScripts.getResponse.mockResolvedValue({ answer: 'event-response' });
+
+    await expect(
+      subject.onNewSurveyEventDetectedForGroup('edge', {
+        type: 'ResponsesSubmitted',
+        surveyId: `0x${'0'.repeat(64)}`,
+        questionIds: [questionId],
+        responder,
+        blockNumber: 30,
+        transactionIndex: 1,
+        logIndex: 1,
+        timestamp: 1,
+      }),
+    ).rejects.toThrow('Failed to persist questions cache');
+
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
   });
 
   it('tears down SBT detail listeners before rebuilding network caches', async () => {
