@@ -4968,6 +4968,14 @@ test('Mini App live results can filter by saved lightweight group details', asyn
     answer: { questionType: 'agree_unsure_disagree', value: 'disagree', label: 'Disagree' },
     createdAt: '2026-05-25T00:01:00.000Z',
   }));
+  await kv.put('telegram:submit-request:three', JSON.stringify({
+    status: 'submit_request_created',
+    sessionSlug: 'alpha',
+    telegramUserId: 'user-c',
+    questionId: 'q-filter',
+    answer: { questionType: 'agree_unsure_disagree', value: 'agree', label: 'Agree' },
+    createdAt: '2026-05-25T00:02:00.000Z',
+  }));
   await kv.put('telegram:lightweight-group-membership:alpha:user-a', JSON.stringify({
     sessionSlug: 'alpha',
     telegramUserId: 'user-a',
@@ -4979,6 +4987,12 @@ test('Mini App live results can filter by saved lightweight group details', asyn
     telegramUserId: 'user-b',
     selections: { age_bucket: ['35_44'], country_relationship: ['live_in'] },
     details: { country_relationship: { live_in_country: 'Canada' } },
+  }));
+  await kv.put('telegram:lightweight-group-membership:alpha:user-c', JSON.stringify({
+    sessionSlug: 'alpha',
+    telegramUserId: 'user-c',
+    selections: { age_bucket: ['25_34'], country_relationship: ['live_in'] },
+    details: { country_relationship: { live_in_country: 'United States' } },
   }));
 
   const filters = encodeURIComponent(JSON.stringify({
@@ -4994,15 +5008,15 @@ test('Mini App live results can filter by saved lightweight group details', asyn
   assert.equal(response.status, 200);
   assert.equal(summary.ok, true);
   assert.equal(summary.demo, false);
-  assert.equal(summary.responseCount, 1);
-  assert.equal(summary.participantCount, 1);
+  assert.equal(summary.responseCount, 2);
+  assert.equal(summary.participantCount, 2);
   assert.equal(summary.filters.applied, true);
-  assert.equal(summary.filters.matchedParticipants, 1);
+  assert.equal(summary.filters.matchedParticipants, 2);
   assert.equal(summary.publicSnapshot.filters.applied, true);
-  assert.equal(summary.publicSnapshot.filters.matchedParticipants, 1);
+  assert.equal(summary.publicSnapshot.filters.matchedParticipants, 2);
   assert.deepEqual(summary.publicSnapshot.filters.details, {
     country_relationship: { live_in_country: 'United States' },
   });
-  assert.equal(summary.questions.consensus[0].counts.Agree, 1);
+  assert.equal(summary.questions.consensus[0].counts.Agree, 2);
   assert.equal(summary.questions.consensus[0].counts.Disagree, undefined);
 });
