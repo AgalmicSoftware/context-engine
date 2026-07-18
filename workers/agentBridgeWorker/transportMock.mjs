@@ -225,7 +225,7 @@ export class MockTelegramTransportHarness {
         ? AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED
         : AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_CREATED,
       lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
-      telegramPrincipalId: account.telegramPrincipal.principalId,
+      telegramPrincipalId: account.principal.principalId,
       accountId: account.accountId,
       summary: {
         accountAddress: account.accountAddress,
@@ -368,7 +368,7 @@ export class MockTelegramTransportHarness {
       eventType,
       lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
       accountId: account.accountId,
-      telegramPrincipalId: account.telegramPrincipal?.principalId,
+      telegramPrincipalId: account.principal?.principalId,
       sessionSlug: resolved.session.sessionSlug,
       questionId: question.questionId,
       summary: {

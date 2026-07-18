@@ -5,7 +5,7 @@ import {
   AGENT_BRIDGE_WORKER_VERSION,
   RISK_CEILINGS,
 } from './constants.mjs';
-import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
+import { normalizeAgentPrincipal } from './agentPrincipal.mjs';
 import { buildOpaqueActionId } from './opaqueActions.mjs';
 import { assertNoSecretShape, redactSecrets } from './redaction.mjs';
 
@@ -61,20 +61,22 @@ export async function deriveManagedDemoAccount({
   createdAt = null,
   lifecycle = AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_CREATED,
 } = {}) {
-  const telegramPrincipal = normalizeTelegramPrincipal(principal);
+  const secretCheck = assertManagedDemoRootSecret(rootSecret, { action: 'create_managed_demo_account' });
+  if (!secretCheck.ok) throw new Error(secretCheck.reason);
+  const normalizedPrincipal = normalizeAgentPrincipal(principal);
+  if (!normalizedPrincipal.principalId) throw new Error('agent_principal_required');
   const normalizedDeploymentId = normalizeDeploymentId(deploymentId);
-  const secretScope = rootSecret ? `secret:${rootSecret}` : 'secret:metadata-only-demo';
-  const fingerprint = await sha256Hex(`${secretScope}|${telegramPrincipal.principalId}|${normalizedDeploymentId}`);
-  const privateKeyHex = await sha256Hex(`demo-private-key|${rootSecret}|${telegramPrincipal.principalId}|${normalizedDeploymentId}`);
+  const fingerprint = await sha256Hex(`secret:${rootSecret}|${normalizedPrincipal.principalId}|${normalizedDeploymentId}`);
+  const privateKeyHex = await sha256Hex(`demo-private-key|${rootSecret}|${normalizedPrincipal.principalId}|${normalizedDeploymentId}`);
   const accountAddress = ethers.utils.computeAddress(`0x${privateKeyHex}`);
   const account = {
-    type: 'managed_telegram_demo_account',
+    type: 'managed_demo_account',
     version: AGENT_BRIDGE_WORKER_VERSION,
     accountMode: ACCOUNT_MODES.MANAGED_TELEGRAM_DEMO,
-    accountId: `ce_tg_demo_${fingerprint.slice(0, 24)}`,
+    accountId: `ce_demo_${fingerprint.slice(0, 24)}`,
     accountAddress,
     chainScope: 'testnet',
-    telegramPrincipal,
+    principal: normalizedPrincipal,
     workerDeploymentId: normalizedDeploymentId,
     signerBoundary: 'durable_object_managed_demo_signer',
     lifecycle: lifecycle === AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED ? 'account_recovered' : 'account_created',
@@ -143,9 +145,10 @@ export async function deriveDemoPrivateKeyMaterial({
 } = {}) {
   const secretCheck = assertManagedDemoRootSecret(rootSecret, { action: 'derive_demo_private_key' });
   if (!secretCheck.ok) throw new Error(secretCheck.reason);
-  const telegramPrincipal = normalizeTelegramPrincipal(principal);
+  const normalizedPrincipal = normalizeAgentPrincipal(principal);
+  if (!normalizedPrincipal.principalId) throw new Error('agent_principal_required');
   const normalizedDeploymentId = normalizeDeploymentId(deploymentId);
-  const privateKeyHex = await sha256Hex(`demo-private-key|${rootSecret}|${telegramPrincipal.principalId}|${normalizedDeploymentId}`);
+  const privateKeyHex = await sha256Hex(`demo-private-key|${rootSecret}|${normalizedPrincipal.principalId}|${normalizedDeploymentId}`);
   return `0x${privateKeyHex}`;
 }
 

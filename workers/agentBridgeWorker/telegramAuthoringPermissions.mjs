@@ -72,7 +72,7 @@ export function evaluateTelegramQuestionAuthoringPermission({
     privateSessionMatches &&
     !privateBoundAuthoringDisabled;
   const delegatedPrivateParticipant = isPrivate &&
-    privateBinding?.source === 'telegram_agent_delegation_token' &&
+    privateBinding?.source === 'agent_credential' &&
     privateSessionMatches &&
     !privateBoundAuthoringDisabled;
 
@@ -84,7 +84,7 @@ export function evaluateTelegramQuestionAuthoringPermission({
         groupChatId: '',
         privateBound: true,
         reason: delegatedPrivateParticipant
-          ? 'telegram_agent_delegation_token_allowed'
+          ? 'agent_credential_allowed'
           : 'telegram_only_private_participant_allowed',
       };
     }

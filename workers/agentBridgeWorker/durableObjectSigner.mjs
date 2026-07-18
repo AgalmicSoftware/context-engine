@@ -69,7 +69,12 @@ export class ManagedDemoSignerDurableObject {
     return String(inputDeploymentId || this.env.AGENT_BRIDGE_DEPLOYMENT_ID || 'local-demo').trim();
   }
 
-  async getOrCreateAccount({ principal = {}, deploymentId = '', createdAt = null, lifecycle } = {}) {
+  async getOrCreateAccount({
+    principal = {},
+    deploymentId = '',
+    createdAt = null,
+    lifecycle,
+  } = {}) {
     const account = await deriveManagedDemoAccount({
       principal,
       deploymentId: this.deploymentId(deploymentId),
@@ -124,7 +129,7 @@ export class ManagedDemoSignerDurableObject {
     let privateKey;
     try {
       privateKey = await deriveDemoPrivateKeyMaterial({
-        principal: managedAccount.telegramPrincipal,
+        principal: managedAccount.principal,
         deploymentId: managedAccount.workerDeploymentId,
         rootSecret: this.rootSecret(),
       });

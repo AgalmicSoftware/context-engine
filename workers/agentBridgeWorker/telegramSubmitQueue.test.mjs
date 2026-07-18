@@ -350,6 +350,7 @@ test('Telegram submit queue consumer updates persisted records after processing'
   }, {
     AGENT_ACTION_KV: kv,
     AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED: 'true',
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root-secret',
   });
 
   const stored = JSON.parse(await kv.get('telegram:submit-request:submit-two'));

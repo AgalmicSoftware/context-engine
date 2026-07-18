@@ -151,7 +151,7 @@ const CAPABILITIES = Object.freeze([
     method: 'POST',
     path: '/telegram/agent/api/questions/next',
     handoffStatus: AGENT_API_HANDOFF_STATUS.WORKER_LOCAL_UNTIL_CANONICAL,
-    requiredFields: ['telegramUserId', 'sessionSlug'],
+    requiredFields: ['sessionSlug'],
     optionalFields: ['groupChatId', 'criteria', 'preferences', 'queueKey', 'advance', 'resetQueue'],
     safeTelegramLanes: [
       TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
@@ -178,7 +178,7 @@ const CAPABILITIES = Object.freeze([
     ],
     groupSafe: false,
     notes: [
-      'Requires the shared service token plus a Telegram account whose managed wallet is a configured session admin; ordinary ceagt_ user tokens cannot change admin queues.',
+      'Requires explicit root/break-glass authority or a scoped user/service credential whose managed account is a configured session admin; ordinary participant credentials cannot change admin queues.',
     ],
   }),
   freezeEntry({
@@ -529,23 +529,6 @@ const CAPABILITIES = Object.freeze([
     ],
     groupSafe: false,
     miniAppRoutes: ['storage/access'],
-  }),
-  freezeEntry({
-    id: 'agent.events.forward_openclaw',
-    category: 'events',
-    label: 'Forward Event',
-    canonicalActionId: 'agent.events.forward_openclaw',
-    method: 'POST',
-    path: '/api/agent/events/forward-openclaw',
-    handoffStatus: AGENT_API_HANDOFF_STATUS.PLANNED_CONTRACT_ONLY,
-    requiredFields: ['eventRef'],
-    optionalFields: ['session', 'requestId'],
-    safeTelegramLanes: [
-      TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
-      TELEGRAM_CHAT_LANES.MINI_APP,
-    ],
-    groupSafe: false,
-    miniAppRoutes: ['events/forward'],
   }),
 ]);
 

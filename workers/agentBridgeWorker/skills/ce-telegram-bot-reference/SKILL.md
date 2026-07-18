@@ -5,7 +5,7 @@ description: Detailed Context Engine Telegram bot, Mini App, admin, and operator
 
 # CE Telegram Bot Reference
 
-**Reference version:** 2026-06-16 (v41)
+**Reference version:** 2026-07-18 (v42)
 
 This is the detailed Telegram bot, Mini App, admin, and operator reference. It
 preserves endpoint details and troubleshooting notes that are too large for the
@@ -193,14 +193,26 @@ reads as the same stale-skill signal.
 ## Preconditions
 
 - The CE worker base URL is `https://ce-agent-bridge-worker.agalmic.workers.dev` for the current Edge City deployment. Operators may override this with `AGENT_BRIDGE_PUBLIC_URL`.
-- Use either a worker service token, a trusted Geo/Hermes invite onboarding token, or a user-scoped agent token.
-- For a worker service token, the worker has `AGENT_BRIDGE_AGENT_API_TOKEN` configured. Send `Authorization: Bearer <token>` or `X-CE-Agent-Token: <token>`.
-- For a trusted Geo/Hermes invite, the agent receives an invite token from the Geo node/link and a verified Telegram user id from its own Telegram context, then calls `POST /api/agent/invite/onboard` to mint a user-scoped `ceagt_...` token. After that, use the returned `ceagt_...` token exactly like copied bot install info.
+- Use a session-bound user/install credential or a named scoped service
+  credential. Both use the `ceagt_...` format and the same authorization
+  header. The deployment root token is bootstrap/break-glass authority only.
+- A one-time invite can mint a user credential through
+  `POST /api/agent/invite/onboard`. Telegram adapters may include a verified
+  Telegram user id; non-Telegram agents omit it and receive an opaque principal.
 - For a user-scoped agent token, the user opens the CE bot, taps `Onboard Agent`, and copies the full install info. If CE already says onboarding is complete, the same screen offers `Copy New Agent Info`; use it to mint a fresh token for another agent surface. The default expiry is 28 days. Send the token as `Authorization: Bearer <token>`.
-- Include `telegramUserId` on every service-token call. When using a user-scoped agent token, CE infers `telegramUserId`; never ask the user for a Telegram handle/id just to use a `ceagt_...` token. The token is not locked to one session; if you omit `sessionSlug`, CE uses the user's selected session or the current worker default.
-- Include `groupChatId` only for service-token calls or user-token actions that are explicitly acting inside a Telegram group and already have the numeric group id from Telegram context. For normal copied-token external-agent onboarding, omit `groupChatId`; do not ask the user to supply it.
+- Do not supply `telegramUserId` to impersonate another participant. CE derives
+  the principal from the credential. Include `groupChatId` only when a
+  Telegram adapter is explicitly acting in a known group.
+- Every user or service credential is locked to its issued session. Omit
+  `sessionSlug` or restate that session; a different slug is denied and does
+  not rebind the credential.
 - Permission currently defaults to Telegram-native group/session binding. SBT or CE resource-gated authoring is not the default yet.
-- Current Edge 2026 demo sessions may include the default `Research Questions (Demo)` session for organizers plus participant sessions. Operators can stop surfacing older smoke-test sessions by moving `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` forward; agents should not rely on older sessions always being listed. A `ceagt_` token follows the user's selected session. To switch sessions, send `sessionSlug=<existing-slug>` on a worker call; CE validates the slug and pins it for later omitted-slug calls.
+- Current Edge 2026 demo sessions may include the default `Research Questions
+  (Demo)` session for organizers plus participant sessions. Operators can stop
+  surfacing older smoke-test sessions by moving
+  `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` forward. Each `ceagt_`
+  credential remains bound to the session for which it was issued; mint a new
+  credential when another session is required.
 
 Worked `ceagt_` token smoke test:
 
@@ -213,9 +225,18 @@ curl -fsS "https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/question
 
 Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any agent that can make HTTPS requests:
 
-1. If you are a Telegram-native Hermes agent and the user clicked a Geo/CE invite link, use the Trusted Geo / Hermes Invite Onboarding flow below to mint a `ceagt_...` token from the invite token plus the Telegram `from.id` you observed. Otherwise, ask the user to open `https://t.me/contextengineer_bot?start=agent_onboarding` (or `https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>` when the session is known).
+1. If the user has a one-time CE invite, redeem it through the invite flow
+   below. Include Telegram `from.id` only when a Telegram adapter already has
+   that verified context. Otherwise, Telegram users can open
+   `https://t.me/contextengineer_bot?start=agent_onboarding` (or the
+   session-specific form) and copy install info.
 2. Obtain the user-scoped `ceagt_...` token either from the invite-onboarding response or from copied bot install info. For copied install info, extract `Worker`, `Skill`, and the `ceagt_...` token. There may be no `Session`, Telegram handle, Telegram id, or group chat id field; that is expected. Never repeat the token in chat, logs, summaries, or error messages.
-3. Choose the first action by agent context. In Claude Code or another low-context copied-token invocation, skip onboarding by default: do not ask for profile, calendar, demographic, attendance, Telegram id, or group chat fields; go straight to questions. In Hermes, OpenClaw, or another Edge-native agent that already has authorized Edge profile/calendar/Telegram context, ask one concise setup question before onboarding: "Can I use your Edge profile, interests, calendar, and non-identifying fields like bio keywords, age bucket, country/region, role, and attendance week to pick relevant CE questions and support research buckets?" If the user says "yes", "accept all", or otherwise approves the recommended setup, translate that into explicit onboarding answers and profile-derived buckets; do not ask the user to manually fill buckets that can be inferred from authorized Edge context. If they decline or narrow consent, persist only the explicit allowed fields. Call `GET <Worker>/api/agent/onboarding` first when preferences, consent, attendance, digest timing, or group buckets are relevant. Do not ask for `telegramUserId` or `groupChatId`; the worker infers the user from the token and treats omitted group context as private onboarding. Add `?sessionSlug=<existing-slug>` only when the user or event context explicitly chooses a session. If relevant consent questions are incomplete, ask them before fetching session questions, then persist the user's choices with `POST <Worker>/api/agent/onboarding`.
+3. Choose the first action by agent context. In Claude Code or another
+   low-context copied-token invocation, skip profile onboarding and go straight
+   to questions. In an Edge-native agent with authorized profile/calendar
+   context, ask one concise consent question before using that context. Do not
+   ask for Telegram ids or group ids. Add `sessionSlug` only when restating the
+   credential's issued session.
 4. Call `GET <Worker>/api/agent/questions?limit=20` with `Authorization: Bearer <token>`, adding `sessionSlug` only when intentionally switching or targeting a specific session. The response marks submitted questions with `answeredByUser` and sorts ordinary listings unanswered-first; keep that ordering unless a sponsored question or strong local relevance signal should override it.
 5. Pick up to 10 answerable, unanswered questions most relevant to the user. If memory is enabled and consented, use it to rank; otherwise use current conversation context, question tags, and session context.
 6. Immediately show the first or most relevant answerable question and ask how the user wants to answer. Do not ask whether to surface it; surfacing it is the default action after a successful question read.
@@ -233,12 +254,12 @@ Use this generic flow for Claude Code, Claude cowork, OpenClaw, Hermes, or any a
 
 The preferred low-friction path is a CE bot deep link. A group-question response remains available when the user should enter through a Telegram group that already has CE bot buttons.
 
-### Trusted Geo / Hermes Invite Onboarding
+### One-Time Invite Onboarding
 
-Use this path when a Telegram-native Hermes agent surfaces a Context Engine
-onboarding link from a Geo node and can read the current Telegram user's numeric
-id from its own Telegram context. The Geo node/link supplies a CE invite token;
-the invite token is a low-privilege password, not an admin credential.
+Use this path when a trusted operator or host supplies a Context Engine invite.
+The invite is a one-time bootstrap secret, not an admin credential. A Telegram
+adapter may attach a verified numeric user id; other agents omit Telegram
+identity fields.
 
 For ordinary Context Engine participation, the invite is configured for the
 Geo node's target `sessionSlug`. Hermes should use the Telegram `from.id` it
@@ -253,7 +274,7 @@ The Geo node can store fields like:
   "contextEngine": {
     "inviteToken": "<geo-link-token>",
     "worker": "https://ce-agent-bridge-worker.agalmic.workers.dev",
-    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=41",
+    "skillUrl": "https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=42",
     "sessionSlug": "<session-slug>"
   }
 }
@@ -289,14 +310,16 @@ Content-Type: application/json
 
 {
   "inviteToken": "<value from contextEngine.inviteToken>",
-  "telegramUserId": "<telegram from.id observed by Hermes>",
+  "telegramUserId": "<optional verified Telegram from.id>",
   "sessionSlug": "<value from contextEngine.sessionSlug>",
   "source": "geo:<optional-node-id>"
 }
 ```
 
+Omit `telegramUserId` entirely when the host has no verified Telegram identity.
 If the invite token is valid, CE returns `token`, `worker`, `skillUrl`,
-`sessionSlug`, `expiresAt`, and the current onboarding state. Treat `token` as
+`sessionSlug`, `expiresAt`, and principal/account metadata. Telegram onboarding
+state is returned only for a Telegram principal. Treat `token` as
 the user's private `ceagt_...` bearer credential: store it only in the agent's
 local auth context, never repeat it back to the user, and send the exact token
 string as `Authorization: Bearer <token>` on later CE calls to the same
@@ -319,10 +342,8 @@ surface the first relevant unanswered question directly in chat. For Claude Code
 low-context copied-token agent, skip onboarding by default and fetch questions
 first.
 
-Do not use this endpoint unless the agent actually has Telegram context for the
-person who clicked the Geo/Hermes link. If the agent cannot observe a verified
-Telegram user id, fall back to the CE bot or Mini App onboarding flows below.
-The invite only permits normal participant/user-token onboarding; it does not
+The invite is consumed after a successful redemption and cannot be used to
+refresh the credential. It permits normal participant/user onboarding; it does not
 grant admin rights, response export, group approval, or permission management.
 
 ### Direct Link Mini App Onboarding
@@ -355,7 +376,13 @@ https://t.me/contextengineer_bot?start=agent_onboarding
 https://t.me/contextengineer_bot?start=agent_onboarding__<session-slug>
 ```
 
-After the user opens the link and starts the bot, CE can create or recover the CE-managed Telegram EVM account and render a private masked token screen with a copy button for full install info. Generic onboarding follows the live worker default session. Session-specific onboarding pins the named session. From then on, use this skill's API calls with the copied token; omit `sessionSlug` for the user's current/default session, or include an existing `sessionSlug` to switch and pin the user. Include `groupChatId` only when the action is explicitly tied to a Telegram group.
+After the user opens the link and starts the bot, CE can create or recover the
+CE-managed Telegram EVM account and render a private masked token screen with a
+copy button for full install info. Generic onboarding resolves the live worker
+default once; session-specific onboarding uses the named session. The minted
+credential remains bound to that issued session. Omit `sessionSlug` or restate
+the same slug on later calls. Include `groupChatId` only when the action is
+explicitly tied to a Telegram group.
 
 ## Prepopulated Questions On First Invocation
 
@@ -400,7 +427,7 @@ Do not invent a new CE endpoint for it. If a link does not open the exact
 relevant question or ordered question series, omit the link and continue the
 response flow directly in the agent chat.
 
-## Non-Telegram Agent Token Flow
+## Copied Agent Credential Flow
 
 Use this path when the user's assistant is not running inside the CE Telegram bot but the user wants it to act against CE on their behalf.
 
@@ -408,7 +435,8 @@ Use this path when the user's assistant is not running inside the CE Telegram bo
 2. The user taps `Onboard Agent`, then `Copy Agent Info`. `/me` also links to account details and activity after onboarding.
 3. The user copies the install info into the trusted external agent. The default token expiry is 28 days.
 4. The external agent calls CE with `Authorization: Bearer <agent token>`.
-5. With a user-scoped token, omit `telegramUserId` unless CE support explicitly asks for it; do not ask the user for a Telegram handle/id or group chat id. The worker infers the Telegram account and current session, and omitted group context means private-agent mode. To switch, pass `sessionSlug=<existing-slug>` once; omitted-slug calls stay on that pinned session until the user changes it again.
+5. Omit `telegramUserId`; the worker infers the principal. The credential is
+   fixed to the session shown in its install info. It cannot switch sessions.
 
 Default token scope permits:
 
@@ -446,8 +474,8 @@ Content-Type: application/json
 
 With `ceagt_...` tokens:
 
-- omit `sessionSlug` to use the user's selected session or the current worker default;
-- include `sessionSlug` in the query string or JSON body only when the user wants to switch to a specific existing session;
+- omit `sessionSlug` to use the credential's issued session;
+- include `sessionSlug` only to restate that same session;
 - omit `telegramUserId` by default, because the worker infers it from the token;
 - omit `groupChatId` by default, because copied-token onboarding is private-agent context; include it only when Telegram context already provided the numeric group id for a group-scoped action;
 - do not send the token as a URL query parameter, request body field, prompt
@@ -459,18 +487,11 @@ With `ceagt_...` tokens:
 
 If the worker returns `401` with `reason` equal to `agent_token_expired`,
 `agent_token_not_found`, `agent_token_inactive`, or another `agent_token_*`
-reason plus `action: "refresh_user_agent_token"`, refresh based on how the
-token was obtained. If this is a trusted Geo/Hermes invite flow and Hermes
-still has the invite token plus the observed Telegram `from.id`, call
-`POST /api/agent/invite/onboard` once more, replace the stored
-`ceagt_...` token with the newly returned token, and retry the CE request with
-that exact bearer token. This is an idempotent refresh path for already
-onboarded users; do not ask them to redo preference onboarding unless the
-returned onboarding state says preferences are incomplete. If there is no
-trusted invite context, ask the user to refresh through the Context Engine
-Telegram bot's `Onboard Agent` flow and tap `Copy New Agent Info` if the bot
-reports that Context Engine is already enabled. Do not keep retrying a missing,
-expired, or inactive token.
+reason plus `action: "obtain_new_agent_credential"`, obtain a replacement from
+the original onboarding channel. One-time invites cannot be replayed. Telegram
+users can mint fresh install info through the bot; named services must be
+rotated by an operator. Do not keep retrying a missing, expired, or inactive
+credential.
 
 Before using personal data, ask the user what may be used in this CE flow. The
 worker exposes a first-run onboarding endpoint for this:
@@ -1153,10 +1174,11 @@ GET /api/agent/question-queue
 POST /api/agent/question-queue
 ```
 
-This is an admin-only route. Use the worker service token, include
-`telegramUserId` for a Telegram user whose managed wallet is configured as a
-session admin, and send either `sponsoredQuestionIds` / `questionIds` or
-`{"clear": true}`. Ordinary user-scoped `ceagt_` tokens cannot call this route.
+This is an admin-only route. Use the root/break-glass token only for explicit
+operator recovery, or a scoped user/service `ceagt_` credential whose managed
+account is configured as a session admin. Send either
+`sponsoredQuestionIds` / `questionIds` or `{"clear": true}`. Ordinary
+participant credentials cannot mutate the queue.
 Question refs may be exact IDs or 1-based candidate numbers from the `GET`
 response.
 
@@ -1166,7 +1188,7 @@ link:
 ```http
 POST /api/agent/group-approval-link
 Content-Type: application/json
-Authorization: Bearer <worker service token>
+Authorization: Bearer <root break-glass token>
 
 {
   "telegramUserId": "123456789",
@@ -1174,9 +1196,10 @@ Authorization: Bearer <worker service token>
 }
 ```
 
-The caller must pass CE's session-admin gate. A normal `ceagt_` token does not
-include the `manage_group_approvals` scope by default; use the worker service
-token for this link endpoint. The response contains a `url` to send to the
+The caller must pass CE's session-admin gate. A normal user credential does not
+include the `manage_group_approvals` scope by default; use root break-glass only
+for explicit operator recovery or mint a service credential with that scope.
+The response contains a `url` to send to the
 Telegram group owner. The first group that opens it becomes approved for that
 session. User-scoped admin tokens should use the normal in-group admin approval
 flow instead of minting group approval links directly.
@@ -1556,6 +1579,12 @@ show. Never expose "under the hood" token, endpoint, or storage details in the
 onboarding message.
 
 ## Changelog
+
+### 2026-07-18 (v42)
+
+- Documented transport-neutral one-time invites, opaque non-Telegram
+  principals, session-bound user/service credentials, root-only bootstrap, and
+  audience-correct browser exchange.
 
 ### 2026-06-16 (v41)
 

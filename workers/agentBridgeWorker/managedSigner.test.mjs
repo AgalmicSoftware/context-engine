@@ -48,6 +48,37 @@ test('same Telegram principal and deployment recover the same managed demo accou
   assert.equal(JSON.stringify(first).includes('root-a'), false);
 });
 
+test('managed accounts preserve transport-neutral principal identity', async () => {
+  const service = await deriveManagedDemoAccount({
+    principal: {
+      principalId: 'cesvc_fixed',
+      kind: 'service',
+      adapter: 'invite',
+      label: 'Indexer',
+    },
+    deploymentId: 'deploy-a',
+    rootSecret: 'root-a',
+  });
+  const other = await deriveManagedDemoAccount({
+    principal: { principalId: 'cesvc_other', kind: 'service' },
+    deploymentId: 'deploy-a',
+    rootSecret: 'root-a',
+  });
+
+  assert.equal(service.principal.principalId, 'cesvc_fixed');
+  assert.equal(service.principal.kind, 'service');
+  assert.equal(service.principal.adapter, 'invite');
+  assert.equal(Object.hasOwn(service, 'telegramPrincipal'), false);
+  assert.notEqual(service.accountAddress, other.accountAddress);
+});
+
+test('managed account issuance fails closed without a root secret', async () => {
+  await assert.rejects(deriveManagedDemoAccount({
+    principal: { principalId: 'cep_user', kind: 'user' },
+    deploymentId: 'deploy-a',
+  }), /managed_demo_root_secret_missing/);
+});
+
 test('managed demo account address is derived from the exportable demo key', async () => {
   const signer = makeSigner();
   const account = await signer.getOrCreateAccount({
@@ -55,7 +86,7 @@ test('managed demo account address is derived from the exportable demo key', asy
   });
   const revealed = await signer.exportDemoKey({
     account,
-    principal: account.telegramPrincipal,
+    principal: account.principal,
     reveal: true,
   });
 
@@ -116,12 +147,12 @@ test('raw demo key export and recover are explicit private-only demo paths with 
   });
   const hidden = await signer.exportDemoKey({
     account,
-    principal: account.telegramPrincipal,
+    principal: account.principal,
     reveal: false,
   });
   const revealed = await signer.exportDemoKey({
     account,
-    principal: account.telegramPrincipal,
+    principal: account.principal,
     reveal: true,
   });
 
@@ -142,36 +173,14 @@ test('raw demo key export and recover are explicit private-only demo paths with 
   assert.equal(JSON.stringify(recovered.events).includes(revealed.reveal.privateKey), false);
 });
 
-test('managed demo signer refuses signing and key reveal without a root secret', async () => {
+test('managed demo signer refuses account issuance without a root secret', async () => {
   const signer = new ManagedDemoSignerDurableObject(createMemoryDurableObjectState(), {
     AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
   });
-  const account = await signer.getOrCreateAccount({
-    principal: { telegramUserId: '42' },
-  });
-  const signed = await signer.signCanonicalDemoEnvelope({
-    account,
-    grant: {
-      status: 'active',
-      sessions: ['alpha'],
-      allowedActions: [TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE],
-      riskCeiling: RISK_CEILINGS.SUBMIT,
-    },
-    sessionSlug: 'alpha',
-    action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
-    requestedRisk: RISK_CEILINGS.SUBMIT,
-    canonicalPayload: { questionId: 'question-1' },
-  });
-  const revealed = await signer.exportDemoKey({
-    account,
-    principal: account.telegramPrincipal,
-    reveal: true,
-  });
-
-  assert.equal(signed.ok, false);
-  assert.equal(signed.reason, 'managed_demo_root_secret_missing');
-  assert.equal(revealed.ok, false);
-  assert.equal(revealed.reason, 'managed_demo_root_secret_missing');
+  await assert.rejects(
+    signer.getOrCreateAccount({ principal: { telegramUserId: '42' } }),
+    /managed_demo_root_secret_missing/,
+  );
 });
 
 test('managed demo signer rejects passkey, Porto, CE-CC local, linked wallet, and production modes', () => {

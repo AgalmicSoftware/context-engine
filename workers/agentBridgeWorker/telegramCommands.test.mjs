@@ -22,10 +22,10 @@ import { DRAFT_EDIT_METRIC_KV_PREFIX } from './telegramDraftEditMetrics.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import {
   loadTelegramAgentDelegationToken,
-  TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX,
+  readTelegramAgentDelegationTokenUserPointer,
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
-} from './telegramAgentDelegationTokens.mjs';
+} from './agentCredentials.mjs';
 import { __test__sessionQuestions } from './sessionQuestions.mjs';
 import {
   canonicalAnswerSessionKvKey,
@@ -4937,7 +4937,7 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
   assert.doesNotMatch(copyInfo, /\/questions first/);
   assert.match(copyInfo, /\ntoken=ceagt_/);
   assert.match(copyInfo, /\nworker=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev/);
-  assert.match(copyInfo, /\nskill=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/api\/agent\/skill\?v=41/);
+  assert.match(copyInfo, /\nskill=https:\/\/ce-agent-bridge-worker\.agalmic\.workers\.dev\/api\/agent\/skill\?v=42/);
   assert.equal(new TextEncoder().encode(copyInfo).length <= 256, true);
   assert.equal(result.response.text.includes(token), false);
   assert.doesNotMatch(result.response.text, /Worker:/);
@@ -4947,9 +4947,13 @@ test('/agent_token creates a 28-day scoped delegation token with masked chat bod
 
   const loaded = await loadTelegramAgentDelegationToken({ env, token, now });
   assert.equal(loaded.ok, true);
-  assert.equal(loaded.record.telegramUserId, '42');
+  assert.equal(loaded.record.principal.adapterUserId, '42');
   assert.equal(loaded.record.sessionSlug, 'alpha');
-  const pointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+  const pointer = await readTelegramAgentDelegationTokenUserPointer({
+    env,
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+  });
   assert.equal(pointer.tokenHash, loaded.tokenHash);
   assert.equal(pointer.tokenHash.length, 64);
   assert.equal(JSON.stringify(pointer).includes(token), false);
@@ -4985,7 +4989,11 @@ test('/agent_token re-onboard revokes the prior token pointer', async () => {
   const secondToken = secondCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   const oldLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
   const secondLoaded = await loadTelegramAgentDelegationToken({ env, token: secondToken, now });
-  const pointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+  const pointer = await readTelegramAgentDelegationTokenUserPointer({
+    env,
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+  });
 
   assert.equal(secondToken && secondToken !== firstToken, true);
   assert.equal(oldLoaded.ok, false);
@@ -5147,7 +5155,11 @@ test('/start agent_onboarding opens Mini App when already onboarded', async () =
     .find((button) => button.text === 'Copy Agent Info')?.copy_text?.text || '';
   const firstToken = firstCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   const firstLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
-  const firstPointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+  const firstPointer = await readTelegramAgentDelegationTokenUserPointer({
+    env,
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+  });
 
   const linkedAgain = await buildTelegramCommandResponse({
     update: privateMessage('/start agent_onboarding__alpha'),
@@ -5158,7 +5170,11 @@ test('/start agent_onboarding opens Mini App when already onboarded', async () =
   const miniApp = buttons.find((button) => button.text === 'Open Mini App');
   const copyNew = buttons.find((button) => button.text === 'Copy New Agent Info');
   const secondToken = copyNew?.copy_text?.text?.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
-  const secondPointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+  const secondPointer = await readTelegramAgentDelegationTokenUserPointer({
+    env,
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+  });
   const oldLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
   const secondLoaded = await loadTelegramAgentDelegationToken({ env, token: secondToken, now });
 
@@ -5252,7 +5268,11 @@ test('already-onboarded agent screen exposes fresh install info as a copy button
   const refreshedToken = refreshedCopy.match(/ceagt_[A-Za-z0-9_-]+/)?.[0] || '';
   const oldLoaded = await loadTelegramAgentDelegationToken({ env, token: firstToken, now });
   const refreshedLoaded = await loadTelegramAgentDelegationToken({ env, token: refreshedToken, now });
-  const pointer = JSON.parse(await env.AGENT_ACTION_KV.get(`${TELEGRAM_AGENT_DELEGATION_TOKEN_USER_KV_PREFIX}42`));
+  const pointer = await readTelegramAgentDelegationTokenUserPointer({
+    env,
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+  });
 
   assert.equal(linkedAgain.screen, 'agent_onboarded_mini_app');
   assert.equal(copyNewButton.callback_data, undefined);
