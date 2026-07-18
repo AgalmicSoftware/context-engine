@@ -3033,6 +3033,62 @@ test('Telegram client login exchanges copied ceagt token for a worker JWT', asyn
   ]);
 });
 
+test('client login derives the worker wallet from a Telegram-optional service principal', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'root-bootstrap-token',
+    AGENT_BRIDGE_SESSION_WORKER_URL: 'https://session-worker.example',
+    AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://client.example',
+  });
+  const bootstrapResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/credentials/service', {
+      method: 'POST',
+      token: 'root-bootstrap-token',
+      body: {
+        name: 'group-reader',
+        sessionSlug: 'alpha',
+        scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_GROUPS],
+      },
+    }),
+    env,
+  });
+  const bootstrap = await jsonBody(bootstrapResponse);
+  assert.equal(bootstrapResponse.status, 200);
+  assert.equal(bootstrap.principal.kind, 'service');
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/client-login/exchange', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://client.example',
+      },
+      body: JSON.stringify({ sessionSlug: 'alpha', token: bootstrap.token }),
+    }),
+    env,
+    fetchImpl: async (url) => {
+      if (String(url).endsWith('/auth/nonce')) {
+        return new Response(JSON.stringify({ nonce: 'service-nonce' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (String(url).endsWith('/auth/login')) {
+        return new Response(JSON.stringify({ token: 'service-worker-jwt', exp: 1780003600 }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    },
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200, JSON.stringify(body));
+  assert.equal(body.accountAddress, bootstrap.accountAddress);
+  assert.equal(body.workerCredential.token, 'service-worker-jwt');
+  assert.equal(body.capabilities.readGroups, true);
+});
+
 test('client login returns audience-correct credentials and the Bridge credential reads questions', async () => {
   const env = telegramOnlyEnv({
     AGENT_BRIDGE_SESSION_WORKER_URL: 'https://session-worker.example',
@@ -4574,6 +4630,115 @@ test('Telegram agent results exposes consensus and difference as aggregate-only 
     assert.equal(serialized.includes('qualitativeResponses'), false);
     assert.equal(serialized.includes('raw private answer'), false);
   }
+});
+
+test('session-member aggregate results require a canonical worker group at the shared minimum size', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_SESSION_WORKER_URL: 'https://session-worker.example',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramBridgeEnabled: true,
+        managedAccountSubmitAllowed: true,
+        sessionModeProfile: {
+          authority: { mode: 'worker_canonical' },
+          authorization: { mechanisms: ['worker_groups'] },
+          surfaces: { web: true, telegram: true },
+          results: { visibility: 'session_member_aggregate' },
+        },
+        resultsExposure: { aggregateResultsEnabled: true, minGroupSize: 2 },
+      }],
+    }),
+  });
+  const accountAddress = await managedAccountAddressForTelegramUser(env, '42');
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'participant',
+    sessionSlug: 'alpha',
+    accountAddress,
+    createdAt: '2026-06-01T12:00:00.000Z',
+    ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
+  });
+  let memberships = [{
+    group: {
+      groupId: 'reviewers',
+      label: 'Reviewers',
+      joinMode: 'admin_add',
+      memberVisibility: 'members',
+    },
+    member: { principalKey: `evm_address:${accountAddress.toLowerCase()}` },
+    memberCount: 2,
+  }];
+  let membershipsStatus = 200;
+  const fetchCalls = [];
+  const fetchImpl = async (url, init = {}) => {
+    fetchCalls.push({ url: String(url), init });
+    if (String(url).endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'member-results-nonce' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (String(url).endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'member-results-worker-jwt', exp: 1780003600 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (String(url).endsWith('/groups/my-memberships')) {
+      assert.equal(new Headers(init.headers).get('authorization'), 'Bearer member-results-worker-jwt');
+      return new Response(JSON.stringify(
+        membershipsStatus === 200
+          ? { ok: true, memberships }
+          : { ok: false, error: 'storage unavailable' }
+      ), {
+        status: membershipsStatus,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+  const requestResults = () => handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/results?sessionSlug=alpha&view=consensus', { token: issued.token }),
+    env,
+    fetchImpl,
+  });
+
+  const allowed = await requestResults();
+  assert.equal(allowed.status, 200, JSON.stringify(await jsonBody(allowed.clone())));
+  assert.deepEqual(fetchCalls.map((call) => call.url), [
+    'https://session-worker.example/auth/nonce',
+    'https://session-worker.example/auth/login',
+    'https://session-worker.example/groups/my-memberships',
+  ]);
+
+  memberships = [{ ...memberships[0], memberCount: 1 }];
+  const belowThreshold = await requestResults();
+  assert.equal(belowThreshold.status, 403);
+  assert.equal((await jsonBody(belowThreshold)).reason, 'session_member_aggregate_min_group_size_not_met');
+
+  memberships = [];
+  const notMember = await requestResults();
+  assert.equal(notMember.status, 403);
+  assert.equal((await jsonBody(notMember)).reason, 'session_member_aggregate_membership_denied');
+
+  const imageDenied = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/results-image?sessionSlug=alpha&view=consensus', { token: issued.token }),
+    env,
+    fetchImpl,
+  });
+  assert.equal(imageDenied.status, 403);
+  assert.equal((await jsonBody(imageDenied)).reason, 'session_member_aggregate_membership_denied');
+
+  membershipsStatus = 503;
+  const unavailable = await requestResults();
+  assert.equal(unavailable.status, 503);
+  assert.equal((await jsonBody(unavailable)).reason, 'session_member_aggregate_membership_unavailable');
 });
 
 test('Telegram agent groups JSON strips aliases and raw qualitative responses', async () => {

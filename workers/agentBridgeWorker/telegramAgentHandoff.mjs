@@ -4601,7 +4601,89 @@ function agentResultsMinGroupSize(session = {}) {
     ? session.resultsExposure
     : {};
   const n = Math.floor(Number(exposure.minGroupSize));
-  return Number.isFinite(n) && n >= 1 ? n : 5;
+  return Number.isFinite(n) && n >= 2 ? n : 5;
+}
+
+function requiresSessionMemberAggregateResults(context = {}, input = {}) {
+  const results = context.session?.sessionModeProfile?.results;
+  return (
+    context.authMode === 'agent_credential' &&
+    !agentBoolean(input.demo) &&
+    lower(results?.visibility) === 'session_member_aggregate'
+  );
+}
+
+async function authorizeSessionMemberAggregateResults({
+  env = {},
+  context = {},
+  input = {},
+  fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch,
+} = {}) {
+  if (!requiresSessionMemberAggregateResults(context, input)) return { ok: true };
+
+  const delegation = context.delegation || {};
+  const accountAddress = safeString(delegation.accountAddress);
+  if (!accountAddress || !delegation.principal) {
+    return { ok: false, status: 403, reason: 'session_member_aggregate_membership_denied' };
+  }
+
+  let login;
+  try {
+    login = await authenticateSessionWorker({
+      env,
+      session: context.session,
+      account: { accountAddress },
+      principal: delegation.principal,
+      fetchImpl,
+    });
+  } catch {
+    return { ok: false, status: 503, reason: 'session_member_aggregate_membership_unavailable' };
+  }
+  if (!login?.ok || !safeString(login.token) || !safeString(login.workerUrl)) {
+    return { ok: false, status: 503, reason: 'session_member_aggregate_membership_unavailable' };
+  }
+
+  let response;
+  let body;
+  try {
+    response = await fetchImpl(`${login.workerUrl}/groups/my-memberships`, {
+      method: 'GET',
+      headers: { authorization: `Bearer ${login.token}` },
+      cache: 'no-store',
+    });
+    body = await response.json();
+  } catch {
+    return { ok: false, status: 503, reason: 'session_member_aggregate_membership_unavailable' };
+  }
+  if (!response.ok || body?.ok !== true || !Array.isArray(body.memberships)) {
+    const denied = response.status === 401 || response.status === 403;
+    return {
+      ok: false,
+      status: denied ? 403 : 503,
+      reason: denied
+        ? 'session_member_aggregate_membership_denied'
+        : 'session_member_aggregate_membership_unavailable',
+    };
+  }
+  if (!body.memberships.length) {
+    return { ok: false, status: 403, reason: 'session_member_aggregate_membership_denied' };
+  }
+
+  const minGroupSize = agentResultsMinGroupSize(context.session);
+  const qualifies = body.memberships.some((membership) => Number(membership?.memberCount) >= minGroupSize);
+  return qualifies
+    ? { ok: true }
+    : { ok: false, status: 403, reason: 'session_member_aggregate_min_group_size_not_met', minGroupSize };
+}
+
+function sessionMemberAggregateDenial(access = {}) {
+  const body = {
+    ok: false,
+    reason: access.reason || 'session_member_aggregate_membership_denied',
+    ...(access.minGroupSize ? { minGroupSize: access.minGroupSize } : {}),
+  };
+  assertNoSecretShape(body, 'Session-member aggregate denial must not serialize secrets.');
+  return json(body, { status: access.status || 403 });
 }
 
 function normalizeAgentResultsView(value = '') {
@@ -4849,6 +4931,7 @@ async function handleResultsRequest({
   env = {},
   context = {},
   input = {},
+  fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch,
 } = {}) {
   const view = normalizeAgentResultsView(input.view || 'topic-map');
   if (!AGENT_RESULTS_SUPPORTED_VIEWS.includes(view)) {
@@ -4863,6 +4946,8 @@ async function handleResultsRequest({
       assertNoSecretShape(body, 'Telegram agent results gate response must not serialize secrets.');
       return json(body, { status: 403 });
     }
+    const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+    if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
     const built = await buildAgentTopicMap({ env, context, input });
     const body = {
       ok: true,
@@ -4883,6 +4968,8 @@ async function handleResultsRequest({
       assertNoSecretShape(body, 'Telegram agent results gate response must not serialize secrets.');
       return json(body, { status: 403 });
     }
+    const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+    if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
     const loaded = await loadAgentResultsDataset({ env, context, input });
     const rows = aggregateQuestionRows(loaded.sourceRecords, loaded.sourceQuestions, view);
     const body = {
@@ -4903,6 +4990,8 @@ async function handleResultsRequest({
       assertNoSecretShape(body, 'Telegram agent polis gate response must not serialize secrets.');
       return json(body, { status: 403 });
     }
+    const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+    if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
     const loaded = await loadAgentResultsDataset({ env, context, input });
     const body = buildAgentPolisDataset(loaded);
     const minGroupSize = agentResultsMinGroupSize(context.session);
@@ -4925,6 +5014,8 @@ async function handleResultsRequest({
     assertNoSecretShape(body, 'Telegram agent groups gate response must not serialize secrets.');
     return json(body, { status: 403 });
   }
+  const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+  if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
   const loaded = await loadAgentResultsDataset({ env, context, input });
   const graph = buildParticipantGraph(loaded.sourceRecords, loaded.sourceQuestions);
   const minGroupSize = agentResultsMinGroupSize(context.session);
@@ -4949,6 +5040,7 @@ async function handleResultsImageRequest({
   env = {},
   context = {},
   input = {},
+  fetchImpl = env.AGENT_BRIDGE_FETCH || globalThis.fetch,
 } = {}) {
   const view = normalizeAgentResultsView(input.view || 'topic-map');
   if (!AGENT_RESULTS_IMAGE_SUPPORTED_VIEWS.includes(view)) {
@@ -4963,6 +5055,8 @@ async function handleResultsImageRequest({
       assertNoSecretShape(body, 'Telegram agent results-image gate response must not serialize secrets.');
       return json(body, { status: 403 });
     }
+    const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+    if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
     const built = await buildAgentTopicMap({ env, context, input });
     if (!built.topicMap.availability.available && !built.demo) {
       const body = {
@@ -4996,6 +5090,8 @@ async function handleResultsImageRequest({
       assertNoSecretShape(body, 'Telegram agent consensus image gate response must not serialize secrets.');
       return json(body, { status: 403 });
     }
+    const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+    if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
     const loaded = await loadAgentResultsDataset({ env, context, input });
     const rows = aggregateQuestionRows(loaded.sourceRecords, loaded.sourceQuestions, 'consensus');
     if (!loaded.demo && (!loaded.sourceRecords.length || !rows.length)) {
@@ -5029,6 +5125,8 @@ async function handleResultsImageRequest({
     assertNoSecretShape(body, 'Telegram agent groups image gate response must not serialize secrets.');
     return json(body, { status: 403 });
   }
+  const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+  if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
   const loaded = await loadAgentResultsDataset({ env, context, input });
   const graph = buildParticipantGraph(loaded.sourceRecords, loaded.sourceQuestions);
   const minGroupSize = agentResultsMinGroupSize(context.session);
@@ -6031,7 +6129,7 @@ async function handleClientLoginExchangeRequest({
   const account = delegated.record.accountAddress
     ? { accountAddress: delegated.record.accountAddress }
     : await deriveManagedDemoAccount({
-      principal: context.normalized,
+      principal: delegated.record.principal,
       deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID,
       rootSecret: env.DEMO_SIGNER_ROOT_SECRET || env.AGENT_BRIDGE_DEMO_ROOT_SECRET || '',
       createdAt: safeString(delegated.record.issuedAt),
@@ -6040,7 +6138,7 @@ async function handleClientLoginExchangeRequest({
     env,
     session: context.session,
     account,
-    principal: context.normalized,
+    principal: delegated.record.principal,
     workerUrl: '',
     fetchImpl,
   });
@@ -6436,10 +6534,10 @@ async function handleTelegramAgentHandoffRequestUnsafe({
     return handleMiniAppLaunchRequest({ env, context, input, waitUntil });
   }
   if (routePathname === '/telegram/agent/api/results' && (request.method === 'GET' || request.method === 'POST')) {
-    return handleResultsRequest({ env, context, input });
+    return handleResultsRequest({ env, context, input, fetchImpl });
   }
   if (routePathname === '/telegram/agent/api/results-image' && request.method === 'GET') {
-    return handleResultsImageRequest({ env, context, input });
+    return handleResultsImageRequest({ env, context, input, fetchImpl });
   }
   if (routePathname === '/telegram/agent/api/geo-backlink' && (request.method === 'GET' || request.method === 'POST')) {
     return handleGeoBacklinkRequest({ env, context, input, waitUntil });
