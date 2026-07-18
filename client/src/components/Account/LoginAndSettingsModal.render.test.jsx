@@ -1437,11 +1437,17 @@ describe('LoginAndSettingsModal agent token login', () => {
         new Response(
           JSON.stringify({
             ok: true,
-            tokenType: 'session_worker_jwt',
             sessionSlug: 'alpha',
             accountAddress: '0x3333333333333333333333333333333333333333',
             workerUrl: 'https://session-worker.example',
-            workerToken: 'jwt-session-token',
+            bridgeCredential: {
+              kind: 'agent_bridge_browser_token',
+              token: 'bridge-browser-token',
+            },
+            workerCredential: {
+              kind: 'session_worker_jwt',
+              token: 'jwt-session-token',
+            },
             expiresAt: '2027-07-05T00:00:00.000Z',
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
