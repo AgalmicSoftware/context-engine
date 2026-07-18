@@ -142,6 +142,7 @@ test('worker groups operate on storage index KV without a D1 binding', async () 
   assert.equal(memberships.ok, true);
   assert.equal(memberships.store, 'kv');
   assert.deepEqual(memberships.memberships.map((entry) => entry.group.groupId), ['fresh-worker']);
+  assert.equal(memberships.memberships[0].memberCount, 1);
 });
 
 test('worker groups ignore session-worker D1 bindings and keep KV authoritative', async () => {
@@ -294,6 +295,7 @@ test('member routes respect visibility and open join mode', async () => {
   const memberships = await listWorkerGroupMemberships({ env, slug: 'session-a', principal: member });
   assert.equal(memberships.ok, true);
   assert.deepEqual(memberships.memberships.map((entry) => entry.group.groupId), ['open-review']);
+  assert.equal(memberships.memberships[0].memberCount, 1);
 });
 
 test('worker group deletion revokes membership checks', async () => {

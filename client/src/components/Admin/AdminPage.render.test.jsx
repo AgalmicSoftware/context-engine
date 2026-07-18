@@ -224,6 +224,7 @@ describe('AdminPage rendered interactions', () => {
     expect(screen.queryByText('Connect a wallet to continue.')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Toggle Sessions section' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh sessions' })).toBeInTheDocument();
+    expect(screen.getByTestId('ce-admin-worker-groups')).toHaveTextContent(/Worker access groups/i);
 
     const sessionLink = screen.getByRole('link', { name: 'Open session' });
     expect(sessionLink).toHaveAttribute('href', expect.stringContaining('/session/edge'));

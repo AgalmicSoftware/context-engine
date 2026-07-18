@@ -13,6 +13,7 @@ import {
 import type { TelegramAgentQuestion } from '../../utilities/session/telegramAgentData';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import LazyFallback from '../Shared/LazyFallback';
+import WorkerGroupMembershipPanel from './WorkerGroupMembershipPanel';
 import styles from './OnePageSession.module.scss';
 
 const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
@@ -115,10 +116,10 @@ const OnePageSessionTelegramShell = ({
             data-testid={E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE}
             fade={false}
           >
-            <strong>Telegram-first session</strong>
+            <strong>Agent-enabled session</strong>
             <span>
-              Sign in with a Context Engine agent token to view questions, groups, and participant-visible results in
-              the web client.
+              Sign in with a Context Engine agent token to view questions, access groups, and participant-visible
+              results in the web client. Telegram is optional.
             </span>
             <button
               type="button"
@@ -155,7 +156,7 @@ const OnePageSessionTelegramShell = ({
           </button>
         </header>
         <div className={styles.telegramAuthBar}>
-          <span className={styles.telegramAuthIndicator}>Signed in from Telegram</span>
+          <span className={styles.telegramAuthIndicator}>Signed in with an agent credential</span>
           <button
             type="button"
             className={styles.telegramLogoutButton}
@@ -184,6 +185,7 @@ const OnePageSessionTelegramShell = ({
           <Suspense fallback={<LazyFallback label="Loading Telegram groups..." minHeight="20vh" />}>
             <TelegramBucketCards cards={loadTelegramGroups(telegramClientEnvelope)} onReconnect={onOpenLoginModal} />
           </Suspense>
+          <WorkerGroupMembershipPanel envelope={telegramClientEnvelope} />
           <section className={styles.telegramListPanel} data-testid="ce-session-telegram-results">
             <div className={styles.telegramListHeader}>
               <span>Results</span>

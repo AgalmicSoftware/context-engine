@@ -47,6 +47,7 @@ import CETooltip from '../Shared/CETooltip';
 import AdminPageMetadataEditor from './AdminPageMetadataEditor';
 import AdminPageTestsPanel from './AdminPageTestsPanel';
 import AdminPageWorkerSecretsPanel from './AdminPageWorkerSecretsPanel';
+import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
 import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
 import {
@@ -2817,6 +2818,13 @@ const AdminPageRuntime = ({
             </>
           )}
         </section>
+
+        <AdminWorkerGroupsPanel
+          canAdminWorker={canAdminWorker}
+          sessionSlug={normalizeSlug(selectedSlug)}
+          workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
+          postSignedRequest={postSignedAdminRequest}
+        />
 
         <AdminPageWorkerSecretsPanel
           workerSecretsOpen={workerSecretsOpen}

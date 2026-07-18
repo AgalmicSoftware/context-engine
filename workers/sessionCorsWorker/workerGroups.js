@@ -450,7 +450,11 @@ export const listWorkerGroupMemberships = async ({ env, slug, principal, deps = 
     // eslint-disable-next-line no-await-in-loop
     const group = await readGroupRecord({ store, slug, groupId: row.groupId });
     if (!group || group.deletedAt) continue;
-    memberships.push({ group: redactGroupForMember(group), member: row });
+    // The count supports the shared aggregate-privacy threshold without
+    // exposing other principals or requiring an admin membership read.
+    // eslint-disable-next-line no-await-in-loop
+    const groupMembers = await listMembershipRecords({ store, slug, groupId: row.groupId });
+    memberships.push({ group: redactGroupForMember(group), member: row, memberCount: groupMembers.length });
   }
   return { ok: true, store: store.kind, principal: normalized.principal, memberships };
 };
