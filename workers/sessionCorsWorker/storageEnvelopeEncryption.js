@@ -317,7 +317,6 @@ export const decryptPayloadWithStorageEnvelope = async ({
   });
 };
 
-const resolveAuditD1 = (env = {}) => env.CE_STORAGE_AUDIT_D1 || env.STORAGE_AUDIT_D1 || env.D1 || env.DB || null;
 const resolveAuditKv = (env = {}) => env.CE_STORAGE_AUDIT_KV || env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
 
 const auditSuffix = (deps = {}) => {

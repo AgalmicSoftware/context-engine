@@ -7,6 +7,7 @@ import {
 } from './storageRouteExecution.js';
 import { dispatchAuthenticatedSecretPathRoute } from './authenticatedSecretPathRouteDispatch.js';
 import { getSessionSecrets } from './sessionConfigSecretsStore.js';
+import { writeStorageEnvelopeKeyReleaseAudit } from './storageEnvelopeEncryption.js';
 import { createWorkerExecutionServicesWithWorkerDeps } from './workerExecutionServiceBinding.js';
 import { resolveRpcUrlListForGate } from './gateRpcResolution.js';
 import { createEthersInterfaceProviderGateHelpersWithWorkerDeps } from './ethersInterfaceProviderGateBinding.js';
@@ -1124,6 +1125,62 @@ test('storageRoute worker_envelope stores ciphertext only and audits successful 
     [...kv.store.keys()].some((key) => key.startsWith(`ce-storage-audit:session-a:${body.storageRef.id}:`)),
     true
   );
+});
+
+test('storage envelope audits ignore D1 aliases and keep KV authoritative', async () => {
+  const d1BindingNames = [
+    'CE_STORAGE_AUDIT_D1',
+    'STORAGE_AUDIT_D1',
+    'D1',
+    'DB',
+  ];
+
+  for (const bindingName of d1BindingNames) {
+    const kv = createMockKv();
+    let d1Calls = 0;
+    const d1 = {
+      prepare() {
+        d1Calls += 1;
+        throw new Error(`${bindingName} must not be used for envelope audits`);
+      },
+    };
+    const result = await writeStorageEnvelopeKeyReleaseAudit({
+      env: {
+        CE_STORAGE_AUDIT_KV: kv,
+        [bindingName]: d1,
+      },
+      slug: 'session-a',
+      payloadId: `payload-${bindingName.toLowerCase()}`,
+      principal: '0x00000000000000000000000000000000000000aa',
+      conditionMatched: 'public',
+      deps: {
+        now: () => Date.parse('2026-01-02T03:04:06.000Z'),
+        randomUUID: () => `audit-${bindingName.toLowerCase()}`,
+      },
+    });
+
+    assert.equal(result.ok, true, bindingName);
+    assert.equal(result.store, 'kv', bindingName);
+    assert.equal(d1Calls, 0, bindingName);
+    assert.equal(
+      [...kv.store.keys()].some((key) => key.startsWith('ce-storage-audit:session-a:')),
+      true,
+      bindingName,
+    );
+
+    await assert.rejects(
+      writeStorageEnvelopeKeyReleaseAudit({
+        env: { [bindingName]: d1 },
+        slug: 'session-a',
+        payloadId: `d1-only-${bindingName.toLowerCase()}`,
+        principal: '0x00000000000000000000000000000000000000aa',
+        conditionMatched: 'public',
+      }),
+      /Storage envelope audit store is not configured/,
+      bindingName,
+    );
+    assert.equal(d1Calls, 0, bindingName);
+  }
 });
 
 test('storageRoute normalizes legacy key metadata without rewrapping before a new envelope write', async () => {

@@ -52,8 +52,7 @@ const DEFAULT_PAYLOAD_ACCESS_RESOURCES = Object.freeze({
 });
 const DEFAULT_CLOUDFLARE_PRIMITIVES = Object.freeze({
   r2: ['session_context_payloads', 'question_payloads', 'survey_payloads', 'response_payloads', 'media_blob_payloads'],
-  d1: ['metadata_indexes', 'audit_events', 'queryable_records'],
-  kv: ['metadata_indexes', 'short_lived_action_ids', 'webhook_replay_cache', 'ephemeral_start_params'],
+  kv: ['metadata_indexes', 'audit_events', 'short_lived_action_ids', 'webhook_replay_cache', 'ephemeral_start_params'],
   durableObjects: ['signer_runtime_coordination_only', 'coordination_locks'],
 });
 const PAYLOAD_ACCESS_MODES = Object.freeze({

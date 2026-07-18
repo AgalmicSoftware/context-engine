@@ -21,8 +21,7 @@ export const SESSION_STORAGE_RESOURCE_STAGES = Object.freeze({
 
 export const SESSION_STORAGE_CLOUDFLARE_PRIMITIVES = Object.freeze({
   r2: ['session_context_payloads', 'question_payloads', 'survey_payloads', 'response_payloads', 'media_blob_payloads'],
-  d1: ['metadata_indexes', 'audit_events', 'queryable_records'],
-  kv: ['metadata_indexes', 'short_lived_action_ids', 'webhook_replay_cache', 'ephemeral_start_params'],
+  kv: ['metadata_indexes', 'audit_events', 'short_lived_action_ids', 'webhook_replay_cache', 'ephemeral_start_params'],
   durableObjects: ['signer_runtime_coordination_only', 'coordination_locks'],
 });
 
@@ -88,7 +87,7 @@ const SESSION_STORAGE_PAYLOAD_ACCESS_DISPLAY_OPTIONS = Object.freeze([
 export const SESSION_STORAGE_PROFILE_DISPLAY_COPY = Object.freeze({
   litArweave: 'Lit-Arweave stores encrypted Arweave payloads for session documents and context.',
   cloudflare:
-    'Cloudflare stores canonical CE payloads through the session worker: R2 for blobs, D1 or KV for metadata/indexes, and Durable Objects only for signer/runtime coordination.',
+    'Cloudflare stores canonical CE payloads through the session worker: R2 for blobs, KV for metadata, indexes, and audits, and Durable Objects only for signer/runtime coordination.',
   publicRead:
     'Public-read mode stores canonical payloads in Cloudflare and serves reads through the session worker without wallet auth. Writes still require an authenticated session worker request.',
   litEncrypted:

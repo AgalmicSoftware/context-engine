@@ -295,6 +295,13 @@ envelope in tab-scoped `sessionStorage`. The
 session metadata, including `clientSubmitReady`, which tells the client whether
 direct answer submit is deploy-ready for that session.
 
+The Bridge's `/groups` and `buckets` data are consented demographic research
+profiles, not session-worker authorization groups. They never grant storage or
+encryption access. The Bridge does not mirror worker group definitions or
+memberships. The client-login exchange already returns the worker JWT that a
+future client group surface can use with session-worker group routes directly;
+no such client surface is implemented yet.
+
 Account-created screens do not include `Open in CE`. Optional onboarding uses: `Enter startup info so I can suggest answers for you.` Confirmation copy is `Submit this response?` with `Save draft` and `Edit`.
 
 Mini App question links can carry a prefilled editable draft and an ordered
@@ -443,9 +450,10 @@ ID; the bridge does not mint its own canonical payload IDs or own those bytes.
 The bridge exposes no Cloudflare credentials, bucket names, long-lived signed
 URLs, worker tokens, or raw storage paths. `/new` Advanced owns the selected
 storage profile. `/worker-setup` may display that profile but does not edit
-storage policy. Cloudflare profiles use R2 for bytes, D1 for queryable metadata
-and audit/index records, KV for short-lived action/replay/start refs, and Durable
-Objects for managed signer runtime and coordination locks.
+storage policy. Session-worker Cloudflare profiles use R2 for bytes, KV for
+metadata, audit/index records, and short-lived action/replay/start refs, and
+Durable Objects for managed signer runtime and coordination locks. The Bridge's
+optional `AGENT_DOCS_D1` remains a separate bridge-owned document index.
 
 ## Live Telegram Setup
 
