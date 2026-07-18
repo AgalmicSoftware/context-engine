@@ -1,5 +1,11 @@
 import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
+import {
+  createOpaqueAgentPrincipalId,
+  normalizeAgentPrincipal,
+} from './agentPrincipal.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
+
+export { createOpaqueAgentPrincipalId, normalizeAgentPrincipal } from './agentPrincipal.mjs';
 
 export const AGENT_CREDENTIAL_KV_PREFIX = 'agent:credential:v2:';
 export const AGENT_CREDENTIAL_SLOT_KV_PREFIX = 'agent:credential-slot:v2:';
@@ -117,23 +123,6 @@ function credentialSlotKey({
   return `${AGENT_CREDENTIAL_SLOT_KV_PREFIX}${slotPart(kind)}:${slotPart(target)}:${slotPart(slug)}:${slotPart(id)}`;
 }
 
-function normalizePrincipal(principal = {}) {
-  const principalId = safeString(principal.principalId || principal.id).slice(0, 160);
-  const kind = safeString(principal.kind) === AGENT_CREDENTIAL_KINDS.SERVICE
-    ? AGENT_CREDENTIAL_KINDS.SERVICE
-    : AGENT_CREDENTIAL_KINDS.USER;
-  const adapter = safeString(principal.adapter).toLowerCase().slice(0, 48);
-  const adapterUserId = safeString(principal.adapterUserId).slice(0, 160);
-  const label = safeString(principal.label).slice(0, 120);
-  return {
-    principalId,
-    kind,
-    ...(adapter ? { adapter } : {}),
-    ...(adapterUserId ? { adapterUserId } : {}),
-    ...(label ? { label } : {}),
-  };
-}
-
 function normalizeScopes(scopes = [], { defaultIfEmpty = false } = {}) {
   const allowed = new Set(Object.values(AGENT_CREDENTIAL_SCOPES));
   const source = Array.isArray(scopes) ? scopes : safeString(scopes).split(',');
@@ -169,18 +158,13 @@ async function deleteKvBestEffort(kv, key) {
 
 export function telegramAgentPrincipal({ telegramUserId = '', username = '' } = {}) {
   const adapterUserId = safeString(telegramUserId);
-  return normalizePrincipal({
+  return normalizeAgentPrincipal({
     principalId: adapterUserId ? `telegram:${adapterUserId}` : '',
     kind: AGENT_CREDENTIAL_KINDS.USER,
     adapter: 'telegram',
     adapterUserId,
     label: safeString(username),
   });
-}
-
-export function createOpaqueAgentPrincipalId(kind = AGENT_CREDENTIAL_KINDS.USER) {
-  const prefix = kind === AGENT_CREDENTIAL_KINDS.SERVICE ? 'cesvc' : 'cep';
-  return `${prefix}_${randomSecret(18)}`;
 }
 
 export async function readAgentCredentialSlot({
@@ -191,7 +175,7 @@ export async function readAgentCredentialSlot({
   credentialKind = AGENT_CREDENTIAL_KINDS.USER,
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
-  const normalizedPrincipal = normalizePrincipal(principal);
+  const normalizedPrincipal = normalizeAgentPrincipal(principal);
   const key = credentialSlotKey({
     principalId: normalizedPrincipal.principalId,
     sessionSlug,
@@ -231,7 +215,7 @@ export async function issueAgentCredential({
   if (!kv || typeof kv.put !== 'function' || typeof kv.get !== 'function') {
     return { ok: false, reason: 'agent_token_storage_unavailable' };
   }
-  const normalizedPrincipal = normalizePrincipal(principal);
+  const normalizedPrincipal = normalizeAgentPrincipal(principal);
   const slug = safeString(sessionSlug);
   if (!normalizedPrincipal.principalId) return { ok: false, reason: 'agent_principal_required' };
   if (!slug) return { ok: false, reason: 'session_required' };
@@ -364,7 +348,7 @@ export async function loadAgentCredential({ env = {}, token = '', now = null } =
     tokenHash,
     record: {
       ...parsed,
-      principal: normalizePrincipal(parsed.principal),
+      principal: normalizeAgentPrincipal(parsed.principal),
       scopes: normalizeScopes(parsed.scopes),
     },
   };
@@ -464,7 +448,7 @@ export const revokeTelegramAgentDelegationTokenHash = revokeAgentCredentialHash;
 export const delegationTokenHasScope = agentCredentialHasScope;
 
 export const __test__agentCredentials = {
-  normalizePrincipal,
+  normalizePrincipal: normalizeAgentPrincipal,
   normalizeScopes,
   sha256Hex,
   tokenKvKey,

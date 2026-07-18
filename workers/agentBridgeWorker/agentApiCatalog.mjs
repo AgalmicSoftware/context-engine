@@ -530,23 +530,6 @@ const CAPABILITIES = Object.freeze([
     groupSafe: false,
     miniAppRoutes: ['storage/access'],
   }),
-  freezeEntry({
-    id: 'agent.events.forward_openclaw',
-    category: 'events',
-    label: 'Forward Event',
-    canonicalActionId: 'agent.events.forward_openclaw',
-    method: 'POST',
-    path: '/api/agent/events/forward-openclaw',
-    handoffStatus: AGENT_API_HANDOFF_STATUS.PLANNED_CONTRACT_ONLY,
-    requiredFields: ['eventRef'],
-    optionalFields: ['session', 'requestId'],
-    safeTelegramLanes: [
-      TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
-      TELEGRAM_CHAT_LANES.MINI_APP,
-    ],
-    groupSafe: false,
-    miniAppRoutes: ['events/forward'],
-  }),
 ]);
 
 const CAPABILITY_BY_ID = new Map(CAPABILITIES.map((capability) => [capability.id, capability]));

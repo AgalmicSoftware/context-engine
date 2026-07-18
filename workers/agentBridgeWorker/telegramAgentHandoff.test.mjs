@@ -713,12 +713,12 @@ test('Telegram agent handoff accepts scoped user delegation tokens without a sha
   const expiredBody = await jsonBody(expiredResponse);
   assert.equal(expiredResponse.status, 401);
   assert.equal(expiredBody.reason, 'agent_token_expired');
-  assert.equal(expiredBody.action, 'refresh_user_agent_token');
-  assert.equal(expiredBody.telegramCommand, '/start');
-  assert.equal(expiredBody.telegramButton, 'Onboard Agent');
+  assert.equal(expiredBody.action, 'obtain_new_agent_credential');
+  assert.equal(Object.hasOwn(expiredBody, 'telegramCommand'), false);
+  assert.equal(Object.hasOwn(expiredBody, 'telegramButton'), false);
   assert.doesNotMatch(expiredBody.message, /invite\/onboard/i);
   assert.doesNotMatch(expiredBody.message, /trusted Geo\/Hermes invite/i);
-  assert.match(expiredBody.message, /Onboard Agent/);
+  assert.match(expiredBody.message, /original onboarding channel/);
 
   const missingTokenResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha', {
@@ -729,7 +729,7 @@ test('Telegram agent handoff accepts scoped user delegation tokens without a sha
   const missingTokenBody = await jsonBody(missingTokenResponse);
   assert.equal(missingTokenResponse.status, 401);
   assert.equal(missingTokenBody.reason, 'agent_token_not_found');
-  assert.equal(missingTokenBody.action, 'refresh_user_agent_token');
+  assert.equal(missingTokenBody.action, 'obtain_new_agent_credential');
 });
 
 test('Telegram agent questions endpoint caps candidate batches when requested', async () => {
@@ -1382,6 +1382,118 @@ test('Invite onboarding mints a user token from a configured Geo invite', async 
   assert.equal(JSON.stringify(onboarding).includes(body.token), false);
 });
 
+test('Invite onboarding creates a transport-neutral user credential exactly once', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
+      tokenHash: sha256Hex('browser-invite-secret'),
+      sessionSlug: 'alpha',
+      label: 'Browser invite',
+      source: 'browser',
+    }]),
+  });
+  const onboardRequest = () => new Request('https://bridge.example/api/agent/invite/onboard', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      inviteToken: 'browser-invite-secret',
+      label: 'Participant',
+    }),
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({ request: onboardRequest(), env });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.sessionSlug, 'alpha');
+  assert.equal(body.principal.kind, 'user');
+  assert.equal(body.principal.adapter, 'invite');
+  assert.match(body.principal.principalId, /^cep_[A-Za-z0-9_-]+$/);
+  assert.match(body.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
+  assert.equal(loaded.ok, true);
+  assert.deepEqual(loaded.record.principal, body.principal);
+  assert.equal(Object.hasOwn(loaded.record.principal, 'adapterUserId'), false);
+  const questionsResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/questions?sessionSlug=alpha&telegramUserId=attacker', {
+      token: body.token,
+    }),
+    env,
+  });
+  assert.equal(questionsResponse.status, 200);
+
+  const replayResponse = await handleTelegramAgentHandoffRequest({ request: onboardRequest(), env });
+  const replay = await jsonBody(replayResponse);
+  assert.equal(replayResponse.status, 409);
+  assert.equal(replay.reason, 'invite_token_redeemed');
+});
+
+test('Root bootstrap mints a named scoped service credential', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'root-bootstrap-token' });
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/credentials/service', {
+      method: 'POST',
+      token: 'root-bootstrap-token',
+      body: {
+        name: 'question-indexer',
+        sessionSlug: 'alpha',
+        scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS],
+      },
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.principal.kind, 'service');
+  assert.equal(body.principal.label, 'question-indexer');
+  assert.match(body.principal.principalId, /^cesvc_[A-Za-z0-9_-]+$/);
+  assert.match(body.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.record.credentialKind, AGENT_CREDENTIAL_KINDS.SERVICE);
+  assert.deepEqual(loaded.record.scopes, [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS]);
+  const questionsResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/questions?sessionSlug=alpha&telegramUserId=attacker', {
+      token: body.token,
+    }),
+    env,
+  });
+  assert.equal(questionsResponse.status, 200);
+  const mismatchResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/questions?sessionSlug=beta', { token: body.token }),
+    env,
+  });
+  assert.equal(mismatchResponse.status, 403);
+  assert.equal((await jsonBody(mismatchResponse)).reason, 'agent_token_session_mismatch');
+});
+
+test('Credential issuance reports missing managed signer configuration', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'root-bootstrap-token',
+    DEMO_SIGNER_ROOT_SECRET: '',
+  });
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/credentials/service', {
+      method: 'POST',
+      token: 'root-bootstrap-token',
+      body: {
+        name: 'question-indexer',
+        sessionSlug: 'alpha',
+        scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS],
+      },
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(body, { ok: false, reason: 'managed_demo_signer_not_configured' });
+});
+
 test('Invite onboarding mode agent_only mints short scoped token without revoking normal token', async () => {
   const env = multiTelegramOnlyEnv({
     defaultSessionSlug: 'alpha',
@@ -1573,18 +1685,6 @@ test('Invite onboarding rejects random Telegram ids without a valid invite token
   assert.equal(invalid.reason, 'invite_token_invalid');
   assert.equal(Array.from(env.AGENT_ACTION_KV.store.keys()).some((key) => key.includes('agent-delegation-token')), false);
 
-  const missingResponse = await handleTelegramAgentHandoffRequest({
-    request: new Request('https://bridge.example/telegram/agent/api/invite/onboard', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ inviteToken: 'real-invite' }),
-    }),
-    env,
-  });
-  const missing = await jsonBody(missingResponse);
-
-  assert.equal(missingResponse.status, 400);
-  assert.equal(missing.reason, 'telegram_user_required');
 });
 
 test('Invite onboarding ignores plaintext invite token env config', async () => {
@@ -2999,6 +3099,26 @@ test('client login returns audience-correct credentials and the Bridge credentia
   assert.equal(questions.ok, true);
   assert.equal(questions.sessionSlug, 'alpha');
   assert.equal(Array.isArray(questions.questions), true);
+
+  const nestedExchangeResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/client-login/exchange', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://client.example',
+      },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        token: exchange.bridgeCredential.token,
+      }),
+    }),
+    env,
+    fetchImpl,
+  });
+  const nestedExchange = await jsonBody(nestedExchangeResponse);
+
+  assert.equal(nestedExchangeResponse.status, 403);
+  assert.equal(nestedExchange.reason, 'agent_credential_exchange_denied');
 });
 
 test('Telegram client login ignores caller-supplied workerUrl', async () => {
@@ -3650,7 +3770,7 @@ test('Telegram result-view cache stores and returns data-version scoped analysis
   });
   const saved = await jsonBody(saveResponse);
   assert.equal(saveResponse.status, 403);
-  assert.equal(saved.reason, 'result_view_cache_write_service_token_required');
+  assert.equal(saved.reason, 'result_view_cache_write_root_token_required');
 
   const serviceSaveResponse = await handleTelegramAgentHandoffRequest({
     request: new Request('https://bridge.example/telegram/agent/api/result-view-cache', {
@@ -4143,7 +4263,7 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(binaryDraft.origin.agentMetadata.agentName, 'hermes');
   assert.equal(env.AGENT_ACTION_KV.metadata.get('telegram:answer-draft:42:alpha:q-binary')?.t, 'answer_draft');
   assert.equal(env.AGENT_ACTION_KV.metadata.get('telegram:answer-draft:42:alpha:q-binary')?.o, 'agent_handoff');
-  assert.equal(binaryDraft.actionMetadata.authMode, 'service_token');
+  assert.equal(binaryDraft.actionMetadata.authMode, 'root_token');
 
   await env.AGENT_ACTION_KV.put('telegram:answer-draft:43:alpha:q-binary', JSON.stringify({
     status: 'draft_saved',
@@ -5639,7 +5759,7 @@ test('Telegram admin default-session endpoint exposes delegated status and servi
   assert.equal(status.configuredDefaultSessionSlug, 'alpha');
   assert.equal(status.adminDefaultSessionInvalidSlug, '');
   assert.equal(delegatedPostResponse.status, 403);
-  assert.equal(delegatedPost.reason, 'question_queue_service_token_required');
+  assert.equal(delegatedPost.reason, 'question_queue_root_token_required');
   assert.equal(emptySlugResponse.status, 400);
   assert.equal(emptySlug.reason, 'invalid_session_slug');
   assert.equal(unknownSlugResponse.status, 404);
@@ -5737,7 +5857,7 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
   assert.equal(initialStatus.updateAvailable, false);
   assert.equal(initialStatus.version, '2026-06-16 (v41)');
   assert.equal(delegatedPostResponse.status, 403);
-  assert.equal(delegatedPost.reason, 'question_queue_service_token_required');
+  assert.equal(delegatedPost.reason, 'question_queue_root_token_required');
   assert.equal(setResponse.status, 200);
   assert.equal(set.ok, true);
   assert.equal(set.updateAvailable, true);
@@ -5819,7 +5939,7 @@ test('Telegram agent can recommend and auto-apply question importance votes with
   assert.equal(decisionRecords.length, 1);
   assert.equal(decisionRecords[0].actionMetadata.runId, 'run-123');
   assert.equal(decisionRecords[0].actionMetadata.source, 'agent_handoff');
-  assert.equal(decisionRecords[0].actionMetadata.authMode, 'service_token');
+  assert.equal(decisionRecords[0].actionMetadata.authMode, 'root_token');
   assert.equal(decisionRecords[0].actionMetadata.clientSource, 'openclaw');
   assert.equal(Object.hasOwn(decisionRecords[0].actionMetadata, 'apiKey'), false);
 });

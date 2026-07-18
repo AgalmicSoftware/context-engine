@@ -354,6 +354,7 @@ test('worker Mini App state and draft endpoints use opaque question actions', as
   const bytes32QuestionId = `0x${'12'.repeat(32)}`;
   const env = {
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root',
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
@@ -939,6 +940,7 @@ test('worker Mini App draft endpoint requires a matching opaque launch in Telegr
   const env = {
     TELEGRAM_BOT_TOKEN: botToken,
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root',
     AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW: 'true',
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
@@ -1088,6 +1090,7 @@ test('worker Telegram webhook requires enable flag, bot token, and secret token'
     TELEGRAM_BOT_TOKEN: 'bot-token',
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root',
     TELEGRAM_FETCH: telegramFetch,
   });
   const body = await accepted.json();
@@ -1123,6 +1126,7 @@ test('worker Telegram webhook defers Telegram sends when waitUntil is available'
     TELEGRAM_BOT_TOKEN: 'bot-token',
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root',
     TELEGRAM_FETCH: async (...args) => {
       telegramCalls.push(args);
       return new Promise(() => {});
@@ -1343,6 +1347,7 @@ test('worker Telegram webhook handles command send errors without leaking token 
     TELEGRAM_BRIDGE_ENABLED: 'true',
     TELEGRAM_BOT_TOKEN: 'bot-token',
     TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root',
     TELEGRAM_FETCH: async () => new Response(JSON.stringify({
       ok: false,
       error_code: 400,

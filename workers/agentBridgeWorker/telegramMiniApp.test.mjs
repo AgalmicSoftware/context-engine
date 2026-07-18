@@ -2291,6 +2291,7 @@ test('Mini App exposes agent-only sidecar state, human votes, confirm, and edit-
   const kv = new MemoryKv();
   const env = {
     AGENT_ACTION_KV: kv,
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root-secret',
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
@@ -2440,6 +2441,7 @@ test('Mini App classifies agent-only confirm/edit by answer semantics, not displ
   const kv = new MemoryKv();
   const env = {
     AGENT_ACTION_KV: kv,
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root-secret',
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
@@ -2587,6 +2589,7 @@ test('Mini App submit skips agent-only sidecar work when the session is not conf
   const kv = new MemoryKv();
   const env = {
     AGENT_ACTION_KV: kv,
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root-secret',
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
@@ -2663,6 +2666,7 @@ test('Mini App submit contains agent-only review failures after persisting the h
   const kv = new MemoryKv();
   const env = {
     AGENT_ACTION_KV: kv,
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root-secret',
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
@@ -2782,6 +2786,7 @@ test('Mini App stores draft divergence only after explicit opt in', async () => 
   }));
   const env = {
     AGENT_ACTION_KV: kv,
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root-secret',
     TELEGRAM_BOT_TOKEN: botToken,
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
@@ -4202,6 +4207,7 @@ test('Mini App state and group endpoints support lightweight Telegram-only group
   const kv = new MemoryKv();
   const env = {
     AGENT_ACTION_KV: kv,
+    DEMO_SIGNER_ROOT_SECRET: 'unit-root-secret',
     AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
