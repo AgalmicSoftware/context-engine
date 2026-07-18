@@ -6,7 +6,7 @@ description: "Run a generic Context Engine session wrapped flow: onboard by invi
 # Context Engine Session Wrapped Runtime
 
 **Skill version:** 2026-07-04 (session-wrapped-v1)
-**Protocol version:** Context Engine agent bridge v41
+**Protocol version:** Context Engine agent bridge v42
 
 Use this skill only to run a generic Context Engine session wrapped flow. Do
 not use the broader `context-engine` skill, local reference docs, setup
@@ -89,10 +89,10 @@ preference, research, or confirmation question when this line is present.
 
 ## Credential
 
-If the forwarded message contains an invite-token line, use it first. Use the
-Telegram id from the current Telegram/Hermes runtime context. If that runtime
-context cannot provide a Telegram id, stop with the credential-needed sentence
-below. Otherwise POST once to:
+If the forwarded message contains an invite-token line, use it first. A
+Telegram/Hermes runtime may include its verified Telegram id, but Telegram is
+optional. A non-Telegram host omits that field and CE creates an opaque
+principal. POST once to:
 
 ```text
 /api/agent/invite/onboard
@@ -103,16 +103,18 @@ with:
 ```json
 {
   "inviteToken": "<Session Wrapped Invite Token>",
-  "telegramUserId": "<telegram id>",
+  "telegramUserId": "<optional verified Telegram id>",
   "mode": "agent_only",
   "skill": "ce-session-wrapped",
   "source": "session-wrapped-forwarded-prompt"
 }
 ```
 
+Omit `telegramUserId` entirely when the host has no verified Telegram identity.
 Use the returned `token` privately as the Bearer token for the rest of the run.
-Do not call invite onboarding without both invite token and Telegram id, and do
-not call it with any mode except `agent_only`.
+Do not call invite onboarding without an invite token, do not reuse the
+one-time invite after redemption, and do not call it with any mode except
+`agent_only`.
 
 If there is no invite token, use an active Context Engine agent-only credential
 already available in the current auth context or the known state file. The
@@ -135,7 +137,7 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 ```
 
 1. Resolve the private credential.
-2. GET `/api/agent/skill-version`; silently verify protocol v41.
+2. GET `/api/agent/skill-version`; silently verify protocol v42.
 3. GET `/api/agent/agent-only/start` with the Bearer token.
 4. Create one fresh `run_id` for the whole run.
 5. Optional `token_usage`: before answer submission, make at most one quiet

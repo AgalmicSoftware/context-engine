@@ -125,9 +125,9 @@ import { authenticateSessionWorker, directSubmitFeatureEnabled } from './onChain
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
 const LEGACY_AGENT_API_PREFIX = '/telegram/agent/api';
 const CANONICAL_AGENT_API_PREFIX = '/api/agent';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=41';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=42';
 const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
-const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-06-16 (v41)';
+const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-07-18 (v42)';
 const DEFAULT_SESSION_WRAPPED_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/session-wrapped';
 const DEFAULT_SESSION_WRAPPED_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/agentBridgeWorker/skills/ce-session-wrapped/SKILL.md';
 const CE_SESSION_WRAPPED_SKILL_VERSION = '2026-07-04 (session-wrapped-v1)';

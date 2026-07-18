@@ -12,16 +12,25 @@ It also exposes canonical session storage routes for future backend routing: `PO
 
 ## Agent Bridge Client Handoff
 
-The Telegram/agent bridge worker exposes the browser-facing agent handoff under
+The agent bridge worker exposes the browser-facing handoff under
 canonical `/api/agent/*` routes:
 
 - `GET /api/agent/session-meta?sessionSlug=<slug>` returns public metadata for
   the selected session, including the sanctioned `clientSubmitReady` boolean the
   client uses to decide whether direct submit is deploy-ready.
-- `POST /api/agent/client-login/exchange` accepts a pasted raw `ceagt_` token
-  once and returns a short-TTL browser envelope. The web client stores only that
-  versioned envelope in tab-scoped `sessionStorage`; raw tokens must not be put
-  in URLs, localStorage, sessionStorage, Redux, or logs.
+- `POST /api/agent/client-login/exchange` accepts a pasted user/install or named
+  service `ceagt_` credential once and returns a short-TTL versioned envelope.
+  That envelope contains a Bridge browser credential for Bridge reads and a
+  distinct session-worker JWT for canonical worker routes. The web client sends
+  each credential only to its intended authority and stores only the envelope
+  in tab-scoped `sessionStorage`; source credentials must not be put in URLs,
+  localStorage, sessionStorage, Redux, or logs.
+- Credentials are bound to one principal, session, audience, scope set, expiry,
+  and revocation slot. Telegram can mint a user credential, but Telegram is not
+  required: `POST /api/agent/invite/onboard` also creates an opaque user from a
+  one-time body-only invite. The Bridge root token is bootstrap/break-glass
+  authority and can mint named scoped services through
+  `POST /api/agent/credentials/service`.
 - Telegram-first session reads and submits use the shared browser components
   after one page-boundary backend-mode decision. `/session/demo` keeps its
   existing demo/off-chain behavior.

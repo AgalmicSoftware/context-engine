@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Unified Agent Bridge authentication around session-bound user, browser, and
+  named service credentials. Telegram is now an optional identity adapter;
+  one-time invites can onboard an opaque non-Telegram user, the root token is
+  limited to bootstrap/break-glass semantics, and browser exchange returns
+  separate Bridge and session-worker credentials.
+- Removed the unused mock OpenClaw forwarding module and catalog entry while
+  retaining transport-neutral direct HTTP and optional host-agent adapters.
 - Completed the frontend modernization baseline with typed domain boundaries,
   downward-only type-debt and size ratchets, decomposed session, survey, and
   application shells, split CI/release verification, synchronized worker-bundle
@@ -35,6 +42,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Made Agent Bridge credential rotation publish replacements before retiring
+  prior records, rejected query-string bearer credentials and nested browser
+  exchanges, pinned credentials to their issued session, and made managed
+  account issuance fail closed without signer configuration.
 - Prevented worker-native group state from silently switching to an unrelated
   D1 or envelope-audit binding: session-worker groups now use only the explicit
   group KV or storage-index KV aliases, and D1-only group configuration fails

@@ -1,6 +1,9 @@
 # Agent Bridge Worker
 
-`workers/agentBridgeWorker/` is the Context Engine Telegram bridge worker. It is separate from `workers/sessionCorsWorker/` and ships as part of the public worker surface.
+`workers/agentBridgeWorker/` is the Context Engine agent bridge worker. It is
+separate from `workers/sessionCorsWorker/` and ships as part of the public
+worker surface. Direct HTTPS agents work without Telegram; Telegram is an
+optional adapter that adds bot, Mini App, and chat-specific interactions.
 
 ## Boundary
 
@@ -26,9 +29,41 @@
 
 ## Managed Demo Accounts
 
-Managed Telegram demo accounts are deterministic by Telegram principal plus worker deployment. Signing happens through the `ManagedDemoSignerDurableObject` boundary and returns a testnet/demo signed envelope. The normal account metadata never serializes raw key material.
+Managed demo accounts are deterministic by agent principal plus worker
+deployment. Credential-issuing and account-creation paths fail closed when
+`DEMO_SIGNER_ROOT_SECRET` is absent, so the worker never invents a publicly
+derivable secretless account. Signing is testnet/demo-only; account metadata
+and API responses never serialize raw key material.
 
 `export_demo_key` and `recover_demo_key` are explicit private-only demo actions. They reject passkey, Porto, CE-CC local, linked external wallet, and production modes.
+
+## Agent Credentials
+
+The bridge has one versioned `ceagt_` credential model:
+
+- A user/install credential belongs to one opaque principal, one session, one
+  audience, explicit scopes, an expiry, and one authoritative rotation slot.
+  Telegram onboarding creates the same credential shape with Telegram identity
+  retained only as adapter metadata.
+- A named service credential uses its own service principal, managed testnet
+  account, session, and scopes. Operators mint one with root-authenticated
+  `POST /api/agent/credentials/service`; integrations should not share the root
+  token or impersonate a participant.
+- The deployment-wide `AGENT_BRIDGE_AGENT_API_TOKEN` is root/bootstrap and
+  break-glass authority. It is not an ordinary integration credential.
+- `POST /api/agent/invite/onboard` redeems a configured invite once from the
+  JSON request body. Telegram fields are optional. Without them, the worker
+  creates an opaque user principal and the same managed testnet account and
+  credential used by other agents.
+- `POST /api/agent/client-login/exchange` accepts only a source user or service
+  credential for the Bridge audience. It returns a short-lived Bridge browser
+  credential and a separate session-worker JWT; the child credential cannot be
+  exchanged again.
+
+Bearer credentials are accepted in authorization headers, never query strings.
+Rotating a credential publishes the replacement before retiring the previous
+record. A credential remains pinned to its issued session; callers cannot move
+it by supplying another `sessionSlug` or by changing Telegram defaults.
 
 ## Agent API Catalog
 
@@ -51,7 +86,7 @@ Initial Telegram-facing capabilities:
 | Client session metadata | `GET /api/agent/session-meta` | web client, private | implemented telegram-first classification |
 | Client token exchange | `POST /api/agent/client-login/exchange` | web client, private | implemented short-lived browser credential exchange |
 | Response submit request | `POST /api/agent/responses/submit-request` | private, Mini App | direct on-chain when enabled; otherwise pending canonical handoff |
-| SBT claim/create, decrypt, storage access, OpenClaw events | existing `/api/agent/*` routes in the catalog | private or Mini App unless explicitly group-safe | planned or contract-only |
+| SBT claim/create, decrypt, storage access | existing `/api/agent/*` routes in the catalog | private or Mini App unless explicitly group-safe | planned or contract-only |
 
 Settings updates currently accept only safe structured fields such as
 `draftStyle` (`concise`, `balanced`, `detailed`).
@@ -74,9 +109,9 @@ For local skill hosts, choose a user-owned skill directory and use:
 CE_SKILL_REF="${CE_SKILL_REF:-main}" CE_SKILL_HOME="${CE_SKILL_HOME:?Set CE_SKILL_HOME to your skill directory}" sh -c 'mkdir -p "$CE_SKILL_HOME" && curl -fsSL "https://raw.githubusercontent.com/AgalmicSoftware/context-engine/${CE_SKILL_REF}/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md" -o "$CE_SKILL_HOME/SKILL.md" && printf "Installed CE Telegram Agent Handoff skill to %s\n" "$CE_SKILL_HOME/SKILL.md"'
 ```
 
-After install, the agent should use the `ce-telegram-agent-handoff` skill and
-ask the user to tap `Onboard Agent` from the CE bot `/start` screen, then paste
-the copied 28-day install info into the agent.
+After install, the agent uses a private `ceagt_` credential from copied install
+info or a one-time invite. Telegram users can obtain install info from the CE
+bot; non-Telegram agents can redeem an operator-provided invite directly.
 
 ### Agent Only Mode
 
@@ -86,10 +121,9 @@ writing normal CE drafts, submits, question votes, posed questions, results, or
 report data.
 
 Agent-only onboarding reuses `POST /api/agent/invite/onboard` with
-`"mode": "agent_only"`. The worker mints a short-lived scoped delegation token
-with `agent_autofill` only, stores it under the separate
-`telegram:agent-only-token:user:` pointer namespace, and leaves the normal
-28-day agent token pointer untouched. Agent-only tokens default to 7 days; set
+`"mode": "agent_only"`. The worker mints a short-lived credential with
+`agent_autofill` only in its own credential-kind slot, leaving any normal user
+credential slot untouched. Agent-only tokens default to 7 days; set
 `AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS` to override.
 
 The public start payload is `GET /api/agent/agent-only/start`. Scoped
@@ -142,7 +176,7 @@ Rating snapshots preserve the authored scale in the proposed question record.
 For example, a 1-5 rating is served to agents as a 1-5 rating schema and rejects
 out-of-scale values such as `0`; 0-10 ratings continue to serve 0-10 schemas.
 
-Operators configure flagged statements with the worker service token or a
+Operators configure flagged statements with the root/break-glass token or a
 `ceagt_...` token whose managed account is an admin for the session:
 
 ```http
@@ -203,7 +237,7 @@ values, so operators do not need to configure a separate export secret. Admin
 metrics count agent-only answers, privacy skips, vote state, principals, and
 windows from KV metadata only, behind the existing metrics cache.
 
-`POST /api/agent/result-view-cache` is service-token-only. Participant
+`POST /api/agent/result-view-cache` is root-token-only. Participant
 and copied `ceagt_...` tokens can read cache entries when their route scopes
 allow it, but they cannot write or overwrite cached Polis/atlas analysis.
 
@@ -289,8 +323,10 @@ The web client login path never places a raw `ceagt_` token in a URL, durable
 browser storage, Redux state, or logs. For Telegram-first sessions, users paste
 the token or copied install info into the login modal; the client calls
 `POST /api/agent/client-login/exchange` once, clears the pasted token from
-component state after exchange, and stores only the returned short-lived browser
-envelope in tab-scoped `sessionStorage`. The
+component state after exchange, and stores only the returned short-lived
+versioned envelope in tab-scoped `sessionStorage`. The envelope keeps the
+Bridge browser credential separate from the session-worker JWT, so each token
+is sent only to its intended authority. The
 `GET /api/agent/session-meta?sessionSlug=<slug>` endpoint returns public
 session metadata, including `clientSubmitReady`, which tells the client whether
 direct answer submit is deploy-ready for that session.
@@ -504,9 +540,9 @@ Required values:
 | Optional Telegram bot display name | Set `TELEGRAM_BOT_NAME` or `AGENT_BRIDGE_TELEGRAM_BOT_NAME` to override the default `Context Engine`; live apply calls Telegram `setMyName` |
 | `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `TELEGRAM_WEBHOOK_SECRET`; Telegram sends it as `X-Telegram-Bot-Api-Secret-Token` |
 | `DEMO_SIGNER_ROOT_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `DEMO_SIGNER_ROOT_SECRET` |
-| `AGENT_BRIDGE_AGENT_API_TOKEN` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_AGENT_API_TOKEN` for OpenClaw/agent handoff API authentication |
-| Production web client origins | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.xyz,https://www.contextengine.xyz,https://contextengine.sh,https://www.contextengine.sh` so hosted clients can exchange Telegram tokens and read result-view cache entries during the current `.xyz` deployment and the planned `.sh` cutover. Result-view cache writes require the worker service token. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges |
-| Optional trusted Geo/Hermes onboarding invite | Store a SHA-256 hash in `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES`, or use `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON` records with `tokenHash`, `sessionSlug`, `label`, and `source`. The Geo node/link carries the plaintext invite token; Hermes supplies the Telegram user id it observes and receives a normal user-scoped `ceagt_...` token from `POST /api/agent/invite/onboard` |
+| `AGENT_BRIDGE_AGENT_API_TOKEN` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes the root/bootstrap and break-glass secret. Use it to mint named service credentials; do not distribute it as an integration token |
+| Production web client origins | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.xyz,https://www.contextengine.xyz,https://contextengine.sh,https://www.contextengine.sh` so hosted clients can exchange agent credentials and read result-view cache entries during the current `.xyz` deployment and the planned `.sh` cutover. Result-view cache writes require root authority. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges |
+| Optional one-time onboarding invite | Store a SHA-256 hash in `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES`, or use `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON` records with `tokenHash`, `sessionSlug`, `label`, and `source`. The agent sends the plaintext invite only in the JSON body of `POST /api/agent/invite/onboard`. Telegram identity may be included by a Telegram adapter but is not required |
 | Optional OpenAI key for Telegram AI | Paste into untracked `.dev.vars` as `AGENT_BRIDGE_OPENAI_API_KEY` or `OPENAI_API_KEY`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_OPENAI_API_KEY`. Telegram question generation, AI search, add-question formatting, group analysis, and transcription pass it as a request-local `apiKey` to the configured session worker when that session worker has no per-session `openaiKey` secret |
 | Public deployed `agentBridgeWorker` URL | Paste or derive the Workers.dev base URL as `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev`; live apply can derive it when the token can read the account workers.dev subdomain |
 | CE/session worker base URL | Paste into `CE_SESSION_WORKER_BASE_URL`, for example `https://<session-worker>.<workers-subdomain>.workers.dev` |
@@ -890,11 +926,11 @@ Current v0 scope:
   `telegram:question-queue-config:v1:<sessionSlug>` in `AGENT_ACTION_KV`.
   Agent next-question calls serve those question ids first when they match the
   user's criteria, then fall back to preference-ranked active questions. The
-  same queue is available to operator agents through the raw service-token
+  same queue is available to operators through the root/break-glass
   route
   `GET /api/agent/question-queue` and
   `POST /api/agent/question-queue`, but writes require the
-  shared service token and a Telegram account whose managed wallet is a
+  root token and a Telegram account whose managed wallet is a
   configured session admin; ordinary `ceagt_` user delegation tokens cannot
   change admin queues through that raw route. Admin `ceagt_` tokens can use
   `GET /api/agent/admin/status`,
@@ -985,7 +1021,7 @@ and the answerable question candidates for a session. `POST` accepts
 `sponsoredQuestionIds` / `questionIds` (question IDs or 1-based candidate
 numbers) and persists the sponsored queue; use `{"clear": true}` or
 `{"operation": "clear"}` to empty it. This is an admin route: callers must use
-the shared service token and include `telegramUserId` for a configured session
+the root/break-glass token and include `telegramUserId` for a configured session
 admin. User-scoped `ceagt_` tokens are intentionally rejected for this route.
 
 `GET /api/agent/admin/status` can be called with a user-scoped
@@ -1007,7 +1043,7 @@ group proposals, distinct respondents, and registry session count. Submit
 metrics are counted from KV list metadata for current records, with a legacy
 body-read fallback, so large Telegram-only sessions avoid one KV read per
 response. `POST /api/agent/group-approval-link` and
-`/group-approval-revoke` are worker-service-token operator routes for managing
+`/group-approval-revoke` are root/break-glass operator routes for managing
 approved Telegram groups; normal user-scoped admin tokens should use the
 in-group approval flow instead.
 
@@ -1305,13 +1341,6 @@ tunable with `AGENT_BRIDGE_FAUCET_BALANCE_WAIT_ATTEMPTS` and
 `AGENT_BRIDGE_FAUCET_BALANCE_WAIT_MS`; failed direct-submit records remain
 retryable so a first-click funding race does not permanently poison the
 idempotency key.
-
-## Mock OpenClaw Forwarding
-
-`openclawForwarding.mjs` models contract-only forwarding for delivered questions,
-drafts, submit requests, approvals, failures, and final status. Envelopes contain
-safe summaries, opaque refs, and canonical `/api/agent/*` routes only. Real
-OpenClaw HTTP/MCP transport is deferred.
 
 ## Question Cards
 

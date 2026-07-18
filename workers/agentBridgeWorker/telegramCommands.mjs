@@ -144,7 +144,7 @@ const DEFAULT_DM_VOICE_TRANSCRIBE_MAX_BYTES = 25 * 1024 * 1024;
 const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_LIMIT = 12;
 const DEFAULT_DM_VOICE_TRANSCRIBE_RATE_WINDOW_SECONDS = 10 * 60;
 const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
-const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=41';
+const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=42';
 const CONTEXT_ENGINE_OSS_URL = 'https://github.com/AgalmicSoftware/context-engine/tree/main';
 const CONTEXT_ENGINE_WORKER_SKILL_URL = 'https://github.com/AgalmicSoftware/context-engine/blob/main/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const TELEGRAM_QUESTION_LIST_LIMIT = 5;
