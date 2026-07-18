@@ -4941,7 +4941,7 @@ test('Mini App live results can filter by saved lightweight group details', asyn
         sessionName: 'Alpha',
         telegramBridgeEnabled: true,
         telegramOnly: true,
-        resultsExposure: { minGroupSize: 1, anonymizedGroupsEnabled: true },
+        resultsExposure: { minGroupSize: 2, anonymizedGroupsEnabled: true },
       }],
     }),
     AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
