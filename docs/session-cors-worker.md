@@ -21,8 +21,10 @@ canonical `/api/agent/*` routes:
 - `POST /api/agent/client-login/exchange` accepts a pasted user/install or named
   service `ceagt_` credential once and returns a short-TTL versioned envelope.
   That envelope contains a Bridge browser credential for Bridge reads and a
-  distinct session-worker JWT for canonical worker routes. The web client sends
-  each credential only to its intended authority and stores only the envelope
+  distinct session-worker JWT for canonical worker routes. The current
+  Telegram-first client sends the Bridge credential only to Bridge routes and
+  retains the worker JWT separately for direct canonical worker consumers; it
+  never sends the worker JWT to the Bridge. The client stores only the envelope
   in tab-scoped `sessionStorage`; source credentials must not be put in URLs,
   localStorage, sessionStorage, Redux, or logs.
 - Credentials are bound to one principal, session, audience, scope set, expiry,

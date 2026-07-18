@@ -325,8 +325,10 @@ the token or copied install info into the login modal; the client calls
 `POST /api/agent/client-login/exchange` once, clears the pasted token from
 component state after exchange, and stores only the returned short-lived
 versioned envelope in tab-scoped `sessionStorage`. The envelope keeps the
-Bridge browser credential separate from the session-worker JWT, so each token
-is sent only to its intended authority. The
+Bridge browser credential separate from the session-worker JWT. Current
+Telegram-first reads and submits send only the Bridge credential to the Bridge;
+the worker JWT is retained for direct canonical session-worker consumers and is
+never sent to the Bridge. The
 `GET /api/agent/session-meta?sessionSlug=<slug>` endpoint returns public
 session metadata, including `clientSubmitReady`, which tells the client whether
 direct answer submit is deploy-ready for that session.
