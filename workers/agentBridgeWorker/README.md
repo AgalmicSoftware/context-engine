@@ -320,15 +320,16 @@ agent token lifespan is 28 days, and the raw token is only included in the
 private copy payload, never in message body text.
 
 The web client login path never places a raw `ceagt_` token in a URL, durable
-browser storage, Redux state, or logs. For Telegram-first sessions, users paste
+browser storage, Redux state, or logs. For agent-enabled sessions, users paste
 the token or copied install info into the login modal; the client calls
 `POST /api/agent/client-login/exchange` once, clears the pasted token from
 component state after exchange, and stores only the returned short-lived
 versioned envelope in tab-scoped `sessionStorage`. The envelope keeps the
 Bridge browser credential separate from the session-worker JWT. Current
-Telegram-first reads and submits send only the Bridge credential to the Bridge;
-the worker JWT is retained for direct canonical session-worker consumers and is
-never sent to the Bridge. The
+question, result, and submit calls send only the Bridge credential to the
+Bridge. The access-group panel sends only the worker JWT directly to the
+canonical session worker for group listing, self-membership reads, and open
+self-join. The worker JWT is never sent back to the Bridge. The
 `GET /api/agent/session-meta?sessionSlug=<slug>` endpoint returns public
 session metadata, including `clientSubmitReady`, which tells the client whether
 direct answer submit is deploy-ready for that session.
@@ -336,9 +337,8 @@ direct answer submit is deploy-ready for that session.
 The Bridge's `/groups` and `buckets` data are consented demographic research
 profiles, not session-worker authorization groups. They never grant storage or
 encryption access. The Bridge does not mirror worker group definitions or
-memberships. The client-login exchange already returns the worker JWT that a
-future client group surface can use with session-worker group routes directly;
-no such client surface is implemented yet.
+memberships. Administrators manage canonical access groups through signed
+session-worker Admin routes, not through Bridge bucket APIs.
 
 Account-created screens do not include `Open in CE`. Optional onboarding uses: `Enter startup info so I can suggest answers for you.` Confirmation copy is `Submit this response?` with `Save draft` and `Edit`.
 
@@ -1100,6 +1100,16 @@ to materially change the map. `GET /api/agent/results-image?view=topic-map`
 returns a PNG rendering of the same map. If there is not enough live data, the
 JSON endpoint reports `available: false` and the image endpoint returns `409`;
 pass `demo=1` for preview output.
+
+When `sessionModeProfile.results.visibility` is
+`session_member_aggregate`, non-root agent credentials receive live JSON or
+image results only if the credential's managed account belongs to a canonical
+session-worker group whose active size meets `resultsExposure.minGroupSize`.
+The Bridge authenticates that same stored principal to the session worker and
+reads `/groups/my-memberships`; it does not cache or mirror membership. Missing
+membership returns `403`, while an unavailable membership authority returns
+`503`. The shared minimum is never lower than two. Demo previews and the
+root/bootstrap operator path retain their existing behavior.
 
 Agents can also ask the worker for a meta-level importance view with
 `POST /api/agent/question-votes/recommend`. The response returns a
