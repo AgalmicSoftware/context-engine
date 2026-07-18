@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
 import {
   addWorkerGroupMember,
@@ -60,30 +60,28 @@ const AdminWorkerGroupsPanel = ({
   const ready = canAdminWorker && !!sessionSlug && !!workerUrl;
 
   const loadGroups = useCallback(async () => {
-    if (!ready) return;
+    if (!ready) return false;
     setBusy(true);
     setStatus('');
     try {
       const payload = await listWorkerGroupsAdmin({ postSignedRequest });
       setGroups(normalizeWorkerGroupsAdminPayload(payload));
+      return true;
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Could not load worker groups.');
+      return false;
     } finally {
       setBusy(false);
     }
   }, [postSignedRequest, ready]);
-
-  useEffect(() => {
-    void loadGroups();
-  }, [loadGroups]);
 
   const runMutation = async (operation: () => Promise<unknown>, success: string): Promise<boolean> => {
     setBusy(true);
     setStatus('');
     try {
       await operation();
-      setStatus(success);
-      await loadGroups();
+      const refreshed = await loadGroups();
+      if (refreshed) setStatus(success);
       return true;
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Worker group request failed.');
@@ -138,8 +136,10 @@ const AdminWorkerGroupsPanel = ({
       const payload = await listWorkerGroupMembers({ groupId, postSignedRequest });
       setMemberGroupId(groupId);
       setMembers(normalizeWorkerGroupMembersAdminPayload(payload));
+      return true;
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Could not load group members.');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -162,8 +162,8 @@ const AdminWorkerGroupsPanel = ({
       if (mode === 'add') await addWorkerGroupMember(args);
       else await removeWorkerGroupMember(args);
       setMemberAddressDraft('');
-      setStatus(mode === 'add' ? 'Member added.' : 'Member removed.');
-      await loadMembers(memberGroupId);
+      const refreshed = await loadMembers(memberGroupId);
+      if (refreshed) setStatus(mode === 'add' ? 'Member added.' : 'Member removed.');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Worker group member request failed.');
     } finally {

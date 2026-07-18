@@ -48,6 +48,7 @@ describe('AdminWorkerGroupsPanel', () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(await screen.findByText('Reviewers')).toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), {
@@ -74,6 +75,7 @@ describe('AdminWorkerGroupsPanel', () => {
         }),
       ),
     );
+    expect(await screen.findByText('Group created.')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Reviewers' }));
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-edit-label'), {
@@ -98,6 +100,7 @@ describe('AdminWorkerGroupsPanel', () => {
         expect.objectContaining({ action: 'groups/add-member' }),
       ),
     );
+    expect(await screen.findByText('Member added.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: `Remove ${ADDRESS}` }));
     await waitFor(() =>
       expect(postSignedRequest).toHaveBeenCalledWith(
