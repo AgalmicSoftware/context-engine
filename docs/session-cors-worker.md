@@ -449,7 +449,7 @@ accept a replacement deployment secret in an Admin request.
 
 Groups are canonical in `sessionCorsWorker`; the agent bridge and clients are future consumers, not owners, of this state. Group membership is visible to the worker/operator by design. This is the same trust domain as worker-enforced gates.
 
-Group records and membership rows are stored separately in the worker group store. The worker uses `CE_WORKER_GROUPS_D1` when present, otherwise the same D1 aliases used by envelope audit, otherwise `CE_WORKER_GROUPS_KV` or the storage index KV aliases. Membership rows are keyed by normalized principals and are not embedded in group objects.
+Group records and membership rows are stored separately in KV. The worker uses `CE_WORKER_GROUPS_KV` when present, otherwise the storage index KV aliases. D1 and envelope-audit bindings are never group stores, so adding an unrelated database cannot switch group authority away from existing KV state. Membership rows are keyed by normalized principals and are not embedded in group objects.
 
 Implemented routes:
 
@@ -472,12 +472,11 @@ KV:
 - `GROUP_KV`
 - `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) for all Cloudflare payload storage: it holds authoritative R2 per-item authorization metadata and the KV-only payload fallback. R2 uploads require both `get` and `put`, and R2 reads never fall back to custom object metadata. The deploy helper aliases the same newly created namespace as `GROUP_KV` and `CE_STORAGE_INDEX_KV` for Cloudflare-backed sessions.
 - `CE_STORAGE_AUDIT_KV` (optional) for worker-envelope key-release audit events. If omitted, the worker uses the storage index KV for audit rows when no D1 audit binding is present.
-- `CE_WORKER_GROUPS_KV` (optional) for worker-native group records and membership rows. If omitted, the worker uses the storage index KV aliases. Membership rows remain separate from group records.
+- `CE_WORKER_GROUPS_KV` (optional) for worker-native group records and membership rows. If omitted, the worker uses the storage index KV aliases. Membership rows remain separate from group records. D1-only configuration is not a group store and fails as unconfigured.
 
 R2/D1:
 - `CE_STORAGE_R2` (or `STORAGE_R2` / `R2_BUCKET`) for preferred Cloudflare payload blobs. One-click deploys bind this only when the request supplies an existing R2 bucket name.
 - `CE_STORAGE_AUDIT_D1` (or `STORAGE_AUDIT_D1` / `DB`) for worker-envelope key-release audit events when the deployment wants a queryable audit table.
-- `CE_WORKER_GROUPS_D1` (optional) for queryable worker-native group records and membership rows. If absent, group storage can use the same D1 aliases as envelope audit; any D1 group store is preferred over KV.
 - D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
 - `CE_SESSION_COORDINATOR` binds the SQLite-backed `SessionWriteCoordinator`
   class for direct/sponsored deploy idempotency, one-shot sponsored faucet

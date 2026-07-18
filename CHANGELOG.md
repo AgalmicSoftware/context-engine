@@ -35,6 +35,10 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Prevented worker-native group state from silently switching to an unrelated
+  D1 or envelope-audit binding: session-worker groups now use only the explicit
+  group KV or storage-index KV aliases, and D1-only group configuration fails
+  as unconfigured.
 - Made KV index rows authoritative for per-item Cloudflare R2 authorization
   metadata: uploads now require a readable/writable index binding, and reads
   fail closed without a valid matching row instead of falling back to weaker
