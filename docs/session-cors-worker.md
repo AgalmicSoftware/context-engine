@@ -458,7 +458,7 @@ accept a replacement deployment secret in an Admin request.
 
 ### Worker-Native Groups
 
-Groups are canonical in `sessionCorsWorker`; the Agent Bridge's demographic research buckets are separate profile data and never grant worker access, and the Bridge does not mirror worker group definitions or memberships. The Bridge client-login exchange already returns a session-worker JWT. A future client group surface can use that credential to call `/groups/list`, `/groups/my-memberships`, and `/groups/join` directly instead of adding a Bridge proxy or cache. These routes require the explicit `groups` scope; the legacy `arweave` compatibility scope applies only to storage routes. Group membership is visible to the worker/operator by design. This is the same trust domain as worker-enforced gates.
+Groups are canonical in `sessionCorsWorker`; the Agent Bridge's demographic research buckets are separate profile data and never grant worker access, and the Bridge does not mirror worker group definitions or memberships. Agent-enabled sessions use the session-worker JWT returned by client login to call `/groups/list`, `/groups/my-memberships`, and `/groups/join` directly. The Admin page uses the existing signed worker-admin request path for group and member management. These routes require the explicit `groups` scope; the legacy `arweave` compatibility scope applies only to storage routes. Group membership is visible to the worker/operator by design. This is the same trust domain as worker-enforced gates.
 
 Group records and membership rows are stored separately in KV. The worker uses `CE_WORKER_GROUPS_KV` when present, otherwise the storage index KV aliases. D1 and envelope-audit bindings are never group stores, so adding an unrelated database cannot switch group authority away from existing KV state. Membership rows are keyed by normalized principals and are not embedded in group objects.
 
@@ -470,7 +470,7 @@ Implemented routes:
 - `POST /admin/groups/add-member` / `POST /admin/groups/remove-member`: admin-signed membership mutation.
 - `POST /admin/groups/list` and `POST /admin/groups/list-members`: admin-signed group/member views.
 - `GET|POST /groups/list`: authenticated member route. It returns session-visible groups and member-visible groups for the caller.
-- `GET|POST /groups/my-memberships`: authenticated self view. A principal can always see its own memberships.
+- `GET|POST /groups/my-memberships`: authenticated self view. A principal can always see its own memberships. Each row includes the active `memberCount` for that group without exposing the other principals.
 - `POST /groups/join`: authenticated self-join for `joinMode: "open"` groups only.
 
 `memberVisibility` defaults to `admin_only`. `members` lets members see the group metadata, and `session` lets any authenticated session principal see the group metadata. Self-membership visibility is always allowed. `passkey_account` and `evm_address` principals use normalized EVM addresses, `telegram` uses the bridge principal id string, and `agent` uses the grant id. Malformed principals fail closed.

@@ -146,6 +146,21 @@ test('session policy prefers sessionModeProfile with legacy fallback', () => {
   assert.equal(legacyTelegram.session.telegramOnly, true);
 });
 
+test('session policy keeps the shared aggregate privacy threshold at two or more', () => {
+  const policy = normalizeSessionPolicy({
+    defaultSessionSlug: 'member-results',
+    sessions: [{
+      sessionSlug: 'member-results',
+      telegramBridgeEnabled: true,
+      resultsExposure: { minGroupSize: 1 },
+    }],
+  });
+
+  const resolved = resolveSessionInvocation(policy, 'member-results');
+  assert.equal(resolved.ok, true);
+  assert.equal(resolved.session.resultsExposure.minGroupSize, 2);
+});
+
 test('session policy can switch the default Telegram demo session by date', () => {
   const base = {
     default: 'ee-26-organizers',

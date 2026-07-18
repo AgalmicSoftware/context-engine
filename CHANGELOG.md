@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
   one-time invites can onboard an opaque non-Telegram user, the root token is
   limited to bootstrap/break-glass semantics, and browser exchange returns
   separate Bridge and session-worker credentials.
+- Added direct session-worker access-group views and open self-join controls to
+  agent-enabled sessions, plus signed group and member administration in the
+  existing Admin surface. The Agent Bridge does not proxy or mirror this state.
 - Removed the unused mock OpenClaw forwarding module and catalog entry while
   retaining transport-neutral direct HTTP and optional host-agent adapters.
 - Completed the frontend modernization baseline with typed domain boundaries,
@@ -46,6 +49,11 @@ All notable changes to this project will be documented in this file.
   prior records, rejected query-string bearer credentials and nested browser
   exchanges, pinned credentials to their issued session, and made managed
   account issuance fail closed without signer configuration.
+- Enforced `session_member_aggregate` result visibility against live canonical
+  worker membership and the configured minimum group size for JSON and image
+  results, failing closed when membership cannot be checked. Telegram-optional
+  user and service exchanges now derive their worker wallet from the stored
+  credential principal.
 - Prevented worker-native group state from silently switching to an unrelated
   D1 or envelope-audit binding: session-worker groups now use only the explicit
   group KV or storage-index KV aliases, and D1-only group configuration fails

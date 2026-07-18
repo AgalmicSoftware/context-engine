@@ -258,10 +258,10 @@ function normalizeResultsExposurePolicy(session = {}) {
       ? true
       : normalizeBool(aggregateValue),
     anonymizedGroupsEnabled: normalizeBool(anonymizedGroupsValue),
-    minGroupSize: normalizePositiveInteger(
+    minGroupSize: Math.max(2, normalizePositiveInteger(
       source.minGroupSize ?? session.resultsMinGroupSize ?? session.telegramResultsMinGroupSize,
       2
-    ),
+    )),
   };
 }
 
