@@ -3,9 +3,11 @@ import { buildPasskeyWalletNetwork, createLoginPasskeyActions } from './loginAnd
 import { createLoginAgentActions, formatAgentTokenError } from './loginAndSettingsAgentTokenActions';
 
 const envelope: AgentClientLoginEnvelope = {
+  v: 2,
   sessionSlug: 'alpha',
   address: '0x0000000000000000000000000000000000000001',
-  credential: { token: 'ceagt_test' },
+  bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'ceagt_bridge_test' },
+  workerCredential: { kind: 'session_worker_jwt', token: 'jwt-worker-test' },
   capabilities: { submitAnswers: true },
   expiresAt: '2026-01-01T00:00:00.000Z',
 };

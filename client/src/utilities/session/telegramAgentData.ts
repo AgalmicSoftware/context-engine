@@ -1,5 +1,5 @@
 import type { AgentClientLoginEnvelope } from './agentClientLogin';
-import { buildAgentClientAuthHeaders } from './agentClientLogin';
+import { buildAgentBridgeAuthHeaders } from './agentClientLogin';
 
 type UnknownRecord = Record<string, unknown>;
 export type TelegramPolisRow = { responder: string; questionId: string; response: string };
@@ -91,7 +91,7 @@ export const fetchTelegramAgentQuestions = async ({
   fetchImpl?: typeof fetch;
 }): Promise<TelegramAgentQuestionsResult> => {
   const base = resolveAgentBridgeUrl(envelope, agentBridgeUrl);
-  if (!envelope?.credential?.token || !base) {
+  if (!envelope?.bridgeCredential?.token || !base) {
     return { ok: false, status: 0, reason: 'telegram_agent_credentials_missing' };
   }
   const url = new URL(`${base}/api/agent/questions`);
@@ -100,7 +100,7 @@ export const fetchTelegramAgentQuestions = async ({
   try {
     const response = await fetchImpl(url.toString(), {
       method: 'GET',
-      headers: buildAgentClientAuthHeaders(envelope),
+      headers: buildAgentBridgeAuthHeaders(envelope),
       cache: 'no-store',
     });
     const body = toRecord(await response.json().catch(() => ({})));
@@ -485,7 +485,7 @@ export const fetchTelegramAgentResults = async ({
   fetchImpl?: typeof fetch;
 }): Promise<TelegramAgentResultsResult> => {
   const base = resolveAgentBridgeUrl(envelope, agentBridgeUrl);
-  if (!envelope?.credential?.token || !base) {
+  if (!envelope?.bridgeCredential?.token || !base) {
     return { ok: false, status: 0, reason: 'telegram_agent_credentials_missing' };
   }
   const fetchView = async ({ key, view }: { key: string; view: string }): Promise<TelegramAgentResultViewState> => {
@@ -495,7 +495,7 @@ export const fetchTelegramAgentResults = async ({
     try {
       const response = await fetchImpl(url.toString(), {
         method: 'GET',
-        headers: buildAgentClientAuthHeaders(envelope),
+        headers: buildAgentBridgeAuthHeaders(envelope),
         cache: 'no-store',
       });
       const body = toRecord(await response.json().catch(() => ({})));

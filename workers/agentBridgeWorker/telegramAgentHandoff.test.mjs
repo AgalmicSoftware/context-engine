@@ -17,13 +17,13 @@ import {
   buildDraftEditMetricSummary,
 } from './telegramDraftEditMetrics.mjs';
 import {
+  AGENT_CREDENTIAL_KINDS,
   createTelegramAgentDelegationToken,
   loadTelegramAgentDelegationToken,
   readTelegramAgentOnlyTokenUserPointer,
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
-  writeTelegramAgentDelegationTokenUserPointer,
-} from './telegramAgentDelegationTokens.mjs';
+} from './agentCredentials.mjs';
 import {
   AGENT_ONLY_MODE_CONFIG_KV_PREFIX,
   AGENT_ONLY_WINDOW_KV_PREFIX,
@@ -662,8 +662,9 @@ test('Telegram agent handoff accepts scoped user delegation tokens without a sha
     env,
   });
   const mismatch = await jsonBody(mismatchResponse);
-  assert.equal(mismatchResponse.status, 404);
-  assert.match(mismatch.reason, /session_not_(found|linked)/);
+  assert.equal(mismatchResponse.status, 403);
+  assert.equal(mismatch.reason, 'agent_token_session_mismatch');
+  assert.equal(mismatch.sessionSlug, 'alpha');
 
   const childSessionResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/sessions/child', {
@@ -838,7 +839,7 @@ test('Telegram agent questions endpoint caps candidate batches when requested', 
   assert.equal(answeredLookup.questions[0].myAnswer.status, answeredLookup.questions[0].answerStatus);
 });
 
-test('Telegram agent token follows a follow-default private binding across default flips', async () => {
+test('Agent credentials remain bound to their issued session across Telegram default flips', async () => {
   const env = multiTelegramOnlyEnv({ defaultSessionSlug: 'alpha', overrides: { AGENT_BRIDGE_AGENT_API_TOKEN: '' } });
   await env.AGENT_ACTION_KV.put('telegram:private-session:42', JSON.stringify({
     version: 1,
@@ -868,10 +869,10 @@ test('Telegram agent token follows a follow-default private binding across defau
     request: agentRequest('/telegram/agent/api/questions', { token: issued.token }),
     env,
   });
-  assert.equal((await jsonBody(betaResponse)).sessionSlug, 'beta');
+  assert.equal((await jsonBody(betaResponse)).sessionSlug, 'alpha');
 });
 
-test('Telegram agent token preserves pinned bindings across default flips', async () => {
+test('Agent credentials remain bound to their issued session despite a Telegram pinned binding', async () => {
   const env = multiTelegramOnlyEnv({ defaultSessionSlug: 'alpha', overrides: { AGENT_BRIDGE_AGENT_API_TOKEN: '' } });
   await env.AGENT_ACTION_KV.put('telegram:private-session:42', JSON.stringify({
     version: 1,
@@ -895,10 +896,10 @@ test('Telegram agent token preserves pinned bindings across default flips', asyn
     request: agentRequest('/telegram/agent/api/questions', { token: issued.token }),
     env,
   });
-  assert.equal((await jsonBody(response)).sessionSlug, 'gamma');
+  assert.equal((await jsonBody(response)).sessionSlug, 'alpha');
 });
 
-test('Telegram agent request with existing sessionSlug switches and pins the user', async () => {
+test('Agent credentials reject attempts to switch their issued session', async () => {
   const env = multiTelegramOnlyEnv({ defaultSessionSlug: 'alpha', overrides: { AGENT_BRIDGE_AGENT_API_TOKEN: '' } });
   const issued = await createTelegramAgentDelegationToken({
     env,
@@ -914,21 +915,21 @@ test('Telegram agent request with existing sessionSlug switches and pins the use
     request: agentRequest('/telegram/agent/api/questions?sessionSlug=gamma', { token: issued.token }),
     env,
   });
-  assert.equal((await jsonBody(switched)).sessionSlug, 'gamma');
-  const binding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
-  assert.equal(binding.sessionSlug, 'gamma');
-  assert.equal(binding.followDefault, false);
-  assert.equal(binding.source, 'telegram_agent_delegation_token');
+  const switchedBody = await jsonBody(switched);
+  assert.equal(switched.status, 403);
+  assert.equal(switchedBody.reason, 'agent_token_session_mismatch');
+  assert.equal(switchedBody.sessionSlug, 'alpha');
+  assert.equal(await env.AGENT_ACTION_KV.get('telegram:private-session:42'), null);
 
   env.AGENT_BRIDGE_SESSION_POLICY_JSON = multiTelegramOnlyEnv({ defaultSessionSlug: 'beta' }).AGENT_BRIDGE_SESSION_POLICY_JSON;
   const omitted = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/questions', { token: issued.token }),
     env,
   });
-  assert.equal((await jsonBody(omitted)).sessionSlug, 'gamma');
+  assert.equal((await jsonBody(omitted)).sessionSlug, 'alpha');
 });
 
-test('Telegram agent treats legacy private bindings without followDefault as pinned', async () => {
+test('Agent credentials do not inherit legacy Telegram session bindings', async () => {
   const env = multiTelegramOnlyEnv({ defaultSessionSlug: 'alpha', overrides: { AGENT_BRIDGE_AGENT_API_TOKEN: '' } });
   await env.AGENT_ACTION_KV.put('telegram:private-session:42', JSON.stringify({
     version: 1,
@@ -950,7 +951,7 @@ test('Telegram agent treats legacy private bindings without followDefault as pin
     request: agentRequest('/telegram/agent/api/questions', { token: issued.token }),
     env,
   });
-  assert.equal((await jsonBody(response)).sessionSlug, 'beta');
+  assert.equal((await jsonBody(response)).sessionSlug, 'alpha');
 });
 
 test('Telegram agent onboarding returns consent questions and persists first-run answers', async () => {
@@ -1235,7 +1236,7 @@ test('Mini App onboarding endpoint validates Telegram initData and mints a scope
   assert.match(body.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
   assert.equal(loaded.ok, true);
-  assert.equal(loaded.record.telegramUserId, '42');
+  assert.equal(loaded.record.principal.adapterUserId, '42');
   assert.equal(loaded.record.sessionSlug, 'alpha');
   const binding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
   assert.equal(binding.sessionSlug, 'alpha');
@@ -1264,7 +1265,7 @@ test('Mini App onboarding endpoint validates Telegram initData and mints a scope
   assert.notEqual(refreshed.token, body.token);
   assert.equal(oldLoaded.ok, false);
   assert.equal(refreshedLoaded.ok, true);
-  assert.equal(refreshedLoaded.record.telegramUserId, '42');
+  assert.equal(refreshedLoaded.record.principal.adapterUserId, '42');
 });
 
 test('Mini App onboarding endpoint rejects disallowed origins and invalid initData', async () => {
@@ -1324,14 +1325,6 @@ test('Invite onboarding mints a user token from a configured Geo invite', async 
     createdAt: '2026-06-01T12:00:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
-  await writeTelegramAgentDelegationTokenUserPointer({
-    env,
-    telegramUserId: '42',
-    tokenHash: previous.tokenHash,
-    issuedAt: previous.record.issuedAt,
-    createdAt: '2026-06-01T12:00:00.000Z',
-  });
-
   const response = await handleTelegramAgentHandoffRequest({
     request: new Request('https://bridge.example/telegram/agent/api/invite/onboard', {
       method: 'POST',
@@ -1357,10 +1350,10 @@ test('Invite onboarding mints a user token from a configured Geo invite', async 
   assert.equal(JSON.stringify(body).includes('geo-invite-secret'), false);
   const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
   assert.equal(loaded.ok, true);
-  assert.equal(loaded.record.telegramUserId, '42');
-  assert.equal(loaded.record.username, '');
+  assert.equal(loaded.record.principal.adapterUserId, '42');
+  assert.equal(Object.hasOwn(loaded.record.principal, 'label'), false);
   assert.equal(loaded.record.sessionSlug, 'beta');
-  assert.equal((await loadTelegramAgentDelegationToken({ env, token: previous.token })).ok, false);
+  assert.equal((await loadTelegramAgentDelegationToken({ env, token: previous.token })).ok, true);
   const binding = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:private-session:42'));
   assert.equal(binding.sessionSlug, 'beta');
   assert.equal(binding.followDefault, false);
@@ -1413,14 +1406,6 @@ test('Invite onboarding mode agent_only mints short scoped token without revokin
     createdAt: '2026-06-01T12:00:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
-  await writeTelegramAgentDelegationTokenUserPointer({
-    env,
-    telegramUserId: '42',
-    tokenHash: previous.tokenHash,
-    issuedAt: previous.record.issuedAt,
-    createdAt: '2026-06-01T12:00:00.000Z',
-  });
-
   const response = await handleTelegramAgentHandoffRequest({
     request: new Request('https://bridge.example/telegram/agent/api/invite/onboard', {
       method: 'POST',
@@ -1447,10 +1432,10 @@ test('Invite onboarding mode agent_only mints short scoped token without revokin
   ]);
   assert.equal(loaded.record.scopes.includes(TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS), false);
   assert.equal(loaded.record.scopes.includes(TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS), false);
-  assert.equal(loaded.record.username, '');
+  assert.equal(Object.hasOwn(loaded.record.principal, 'label'), false);
   assert.equal(loaded.record.ttlSeconds, 604800);
   assert.equal((await loadTelegramAgentDelegationToken({ env, token: previous.token })).ok, true);
-  const pointer = await readTelegramAgentOnlyTokenUserPointer({ env, telegramUserId: '42' });
+  const pointer = await readTelegramAgentOnlyTokenUserPointer({ env, telegramUserId: '42', sessionSlug: 'alpha' });
   assert.equal(pointer.tokenHash, loaded.tokenHash);
 });
 
@@ -1501,9 +1486,13 @@ test('Session Wrapped invite onboarding mints wrapped agent-only credential meta
     TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
   ]);
   assert.equal(loaded.record.sessionSlug, 'session-wrapped');
-  assert.equal(loaded.record.username, '');
+  assert.equal(Object.hasOwn(loaded.record.principal, 'label'), false);
   assert.equal(loaded.record.ttlSeconds, 604800);
-  const pointer = await readTelegramAgentOnlyTokenUserPointer({ env, telegramUserId: '4242' });
+  const pointer = await readTelegramAgentOnlyTokenUserPointer({
+    env,
+    telegramUserId: '4242',
+    sessionSlug: 'session-wrapped',
+  });
   assert.equal(pointer.tokenHash, loaded.tokenHash);
 });
 
@@ -1765,12 +1754,13 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     scopes: [
       TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
     ],
+    credentialKind: AGENT_CREDENTIAL_KINDS.AGENT_ONLY,
     createdAt: '2026-06-12T15:02:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
   const agentOnlyReadToken = await createTelegramAgentDelegationToken({
     env,
-    telegramUserId: '42',
+    telegramUserId: '43',
     username: '',
     sessionSlug: 'alpha',
     accountAddress: `0x${'34'.repeat(20)}`,
@@ -1778,6 +1768,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
       TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,
     ],
+    credentialKind: AGENT_CREDENTIAL_KINDS.AGENT_ONLY,
     createdAt: '2026-06-12T15:02:30.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
@@ -2503,6 +2494,7 @@ test('Agent-only admin routes accept session admin delegation tokens and reject 
     scopes: [
       TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
     ],
+    credentialKind: AGENT_CREDENTIAL_KINDS.AGENT_ONLY,
     createdAt: '2026-06-12T15:02:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
@@ -2924,8 +2916,10 @@ test('Telegram client login exchanges copied ceagt token for a worker JWT', asyn
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('access-control-allow-origin'), 'https://client.example');
   assert.equal(body.ok, true);
-  assert.equal(body.tokenType, 'session_worker_jwt');
-  assert.equal(body.workerToken, 'worker-jwt-1');
+  assert.equal(body.bridgeCredential.kind, 'agent_bridge_browser_token');
+  assert.match(body.bridgeCredential.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  assert.equal(body.workerCredential.kind, 'session_worker_jwt');
+  assert.equal(body.workerCredential.token, 'worker-jwt-1');
   assert.equal(body.sessionSlug, 'alpha');
   assert.equal(body.accountAddress, accountAddress);
   assert.equal(body.workerUrl, 'https://session-worker.example');
@@ -2937,6 +2931,74 @@ test('Telegram client login exchanges copied ceagt token for a worker JWT', asyn
     'https://session-worker.example/auth/nonce',
     'https://session-worker.example/auth/login',
   ]);
+});
+
+test('client login returns audience-correct credentials and the Bridge credential reads questions', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_SESSION_WORKER_URL: 'https://session-worker.example',
+    AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://client.example',
+  });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'host',
+    sessionSlug: 'alpha',
+    accountAddress: await managedAccountAddressForTelegramUser(env, '42'),
+    createdAt: '2026-06-01T12:00:00.000Z',
+    ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
+  });
+  const fetchImpl = async (url) => {
+    if (String(url).endsWith('/auth/nonce')) {
+      return new Response(JSON.stringify({ nonce: 'nonce-1' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    if (String(url).endsWith('/auth/login')) {
+      return new Response(JSON.stringify({ token: 'worker-jwt-1', exp: 1780003600 }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  const exchangeResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/client-login/exchange', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://client.example',
+      },
+      body: JSON.stringify({ sessionSlug: 'alpha', token: issued.token }),
+    }),
+    env,
+    fetchImpl,
+  });
+  const exchange = await jsonBody(exchangeResponse);
+
+  assert.equal(exchangeResponse.status, 200);
+  assert.equal(exchange.bridgeCredential.kind, 'agent_bridge_browser_token');
+  assert.match(exchange.bridgeCredential.token, /^ceagt_/);
+  assert.notEqual(exchange.bridgeCredential.token, issued.token);
+  assert.equal(exchange.workerCredential.kind, 'session_worker_jwt');
+  assert.equal(exchange.workerCredential.token, 'worker-jwt-1');
+  assert.equal(exchange.capabilities.readQuestions, true);
+  assert.equal(exchange.capabilities.readResults, true);
+  assert.equal(exchange.capabilities.admin, false);
+  assert.equal(exchange.capabilities.export, false);
+
+  const questionsResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/questions?sessionSlug=alpha', {
+      token: exchange.bridgeCredential.token,
+    }),
+    env,
+  });
+  const questions = await jsonBody(questionsResponse);
+  assert.equal(questionsResponse.status, 200);
+  assert.equal(questions.ok, true);
+  assert.equal(questions.sessionSlug, 'alpha');
+  assert.equal(Array.isArray(questions.questions), true);
 });
 
 test('Telegram client login ignores caller-supplied workerUrl', async () => {
@@ -3720,7 +3782,7 @@ test('Telegram agent can mint a Mini App question-series launch link', async () 
   assert.equal(issued.ok, true);
   const readOnly = await createTelegramAgentDelegationToken({
     env,
-    telegramUserId: '42',
+    telegramUserId: '43',
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'34'.repeat(20)}`,
@@ -4902,7 +4964,8 @@ test('Telegram agent admin can mint a one-use group approval link through the AP
 test('Telegram agent group approval links require an explicit delegated admin scope', async () => {
   const env = baseEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
   const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
-  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
+  const scopedAdminAddress = await managedAccountAddressForTelegramUser(env, '44');
+  env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = `${adminAddress},${scopedAdminAddress}`;
   const defaultToken = await createTelegramAgentDelegationToken({
     env,
     telegramUserId: '42',
@@ -4914,10 +4977,10 @@ test('Telegram agent group approval links require an explicit delegated admin sc
   });
   const scopedToken = await createTelegramAgentDelegationToken({
     env,
-    telegramUserId: '42',
+    telegramUserId: '44',
     username: 'admin',
     sessionSlug: 'alpha',
-    accountAddress: adminAddress,
+    accountAddress: scopedAdminAddress,
     scopes: [
       ...TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES,
       TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.MANAGE_GROUP_APPROVALS,

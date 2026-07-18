@@ -268,12 +268,13 @@ describe('OnePageSession view gating', () => {
 
   it('renders telegram parity surfaces from an exchanged envelope', async () => {
     writeAgentClientLoginEnvelope({
-      v: 1,
+      v: 2,
       sessionSlug: 'edge',
       expiresAt: '2027-07-05T00:00:00.000Z',
       address: '0x3333333333333333333333333333333333333333',
       capabilities: { readQuestions: true, readResults: true, submitAnswers: false },
-      credential: { kind: 'session_worker_jwt', token: 'jwt-session-token' },
+      bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'bridge-browser-token' },
+      workerCredential: { kind: 'session_worker_jwt', token: 'jwt-session-token' },
       agentBridgeUrl: 'https://bridge.example',
     });
     Object.defineProperty(global, 'fetch', {

@@ -81,18 +81,17 @@ import {
 } from './telegramQuestionQueue.mjs';
 import { canManageResponseExportAllowlist } from './telegramResponseExport.mjs';
 import {
+  AGENT_BROWSER_CREDENTIAL_TTL_SECONDS,
+  AGENT_CREDENTIAL_AUDIENCES,
+  AGENT_CREDENTIAL_KINDS,
   createTelegramAgentDelegationToken,
   delegationTokenHasScope,
+  issueAgentCredential,
   loadTelegramAgentDelegationToken,
-  readTelegramAgentOnlyTokenUserPointer,
-  readTelegramAgentDelegationTokenUserPointer,
-  revokeTelegramAgentDelegationTokenHash,
   TELEGRAM_AGENT_DELEGATION_TOKEN_KV_PREFIX,
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
-  writeTelegramAgentOnlyTokenUserPointer,
-  writeTelegramAgentDelegationTokenUserPointer,
-} from './telegramAgentDelegationTokens.mjs';
+} from './agentCredentials.mjs';
 import {
   AGENT_ONLY_ENDPOINTS,
   agentOnlyTokenTtlSeconds,
@@ -1498,6 +1497,14 @@ function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = '
   }
   const requestedSessionSlug = sanitizeSessionSlug(input.sessionSlug);
   const delegatedSessionSlug = sanitizeSessionSlug(delegation.sessionSlug);
+  if (delegatedSessionSlug && requestedSessionSlug && requestedSessionSlug !== delegatedSessionSlug) {
+    return {
+      ok: false,
+      status: 403,
+      reason: 'agent_token_session_mismatch',
+      sessionSlug: delegatedSessionSlug,
+    };
+  }
   const isAgentOnlyToken = delegationTokenHasScope(delegation, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL);
   const allowedAgentOnlyPath = (
     pathname === AGENT_ONLY_ENDPOINTS.statements ||
@@ -1513,21 +1520,15 @@ function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = '
       requiredScope: TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
     };
   }
-  if (isAgentOnlyToken && delegatedSessionSlug && requestedSessionSlug && requestedSessionSlug !== delegatedSessionSlug) {
-    return {
-      ok: false,
-      status: 403,
-      reason: 'agent_token_session_mismatch',
-      sessionSlug: delegatedSessionSlug,
-    };
-  }
+  const principal = delegation.principal || {};
+  const principalUserId = safeString(principal.adapterUserId || principal.principalId);
   return {
     ok: true,
     input: {
       ...input,
-      telegramUserId: safeString(delegation.telegramUserId),
-      username: safeString(input.username || delegation.username),
-      sessionSlug: isAgentOnlyToken && delegatedSessionSlug ? delegatedSessionSlug : requestedSessionSlug,
+      telegramUserId: principalUserId,
+      username: safeString(input.username || principal.label),
+      sessionSlug: delegatedSessionSlug,
       groupChatId: safeString(input.groupChatId),
     },
   };
@@ -1560,27 +1561,6 @@ async function resolveHandoffContext({
   const resolved = resolveSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
     return { ok: false, status: 404, reason: resolved.reason || 'session_not_found', sessionSlug };
-  }
-  if (delegation && requestedSessionSlug && !ignoreSessionBinding) {
-    const existingPinnedSlug = privateBinding?.followDefault === true ? '' : sanitizeSessionSlug(privateBinding?.sessionSlug);
-    if (existingPinnedSlug !== resolved.session.sessionSlug) {
-      const saved = await persistTelegramUserSessionBinding({
-        env,
-        normalized,
-        session: resolved.session,
-        createdAt: input.createdAt || null,
-        source: 'telegram_agent_delegation_token',
-        followDefault: false,
-      });
-      if (saved.ok) {
-        privateBinding = {
-          ...(privateBinding || {}),
-          sessionSlug: resolved.session.sessionSlug,
-          source: 'telegram_agent_delegation_token',
-          followDefault: false,
-        };
-      }
-    }
   }
   const effectiveGroupBinding = groupBinding?.followDefault === true
     ? { ...groupBinding, sessionSlug: resolved.session.sessionSlug }
@@ -2928,11 +2908,11 @@ async function buildAdminMetricsSnapshot({
       ? entry.metadata
       : null;
     let tokenSessionSlug = sanitizeSessionSlug(metadata?.sg);
-    let telegramUserId = safeString(metadata?.u);
+    let telegramUserId = safeString(metadata?.p || metadata?.u);
     if (!tokenSessionSlug || !telegramUserId) {
       const record = await readMetricRecord(env, entry.key);
       tokenSessionSlug = sanitizeSessionSlug(record?.sessionSlug);
-      telegramUserId = safeString(record?.telegramUserId);
+      telegramUserId = safeString(record?.principal?.principalId || record?.telegramUserId);
     }
     if (!tokenSessionSlug || !inScope(tokenSessionSlug)) continue;
     totals.agentsOnboarded += 1;
@@ -5649,21 +5629,6 @@ async function handleMiniAppOnboardRequest({
     lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED,
     createdAt,
   });
-  const previousPointer = await readTelegramAgentDelegationTokenUserPointer({ env, telegramUserId });
-  if (previousPointer.tokenHash) {
-    await revokeTelegramAgentDelegationTokenHash({ env, tokenHash: previousPointer.tokenHash });
-  }
-  if (sessionSlug) {
-    const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
-    await persistTelegramUserSessionBinding({
-      env,
-      normalized,
-      session: resolved.session,
-      createdAt,
-      source: 'mini_app_agent_onboarding',
-      followDefault,
-    });
-  }
   const issued = await createTelegramAgentDelegationToken({
     env,
     telegramUserId,
@@ -5679,18 +5644,16 @@ async function handleMiniAppOnboardRequest({
       reason: issued.reason || 'agent_token_create_failed',
     }, { status: 500 });
   }
-  const pointer = await writeTelegramAgentDelegationTokenUserPointer({
-    env,
-    telegramUserId,
-    tokenHash: issued.tokenHash,
-    issuedAt: issued.record?.issuedAt || createdAt,
-    createdAt,
-  });
-  if (!pointer.ok) {
-    return jsonMiniAppOnboard(request, env, {
-      ok: false,
-      reason: pointer.reason || 'agent_token_pointer_write_failed',
-    }, { status: 500 });
+  if (sessionSlug) {
+    const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
+    await persistTelegramUserSessionBinding({
+      env,
+      normalized,
+      session: resolved.session,
+      createdAt,
+      source: 'mini_app_agent_onboarding',
+      followDefault,
+    });
   }
   const response = {
     ok: true,
@@ -5797,9 +5760,23 @@ async function handleInviteOnboardRequest({
   const onboardingMode = lower(body.mode || body.onboardingMode);
   if (onboardingMode === 'agent_only') {
     const wrappedOnboarding = isSessionWrappedOnboardingRequest(body);
-    const previousAgentOnlyPointer = await readTelegramAgentOnlyTokenUserPointer({ env, telegramUserId });
-    if (previousAgentOnlyPointer.tokenHash) {
-      await revokeTelegramAgentDelegationTokenHash({ env, tokenHash: previousAgentOnlyPointer.tokenHash });
+    const issued = await createTelegramAgentDelegationToken({
+      env,
+      telegramUserId,
+      username: '',
+      sessionSlug: resolved.session.sessionSlug,
+      accountAddress: account.accountAddress,
+      scopes: [
+        TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
+      ],
+      credentialKind: AGENT_CREDENTIAL_KINDS.AGENT_ONLY,
+      ttlSeconds: agentOnlyTokenTtlSeconds(env),
+      createdAt,
+    });
+    if (!issued.ok) {
+      const payload = { ok: false, reason: issued.reason || 'agent_token_create_failed' };
+      assertNoSecretShape(payload, 'Telegram invite onboarding token failure must not serialize secrets.');
+      return json(payload, { status: 500 });
     }
     if (explicitSessionSlug) {
       const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
@@ -5811,35 +5788,6 @@ async function handleInviteOnboardRequest({
         source: 'trusted_invite_agent_only_onboarding',
         followDefault,
       });
-    }
-    const issued = await createTelegramAgentDelegationToken({
-      env,
-      telegramUserId,
-      username: '',
-      sessionSlug: resolved.session.sessionSlug,
-      accountAddress: account.accountAddress,
-      scopes: [
-        TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
-      ],
-      ttlSeconds: agentOnlyTokenTtlSeconds(env),
-      createdAt,
-    });
-    if (!issued.ok) {
-      const payload = { ok: false, reason: issued.reason || 'agent_token_create_failed' };
-      assertNoSecretShape(payload, 'Telegram invite onboarding token failure must not serialize secrets.');
-      return json(payload, { status: 500 });
-    }
-    const pointer = await writeTelegramAgentOnlyTokenUserPointer({
-      env,
-      telegramUserId,
-      tokenHash: issued.tokenHash,
-      issuedAt: issued.record?.issuedAt || createdAt,
-      createdAt,
-    });
-    if (!pointer.ok) {
-      const payload = { ok: false, reason: pointer.reason || 'agent_token_pointer_write_failed' };
-      assertNoSecretShape(payload, 'Telegram invite onboarding pointer failure must not serialize secrets.');
-      return json(payload, { status: 500 });
     }
     const response = {
       ok: true,
@@ -5858,21 +5806,6 @@ async function handleInviteOnboardRequest({
     assertNoSecretShape(secretFree, 'Telegram invite agent-only onboarding response metadata must not serialize secrets.');
     return json(response);
   }
-  const previousPointer = await readTelegramAgentDelegationTokenUserPointer({ env, telegramUserId });
-  if (previousPointer.tokenHash) {
-    await revokeTelegramAgentDelegationTokenHash({ env, tokenHash: previousPointer.tokenHash });
-  }
-  if (explicitSessionSlug) {
-    const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
-    await persistTelegramUserSessionBinding({
-      env,
-      normalized,
-      session: resolved.session,
-      createdAt,
-      source: 'trusted_invite_onboarding',
-      followDefault,
-    });
-  }
   const issued = await createTelegramAgentDelegationToken({
     env,
     telegramUserId,
@@ -5887,17 +5820,16 @@ async function handleInviteOnboardRequest({
     assertNoSecretShape(payload, 'Telegram invite onboarding token failure must not serialize secrets.');
     return json(payload, { status: 500 });
   }
-  const pointer = await writeTelegramAgentDelegationTokenUserPointer({
-    env,
-    telegramUserId,
-    tokenHash: issued.tokenHash,
-    issuedAt: issued.record?.issuedAt || createdAt,
-    createdAt,
-  });
-  if (!pointer.ok) {
-    const payload = { ok: false, reason: pointer.reason || 'agent_token_pointer_write_failed' };
-    assertNoSecretShape(payload, 'Telegram invite onboarding pointer failure must not serialize secrets.');
-    return json(payload, { status: 500 });
+  if (explicitSessionSlug) {
+    const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
+    await persistTelegramUserSessionBinding({
+      env,
+      normalized,
+      session: resolved.session,
+      createdAt,
+      source: 'trusted_invite_onboarding',
+      followDefault,
+    });
   }
 
   const settings = await loadTelegramAgentSettings({ env, sessionSlug: resolved.session.sessionSlug, telegramUserId });
@@ -5943,36 +5875,30 @@ async function handleClientLoginExchangeRequest({
   if (request.method !== 'POST') {
     return jsonClientLogin(request, env, { ok: false, reason: 'method_not_allowed' }, { status: 405 });
   }
-  const url = new URL(request.url);
   const body = await readRequestJson(request);
   const suppliedToken = extractTelegramAgentToken(
     body.token ||
     body.agentToken ||
     body.telegramToken ||
-    url.searchParams.get('token') ||
-    url.searchParams.get('agentToken') ||
     request.headers.get('authorization')
   );
   if (!suppliedToken) {
     return jsonClientLogin(request, env, { ok: false, reason: 'agent_token_missing' }, { status: 401 });
   }
-  if (suppliedToken === 'preview-user') {
-    return jsonClientLogin(request, env, { ok: false, reason: 'preview_user_not_allowed' }, { status: 401 });
-  }
   const delegated = await loadTelegramAgentDelegationToken({ env, token: suppliedToken });
   if (!delegated.ok) {
+    const unavailable = delegated.reason === 'agent_token_storage_unavailable';
     return jsonClientLogin(request, env, {
       ok: false,
       reason: delegated.reason || 'agent_token_invalid',
-      message: 'Open the Context Engine Telegram bot, tap Onboard Agent, and paste the copied install token again.',
-    }, { status: 401 });
+    }, { status: unavailable ? 503 : 401 });
   }
-  const requestedSessionSlug = sanitizeSessionSlug(body.sessionSlug || url.searchParams.get('sessionSlug'));
+  const requestedSessionSlug = sanitizeSessionSlug(body.sessionSlug);
   const context = await resolveHandoffContext({
     env,
     input: {
-      telegramUserId: safeString(delegated.record.telegramUserId),
-      username: safeString(delegated.record.username),
+      telegramUserId: safeString(delegated.record.principal?.adapterUserId || delegated.record.principal?.principalId),
+      username: safeString(delegated.record.principal?.label),
       sessionSlug: requestedSessionSlug,
     },
     auth: {
@@ -6011,24 +5937,62 @@ async function handleClientLoginExchangeRequest({
       skipped: login.skipped === true,
     }, { status: login.skipped ? 400 : 502 });
   }
+  const bridgeCredential = await issueAgentCredential({
+    env,
+    principal: delegated.record.principal,
+    sessionSlug: context.session.sessionSlug,
+    accountAddress: login.accountAddress,
+    scopes: delegated.record.scopes,
+    audience: AGENT_CREDENTIAL_AUDIENCES.AGENT_BRIDGE_BROWSER,
+    credentialKind: AGENT_CREDENTIAL_KINDS.BROWSER,
+    ttlSeconds: AGENT_BROWSER_CREDENTIAL_TTL_SECONDS,
+  });
+  if (!bridgeCredential.ok) {
+    return jsonClientLogin(request, env, {
+      ok: false,
+      reason: bridgeCredential.reason || 'agent_browser_credential_create_failed',
+    }, { status: bridgeCredential.reason === 'agent_token_storage_unavailable' ? 503 : 500 });
+  }
   const groups = await loadTelegramLightweightGroups({
     env,
     session: context.session,
-    telegramUserId: safeString(delegated.record.telegramUserId),
+    telegramUserId: safeString(delegated.record.principal?.adapterUserId || delegated.record.principal?.principalId),
     accountAddress: login.accountAddress,
   });
   const payload = {
     ok: true,
-    tokenType: 'session_worker_jwt',
     sessionSlug: context.session.sessionSlug,
     accountAddress: login.accountAddress,
     workerUrl: login.workerUrl,
-    workerToken: login.token,
-    exp: login.exp,
-    expiresAt: login.exp ? new Date(Number(login.exp) * 1000).toISOString() : '',
+    bridgeCredential: {
+      kind: 'agent_bridge_browser_token',
+      token: bridgeCredential.token,
+      expiresAt: bridgeCredential.record.expiresAt,
+    },
+    workerCredential: {
+      kind: 'session_worker_jwt',
+      token: login.token,
+      expiresAt: login.exp ? new Date(Number(login.exp) * 1000).toISOString() : '',
+    },
+    expiresAt: bridgeCredential.record.expiresAt,
+    capabilities: {
+      readQuestions: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS),
+      draftAnswers: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS),
+      submitAnswers: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS) && directSubmitFeatureEnabled(env),
+      voteQuestions: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.APPLY_QUESTION_VOTES),
+      poseQuestions: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.POSE_QUESTIONS),
+      readResults: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS),
+      readGroups: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_GROUPS),
+      admin: false,
+      export: false,
+    },
     buckets: groups,
   };
-  const { workerToken: _workerToken, ...secretFree } = payload;
+  const secretFree = {
+    ...payload,
+    bridgeCredential: { ...payload.bridgeCredential, token: '[redacted]' },
+    workerCredential: { ...payload.workerCredential, token: '[redacted]' },
+  };
   assertNoSecretShape(secretFree, 'Telegram client-login exchange metadata must not serialize bearer tokens.');
   return jsonClientLogin(request, env, payload);
 }

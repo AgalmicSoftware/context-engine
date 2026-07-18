@@ -1,5 +1,5 @@
 import type { AgentClientLoginEnvelope } from './agentClientLogin';
-import { buildAgentClientAuthHeaders } from './agentClientLogin';
+import { buildAgentBridgeAuthHeaders } from './agentClientLogin';
 import {
   buildTelegramPolisDataset,
   fetchTelegramAgentQuestions,
@@ -112,7 +112,7 @@ export const submitAnswer = async ({
   fetchImpl?: typeof fetch;
 }): Promise<TelegramSubmitAnswerResult> => {
   const base = resolveAgentBridgeUrl(envelope, agentBridgeUrl);
-  if (!envelope?.credential?.token || !base)
+  if (!envelope?.bridgeCredential?.token || !base)
     return { ok: false, status: 0, reason: 'telegram_agent_credentials_missing' };
   const questionId = toStr(question.questionId);
   if (!questionId) return { ok: false, status: 0, reason: 'telegram_question_id_missing' };
@@ -132,7 +132,7 @@ export const submitAnswer = async ({
     const response = await fetchImpl(url, {
       method: 'POST',
       headers: {
-        ...buildAgentClientAuthHeaders(envelope),
+        ...buildAgentBridgeAuthHeaders(envelope),
         'content-type': 'application/json',
       },
       body: JSON.stringify(payload),

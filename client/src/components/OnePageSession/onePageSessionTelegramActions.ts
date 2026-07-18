@@ -112,8 +112,8 @@ export const createOnePageSessionTelegramActions = ({
     const sessionSlug = resolveCurrentSessionSlug();
     const envelope = ports.readStoredEnvelope(sessionSlug);
     const state = getState();
-    const currentToken = state.telegramClientEnvelope?.credential?.token || '';
-    const nextToken = envelope?.credential?.token || '';
+    const currentToken = state.telegramClientEnvelope?.bridgeCredential?.token || '';
+    const nextToken = envelope?.bridgeCredential?.token || '';
     if (currentToken !== nextToken || state.telegramClientEnvelope?.sessionSlug !== envelope?.sessionSlug) {
       setState({ telegramClientEnvelope: envelope });
     }

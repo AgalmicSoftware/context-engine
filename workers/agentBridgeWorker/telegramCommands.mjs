@@ -44,10 +44,8 @@ import { evaluateTelegramQuestionAuthoringPermission } from './telegramAuthoring
 import {
   createTelegramAgentDelegationToken,
   readTelegramAgentDelegationTokenUserPointer,
-  revokeTelegramAgentDelegationTokenHash,
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
-  writeTelegramAgentDelegationTokenUserPointer,
-} from './telegramAgentDelegationTokens.mjs';
+} from './agentCredentials.mjs';
 import { loadTelegramAgentSettings } from './telegramAgentSettings.mjs';
 import {
   answerFromStoredDraft,
@@ -3750,9 +3748,17 @@ async function buildAgentOnboardingStartResponse({
 } = {}) {
   if (normalized.chat?.isPrivate) {
     const forceToken = normalized.forceAgentToken === true;
+    const policy = await loadSessionPolicy(env);
+    const resolved = await resolveAgentTokenSession({
+      env,
+      normalized,
+      policy,
+      explicitSessionSlug: sessionSlugOverride,
+    });
     const pointer = await readTelegramAgentDelegationTokenUserPointer({
       env,
       telegramUserId: normalized.user.telegramUserId,
+      sessionSlug: resolved.ok ? resolved.session.sessionSlug : sanitizeSessionSlug(sessionSlugOverride),
     });
     if (pointer.tokenHash && !forceToken) {
       return buildAgentAlreadyOnboardedResponse({
@@ -3835,16 +3841,6 @@ async function buildAgentAlreadyOnboardedResponse({
       lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED,
       createdAt,
     });
-    const previousPointer = await readTelegramAgentDelegationTokenUserPointer({
-      env,
-      telegramUserId: normalized.user.telegramUserId,
-    });
-    if (previousPointer.tokenHash) {
-      await revokeTelegramAgentDelegationTokenHash({
-        env,
-        tokenHash: previousPointer.tokenHash,
-      });
-    }
     const issued = await createTelegramAgentDelegationToken({
       env,
       telegramUserId: normalized.user.telegramUserId,
@@ -3855,20 +3851,11 @@ async function buildAgentAlreadyOnboardedResponse({
       createdAt,
     });
     if (issued.ok) {
-      const pointer = await writeTelegramAgentDelegationTokenUserPointer({
-        env,
-        telegramUserId: normalized.user.telegramUserId,
-        tokenHash: issued.tokenHash,
-        issuedAt: issued.record?.issuedAt || createdAt,
-        createdAt,
-      });
-      if (pointer.ok) {
-        copyInfoButton = copyTextButton('Copy New Agent Info', buildAgentInstallCopyInfo({
-          token: issued.token,
-          workerUrl: agentBridgePublicUrl(env),
-          skillUrl: agentSkillUrl(env),
-        }));
-      }
+      copyInfoButton = copyTextButton('Copy New Agent Info', buildAgentInstallCopyInfo({
+        token: issued.token,
+        workerUrl: agentBridgePublicUrl(env),
+        skillUrl: agentSkillUrl(env),
+      }));
     }
   } catch {
     copyInfoButton = null;
@@ -9787,26 +9774,6 @@ async function buildAgentTokenResponse({
     lifecycle: AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED,
     createdAt,
   });
-  const previousPointer = await readTelegramAgentDelegationTokenUserPointer({
-    env,
-    telegramUserId: normalized.user.telegramUserId,
-  });
-  if (previousPointer.tokenHash) {
-    await revokeTelegramAgentDelegationTokenHash({
-      env,
-      tokenHash: previousPointer.tokenHash,
-    });
-  }
-  if (sanitizeSessionSlug(sessionSlugOverride)) {
-    const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
-    await persistPrivateSessionBinding({
-      env,
-      normalized,
-      session: resolved.session,
-      createdAt,
-      followDefault,
-    });
-  }
   const issued = await createTelegramAgentDelegationToken({
     env,
     telegramUserId: normalized.user.telegramUserId,
@@ -9824,19 +9791,14 @@ async function buildAgentTokenResponse({
       text: 'Could not create an agent token for this account.',
     });
   }
-  const pointer = await writeTelegramAgentDelegationTokenUserPointer({
-    env,
-    telegramUserId: normalized.user.telegramUserId,
-    tokenHash: issued.tokenHash,
-    issuedAt: issued.record?.issuedAt || createdAt,
-    createdAt,
-  });
-  if (!pointer.ok) {
-    return errorReply({
+  if (sanitizeSessionSlug(sessionSlugOverride)) {
+    const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
+    await persistPrivateSessionBinding({
+      env,
       normalized,
-      command,
-      reason: pointer.reason || 'agent_token_pointer_write_failed',
-      text: 'Could not save the agent token pointer for this account.',
+      session: resolved.session,
+      createdAt,
+      followDefault,
     });
   }
   const workerUrl = agentBridgePublicUrl(env);
