@@ -109,7 +109,7 @@ describe('SessionWizard worker resource rendering', () => {
       expect(arweaveOption).toHaveAttribute('aria-checked', 'false');
       expect(cloudflareOption).toHaveAttribute('aria-checked', 'true');
     });
-    expect(screen.getByText(/R2 for blobs, D1 or KV for metadata\/indexes/)).toBeInTheDocument();
+    expect(screen.getByText(/R2 for blobs, KV for metadata, indexes, and audits/)).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Public read' })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('radio', { name: 'Worker SBT gate' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: 'Lit encrypted' })).toHaveAttribute('aria-checked', 'false');

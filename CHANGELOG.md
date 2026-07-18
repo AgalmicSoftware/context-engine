@@ -39,6 +39,15 @@ All notable changes to this project will be documented in this file.
   D1 or envelope-audit binding: session-worker groups now use only the explicit
   group KV or storage-index KV aliases, and D1-only group configuration fails
   as unconfigured.
+- Kept worker-envelope key-release audits on the explicit audit KV or storage
+  index KV, ignored unrelated D1 aliases, and preserved fail-closed
+  audit-before-decrypt behavior when persistence is unavailable.
+- Required the explicit `groups` JWT scope for worker group listing,
+  self-membership reads, and joins instead of accepting the legacy `arweave`
+  storage compatibility scope.
+- Stopped generated session-worker Cloudflare profiles from advertising an
+  unused D1 primitive; payload indexes, envelope audits, and group records now
+  describe the KV authority that the deployed worker actually binds.
 - Made KV index rows authoritative for per-item Cloudflare R2 authorization
   metadata: uploads now require a readable/writable index binding, and reads
   fail closed without a valid matching row instead of falling back to weaker

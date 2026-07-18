@@ -1355,6 +1355,11 @@ describe('deploy-helper worker', () => {
         exposesBucketName: false,
         exposesWorkerToken: false,
       }));
+      expect(configWrite.storageProfile.cloudflare.primitives).toEqual({
+        r2: ['session_context_payloads', 'question_payloads', 'survey_payloads', 'response_payloads', 'media_blob_payloads'],
+        kv: ['metadata_indexes', 'audit_events', 'short_lived_action_ids', 'webhook_replay_cache', 'ephemeral_start_params'],
+        durableObjects: ['signer_runtime_coordination_only', 'coordination_locks'],
+      });
       expect(JSON.stringify(configWrite)).not.toContain('storage-secret');
       expect(JSON.stringify(configWrite)).not.toContain('storage-account');
 

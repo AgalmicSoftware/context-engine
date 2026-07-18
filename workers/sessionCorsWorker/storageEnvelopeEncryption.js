@@ -317,7 +317,6 @@ export const decryptPayloadWithStorageEnvelope = async ({
   });
 };
 
-const resolveAuditD1 = (env = {}) => env.CE_STORAGE_AUDIT_D1 || env.STORAGE_AUDIT_D1 || env.D1 || env.DB || null;
 const resolveAuditKv = (env = {}) => env.CE_STORAGE_AUDIT_KV || env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
 
 const auditSuffix = (deps = {}) => {
@@ -347,20 +346,6 @@ export const writeStorageEnvelopeKeyReleaseAudit = async ({
     conditionMatched: isObj(conditionMatched) ? cloneJson(conditionMatched) : conditionMatched || 'gate_fallback',
     timestamp,
   };
-  const d1 = resolveAuditD1(env);
-  if (d1 && typeof d1.prepare === 'function') {
-    await d1.prepare(
-      'INSERT INTO ce_storage_key_release_audit (session_slug, payload_id, principal, condition_matched, timestamp, entry_json) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(
-      entry.sessionSlug,
-      entry.payloadId,
-      entry.principal,
-      JSON.stringify(entry.conditionMatched),
-      entry.timestamp,
-      JSON.stringify(entry),
-    ).run();
-    return { ok: true, store: 'd1', entry };
-  }
   const kv = resolveAuditKv(env);
   if (!kv || typeof kv.put !== 'function') {
     throw new Error('Storage envelope audit store is not configured.');

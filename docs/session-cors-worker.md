@@ -398,7 +398,7 @@ Where older clients still need one string, the worker and client derive the lega
 - `gate: "group_gate"` checks worker-native group membership before upload, list, or read bytes are exposed. The gate reads group ids from `storageProfile.payloadAccessControl.groupId`/`groupIds`, or from payload metadata for per-payload group storage refs. Missing, deleted, or unreadable groups fail closed.
 - `gate: "none"` keeps canonical payloads in Cloudflare but serves read/list requests without wallet auth. Uploads still require authenticated session worker requests unless the caller is already on an anonymous read/list route. Use this for public question prompts or public response summaries that should render identically across Arweave, Cloudflare, Telegram, Mini App, and the CE client.
 - `encryption: "lit"` keeps the existing Lit scaffold. Cloudflare stores only caller-supplied encrypted payload envelopes and Lit governs decrypt. The worker rejects plaintext Cloudflare uploads in this mode until the client/session path supplies `payloadEncrypted=true` with a Lit-encrypted envelope.
-- `encryption: "worker_envelope"` encrypts payload bytes at rest inside the session worker trust domain, then releases keys only after worker-evaluated conditions pass. The operator and Cloudflare runtime can decrypt. This mode protects against storage-layer dumps of R2/KV/D1 data, backups, or bucket/index misconfiguration; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime. Audience removal stops future key release, but cannot un-read plaintext already fetched.
+- `encryption: "worker_envelope"` encrypts payload bytes at rest inside the session worker trust domain, then releases keys only after worker-evaluated conditions pass. The operator and Cloudflare runtime can decrypt. This mode protects against storage-layer dumps of the supported R2/KV payload stores, backups, or bucket/index misconfiguration; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime. Audience removal stops future key release, but cannot un-read plaintext already fetched.
 
 Lit credentials are required only for `lit-arweave` storage or Cloudflare `encryption: "lit"` payload mode. Cloudflare `sbt_gate`, `worker_envelope`, and `none` modes hide the `/new` Lit key input; `sbt_gate` relies on the session worker SBT check while `none` relies on the operator intentionally publishing the payload. In `/new`, `worker_envelope` is selectable only when `storage.backend` is `cloudflare`; Arweave-backed encrypted artifacts remain Lit-managed.
 
@@ -406,7 +406,7 @@ Lit credentials are required only for `lit-arweave` storage or Cloudflare `encry
 
 `worker_envelope` uses WebCrypto AES-256-GCM and the existing session config/index stores:
 
-- Deployment KEK: read from the Worker secret `CE_STORAGE_ENVELOPE_KEK` through the `worker_secret` key provider. The plaintext KEK is never stored in KV, D1, or R2. Keep this secret stable for the lifetime of the encrypted session. Automatically provisioned Workers do not return this secret to the client. `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` is a temporary break-glass unwrap fallback after a mistaken replacement, not a rotation mechanism: restore the original value as `CE_STORAGE_ENVELOPE_KEK`, verify reads, and then remove the fallback.
+- Deployment KEK: read from the Worker secret `CE_STORAGE_ENVELOPE_KEK` through the `worker_secret` key provider. The plaintext KEK is never stored in KV or R2. Keep this secret stable for the lifetime of the encrypted session. Automatically provisioned Workers do not return this secret to the client. `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` is a temporary break-glass unwrap fallback after a mistaken replacement, not a rotation mechanism: restore the original value as `CE_STORAGE_ENVELOPE_KEK`, verify reads, and then remove the fallback.
 - Session KEK: generated locally on the first envelope write for a session and wrapped by the deployment KEK before coordination. The per-session `SessionWriteCoordinator` adopts one wrapped candidate, keeps that wrapped record authoritative, and projects it to `session:{slug}:config` under `storageEnvelope.sessionKey`. Raw session keys and the deployment KEK never pass through coordinator state. A missing coordinator binding fails closed instead of falling back to a racing KV write.
 - Payload DEK: generated per payload, used to encrypt the stored bytes, wrapped by the session KEK, and stored in payload metadata with the envelope algorithm, IVs, key id, and condition reference.
 
@@ -414,7 +414,7 @@ All R2 uploads require a readable/writable index KV binding. Worker-envelope
 payloads additionally keep the wrapped payload DEK in that authoritative row,
 so the general R2/index check returns `501` before key creation or any R2 write.
 
-Reads authorize first, then unwrap the DEK, decrypt the payload, return `Cache-Control: private, no-store`, and write one key-release audit event. The audit store is D1 when a `CE_STORAGE_AUDIT_D1`/`STORAGE_AUDIT_D1`/`DB` binding is present; otherwise it uses `CE_STORAGE_AUDIT_KV` or the storage index KV. If no audit store is available, key release fails closed.
+Reads authorize first, await one KV key-release audit event, then unwrap the DEK, decrypt the payload, and return `Cache-Control: private, no-store`. The worker uses `CE_STORAGE_AUDIT_KV` when present, otherwise the storage index KV aliases. D1 bindings are not envelope-audit stores. If no KV audit store is available or the audit write fails, key release fails closed before decryption.
 
 Access conditions may be attached per payload or at session level:
 
@@ -447,7 +447,7 @@ accept a replacement deployment secret in an Admin request.
 
 ### Worker-Native Groups
 
-Groups are canonical in `sessionCorsWorker`; the agent bridge and clients are future consumers, not owners, of this state. Group membership is visible to the worker/operator by design. This is the same trust domain as worker-enforced gates.
+Groups are canonical in `sessionCorsWorker`; the Agent Bridge's demographic research buckets are separate profile data and never grant worker access, and the Bridge does not mirror worker group definitions or memberships. The Bridge client-login exchange already returns a session-worker JWT. A future client group surface can use that credential to call `/groups/list`, `/groups/my-memberships`, and `/groups/join` directly instead of adding a Bridge proxy or cache. These routes require the explicit `groups` scope; the legacy `arweave` compatibility scope applies only to storage routes. Group membership is visible to the worker/operator by design. This is the same trust domain as worker-enforced gates.
 
 Group records and membership rows are stored separately in KV. The worker uses `CE_WORKER_GROUPS_KV` when present, otherwise the storage index KV aliases. D1 and envelope-audit bindings are never group stores, so adding an unrelated database cannot switch group authority away from existing KV state. Membership rows are keyed by normalized principals and are not embedded in group objects.
 
@@ -471,13 +471,11 @@ Upload policy `group_allowlist` may be supplied on Cloudflare storage uploads wi
 KV:
 - `GROUP_KV`
 - `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) for all Cloudflare payload storage: it holds authoritative R2 per-item authorization metadata and the KV-only payload fallback. R2 uploads require both `get` and `put`, and R2 reads never fall back to custom object metadata. The deploy helper aliases the same newly created namespace as `GROUP_KV` and `CE_STORAGE_INDEX_KV` for Cloudflare-backed sessions.
-- `CE_STORAGE_AUDIT_KV` (optional) for worker-envelope key-release audit events. If omitted, the worker uses the storage index KV for audit rows when no D1 audit binding is present.
+- `CE_STORAGE_AUDIT_KV` (optional) for worker-envelope key-release audit events. If omitted, the worker uses the storage index KV for audit rows.
 - `CE_WORKER_GROUPS_KV` (optional) for worker-native group records and membership rows. If omitted, the worker uses the storage index KV aliases. Membership rows remain separate from group records. D1-only configuration is not a group store and fails as unconfigured.
 
-R2/D1:
+R2 / Durable Objects:
 - `CE_STORAGE_R2` (or `STORAGE_R2` / `R2_BUCKET`) for preferred Cloudflare payload blobs. One-click deploys bind this only when the request supplies an existing R2 bucket name.
-- `CE_STORAGE_AUDIT_D1` (or `STORAGE_AUDIT_D1` / `DB`) for worker-envelope key-release audit events when the deployment wants a queryable audit table.
-- D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
 - `CE_SESSION_COORDINATOR` binds the SQLite-backed `SessionWriteCoordinator`
   class for direct/sponsored deploy idempotency, one-shot sponsored faucet
   receipts, atomic wrapped session-key selection, and versioned public session
