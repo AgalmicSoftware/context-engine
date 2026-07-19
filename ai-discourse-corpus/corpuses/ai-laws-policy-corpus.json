@@ -290,7 +290,7 @@
       "date_enacted": "2024-05-17",
       "date_proposed": "2023-05-17",
       "status": "framework",
-      "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. 17 signatories include the EU, US, UK, Canada, and others. Implementation occurs through national legislative measures coordinated with the EU AI Act and other frameworks.",
+      "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. As of July 19, 2026, the Council of Europe listed the European Union as a party and 21 signatories, including the United States, United Kingdom, Canada, Japan, Israel, and Uruguay. Implementation occurs through national legislative measures coordinated with the EU AI Act and other frameworks.",
       "key_provisions": [
         "Human rights, democracy and rule of law as core principles",
         "Graduated and differentiated measures based on severity and probability of adverse impacts",
@@ -343,6 +343,8 @@
         "https://opiniojuris.org/2024/11/05/understanding-the-scope-of-the-council-of-europe-framework-convention-on-ai/"
       ],
       "source_url": "https://www.coe.int/en/web/artificial-intelligence/the-framework-convention-on-artificial-intelligence",
+      "verification_status": "verified",
+      "verification_notes": "Verified 2026-07-19 against the Council of Europe convention page; treaty status, opening date, party, and 21 listed signatories checked against the live official page.",
       "merged_from": [
         "council_of_europe_ai_convention"
       ]

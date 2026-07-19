@@ -45,6 +45,8 @@ test('validates corpus references and client mirrors', () => {
   assert.deepEqual(validation.targetDebateReferences.ambiguousReferences, []);
   assert.deepEqual(validation.metaCountDrift, []);
   assert.deepEqual(validation.malformedYears, []);
+  assert.deepEqual(validation.rangeDateFields, []);
+  assert.deepEqual(validation.invalidPrimaryUrls, []);
   assert.deepEqual(validation.duplicateTitles, []);
 });
 

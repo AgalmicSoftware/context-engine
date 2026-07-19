@@ -14,7 +14,7 @@ This corpus is maintained as part of [Context Engine](https://github.com/Agalmic
 | `arxiv-ai-safety-corpus.json` | 279 | Academic papers on AI safety, alignment, interpretability, and governance. |
 | `cross-corpus-debates.json` | 16 | Structured debate trees that synthesize evidence across multiple AI discourse sources. |
 | `dwarkesh-lab-insiders-corpus.json` | 154 | Interviews and writings from AI lab insiders and practitioners on frontier AI development. |
-| `enriched-tweets.json` | 4140 | Enriched social-media discourse with summaries, tags, relevance signals, and linked context. |
+| `enriched-tweets.json` | 4140 | Enriched social-media discourse from 2018-09-21 through 2026-07-11, with summaries, tags, relevance signals, and linked context. |
 | `lab-primary-docs-corpus.json` | 30 | Primary safety/governance documents from frontier labs: safety frameworks (RSP, Preparedness, FSF), system cards, framework compliance reports, model specs, and deployment updates. |
 | `lesswrong-posts-corpus.json` | 225 | Influential LessWrong, Alignment Forum, EA Forum, and related AI safety/rationalist writing. |
 | `metr-evals-metrics-corpus.json` | 100 | METR publications, benchmarks, evaluation reports, and measurement-oriented policy material. |
@@ -38,7 +38,7 @@ node scripts/ai-discourse-corpus-tools.js validate
 node scripts/ai-discourse-corpus-tools.js extract debate_ai_water_usage
 ```
 
-The helper reports counts, metadata drift, duplicate IDs and normalized titles,
+The helper reports counts, metadata drift, duplicate IDs and per-sub-corpus normalized titles,
 debate-reference coverage, client debate/sample mirror coverage, taxonomy and
 date/year drift, and compact single-record extracts without dumping the full
 corpus into the chat context. URL-form lookups normalize protocol, `www`, and
