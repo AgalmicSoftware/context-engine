@@ -6,6 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Replaced the placeholder emoji favicon family with the Context Engine circuit
+  C on a white background across browser, Apple touch, and Android icons.
 - Added a repository-owned Netlify build contract for strict, Node 20 client
   builds from public `main`, with pull-request preview guidance and the existing
   manual-deploy redirect fallback retained.
