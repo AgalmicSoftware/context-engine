@@ -59,7 +59,7 @@ describe('sessionWorkerDiscovery origin validation', () => {
   it.each([
     'not-a-url',
     'ftp://worker.example.test',
-    'https://user:password@worker.example.test',
+    'https://user:password@127.0.0.1',
     'https://worker.example.test/path',
     'https://worker.example.test/%2e%2e',
     'https://worker.example.test?session=a',

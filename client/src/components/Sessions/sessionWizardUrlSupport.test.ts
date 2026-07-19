@@ -66,7 +66,7 @@ describe('sessionWizardUrlSupport', () => {
       buildSessionWizardSessionUrl({
         slug: 'worker-session',
         origin: 'https://app.example',
-        workerOrigin: 'https://user:secret@worker.example/path',
+        workerOrigin: 'https://user:secret@127.0.0.1/path',
       }),
     ).toBe('https://app.example/session/worker-session');
   });

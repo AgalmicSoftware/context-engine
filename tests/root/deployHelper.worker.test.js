@@ -1049,7 +1049,7 @@ describe('deploy-helper worker', () => {
           apiKey: 'sk-never-store',
           headers: { Authorization: 'Bearer sk-header-secret' },
           provider: { key: 'sk-generic-key' },
-          endpoint: 'https://user:password@api.example.test',
+          endpoint: 'https://user:password@127.0.0.1',
         },
         cfApiToken: 'cf-alias-never-store',
         scopes: { cloudflare: { credentials: { token: 'nested-cf-never-store' } } },

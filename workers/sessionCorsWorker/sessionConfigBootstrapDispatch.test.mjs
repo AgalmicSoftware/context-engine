@@ -49,9 +49,9 @@ const buildWorkerCanonicalConfig = () => ({
     apiKey: 'sk-never-public',
     headers: { Authorization: 'Bearer sk-header-secret' },
     provider: { key: 'sk-generic-key' },
-    endpoint: 'https://user:password@api.example.test',
+    endpoint: 'https://user:password@127.0.0.1',
   },
-  rpcUrl: 'https://user:rpc-secret@rpc.example.test',
+  rpcUrl: 'https://user:rpc-secret@127.0.0.1',
   rpcUrlsByChainId: { 1: ['https://rpc.example.test/secret'] },
   faucet: { rpcUrl: 'https://rpc.example.test', privateKey: '0xprivate' },
   litCredentials: { litApiBase: 'https://lit.example.test', litActionCid: 'secret-cid' },
@@ -189,7 +189,7 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
     'config.ai.headers',
   );
   assert.equal(
-    findForbiddenWorkerConfigSecretPath({ ai: { endpoint: 'https://user:password@api.example.test' } }),
+    findForbiddenWorkerConfigSecretPath({ ai: { endpoint: 'https://user:password@127.0.0.1' } }),
     'config.ai.endpoint',
   );
   assert.equal(
@@ -248,7 +248,7 @@ test('Cloudflare deployment-token detection covers aliases and nested Cloudflare
     { token: 'generic-secret' },
     { litNetwork: 'datil' },
     { metadata: { clientSecret: 'nested-secret' } },
-    { litApiBase: 'https://user:secret@lit.example' },
+    { litApiBase: 'https://user:secret@127.0.0.1' },
   ]) {
     assert.match(
       findForbiddenWorkerConfigSecretPath({ litCredentials: unsafeLitCredentials }),

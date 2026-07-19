@@ -75,6 +75,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
 
     for (const relativePath of [
       '.github/ISSUE_TEMPLATE/config.yml',
+      'client/src/components/Sessions/sessionWizardUrlSupport.test.ts',
       'client/src/components/Sessions/sessionWizardWorkerConfigPersistence.test.ts',
       'client/src/variables/publicRepoMetadata.ts',
       'workers/sessionCorsWorker/chipotleClient.test.mjs',
@@ -269,6 +270,13 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'restore-private-pack.sh')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'lib', 'passkey-wallet-derivation.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'private-pack.manifest.json')), false);
+    assert.match(
+      fs.readFileSync(
+        path.join(outputDir, 'client', 'src', 'components', 'Sessions', 'sessionWizardUrlSupport.test.ts'),
+        'utf8',
+      ),
+      /https:\/\/user:secret@127\.0\.0\.1\/path/,
+    );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

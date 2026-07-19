@@ -236,7 +236,7 @@ test('putSessionConfig fails closed before KV persistence for secret-like config
     { litCredentials: { token: 'generic-secret' } },
     { litCredentials: { litNetwork: 'datil' } },
     { litCredentials: { metadata: { clientSecret: 'nested-secret' } } },
-    { litCredentials: { litApiBase: 'https://user:secret@lit.example' } },
+    { litCredentials: { litApiBase: 'https://user:secret@127.0.0.1' } },
   ];
   let writes = 0;
 
