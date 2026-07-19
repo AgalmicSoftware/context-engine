@@ -275,6 +275,11 @@ test('prepare-public-release fails if private planning paths survive strip rules
     writeFile(sourceDir, path.join('scripts', 'prepare-public-release.sh'), fs.readFileSync(SCRIPT_SOURCE_PATH, 'utf8'));
     writeFile(
       sourceDir,
+      path.join('scripts', 'scrub-public-package-json.js'),
+      fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
       path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),
       fs.readFileSync(HELPER_SOURCE_PATH, 'utf8'),
     );
