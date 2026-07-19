@@ -6,6 +6,18 @@ const path = require('node:path');
 const ROOT_DIR = path.resolve(__dirname, '..');
 const CORPUS_DIR = path.join(ROOT_DIR, 'ai-discourse-corpus', 'corpuses');
 const CLIENT_DEBATES_PATH = path.join(ROOT_DIR, 'client', 'src', 'variables', 'demo', 'debates.json');
+const CLIENT_CORPUS_SAMPLE_PATH = path.join(ROOT_DIR, 'client', 'src', 'variables', 'demo', 'corpus_sample.json');
+
+const CLIENT_SAMPLE_CORPUS_KEYS = Object.freeze({
+  tweets: 'tweets',
+  ai_laws_policy: 'ai-laws-policy',
+  arxiv_ai_safety: 'arxiv-ai-safety',
+  lesswrong_posts: 'lesswrong-posts',
+  dwarkesh_lab_insiders: 'dwarkesh-lab-insiders',
+  ai_scifi_books: 'ai-scifi-books',
+  metr_evals_metrics: 'metr-evals-metrics',
+  cross_corpus: 'cross-corpus',
+});
 
 const CORPUS_FILES = Object.freeze({
   'ai-forecasting-economics': {
@@ -233,6 +245,36 @@ function getEntryIdentifier(entry) {
   return entry.id || entry.url || null;
 }
 
+function normalizeUrlKey(value) {
+  if (typeof value !== 'string' || !VALID_PRIMARY_URL_RE.test(value.trim())) {
+    return null;
+  }
+  try {
+    const parsed = new URL(value.trim());
+    parsed.protocol = 'https:';
+    parsed.hostname = parsed.hostname.replace(/^www\./i, '').toLowerCase();
+    parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+    const normalized = parsed.toString();
+    return parsed.pathname === '/' && !parsed.search && !parsed.hash
+      ? normalized.replace(/\/$/, '')
+      : normalized;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeTitleKey(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const normalized = value
+    .normalize('NFKC')
+    .toLocaleLowerCase('en-US')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+  return normalized || null;
+}
+
 function getEntryLookupKeys(entry) {
   if (!entry || typeof entry !== 'object') {
     return [];
@@ -241,6 +283,10 @@ function getEntryLookupKeys(entry) {
   [entry.id, entry.url].forEach((value) => {
     if (typeof value === 'string' && value) {
       keys.add(value);
+      const normalizedUrl = normalizeUrlKey(value);
+      if (normalizedUrl) {
+        keys.add(normalizedUrl);
+      }
     }
   });
   return [...keys];
@@ -324,12 +370,21 @@ function buildRecordIndex(corpusFiles = loadCorpusFiles()) {
 
 function resolveRecord(index, corpusKey, id) {
   const normalizedCorpusKey = normalizeCorpusKey(corpusKey, index.aliasMap);
-  return index.byCorpusAndId.get(`${normalizedCorpusKey}:${id}`) || null;
+  const direct = index.byCorpusAndId.get(`${normalizedCorpusKey}:${id}`);
+  if (direct) {
+    return direct;
+  }
+  const normalizedUrl = normalizeUrlKey(id);
+  return normalizedUrl
+    ? index.byCorpusAndId.get(`${normalizedCorpusKey}:${normalizedUrl}`) || null
+    : null;
 }
 
 function countEntriesForKey(index, corpusKey, id) {
   const normalizedCorpusKey = normalizeCorpusKey(corpusKey, index.aliasMap);
-  return index.lookupKeyEntryCounts.get(`${normalizedCorpusKey}:${id}`) || 0;
+  const normalizedUrl = normalizeUrlKey(id);
+  const lookupKey = normalizedUrl || id;
+  return index.lookupKeyEntryCounts.get(`${normalizedCorpusKey}:${lookupKey}`) || 0;
 }
 
 function collectSummary(rootDir = ROOT_DIR) {
@@ -356,8 +411,7 @@ function collectSummary(rootDir = ROOT_DIR) {
 }
 
 function hasRecord(index, corpusKey, id) {
-  const normalizedCorpusKey = normalizeCorpusKey(corpusKey, index.aliasMap);
-  return index.byCorpusAndId.has(`${normalizedCorpusKey}:${id}`);
+  return Boolean(resolveRecord(index, corpusKey, id));
 }
 
 function collectDebateReferenceIssues(crossCorpusFile, index, debateIds = null) {
@@ -439,12 +493,50 @@ function collectValidation(rootDir = ROOT_DIR) {
   const crossCorpusDebateIds = new Set(crossCorpusFile.entries.map((debate) => debate.id));
   const clientDebates = readJson(path.join(rootDir, path.relative(ROOT_DIR, CLIENT_DEBATES_PATH)));
   const clientDebateIds = new Set((Array.isArray(clientDebates) ? clientDebates : []).map((debate) => debate.id));
+  const clientCorpusSample = readJson(path.join(rootDir, path.relative(ROOT_DIR, CLIENT_CORPUS_SAMPLE_PATH)));
   const metaCountDrift = [];
   const malformedYears = [];
   const rangeDateFields = [];
   const invalidPrimaryUrls = [];
   const taxonomyDrift = [];
   const unknownCorpusKeys = [];
+  const duplicateTitles = [];
+  const clientSampleCountDrift = [];
+  const missingClientSampleEntries = [];
+
+  const corpusFilesByKey = new Map(corpusFiles.map((file) => [file.corpusKey, file]));
+  Object.entries(clientCorpusSample.corpuses || {}).forEach(([sampleKey, sampleCorpus]) => {
+    const corpusKey = CLIENT_SAMPLE_CORPUS_KEYS[sampleKey];
+    const corpusFile = corpusFilesByKey.get(corpusKey);
+    if (!corpusFile) {
+      missingClientSampleEntries.push({ sampleKey, id: null, reason: 'unknown corpus' });
+      return;
+    }
+    const expectedCount = corpusFile.entries.length;
+    if (sampleCorpus.count_full !== expectedCount) {
+      clientSampleCountDrift.push({
+        sampleKey,
+        field: 'count_full',
+        expected: expectedCount,
+        actual: sampleCorpus.count_full,
+      });
+    }
+    const metaFullCount = clientCorpusSample.meta?.corpuses?.[sampleKey]?.full_count;
+    if (metaFullCount !== expectedCount) {
+      clientSampleCountDrift.push({
+        sampleKey,
+        field: 'meta.full_count',
+        expected: expectedCount,
+        actual: metaFullCount,
+      });
+    }
+    (sampleCorpus.entries || []).forEach((entry) => {
+      const id = getEntryIdentifier(entry);
+      if (!id || !resolveRecord(index, corpusKey, id)) {
+        missingClientSampleEntries.push({ sampleKey, id, reason: 'missing record' });
+      }
+    });
+  });
 
   const declaredSourceTotal = crossCorpusFile.data?.meta?.total_cross_corpus_sources;
   if (typeof declaredSourceTotal === 'number') {
@@ -463,6 +555,7 @@ function collectValidation(rootDir = ROOT_DIR) {
   }
 
   corpusFiles.forEach((file) => {
+    const seenTitles = new Map();
     file.metaCountKeys.forEach((key) => {
       const expected = file.data?.meta?.[key];
       if (typeof expected === 'number' && expected !== file.entries.length) {
@@ -477,6 +570,19 @@ function collectValidation(rootDir = ROOT_DIR) {
 
     file.entries.forEach((entry) => {
       const id = getEntryIdentifier(entry);
+      const normalizedTitle = normalizeTitleKey(entry?.title);
+      if (normalizedTitle) {
+        if (seenTitles.has(normalizedTitle)) {
+          duplicateTitles.push({
+            corpus: file.corpusKey,
+            title: normalizedTitle,
+            firstId: seenTitles.get(normalizedTitle),
+            secondId: id,
+          });
+        } else {
+          seenTitles.set(normalizedTitle, id);
+        }
+      }
       if (typeof entry?.year === 'string' && /^\d+$/.test(entry.year)) {
         malformedYears.push({ corpus: file.corpusKey, id, year: entry.year });
       }
@@ -529,6 +635,7 @@ function collectValidation(rootDir = ROOT_DIR) {
 
   return {
     duplicateIds: index.duplicateIds,
+    duplicateTitles,
     metaCountDrift,
     malformedYears,
     rangeDateFields,
@@ -540,6 +647,10 @@ function collectValidation(rootDir = ROOT_DIR) {
     clientDebateMirror: {
       missingFromClient: [...crossCorpusDebateIds].filter((id) => !clientDebateIds.has(id)),
       extraInClient: [...clientDebateIds].filter((id) => !crossCorpusDebateIds.has(id)),
+    },
+    clientSampleMirror: {
+      countDrift: clientSampleCountDrift,
+      missingEntries: missingClientSampleEntries,
     },
   };
 }
@@ -579,8 +690,12 @@ function compactRecord(record) {
 
 function extractRecord(id, rootDir = ROOT_DIR) {
   const corpusFiles = loadCorpusFiles(rootDir);
+  const normalizedUrl = normalizeUrlKey(id);
   for (const file of corpusFiles) {
-    const entry = file.entries.find((candidate) => getEntryLookupKeys(candidate).includes(id));
+    const entry = file.entries.find((candidate) => {
+      const lookupKeys = getEntryLookupKeys(candidate);
+      return lookupKeys.includes(id) || Boolean(normalizedUrl && lookupKeys.includes(normalizedUrl));
+    });
     if (entry) {
       return {
         corpus: file.corpusKey,
@@ -629,6 +744,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  CLIENT_CORPUS_SAMPLE_PATH,
   CLIENT_DEBATES_PATH,
   CORPUS_FILES,
   TARGET_DEBATE_IDS,
@@ -641,4 +757,5 @@ module.exports = {
   loadCorpusFiles,
   main,
   normalizeCorpusKey,
+  normalizeUrlKey,
 };

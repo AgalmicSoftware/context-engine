@@ -30,11 +30,13 @@ test('normalizes common corpus aliases used inside debate references', () => {
   assert.equal(normalizeCorpusKey('dwarkesh_lab_insiders'), 'dwarkesh-lab-insiders');
 });
 
-test('validates all debates and client mirror coverage', () => {
+test('validates corpus references and client mirrors', () => {
   const validation = collectValidation();
 
   assert.deepEqual(validation.clientDebateMirror.missingFromClient, []);
   assert.deepEqual(validation.clientDebateMirror.extraInClient, []);
+  assert.deepEqual(validation.clientSampleMirror.countDrift, []);
+  assert.deepEqual(validation.clientSampleMirror.missingEntries, []);
   assert.deepEqual(validation.debateReferences.missing, []);
   assert.deepEqual(validation.debateReferences.duplicatePositions, []);
   assert.deepEqual(validation.debateReferences.ambiguousReferences, []);
@@ -43,6 +45,7 @@ test('validates all debates and client mirror coverage', () => {
   assert.deepEqual(validation.targetDebateReferences.ambiguousReferences, []);
   assert.deepEqual(validation.metaCountDrift, []);
   assert.deepEqual(validation.malformedYears, []);
+  assert.deepEqual(validation.duplicateTitles, []);
 });
 
 test('taxonomy fields stay within their canonical vocabularies', () => {
@@ -83,6 +86,18 @@ test('indexes records under both id and url so either reference form resolves', 
   assert.ok(index.byCorpusAndId.has('synthetic:entry_b'));
   assert.ok(index.byCorpusAndId.has('synthetic:https://example.com/c'));
   assert.equal(index.duplicateIds.length, 0);
+});
+
+test('normalizes URL variants into a shared lookup key', () => {
+  const index = buildRecordIndex([
+    {
+      corpusKey: 'synthetic',
+      entries: [{ id: 'entry_a', url: 'http://www.Example.com/Case/' }],
+    },
+  ]);
+
+  assert.ok(index.byCorpusAndId.has('synthetic:https://example.com/Case'));
+  assert.equal(index.lookupKeyEntryCounts.get('synthetic:https://example.com/Case'), 1);
 });
 
 test('extracts records by url as well as by id', () => {

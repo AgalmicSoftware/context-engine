@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Refreshed the AI discourse corpus with verified 2026 policy, safety,
+  evaluation, and practitioner sources; consolidated duplicate records,
+  repaired primary-source provenance and tweet metadata, synchronized the
+  client sample, and added normalized-URL and duplicate-title quality gates.
 - Toolchain correction (2026-07-19): Vite is the canonical client dev/build
   path, and normal client installs again use npm's strict peer resolution.
   Earlier entries describing Create React App as canonical or durable
