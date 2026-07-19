@@ -432,12 +432,7 @@ describe('CommunityTab helpers', () => {
       '_blank',
       'noopener,noreferrer',
     );
-    expect(openSpy).toHaveBeenNthCalledWith(
-      2,
-      '/survey/0xdef/results?session=edge',
-      '_blank',
-      'noopener,noreferrer',
-    );
+    expect(openSpy).toHaveBeenNthCalledWith(2, '/survey/0xdef/results?session=edge', '_blank', 'noopener,noreferrer');
     openSpy.mockRestore();
   });
 
@@ -618,12 +613,7 @@ describe('CommunityTab helpers', () => {
     );
     responseSpans[0].props.onClick();
     responseSpans[1].props.onClick();
-    expect(openSpy).toHaveBeenNthCalledWith(
-      1,
-      '/survey/0xabc/results?session=DEBATE',
-      '_blank',
-      'noopener,noreferrer',
-    );
+    expect(openSpy).toHaveBeenNthCalledWith(1, '/survey/0xabc/results?session=DEBATE', '_blank', 'noopener,noreferrer');
     expect(openSpy).toHaveBeenNthCalledWith(2, '/survey/0xdef/results', '_blank', 'noopener,noreferrer');
     openSpy.mockRestore();
   });

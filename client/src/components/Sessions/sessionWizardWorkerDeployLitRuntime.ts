@@ -1,9 +1,6 @@
 import { toStr } from '../../utilities/shared/primitives.js';
 import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../shellTypes';
-import {
-  CHIPOTLE_LIT_CONFIG_FIELDS,
-  LIT_RUNTIME_RECOVERY_MARKER_FIELD,
-} from './sessionWizardWorkerSecretSupport';
+import { CHIPOTLE_LIT_CONFIG_FIELDS, LIT_RUNTIME_RECOVERY_MARKER_FIELD } from './sessionWizardWorkerSecretSupport';
 import { normalizeSessionWizardSlug, normalizeSessionWizardWorkerUrl } from './sessionWizardUrlSupport';
 
 export type SessionWizardLitBootstrapRecovery = {
@@ -12,17 +9,18 @@ export type SessionWizardLitBootstrapRecovery = {
   litCredentials: Record<string, string>;
 };
 
-export const createSessionWizardEnsureWorkerSessionConfig = ({
-  getWorkerConfig,
-  getAdminAddress,
-  signTypedAdminAction,
-  fetchImpl = fetch,
-}: {
-  getWorkerConfig: () => AnyRecord;
-  getAdminAddress: () => string;
-  signTypedAdminAction: (input: AnyRecord) => Promise<AnyRecord>;
-  fetchImpl?: typeof fetch;
-}) =>
+export const createSessionWizardEnsureWorkerSessionConfig =
+  ({
+    getWorkerConfig,
+    getAdminAddress,
+    signTypedAdminAction,
+    fetchImpl = fetch,
+  }: {
+    getWorkerConfig: () => AnyRecord;
+    getAdminAddress: () => string;
+    signTypedAdminAction: (input: AnyRecord) => Promise<AnyRecord>;
+    fetchImpl?: typeof fetch;
+  }) =>
   async ({ workerUrl, slug: targetSlug }: AnyRecord): Promise<void> => {
     const workerConfig = getWorkerConfig();
     const requestBody = {
@@ -101,9 +99,7 @@ export const matchesSessionWizardLitBootstrapRecovery = ({
     candidate &&
     recovery.workerUrl === candidate.workerUrl &&
     recovery.slug === candidate.slug &&
-    CHIPOTLE_LIT_CONFIG_FIELDS.every(
-      (field) => recovery.litCredentials[field] === candidate.litCredentials[field],
-    )
+    CHIPOTLE_LIT_CONFIG_FIELDS.every((field) => recovery.litCredentials[field] === candidate.litCredentials[field])
   );
 };
 
@@ -120,7 +116,11 @@ export const syncSessionWizardLitRuntimeConfigAfterDeploy = async ({
   litCredentials?: unknown;
   ensureSessionConfig?: (input: AnyRecord) => Promise<unknown>;
 }): Promise<WorkerSecretSyncResult> => {
-  if (!requiresLit || !normalizeSessionWizardWorkerUrl(workerUrl) || !resolveCompleteSessionWizardLitRuntime(litCredentials)) {
+  if (
+    !requiresLit ||
+    !normalizeSessionWizardWorkerUrl(workerUrl) ||
+    !resolveCompleteSessionWizardLitRuntime(litCredentials)
+  ) {
     return { warning: '', note: '', synced: false, skipped: true };
   }
   try {

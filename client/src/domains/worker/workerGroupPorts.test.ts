@@ -82,11 +82,12 @@ describe('worker group ports', () => {
   });
 
   it('joins only through the worker route and preserves an explicit worker failure reason', async () => {
-    const successfulFetch = jest.fn(async () =>
-      new Response(JSON.stringify({ ok: true, group: { groupId: 'reviewers' } }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      }),
+    const successfulFetch = jest.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true, group: { groupId: 'reviewers' } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
     );
 
     await expect(
@@ -107,11 +108,12 @@ describe('worker group ports', () => {
       body: JSON.stringify({ groupId: 'reviewers' }),
     });
 
-    const deniedFetch = jest.fn(async () =>
-      new Response(JSON.stringify({ ok: false, reason: 'worker_group_join_denied' }), {
-        status: 403,
-        headers: { 'content-type': 'application/json' },
-      }),
+    const deniedFetch = jest.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: false, reason: 'worker_group_join_denied' }), {
+          status: 403,
+          headers: { 'content-type': 'application/json' },
+        }),
     );
     await expect(
       joinWorkerGroup({

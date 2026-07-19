@@ -315,14 +315,7 @@ describe('error paths', () => {
       .mockReturnValueOnce(`0x${'22'.repeat(32)}`);
 
     await expect(
-      addSurvey(
-        'wagmi',
-        SURVEY_ID,
-        { title: 'Zero content hash' },
-        [QUESTION_ID],
-        [{ prompt: 'Question' }],
-        GROUP_CFG,
-      ),
+      addSurvey('wagmi', SURVEY_ID, { title: 'Zero content hash' }, [QUESTION_ID], [{ prompt: 'Question' }], GROUP_CFG),
     ).rejects.toThrow('addSurveyWithQuestions: survey content hash cannot be zero.');
 
     arweaveClient.uploadDataToArweave.mockReset();
@@ -374,14 +367,7 @@ describe('error paths', () => {
     arweaveClient.base64urlToHex.mockReturnValueOnce(ethers.constants.HashZero);
 
     await expect(
-      submitResponses(
-        'wagmi',
-        [QUESTION_ID],
-        [{ answer: 'yes' }],
-        ethers.constants.HashZero,
-        null,
-        GROUP_CFG,
-      ),
+      submitResponses('wagmi', [QUESTION_ID], [{ answer: 'yes' }], ethers.constants.HashZero, null, GROUP_CFG),
     ).rejects.toThrow('submitResponses: questionResponseHashes[0] cannot be zero.');
 
     expect(mockSurveyContract.interface.encodeFunctionData).not.toHaveBeenCalled();

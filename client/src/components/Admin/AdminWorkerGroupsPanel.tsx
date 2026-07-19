@@ -249,7 +249,13 @@ const AdminWorkerGroupsPanel = ({
             <span>{group.joinMode === 'open' ? 'Open self-join' : 'Admin adds members'}</span>
             <span>Visible to {group.memberVisibility.replace('_', ' ')}</span>
             <div>
-              <Button size="sm" color="secondary" outline onClick={() => startEdit(group)} aria-label={`Edit ${group.label}`}>
+              <Button
+                size="sm"
+                color="secondary"
+                outline
+                onClick={() => startEdit(group)}
+                aria-label={`Edit ${group.label}`}
+              >
                 Edit
               </Button>{' '}
               <Button

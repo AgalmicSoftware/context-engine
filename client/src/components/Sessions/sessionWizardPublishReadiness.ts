@@ -120,8 +120,7 @@ export function resolveSessionWizardPublishReadiness({
 }: SessionWizardPublishReadinessInput): SessionWizardPublishReadinessDescriptor {
   const modeRequirements = resolveSessionWizardModeRequirements(sessionModeProfile);
   const canUploadMetadataNow =
-    !!resolvedWorkerBaseUrl &&
-    (workerMode === 'default' || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
+    !!resolvedWorkerBaseUrl && (workerMode === 'default' || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
   const uploadBlockedReason = !resolvedWorkerBaseUrl
     ? 'Set a worker URL before uploading metadata.'
     : workerMode !== 'default' && !deployVerifiedInUi
@@ -136,8 +135,7 @@ export function resolveSessionWizardPublishReadiness({
   const canPersistWorkerConfigNow =
     modeRequirements.isWorkerCanonical &&
     !!resolvedWorkerBaseUrl &&
-    ((workerMode === 'default' && usesDefaultWorkerUrl) ||
-      (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
+    ((workerMode === 'default' && usesDefaultWorkerUrl) || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
   const canPublishNow = modeRequirements.isWorkerCanonical
     ? canPersistWorkerConfigNow || canUseSponsoredAutoDeployNow
     : canUploadMetadataNow || canUseSponsoredAutoDeployNow || hasManualMetadata || hasUploadedMetadata;

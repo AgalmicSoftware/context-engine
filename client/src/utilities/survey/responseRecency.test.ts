@@ -1,8 +1,4 @@
-import {
-  isResponseRecencyAtLeast,
-  isResponseRecencyNewer,
-  toResponseRecencyPair,
-} from './responseRecency';
+import { isResponseRecencyAtLeast, isResponseRecencyNewer, toResponseRecencyPair } from './responseRecency';
 
 describe('responseRecency', () => {
   it('normalizes recency metadata from either wrapper or response payload', () => {
@@ -15,15 +11,9 @@ describe('responseRecency', () => {
   });
 
   it('orders response recency by block, transaction, log, then timestamp', () => {
-    expect(isResponseRecencyNewer({ bn: 11, txi: 0, li: 0, ts: 0 }, { bn: 10, txi: 99, li: 99, ts: 99 })).toBe(
-      true,
-    );
-    expect(isResponseRecencyNewer({ bn: 10, txi: 2, li: 3, ts: 4 }, { bn: 10, txi: 2, li: 3, ts: 5 })).toBe(
-      false,
-    );
-    expect(isResponseRecencyAtLeast({ bn: 10, txi: 2, li: 3, ts: 4 }, { bn: 10, txi: 2, li: 3, ts: 4 })).toBe(
-      true,
-    );
+    expect(isResponseRecencyNewer({ bn: 11, txi: 0, li: 0, ts: 0 }, { bn: 10, txi: 99, li: 99, ts: 99 })).toBe(true);
+    expect(isResponseRecencyNewer({ bn: 10, txi: 2, li: 3, ts: 4 }, { bn: 10, txi: 2, li: 3, ts: 5 })).toBe(false);
+    expect(isResponseRecencyAtLeast({ bn: 10, txi: 2, li: 3, ts: 4 }, { bn: 10, txi: 2, li: 3, ts: 4 })).toBe(true);
   });
 
   it('centralizes strict and equal-recency merge decisions', () => {

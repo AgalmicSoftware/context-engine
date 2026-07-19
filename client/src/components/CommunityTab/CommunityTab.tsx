@@ -2033,9 +2033,7 @@ class CommunityTab extends Component<any, any> {
                     <div
                       key={index}
                       className={styles.userItem}
-                      onClick={() =>
-                        window.open(buildPublicRoute(`/u/${address}`), '_blank', 'noopener,noreferrer')
-                      }
+                      onClick={() => window.open(buildPublicRoute(`/u/${address}`), '_blank', 'noopener,noreferrer')}
                     >
                       {blockieUrl ? (
                         <img

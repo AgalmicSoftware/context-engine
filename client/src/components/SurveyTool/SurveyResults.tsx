@@ -2066,9 +2066,7 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
           applyRefreshState: (statePatch, afterApply) => {
             return new Promise<void>((resolve, reject) => {
               setState(asSurveyResultsStatePatch(statePatch), () => {
-                void Promise.resolve()
-                  .then(afterApply)
-                  .then(resolve, reject);
+                void Promise.resolve().then(afterApply).then(resolve, reject);
               });
             });
           },

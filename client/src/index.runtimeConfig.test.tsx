@@ -51,7 +51,10 @@ describe('browser runtime config entrypoint', () => {
   });
 
   it('applies URL runtime overrides before rendering the application', () => {
-    let runtimeAtRender: Pick<RuntimeGlobals, 'CE_RPC_TESTING_MODE' | 'CE_SESSION_SCAN_SCOPE' | 'CE_SESSION_SCAN_SLUGS'> = {};
+    let runtimeAtRender: Pick<
+      RuntimeGlobals,
+      'CE_RPC_TESTING_MODE' | 'CE_SESSION_SCAN_SCOPE' | 'CE_SESSION_SCAN_SLUGS'
+    > = {};
     mockRender.mockImplementationOnce(() => {
       runtimeAtRender = {
         CE_RPC_TESTING_MODE: runtimeGlobals.CE_RPC_TESTING_MODE,

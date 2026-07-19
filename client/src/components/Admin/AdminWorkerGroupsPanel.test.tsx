@@ -96,23 +96,17 @@ describe('AdminWorkerGroupsPanel', () => {
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-member-address'), { target: { value: ADDRESS } });
     fireEvent.click(screen.getByRole('button', { name: 'Add member' }));
     await waitFor(() =>
-      expect(postSignedRequest).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'groups/add-member' }),
-      ),
+      expect(postSignedRequest).toHaveBeenCalledWith(expect.objectContaining({ action: 'groups/add-member' })),
     );
     expect(await screen.findByText('Member added.')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: `Remove ${ADDRESS}` }));
     await waitFor(() =>
-      expect(postSignedRequest).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'groups/remove-member' }),
-      ),
+      expect(postSignedRequest).toHaveBeenCalledWith(expect.objectContaining({ action: 'groups/remove-member' })),
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete Reviewers' }));
     await waitFor(() =>
-      expect(postSignedRequest).toHaveBeenCalledWith(
-        expect.objectContaining({ action: 'groups/delete' }),
-      ),
+      expect(postSignedRequest).toHaveBeenCalledWith(expect.objectContaining({ action: 'groups/delete' })),
     );
   });
 

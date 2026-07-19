@@ -224,7 +224,9 @@ export const createSessionWizardPublishRuntimeController = ({
               // Keep worker-only reads lazy; eager RPC/secret resolution changes which requirements unrelated plans observe.
               const evidence = getWorkerPublishEvidence({ workerUrlOverride });
               if (!evidence?.verified) {
-                throw new Error('Worker deployment requirements changed. Reverify the selected worker before publishing.');
+                throw new Error(
+                  'Worker deployment requirements changed. Reverify the selected worker before publishing.',
+                );
               }
               const runtime = evidence.runtime;
               const draft = evidence.draft;
@@ -247,11 +249,15 @@ export const createSessionWizardPublishRuntimeController = ({
               // The remote write is terminal, so never clear local state unless the
               // readback still belongs to the exact draft, identity, profile, AI, and secrets that initiated it.
               if (!liveEvidence || !matchesSessionWizardWorkerPublishEvidence(evidence, liveEvidence)) {
-                throw new Error('Session inputs changed while worker config was being verified. Review and publish again.');
+                throw new Error(
+                  'Session inputs changed while worker config was being verified. Review and publish again.',
+                );
               }
               const liveConfig = buildConfigForEvidence({ evidence: liveEvidence, signerAccount, workerUrl });
               if (!hasSameCanonicalValue(config, liveConfig)) {
-                throw new Error('Session config inputs changed while worker config was being verified. Review and publish again.');
+                throw new Error(
+                  'Session config inputs changed while worker config was being verified. Review and publish again.',
+                );
               }
               return {
                 workerUrl: verified.workerOrigin,
@@ -321,7 +327,9 @@ export const createSessionWizardPublishRuntimeController = ({
       !verifiedWorkerConfig.workerConfigFingerprint ||
       fingerprintCanonicalValue(liveConfig) !== verifiedWorkerConfig.workerConfigFingerprint
     ) {
-      throw new Error('Session config inputs changed before worker publication could settle. Review and publish again.');
+      throw new Error(
+        'Session config inputs changed before worker publication could settle. Review and publish again.',
+      );
     }
     const workerSettlement = resolveSessionWizardWorkerPublishSuccessSettlementDescriptor({
       slug: settlementIdentity.slug,

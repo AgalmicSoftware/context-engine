@@ -1,8 +1,4 @@
-import {
-  listSessionStorageRefsPage,
-  readSessionStorageBlob,
-  uploadDataToSessionStorage,
-} from './storageClient.js';
+import { listSessionStorageRefsPage, readSessionStorageBlob, uploadDataToSessionStorage } from './storageClient.js';
 
 jest.mock('../arweave/arweaveClient.js', () => ({
   arweaveClient: {
@@ -167,10 +163,10 @@ describe('storageClient', () => {
   test('propagates Cloudflare list cursors through the typed page helper', async () => {
     fetchWorkerWithAuth
       .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ items: [], cursor: 'page-two', listComplete: false }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
+        new Response(JSON.stringify({ items: [], cursor: 'page-two', listComplete: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
       )
       .mockResolvedValueOnce(
         new Response(

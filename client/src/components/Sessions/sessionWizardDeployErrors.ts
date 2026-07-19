@@ -158,9 +158,8 @@ export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): s
   const kvCleanupStatus = toStr(resources?.kvCleanupStatus).trim();
   const workerCleanupStatus = toStr(resources?.workerCleanupStatus).trim();
   const workerMayStillOwnKv = WORKER_MAY_STILL_OWN_KV_STATUSES.has(workerCleanupStatus);
-  const retainedKv = !!kvNamespaceId && (
-    RETAINED_KV_CLEANUP_STATUSES.has(kvCleanupStatus) || (!kvCleanupStatus && workerMayStillOwnKv)
-  );
+  const retainedKv =
+    !!kvNamespaceId && (RETAINED_KV_CLEANUP_STATUSES.has(kvCleanupStatus) || (!kvCleanupStatus && workerMayStillOwnKv));
   const labels = [
     workerName && workerCleanupStatus === 'owned-delete-failed' ? `worker ${workerName}` : '',
     kvNamespaceId && !retainedKv ? `KV namespace ${kvNamespaceId}` : '',
@@ -180,9 +179,7 @@ export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): s
             : workerCleanupStatus === 'ownership-unverified'
               ? ' Worker ownership could not be verified, so no worker deletion was attempted.'
               : '';
-  const retainedKvNote = retainedKv
-    ? buildRetainedKvGuidance({ kvNamespaceId, kvCleanupStatus })
-    : '';
+  const retainedKvNote = retainedKv ? buildRetainedKvGuidance({ kvNamespaceId, kvCleanupStatus }) : '';
   return `${cleanupInstruction}${ownershipNote}${retainedKvNote}`;
 };
 

@@ -82,9 +82,7 @@ jest.mock('../../utilities/docLibrary/uploads.js', () => ({
 jest.mock('../../utilities/storage/storageClient.js', () => ({
   listSessionStorageRefsPage: async (...args: any[]) => {
     const result = await mockListSessionStorageRefs(...args);
-    return Array.isArray(result)
-      ? { items: result, cursor: null, listComplete: true }
-      : result;
+    return Array.isArray(result) ? { items: result, cursor: null, listComplete: true } : result;
   },
   readSessionStorageBlob: (...args: any[]) => mockReadSessionStorageBlob(...args),
 }));

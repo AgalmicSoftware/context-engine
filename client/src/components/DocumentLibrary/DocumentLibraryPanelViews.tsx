@@ -725,9 +725,7 @@ export const DocumentLibraryList = ({
 }: DocumentLibraryListProps) => (
   <div className={styles.list}>
     {!docs.length && !loading && canList && (
-      <div className={styles.empty}>
-        {cursor ? 'No accessible documents on this page.' : 'No documents found yet.'}
-      </div>
+      <div className={styles.empty}>{cursor ? 'No accessible documents on this page.' : 'No documents found yet.'}</div>
     )}
     {docs.map((doc) => {
       const tagMap = doc?.tagMap || {};

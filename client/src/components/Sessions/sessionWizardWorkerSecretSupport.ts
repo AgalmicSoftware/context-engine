@@ -85,14 +85,10 @@ export const buildWorkerLitCredentialsConfig = (
     {} as Record<string, string>,
   );
 
-export const resolveSessionWizardLitCredentialPathReadiness = (
-  workerSecrets: WorkerSecretsLike | AnyRecord = {},
-) => {
+export const resolveSessionWizardLitCredentialPathReadiness = (workerSecrets: WorkerSecretsLike | AnyRecord = {}) => {
   const litAccountApiKey = toStr((workerSecrets as AnyRecord)?.litAccountApiKey).trim();
   const litUsageApiKey = toStr((workerSecrets as AnyRecord)?.litUsageApiKey).trim();
-  const hasRuntimeConfig = CHIPOTLE_LIT_CONFIG_FIELDS.every((key) =>
-    toStr((workerSecrets as AnyRecord)?.[key]).trim(),
-  );
+  const hasRuntimeConfig = CHIPOTLE_LIT_CONFIG_FIELDS.every((key) => toStr((workerSecrets as AnyRecord)?.[key]).trim());
   const hasUsageCredential = !!litUsageApiKey;
   const canBootstrap = !!litAccountApiKey;
   return {
@@ -144,9 +140,7 @@ export const resolveSessionWizardWorkerRuntimeReadiness = ({
   // full-config write proofs make a selected Lit runtime publish-safe.
   const requiredLitRuntimeReady =
     !requiresLit ||
-    (litCredentialReadiness.hasRuntimeConfig &&
-      litCredentialReadiness.hasUsageCredential &&
-      litRuntimeConfigVerified);
+    (litCredentialReadiness.hasRuntimeConfig && litCredentialReadiness.hasUsageCredential && litRuntimeConfigVerified);
   return {
     requiredLitRuntimeReady,
     requiredWorkerSecretsDelivered,

@@ -45,9 +45,7 @@ export type SignedWorkerGroupRequestArgs = {
   body?: UnknownRecord;
 };
 
-export type PostSignedWorkerGroupRequest = (
-  args: SignedWorkerGroupRequestArgs,
-) => Promise<{ data?: unknown }>;
+export type PostSignedWorkerGroupRequest = (args: SignedWorkerGroupRequestArgs) => Promise<{ data?: unknown }>;
 
 const toRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
@@ -294,5 +292,6 @@ export const normalizeWorkerGroupsAdminPayload = (payload: unknown): WorkerGroup
   normalizeGroups(toRecord(payload).groups);
 
 export const normalizeWorkerGroupMembersAdminPayload = (payload: unknown): WorkerGroupMember[] =>
-  (Array.isArray(toRecord(payload).members) ? (toRecord(payload).members as unknown[]) : [])
-    .map((member) => toRecord(member) as WorkerGroupMember);
+  (Array.isArray(toRecord(payload).members) ? (toRecord(payload).members as unknown[]) : []).map(
+    (member) => toRecord(member) as WorkerGroupMember,
+  );

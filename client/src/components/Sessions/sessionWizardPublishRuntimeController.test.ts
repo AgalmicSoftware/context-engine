@@ -53,24 +53,24 @@ const createControllerHarness = () => {
   const parseAllowOriginsInput = jest.fn(() => ['https://app.example.test']);
   const runtimeRef = {
     current: {
-        draft: {
-          slug: 'worker-session',
-          networkChainId: 11155420,
-          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
-          ai: {
-            models: {
-              fast: { provider: 'openai', model: 'gpt-5' },
-              thinking: { provider: 'openai', model: 'gpt-5' },
-            },
+      draft: {
+        slug: 'worker-session',
+        networkChainId: 11155420,
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        ai: {
+          models: {
+            fast: { provider: 'openai', model: 'gpt-5' },
+            thinking: { provider: 'openai', model: 'gpt-5' },
           },
         },
-        embeddedDeployHelperEnabled: true,
-        latestChainBlock: 123,
-        registryAddress: '0x2222222222222222222222222222222222222222',
-        registryChainId: 11155420,
-        sessionId: SESSION_ID,
-        sessionIdHex: SESSION_ID,
-        workerLimitPerWallet: 7,
+      },
+      embeddedDeployHelperEnabled: true,
+      latestChainBlock: 123,
+      registryAddress: '0x2222222222222222222222222222222222222222',
+      registryChainId: 11155420,
+      sessionId: SESSION_ID,
+      sessionIdHex: SESSION_ID,
+      workerLimitPerWallet: 7,
     },
   };
   const getWorkerPublishEvidence = jest.fn(() => {
@@ -279,11 +279,8 @@ describe('sessionWizardPublishRuntimeController', () => {
 
   it('fails closed when provider assignments change during worker persistence readback', async () => {
     const harness = createControllerHarness();
-    let resolvePersist: ((value: {
-      workerOrigin: string;
-      configRevision: string;
-      publicConfig: { slug: string };
-    }) => void) | undefined;
+    let resolvePersist:
+      ((value: { workerOrigin: string; configRevision: string; publicConfig: { slug: string } }) => void) | undefined;
     harness.persistWorkerConfig.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -364,7 +361,9 @@ describe('sessionWizardPublishRuntimeController', () => {
         publishControllerResult,
         runTrackedPublishEffect: harness.runTrackedPublishEffect,
       }),
-    ).rejects.toThrow('Session config inputs changed before worker publication could settle. Review and publish again.');
+    ).rejects.toThrow(
+      'Session config inputs changed before worker publication could settle. Review and publish again.',
+    );
     expect(harness.callbacks.clearSessionWizardCache).not.toHaveBeenCalled();
   });
 

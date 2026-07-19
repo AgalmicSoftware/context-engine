@@ -50,20 +50,27 @@ import {
   type SessionWizardWorkerRequirementProof,
 } from '../sessionWizardWorkerRequirementProof';
 import {
-  buildSessionWizardLitBootstrapRecovery, createSessionWizardEnsureWorkerSessionConfig,
-  matchesSessionWizardLitBootstrapRecovery, mergeRecoveredSessionWizardLitRuntime,
+  buildSessionWizardLitBootstrapRecovery,
+  createSessionWizardEnsureWorkerSessionConfig,
+  matchesSessionWizardLitBootstrapRecovery,
+  mergeRecoveredSessionWizardLitRuntime,
   resolveCompleteSessionWizardLitRuntime,
-  syncSessionWizardLitRuntimeConfigAfterDeploy, type SessionWizardLitBootstrapRecovery,
+  syncSessionWizardLitRuntimeConfigAfterDeploy,
+  type SessionWizardLitBootstrapRecovery,
 } from '../sessionWizardWorkerDeployLitRuntime';
 import { getSessionWizardWorkerDeployValidationError } from '../sessionWizardWorkerRpc';
 import { resolveSessionWizardModeRequirements } from '../sessionWizardModeRequirements';
 import {
   advanceSessionWizardDeployAttemptGeneration,
+  isStructuredSessionWizardDeployAttemptConflict,
   markSessionWizardDeployAttemptCompleted,
   resolveSessionWizardDeployAttemptIdentity,
+  shouldRetainSessionWizardDeployAttemptIdentity,
 } from '../sessionWizardDeployAttemptIdentity';
-import { normalizeSessionWizardSlug as normalizeSlug,
-  normalizeSessionWizardWorkerUrl as normalizeWorkerUrl } from '../sessionWizardUrlSupport';
+import {
+  normalizeSessionWizardSlug as normalizeSlug,
+  normalizeSessionWizardWorkerUrl as normalizeWorkerUrl,
+} from '../sessionWizardUrlSupport';
 import type { AnyRecord, ChainIdLike, NetworkLike, WorkerSecretSyncResult, WorkerSecretsLike } from '../../shellTypes';
 type DeployFormLike = AnyRecord & {
   apiToken?: string;
@@ -112,33 +119,6 @@ export type SessionWizardWorkerDeployRuntime = {
 };
 
 const isRecord = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
-
-const isStructuredTerminalDeployConflict = (responseBody: unknown): boolean => {
-  const body = isRecord(responseBody) ? responseBody : {};
-  return body.deploymentRequestConflict === true && body.deploymentRequestTerminal === true;
-};
-
-const shouldRetainDeployAttemptIdentity = (status: number, responseBody: unknown): boolean => {
-  const body = isRecord(responseBody) ? responseBody : {};
-  if (body.deploymentRequestPending === true) return true;
-  // Regression guard: only a server-declared terminal conflict may rotate the next
-  // attempt. A generic conflict can still belong to an in-flight peer tab.
-  if (body.deploymentRequestTerminal === true) return false;
-  if (body.deploymentRequestConflict === true || body.deploymentRequestIdConflict === true) return true;
-  const errorMessage = toStr(body.error).trim();
-  if (
-    status === 409 &&
-    /^deploymentRequestId was already used with a different request payload\.?$/i.test(errorMessage)
-  ) {
-    // Compatibility for helpers deployed before the structured conflict field.
-    // The ID is owned by another in-flight payload, so generation rotation here
-    // can race its success and create a second set of resources.
-    return true;
-  }
-  const hasOrphanOutcome = isRecord(body.orphanResources) && Object.keys(body.orphanResources).length > 0;
-  if (hasOrphanOutcome) return false;
-  return status === 408 || status === 425 || status === 429 || status >= 500;
-};
 
 const firstTrimmed = (...values: unknown[]): string => {
   for (const value of values) {
@@ -521,11 +501,11 @@ const useSessionWizardWorkerDeploy = ({
             const nextDeployStatusCode = sponsoredDeployRes.status;
             const nextData = await sponsoredDeployRes.json().catch(() => ({}));
             if (!sponsoredDeployRes.ok) {
-              if (!shouldRetainDeployAttemptIdentity(sponsoredDeployRes.status, nextData)) {
+              if (!shouldRetainSessionWizardDeployAttemptIdentity(sponsoredDeployRes.status, nextData)) {
                 // Only the coordinator's structured terminal conflict may reopen
                 // a locally completed scope; generic failures can be stale peer callbacks.
                 advanceSessionWizardDeployAttemptGeneration(deployAttemptIdentity, {
-                  allowCompletedTerminalConflict: isStructuredTerminalDeployConflict(nextData),
+                  allowCompletedTerminalConflict: isStructuredSessionWizardDeployAttemptConflict(nextData),
                 });
               }
               const err = new Error(
@@ -561,11 +541,11 @@ const useSessionWizardWorkerDeploy = ({
           const nextDeployStatusCode = res.status;
           const nextData = await res.json().catch(() => ({}));
           if (!res.ok) {
-            if (!shouldRetainDeployAttemptIdentity(res.status, nextData)) {
+            if (!shouldRetainSessionWizardDeployAttemptIdentity(res.status, nextData)) {
               // Keep direct and sponsored retries on the same narrow authority:
               // both structured flags are required to supersede completed state.
               advanceSessionWizardDeployAttemptGeneration(deployAttemptIdentity, {
-                allowCompletedTerminalConflict: isStructuredTerminalDeployConflict(nextData),
+                allowCompletedTerminalConflict: isStructuredSessionWizardDeployAttemptConflict(nextData),
               });
             }
             const err = new Error(nextData?.error || `Worker deploy failed (${res.status}).`) as Error & AnyRecord;
@@ -665,64 +645,64 @@ const useSessionWizardWorkerDeploy = ({
           litBootstrapStatus = recoveredBootstrap
             ? { warning: '', note: 'Lit bootstrap recovery verified.', synced: true, skipped: true }
             : await syncWorkerLitSessionBootstrapAfterDeploy({
-            workerUrl: resolvedDeployWorkerUrl,
-            account: resolvedAdmin,
-            slug,
-            bootstrapRequest: buildSessionWizardLitBootstrapRequest(currentWorkerSecrets, {
-              sessionName: currentDraft?.sessionName,
-            }),
-            signAdminAction: ({ action = 'lit-chipotle-bootstrap-session', targetSlug, workerUrl, body }) =>
-              signTypedAdminAction({
-                action,
-                body,
-                targetSlug,
-                workerUrl,
-                accountOverride: resolvedAdmin,
-              }),
-            postBootstrap: async ({ auth, requestBody, workerUrl, slug: targetSlug }) => {
-              const requestBodyWithSlug = {
-                sessionSlug: targetSlug,
-                ...requestBody,
-              };
-              const bootstrapRes = await fetch(`${workerUrl}/admin/lit-chipotle-bootstrap-session`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...requestBodyWithSlug, ...auth }),
-              });
-              const bootstrapData = await bootstrapRes.json().catch(() => ({}));
-              if (!bootstrapRes.ok) {
-                throw new Error(bootstrapData?.error || 'Failed to auto-bootstrap the Lit session account.');
-              }
-              return bootstrapData;
-            },
-            ensureSessionConfig: ensureWorkerSessionConfig,
-            applyBootstrappedConfig: async ({ apiBase, litActionCid, litGroupId, litPkpId, result }) => {
-              const recoveredLitCredentials = resolveCompleteSessionWizardLitRuntime({
-                ...(workerConfigPayload?.litCredentials || {}),
-                litApiBase: apiBase || result?.apiBase || result?.litCredentials?.litApiBase,
-                litActionCid,
-                litGroupId,
-                litPkpId,
-              });
-              if (!recoveredLitCredentials) return;
-              workerConfigPayload = {
-                ...workerConfigPayload,
-                litCredentials: recoveredLitCredentials,
-              };
-              currentWorkerSecrets = mergeRecoveredSessionWizardLitRuntime(
-                currentWorkerSecrets,
-                recoveredLitCredentials,
-              );
-              litBootstrapRecoveryRef.current = buildSessionWizardLitBootstrapRecovery({
                 workerUrl: resolvedDeployWorkerUrl,
+                account: resolvedAdmin,
                 slug,
-                litCredentials: recoveredLitCredentials,
+                bootstrapRequest: buildSessionWizardLitBootstrapRequest(currentWorkerSecrets, {
+                  sessionName: currentDraft?.sessionName,
+                }),
+                signAdminAction: ({ action = 'lit-chipotle-bootstrap-session', targetSlug, workerUrl, body }) =>
+                  signTypedAdminAction({
+                    action,
+                    body,
+                    targetSlug,
+                    workerUrl,
+                    accountOverride: resolvedAdmin,
+                  }),
+                postBootstrap: async ({ auth, requestBody, workerUrl, slug: targetSlug }) => {
+                  const requestBodyWithSlug = {
+                    sessionSlug: targetSlug,
+                    ...requestBody,
+                  };
+                  const bootstrapRes = await fetch(`${workerUrl}/admin/lit-chipotle-bootstrap-session`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...requestBodyWithSlug, ...auth }),
+                  });
+                  const bootstrapData = await bootstrapRes.json().catch(() => ({}));
+                  if (!bootstrapRes.ok) {
+                    throw new Error(bootstrapData?.error || 'Failed to auto-bootstrap the Lit session account.');
+                  }
+                  return bootstrapData;
+                },
+                ensureSessionConfig: ensureWorkerSessionConfig,
+                applyBootstrappedConfig: async ({ apiBase, litActionCid, litGroupId, litPkpId, result }) => {
+                  const recoveredLitCredentials = resolveCompleteSessionWizardLitRuntime({
+                    ...(workerConfigPayload?.litCredentials || {}),
+                    litApiBase: apiBase || result?.apiBase || result?.litCredentials?.litApiBase,
+                    litActionCid,
+                    litGroupId,
+                    litPkpId,
+                  });
+                  if (!recoveredLitCredentials) return;
+                  workerConfigPayload = {
+                    ...workerConfigPayload,
+                    litCredentials: recoveredLitCredentials,
+                  };
+                  currentWorkerSecrets = mergeRecoveredSessionWizardLitRuntime(
+                    currentWorkerSecrets,
+                    recoveredLitCredentials,
+                  );
+                  litBootstrapRecoveryRef.current = buildSessionWizardLitBootstrapRecovery({
+                    workerUrl: resolvedDeployWorkerUrl,
+                    slug,
+                    litCredentials: recoveredLitCredentials,
+                  });
+                  applyWorkerSecretsUpdate((prev: WorkerSecretsLike) =>
+                    mergeRecoveredSessionWizardLitRuntime(prev, recoveredLitCredentials),
+                  );
+                },
               });
-              applyWorkerSecretsUpdate((prev: WorkerSecretsLike) =>
-                mergeRecoveredSessionWizardLitRuntime(prev, recoveredLitCredentials),
-              );
-            },
-          });
         }
         let litProvisionStatus: WorkerSecretSyncResult = { warning: '', note: '', synced: false, skipped: true };
         if (resolvedDeployWorkerUrl && shouldSyncLitAfterDeploy) {
@@ -845,13 +825,17 @@ const useSessionWizardWorkerDeploy = ({
             },
           });
         }
-        const { requiredLitRuntimeReady, requiredWorkerSecretsReady } =
-          resolveSessionWizardWorkerRuntimeReadiness({
-            requiredWorkerSecretFields, deploySecrets, helperWritesSecrets, secretsSyncStatus,
-            requiresLit: modeRequirements.requiresLit, litCredentials: workerConfigPayload?.litCredentials,
-            litRuntimeConfigSynced: litRuntimeConfigSyncStatus?.synced === true,
-            litBootstrapSynced: litBootstrapStatus?.synced === true, litProvisionSynced: litProvisionStatus?.synced === true,
-          });
+        const { requiredLitRuntimeReady, requiredWorkerSecretsReady } = resolveSessionWizardWorkerRuntimeReadiness({
+          requiredWorkerSecretFields,
+          deploySecrets,
+          helperWritesSecrets,
+          secretsSyncStatus,
+          requiresLit: modeRequirements.requiresLit,
+          litCredentials: workerConfigPayload?.litCredentials,
+          litRuntimeConfigSynced: litRuntimeConfigSyncStatus?.synced === true,
+          litBootstrapSynced: litBootstrapStatus?.synced === true,
+          litProvisionSynced: litProvisionStatus?.synced === true,
+        });
         // Regression guard: manual and forced deploys must keep the publish step
         // open until selected-profile secrets are remote; the same terminal request
         // ID then resumes signed sync without provisioning a second worker.
@@ -872,7 +856,8 @@ const useSessionWizardWorkerDeploy = ({
             : null;
         // A worker-canonical deploy is publish-safe only when the exact remote
         // secret/requirement evidence can be compared against later edits.
-        const publishSafeDeployComplete = remoteWorkerReady && (!modeRequirements.isWorkerCanonical || !!workerRequirementProof);
+        const publishSafeDeployComplete =
+          remoteWorkerReady && (!modeRequirements.isWorkerCanonical || !!workerRequirementProof);
         if (publishSafeDeployComplete && litBootstrapStatus?.synced === true) {
           // Keep bootstrap authority through every post-deploy write. Clearing it
           // earlier makes a failed AI/RPC secret sync impossible to resume safely.
@@ -922,8 +907,14 @@ const useSessionWizardWorkerDeploy = ({
           withLitBootstrapSyncStatus(baseDeployStatus, litBootstrapStatus),
           litProvisionStatus,
         );
-        publishVerifiedRuntime(runtimeRef, currentDraft, resolvedDeployWorkerUrl, displayWorkerUrl,
-          publishSafeDeployComplete, workerRequirementProof);
+        publishVerifiedRuntime(
+          runtimeRef,
+          currentDraft,
+          resolvedDeployWorkerUrl,
+          displayWorkerUrl,
+          publishSafeDeployComplete,
+          workerRequirementProof,
+        );
         updateDeploymentState({
           deployWorkerUrl: displayWorkerUrl,
           deployStatus: withWorkerConfigSyncWarning(

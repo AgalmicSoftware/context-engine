@@ -1,4 +1,5 @@
 import sha256 from 'crypto-js/sha256';
+import { toStr } from '../../utilities/shared/primitives.js';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -20,6 +21,34 @@ type SessionWizardDeployAttemptRecord = Pick<SessionWizardDeployAttemptIdentity,
 
 const STORAGE_KEY_PREFIX = 'ce:sessionWizardDeployAttempt:v1:';
 const MAX_GENERATION = Number.MAX_SAFE_INTEGER - 1;
+
+const isRecord = (value: unknown): value is UnknownRecord =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+export const isStructuredSessionWizardDeployAttemptConflict = (responseBody: unknown): boolean => {
+  const body = isRecord(responseBody) ? responseBody : {};
+  return body.deploymentRequestConflict === true && body.deploymentRequestTerminal === true;
+};
+
+export const shouldRetainSessionWizardDeployAttemptIdentity = (status: number, responseBody: unknown): boolean => {
+  const body = isRecord(responseBody) ? responseBody : {};
+  if (body.deploymentRequestPending === true) return true;
+  // Only a server-declared terminal conflict may rotate the next attempt.
+  // A generic conflict can still belong to an in-flight peer tab.
+  if (body.deploymentRequestTerminal === true) return false;
+  if (body.deploymentRequestConflict === true || body.deploymentRequestIdConflict === true) return true;
+  const errorMessage = toStr(body.error).trim();
+  if (
+    status === 409 &&
+    /^deploymentRequestId was already used with a different request payload\.?$/i.test(errorMessage)
+  ) {
+    // Compatibility for helpers deployed before the structured conflict field.
+    return true;
+  }
+  const hasOrphanOutcome = isRecord(body.orphanResources) && Object.keys(body.orphanResources).length > 0;
+  if (hasOrphanOutcome) return false;
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+};
 
 const canonicalize = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(canonicalize);
@@ -120,9 +149,7 @@ export const advanceSessionWizardDeployAttemptGeneration = (
   // never reopen it unless the server proves this ID is terminally bound elsewhere.
   if (current.status === 'completed' && !allowCompletedTerminalConflict) return true;
   const minimumNextGeneration =
-    current.status === 'completed' && allowCompletedTerminalConflict
-      ? current.generation + 1
-      : identity.generation + 1;
+    current.status === 'completed' && allowCompletedTerminalConflict ? current.generation + 1 : identity.generation + 1;
   const next = Math.min(Math.max(current.generation, minimumNextGeneration), MAX_GENERATION);
   return writeAttemptRecord(storageRef, identity.storageKey, { generation: next, status: 'active' });
 };

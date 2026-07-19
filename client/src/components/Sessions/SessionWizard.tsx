@@ -805,7 +805,9 @@ const SessionWizard = ({
   });
   const getWorkerPublishEvidence = () =>
     resolveSessionWizardWorkerPublishEvidence({
-      runtime: workerDeployRuntimeRef.current, workerSecrets: getCurrentWorkerSecrets(), defaultWorkerUrl: getSessionWizardDefaultWorkerUrl(),
+      runtime: workerDeployRuntimeRef.current,
+      workerSecrets: getCurrentWorkerSecrets(),
+      defaultWorkerUrl: getSessionWizardDefaultWorkerUrl(),
     });
   const {
     sessionHeaderMode,
@@ -2509,7 +2511,9 @@ const SessionWizard = ({
       normalModeRequiresCustomWorker,
     });
   const currentWorkerSecrets = getCurrentWorkerSecrets();
-  const deployRequirementsVerified = workerRequirementProof ? getWorkerPublishEvidence()?.verified === true : !sessionModeRequirements.isWorkerCanonical;
+  const deployRequirementsVerified = workerRequirementProof
+    ? getWorkerPublishEvidence()?.verified === true
+    : !sessionModeRequirements.isWorkerCanonical;
   // Derive current publish authority from the selected worker, profile, provider, and secrets.
   const deployVerifiedInUi = deployIdentityVerifiedInUi && deployRequirementsVerified;
   const customWorkerSelected = normalModeRequiresCustomWorker || workerMode !== 'default';

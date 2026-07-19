@@ -1,7 +1,9 @@
 import {
   advanceSessionWizardDeployAttemptGeneration,
+  isStructuredSessionWizardDeployAttemptConflict,
   markSessionWizardDeployAttemptCompleted,
   resolveSessionWizardDeployAttemptIdentity,
+  shouldRetainSessionWizardDeployAttemptIdentity,
 } from './sessionWizardDeployAttemptIdentity';
 
 const scope = {
@@ -14,6 +16,28 @@ const scope = {
 
 describe('sessionWizardDeployAttemptIdentity', () => {
   beforeEach(() => localStorage.clear());
+
+  it('classifies deploy-helper retry outcomes without rotating ambiguous attempts', () => {
+    expect(shouldRetainSessionWizardDeployAttemptIdentity(202, { deploymentRequestPending: true })).toBe(true);
+    expect(shouldRetainSessionWizardDeployAttemptIdentity(409, { deploymentRequestConflict: true })).toBe(true);
+    expect(shouldRetainSessionWizardDeployAttemptIdentity(409, { deploymentRequestIdConflict: true })).toBe(true);
+    expect(
+      shouldRetainSessionWizardDeployAttemptIdentity(409, {
+        error: 'deploymentRequestId was already used with a different request payload.',
+      }),
+    ).toBe(true);
+    expect(shouldRetainSessionWizardDeployAttemptIdentity(503, {})).toBe(true);
+
+    const terminalConflict = {
+      deploymentRequestConflict: true,
+      deploymentRequestTerminal: true,
+    };
+    expect(isStructuredSessionWizardDeployAttemptConflict(terminalConflict)).toBe(true);
+    expect(shouldRetainSessionWizardDeployAttemptIdentity(409, terminalConflict)).toBe(false);
+    expect(shouldRetainSessionWizardDeployAttemptIdentity(409, { orphanResources: { worker: 'orphaned' } })).toBe(
+      false,
+    );
+  });
 
   it('converges independent callers on one persisted non-secret identity', () => {
     const first = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
@@ -97,9 +121,7 @@ describe('sessionWizardDeployAttemptIdentity', () => {
 
     expect(markSessionWizardDeployAttemptCompleted(currentAttempt, { storage: localStorage })).toBe(true);
     expect(markSessionWizardDeployAttemptCompleted(currentAttempt, { storage: localStorage })).toBe(true);
-    expect(localStorage.getItem(currentAttempt.storageKey)).toBe(
-      '{"version":1,"generation":0,"status":"completed"}',
-    );
+    expect(localStorage.getItem(currentAttempt.storageKey)).toBe('{"version":1,"generation":0,"status":"completed"}');
   });
 
   it('lets a newer identity repair an older completed record', () => {
@@ -107,10 +129,7 @@ describe('sessionWizardDeployAttemptIdentity', () => {
     expect(advanceSessionWizardDeployAttemptGeneration(firstAttempt, { storage: localStorage })).toBe(true);
     const nextAttempt = resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage });
     // Model a stale peer write from an older client after this tab already captured generation 1.
-    localStorage.setItem(
-      nextAttempt.storageKey,
-      '{"version":1,"generation":0,"status":"completed"}',
-    );
+    localStorage.setItem(nextAttempt.storageKey, '{"version":1,"generation":0,"status":"completed"}');
 
     expect(markSessionWizardDeployAttemptCompleted(nextAttempt, { storage: localStorage })).toBe(true);
     expect(resolveSessionWizardDeployAttemptIdentity({ scope, storage: localStorage })).toEqual(

@@ -75,14 +75,16 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
   const [deployComplete, setDeployComplete] = useState(
     () =>
       !!cachedWizard?.deployComplete &&
-      !(cachedWizard as (CachedWorkerState & { workerRequirementProof?: unknown }))?.workerRequirementProof,
+      !(cachedWizard as CachedWorkerState & { workerRequirementProof?: unknown })?.workerRequirementProof,
   );
   const [deployWorkerUrl, setDeployWorkerUrl] = useState(() =>
     normalizeBaseUrl(toStr(cachedWizard?.deployWorkerUrl).trim()),
   );
   // Requirement evidence contains live-only salted secret comparisons. Never
   // hydrate it from storage; reloads must reverify the stable deploy attempt.
-  const [workerRequirementProof, setWorkerRequirementProof] = useState<SessionWizardWorkerRequirementProof | null>(null);
+  const [workerRequirementProof, setWorkerRequirementProof] = useState<SessionWizardWorkerRequirementProof | null>(
+    null,
+  );
   const [provisionedSponsoredContext, setProvisionedSponsoredContext] = useState<TProvisionedSponsoredContext>(() =>
     buildProvisionedSponsoredContextState(cachedWizard?.provisionedSponsoredContext),
   );

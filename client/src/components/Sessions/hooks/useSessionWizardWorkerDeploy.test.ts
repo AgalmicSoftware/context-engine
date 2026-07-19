@@ -774,20 +774,14 @@ describe('useSessionWizardWorkerDeploy', () => {
         requiredWorkerSecretFields: ['openaiKey'],
       }),
     );
-    expect(failedDeployReadiness).toEqual(
-      expect.objectContaining({ canPublishNow: false, readinessKind: 'blocked' }),
-    );
+    expect(failedDeployReadiness).toEqual(expect.objectContaining({ canPublishNow: false, readinessKind: 'blocked' }));
     expect(retryPublishPlan.shouldAutoDeployWorker).toBe(false);
     expect(deployBodies).toHaveLength(2);
     expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
     expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
     expect(secretsSyncCalls).toBe(2);
-    expect(options.updateDeploymentState).toHaveBeenCalledWith(
-      expect.objectContaining({ deployComplete: false }),
-    );
-    expect(options.updateDeploymentState).toHaveBeenCalledWith(
-      expect.objectContaining({ deployComplete: true }),
-    );
+    expect(options.updateDeploymentState).toHaveBeenCalledWith(expect.objectContaining({ deployComplete: false }));
+    expect(options.updateDeploymentState).toHaveBeenCalledWith(expect.objectContaining({ deployComplete: true }));
   });
 
   it('does not cache a 200 partial deploy when signed config recovery fails', async () => {
@@ -1447,13 +1441,8 @@ describe('useSessionWizardWorkerDeploy', () => {
         requiredWorkerSecretsReady: false,
       }),
     );
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://deployed.example.test/admin/set-secrets',
-      expect.any(Object),
-    );
-    expect(options.updateDeploymentState).toHaveBeenCalledWith(
-      expect.objectContaining({ deployComplete: false }),
-    );
+    expect(fetchMock).toHaveBeenCalledWith('https://deployed.example.test/admin/set-secrets', expect.any(Object));
+    expect(options.updateDeploymentState).toHaveBeenCalledWith(expect.objectContaining({ deployComplete: false }));
   });
 
   it('accepts Lit bootstrap only after the worker confirms both secret and config writes', async () => {
@@ -1627,9 +1616,7 @@ describe('useSessionWizardWorkerDeploy', () => {
     );
     expect(deployBodies).toHaveLength(2);
     expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
-    expect(deployBodies[1].secrets).toEqual(
-      expect.objectContaining({ openaiKey: 'sk-ai-edited-before-retry' }),
-    );
+    expect(deployBodies[1].secrets).toEqual(expect.objectContaining({ openaiKey: 'sk-ai-edited-before-retry' }));
     expect(
       fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/admin/lit-chipotle-bootstrap-session')),
     ).toHaveLength(1);

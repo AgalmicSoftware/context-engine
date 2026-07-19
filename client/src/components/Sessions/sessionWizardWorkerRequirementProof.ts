@@ -116,9 +116,7 @@ const normalizeAiModelAssignments = (value: unknown): Record<string, { provider:
   return ['fast', 'thinking', 'transcription'].reduce<Record<string, { provider: string; model: string }>>(
     (result, key) => {
       const assignment =
-        models[key] && typeof models[key] === 'object' && !Array.isArray(models[key])
-          ? (models[key] as AnyRecord)
-          : {};
+        models[key] && typeof models[key] === 'object' && !Array.isArray(models[key]) ? (models[key] as AnyRecord) : {};
       result[key] = {
         provider: normalizeAiProvider(assignment.provider, key === 'transcription' ? 'openai' : fallbackProvider),
         model: toStr(assignment.model).trim(),
@@ -316,7 +314,9 @@ export const resolveSessionWizardWorkerRequirementReadiness = ({
   if (selection.requirementsFingerprint !== proof.requirementsFingerprint) {
     return { verified: false, reason: 'requirements-changed' };
   }
-  if (JSON.stringify(normalizeFieldList(selection.requiredSecretFields)) !== JSON.stringify(proof.requiredSecretFields)) {
+  if (
+    JSON.stringify(normalizeFieldList(selection.requiredSecretFields)) !== JSON.stringify(proof.requiredSecretFields)
+  ) {
     return { verified: false, reason: 'requirements-changed' };
   }
   if (!workerSecretsEnabled && proof.requiredSecretFields.length) {
