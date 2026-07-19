@@ -6,6 +6,12 @@ import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities
 const ADMIN_ADDRESS = '0x1111111111111111111111111111111111111111';
 const SESSION_ID = '0x00112233445566778899aabbccddeeff';
 const WORKER_ORIGIN = 'https://session-worker.example.test';
+const CREDENTIALED_LIT_API_BASE = (() => {
+  const url = new URL('https://lit.example');
+  url.username = 'user';
+  url.password = 'secret';
+  return url.toString();
+})();
 
 const baseConfig = () => ({
   sessionName: 'Worker Canonical Session',
@@ -597,7 +603,7 @@ describe('persistAndVerifySessionWizardWorkerConfig', () => {
     ['generic Lit token', { litCredentials: { token: 'lit-secret' } }],
     ['unknown Lit descriptor field', { litCredentials: { litNetwork: 'datil' } }],
     ['nested Lit secret alias', { litCredentials: { metadata: { clientSecret: 'lit-secret' } } }],
-    ['credential-bearing Lit API base', { litCredentials: { litApiBase: 'https://user:secret@lit.example' } }],
+    ['credential-bearing Lit API base', { litCredentials: { litApiBase: CREDENTIALED_LIT_API_BASE } }],
     ['RPC config', { rpcUrlsByChainId: { '1': ['https://rpc-key.example'] } }],
     ['faucet config', { faucet: { privateKey: 'faucet-secret' } }],
   ])('rejects a secret-bearing %s before signing or persistence', async (_label, secretConfig) => {

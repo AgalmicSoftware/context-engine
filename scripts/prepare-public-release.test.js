@@ -69,6 +69,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
 
     for (const relativePath of [
       '.github/ISSUE_TEMPLATE/config.yml',
+      'client/src/components/Sessions/sessionWizardWorkerConfigPersistence.test.ts',
       'client/src/variables/publicRepoMetadata.ts',
       'workers/sessionCorsWorker/chipotleClient.test.mjs',
     ]) {
@@ -198,6 +199,12 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.match(publicChipotleTest, /credentialedApiBase/);
     assert.match(publicChipotleTest, /must not include credentials/);
     assert.doesNotMatch(publicChipotleTest, /\[redacted-email\]/);
+    const publicWorkerConfigPersistenceTest = fs.readFileSync(
+      path.join(outputDir, 'client/src/components/Sessions/sessionWizardWorkerConfigPersistence.test.ts'),
+      'utf8',
+    );
+    assert.match(publicWorkerConfigPersistenceTest, /credential-bearing Lit API base/);
+    assert.doesNotMatch(publicWorkerConfigPersistenceTest, /\[redacted-email\]/);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(outputDir, 'package.json'), 'utf8')).scripts, {
       test: 'node scripts/run-node-tests.js',
       'test:ci': 'npm run test',
