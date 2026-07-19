@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Toolchain correction (2026-07-19): Vite is the canonical client dev/build
+  path, and normal client installs again use npm's strict peer resolution.
+  Earlier entries describing Create React App as canonical or durable
+  `legacy-peer-deps` installation reflect superseded intermediate states.
 - Unified Agent Bridge authentication around session-bound user, browser, and
   named service credentials. Telegram is now an optional identity adapter;
   one-time invites can onboard an opaque non-Telegram user, the root token is
