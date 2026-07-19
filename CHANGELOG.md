@@ -55,7 +55,8 @@ All notable changes to this project will be documented in this file.
 
 - Kept history-preserving public releases self-testing when the Agent Bridge
   cutover follows a source-only baseline by restoring its narrow root test
-  command alongside the audited worker and runner snapshot.
+  command alongside the audited worker and runner snapshot, while using the
+  artifact scrubber to remove commands whose private runners are stripped.
 - Made Agent Bridge credential rotation publish replacements before retiring
   prior records, rejected query-string bearer credentials and nested browser
   exchanges, pinned credentials to their issued session, and made managed

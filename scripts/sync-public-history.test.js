@@ -13,6 +13,7 @@ const DOCS_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-docs.js');
 const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js');
 const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
 const PII_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-pii.sh');
+const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
 const PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
 const PRE_PUSH_HOOK_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-sync-public-history-tests');
@@ -62,6 +63,11 @@ function installSyncScriptFixture(sourceDir) {
     sourceDir,
     path.join('scripts', 'verify-public-release-pii.sh'),
     fs.readFileSync(PII_VERIFIER_SOURCE_PATH, 'utf8'),
+  );
+  writeFile(
+    sourceDir,
+    path.join('scripts', 'scrub-public-package-json.js'),
+    fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
   );
   writeFile(
     sourceDir,
@@ -544,6 +550,28 @@ test('sync-public-history restores Agent Bridge package wiring at an explicit pu
       publicPackage.scripts['test:worker:agent-bridge'],
       'node scripts/run-agent-bridge-worker-tests.js',
     );
+  });
+});
+
+test('sync-public-history removes package commands whose runners are stripped', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const packagePath = path.join(sourceDir, 'package.json');
+    const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+    packageJson.scripts['ai:test-private-e2e'] = 'node scripts/e2e/private-runner.js';
+    packageJson.scripts['test:ci'] = 'npm run test:node && npm run ai:test-private-e2e';
+    fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
+    writeFile(sourceDir, path.join('scripts', 'e2e', 'private-runner.js'), 'private E2E runner\n');
+    commitAll(sourceDir, 'Add source-only E2E command', {
+      authorDate: '2025-01-05T00:00:00Z',
+      committerDate: '2025-01-05T00:00:00Z',
+    });
+
+    const result = runSyncScript(sourceDir, ['release-candidate']);
+
+    assert.equal(result.status, 0, result.stderr);
+    const publicPackage = JSON.parse(git(sourceDir, ['show', 'release-candidate:package.json']));
+    assert.equal(publicPackage.scripts['ai:test-private-e2e'], undefined);
+    assert.equal(publicPackage.scripts['test:ci'], 'npm run test:node');
   });
 });
 
