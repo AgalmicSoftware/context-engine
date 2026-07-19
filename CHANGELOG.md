@@ -54,6 +54,9 @@ All notable changes to this project will be documented in this file.
   results, failing closed when membership cannot be checked. Telegram-optional
   user and service exchanges now derive their worker wallet from the stored
   credential principal.
+- Granted the explicit worker-group scope after a registry-backed participant
+  passes the session's default gate, restoring direct group reads and joins
+  without weakening group membership checks.
 - Prevented worker-native group state from silently switching to an unrelated
   D1 or envelope-audit binding: session-worker groups now use only the explicit
   group KV or storage-index KV aliases, and D1-only group configuration fails

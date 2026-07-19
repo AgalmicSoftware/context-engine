@@ -333,6 +333,7 @@ test('computeScopesForLogin uses legacy networkChainId, attests once per request
     faucet: false,
     fetch: false,
     lit: false,
+    groups: true,
   });
   assert.deepEqual(second, first);
   assert.equal(chainAttestations, 2);

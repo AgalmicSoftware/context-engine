@@ -67,6 +67,7 @@ export const computeLoginScopes = async ({
     faucet: !!gateResults.txGas,
     fetch: !!gateResults.rpc,
     lit: !!gateResults.lit,
+    groups: true,
   };
 
   const scopeOverrides = config?.scopes && typeof config.scopes === 'object' ? config.scopes : null;

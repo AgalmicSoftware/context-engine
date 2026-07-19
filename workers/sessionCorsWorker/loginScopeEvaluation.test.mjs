@@ -48,6 +48,7 @@ test('computeLoginScopes preserves scope mapping, overrides, and login gate auth
     faucet: false,
     fetch: false,
     lit: false,
+    groups: true,
   });
   assert.deepEqual(calls, [{
     address: '0xabc123',
