@@ -10,6 +10,15 @@ const rootDir = resolve(__dirname, '..', '..');
 const readJson = (relativePath) => JSON.parse(readFileSync(resolve(rootDir, relativePath), 'utf8'));
 const readText = (relativePath) => readFileSync(resolve(rootDir, relativePath), 'utf8');
 
+test('root and client packages require the same supported Node and npm versions', () => {
+  const rootPackage = readJson('package.json');
+  const rootLock = readJson('package-lock.json');
+  const clientPackage = readJson('client/package.json');
+
+  assert.deepEqual(rootPackage.engines, clientPackage.engines);
+  assert.deepEqual(rootLock?.packages?.['']?.engines, clientPackage.engines);
+});
+
 test('client dev/build scripts stay rooted at / while package homepage points to the live site', () => {
   const pkg = readJson('client/package.json');
 
