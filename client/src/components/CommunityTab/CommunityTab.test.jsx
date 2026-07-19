@@ -426,8 +426,18 @@ describe('CommunityTab helpers', () => {
     );
     responseSpans[0].props.onClick();
     responseSpans[1].props.onClick();
-    expect(openSpy).toHaveBeenNthCalledWith(1, '/survey/0xabc/results?session=test-10', '_blank');
-    expect(openSpy).toHaveBeenNthCalledWith(2, '/survey/0xdef/results?session=edge', '_blank');
+    expect(openSpy).toHaveBeenNthCalledWith(
+      1,
+      '/survey/0xabc/results?session=test-10',
+      '_blank',
+      'noopener,noreferrer',
+    );
+    expect(openSpy).toHaveBeenNthCalledWith(
+      2,
+      '/survey/0xdef/results?session=edge',
+      '_blank',
+      'noopener,noreferrer',
+    );
     openSpy.mockRestore();
   });
 
@@ -455,7 +465,12 @@ describe('CommunityTab helpers', () => {
         (node) => node?.type === 'span' && typeof node?.props?.onClick === 'function',
       );
       responseSpan.props.onClick();
-      expect(openSpy).toHaveBeenNthCalledWith(1, '/ce/survey/0xabc/results?session=test-10', '_blank');
+      expect(openSpy).toHaveBeenNthCalledWith(
+        1,
+        '/ce/survey/0xabc/results?session=test-10',
+        '_blank',
+        'noopener,noreferrer',
+      );
 
       instance.state = {
         ...instance.state,
@@ -470,8 +485,8 @@ describe('CommunityTab helpers', () => {
 
       instance.handleUserClick({ username: '0xabc' });
       instance.handleUserClick({ username: 'ada' });
-      expect(openSpy).toHaveBeenNthCalledWith(2, '/ce/u/0xabc', '_blank');
-      expect(openSpy).toHaveBeenNthCalledWith(3, '/ce/su/ada', '_blank');
+      expect(openSpy).toHaveBeenNthCalledWith(2, '/ce/u/0xabc', '_blank', 'noopener,noreferrer');
+      expect(openSpy).toHaveBeenNthCalledWith(3, '/ce/su/ada', '_blank', 'noopener,noreferrer');
     } finally {
       openSpy.mockRestore();
       if (previousPublicUrl === undefined) {
@@ -603,8 +618,13 @@ describe('CommunityTab helpers', () => {
     );
     responseSpans[0].props.onClick();
     responseSpans[1].props.onClick();
-    expect(openSpy).toHaveBeenNthCalledWith(1, '/survey/0xabc/results?session=DEBATE', '_blank');
-    expect(openSpy).toHaveBeenNthCalledWith(2, '/survey/0xdef/results', '_blank');
+    expect(openSpy).toHaveBeenNthCalledWith(
+      1,
+      '/survey/0xabc/results?session=DEBATE',
+      '_blank',
+      'noopener,noreferrer',
+    );
+    expect(openSpy).toHaveBeenNthCalledWith(2, '/survey/0xdef/results', '_blank', 'noopener,noreferrer');
     openSpy.mockRestore();
   });
 
@@ -1327,6 +1347,28 @@ describe('CommunityTab helpers', () => {
 
     expect(instance.state.uniqueUsers).toEqual(['0xaaa', '0xbbb']);
     expect(instance.state.filteredUsers).toEqual(['0xaaa', '0xbbb']);
+  });
+
+  it('isolates new tabs opened from filtered user results', () => {
+    const address = '0x1234567890abcdef1234567890abcdef12345678';
+    const instance = new CommunityTab({ activeSessionSlug: 'edge' });
+    instance.state = {
+      ...instance.state,
+      modalType: 'users',
+      loadingFilter: false,
+      uniqueUsers: [address],
+      filteredUsers: [address],
+    };
+    const openSpy = jest.spyOn(window, 'open').mockImplementation(() => null);
+
+    const tree = instance.renderModalContent();
+    const [userResult] = collectTreeNodes(
+      tree,
+      (node) => node?.type === 'div' && typeof node?.props?.onClick === 'function',
+    );
+    userResult.props.onClick();
+
+    expect(openSpy).toHaveBeenCalledWith(`/u/${address}`, '_blank', 'noopener,noreferrer');
   });
 
   it('uses adaptive timeout delays for unchanged polling streaks', () => {

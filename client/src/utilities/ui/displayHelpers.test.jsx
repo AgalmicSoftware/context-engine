@@ -25,6 +25,7 @@ describe('displayHelpers', () => {
     const link = screen.getByRole('link', { name: '0x123...5678' });
     expect(link).toHaveAttribute('href', '/custom-user');
     expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     expect(link).toHaveStyle({ padding: '0px' });
   });
 
@@ -39,6 +40,7 @@ describe('displayHelpers', () => {
 
     expect(link).toHaveAttribute('href', '/custom-survey');
     expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     expect(link.style.padding).toBe('0px');
     expect(link.style.color).toBe('blue');
     expect(link.style.marginLeft).toBe('5px');
@@ -65,7 +67,12 @@ describe('displayHelpers', () => {
       </>,
     );
 
-    expect(screen.getByRole('link', { name: 'qwe...rst' })).toHaveAttribute('href', '/custom-question');
-    expect(screen.getByRole('link', { name: '0x1234...fedcba' })).toHaveAttribute('href', '/custom-tx');
+    const questionLink = screen.getByRole('link', { name: 'qwe...rst' });
+    const transactionLink = screen.getByRole('link', { name: '0x1234...fedcba' });
+
+    expect(questionLink).toHaveAttribute('href', '/custom-question');
+    expect(questionLink).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(transactionLink).toHaveAttribute('href', '/custom-tx');
+    expect(transactionLink).toHaveAttribute('rel', 'noopener noreferrer');
   });
 });

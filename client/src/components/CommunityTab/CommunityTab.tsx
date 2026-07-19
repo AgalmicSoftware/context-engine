@@ -1379,9 +1379,9 @@ class CommunityTab extends Component<any, any> {
 
   handleUserClick = (user: any) => {
     if (user.username.startsWith('0x')) {
-      window.open(buildPublicRoute(`/u/${user.username}`), '_blank');
+      window.open(buildPublicRoute(`/u/${user.username}`), '_blank', 'noopener,noreferrer');
     } else {
-      window.open(buildPublicRoute(`/su/${user.username}`), '_blank');
+      window.open(buildPublicRoute(`/su/${user.username}`), '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -2033,7 +2033,9 @@ class CommunityTab extends Component<any, any> {
                     <div
                       key={index}
                       className={styles.userItem}
-                      onClick={() => window.open(buildPublicRoute(`/u/${address}`), '_blank')}
+                      onClick={() =>
+                        window.open(buildPublicRoute(`/u/${address}`), '_blank', 'noopener,noreferrer')
+                      }
                     >
                       {blockieUrl ? (
                         <img
@@ -2074,7 +2076,11 @@ class CommunityTab extends Component<any, any> {
                   <span
                     className={styles.responsesCount}
                     onClick={() =>
-                      window.open(buildPublicRoute(`/survey/${survey.id}/results${sessionQuery}`), '_blank')
+                      window.open(
+                        buildPublicRoute(`/survey/${survey.id}/results${sessionQuery}`),
+                        '_blank',
+                        'noopener,noreferrer',
+                      )
                     } // Link to results page
                     style={{ cursor: 'pointer' }} // Add pointer cursor
                   >
