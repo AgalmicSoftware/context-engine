@@ -277,6 +277,39 @@ ensure_public_replay_message() {
   fi
 }
 
+sync_agent_bridge_public_package_wiring() {
+  local commit_sha="$1"
+  local target_package="$TEMP_CLONE/package.json"
+  local source_package="$TMP_ROOT/agent-bridge-source-package.json"
+
+  if [ ! -f "$target_package" ]; then
+    fail "Agent Bridge public cutover requires package.json in replay output." 2
+  fi
+
+  if ! git -C "$REPO_ROOT" show "${commit_sha}:package.json" > "$source_package"; then
+    fail "Agent Bridge public cutover source is missing package.json at $commit_sha." 2
+  fi
+
+  node - "$target_package" "$source_package" <<'NODE'
+const fs = require('node:fs');
+
+const targetPath = process.argv[2];
+const sourcePath = process.argv[3];
+const targetPackage = JSON.parse(fs.readFileSync(targetPath, 'utf8'));
+const sourcePackage = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+const scriptName = 'test:worker:agent-bridge';
+const command = sourcePackage.scripts?.[scriptName];
+
+if (typeof command !== 'string' || !command.includes('scripts/run-agent-bridge-worker-tests.js')) {
+  throw new Error(`Agent Bridge public cutover source is missing ${scriptName}`);
+}
+
+targetPackage.scripts ||= {};
+targetPackage.scripts[scriptName] = command;
+fs.writeFileSync(targetPath, `${JSON.stringify(targetPackage, null, 2)}\n`);
+NODE
+}
+
 apply_agent_bridge_public_history_policy() {
   local commit_sha="$1"
   local path
@@ -303,6 +336,8 @@ apply_agent_bridge_public_history_policy() {
         printf 'Agent Bridge public cutover marker is missing from source commit %s.\n' "$commit_sha" >&2
         exit 2
       fi
+
+      sync_agent_bridge_public_package_wiring "$commit_sha"
     fi
   )
 }
