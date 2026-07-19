@@ -17,10 +17,16 @@ import {
   buildDraftEditMetricSummary,
 } from './telegramDraftEditMetrics.mjs';
 import {
+  AGENT_CREDENTIAL_KV_PREFIX,
   AGENT_CREDENTIAL_KINDS,
+  AGENT_CREDENTIAL_SLOT_KV_PREFIX,
   createTelegramAgentDelegationToken,
+  issueAgentCredential,
+  loadAgentCredential,
   loadTelegramAgentDelegationToken,
+  readAgentCredentialSlot,
   readTelegramAgentOnlyTokenUserPointer,
+  telegramAgentPrincipal,
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
 } from './agentCredentials.mjs';
@@ -257,6 +263,45 @@ function sha256Hex(value = '') {
 }
 
 const LONG_TEST_TOKEN_TTL_SECONDS = 3650 * 24 * 60 * 60;
+
+test('credential rotation preserves the active token when the slot write fails', async () => {
+  const env = { AGENT_ACTION_KV: new MemoryKv() };
+  const principal = telegramAgentPrincipal({ telegramUserId: '42', username: 'host' });
+  const first = await issueAgentCredential({
+    env,
+    principal,
+    sessionSlug: 'alpha',
+    createdAt: '2026-07-19T12:00:00.000Z',
+    ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
+  });
+  assert.equal(first.ok, true);
+
+  const originalPut = env.AGENT_ACTION_KV.put.bind(env.AGENT_ACTION_KV);
+  let rejectNextSlotWrite = true;
+  env.AGENT_ACTION_KV.put = async (key, value, options) => {
+    if (rejectNextSlotWrite && String(key).startsWith(AGENT_CREDENTIAL_SLOT_KV_PREFIX)) {
+      rejectNextSlotWrite = false;
+      throw new Error('slot_write_unavailable');
+    }
+    return originalPut(key, value, options);
+  };
+
+  const failed = await issueAgentCredential({
+    env,
+    principal,
+    sessionSlug: 'alpha',
+    createdAt: '2026-07-19T12:01:00.000Z',
+    ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
+  });
+  assert.equal(failed.ok, false);
+  assert.equal(failed.reason, 'agent_token_pointer_write_failed');
+  assert.equal((await loadAgentCredential({ env, token: first.token })).ok, true);
+  assert.equal((await readAgentCredentialSlot({ env, principal, sessionSlug: 'alpha' })).tokenHash, first.tokenHash);
+  assert.equal(
+    [...env.AGENT_ACTION_KV.store.keys()].filter((key) => String(key).startsWith(AGENT_CREDENTIAL_KV_PREFIX)).length,
+    1,
+  );
+});
 
 test('fixed-date delegation token fixtures declare an explicit TTL', () => {
   const source = readFileSync(new URL(import.meta.url), 'utf8');
@@ -3280,6 +3325,34 @@ test('Telegram client login rejects preview-user and session-mismatched tokens',
   assert.equal((await jsonBody(previewResponse)).reason, 'agent_token_missing');
   assert.equal(mismatchResponse.status, 404);
   assert.match((await jsonBody(mismatchResponse)).reason, /session_not_(found|linked)/);
+});
+
+test('Telegram client login exchange ignores raw tokens in URL query parameters', async () => {
+  const env = telegramOnlyEnv({ AGENT_BRIDGE_SESSION_WORKER_URL: 'https://session-worker.example' });
+  const issued = await createTelegramAgentDelegationToken({
+    env,
+    telegramUserId: '42',
+    username: 'host',
+    sessionSlug: 'alpha',
+    accountAddress: `0x${'12'.repeat(20)}`,
+    createdAt: '2026-06-01T12:00:00.000Z',
+    ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
+  });
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request(`https://bridge.example/telegram/agent/api/client-login/exchange?token=${issued.token}&agentToken=${issued.token}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionSlug: 'alpha' }),
+    }),
+    env,
+    fetchImpl: async () => {
+      throw new Error('query token must not reach worker auth');
+    },
+  });
+
+  assert.equal(response.status, 401);
+  assert.equal((await jsonBody(response)).reason, 'agent_token_missing');
 });
 
 test('Telegram session-meta reports telegram-only status without auth', async () => {
