@@ -79,7 +79,6 @@ scripts/run-contextengine-cc-tests.js
 scripts/run-contextengine-cc-tests.test.js
 scripts/e2e-env-example.test.js
 scripts/vendor-cecc-ethers-bundle.js
-scripts/scrub-public-package-json.js
 scripts/build_external_llm_prompt.py
 scripts/restore-private-pack.sh
 scripts/audit-diff.sh
@@ -149,7 +148,6 @@ scripts/run-contextengine-cc-tests.js
 scripts/run-contextengine-cc-tests.test.js
 scripts/e2e-env-example.test.js
 scripts/vendor-cecc-ethers-bundle.js
-scripts/scrub-public-package-json.js
 scripts/restore-private-pack.sh
 scripts/audit-diff.sh
 scripts/audit-full.sh
