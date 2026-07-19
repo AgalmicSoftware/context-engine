@@ -3,7 +3,7 @@
     "description": "Corpus of METR (Model Evaluation and Threat Research) publications, benchmarks, datasets, evaluation reports, and policy work. Provides the empirical measurement foundation for AI progress and governance debates - the actual data on how fast AI capabilities are advancing, how reliably we can measure them, and what quantitative trends imply for policy.",
     "version": "1.0",
     "date_generated": "2026-02-15",
-    "entry_count": 94,
+    "entry_count": 100,
     "coverage": {
       "source_types": [
         "benchmark",
@@ -6809,6 +6809,468 @@
         "https://metr.org/blog/2026-06-26-gpt-5-6-sol/",
         "https://metr.substack.com/p/2026-06-26-gpt-5-6-sol"
       ]
+    },
+    {
+      "id": "metr_confidential_information_2026",
+      "title": "How We Protect Confidential Information",
+      "authors": [
+        "METR"
+      ],
+      "date": "2026-02-17",
+      "source_type": "process_post",
+      "source_platform": "METR Blog",
+      "url": "https://metr.org/blog/2026-02-17-how-we-protect-confidential-information/",
+      "category": "policy",
+      "summary": "METR describes the confidentiality and security practices it uses to protect nonpublic model access and proprietary information shared by frontier AI developers, governments, and research partners. The post is organized around two pillars: confidentiality measures (policy, infrastructure setup, and organizational norms) and security measures (identity and access management, endpoint hardening, monitoring, and governance). Information is assigned to six confidentiality levels ranging from public to internally siloed, with the most sensitive material — details of nonpublic models — restricted to researchers directly involved and referred to only by animal codenames (e.g., 'playful-panda'). Confidentiality levels appear as prefixes in Slack, documents, and internal platforms; documents cannot be shared externally without explicit marking; and each evaluation uses a separate restricted-access repository fork. The policy also governs how staff discuss AI developers, permitting reference to specific points while avoiding aggregate characterizations of a lab's capability position. Norms include consistent codename use in all conversations, recognition programs that reward careful handling, and logging of slips and near-misses followed by retrospectives. On the security side, METR reports controls that contributed to SOC 2 Type I certification: FIDO2 authentication with device allowlists, layered model access (SSO-authenticated VPN, private VPCs, token-based authorization), mobile device management enforcing automatic updates, security monitoring streamed to a SIEM, and annual security audits by external experts. The post functions as transparency documentation supporting METR's role as a trusted third-party evaluator with pre-deployment access to frontier models.",
+      "key_findings": [
+        "METR assigns information to six confidentiality levels, from public to internally siloed; details of nonpublic models are restricted to directly involved researchers and referenced only via animal codenames.",
+        "Confidentiality is enforced structurally, not just by policy: level prefixes in Slack, documents, and platforms; no external sharing without explicit marking; separate restricted-access repository forks per evaluation.",
+        "Organizational norms complement technical controls: consistent codename use in all conversations, recognition programs rewarding careful handling, and logging of slips and near-misses with retrospectives.",
+        "Security controls contributed to SOC 2 Type I certification, including FIDO2 authentication, device allowlists, SSO-gated VPN access to private VPCs with token-based authorization, MDM-enforced updates, and SIEM-based monitoring.",
+        "Annual security audits by external experts provide independent assurance on top of internal controls."
+      ],
+      "quantitative_data": {
+        "confidentiality_levels": 6,
+        "security_certification": "SOC 2 Type I",
+        "external_security_audit_cadence": "annual"
+      },
+      "novel_arguments_and_concepts": "The post's implicit argument is that independent evaluation of frontier models is compatible with strict confidentiality, and that this is achieved through layered defense rather than any single control: a graded classification scheme (six levels), structural enforcement (level prefixes, marking requirements, per-evaluation repository forks), and cultivated norms (codenames in all conversations, recognition programs, near-miss logging with retrospectives). Treating confidentiality lapses like safety incidents — logged, retrospected, and rewarded when handled well — imports safety-culture practice into information handling. The post also functions as a costly signal: by publishing its control set and SOC 2 Type I status, METR makes its trustworthiness legible to labs deciding whether to grant pre-deployment model access, addressing a standard objection to third-party evaluation regimes.",
+      "implications_for_governance": [
+        "Provides a concrete, public template that regulators and labs can reference when negotiating third-party evaluator access to nonpublic models.",
+        "SOC 2 Type I certification and annual external audits demonstrate that independent evaluators can meet auditable security bars, weakening confidentiality-based objections to external evaluation access.",
+        "The six-level classification scheme offers a transferable vocabulary for structuring information-sharing agreements among labs, evaluators, and governments.",
+        "Near-miss logging and retrospectives suggest process-based (not purely technical) assurance mechanisms that oversight bodies could require of evaluation organizations."
+      ],
+      "debate_connections": [
+        "regulation_timing"
+      ],
+      "methodology": {
+        "type": "process_description",
+        "description": "Narrative account of METR's internal confidentiality policy framework, infrastructure setup, and organizational norms, plus its security control stack; a transparency post rather than an empirical study."
+      },
+      "related_work": [],
+      "themes": [
+        "third_party_evaluation",
+        "evaluator_access",
+        "information_security",
+        "organizational_practice"
+      ],
+      "tags": [
+        "confidentiality",
+        "security_controls",
+        "soc2",
+        "evaluator_operations",
+        "transparency",
+        "pre_deployment_access"
+      ],
+      "influence_score": 5,
+      "source_links": [
+        "https://metr.org/blog/2026-02-17-how-we-protect-confidential-information/"
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://metr.org/blog/2026-02-17-how-we-protect-confidential-information/"
+    },
+    {
+      "id": "metr_cot_controllability_finetuning_2026",
+      "title": "Fine-tuning experiments on CoT controllability",
+      "authors": [
+        "METR"
+      ],
+      "date": "2026-04-01",
+      "source_type": "research_blog",
+      "source_platform": "METR Blog",
+      "url": "https://metr.org/blog/2026-04-01-fine-tuning-cot-controllability/",
+      "category": "research",
+      "summary": "METR reports fine-tuning experiments testing whether reasoning models' limited control over their chain-of-thought (CoT) is a robust property. CoT controllability — a model's ability to follow instructions about the format or content of its reasoning traces — matters because CoT monitorability arguments implicitly assume traces are hard for models to shape deliberately. METR fine-tuned four open-weight reasoning models (GPT-OSS-20B, GPT-OSS-120B, Qwen-3-8B, Qwen-3-32B) on small instruction-following datasets of roughly 240 examples (100K-300K tokens) derived from the ReasonIF evaluation suite, using per-model SFT datasets built from edited model rollouts (LR 1e-4, batch size 4, LoRA rank 32). Generalization was then measured on the out-of-distribution CoTControl suite, using a 900-example QA subset. Average out-of-distribution compliance rose from 2.9% at baseline to 8.8% after fine-tuning across the four models, with the largest CoTControl gains on reasoning casing, word suppression, and adding specific strings; the in-distribution ReasonIF suite showed more consistent improvements across instruction types. Compliance declined as reasoning effort increased in both evaluation sets, a trend that generally persisted after fine-tuning. METR's headline interpretation is that currently low CoT controllability 'may not be very robust to accidental optimization pressure': small amounts of tuning meaningfully increased instruction-following on held-out controllability tasks. The post flags limitations: the setup is unrealistic in that frontier labs would not intentionally fine-tune for controllability, the work does not demonstrate that increased controllability reduces monitorability in practice, effects in multi-turn and agentic settings are untested, and the two evaluation suites may share structural similarity.",
+      "key_findings": [
+        "Out-of-distribution CoT controllability compliance rose from an average of 2.9% at baseline to 8.8% after fine-tuning, across four open-weight reasoning models.",
+        "The training budget was small — roughly 240 examples and 100K-300K tokens per model (LoRA rank 32) — indicating low controllability shifts under modest optimization pressure.",
+        "Largest out-of-distribution gains were on reasoning casing, word suppression, and inserting specific strings; in-distribution ReasonIF improvements were more consistent across instruction types.",
+        "Compliance decreased as reasoning effort increased in both evaluation suites, and this trend generally continued after fine-tuning.",
+        "The results do not directly demonstrate reduced monitorability, and effects in multi-turn or agentic settings remain untested."
+      ],
+      "quantitative_data": {
+        "models": [
+          "GPT-OSS-20B",
+          "GPT-OSS-120B",
+          "Qwen-3-8B",
+          "Qwen-3-32B"
+        ],
+        "ood_compliance_baseline_pct": 2.9,
+        "ood_compliance_after_finetuning_pct": 8.8,
+        "finetuning_examples_per_model": "~240",
+        "finetuning_tokens": "100K-300K",
+        "ood_eval_set": "900-example CoTControl QA subset",
+        "hyperparameters": {
+          "learning_rate": "1e-4",
+          "batch_size": 4,
+          "lora_rank": 32
+        }
+      },
+      "novel_arguments_and_concepts": "The core concept is CoT controllability as a distinct, measurable property, framed as a load-bearing assumption behind CoT monitorability arguments: reasoning-trace monitoring is only reassuring if models cannot easily shape their traces on demand. The novel empirical move is testing the robustness of low controllability rather than merely its level. By showing that a few hundred fine-tuning examples roughly triple out-of-distribution compliance (2.9% to 8.8%), METR argues that today's low controllability may be an artifact of current training incentives rather than a stable property, and could erode under accidental optimization pressure — for instance, training processes that inadvertently reward particular trace styles. The inverse relationship between reasoning effort and instruction compliance is a secondary observation relevant to how controllability behaves as test-time compute scales.",
+      "implications_for_governance": [
+        "Safety cases resting on CoT monitoring should include evidence that controllability remains low under the lab's actual training pipeline, not only at a single evaluation snapshot.",
+        "Evaluators should track CoT controllability as a monitored property across model generations, since small and possibly unintended optimization pressures can shift it.",
+        "Claims that reasoning traces are a trustworthy oversight surface need explicit caveats about robustness to fine-tuning, including accidental pressure rather than adversarial training.",
+        "The use of open-weight models makes these robustness tests independently reproducible by external evaluators."
+      ],
+      "debate_connections": [
+        "alignment_tractability",
+        "safety_vs_capabilities"
+      ],
+      "methodology": {
+        "design": "Supervised fine-tuning of four open-weight reasoning models on instruction-following data derived from the ReasonIF suite, with generalization measured on the out-of-distribution CoTControl suite.",
+        "training_data": "Approximately 240 examples (100K-300K tokens) per model, built as separate SFT datasets from edited model rollouts.",
+        "evaluation": "Compliance rates on ReasonIF (in-distribution) and a 900-example CoTControl QA subset (out-of-distribution), measured across reasoning-effort settings.",
+        "hyperparameters": "Learning rate 1e-4, batch size 4, LoRA rank 32."
+      },
+      "related_work": [
+        "metr_reward_hacking_2025"
+      ],
+      "themes": [
+        "cot_monitorability",
+        "training_robustness",
+        "reasoning_models",
+        "oversight_surfaces"
+      ],
+      "tags": [
+        "chain_of_thought",
+        "fine_tuning",
+        "monitorability",
+        "instruction_following",
+        "open_weight_models",
+        "reasonif",
+        "cotcontrol"
+      ],
+      "influence_score": 6,
+      "source_links": [
+        "https://metr.org/blog/2026-04-01-fine-tuning-cot-controllability/"
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://metr.org/blog/2026-04-01-fine-tuning-cot-controllability/"
+    },
+    {
+      "id": "metr_rd_section_anthropic_risk_report_review_2026",
+      "title": "Review of the 'Risks from automated R&D' section in the Anthropic Risk Report (February 2026)",
+      "authors": [
+        "METR"
+      ],
+      "date": "2026-05-08",
+      "source_type": "evaluation_report",
+      "source_platform": "METR Blog",
+      "url": "https://metr.org/blog/2026-05-08-rd-section-anthropic-risk-report-feb-2026-review/",
+      "category": "evaluation",
+      "summary": "METR publishes a third-party review of the 'Risks from automated R&D' section of Anthropic's February 2026 Risk Report, which argued that catastrophic risk from Claude Opus 4.6 automating AI R&D is very low. METR's assessment is deliberately two-sided: it agrees with the bottom-line conclusion — drawing on additional evidence including METR's own evaluations and the absence of public reports of substantial R&D automation — but judges that the evidence presented in the report is inadequate to establish that conclusion. The central criticism targets Anthropic's reliance on an internal survey of 349 technical workers: METR contends the cited results provide little evidence about the level of overall risk, pointing to insufficient sample size for the inference drawn, coarse question granularity, poor survey framing, and a specific data-handling error in which one missing survey response was miscounted as a negative response. METR also argues the section under-attends to risks from substantial AI-driven R&D acceleration arriving before full automation. The review was conducted using the published report, non-public supplementary materials provided by Anthropic, and METR's prior research on calibrated survey responses, and was released in original and updated versions. As one of the first public third-party reviews of a frontier lab's risk report, the post is a working example of what independent scrutiny looks like in practice: verifying whether stated conclusions follow from the presented evidence, rather than only re-litigating the conclusions themselves.",
+      "key_findings": [
+        "METR agrees that risk from Claude Opus 4.6 or less capable models automating R&D is very low, supported by additional evidence including METR's own evaluations and the absence of public automation reports.",
+        "METR nonetheless finds the report's presented evidence inadequate to establish that conclusion, a distinction it treats as central to meaningful third-party review.",
+        "Anthropic's internal survey of 349 technical workers is judged to provide little evidence about overall risk, due to insufficient sample size, coarse question granularity, and poor framing.",
+        "The report miscounted one missing survey response as a negative response, a concrete evidence-presentation error.",
+        "The analysis overlooked substantial risks from AI R&D acceleration occurring before full automation.",
+        "The review drew on non-public supplementary materials provided by Anthropic, demonstrating that labs will share such material with external reviewers."
+      ],
+      "quantitative_data": {
+        "survey_sample_size_reviewed": 349,
+        "model_under_assessment": "Claude Opus 4.6",
+        "anthropic_bottom_line": "catastrophic risk from automated R&D assessed as very low",
+        "review_versions_released": 2
+      },
+      "novel_arguments_and_concepts": "The review's distinctive contribution is separating two questions that lab risk reports tend to fuse: whether a bottom-line risk conclusion is correct, and whether the presented evidence establishes it. METR endorses the first while rejecting the second — a posture that models what rigorous third-party review should look like, since a reviewer who only checks conclusions adds little assurance beyond the lab's own claim. The methodological critique of internal surveys as risk evidence (sample size, granularity, framing, and the miscounting of a non-response as a negative) effectively proposes minimum standards for survey-based components of safety cases. The review also advances the argument that R&D acceleration short of full automation is a risk channel in its own right, which should be analyzed continuously rather than treated as a threshold phenomenon that only matters at full automation.",
+      "implications_for_governance": [
+        "Third-party review can validate a lab's conclusion while rejecting the sufficiency of its evidence — a distinction consumers of risk reports, including regulators, need to preserve.",
+        "Survey-based components of lab safety cases require methodological scrutiny: sample size, question granularity, framing, and non-response handling can each undermine the inference.",
+        "Governance frameworks should track AI R&D acceleration risks that arrive before full automation, not only the full-automation endpoint.",
+        "Anthropic's provision of non-public supplementary materials to METR sets a workable precedent for reviewer access arrangements.",
+        "Releasing original and updated review versions demonstrates a correction-friendly norm for public evaluation documents."
+      ],
+      "debate_connections": [
+        "ai_rd_automation",
+        "existential_risk_debate",
+        "regulation_timing"
+      ],
+      "methodology": {
+        "type": "external_document_review",
+        "inputs": [
+          "Anthropic's February 2026 Risk Report ('Risks from automated R&D' section)",
+          "Non-public supplementary materials provided by Anthropic",
+          "Prior METR research on calibrated survey responses"
+        ],
+        "process": "Assessment of whether the section's evidence supports its stated conclusion, with findings released as an original and an updated review document."
+      },
+      "related_work": [
+        "metr_time_horizon_1_1_2026",
+        "metr_nanogpt_ai_rd_2026",
+        "metr_anthropic_researcher_uplift_2026"
+      ],
+      "themes": [
+        "third_party_review",
+        "ai_rd_automation",
+        "risk_reporting",
+        "survey_methodology"
+      ],
+      "tags": [
+        "anthropic",
+        "risk_report",
+        "automated_rd",
+        "external_review",
+        "safety_cases",
+        "claude_opus_4_6"
+      ],
+      "influence_score": 7,
+      "source_links": [
+        "https://metr.org/blog/2026-05-08-rd-section-anthropic-risk-report-feb-2026-review/"
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://metr.org/blog/2026-05-08-rd-section-anthropic-risk-report-feb-2026-review/"
+    },
+    {
+      "id": "metr_swebench_prs_not_merged_2026",
+      "title": "Many SWE-bench-Passing PRs Would Not Be Merged into Main",
+      "authors": [
+        "METR"
+      ],
+      "date": "2026-03-10",
+      "source_type": "short_note",
+      "source_platform": "METR Notes",
+      "url": "https://metr.org/notes/2026-03-10-many-swe-bench-passing-prs-would-not-be-merged-into-main/",
+      "category": "research",
+      "summary": "This METR research note examines whether AI-generated pull requests that pass SWE-bench Verified's automated tests would actually be accepted by the maintainers of the underlying repositories. METR had 4 active maintainers across three repositories (scikit-learn, Sphinx, pytest) review 296 AI-generated PRs on GitHub — covering 95 of the 500 SWE-bench Verified issues (19%) — from Claude 3.5 Sonnet (Old), Claude 3.7 Sonnet, Claude 4 Opus, Claude 4.5 Sonnet, and GPT-5, alongside 47 original human-written 'golden' patches as a baseline. Maintainers rated acceptance versus changes needed, rejection reasons, percentage progress toward mergeability (0-100%), and confidence (1-10). The headline result: roughly half of test-passing PRs from mid-2024 to late-2025 agents would fail maintainer review, with maintainer merge rates averaging 24.2 percentage points below automated-grader scores (SE 2.7). The golden baseline calibrates strictness — only 68% of originally merged human patches were re-merged, though 85% were rated as making 80%+ progress. A weaker trend result suggests maintainer-judged performance improved 9.6 pp/yr more slowly than grader-judged performance (SE 5.5), significant only at the 10% level and fragile to model selection. Code-quality issues (style, repository-standard violations) were the most common rejection reason, followed by incorrect core functionality despite passing tests, and breaking other code. METR emphasizes the gap reflects agents' lack of the iteration cycle human contributors receive, rather than a fundamental capability deficit, but concludes benchmark scores substantially overestimate real-world usefulness.",
+      "key_findings": [
+        "Maintainer merge rates averaged 24.2 percentage points below automated-grader scores (SE 2.7); approximately half of test-passing SWE-bench Verified PRs would fail maintainer review.",
+        "The golden baseline is itself strict: only 68% of originally merged human patches were re-merged, with 85% rated as making 80%+ progress toward mergeability.",
+        "Code-quality issues were the most common rejection reason; some patches passed automated tests while solving the issue incorrectly or breaking other code.",
+        "Weaker evidence of a widening gap: maintainer-judged performance improved 9.6 pp/yr more slowly than grader-judged performance (SE 5.5), significant only at the 10% level and fragile to removing non-SOTA models.",
+        "The 'progress toward mergeable' measure (80% threshold) produced similar results to binary merge decisions, supporting robustness of the level gap.",
+        "METR attributes much of the gap to missing iteration opportunity — agents received no review cycle — rather than fundamental capability limits."
+      ],
+      "quantitative_data": {
+        "prs_reviewed": 296,
+        "maintainers": 4,
+        "repositories": [
+          "scikit-learn",
+          "Sphinx",
+          "pytest"
+        ],
+        "issue_coverage": "95 of 500 SWE-bench Verified issues (19%); 3 of the benchmark's repositories (25%)",
+        "models": [
+          "Claude 3.5 Sonnet (Old)",
+          "Claude 3.7 Sonnet",
+          "Claude 4 Opus",
+          "Claude 4.5 Sonnet",
+          "GPT-5"
+        ],
+        "golden_human_patches": 47,
+        "merge_rate_gap_vs_grader_pp": 24.2,
+        "merge_rate_gap_se": 2.7,
+        "golden_patch_remerge_rate_pct": 68,
+        "golden_patch_80pct_progress_rate_pct": 85,
+        "trend_gap_pp_per_year": 9.6,
+        "trend_gap_se": 5.5,
+        "trend_significance": "10% level only; fragile to model selection"
+      },
+      "novel_arguments_and_concepts": "The note operationalizes the distinction between 'passes automated tests' and 'would be accepted by the humans responsible for the codebase,' using real repository maintainers as a ground-truth oracle for SWE-bench Verified. Using the golden-patch re-merge rate (68%) as a calibration anchor is a notable methodological device: maintainer review is strict even for previously merged human work, so the AI-human gap must be read against that baseline rather than against 100%. The note also introduces a dynamic version of the benchmark-validity concern — grader-judged progress may be improving faster than maintainer-judged progress — while candidly flagging the trend's statistical fragility. Finally, attributing much of the gap to missing iteration (agents get no review-and-revise cycle) reframes part of the deficit as a harness and interaction-design limitation rather than a pure capability shortfall.",
+      "implications_for_governance": [
+        "Benchmark scores cited in capability claims or deployment decisions should be discounted for the gap between automated grading and human acceptance standards.",
+        "Evaluations of software autonomy should incorporate human-expert acceptance criteria, not only test-passing, especially when scores feed risk thresholds.",
+        "Trend extrapolations built on automated-grader scores may overstate real-world progress if the grader-versus-human gap is widening.",
+        "Golden-baseline calibration should be standard practice whenever human review is used as ground truth in evaluations."
+      ],
+      "debate_connections": [
+        "benchmark_validity",
+        "ai_rd_automation"
+      ],
+      "methodology": {
+        "design": "Blind-style maintainer review of AI-generated and golden human PRs on GitHub, without CI tools and with testing requirements waived (generous to AI).",
+        "sample": "296 AI-generated PRs plus 47 golden patches, reviewed by 4 active maintainers across scikit-learn, Sphinx, and pytest (95 of 500 SWE-bench Verified issues).",
+        "measures": "Accept/needs-changes decisions, rejection reasons, 0-100% progress toward mergeability, and 1-10 confidence ratings.",
+        "caveats": "Three repositories only; golden patches potentially recognizable; agents had no iteration opportunity; results specific to one benchmark and harness configuration; appendix includes false-negative, ordering-effect, repo-specific, and time-horizon-conversion analyses."
+      },
+      "related_work": [
+        "metr_time_horizon_1_1_2026"
+      ],
+      "themes": [
+        "benchmark_validity",
+        "real_world_transfer",
+        "software_engineering_evaluation",
+        "human_baselines"
+      ],
+      "tags": [
+        "swe_bench",
+        "code_review",
+        "maintainers",
+        "pull_requests",
+        "automated_grading",
+        "benchmark_gaps"
+      ],
+      "influence_score": 7,
+      "source_links": [
+        "https://metr.org/notes/2026-03-10-many-swe-bench-passing-prs-would-not-be-merged-into-main/"
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://metr.org/notes/2026-03-10-many-swe-bench-passing-prs-would-not-be-merged-into-main/"
+    },
+    {
+      "id": "metr_nanogpt_ai_rd_2026",
+      "title": "Evidence on AI R&D Progress from NanoGPT",
+      "authors": [
+        "METR"
+      ],
+      "date": "2026-04-21",
+      "source_type": "short_note",
+      "source_platform": "METR Notes",
+      "url": "https://metr.org/notes/2026-04-21-ai-rd-nanogpt-progress/",
+      "category": "research",
+      "summary": "This METR research note uses the NanoGPT speedrun — a public leaderboard for minimizing the time to pretrain a small language model to fixed validation-loss thresholds on 8xH100 GPUs — as a lens on AI R&D progress and the character of R&D contributions. METR classified 77 record-setting submissions from 36 contributors (May 2024 to March 2026) along two dimensions: optimization depth (breakthrough, deep, moderate, or shallow) and provenance (invented, adapted, or imported). Over the period, training time fell from 45 minutes to 1.43 minutes, a 31x speedup. Decomposing that improvement, shallow and moderate contributions account for approximately 21x of the 31x total; by provenance, imported ideas contributed 6.7x, adapted ideas 3.0x, and invented ideas 1.6x. Early records mostly imported existing frontier research techniques, while later gains increasingly involved novel ideas as accessible improvements were exhausted. Four records between late 2025 and early 2026 were produced with AI agents; METR judges all four to be real improvements, but none reached the deep or breakthrough end of the scale, placing AI contributions on par with recent human baseline efforts rather than demonstrably beyond them, and notes limited public evidence of agents operating at scale on this type of task. The note closes by discussing what challenges like this are useful for measuring, and flags caveats: training-data contamination could obscure genuine agent novelty, survivorship bias hides failed attempts, small-scale pretraining insights may not transfer to frontier scale, and the inference compute and human direction behind agent runs are unknown.",
+      "key_findings": [
+        "The NanoGPT speedrun achieved a 31x cumulative speedup (45 minutes to 1.43 minutes) across 77 records set by 36 contributors between May 2024 and March 2026.",
+        "Shallow and moderate-depth contributions drove approximately 21x of the 31x total improvement; deep or breakthrough contributions account for a minority of measured progress.",
+        "By provenance, imported ideas contributed 6.7x of the total speedup, adapted ideas 3.0x, and invented ideas 1.6x — most progress came from moving existing techniques in, not de novo research.",
+        "The contribution mix shifted over time from importing frontier techniques toward novel ideas as easy gains were exhausted.",
+        "Four AI-agent records (late 2025 to early 2026) are real improvements, but none rated deep or breakthrough — comparable to recent human baseline efforts rather than superior to them.",
+        "Contamination, survivorship bias, scale-transfer questions, and unknown agent compute/human steering all limit what the leaderboard establishes about R&D automation."
+      ],
+      "quantitative_data": {
+        "records_classified": 77,
+        "contributors": 36,
+        "period": "May 2024 to March 2026",
+        "training_time_start_minutes": 45,
+        "training_time_end_minutes": 1.43,
+        "total_speedup": "31x",
+        "speedup_from_shallow_and_moderate": "~21x of the 31x",
+        "speedup_from_imported_ideas": "6.7x",
+        "speedup_from_adapted_ideas": "3.0x",
+        "speedup_from_invented_ideas": "1.6x",
+        "ai_agent_records": 4,
+        "hardware": "8xH100 GPUs"
+      },
+      "novel_arguments_and_concepts": "The note's main conceptual contribution is a two-dimensional taxonomy of R&D contributions — optimization depth (shallow to breakthrough) and provenance (imported, adapted, invented) — applied to a fully public optimization race. Decomposing a headline 31x speedup into these categories shows that most measured progress came from shallow-to-moderate engineering and imported ideas, which recalibrates what 'R&D progress' on such benchmarks demonstrates: strong performance may primarily reflect integration and tuning capacity rather than novel research insight. Applying the same rubric to the first AI-agent records enables a like-for-like comparison of human and AI contributions on identical terms; the finding that agent records are real but not deep offers a concrete, falsifiable marker for detecting when agents begin producing deep or breakthrough research contributions.",
+      "implications_for_governance": [
+        "Claims of AI R&D automation should be graded by contribution depth and provenance, not just leaderboard movement or aggregate speedups.",
+        "The current absence of deep or breakthrough AI contributions on a public R&D task provides a legible tripwire that monitors and evaluators can track over time.",
+        "Public optimization races offer governance-relevant transparency about the character of AI R&D contributions that internal lab metrics lack, though contamination and survivorship caveats apply.",
+        "Assessments extrapolating small-scale R&D results to frontier-scale automation risk should account for the unknown transferability of small-scale pretraining insights."
+      ],
+      "debate_connections": [
+        "ai_rd_automation",
+        "benchmark_validity"
+      ],
+      "methodology": {
+        "design": "Retrospective classification of NanoGPT speedrun leaderboard records.",
+        "sample": "77 records from 36 contributors, May 2024 to March 2026, targeting fixed validation-loss thresholds on 8xH100 GPUs.",
+        "classification_dimensions": [
+          "optimization depth: breakthrough / deep / moderate / shallow",
+          "provenance: invented / adapted / imported"
+        ],
+        "caveats": "Training-data contamination, survivorship bias over failed attempts, uncertain small-to-frontier scale transfer, and unknown inference compute and human direction for AI-agent runs."
+      },
+      "related_work": [
+        "metr_rd_section_anthropic_risk_report_review_2026",
+        "metr_anthropic_researcher_uplift_2026"
+      ],
+      "themes": [
+        "ai_rd_automation",
+        "research_contribution_taxonomy",
+        "capability_measurement",
+        "open_leaderboards"
+      ],
+      "tags": [
+        "nanogpt_speedrun",
+        "ai_rd",
+        "optimization_depth",
+        "provenance",
+        "ai_agents",
+        "pretraining"
+      ],
+      "influence_score": 6,
+      "source_links": [
+        "https://metr.org/notes/2026-04-21-ai-rd-nanogpt-progress/"
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://metr.org/notes/2026-04-21-ai-rd-nanogpt-progress/"
+    },
+    {
+      "id": "metr_anthropic_researcher_uplift_2026",
+      "title": "Because 8 ≈ e², Anthropic's researcher uplift is plausibly >2x",
+      "authors": [
+        "Thomas Kwa (METR)"
+      ],
+      "date": "2026-07-08",
+      "source_type": "short_note",
+      "source_platform": "METR Notes",
+      "url": "https://metr.org/notes/2026-07-08-anthropic-researcher-uplift/",
+      "category": "research",
+      "summary": "This METR research note (authored by Thomas Kwa and flagged as his opinion, with noted disagreement from others at METR) converts Anthropic's report that contributors merged 8x as much code per day in Q2 2026 versus a 2021-2024 baseline into an estimate of individual researcher uplift. Under a Cobb-Douglas production function with researchers spending roughly half their time coding (beta = 0.5), uplift is U = M^beta = sqrt(8) ≈ 2.83x. The titular observation is that because 8 ≈ e² (7.39), this estimate is unusually robust to the elasticity of substitution between coding and non-coding work: across CES models with sigma in [0.5, 3.0], predicted uplift spans 2.75-2.91x, staying within ±3% of 2.83 for sigma in [0.5, 2]. A code-heterogeneity variant, in which AI accelerates low-stakes code more than high-stakes code, yields 2.33-2.66x for plausible parameters — still above 2x. Caveats that could pull the estimate below 2x include AI code verbosity (a prior RCT's 95% CI of 1.22-2.57x lines-of-code inflation; at 1.83x, the effective multiplier falls to 4.4x and uplift to 1.84-2.08x), barely-useful induced code, and researcher time-allocation irrationality (developers in a prior study believed AI sped them up ~20% when it had slowed them ~20%). The note contrasts its 2.5-2.8x central estimate of serial researcher uplift with Anthropic's system-card claim that overall R&D uplift is 'well short of 2x,' noting that under an R&D model of labor^0.55 x compute^0.45, a 2x overall speedup would require roughly 3.52x researcher uplift.",
+      "key_findings": [
+        "A Cobb-Douglas model with 50% of researcher time spent coding converts Anthropic's 8x code-merge multiplier into approximately 2.83x individual researcher uplift.",
+        "Because 8 ≈ e² ≈ 7.39, the estimate is robust to modeling choices: CES models with elasticity of substitution in [0.5, 3.0] give 2.75-2.91x, within ±3% of 2.83 for sigma in [0.5, 2].",
+        "Accounting for code heterogeneity (AI accelerating low-stakes code more than high-stakes code) lowers the plausible range to 2.33-2.66x — still above 2x.",
+        "Verbosity is the strongest deflator: at 1.83x lines-of-code inflation (within a prior RCT's 1.22-2.57x 95% CI), the effective multiplier drops to 4.4x and uplift to 1.84-2.08x, barely straddling the 2x threshold.",
+        "Very low substitution elasticities are ruled out as implausible: sigma = 0.3 would require a ~114x coding speedup and imply only 3.5% of time spent coding, and sigma = 0 caps the code multiplier at 2, making the observed 8x impossible.",
+        "The tension with Anthropic's 'well short of 2x' claim is partly definitional: serial researcher uplift differs from overall R&D speedup, which includes compute; a 2x overall speedup would require about 3.52x researcher uplift under labor^0.55 x compute^0.45."
+      ],
+      "quantitative_data": {
+        "anthropic_reported_multiplier": "8x code merged per contributor per day, Q2 2026 vs 2021-2024 baseline",
+        "cobb_douglas_uplift": "sqrt(8) ≈ 2.83x with beta = 0.5",
+        "ces_uplift_range": "2.75-2.91x for sigma in [0.5, 3.0]",
+        "robustness_window": "within ±3% of 2.83 for sigma in [0.5, 2]",
+        "code_heterogeneity_range": "2.33-2.66x for low-stakes share alpha in [0.3, 0.9]",
+        "verbosity_ci": "1.22-2.57x lines-of-code inflation (95% CI from prior RCT)",
+        "verbosity_adjusted_uplift": "1.84-2.08x at 1.83x verbosity (effective multiplier 4.4x)",
+        "noncode_speedup_scenario": "1.3x non-code speedup raises the Cobb-Douglas estimate from 2.83x to 3.22x",
+        "implausibility_bounds": "sigma = 0.3 requires ~114x coding speedup and 3.5% coding time; sigma = 0 caps M at 2",
+        "central_estimate": "2.5-2.8x serial researcher uplift",
+        "required_uplift_for_2x_overall_rd": "≈3.52x under R&D ≈ labor^0.55 x compute^0.45"
+      },
+      "novel_arguments_and_concepts": "The titular observation — that 8 ≈ e² makes the uplift estimate insensitive to the elasticity of substitution between coding and non-coding work — is a genuinely novel analytic point: near M = e², the CES correction term almost vanishes (at M = 8 it equals -2.08 + 2.16 = 0.08), so Cobb-Douglas and CES models converge on roughly 2.83x regardless of whether the two kinds of work are complements or substitutes. The note also argues that observed code output is a better uplift metric than per-task code speedup, because output reflects researchers' rational reallocation of time toward whatever has become marginally valuable. Distinguishing serial researcher uplift from overall R&D speedup (which folds in compute) reconciles the >2x estimate with Anthropic's own 'well short of 2x' claim. The closing observation — with compute tripling annually and researcher uplift rising as models improve, both R&D inputs are growing exponentially — frames researcher uplift as a compounding input capable of sustaining exponential research output gains.",
+      "implications_for_governance": [
+        "Lab-reported productivity metrics such as code merged can be translated, with stated assumptions, into researcher-uplift estimates relevant to AI R&D acceleration thresholds in safety frameworks.",
+        "The gap between lab characterizations ('well short of 2x') and independent estimates (>2x) argues for standardized uplift definitions — serial labor uplift versus overall R&D speedup — in risk reporting.",
+        "Uplift claims built on code metrics need accompanying measurements of verbosity, time-allocation shifts, and non-coding output to be interpretable; the note recommends Anthropic collect exactly these.",
+        "If researcher uplift and compute are both growing exponentially, R&D-acceleration triggers in frontier safety policies may be approached sooner than single-metric readings suggest."
+      ],
+      "debate_connections": [
+        "ai_rd_automation",
+        "existential_risk_debate"
+      ],
+      "methodology": {
+        "approach": "Back-of-envelope economic modeling of researcher output from a single reported code-output statistic.",
+        "models": [
+          "Cobb-Douglas production function (U = M^beta)",
+          "CES with varying elasticity of substitution (sigma 0.5-3.0)",
+          "code-heterogeneity variant with low-stakes vs high-stakes code (g_high = g_low^(1/3))"
+        ],
+        "sensitivity_analysis": "Parameter sweeps over sigma, coding-time share beta, low-stakes share alpha, verbosity adjustment, and a non-code-speedup scenario.",
+        "caveats_modeled": [
+          "AI code verbosity",
+          "barely-useful induced code (5%-20% as valuable despite >20x speedup)",
+          "researcher time-allocation irrationality"
+        ],
+        "epistemic_status": "Author's opinion; others at METR disagree, with a named dissent citing verbosity, code heterogeneity, and population-definition concerns."
+      },
+      "related_work": [
+        "metr_nanogpt_ai_rd_2026",
+        "metr_rd_section_anthropic_risk_report_review_2026"
+      ],
+      "themes": [
+        "ai_rd_automation",
+        "productivity_measurement",
+        "economic_modeling",
+        "lab_transparency"
+      ],
+      "tags": [
+        "researcher_uplift",
+        "anthropic",
+        "cobb_douglas",
+        "ces",
+        "code_metrics",
+        "rd_acceleration"
+      ],
+      "influence_score": 6,
+      "source_links": [
+        "https://metr.org/notes/2026-07-08-anthropic-researcher-uplift/"
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://metr.org/notes/2026-07-08-anthropic-researcher-uplift/"
     }
   ]
 }

@@ -166,6 +166,7 @@ const TAXONOMY_ENUMS = Object.freeze({
       'Slate Star Codex',
       'Substack',
       'TIME Magazine',
+      'Website',
       'arXiv',
     ]),
   }),
@@ -193,9 +194,13 @@ const TAXONOMY_ENUMS = Object.freeze({
   }),
   'dwarkesh-lab-insiders': Object.freeze({
     role_category: Object.freeze([
+      'analyst',
       'capabilities_researcher',
+      'economist',
+      'educator',
       'former_insider',
       'governance_expert',
+      'host',
       'independent_researcher',
       'investor_strategist',
       'lab_leader',

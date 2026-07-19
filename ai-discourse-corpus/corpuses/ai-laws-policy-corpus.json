@@ -4,7 +4,7 @@
     "version": "2.0",
     "date_created": "2026-02-15",
     "last_updated": "2026-07-04",
-    "total_entries": 217,
+    "total_entries": 224,
     "usage_notes": "This corpus documents how AI governance is being implemented and discussed globally. Each entry includes not just the law's provisions but the regulatory ideas and arguments surrounding it. The novel_arguments_and_perspectives and public_comments_and_debate fields contain the substantive analysis. Tags align with the expanded AI discourse taxonomy in expanded_tag_list.json.",
     "note_on_dates": "Dates reflect enactment or significant legislative status as of February 2026. Some entries reflect proposals whose timelines may have shifted.",
     "schema_version": "2.0",
@@ -9410,6 +9410,349 @@
         "https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260SB53"
       ],
       "source_url": "https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260SB53"
+    },
+    {
+      "id": "illinois_sb315_ai_safety_2026",
+      "title": "Illinois SB 315 — AI Safety Measures Act",
+      "jurisdiction": "Illinois, United States",
+      "jurisdiction_level": "state",
+      "date_enacted": "2026-07-06",
+      "date_proposed": null,
+      "status": "enacted",
+      "summary": "Governor Pritzker signed SB 315, the AI Safety Measures Act, on July 6, 2026, making Illinois the first US state to mandate annual independent third-party safety audits of frontier AI models. The law applies to developers exceeding 10^26 operations of training compute and $500 million in annual revenue, and also requires published frontier AI safety frameworks, public disclosure of safety practices, and reporting of significant safety incidents. Core obligations take effect January 1, 2027, with the independent audit requirement beginning January 1, 2028. State officials framed the bipartisan law as filling a federal oversight gap and building on frameworks already passed in California and New York.",
+      "key_provisions": [
+        "First-in-nation requirement of regular independent third-party safety audits of frontier models, applying from January 1, 2028",
+        "Scoped to frontier developers exceeding 10^26 operations of training compute and $500 million in annual revenue",
+        "Developers must publish frontier AI safety frameworks and publicly disclose safety practices",
+        "Mandatory reporting of significant safety incidents and maintenance of robust compliance processes",
+        "Confidential reporting channels with whistleblower protections for employees",
+        "Effective January 1, 2027"
+      ],
+      "novel_arguments_and_perspectives": [
+        "First US mandate for independent external verification of frontier AI safety, going beyond the transparency-only frameworks of California and New York",
+        "State legislation explicitly positioned as substituting for absent federal frontier-safety oversight",
+        "Bipartisan passage presented as evidence that frontier AI safety regulation need not be partisan"
+      ],
+      "public_comments_and_debate": [
+        "Governor Pritzker called it a 'bipartisan, first- and most-protective-in-the-nation law'",
+        "Attorney General Raoul said Illinois is 'filling the gap' left by the absence of federal frontier AI oversight",
+        "The governor's office positioned it as the strongest AI safety law in the country, building on California and New York frameworks"
+      ],
+      "risk_approach": "Frontier-model safety regime combining mandatory independent audits, published safety frameworks, and incident reporting, scoped by compute and revenue thresholds",
+      "enforcement_mechanism": "State-enforced guardrails with confidential reporting channels and whistleblower protections; the signing announcement does not specify the enforcing agency",
+      "tags": [
+        "State AI Law",
+        "Frontier Models",
+        "Safety Audits",
+        "Incident Reporting",
+        "Whistleblower Protections",
+        "Transparency"
+      ],
+      "relevance_to_ai_discourse": "Escalates state-level frontier AI regulation from transparency mandates to mandatory external verification, creating the first US independent-audit requirement for advanced AI developers",
+      "related_legislation": [],
+      "source_links": [
+        "https://gov-pritzker-newsroom.prezly.com/gov-pritzker-signs-nation-leading-artificial-intelligence-safety-law"
+      ],
+      "source_url": "https://gov-pritzker-newsroom.prezly.com/gov-pritzker-signs-nation-leading-artificial-intelligence-safety-law",
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://gov-pritzker-newsroom.prezly.com/gov-pritzker-signs-nation-leading-artificial-intelligence-safety-law. Compute/revenue thresholds and 2028 audit start date per pre-verified metadata; the press release confirms signing date, effective date, audit mandate, disclosure, incident reporting and whistleblower provisions but does not state the numeric thresholds."
+    },
+    {
+      "id": "un_scientific_panel_first_report_2026",
+      "title": "First Report of the UN Independent International Scientific Panel on AI",
+      "jurisdiction": "United Nations",
+      "jurisdiction_level": "international",
+      "date_enacted": "2026-07-01",
+      "date_proposed": null,
+      "status": "policy_report",
+      "summary": "The UN Independent International Scientific Panel on AI published its first report on July 1, 2026. The 40-expert panel, drawn from every global region with members serving in their personal capacity and co-chaired by Yoshua Bengio and Maria Ressa, warned that science currently cannot guarantee that increasingly capable AI systems will not cause catastrophic harm, whether through autonomous action or malicious misuse. The report also flags AI-amplified misinformation as a threat to democratic integrity, documents the concentration of frontier AI development in the United States and China alongside a widening digital divide, and acknowledges benefits for healthcare, science, economic development and productivity if AI is used responsibly. It served as the evidence base for the first UN Global Dialogue on AI Governance held days later in Geneva.",
+      "key_provisions": [
+        "Warns that science currently cannot guarantee that increasingly capable AI will not cause catastrophic harm, via autonomous action or malicious misuse",
+        "Identifies AI-amplified misinformation, laced with fear and anger, as a threat to democratic integrity",
+        "Documents concentration of frontier AI development in two countries (United States and China) and the risk of developing nations being left behind",
+        "Acknowledges potential benefits for economic development, healthcare, scientific progress and productivity if used responsibly",
+        "Calls for multilateral governance responses through the UN and better policymaker understanding of AI systems"
+      ],
+      "novel_arguments_and_perspectives": [
+        "First report of a UN-mandated independent scientific assessment body for AI, institutionalizing evidence synthesis akin to climate assessment panels",
+        "Frames catastrophic frontier-AI risk as a problem of scientific uncertainty rather than a settled debate",
+        "Links information integrity directly to the viability of democracy"
+      ],
+      "public_comments_and_debate": [
+        "Co-chair Yoshua Bengio: 'science currently cannot guarantee that as capabilities increase, AI will not cause catastrophic harm'",
+        "Co-chair Maria Ressa warned of an 'information Armageddon', saying 'If you can't tell fact from fiction, you cannot have a democracy'",
+        "Report positioned as input to the UN Global Dialogue on AI Governance (July 6-7, 2026, Geneva)"
+      ],
+      "risk_approach": "Independent scientific evidence synthesis informing multilateral governance; assessment rather than regulation",
+      "enforcement_mechanism": "None — advisory scientific panel with no regulatory authority",
+      "tags": [
+        "International Governance",
+        "Frontier Models",
+        "Catastrophic Risk",
+        "Misinformation",
+        "Scientific Assessment",
+        "United Nations"
+      ],
+      "relevance_to_ai_discourse": "Establishes an authoritative UN scientific baseline on AI risks, including an explicit statement that catastrophic harm from frontier AI cannot currently be ruled out",
+      "related_legislation": [
+        "un_global_dialogue_first_session_2026"
+      ],
+      "source_links": [
+        "https://news.un.org/en/story/2026/07/1167862"
+      ],
+      "source_url": "https://news.un.org/en/story/2026/07/1167862",
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://news.un.org/en/story/2026/07/1167862. Co-chair identification of Bengio and Ressa per pre-verified metadata, consistent with the story's attribution of lead statements to both."
+    },
+    {
+      "id": "un_global_dialogue_first_session_2026",
+      "title": "First Session of the UN Global Dialogue on AI Governance",
+      "jurisdiction": "United Nations",
+      "jurisdiction_level": "international",
+      "date_enacted": "2026-07-06",
+      "date_proposed": "2025-08",
+      "status": "framework",
+      "summary": "The inaugural session of the UN Global Dialogue on AI Governance convened in Geneva on July 6-7, 2026, alongside the ITU's AI for Good Global Summit, as the first AI governance forum open to all UN member states. Established by General Assembly resolution A/RES/79/325 (August 2025) following the Global Digital Compact adopted at the 2024 Summit of the Future, the Dialogue brings governments together with the private sector, academia, civil society and technical experts, with government co-chairs from El Salvador and Estonia. Its stated aim is to ensure that AI governance reflects the priorities of all nations, not just the most technologically advanced, with discussions organized around four thematic clusters spanning AI's societal dimensions, capacity-building and digital equity, safe and trustworthy AI, and human rights and accountability.",
+      "key_provisions": [
+        "First AI governance platform including all UN member states alongside the private sector, academia, civil society and technical experts",
+        "Established by GA resolution A/RES/79/325 (August 2025), implementing commitments of the Global Digital Compact",
+        "Inaugural session held July 6-7, 2026 in Geneva alongside the ITU AI for Good Global Summit",
+        "Four thematic clusters: social, economic, ethical, cultural, linguistic and technical dimensions; capacity-building and digital equity; safe, secure and trustworthy AI systems; human rights protection and accountability",
+        "Intergovernmental co-chairs from El Salvador and Estonia"
+      ],
+      "novel_arguments_and_perspectives": [
+        "Universal-membership alternative to plurilateral AI forums such as the G7, OECD and the AI summit series",
+        "Explicit framing that governance should reflect 'the priorities of all nations, not just the most technologically advanced'",
+        "Pairs political dialogue with an independent scientific panel whose first report was published days before the session"
+      ],
+      "public_comments_and_debate": [
+        "Featured speakers included UN leadership, government representatives and AI sector leaders",
+        "Positioned as follow-through on the Global Digital Compact adopted at the 2024 Summit of the Future",
+        "The UN scientific panel's first report, warning that catastrophic frontier-AI harm cannot be ruled out, framed the session's risk discussions"
+      ],
+      "risk_approach": "Inclusive multilateral dialogue and norm development; non-binding cooperation rather than regulation",
+      "enforcement_mechanism": "None — voluntary intergovernmental platform without binding authority",
+      "tags": [
+        "International Governance",
+        "United Nations",
+        "Multilateralism",
+        "Capacity Building",
+        "Human Rights",
+        "Digital Divide"
+      ],
+      "relevance_to_ai_discourse": "Creates the first universal intergovernmental venue for AI governance, shifting part of the global debate from plurilateral summits and expert bodies to an all-member-state UN process",
+      "related_legislation": [
+        "un_scientific_panel_first_report_2026"
+      ],
+      "source_links": [
+        "https://www.un.org/global-dialogue-ai-governance/en",
+        "https://news.un.org/en/story/2026/07/1167862"
+      ],
+      "source_url": "https://www.un.org/global-dialogue-ai-governance/en",
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://www.un.org/global-dialogue-ai-governance/en (session dates, mandate, resolution, co-chairs, thematic clusters) and https://news.un.org/en/story/2026/07/1167862 (scientific panel report feeding into the session)."
+    },
+    {
+      "id": "eu_code_of_practice_ai_content_transparency_2026",
+      "title": "EU Code of Practice on Transparency of AI-Generated Content",
+      "jurisdiction": "European Union",
+      "jurisdiction_level": "supranational",
+      "date_enacted": "2026-06-10",
+      "date_proposed": "2025-09",
+      "status": "voluntary_code",
+      "summary": "The European Commission's AI Office published the final Code of Practice on Transparency of AI-Generated Content on June 10, 2026, concluding a drafting process launched with a public consultation in September 2025. The voluntary code operationalizes the legally binding transparency obligations of AI Act Article 50 — machine-readable marking of AI-generated or manipulated outputs by providers, and labeling of deepfakes and AI-generated public-interest text by deployers — which apply from August 2, 2026. Providers and deployers of generative AI systems may sign the code (signatures due July 27, 2026); positively assessed signatories can rely on its measures to demonstrate compliance across Member States and join Signatory Taskforces, while non-signatories must demonstrate compliance through alternative means assessed individually by market surveillance authorities.",
+      "key_provisions": [
+        "Operationalizes the AI Act Article 50 marking obligation: provider outputs must be marked in a machine-readable format and detectable as artificially generated or manipulated",
+        "Deployer labeling of deepfakes and of AI-generated text published on matters of public interest, unless subject to editorial review",
+        "Voluntary adherence; following positive assessment, signatories may rely on the code's measures to demonstrate Article 50 compliance",
+        "Technical solutions must be effective, interoperable, robust and reliable, by reference to the generally acknowledged state of the art rather than mandated techniques",
+        "Signatory Taskforces to share implementation practices",
+        "Underlying Article 50 obligations apply from August 2, 2026; signatures due July 27, 2026"
+      ],
+      "novel_arguments_and_perspectives": [
+        "Extends the AI Act's code-of-practice compliance model from general-purpose AI obligations to content transparency",
+        "Compliance-presumption incentive design: voluntary adherence buys legal certainty and reduced administrative burden, while non-signatories face individual assessment",
+        "Technology-neutral reliance on state-of-the-art marking rather than mandating specific watermarking or provenance standards"
+      ],
+      "public_comments_and_debate": [
+        "Drafted through a multi-round process with a public consultation beginning September 2025",
+        "Commission frames signing as providing legal certainty and trust across all Member States and demonstrating AI Act compliance with reduced administrative burden",
+        "Non-signatories using alternative compliance means face individual assessment by market surveillance authorities"
+      ],
+      "risk_approach": "Transparency and provenance obligations for synthetic content; voluntary soft-law instrument scaffolding binding AI Act requirements",
+      "enforcement_mechanism": "The code itself is voluntary; the underlying Article 50 obligations are enforced by national market surveillance authorities under the AI Act",
+      "tags": [
+        "Transparency",
+        "Deepfakes",
+        "Content Provenance",
+        "Voluntary Code",
+        "AI-Generated Content",
+        "Watermarking"
+      ],
+      "relevance_to_ai_discourse": "Sets the EU operational baseline for marking and labeling AI-generated content just before Article 50 obligations take effect, shaping global watermarking and provenance practice",
+      "related_legislation": [
+        "eu_ai_act"
+      ],
+      "source_links": [
+        "https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content"
+      ],
+      "source_url": "https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content",
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content. July 27, 2026 signature deadline per pre-verified metadata; the Commission page describes the signatory form without stating that date."
+    },
+    {
+      "id": "texas_traiga_hb149_2025",
+      "title": "Texas Responsible Artificial Intelligence Governance Act (TRAIGA, HB 149)",
+      "jurisdiction": "Texas, United States",
+      "jurisdiction_level": "state",
+      "date_enacted": "2025-06-22",
+      "date_proposed": "2025-03-14",
+      "status": "enacted",
+      "summary": "Governor Abbott signed HB 149, the Texas Responsible Artificial Intelligence Governance Act (TRAIGA), on June 22, 2025, making Texas the third US state after Colorado and Utah to adopt a comprehensive AI law; it took effect January 1, 2026. Rather than a risk-management framework, TRAIGA prohibits specific AI uses — intentional unlawful discrimination, manipulation inciting self-harm, harm to others or criminal activity, and government social scoring — and imposes AI-interaction disclosure duties on government agencies and healthcare providers. Liability generally requires intentional conduct, with disparate impact alone insufficient. The Act is enforced exclusively by the Texas Attorney General with a 60-day cure period and tiered civil penalties, and creates a regulatory sandbox permitting up to 36 months of supervised experimentation.",
+      "key_provisions": [
+        "Prohibits AI use for intentional discrimination against protected classes, manipulation inciting self-harm, harm to others or criminal activity, and government social scoring",
+        "Government agencies must disclose AI system use clearly and conspicuously, before or at the time of interaction, without dark patterns; no affirmative consent required",
+        "Healthcare providers must disclose AI use in relation to healthcare services or treatment, with emergency-care flexibility",
+        "Intent-based liability standard: disparate impact alone is insufficient to establish a violation",
+        "Exclusive Attorney General enforcement with no private right of action and a 60-day cure period",
+        "Civil penalties of $10,000-$12,000 per curable violation, $80,000-$200,000 per uncurable violation, and $2,000-$40,000 per day for continuing violations",
+        "Regulatory sandbox allowing up to 36 months of participation with quarterly reporting, while core duties still apply",
+        "Effective January 1, 2026"
+      ],
+      "novel_arguments_and_perspectives": [
+        "Prohibited-uses model with an intent gate, in deliberate contrast to disparate-impact and risk-management approaches",
+        "Pairs enforcement with a regulatory sandbox to signal innovation-friendliness",
+        "Template for comprehensive AI legislation in Republican-led states distinct from Colorado's original risk-based framework"
+      ],
+      "public_comments_and_debate": [
+        "Law firm commentary described the enacted text as a significantly pared-back version of the original bill",
+        "Commentators noted Texas became the third US state with a comprehensive AI law, after Colorado and Utah",
+        "Analyses contrast TRAIGA's intent-based approach with the risk-management frameworks scheduled to take effect in Colorado and California in 2026"
+      ],
+      "risk_approach": "Prohibited-uses and intent-based liability model with targeted disclosure duties, rather than EU-style or Colorado-style risk management",
+      "enforcement_mechanism": "Exclusive Texas Attorney General enforcement with a 60-day cure period and tiered civil penalties; no private right of action",
+      "tags": [
+        "State AI Law",
+        "Prohibited Uses",
+        "Government Use of AI",
+        "Regulatory Sandbox",
+        "Attorney General Enforcement",
+        "Disclosure"
+      ],
+      "relevance_to_ai_discourse": "In effect since January 2026, TRAIGA anchors the intent-based, prohibited-uses pole of US state AI regulation, an approach later echoed in Colorado's 2026 pivot away from risk management",
+      "related_legislation": [
+        "colorado_sb_24_205",
+        "colorado_sb_26_189_2026"
+      ],
+      "source_links": [
+        "https://www.nortonrosefulbright.com/en/knowledge/publications/c6c60e0c/the-texas-responsible-ai-governance-act",
+        "https://capitol.texas.gov/BillLookup/History.aspx?LegSess=89R&Bill=HB149"
+      ],
+      "source_url": "https://capitol.texas.gov/BillLookup/History.aspx?LegSess=89R&Bill=HB149",
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://www.nortonrosefulbright.com/en/knowledge/publications/c6c60e0c/the-texas-responsible-ai-governance-act and the official history at https://capitol.texas.gov/BillLookup/History.aspx?LegSess=89R&Bill=HB149 (filed 2025-03-14, signed 2025-06-22, effective 2026-01-01), with web-search corroboration of the signing date."
+    },
+    {
+      "id": "india_it_amendment_rules_2026",
+      "title": "India IT (Intermediary Guidelines and Digital Media Ethics Code) Amendment Rules 2026 — Synthetic Content Labeling",
+      "jurisdiction": "India",
+      "jurisdiction_level": "national",
+      "date_enacted": "2026-02-10",
+      "date_proposed": null,
+      "status": "enacted",
+      "summary": "On February 10, 2026, India's Ministry of Electronics and Information Technology (MeitY) notified amendments to the IT (Intermediary Guidelines and Digital Media Ethics Code) Rules 2021, effective February 20, 2026, creating a mandatory labeling regime for synthetically generated information (SGI) — deepfakes and other AI-generated or AI-altered audio and visual content appearing indistinguishable from real persons or events (AI-generated text is excluded). Platforms must label SGI clearly and prominently and, where feasible, embed permanent provenance metadata; significant social media intermediaries (over 5 million registered users) must collect user declarations about synthetic content and deploy automated verification tools. The amendments also sharply compress takedown timelines, including three hours for court or government orders, with non-compliance forfeiting intermediary safe harbour protection.",
+      "key_provisions": [
+        "Defines synthetically generated information (SGI) as artificially or algorithmically created audio, visual or audio-visual content appearing indistinguishable from a natural person or real-world event; AI-generated text excluded",
+        "Mandatory clear and prominent labeling of SGI, with visual labels for imagery and audible disclosures for audio; the draft 10% visible-area watermark requirement was dropped from the final rules",
+        "Permanent embedded metadata and unique identifiers for provenance tracing where feasible; removal or modification of labels and metadata prohibited",
+        "Significant social media intermediaries (over 5 million registered users) must obtain user declarations on synthetic content and deploy automated tools to verify their accuracy",
+        "Compressed takedown timelines: 3 hours for court or government orders (previously 36), and 2 hours for high-risk content such as non-consensual intimate imagery and impersonation",
+        "Non-compliance with due diligence obligations forfeits intermediary safe harbour, exposing platforms to direct liability, fines and potential criminal exposure"
+      ],
+      "novel_arguments_and_perspectives": [
+        "Regulates synthetic content through intermediary safe harbour conditions rather than a standalone AI statute",
+        "Provenance metadata designed so a deepfake can be traced back to the specific AI tool that created it",
+        "Scales obligations by platform size (5 million registered user threshold) rather than by model capability"
+      ],
+      "public_comments_and_debate": [
+        "The final rules dropped the draft's 10% visible-area watermark requirement following consultation",
+        "Law firm and industry commentary flags the 3-hour takedown window as notably strict",
+        "Intermediaries must warn users that creating or disseminating unlawful synthetic content can lead to disclosure of the user's identity to victims"
+      ],
+      "risk_approach": "Platform due-diligence and labeling obligations conditioned on safe harbour, targeting deepfakes and synthetic media distribution rather than AI development",
+      "enforcement_mechanism": "Loss of intermediary safe harbour plus potential monetary fines and criminal liability under the IT Act framework; administered by MeitY",
+      "tags": [
+        "Deepfakes",
+        "Transparency",
+        "Platform Regulation",
+        "Content Labeling",
+        "Safe Harbour",
+        "Content Provenance"
+      ],
+      "relevance_to_ai_discourse": "One of the largest jurisdictions to mandate synthetic-content labeling, converging with EU Article 50 transparency goals while using platform liability rather than AI-specific regulation",
+      "related_legislation": [
+        "eu_code_of_practice_ai_content_transparency_2026"
+      ],
+      "source_links": [
+        "https://www.meity.gov.in/static/uploads/2026/02/f55fe52418b03f58b0669f6a8bc03b6d.pdf",
+        "https://www.freshfields.com/en/our-thinking/blogs/technology-quotient/india-targets-deepfakes-and-ai-generated-content-key-changes-under-meitys-2026-102mjwn"
+      ],
+      "source_url": "https://www.meity.gov.in/static/uploads/2026/02/f55fe52418b03f58b0669f6a8bc03b6d.pdf",
+      "verification_status": "verified",
+      "verification_notes": "Verified 2026-07-19 against MeitY notification G.S.R. 120(E), notified 10 February 2026 and effective 20 February 2026; Freshfields retained as secondary analysis."
+    },
+    {
+      "id": "new_york_2026_ai_legislative_package",
+      "title": "New York 2026 AI Legislative Package (Chatbot Safeguards, Transparency, Data Centers)",
+      "jurisdiction": "New York, United States",
+      "jurisdiction_level": "state",
+      "date_enacted": null,
+      "date_proposed": "2026-06",
+      "status": "passed_legislature",
+      "summary": "New York's legislature passed a package of seven AI-related bills in June 2026. The measures passed both houses and were awaiting gubernatorial action at the time of verification. The centerpiece, S 9051 (Kids Chatbot Safety Act), passed unanimously (137-0 Assembly, 60-0 Senate) and prohibits offering minors AI companion chatbots with unsafe features such as simulated human emotion, false relationship-building, deceptive companionship tactics and self-harm facilitation. The package also includes training-data transparency, synthetic-content provenance, disclosure for AI-produced news, a one-year moratorium on hyperscale data-center permits over 20 megawatts, a surveillance-pricing ban, and an AI output warning-label bill.",
+      "key_provisions": [
+        "S 9051 Kids Chatbot Safety Act: prohibits offering minors AI companion chatbots with unsafe features (simulating human emotions, creating false relationships, deceptive companionship tactics, facilitating self-harm); Attorney General enforcement with fines up to $25,000 per violation; would take effect January 1, 2027",
+        "A 6578 AI Training Data Transparency Act: generative AI developers must post summaries of datasets used in model development, following California's AB 2013",
+        "S 6954 AI Disclosure and Provenance Data Bill: synthetic content must carry provenance data identifying it as AI-generated, including creation date/time and system provider, applying to content created 180 days after enactment",
+        "S 8451 FAIR News Act: conspicuous disclosure required for news media substantially created through generative AI; Attorney General enforcement with penalties of $1,000-$5,000",
+        "A 11560 Responsible Data Center Development Act: one-year moratorium on permits for hyperscale data centers exceeding 20 megawatts",
+        "A 9349 surveillance-pricing ban and A 3411 requirement that generative AI systems display notices that outputs may be inaccurate"
+      ],
+      "novel_arguments_and_perspectives": [
+        "First state-level ban on offering AI companion chatbots to minors, framed around product design features rather than content moderation",
+        "Package strategy of several narrow bills spanning child safety, transparency, provenance, journalism and infrastructure instead of a single omnibus AI act",
+        "Data-center moratorium ties AI governance to energy and land-use policy"
+      ],
+      "public_comments_and_debate": [
+        "Unanimous passage of the chatbot bill (137-0 Assembly, 60-0 Senate) signals cross-party consensus on child safety in AI",
+        "Closer margins on the data-center moratorium (43-17 Senate, 103-38 Assembly) and surveillance-pricing ban (39-21 Senate, 100-42 Assembly) reflect more contested economic measures",
+        "Training-data transparency measure is modeled on California's AB 2013, which survived a federal court challenge in March 2026"
+      ],
+      "risk_approach": "Harm-specific bills targeting child safety, transparency, provenance and infrastructure rather than a comprehensive risk-management framework",
+      "enforcement_mechanism": "Attorney General enforcement with civil penalties for the chatbot and news-disclosure bills; mechanisms vary per bill; none yet in force pending gubernatorial action",
+      "tags": [
+        "State AI Law",
+        "Child Safety",
+        "AI Companions",
+        "Training Data Transparency",
+        "Data Centers",
+        "Content Provenance"
+      ],
+      "relevance_to_ai_discourse": "Broadest single-session state AI package of 2026; the unanimous companion-chatbot ban marks child safety as the consensus frontier of US state AI regulation",
+      "related_legislation": [],
+      "source_links": [
+        "https://www.nysenate.gov/legislation/bills/2025/S9051",
+        "https://www.nysenate.gov/legislation/bills/2025/S6955",
+        "https://www.nysenate.gov/legislation/bills/2025/A6578",
+        "https://www.nysenate.gov/legislation/bills/2025/S8451",
+        "https://www.nysenate.gov/legislation/bills/2025/A11560",
+        "https://www.nysenate.gov/legislation/bills/2025/A9349",
+        "https://www.nysenate.gov/legislation/bills/2025/A3411",
+        "https://www.transparencycoalition.ai/news/new-york-lawmakers-pass-kids-ai-chatbot-safety-bill-and-two-transparency-acts"
+      ],
+      "source_url": "https://www.nysenate.gov/legislation/bills/2025/S9051",
+      "verification_status": "verified",
+      "verification_notes": "Verified 2026-07-19 against official New York Senate bill pages, which show passage by both houses but did not establish delivery to the governor; secondary coverage retained for package context."
     }
   ]
 }
