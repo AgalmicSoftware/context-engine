@@ -217,7 +217,6 @@ describe('client package modernization contract', () => {
       'vendor-ethers',
       'vendor-wallet-core',
       'vendor-wallet-connectors',
-      'vendor-lit',
       'vendor-arweave',
       'vendor-visualization',
       'vendor-canvas',
@@ -238,6 +237,7 @@ describe('client package modernization contract', () => {
     expectedVendorChunks.forEach((chunkName) => {
       expect(viteConfig).toContain(chunkName);
     });
+    expect(viteConfig).not.toContain('vendor-lit');
     expect(viteConfig).toContain("'/node_modules/hash.js/'");
     expect(viteConfig).toContain("'/node_modules/inherits/'");
     expect(viteConfig).toContain("'/node_modules/minimalistic-assert/'");

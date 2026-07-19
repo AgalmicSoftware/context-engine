@@ -109,12 +109,6 @@ const manualChunkGroups = [
     ],
   },
   {
-    name: 'vendor-lit',
-    patterns: [
-      '/node_modules/@lit-protocol/',
-    ],
-  },
-  {
     name: 'vendor-arweave',
     patterns: [
       '/node_modules/arweave/',
