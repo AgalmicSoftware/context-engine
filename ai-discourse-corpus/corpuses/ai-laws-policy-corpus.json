@@ -5887,7 +5887,7 @@
       "jurisdiction_level": "state_provincial",
       "date_enacted": null,
       "date_proposed": "2024-02-01",
-      "status": "in_committee",
+      "status": "expired",
       "summary": "Proposed legislation that would require developers and deployers of high-risk AI systems to use reasonable care to protect consumers from any known or reasonably foreseeable risks of algorithmic discrimination. The bill passed the Connecticut Senate on April 24, 2024, but was not taken up in the House before the legislative session ended on May 8, 2024.",
       "key_provisions": [
         "Applies to developers and deployers of high-risk AI systems",
@@ -5908,12 +5908,13 @@
       ],
       "relevance_to_ai_discourse": "SB 2's failure to advance illustrates that even bills modeled on successful legislation in other states may not pass if they face opposition from the Governor's office or lack sufficient legislative support. This highlights the importance of building broad coalitions around AI regulation.",
       "related_legislation": [
-        "colorado_sb_24_205"
+        "colorado_sb_24_205",
+        "connecticut_sb5_ai_2026"
       ],
       "source_links": [
         "https://www.seyfarth.com/news-insights/colorado-governor-signs-broad-ai-bill-regulating-employment-decisions.html"
       ],
-      "source_url": "https://www.cga.ct.gov/"
+      "source_url": "https://www.cga.ct.gov/asp/CGABillStatus/cgabillstatus.asp?bill_num=SB00002&selBillType=Bill&which_year=2024"
     },
     {
       "id": "florida_ai_bill_of_rights",
@@ -6547,7 +6548,7 @@
       "title": "Responsible AI Safety and Education Act (RAISE Act)",
       "jurisdiction": "New York, United States",
       "jurisdiction_level": "state_provincial",
-      "date_enacted": "2025-12-15",
+      "date_enacted": "2025-12-19",
       "date_proposed": "2024-06-01",
       "status": "enacted",
       "summary": "Governor Hochul signed nation-leading legislation requiring AI frameworks for frontier AI models. The law establishes a new AI oversight office within New York Department of Financial Services and requires large AI developers to register with the state, publish safety protocols, and report incidents within 72 hours. Effective January 1, 2027.",
@@ -6577,9 +6578,10 @@
         "new_york_loading_act"
       ],
       "source_links": [
-        "https://www.governor.ny.gov/news/governor-hochul-signs-nation-leading-legislation-require-ai-frameworks-ai-frontier-models"
+        "https://www.governor.ny.gov/news/governor-hochul-signs-nation-leading-legislation-require-ai-frameworks-ai-frontier-models",
+        "https://www.nysenate.gov/"
       ],
-      "source_url": "https://www.nysenate.gov/"
+      "source_url": "https://www.governor.ny.gov/news/governor-hochul-signs-nation-leading-legislation-require-ai-frameworks-ai-frontier-models"
     },
     {
       "id": "ohio_education_ai_policy",
@@ -8402,13 +8404,13 @@
     },
     {
       "id": "eu_digital_omnibus_ai_2026",
-      "title": "EU Digital Omnibus on AI — Provisional Agreement",
+      "title": "EU Digital Omnibus on AI — Adopted",
       "jurisdiction": "European Union",
       "jurisdiction_level": "international",
-      "date_enacted": "",
+      "date_enacted": "2026-07-08",
       "date_proposed": "2026-05-07",
-      "status": "proposed",
-      "summary": "Provisional agreement between EU Council and Parliament amending the AI Act, delaying high-risk system compliance deadlines by 12-16 months and adding new prohibited practices including non-consensual intimate image generation.",
+      "status": "enacted",
+      "summary": "Provisional agreement between EU Council and Parliament amending the AI Act, delaying high-risk system compliance deadlines by 12-16 months and adding new prohibited practices including non-consensual intimate image generation. The European Parliament adopted the regulation on 16 June 2026, the Council gave final approval on 29 June, and the presidents of both institutions signed it on 8 July. The adopted package moves the high-risk AI deadlines to 2 December 2027 for stand-alone systems and 2 August 2028 for systems embedded in regulated products, and adds prohibitions covering non-consensual sexual deepfakes and AI-generated child sexual abuse material.",
       "key_provisions": [
         "Annex III high-risk AI obligations delayed from Aug 2026 to Dec 2027",
         "Annex I product-regulated AI delayed from Aug 2027 to Aug 2028",
@@ -8440,9 +8442,11 @@
         "eu_ai_act_2024"
       ],
       "source_links": [
-        "https://www.consilium.europa.eu/en/press/press-releases/2026/05/07/artificial-intelligence-council-and-parliament-agree-to-simplify-and-streamline-rules/"
+        "https://www.consilium.europa.eu/en/press/press-releases/2026/05/07/artificial-intelligence-council-and-parliament-agree-to-simplify-and-streamline-rules/",
+        "https://eur-lex.europa.eu/legal-content/EN/HIS/?uri=consil%3AWK_1027_2026_INIT",
+        "https://oeil.europarl.europa.eu/oeil/en/document-summary?id=1905596"
       ],
-      "source_url": "https://www.consilium.europa.eu/en/press/press-releases/2026/05/07/"
+      "source_url": "https://www.consilium.europa.eu/en/press/press-releases/2026/06/29/artificial-intelligence-council-gives-final-green-light-to-simplify-and-streamline-rules/"
     },
     {
       "id": "colorado_sb_26_189_2026",
@@ -8493,10 +8497,10 @@
       "title": "Connecticut SB 5 — An Act Concerning Online Safety (AI Responsibility Act)",
       "jurisdiction": "Connecticut, United States",
       "jurisdiction_level": "state",
-      "date_enacted": "",
+      "date_enacted": "2026-05-27",
       "date_proposed": "2026-05-01",
-      "status": "proposed",
-      "summary": "Comprehensive omnibus AI bill passed both chambers of the Connecticut legislature. Introduces employment-related AI obligations, chatbot safety rules, synthetic content labeling, safe harbor programs, and anti-discrimination provisions.",
+      "status": "enacted",
+      "summary": "Comprehensive omnibus AI bill passed both chambers of the Connecticut legislature. Introduces employment-related AI obligations, chatbot safety rules, synthetic content labeling, safe harbor programs, and anti-discrimination provisions. Governor Ned Lamont signed the bill as Public Act 26-15 on 27 May 2026.",
       "key_provisions": [
         "Employment-related AI obligations for automated hiring",
         "Chatbot safety and disclosure rules",
@@ -8526,7 +8530,8 @@
       "relevance_to_ai_discourse": "Most comprehensive US state omnibus AI bill, potentially setting template for other states",
       "related_legislation": [],
       "source_links": [
-        "https://www.kelleydrye.com/viewpoints/blogs/ad-law-access/ai-regulatory-roundup-recent-developments-in-colorado-connecticut-and-california"
+        "https://www.kelleydrye.com/viewpoints/blogs/ad-law-access/ai-regulatory-roundup-recent-developments-in-colorado-connecticut-and-california",
+        "https://portal.ct.gov/governor/-/media/office-of-the-governor/bill-notifications/2026/bill-notification-2026-11.pdf?rev=ad8315ea7f1a4afda0d85c5c1f828d33"
       ],
       "source_url": "https://www.cga.ct.gov/asp/cgabillstatus/cgabillstatus.asp?selBillType=Bill&bill_num=SB00005"
     },
