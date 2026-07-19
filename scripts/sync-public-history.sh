@@ -351,7 +351,11 @@ strip_private_paths_from_clone() {
     done
 
     apply_agent_bridge_public_history_policy "$commit_sha"
-    node "$REPO_ROOT/scripts/scrub-public-package-json.js" "$TEMP_CLONE/package.json"
+    git -C "$REPO_ROOT" show "${commit_sha}:package.json" > "$TMP_ROOT/public-package-source.json"
+    node \
+      "$REPO_ROOT/scripts/scrub-public-package-json.js" \
+      "$TEMP_CLONE/package.json" \
+      "$TMP_ROOT/public-package-source.json"
 
     git add -A
   )

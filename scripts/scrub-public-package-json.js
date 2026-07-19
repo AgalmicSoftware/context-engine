@@ -2,11 +2,13 @@
 
 const fs = require('node:fs');
 
-function scrubPublicPackageJson(packageJsonPath) {
+function scrubPublicPackageJson(packageJsonPath, referencePackageJsonPath = packageJsonPath) {
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  const referencePackageJson = JSON.parse(fs.readFileSync(referencePackageJsonPath, 'utf8'));
 
   if (packageJson.scripts && typeof packageJson.scripts === 'object') {
     const scripts = packageJson.scripts;
+    const referenceScripts = referencePackageJson.scripts || {};
     const removed = new Set();
     const strippedRunnerPatterns = [
       /\bscripts\/test-[^\s'"]+\.js\b/,
@@ -23,9 +25,11 @@ function scrubPublicPackageJson(packageJsonPath) {
       /\bclient\/src\/utilities\/web3\/contractScripts\.[^\s'"]+\.proxy\.test\.js\b/,
     ];
 
-    for (const [name, command] of Object.entries(scripts)) {
-      if (strippedRunnerPatterns.some((pattern) => pattern.test(String(command)))) {
-        removed.add(name);
+    for (const scriptMap of [scripts, referenceScripts]) {
+      for (const [name, command] of Object.entries(scriptMap)) {
+        if (strippedRunnerPatterns.some((pattern) => pattern.test(String(command)))) {
+          removed.add(name);
+        }
       }
     }
 
@@ -63,6 +67,15 @@ function scrubPublicPackageJson(packageJsonPath) {
     for (const name of removed) {
       delete scripts[name];
     }
+
+    const orderedScripts = {};
+    for (const name of Object.keys(referenceScripts)) {
+      if (Object.prototype.hasOwnProperty.call(scripts, name)) orderedScripts[name] = scripts[name];
+    }
+    for (const [name, command] of Object.entries(scripts)) {
+      if (!Object.prototype.hasOwnProperty.call(orderedScripts, name)) orderedScripts[name] = command;
+    }
+    packageJson.scripts = orderedScripts;
   }
 
   fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
@@ -70,11 +83,12 @@ function scrubPublicPackageJson(packageJsonPath) {
 
 if (require.main === module) {
   const packageJsonPath = process.argv[2];
+  const referencePackageJsonPath = process.argv[3] || packageJsonPath;
   if (!packageJsonPath) {
     console.error('Usage: node scripts/scrub-public-package-json.js <package.json>');
     process.exitCode = 1;
   } else {
-    scrubPublicPackageJson(packageJsonPath);
+    scrubPublicPackageJson(packageJsonPath, referencePackageJsonPath);
   }
 }
 
