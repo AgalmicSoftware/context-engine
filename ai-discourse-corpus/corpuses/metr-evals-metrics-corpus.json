@@ -3,7 +3,7 @@
     "description": "Corpus of METR (Model Evaluation and Threat Research) publications, benchmarks, datasets, evaluation reports, and policy work. Provides the empirical measurement foundation for AI progress and governance debates - the actual data on how fast AI capabilities are advancing, how reliably we can measure them, and what quantitative trends imply for policy.",
     "version": "1.0",
     "date_generated": "2026-02-15",
-    "entry_count": 95,
+    "entry_count": 94,
     "coverage": {
       "source_types": [
         "benchmark",
@@ -2889,72 +2889,6 @@
       "verification_notes": "Corrected to METR PDF response to OSTP AI Action Plan RFI."
     },
     {
-      "id": "metr_predeployment_inadequate_2025",
-      "title": "AI models can be dangerous before public deployment",
-      "authors": [
-        "METR Team"
-      ],
-      "date": "2025-01-17",
-      "source_type": "blog_post",
-      "source_platform": "METR",
-      "url": "https://metr.org/blog/2025-01-17-ai-models-dangerous-before-public-deployment/",
-      "category": "research_finding",
-      "summary": "METR argues that pre-deployment testing centered on public release can miss risks created during internal development and internal deployment, including model theft and sanctioned or rogue internal model use. The entry supports continuous and earlier lifecycle evaluation rather than treating public deployment as the only risk boundary.",
-      "key_findings": [
-        "Pre-deployment testing before public release is not enough when internal model development or use can create risk",
-        "Training and internal deployment can be less reversible than public product access",
-        "Frontier developers need evaluation earlier in the model lifecycle, not only shortly before public launch"
-      ],
-      "quantitative_data": {
-        "publication_date": "2025-01-15",
-        "capability_elicitation_mechanisms": 4,
-        "regulatory_frameworks_challenged": "Frameworks based on pre-deployment gates"
-      },
-      "novel_arguments_and_concepts": "This work makes a critical contribution to AI governance theory by arguing that deployment itself should not be treated as the critical safety boundary. Rather than viewing the model as static after deployment, METR demonstrates that models are dynamic systems continuously modified through user interaction, fine-tuning, and system-level adaptation. This reframes risk management from a gate-keeping problem (deciding whether model is safe enough to release) to a continuous monitoring problem (ensuring safety properties hold across various uses and modifications). The argument has profound implications for regulatory design, suggesting that post-deployment monitoring and evaluation frameworks are not supplementary to pre-deployment evaluation but fundamental to safety governance. This challenges the assumption that companies can certify model safety at a fixed pre-deployment moment.",
-      "implications_for_governance": [
-        "Regulatory frameworks based solely on pre-deployment gates are inadequate",
-        "Ongoing post-deployment monitoring is essential to frontier AI safety governance",
-        "Companies should maintain evaluation capabilities throughout model lifecycle",
-        "Government oversight may need post-deployment monitoring and evaluation access",
-        "Safety governance requires continuous rather than one-time assessment",
-        "Risk management must account for model modification post-deployment"
-      ],
-      "debate_connections": [
-        "alignment_tractability",
-        "regulation_timing",
-        "safety_vs_capabilities",
-        "who_governs_ai"
-      ],
-      "themes": [
-        "Post-deployment risks",
-        "Capability elicitation",
-        "Governance framework design",
-        "Model modification mechanisms",
-        "Continuous evaluation requirements",
-        "Safety boundaries"
-      ],
-      "tags": [
-        "post_deployment_risks",
-        "governance_framework",
-        "capability_elicitation",
-        "model_modification",
-        "continuous_evaluation",
-        "regulatory_analysis",
-        "frontier_ai_safety"
-      ],
-      "influence_score": 8,
-      "citation_context": "Foundational argument for post-deployment monitoring as essential to frontier AI safety governance. Directly challenges assumptions underlying many regulatory frameworks.",
-      "source_links": [
-        "https://metr.org/blog/2025-01-17-ai-models-dangerous-before-public-deployment/"
-      ],
-      "related_work": [
-        "metr_dangerous_before_deployment_2025",
-        "metr_legible_reasoning_2025"
-      ],
-      "verification_status": "verified",
-      "verification_notes": "Corrected title, date, source, and summary against METR post."
-    },
-    {
       "id": "metr_dangerous_before_deployment_2025",
       "title": "AI models can be dangerous before public deployment",
       "authors": [
@@ -2972,7 +2906,10 @@
         "Fine-tuning capabilities allow dangerous applications before public deployment",
         "Research partnerships enable external access to unreleased models",
         "Multiple risk channels exist between development and public deployment",
-        "Pre-deployment evaluation should occur before any access mechanisms activate"
+        "Pre-deployment evaluation should occur before any access mechanisms activate",
+        "Pre-deployment testing before public release is not enough when internal model development or use can create risk",
+        "Training and internal deployment can be less reversible than public product access",
+        "Frontier developers need evaluation earlier in the model lifecycle, not only shortly before public launch"
       ],
       "quantitative_data": {
         "risk_channels_identified": 4,
@@ -2985,10 +2922,19 @@
         "Regulatory frameworks should establish checkpoints for API access, fine-tuning, and research access",
         "Companies have responsibility to evaluate models before internal use and partnership access",
         "Safety governance requires understanding deployment as multi-stage process",
-        "Insider risk and research access should be addressed through pre-deployment oversight"
+        "Insider risk and research access should be addressed through pre-deployment oversight",
+        "Regulatory frameworks based solely on pre-deployment gates are inadequate",
+        "Ongoing post-deployment monitoring is essential to frontier AI safety governance",
+        "Companies should maintain evaluation capabilities throughout model lifecycle",
+        "Government oversight may need post-deployment monitoring and evaluation access",
+        "Safety governance requires continuous rather than one-time assessment",
+        "Risk management must account for model modification post-deployment"
       ],
       "debate_connections": [
-        "regulation_timing"
+        "regulation_timing",
+        "alignment_tractability",
+        "safety_vs_capabilities",
+        "who_governs_ai"
       ],
       "themes": [
         "Pre-deployment risks",
@@ -2996,7 +2942,13 @@
         "Deployment timeline",
         "Safety evaluation checkpoints",
         "Risk management stages",
-        "Insider threat management"
+        "Insider threat management",
+        "Post-deployment risks",
+        "Capability elicitation",
+        "Governance framework design",
+        "Model modification mechanisms",
+        "Continuous evaluation requirements",
+        "Safety boundaries"
       ],
       "tags": [
         "pre_deployment_risks",
@@ -3005,7 +2957,13 @@
         "api_access_risks",
         "insider_threats",
         "deployment_timeline",
-        "governance_framework"
+        "governance_framework",
+        "post_deployment_risks",
+        "capability_elicitation",
+        "model_modification",
+        "continuous_evaluation",
+        "regulatory_analysis",
+        "frontier_ai_safety"
       ],
       "influence_score": 7,
       "citation_context": "Supports pre-deployment evaluation mandates by establishing multiple risk pathways before public deployment. Important for regulatory framework design.",
@@ -3013,6 +2971,12 @@
         "https://metr.org/blog/2025-01-17-ai-models-dangerous-before-public-deployment/"
       ],
       "related_work": [
+        "metr_dangerous_before_deployment_2025",
+        "metr_legible_reasoning_2025"
+      ],
+      "verification_status": "verified",
+      "verification_notes": "Corrected title, date, source, and summary against METR post.",
+      "merged_from": [
         "metr_predeployment_inadequate_2025"
       ]
     },
@@ -3520,7 +3484,7 @@
         "https://metr.org/blog/2026-01-19-early-work-on-monitorability-evaluations/"
       ],
       "related_work": [
-        "metr_predeployment_inadequate_2025"
+        "metr_dangerous_before_deployment_2025"
       ]
     },
     {
@@ -6185,7 +6149,7 @@
       ],
       "methodology": "Controlled benchmark with human-calibrated coding tasks at multi-week timescales",
       "related_work": [
-        "metr_time_horizon_11_2026"
+        "metr_time_horizon_1_1_2026"
       ],
       "themes": [
         "Benchmarks",
@@ -6630,10 +6594,10 @@
       "authors": [
         "METR"
       ],
-      "date": "2026-01-15",
+      "date": "2026-01-29",
       "source_type": "benchmark_update",
       "source_platform": "METR Blog",
-      "url": "https://metr.org/time-horizons/",
+      "url": "https://metr.org/blog/2026-1-29-time-horizon-1-1/",
       "category": "metric",
       "summary": "Time Horizon 1.1 is a major expansion of METR's flagship capability measurement benchmark, growing from 14 to 31 long-horizon tasks where each task is estimated to take a human more than 8 hours to complete. The update incorporates data from 9 additional benchmarks spanning scientific reasoning, mathematics, robotics, computer use, and self-driving, providing cross-domain validation of capability growth trends. The central finding is that improvement rates across these diverse domains are generally similar to the 7-month doubling time established in the original Time Horizon paper, though with some evidence of acceleration in post-2023 data showing a roughly 131-day doubling time. A notable result is that AI agents successfully solved MirrorCode tasks — a software reimplementation benchmark developed in collaboration with Epoch AI — at a level corresponding to tasks that take experienced human developers weeks to complete. The update includes a performance hierarchy across frontier models: Claude Opus 4.6 achieves approximately 14.5 hours, GPT-5.2 approximately 6.6 hours, and Claude Opus 4.5 approximately 4.8 hours on the 50%-task-completion time horizon metric. The expanded benchmark suite provides more robust trend estimation and cross-domain generalization evidence than the original paper's software-engineering-focused task set.",
       "key_findings": [
@@ -6751,7 +6715,7 @@
       "date": "2026-06-26",
       "source_type": "evaluation_report",
       "source_platform": "METR Blog",
-      "url": "https://metr.substack.com/p/2026-06-26-gpt-5-6-sol",
+      "url": "https://metr.org/blog/2026-06-26-gpt-5-6-sol/",
       "category": "evaluation",
       "summary": "METR's pre-deployment evaluation of OpenAI's GPT-5.6 Sol model represents one of the most anticipated third-party assessments of a frontier model released in mid-2026. As part of METR's ongoing commitment to independent evaluation of frontier AI systems prior to public deployment, this report assesses GPT-5.6 Sol across METR's standard evaluation dimensions including autonomous task completion capability, reward hacking propensity, sandbagging detection, and alignment-relevant behavioral patterns. GPT-5.6 Sol is positioned as OpenAI's most capable publicly released model at the time of assessment, building on the GPT-5 and GPT-5.1 series that METR previously evaluated. The evaluation applies METR's established methodology including the Time Horizon metric, RE-Bench tasks, HCAST evaluation integrity monitoring, and specialized probes for deceptive behavior patterns. The report provides quantitative capability measurements and qualitative assessment of alignment-relevant behaviors, contributing to the growing body of pre-deployment evaluation data that informs both OpenAI's release decisions and broader governance discussions about frontier model deployment.",
       "key_findings": [
@@ -6842,6 +6806,7 @@
       ],
       "influence_score": 8,
       "source_links": [
+        "https://metr.org/blog/2026-06-26-gpt-5-6-sol/",
         "https://metr.substack.com/p/2026-06-26-gpt-5-6-sol"
       ]
     }

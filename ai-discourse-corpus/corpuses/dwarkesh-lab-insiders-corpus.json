@@ -3,7 +3,7 @@
     "description": "Corpus of Dwarkesh Patel podcast interviews and writings/interviews by AI lab insiders. Captures the practitioner perspective on AI development, safety, governance, and futures from the people closest to building frontier AI systems.",
     "version": "1.0",
     "date_generated": "2026-02-15",
-    "entry_count": 152,
+    "entry_count": 148,
     "coverage": {
       "sources": [
         "AI Futures Project",
@@ -598,111 +598,10 @@
       "related_entries": [
         "zuckerberg_mark_dwarkesh_2024_llama",
         "schulman_john_dwarkesh_2024_rl",
-        "karpathy_andrej_dwarkesh_2025_agi"
+        "karpathy_andrej_dwarkesh_2025_decade_of_agents"
       ],
       "source_links": [
         "https://www.dwarkesh.com/p/mark-zuckerberg-2"
-      ],
-      "transcript_available": true
-    },
-    {
-      "id": "sutskever_ilya_dwarkesh_2025_research",
-      "title": "Moving from the age of scaling to the age of research",
-      "author": "Ilya Sutskever",
-      "interviewer": "Dwarkesh Patel",
-      "date": "2025-11-08",
-      "source_type": "podcast_transcript",
-      "source_platform": "Dwarkesh Podcast",
-      "url": "https://www.dwarkesh.com/p/ilya-sutskever-2",
-      "affiliation": "SSI (Safety and Superintelligence Institute)",
-      "affiliation_at_time": "Founder and Chief Researcher",
-      "role_category": "safety_researcher",
-      "summary": "Ilya Sutskever, former Chief Scientist at OpenAI and founder of SSI (Safety and Superintelligence Institute), discusses the transition from scaling-driven AI development to research-driven innovation. He articulates why scaling laws are reaching their limits and what comes next—arguing that major breakthroughs will require fundamental research into model generalization, reasoning, and alignment. Sutskever covers the challenge of reinforcement learning at scale and why current approaches may be insufficient for AGI. He discusses his departure from OpenAI and the reasoning behind founding SSI, framed around the necessity of solving alignment before developing superintelligence. The conversation emphasizes that the next era requires deeper understanding of how models generalize and reason, rather than simply increasing parameters and data.",
-      "key_claims_and_positions": [
-        "Scaling laws are hitting diminishing returns; we're moving from scaling era to research era",
-        "Model generalization remains poorly understood and is the key limiting factor",
-        "Reinforcement learning at scale faces fundamental challenges unresolved by current approaches",
-        "AGI safety must be solved concurrently with capabilities, not after",
-        "Current interpretability approaches are insufficient for understanding large models",
-        "Research breakthroughs, not engineering, will drive next capabilities leap",
-        "Superintelligence development without alignment solution is existentially dangerous"
-      ],
-      "novel_arguments_and_concepts": "Sutskever introduces the framework of 'the age of research' following 'the age of scaling'—a fundamental shift in how AI progress happens. Rather than incremental scaling producing incremental gains, major advances now require theoretical breakthroughs in understanding generalization, abstraction, and reasoning. He emphasizes that current RL approaches for training models may be fundamentally limited—that we may need new paradigms for training that go beyond next-token prediction and reward maximization. Sutskever's founding of SSI represents a conviction that safety research must be decoupled from capabilities scaling to receive adequate focus. He introduces the concept that alignment difficulty is not necessarily intractable but requires dedicated research equivalent to what enabled scaling. The argument challenges the assumption that more data and compute solve everything; instead, fundamental understanding becomes the bottleneck.",
-      "predictions": [
-        {
-          "claim": "AGI timelines will be slower than 2024-2025 predictions suggested",
-          "timeframe": "2025-2030",
-          "confidence": "Medium-High",
-          "context": "Based on research bottlenecks becoming evident"
-        },
-        {
-          "claim": "New training paradigms beyond current RL will be necessary for further capability gains",
-          "timeframe": "2-3 years",
-          "confidence": "Medium-High",
-          "context": "Current RL limitations becoming apparent"
-        },
-        {
-          "claim": "Interpretability breakthroughs will be prerequisites for alignment at superintelligence levels",
-          "timeframe": "3-5 years before AGI",
-          "confidence": "Medium",
-          "context": "SSI research focus"
-        }
-      ],
-      "disagreements_with": [
-        {
-          "target": "Continued scaling advocates",
-          "topic": "Sufficiency of scale",
-          "position": "Scale alone cannot solve generalization; research breakthroughs necessary"
-        },
-        {
-          "target": "Deference to market-driven capabilities",
-          "topic": "Alignment timing",
-          "position": "Alignment work must precede superintelligence; cannot assume market incentives suffice"
-        }
-      ],
-      "policy_positions": [
-        {
-          "topic": "Research funding for AI safety",
-          "position": "Substantial public and private resources needed for alignment research equivalently to capabilities",
-          "debate_connection": "alignment_tractability"
-        },
-        {
-          "topic": "Who governs AGI development",
-          "position": "Technical safety researchers and ethicists should have significant voice in AGI governance",
-          "debate_connection": "who_governs_ai"
-        }
-      ],
-      "debate_connections": [
-        "alignment_tractability",
-        "existential_risk_debate",
-        "safety_vs_capabilities",
-        "who_governs_ai"
-      ],
-      "themes": [
-        "Post-scaling paradigm",
-        "Research-driven progress",
-        "Model generalization",
-        "RL challenges",
-        "AGI alignment necessity",
-        "Safety research independence"
-      ],
-      "tags": [
-        "openai-departure",
-        "ssi",
-        "Alignment",
-        "rl-challenges",
-        "post-scaling",
-        "research",
-        "generalization"
-      ],
-      "influence_score": 9,
-      "related_entries": [
-        "amodei_dario_dwarkesh_2026_scaling",
-        "christiano_paul_dwarkesh_2023_takeover",
-        "schulman_john_dwarkesh_2024_rl"
-      ],
-      "source_links": [
-        "https://www.dwarkesh.com/p/ilya-sutskever-2"
       ],
       "transcript_available": true
     },
@@ -1009,7 +908,7 @@
       "related_entries": [
         "legg_shane_dwarkesh_2023_agi",
         "hassabis_demis_dwarkesh_2024_superhuman",
-        "sutskever_ilya_dwarkesh_2025_research"
+        "sutskever_ilya_dwarkesh_2025_after_llms"
       ],
       "source_links": [
         "https://www.dwarkesh.com/p/john-schulman"
@@ -1116,7 +1015,7 @@
       "related_entries": [
         "yudkowsky_eliezer_dwarkesh_2023_danger",
         "schulman_john_dwarkesh_2024_rl",
-        "sutskever_ilya_dwarkesh_2025_research"
+        "sutskever_ilya_dwarkesh_2025_after_llms"
       ],
       "source_links": [
         "https://www.dwarkesh.com/p/paul-christiano"
@@ -1592,7 +1491,7 @@
       "related_entries": [
         "schulman_john_dwarkesh_2024_rl",
         "douglas_sholto_dwarkesh_2024_gpt7",
-        "sutskever_ilya_dwarkesh_2025_research"
+        "sutskever_ilya_dwarkesh_2025_after_llms"
       ],
       "source_links": [
         "https://podcasts.apple.com/us/podcast/is-rl-llms-enough-for-agi-sholto-douglas-trenton-bricken/id1516093381?i=1000709488338"
@@ -1683,7 +1582,7 @@
       "related_entries": [
         "hassabis_demis_dwarkesh_2024_superhuman",
         "amodei_dario_dwarkesh_2026_scaling",
-        "sutskever_ilya_dwarkesh_2025_research"
+        "sutskever_ilya_dwarkesh_2025_after_llms"
       ],
       "source_links": [
         "https://www.dwarkesh.com/p/jeff-dean-and-noam-shazeer"
@@ -1879,108 +1778,6 @@
       ],
       "source_links": [
         "https://www.dwarkesh.com/p/satya-nadella"
-      ],
-      "transcript_available": true
-    },
-    {
-      "id": "karpathy_andrej_dwarkesh_2025_agi",
-      "title": "AGI is still a decade away",
-      "author": "Andrej Karpathy",
-      "interviewer": "Dwarkesh Patel",
-      "date": "2025-10-18",
-      "source_type": "podcast_transcript",
-      "source_platform": "Dwarkesh Podcast",
-      "url": "https://www.dwarkesh.com/p/andrej-karpathy",
-      "affiliation": "Independent",
-      "affiliation_at_time": "Independent researcher, formerly Tesla AI",
-      "role_category": "independent_researcher",
-      "summary": "Andrej Karpathy presents a more conservative estimate of AGI timelines, arguing that a decade remains before AGI-level capabilities emerge. He discusses what current systems lack relative to AGI: persistent learning, embodied experience, real-world problem-solving, and robust reasoning. Karpathy examines limitations of current language models and language-model-only approaches, arguing that language models alone will plateau in capabilities. The conversation covers what genuine AGI might require beyond scaling: physical grounding, continuous learning, world models, and integration with embodied systems. Karpathy's position contrasts with nearer-term predictions from others, offering technical reasons why current architectures may be insufficient.",
-      "key_claims_and_positions": [
-        "AGI is likely still 10+ years away despite recent progress",
-        "Current language models have fundamental limitations for AGI",
-        "Embodied experience and real-world interaction are necessary for AGI",
-        "Persistent learning and continual adaptation are missing from current systems",
-        "Language-only approach will plateau in capabilities",
-        "World models and planning integrated with embodiment are crucial",
-        "Scaling current models will hit severe diminishing returns toward AGI"
-      ],
-      "novel_arguments_and_concepts": "Karpathy argues that recent impressive capabilities of language models obscure fundamental limitations. He emphasizes that AGI requires understanding the physical world through embodied interaction, not just language understanding. The concept of persistent learning contrasts with current training approaches: AGI systems must continually improve from experience, not be static after training. He argues that world models—mental simulations of how the world works—are necessary for AGI reasoning and planning but are underdeveloped in current systems. Karpathy's core argument is that language is necessary but insufficient for AGI; embodiment and continuous grounding in reality are necessary. This positions AGI as farther away than scaling curves suggest.",
-      "predictions": [
-        {
-          "claim": "AGI will require embodied systems integrated with learning capabilities",
-          "timeframe": "Before AGI",
-          "confidence": "High",
-          "context": "Technical requirement"
-        },
-        {
-          "claim": "Language-model-only approaches will plateau before AGI",
-          "timeframe": "2-5 years",
-          "confidence": "Medium",
-          "context": "Based on fundamental limitations"
-        },
-        {
-          "claim": "New paradigm combining embodiment, learning, and language required for AGI",
-          "timeframe": "Before AGI (10+ years out)",
-          "confidence": "Medium-High",
-          "context": "Karpathy's position"
-        }
-      ],
-      "disagreements_with": [
-        {
-          "target": "Near-term AGI optimists (Schulman, Aschenbrenner, others)",
-          "topic": "AGI timelines",
-          "position": "AGI is likely 10+ years away; current timelines too aggressive"
-        },
-        {
-          "target": "Pure language model optimists",
-          "topic": "Sufficiency of current approaches",
-          "position": "Language models alone insufficient; embodiment necessary"
-        }
-      ],
-      "policy_positions": [
-        {
-          "topic": "Research direction diversity",
-          "position": "Embodied AI and robotics should be invested equally with language models",
-          "debate_connection": "alignment_tractability"
-        },
-        {
-          "topic": "AGI timeline realism",
-          "position": "Policy should be based on realistic timelines, not speculative near-term AGI",
-          "debate_connection": "regulation_timing"
-        }
-      ],
-      "debate_connections": [
-        "alignment_tractability",
-        "existential_risk_debate",
-        "regulation_timing",
-        "safety_vs_capabilities"
-      ],
-      "themes": [
-        "AGI timelines",
-        "Embodied AI",
-        "World models",
-        "Current system limitations",
-        "Persistent learning",
-        "Scaling plateaus",
-        "Research diversity"
-      ],
-      "tags": [
-        "agi-timeline",
-        "embodied-ai",
-        "scaling-limits",
-        "World Models",
-        "conservative-timeline",
-        "language-model-limits",
-        "Robotics"
-      ],
-      "influence_score": 8,
-      "related_entries": [
-        "aschenbrenner_leopold_dwarkesh_2024_agi",
-        "legg_shane_dwarkesh_2023_agi",
-        "sutskever_ilya_dwarkesh_2025_research"
-      ],
-      "source_links": [
-        "https://www.dwarkesh.com/p/andrej-karpathy"
       ],
       "transcript_available": true
     },
@@ -7295,7 +7092,13 @@
         "Staged deployment reduces risks through careful rollout",
         "Safety evaluation must scale with model capabilities",
         "Transparent governance builds stakeholder confidence",
-        "Formal protocols prevent ad-hoc safety decision-making"
+        "Formal protocols prevent ad-hoc safety decision-making",
+        "Frontier labs employ diverse but recognizable safety approaches with common elements",
+        "Red teaming has become standard practice for safety evaluation",
+        "Safety practices are evolving faster than policy and regulation",
+        "Common vulnerabilities exist across labs that deserve coordinated attention",
+        "International sharing of safety research could accelerate progress",
+        "Safety practices should be evaluated for effectiveness, not just presence"
       ],
       "novel_arguments_and_concepts": "DeepMind's frontier safety framework introduces idea formal, structured governance approaches are more reliable than ad-hoc safety processes. By establishing clear protocols for evaluation, red-teaming, and deployment decisions, framework makes safety practices transparent and auditable. This allows external oversight and enables learning across deployments. The framework reflects industry maturation toward systematic safety governance rather than relying on benevolence. Formal frameworks institutionalize safety considerations in development processes rather than leaving them to individual judgment. The approach reflects recognition that systematizing safety improves reliability. Formal governance frameworks transform safety from ad-hoc concern into systematized process. By establishing protocols and procedures, labs make safety considerations concrete and binding. This institutionalization ensures safety remains priority even when business pressures increase.",
       "predictions": [
@@ -7303,18 +7106,49 @@
           "prediction": "Formal safety frameworks will become standard across frontier AI labs",
           "confidence": 0.75,
           "timeframe": "2025-2028"
+        },
+        {
+          "prediction": "Industry will converge toward common safety evaluation methodologies",
+          "confidence": 0.65,
+          "timeframe": "2025-2030"
+        },
+        {
+          "prediction": "International coordination on safety practices will increase",
+          "confidence": 0.7,
+          "timeframe": "2024-2028"
+        },
+        {
+          "prediction": "Safety practices will become subject to external auditing and verification",
+          "confidence": 0.7,
+          "timeframe": "2025-2028"
         }
       ],
       "disagreements_with": [
         {
           "party": "Those skeptical of self-governance",
           "disagreement": "DeepMind relies on internal governance; critics argue external regulation is necessary"
+        },
+        {
+          "opposing_position": "Safety is primarily individual lab responsibility",
+          "specific_disagreement": "DeepMind argues industry coordination improves safety"
         }
       ],
       "policy_positions": [
         {
           "position": "Frontier labs should establish formal safety frameworks governing development",
           "reasoning": "Structured governance improves decision-making and enables oversight"
+        },
+        {
+          "position": "Industry standards for safety practices should be established",
+          "category": "who_governs_ai"
+        },
+        {
+          "position": "External audit of safety practices should become standard",
+          "category": "regulation_timing"
+        },
+        {
+          "position": "International coordination on safety research would benefit all labs",
+          "category": "concentration_of_power"
         }
       ],
       "debate_connections": [
@@ -7325,21 +7159,40 @@
         "governance",
         "safety-framework",
         "evaluation",
-        "responsible-scaling"
+        "responsible-scaling",
+        "industry_practices",
+        "red_teaming",
+        "evaluation_frameworks",
+        "safety_standards",
+        "coordination",
+        "effectiveness"
       ],
       "tags": [
         "DeepMind",
         "safety-framework",
         "Governance",
-        "Evaluations"
+        "Evaluations",
+        "Safety",
+        "industry_survey",
+        "practices",
+        "Standards",
+        "Coordination",
+        "research"
       ],
       "influence_score": 6,
       "related_entries": [
         "38",
-        "43"
+        "43",
+        "deepmind_gemini_safety_2024",
+        "anthropic_scaling_trust_2024",
+        "openai_gpt4_system_card_2023"
       ],
       "source_links": [
-        "https://www.deepmind.com/research"
+        "https://www.deepmind.com/research",
+        "https://deepmind.google/discover/blog/introducing-the-frontier-safety-framework/"
+      ],
+      "merged_from": [
+        "deepmind_spec_spec_2024"
       ]
     },
     {
@@ -8186,101 +8039,6 @@
         "https://deepmind.google/research/publications/78149/",
         "https://arxiv.org/abs/2404.14068"
       ]
-    },
-    {
-      "id": "anthropic_scaling_trust_2024",
-      "title": "Anthropic 'Challenges in Scaling AI Trust & Safety' 2024",
-      "author": "Anthropic Safety Team",
-      "date": "2024-07-20",
-      "source_type": "research_blog",
-      "source_platform": "anthropic.com",
-      "url": "https://deepmind.google/discover/blog/introducing-the-frontier-safety-framework/",
-      "affiliation": "Anthropic",
-      "affiliation_at_time": "Anthropic",
-      "role_category": "safety_researcher",
-      "summary": "Anthropic's analysis of practical challenges in maintaining trust and safety at scale addresses the core tension in deploying increasingly capable AI systems. The report identifies specific operational challenges: scaling content policy enforcement, managing user safety across diverse contexts, preventing harmful use cases, and maintaining safety as models reach wider audiences. Anthropic documents the computational and organizational costs of safety at scale, including the challenge of training data curation becoming intractable at larger scales. The work presents case studies from Claude's deployment, showing how safety challenges change as usage patterns evolve and expand. Key contributions include frameworks for thinking about safety as a multidimensional property that must be maintained across different use cases, user populations, and deployment contexts. The report articulates how safety isn't a single threshold but a continuous property that requires ongoing monitoring and adjustment.",
-      "key_claims_and_positions": [
-        "Safety is not achieved at training time but requires continuous monitoring in deployment",
-        "Content policy enforcement at scale requires sophisticated automated systems alongside human review",
-        "Different user populations have different safety requirements and risk profiles",
-        "Harmful use prevention requires understanding context and intent, not just content",
-        "Safety-capability tradeoffs become more complex at scale; safety measures can't simply reduce capability uniformly",
-        "Trust and safety are separate challenges requiring distinct approaches"
-      ],
-      "novel_arguments_and_concepts": "Anthropic introduces the concept of 'safety in deployment' as fundamentally distinct from 'safety in training.' They argue that many safety challenges only emerge once systems are in production with real users exhibiting unexpected use patterns. This shifts focus from theoretical safety guarantees to pragmatic, adaptive safety management. The report articulates a framework where safety operates at multiple levels: the model level (what it's trained to do), the system level (how it's deployed and constrained), and the organizational level (policies, monitoring, incident response). A crucial novel contribution is the recognition that scaling creates qualitatively new safety challenges, not just quantitative versions of existing ones. For instance, with millions of users, rare failure modes that affect 0.001% of interactions become significant in absolute numbers. Anthropic presents 'safety elasticity' - the property that safety measures degrade differently as systems scale. They also introduce the concept of 'harmful use surface area' - the space of potential misuse cases expands super-linearly with capability gains. The report makes an important argument about user safety vs. system safety: even a perfectly safe system can be used unsafely by users with harmful intent, requiring defensive design principles.",
-      "predictions": [
-        {
-          "prediction": "Safety incident response will become as professionalized as security incident response, with dedicated teams and protocols",
-          "confidence": 0.8,
-          "timeframe": "2024-2026"
-        },
-        {
-          "prediction": "Automated content policy enforcement will require continuous retraining as users discover evasion techniques",
-          "confidence": 0.85,
-          "timeframe": "2024-2025"
-        },
-        {
-          "prediction": "User context understanding will become a primary safety challenge, requiring deeper integration with user intent modeling",
-          "confidence": 0.7,
-          "timeframe": "2025-2027"
-        }
-      ],
-      "disagreements_with": [
-        {
-          "opposing_position": "OpenAI's approach of constitutional AI at training time solving safety problems",
-          "specific_disagreement": "Anthropic argues safety requires continuous monitoring and adjustment in deployment"
-        },
-        {
-          "opposing_position": "Regulatory approach of setting safety standards once and enforcing them",
-          "specific_disagreement": "Anthropic argues safety must evolve dynamically as deployment experiences reveal new challenges"
-        }
-      ],
-      "policy_positions": [
-        {
-          "position": "Safety requirements should be risk-scaled based on deployment context and user population",
-          "category": "regulation_timing"
-        },
-        {
-          "position": "Incident reporting infrastructure should be established for serious safety failures",
-          "category": "who_governs_ai"
-        },
-        {
-          "position": "Harmful use prevention requires understanding user context, not just content filtering",
-          "category": "safety_vs_capabilities"
-        }
-      ],
-      "debate_connections": [
-        "safety_vs_capabilities"
-      ],
-      "themes": [
-        "safety_at_scale",
-        "deployment_challenges",
-        "content_policy",
-        "harmful_use_prevention",
-        "user_safety",
-        "incident_response"
-      ],
-      "tags": [
-        "Safety",
-        "Policy",
-        "deployment",
-        "Anthropic",
-        "Scaling Laws",
-        "Trust",
-        "user_safety",
-        "operations"
-      ],
-      "influence_score": 5,
-      "related_entries": [
-        "deepmind_gemini_safety_2024",
-        "openai_gpt4_system_card_2023",
-        "anthropic_claude3_system_card_2024"
-      ],
-      "source_links": [
-        "https://deepmind.google/discover/blog/introducing-the-frontier-safety-framework/"
-      ],
-      "verification_status": "partially_verified",
-      "verification_notes": "Removed broken url: https://www.anthropic.com/research/scaling-ai-trust-safety"
     },
     {
       "id": "russell_ai_control_problem_2024",
@@ -9412,95 +9170,6 @@
       "source_links": [
         "https://www.anthropic.com/claude-3-model-card",
         "https://www.anthropic.com/responsible-scaling-policy"
-      ]
-    },
-    {
-      "id": "deepmind_spec_spec_2024",
-      "title": "Google DeepMind 'AI Safety in Frontier AI Labs' Report 2024",
-      "author": "Google DeepMind Research Team",
-      "date": "2024-07-01",
-      "source_type": "research_blog",
-      "source_platform": "deepmind.com",
-      "url": "https://deepmind.google/discover/blog/introducing-the-frontier-safety-framework/",
-      "affiliation": "Google DeepMind",
-      "affiliation_at_time": "Google DeepMind",
-      "role_category": "lab_leader",
-      "summary": "DeepMind's comprehensive report on AI safety practices across frontier AI laboratories provides comparative analysis of how leading organizations approach safety. The report surveys practices at major labs including OpenAI, Anthropic, Meta, and others, documenting their red teaming approaches, safety evaluation frameworks, deployment safeguards, and governance structures. DeepMind identifies common patterns in safety practice, variations in approach, and evidence about which safety methods prove effective. The report makes recommendations for industry-wide improvements and identifies gaps where further development is needed. The work serves as an important reference point for understanding the current state of safety practice across the industry.",
-      "key_claims_and_positions": [
-        "Frontier labs employ diverse but recognizable safety approaches with common elements",
-        "Red teaming has become standard practice for safety evaluation",
-        "Safety practices are evolving faster than policy and regulation",
-        "Common vulnerabilities exist across labs that deserve coordinated attention",
-        "International sharing of safety research could accelerate progress",
-        "Safety practices should be evaluated for effectiveness, not just presence"
-      ],
-      "novel_arguments_and_concepts": "DeepMind introduces a framework for analyzing 'safety infrastructure maturity' - assessing not just whether labs conduct red teaming or safety evaluation, but the sophistication and rigor with which they do so. They articulate the concept of 'safety practice consistency' - the observation that effective safety requires consistent implementation across all stages of development and deployment, not just isolated safety measures. DeepMind's analysis of 'safety-capability integration' shows how labs differ in whether safety is integrated throughout development or applied post-hoc. They also introduce 'safety assessment comparability' - the challenge that different labs use different evaluation methodologies, making it difficult to compare safety across models. DeepMind's framework of 'emerging safety challenges' identifies new risks not yet well-addressed across the industry, including long-horizon harms and emergent capabilities.",
-      "predictions": [
-        {
-          "prediction": "Industry will converge toward common safety evaluation methodologies",
-          "confidence": 0.65,
-          "timeframe": "2025-2030"
-        },
-        {
-          "prediction": "International coordination on safety practices will increase",
-          "confidence": 0.7,
-          "timeframe": "2024-2028"
-        },
-        {
-          "prediction": "Safety practices will become subject to external auditing and verification",
-          "confidence": 0.7,
-          "timeframe": "2025-2028"
-        }
-      ],
-      "disagreements_with": [
-        {
-          "opposing_position": "Safety is primarily individual lab responsibility",
-          "specific_disagreement": "DeepMind argues industry coordination improves safety"
-        }
-      ],
-      "policy_positions": [
-        {
-          "position": "Industry standards for safety practices should be established",
-          "category": "who_governs_ai"
-        },
-        {
-          "position": "External audit of safety practices should become standard",
-          "category": "regulation_timing"
-        },
-        {
-          "position": "International coordination on safety research would benefit all labs",
-          "category": "concentration_of_power"
-        }
-      ],
-      "debate_connections": [
-        "safety_vs_capabilities"
-      ],
-      "themes": [
-        "industry_practices",
-        "red_teaming",
-        "evaluation_frameworks",
-        "safety_standards",
-        "coordination",
-        "effectiveness"
-      ],
-      "tags": [
-        "Safety",
-        "DeepMind",
-        "industry_survey",
-        "practices",
-        "Standards",
-        "Coordination",
-        "Governance",
-        "research"
-      ],
-      "influence_score": 5,
-      "related_entries": [
-        "deepmind_gemini_safety_2024",
-        "anthropic_scaling_trust_2024",
-        "openai_gpt4_system_card_2023"
-      ],
-      "source_links": [
-        "https://deepmind.google/discover/blog/introducing-the-frontier-safety-framework/"
       ]
     },
     {
@@ -10870,7 +10539,7 @@
       "influence_score": 7,
       "related_entries": [
         "bengio_ai_governance_framework_2024",
-        "deepmind_spec_spec_2024",
+        "deepmind_google_deepmind_fron_2024",
         "openai_gpt4_system_card_2023"
       ],
       "source_links": [
@@ -11789,7 +11458,7 @@
       "title": "We Are Near the End of the Exponential",
       "author": "Dario Amodei",
       "interviewer": "Dwarkesh Patel",
-      "date": "2026-02-05",
+      "date": "2026-02-13",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
       "url": "https://www.dwarkesh.com/p/dario-amodei-2",
@@ -12168,7 +11837,7 @@
       "title": "AGI is Still a Decade Away",
       "author": "Andrej Karpathy",
       "interviewer": "Dwarkesh Patel",
-      "date": "2025-04-24",
+      "date": "2025-10-17",
       "source_type": "podcast_transcript",
       "source_platform": "Dwarkesh Podcast",
       "url": "https://www.dwarkesh.com/p/andrej-karpathy",
@@ -12183,7 +11852,14 @@
         "LLMs are 'Ghosts' — disembodied mimics of human text patterns",
         "Reinforcement learning is 'terrible' compared to human learning processes",
         "Models lack core cognitive abilities: reliable memory, genuine multimodality, complex task handling",
-        "Self-driving delays offer cautionary lessons for AGI timeline optimism"
+        "Self-driving delays offer cautionary lessons for AGI timeline optimism",
+        "AGI is likely still 10+ years away despite recent progress",
+        "Current language models have fundamental limitations for AGI",
+        "Embodied experience and real-world interaction are necessary for AGI",
+        "Persistent learning and continual adaptation are missing from current systems",
+        "Language-only approach will plateau in capabilities",
+        "World models and planning integrated with embodiment are crucial",
+        "Scaling current models will hit severe diminishing returns toward AGI"
       ],
       "novel_arguments_and_concepts": "Karpathy's 'Ghosts' metaphor reframes the alignment and capabilities debate by emphasizing what LLMs fundamentally are: statistical reconstructions of human communication patterns, not thinking entities. This challenges both the 'stochastic parrot' framing (which he considers too dismissive) and the AGI-is-imminent framing (which he considers too generous). His 'decade of agents' reframing is notable coming from someone who built production AI systems at Tesla and trained foundational models at OpenAI — he argues from direct engineering experience that the gap between impressive demos and reliable autonomous systems is far wider than the industry acknowledges. His critique of RL is particularly pointed: rather than seeing RL as the path to superhuman reasoning (as many labs frame it), Karpathy argues it produces brittle, narrow optimization that fails to capture how humans build robust understanding through embodied experience, social learning, and iterative refinement across years of development.",
       "predictions": [
@@ -12198,6 +11874,24 @@
           "timeframe": "2025-2035",
           "confidence": "Medium-High",
           "context": "Based on experience with self-driving timelines and production AI systems"
+        },
+        {
+          "claim": "AGI will require embodied systems integrated with learning capabilities",
+          "timeframe": "Before AGI",
+          "confidence": "High",
+          "context": "Technical requirement"
+        },
+        {
+          "claim": "Language-model-only approaches will plateau before AGI",
+          "timeframe": "2-5 years",
+          "confidence": "Medium",
+          "context": "Based on fundamental limitations"
+        },
+        {
+          "claim": "New paradigm combining embodiment, learning, and language required for AGI",
+          "timeframe": "Before AGI (10+ years out)",
+          "confidence": "Medium-High",
+          "context": "Karpathy's position"
         }
       ],
       "disagreements_with": [
@@ -12210,14 +11904,38 @@
           "target": "RL-focused scaling advocates",
           "topic": "Reinforcement learning as the path to general intelligence",
           "position": "RL is 'terrible' and produces brittle optimization, not genuine understanding"
+        },
+        {
+          "target": "Near-term AGI optimists (Schulman, Aschenbrenner, others)",
+          "topic": "AGI timelines",
+          "position": "AGI is likely 10+ years away; current timelines too aggressive"
+        },
+        {
+          "target": "Pure language model optimists",
+          "topic": "Sufficiency of current approaches",
+          "position": "Language models alone insufficient; embodiment necessary"
         }
       ],
-      "policy_positions": [],
+      "policy_positions": [
+        {
+          "topic": "Research direction diversity",
+          "position": "Embodied AI and robotics should be invested equally with language models",
+          "debate_connection": "alignment_tractability"
+        },
+        {
+          "topic": "AGI timeline realism",
+          "position": "Policy should be based on realistic timelines, not speculative near-term AGI",
+          "debate_connection": "regulation_timing"
+        }
+      ],
       "debate_connections": [
         "agi_timelines",
         "scaling_limits",
         "safety_vs_capabilities",
-        "agent_reliability"
+        "agent_reliability",
+        "alignment_tractability",
+        "existential_risk_debate",
+        "regulation_timing"
       ],
       "themes": [
         "AGI timeline skepticism",
@@ -12225,7 +11943,14 @@
         "Agent reliability gap",
         "Reinforcement learning critique",
         "Education and AI",
-        "Self-driving lessons for AI"
+        "Self-driving lessons for AI",
+        "AGI timelines",
+        "Embodied AI",
+        "World models",
+        "Current system limitations",
+        "Persistent learning",
+        "Scaling plateaus",
+        "Research diversity"
       ],
       "tags": [
         "AGI Timelines",
@@ -12233,17 +11958,29 @@
         "LLM Limitations",
         "Education",
         "Reinforcement Learning",
-        "Autonomous AI"
+        "Autonomous AI",
+        "agi-timeline",
+        "embodied-ai",
+        "scaling-limits",
+        "World Models",
+        "conservative-timeline",
+        "language-model-limits",
+        "Robotics"
       ],
       "influence_score": 9,
       "related_entries": [
         "sutskever_ilya_dwarkesh_2025_after_llms",
-        "amodei_dario_dwarkesh_2023_scaling"
+        "amodei_dario_dwarkesh_2023_scaling",
+        "aschenbrenner_leopold_dwarkesh_2024_agi",
+        "legg_shane_dwarkesh_2023_agi"
       ],
       "source_links": [
         "https://www.dwarkesh.com/p/andrej-karpathy"
       ],
-      "transcript_available": true
+      "transcript_available": true,
+      "merged_from": [
+        "karpathy_andrej_dwarkesh_2025_agi"
+      ]
     },
     {
       "id": "sutskever_ilya_dwarkesh_2025_after_llms",
@@ -12264,7 +12001,14 @@
         "SSI is pursuing a safety-first approach to superintelligence development",
         "The transition period from LLMs to successor architectures is maximally dangerous",
         "The current LLM paradigm, while successful, has fundamental limitations",
-        "SSI's $32B valuation reflects confidence in post-LLM research direction"
+        "SSI's $32B valuation reflects confidence in post-LLM research direction",
+        "Scaling laws are hitting diminishing returns; we're moving from scaling era to research era",
+        "Model generalization remains poorly understood and is the key limiting factor",
+        "Reinforcement learning at scale faces fundamental challenges unresolved by current approaches",
+        "AGI safety must be solved concurrently with capabilities, not after",
+        "Current interpretability approaches are insufficient for understanding large models",
+        "Research breakthroughs, not engineering, will drive next capabilities leap",
+        "Superintelligence development without alignment solution is existentially dangerous"
       ],
       "novel_arguments_and_concepts": "Sutskever's core argument represents a dramatic pivot from the figure who, more than anyone, demonstrated the power of scaling. His claim that scaling has hit a wall carries unique authority precisely because he was the chief architect of the scaling paradigm at OpenAI. The intellectual framework he sketches for 'what comes after LLMs' centers on the idea that current models are fundamentally limited by their reliance on human-generated training data — they can only learn what humans have already articulated, and they learn it in a profoundly inefficient way compared to how the physical world contains and transmits information. SSI's approach, as described, aims to discover learning principles that are orders of magnitude more efficient, drawing on insights from neuroscience, physics, and information theory rather than simply collecting more data or building larger clusters. This positions SSI not as an LLM lab that also does safety, but as a fundamental research organization that believes safety and the search for successor architectures are the same problem.",
       "predictions": [
@@ -12279,6 +12023,24 @@
           "timeframe": "Unknown",
           "confidence": "High",
           "context": "Positions this as the key bottleneck rather than compute or data availability"
+        },
+        {
+          "claim": "AGI timelines will be slower than 2024-2025 predictions suggested",
+          "timeframe": "2025-2030",
+          "confidence": "Medium-High",
+          "context": "Based on research bottlenecks becoming evident"
+        },
+        {
+          "claim": "New training paradigms beyond current RL will be necessary for further capability gains",
+          "timeframe": "2-3 years",
+          "confidence": "Medium-High",
+          "context": "Current RL limitations becoming apparent"
+        },
+        {
+          "claim": "Interpretability breakthroughs will be prerequisites for alignment at superintelligence levels",
+          "timeframe": "3-5 years before AGI",
+          "confidence": "Medium",
+          "context": "SSI research focus"
         }
       ],
       "disagreements_with": [
@@ -12291,6 +12053,16 @@
           "target": "Labs pursuing AGI through LLM scaling",
           "topic": "Research strategy for general intelligence",
           "position": "Fundamental science, not engineering optimization, is the bottleneck"
+        },
+        {
+          "target": "Continued scaling advocates",
+          "topic": "Sufficiency of scale",
+          "position": "Scale alone cannot solve generalization; research breakthroughs necessary"
+        },
+        {
+          "target": "Deference to market-driven capabilities",
+          "topic": "Alignment timing",
+          "position": "Alignment work must precede superintelligence; cannot assume market incentives suffice"
         }
       ],
       "policy_positions": [
@@ -12298,20 +12070,39 @@
           "topic": "Safety-first AI development",
           "position": "Safety and capability research should be unified, not treated as separate tracks",
           "debate_connection": "safety_vs_capabilities"
+        },
+        {
+          "topic": "Research funding for AI safety",
+          "position": "Substantial public and private resources needed for alignment research equivalently to capabilities",
+          "debate_connection": "alignment_tractability"
+        },
+        {
+          "topic": "Who governs AGI development",
+          "position": "Technical safety researchers and ethicists should have significant voice in AGI governance",
+          "debate_connection": "who_governs_ai"
         }
       ],
       "debate_connections": [
         "scaling_limits",
         "agi_timelines",
         "safety_vs_capabilities",
-        "post_llm_architectures"
+        "post_llm_architectures",
+        "alignment_tractability",
+        "existential_risk_debate",
+        "who_governs_ai"
       ],
       "themes": [
         "Post-LLM architectures",
         "Scaling limits",
         "Safety-first development",
         "Scientific discovery for AI",
-        "SSI's research philosophy"
+        "SSI's research philosophy",
+        "Post-scaling paradigm",
+        "Research-driven progress",
+        "Model generalization",
+        "RL challenges",
+        "AGI alignment necessity",
+        "Safety research independence"
       ],
       "tags": [
         "Scaling Laws",
@@ -12319,17 +12110,30 @@
         "SSI",
         "Superintelligence",
         "AI Safety",
-        "Scientific Discovery"
+        "Scientific Discovery",
+        "openai-departure",
+        "ssi",
+        "Alignment",
+        "rl-challenges",
+        "post-scaling",
+        "research",
+        "generalization"
       ],
       "influence_score": 10,
       "related_entries": [
         "karpathy_andrej_dwarkesh_2025_decade_of_agents",
-        "amodei_dario_dwarkesh_2023_scaling"
+        "amodei_dario_dwarkesh_2023_scaling",
+        "amodei_dario_dwarkesh_2026_scaling",
+        "christiano_paul_dwarkesh_2023_takeover",
+        "schulman_john_dwarkesh_2024_rl"
       ],
       "source_links": [
         "https://www.dwarkesh.com/p/ilya-sutskever-2"
       ],
-      "transcript_available": true
+      "transcript_available": true,
+      "merged_from": [
+        "sutskever_ilya_dwarkesh_2025_research"
+      ]
     },
     {
       "id": "imas_trammell_dwarkesh_2026_economics_agi",
