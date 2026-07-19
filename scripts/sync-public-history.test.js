@@ -200,6 +200,20 @@ function setupSourceRepo() {
       ].join('\n'),
     );
     writeFile(sourceDir, path.join('scripts', 'run-agent-bridge-worker-tests.js'), 'agent bridge test runner\n');
+    writeFile(
+      sourceDir,
+      'package.json',
+      `${JSON.stringify(
+        {
+          scripts: {
+            'test:node': 'node scripts/public-node-test-fixture.js',
+            'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
     writeFile(sourceDir, path.join('scripts', 'vendor-cecc-ethers-bundle.js'), 'private companion vendoring\n');
     commitAll(sourceDir, 'Mixed commit', {
       authorDate: '2025-01-04T05:06:07Z',
@@ -463,6 +477,76 @@ test('sync-public-history replays public commits, skips private-only commits, an
   });
 });
 
+test('sync-public-history restores Agent Bridge package wiring at an explicit public cutover', () => {
+  withSourceRepo(({ sourceDir }) => {
+    git(sourceDir, ['checkout', '--quiet', '-B', 'cutover-source', 'origin/main']);
+
+    writeFile(
+      sourceDir,
+      path.join('workers', 'agentBridgeWorker', 'worker.js'),
+      'private pre-cutover agent bridge worker\n',
+    );
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'run-agent-bridge-worker-tests.js'),
+      'private pre-cutover agent bridge test runner\n',
+    );
+    writeFile(
+      sourceDir,
+      'package.json',
+      `${JSON.stringify(
+        {
+          scripts: {
+            'test:node': 'node scripts/public-node-test-fixture.js',
+            'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    commitAll(sourceDir, 'Prepare bridge source base', {
+      authorDate: '2025-01-02T00:00:00Z',
+      committerDate: '2025-01-02T00:00:00Z',
+    });
+    const sourceBase = git(sourceDir, ['rev-parse', 'HEAD']).trim();
+
+    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'public agent bridge worker\n');
+    writeFile(
+      sourceDir,
+      path.join('workers', 'agentBridgeWorker', 'PUBLIC_RELEASE_CUTOVER'),
+      [
+        'context-engine-agent-bridge-public-cutover-v1',
+        'audited=2025-01-03',
+        'scope=workers/agentBridgeWorker,scripts/run-agent-bridge-worker-tests.js',
+        '',
+      ].join('\n'),
+    );
+    writeFile(sourceDir, path.join('scripts', 'run-agent-bridge-worker-tests.js'), 'agent bridge test runner\n');
+    commitAll(sourceDir, 'Publish bridge cutover', {
+      authorDate: '2025-01-03T00:00:00Z',
+      committerDate: '2025-01-03T00:00:00Z',
+    });
+
+    const result = runSyncScript(sourceDir, [
+      '--source-branch',
+      'cutover-source',
+      '--source-base',
+      sourceBase,
+      '--target-base',
+      'origin/main',
+      'release-candidate',
+    ]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const publicPackage = JSON.parse(git(sourceDir, ['show', 'release-candidate:package.json']));
+    assert.equal(
+      publicPackage.scripts['test:worker:agent-bridge'],
+      'node scripts/run-agent-bridge-worker-tests.js',
+    );
+  });
+});
+
 test('sync-public-history rejects public files that import stripped paths before pushing', () => {
   withSourceRepo(({ sourceDir }) => {
     const strippedImport = '../../contextEngine-cc/lib/litChipotleActionCatalog.mjs';
@@ -578,7 +662,16 @@ test('sync-public-history links source node_modules for public Node ESM imports 
     writeFile(
       sourceDir,
       'package.json',
-      `${JSON.stringify({ scripts: { 'test:node': 'node scripts/public-node-test-fixture.mjs' } }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          scripts: {
+            'test:node': 'node scripts/public-node-test-fixture.mjs',
+            'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
+          },
+        },
+        null,
+        2,
+      )}\n`,
     );
     writeFile(
       sourceDir,
