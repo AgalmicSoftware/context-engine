@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Added a repository-owned Netlify build contract for strict, Node 20 client
+  builds from public `main`, with pull-request preview guidance and the existing
+  manual-deploy redirect fallback retained.
+- Refreshed the AI discourse corpus with verified 2026 policy, safety,
+  evaluation, and practitioner sources; consolidated duplicate records,
+  repaired primary-source provenance and tweet metadata, synchronized the
+  client sample, and added normalized-URL and duplicate-title quality gates.
+- Toolchain correction (2026-07-19): Vite is the canonical client dev/build
+  path, and normal client installs again use npm's strict peer resolution.
+  Earlier entries describing Create React App as canonical or durable
+  `legacy-peer-deps` installation reflect superseded intermediate states.
 - Unified Agent Bridge authentication around session-bound user, browser, and
   named service credentials. Telegram is now an optional identity adapter;
   one-time invites can onboard an opaque non-Telegram user, the root token is
