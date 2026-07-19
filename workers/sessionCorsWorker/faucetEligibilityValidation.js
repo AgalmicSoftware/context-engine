@@ -1,7 +1,13 @@
 import { toTrimmedString } from './stringCoercion.js';
+import { resolveRegistryChainId } from './chainIdNormalization.js';
 import {
   resolveFaucetEligibilityAuthority,
 } from './faucetEligibilityAuthority.js';
+import { isSessionSecretRpcUrlForGateRuntime } from './gateRpcResolution.js';
+import {
+  createRpcDiagnosticMasker,
+  sanitizeRpcFailureDetails,
+} from './rpcDiagnosticSafety.js';
 
 const resolveCurrentSelfFundingFaucetAccess = async ({
   config,
@@ -32,14 +38,13 @@ const resolveCurrentSelfFundingFaucetAccess = async ({
   const checkSbtGate = typeof deps?.checkSbtGate === 'function'
     ? deps.checkSbtGate
     : async () => false;
-  const maskRpcUrl = typeof deps?.maskRpcUrl === 'function'
-    ? deps.maskRpcUrl
-    : (value) => toTrimmedString(value, deps);
+  const maskRpcUrl = createRpcDiagnosticMasker({ maskRpcUrl: deps?.maskRpcUrl });
   const anonymousGateUnavailableError = toTrimmedString(constants?.anonymousGateUnavailableError, deps)
     || 'Access denied: on-chain gate data unavailable.';
 
   const normalizedRequester = normalizeAddressLower(requesterAddress);
   const registryAddress = toTrimmedString(config?.registryAddress, deps);
+  const registryChainId = resolveRegistryChainId(config);
   const registryRpcUrls = resolveRegistryRpcUrls(config);
   if (!normalizedRequester || !isAddress(registryAddress) || !registryRpcUrls.length) {
     return {
@@ -51,10 +56,13 @@ const resolveCurrentSelfFundingFaucetAccess = async ({
   }
 
   const registrySlug = toRegistrySessionSlug(slug);
+  const chainAttestationCache = new Map();
   const sessionCheck = await readSessionExistsOnChain({
     registryAddress,
     registryRpcUrls,
     registrySlug,
+    expectedChainId: registryChainId,
+    chainAttestationCache,
   });
   if (sessionCheck?.exists !== true) {
     return {
@@ -65,7 +73,10 @@ const resolveCurrentSelfFundingFaucetAccess = async ({
       details: {
         registryAddress,
         rpcUrl: sessionCheck?.rpcUrl ? maskRpcUrl(sessionCheck.rpcUrl) : '',
-        errors: sessionCheck?.errors || [],
+        errors: sanitizeRpcFailureDetails(sessionCheck?.errors, {
+          maskRpcUrl: deps?.maskRpcUrl,
+          errorLabel: 'Session existence RPC request failed.',
+        }),
       },
     };
   }
@@ -75,6 +86,8 @@ const resolveCurrentSelfFundingFaucetAccess = async ({
     registryRpcUrls,
     registrySlug,
     resourceKey: 'txGas',
+    expectedChainId: registryChainId,
+    chainAttestationCache,
   });
   if (!gateResult?.ok) {
     return {
@@ -82,7 +95,10 @@ const resolveCurrentSelfFundingFaucetAccess = async ({
       status: 403,
       error: anonymousGateUnavailableError,
       reason: 'txgas-gate-unavailable',
-      details: gateResult?.errors || [],
+      details: sanitizeRpcFailureDetails(gateResult?.errors, {
+        maskRpcUrl: deps?.maskRpcUrl,
+        errorLabel: 'Registry gate lookup RPC request failed.',
+      }),
     };
   }
 
@@ -113,6 +129,12 @@ const resolveCurrentSelfFundingFaucetAccess = async ({
       rpcUrl,
       mode: gate.mode,
       chainId: gate.chainId,
+      rpcUrlIsPrivate: isSessionSecretRpcUrlForGateRuntime({
+        config,
+        gateChainId: gate.chainId,
+        rpcUrl,
+      }),
+      chainAttestationCache,
     });
     if (hasAccess) {
       return {
@@ -216,6 +238,7 @@ export const validateFaucetEligibilityRequest = async ({
       readSbtFaucetValidationState: deps?.readSbtFaucetValidationState,
       validateSbtPasswordForFaucet: deps?.validateSbtPasswordForFaucet,
       verifyGroupSignatureForFaucet: deps?.verifyGroupSignatureForFaucet,
+      maskRpcUrl: deps?.maskRpcUrl,
     },
     constants: {
       anonymousGateUnavailableError: constants?.anonymousGateUnavailableError,

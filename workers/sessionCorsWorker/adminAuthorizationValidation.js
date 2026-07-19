@@ -1,3 +1,6 @@
+import { resolveRegistryChainId } from './chainIdNormalization.js';
+import { attestRpcEndpointChain } from './rpcChainAttestation.js';
+
 export const validateAdmin = async ({
   env,
   slug,
@@ -28,10 +31,23 @@ export const validateAdmin = async ({
   }
 
   if (adminHatId > 0n && deps?.isAddress?.(hatsAddress)) {
+    const expectedChainId = resolveRegistryChainId(config);
+    if (!expectedChainId) return false;
     const rpcUrls = deps?.resolveRegistryRpcUrls?.(config) || [];
     if (!rpcUrls.length) return false;
+    // Regression guard: cache only within this authorization request so a later
+    // request cannot inherit stale endpoint identity after DNS or RPC changes.
+    const chainAttestationCache = new Map();
     for (const rpcUrl of rpcUrls) {
       try {
+        const attestation = await attestRpcEndpointChain({
+          rpcUrl,
+          expectedChainId,
+          rpcRequest: deps?.rpcRequest,
+          toChainId: deps?.toChainId,
+          cache: chainAttestationCache,
+        });
+        if (!attestation?.ok) continue;
         const iface = deps?.getHatsInterface?.();
         const decoded = await deps?.callContractFunction?.({
           rpcUrl,

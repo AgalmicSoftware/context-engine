@@ -55,15 +55,6 @@ export const resolveWorkerGroupCaps = (env = {}) => ({
   ),
 });
 
-export const resolveWorkerGroupsD1 = (env = {}) => (
-  env.CE_WORKER_GROUPS_D1 ||
-  env.CE_STORAGE_AUDIT_D1 ||
-  env.STORAGE_AUDIT_D1 ||
-  env.D1 ||
-  env.DB ||
-  null
-);
-
 export const resolveWorkerGroupsKv = (env = {}) => (
   env.CE_WORKER_GROUPS_KV ||
   env.CE_STORAGE_INDEX_KV ||
@@ -73,8 +64,6 @@ export const resolveWorkerGroupsKv = (env = {}) => (
 );
 
 const resolveWorkerGroupStore = (env = {}) => {
-  const d1 = resolveWorkerGroupsD1(env);
-  if (d1 && typeof d1.prepare === 'function') return { kind: 'd1', store: d1 };
   const kv = resolveWorkerGroupsKv(env);
   if (kv && typeof kv.get === 'function' && typeof kv.put === 'function') return { kind: 'kv', store: kv };
   return null;
@@ -250,37 +239,6 @@ const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps
   };
 };
 
-const ensureD1Tables = async (d1) => {
-  if (typeof d1.exec !== 'function') return;
-  await d1.exec(`
-    CREATE TABLE IF NOT EXISTS ce_worker_groups (
-      session_slug TEXT NOT NULL,
-      group_id TEXT NOT NULL,
-      label TEXT NOT NULL,
-      description TEXT,
-      join_mode TEXT NOT NULL,
-      member_visibility TEXT NOT NULL,
-      created_by_json TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL,
-      deleted_at TEXT,
-      group_json TEXT NOT NULL,
-      PRIMARY KEY (session_slug, group_id)
-    );
-    CREATE TABLE IF NOT EXISTS ce_worker_group_members (
-      session_slug TEXT NOT NULL,
-      group_id TEXT NOT NULL,
-      principal_key TEXT NOT NULL,
-      principal_json TEXT NOT NULL,
-      added_by_json TEXT NOT NULL,
-      added_at TEXT NOT NULL,
-      removed_at TEXT,
-      member_json TEXT NOT NULL,
-      PRIMARY KEY (session_slug, group_id, principal_key)
-    );
-  `);
-};
-
 const kvGetJson = async (kv, key) => {
   try {
     const raw = await kv.get(key);
@@ -299,55 +257,15 @@ const kvListKeys = async (kv, prefix) => {
 };
 
 const readGroupRecord = async ({ store, slug, groupId }) => {
-  if (store.kind === 'd1') {
-    await ensureD1Tables(store.store);
-    const row = await store.store.prepare(
-      'SELECT group_json FROM ce_worker_groups WHERE session_slug = ? AND group_id = ?'
-    ).bind(safeSlugPart(slug), safeKeyPart(groupId)).first();
-    return row?.group_json ? JSON.parse(row.group_json) : null;
-  }
   return kvGetJson(store.store, groupKey({ slug, groupId }));
 };
 
 const writeGroupRecord = async ({ store, slug, group }) => {
-  if (store.kind === 'd1') {
-    await ensureD1Tables(store.store);
-    await store.store.prepare(
-      `INSERT OR REPLACE INTO ce_worker_groups
-        (session_slug, group_id, label, description, join_mode, member_visibility, created_by_json, created_at, updated_at, deleted_at, group_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      safeSlugPart(slug),
-      group.groupId,
-      group.label,
-      group.description || '',
-      group.joinMode,
-      group.memberVisibility,
-      JSON.stringify(group.createdBy),
-      group.createdAt,
-      group.updatedAt,
-      group.deletedAt || null,
-      JSON.stringify(group),
-    ).run();
-    return;
-  }
   await store.store.put(groupKey({ slug, groupId: group.groupId }), JSON.stringify(group));
   await store.store.put(groupIndexKey({ slug, groupId: group.groupId }), group.groupId);
 };
 
 const listGroupRecords = async ({ store, slug, includeDeleted = false }) => {
-  if (store.kind === 'd1') {
-    await ensureD1Tables(store.store);
-    const query = includeDeleted
-      ? 'SELECT group_json FROM ce_worker_groups WHERE session_slug = ?'
-      : 'SELECT group_json FROM ce_worker_groups WHERE session_slug = ? AND deleted_at IS NULL';
-    const result = await store.store.prepare(query).bind(safeSlugPart(slug)).all();
-    return (Array.isArray(result?.results) ? result.results : [])
-      .map((row) => {
-        try { return JSON.parse(row.group_json); } catch { return null; }
-      })
-      .filter(Boolean);
-  }
   const keys = await kvListKeys(store.store, groupIndexPrefix({ slug }));
   const groups = [];
   for (const key of keys) {
@@ -361,55 +279,15 @@ const listGroupRecords = async ({ store, slug, includeDeleted = false }) => {
 };
 
 const writeMembershipRecord = async ({ store, slug, groupId, member }) => {
-  if (store.kind === 'd1') {
-    await ensureD1Tables(store.store);
-    await store.store.prepare(
-      `INSERT OR REPLACE INTO ce_worker_group_members
-        (session_slug, group_id, principal_key, principal_json, added_by_json, added_at, removed_at, member_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      safeSlugPart(slug),
-      safeKeyPart(groupId),
-      member.principalKey,
-      JSON.stringify(member.principal),
-      JSON.stringify(member.addedBy),
-      member.addedAt,
-      member.removedAt || null,
-      JSON.stringify(member),
-    ).run();
-    return;
-  }
   await store.store.put(memberKey({ slug, groupId, principalKey: member.principalKey }), JSON.stringify(member));
   await store.store.put(memberIndexKey({ slug, principalKey: member.principalKey, groupId }), safeKeyPart(groupId));
 };
 
 const readMembershipRecord = async ({ store, slug, groupId, principalKey }) => {
-  if (store.kind === 'd1') {
-    await ensureD1Tables(store.store);
-    const row = await store.store.prepare(
-      'SELECT member_json FROM ce_worker_group_members WHERE session_slug = ? AND group_id = ? AND principal_key = ?'
-    ).bind(safeSlugPart(slug), safeKeyPart(groupId), principalKey).first();
-    return row?.member_json ? JSON.parse(row.member_json) : null;
-  }
   return kvGetJson(store.store, memberKey({ slug, groupId, principalKey }));
 };
 
 const listMembershipRecords = async ({ store, slug, groupId = '', principalKey = '' }) => {
-  if (store.kind === 'd1') {
-    await ensureD1Tables(store.store);
-    const sql = groupId
-      ? 'SELECT member_json FROM ce_worker_group_members WHERE session_slug = ? AND group_id = ? AND removed_at IS NULL'
-      : 'SELECT member_json FROM ce_worker_group_members WHERE session_slug = ? AND principal_key = ? AND removed_at IS NULL';
-    const args = groupId
-      ? [safeSlugPart(slug), safeKeyPart(groupId)]
-      : [safeSlugPart(slug), principalKey];
-    const result = await store.store.prepare(sql).bind(...args).all();
-    return (Array.isArray(result?.results) ? result.results : [])
-      .map((row) => {
-        try { return JSON.parse(row.member_json); } catch { return null; }
-      })
-      .filter((member) => member && !member.removedAt);
-  }
   const prefix = groupId
     ? memberPrefix({ slug, groupId })
     : principalPrefix({ slug, principalKey });
@@ -572,7 +450,11 @@ export const listWorkerGroupMemberships = async ({ env, slug, principal, deps = 
     // eslint-disable-next-line no-await-in-loop
     const group = await readGroupRecord({ store, slug, groupId: row.groupId });
     if (!group || group.deletedAt) continue;
-    memberships.push({ group: redactGroupForMember(group), member: row });
+    // The count supports the shared aggregate-privacy threshold without
+    // exposing other principals or requiring an admin membership read.
+    // eslint-disable-next-line no-await-in-loop
+    const groupMembers = await listMembershipRecords({ store, slug, groupId: row.groupId });
+    memberships.push({ group: redactGroupForMember(group), member: row, memberCount: groupMembers.length });
   }
   return { ok: true, store: store.kind, principal: normalized.principal, memberships };
 };

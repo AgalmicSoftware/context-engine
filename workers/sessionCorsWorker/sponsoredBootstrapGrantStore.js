@@ -60,3 +60,166 @@ export const writeSponsoredGrantRecord = async (env, token, record, ttlSeconds =
 export const deleteSponsoredGrantRecord = async (env, token) => (
   env?.GROUP_KV?.delete?.(buildSponsoredGrantKvKey(token))
 );
+
+const normalizeSensitiveValues = (values = []) => Array.from(new Set(
+  (Array.isArray(values) ? values : [])
+    .map((value) => toTrimmedString(value))
+    .filter((value) => value.length >= 4),
+)).sort((left, right) => right.length - left.length);
+
+export const redactSponsoredSensitiveText = (value, sensitiveValues = []) => {
+  let redacted = toTrimmedString(value);
+  normalizeSensitiveValues(sensitiveValues).forEach((secret) => {
+    redacted = redacted.split(secret).join('[REDACTED]');
+  });
+  return redacted;
+};
+
+export const buildSafeSponsoredReceiptBody = (incoming = {}, sensitiveValues = []) => {
+  const body = {};
+  [
+    'ok',
+    'error',
+    'workerName',
+    'workerUrl',
+    'resolvedSlug',
+    'kvNamespaceId',
+    'deploymentId',
+    'sessionConfigKey',
+    'sessionSecretsKey',
+    'sessionKvPrefix',
+    'partial',
+    'writesSessionConfig',
+    'writesSessionSecrets',
+    'tokenSecretSet',
+    'tokenSecretPreserved',
+    'envelopeKekSecretSet',
+    'envelopeKekSecretPreserved',
+    'subdomain',
+    'subdomainStatus',
+    'subdomainEnabled',
+    'subdomainError',
+    'scriptSubdomainEnabled',
+    'scriptSubdomainError',
+    'configVerified',
+    'deploymentRequestPending',
+    'deploymentRequestTerminal',
+    'deploymentRequestConflict',
+    'sponsoredGrantPayloadConflict',
+    'txHash',
+    'status',
+    'to',
+    'amountEth',
+    'chainId',
+  ].forEach((key) => {
+    const rawValue = incoming?.[key];
+    const value = key === 'error' && typeof rawValue === 'string'
+      ? redactSponsoredSensitiveText(rawValue, sensitiveValues)
+      : rawValue;
+    if (typeof value === 'string' || typeof value === 'boolean' || Number.isFinite(value)) {
+      body[key] = value;
+    }
+  });
+  if (incoming?.orphanResources && typeof incoming.orphanResources === 'object') {
+    const orphanResources = {};
+    ['kvNamespaceId', 'kvCleanupStatus', 'workerName', 'workerCleanupStatus'].forEach((key) => {
+      const value = incoming.orphanResources[key];
+      if (typeof value === 'string') {
+        orphanResources[key] = redactSponsoredSensitiveText(value, sensitiveValues);
+      }
+    });
+    if (Object.keys(orphanResources).length) body.orphanResources = orphanResources;
+  }
+  if (incoming?.bundleDiagnostics && typeof incoming.bundleDiagnostics === 'object') {
+    const bundleDiagnostics = {};
+    [
+      'source',
+      'length',
+      'sha256',
+      'hasAnyExport',
+      'hasExportDefault',
+      'hasNamedDefaultExport',
+      'hasStringExportWrapper',
+      'hasFetchHandler',
+      'hasServiceWorkerFetch',
+    ].forEach((key) => {
+      const value = incoming.bundleDiagnostics[key];
+      if (typeof value === 'string') {
+        bundleDiagnostics[key] = redactSponsoredSensitiveText(value, sensitiveValues);
+      } else if (typeof value === 'boolean' || Number.isFinite(value)) {
+        bundleDiagnostics[key] = value;
+      }
+    });
+    if (Object.keys(bundleDiagnostics).length) body.bundleDiagnostics = bundleDiagnostics;
+  }
+  return body;
+};
+
+const buildSponsoredGrantContinuationRecord = ({
+  grantRecord,
+  requestDigest,
+  state,
+} = {}) => {
+  const expiresAt = toTrimmedString(grantRecord?.expiresAt);
+  const sourceAllowOrigins = Array.isArray(grantRecord?.sourceConfig?.allowOrigins)
+    ? grantRecord.sourceConfig.allowOrigins
+      .map((value) => toTrimmedString(value))
+      .filter(Boolean)
+    : [];
+  return {
+    type: toTrimmedString(grantRecord?.type),
+    sourceSessionSlug: toTrimmedString(grantRecord?.sourceSessionSlug),
+    sourceConfig: sourceAllowOrigins.length ? { allowOrigins: sourceAllowOrigins } : {},
+    ...(expiresAt ? { expiresAt } : {}),
+    state,
+    requestDigest: toTrimmedString(requestDigest),
+  };
+};
+
+export const writeSponsoredGrantRedemptionReservation = async ({
+  env,
+  token,
+  grantRecord,
+  requestDigest,
+  nowMs = Date.now(),
+} = {}) => {
+  const expiresAt = toTrimmedString(grantRecord?.expiresAt);
+  const ttlSeconds = expiresAt
+    ? computeSponsoredGrantExpirationTtl(expiresAt, nowMs)
+    : null;
+  const reservation = buildSponsoredGrantContinuationRecord({
+    grantRecord,
+    requestDigest,
+    state: 'redeeming',
+  });
+  await writeSponsoredGrantRecord(env, token, reservation, ttlSeconds);
+  return reservation;
+};
+
+export const writeSponsoredGrantReceipt = async ({
+  env,
+  token,
+  grantRecord,
+  requestDigest,
+  response,
+  sensitiveValues = [],
+  nowMs = Date.now(),
+} = {}) => {
+  const expiresAt = toTrimmedString(grantRecord?.expiresAt);
+  const ttlSeconds = expiresAt
+    ? computeSponsoredGrantExpirationTtl(expiresAt, nowMs)
+    : null;
+  const safeRecord = {
+    ...buildSponsoredGrantContinuationRecord({
+      grantRecord,
+      requestDigest,
+      state: 'redeemed',
+    }),
+    receipt: {
+      status: Number(response?.status || 0) || 200,
+      body: buildSafeSponsoredReceiptBody(response?.body, sensitiveValues),
+    },
+  };
+  await writeSponsoredGrantRecord(env, token, safeRecord, ttlSeconds);
+  return safeRecord.receipt;
+};

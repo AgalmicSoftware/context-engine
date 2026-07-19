@@ -58,7 +58,7 @@ const RESPONSES_SUBMITTED_IFACE = new ethers.utils.Interface([
   'event ResponsesSubmitted(address indexed responder,bytes32[] questionIds,bytes32 indexed surveyId)',
 ]);
 
-const makeResponsesSubmittedLog = (responder, blockNumber, logIndex = 0) => {
+const makeResponsesSubmittedLog = (responder, blockNumber, logIndex = 0, transactionIndex = 0) => {
   const encoded = RESPONSES_SUBMITTED_IFACE.encodeEventLog(RESPONSES_SUBMITTED_IFACE.getEvent('ResponsesSubmitted'), [
     responder,
     [QUESTION_ID],
@@ -68,7 +68,7 @@ const makeResponsesSubmittedLog = (responder, blockNumber, logIndex = 0) => {
     address: GROUP_CFG.contracts.surveys.address,
     blockNumber,
     logIndex,
-    transactionIndex: 0,
+    transactionIndex,
     topics: encoded.topics,
     data: encoded.data,
   };
@@ -242,6 +242,27 @@ describe('contractScripts.fetchAllSurveyResponses', () => {
         blockNumber: 9,
         logIndex: 1,
         timestamp: 1712345678,
+      }),
+    ]);
+  });
+
+  it('preserves transaction ordering metadata for the latest same-block responder event', async () => {
+    const responder = '0x00000000000000000000000000000000000000aa';
+    mockFetchLogsSmartWithProvider.mockResolvedValue([
+      makeResponsesSubmittedLog(responder, 7, 1, 1),
+      makeResponsesSubmittedLog(responder, 7, 3, 2),
+    ]);
+    jest.spyOn(contractScripts, 'getSurveyResponse').mockResolvedValue({ answer: 'latest' });
+
+    const result = await contractScripts.fetchAllSurveyResponses('none', SURVEY_ID, 1, 30, GROUP_CFG);
+
+    expect(result.responses).toEqual([
+      expect.objectContaining({
+        responder,
+        response: { answer: 'latest' },
+        blockNumber: 7,
+        transactionIndex: 2,
+        logIndex: 3,
       }),
     ]);
   });

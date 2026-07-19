@@ -1,9 +1,10 @@
+import { getOrCreateCoordinatedStorageEnvelopeSessionKey } from './sessionWriteCoordinator.js';
+
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
 export const STORAGE_ENVELOPE_KEK_SECRET_NAME = 'CE_STORAGE_ENVELOPE_KEK';
 export const STORAGE_ENVELOPE_PREVIOUS_KEK_SECRET_NAME = 'CE_STORAGE_ENVELOPE_PREVIOUS_KEK';
-
 const ENVELOPE_VERSION = 1;
 const AES_GCM = 'AES-GCM';
 const AES_256_GCM = 'AES-256-GCM';
@@ -14,8 +15,6 @@ const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(
 const cloneJson = (value) => JSON.parse(JSON.stringify(value || {}));
 
 const safeSlugPart = (value) => trim(value || 'general').toLowerCase().replace(/[^a-z0-9._:-]+/g, '-').replace(/^-+|-+$/g, '') || 'general';
-const buildPayloadKey = ({ slug, id }) => `ce-storage-payload:${safeSlugPart(slug)}:${id}`;
-const buildIndexPrefix = ({ slug }) => `ce-storage:${safeSlugPart(slug)}:`;
 
 export const bytesToBase64url = (bytes) => {
   const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
@@ -97,11 +96,6 @@ const importDeploymentKek = async ({ env = {}, previous = false, deps = {} } = {
   return importAesKey(keyBytes, ['encrypt', 'decrypt'], deps);
 };
 
-const importDeploymentKekFromSecret = async ({ secret, deps = {} } = {}) => {
-  const keyBytes = await deriveDeploymentKeyBytes(secret, deps);
-  return importAesKey(keyBytes, ['encrypt', 'decrypt'], deps);
-};
-
 const aesEncrypt = async ({ keyBytes, plaintextBytes, aad = '', deps = {} }) => {
   const iv = randomBytes(12, deps);
   const key = await importAesKey(keyBytes, ['encrypt'], deps);
@@ -150,16 +144,22 @@ const readSessionKeyRecord = (config = {}) => {
   return isObj(envelope.sessionKey) ? envelope.sessionKey : null;
 };
 
-const buildSessionEnvelopeConfig = ({ config, sessionKeyRecord, rotatedAt }) => ({
-  ...cloneJson(config),
-  storageEnvelope: {
-    ...(isObj(config?.storageEnvelope) ? cloneJson(config.storageEnvelope) : {}),
-    version: ENVELOPE_VERSION,
-    keyProvider: 'worker_secret',
-    sessionKey: sessionKeyRecord,
-    ...(rotatedAt ? { rotatedAt } : {}),
-  },
-});
+const isCoordinatorWrappedSessionKeyRecord = (record, slug) => {
+  if (!isObj(record)) return false;
+  const createdAt = trim(record.createdAt);
+  const createdAtMs = Date.parse(createdAt);
+  return (
+    record.version === ENVELOPE_VERSION &&
+    record.keyProvider === 'worker_secret' &&
+    record.alg === AES_256_GCM &&
+    record.wrapAlg === 'AES-GCM-KW-v1' &&
+    Number.isFinite(createdAtMs) &&
+    new Date(createdAtMs).toISOString() === createdAt &&
+    trim(record.keyId) === `session:${safeSlugPart(slug)}:${createdAt}` &&
+    /^[A-Za-z0-9_-]{16}$/.test(trim(record.iv)) &&
+    /^[A-Za-z0-9_-]{64}$/.test(trim(record.wrappedKey))
+  );
+};
 
 const unwrapSessionKeyBytes = async ({ env, config, slug, deps = {} }) => {
   const record = readSessionKeyRecord(config);
@@ -183,35 +183,58 @@ const unwrapSessionKeyBytes = async ({ env, config, slug, deps = {} }) => {
 
 export const ensureStorageEnvelopeSessionKey = async ({ env, config, slug, deps = {} }) => {
   const existing = readSessionKeyRecord(config);
-  if (existing) {
-    return {
-      keyBytes: await unwrapSessionKeyBytes({ env, config, slug, deps }),
-      config,
-      created: false,
+  let candidateRecord = existing;
+  if (existing && !isCoordinatorWrappedSessionKeyRecord(existing, slug)) {
+    // Verify the legacy bytes with the current/fallback KEK, but never rewrap
+    // them during an upload. Rewrapping could silently bind the session to a
+    // mistaken current secret; only the coordinator metadata is normalized.
+    await unwrapSessionKeyBytes({ env, config, slug, deps });
+    const createdAt = nowIso(deps);
+    candidateRecord = {
+      version: ENVELOPE_VERSION,
+      keyProvider: 'worker_secret',
+      keyId: `session:${safeSlugPart(slug)}:${createdAt}`,
+      createdAt,
+      alg: AES_256_GCM,
+      wrapAlg: 'AES-GCM-KW-v1',
+      iv: existing.iv,
+      wrappedKey: existing.wrappedKey,
+    };
+  } else if (!candidateRecord) {
+    const keyBytes = randomBytes(32, deps);
+    const deploymentKey = await importDeploymentKek({ env, deps });
+    const createdAt = nowIso(deps);
+    candidateRecord = {
+      version: ENVELOPE_VERSION,
+      keyProvider: 'worker_secret',
+      keyId: `session:${safeSlugPart(slug)}:${createdAt}`,
+      createdAt,
+      ...await wrapBytesWithKey({
+        wrappingKey: deploymentKey,
+        plaintextBytes: keyBytes,
+        aad: `ce-storage-envelope:session:${safeSlugPart(slug)}`,
+        deps,
+      }),
     };
   }
 
-  const keyBytes = randomBytes(32, deps);
-  const deploymentKey = await importDeploymentKek({ env, deps });
-  const createdAt = nowIso(deps);
-  const sessionKeyRecord = {
-    version: ENVELOPE_VERSION,
-    keyProvider: 'worker_secret',
-    keyId: `session:${safeSlugPart(slug)}:${createdAt}`,
-    createdAt,
-    ...await wrapBytesWithKey({
-      wrappingKey: deploymentKey,
-      plaintextBytes: keyBytes,
-      aad: `ce-storage-envelope:session:${safeSlugPart(slug)}`,
-      deps,
-    }),
-  };
-  const nextConfig = buildSessionEnvelopeConfig({ config, sessionKeyRecord });
-  if (typeof deps.putSessionConfig !== 'function') {
-    throw new Error('Session config store is required for storage envelope session keys.');
+  const coordinate = deps.getOrCreateCoordinatedStorageEnvelopeSessionKey ||
+    getOrCreateCoordinatedStorageEnvelopeSessionKey;
+  const coordinated = await coordinate({
+    env,
+    slug,
+    baseConfig: config,
+    candidateRecord,
+  });
+  const nextConfig = coordinated?.config;
+  if (!isObj(nextConfig) || !readSessionKeyRecord(nextConfig)) {
+    throw new Error('Session config coordination returned no wrapped session key.');
   }
-  await deps.putSessionConfig(env, slug, nextConfig);
-  return { keyBytes, config: nextConfig, created: true };
+  return {
+    keyBytes: await unwrapSessionKeyBytes({ env, config: nextConfig, slug, deps }),
+    config: nextConfig,
+    created: !existing && coordinated.created === true,
+  };
 };
 
 export const encryptPayloadWithStorageEnvelope = async ({
@@ -294,146 +317,6 @@ export const decryptPayloadWithStorageEnvelope = async ({
   });
 };
 
-const readJson = (value) => {
-  if (!trim(value)) return null;
-  try { return typeof value === 'string' ? JSON.parse(value) : value; } catch { return null; }
-};
-
-const listEnvelopeMetadataRows = async ({ index, slug }) => {
-  const rows = [];
-  const prefix = buildIndexPrefix({ slug });
-  let cursor = '';
-  do {
-    // eslint-disable-next-line no-await-in-loop
-    const listed = await index.list({
-      prefix,
-      ...(cursor ? { cursor } : {}),
-    });
-    const keys = Array.isArray(listed?.keys) ? listed.keys : [];
-    for (const keyEntry of keys) {
-      const key = trim(keyEntry?.name || keyEntry);
-      if (!key) continue;
-      // eslint-disable-next-line no-await-in-loop
-      const metadata = readJson(await index.get(key));
-      if (metadata?.envelope?.encryption === 'worker_envelope') rows.push({ key, metadata });
-    }
-    cursor = listed?.list_complete === false ? trim(listed?.cursor) : '';
-  } while (cursor);
-  return rows;
-};
-
-export const rotateStorageEnvelopeKeys = async ({ env = {}, slug, config, deps = {} } = {}) => {
-  const index = env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
-  if (!index || typeof index.list !== 'function' || typeof index.get !== 'function' || typeof index.put !== 'function') {
-    throw new Error('Storage index KV is required for envelope key rotation.');
-  }
-  if (typeof deps.putSessionConfig !== 'function') {
-    throw new Error('Session config store is required for envelope key rotation.');
-  }
-  const oldSessionKeyBytes = await unwrapSessionKeyBytes({ env, config, slug, deps });
-  const oldSessionKey = await importAesKey(oldSessionKeyBytes, ['decrypt'], deps);
-  const newSessionKeyBytes = randomBytes(32, deps);
-  const newSessionKey = await importAesKey(newSessionKeyBytes, ['encrypt'], deps);
-  const deploymentKey = await importDeploymentKek({ env, deps });
-  const rotatedAt = nowIso(deps);
-  const sessionKeyRecord = {
-    version: ENVELOPE_VERSION,
-    keyProvider: 'worker_secret',
-    keyId: `session:${safeSlugPart(slug)}:${rotatedAt}`,
-    createdAt: rotatedAt,
-    ...await wrapBytesWithKey({
-      wrappingKey: deploymentKey,
-      plaintextBytes: newSessionKeyBytes,
-      aad: `ce-storage-envelope:session:${safeSlugPart(slug)}`,
-      deps,
-    }),
-  };
-  const rows = await listEnvelopeMetadataRows({ index, slug });
-  for (const row of rows) {
-    const payloadId = trim(row.metadata.id);
-    const aad = `ce-storage-envelope:payload:${safeSlugPart(slug)}:${payloadId}`;
-    // eslint-disable-next-line no-await-in-loop
-    const dekBytes = await unwrapBytesWithKey({
-      wrappingKey: oldSessionKey,
-      wrapped: row.metadata.envelope.dek,
-      aad: `${aad}:dek`,
-      deps,
-    });
-    // eslint-disable-next-line no-await-in-loop
-    const nextDek = await wrapBytesWithKey({
-      wrappingKey: newSessionKey,
-      plaintextBytes: dekBytes,
-      aad: `${aad}:dek`,
-      deps,
-    });
-    const nextMetadata = {
-      ...row.metadata,
-      envelope: {
-        ...row.metadata.envelope,
-        dek: {
-          ...row.metadata.envelope.dek,
-          ...nextDek,
-        },
-        rotatedAt,
-      },
-    };
-    // eslint-disable-next-line no-await-in-loop
-    await index.put(row.key, JSON.stringify(nextMetadata));
-    const payloadKey = buildPayloadKey({ slug, id: payloadId });
-    // eslint-disable-next-line no-await-in-loop
-    const payloadEnvelope = readJson(await index.get(payloadKey));
-    if (payloadEnvelope?.metadata) {
-      payloadEnvelope.metadata = nextMetadata;
-      // eslint-disable-next-line no-await-in-loop
-      await index.put(payloadKey, JSON.stringify(payloadEnvelope));
-    }
-  }
-  const nextConfig = buildSessionEnvelopeConfig({ config, sessionKeyRecord, rotatedAt });
-  await deps.putSessionConfig(env, slug, nextConfig);
-  return {
-    ok: true,
-    rotatedAt,
-    payloadsRewrapped: rows.length,
-    config: nextConfig,
-  };
-};
-
-export const rewrapStorageEnvelopeSessionKeyForDeployment = async ({
-  env = {},
-  slug,
-  config,
-  newDeploymentKek,
-  deps = {},
-} = {}) => {
-  if (typeof deps.putSessionConfig !== 'function') {
-    throw new Error('Session config store is required for envelope deployment re-wrap.');
-  }
-  const sessionKeyBytes = await unwrapSessionKeyBytes({ env, config, slug, deps });
-  const nextDeploymentKey = await importDeploymentKekFromSecret({ secret: newDeploymentKek, deps });
-  const rewrappedAt = nowIso(deps);
-  const sessionKeyRecord = {
-    version: ENVELOPE_VERSION,
-    keyProvider: 'worker_secret',
-    keyId: `session:${safeSlugPart(slug)}:${rewrappedAt}`,
-    createdAt: rewrappedAt,
-    ...await wrapBytesWithKey({
-      wrappingKey: nextDeploymentKey,
-      plaintextBytes: sessionKeyBytes,
-      aad: `ce-storage-envelope:session:${safeSlugPart(slug)}`,
-      deps,
-    }),
-  };
-  const nextConfig = buildSessionEnvelopeConfig({ config, sessionKeyRecord, rotatedAt: rewrappedAt });
-  await deps.putSessionConfig(env, slug, nextConfig);
-  return {
-    ok: true,
-    rewrappedAt,
-    config: nextConfig,
-    keyProvider: 'worker_secret',
-  };
-};
-
-const resolveAuditD1 = (env = {}) => env.CE_STORAGE_AUDIT_D1 || env.STORAGE_AUDIT_D1 || env.D1 || env.DB || null;
 const resolveAuditKv = (env = {}) => env.CE_STORAGE_AUDIT_KV || env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
 
 const auditSuffix = (deps = {}) => {
@@ -463,20 +346,6 @@ export const writeStorageEnvelopeKeyReleaseAudit = async ({
     conditionMatched: isObj(conditionMatched) ? cloneJson(conditionMatched) : conditionMatched || 'gate_fallback',
     timestamp,
   };
-  const d1 = resolveAuditD1(env);
-  if (d1 && typeof d1.prepare === 'function') {
-    await d1.prepare(
-      'INSERT INTO ce_storage_key_release_audit (session_slug, payload_id, principal, condition_matched, timestamp, entry_json) VALUES (?, ?, ?, ?, ?, ?)'
-    ).bind(
-      entry.sessionSlug,
-      entry.payloadId,
-      entry.principal,
-      JSON.stringify(entry.conditionMatched),
-      entry.timestamp,
-      JSON.stringify(entry),
-    ).run();
-    return { ok: true, store: 'd1', entry };
-  }
   const kv = resolveAuditKv(env);
   if (!kv || typeof kv.put !== 'function') {
     throw new Error('Storage envelope audit store is not configured.');

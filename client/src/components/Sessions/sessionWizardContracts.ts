@@ -1,4 +1,9 @@
-import { getSessionContractsForChain, getSessionRegistryAddress } from '../../variables/chains.js';
+import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
+import {
+  getSessionContractsForChain,
+  getSessionRegistryAddress,
+  getSessionRegistryChains,
+} from '../../variables/chains.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { buildContractsPageHref } from '../ContractPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
@@ -12,6 +17,11 @@ import type {
 
 type VisibleSessionWizardContractKey = 'surveys' | 'sbtFactory' | 'sessionRegistry';
 type SessionWizardContractsRecord = Record<string, unknown>;
+
+type SessionWizardInitialRegistryChainInput = {
+  draftChainId?: ChainIdLike;
+  networkChainId?: ChainIdLike;
+};
 
 type SessionWizardContractViewerPlanInput = {
   activeSessionSlug?: unknown;
@@ -46,6 +56,19 @@ export const getSessionWizardContractDefaults = (chainId: unknown): SessionWizar
     contracts.sessionRegistry = registryAddress;
   }
   return contracts;
+};
+
+export const resolveSessionWizardInitialRegistryChainId = ({
+  draftChainId,
+  networkChainId,
+}: SessionWizardInitialRegistryChainInput = {}): number => {
+  const configuredCandidates = [draftChainId, networkChainId, DEFAULT_CHAIN_ID];
+  for (const candidate of configuredCandidates) {
+    const chainId = Number(candidate || 0);
+    if (chainId && getSessionRegistryAddress(chainId)) return chainId;
+  }
+  const firstAvailableChainId = Number(getSessionRegistryChains()[0]?.id || 0);
+  return firstAvailableChainId || Number(DEFAULT_CHAIN_ID || 0) || 0;
 };
 
 export const resolveSessionWizardRegistryAddress = (

@@ -12,6 +12,15 @@ kv_namespaces = [
   { binding = "DEPLOY_HELPER_KV", id = "YOUR_DEPLOY_HELPER_KV_NAMESPACE_ID" },
 ]
 
+[durable_objects]
+bindings = [
+  { name = "CE_SESSION_COORDINATOR", class_name = "SessionWriteCoordinator" },
+]
+
+[[migrations]]
+tag = "ce-session-write-coordinator-v1"
+new_sqlite_classes = ["SessionWriteCoordinator"]
+
 [vars]
 # Comma- or newline-delimited browser origins allowed to call the helper.
 ALLOWED_ORIGINS = "http://localhost:3000"

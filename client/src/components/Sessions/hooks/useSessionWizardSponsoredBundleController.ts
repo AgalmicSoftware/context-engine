@@ -7,6 +7,7 @@ import {
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from '../sessionWizardWorkerSecretSupport';
 import { deepClone } from '../sessionWizardCoreUtils';
+import type { SessionWizardWorkerRequirementProof } from '../sessionWizardWorkerRequirementProof';
 import useSponsoredBundleLifecycle from './useSponsoredBundleLifecycle';
 import type { AnyRecord, WorkerSecretsLike } from '../../shellTypes';
 
@@ -19,6 +20,7 @@ type SponsoredBundleDeploymentStatePatch<TDeployForm> = {
   deployComplete?: boolean;
   workerMode?: string;
   deployWorkerUrl?: string;
+  workerRequirementProof?: SessionWizardWorkerRequirementProof | null;
   provisionedSponsoredContext?: AnyRecord;
   forceManualBundleFile?: boolean;
   normalModeBundleUrlOverride?: string;
@@ -62,6 +64,7 @@ type UseSessionWizardSponsoredBundleControllerOptions<
   setDeployComplete: Dispatch<SetStateAction<boolean>>;
   setWorkerMode: Dispatch<SetStateAction<string>>;
   setDeployWorkerUrl: Dispatch<SetStateAction<string>>;
+  setWorkerRequirementProof: Dispatch<SetStateAction<SessionWizardWorkerRequirementProof | null>>;
   setProvisionedSponsoredContext: Dispatch<SetStateAction<TProvisionedSponsoredContext>>;
   setForceManualBundleFile: Dispatch<SetStateAction<boolean>>;
   setNormalModeBundleUrlOverride: Dispatch<SetStateAction<string>>;
@@ -90,6 +93,7 @@ const useSessionWizardSponsoredBundleController = <
   setDeployComplete,
   setWorkerMode,
   setDeployWorkerUrl,
+  setWorkerRequirementProof,
   setProvisionedSponsoredContext,
   setForceManualBundleFile,
   setNormalModeBundleUrlOverride,
@@ -176,6 +180,7 @@ const useSessionWizardSponsoredBundleController = <
       deployComplete: nextDeployComplete,
       workerMode: nextWorkerMode,
       deployWorkerUrl: nextDeployWorkerUrl,
+      workerRequirementProof: nextWorkerRequirementProof,
       provisionedSponsoredContext: nextProvisionedSponsoredContext,
       forceManualBundleFile: nextForceManualBundleFile,
       normalModeBundleUrlOverride: nextNormalModeBundleUrlOverride,
@@ -199,6 +204,9 @@ const useSessionWizardSponsoredBundleController = <
       if (typeof nextDeployWorkerUrl === 'string') {
         setDeployWorkerUrl(nextDeployWorkerUrl);
       }
+      if (nextWorkerRequirementProof !== undefined) {
+        setWorkerRequirementProof(nextWorkerRequirementProof);
+      }
       if (nextProvisionedSponsoredContext !== undefined) {
         setProvisionedSponsoredContext(buildProvisionedSponsoredContextState(nextProvisionedSponsoredContext));
       }
@@ -219,6 +227,7 @@ const useSessionWizardSponsoredBundleController = <
       setDeployInFlight,
       setDeployStatus,
       setDeployWorkerUrl,
+      setWorkerRequirementProof,
       setForceManualBundleFile,
       setNormalModeBundleUrlOverride,
       setProvisionedSponsoredContext,

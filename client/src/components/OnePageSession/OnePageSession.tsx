@@ -1102,7 +1102,9 @@ class OnePageSession extends Component<any, any> {
   recordOriginalURL(urlIn: any = null) {
     if (this.originalURL || typeof window === 'undefined') return;
     const nextUrl =
-      typeof urlIn === 'string' && urlIn ? urlIn : `${window.location.pathname || ''}${window.location.search || ''}`;
+      typeof urlIn === 'string' && urlIn
+        ? urlIn
+        : `${window.location.pathname || ''}${window.location.search || ''}${window.location.hash || ''}`;
     this.originalURL = nextUrl || '';
   }
 

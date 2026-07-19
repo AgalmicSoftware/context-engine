@@ -1,4 +1,15 @@
 import { toTrimmedString } from './stringCoercion.js';
+import { resolveRegistryChainId } from './chainIdNormalization.js';
+import {
+  isSessionSecretRpcUrlForGateRuntime,
+  resolveSessionSecretRpcUrlListForGateRuntime,
+} from './gateRpcResolution.js';
+import { attestRpcEndpointChain } from './rpcChainAttestation.js';
+import {
+  buildSafeRpcFailure,
+  createRpcDiagnosticMasker,
+  sanitizeRpcFailureDetails,
+} from './rpcDiagnosticSafety.js';
 
 const RESOURCE_GATE_KEYS_FALLBACK = ['default', 'ai', 'arweave', 'txGas', 'rpc', 'lit'];
 const ZERO_BYTES32_FALLBACK = `0x${'0'.repeat(64)}`;
@@ -31,9 +42,7 @@ export const createFaucetGateAuthorityWithDeps = ({
     const readSessionExistsOnChain = typeof deps?.readSessionExistsOnChain === 'function'
       ? deps.readSessionExistsOnChain
       : async () => ({ exists: null, errors: [], error: null });
-    const maskRpcUrl = typeof deps?.maskRpcUrl === 'function'
-      ? deps.maskRpcUrl
-      : (value) => toTrimmedString(value, deps);
+    const maskRpcUrl = createRpcDiagnosticMasker({ maskRpcUrl: deps?.maskRpcUrl });
     const readResourceGateOnChain = typeof deps?.readResourceGateOnChain === 'function'
       ? deps.readResourceGateOnChain
       : async () => ({ ok: false, error: 'Registry gate lookup failed.', errors: [] });
@@ -45,6 +54,7 @@ export const createFaucetGateAuthorityWithDeps = ({
       : RESOURCE_GATE_KEYS_FALLBACK;
 
     const registryAddress = toTrimmedString(config?.registryAddress, deps);
+    const registryChainId = resolveRegistryChainId(config);
     const registryRpcUrls = resolveRegistryRpcUrls(config);
     if (!isAddress(registryAddress) || !registryRpcUrls.length) {
       return {
@@ -61,7 +71,14 @@ export const createFaucetGateAuthorityWithDeps = ({
     }
 
     const registrySlug = toRegistrySessionSlug(slug);
-    const sessionCheck = await readSessionExistsOnChain({ registryAddress, registryRpcUrls, registrySlug });
+    const chainAttestationCache = new Map();
+    const sessionCheck = await readSessionExistsOnChain({
+      registryAddress,
+      registryRpcUrls,
+      registrySlug,
+      expectedChainId: registryChainId,
+      chainAttestationCache,
+    });
     if (sessionCheck.exists !== true) {
       return {
         ok: false,
@@ -71,7 +88,10 @@ export const createFaucetGateAuthorityWithDeps = ({
         details: {
           registryAddress,
           rpcUrl: sessionCheck.rpcUrl ? maskRpcUrl(sessionCheck.rpcUrl) : '',
-          errors: sessionCheck.errors || [],
+          errors: sanitizeRpcFailureDetails(sessionCheck.errors, {
+            maskRpcUrl: deps?.maskRpcUrl,
+            errorLabel: 'Session existence RPC request failed.',
+          }),
         },
       };
     }
@@ -87,12 +107,17 @@ export const createFaucetGateAuthorityWithDeps = ({
         registryRpcUrls,
         registrySlug,
         resourceKey,
+        expectedChainId: registryChainId,
+        chainAttestationCache,
       });
       if (!gateResult.ok) {
         failures.push({
           resourceKey,
-          error: gateResult.error || 'Registry gate lookup failed.',
-          rpcErrors: gateResult.errors || [],
+          error: 'Registry gate lookup failed.',
+          rpcErrors: sanitizeRpcFailureDetails(gateResult.errors, {
+            maskRpcUrl: deps?.maskRpcUrl,
+            errorLabel: 'Registry gate lookup RPC request failed.',
+          }),
         });
         continue;
       }
@@ -140,9 +165,6 @@ export const createFaucetGateAuthorityWithDeps = ({
     const toChainId = typeof deps?.toChainId === 'function' ? deps.toChainId : () => 0;
     const getFaucetSbtGateInterface = deps?.getFaucetSbtGateInterface;
     const callContractFunction = deps?.callContractFunction;
-    const maskRpcUrl = typeof deps?.maskRpcUrl === 'function'
-      ? deps.maskRpcUrl
-      : (value) => toTrimmedString(value, deps);
     const zeroBytes32 = toTrimmedString(constants?.zeroBytes32, deps) || ZERO_BYTES32_FALLBACK;
 
     const rpcUrls = resolveRpcUrlListForGate(config, gateChainId);
@@ -155,9 +177,36 @@ export const createFaucetGateAuthorityWithDeps = ({
     }
 
     const iface = getFaucetSbtGateInterface();
-    let lastError = null;
     const errors = [];
+    const chainAttestationCache = new Map();
     for (const rpcUrl of rpcUrls) {
+      const isPrivate = isSessionSecretRpcUrlForGateRuntime({
+        config,
+        gateChainId,
+        rpcUrl,
+      });
+      const privateRpcUrls = resolveSessionSecretRpcUrlListForGateRuntime({ config, gateChainId });
+      const attestation = await attestRpcEndpointChain({
+        rpcUrl,
+        expectedChainId: gateChainId,
+        rpcRequest: deps?.rpcRequest,
+        toChainId,
+        cache: chainAttestationCache,
+      });
+      if (!attestation.ok) {
+        errors.push(buildSafeRpcFailure({
+          rpcUrl,
+          error: {
+            rpcStatus: attestation.status,
+            rpcCode: attestation.code,
+          },
+          errorLabel: 'SBT validation RPC chain attestation failed.',
+          maskRpcUrl: deps?.maskRpcUrl,
+          privateRpcUrls,
+          isPrivate,
+        }));
+        continue;
+      }
       try {
         const [passwordMintDecoded, groupHashDecoded] = await Promise.all([
           callContractFunction({
@@ -185,19 +234,20 @@ export const createFaucetGateAuthorityWithDeps = ({
           groupPasswordHash,
         };
       } catch (err) {
-        lastError = err;
-        errors.push({
-          rpcUrl: maskRpcUrl(rpcUrl),
-          status: err?.rpcStatus ?? null,
-          error: toTrimmedString(err?.message || err, deps),
-          rpcError: err?.rpcError || null,
-        });
+        errors.push(buildSafeRpcFailure({
+          rpcUrl,
+          error: err,
+          errorLabel: 'SBT validation RPC request failed.',
+          maskRpcUrl: deps?.maskRpcUrl,
+          privateRpcUrls,
+          isPrivate,
+        }));
       }
     }
 
     return {
       ok: false,
-      error: toTrimmedString(lastError?.message || lastError || 'SBT gate validation failed.', deps),
+      error: 'SBT gate validation failed.',
       errors,
     };
   };
@@ -214,10 +264,6 @@ export const createFaucetGateAuthorityWithDeps = ({
     const toChainId = typeof deps?.toChainId === 'function' ? deps.toChainId : () => 0;
     const getFaucetSbtGateInterface = deps?.getFaucetSbtGateInterface;
     const callContractFunction = deps?.callContractFunction;
-    const maskRpcUrl = typeof deps?.maskRpcUrl === 'function'
-      ? deps.maskRpcUrl
-      : (value) => toTrimmedString(value, deps);
-
     const rpcUrls = resolveRpcUrlListForGate(config, gateChainId);
     if (!rpcUrls.length) {
       return {
@@ -228,9 +274,36 @@ export const createFaucetGateAuthorityWithDeps = ({
     }
 
     const iface = getFaucetSbtGateInterface();
-    let lastError = null;
     const errors = [];
+    const chainAttestationCache = new Map();
     for (const rpcUrl of rpcUrls) {
+      const isPrivate = isSessionSecretRpcUrlForGateRuntime({
+        config,
+        gateChainId,
+        rpcUrl,
+      });
+      const privateRpcUrls = resolveSessionSecretRpcUrlListForGateRuntime({ config, gateChainId });
+      const attestation = await attestRpcEndpointChain({
+        rpcUrl,
+        expectedChainId: gateChainId,
+        rpcRequest: deps?.rpcRequest,
+        toChainId,
+        cache: chainAttestationCache,
+      });
+      if (!attestation.ok) {
+        errors.push(buildSafeRpcFailure({
+          rpcUrl,
+          error: {
+            rpcStatus: attestation.status,
+            rpcCode: attestation.code,
+          },
+          errorLabel: 'SBT password validation RPC chain attestation failed.',
+          maskRpcUrl: deps?.maskRpcUrl,
+          privateRpcUrls,
+          isPrivate,
+        }));
+        continue;
+      }
       try {
         const decoded = await callContractFunction({
           rpcUrl,
@@ -242,19 +315,20 @@ export const createFaucetGateAuthorityWithDeps = ({
         const isValid = !!(Array.isArray(decoded) ? decoded[0] : decoded);
         return { ok: true, rpcUrl, isValid };
       } catch (err) {
-        lastError = err;
-        errors.push({
-          rpcUrl: maskRpcUrl(rpcUrl),
-          status: err?.rpcStatus ?? null,
-          error: toTrimmedString(err?.message || err, deps),
-          rpcError: err?.rpcError || null,
-        });
+        errors.push(buildSafeRpcFailure({
+          rpcUrl,
+          error: err,
+          errorLabel: 'SBT password validation RPC request failed.',
+          maskRpcUrl: deps?.maskRpcUrl,
+          privateRpcUrls,
+          isPrivate,
+        }));
       }
     }
 
     return {
       ok: false,
-      error: toTrimmedString(lastError?.message || lastError || 'SBT password validation failed.', deps),
+      error: 'SBT password validation failed.',
       errors,
     };
   };

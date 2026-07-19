@@ -101,6 +101,20 @@ test('resolveRegistryRpcUrls falls back to direct config RPC URLs when no regist
   ]);
 });
 
+test('resolveRegistryRpcUrls uses legacy networkChainId when registryChainId is absent', () => {
+  const result = resolveRegistryRpcUrls({
+    config: {
+      networkChainId: 11155420,
+      rpcUrlsByChainId: {
+        11155420: ['https://legacy-network.example.test'],
+      },
+    },
+    deps,
+  });
+
+  assert.deepEqual(result, ['https://legacy-network.example.test']);
+});
+
 test('resolveFaucetRpcUrl preserves explicit faucet rpcUrl precedence', () => {
   const result = resolveFaucetRpcUrl({
     config: {
@@ -137,6 +151,27 @@ test('resolveFaucetRpcUrl uses faucet->network->registry chain precedence before
   });
 
   assert.equal(result, 'https://network-chain.example.test');
+});
+
+test('resolveFaucetRpcUrls does not use another chain mapping after a malformed explicit faucet chain id', () => {
+  const result = resolveFaucetRpcUrls({
+    config: {
+      registryChainId: 8453,
+      networkChainId: 84532,
+      rpcUrl: 'https://unmapped-fallback.example.test',
+      rpcUrlsByChainId: {
+        84532: ['https://network-chain.example.test'],
+      },
+    },
+    faucetCfg: { chainId: '3.1337e4' },
+    defaultFaucetRpcUrl: 'https://default.example.test',
+    deps,
+  });
+
+  assert.deepEqual(result, [
+    'https://unmapped-fallback.example.test',
+    'https://default.example.test',
+  ]);
 });
 
 test('resolveFaucetRpcUrl falls back to OP Sepolia chain defaults when config omits explicit RPCs', () => {

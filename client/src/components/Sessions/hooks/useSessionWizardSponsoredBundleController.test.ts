@@ -77,6 +77,7 @@ const createControllerHarness = (overrides: Record<string, unknown> = {}) => {
     setDeployComplete: jest.fn(),
     setWorkerMode: jest.fn(),
     setDeployWorkerUrl: jest.fn(),
+    setWorkerRequirementProof: jest.fn(),
     setProvisionedSponsoredContext: jest.fn(),
     setForceManualBundleFile: jest.fn(),
     setNormalModeBundleUrlOverride: jest.fn(),
@@ -167,6 +168,16 @@ describe('useSessionWizardSponsoredBundleController', () => {
   it('applies sponsored deployment state patches to the existing setters', () => {
     const { result, buildProvisionedSponsoredContextState, setters } = createControllerHarness();
     const deployForm = { workerName: 'patched-worker' };
+    const workerRequirementProof = {
+      version: 1 as const,
+      verificationKind: 'remote-deploy-verification' as const,
+      workerIdentityFingerprint: 'a'.repeat(64),
+      requirementsFingerprint: 'b'.repeat(64),
+      requiredSecretFields: ['openaiKey'],
+      secretValueFingerprints: { openaiKey: 'c'.repeat(64) },
+      remoteManagedSecretFields: [],
+      runtimeSource: 'live' as const,
+    };
 
     act(() => {
       result.current.updateSponsoredBundleDeploymentState({
@@ -176,6 +187,7 @@ describe('useSessionWizardSponsoredBundleController', () => {
         deployComplete: false,
         workerMode: 'custom',
         deployWorkerUrl: 'https://worker.example',
+        workerRequirementProof,
         provisionedSponsoredContext: {
           sessionSlug: 'demo',
           workerUrl: 'https://worker.example',
@@ -193,6 +205,7 @@ describe('useSessionWizardSponsoredBundleController', () => {
     expect(setters.setDeployComplete).toHaveBeenCalledWith(false);
     expect(setters.setWorkerMode).toHaveBeenCalledWith('custom');
     expect(setters.setDeployWorkerUrl).toHaveBeenCalledWith('https://worker.example');
+    expect(setters.setWorkerRequirementProof).toHaveBeenCalledWith(workerRequirementProof);
     expect(buildProvisionedSponsoredContextState).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionSlug: 'demo',

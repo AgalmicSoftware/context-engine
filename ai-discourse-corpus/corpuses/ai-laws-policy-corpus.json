@@ -4,7 +4,7 @@
     "version": "2.0",
     "date_created": "2026-02-15",
     "last_updated": "2026-07-04",
-    "total_entries": 227,
+    "total_entries": 224,
     "usage_notes": "This corpus documents how AI governance is being implemented and discussed globally. Each entry includes not just the law's provisions but the regulatory ideas and arguments surrounding it. The novel_arguments_and_perspectives and public_comments_and_debate fields contain the substantive analysis. Tags align with the expanded AI discourse taxonomy in expanded_tag_list.json.",
     "note_on_dates": "Dates reflect enactment or significant legislative status as of February 2026. Some entries reflect proposals whose timelines may have shifted.",
     "schema_version": "2.0",
@@ -150,7 +150,13 @@
         "Accountability and responsibility frameworks",
         "Expanded Guide on Generative AI with Gen AI-specific considerations",
         "Sector-specific application guidance",
-        "International standards alignment while permitting regional flexibility"
+        "International standards alignment while permitting regional flexibility",
+        "Seven core principles: transparency, fairness, security, reliability, privacy, accountability, human centricity",
+        "National-level recommendations for AI governance",
+        "Regional-level recommendations for policymakers",
+        "Responsible design, development, and deployment guidance",
+        "Best practices for trustworthy AI",
+        "Flexible framework allowing national adaptation"
       ],
       "novel_arguments_and_perspectives": "The ASEAN Guide is distinctive in representing Southeast Asian middle path between strict EU regulation and light-touch approaches. The emphasis on practical guidance rather than regulatory prescription reflects ASEAN's consensus-based decision-making culture and respect for national sovereignty. The 'living document' approach acknowledges rapid AI evolution and explicitly commits to periodic updating, recognizing that fixed rules quickly become outdated. The supplementary Expanded Guide on Generative AI (2025) demonstrates adaptive capacity addressing rapidly emerging technology. The Guide's focus on interoperability—fostering alignment across jurisdictions—reflects regional trade and investment priorities. The voluntary nature accommodates varying national regulatory sophistication while establishing baseline expectations through soft governance. The inclusion of Gen AI supplement reflects regional recognition that generative AI requires distinct governance approach beyond traditional AI guidance.",
       "public_comments_and_debate": "Regional governments appreciated voluntary approach respecting national regulatory autonomy. Tech companies supported interoperability focus facilitating regional operations. Developing ASEAN economies noted implementation challenges given capacity constraints. Regional civil society groups debated whether voluntary guidelines adequately protect populations from AI risks. Questions raised about enforcement of interoperability requirements when individual countries lack regulatory infrastructure.",
@@ -161,59 +167,31 @@
         "Regional Framework",
         "Voluntary Standards",
         "Transparency",
-        "Interoperability"
-      ],
-      "relevance_to_ai_discourse": "The ASEAN Guide demonstrates regional approach to AI governance balancing harmonization with sovereignty. It represents alternative to both strict EU regulation and purely national approaches. The Guide's regional focus and practical orientation reflect that AI governance implementation requires attention to local contexts. The supplementary Gen AI guidance reflects necessary adaptive capacity in rapidly evolving AI landscape.",
-      "related_legislation": [
-        "oecd_ai_principles",
-        "coe_framework_convention_ai"
-      ],
-      "source_links": [
-        "https://asean.org/wp-content/uploads/2024/02/ASEAN-Guide-on-AI-Governance-and-Ethics_beautified_201223_v2.pdf",
-        "https://www.rajahtannasia.com/wp-content/uploads/2024/10/2024-03_ASEAN-Guide-AI-Governance-Ethics-v2.pdf",
-        "https://asean.org/wp-content/uploads/2025/01/Expanded-ASEAN-Guide-on-AI-Governance-and-Ethics-Generative-AI.pdf",
-        "https://www.iseas.edu.sg/wp-content/uploads/2024/06/TRS18_24.pdf"
-      ],
-      "source_url": "https://asean.org/book/asean-guide-on-ai-governance-and-ethics/"
-    },
-    {
-      "id": "asean_001",
-      "title": "ASEAN Guide on AI Governance and Ethics",
-      "jurisdiction": "ASEAN (Regional)",
-      "jurisdiction_level": "international",
-      "date_enacted": "2024-02-01",
-      "date_proposed": "2023-01-01",
-      "status": "enacted",
-      "summary": "Non-binding regional guide establishing common AI governance principles for ASEAN member states. Articulates core principles and recommends best practices for responsible AI design, development, and deployment.",
-      "key_provisions": [
-        "Seven core principles: transparency, fairness, security, reliability, privacy, accountability, human centricity",
-        "National-level recommendations for AI governance",
-        "Regional-level recommendations for policymakers",
-        "Responsible design, development, and deployment guidance",
-        "Best practices for trustworthy AI",
-        "Flexible framework allowing national adaptation"
-      ],
-      "novel_arguments_and_perspectives": "Regional coordination approach; balance between harmonization and national flexibility; seven-principle framework; emphasis on practical implementation",
-      "public_comments_and_debate": "ASEAN member consultation process; regional cooperation and coordination discussions",
-      "risk_approach": "Principles-based governance allowing national customization",
-      "enforcement_mechanism": "Non-binding regional guide; reliance on member state adoption",
-      "tags": [
+        "Interoperability",
         "regional guide",
         "seven principles",
         "non-binding",
         "ASEAN cooperation",
         "policy recommendations"
       ],
-      "relevance_to_ai_discourse": "Regional harmonization effort; demonstrates ASEAN's collective AI governance approach; influences member state policies",
+      "relevance_to_ai_discourse": "The ASEAN Guide demonstrates regional approach to AI governance balancing harmonization with sovereignty. It represents alternative to both strict EU regulation and purely national approaches. The Guide's regional focus and practical orientation reflect that AI governance implementation requires attention to local contexts. The supplementary Gen AI guidance reflects necessary adaptive capacity in rapidly evolving AI landscape.",
       "related_legislation": [
+        "oecd_ai_principles",
+        "coe_framework_convention_ai",
         "Expanded ASEAN Guide on AI Governance and Ethics - Generative AI (2025)"
       ],
       "source_links": [
         "https://asean.org/wp-content/uploads/2024/02/ASEAN-Guide-on-AI-Governance-and-Ethics_beautified_201223_v2.pdf",
+        "https://www.rajahtannasia.com/wp-content/uploads/2024/10/2024-03_ASEAN-Guide-AI-Governance-Ethics-v2.pdf",
+        "https://asean.org/wp-content/uploads/2025/01/Expanded-ASEAN-Guide-on-AI-Governance-and-Ethics-Generative-AI.pdf",
+        "https://www.iseas.edu.sg/wp-content/uploads/2024/06/TRS18_24.pdf",
         "https://www.rajahtannasia.com/viewpoints/expanded-asean-guide-on-ai-governance-and-ethics/",
         "https://www.nbr.org/publication/charting-aseans-path-to-ai-governance-uneven-yet-gaining-ground"
       ],
-      "source_url": "https://asean.org/our-communities/asean-working-group-on-ai/"
+      "source_url": "https://asean.org/book/asean-guide-on-ai-governance-and-ethics/",
+      "merged_from": [
+        "asean_001"
+      ]
     },
     {
       "id": "asean_002",
@@ -309,10 +287,10 @@
       "title": "Council of Europe Framework Convention on Artificial Intelligence and Human Rights, Democracy and the Rule of Law",
       "jurisdiction": "Council of Europe",
       "jurisdiction_level": "international",
-      "date_enacted": null,
+      "date_enacted": "2024-05-17",
       "date_proposed": "2023-05-17",
       "status": "framework",
-      "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. 17 signatories include the EU, US, UK, Canada, and others. Implementation occurs through national legislative measures coordinated with the EU AI Act and other frameworks.",
+      "summary": "Opened for signature September 5, 2024, and represents the first legally binding international agreement on AI. The Convention applies to AI systems throughout their lifecycle, requiring parties to implement measures ensuring consistency with human rights, democracy, and rule of law. As of July 19, 2026, the Council of Europe listed the European Union as a party and 21 signatories, including the United States, United Kingdom, Canada, Japan, Israel, and Uruguay. Implementation occurs through national legislative measures coordinated with the EU AI Act and other frameworks.",
       "key_provisions": [
         "Human rights, democracy and rule of law as core principles",
         "Graduated and differentiated measures based on severity and probability of adverse impacts",
@@ -323,7 +301,13 @@
         "Institutional accountability and oversight",
         "Stakeholder participation and consultation",
         "Conference of Parties oversight mechanism",
-        "Regular reporting requirements on AI system uses in public and private sectors"
+        "Regular reporting requirements on AI system uses in public and private sectors",
+        "Risk-based approach to AI system lifecycle",
+        "Transparency requirements throughout AI value chain",
+        "Documentation obligations for high-risk AI systems",
+        "Risk management obligations with possible bans for systems threatening fundamental rights",
+        "Application to both public authorities and private actors",
+        "Exclusions for national defence and most R&D activities"
       ],
       "novel_arguments_and_perspectives": "The Council of Europe Convention represents a shift from soft law guidance to binding international obligation, establishing for the first time that AI governance is a human rights and rule of law matter requiring treaty-level commitment. Its framing of AI through human rights, democracy, and rule of law lenses is more foundational than risk-based or sector-specific approaches—it asserts that AI legitimacy depends on respecting these core values regardless of technological benefits. The Convention's lifecycle approach (from design through deployment to decommissioning) is comprehensive compared to frameworks focusing only on deployment or high-risk systems. The differentiation principle—proportionate measures based on actual and foreseeable harms—provides flexibility for diverse contexts while maintaining universal principles. Notably, the Convention applies not just to government AI but also private sector deployment, recognizing that democratic legitimacy and rule of law apply regardless of actor. The establishment of a Conference of Parties mechanism creates ongoing international coordination unlike purely national implementation frameworks.",
       "public_comments_and_debate": "Participating governments emphasized the Convention as compromise between different regulatory philosophies represented by signatories (including both EU strict regulation advocates and innovation-focused countries). Civil society groups appreciated binding nature but noted enforcement mechanisms remain underdeveloped. Tech industry raised questions about how binding international obligations would coordinate with national regulatory frameworks. Academic observers noted that diverse signatory interests (ranging from democracies to non-democracies) meant the Convention uses aspirational language permitting variable implementation. Debate continues on how the Convention's human rights framework interacts with risk-based regulation in national laws.",
@@ -335,13 +319,22 @@
         "Human Rights",
         "Democracy",
         "Rule of Law",
-        "Frameworks"
+        "Frameworks",
+        "international treaty",
+        "human rights",
+        "rule of law",
+        "risk-based regulation",
+        "fundamental rights",
+        "binding agreement"
       ],
       "relevance_to_ai_discourse": "The Council of Europe Convention is significant because it establishes international consensus that AI raises fundamental human rights and democratic questions requiring treaty-level commitment. It represents recognition that purely national regulation cannot address transnational AI risks and that international coordination requires binding obligations. The Convention's human rights framing provides global standard complementing risk-based approaches in national regulations. Its role as first binding international AI agreement establishes precedent for future international AI treaties and coordination mechanisms.",
       "related_legislation": [
         "eu_ai_act",
         "oecd_ai_principles",
-        "unesco_ai_ethics"
+        "unesco_ai_ethics",
+        "EU AI Act",
+        "NIST AI Risk Management Framework",
+        "Seoul Declaration"
       ],
       "source_links": [
         "https://www.coe.int/en/web/artificial-intelligence/the-framework-convention-on-artificial-intelligence",
@@ -349,7 +342,12 @@
         "https://www.state.gov/bureau-of-democracy-human-rights-and-labor/the-council-of-europes-framework-convention-on-artificial-intelligence-and-human-rights-democracy-and-the-rule-of-law/",
         "https://opiniojuris.org/2024/11/05/understanding-the-scope-of-the-council-of-europe-framework-convention-on-ai/"
       ],
-      "source_url": "https://www.coe.int/en/web/artificial-intelligence/the-framework-convention-on-artificial-intelligence"
+      "source_url": "https://www.coe.int/en/web/artificial-intelligence/the-framework-convention-on-artificial-intelligence",
+      "verification_status": "verified",
+      "verification_notes": "Verified 2026-07-19 against the Council of Europe convention page; treaty status, opening date, party, and 21 listed signatories checked against the live official page.",
+      "merged_from": [
+        "council_of_europe_ai_convention"
+      ]
     },
     {
       "id": "g20_ai_principles",
@@ -568,48 +566,6 @@
       "source_url": "https://clad.org/declaraciones-consensos/ibero-american-charter-on-artificial-intelligence-in-civil-service/"
     },
     {
-      "id": "council_of_europe_ai_convention",
-      "title": "Council of Europe Framework Convention on Artificial Intelligence and Human Rights, Democracy and the Rule of Law",
-      "jurisdiction": "International",
-      "jurisdiction_level": "international",
-      "date_enacted": "2024-05-17",
-      "date_proposed": null,
-      "status": "enacted",
-      "summary": "The first legally binding international treaty on artificial intelligence, adopted by the Council of Europe Committee of Ministers on May 17, 2024, and opened for signature on September 5, 2024. The Convention ensures AI activities are consistent with human rights, democracy, and the rule of law while promoting technological progress and innovation. It adopts a risk-based approach and is compatible with the EU AI Act.",
-      "key_provisions": [
-        "Risk-based approach to AI system lifecycle",
-        "Transparency requirements throughout AI value chain",
-        "Documentation obligations for high-risk AI systems",
-        "Risk management obligations with possible bans for systems threatening fundamental rights",
-        "Application to both public authorities and private actors",
-        "Exclusions for national defence and most R&D activities"
-      ],
-      "novel_arguments_and_perspectives": "As the first internationally legally binding AI treaty, this Convention represents a watershed moment in global AI governance, establishing binding commitments across Council of Europe member states and signatory countries. Its risk-based approach mirrors the EU AI Act but extends to an international context, creating potential for harmonization across diverse legal systems. The Convention's emphasis on human rights, democracy, and rule of law reflects growing global consensus that AI governance must be grounded in democratic values and fundamental rights protections.",
-      "public_comments_and_debate": "The Convention has received broad international support, with initial signings from diverse nations including the US, UK, Israel, and all EU member states through the Commission. Debate has centered on implementation mechanisms, ensuring adequate resources for compliance monitoring, and balancing the Convention's protective requirements with innovation incentives across different levels of economic development.",
-      "risk_approach": "Comprehensive risk-based approach requiring careful consideration of potential negative consequences at each stage of AI system lifecycle; risk management obligations scale with identified risks to fundamental rights",
-      "enforcement_mechanism": "Entry into force requires ratification by at least five states (three of which must be Council of Europe members); establishment of a Committee on AI to monitor and enforce compliance; signatories commit to implementing the Convention through national legislation",
-      "tags": [
-        "international treaty",
-        "human rights",
-        "Democracy",
-        "rule of law",
-        "risk-based regulation",
-        "fundamental rights",
-        "binding agreement"
-      ],
-      "relevance_to_ai_discourse": "This Convention establishes the first legally binding international framework for AI governance, setting global precedents for how nations should balance AI innovation with fundamental rights protection. It provides a template for international AI cooperation and has influenced subsequent national and regional AI regulatory efforts. The Convention's emphasis on democratic legitimacy and human rights makes it central to discussions about ethical AI governance.",
-      "related_legislation": [
-        "EU AI Act",
-        "NIST AI Risk Management Framework",
-        "Seoul Declaration"
-      ],
-      "source_links": [
-        "https://www.coe.int/en/web/artificial-intelligence/the-framework-convention-on-artificial-intelligence",
-        "https://www.eeas.europa.eu/delegations/council-europe/european-commission-signs-historic-council-europe-framework-convention-artificial-intelligence-and_en"
-      ],
-      "source_url": "https://www.coe.int/en/web/artificial-intelligence/the-framework-convention-on-artificial-intelligence"
-    },
-    {
       "id": "ai_safety_institute_network",
       "title": "International Network of AI Safety Institutes",
       "jurisdiction": "International",
@@ -655,48 +611,6 @@
         "https://www.commerce.gov/news/fact-sheets/2024/11/fact-sheet-us-department-commerce-us-department-state-launch-international-network"
       ],
       "source_url": "https://www.nist.gov/news-events/news/2024/11/fact-sheet-us-department-commerce-us-department-state-launch-international"
-    },
-    {
-      "id": "seoul_declaration_ai_safety_2024",
-      "title": "Seoul Declaration for Safe, Innovative and Inclusive AI",
-      "jurisdiction": "International",
-      "jurisdiction_level": "international",
-      "date_enacted": "2024-05-21",
-      "date_proposed": null,
-      "status": "framework",
-      "summary": "Adopted at the AI Seoul Summit on May 21, 2024, by leaders from Australia, Canada, the EU, France, Germany, Italy, Japan, South Korea, Singapore, the UK, and the US. The declaration commits participating nations to foster interoperable AI governance frameworks and international cooperation on AI safety research, building on the Bletchley Declaration and integrating the Hiroshima Process International Code of Conduct.",
-      "key_provisions": [
-        "Commitment to develop interoperable AI governance frameworks",
-        "Integration of Hiroshima Process International Code of Conduct for Advanced AI Systems",
-        "Support for establishing or expanding AI Safety Institutes",
-        "Ambition to develop international network for AI safety research",
-        "Commitment to facilitate AI safety research and testing",
-        "Support for developing guidance for commercially and publicly available AI systems"
-      ],
-      "novel_arguments_and_perspectives": "The Seoul Declaration represents a significant step in international AI safety cooperation, building on the Bletchley Declaration with concrete commitments to establish safety infrastructure. The focus on interoperable frameworks acknowledges the challenge of harmonizing AI governance across jurisdictions with different regulatory approaches. The emphasis on international AI Safety Institutes creates new institutional mechanisms for global cooperation on technical AI safety.",
-      "public_comments_and_debate": "The declaration has been broadly welcomed by participating nations and international observers as evidence of serious commitment to AI safety. Debate has centered on resource allocation for Safety Institutes, ensuring equitable participation from developing nations, and translating the declaration's commitments into concrete action. The 27 additional countries that signed the Seoul Ministerial Statement indicate growing international consensus.",
-      "risk_approach": "Emphasizes safety-centric approach through international cooperation, research coordination, and development of technical guidance for responsible AI development and deployment",
-      "enforcement_mechanism": "Political commitment by signatory nations; coordinated through national AI Safety Institutes and international working groups; tracked through regular progress reporting and multilateral discussions",
-      "tags": [
-        "international cooperation",
-        "Safety",
-        "safety institutes",
-        "research collaboration",
-        "interoperability",
-        "governance coordination"
-      ],
-      "relevance_to_ai_discourse": "The Seoul Declaration signals a shift from unilateral national AI policies toward coordinated international governance. The emphasis on AI Safety Institutes as concrete institutional mechanisms reflects growing recognition that technical safety research must be institutionalized globally. This declaration influences subsequent AI policy development in signatory nations and provides a model for other regional AI cooperation initiatives.",
-      "related_legislation": [
-        "Council of Europe AI Convention",
-        "UN GA AI Resolution",
-        "Bletchley Declaration",
-        "Hiroshima Process Code of Conduct"
-      ],
-      "source_links": [
-        "https://www.gov.uk/government/publications/seoul-declaration-for-safe-innovative-and-inclusive-ai-ai-seoul-summit-2024",
-        "https://www.industry.gov.au/publications/seoul-declaration-countries-attending-ai-seoul-summit-21-22-may-2024"
-      ],
-      "source_url": "https://www.gov.uk/government/publications/seoul-declaration-for-safe-innovative-and-inclusive-ai-ai-seoul-summit-2024"
     },
     {
       "id": "un_ga_ai_resolution_2024",
@@ -844,7 +758,13 @@
         "Commitment to transparent reporting on AI safety efforts",
         "Support for international coordination frameworks",
         "Recognition of need for continued global dialogue",
-        "Frontier AI Safety Commitments (separate document) on safety practices"
+        "Frontier AI Safety Commitments (separate document) on safety practices",
+        "Commitment to develop interoperable AI governance frameworks",
+        "Integration of Hiroshima Process International Code of Conduct for Advanced AI Systems",
+        "Support for establishing or expanding AI Safety Institutes",
+        "Ambition to develop international network for AI safety research",
+        "Commitment to facilitate AI safety research and testing",
+        "Support for developing guidance for commercially and publicly available AI systems"
       ],
       "novel_arguments_and_perspectives": "The Seoul Declaration advances frontier AI governance discourse by explicitly rejecting false choice between safety and innovation—asserting these are complementary objectives. This represents maturation from 2023 Bletchley framing which emphasized safety risks; Seoul adds that innovation and inclusivity remain important. The Declaration's emphasis on AI Safety Institutes as institutional mechanism represents concrete governance innovation: rather than relying on regulatory enforcement or voluntary compliance, establish public institutions with technical expertise and convening power. The distinction between Seoul Declaration signatories (10 countries/EU) and broader Ministerial Statement signatories (27 countries/EU) reflects both commitment to deeper engagement by leading actors and inclusive participation by broader international community. The Frontier AI Safety Commitments component addresses frontier models specifically, establishing differentiated governance approach. The inclusion of Singapore and Korea as signatories reflects non-Western leadership in AI governance, not merely Western countries setting agenda.",
       "public_comments_and_debate": "Tech industry appreciated innovation-inclusivity emphasis as balance to pure safety focus. Developing nations welcomed explicit inclusion in governance discussions and Ministerial Statement mechanism. AI safety researchers debated whether AI Safety Institutes have sufficient independence and resources to provide authentic technical oversight. Academics noted that distinguishing 'frontier' from other AI systems remains conceptually challenging. Questions raised about how Seoul commitments differ from or advance beyond Bletchley Declaration in concrete terms.",
@@ -856,20 +776,32 @@
         "Frontier Models",
         "Safety",
         "Innovation",
-        "Inclusivity"
+        "Inclusivity",
+        "international cooperation",
+        "safety institutes",
+        "research collaboration",
+        "interoperability",
+        "governance coordination"
       ],
       "relevance_to_ai_discourse": "The Seoul Declaration establishes that frontier AI governance is ongoing international commitment requiring regular summits and institutional coordination. Its emphasis on AI Safety Institutes as central governance mechanism represents innovative institutional approach. The explicit framing of safety-innovation-inclusivity as complementary reflects maturation toward recognizing AI governance complexity. The Declaration's broader signatory base compared to formal signatories reflects international consensus that AI governance requires multi-level participation.",
       "related_legislation": [
         "bletchley_declaration",
         "g7_hiroshima_code",
-        "ai_safety_institute_network"
+        "ai_safety_institute_network",
+        "Council of Europe AI Convention",
+        "UN GA AI Resolution",
+        "Bletchley Declaration",
+        "Hiroshima Process Code of Conduct"
       ],
       "source_links": [
         "https://www.industry.gov.au/publications/seoul-declaration-countries-attending-ai-seoul-summit-21-22-may-2024",
         "https://www.gov.uk/government/publications/seoul-declaration-for-safe-innovative-and-inclusive-ai-ai-seoul-summit-2024",
         "https://www.csis.org/analysis/ai-seoul-summit"
       ],
-      "source_url": "https://www.gov.uk/government/publications/seoul-declaration-for-safe-innovative-and-inclusive-ai-ai-seoul-summit-2024"
+      "source_url": "https://www.gov.uk/government/publications/seoul-declaration-for-safe-innovative-and-inclusive-ai-ai-seoul-summit-2024",
+      "merged_from": [
+        "seoul_declaration_ai_safety_2024"
+      ]
     },
     {
       "id": "oecd_ai_principles",
@@ -1611,51 +1543,12 @@
       "date_notes": "Grouped provincial entry: activity spans 2022-2024; date fields capture the first proposal/activity year and latest major enactment/update year."
     },
     {
-      "id": "chile_ai_bill",
-      "title": "Chile AI Regulation Bill - Law Regulating Artificial Intelligence Systems",
-      "jurisdiction": "Chile",
-      "jurisdiction_level": "national",
-      "date_enacted": null,
-      "date_proposed": "2024-05-07",
-      "status": "in_committee",
-      "summary": "Chile introduced landmark Bill 16821-19 May 7, 2024, following UNESCO's Readiness Assessment Methodology. Risk-based framework classifying AI: unacceptable risk (prohibited), high risk, limited risk, no evident risk. Guided by principles: privacy/data governance, transparency/explainability, diversity/non-discrimination, consumer protection. Creates AI Technical Advisory Council; Personal Data Protection Agency designated as supervisor. Chile first country to complete UNESCO methodology.",
-      "key_provisions": [
-        "Four-tier AI risk classification (unacceptable, high, limited, no evident)",
-        "Privacy and data governance principles",
-        "Transparency and explainability requirements",
-        "Diversity and non-discrimination focus",
-        "Consumer rights protection",
-        "AI Technical Advisory Council establishment",
-        "Personal Data Protection Agency supervisory role"
-      ],
-      "novel_arguments_and_perspectives": "UNESCO Readiness Assessment alignment Latin American AI regulation pioneer Diversity and non-discrimination emphasis Rights-based approach to AI governance",
-      "public_comments_and_debate": "Support for UNESCO-aligned approach International recognition of innovation Implementation feasibility concerns Balance between innovation and rights protection",
-      "risk_approach": "Risk-tiered (unacceptable, high, limited, none)",
-      "enforcement_mechanism": "Personal Data Protection Agency supervision; Sanctions for violations",
-      "tags": [
-        "Chile",
-        "UNESCO",
-        "risk-based",
-        "Latin America"
-      ],
-      "relevance_to_ai_discourse": "UNESCO-aligned precedent; Regional regulatory leadership",
-      "related_legislation": [
-        "Chile's constitutional reforms",
-        "Data protection laws"
-      ],
-      "source_links": [
-        "https://www.unesco.org/en/articles/chile-launches-national-ai-policy-and-introduces-ai-bill-following-unescos-recommendations",
-        "https://www.carey.cl/en/bill-to-regulate-artificial-intelligence-systems-is-introduced-to-the-chilean-chamber-of-deputies/"
-      ],
-      "source_url": "https://digital.nemko.com/regulations/ai-regulation-chile"
-    },
-    {
       "id": "chile_ai_policy",
       "title": "Chile Law Regulating Artificial Intelligence Systems and National AI Policy",
       "jurisdiction": "Chile",
       "jurisdiction_level": "national",
       "date_enacted": "2024-05-15",
-      "date_proposed": null,
+      "date_proposed": "2024-05-07",
       "status": "proposed",
       "summary": "In May 2024, Chile introduced the Law Regulating Artificial Intelligence Systems and updated its National AI Policy following UNESCO assessment. Chile became the first country globally to complete UNESCO's AI Readiness Assessment Model. The proposed law establishes a risk-based framework with four AI categories: unacceptable risk (banned), high risk, limited risk, and no evident risk.",
       "key_provisions": [
@@ -1666,7 +1559,14 @@
         "Bans on harmful applications (fundamental rights violation, harm without legal basis)",
         "AI Technical Advisory Council creation",
         "Personal Data Protection Agency supervision",
-        "Human-centered AI principle emphasis"
+        "Human-centered AI principle emphasis",
+        "Four-tier AI risk classification (unacceptable, high, limited, no evident)",
+        "Privacy and data governance principles",
+        "Transparency and explainability requirements",
+        "Diversity and non-discrimination focus",
+        "Consumer rights protection",
+        "AI Technical Advisory Council establishment",
+        "Personal Data Protection Agency supervisory role"
       ],
       "novel_arguments_and_perspectives": "Chile's approach, informed by UNESCO's Readiness Assessment Model, represents evidence-based policy development integrating international best practices with national context. The four-tier system provides clear risk differentiation while the ban on unacceptable risks reflects principle that some AI uses are fundamentally incompatible with rights protection.",
       "public_comments_and_debate": "Chile's proposed legislation has generated significant debate within Latin America about balancing innovation with rights protection. Debate centers on clarity of risk categories, adequacy of governance requirements for high-risk systems, and appropriate roles for different institutional actors.",
@@ -1677,19 +1577,28 @@
         "Latin American leadership",
         "risk-based regulation",
         "UNESCO model",
-        "innovation and rights balance"
+        "innovation and rights balance",
+        "UNESCO",
+        "risk-based",
+        "Latin America"
       ],
       "relevance_to_ai_discourse": "Chile's evidence-based policy development approach and integration of UNESCO assessment influences Latin American AI governance development. The four-tier system provides alternative to EU AI Act binary risk approach.",
       "related_legislation": [
         "Peru AI regulation",
         "Colombia AI framework",
-        "EU AI Act"
+        "EU AI Act",
+        "Chile's constitutional reforms",
+        "Data protection laws"
       ],
       "source_links": [
         "https://www.unesco.org/en/articles/chile-launches-national-ai-policy-and-introduces-ai-bill-following-unescos-recommendations",
-        "https://digital.nemko.com/regulations/ai-regulation-chile"
+        "https://digital.nemko.com/regulations/ai-regulation-chile",
+        "https://www.carey.cl/en/bill-to-regulate-artificial-intelligence-systems-is-introduced-to-the-chilean-chamber-of-deputies/"
       ],
-      "source_url": "https://digital.nemko.com/regulations/ai-regulation-chile"
+      "source_url": "https://digital.nemko.com/regulations/ai-regulation-chile",
+      "merged_from": [
+        "chile_ai_bill"
+      ]
     },
     {
       "id": "china_005",
@@ -1853,46 +1762,6 @@
         "https://www.chinalawtranslate.com/en/generative-ai-interim/"
       ],
       "source_url": "https://www.hoganlovells.com/en/publications/china-finalizes-generative-ai-regulation"
-    },
-    {
-      "id": "china_011",
-      "title": "Measures for Labeling of AI-Generated and Synthetic Content",
-      "jurisdiction": "China (National)",
-      "jurisdiction_level": "national",
-      "date_enacted": "2025-09-01",
-      "date_proposed": "2024-09-14",
-      "status": "enacted",
-      "summary": "Mandatory labeling requirements for AI-generated and synthetic content. Jointly released by CAC, MIIT, MPS, and NRTA. Standardizes requirements for identifying AI-generated texts, images, audio, video, and virtual scenes.",
-      "key_provisions": [
-        "Explicit labels: visible indicators (text, audio, graphics) for AI-generated content",
-        "Implicit labels: metadata with service provider name and content ID",
-        "Three-category classification: confirmed, possible, or suspected AI-generated",
-        "Service provider responsibility for labeling systems",
-        "Technology standards for label placement and integrity",
-        "Prohibition of misleading labels or label removal",
-        "Platform obligation to deploy labeling technologies"
-      ],
-      "novel_arguments_and_perspectives": "Comprehensive approach with explicit and implicit labeling; three-tier confidence classification; metadata-based implicit labeling for technical implementation",
-      "public_comments_and_debate": "Public consultation September-October 2024; concerns about technical feasibility and implementation costs; industry input on labeling standards",
-      "risk_approach": "Disclosure-based approach requiring transparent labeling of AI-generated content",
-      "enforcement_mechanism": "CAC, MIIT, MPS, NRTA with authority to inspect labeling systems and enforce compliance",
-      "tags": [
-        "content labeling",
-        "AI-generated content",
-        "Transparency",
-        "synthetic media"
-      ],
-      "relevance_to_ai_discourse": "Global standard for AI content labeling; influences international discussions on content provenance and disclosure",
-      "related_legislation": [
-        "Interim Measures for Management of Generative AI Services (2023)",
-        "Provisions on Management of Deep Synthesis (2023)"
-      ],
-      "source_links": [
-        "https://www.insideprivacy.com/international/china/china-releases-new-labeling-requirements-for-ai-generated-content/",
-        "https://cms-lawnow.com/en/ealerts/2024/09/china-proposes-new-regulations-on-ai-generated-content-labelling/",
-        "https://www.chinalawtranslate.com/en/ai-labeling/"
-      ],
-      "source_url": "https://www.twobirds.com/en/insights/2025/new-ai-content-labelling-rules-in-china-what-are-they-and-how-do-they-compare-to-the-eu-ai-act"
     },
     {
       "id": "china_004",
@@ -3033,7 +2902,7 @@
       "jurisdiction": "New Zealand",
       "jurisdiction_level": "national",
       "date_enacted": "2020-07-01",
-      "date_proposed": null,
+      "date_proposed": "2018-06-01",
       "status": "voluntary",
       "summary": "Published in July 2020 by Stats NZ, the Algorithm Charter represents New Zealand government agencies' voluntary commitment to managing algorithm use fairly, ethically, and transparently. Signed by 21 government agencies, the charter focuses on algorithms with high risk of unintended consequences or significant impact on vulnerable communities, incorporating Te Ao Māori perspectives alongside modern governance principles.",
       "key_provisions": [
@@ -3043,7 +2912,16 @@
         "Embedding Te Ao Māori perspectives in algorithm development and use",
         "Minimizing risks to people and maximizing benefits",
         "Human oversight of algorithm decisions",
-        "Agency self-assessment of algorithm scope"
+        "Agency self-assessment of algorithm scope",
+        "Transparency in algorithmic decision-making",
+        "Accountability for algorithm outcomes",
+        "Fairness and non-discrimination principles",
+        "Te Ao Māori perspective integration",
+        "Human oversight requirements",
+        "Impact assessment and monitoring",
+        "Stakeholder engagement",
+        "Tools and guidance provision by December 2024",
+        "21 government agency signatories"
       ],
       "novel_arguments_and_perspectives": "The Algorithm Charter represents a distinctive approach to AI governance that integrates Indigenous (Māori) perspectives with modern governance principles, recognizing that algorithm fairness and transparency must reflect diverse values and worldviews. The voluntary, self-assessment model respects agency autonomy while establishing common commitments. The charter's evolution since 2020 reflects growing global recognition that algorithm governance is an essential government function.",
       "public_comments_and_debate": "The charter has been celebrated as pioneering the integration of Indigenous perspectives into algorithm governance. Debate centers on whether voluntary adoption and self-assessment provide adequate accountability, whether all relevant agencies have adopted the charter, and whether the principles are being consistently implemented across government.",
@@ -3056,62 +2934,29 @@
         "Transparency",
         "indigenous perspectives",
         "voluntary",
-        "Fairness"
+        "Fairness",
+        "government algorithms",
+        "Accountability",
+        "public sector"
       ],
       "relevance_to_ai_discourse": "New Zealand's charter demonstrates how AI governance can incorporate diverse cultural values and indigenous perspectives, challenging Western-centric approaches to algorithm governance. The charter influenced international discussions about public sector algorithm governance and the importance of indigenous voice in technology policy.",
       "related_legislation": [
         "Australia Voluntary AI Safety Standard",
-        "Government algorithm governance internationally"
-      ],
-      "source_links": [
-        "https://data.govt.nz/toolkit/data-ethics/government-algorithm-transparency-and-accountability/algorithm-charter",
-        "https://www.justice.govt.nz/justice-sector-policy/key-initiatives/cross-government/the-algorithm-charter/"
-      ],
-      "source_url": "https://data.govt.nz/toolkit/data-ethics/government-algorithm-transparency-and-accountability/algorithm-charter"
-    },
-    {
-      "id": "newzealand_001",
-      "title": "Algorithm Charter for Aotearoa New Zealand",
-      "jurisdiction": "New Zealand (National)",
-      "jurisdiction_level": "national",
-      "date_enacted": "2020-07-01",
-      "date_proposed": "2018-06-01",
-      "status": "enacted",
-      "summary": "World-first algorithm charter establishing standards for government algorithm use. Focuses on transparency, accountability, and fairness. Signed by 21 government agencies. Phase two focuses on transparency and accountability tools.",
-      "key_provisions": [
-        "Transparency in algorithmic decision-making",
-        "Accountability for algorithm outcomes",
-        "Fairness and non-discrimination principles",
-        "Te Ao Māori perspective integration",
-        "Human oversight requirements",
-        "Impact assessment and monitoring",
-        "Stakeholder engagement",
-        "Tools and guidance provision by December 2024",
-        "21 government agency signatories"
-      ],
-      "novel_arguments_and_perspectives": "First government algorithm charter globally; emphasis on transparency and accountability; integration of indigenous (Te Ao Māori) perspectives; focus on practical implementation tools",
-      "public_comments_and_debate": "Public consultation on charter principles; stakeholder input on implementation; international interest as model for government AI governance",
-      "risk_approach": "Governance and accountability-focused; proportional transparency to algorithm risk and impact",
-      "enforcement_mechanism": "Non-binding charter; reliance on agency adoption and public accountability mechanisms",
-      "tags": [
-        "government algorithms",
-        "Transparency",
-        "Accountability",
-        "public sector",
-        "Fairness"
-      ],
-      "relevance_to_ai_discourse": "Demonstrates government sector approach to algorithm governance; emphasizes transparency and accountability; incorporates indigenous perspectives",
-      "related_legislation": [
+        "Government algorithm governance internationally",
         "Official Information Act 1982",
         "Privacy Act 2020",
         "Public Finance Act 1989"
       ],
       "source_links": [
         "https://data.govt.nz/toolkit/data-ethics/government-algorithm-transparency-and-accountability/algorithm-charter",
+        "https://www.justice.govt.nz/justice-sector-policy/key-initiatives/cross-government/the-algorithm-charter/",
         "https://www.beehive.govt.nz/release/new-algorithm-charter-a-world-first",
         "https://www.buddlefindlay.com/insights/regulation-of-algorithm-use-in-new-zealand-government-processes"
       ],
-      "source_url": "https://www.justice.govt.nz/justice-sector-policy/key-initiatives/cross-government/the-algorithm-charter/"
+      "source_url": "https://data.govt.nz/toolkit/data-ethics/government-algorithm-transparency-and-accountability/algorithm-charter",
+      "merged_from": [
+        "newzealand_001"
+      ]
     },
     {
       "id": "nigeria_ai_strategy",
@@ -3697,43 +3542,7 @@
         "Public support for AI development and innovation",
         "AI data center and training data access programs",
         "Risk-based regulatory framework",
-        "Government AI use guidelines"
-      ],
-      "novel_arguments_and_perspectives": "",
-      "public_comments_and_debate": "The framework has generated debate between those emphasizing innovation support and those prioritizing safety and rights protection. Key discussions center on the adequacy of impact assessment requirements, resource allocation for compliance oversight, and ensuring that public AI support reaches diverse companies beyond established tech giants.",
-      "risk_approach": "Risk-based approach targeting high-impact AI systems in critical sectors; emphasis on advance assessment and labeling to inform users and protect fundamental rights",
-      "enforcement_mechanism": "Implementation mechanism to be established during the one-year preparation period (through January 22, 2026); oversight authority to be designated; compliance oversight and enforcement procedures to be developed",
-      "tags": [
-        "South Korea",
-        "comprehensive AI law",
-        "risk-based regulation",
-        "high-impact systems",
-        "generative AI",
-        "public support",
-        "critical sectors"
-      ],
-      "relevance_to_ai_discourse": "South Korea's comprehensive AI framework establishes Asia as an important site for global AI governance innovation, demonstrating that jurisdictions beyond the EU and US are developing sophisticated AI regulatory approaches. The emphasis on balancing innovation support with safety governance reflects recognition that AI competitiveness and responsible innovation are complementary goals.",
-      "related_legislation": [
-        "EU AI Act",
-        "Seoul Declaration",
-        "Taiwan AI Basic Act"
-      ],
-      "source_links": [
-        "https://iapp.org/news/a/analyzing-south-korea-s-framework-act-on-the-development-of-ai/",
-        "https://fpf.org/blog/south-koreas-new-ai-framework-act-a-balancing-act-between-innovation-and-regulation/"
-      ],
-      "source_url": "https://iapp.org/news/a/analyzing-south-korea-s-framework-act-on-the-development-of-ai/"
-    },
-    {
-      "id": "southkorea_001",
-      "title": "Framework Act on the Development of Artificial Intelligence and Establishment of Trust",
-      "jurisdiction": "South Korea (National)",
-      "jurisdiction_level": "national",
-      "date_enacted": "2026-01-22",
-      "date_proposed": "2024-12-26",
-      "status": "enacted",
-      "summary": "South Korea's comprehensive AI law enacted December 2024, making it the second country after EU to pass comprehensive AI regulation. Risk-based approach focusing on high-impact AI and generative AI with one-year implementation period.",
-      "key_provisions": [
+        "Government AI use guidelines",
         "Risk-based regulation of 'high-impact' AI systems in critical sectors (healthcare, energy, public services)",
         "Specific obligations for generative AI applications",
         "Mandatory labeling requirements for generative AI",
@@ -3746,28 +3555,40 @@
         "Extraterritorial application to AI systems impacting South Korean market"
       ],
       "novel_arguments_and_perspectives": "Risk-based approach balancing innovation with safety; second comprehensive national AI law globally; emphasis on high-impact systems in critical sectors; substantial public support for AI development",
-      "public_comments_and_debate": "Passed with overwhelming bipartisan support despite political turmoil; debate over enforcement provisions and high-risk definition; international interest as model for comprehensive AI regulation",
-      "risk_approach": "Risk-based regulation with specific obligations for high-impact and generative AI; moderate enforcement approach",
-      "enforcement_mechanism": "Government agencies with authority to issue directives and impose administrative fines",
+      "public_comments_and_debate": "The framework has generated debate between those emphasizing innovation support and those prioritizing safety and rights protection. Key discussions center on the adequacy of impact assessment requirements, resource allocation for compliance oversight, and ensuring that public AI support reaches diverse companies beyond established tech giants.",
+      "risk_approach": "Risk-based approach targeting high-impact AI systems in critical sectors; emphasis on advance assessment and labeling to inform users and protect fundamental rights",
+      "enforcement_mechanism": "Implementation mechanism to be established during the one-year preparation period (through January 22, 2026); oversight authority to be designated; compliance oversight and enforcement procedures to be developed",
       "tags": [
+        "South Korea",
+        "comprehensive AI law",
+        "risk-based regulation",
+        "high-impact systems",
+        "generative AI",
+        "public support",
+        "critical sectors",
         "comprehensive regulation",
         "risk-based approach",
-        "high-impact AI",
-        "generative AI",
-        "critical sectors"
+        "high-impact AI"
       ],
-      "relevance_to_ai_discourse": "Second comprehensive national AI law; demonstrates successful legislative approach combining innovation support with safety; influences other jurisdictions' regulatory design",
+      "relevance_to_ai_discourse": "South Korea's comprehensive AI framework establishes Asia as an important site for global AI governance innovation, demonstrating that jurisdictions beyond the EU and US are developing sophisticated AI regulatory approaches. The emphasis on balancing innovation support with safety governance reflects recognition that AI competitiveness and responsible innovation are complementary goals.",
       "related_legislation": [
+        "EU AI Act",
+        "Seoul Declaration",
+        "Taiwan AI Basic Act",
         "Data Protection Act",
         "Telecommunications Business Act",
         "Sector-specific regulations"
       ],
       "source_links": [
-        "https://www.trade.gov/market-intelligence/south-korea-artificial-intelligence-ai-basic-act",
+        "https://iapp.org/news/a/analyzing-south-korea-s-framework-act-on-the-development-of-ai/",
         "https://fpf.org/blog/south-koreas-new-ai-framework-act-a-balancing-act-between-innovation-and-regulation/",
+        "https://www.trade.gov/market-intelligence/south-korea-artificial-intelligence-ai-basic-act",
         "https://cset.georgetown.edu/publication/south-korea-ai-law-2025/"
       ],
-      "source_url": "https://iapp.org/news/a/analyzing-south-korea-s-framework-act-on-the-development-of-ai"
+      "source_url": "https://iapp.org/news/a/analyzing-south-korea-s-framework-act-on-the-development-of-ai/",
+      "merged_from": [
+        "southkorea_001"
+      ]
     },
     {
       "id": "spain_aesia_ai_regulatory_sandbox",
@@ -5066,7 +4887,15 @@
         "Incident response and disclosure mechanisms for adverse events",
         "Data quality and sourcing documentation standards",
         "Transparency in model capabilities, limitations, and training data",
-        "Guidance on managing emerging risks from autonomous AI capabilities"
+        "Guidance on managing emerging risks from autonomous AI capabilities",
+        "Governance mechanisms for generative AI systems",
+        "Content provenance tracking and documentation",
+        "Pre-deployment testing requirements",
+        "Incident disclosure protocols",
+        "12 distinct risk categories addressing generative AI",
+        "200+ specific actions for risk management",
+        "Implementation guidance for diverse organizational contexts",
+        "Flexible, scalable approach to AI risk management"
       ],
       "novel_arguments_and_perspectives": "NIST AI 600-1 represents recognition that generative AI systems present distinct challenges beyond traditional AI risk frameworks. The profile addresses concerns specific to large language models and generative systems: hallucinations, lack of interpretability, training data provenance, potential for generating harmful content, and rapid deployment cycles. It focuses particular attention on content provenance given widespread concerns about copyrighted content in training data. The framework maintains the voluntary approach of the broader AI RMF while providing more granular guidance for an AI category that emerged after the original framework. It represents an attempt to balance the need for guidance on rapidly-evolving technology with preservation of flexibility for innovation.",
       "public_comments_and_debate": "The generative AI profile received extensive input from stakeholders during public comment periods, reflecting diverse interests: AI companies seeking clarity on compliance expectations, creators and copyright holders concerned about training data, civil rights organizations focused on fairness and bias, and security experts emphasizing testing and disclosure. The focus on content provenance particularly resonated with creators and content owners worried about unauthorized use of their work. Some stakeholders argued the profile should be more prescriptive about specific testing requirements, while others emphasized the need for flexibility given rapid technological change.",
@@ -5079,65 +4908,33 @@
         "Risk",
         "Voluntary",
         "Standards",
-        "Content Provenance"
-      ],
-      "relevance_to_ai_discourse": "NIST AI 600-1 addresses the rapid emergence of generative AI as a distinct governance challenge. It demonstrates how foundational frameworks can be adapted for new technological developments. The profile's emphasis on content provenance reflects broader societal concerns about copyright, training data rights, and creator compensation. It has become an important reference for organizations deploying generative AI systems and for regulatory guidance from federal agencies. The profile illustrates the challenge of providing meaningful guidance for rapidly-evolving technology while maintaining sufficient flexibility for innovation.",
-      "related_legislation": [
-        "NIST AI RMF 1.0",
-        "Executive Order 14110",
-        "AI Training Data Transparency Act",
-        "Copyright and AI legislation"
-      ],
-      "source_links": [
-        "https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence",
-        "https://doi.org/10.6028/NIST.AI.600-1",
-        "https://www.wilmerhale.com/en/insights/blogs/wilmerhale-privacy-and-cybersecurity-law/20240808-nist-issues-new-ai-risk-mitigation-guidelines-and-software",
-        "https://govciomedia.com/nist-says-risk-management-is-central-to-generative-ai-adoption/"
-      ],
-      "source_url": "https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence"
-    },
-    {
-      "id": "nist_ai_600_1",
-      "title": "NIST AI 600-1: Generative AI Profile for AI Risk Management Framework",
-      "jurisdiction": "United States",
-      "jurisdiction_level": "national",
-      "date_enacted": "2024-07-26",
-      "date_proposed": null,
-      "status": "framework",
-      "summary": "Released July 26, 2024, NIST AI 600-1 is a cross-sectoral profile and companion resource implementing the AI Risk Management Framework for Generative AI. Developed by the Generative AI Public Working Group, the profile addresses four primary considerations: Governance, Content Provenance, Pre-deployment Testing, and Incident Disclosure, offering 200+ actions across 12 risk categories.",
-      "key_provisions": [
-        "Governance mechanisms for generative AI systems",
-        "Content provenance tracking and documentation",
-        "Pre-deployment testing requirements",
-        "Incident disclosure protocols",
-        "12 distinct risk categories addressing generative AI",
-        "200+ specific actions for risk management",
-        "Implementation guidance for diverse organizational contexts",
-        "Flexible, scalable approach to AI risk management"
-      ],
-      "novel_arguments_and_perspectives": "NIST AI 600-1 translates the comprehensive AI Risk Management Framework into specific guidance for generative AI systems, addressing unique risks posed by large language models and generative systems. The four core considerations reflect careful analysis of generative AI risk categories. The 200+ actions provide granular implementation guidance.",
-      "public_comments_and_debate": "NIST AI 600-1 has been praised for providing practical generative AI governance guidance. Debate centers on whether the profile covers all important generative AI risks, implementation feasibility for resource-constrained organizations, and how the profile should integrate with regulatory requirements.",
-      "risk_approach": "Comprehensive generative AI risk management approach addressing governance, content provenance, testing, and incident disclosure; flexible, scalable implementation options",
-      "enforcement_mechanism": "Voluntary framework influencing organizational practices; integration into regulatory requirements by government agencies; use in certification and compliance audits",
-      "tags": [
-        "NIST",
+        "Content Provenance",
         "generative AI",
         "risk management",
         "Governance",
         "framework",
         "testing"
       ],
-      "relevance_to_ai_discourse": "NIST AI 600-1 provides foundational guidance for generative AI governance globally, influencing both government regulation and corporate practice. The profile's practical approach bridges abstract principles and operational requirements.",
+      "relevance_to_ai_discourse": "NIST AI 600-1 addresses the rapid emergence of generative AI as a distinct governance challenge. It demonstrates how foundational frameworks can be adapted for new technological developments. The profile's emphasis on content provenance reflects broader societal concerns about copyright, training data rights, and creator compensation. It has become an important reference for organizations deploying generative AI systems and for regulatory guidance from federal agencies. The profile illustrates the challenge of providing meaningful guidance for rapidly-evolving technology while maintaining sufficient flexibility for innovation.",
       "related_legislation": [
-        "NIST AI Risk Management Framework 1.0",
+        "NIST AI RMF 1.0",
         "Executive Order 14110",
+        "AI Training Data Transparency Act",
+        "Copyright and AI legislation",
+        "NIST AI Risk Management Framework 1.0",
         "Federal and state AI regulation"
       ],
       "source_links": [
         "https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence",
+        "https://doi.org/10.6028/NIST.AI.600-1",
+        "https://www.wilmerhale.com/en/insights/blogs/wilmerhale-privacy-and-cybersecurity-law/20240808-nist-issues-new-ai-risk-mitigation-guidelines-and-software",
+        "https://govciomedia.com/nist-says-risk-management-is-central-to-generative-ai-adoption/",
         "https://airc.nist.gov/docs/NIST.AI.600-1.GenAI-Profile.ipd.pdf"
       ],
-      "source_url": "https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence"
+      "source_url": "https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence",
+      "merged_from": [
+        "nist_ai_600_1"
+      ]
     },
     {
       "id": "nist_ai_rmf_1_0",
@@ -5251,7 +5048,15 @@
         "Support for AI research in critical domains including healthcare, agriculture, energy, and manufacturing",
         "Workforce development and AI education programs",
         "Focus on broadening participation in AI research and training",
-        "Emphasis on AI testbeds and datasets for research"
+        "Emphasis on AI testbeds and datasets for research",
+        "National Artificial Intelligence Initiative establishment",
+        "Office of Science and Technology Policy coordination",
+        "National Science and Technology Council Interagency Committee",
+        "National AI Advisory Committee (DOE-administered)",
+        "NSF research and education funding",
+        "NIST voluntary standards development",
+        "International AI cooperation and competitiveness",
+        "Federal research priorities in AI"
       ],
       "novel_arguments_and_perspectives": "The National AI Initiative Act reflects a strategic recognition that AI development requires sustained government investment in research infrastructure, not just private sector innovation. It positions AI as a strategic technology requiring coordinated federal support across agencies and academic institutions. The legislation emphasizes that national AI competitiveness depends on a robust research ecosystem, diverse workforce participation, and public research institutions complementing private sector development. The act represents a bipartisan consensus that the U.S. should actively build AI capabilities rather than relying on market forces alone. Its focus on research institutes addresses concerns about concentration of AI development in large tech companies by spreading opportunities across universities and regions.",
       "public_comments_and_debate": "The act received broad bipartisan support, with agreement that federal AI investment is necessary for maintaining U.S. competitiveness. There was consensus on supporting academic research and workforce development. Some debate centered on funding levels and resource allocation among different research priorities. Labor advocates were concerned about ensuring benefits reach workers, while tech industry focused on ensuring research supports commercial applications. There was general agreement that federal research investment complements rather than competes with private sector development.",
@@ -5264,13 +5069,21 @@
         "Education",
         "Workforce Development",
         "National Strategy",
-        "Policy"
+        "Policy",
+        "US federal",
+        "research initiative",
+        "innovation focus",
+        "standards development",
+        "international competitiveness"
       ],
       "relevance_to_ai_discourse": "The National AI Initiative Act established foundational federal infrastructure for AI development and workforce preparation. It demonstrates bipartisan recognition that AI competitiveness requires sustained government investment. The act's emphasis on research diversity and workforce development addresses concerns about AI development concentration and skills gaps. Its implementation through the National AI Initiative Office provides ongoing coordination across federal agencies for AI policy.",
       "related_legislation": [
         "CREATE AI Act",
         "Advancing American AI Act",
-        "National AI Research Resource initiatives"
+        "National AI Research Resource initiatives",
+        "NIST AI Risk Management Framework",
+        "Executive Order 14110",
+        "State and federal AI legislation"
       ],
       "source_links": [
         "https://www.congress.gov/bill/116th-congress/house-bill/6216",
@@ -5278,49 +5091,10 @@
         "https://science.house.gov/2020/12/hr-6216-national-artificial-intelligence-initiative-act-2020",
         "https://www.govinfo.gov/app/details/BILLS-116hr6216ih"
       ],
-      "source_url": "https://www.congress.gov/bill/116th-congress/house-bill/6216"
-    },
-    {
-      "id": "omb_m_24_10",
-      "title": "OMB M-24-10: Advancing Governance, Innovation, and Risk Management for Agency Use of AI",
-      "jurisdiction": "United States",
-      "jurisdiction_level": "national",
-      "date_enacted": "2024-03-28",
-      "date_proposed": null,
-      "status": "enacted",
-      "summary": "Released March 28, 2024, OMB Memorandum M-24-10 directs federal agencies to advance responsible AI governance and innovation while managing AI risks. The memorandum requires agencies to establish AI governance bodies, inventory AI use cases annually, conduct risk assessments, and stop using AI systems that lack required safeguards after December 1, 2024. CFO Act agencies must submit compliance plans within 180 days.",
-      "key_provisions": [
-        "Enterprise AI strategy development for CFO Act agencies",
-        "Agency AI governance body establishment (within 60 days)",
-        "Annual AI use case inventory (public versions)",
-        "Risk management safeguard adoption by December 1, 2024",
-        "AI system discontinuation for non-compliant systems",
-        "Compliance plan submission (within 180 days)",
-        "Biennial plan updates through 2036",
-        "OMB oversight and monitoring"
-      ],
-      "novel_arguments_and_perspectives": "OMB M-24-10 represents significant federal governance mechanism establishing AI management requirements across executive branch agencies. The requirement to discontinue non-compliant AI systems represents enforceable requirement with concrete deadline. The compliance plan approach provides flexibility while establishing accountability.",
-      "public_comments_and_debate": "The memorandum has generated substantial agency activity with most CFO Act agencies submitting compliance plans. Debate centers on implementation feasibility, resource adequacy for compliance, and whether requirements are sufficiently protective of public rights.",
-      "risk_approach": "Government-focused risk management approach requiring governance structures, impact assessment, risk-informed decision-making, and discontinuation of non-compliant systems",
-      "enforcement_mechanism": "OMB oversight of agency compliance; requirement for public compliance plans; December 1, 2024 deadline for safeguard adoption creates enforcement point; biennial reporting maintains ongoing accountability",
-      "tags": [
-        "OMB",
-        "federal government",
-        "AI Governance",
-        "risk management",
-        "agency requirements",
-        "Compliance"
-      ],
-      "relevance_to_ai_discourse": "OMB M-24-10 establishes binding federal requirements for government AI use, creating model for how government can govern its own AI systems. The approach influenced international discussions about government AI governance.",
-      "related_legislation": [
-        "Executive Order 14110",
-        "NIST AI Risk Management Framework",
-        "State AI legislation"
-      ],
-      "source_links": [
-        "https://www.whitehouse.gov/wp-content/uploads/2024/03/M-24-10-Advancing-Governance-Innovation-and-Risk-Management-for-Agency-Use-of-Artificial-Intelligence.pdf"
-      ],
-      "source_url": "https://www.whitehouse.gov/wp-content/uploads/2024/03/M-24-10-Advancing-Governance-Innovation-and-Risk-Management-for-Agency-Use-of-Artificial-Intelligence.pdf"
+      "source_url": "https://www.congress.gov/bill/116th-congress/house-bill/6216",
+      "merged_from": [
+        "national_ai_initiative_act"
+      ]
     },
     {
       "id": "omb_m_24_10_ai_governance",
@@ -5341,7 +5115,15 @@
         "Termination requirement for noncompliant uses of AI by December 1, 2024",
         "Annual AI use case inventories submitted to OMB and published publicly",
         "Documentation and transparency about AI systems and their impacts",
-        "Support for innovation while managing risks in federal AI deployment"
+        "Support for innovation while managing risks in federal AI deployment",
+        "Enterprise AI strategy development for CFO Act agencies",
+        "Agency AI governance body establishment (within 60 days)",
+        "Annual AI use case inventory (public versions)",
+        "Risk management safeguard adoption by December 1, 2024",
+        "AI system discontinuation for non-compliant systems",
+        "Compliance plan submission (within 180 days)",
+        "Biennial plan updates through 2036",
+        "OMB oversight and monitoring"
       ],
       "novel_arguments_and_perspectives": "OMB M-24-10 represents the most concrete federal requirement for AI risk management in government operations. It establishes that rights-impacting and safety-impacting AI systems require specific safeguards including assessment, monitoring, notification, and human oversight. The memo positions AI governance as requiring dedicated institutional capacity (Chief AI Officers) and processes (impact assessments, inventories). It reflects the view that government should pioneer responsible AI practices and that AI use by government raises distinct concerns about rights and fairness. The focus on systems affecting rights and safety reflects civil rights and civil liberties priorities. The December 1, 2024 implementation deadline created pressure for rapid agency compliance.",
       "public_comments_and_debate": "Civil rights organizations and transparency advocates praised the memo as establishing necessary safeguards for government AI use. Federal agencies expressed concerns about implementation timelines, resource requirements, and ambiguities in identifying which systems trigger requirements. Some questioned whether all agencies could meet December 1 deadline. Tech experts debated technical feasibility of some requirements, particularly discrimination monitoring post-deployment. Some called for stronger requirements while others viewed the memo as appropriately balancing innovation and risk management.",
@@ -5353,13 +5135,21 @@
         "Risk",
         "Rights Protection",
         "Enacted",
-        "Regulation"
+        "Regulation",
+        "OMB",
+        "federal government",
+        "AI Governance",
+        "risk management",
+        "agency requirements",
+        "Compliance"
       ],
       "relevance_to_ai_discourse": "OMB M-24-10 demonstrates how administrative authority can establish binding AI governance requirements without new legislation. It represents the most detailed federal specification of AI risk management practices. The memo has influenced how federal agencies approach AI deployment and compliance. Its implementation challenges highlight practical difficulties in operationalizing AI governance requirements. The memo's approach has been referenced in subsequent legislative proposals and state AI governance initiatives.",
       "related_legislation": [
         "AI in Government Act",
         "Executive Order 14110",
-        "Federal IT standards"
+        "Federal IT standards",
+        "NIST AI Risk Management Framework",
+        "State AI legislation"
       ],
       "source_links": [
         "https://www.whitehouse.gov/wp-content/uploads/2024/03/M-24-10-Advancing-Governance-Innovation-and-Risk-Management-for-Agency-Use-of-Artificial-Intelligence.pdf",
@@ -5367,7 +5157,10 @@
         "https://www.crowell.com/en/insights/client-alerts/omb-releases-final-guidance-memo-on-the-governments-use-of-ai",
         "https://www.cov.com/en/news-and-insights/insights/2024/10/omb-releases-requirements-for-responsible-ai-procurement-by-federal-agencies"
       ],
-      "source_url": "https://www.whitehouse.gov/wp-content/uploads/2024/03/M-24-10-Advancing-Governance-Innovation-and-Risk-Management-for-Agency-Use-of-Artificial-Intelligence.pdf"
+      "source_url": "https://www.whitehouse.gov/wp-content/uploads/2024/03/M-24-10-Advancing-Governance-Innovation-and-Risk-Management-for-Agency-Use-of-Artificial-Intelligence.pdf",
+      "merged_from": [
+        "omb_m_24_10"
+      ]
     },
     {
       "id": "safe_innovation_framework",
@@ -5505,48 +5298,6 @@
         "https://www.heinrich.senate.gov/newsroom/press-releases/heinrich-convenes-third-and-fourth-bipartisan-senate-ai-insight-forums-focused-on-ai-and-the-workforce-and-ai-high-impact-applications"
       ],
       "source_url": "https://www.schumer.senate.gov/newsroom/press-releases/following-historic-ai-insight-forums-over-the-past-year-leader-schumer-senators-rounds-heinrich-and-young-reveal-bipartisan-roadmap-for-artificial-intelligence-policy-in-the-united-states-senate"
-    },
-    {
-      "id": "national_ai_initiative_act",
-      "title": "US National Artificial Intelligence Initiative Act of 2020",
-      "jurisdiction": "United States",
-      "jurisdiction_level": "national",
-      "date_enacted": "2021-01-01",
-      "date_proposed": "2020-03-12",
-      "status": "enacted",
-      "summary": "Introduced March 12, 2020, the National AI Initiative Act established the National AI Initiative to advance US AI research and development. Provisions were incorporated into the National Defense Authorization Act for Fiscal Year 2021 (H.R. 6395), enacted with veto override on January 1, 2021. The Act focuses on research funding, voluntary standards development, and international AI competitiveness.",
-      "key_provisions": [
-        "National Artificial Intelligence Initiative establishment",
-        "Office of Science and Technology Policy coordination",
-        "National Science and Technology Council Interagency Committee",
-        "National AI Advisory Committee (DOE-administered)",
-        "NSF research and education funding",
-        "NIST voluntary standards development",
-        "International AI cooperation and competitiveness",
-        "Federal research priorities in AI"
-      ],
-      "novel_arguments_and_perspectives": "The National AI Initiative Act focuses on research and development rather than AI regulation, reflecting US policy emphasis on innovation and competitiveness. The Act establishes institutional mechanisms for federal AI coordination and emphasizes research investment as key to maintaining US AI leadership. The Advisory Committee structure ensures multistakeholder input.",
-      "public_comments_and_debate": "The Act has been supported as establishing framework for sustained federal AI research investment. Debate centers on adequacy of funding levels, whether research focus should be accompanied by regulatory frameworks, and how to balance international competitiveness with governance standards.",
-      "risk_approach": "Innovation-focused approach emphasizing research investment, standards development, and international competitiveness; institutional coordination across federal agencies",
-      "enforcement_mechanism": "Government implementation through designated agencies; Advisory Committee provides input to President and Initiative Office; research funding allocation through normal federal appropriations processes",
-      "tags": [
-        "US federal",
-        "research initiative",
-        "innovation focus",
-        "standards development",
-        "international competitiveness"
-      ],
-      "relevance_to_ai_discourse": "The National AI Initiative Act establishes federal commitment to AI research and development as competitive priority. The emphasis on voluntary standards influenced subsequent NIST framework development.",
-      "related_legislation": [
-        "NIST AI Risk Management Framework",
-        "Executive Order 14110",
-        "State and federal AI legislation"
-      ],
-      "source_links": [
-        "https://www.congress.gov/bill/116th-congress/house-bill/6216",
-        "https://www.nist.gov/artificial-intelligence/ai-congressional-mandates-executive-orders-and-actions"
-      ],
-      "source_url": "https://www.congress.gov/bill/116th-congress/house-bill/6216"
     },
     {
       "id": "white_house_voluntary_ai_commitments",
@@ -6138,7 +5889,7 @@
       "jurisdiction_level": "state_provincial",
       "date_enacted": null,
       "date_proposed": "2024-02-01",
-      "status": "in_committee",
+      "status": "expired",
       "summary": "Proposed legislation that would require developers and deployers of high-risk AI systems to use reasonable care to protect consumers from any known or reasonably foreseeable risks of algorithmic discrimination. The bill passed the Connecticut Senate on April 24, 2024, but was not taken up in the House before the legislative session ended on May 8, 2024.",
       "key_provisions": [
         "Applies to developers and deployers of high-risk AI systems",
@@ -6159,12 +5910,13 @@
       ],
       "relevance_to_ai_discourse": "SB 2's failure to advance illustrates that even bills modeled on successful legislation in other states may not pass if they face opposition from the Governor's office or lack sufficient legislative support. This highlights the importance of building broad coalitions around AI regulation.",
       "related_legislation": [
-        "colorado_sb_24_205"
+        "colorado_sb_24_205",
+        "connecticut_sb5_ai_2026"
       ],
       "source_links": [
         "https://www.seyfarth.com/news-insights/colorado-governor-signs-broad-ai-bill-regulating-employment-decisions.html"
       ],
-      "source_url": "https://www.cga.ct.gov/"
+      "source_url": "https://www.cga.ct.gov/asp/CGABillStatus/cgabillstatus.asp?bill_num=SB00002&selBillType=Bill&which_year=2024"
     },
     {
       "id": "florida_ai_bill_of_rights",
@@ -6798,7 +6550,7 @@
       "title": "Responsible AI Safety and Education Act (RAISE Act)",
       "jurisdiction": "New York, United States",
       "jurisdiction_level": "state_provincial",
-      "date_enacted": "2025-12-15",
+      "date_enacted": "2025-12-19",
       "date_proposed": "2024-06-01",
       "status": "enacted",
       "summary": "Governor Hochul signed nation-leading legislation requiring AI frameworks for frontier AI models. The law establishes a new AI oversight office within New York Department of Financial Services and requires large AI developers to register with the state, publish safety protocols, and report incidents within 72 hours. Effective January 1, 2027.",
@@ -6828,9 +6580,10 @@
         "new_york_loading_act"
       ],
       "source_links": [
-        "https://www.governor.ny.gov/news/governor-hochul-signs-nation-leading-legislation-require-ai-frameworks-ai-frontier-models"
+        "https://www.governor.ny.gov/news/governor-hochul-signs-nation-leading-legislation-require-ai-frameworks-ai-frontier-models",
+        "https://www.nysenate.gov/"
       ],
-      "source_url": "https://www.nysenate.gov/"
+      "source_url": "https://www.governor.ny.gov/news/governor-hochul-signs-nation-leading-legislation-require-ai-frameworks-ai-frontier-models"
     },
     {
       "id": "ohio_education_ai_policy",
@@ -7649,7 +7402,7 @@
       "jurisdiction": "Multiple Jurisdictions",
       "jurisdiction_level": "sector_specific",
       "date_enacted": "2025-03-14",
-      "date_proposed": null,
+      "date_proposed": "2024-09-14",
       "status": "enacted",
       "summary": "Comparative overview of AI-generated content labeling and watermarking regimes, with China, EU, and U.S. approaches represented more precisely by dedicated corpus entries such as China synthetic-content labeling, California AB 2885, the EU AI Act/GPAI Code, NIST synthetic-content transparency guidance, and proposed U.S. labeling bills.",
       "key_provisions": [
@@ -7662,7 +7415,14 @@
         "EU: Exceptions for artistic and journalistic purposes",
         "EU: Code of Practice supporting labeling compliance",
         "US: California law requires AI detection tools with API support",
-        "US: No comprehensive federal labeling requirement; focus on detection capability"
+        "US: No comprehensive federal labeling requirement; focus on detection capability",
+        "Explicit labels: visible indicators (text, audio, graphics) for AI-generated content",
+        "Implicit labels: metadata with service provider name and content ID",
+        "Three-category classification: confirmed, possible, or suspected AI-generated",
+        "Service provider responsibility for labeling systems",
+        "Technology standards for label placement and integrity",
+        "Prohibition of misleading labels or label removal",
+        "Platform obligation to deploy labeling technologies"
       ],
       "novel_arguments_and_perspectives": "The divergent labeling approaches reflect different governance philosophies: China's traceability system emphasizes state oversight and accountability; EU's transparency requirement emphasizes user awareness; US focuses on detection capability and market-driven solutions. No jurisdiction has yet established effective watermarking that both survives content manipulation and is detectable by average users.",
       "public_comments_and_debate": "Technologists debate feasibility of effective watermarking and machine-readable labeling across different media formats. Content platforms worry about compliance costs across multiple jurisdictions. Civil society advocates for labeling but questions effectiveness as user protection mechanism. Creators fear false labeling of human content as AI-generated.",
@@ -7674,25 +7434,34 @@
         "Watermarking",
         "Transparency",
         "synthetic media",
-        "international regulation"
+        "international regulation",
+        "content labeling"
       ],
       "relevance_to_ai_discourse": "Shows emerging international consensus on need to label AI-generated content while struggling with practical implementation. Influences media literacy and detection technology development. Raises questions about effectiveness of labeling versus detection approaches.",
       "related_legislation": [
-        "china_011",
+        "ai_content_labeling_watermarking",
         "california_ab_2885",
         "ai_labeling_act",
         "eu_ai_act",
         "eu_gpai_code_of_practice_2025",
-        "nist_synthetic_content_transparency_2024"
+        "nist_synthetic_content_transparency_2024",
+        "Interim Measures for Management of Generative AI Services (2023)",
+        "Provisions on Management of Deep Synthesis (2023)"
       ],
       "source_links": [
         "https://www.twobirds.com/en/insights/2025/new-ai-content-labelling-rules-in-china-what-are-they-and-how-do-they-compare-to-the-eu-ai-act",
         "https://www.imatag.com/blog/ai-act-legal-requirement-to-label-ai-generated-content",
-        "https://cadeproject.org/updates/china-enforces-new-ai-content-identification-rules-starting-today/"
+        "https://cadeproject.org/updates/china-enforces-new-ai-content-identification-rules-starting-today/",
+        "https://www.insideprivacy.com/international/china/china-releases-new-labeling-requirements-for-ai-generated-content/",
+        "https://cms-lawnow.com/en/ealerts/2024/09/china-proposes-new-regulations-on-ai-generated-content-labelling/",
+        "https://www.chinalawtranslate.com/en/ai-labeling/"
       ],
       "source_url": "https://www.twobirds.com/en/insights/2025/new-ai-content-labelling-rules-in-china-what-are-they-and-how-do-they-compare-to-the-eu-ai-act",
       "verification_status": "partially_verified",
-      "verification_notes": "Retained as comparative overview; debate references should prefer specific primary-source entries when making jurisdiction-specific claims."
+      "verification_notes": "Retained as comparative overview; debate references should prefer specific primary-source entries when making jurisdiction-specific claims.",
+      "merged_from": [
+        "china_011"
+      ]
     },
     {
       "id": "ai_elections_regulation",
@@ -8637,13 +8406,13 @@
     },
     {
       "id": "eu_digital_omnibus_ai_2026",
-      "title": "EU Digital Omnibus on AI — Provisional Agreement",
+      "title": "EU Digital Omnibus on AI — Adopted",
       "jurisdiction": "European Union",
       "jurisdiction_level": "international",
-      "date_enacted": "",
+      "date_enacted": "2026-07-08",
       "date_proposed": "2026-05-07",
-      "status": "proposed",
-      "summary": "Provisional agreement between EU Council and Parliament amending the AI Act, delaying high-risk system compliance deadlines by 12-16 months and adding new prohibited practices including non-consensual intimate image generation.",
+      "status": "enacted",
+      "summary": "Provisional agreement between EU Council and Parliament amending the AI Act, delaying high-risk system compliance deadlines by 12-16 months and adding new prohibited practices including non-consensual intimate image generation. The European Parliament adopted the regulation on 16 June 2026, the Council gave final approval on 29 June, and the presidents of both institutions signed it on 8 July. The adopted package moves the high-risk AI deadlines to 2 December 2027 for stand-alone systems and 2 August 2028 for systems embedded in regulated products, and adds prohibitions covering non-consensual sexual deepfakes and AI-generated child sexual abuse material.",
       "key_provisions": [
         "Annex III high-risk AI obligations delayed from Aug 2026 to Dec 2027",
         "Annex I product-regulated AI delayed from Aug 2027 to Aug 2028",
@@ -8675,9 +8444,11 @@
         "eu_ai_act_2024"
       ],
       "source_links": [
-        "https://www.consilium.europa.eu/en/press/press-releases/2026/05/07/artificial-intelligence-council-and-parliament-agree-to-simplify-and-streamline-rules/"
+        "https://www.consilium.europa.eu/en/press/press-releases/2026/05/07/artificial-intelligence-council-and-parliament-agree-to-simplify-and-streamline-rules/",
+        "https://eur-lex.europa.eu/legal-content/EN/HIS/?uri=consil%3AWK_1027_2026_INIT",
+        "https://oeil.europarl.europa.eu/oeil/en/document-summary?id=1905596"
       ],
-      "source_url": "https://www.consilium.europa.eu/en/press/press-releases/2026/05/07/"
+      "source_url": "https://www.consilium.europa.eu/en/press/press-releases/2026/06/29/artificial-intelligence-council-gives-final-green-light-to-simplify-and-streamline-rules/"
     },
     {
       "id": "colorado_sb_26_189_2026",
@@ -8728,10 +8499,10 @@
       "title": "Connecticut SB 5 — An Act Concerning Online Safety (AI Responsibility Act)",
       "jurisdiction": "Connecticut, United States",
       "jurisdiction_level": "state",
-      "date_enacted": "",
+      "date_enacted": "2026-05-27",
       "date_proposed": "2026-05-01",
-      "status": "proposed",
-      "summary": "Comprehensive omnibus AI bill passed both chambers of the Connecticut legislature. Introduces employment-related AI obligations, chatbot safety rules, synthetic content labeling, safe harbor programs, and anti-discrimination provisions.",
+      "status": "enacted",
+      "summary": "Comprehensive omnibus AI bill passed both chambers of the Connecticut legislature. Introduces employment-related AI obligations, chatbot safety rules, synthetic content labeling, safe harbor programs, and anti-discrimination provisions. Governor Ned Lamont signed the bill as Public Act 26-15 on 27 May 2026.",
       "key_provisions": [
         "Employment-related AI obligations for automated hiring",
         "Chatbot safety and disclosure rules",
@@ -8761,7 +8532,8 @@
       "relevance_to_ai_discourse": "Most comprehensive US state omnibus AI bill, potentially setting template for other states",
       "related_legislation": [],
       "source_links": [
-        "https://www.kelleydrye.com/viewpoints/blogs/ad-law-access/ai-regulatory-roundup-recent-developments-in-colorado-connecticut-and-california"
+        "https://www.kelleydrye.com/viewpoints/blogs/ad-law-access/ai-regulatory-roundup-recent-developments-in-colorado-connecticut-and-california",
+        "https://portal.ct.gov/governor/-/media/office-of-the-governor/bill-notifications/2026/bill-notification-2026-11.pdf?rev=ad8315ea7f1a4afda0d85c5c1f828d33"
       ],
       "source_url": "https://www.cga.ct.gov/asp/cgabillstatus/cgabillstatus.asp?selBillType=Bill&bill_num=SB00005"
     },
@@ -8912,11 +8684,6 @@
         "Model evaluation standards",
         "Environmental impact considerations including water and energy"
       ],
-      "novel_arguments_and_concepts": [
-        "Updated scientific consensus on AI risks",
-        "International coordination mechanisms for AI governance",
-        "Environmental sustainability as safety dimension"
-      ],
       "public_comments_and_debate": [
         "Builds on Bletchley and Seoul summits",
         "Debate on whether voluntary commitments are sufficient",
@@ -8936,7 +8703,12 @@
       "source_links": [
         "https://internationalaisafetyreport.org/publication/international-ai-safety-report-2026"
       ],
-      "source_url": "https://internationalaisafetyreport.org/"
+      "source_url": "https://internationalaisafetyreport.org/",
+      "novel_arguments_and_perspectives": [
+        "Updated scientific consensus on AI risks",
+        "International coordination mechanisms for AI governance",
+        "Environmental sustainability as safety dimension"
+      ]
     },
     {
       "id": "eu_council_of_europe_ai_convention_2026",
@@ -9253,7 +9025,7 @@
       "related_legislation": [
         "data_center_water_environmental_regulations_2026",
         "us_america_ai_action_plan_2025",
-        "seoul_declaration_ai_safety_2024"
+        "seoul_declaration"
       ],
       "source_links": [
         "https://www.iea.org/reports/energy-and-ai",
@@ -9640,6 +9412,349 @@
         "https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260SB53"
       ],
       "source_url": "https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260SB53"
+    },
+    {
+      "id": "illinois_sb315_ai_safety_2026",
+      "title": "Illinois SB 315 — AI Safety Measures Act",
+      "jurisdiction": "Illinois, United States",
+      "jurisdiction_level": "state",
+      "date_enacted": "2026-07-06",
+      "date_proposed": null,
+      "status": "enacted",
+      "summary": "Governor Pritzker signed SB 315, the AI Safety Measures Act, on July 6, 2026, making Illinois the first US state to mandate annual independent third-party safety audits of frontier AI models. The law applies to developers exceeding 10^26 operations of training compute and $500 million in annual revenue, and also requires published frontier AI safety frameworks, public disclosure of safety practices, and reporting of significant safety incidents. Core obligations take effect January 1, 2027, with the independent audit requirement beginning January 1, 2028. State officials framed the bipartisan law as filling a federal oversight gap and building on frameworks already passed in California and New York.",
+      "key_provisions": [
+        "First-in-nation requirement of regular independent third-party safety audits of frontier models, applying from January 1, 2028",
+        "Scoped to frontier developers exceeding 10^26 operations of training compute and $500 million in annual revenue",
+        "Developers must publish frontier AI safety frameworks and publicly disclose safety practices",
+        "Mandatory reporting of significant safety incidents and maintenance of robust compliance processes",
+        "Confidential reporting channels with whistleblower protections for employees",
+        "Effective January 1, 2027"
+      ],
+      "novel_arguments_and_perspectives": [
+        "First US mandate for independent external verification of frontier AI safety, going beyond the transparency-only frameworks of California and New York",
+        "State legislation explicitly positioned as substituting for absent federal frontier-safety oversight",
+        "Bipartisan passage presented as evidence that frontier AI safety regulation need not be partisan"
+      ],
+      "public_comments_and_debate": [
+        "Governor Pritzker called it a 'bipartisan, first- and most-protective-in-the-nation law'",
+        "Attorney General Raoul said Illinois is 'filling the gap' left by the absence of federal frontier AI oversight",
+        "The governor's office positioned it as the strongest AI safety law in the country, building on California and New York frameworks"
+      ],
+      "risk_approach": "Frontier-model safety regime combining mandatory independent audits, published safety frameworks, and incident reporting, scoped by compute and revenue thresholds",
+      "enforcement_mechanism": "State-enforced guardrails with confidential reporting channels and whistleblower protections; the signing announcement does not specify the enforcing agency",
+      "tags": [
+        "State AI Law",
+        "Frontier Models",
+        "Safety Audits",
+        "Incident Reporting",
+        "Whistleblower Protections",
+        "Transparency"
+      ],
+      "relevance_to_ai_discourse": "Escalates state-level frontier AI regulation from transparency mandates to mandatory external verification, creating the first US independent-audit requirement for advanced AI developers",
+      "related_legislation": [],
+      "source_links": [
+        "https://gov-pritzker-newsroom.prezly.com/gov-pritzker-signs-nation-leading-artificial-intelligence-safety-law"
+      ],
+      "source_url": "https://gov-pritzker-newsroom.prezly.com/gov-pritzker-signs-nation-leading-artificial-intelligence-safety-law",
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://gov-pritzker-newsroom.prezly.com/gov-pritzker-signs-nation-leading-artificial-intelligence-safety-law. Compute/revenue thresholds and 2028 audit start date per pre-verified metadata; the press release confirms signing date, effective date, audit mandate, disclosure, incident reporting and whistleblower provisions but does not state the numeric thresholds."
+    },
+    {
+      "id": "un_scientific_panel_first_report_2026",
+      "title": "First Report of the UN Independent International Scientific Panel on AI",
+      "jurisdiction": "United Nations",
+      "jurisdiction_level": "international",
+      "date_enacted": "2026-07-01",
+      "date_proposed": null,
+      "status": "policy_report",
+      "summary": "The UN Independent International Scientific Panel on AI published its first report on July 1, 2026. The 40-expert panel, drawn from every global region with members serving in their personal capacity and co-chaired by Yoshua Bengio and Maria Ressa, warned that science currently cannot guarantee that increasingly capable AI systems will not cause catastrophic harm, whether through autonomous action or malicious misuse. The report also flags AI-amplified misinformation as a threat to democratic integrity, documents the concentration of frontier AI development in the United States and China alongside a widening digital divide, and acknowledges benefits for healthcare, science, economic development and productivity if AI is used responsibly. It served as the evidence base for the first UN Global Dialogue on AI Governance held days later in Geneva.",
+      "key_provisions": [
+        "Warns that science currently cannot guarantee that increasingly capable AI will not cause catastrophic harm, via autonomous action or malicious misuse",
+        "Identifies AI-amplified misinformation, laced with fear and anger, as a threat to democratic integrity",
+        "Documents concentration of frontier AI development in two countries (United States and China) and the risk of developing nations being left behind",
+        "Acknowledges potential benefits for economic development, healthcare, scientific progress and productivity if used responsibly",
+        "Calls for multilateral governance responses through the UN and better policymaker understanding of AI systems"
+      ],
+      "novel_arguments_and_perspectives": [
+        "First report of a UN-mandated independent scientific assessment body for AI, institutionalizing evidence synthesis akin to climate assessment panels",
+        "Frames catastrophic frontier-AI risk as a problem of scientific uncertainty rather than a settled debate",
+        "Links information integrity directly to the viability of democracy"
+      ],
+      "public_comments_and_debate": [
+        "Co-chair Yoshua Bengio: 'science currently cannot guarantee that as capabilities increase, AI will not cause catastrophic harm'",
+        "Co-chair Maria Ressa warned of an 'information Armageddon', saying 'If you can't tell fact from fiction, you cannot have a democracy'",
+        "Report positioned as input to the UN Global Dialogue on AI Governance (July 6-7, 2026, Geneva)"
+      ],
+      "risk_approach": "Independent scientific evidence synthesis informing multilateral governance; assessment rather than regulation",
+      "enforcement_mechanism": "None — advisory scientific panel with no regulatory authority",
+      "tags": [
+        "International Governance",
+        "Frontier Models",
+        "Catastrophic Risk",
+        "Misinformation",
+        "Scientific Assessment",
+        "United Nations"
+      ],
+      "relevance_to_ai_discourse": "Establishes an authoritative UN scientific baseline on AI risks, including an explicit statement that catastrophic harm from frontier AI cannot currently be ruled out",
+      "related_legislation": [
+        "un_global_dialogue_first_session_2026"
+      ],
+      "source_links": [
+        "https://news.un.org/en/story/2026/07/1167862"
+      ],
+      "source_url": "https://news.un.org/en/story/2026/07/1167862",
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://news.un.org/en/story/2026/07/1167862. Co-chair identification of Bengio and Ressa per pre-verified metadata, consistent with the story's attribution of lead statements to both."
+    },
+    {
+      "id": "un_global_dialogue_first_session_2026",
+      "title": "First Session of the UN Global Dialogue on AI Governance",
+      "jurisdiction": "United Nations",
+      "jurisdiction_level": "international",
+      "date_enacted": "2026-07-06",
+      "date_proposed": "2025-08",
+      "status": "framework",
+      "summary": "The inaugural session of the UN Global Dialogue on AI Governance convened in Geneva on July 6-7, 2026, alongside the ITU's AI for Good Global Summit, as the first AI governance forum open to all UN member states. Established by General Assembly resolution A/RES/79/325 (August 2025) following the Global Digital Compact adopted at the 2024 Summit of the Future, the Dialogue brings governments together with the private sector, academia, civil society and technical experts, with government co-chairs from El Salvador and Estonia. Its stated aim is to ensure that AI governance reflects the priorities of all nations, not just the most technologically advanced, with discussions organized around four thematic clusters spanning AI's societal dimensions, capacity-building and digital equity, safe and trustworthy AI, and human rights and accountability.",
+      "key_provisions": [
+        "First AI governance platform including all UN member states alongside the private sector, academia, civil society and technical experts",
+        "Established by GA resolution A/RES/79/325 (August 2025), implementing commitments of the Global Digital Compact",
+        "Inaugural session held July 6-7, 2026 in Geneva alongside the ITU AI for Good Global Summit",
+        "Four thematic clusters: social, economic, ethical, cultural, linguistic and technical dimensions; capacity-building and digital equity; safe, secure and trustworthy AI systems; human rights protection and accountability",
+        "Intergovernmental co-chairs from El Salvador and Estonia"
+      ],
+      "novel_arguments_and_perspectives": [
+        "Universal-membership alternative to plurilateral AI forums such as the G7, OECD and the AI summit series",
+        "Explicit framing that governance should reflect 'the priorities of all nations, not just the most technologically advanced'",
+        "Pairs political dialogue with an independent scientific panel whose first report was published days before the session"
+      ],
+      "public_comments_and_debate": [
+        "Featured speakers included UN leadership, government representatives and AI sector leaders",
+        "Positioned as follow-through on the Global Digital Compact adopted at the 2024 Summit of the Future",
+        "The UN scientific panel's first report, warning that catastrophic frontier-AI harm cannot be ruled out, framed the session's risk discussions"
+      ],
+      "risk_approach": "Inclusive multilateral dialogue and norm development; non-binding cooperation rather than regulation",
+      "enforcement_mechanism": "None — voluntary intergovernmental platform without binding authority",
+      "tags": [
+        "International Governance",
+        "United Nations",
+        "Multilateralism",
+        "Capacity Building",
+        "Human Rights",
+        "Digital Divide"
+      ],
+      "relevance_to_ai_discourse": "Creates the first universal intergovernmental venue for AI governance, shifting part of the global debate from plurilateral summits and expert bodies to an all-member-state UN process",
+      "related_legislation": [
+        "un_scientific_panel_first_report_2026"
+      ],
+      "source_links": [
+        "https://www.un.org/global-dialogue-ai-governance/en",
+        "https://news.un.org/en/story/2026/07/1167862"
+      ],
+      "source_url": "https://www.un.org/global-dialogue-ai-governance/en",
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://www.un.org/global-dialogue-ai-governance/en (session dates, mandate, resolution, co-chairs, thematic clusters) and https://news.un.org/en/story/2026/07/1167862 (scientific panel report feeding into the session)."
+    },
+    {
+      "id": "eu_code_of_practice_ai_content_transparency_2026",
+      "title": "EU Code of Practice on Transparency of AI-Generated Content",
+      "jurisdiction": "European Union",
+      "jurisdiction_level": "supranational",
+      "date_enacted": "2026-06-10",
+      "date_proposed": "2025-09",
+      "status": "voluntary_code",
+      "summary": "The European Commission's AI Office published the final Code of Practice on Transparency of AI-Generated Content on June 10, 2026, concluding a drafting process launched with a public consultation in September 2025. The voluntary code operationalizes the legally binding transparency obligations of AI Act Article 50 — machine-readable marking of AI-generated or manipulated outputs by providers, and labeling of deepfakes and AI-generated public-interest text by deployers — which apply from August 2, 2026. Providers and deployers of generative AI systems may sign the code (signatures due July 27, 2026); positively assessed signatories can rely on its measures to demonstrate compliance across Member States and join Signatory Taskforces, while non-signatories must demonstrate compliance through alternative means assessed individually by market surveillance authorities.",
+      "key_provisions": [
+        "Operationalizes the AI Act Article 50 marking obligation: provider outputs must be marked in a machine-readable format and detectable as artificially generated or manipulated",
+        "Deployer labeling of deepfakes and of AI-generated text published on matters of public interest, unless subject to editorial review",
+        "Voluntary adherence; following positive assessment, signatories may rely on the code's measures to demonstrate Article 50 compliance",
+        "Technical solutions must be effective, interoperable, robust and reliable, by reference to the generally acknowledged state of the art rather than mandated techniques",
+        "Signatory Taskforces to share implementation practices",
+        "Underlying Article 50 obligations apply from August 2, 2026; signatures due July 27, 2026"
+      ],
+      "novel_arguments_and_perspectives": [
+        "Extends the AI Act's code-of-practice compliance model from general-purpose AI obligations to content transparency",
+        "Compliance-presumption incentive design: voluntary adherence buys legal certainty and reduced administrative burden, while non-signatories face individual assessment",
+        "Technology-neutral reliance on state-of-the-art marking rather than mandating specific watermarking or provenance standards"
+      ],
+      "public_comments_and_debate": [
+        "Drafted through a multi-round process with a public consultation beginning September 2025",
+        "Commission frames signing as providing legal certainty and trust across all Member States and demonstrating AI Act compliance with reduced administrative burden",
+        "Non-signatories using alternative compliance means face individual assessment by market surveillance authorities"
+      ],
+      "risk_approach": "Transparency and provenance obligations for synthetic content; voluntary soft-law instrument scaffolding binding AI Act requirements",
+      "enforcement_mechanism": "The code itself is voluntary; the underlying Article 50 obligations are enforced by national market surveillance authorities under the AI Act",
+      "tags": [
+        "Transparency",
+        "Deepfakes",
+        "Content Provenance",
+        "Voluntary Code",
+        "AI-Generated Content",
+        "Watermarking"
+      ],
+      "relevance_to_ai_discourse": "Sets the EU operational baseline for marking and labeling AI-generated content just before Article 50 obligations take effect, shaping global watermarking and provenance practice",
+      "related_legislation": [
+        "eu_ai_act"
+      ],
+      "source_links": [
+        "https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content"
+      ],
+      "source_url": "https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content",
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://digital-strategy.ec.europa.eu/en/policies/code-practice-ai-generated-content. July 27, 2026 signature deadline per pre-verified metadata; the Commission page describes the signatory form without stating that date."
+    },
+    {
+      "id": "texas_traiga_hb149_2025",
+      "title": "Texas Responsible Artificial Intelligence Governance Act (TRAIGA, HB 149)",
+      "jurisdiction": "Texas, United States",
+      "jurisdiction_level": "state",
+      "date_enacted": "2025-06-22",
+      "date_proposed": "2025-03-14",
+      "status": "enacted",
+      "summary": "Governor Abbott signed HB 149, the Texas Responsible Artificial Intelligence Governance Act (TRAIGA), on June 22, 2025, making Texas the third US state after Colorado and Utah to adopt a comprehensive AI law; it took effect January 1, 2026. Rather than a risk-management framework, TRAIGA prohibits specific AI uses — intentional unlawful discrimination, manipulation inciting self-harm, harm to others or criminal activity, and government social scoring — and imposes AI-interaction disclosure duties on government agencies and healthcare providers. Liability generally requires intentional conduct, with disparate impact alone insufficient. The Act is enforced exclusively by the Texas Attorney General with a 60-day cure period and tiered civil penalties, and creates a regulatory sandbox permitting up to 36 months of supervised experimentation.",
+      "key_provisions": [
+        "Prohibits AI use for intentional discrimination against protected classes, manipulation inciting self-harm, harm to others or criminal activity, and government social scoring",
+        "Government agencies must disclose AI system use clearly and conspicuously, before or at the time of interaction, without dark patterns; no affirmative consent required",
+        "Healthcare providers must disclose AI use in relation to healthcare services or treatment, with emergency-care flexibility",
+        "Intent-based liability standard: disparate impact alone is insufficient to establish a violation",
+        "Exclusive Attorney General enforcement with no private right of action and a 60-day cure period",
+        "Civil penalties of $10,000-$12,000 per curable violation, $80,000-$200,000 per uncurable violation, and $2,000-$40,000 per day for continuing violations",
+        "Regulatory sandbox allowing up to 36 months of participation with quarterly reporting, while core duties still apply",
+        "Effective January 1, 2026"
+      ],
+      "novel_arguments_and_perspectives": [
+        "Prohibited-uses model with an intent gate, in deliberate contrast to disparate-impact and risk-management approaches",
+        "Pairs enforcement with a regulatory sandbox to signal innovation-friendliness",
+        "Template for comprehensive AI legislation in Republican-led states distinct from Colorado's original risk-based framework"
+      ],
+      "public_comments_and_debate": [
+        "Law firm commentary described the enacted text as a significantly pared-back version of the original bill",
+        "Commentators noted Texas became the third US state with a comprehensive AI law, after Colorado and Utah",
+        "Analyses contrast TRAIGA's intent-based approach with the risk-management frameworks scheduled to take effect in Colorado and California in 2026"
+      ],
+      "risk_approach": "Prohibited-uses and intent-based liability model with targeted disclosure duties, rather than EU-style or Colorado-style risk management",
+      "enforcement_mechanism": "Exclusive Texas Attorney General enforcement with a 60-day cure period and tiered civil penalties; no private right of action",
+      "tags": [
+        "State AI Law",
+        "Prohibited Uses",
+        "Government Use of AI",
+        "Regulatory Sandbox",
+        "Attorney General Enforcement",
+        "Disclosure"
+      ],
+      "relevance_to_ai_discourse": "In effect since January 2026, TRAIGA anchors the intent-based, prohibited-uses pole of US state AI regulation, an approach later echoed in Colorado's 2026 pivot away from risk management",
+      "related_legislation": [
+        "colorado_sb_24_205",
+        "colorado_sb_26_189_2026"
+      ],
+      "source_links": [
+        "https://www.nortonrosefulbright.com/en/knowledge/publications/c6c60e0c/the-texas-responsible-ai-governance-act",
+        "https://capitol.texas.gov/BillLookup/History.aspx?LegSess=89R&Bill=HB149"
+      ],
+      "source_url": "https://capitol.texas.gov/BillLookup/History.aspx?LegSess=89R&Bill=HB149",
+      "verification_status": "verified",
+      "verification_notes": "Drafted 2026-07-19 from https://www.nortonrosefulbright.com/en/knowledge/publications/c6c60e0c/the-texas-responsible-ai-governance-act and the official history at https://capitol.texas.gov/BillLookup/History.aspx?LegSess=89R&Bill=HB149 (filed 2025-03-14, signed 2025-06-22, effective 2026-01-01), with web-search corroboration of the signing date."
+    },
+    {
+      "id": "india_it_amendment_rules_2026",
+      "title": "India IT (Intermediary Guidelines and Digital Media Ethics Code) Amendment Rules 2026 — Synthetic Content Labeling",
+      "jurisdiction": "India",
+      "jurisdiction_level": "national",
+      "date_enacted": "2026-02-10",
+      "date_proposed": null,
+      "status": "enacted",
+      "summary": "On February 10, 2026, India's Ministry of Electronics and Information Technology (MeitY) notified amendments to the IT (Intermediary Guidelines and Digital Media Ethics Code) Rules 2021, effective February 20, 2026, creating a mandatory labeling regime for synthetically generated information (SGI) — deepfakes and other AI-generated or AI-altered audio and visual content appearing indistinguishable from real persons or events (AI-generated text is excluded). Platforms must label SGI clearly and prominently and, where feasible, embed permanent provenance metadata; significant social media intermediaries (over 5 million registered users) must collect user declarations about synthetic content and deploy automated verification tools. The amendments also sharply compress takedown timelines, including three hours for court or government orders, with non-compliance forfeiting intermediary safe harbour protection.",
+      "key_provisions": [
+        "Defines synthetically generated information (SGI) as artificially or algorithmically created audio, visual or audio-visual content appearing indistinguishable from a natural person or real-world event; AI-generated text excluded",
+        "Mandatory clear and prominent labeling of SGI, with visual labels for imagery and audible disclosures for audio; the draft 10% visible-area watermark requirement was dropped from the final rules",
+        "Permanent embedded metadata and unique identifiers for provenance tracing where feasible; removal or modification of labels and metadata prohibited",
+        "Significant social media intermediaries (over 5 million registered users) must obtain user declarations on synthetic content and deploy automated tools to verify their accuracy",
+        "Compressed takedown timelines: 3 hours for court or government orders (previously 36), and 2 hours for high-risk content such as non-consensual intimate imagery and impersonation",
+        "Non-compliance with due diligence obligations forfeits intermediary safe harbour, exposing platforms to direct liability, fines and potential criminal exposure"
+      ],
+      "novel_arguments_and_perspectives": [
+        "Regulates synthetic content through intermediary safe harbour conditions rather than a standalone AI statute",
+        "Provenance metadata designed so a deepfake can be traced back to the specific AI tool that created it",
+        "Scales obligations by platform size (5 million registered user threshold) rather than by model capability"
+      ],
+      "public_comments_and_debate": [
+        "The final rules dropped the draft's 10% visible-area watermark requirement following consultation",
+        "Law firm and industry commentary flags the 3-hour takedown window as notably strict",
+        "Intermediaries must warn users that creating or disseminating unlawful synthetic content can lead to disclosure of the user's identity to victims"
+      ],
+      "risk_approach": "Platform due-diligence and labeling obligations conditioned on safe harbour, targeting deepfakes and synthetic media distribution rather than AI development",
+      "enforcement_mechanism": "Loss of intermediary safe harbour plus potential monetary fines and criminal liability under the IT Act framework; administered by MeitY",
+      "tags": [
+        "Deepfakes",
+        "Transparency",
+        "Platform Regulation",
+        "Content Labeling",
+        "Safe Harbour",
+        "Content Provenance"
+      ],
+      "relevance_to_ai_discourse": "One of the largest jurisdictions to mandate synthetic-content labeling, converging with EU Article 50 transparency goals while using platform liability rather than AI-specific regulation",
+      "related_legislation": [
+        "eu_code_of_practice_ai_content_transparency_2026"
+      ],
+      "source_links": [
+        "https://www.meity.gov.in/static/uploads/2026/02/f55fe52418b03f58b0669f6a8bc03b6d.pdf",
+        "https://www.freshfields.com/en/our-thinking/blogs/technology-quotient/india-targets-deepfakes-and-ai-generated-content-key-changes-under-meitys-2026-102mjwn"
+      ],
+      "source_url": "https://www.meity.gov.in/static/uploads/2026/02/f55fe52418b03f58b0669f6a8bc03b6d.pdf",
+      "verification_status": "verified",
+      "verification_notes": "Verified 2026-07-19 against MeitY notification G.S.R. 120(E), notified 10 February 2026 and effective 20 February 2026; Freshfields retained as secondary analysis."
+    },
+    {
+      "id": "new_york_2026_ai_legislative_package",
+      "title": "New York 2026 AI Legislative Package (Chatbot Safeguards, Transparency, Data Centers)",
+      "jurisdiction": "New York, United States",
+      "jurisdiction_level": "state",
+      "date_enacted": null,
+      "date_proposed": "2026-06",
+      "status": "passed_legislature",
+      "summary": "New York's legislature passed a package of seven AI-related bills in June 2026. The measures passed both houses and were awaiting gubernatorial action at the time of verification. The centerpiece, S 9051 (Kids Chatbot Safety Act), passed unanimously (137-0 Assembly, 60-0 Senate) and prohibits offering minors AI companion chatbots with unsafe features such as simulated human emotion, false relationship-building, deceptive companionship tactics and self-harm facilitation. The package also includes training-data transparency, synthetic-content provenance, disclosure for AI-produced news, a one-year moratorium on hyperscale data-center permits over 20 megawatts, a surveillance-pricing ban, and an AI output warning-label bill.",
+      "key_provisions": [
+        "S 9051 Kids Chatbot Safety Act: prohibits offering minors AI companion chatbots with unsafe features (simulating human emotions, creating false relationships, deceptive companionship tactics, facilitating self-harm); Attorney General enforcement with fines up to $25,000 per violation; would take effect January 1, 2027",
+        "A 6578 AI Training Data Transparency Act: generative AI developers must post summaries of datasets used in model development, following California's AB 2013",
+        "S 6954 AI Disclosure and Provenance Data Bill: synthetic content must carry provenance data identifying it as AI-generated, including creation date/time and system provider, applying to content created 180 days after enactment",
+        "S 8451 FAIR News Act: conspicuous disclosure required for news media substantially created through generative AI; Attorney General enforcement with penalties of $1,000-$5,000",
+        "A 11560 Responsible Data Center Development Act: one-year moratorium on permits for hyperscale data centers exceeding 20 megawatts",
+        "A 9349 surveillance-pricing ban and A 3411 requirement that generative AI systems display notices that outputs may be inaccurate"
+      ],
+      "novel_arguments_and_perspectives": [
+        "First state-level ban on offering AI companion chatbots to minors, framed around product design features rather than content moderation",
+        "Package strategy of several narrow bills spanning child safety, transparency, provenance, journalism and infrastructure instead of a single omnibus AI act",
+        "Data-center moratorium ties AI governance to energy and land-use policy"
+      ],
+      "public_comments_and_debate": [
+        "Unanimous passage of the chatbot bill (137-0 Assembly, 60-0 Senate) signals cross-party consensus on child safety in AI",
+        "Closer margins on the data-center moratorium (43-17 Senate, 103-38 Assembly) and surveillance-pricing ban (39-21 Senate, 100-42 Assembly) reflect more contested economic measures",
+        "Training-data transparency measure is modeled on California's AB 2013, which survived a federal court challenge in March 2026"
+      ],
+      "risk_approach": "Harm-specific bills targeting child safety, transparency, provenance and infrastructure rather than a comprehensive risk-management framework",
+      "enforcement_mechanism": "Attorney General enforcement with civil penalties for the chatbot and news-disclosure bills; mechanisms vary per bill; none yet in force pending gubernatorial action",
+      "tags": [
+        "State AI Law",
+        "Child Safety",
+        "AI Companions",
+        "Training Data Transparency",
+        "Data Centers",
+        "Content Provenance"
+      ],
+      "relevance_to_ai_discourse": "Broadest single-session state AI package of 2026; the unanimous companion-chatbot ban marks child safety as the consensus frontier of US state AI regulation",
+      "related_legislation": [],
+      "source_links": [
+        "https://www.nysenate.gov/legislation/bills/2025/S9051",
+        "https://www.nysenate.gov/legislation/bills/2025/S6955",
+        "https://www.nysenate.gov/legislation/bills/2025/A6578",
+        "https://www.nysenate.gov/legislation/bills/2025/S8451",
+        "https://www.nysenate.gov/legislation/bills/2025/A11560",
+        "https://www.nysenate.gov/legislation/bills/2025/A9349",
+        "https://www.nysenate.gov/legislation/bills/2025/A3411",
+        "https://www.transparencycoalition.ai/news/new-york-lawmakers-pass-kids-ai-chatbot-safety-bill-and-two-transparency-acts"
+      ],
+      "source_url": "https://www.nysenate.gov/legislation/bills/2025/S9051",
+      "verification_status": "verified",
+      "verification_notes": "Verified 2026-07-19 against official New York Senate bill pages, which show passage by both houses but did not establish delivery to the governor; secondary coverage retained for package context."
     }
   ]
 }

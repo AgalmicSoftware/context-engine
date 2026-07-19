@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useQuery, useQueryClient, type QueryClient, type UseQueryResult } from '@tanstack/react-query';
 import {
   sessionRegistryReadsPort,
@@ -23,13 +22,12 @@ type UseSessionRegistryReadsResult = {
   snapshotQuery: UseQueryResult<SessionRegistrySnapshot>;
 };
 
-const registryFamilyKey = queryKeys.entity('sessions', 'registry');
-
 const sessionRegistryQueryKeys = Object.freeze({
-  family: registryFamilyKey,
-  snapshot: (
-    { chainId = null, includeRegistryList = true, sessionSlugs = [] }: UseSessionRegistryReadsOptions = {},
-  ): ScopedQueryKey => {
+  snapshot: ({
+    chainId = null,
+    includeRegistryList = true,
+    sessionSlugs = [],
+  }: UseSessionRegistryReadsOptions = {}): ScopedQueryKey => {
     const requestedSlugs = Array.from(new Set(sessionSlugs.map(String))).sort();
     return queryKeys.scoped('sessions', 'registry', {
       chainId,
@@ -83,13 +81,6 @@ export const useSessionRegistryReads = (
     staleTime: Infinity,
   });
 
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return undefined;
-    return sessionRegistryReadsPort.subscribeToCacheUpdates(window, () => {
-      void queryClient.invalidateQueries({ queryKey: sessionRegistryQueryKeys.family });
-    });
-  }, [queryClient]);
-
   return { queryClient, snapshotQuery };
 };
 
@@ -98,4 +89,4 @@ export const useSessionRegistryReads = (
 // | synchronous cache read on render | initialData uses the same read port |
 // | no registry TTL | staleTime: Infinity |
 // | cache load/upsert completion | existing cache-update event invalidates this family |
-// | no explicit eviction contract | v4 cacheTime remains at its library default |
+// | no explicit eviction contract | shared wagmi client retains queries for 24 hours |

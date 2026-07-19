@@ -1,5 +1,9 @@
 import { act, renderHook } from '@testing-library/react';
-import usePendingSbtDrafts, { SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY } from './usePendingSbtDrafts.js';
+import usePendingSbtDrafts, {
+  SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY,
+  clearSessionWizardPendingSbtDraftsCache,
+  writeSessionWizardPendingSbtDraftsCache,
+} from './usePendingSbtDrafts.js';
 
 const PENDING_ADDRESS = '0x00000000000000000000000000000000000000a1';
 const DEPLOYED_ADDRESS = '0x00000000000000000000000000000000000000b2';
@@ -61,6 +65,38 @@ describe('usePendingSbtDrafts', () => {
         metadataUploadStatus: 'pending-upload',
       }),
     ]);
+  });
+
+  it('reports a throwing sessionStorage clear instead of swallowing it', () => {
+    const storage = {
+      removeItem: jest.fn(() => {
+        throw new Error('sessionStorage denied');
+      }),
+    };
+
+    expect(clearSessionWizardPendingSbtDraftsCache({ storage })).toEqual({
+      ok: false,
+      removed: 0,
+      failed: 1,
+      status: 'partial-failure',
+    });
+  });
+
+  it('reports a failed atomic replacement without deleting the prior pending drafts', () => {
+    const prior = JSON.stringify([buildDraft({ displayName: 'Prior draft' })]);
+    const storage = {
+      getItem: jest.fn(() => prior),
+      setItem: jest.fn(() => {
+        throw new Error('sessionStorage denied');
+      }),
+      removeItem: jest.fn(),
+    };
+
+    expect(writeSessionWizardPendingSbtDraftsCache([buildDraft()], { storage })).toEqual(
+      expect.objectContaining({ ok: false, status: 'write-failed' }),
+    );
+    expect(storage.removeItem).not.toHaveBeenCalled();
+    expect(storage.getItem()).toBe(prior);
   });
 
   it('derives normalized drafts and undeployed status from state', () => {

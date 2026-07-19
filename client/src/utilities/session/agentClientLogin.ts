@@ -4,19 +4,22 @@ type UnknownRecord = Record<string, unknown>;
 
 export type AgentClientCapabilities = Record<string, boolean>;
 
+export type AgentClientCredential = {
+  kind: string;
+  token: string;
+  expiresAt?: string;
+};
+
 export type AgentClientLoginEnvelope = {
-  v: 1;
+  v: 2;
   sessionSlug: string;
   expiresAt: string;
   address: string;
   capabilities: AgentClientCapabilities;
-  credential: {
-    kind: string;
-    token: string;
-  };
+  bridgeCredential: AgentClientCredential;
+  workerCredential: AgentClientCredential;
   workerUrl?: string;
   agentBridgeUrl?: string;
-  tokenType?: string;
   buckets?: unknown;
 };
 
@@ -30,11 +33,10 @@ export type ExchangeAgentClientLoginArgs = {
   agentBridgeUrl: string;
   sessionSlug: string;
   tokenOrLink: string;
-  requestedCapabilities?: string[];
   fetchImpl?: typeof fetch;
 };
 
-const STORAGE_PREFIX = 'ce:agentClientLogin:v1';
+const STORAGE_PREFIX = 'ce:agentClientLogin:v2';
 const RAW_AGENT_TOKEN_RE = /ceagt_[A-Za-z0-9_-]{16,}/;
 
 const toRecord = (value: unknown): UnknownRecord =>
@@ -97,17 +99,6 @@ const normalizeCapabilities = (input: unknown): AgentClientCapabilities => {
   return out;
 };
 
-const defaultCapabilitiesForWorkerToken = (body: UnknownRecord): AgentClientCapabilities => ({
-  readQuestions: !!(body.workerToken || toRecord(body.credential).token),
-  draftAnswers: false,
-  submitAnswers: false,
-  voteQuestions: false,
-  poseQuestions: false,
-  readResults: !!(body.workerToken || toRecord(body.credential).token),
-  admin: false,
-  export: false,
-});
-
 const normalizeExchangeEnvelope = ({
   body,
   sessionSlug,
@@ -122,9 +113,10 @@ const normalizeExchangeEnvelope = ({
   if (sourceToken && JSON.stringify(body).includes(sourceToken)) {
     throw new Error('telegram_client_login_echoed_source_token');
   }
-  const credentialRecord = toRecord(body.credential);
-  const credentialToken = toStr(credentialRecord.token || body.workerToken);
-  if (!credentialToken) throw new Error('telegram_client_login_missing_credential');
+  const bridgeCredential = toRecord(body.bridgeCredential);
+  const workerCredential = toRecord(body.workerCredential);
+  if (!toStr(bridgeCredential.token)) throw new Error('telegram_client_login_missing_bridge_credential');
+  if (!toStr(workerCredential.token)) throw new Error('telegram_client_login_missing_worker_credential');
   const normalizedSlug = normalizeSessionSlug(body.sessionSlug || sessionSlug);
   if (normalizedSlug !== normalizeSessionSlug(sessionSlug)) {
     throw new Error('telegram_client_login_session_mismatch');
@@ -133,38 +125,46 @@ const normalizeExchangeEnvelope = ({
     toStr(body.expiresAt) || (Number(body.exp || 0) > 0 ? new Date(Number(body.exp) * 1000).toISOString() : '');
   const address = toStr(toRecord(body.account).address || body.accountAddress || body.address);
   const envelope: AgentClientLoginEnvelope = {
-    v: 1,
+    v: 2,
     sessionSlug: normalizedSlug,
     expiresAt,
     address,
-    capabilities: Object.keys(toRecord(body.capabilities)).length
-      ? normalizeCapabilities(body.capabilities)
-      : defaultCapabilitiesForWorkerToken(body),
-    credential: {
-      kind: toStr(credentialRecord.kind || body.tokenType) || 'session_worker_jwt',
-      token: credentialToken,
+    capabilities: normalizeCapabilities(body.capabilities),
+    bridgeCredential: {
+      kind: toStr(bridgeCredential.kind) || 'agent_bridge_browser_token',
+      token: toStr(bridgeCredential.token),
+      expiresAt: toStr(bridgeCredential.expiresAt),
+    },
+    workerCredential: {
+      kind: toStr(workerCredential.kind) || 'session_worker_jwt',
+      token: toStr(workerCredential.token),
+      expiresAt: toStr(workerCredential.expiresAt),
     },
     workerUrl: normalizeWorkerUrl(toStr(body.workerUrl)),
     agentBridgeUrl: normalizeWorkerUrl(agentBridgeUrl),
-    tokenType: toStr(body.tokenType),
     buckets: body.buckets ?? null,
   };
   return envelope;
 };
 
 const persistedEnvelope = (envelope: AgentClientLoginEnvelope): AgentClientLoginEnvelope => ({
-  v: 1,
+  v: 2,
   sessionSlug: envelope.sessionSlug,
   expiresAt: envelope.expiresAt,
   address: envelope.address,
   capabilities: { ...(envelope.capabilities || {}) },
-  credential: {
-    kind: envelope.credential.kind,
-    token: envelope.credential.token,
+  bridgeCredential: {
+    kind: envelope.bridgeCredential.kind,
+    token: envelope.bridgeCredential.token,
+    expiresAt: envelope.bridgeCredential.expiresAt,
+  },
+  workerCredential: {
+    kind: envelope.workerCredential.kind,
+    token: envelope.workerCredential.token,
+    expiresAt: envelope.workerCredential.expiresAt,
   },
   workerUrl: envelope.workerUrl,
   agentBridgeUrl: envelope.agentBridgeUrl,
-  tokenType: envelope.tokenType,
   buckets: null,
 });
 
@@ -194,23 +194,33 @@ export const readAgentClientLoginEnvelope = (sessionSlug: unknown): AgentClientL
     const raw = storage.getItem(key);
     if (!raw) return null;
     const parsed = toRecord(JSON.parse(raw));
-    const credential = toRecord(parsed.credential);
+    const bridgeCredential = toRecord(parsed.bridgeCredential);
+    const workerCredential = toRecord(parsed.workerCredential);
     const envelope: AgentClientLoginEnvelope = {
-      v: 1,
+      v: 2,
       sessionSlug: normalizeSessionSlug(parsed.sessionSlug),
       expiresAt: toStr(parsed.expiresAt),
       address: toStr(parsed.address),
       capabilities: normalizeCapabilities(parsed.capabilities),
-      credential: {
-        kind: toStr(credential.kind) || 'session_worker_jwt',
-        token: toStr(credential.token),
+      bridgeCredential: {
+        kind: toStr(bridgeCredential.kind) || 'agent_bridge_browser_token',
+        token: toStr(bridgeCredential.token),
+        expiresAt: toStr(bridgeCredential.expiresAt),
+      },
+      workerCredential: {
+        kind: toStr(workerCredential.kind) || 'session_worker_jwt',
+        token: toStr(workerCredential.token),
+        expiresAt: toStr(workerCredential.expiresAt),
       },
       workerUrl: normalizeWorkerUrl(toStr(parsed.workerUrl)),
       agentBridgeUrl: normalizeWorkerUrl(toStr(parsed.agentBridgeUrl)),
-      tokenType: toStr(parsed.tokenType),
       buckets: null,
     };
-    if (!envelope.credential.token || envelope.sessionSlug !== normalizeSessionSlug(sessionSlug)) {
+    if (
+      !envelope.bridgeCredential.token ||
+      !envelope.workerCredential.token ||
+      envelope.sessionSlug !== normalizeSessionSlug(sessionSlug)
+    ) {
       storage.removeItem(key);
       return null;
     }
@@ -230,14 +240,13 @@ export const clearAgentClientLoginEnvelope = (sessionSlug: unknown): void => {
   if (storage) storage.removeItem(storageKey(sessionSlug));
 };
 
-export const buildAgentClientAuthHeaders = (envelope: AgentClientLoginEnvelope | null): Record<string, string> =>
-  envelope?.credential?.token ? { Authorization: `Bearer ${envelope.credential.token}` } : {};
+export const buildAgentBridgeAuthHeaders = (envelope: AgentClientLoginEnvelope | null): Record<string, string> =>
+  envelope?.bridgeCredential?.token ? { Authorization: `Bearer ${envelope.bridgeCredential.token}` } : {};
 
 export const exchangeAgentClientLogin = async ({
   agentBridgeUrl,
   sessionSlug,
   tokenOrLink,
-  requestedCapabilities = ['client_session_read', 'client_results_read', 'client_answer_submit'],
   fetchImpl = fetch,
 }: ExchangeAgentClientLoginArgs): Promise<AgentClientLoginEnvelope> => {
   const bridge = normalizeWorkerUrl(agentBridgeUrl);
@@ -253,7 +262,6 @@ export const exchangeAgentClientLogin = async ({
     body: JSON.stringify({
       sessionSlug: slug,
       token: validation.token,
-      requestedCapabilities,
     }),
     cache: 'no-store',
   });

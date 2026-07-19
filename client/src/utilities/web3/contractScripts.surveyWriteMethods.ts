@@ -145,6 +145,15 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
     validateNoLockedPlaintextInPayload,
   } = deps;
 
+  const assertNonZeroBytes32 = (value: unknown, label: string): void => {
+    if (!utils.isHexString(value, 32)) {
+      throw new Error(`${label} is not a bytes32.`);
+    }
+    if (!hasNonZeroHashValue(value)) {
+      throw new Error(`${label} cannot be zero.`);
+    }
+  };
+
   return {
     submitSurveyResponse: async function (
       providerName: ProviderName,
@@ -236,8 +245,6 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           `[addSurveyWithQuestions] Missing surveys contract address for session slug "${slug || 'general'}".`,
         );
       }
-      const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
-
       let surveyPayloadUpload: PayloadPointerUpload | null = null;
       const questionPayloadUploads: PayloadPointerUpload[] = [];
 
@@ -256,9 +263,9 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       const sId = ensureHash(surveyId);
       const qIds32 = (Array.isArray(questionIds) ? questionIds : []).map(ensureHash);
 
-      if (!utils.isHexString(sId, 32)) throw new Error('addSurveyWithQuestions: surveyId is not a bytes32.');
+      assertNonZeroBytes32(sId, 'addSurveyWithQuestions: surveyId');
       qIds32.forEach((id: string, i: number) => {
-        if (!utils.isHexString(id, 32)) throw new Error(`addSurveyWithQuestions: questionIds[${i}] is not bytes32.`);
+        assertNonZeroBytes32(id, `addSurveyWithQuestions: questionIds[${i}]`);
       });
 
       const canUseSessionStorage =
@@ -338,6 +345,11 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
 
       const surveyArweaveHashBytes = surveyPayloadUpload.pointerBytes;
       const questionArweaveHashesBytes = questionPayloadUploads.map((upload) => upload.pointerBytes);
+      assertNonZeroBytes32(surveyArweaveHashBytes, 'addSurveyWithQuestions: survey content hash');
+      questionArweaveHashesBytes.forEach((hash, index) => {
+        assertNonZeroBytes32(hash, `addSurveyWithQuestions: question content hashes[${index}]`);
+      });
+      const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
 
       rpcLog('RPC Call (Tx):', {
         function: 'addSurveyWithQuestions',
@@ -419,8 +431,6 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         const slug = normalizeSessionSlug(typeof groupKeyOrCfg === 'string' ? groupKeyOrCfg : cfg?.slug || '');
         throw new Error(`[addQuestions] Missing surveys contract address for session slug "${slug || 'general'}".`);
       }
-      const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
-
       const questionPayloadUploads: PayloadPointerUpload[] = [];
 
       // Normalize IDs to bytes32
@@ -439,7 +449,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       const sIds32 = (Array.isArray(surveyIds) ? surveyIds : []).map(ensureHash);
 
       qIds32.forEach((id: string, i: number) => {
-        if (!utils.isHexString(id, 32)) throw new Error(`addQuestions: questionIds[${i}] is not a bytes32.`);
+        assertNonZeroBytes32(id, `addQuestions: questionIds[${i}]`);
       });
       sIds32.forEach((id: string, i: number) => {
         if (!utils.isHexString(id, 32)) throw new Error(`addQuestions: surveyIds[${i}] is not a bytes32.`);
@@ -492,6 +502,10 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       }
 
       const questionArweaveHashBytesArray = questionPayloadUploads.map((upload) => upload.pointerBytes);
+      questionArweaveHashBytesArray.forEach((hash, index) => {
+        assertNonZeroBytes32(hash, `addQuestions: content hashes[${index}]`);
+      });
+      const SurveyContract = new ethers.Contract(addr, SURVEYS, signer as any);
 
       rpcLog('RPC Call (Tx):', {
         function: 'addQuestions',
@@ -581,10 +595,15 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
 
       const hashedQuestionIds = Array.isArray(questionIds) ? questionIds.map(ensureHash) : [];
       const hashedSurveyId = ensureHash(surveyId);
+      const hasSurveyId = hasNonZeroHashValue(hashedSurveyId);
+      const hasSurveyResponse = !!surveyResponse;
+      if (hasSurveyId !== hasSurveyResponse) {
+        throw new Error('submitResponses: survey response ID/hash mismatch.');
+      }
 
       // Optional preflight
       hashedQuestionIds.forEach((id: string, i: number) => {
-        if (!utils.isHexString(id, 32)) throw new Error(`submitResponses: questionIds[${i}] is not a bytes32.`);
+        assertNonZeroBytes32(id, `submitResponses: questionIds[${i}]`);
       });
       if (!utils.isHexString(hashedSurveyId, 32)) {
         throw new Error('submitResponses: surveyId is not a bytes32.');
@@ -674,6 +693,14 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       }
 
       const questionResponseHashesBytes = questionResponseUploads.map((upload) => upload.pointerBytes);
+      // Regression guard: zero remains the absence sentinel on-chain, so uploaded
+      // pointers and the optional survey pair must be validated before wallet submission.
+      questionResponseHashesBytes.forEach((hash, index) => {
+        assertNonZeroBytes32(hash, `submitResponses: questionResponseHashes[${index}]`);
+      });
+      if (hasSurveyResponse) {
+        assertNonZeroBytes32(surveyResponseHashBytes, 'submitResponses: survey response hash');
+      }
 
       // === Address resolution (group-aware; no SURVEYS_ADDRESS fallback)
       const gAddrs = getSessionAddresses(cfg);

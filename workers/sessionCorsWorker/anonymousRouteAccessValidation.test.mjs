@@ -113,21 +113,30 @@ test('evaluateAnonymousRouteAccess preserves invalid-route and scope-disabled fa
 
 test('evaluateAnonymousRouteAccess canonicalizes registry slugs and allows open default+ai gates', async () => {
   const registryReads = [];
+  let chainAttestationCache;
 
   const result = await evaluateAnonymousRouteAccess({
     slug: 'debate',
     config: {
       registryAddress: REGISTRY_ADDRESS,
+      registryChainId: 84532,
       rpcUrl: 'https://rpc.example',
     },
     route: 'transcribe',
     apiKey: '',
     deps: createDeps({
-      readSessionExistsOnChain: async ({ registrySlug }) => {
+      readSessionExistsOnChain: async (value) => {
+        const { registrySlug } = value;
+        assert.equal(value.expectedChainId, 84532);
+        assert.ok(value.chainAttestationCache instanceof Map);
+        chainAttestationCache = value.chainAttestationCache;
         registryReads.push(['sessionExists', registrySlug]);
         return { exists: true, rpcUrl: 'https://rpc.example', errors: [], error: null };
       },
-      readResourceGateOnChain: async ({ resourceKey, registrySlug }) => {
+      readResourceGateOnChain: async (value) => {
+        const { resourceKey, registrySlug } = value;
+        assert.equal(value.expectedChainId, 84532);
+        assert.equal(value.chainAttestationCache, chainAttestationCache);
         registryReads.push([resourceKey, registrySlug]);
         return {
           ok: true,
@@ -300,4 +309,57 @@ test('evaluateAnonymousRouteAccess preserves default/ai gate lookup failures and
       aiOpen: false,
     }
   );
+});
+
+test('evaluateAnonymousRouteAccess uses worker-canonical anonymous policy without registry reads', async () => {
+  let registryReads = 0;
+  const config = {
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    workerAuthority: {
+      version: 1,
+      participantScopes: ['ai', 'transcribe'],
+      anonymousScopes: ['ai'],
+    },
+  };
+
+  const allowed = await evaluateAnonymousRouteAccess({
+    slug: 'session-worker',
+    config,
+    route: 'ai',
+    apiKey: '',
+    deps: createDeps({
+      readSessionExistsOnChain: async () => {
+        registryReads += 1;
+        return { exists: false };
+      },
+    }),
+    constants,
+  });
+  const denied = await evaluateAnonymousRouteAccess({
+    slug: 'session-worker',
+    config,
+    route: 'transcribe',
+    apiKey: '',
+    deps: createDeps(),
+    constants,
+  });
+  const deniedWithRequestKey = await evaluateAnonymousRouteAccess({
+    slug: 'session-worker',
+    config,
+    route: 'transcribe',
+    apiKey: 'caller-supplied-key',
+    deps: createDeps(),
+    constants,
+  });
+
+  assert.equal(registryReads, 0);
+  assert.deepEqual(allowed, { ok: true, reason: 'worker-canonical-open', scope: 'ai' });
+  assert.deepEqual(denied, {
+    ok: false,
+    status: 403,
+    error: constants.anonymousRouteDeniedError,
+    reason: 'worker-canonical-anonymous-scope-denied',
+    scope: 'transcribe',
+  });
+  assert.deepEqual(deniedWithRequestKey, denied);
 });

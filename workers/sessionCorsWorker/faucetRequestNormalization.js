@@ -1,4 +1,7 @@
-import { toChainId as defaultToChainId } from './chainIdNormalization.js';
+import {
+  resolveChainIdWithLegacyFallback,
+  toChainId as defaultToChainId,
+} from './chainIdNormalization.js';
 import { toTrimmedString } from './stringCoercion.js';
 
 const toComparableBigInt = (value, deps) => {
@@ -73,7 +76,13 @@ export const normalizeFaucetRequest = ({
   const registryChainId = toChainId(config?.registryChainId);
   const networkChainId = toChainId(config?.networkChainId);
   const faucetChainId = toChainId(faucetCfg?.chainId);
-  const expectedChainId = faucetChainId || networkChainId || registryChainId;
+  const expectedChainId = resolveChainIdWithLegacyFallback(
+    faucetCfg?.chainId,
+    resolveChainIdWithLegacyFallback(
+      config?.networkChainId,
+      resolveChainIdWithLegacyFallback(config?.registryChainId, 0),
+    ),
+  );
   const configuredAmount = toTrimmedString(
     faucetCfg.amountEth || defaults?.defaultAmountEth,
     deps

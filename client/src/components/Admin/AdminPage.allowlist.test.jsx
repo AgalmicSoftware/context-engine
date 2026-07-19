@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { ethers } from 'ethers';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { getCachedSessionWorkerConfig } from '../../utilities/session/sessionWorkerConfigCache.js';
+import { cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { CLOUDFLARE_CORS_WORKER_URL } from '../../variables/appConfig.js';
 
 const ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
@@ -94,7 +95,12 @@ jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-admin-sbt-se
 
 const AdminPage = require('./AdminPage').default;
 
-const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, initialRegistryChainId } = {}) => {
+const renderAdminPage = async ({
+  account = ADMIN_ADDRESS,
+  initialSessionId,
+  initialRegistryChainId,
+  initialSessionConfig,
+} = {}) => {
   let utils;
   await act(async () => {
     utils = render(
@@ -105,6 +111,7 @@ const renderAdminPage = async ({ account = ADMIN_ADDRESS, initialSessionId, init
         toggleLoginModal={jest.fn()}
         initialSessionId={initialSessionId}
         initialRegistryChainId={initialRegistryChainId}
+        initialSessionConfig={initialSessionConfig}
       />,
     );
     await Promise.resolve();
@@ -271,6 +278,41 @@ describe('AdminPage allowlist controls', () => {
         rpcEndpoint: 'https://rpc.example.test',
       }),
     );
+  });
+
+  it('saves a registry-free worker-canonical allowlist without an on-chain write', async () => {
+    sessionEntries = [];
+    const initialSessionConfig = {
+      slug: 'worker-allowlist',
+      sessionId: '0x1234567890abcdef1234567890abcdef',
+      configRevision: 'worker-allowlist-revision',
+      corsWorkerUrl: 'https://worker-allowlist.example.test',
+      adminAddress: ADMIN_ADDRESS,
+      sessionModeProfile: cloneSessionModePreset('fast_cheap_cloudflare'),
+    };
+    mockResolveCorsProxyUrl.mockResolvedValue({
+      url: initialSessionConfig.corsWorkerUrl,
+      source: 'session-config',
+      status: 'ok',
+    });
+
+    await renderAdminPage({ initialSessionConfig });
+    expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
+    fireEvent.change(await openAllowlistEditor(), {
+      target: { value: 'https://participant.example.test' },
+    });
+    await clickAndSettle(screen.getByRole('button', { name: 'Save allowlist' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/allowOrigins saved \(1 origins\)/)).toBeInTheDocument();
+    });
+    const adminCall = global.fetch.mock.calls.find(([url]) => String(url).endsWith('/admin/set-config'));
+    expect(JSON.parse(adminCall[1].body).config).toEqual({
+      allowOrigins: ['https://participant.example.test'],
+    });
+    expect(mockSetSessionFieldsOnChain).not.toHaveBeenCalled();
+    expect(mockUploadSessionMetadata).not.toHaveBeenCalled();
+    expect(mockUpdateSessionMetadataOnChain).not.toHaveBeenCalled();
   });
 
   it('normalizes mixed delimiter allowOrigins input before saving', async () => {

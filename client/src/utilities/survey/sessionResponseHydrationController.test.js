@@ -164,6 +164,13 @@ const createMockHost = (overrides = {}) => {
     return true;
   });
 
+  const createAtomicUpdater = (key) =>
+    jest.fn(async (slug, updater) => {
+      const current = storage[key]?.[slug] ?? null;
+      const next = await updater(deepClone(current));
+      return dgWrite(key, slug, next);
+    });
+
   return {
     setState: jest.fn((updater, cb) => {
       const patch = typeof updater === 'function' ? updater(state) : updater;
@@ -179,6 +186,8 @@ const createMockHost = (overrides = {}) => {
       return deepClone(bucket[slug]);
     }),
     dgWrite,
+    updateQuestionsCacheAtomic: createAtomicUpdater('questionsCache'),
+    updateUserCacheAtomic: createAtomicUpdater('userCache'),
     getActiveSessionSlug: jest.fn(() => activeSlug || SESSION_SLUG),
     getSessionCfg: jest.fn((slug) => ({
       slug,
@@ -204,6 +213,10 @@ const createMockHost = (overrides = {}) => {
         return null;
       }
       return deepClone(bucket[slug]);
+    },
+    setStored: (key, slug, value) => {
+      if (!storage[key]) storage[key] = {};
+      storage[key][slug] = deepClone(value);
     },
     ...rest,
   };
@@ -854,7 +867,10 @@ describe('createSessionResponseHydrationController', () => {
             },
             11,
           );
-          intermediateWriteKeys = host.dgWrite.mock.calls.map(([key]) => key);
+          intermediateWriteKeys = [
+            ...(host.updateQuestionsCacheAtomic.mock.calls.length ? ['questionsCache'] : []),
+            ...(host.updateUserCacheAtomic.mock.calls.length ? ['userCache'] : []),
+          ];
           await deferred.promise;
         },
       );
@@ -948,6 +964,239 @@ describe('createSessionResponseHydrationController', () => {
       expect(storedNet?.pendingQuestionMetadata?.[QUESTION_ID_A]).toBeUndefined();
     });
 
+    it('does not resurrect a concurrent pending row after response-backed metadata is produced', async () => {
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: createQuestionCacheNetworkNode({
+              pendingQuestionMetadata: {
+                [QUESTION_ID_A]: { attempts: 2, nextRetryAtMs: 5000, state: 'transient' },
+              },
+            }),
+          },
+        },
+      });
+      const controller = createSessionResponseHydrationController(host);
+      const responsePayload = {
+        type: 'binary',
+        prompt: 'Response-backed prompt wins over a pending retry row.',
+        answer: { value: 'Agree', encrypted: false },
+      };
+      contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
+        async (mode, fromBlock, toBlock, progressCb, dataCb) => {
+          dataCb(
+            {
+              [QUESTION_ID_A]: [
+                {
+                  responder: RESPONDER,
+                  response: responsePayload,
+                  blockNumber: 10,
+                  transactionIndex: 0,
+                  logIndex: 0,
+                  timestamp: 100,
+                },
+              ],
+            },
+            10,
+          );
+        },
+      );
+
+      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+
+      const storedNet = host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID];
+      expect(storedNet?.questions?.[QUESTION_ID_A]).toEqual(
+        expect.objectContaining({ prompt: responsePayload.prompt, __ceQuestionMetadataFromResponse: true }),
+      );
+      expect(storedNet?.pendingQuestionMetadata?.[QUESTION_ID_A]).toBeUndefined();
+    });
+
+    it('preserves a network branch added while response hydration is in flight', async () => {
+      const deferred = createDeferred();
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
+        async (mode, fromBlock, toBlock, progressCb, dataCb) => {
+          await deferred.promise;
+          dataCb(
+            {
+              [QUESTION_ID_A]: [
+                {
+                  responder: RESPONDER,
+                  response: 'response',
+                  blockNumber: 10,
+                  transactionIndex: 0,
+                  logIndex: 0,
+                  timestamp: 100,
+                },
+              ],
+            },
+            10,
+          );
+        },
+      );
+
+      const hydrationPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+      await flushMicrotasks();
+      const current = host.getStored('questionsCache', SESSION_SLUG) || {};
+      current['84532'] = createQuestionCacheNetworkNode({
+        questions: { other: { id: 'other', prompt: 'Other network question' } },
+      });
+      host.setStored('questionsCache', SESSION_SLUG, current);
+      deferred.resolve();
+      await hydrationPromise;
+
+      expect(host.getStored('questionsCache', SESSION_SLUG)['84532'].questions.other).toEqual(
+        expect.objectContaining({ prompt: 'Other network question' }),
+      );
+    });
+
+    it('preserves independent concurrent user scan flags during response hydration', async () => {
+      const deferred = createDeferred();
+      const host = createMockHost({
+        initialStorage: {
+          userCache: {
+            [SESSION_SLUG]: {
+              [RESPONDER_LOWER]: {
+                [NETWORK_ID]: {
+                  lastBlockScanned: 5,
+                  lastScanTimestamp: 5,
+                  scanIncomplete: false,
+                  sbtLastBlockScanned: 5,
+                  data: {
+                    sbts: [],
+                    createdSurveys: [],
+                    createdQuestions: [],
+                    surveyResponses: [],
+                    questionResponses: [],
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionResponseHydrationController(host);
+      contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
+        async (mode, fromBlock, toBlock, progressCb, dataCb) => {
+          await deferred.promise;
+          dataCb(
+            {
+              [QUESTION_ID_A]: [
+                {
+                  responder: RESPONDER,
+                  response: 'response',
+                  blockNumber: 10,
+                  transactionIndex: 0,
+                  logIndex: 0,
+                  timestamp: 100,
+                },
+              ],
+            },
+            10,
+          );
+        },
+      );
+
+      const hydrationPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+      await flushMicrotasks();
+      const concurrentUserCache = host.getStored('userCache', SESSION_SLUG);
+      concurrentUserCache[RESPONDER_LOWER][NETWORK_ID].scanIncomplete = true;
+      concurrentUserCache[RESPONDER_LOWER][NETWORK_ID].sbtLastBlockScanned = 50;
+      host.setStored('userCache', SESSION_SLUG, concurrentUserCache);
+      deferred.resolve();
+      await hydrationPromise;
+
+      const storedNode = host.getStored('userCache', SESSION_SLUG)[RESPONDER_LOWER][NETWORK_ID];
+      expect(storedNode.scanIncomplete).toBe(true);
+      expect(storedNode.sbtLastBlockScanned).toBe(50);
+      expect(storedNode.data.questionResponses).toEqual([
+        expect.objectContaining({ questionId: QUESTION_ID_A, response: 'response' }),
+      ]);
+    });
+
+    it('preserves a concurrent unorderable response over an older pending snapshot', async () => {
+      const deferred = createDeferred();
+      const host = createMockHost({
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: {
+              [NETWORK_ID]: createQuestionCacheNetworkNode({
+                questionResponses: {
+                  [QUESTION_ID_A]: { [RESPONDER_LOWER]: 'older-local' },
+                },
+                questionResponsesMeta: {
+                  [QUESTION_ID_A]: { [RESPONDER_LOWER]: { bn: 0, txi: 0, li: 0, ts: 0 } },
+                },
+              }),
+            },
+          },
+          userCache: {
+            [SESSION_SLUG]: {
+              [RESPONDER_LOWER]: {
+                [NETWORK_ID]: {
+                  lastBlockScanned: 9,
+                  lastScanTimestamp: 9,
+                  data: {
+                    sbts: [],
+                    createdSurveys: [],
+                    createdQuestions: [],
+                    surveyResponses: [],
+                    questionResponses: [
+                      {
+                        questionId: QUESTION_ID_A,
+                        responder: RESPONDER_LOWER,
+                        response: 'older-local',
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+      const controller = createSessionResponseHydrationController(host);
+      contractScripts.getQuestionResponsesChunkedWithCallback.mockImplementationOnce(
+        async (mode, fromBlock, toBlock, progressCb, dataCb) => {
+          await deferred.promise;
+          dataCb(
+            {
+              [QUESTION_ID_B]: [
+                {
+                  responder: RESPONDER,
+                  response: 'ordered-new-response',
+                  blockNumber: 10,
+                  transactionIndex: 0,
+                  logIndex: 0,
+                  timestamp: 100,
+                },
+              ],
+            },
+            10,
+          );
+        },
+      );
+
+      const hydrationPromise = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+      await flushMicrotasks();
+      const concurrent = host.getStored('questionsCache', SESSION_SLUG);
+      concurrent[NETWORK_ID].questionResponses[QUESTION_ID_A][RESPONDER_LOWER] = 'concurrent-unorderable';
+      host.setStored('questionsCache', SESSION_SLUG, concurrent);
+      const concurrentUser = host.getStored('userCache', SESSION_SLUG);
+      concurrentUser[RESPONDER_LOWER][NETWORK_ID].data.questionResponses[0].response = 'concurrent-unorderable';
+      host.setStored('userCache', SESSION_SLUG, concurrentUser);
+      deferred.resolve();
+      await hydrationPromise;
+
+      expect(
+        host.getStored('questionsCache', SESSION_SLUG)[NETWORK_ID].questionResponses[QUESTION_ID_A][RESPONDER_LOWER],
+      ).toBe('concurrent-unorderable');
+      expect(
+        host.getStored('userCache', SESSION_SLUG)[RESPONDER_LOWER][NETWORK_ID].data.questionResponses[0].response,
+      ).toBe('concurrent-unorderable');
+    });
+
     it('marks response metadata from the general bucket as authoritative for legacy demo route reads', async () => {
       const host = createMockHost();
       const controller = createSessionResponseHydrationController(host);
@@ -995,7 +1244,7 @@ describe('createSessionResponseHydrationController', () => {
       expect(storedNet?.pendingQuestionMetadata?.[QUESTION_ID_A]).toBeUndefined();
     });
 
-    it('keeps responses ready and clamps the final watermark when a managed questionsCache write returns false', async () => {
+    it('rejects and keeps responses unready when an atomic questionsCache write returns false', async () => {
       let partialFlushChecks = 0;
       let failedQuestionsWrites = 0;
       const host = createMockHost({
@@ -1047,17 +1296,16 @@ describe('createSessionResponseHydrationController', () => {
         },
       );
 
-      await controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
+      await expect(controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG)).rejects.toThrow(
+        'Failed to persist questions cache',
+      );
 
-      expect(failedQuestionsWrites).toBe(1);
+      expect(failedQuestionsWrites).toBeGreaterThanOrEqual(1);
       expect(host.getStateSnapshot()).toMatchObject({
-        isResponsesCacheReady: true,
-        questionResponsesNonce: 2,
+        isResponsesCacheReady: false,
+        questionResponsesNonce: 0,
       });
-      expect(resolvePersistedQuestionResponsesWatermark).toHaveBeenCalledWith({
-        floorBlock: 9,
-        processedToBlock: 10,
-      });
+      expect(resolvePersistedQuestionResponsesWatermark).not.toHaveBeenCalled();
       expect(host.getStored('questionsCache', SESSION_SLUG)?.[NETWORK_ID]?.questionResponsesLatestBlock).toBe(10);
     });
 
@@ -1267,6 +1515,65 @@ describe('createSessionResponseHydrationController', () => {
         logIndex: 0,
         timestamp: 0,
       });
+    });
+
+    it('preserves an ordered response written while a targeted RPC read is in flight', async () => {
+      const responseDeferred = createDeferred();
+      const host = createMockHost();
+      const controller = createSessionResponseHydrationController(host);
+      contractScripts.getResponse.mockReturnValueOnce(responseDeferred.promise);
+
+      const refreshPromise = controller.refreshQuestionResponses([QUESTION_ID_A], {
+        responder: RESPONDER,
+      });
+      await flushMicrotasks();
+      host.setStored('questionsCache', SESSION_SLUG, {
+        [NETWORK_ID]: createQuestionCacheNetworkNode({
+          questionResponses: {
+            [QUESTION_ID_A]: { [RESPONDER_LOWER]: 'concurrent-newer' },
+          },
+          questionResponsesMeta: {
+            [QUESTION_ID_A]: {
+              [RESPONDER_LOWER]: { bn: 15, txi: 1, li: 2, ts: 150 },
+            },
+          },
+          questionResponsesLatestBlock: 15,
+        }),
+      });
+      host.setStored('userCache', SESSION_SLUG, {
+        [RESPONDER_LOWER]: {
+          [NETWORK_ID]: {
+            lastBlockScanned: 15,
+            lastScanTimestamp: 15,
+            data: {
+              sbts: [],
+              createdSurveys: [],
+              createdQuestions: [],
+              surveyResponses: [],
+              questionResponses: [
+                {
+                  questionId: QUESTION_ID_A,
+                  responder: RESPONDER_LOWER,
+                  response: 'concurrent-newer',
+                  blockNumber: 15,
+                  transactionIndex: 1,
+                  logIndex: 2,
+                  timestamp: 150,
+                },
+              ],
+            },
+          },
+        },
+      });
+      responseDeferred.resolve('stale-rpc-result');
+      await refreshPromise;
+
+      expect(
+        host.getStored('questionsCache', SESSION_SLUG)[NETWORK_ID].questionResponses[QUESTION_ID_A][RESPONDER_LOWER],
+      ).toBe('concurrent-newer');
+      expect(
+        host.getStored('userCache', SESSION_SLUG)[RESPONDER_LOWER][NETWORK_ID].data.questionResponses[0].response,
+      ).toBe('concurrent-newer');
     });
 
     it('seeds provisional question metadata from targeted response refresh payloads', async () => {

@@ -7,6 +7,7 @@ import {
 } from '../../../utilities/crypto/litProtocol.js';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../../utilities/session/sponsoredFlags.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
+import { resolveSessionWizardModeRequirements } from '../sessionWizardModeRequirements';
 import {
   arweavePublishAdapter,
   workerAuthPublishAdapter,
@@ -22,6 +23,7 @@ import {
 } from '../sessionWizardWorkerRuntimeSupport';
 import {
   CHIPOTLE_LIT_CONFIG_FIELDS,
+  resolveSessionWizardLitCredentialPathReadiness,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from '../sessionWizardWorkerSecretSupport';
@@ -192,13 +194,24 @@ const useSessionWizardWorkerSecretsController = ({
 
   const getMissingWorkerSecretsForDeploy = useCallback(
     (secretsSnapshot = getCurrentWorkerSecrets()) => {
+      const modeRequirements = resolveSessionWizardModeRequirements(draft?.sessionModeProfile);
       const missing = [];
-      if (!toStr(secretsSnapshot.openaiKey).trim()) {
+      if (modeRequirements.isWorkerCanonical) {
+        resolveSessionWizardResourceSecretFields('ai', draft?.ai).forEach((field) => {
+          if (!toStr(secretsSnapshot?.[field.key]).trim()) missing.push(field.label);
+        });
+      } else if (!toStr(secretsSnapshot.openaiKey).trim()) {
         missing.push('OpenAI key');
       }
-      if (!toStr(secretsSnapshot.arweaveJwk).trim()) missing.push('Arweave JWK');
+      if (
+        (!modeRequirements.selected || modeRequirements.requiresArweave) &&
+        !toStr(secretsSnapshot.arweaveJwk).trim()
+      ) {
+        missing.push('Arweave JWK');
+      }
       const rpcUrl = resolveWorkerRpcUrl();
-      if (!rpcUrl) missing.push('Worker RPC URL');
+      if ((!modeRequirements.selected || modeRequirements.requiresRpc) && !rpcUrl) missing.push('Worker RPC URL');
+      const litCredentialPath = resolveSessionWizardLitCredentialPathReadiness(secretsSnapshot);
       const hasAnyChipotleField =
         CHIPOTLE_LIT_CONFIG_FIELDS.some((key) => !!toStr(secretsSnapshot?.[key]).trim()) ||
         !!toStr(secretsSnapshot?.litAccountApiKey).trim() ||
@@ -211,7 +224,11 @@ const useSessionWizardWorkerSecretsController = ({
           !toStr(secretsSnapshot?.litPkpId).trim() &&
           !toStr(secretsSnapshot?.litActionCid).trim() &&
           !toStr(secretsSnapshot?.litUsageApiKey).trim());
-      if (hasAnyChipotleField && !bootstrapOnlyChipotleConfig) {
+      if (modeRequirements.selected && modeRequirements.requiresLit && !litCredentialPath.hasDeployCredentialPath) {
+        // The account key can create the runtime; without it, all public tuple
+        // fields plus a usage key must already exist as one credential path.
+        missing.push('Lit API key or complete Lit runtime credentials');
+      } else if (!modeRequirements.selected && hasAnyChipotleField && !bootstrapOnlyChipotleConfig) {
         const requiredChipotleFields = [
           ['litApiBase', 'Lit API base'],
           ['litGroupId', 'Lit group ID'],
@@ -223,7 +240,7 @@ const useSessionWizardWorkerSecretsController = ({
       }
       return missing;
     },
-    [getCurrentWorkerSecrets, resolveWorkerRpcUrl],
+    [draft?.ai, draft?.sessionModeProfile, getCurrentWorkerSecrets, resolveWorkerRpcUrl],
   );
 
   const chipotleHookWorkerSecrets = useMemo<WorkerSecretsLike>(

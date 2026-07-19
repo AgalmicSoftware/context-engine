@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createRegistryFaucetRpcHelpersWithWorkerDeps } from './registryFaucetRpcBinding.js';
+import { attachSessionSecretRpcForGateRuntime } from './gateRpcResolution.js';
 
 const BASE_SEPOLIA_FAUCET_FALLBACK_RPC_URLS = Object.freeze([
   'https://sepolia.base.org', // intentional: production faucet fallback snapshot
@@ -189,4 +190,28 @@ test('createRegistryFaucetRpcHelpersWithWorkerDeps preserves faucet rpc explicit
       'https://default.example.test',
     ],
   );
+});
+
+test('createRegistryFaucetRpcHelpersWithWorkerDeps prefers a worker-canonical session-secret RPC for the faucet transaction', () => {
+  const helpers = createRegistryFaucetRpcHelpersWithWorkerDeps({
+    deps: createDeps(),
+    defaults: {
+      defaultFaucetRpcUrl: 'https://default.example.test',
+    },
+  });
+  const runtimeConfig = attachSessionSecretRpcForGateRuntime({
+    config: {
+      networkChainId: 11155420,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      faucet: { rpcUrl: 'https://legacy-explicit-op-rpc.example.test' },
+    },
+    secrets: { customRpcUrl: 'https://private-op-rpc.example.test' },
+  });
+
+  assert.deepEqual(helpers.resolveFaucetRpcUrls(runtimeConfig, runtimeConfig.faucet), [
+    'https://private-op-rpc.example.test',
+    'https://legacy-explicit-op-rpc.example.test',
+    ...OP_SEPOLIA_FAUCET_FALLBACK_RPC_URLS,
+    'https://default.example.test',
+  ]);
 });

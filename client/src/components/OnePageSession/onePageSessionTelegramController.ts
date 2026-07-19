@@ -181,8 +181,9 @@ export const resolveTelegramResultsAuthFailureReason = (result: TelegramResultsD
 
 const isAgentClientLoginEnvelope = (value: unknown): value is AgentClientLoginEnvelope => {
   const envelope = toRecord(value);
-  const credential = toRecord(envelope.credential);
-  return toTrimmedString(credential.token).length > 0;
+  const bridgeCredential = toRecord(envelope.bridgeCredential);
+  const workerCredential = toRecord(envelope.workerCredential);
+  return toTrimmedString(bridgeCredential.token).length > 0 && toTrimmedString(workerCredential.token).length > 0;
 };
 
 export const resolveAgentClientLoginEnvelopeFromEvent = (

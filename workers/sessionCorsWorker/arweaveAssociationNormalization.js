@@ -8,6 +8,7 @@ export const normalizeArweaveAssociationTags = async ({
   slug,
   config,
   uploaderAddress,
+  chainAttestationCache,
   deps,
 }) => {
   const normalizedTags = Array.isArray(tags) ? tags : [];
@@ -16,6 +17,7 @@ export const normalizeArweaveAssociationTags = async ({
     tags: normalizedTags,
     slug,
     config,
+    chainAttestationCache,
     deps,
   });
   if (!sessionIdCheck.ok) {
@@ -26,6 +28,7 @@ export const normalizeArweaveAssociationTags = async ({
     config,
     tags: normalizedTags,
     uploaderAddress,
+    chainAttestationCache,
     deps,
   });
   if (!sbtAuth.ok) {

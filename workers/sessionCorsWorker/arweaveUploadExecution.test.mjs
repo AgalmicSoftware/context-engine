@@ -5,6 +5,7 @@ import {
   arweaveUpload,
   resolveArweaveCtor,
 } from './arweaveUploadExecution.js';
+import { resolveRpcUrlListForGate } from './gateRpcResolution.js';
 
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
@@ -151,12 +152,15 @@ test('arweaveUpload preserves session-id resolve rejection logging and status pa
         ok: true,
         tags: [{ name: 'CE-SessionId', value: '0x11' }],
       }),
-      normalizeArweaveAssociationTags: async () => ({
-        ok: false,
-        status: 400,
-        error: 'registry read failed',
-        reason: 'session-id-resolve',
-      }),
+      normalizeArweaveAssociationTags: async ({ chainAttestationCache }) => {
+        assert.ok(chainAttestationCache instanceof Map);
+        return {
+          ok: false,
+          status: 400,
+          error: 'registry read failed',
+          reason: 'session-id-resolve',
+        };
+      },
     },
   });
 
@@ -173,6 +177,64 @@ test('arweaveUpload preserves session-id resolve rejection logging and status pa
       error: 'registry read failed',
     },
   ]]);
+});
+
+test('arweaveUpload supplies the session-secret RPC to SBT association checks', async () => {
+  const secretRpcUrl = 'https://private-rpc.example.test/eth';
+  const publicConfig = {
+    networkChainId: 31337,
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+  };
+  let associationRpcUrls = [];
+
+  const result = await arweaveUpload({
+    request: { headers: new Headers() },
+    secrets: {
+      arweaveJwk: '{}',
+      customRpcUrl: secretRpcUrl,
+    },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    config: publicConfig,
+    slug: 'session-a',
+    uploaderAddress: '0x0000000000000000000000000000000000000abc',
+    deps: {
+      json: createJsonStub(),
+      readArweaveUploadRequestPayload: async () => ({
+        ok: true,
+        payload: {
+          bytes: new Uint8Array([1, 2, 3]),
+          contentType: 'application/json',
+          providedJwk: null,
+          requestId: 'req-secret-rpc',
+          tagsInput: [],
+        },
+      }),
+      resolveArweaveCtor: async () => ({ init: () => ({}) }),
+      resolveArweaveUploadJwk: () => ({
+        ok: true,
+        jwk: { kty: 'RSA' },
+        hasProvidedJwk: false,
+        hasWorkerJwk: true,
+      }),
+      normalizeArweaveCeTags: () => ({ ok: true, tags: [] }),
+      normalizeArweaveAssociationTags: async ({ config }) => {
+        associationRpcUrls = resolveRpcUrlListForGate({
+          config,
+          gateChainId: 31337,
+        });
+        return {
+          ok: false,
+          status: 403,
+          error: 'stop after rpc assertion',
+          reason: 'sbt-association',
+        };
+      },
+    },
+  });
+
+  assert.equal(result.status, 403);
+  assert.deepEqual(associationRpcUrls, [secretRpcUrl]);
+  assert.equal(JSON.stringify(publicConfig).includes(secretRpcUrl), false);
 });
 
 test('arweaveUpload preserves upload start/success logging and transaction tag wiring', async () => {

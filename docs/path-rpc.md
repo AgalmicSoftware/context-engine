@@ -147,9 +147,12 @@ Important current behavior on OP Sepolia (`11155420`) and Base Sepolia (`84532`)
   can now be consumed by the main client read-provider path only when the on-chain `rpc` gate is open or the current wallet already has a cached grant.
 - AdminPage worker-config payloads currently default `rpcUrl` to `getDefaultHttpRpc(chainId)`, which is
   PATH-first when PATH preference is enabled.
-- AdminPage Resources -> Faucet balance is a read-only lookup that follows the session chain first:
-  `faucet.rpcUrl`, then `rpcUrlsByChainId[networkChainId]`, then `rpc.providers.path.rpcUrl`,
-  then generic session `rpcUrl`, then the built-in chain default. It does not use wallet RPC calls.
+- AdminPage Resources -> Faucet balance is a browser read-only lookup that follows the public session
+  chain values; it does not use worker secrets or wallet RPC calls.
+- Authenticated faucet execution for a worker-canonical session uses its same-network
+  `customRpcUrl` session secret first, then legacy `faucet.rpcUrl`, mapped/session RPC values, and
+  public fallbacks. The Worker verifies `eth_chainId` before protected reads and masks private
+  endpoint details in diagnostics. Decentralized sessions retain the legacy public-config ordering.
 - Worker faucet fallback order is not identical to the client read-provider order.
 
 In other words: do not assume the worker's default RPC order exactly matches the app's read-provider order.

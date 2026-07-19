@@ -1,23 +1,38 @@
 # Cloudflare Worker: sessionCorsWorker
 
-This Worker handles AI proxying, transcription, Arweave uploads, fetch helpers, and the testnet faucet.
-Secrets live in Worker KV by default; when a user enables a local override, the client may send per-request credentials
-(`apiKey`, `rpcUrl`, `arweaveJwk`) and the worker will use them instead of KV secrets.
+This Worker can be the canonical identity, content/config, auth, AI, and payload
+storage authority for a `worker_canonical` session. It also keeps the existing
+AI proxy, transcription, Arweave, fetch-helper, and testnet-faucet capabilities
+for profiles that enable them. Session secrets use the separate versioned
+Worker KV secrets envelope; public config never contains API keys, private
+keys, JWKs, bearer tokens, credentials, RPC/faucet settings, or URL-embedded
+credentials.
 
 It also exposes canonical session storage routes for future backend routing: `POST /storage/upload`, `GET|POST /storage/read`, and `GET|POST /storage/list`. `/arweave/upload` remains supported for compatibility.
 
 ## Agent Bridge Client Handoff
 
-The Telegram/agent bridge worker exposes the browser-facing agent handoff under
+The agent bridge worker exposes the browser-facing handoff under
 canonical `/api/agent/*` routes:
 
 - `GET /api/agent/session-meta?sessionSlug=<slug>` returns public metadata for
   the selected session, including the sanctioned `clientSubmitReady` boolean the
   client uses to decide whether direct submit is deploy-ready.
-- `POST /api/agent/client-login/exchange` accepts a pasted raw `ceagt_` token
-  once and returns a short-TTL browser envelope. The web client stores only that
-  versioned envelope in tab-scoped `sessionStorage`; raw tokens must not be put
-  in URLs, localStorage, sessionStorage, Redux, or logs.
+- `POST /api/agent/client-login/exchange` accepts a pasted user/install or named
+  service `ceagt_` credential once and returns a short-TTL versioned envelope.
+  That envelope contains a Bridge browser credential for Bridge reads and a
+  distinct session-worker JWT for canonical worker routes. The current
+  Telegram-first client sends the Bridge credential only to Bridge routes and
+  retains the worker JWT separately for direct canonical worker consumers; it
+  never sends the worker JWT to the Bridge. The client stores only the envelope
+  in tab-scoped `sessionStorage`; source credentials must not be put in URLs,
+  localStorage, sessionStorage, Redux, or logs.
+- Credentials are bound to one principal, session, audience, scope set, expiry,
+  and revocation slot. Telegram can mint a user credential, but Telegram is not
+  required: `POST /api/agent/invite/onboard` also creates an opaque user from a
+  one-time body-only invite. The Bridge root token is bootstrap/break-glass
+  authority and can mint named scoped services through
+  `POST /api/agent/credentials/service`.
 - Telegram-first session reads and submits use the shared browser components
   after one page-boundary backend-mode decision. `/session/demo` keeps its
   existing demo/off-chain behavior.
@@ -61,36 +76,72 @@ The route-shell bundle is intentionally still a large boundary object because it
 
 ## Wizard flow (/new + deploy-helper)
 
-If you deploy via the Group Wizard and a deploy-helper:
+For the default `Fast & Cheap (Cloudflare)` preset:
 
-1) Fill in the Cloudflare API token and worker name.
-   - The "Create API token" link opens a prefilled Cloudflare token template with the required
-     Workers KV, Workers Scripts, R2, D1, and Durable Objects permissions used by the deploy-helper.
-     `Account Settings: Edit` is needed only when the helper must create or change the
-     account-level workers.dev subdomain.
+1) Fill in the Cloudflare API token and one key for the selected AI provider.
+   - The "Create prefilled API token" link opens a Cloudflare token template with the required
+     `Workers Scripts: Edit` and `Workers KV Storage: Edit` permissions used by the default
+     deploy-helper path. The helper's workers.dev subdomain calls are also covered by
+     `Workers Scripts: Edit`.
+   - The first onboarding requirements banner uses the same prefilled link. Cloudflare only
+     pre-fills the form: create the token, copy its generated value, and paste it into the
+     password field in the Worker step.
    - CLI equivalent for agents/local setup: `npm run -s cloudflare:token-link -- --slug <session-slug>`
-     Add `--include-workers-dev-subdomain-setup` only when the account does not already have a
-     workers.dev subdomain or when intentionally changing it.
+     Add `--include-r2-storage` only for an advanced deployment that manages an existing R2 bucket;
+     the flag does not create the bucket.
+   - When the template preselects `All accounts`, restrict Account Resources to the one account
+     where the session worker will run before creating the token.
    - The template auto-names the token as `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMAM` or `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMPM` (local time).
-   - The first-party wizard no longer asks for Cloudflare account ID; the deploy-helper resolves it from the API token.
-2) Fill worker secrets in the wizard (OpenAI key, Arweave JWK, RPC URL, Anthropic key only if any selected AI model uses Anthropic, and optional OpenRouter key) and then click "Deploy worker".
+   - The first-party wizard derives the worker name and does not ask for a
+     Cloudflare account ID. The deploy-helper resolves exactly one visible
+     account from the API token and stops when the token exposes zero or multiple
+     accounts.
+   - On the direct default `/new` path, the token is deploy-helper request input
+     only. It is rejected from canonical session config and must not appear in
+     worker config/secrets, URLs, metadata, logs, analytics, or browser/durable
+     storage. The separate legacy sponsored deploy-grant path below retains its
+     existing short-lived server-side grant record.
+2) Click "Deploy worker". The default preset does not ask for an Arweave JWK,
+   Lit key, user RPC URL/key, faucet key, wallet connector, funding, or gas.
+   Those inputs remain available only when an explicit Lit, decentralized, or
+   other chain-backed profile requires them.
    - Normal mode now points deploy-helper requests at the GitHub release bundle URL automatically instead of asking for a local upload first.
    - If the helper cannot fetch that release asset, the Worker step keeps the GitHub URL as the default path and reveals one-off retry overrides: paste a direct bundle URL or upload `dist/sessionCorsWorker.bundle.js` if you want to override the hosted URL.
    - The in-wizard deployment panel links to the GitHub worker source, deploy-helper source, and worker docs instead of shipping mirrored source snapshots inside the client bundle.
-3) The deploy-helper uses the Workers API to fetch or create the account subdomain,
-   enables the script’s workers.dev subdomain, and returns:
-   `https://<worker-name>.<subdomain>.workers.dev/`
+3) The deploy-helper uses the Workers API to fetch or create the account
+   subdomain and derives a unique physical name from the requested display-name
+   prefix. The first-party wizard supplies a stable `deploymentRequestId`, so
+   its suffix is deterministic and a same-ID retry resumes or replays that same
+   deployment. An explicit new request generation receives a new deterministic
+   identity; only a legacy request without an ID receives a random suffix. The
+   helper enables the workers.dev subdomain and returns
+   `https://<physical-worker-name>.<subdomain>.workers.dev/`.
    - When the session URL is empty, the deploy-helper reports the resolved slug as `general`.
-4) The wizard auto-fills `corsWorkerUrl` with that URL so it can seed Worker KV config and the current registry compatibility mirror.
+4) The deploy helper seeds the worker-canonical profile, passkey-derived admin
+   address, authority policy, identity/content fields, storage profile, and
+   worker URL in `session:{slug}:config`. It reads that KV record back and
+   verifies the slug, worker URL, revision/session ID, authority mode, and
+   worker-authority policy before reporting success.
    - Default worker `allowOrigins` initialization now prepends the current browser origin, so first-run deploys on a custom host keep the creating UI origin authorized without requiring a manual CORS patch first.
    - Advanced custom-worker deploys expose an `Enable embedded deploy-helper on this worker` checkbox (default `true`). It sets the worker's `DEPLOY_HELPER_ENABLED` binding at deploy time and is not updateable later through Worker KV config.
-   - Arweave metadata uploads now strip worker-only fields like `corsWorkerUrl`, `allowOrigins`, `limits`, and `rpcEndpoint` before upload.
-   - Successful deploys now also refresh a browser-side worker-config replica cache with a local freshness timestamp, so client worker URL resolution only prefers that Worker-KV-shaped bridge when it is newer than the registry compatibility mirror or when the mirror is still empty.
-5) Upload metadata and register the session on-chain.
-6) Post-deploy secrets verification retries `/auth/nonce` + `/admin/set-secrets` with backoff.
+5) The wizard persists its final sanitized, admin-signed config and verifies it
+   again through public `GET /session-config` before surfacing the share URLs.
+   The default publish does not upload Arweave metadata, register on-chain, or
+   refresh a registry cache.
+6) Post-deploy secret verification retries `/auth/nonce` +
+   `/admin/set-secrets` with backoff.
    - If `/admin/set-secrets` returns `Admin authorization failed` (common when session config has not propagated/seeded yet), the wizard now auto-runs signed `/admin/set-config` once and retries secrets sync in the same deploy flow.
    - Deploy-helper now returns `writesSessionConfig` / `writesSessionSecrets` flags; the wizard only shows the non-fatal "helper already wrote secrets" note when those flags explicitly confirm session-key writes.
-   - Deploy payloads now include normalized `blockLimits` (`start`, optional `end`) so worker KV config reflects the Session Wizard start block immediately after `/new` deploy.
+   - Chain-backed profiles continue to persist their normalized `blockLimits`
+     (`start`, optional `end`); worker-canonical does not require a chain scan
+     window.
+
+Failed worker-canonical deployments are rollback-safe. The helper deletes a
+script only when the current invocation uploaded it and its deployment-id
+binding proves that the helper still owns that exact deployment. Resources
+recovered from an earlier invocation, and all existing or ambiguous scripts,
+are preserved. KV/script orphans are reported for operator cleanup rather than
+deleted speculatively.
 
 ## Deploy Helper
 
@@ -99,15 +150,39 @@ If you deploy via the Group Wizard and a deploy-helper:
 - The checked-in deploy-helper source imports shared modules from `workers/shared/`. If you deploy outside Wrangler, bundle it first; do not paste raw `workers/deploy-helper/worker.js` into the Cloudflare dashboard as a standalone script.
 - `workers/deploy-helper/README.md` is the quick public reference for bindings, env vars, trust boundaries, and endpoint behavior.
 - Every newly deployed `sessionCorsWorker` now also ships with embedded deploy-helper capability enabled by default. Sponsored bootstrap deploys target the sponsoring `sessionCorsWorker` first, and that worker runs the same Cloudflare deploy core locally. Grant-backed sponsored deploys now require that embedded path and no longer fall back to a standalone helper URL.
+- New deployments bind `CE_SESSION_COORDINATOR` to the SQLite-backed
+  `SessionWriteCoordinator` class. It reserves stable direct and sponsored
+  deployments before any Cloudflare mutation and makes sponsored faucet
+  transfers one-shot before the non-idempotent transfer begins. Concurrent
+  conflicting payloads receive `409`; matching in-flight work receives retryable
+  `503`; terminal safe receipts replay without repeating the side effect.
+  Missing coordination fails closed for those deployment and faucet paths. A
+  worker created before this binding was introduced must be redeployed before it
+  can use them. The same per-session coordinator now chooses the first wrapped
+  worker-envelope session key and serializes signed `set-config`, `set-limits`,
+  and Lit-descriptor mutations against one authoritative public config record.
+  Missing coordination fails closed for those writes as well. Payload/index
+  uploads remain intentionally at-least-once: a failed or ambiguous attempt may
+  leave an invisible orphan or a readable duplicate, but the worker returns
+  success only after its payload and index writes finish. The worker does not
+  expose session-key rotation or deployment-key re-wrap actions.
 - Operating modes:
   - CE-hosted: use the default `CLOUDFLARE_DEPLOY_HELPER_URL` (`https://ce-deploy-helper.agalmic.workers.dev/`) and let Context Engine operate the shared helper.
-  - Self-hosted: deploy `workers/deploy-helper/worker.js` with your own Wrangler config (`wrangler.toml` or equivalent), bind `DEPLOY_HELPER_KV`, set `ALLOWED_ORIGINS`, and set `ADMIN_SECRET` with Wrangler secrets.
+  - Self-hosted: deploy `workers/deploy-helper/worker.js` with your own Wrangler config (`wrangler.toml` or equivalent), bind `DEPLOY_HELPER_KV` and `CE_SESSION_COORDINATOR`, install the `ce-session-write-coordinator-v1` SQLite-class migration, set `ALLOWED_ORIGINS`, and set `ADMIN_SECRET` with Wrangler secrets. The checked-in example and direct CLI automation include both bindings and the migration.
   - No helper: leave the helper out entirely and deploy `sessionCorsWorker` manually with Wrangler/dashboard steps from the `Self-deploy` section below.
 - Origin allowlist resolution is now:
   - `DEPLOY_HELPER_KV["deploy-helper:origins"]`
   - `env.ALLOWED_ORIGINS`
   - fallback `http://localhost:3000`
 - `ALLOWED_ORIGINS` accepts comma- or newline-delimited origins. Stored admin values are normalized to origins before they are written back to KV.
+- The first-party wizard sends a stable `deploymentRequestId` and
+  `configRevision`. The per-request Durable Object binds that ID to the derived
+  Cloudflare account and immutable session/worker identity, while
+  `DEPLOY_HELPER_KV` keeps the step journal used to resume a partially completed
+  deployment. A terminal safe receipt survives KV journal expiry; a conflicting
+  identity receives `409`. Raw Cloudflare/provider tokens, secrets, request
+  bodies, and worker bundle bytes are not written to either coordinator state or
+  the journal. KV journal records expire after seven days.
 - Deploy-helper origin configuration:
   - CE-hosted mode should set `ALLOWED_ORIGINS` explicitly to the public app origins it serves. Current hosted example: `https://contextengine.xyz,https://www.contextengine.xyz,http://localhost:3000`.
   - Self-hosted mode should replace that list with the origins for your own app/admin hosts. Leaving `ALLOWED_ORIGINS` unset is intentionally restrictive and only allows `http://localhost:3000` until you configure it.
@@ -146,7 +221,7 @@ If you deploy via the Group Wizard and a deploy-helper:
   - `/new` can use that key during redemption/bootstrap to mint a fresh group / PKP / usage key for the new session
   - scoped runtime bundles keep using `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid`
 - The manual `/new` Lit card now exposes only `litAccountApiKey` / `LIT_ACCOUNT_API_KEY`; scoped runtime identifiers stay worker-side and are derived during bootstrap or supplied through admin/sponsored-bundle paths.
-- The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry.
+- The raw Cloudflare API token entered on `/sponsor` is not written into the encrypted bundle payload. `/sponsor` exchanges it for a `deployGrantToken`, and the sponsoring worker keeps the raw token only inside the server-side sponsored grant record until redeem/expiry. The per-grant coordinator stores only the request digest, attempt state, and a credential-redacted safe result. A successful deploy replaces the credential-bearing KV grant record with a secret-free terminal receipt so a lost browser response can be replayed without deploying again.
 - The uploaded Arweave envelope is:
   - `type: "contextengine-sponsored-bundle"`
   - `version: 1`
@@ -165,7 +240,15 @@ If you deploy via the Group Wizard and a deploy-helper:
   - and `getMissingWorkerSecretsForDeploy(...)` is empty for the current session config.
 - Sponsored deploy grants now keep only the Cloudflare API token plus the source worker bootstrap context on the sponsoring worker; the encrypted bundle itself carries only the resulting `deployGrantToken` and bootstrap worker URL. Grants do not snapshot account ID or a standalone helper URL.
 - For grant-backed sponsored deploys, the browser posts to the sponsoring `sessionCorsWorker` `/sponsored/redeem-deploy` route, and that source worker must have embedded deploy enabled from its deploy-time `DEPLOY_HELPER_ENABLED` binding. `/sponsor` no longer writes a standalone deploy-helper fallback URL into the bundle or grant.
-  - In that deploy-ready state, Publish deploys the worker first, then uploads metadata and registers on-chain. Both the regular normal-mode worker step and the sponsored publish path default to the hosted GitHub release asset URL.
+  - In that deploy-ready state, Publish deploys the worker first. A
+    worker-canonical profile then persists and verifies Worker KV config; a
+    decentralized profile keeps the existing metadata upload and on-chain
+    registration steps. Both paths default to the hosted GitHub release asset
+    URL.
+- Sponsored faucet redemption writes a secret-free `redeeming` reservation
+  before it can broadcast the one-shot transfer. If the transfer or receipt is
+  ambiguous, the grant remains pending and the action is not repeated; inspect
+  the first attempt and issue a new grant instead of retrying the same bearer.
 
 - The worker KV config now keeps a mirrored `embeddedDeployHelperEnabled` boolean so the frontend can reopen the wizard with the current deploy-time toggle state, but runtime behavior still comes from the worker's `DEPLOY_HELPER_ENABLED` binding.
   - If the hosted release-asset fetch fails, the normal-mode worker step or sponsored normal-mode Publish panel keeps the GitHub release asset URL as the default path and offers either a manual bundle URL override or `nvm use 20 && npm run worker:bundle` plus `/dist/sessionCorsWorker.bundle.js` as an optional local upload override.
@@ -195,11 +278,45 @@ Worker URL source clarity:
   - custom URL that is present but not verified in this run (or changed after deploy).
 - Metadata upload is blocked for custom mode until deploy verification matches the configured custom worker URL.
 
-Default worker URL:
-- `CLOUDFLARE_CORS_WORKER_URL` remains the shared fallback worker URL.
-- Normal-mode `/session/new` no longer pre-populates per-session `corsWorkerUrl` from that fallback; for now the simplified wizard assumes bring-your-own worker until a dedicated shared hosted worker product exists.
-- New SessionWizard writes seed per-session `corsWorkerUrl` into Worker KV config and keep a temporary registry compatibility mirror; new Arweave metadata uploads no longer carry worker-only config.
-- Client worker URL resolution now prefers a browser-side replica of Worker KV session config only when that replica is fresher than the temporary registry `corsWorkerUrl` mirror, or when the mirror is still empty.
+Worker-canonical discovery:
+- The published session and admin links include one `worker=<encoded HTTPS origin>`
+  query parameter. This value locates the worker; it is never an authorization
+  credential.
+- Production parsing rejects non-HTTPS origins, URL credentials, path/query/hash
+  additions inside the origin, duplicate parameters, localhost/private-network
+  targets, and redirects. Local HTTP is accepted only by the explicit dev/test
+  policy.
+- A fresh browser requests `GET <worker-origin>/session-config` with the
+  matching `X-Session-Slug`. The route exists only for persisted `worker_canonical`
+  profiles, applies the session CORS allowlist, and returns `Cache-Control:
+  no-store` plus `Vary: Origin, X-Session-Slug` on success and failures.
+- The public response contains the canonical identity/content, authority,
+  storage, model, CORS, and limits fields needed to hydrate the app. Recursive
+  redaction removes provider keys/credentials, authorization headers, RPC and
+  faucet fields, Lit credentials, JWKs, secrets, tokens, passwords, private
+  keys, and URLs containing credentials.
+- The client validates the returned slug, session ID, worker URL, authority
+  mode, and absence of secret-like fields. It then pins exactly
+  `(worker origin, slug, session ID)` in the hardened
+  `session:0:<sessionIdHex>` worker-config cache. Slug-keyed registry caches are
+  not used. A conflicting re-pin requires an explicit trust-on-first-use
+  confirmation, and a prior browser cache record is never authoritative without
+  a successful current fetch.
+- For `worker_canonical`, Worker KV is authoritative for identity, content,
+  gates, and worker config. The client does not fall back to Arweave or
+  SessionRegistry when an explicit worker discovery request fails.
+- For a validated explicit-Lit worker profile, the profile's
+  `evm.registryChainId` is authoritative for the route network and the effective
+  session config passed to response-gate and auto-mint consumers. A stale
+  top-level `networkChainId` cannot override the chain used for Lit operations.
+
+Legacy/default worker URL:
+- `CLOUDFLARE_CORS_WORKER_URL` remains the shared fallback worker URL for the
+  general/default legacy session.
+- Registry-canonical sessions retain the temporary registry `corsWorkerUrl`
+  compatibility mirror. Worker-canonical sessions do not write or refresh it.
+- Browser replicas remain caches only; they never grant authority or override a
+  fresh Worker KV/registry source.
 - Shared client session-config readers now apply that same freshness guard before overlaying the worker-config replica, so app surfaces using `sessionRegistryStore`, `sessionRegistryReader`, `contractScripts`, and debate-mode session selection stop treating an older browser replica as a permanent authority override.
 - Legacy untimestamped browser replicas remain a migration bridge only when the registry mirror is blank; once the mirror has a worker URL again, those old cache entries no longer outrank it.
 - `client/src/utilities/session/sessionWorkerAvailability.ts` now gives UI a sync worker-config overlay surface for both "is a usable worker-backed config available?" and "what configured worker URL is currently usable?"; when callers opt in, it also returns the shared default/general fallback worker URL synchronously. `SBTsList.tsx`, `LiveDebateMode.tsx`, and `AdminPage.tsx` use it instead of component-local raw `corsWorkerUrl` truthiness.
@@ -222,11 +339,14 @@ Default worker URL:
 
 Notes:
 - This flow avoids opening the Cloudflare dashboard.
-- Do not send Cloudflare API tokens from the browser directly; use the deploy-helper (trusted) endpoint.
+- On direct `/new`, send the Cloudflare token only to the trusted deploy-helper
+  request. Never send it to the deployed session worker or include it in
+  canonical config. Sponsored deploy grants remain a separate legacy workflow.
 
 Admin test panel:
 - The Session Admin page includes a Worker Tests panel to hit `/health`, run a basic AI call,
-  upload a tiny JSON payload to Arweave, and record a short AudioInput transcription.
+  and record a short AudioInput transcription. It also offers an Arweave upload
+  or faucet test when the selected profile configures that resource.
   Arweave and faucet test results include clickable tx links for quick verification.
   Arweave links use the preferred AR.IO gateway (`CE_ARWEAVE_AR_IO_URL` when set, otherwise `https://ar-io.dev`) while `CE_ARWEAVE_DIRECT_TO_AR_IO` is enabled, which is the default. In this mode, read retries stay on AR.IO and do not fan out to legacy gateways. Set `CE_ARWEAVE_DIRECT_TO_AR_IO=false` only when a deployment intentionally wants fallback reads through `ARWEAVE_GATEWAY_URL`, `https://arweave.net`, Irys, Permagate, and alternate raw/tx-data routes. Runtime overrides: `window.CE_ARWEAVE_GATEWAY_URL`, `window.CE_ARWEAVE_DIRECT_TO_AR_IO`, `window.CE_ARWEAVE_AR_IO_URL`.
   Run these while signed in as a user who holds the sponsored SBT to confirm gating + secrets are wired correctly.
@@ -257,13 +377,19 @@ Admin test panel:
 
 Authenticated clients can use the worker as the session storage boundary:
 
-- `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and metadata/index rows to KV/D1-style bindings when R2 is available. For small JSON/demo deployments where R2 is not enabled, the worker can store opaque payload envelopes in KV-only Cloudflare storage. Both modes return an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
+- `POST /storage/upload`: accepts JSON or multipart payloads for CE payload resources (`docsContext`, `questions`, `surveys`, `responses`, `generatedArtifacts`, and `media`). `arweave` and `lit-arweave` delegate to the existing Arweave upload behavior and return both `arweaveTxId` and `storageRef`. `cloudflare` writes blobs to R2 and authorization metadata/index rows to KV when R2 is available. An R2 deployment must provide an index binding with both `get` and `put`; otherwise upload returns `501` before any R2 write. For small JSON/demo deployments where R2 is not enabled, the worker can store opaque payload envelopes in KV-only Cloudflare storage. Both modes return an opaque 32-byte base64url Cloudflare `storageRef.id` that existing Surveys `bytes32` pointer fields can carry without changing the ABI.
   - Upload bodies are capped at 25 MB by default before Arweave or Cloudflare storage handoff. Set `CE_MAX_UPLOAD_BYTES` on the Worker to lower or raise that limit for `/storage/upload` and `/arweave/upload`.
-- `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the configured Cloudflare payload access check. Public-read sessions may be served anonymously; gated sessions require authenticated route preflight. It returns the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
-- `GET|POST /storage/list`: lists Cloudflare metadata/index rows for a resource such as `docsContext`, returning safe `storageRef` objects, tag metadata, and the configured payload access mode. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
+  - KV-only payloads have a separate hard ceiling after base64/envelope JSON
+    encoding: the serialized value must be at most 24 MiB, leaving 1 MiB below
+    Cloudflare KV's 25 MiB value limit. Oversized encoded media/images and other
+    payload resources fail with `413` before any payload or index row is written.
+    Raising `CE_MAX_UPLOAD_BYTES` cannot raise this KV ceiling; use R2 for
+    larger payloads.
+- `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the configured Cloudflare payload access check. For R2 bytes, the matching KV index row is authoritative for per-item authorization metadata, while the session's `storageProfile.payloadAccessControl` remains the coarse fallback policy; R2 custom metadata is only a locator and is never an access-policy fallback. The worker validates the row's id/resource and authorizes it before consuming object body methods. A missing index binding returns `501`, a cleanly absent row returns `404`, and an unreadable, malformed, or mismatched row returns `503` without returning payload bytes. Public-read sessions may be served anonymously only when the resolved per-item conditions or session fallback policy allows it; gated sessions require authenticated route preflight. Successful reads return the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
+- `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
 - `GET|POST /storage/export-envelopes`: returns ciphertext plus envelope metadata for encrypted Cloudflare payloads in the requested resource. It does not decrypt payload bytes and does not include session KEK material.
 
-Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; legacy doc-library configs with `docLibrary.provider = "cloudflare"` are also accepted by the worker for storage route compatibility. Backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for preferred blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes plus the KV-only payload fallback. One-click deploys that receive a Cloudflare storage profile bind the created session KV namespace as both `GROUP_KV` and `CE_STORAGE_INDEX_KV`, then persist a sanitized `storageProfile` in `session:{slug}:config`. If the deploy request explicitly asks for R2 storage, it must provide an existing bucket name so the helper can bind it as `CE_STORAGE_R2`; otherwise the helper fails before provisioning partial Cloudflare resources. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
+Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; legacy doc-library configs with `docLibrary.provider = "cloudflare"` are also accepted by the worker for storage route compatibility. Backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for preferred blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for authoritative R2 per-item authorization metadata plus the KV-only payload fallback. R2-only payload objects are not readable through the worker, including legacy objects whose per-item conditions cannot be proven from R2 metadata; restore their matching index rows rather than weakening authorization. KV-only payload storage remains supported. One-click deploys that receive a Cloudflare storage profile bind the created session KV namespace as both `GROUP_KV` and `CE_STORAGE_INDEX_KV`, then persist a sanitized `storageProfile` in `session:{slug}:config`. If the deploy request explicitly asks for R2 storage, it must provide an existing bucket name so the helper can bind it as `CE_STORAGE_R2`; otherwise the helper fails before provisioning partial Cloudflare resources. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
 
 `storageProfile.payloadAccessControl` is the worker enforcement contract. New configs use:
 
@@ -279,11 +405,11 @@ The worker still read-normalizes legacy `payloadAccessControl.mode`, `cloudflare
 
 Where older clients still need one string, the worker and client derive the legacy `payloadAccessMode` from the v2 object.
 
-- `gate: "sbt_gate"` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain using the configured RPC before upload, list, or read bytes are exposed.
+- `gate: "sbt_gate"` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain before upload, list, or read bytes are exposed. Worker-canonical same-network checks prefer the private `customRpcUrl` session secret; Cloudflare storage loads that secret lazily only when an SBT condition or policy is evaluated. Public/group/role reads do not read it, and an unavailable secret store fails closed only for the affected SBT check. Before a contract read, the Worker calls `eth_chainId` and rejects an endpoint that cannot prove the expected chain.
 - `gate: "group_gate"` checks worker-native group membership before upload, list, or read bytes are exposed. The gate reads group ids from `storageProfile.payloadAccessControl.groupId`/`groupIds`, or from payload metadata for per-payload group storage refs. Missing, deleted, or unreadable groups fail closed.
 - `gate: "none"` keeps canonical payloads in Cloudflare but serves read/list requests without wallet auth. Uploads still require authenticated session worker requests unless the caller is already on an anonymous read/list route. Use this for public question prompts or public response summaries that should render identically across Arweave, Cloudflare, Telegram, Mini App, and the CE client.
 - `encryption: "lit"` keeps the existing Lit scaffold. Cloudflare stores only caller-supplied encrypted payload envelopes and Lit governs decrypt. The worker rejects plaintext Cloudflare uploads in this mode until the client/session path supplies `payloadEncrypted=true` with a Lit-encrypted envelope.
-- `encryption: "worker_envelope"` encrypts payload bytes at rest inside the session worker trust domain, then releases keys only after worker-evaluated conditions pass. The operator and Cloudflare runtime can decrypt. This mode protects against storage-layer dumps of R2/KV/D1 data, backups, or bucket/index misconfiguration; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime. Audience removal stops future key release, but cannot un-read plaintext already fetched.
+- `encryption: "worker_envelope"` encrypts payload bytes at rest inside the session worker trust domain, then releases keys only after worker-evaluated conditions pass. The operator and Cloudflare runtime can decrypt. This mode protects against storage-layer dumps of the supported R2/KV payload stores, backups, or bucket/index misconfiguration; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime. Audience removal stops future key release, but cannot un-read plaintext already fetched.
 
 Lit credentials are required only for `lit-arweave` storage or Cloudflare `encryption: "lit"` payload mode. Cloudflare `sbt_gate`, `worker_envelope`, and `none` modes hide the `/new` Lit key input; `sbt_gate` relies on the session worker SBT check while `none` relies on the operator intentionally publishing the payload. In `/new`, `worker_envelope` is selectable only when `storage.backend` is `cloudflare`; Arweave-backed encrypted artifacts remain Lit-managed.
 
@@ -291,11 +417,15 @@ Lit credentials are required only for `lit-arweave` storage or Cloudflare `encry
 
 `worker_envelope` uses WebCrypto AES-256-GCM and the existing session config/index stores:
 
-- Deployment KEK: read from the Worker secret `CE_STORAGE_ENVELOPE_KEK` through the `worker_secret` key provider. The plaintext KEK is never stored in KV, D1, or R2. `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` is optional during deployment-key rotation so old session KEKs can be unwrapped and rewrapped under the current secret.
-- Session KEK: generated on the first envelope write for a session, wrapped by the deployment KEK, and stored in `session:{slug}:config` under `storageEnvelope.sessionKey`.
+- Deployment KEK: read from the Worker secret `CE_STORAGE_ENVELOPE_KEK` through the `worker_secret` key provider. The plaintext KEK is never stored in KV or R2. Keep this secret stable for the lifetime of the encrypted session. Automatically provisioned Workers do not return this secret to the client. `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` is a temporary break-glass unwrap fallback after a mistaken replacement, not a rotation mechanism: restore the original value as `CE_STORAGE_ENVELOPE_KEK`, verify reads, and then remove the fallback.
+- Session KEK: generated locally on the first envelope write for a session and wrapped by the deployment KEK before coordination. The per-session `SessionWriteCoordinator` adopts one wrapped candidate, keeps that wrapped record authoritative, and projects it to `session:{slug}:config` under `storageEnvelope.sessionKey`. Raw session keys and the deployment KEK never pass through coordinator state. A missing coordinator binding fails closed instead of falling back to a racing KV write.
 - Payload DEK: generated per payload, used to encrypt the stored bytes, wrapped by the session KEK, and stored in payload metadata with the envelope algorithm, IVs, key id, and condition reference.
 
-Reads authorize first, then unwrap the DEK, decrypt the payload, return `Cache-Control: private, no-store`, and write one key-release audit event. The audit store is D1 when a `CE_STORAGE_AUDIT_D1`/`STORAGE_AUDIT_D1`/`DB` binding is present; otherwise it uses `CE_STORAGE_AUDIT_KV` or the storage index KV. If no audit store is available, key release fails closed.
+All R2 uploads require a readable/writable index KV binding. Worker-envelope
+payloads additionally keep the wrapped payload DEK in that authoritative row,
+so the general R2/index check returns `501` before key creation or any R2 write.
+
+Reads authorize first, await one KV key-release audit event, then unwrap the DEK, decrypt the payload, and return `Cache-Control: private, no-store`. The worker uses `CE_STORAGE_AUDIT_KV` when present, otherwise the storage index KV aliases. D1 bindings are not envelope-audit stores. If no KV audit store is available or the audit write fails, key release fails closed before decryption.
 
 Access conditions may be attached per payload or at session level:
 
@@ -312,21 +442,25 @@ Access conditions may be attached per payload or at session level:
 
 `match: "any"` releases when any condition passes; `match: "all"` requires every condition. Empty or missing conditions fall back to the configured gate. Unknown condition kinds fail closed. `worker_group` checks canonical worker group membership and deleted groups fail closed.
 
-`POST /admin/rotate-envelope-keys` is admin-signed. It rewraps payload DEKs under a new session KEK and stores the session KEK wrapped by the current deployment KEK without re-encrypting payload bytes.
+### Encrypted Envelope Archive
 
-### Envelope Export And Re-Host
+Admin-signed `POST /admin/export-storage-envelopes` returns an encrypted archival bundle for Cloudflare payloads. The response includes a manifest, ciphertext payload entries, per-payload envelope metadata, and wrapped session-key metadata. For `worker_envelope`, payload entries carry the wrapped DEK, IV, algorithm, key provider, and condition document reference. For Cloudflare `lit` payloads, the worker passes through the ciphertext as stored and does not attempt Lit decrypt.
 
-Admin-signed `POST /admin/export-storage-envelopes` returns a re-hostable bundle for Cloudflare encrypted payloads. The response includes a manifest, ciphertext payload entries, per-payload envelope metadata, and the wrapped session KEK material needed by an operator-controlled re-host flow. For `worker_envelope`, payload entries carry the wrapped DEK, IV, algorithm, key provider, and condition document reference. For Cloudflare `lit` payloads, the worker passes through the ciphertext as stored and does not attempt Lit decrypt.
+The export manifest includes `exportScope: "encrypted_envelopes_only"`, `storageBackend`, `encryptedPayloadCount`, `partial`, `readErrors`, `wrappedKeysIncluded`, `keyProvider`, and `deploymentKekContinuityRequired`. That continuity flag is true when the archive actually contains worker-secret-wrapped material and false for pure-Lit or empty exports. Manifest version 1 also retains `rewrapRequiredForNewDeployment` as a deprecated compatibility alias with the same value; it is a warning to preserve the original secret, not an available rewrap operation. Telegram response export honors the same scope by calling `/storage/export-envelopes?resource=responses` with a session export/admin principal; that route packages ciphertext and envelope metadata, omits session KEK material, and skips `/storage/read`.
 
-The export manifest includes `exportScope: "encrypted_envelopes_only"`, `storageBackend`, `encryptedPayloadCount`, `partial`, `readErrors`, `wrappedKeysIncluded`, `keyProvider`, and `rewrapRequiredForNewDeployment: true`. Telegram response export honors the same scope by calling `/storage/export-envelopes?resource=responses` with a session export/admin principal; that route packages ciphertext and envelope metadata, omits session KEK material, and skips `/storage/read`.
-
-Admin-signed `POST /admin/rewrap-envelope-deployment-key` accepts `{ "newDeploymentKek": "<secret value>" }` and re-wraps the stored session KEK under that new deployment KEK without changing payload ciphertext or wrapped payload DEKs. Use this during an operator-controlled re-host to move a session to a worker with a different `CE_STORAGE_ENVELOPE_KEK`, then retire the old deployment secret after verification. Rotation or re-wrap stops future key release under retired keys; it cannot un-read plaintext that was already fetched.
+The export is non-mutating and does not change encryption keys. A worker-envelope
+archive remains tied to the original Worker's `CE_STORAGE_ENVELOPE_KEK`; the
+bundle alone cannot decrypt it. Default and sponsored provisioning deliberately
+do not expose that generated secret, so this release does not claim portable
+cross-Worker recovery. Manual operators who need external disaster recovery must
+preserve their originally supplied secret outside the bundle. The worker does not
+accept a replacement deployment secret in an Admin request.
 
 ### Worker-Native Groups
 
-Groups are canonical in `sessionCorsWorker`; the agent bridge and clients are future consumers, not owners, of this state. Group membership is visible to the worker/operator by design. This is the same trust domain as worker-enforced gates.
+Groups are canonical in `sessionCorsWorker`; the Agent Bridge's demographic research buckets are separate profile data and never grant worker access, and the Bridge does not mirror worker group definitions or memberships. Agent-enabled sessions use the session-worker JWT returned by client login to call `/groups/list`, `/groups/my-memberships`, and `/groups/join` directly. The Admin page uses the existing signed worker-admin request path for group and member management. These routes require the explicit `groups` scope; successful registry-backed participant login grants that scope after the default session gate passes, and session configuration may still disable it explicitly. The legacy `arweave` compatibility scope applies only to storage routes. Group membership is visible to the worker/operator by design. This is the same trust domain as worker-enforced gates.
 
-Group records and membership rows are stored separately in the worker group store. The worker uses `CE_WORKER_GROUPS_D1` when present, otherwise the same D1 aliases used by envelope audit, otherwise `CE_WORKER_GROUPS_KV` or the storage index KV aliases. Membership rows are keyed by normalized principals and are not embedded in group objects.
+Group records and membership rows are stored separately in KV. The worker uses `CE_WORKER_GROUPS_KV` when present, otherwise the storage index KV aliases. D1 and envelope-audit bindings are never group stores, so adding an unrelated database cannot switch group authority away from existing KV state. Membership rows are keyed by normalized principals and are not embedded in group objects.
 
 Implemented routes:
 
@@ -336,7 +470,7 @@ Implemented routes:
 - `POST /admin/groups/add-member` / `POST /admin/groups/remove-member`: admin-signed membership mutation.
 - `POST /admin/groups/list` and `POST /admin/groups/list-members`: admin-signed group/member views.
 - `GET|POST /groups/list`: authenticated member route. It returns session-visible groups and member-visible groups for the caller.
-- `GET|POST /groups/my-memberships`: authenticated self view. A principal can always see its own memberships.
+- `GET|POST /groups/my-memberships`: authenticated self view. A principal can always see its own memberships. Each row includes the active `memberCount` for that group without exposing the other principals.
 - `POST /groups/join`: authenticated self-join for `joinMode: "open"` groups only.
 
 `memberVisibility` defaults to `admin_only`. `members` lets members see the group metadata, and `session` lets any authenticated session principal see the group metadata. Self-membership visibility is always allowed. `passkey_account` and `evm_address` principals use normalized EVM addresses, `telegram` uses the bridge principal id string, and `agent` uses the grant id. Malformed principals fail closed.
@@ -347,21 +481,37 @@ Upload policy `group_allowlist` may be supplied on Cloudflare storage uploads wi
 
 KV:
 - `GROUP_KV`
-- `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) when Cloudflare payload storage uses KV metadata/index rows, and required for KV-only payload fallback. The deploy helper aliases the same newly created namespace as `GROUP_KV` and `CE_STORAGE_INDEX_KV` for Cloudflare-backed sessions.
-- `CE_STORAGE_AUDIT_KV` (optional) for worker-envelope key-release audit events. If omitted, the worker uses the storage index KV for audit rows when no D1 audit binding is present.
-- `CE_WORKER_GROUPS_KV` (optional) for worker-native group records and membership rows. If omitted, the worker uses the storage index KV aliases. Membership rows remain separate from group records.
+- `CE_STORAGE_INDEX_KV` (or `STORAGE_INDEX_KV` / `STORAGE_KV`) for all Cloudflare payload storage: it holds authoritative R2 per-item authorization metadata and the KV-only payload fallback. R2 uploads require both `get` and `put`, and R2 reads never fall back to custom object metadata. The deploy helper aliases the same newly created namespace as `GROUP_KV` and `CE_STORAGE_INDEX_KV` for Cloudflare-backed sessions.
+- `CE_STORAGE_AUDIT_KV` (optional) for worker-envelope key-release audit events. If omitted, the worker uses the storage index KV for audit rows.
+- `CE_WORKER_GROUPS_KV` (optional) for worker-native group records and membership rows. If omitted, the worker uses the storage index KV aliases. Membership rows remain separate from group records. D1-only configuration is not a group store and fails as unconfigured.
 
-R2/D1:
+R2 / Durable Objects:
 - `CE_STORAGE_R2` (or `STORAGE_R2` / `R2_BUCKET`) for preferred Cloudflare payload blobs. One-click deploys bind this only when the request supplies an existing R2 bucket name.
-- `CE_STORAGE_AUDIT_D1` (or `STORAGE_AUDIT_D1` / `DB`) for worker-envelope key-release audit events when the deployment wants a queryable audit table.
-- `CE_WORKER_GROUPS_D1` (optional) for queryable worker-native group records and membership rows. If absent, group storage can use the same D1 aliases as envelope audit; any D1 group store is preferred over KV.
-- D1 may be linked for queryable metadata/indexes where a deployment models those indexes in D1 instead of KV; ordinary payload bytes should stay in R2.
-- Durable Objects are for signer/runtime coordination only, not ordinary session payload blobs.
+- `CE_SESSION_COORDINATOR` binds the SQLite-backed `SessionWriteCoordinator`
+  class for direct/sponsored deploy idempotency, one-shot sponsored faucet
+  receipts, atomic wrapped session-key selection, and versioned public session
+  config mutation. One-click deploy metadata installs migration tag
+  `ce-session-write-coordinator-v1`; a repeated upload retries without
+  reapplying an already-installed migration. Coordinator state contains only
+  credential-redacted deploy/faucet records, normalized public session config,
+  revisions, and wrapped session-key records. It never stores deployment
+  credentials, raw session keys, deployment KEKs, raw DEKs, request bodies,
+  worker bundle bytes, or ordinary session payload blobs. The binding serializes
+  first-use key selection with signed Admin config mutations. Once its authority
+  record exists, that record is canonical and KV is its readable projection;
+  manual KV edits are not imported and may be overwritten by the next
+  coordinated write. Use signed Admin routes for runtime config changes. The
+  deploy helper may seed a new isolated KV namespace before the Worker can run
+  and before coordinator authority exists, but it does not whole-replace a
+  compatible live config during resume. Payload-plus-index uploads intentionally
+  retain at-least-once retry semantics: success means both writes completed, while
+  a failed or response-lost attempt may leave an invisible orphan or a readable
+  duplicate. There is no upload receipt journal or key-rotation state machine.
 
 Vars:
 - `TOKEN_HMAC_SECRET` (HMAC secret for session tokens)
 - `CE_STORAGE_ENVELOPE_KEK` (Worker secret for `worker_envelope`; required only when sessions use `encryption: "worker_envelope"`. `/new` custom-worker deploys that select worker-envelope storage ask the deploy helper to generate and set this secret during Worker provisioning; manual deployments must set it themselves.)
-- `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` (optional Worker secret used only while rewrapping old session KEKs after deployment-key rotation)
+- `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` (temporary break-glass unwrap fallback after a mistaken deployment-secret replacement; restore the original current KEK, verify access, then remove the fallback)
 - `CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION` (optional; defaults to `100`)
 - `CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP` (optional; defaults to `1000`)
 - `DEFAULT_SESSION_SLUG` (optional; canonical)
@@ -383,51 +533,59 @@ Runtime:
 - `session:{slug}:config` JSON:
   ```json
   {
+    "slug": "test-72",
+    "sessionId": "0x0123456789abcdef0123456789abcdef",
+    "configRevision": "6f0c2c84-f28b-4fa7-baba-d035f9767967",
+    "sessionName": "Example session",
+    "sessionInfo": "Worker-canonical example",
+    "adminAddress": "0x0000000000000000000000000000000000000001",
+    "corsWorkerUrl": "https://test-72-a1b2c3d4e5f6.example.workers.dev",
+    "allowOrigins": ["https://app.example"],
+    "sessionModeProfile": {
+      "profileVersion": 1,
+      "preset": "fast_cheap_cloudflare",
+      "storage": { "backend": "cloudflare" },
+      "authority": { "mode": "worker_canonical" },
+      "evm": { "registryChainId": null },
+      "identity": { "default": "passkey", "enabled": ["passkey"] },
+      "authorization": { "mechanisms": ["worker_roles"] },
+      "encryption": { "mode": "worker_envelope", "keyProvider": "worker_secret" },
+      "surfaces": { "web": true, "telegram": false, "miniApp": false, "agentHttp": false, "mcp": false, "ceCc": false },
+      "results": { "visibility": "participant_aggregate" },
+      "export": { "scope": "admin_raw" }
+    },
+    "workerAuthority": {
+      "version": 1,
+      "participantScopes": ["ai", "storage"],
+      "anonymousScopes": []
+    },
     "storageProfile": {
       "backend": "cloudflare",
       "resources": { "docsContext": "active", "questions": "active", "surveys": "active", "responses": "active" },
-      "payloadAccessControl": { "gate": "sbt_gate", "encryption": "none" },
-      "cloudflare": { "payloadAccessMode": "worker_sbt_gate" }
+      "payloadAccessControl": { "encryption": "worker_envelope" }
     },
-    "storageEnvelope": {
-      "version": 1,
-      "keyProvider": "worker_secret",
-      "sessionKey": {
-        "version": 1,
-        "keyProvider": "worker_secret",
-        "alg": "AES-256-GCM",
-        "wrapAlg": "AES-GCM-KW-v1",
-        "iv": "base64url-wrapped-iv",
-        "wrappedKey": "base64url-wrapped-session-kek"
-      }
-    },
-    "slug": "test-72",
-    "networkChainId": 11155420,
-    "registryAddress": "0x...",
-    "registryChainId": 11155420,
-    "adminAddress": "0x...",
-    "hatsAddress": "0x...",
-    "adminHatId": "123",
-    "rpcUrl": "https://...",
-    "blockLimits": { "start": 12345678, "end": null },
-    "contracts": {
-      "surveys": { "address": "0x...", "chainId": 11155420 }
-    },
-    "allowOrigins": ["https://app.example"],
-    "limits": { "perWalletPerDay": 1000 },
-    "scopes": { "ai": true, "arweave": true, "transcribe": true, "faucet": true, "fetch": true }
+    "ai": { "models": { "fast": { "provider": "openai", "model": "gpt-5" } } },
+    "limits": { "perWalletPerDay": 1000 }
   }
   ```
   For `"backend": "cloudflare"`, new `/new` configs default canonical CE payload
   resources (`docsContext`, `questions`, `surveys`, `responses`, media, and
   generated artifacts) to `"active"` unless an advanced draft explicitly stages
   a resource for legacy fallback.
-  - `hatsAddress` / `adminHatId` are optional; leave blank/zero to use `adminAddress` only.
+  - `workerAuthority.version: 1` is required for worker-canonical login and
+    anonymous scope evaluation. Session existence is the presence of this
+    persisted canonical config; it does not require a registry record.
+  - `registryAddress`, chain/RPC, `blockLimits`, contract, Hats, and faucet
+    fields remain supported for legacy/decentralized or explicitly chain-backed
+    profiles, but the default worker-canonical config omits them.
   - Worker KV config is normalized on read/write:
     - `allowOrigins` accepts legacy comma/newline-delimited strings but is stored/read as a trimmed array.
     - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist).
     - if a `slug` field is present in the config payload, the authenticated request slug / KV key remains authoritative and overwrites mismatched values.
     - `/admin/set-config` preserves existing `limits` / `scopes` object branches when malformed non-object patches are sent, instead of letting those branches degrade into corrupted shapes.
+    - writes fail closed when open config subtrees contain secret-like keys,
+      Cloudflare deployment tokens, URL credentials, RPC/faucet values, or
+      provider credential aliases.
 - `session:{slug}:secrets` v1 envelope JSON:
   ```json
   {
@@ -451,22 +609,25 @@ Runtime:
     and non-object scalars are stringified before storage.
   - Reads still accept legacy unversioned secrets objects, but new admin and
     deploy-helper writes store the v1 envelope.
+  - The Cloudflare API token is never a session secret. A direct `/new` token is
+    consumed only by the deploy helper and is not written to either KV record.
 
 ## Session authority model
 
 The session config resolution follows a strict authority matrix that determines which
 sources are authoritative for each field group. This is defined in
-`client/src/utilities/session/sessionAuthorityMatrix.ts` and partially adopted by
-`client/src/utilities/session/canonicalSessionContext.ts`; full gate and secret
-enforcement is deferred to stage-B strictness work.
+`client/src/utilities/session/sessionAuthorityMatrix.ts` and enforced by
+`client/src/utilities/session/canonicalSessionContext.ts`. Authority depends on
+the declared profile: Worker KV owns canonical worker sessions; the registry and
+Arweave retain their existing roles for decentralized sessions.
 
 ### Authority sources
 
 | Source | Key | Description |
 |---|---|---|
-| Registry | `registry` | On-chain SessionRegistry contract (authoritative for identity and gates) |
-| Arweave | `arweave` | Arweave metadata uploads (authoritative for text metadata) |
-| Worker KV | `worker-kv` | Cloudflare Worker KV store (authoritative for worker config) |
+| Registry | `registry` | On-chain SessionRegistry contract (authoritative for decentralized identity and gates) |
+| Arweave | `arweave` | Arweave metadata uploads (authoritative for decentralized text metadata) |
+| Worker KV | `worker-kv` | Cloudflare Worker KV store (authoritative for worker-canonical identity, content, gates, and worker config) |
 | Worker Secrets | `worker-secrets` | Cloudflare Worker secrets (authoritative for API keys) |
 | Browser | `browser` | Browser localStorage (authoritative for local preferences) |
 | Demo | `demo` | Demo session configs (fallback only for identity and text metadata) |
@@ -476,13 +637,13 @@ enforcement is deferred to stage-B strictness work.
 
 | Field Group | Authoritative Source | Allowed Fallbacks | Must Not Override |
 |---|---|---|---|
-| Identity (slug, sessionId, metadataURI, chainId) | Registry | Demo | Arweave, Browser, Cache |
-| Gates (sponsored, sponsoredSbtAddress, gates) | Registry | — | Arweave, Browser, Demo, Cache |
-| Text Metadata (sessionName, sessionInfo, tags, ai, lit, encryption) | Arweave | Demo, Cache | Browser |
+| Identity (slug, sessionId, metadataURI, chainId) | Worker KV for `worker_canonical`; Registry for decentralized | Demo only in explicit demo mode | Browser, Cache |
+| Gates/authority policy | Worker KV for `worker_canonical`; Registry for decentralized | — | Browser, Demo, Cache |
+| Text Metadata (sessionName, sessionInfo, tags, ai, encryption) | Worker KV for `worker_canonical`; Arweave for decentralized | Demo in explicit demo mode | Browser, Cache |
 | Worker Config (corsWorkerUrl, allowOrigins, limits, rpcEndpoint) | Worker KV | — | Arweave, Browser, Demo, Cache |
 | Secrets (arweaveJwk, apiKey, privateKey) | Worker Secrets | Browser | Arweave, Demo, Cache |
 | Local Preferences (rpc.useLocal, rpc.apiKey, arweave.useLocal, arweave.jwk, faucet.useLocal, faucet.privateKey) | Browser | — | All other sources |
-| Cache Replica (__fromCache) | — | — | All other sources |
+| Cache Replica (`__fromCache`) | — | — | All authoritative sources |
 
 ### Client-side helpers
 
@@ -806,24 +967,44 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   `config.rpcUrl` normalization, mapped `rpcUrlsByChainId` lookup,
   registry-chain merge + dedupe behavior, and the existing caller contracts
   used by login gate evaluation, Arweave SBT association, and faucet RPC
-  selection.
+  selection. Worker-canonical runtime callers may attach the same-network
+  `customRpcUrl` secret on a private non-enumerable request object; it is never
+  copied into KV, a public config projection, or JSON output.
 - Shared registry/faucet RPC resolution now routes through
   `workers/sessionCorsWorker/registryFaucetRpcResolution.js`, preserving
-  registry-chain mapped + direct fallback ordering, explicit faucet `rpcUrl`
-  precedence, `faucet.chainId -> networkChainId -> registryChainId`
+  registry-chain mapped + direct fallback ordering,
+  `faucet.chainId -> networkChainId -> registryChainId`
   selection, Base Sepolia special ordering, Base mainnet fallbacks, and the
   existing caller contracts used by login/admin/anonymous registry reads,
   Arweave association checks, and authenticated faucet RPC selection.
+  Worker-canonical faucet execution now prefers the attached same-network
+  session secret, then legacy explicit `faucet.rpcUrl`, then mapped/public
+  fallbacks; decentralized-session ordering is unchanged. Contract and faucet
+  proof reads attest `eth_chainId` first. Registry-authority reads use
+  `registryChainId` as the expected chain, with `networkChainId` retained only as
+  the legacy fallback when `registryChainId` is absent or zero. A malformed
+  explicit `registryChainId` does not fall through; authority reads fail closed.
+  Before SessionRegistry reads used by login preflight/resource gates, anonymous
+  routes, faucet eligibility/gate lookup, storage gate fallback, bootstrap
+  ownership, and Arweave session association, the Worker attests `eth_chainId`.
+  Attestation is memoized only within the current request; mismatches or
+  unavailable identity deny the read. Worker-canonical paths that do not use
+  SessionRegistry remain off-chain. Diagnostics identify private endpoints only
+  as `[private-session-rpc]` and never return their host, path, query, or raw
+  upstream error message.
 - Shared RPC URL list normalization now routes through
   `workers/sessionCorsWorker/rpcUrlListNormalization.js`, preserving trimmed
   scalar/array normalization plus first-seen dedupe ordering across merged
   URL lists for the extracted gate, registry, faucet, and bootstrap-admin
   helper paths.
 - Shared chain-id normalization now routes through
-  `workers/sessionCorsWorker/chainIdNormalization.js`, preserving the
-  existing Number-based chain-id coercion and `0` fallback behavior used by
-  the extracted gate, registry/faucet, login-scope, session-gate, Arweave,
-  and faucet helper paths.
+  `workers/sessionCorsWorker/chainIdNormalization.js`. It accepts only positive
+  safe-integer numbers, whole decimal strings, or complete `0x` hex strings.
+  Signed, fractional, scientific-notation, partial-hex, non-finite, and
+  precision-losing values normalize to `0` and therefore fail closed across the
+  extracted gate, registry/faucet, login-scope, session-gate, storage SBT,
+  Arweave, Lit Chipotle, and faucet helper paths. Only absent or legacy zero
+  sentinels advance through documented chain fallback precedence.
 - Shared base string coercion plus deps-aware trimmed-string normalization
   now route through `workers/sessionCorsWorker/stringCoercion.js`,
   preserving the existing `string -> same`, `nullish -> ''`, and
@@ -850,7 +1031,15 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
    - Signed login request authority now also routes through a shared helper:
      it preserves slug resolution, address/message/slug preconditions,
      existing-session CORS passthrough, SIWE/signature/nonce validation,
-     missing-config `404`, and on-chain scope computation before token signing.
+     missing-config `404`, and mode-specific scope computation before token
+     signing.
+   - For `worker_canonical`, the persisted KV config is session existence.
+     Login does not query SessionRegistry; it derives participant scopes and any
+     login gate from the required version-1 `workerAuthority` policy plus
+     worker-native groups. The passkey-derived EOA can therefore log into a
+     session that has never been registered on-chain.
+   - Registry-canonical sessions keep their existing on-chain existence, gate,
+     and scope evaluation.
    - Signed login request dispatch remains the thinner shared helper shell:
      it preserves login JSON parse failures, token signing, and the final
      `{ token, exp }` response contract after the extracted authority helper
@@ -940,6 +1129,19 @@ Never return secrets in responses.
 
 `/admin/set-config` notes:
 - The session slug is taken from the signed request context, not trusted from `config.slug`.
+- After a worker-canonical session is initialized, its slug, worker URL, authority
+  mode, and normalized `sessionId`/`sessionIdHex` identity are immutable. Attempts
+  to retarget that Worker return `409`.
+- The first signed worker-canonical publish carrying a `configRevision` finalizes
+  that publication in the server-managed KV record. A sequential exact
+  same-revision retry is an idempotent no-op; a different revision returns
+  `409`. Session config writes are serialized by the per-session coordinator
+  with first-use worker-envelope key selection. Revision-free signed Admin
+  patches remain supported; upload retry receipts and key-changing maintenance
+  actions are not part of this config boundary.
+- A successful worker-canonical publish is terminal in `/new`, including after a
+  reload or another open tab observes the settlement record. Use **Create another
+  session** to clear the settled local wizard state and begin a new session.
 - Legacy string `allowOrigins` payloads are accepted and normalized into arrays.
 - `limits` and `scopes` only merge from object payloads; malformed non-object patches are ignored rather than corrupting stored branches.
 - Signed request validation is shared with login/bootstrap flows:
@@ -950,7 +1152,8 @@ Never return secrets in responses.
   and still switches to on-chain admin authorization once the registry proves the slug exists.
 - Configured admin authorization now also routes through a shared helper:
   it preserves direct `adminAddress` authorization, uses config-derived RPC URLs for optional Hats `isWearerOfHat(...)`
-  checks, and still fails closed when Hats config is incomplete or no configured RPC can prove the wearer.
+  checks, attests each candidate endpoint against the exact registry chain first,
+  and still fails closed when Hats config is incomplete or no configured RPC can prove the wearer.
 - Signed admin request authority now also routes through a shared helper:
   it preserves signed slug resolution, address/message/slug preconditions,
   existing-session CORS passthrough, SIWE/signature/nonce validation,
@@ -992,7 +1195,9 @@ Never return secrets in responses.
   - `check` / `decrypt` derive RPC from worker-approved config, secrets, or
     defaults. Request `rpcUrl` / `customRpcUrl` is rejected unless it exactly
     matches that allowlist, and the Lit Action rejects endpoints whose reported
-    chain ID does not match the gate chain.
+    chain ID does not match the gate chain. Gate-chain inputs use the same strict
+    parser as worker authority reads, so malformed explicit values cannot fall
+    through to a different configured chain.
   - stored Chipotle metadata omits RPC URLs; legacy v1 / bare-hex Chipotle
     wrapped keys are rejected by default and must be recreated with v2 metadata
   - admin `POST /admin/lit-chipotle-status` to query worker-mediated Chipotle
@@ -1140,6 +1345,18 @@ Signed login/bootstrap requests:
 
 ## Endpoints
 
+- `GET /session-config?slug=<slug>` with matching `X-Session-Slug`
+  - `X-Session-Slug` remains the authoritative selector. When the optional
+    `slug` query alias is present, the worker validates it and returns `400`
+    unless it is canonical and exactly matches the resolved header slug.
+  - Public, CORS-scoped bootstrap for persisted `worker_canonical` sessions;
+    registry-canonical or missing configs return `404`.
+  - Returns `{ ok, sessionSlug, config }` with the sanitized canonical config
+    needed by a fresh browser. It never returns the session secrets envelope,
+    Cloudflare token, provider credentials, Lit credentials, RPC/faucet config,
+    JWKs, passwords, private keys, authorization headers, or URL credentials.
+  - Success and error responses are `Cache-Control: no-store` and vary on both
+    `Origin` and `X-Session-Slug`.
 - `GET /health` (requires Authorization token; does not require session KV config, so it works for newly registered sessions during bootstrap)
 - `GET /resource-presence` with `X-Session-Slug`
   - Validates the selected session and its browser-origin CORS policy.
@@ -1261,6 +1478,12 @@ Manual:
   - Deploy-helper paste/upload file: `dist/deployHelper.bundle.js`
 - Enable Node.js compatibility + add deps in the dashboard.
 - Create KV namespace `GROUP_KV` and add vars.
+- Bind a SQLite-backed Durable Object namespace named `CE_SESSION_COORDINATOR`
+  to the bundle's exported `SessionWriteCoordinator` class and install migration
+  tag `ce-session-write-coordinator-v1` with that class in
+  `new_sqlite_classes`. Without this binding, signed config mutations and the
+  first worker-envelope write fail closed with `503`; use a Wrangler/module
+  upload when the dashboard cannot install the binding and migration together.
 
 Deploy-helper (trusted, self-host via CLI or Wrangler):
 - For a copyable starting point, use `workers/deploy-helper/wrangler.example.toml` and `workers/deploy-helper/.dev.vars.example`.
@@ -1268,22 +1491,95 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
   - If you insist on dashboard/manual upload instead of Wrangler, pre-bundle the helper first because the checked-in source imports `../shared/*.mjs`.
 - Or publish it directly with the repo automation helper:
   - `nvm use 20 && npm run deploy-helper:deploy -- --worker-name <your-helper-name> --api-token <cloudflare-token> --allowed-origins https://your-app.example,http://localhost:3000`
+  - The CLI upload binds `CE_SESSION_COORDINATOR` and installs migration tag
+    `ce-session-write-coordinator-v1`. Re-running it against a helper that already
+    has that migration retries the same module and binding without replaying the
+    one-time migration.
+  - The helper still needs only one deployment token containing `Workers
+    Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
+    binding and migration are part of the Worker script upload.
   - If you omit `--allowed-origins`, the CLI seeds the stable hosted/local defaults only. Unlike `/new`, it does not know your current self-hosted browser origin, so custom hosts still need an explicit `--allowed-origins`.
   - If you omit `--admin-secret`, the script generates one and prints it after deploy so you can still manage `/admin/origins`.
-- `POST /deploy` with CF API token, worker name, admin address, registry info, rpcUrl (optional hats config).
-  - `accountId` remains optional for low-level callers, but the first-party wizard now omits it and lets the helper resolve the account from the API token.
+- `POST /deploy` with CF API token, requested worker name, passkey-derived admin
+  address, session identity/profile, authority policy, public canonical config,
+  and the AI secret selected by the profile. Registry/RPC/Hats fields are
+  profile-dependent and are omitted for the default worker-canonical deploy.
+  - `accountId` is not a deploy selection input. The helper always discovers
+    exactly one visible account through Cloudflare using the API token and fails
+    on zero or multiple accounts; caller-supplied account IDs are ignored.
+  - Creator onboarding sends that one deployment token only. The separate
+    `CLOUDFLARE_API_TOKEN` with `API Tokens: Read` used by the two-key live E2E is
+    a separate same-user, E2E-only policy auditor: it reads the dedicated token's
+    policy and permission-group catalog, compares immutable permission IDs, and
+    is never included in a deploy request or required from a session creator.
+  - First-party callers include `deploymentRequestId` (8-128 safe identifier
+    characters). Sequential retries after a lost or gateway-shaped response
+    must reuse both that ID and `configRevision`; a definitive terminal response
+    or an explicit new attempt rotates them.
   - Provide either `bundleUrl` (release asset) or `bundleText` (raw bundle contents) from the `/new` UI.
 - The helper fetches the latest bundled worker asset and configures KV + bindings.
+- Every fresh deploy treats the requested worker name as a readable prefix. An
+  idempotent request derives a stable physical suffix and KV title marker from
+  `deploymentRequestId`; a legacy request without that ID receives a random
+  suffix. The helper requires authoritative preflight `404` responses before
+  staging and immediately before upload. Rollback deletes only resources that
+  still prove ownership by the current deployment id.
+- In-place redeploy remains disabled. Preserving or replacing an existing
+  physical worker requires a separate explicit state-migration workflow because
+  its KV may contain auth markers, groups, storage indexes, and wrapped envelope
+  keys that are not present in a fresh deploy request.
+- Rollback deletes a staged KV namespace only after the uploaded script is
+  confirmed absent or the exact deployment-id owner is deleted. If ownership
+  changed, cannot be verified, or script deletion fails, the helper retains and
+  reports that KV; do not delete it until the live binding is recovered or
+  independently verified.
+- Local Cloudflare E2E finalizers serialize only narrow KV-only,
+  owned-delete-ready, prior-verified Worker-delete-failed, or verify-later
+  ownership recovery handoffs. The last form is emitted whenever account or Worker-settings
+  ownership cannot be verified; transient reads use bounded retries first. It
+  requires exact live deployment and KV binding markers before either resource
+  is deleted. Each handoff contains a domain-separated HMAC-SHA256 proof made
+  with the cleanup token; it never stores that token. The proof binds the
+  recovery type, Worker name, token-derived
+  account ID, KV namespace, deployment marker, and cleanup status. The private
+  E2E runbook documents the stripped operator-only recovery command. Recovery
+  re-derives the account before settings or delete calls and fails closed if the
+  selected token now exposes a different account. The CLI atomically reserves a
+  distinct writable result before any Cloudflare request, then persists a signed
+  owned-delete-ready checkpoint after exact settings proof and before its first
+  Worker DELETE. A failed checkpoint write issues no DELETE. An incomplete
+  attempt persists only a validated signed handoff, advanced to a successor when
+  cleanup state changes. That result is valid input for the next recovery
+  invocation; a crash or final write failure leaves the latest durable handoff
+  reserved.
+- Concurrent deploys with different request IDs may reuse the same requested
+  prefix; each receives a distinct physical worker name and isolated KV
+  namespace. Stable same-ID requests are serialized by
+  `SessionWriteCoordinator` before Cloudflare mutation; matching in-flight work
+  is retryable, conflicting immutable identities fail closed, and terminal safe
+  receipts replay without repeating deployment side effects. The KV journal
+  remains the resumable per-step record after coordination.
+- A definitive bundle-upload rejection after stable staging writes a separate,
+  non-secret recovery marker that outlives the ordinary replay journals until
+  terminal success. A same-ID retry may change only the bundle source/bytes (and
+  rotate the request-only token); every infrastructure-affecting field remains
+  bound. A visible Worker must match the exact deployment, KV, Durable Object,
+  storage, admin, slug, and helper-mode bindings before replacement. Both
+  visible and temporarily hidden replacements preserve `secret_text` bindings,
+  and any later non-success remains pending. The helper returns/replays success
+  only after the terminal receipt commits and the rejection marker is removed.
 - Optional: pass `subdomain` (or `workersSubdomain`) to set the account-level workers.dev subdomain
-  when none exists yet (falls back to a deterministic `ce-<accountId>` name). This is the only
-  deploy-helper path that needs `Account Settings: Edit`; script-level Workers.dev enablement uses
-  the Workers script scope.
+  when none exists yet (falls back to a deterministic `ce-<accountId>` name). Account-level and
+  script-level workers.dev setup are both covered by `Workers Scripts: Edit`.
 - `allowOrigins` entries are normalized to origins (`https://host`, `http://localhost:3000`), and the
   helper returns a normalized `workerUrl` with protocol. The first-party Session Wizard default seed list includes the hosted app plus local dev/E2E origins for ports `3000`, `3001`, and `7391`.
 - `/new` now uses the project helper by default at `https://ce-deploy-helper.agalmic.workers.dev/`.
 - If you self-host a different helper, set `REACT_APP_CE_DEPLOY_HELPER_URL=https://<deploy-helper-name>.<account-subdomain>.workers.dev/` in `client/.env` so the local `/new` flow uses your override instead.
 
-Warning: passing a Cloudflare API token to a deploy-helper requires trust.
+Warning: passing a Cloudflare API token to a deploy-helper requires trust. On
+the direct `/new` route, the token is request-only input and must not be
+returned, logged, placed in metadata/config, or stored by the helper or session
+worker. Sponsored deploy grants are the separately documented legacy exception.
 
 ## Release bundle
 

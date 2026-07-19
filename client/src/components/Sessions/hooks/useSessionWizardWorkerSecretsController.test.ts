@@ -5,6 +5,7 @@ import {
 } from '../../../domains/sessions/publish/sessionPublishAdapters.js';
 import { setGlobalLitHooks } from '../../../utilities/crypto/litProtocol.js';
 import { SPONSORED_FIELD_KEYS } from '../../../utilities/session/sponsoredFlags.js';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../../utilities/session/sessionModeProfile';
 import type { WorkerSecretsLike } from '../../shellTypes';
 import useSessionWizardWorkerSecretsController from './useSessionWizardWorkerSecretsController';
 
@@ -99,9 +100,17 @@ const baseDraft = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
+const buildWorkerCanonicalLitProfile = () => {
+  const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+  profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+  profile.encryption = { mode: 'lit' };
+  return profile;
+};
+
 const createControllerHarness = (overrides: Record<string, unknown> = {}) => {
   const {
     draft: draftOverride,
+    draftFactory: draftFactoryOverride,
     workerSecrets: workerSecretsOverride,
     applyWorkerSecretsUpdate: applyWorkerSecretsUpdateOverride,
     updateDraftValue: updateDraftValueOverride,
@@ -115,7 +124,10 @@ const createControllerHarness = (overrides: Record<string, unknown> = {}) => {
       account: '0x00000000000000000000000000000000000000aa',
       provider: 'injected-provider',
       network: { id: 11155420 },
-      draft: baseDraft((draftOverride as Record<string, unknown> | undefined) || {}),
+      draft:
+        typeof draftFactoryOverride === 'function'
+          ? draftFactoryOverride()
+          : baseDraft((draftOverride as Record<string, unknown> | undefined) || {}),
       wizardMode: 'advanced',
       deployComplete: false,
       deployWorkerUrl: '',
@@ -179,6 +191,146 @@ describe('useSessionWizardWorkerSecretsController', () => {
       'Lit group ID',
       'Lit PKP ID',
     ]);
+  });
+
+  it('requires only the AI key for the default Cloudflare profile', () => {
+    const { result } = createControllerHarness({
+      network: { id: 0 },
+      registryChainId: 0,
+      draft: baseDraft({
+        networkChainId: 0,
+        rpc: { providers: {} },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      }),
+      workerSecrets: baseWorkerSecrets(),
+    });
+
+    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['OpenAI key']);
+  });
+
+  it('requires a bootstrap key or a complete existing runtime for selected Lit encryption', () => {
+    const commonDraft = baseDraft({
+      sessionModeProfile: buildWorkerCanonicalLitProfile(),
+    });
+    const missing = createControllerHarness({
+      draft: commonDraft,
+      workerSecrets: baseWorkerSecrets({ openaiKey: 'sk-ai' }),
+    });
+    const bootstrap = createControllerHarness({
+      draft: commonDraft,
+      workerSecrets: baseWorkerSecrets({ openaiKey: 'sk-ai', litAccountApiKey: 'lit-account' }),
+    });
+    const existingRuntime = createControllerHarness({
+      draft: commonDraft,
+      workerSecrets: baseWorkerSecrets({
+        openaiKey: 'sk-ai',
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litGroupId: 'group-1',
+        litPkpId: 'pkp-1',
+        litActionCid: 'bafy-action',
+        litUsageApiKey: 'lit-usage',
+      }),
+    });
+
+    expect(missing.result.current.getMissingWorkerSecretsForDeploy()).toContain(
+      'Lit API key or complete Lit runtime credentials',
+    );
+    expect(bootstrap.result.current.getMissingWorkerSecretsForDeploy()).toEqual([]);
+    expect(existingRuntime.result.current.getMissingWorkerSecretsForDeploy()).toEqual([]);
+  });
+
+  it.each(['anthropicKey', 'openrouterKey'])(
+    'does not accept unselected %s for the default Cloudflare AI models',
+    (key) => {
+      const { result } = createControllerHarness({
+        network: { id: 0 },
+        registryChainId: 0,
+        draft: baseDraft({
+          networkChainId: 0,
+          rpc: { providers: {} },
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        }),
+        workerSecrets: baseWorkerSecrets({ [key]: 'provider-secret' }),
+      });
+
+      expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['OpenAI key']);
+    },
+  );
+
+  it.each([
+    ['anthropic', 'anthropicKey'],
+    ['openrouter', 'openrouterKey'],
+  ])('accepts the selected %s provider key for worker-canonical AI models', (provider, key) => {
+    const { result } = createControllerHarness({
+      network: { id: 0 },
+      registryChainId: 0,
+      draft: baseDraft({
+        networkChainId: 0,
+        rpc: { providers: {} },
+        ai: {
+          models: {
+            fast: { provider },
+            thinking: { provider },
+          },
+        },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      }),
+      workerSecrets: baseWorkerSecrets({ [key]: 'provider-secret', openaiKey: 'transcription-secret' }),
+    });
+
+    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual([]);
+  });
+
+  it('requires every provider selected by mixed worker-canonical AI models', () => {
+    const { result } = createControllerHarness({
+      network: { id: 0 },
+      registryChainId: 0,
+      draft: baseDraft({
+        networkChainId: 0,
+        rpc: { providers: {} },
+        ai: {
+          models: {
+            fast: { provider: 'openai' },
+            thinking: { provider: 'anthropic' },
+          },
+        },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      }),
+      workerSecrets: baseWorkerSecrets({ anthropicKey: 'provider-secret' }),
+    });
+
+    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['OpenAI key']);
+  });
+
+  it('refreshes provider-aware readiness when the selected AI providers change', () => {
+    let draft = baseDraft({
+      networkChainId: 0,
+      rpc: { providers: {} },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const { result, rerender } = createControllerHarness({
+      network: { id: 0 },
+      registryChainId: 0,
+      draftFactory: () => draft,
+      workerSecrets: baseWorkerSecrets({ openaiKey: 'provider-secret' }),
+    });
+
+    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual([]);
+
+    draft = baseDraft({
+      networkChainId: 0,
+      rpc: { providers: {} },
+      ai: {
+        models: {
+          fast: { provider: 'anthropic' },
+          thinking: { provider: 'anthropic' },
+        },
+      },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    rerender();
+
+    expect(result.current.getMissingWorkerSecretsForDeploy()).toEqual(['Anthropic key']);
   });
 
   it('preserves sponsored fallback fields only for the current slug and worker URL', () => {

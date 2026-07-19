@@ -62,6 +62,7 @@ export const resolveSponsoredBundleAdvancedFieldNotices = ({
 
 export const cacheSessionWorkerConfigAfterDeploy = ({
   deployStatusCode,
+  deployPartial,
   configSyncStatus,
   workerUrl,
   slug,
@@ -70,6 +71,7 @@ export const cacheSessionWorkerConfigAfterDeploy = ({
   config,
 }: {
   deployStatusCode?: unknown;
+  deployPartial?: unknown;
   configSyncStatus?: AnyRecord | null;
   workerUrl?: unknown;
   slug?: unknown;
@@ -80,6 +82,7 @@ export const cacheSessionWorkerConfigAfterDeploy = ({
   if (
     !shouldCacheSessionWorkerConfigAfterDeploy({
       deployStatusCode,
+      deployPartial,
       configSyncStatus,
       workerUrl,
     })

@@ -1,5 +1,41 @@
 import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
 import { toStr } from '../../utilities/shared/primitives.js';
+import type { SessionWizardWorkerRequirementProof } from './sessionWizardWorkerRequirementProof';
+
+type WorkerDeployRuntimeSnapshot = {
+  draft?: Record<string, unknown> | null;
+  workerMode?: string;
+  deployComplete?: boolean;
+  deployWorkerUrl?: string;
+  workerRequirementProof?: SessionWizardWorkerRequirementProof | null;
+};
+
+type WorkerDeployRuntimeRef<Runtime extends WorkerDeployRuntimeSnapshot> = {
+  current: Runtime | null;
+};
+
+export const publishVerifiedRuntime = <Runtime extends WorkerDeployRuntimeSnapshot>(
+  runtimeRef: WorkerDeployRuntimeRef<Runtime> | undefined,
+  fallbackDraft: Record<string, unknown>,
+  workerUrl: string,
+  displayWorkerUrl: string,
+  deployComplete: boolean,
+  workerRequirementProof: SessionWizardWorkerRequirementProof | null,
+): void => {
+  if (!runtimeRef || !workerUrl) return;
+  // React state setters do not flush inside the awaited deploy callback. Keep
+  // concurrent draft edits while publishing the verified tuple synchronously.
+  const runtime = runtimeRef.current && typeof runtimeRef.current === 'object' ? runtimeRef.current : ({} as Runtime);
+  const draft = runtime.draft && typeof runtime.draft === 'object' ? runtime.draft : fallbackDraft;
+  runtimeRef.current = {
+    ...runtime,
+    workerMode: 'custom',
+    deployComplete,
+    deployWorkerUrl: displayWorkerUrl,
+    workerRequirementProof,
+    draft: { ...draft, corsWorkerUrl: workerUrl },
+  } as Runtime;
+};
 
 type SessionWizardConfigSyncStatus = Record<string, unknown> & {
   synced?: unknown;
@@ -73,12 +109,18 @@ export const resolveSessionWizardWorkerVerificationUiState = ({
 
 export const shouldCacheSessionWorkerConfigAfterDeploy = ({
   deployStatusCode,
+  deployPartial,
   configSyncStatus,
   workerUrl,
 }: {
   deployStatusCode?: unknown;
+  deployPartial?: unknown;
   configSyncStatus?: SessionWizardConfigSyncStatus | null;
   workerUrl?: unknown;
-} = {}) =>
-  !!normalizeWorkerAuthUrl(toStr(workerUrl).trim()) &&
-  (Number(deployStatusCode || 0) === 200 || configSyncStatus?.synced === true);
+} = {}) => {
+  if (!normalizeWorkerAuthUrl(toStr(workerUrl).trim())) return false;
+  // A partial 200 proves infrastructure survival, not config authority. Cache
+  // the draft only after the signed recovery write confirms the current config.
+  if (deployPartial === true) return configSyncStatus?.synced === true;
+  return Number(deployStatusCode || 0) === 200 || configSyncStatus?.synced === true;
+};

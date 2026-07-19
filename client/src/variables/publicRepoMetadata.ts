@@ -1,7 +1,7 @@
 export const PUBLIC_GITHUB_ORG = 'AgalmicSoftware';
 export const PUBLIC_GITHUB_REPO = 'context-engine';
 export const PUBLIC_GITHUB_BRANCH = 'main';
-export const PUBLIC_SECURITY_EMAIL = '[redacted-email]';
+export const PUBLIC_SECURITY_EMAIL = 'contextengine@protonmail.com';
 
 export const PUBLIC_REPO_URL = `https://github.com/${PUBLIC_GITHUB_ORG}/${PUBLIC_GITHUB_REPO}`;
 export const PUBLIC_REPO_SOURCE_URL = `${PUBLIC_REPO_URL}/tree/${PUBLIC_GITHUB_BRANCH}`;

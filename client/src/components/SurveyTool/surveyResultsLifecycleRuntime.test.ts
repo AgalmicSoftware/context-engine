@@ -344,4 +344,52 @@ describe('runSurveyResultsComponentDidMount', () => {
     expect(window.location.pathname).toBe('/questions');
     expect(window.location.search).toBe('?session=edge');
   });
+
+  it('reports a rejected detached survey refresh without leaking the rejection', async () => {
+    const instance = createInstance();
+    const error = new Error('atomic persistence failed');
+    const refreshSurveyResponsesByID = jest.fn().mockRejectedValue(error);
+    const reportDetachedRefreshError = jest.fn();
+    const props = createProps({
+      isOpen: true,
+      refreshSurveyResponsesByID,
+      surveyId: '0xABC',
+      viewMode: 'survey',
+    });
+    const state = createState({
+      surveyId: '0xABC',
+      viewMode: 'survey',
+    });
+
+    const cleanup = runSurveyResultsComponentDidMount({
+      instance,
+      ports: {
+        appendSessionHintToSurveyPath: (path) => path,
+        applyStatePatch: (_patch, afterApply) => afterApply?.(),
+        destroyFetchResponsesRuntime: jest.fn(),
+        destroyLocalStoragePollingRuntime: jest.fn(),
+        destroyQueuedResultsRefreshRuntime: jest.fn(),
+        getProps: () => props,
+        getState: () => state,
+        handleDocumentVisibilityChange: jest.fn(),
+        handleManagedCacheUpdate: jest.fn(),
+        handleManualRefresh: jest.fn(),
+        handleUrlBasedView: jest.fn(),
+        handleUrlChange: jest.fn(),
+        queueResultsRefresh: jest.fn(),
+        reportDetachedRefreshError,
+        subscribeCacheUpdates: jest.fn(),
+        updateLocalStoragePollingState: jest.fn(),
+        updateParentWithCurrentFiltersForUrl: jest.fn(),
+      },
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(refreshSurveyResponsesByID).toHaveBeenCalledWith('0xabc');
+    expect(reportDetachedRefreshError).toHaveBeenCalledWith('initial-survey-refresh', error);
+
+    cleanup();
+  });
 });

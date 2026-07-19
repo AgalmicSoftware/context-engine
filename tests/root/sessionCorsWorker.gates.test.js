@@ -436,13 +436,15 @@ describe('sessionCorsWorker gate authority', () => {
 
     const rpcMethods = fetchMock.mock.calls.map(([, options]) => JSON.parse(options?.body || '{}').method);
     expect(rpcMethods.filter((method) => method === 'eth_getCode')).toHaveLength(1);
-    expect(rpcMethods.filter((method) => method === 'eth_chainId')).toHaveLength(1);
+    // One request attests the registry reads; the existing diagnostic probe
+    // intentionally performs its own endpoint-health request.
+    expect(rpcMethods.filter((method) => method === 'eth_chainId')).toHaveLength(2);
     expect(logSpy).toHaveBeenCalledWith(
       '[gating] registry code probe',
       expect.objectContaining({
         slug: 'general',
         bytecodeSize: 2,
-        rpcUrl: 'https://rpc.example/',
+        rpcUrl: 'https://rpc.example',
         errors: [],
         error: '',
       })

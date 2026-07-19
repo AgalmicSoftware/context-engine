@@ -1,10 +1,10 @@
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppShell, appShellDispatchActions } from './AppShell';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import contractScripts from '../../utilities/web3/chainGateway.js';
-import { initCacheManager } from '../../utilities/cache/cacheScripts.js';
+import { initCacheManager, updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
@@ -18,6 +18,8 @@ import {
 import { FIRST_VISIT_STORAGE_KEY } from '../Onboarding/onboardingConfig.js';
 import { FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY } from './sessionFallbackRedirect.js';
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
+import { createLitHooks, setGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile.js';
 
 const mockAdminPage = jest.fn(() => null);
 const mockSponsorPage = jest.fn(() => null);
@@ -150,6 +152,7 @@ jest.mock('../DocumentLibrary/SessionDocumentsPage', () => {
         'data-session-id-hex': String(props.sessionIdHex || ''),
         'data-session-slug': String(props.sessionSlug || ''),
         'data-session-token': String(props.sessionToken || ''),
+        'data-worker-origin': String(props.workerOrigin || ''),
       });
     },
   };
@@ -167,6 +170,7 @@ jest.mock('../OnePageSession/OnePageSession', () => {
         'data-session-info': String(props.sessionInfo || ''),
         'data-session-slug': String(props.slug || ''),
         'data-question-session-slug': String(props.questionSessionSlug || ''),
+        'data-network-id': String(props.network?.id || ''),
       });
     },
   };
@@ -316,9 +320,11 @@ jest.mock('../../utilities/ui/uiRuntimeStats.js', () => ({
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   __esModule: true,
+  buildSbtAccessControlConditions: jest.fn(() => []),
   createLitHooks: jest.fn(() => ({})),
   attachLitDevTools: jest.fn(),
   getGlobalLitHooks: jest.fn(() => null),
+  resolveLitChain: jest.fn(() => 'optimismSepolia'),
   setGlobalLitHooks: jest.fn(),
 }));
 
@@ -331,6 +337,7 @@ jest.mock('../../utilities/cache/cacheScripts.js', () => ({
   __esModule: true,
   initCacheManager: jest.fn(() => Promise.resolve()),
   subscribeCacheUpdates: jest.fn(() => jest.fn()),
+  updateCacheAtomic: jest.fn(),
 }));
 
 jest.mock('../../utilities/web3/sessionRegistry.js', () => {
@@ -617,6 +624,7 @@ describe('AppShell route render smoke', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     initCacheManager.mockResolvedValue(undefined);
+    updateCacheAtomic.mockReset();
     getSessionConfigBySlug.mockImplementation(() => null);
     normalizeSessionSlug.mockImplementation((value = '') =>
       String(value || '')
@@ -787,6 +795,44 @@ describe('AppShell route render smoke', () => {
     );
   });
 
+  it('fresh-loads a worker-canonical admin link without registry lookup', async () => {
+    const workerOrigin = 'https://admin-worker.example.com';
+    const sessionId = '0xabcdefabcdefabcdefabcdefabcdefab';
+    const workerConfig = {
+      slug: 'admin-worker',
+      sessionId,
+      configRevision: 'admin-revision-1',
+      corsWorkerUrl: workerOrigin,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          sessionSlug: workerConfig.slug,
+          config: workerConfig,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const subject = createSubject({
+      path: '/admin',
+      search:
+        `?sessionId=${sessionId}&sessionSlug=${workerConfig.slug}` + `&worker=${encodeURIComponent(workerOrigin)}`,
+      sessionConfig: null,
+    });
+
+    const view = render(subject.render());
+
+    expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toBeInTheDocument();
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+    view.rerender(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_ADMIN_ROOT)).toBeInTheDocument();
+    expect(mockAdminPage.mock.calls.at(-1)?.[0]?.initialSessionConfig).toEqual(workerConfig);
+    expect(mockAdminPage.mock.calls.at(-1)?.[0]?.initialRegistryChainId).toBeNull();
+  });
+
   it('renders the posts root without waiting for cache hydration', async () => {
     const subject = createSubject({ path: '/posts' });
     subject.state = {
@@ -832,6 +878,210 @@ describe('AppShell route render smoke', () => {
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'demo');
     expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-question-session-slug', 'demo');
+  });
+
+  it('fresh-loads an explicit worker-canonical session without registry fallback', async () => {
+    const workerOrigin = 'https://worker-session.example.com';
+    const workerConfig = {
+      slug: 'worker-session',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      configRevision: 'revision-1',
+      corsWorkerUrl: workerOrigin,
+      sessionName: 'Worker Session',
+      networkChainId: 11155420,
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+        storage: { mode: 'worker_kv' },
+        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+      },
+      workerAuthority: { participantScopes: ['ai', 'storage'] },
+    };
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          sessionSlug: 'worker-session',
+          config: workerConfig,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const subject = createSubject({
+      path: '/session/worker-session',
+      search: `?worker=${encodeURIComponent(workerOrigin)}`,
+      activeSessionSlug: 'edge',
+      sessionConfig: null,
+    });
+    subject.resolveSessionPathSlug = jest.fn();
+
+    const view = render(subject.render());
+
+    expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent(
+      'Loading worker session',
+    );
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+
+    view.rerender(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'worker-session');
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-network-id', '11155420');
+    expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual(workerConfig);
+    expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
+    expect(fetchSpy.mock.calls[0][0]).toBe('https://worker-session.example.com/session-config?slug=worker-session');
+  });
+
+  it('installs verified explicit-Lit worker hooks through the boundary and route controller', async () => {
+    const workerOrigin = 'https://worker-lit.example.com';
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.encryption = { mode: 'lit' };
+    sessionModeProfile.evm.registryChainId = 11155420;
+    const workerConfig = {
+      slug: 'worker-lit',
+      sessionId: '0x11223344556677889900aabbccddeeff',
+      configRevision: 'revision-lit-1',
+      corsWorkerUrl: workerOrigin,
+      sessionName: 'Worker Lit Session',
+      // The validated Lit profile is authoritative when stale top-level data
+      // disagrees with the chain used for encryption and decryption.
+      networkChainId: 84532,
+      sessionModeProfile,
+    };
+    const bootstrapResponse = createDeferred();
+    const fetchSpy = jest.spyOn(globalThis, 'fetch').mockReturnValueOnce(bootstrapResponse.promise);
+    const litHooks = { saveKey: jest.fn(), getKey: jest.fn() };
+    createLitHooks.mockReturnValueOnce(litHooks);
+    const subject = createSubject({
+      path: '/session/worker-lit',
+      search: `?worker=${encodeURIComponent(workerOrigin)}`,
+      activeSessionSlug: 'edge',
+      sessionConfig: null,
+    });
+    subject.handleNetworkChange = jest.fn();
+    subject.syncSessionFallbackRedirectConsumption = jest.fn();
+
+    const view = render(subject.render());
+
+    // A routing query alone must not install hooks before the boundary has
+    // fetched, validated, cached, and marked the worker bootstrap verified.
+    subject.syncLitHooks();
+    expect(createLitHooks).not.toHaveBeenCalled();
+    expect(setGlobalLitHooks).toHaveBeenLastCalledWith(null);
+
+    await act(async () => {
+      bootstrapResponse.resolve(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionSlug: workerConfig.slug,
+            config: workerConfig,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+      await bootstrapResponse.promise;
+    });
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+
+    const prevState = {
+      ...subject.state,
+      litHooks: null,
+      sessionPathResolutionNonce: 0,
+    };
+    subject.componentDidUpdate(subject.props, prevState);
+
+    expect(createLitHooks).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chainId: 11155420,
+        litNetwork: 'chipotle',
+        chipotle: expect.objectContaining({
+          sessionSlug: 'worker-lit',
+          sessionConfig: workerConfig,
+          workerUrl: workerOrigin,
+        }),
+      }),
+    );
+    expect(setGlobalLitHooks).toHaveBeenLastCalledWith(litHooks);
+    expect(subject.state.litHooks).toBe(litHooks);
+
+    view.rerender(subject.render());
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    const onePageSessionProps = mockOnePageSession.mock.calls.at(-1)?.[0];
+    expect(onePageSessionProps?.litHooks).toBe(litHooks);
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-network-id', '11155420');
+    expect(onePageSessionProps?.networkChainId).toBe(11155420);
+    expect(onePageSessionProps?.sessionConfig).toEqual({
+      ...workerConfig,
+      networkChainId: 11155420,
+    });
+
+    const envelopeOrigin = 'https://worker-envelope.example.com';
+    const envelopeConfig = {
+      slug: 'worker-envelope',
+      sessionId: '0xffeeddccbbaa00998877665544332211',
+      configRevision: 'revision-envelope-1',
+      corsWorkerUrl: envelopeOrigin,
+      sessionName: 'Worker Envelope Session',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    const envelopeResponse = createDeferred();
+    fetchSpy.mockReturnValueOnce(envelopeResponse.promise);
+    const litRouteState = { ...subject.state };
+    setRoute('/session/worker-envelope', `?worker=${encodeURIComponent(envelopeOrigin)}`);
+
+    view.rerender(subject.render());
+    subject.componentDidUpdate(subject.props, litRouteState);
+
+    expect(subject.state.litHooks).toBeNull();
+    expect(setGlobalLitHooks).toHaveBeenLastCalledWith(null);
+    expect(createLitHooks).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      envelopeResponse.resolve(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionSlug: envelopeConfig.slug,
+            config: envelopeConfig,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      );
+      await envelopeResponse.promise;
+    });
+    await waitFor(() =>
+      expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(litRouteState.sessionPathResolutionNonce),
+    );
+
+    subject.componentDidUpdate(subject.props, {
+      ...subject.state,
+      sessionPathResolutionNonce: litRouteState.sessionPathResolutionNonce,
+    });
+    expect(subject.state.litHooks).toBeNull();
+    expect(setGlobalLitHooks).toHaveBeenLastCalledWith(null);
+    expect(createLitHooks).toHaveBeenCalledTimes(1);
+
+    view.rerender(subject.render());
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.litHooks).toBeNull();
+  });
+
+  it('fails closed on duplicate worker discovery parameters without registry fallback', async () => {
+    const fetchSpy = jest.spyOn(globalThis, 'fetch');
+    const subject = createSubject({
+      path: '/session/worker-session',
+      search: '?worker=https%3A%2F%2Ffirst.example.com&worker=https%3A%2F%2Fsecond.example.com',
+      sessionConfig: null,
+    });
+    subject.resolveSessionPathSlug = jest.fn();
+
+    render(subject.render());
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('must appear exactly once');
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
   });
 
   it('redirects a first-visit root load to the about page', async () => {
@@ -1435,6 +1685,48 @@ describe('AppShell route render smoke', () => {
       'data-session-id-hex',
       '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     );
+  });
+
+  it('forwards validated worker discovery to an unregistered worker-canonical docs route', async () => {
+    const workerOrigin = 'https://worker-docs.example.workers.dev';
+    const workerConfig = {
+      slug: 'worker-docs',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      configRevision: 'worker-docs-revision-1',
+      corsWorkerUrl: workerOrigin,
+      sessionName: 'Worker Docs',
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+        storage: { backend: 'cloudflare' },
+        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+      },
+    };
+    jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ok: true,
+          sessionSlug: workerConfig.slug,
+          config: workerConfig,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const subject = createSubject({
+      path: '/session/worker-docs/docs',
+      search: `?worker=${encodeURIComponent(workerOrigin)}`,
+      sessionConfig: null,
+    });
+    subject.resolveSessionPathSlug = jest.fn();
+
+    const view = render(subject.render());
+
+    expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toBeInTheDocument();
+    await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+    view.rerender(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_DOCS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-session-docs-page')).toHaveAttribute('data-worker-origin', workerOrigin);
+    expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
   });
 
   it('renders the session route with resolved session metadata', async () => {
@@ -2242,6 +2534,11 @@ describe('AppShell route render smoke', () => {
         },
       },
     });
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const next = await updater(dg.read(name, slug));
+      dg.write(name, slug, next);
+      return next;
+    });
     subject.buildMetadataSessionCacheEnvelope = jest.fn((metadata, slug) => ({
       targetSlug: slug,
       metadata: {
@@ -2312,6 +2609,270 @@ describe('AppShell route render smoke', () => {
       needsQuestionResponsesNonce: true,
       checkAllCachesReady: true,
     });
+  });
+
+  it('merges event metadata into the latest cache and publishes readiness only after persistence', async () => {
+    const questionId = `0x${'5'.repeat(64)}`;
+    const concurrentId = `0x${'6'.repeat(64)}`;
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    const dg = attachDgStore(subject, {
+      'questionsCache:edge': {
+        84532: {
+          questionsLatestBlock: 12,
+          questionsDiscoveryCheckpointBlock: 12,
+          questions: {},
+          questionResponses: {},
+          questionResponsesMeta: {},
+          questionResponsesLatestBlock: 12,
+          pendingQuestionMetadata: {},
+          arweaveTxCache: {},
+          arweaveTxFailureCache: {},
+          questionHydrationMeta: {},
+        },
+      },
+    });
+    const persist = createDeferred();
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const current = dg.read(name, slug) || {};
+      if (name === 'questionsCache') {
+        current['84532'].questions[concurrentId] = { id: concurrentId, prompt: 'Concurrent' };
+        current['84532'].questionsLatestBlock = 40;
+      }
+      const next = await updater(current);
+      await persist.promise;
+      dg.write(name, slug, next);
+      return next;
+    });
+    subject.buildMetadataSessionCacheEnvelope = jest.fn((metadata, slug) => ({
+      targetSlug: slug,
+      metadata: { ...metadata, sessionSlug: slug, slug },
+    }));
+    subject.buildQuestionDecryptContext = jest.fn(() => ({ sessionSlug: 'edge' }));
+    subject.setReadinessStateIfChanged = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+    });
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 20 });
+    contractScripts.getQuestionData.mockResolvedValue({ prompt: 'Event question' });
+
+    const eventPromise = subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'QuestionsAdded',
+      questionIds: [questionId],
+      blockNumber: 30,
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
+    persist.resolve();
+    await eventPromise;
+
+    const stored = dg.read('questionsCache', 'edge')['84532'];
+    expect(stored.questions[concurrentId]).toEqual(expect.objectContaining({ prompt: 'Concurrent' }));
+    expect(stored.questions[questionId]).toEqual(expect.objectContaining({ prompt: 'Event question' }));
+    expect(stored.questionsLatestBlock).toBe(40);
+    expect(subject.queueLocalRevisionUpdate).toHaveBeenCalledWith({
+      needsQuestionResponsesNonce: true,
+      checkAllCachesReady: true,
+    });
+  });
+
+  it('keeps event readiness closed and rejects when managed-cache persistence rejects', async () => {
+    const questionId = `0x${'7'.repeat(64)}`;
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    attachDgStore(subject, {
+      'questionsCache:edge': {
+        84532: {
+          questionsLatestBlock: 12,
+          questions: {},
+          questionResponses: {},
+          questionResponsesMeta: {},
+          pendingQuestionMetadata: {},
+          arweaveTxCache: {},
+          arweaveTxFailureCache: {},
+          questionHydrationMeta: {},
+        },
+      },
+    });
+    updateCacheAtomic.mockRejectedValue(new Error('indexeddb unavailable'));
+    subject.buildMetadataSessionCacheEnvelope = jest.fn((metadata, slug) => ({
+      targetSlug: slug,
+      metadata: { ...metadata, sessionSlug: slug, slug },
+    }));
+    subject.buildQuestionDecryptContext = jest.fn(() => ({ sessionSlug: 'edge' }));
+    subject.setReadinessStateIfChanged = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+    });
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 20 });
+    contractScripts.getQuestionData.mockResolvedValue({ prompt: 'Event question' });
+
+    await expect(
+      subject.onNewSurveyEventDetectedForGroup('edge', {
+        type: 'QuestionsAdded',
+        questionIds: [questionId],
+        blockNumber: 30,
+      }),
+    ).rejects.toThrow('Failed to persist questions cache');
+
+    expect(subject.state.isQuestionCacheReady).toBe(false);
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rechecks response-event recency inside the atomic updater before publishing a revision', async () => {
+    const questionId = `0x${'8'.repeat(64)}`;
+    const responder = '0x00000000000000000000000000000000000000a8';
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    const dg = attachDgStore(subject, {
+      'questionsCache:edge': {
+        84532: {
+          questionsLatestBlock: 12,
+          questions: {},
+          questionResponses: { [questionId]: {} },
+          questionResponsesMeta: { [questionId]: {} },
+          questionResponsesLatestBlock: 12,
+          pendingQuestionMetadata: {},
+          arweaveTxCache: {},
+          arweaveTxFailureCache: {},
+          questionHydrationMeta: {},
+        },
+      },
+    });
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const current = dg.read(name, slug) || {};
+      if (name === 'questionsCache') {
+        current['84532'].questionResponses[questionId][responder] = { answer: 'concurrent-newer' };
+        current['84532'].questionResponsesMeta[questionId][responder] = { bn: 40, txi: 1, li: 1, ts: 1 };
+        current['84532'].questionResponsesLatestBlock = 40;
+      }
+      const next = await updater(current);
+      dg.write(name, slug, next);
+      return next;
+    });
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 20 });
+    contractScripts.getResponse.mockResolvedValue({ answer: 'event-older' });
+
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'ResponsesSubmitted',
+      surveyId: `0x${'0'.repeat(64)}`,
+      questionIds: [questionId],
+      responder,
+      blockNumber: 30,
+      transactionIndex: 1,
+      logIndex: 1,
+      timestamp: 1,
+    });
+
+    const stored = dg.read('questionsCache', 'edge')['84532'];
+    expect(stored.questionResponses[questionId][responder]).toEqual({ answer: 'concurrent-newer' });
+    expect(stored.questionResponsesLatestBlock).toBe(40);
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
+  });
+
+  it('fails closed on malformed cached response recency metadata', async () => {
+    const questionId = `0x${'a'.repeat(64)}`;
+    const responder = '0x00000000000000000000000000000000000000aa';
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    const dg = attachDgStore(subject, {
+      'questionsCache:edge': {
+        84532: {
+          questionsLatestBlock: 12,
+          questions: {},
+          questionResponses: { [questionId]: { [responder]: { answer: 'keep-existing' } } },
+          questionResponsesMeta: { [questionId]: { [responder]: { bn: 'invalid', txi: 0, li: 0, ts: 0 } } },
+          questionResponsesLatestBlock: 12,
+          pendingQuestionMetadata: {},
+          arweaveTxCache: {},
+          arweaveTxFailureCache: {},
+          questionHydrationMeta: {},
+        },
+      },
+    });
+    updateCacheAtomic.mockImplementation(async (name, slug, updater) => {
+      const next = await updater(dg.read(name, slug) || {});
+      dg.write(name, slug, next);
+      return next;
+    });
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 20 });
+    contractScripts.getResponse.mockResolvedValue({ answer: 'do-not-apply' });
+
+    await subject.onNewSurveyEventDetectedForGroup('edge', {
+      type: 'ResponsesSubmitted',
+      surveyId: `0x${'0'.repeat(64)}`,
+      questionIds: [questionId],
+      responder,
+      blockNumber: 30,
+      transactionIndex: 1,
+      logIndex: 1,
+      timestamp: 1,
+    });
+
+    const stored = dg.read('questionsCache', 'edge')['84532'];
+    expect(stored.questionResponses[questionId][responder]).toEqual({ answer: 'keep-existing' });
+    expect(contractScripts.getResponse).not.toHaveBeenCalled();
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
+  });
+
+  it('does not publish response-event success when atomic persistence rejects', async () => {
+    const questionId = `0x${'9'.repeat(64)}`;
+    const responder = '0x00000000000000000000000000000000000000a9';
+    const subject = createSubject({
+      path: '/session/edge',
+      activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
+    });
+    attachDgStore(subject, {
+      'questionsCache:edge': {
+        84532: {
+          questionsLatestBlock: 12,
+          questions: {},
+          questionResponses: { [questionId]: {} },
+          questionResponsesMeta: { [questionId]: {} },
+          questionResponsesLatestBlock: 12,
+          pendingQuestionMetadata: {},
+          arweaveTxCache: {},
+          arweaveTxFailureCache: {},
+          questionHydrationMeta: {},
+        },
+      },
+    });
+    updateCacheAtomic.mockRejectedValue(new Error('indexeddb unavailable'));
+    subject.queueLocalRevisionUpdate = jest.fn();
+    contractScripts.getRelevantBlockWindowForFilter.mockResolvedValue({ fromBlock: 10, toBlock: 20 });
+    contractScripts.getResponse.mockResolvedValue({ answer: 'event-response' });
+
+    await expect(
+      subject.onNewSurveyEventDetectedForGroup('edge', {
+        type: 'ResponsesSubmitted',
+        surveyId: `0x${'0'.repeat(64)}`,
+        questionIds: [questionId],
+        responder,
+        blockNumber: 30,
+        transactionIndex: 1,
+        logIndex: 1,
+        timestamp: 1,
+      }),
+    ).rejects.toThrow('Failed to persist questions cache');
+
+    expect(subject.queueLocalRevisionUpdate).not.toHaveBeenCalled();
   });
 
   it('tears down SBT detail listeners before rebuilding network caches', async () => {

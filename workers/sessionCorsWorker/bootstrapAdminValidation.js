@@ -1,3 +1,5 @@
+import { resolveRegistryChainId } from './chainIdNormalization.js';
+
 const resolveBootstrapAdminAddress = (body = {}, deps) => {
   const incoming = body?.config && typeof body.config === 'object' ? body.config : null;
   const requestedAdmin = deps?.toStr?.(incoming?.adminAddress || body?.adminAddress).trim();
@@ -18,6 +20,15 @@ export const validateBootstrapAdmin = async ({
     requestedAdmin.toLowerCase() === address.toLowerCase()
   );
 
+  const boundBootstrapAdmin = deps?.toStr?.(env?.BOOTSTRAP_ADMIN_ADDRESS || '').trim();
+  if (boundBootstrapAdmin) {
+    if (!deps?.isAddress?.(boundBootstrapAdmin)) return false;
+    return (
+      requestedAdminMatches &&
+      boundBootstrapAdmin.toLowerCase() === address.toLowerCase()
+    );
+  }
+
   const registryAddress = deps?.toStr?.(env?.REGISTRY_ADDRESS || '').trim();
   const registryRpcUrls = deps?.normalizeRpcUrlList?.(env?.RPC_URL) || [];
   const registrySlug = deps?.toRegistrySessionSlug?.(slug);
@@ -29,10 +40,21 @@ export const validateBootstrapAdmin = async ({
     return requestedAdminMatches;
   }
 
+  const incomingConfig = body?.config && typeof body.config === 'object' ? body.config : {};
+  const environmentChainId = resolveRegistryChainId({
+    registryChainId: env?.REGISTRY_CHAIN_ID,
+    networkChainId: env?.CHAIN_ID,
+  });
+  const expectedChainId = resolveRegistryChainId(incomingConfig, environmentChainId);
+  if (!expectedChainId) return false;
+  const chainAttestationCache = new Map();
+
   const sessionCheck = await deps?.readSessionExistsOnChain?.({
     registryAddress,
     registryRpcUrls,
     registrySlug,
+    expectedChainId,
+    chainAttestationCache,
   });
   if (sessionCheck?.exists === false) {
     return requestedAdminMatches;
@@ -45,6 +67,8 @@ export const validateBootstrapAdmin = async ({
     registryAddress,
     registryRpcUrls: [sessionCheck?.rpcUrl || registryRpcUrls[0]].filter(Boolean),
     registrySlug,
+    expectedChainId,
+    chainAttestationCache,
   });
   if (!tupleRead?.ok) {
     return false;

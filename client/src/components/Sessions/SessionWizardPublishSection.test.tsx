@@ -114,6 +114,10 @@ const buildProps = (overrides: Partial<SessionWizardPublishSectionProps> = {}): 
   onToggleCollapsed: jest.fn(),
   onTogglePublishAdvanced: jest.fn(),
   publishUiPlan: buildPublishUiPlan(),
+  publishSettingsCapabilities: {
+    showArweaveMetadataControls: true,
+    showGasOverrideControls: true,
+  },
   publishedPendingSbtLinks: [],
   registerExplorerBaseUrl: '',
   registerTxs: [],

@@ -9,6 +9,10 @@ import {
   normalizeWorkerUrl,
 } from './workerAuth.js';
 import { getCorsProxyUrlOrThrow } from './corsProxy.js';
+import {
+  markWorkerCanonicalSessionBootstrapVerified,
+  upsertWorkerCanonicalSessionBootstrap,
+} from '../session/sessionWorkerConfigCache.js';
 
 const TEST_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const NEXT_TEST_ADDRESS = '0x00000000000000000000000000000000000000bb';
@@ -301,6 +305,7 @@ describe('workerAuth canonical session resolution', () => {
     mockProviderRequest.mockClear();
     mockProviderRequest.mockImplementation(defaultProviderRequest);
     localStorage.clear();
+    window.history.replaceState({}, '', '/');
     jest.clearAllMocks();
   });
 
@@ -329,6 +334,54 @@ describe('workerAuth canonical session resolution', () => {
 
     const nonceBody = JSON.parse(global.fetch.mock.calls[0][1].body);
     expect(nonceBody.sessionSlug).toBe('');
+  });
+
+  it('logs into an unregistered worker-canonical session using the freshly verified route config', async () => {
+    const workerOrigin = 'https://unregistered-worker.example.com';
+    const sessionId = '0x1234567890abcdef1234567890abcdef';
+    const workerConfig = {
+      slug: 'unregistered-worker',
+      sessionId,
+      corsWorkerUrl: workerOrigin,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    upsertWorkerCanonicalSessionBootstrap({
+      slug: workerConfig.slug,
+      sessionIdHex: sessionId,
+      workerOrigin,
+      config: workerConfig,
+    });
+    expect(
+      markWorkerCanonicalSessionBootstrapVerified({
+        slug: workerConfig.slug,
+        sessionIdHex: sessionId,
+        workerOrigin,
+      }),
+    ).toBe(true);
+    window.history.replaceState({}, '', `/session/unregistered-worker?worker=${encodeURIComponent(workerOrigin)}`);
+    getCorsProxyUrlOrThrow.mockResolvedValueOnce(workerOrigin);
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'worker-nonce' }))
+      .mockResolvedValueOnce(jsonResp(200, { token: 'worker-token', exp: Math.floor(Date.now() / 1000) + 3600 }));
+
+    await expect(getWorkerSessionToken({ sessionSlug: 'unregistered-worker', context: authContext })).resolves.toBe(
+      'worker-token',
+    );
+
+    expect(getCorsProxyUrlOrThrow).toHaveBeenCalledWith({
+      sessionSlug: 'unregistered-worker',
+      sessionConfig: workerConfig,
+      context: authContext,
+      allowDemoFallback: false,
+    });
+    expect(global.fetch.mock.calls.map(([url]) => url)).toEqual([
+      `${workerOrigin}/auth/nonce`,
+      `${workerOrigin}/auth/login`,
+    ]);
+    expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual(
+      expect.objectContaining({ sessionSlug: 'unregistered-worker' }),
+    );
   });
 
   it('does not inject demo general config into worker lookup for implicit default session in on-chain mode', async () => {

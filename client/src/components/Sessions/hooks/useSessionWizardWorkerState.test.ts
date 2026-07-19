@@ -46,7 +46,6 @@ describe('useSessionWizardWorkerState', () => {
       apiToken: '',
       workerName: '',
       adminAddress: undefined,
-      accountId: '',
       bundleUrl: 'https://bundle.example/session-worker.js',
     });
     expect(result.current.bundleMode).toBe('url');
@@ -66,6 +65,15 @@ describe('useSessionWizardWorkerState', () => {
         persistWorkerSecrets: false,
         deployComplete: true,
         deployWorkerUrl: 'worker.example/path///',
+        workerRequirementProof: {
+          version: 1,
+          verificationKind: 'remote-deploy-verification',
+          workerIdentityFingerprint: 'a'.repeat(64),
+          requirementsFingerprint: 'b'.repeat(64),
+          requiredSecretFields: ['openaiKey'],
+          secretValueFingerprints: { openaiKey: 'c'.repeat(64) },
+          remoteManagedSecretFields: [],
+        },
         deployForm: {
           apiToken: ' token ',
           workerName: ' worker ',
@@ -89,15 +97,16 @@ describe('useSessionWizardWorkerState', () => {
 
     expect(result.current.workerSecretsEnabled).toBe(false);
     expect(result.current.persistWorkerSecrets).toBe(false);
-    expect(result.current.deployComplete).toBe(true);
+    expect(result.current.deployComplete).toBe(false);
     expect(result.current.deployWorkerUrl).toBe('https://worker.example/path');
+    expect(result.current.workerRequirementProof).toBeNull();
     expect(result.current.deployForm).toEqual({
       apiToken: 'token',
       workerName: 'worker',
       adminAddress: '0xAdmin',
-      accountId: 'account',
       bundleUrl: 'https://cached.example/worker.js',
     });
+    expect(result.current.deployForm.accountId).toBeUndefined();
     expect(result.current.provisionedSponsoredContext).toEqual({
       sessionSlug: 'cached-session',
       workerUrl: 'https://cached-worker.example',

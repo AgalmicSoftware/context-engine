@@ -69,5 +69,30 @@ test('lookupCloudflareAccount passes the configured API base URL to cfFetch', as
 
   assert.equal(result.ok, true);
   assert.equal(result.accountId, 'account-123');
-  assert.equal(calls[0][0], 'https://api.cloudflare.example.test/client/v4/accounts?per_page=1');
+  assert.equal(calls[0][0], 'https://api.cloudflare.example.test/client/v4/accounts?per_page=5');
+});
+
+test('lookupCloudflareAccount rejects an ambiguous multi-account token', async () => {
+  const result = await lookupCloudflareAccount({
+    apiToken: 'cf-token',
+    fetchImpl: async () => new Response(JSON.stringify({
+      success: true,
+      result: [
+        { id: 'account-123', name: 'First account' },
+        { id: 'account-456', name: 'Second account' },
+      ],
+      result_info: { total_count: 2 },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 409);
+  assert.equal(
+    result.error,
+    'Multiple accounts are available for this token. Restrict the token to exactly one account and retry.'
+  );
+  assert.equal(result.fallbackEligible, false);
 });

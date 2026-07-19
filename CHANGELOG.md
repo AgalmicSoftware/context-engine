@@ -6,6 +6,24 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Refreshed the AI discourse corpus with verified 2026 policy, safety,
+  evaluation, and practitioner sources; consolidated duplicate records,
+  repaired primary-source provenance and tweet metadata, synchronized the
+  client sample, and added normalized-URL and duplicate-title quality gates.
+- Toolchain correction (2026-07-19): Vite is the canonical client dev/build
+  path, and normal client installs again use npm's strict peer resolution.
+  Earlier entries describing Create React App as canonical or durable
+  `legacy-peer-deps` installation reflect superseded intermediate states.
+- Unified Agent Bridge authentication around session-bound user, browser, and
+  named service credentials. Telegram is now an optional identity adapter;
+  one-time invites can onboard an opaque non-Telegram user, the root token is
+  limited to bootstrap/break-glass semantics, and browser exchange returns
+  separate Bridge and session-worker credentials.
+- Added direct session-worker access-group views and open self-join controls to
+  agent-enabled sessions, plus signed group and member administration in the
+  existing Admin surface. The Agent Bridge does not proxy or mirror this state.
+- Removed the unused mock OpenClaw forwarding module and catalog entry while
+  retaining transport-neutral direct HTTP and optional host-agent adapters.
 - Completed the frontend modernization baseline with typed domain boundaries,
   downward-only type-debt and size ratchets, decomposed session, survey, and
   application shells, split CI/release verification, synchronized worker-bundle
@@ -28,9 +46,71 @@ All notable changes to this project will be documented in this file.
   depth, keeping live/future borders visible only while demo mode is enabled.
 - Split the desktop main-screen welcome controls into equal-height rows and
   aligned their rail to the slide edges without changing session welcome slides.
+- Stabilized the desktop main-screen welcome carousel at one responsive frame
+  height so advancing between slides no longer resizes the card.
+- Added the agent bridge worker and its test runner to the public release
+  surface, with public-safe setup examples and artifact-level PII verification.
 
 ### Fixed
 
+- Kept history-preserving public releases self-testing when the Agent Bridge
+  cutover follows a source-only baseline by restoring its narrow root test
+  command alongside the audited worker and runner snapshot, while using the
+  artifact scrubber to remove commands whose private runners are stripped.
+- Made Agent Bridge credential rotation publish replacements before retiring
+  prior records, rejected query-string bearer credentials and nested browser
+  exchanges, pinned credentials to their issued session, and made managed
+  account issuance fail closed without signer configuration.
+- Enforced `session_member_aggregate` result visibility against live canonical
+  worker membership and the configured minimum group size for JSON and image
+  results, failing closed when membership cannot be checked. Telegram-optional
+  user and service exchanges now derive their worker wallet from the stored
+  credential principal.
+- Granted the explicit worker-group scope after a registry-backed participant
+  passes the session's default gate, restoring direct group reads and joins
+  without weakening group membership checks.
+- Prevented worker-native group state from silently switching to an unrelated
+  D1 or envelope-audit binding: session-worker groups now use only the explicit
+  group KV or storage-index KV aliases, and D1-only group configuration fails
+  as unconfigured.
+- Kept worker-envelope key-release audits on the explicit audit KV or storage
+  index KV, ignored unrelated D1 aliases, and preserved fail-closed
+  audit-before-decrypt behavior when persistence is unavailable.
+- Required the explicit `groups` JWT scope for worker group listing,
+  self-membership reads, and joins instead of accepting the legacy `arweave`
+  storage compatibility scope.
+- Stopped generated session-worker Cloudflare profiles from advertising an
+  unused D1 primitive; payload indexes, envelope audits, and group records now
+  describe the KV authority that the deployed worker actually binds.
+- Made KV index rows authoritative for per-item Cloudflare R2 authorization
+  metadata: uploads now require a readable/writable index binding, and reads
+  fail closed without a valid matching row instead of falling back to weaker
+  object metadata.
+- Bounded Cloudflare storage listings to opaque-cursor pages and preserved
+  manual continuation in the Document Library when authorization filtering
+  produces an empty page with a later cursor.
+- Made targeted survey-response refreshes merge into the latest cache snapshot,
+  resolve concurrent same-responder updates without regressing newer or
+  unorderable values, keep scan watermarks monotonic, and publish their UI
+  revision only after durable cache persistence succeeds; detached initial
+  refresh failures are now caught and logged at the results lifecycle boundary.
+- Made the remaining survey and question discovery, response hydration, and
+  application event cache commits merge only their active deltas into the
+  latest managed-cache snapshot. Concurrent metadata, responder recency,
+  retry state, and monotonic watermarks are preserved, while readiness,
+  revisions, and awaited success are withheld when persistence fails.
+- Serialized first-use worker-envelope keys and signed session-config writes
+  through one per-session coordinator, rejected unreadable R2-only envelope
+  writes, and removed unsafe unused key-changing Admin actions. Cloudflare
+  uploads retain documented at-least-once retry behavior.
+- Hardened the `Surveys` source contract and client preflight so zero survey or
+  question IDs, zero content or response hashes, and mismatched optional
+  survey-response pairs fail before ambiguous state or wallet submission.
+- Required configured deterministic SBT deployments to be submitted by the
+  configured SBT admin in both the source contract and ethers-v5 client
+  preflight, preventing public callers from front-running predicted addresses.
+  These immutable-contract fixes require a separate testnet redeploy before
+  they are live at configured addresses.
 - Fixed passkey survey-response uploads by preserving object-valued EIP-1193
   providers through worker authentication, kept SBT metadata and image reads on
   AR.IO while direct mode is enabled, and serialized shared RPC reads per

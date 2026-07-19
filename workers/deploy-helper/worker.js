@@ -11,6 +11,7 @@ import {
   resolveDeployHelperAllowList,
   resolveDeployHelperFallbackAllowList,
 } from '../shared/deployHelperOrigins.mjs';
+export { SessionWriteCoordinator } from '../sessionCorsWorker/sessionWriteCoordinator.js';
 const isAdminAuthorized = (request, env) => {
   const adminSecret = toStr(env?.ADMIN_SECRET).trim();
   const authHeader = toStr(request.headers.get('Authorization')).trim();
@@ -98,10 +99,12 @@ export default {
       if (!apiToken) return json({ error: 'Missing apiToken.' }, 400, headers);
       const accountLookup = await lookupCloudflareAccount({ apiToken, env });
       if (!accountLookup.ok) {
+        const lookupStatus = Number(accountLookup.status || 0);
+        const responseStatus = lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502;
         return json({
           error: accountLookup.error,
           detail: accountLookup.detail,
-        }, 502, headers);
+        }, responseStatus, headers);
       }
       return json({
         accountId: accountLookup.accountId,

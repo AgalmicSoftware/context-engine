@@ -6437,7 +6437,7 @@
       "title": "The Wildcraft Drones",
       "author": "T.K. Rex",
       "year": 2026,
-      "type": "novel",
+      "type": "anthology",
       "summary": "An AI breakthrough enables a team of scientists to establish genuine communication with a wild dolphin, opening a window into non-human intelligence for the first time. But the research team is in a race against climate breakdown — rising ocean temperatures and acidification are destroying the dolphin populations they study, and funding depends on demonstrating results before their subjects disappear. The novel explores the bitter irony of developing the technology to talk to another species just as we are destroying their world.",
       "themes": [
         "AI-Animal Communication",
@@ -6470,43 +6470,44 @@
         "AI ethics discussions on non-human intelligence",
         "Climate and technology discourse"
       ],
-      "source_url": null,
+      "source_url": "https://www.stelliform.press/index.php/product/the-wildcraft-drones-by-tk-rex/",
       "source_links": []
     },
     {
-      "id": "park_bright",
-      "title": "Bright",
+      "id": "park_luminous_2025",
+      "title": "Luminous",
       "author": "Silvia Park",
-      "year": 2026,
+      "year": 2025,
       "type": "novel",
-      "summary": "A literary fiction novel described as 'brimming with thought-provoking ideas on the future of AI.' Bright explores near-term AI scenarios through a literary lens, examining how artificial intelligence reshapes human relationships, creative work, and self-understanding in the immediate future rather than in distant speculative settings.",
+      "summary": "Silvia Park’s debut novel, published by Simon & Schuster in March 2025, is set in a reunified Korea where humanoid robots are woven into families, labor, and war memory. Estranged siblings Jun and Morgan — one a detective in a robot-crimes unit, the other a robot designer — are drawn back together when a young girl finds a discarded robot boy, Yoyo, in a scrapyard. The novel uses robot personhood, obsolescence, and grief to examine what counts as a life worth protecting, and treats human–robot kinship with unusual moral seriousness rather than as spectacle.",
       "themes": [
-        "AI Futures",
-        "Technology and Society"
+        "Robot personhood",
+        "Human-robot kinship",
+        "Obsolescence and disposability",
+        "Grief and memory",
+        "War and technology",
+        "Family estrangement"
       ],
-      "novel_arguments_and_concepts": "Bright represents a growing trend in literary fiction that engages seriously with AI rather than treating it as a background technology or a plot device for dystopia. Park's contribution is to examine AI futures through the intimate scale of literary fiction — focusing on how individuals experience, adapt to, and are changed by AI systems in their daily lives rather than depicting civilization-scale transformations. This granular approach captures something that both science fiction and policy discourse often miss: the lived texture of a world where AI is pervasive but not apocalyptic, where the changes are profound but incremental, and where the most important effects are on how people understand themselves and relate to each other. The novel's literary framing positions AI not as a technical problem to be solved but as a cultural condition to be inhabited, explored, and made sense of through narrative. By eschewing both techno-utopianism and dystopian catastrophism, Park occupies a realist middle ground that may more accurately reflect how AI integration actually unfolds: not with a bang or a whimper but with a million small adjustments to what we consider normal.",
-      "relevance_to_ai_discourse": "Bright is relevant to AI discourse precisely because it approaches AI from outside the technical and policy frames that dominate the conversation. Literary fiction's strength is its attention to interiority, ambiguity, and the complexity of lived experience — qualities that are often absent from AI discourse, which tends toward abstraction and scenario analysis. The novel's engagement with near-term rather than far-future AI scenarios connects it to the growing recognition that AI's most significant impacts may be the ones that are hardest to see: not superintelligence or existential risk but the gradual transformation of work, creativity, relationships, and self-understanding. Park's work contributes to the diversification of voices in AI discourse beyond engineers, policy experts, and rationalist philosophers.",
-      "notable_discussions_and_commentary": "Noted as part of a 2026 wave of literary fiction engaging with AI themes, alongside works by other literary authors bringing non-genre perspectives to technology questions.",
-      "key_concepts_introduced": [
-        "Literary realism as AI discourse",
-        "Intimate-scale AI futures",
-        "AI as cultural condition rather than technical problem",
-        "The middle ground between utopia and dystopia"
-      ],
+      "novel_arguments_and_concepts": "Park frames robot rights primarily through intimate family relationships rather than courtroom or policy set-pieces: the moral status of machines is negotiated in scenes of caregiving, sibling rivalry, and mourning. The reunified-Korea setting ties AI embodiment to national reconciliation and the absorption of wartime technologies into civilian life, a pairing rarely explored in Anglophone AI fiction.",
+      "relevance_to_ai_discourse": "A literary treatment of robot personhood, disposability of intelligent machines, and caregiving relationships with AI — useful for discussions of moral status, embodied AI, and how societies metabolize military robotics. Finalist for the 2026 Locus Award for Best First Novel.",
+      "notable_discussions_and_commentary": [],
+      "key_concepts_introduced": [],
       "tags": [
-        "AI Futures",
-        "Society and AI",
-        "Literary Fiction",
-        "Technology and Society",
-        "Science Fiction",
-        "Narrative"
+        "Robots",
+        "Personhood",
+        "Korea",
+        "Literary SF",
+        "Debut Novel",
+        "Embodied AI"
       ],
-      "frequently_referenced_by": [
-        "Literary critics engaging with technology themes",
-        "AI and society discourse"
+      "frequently_referenced_by": [],
+      "source_url": "https://www.simonandschuster.com/books/Luminous/Silvia-Park/9781668021668",
+      "source_links": [
+        "https://www.goodreads.com/book/show/214151232-luminous"
       ],
-      "source_url": null,
-      "source_links": []
+      "verification_status": "verified",
+      "verification_notes": "Replaces fabricated entry \"Bright\" (no such Silvia Park book exists; audit 2026-07-19). Metadata verified against Simon & Schuster and Goodreads.",
+      "replaces": "park_bright"
     }
   ]
 }

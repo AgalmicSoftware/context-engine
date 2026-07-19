@@ -18,10 +18,6 @@ import {
   normalizeEmbeddedDeployHelperEnabled,
 } from '../shared/deployHelperCore.mjs';
 import {
-  rewrapStorageEnvelopeSessionKeyForDeployment,
-  rotateStorageEnvelopeKeys,
-} from './storageEnvelopeEncryption.js';
-import {
   exportCloudflareEncryptedPayloadEnvelopes,
 } from './storageRouteExecution.js';
 import {
@@ -31,6 +27,11 @@ import {
   ABUSE_COUNTER_TYPES,
   recordAbuseEvent as recordAbuseEventBoundary,
 } from './abuseObservability.js';
+import {
+  findForbiddenCloudflareDeploymentTokenPath,
+  findForbiddenWorkerConfigSecretPath,
+} from '../shared/workerSessionConfig.mjs';
+import { executeCoordinatedSessionConfigMutation } from './sessionWriteCoordinator.js';
 
 const ALLOWED_SECRET_KEYS = [
   'openaiKey',
@@ -107,6 +108,18 @@ const mergeAdminSecrets = ({
     if (value !== undefined) nextSecrets[key] = value;
   });
   return nextSecrets;
+};
+
+const executeDirectSessionConfigMutation = async ({
+  env,
+  slug,
+  existingConfig,
+  mutation,
+  deps,
+} = {}) => {
+  const coordinate = deps?.executeCoordinatedSessionConfigMutation ||
+    executeCoordinatedSessionConfigMutation;
+  return coordinate({ env, slug, existingConfig, mutation });
 };
 
 export const dispatchAdminRequest = async ({
@@ -188,14 +201,29 @@ export const dispatchAdminRequest = async ({
       deps,
     });
     if (!incoming) return deps?.json?.({ error: 'Missing config.' }, 400, headers);
+    if (findForbiddenCloudflareDeploymentTokenPath(incoming)) {
+      return deps?.json?.({
+        error: 'Cloudflare deployment tokens are not allowed in session config.',
+      }, 400, headers);
+    }
+    if (findForbiddenWorkerConfigSecretPath(incoming)) {
+      return deps?.json?.({
+        error: 'Secret-like values are not allowed in public session config fields.',
+      }, 400, headers);
+    }
 
-    const merged = deps?.mergeWorkerConfigRecords?.({
-      existingConfig,
-      incomingConfig: incoming,
+    const mutationResult = await executeDirectSessionConfigMutation({
+      env,
       slug: targetSlug,
+      existingConfig,
+      mutation: { kind: 'set-config', incomingConfig: incoming },
+      deps,
     });
-    await deps?.putSessionConfig?.(env, targetSlug, merged);
-    return deps?.json?.({ ok: true }, 200, headers);
+    return deps?.json?.(
+      mutationResult?.body || { error: 'Session config mutation failed.' },
+      mutationResult?.status || 503,
+      headers,
+    );
   }
 
   if (action === 'set-secrets') {
@@ -267,12 +295,20 @@ export const dispatchAdminRequest = async ({
         ...(result?.litPkpId ? { litPkpId: result.litPkpId } : {}),
       } : null;
       if (litCredentials) {
-        const mergedConfig = deps?.mergeWorkerConfigRecords?.({
-          existingConfig,
-          incomingConfig: { litCredentials },
+        const mutationResult = await executeDirectSessionConfigMutation({
+          env,
           slug: targetSlug,
+          existingConfig,
+          mutation: { kind: 'merge-lit-credentials', litCredentials },
+          deps,
         });
-        await deps?.putSessionConfig?.(env, targetSlug, mergedConfig);
+        if (!mutationResult?.ok) {
+          return deps?.json?.(
+            mutationResult?.body || { error: 'Session config mutation failed.' },
+            mutationResult?.status || 503,
+            headers,
+          );
+        }
       }
       return deps?.json?.(result, 200, headers);
     } catch (error) {
@@ -304,19 +340,20 @@ export const dispatchAdminRequest = async ({
         typeof result.litCredentials === 'object'
       ) ? result.litCredentials : null;
       if (litCredentials) {
-        const mergedConfig = deps?.mergeWorkerConfigRecords?.({
-          existingConfig,
-          incomingConfig: {
-            litCredentials: {
-              ...((existingConfig?.litCredentials && typeof existingConfig.litCredentials === 'object')
-                ? existingConfig.litCredentials
-                : {}),
-              ...litCredentials,
-            },
-          },
+        const mutationResult = await executeDirectSessionConfigMutation({
+          env,
           slug: targetSlug,
+          existingConfig,
+          mutation: { kind: 'merge-lit-credentials', litCredentials },
+          deps,
         });
-        await deps?.putSessionConfig?.(env, targetSlug, mergedConfig);
+        if (!mutationResult?.ok) {
+          return deps?.json?.(
+            mutationResult?.body || { error: 'Session config mutation failed.' },
+            mutationResult?.status || 503,
+            headers,
+          );
+        }
       }
       const responseBody = { ...result };
       delete responseBody.secretOutputs;
@@ -331,38 +368,18 @@ export const dispatchAdminRequest = async ({
     const incoming = body?.limits && typeof body.limits === 'object' ? body.limits : null;
     if (!incoming) return deps?.json?.({ error: 'Missing limits.' }, 400, headers);
 
-    const merged = deps?.mergeWorkerLimitRecords?.({
-      existingConfig,
-      incomingLimits: incoming,
+    const mutationResult = await executeDirectSessionConfigMutation({
+      env,
       slug: targetSlug,
+      existingConfig,
+      mutation: { kind: 'set-limits', incomingLimits: incoming },
+      deps,
     });
-    await deps?.putSessionConfig?.(env, targetSlug, merged);
-    return deps?.json?.({ ok: true }, 200, headers);
-  }
-
-  if (action === 'rotate-envelope-keys') {
-    try {
-      const result = await (deps?.rotateStorageEnvelopeKeys || rotateStorageEnvelopeKeys)({
-        env,
-        slug: targetSlug,
-        config: existingConfig,
-        deps: {
-          putSessionConfig: deps?.putSessionConfig,
-          now: deps?.now,
-          randomBytes: deps?.randomBytes,
-          getRandomValues: deps?.getRandomValues,
-          randomUUID: deps?.randomUUID,
-          getStorageEnvelopeKek: deps?.getStorageEnvelopeKek,
-        },
-      });
-      return deps?.json?.({
-        ok: true,
-        rotatedAt: result.rotatedAt,
-        payloadsRewrapped: result.payloadsRewrapped,
-      }, 200, headers);
-    } catch (error) {
-      return deps?.json?.({ error: error?.message || 'Storage envelope key rotation failed.' }, 500, headers);
-    }
+    return deps?.json?.(
+      mutationResult?.body || { error: 'Session config mutation failed.' },
+      mutationResult?.status || 503,
+      headers,
+    );
   }
 
   if (action === 'export-storage-envelopes') {
@@ -384,42 +401,6 @@ export const dispatchAdminRequest = async ({
       );
     } catch (error) {
       return deps?.json?.({ error: error?.message || 'Encrypted-envelope export failed.' }, 500, headers);
-    }
-  }
-
-  if (action === 'rewrap-envelope-deployment-key') {
-    const newDeploymentKek = toTrimmedString(
-      body?.newDeploymentKek ||
-      body?.deploymentKek ||
-      body?.newKek
-    );
-    if (!newDeploymentKek) {
-      return deps?.json?.({ error: 'Missing newDeploymentKek.' }, 400, headers);
-    }
-    try {
-      const result = await (
-        deps?.rewrapStorageEnvelopeSessionKeyForDeployment ||
-        rewrapStorageEnvelopeSessionKeyForDeployment
-      )({
-        env,
-        slug: targetSlug,
-        config: existingConfig,
-        newDeploymentKek,
-        deps: {
-          putSessionConfig: deps?.putSessionConfig,
-          now: deps?.now,
-          randomBytes: deps?.randomBytes,
-          getRandomValues: deps?.getRandomValues,
-          getStorageEnvelopeKek: deps?.getStorageEnvelopeKek,
-        },
-      });
-      return deps?.json?.({
-        ok: true,
-        rewrappedAt: result.rewrappedAt,
-        keyProvider: result.keyProvider || 'worker_secret',
-      }, 200, headers);
-    } catch (error) {
-      return deps?.json?.({ error: error?.message || 'Storage envelope deployment re-wrap failed.' }, 500, headers);
     }
   }
 

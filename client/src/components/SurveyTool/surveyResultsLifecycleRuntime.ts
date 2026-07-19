@@ -69,6 +69,7 @@ export type SurveyResultsComponentMountPorts = {
   handleUrlBasedView: () => void;
   handleUrlChange: () => void;
   queueResultsRefresh: (reason: string) => unknown;
+  reportDetachedRefreshError?: (operation: string, error: unknown) => unknown;
   subscribeCacheUpdates: (listener: (update?: unknown) => void) => (() => void) | null | undefined;
   updateLocalStoragePollingState: () => unknown;
   updateParentWithCurrentFiltersForUrl: () => unknown;
@@ -167,7 +168,14 @@ export const runSurveyResultsComponentDidMount = ({
         }
       } else if (currentState.viewMode === 'survey' && currentState.surveyId) {
         if (currentProps.refreshSurveyResponsesByID) {
-          currentProps.refreshSurveyResponsesByID(currentState.surveyId.toLowerCase());
+          try {
+            const refreshResult = currentProps.refreshSurveyResponsesByID(currentState.surveyId.toLowerCase());
+            void Promise.resolve(refreshResult).catch((error: unknown) => {
+              ports.reportDetachedRefreshError?.('initial-survey-refresh', error);
+            });
+          } catch (error: unknown) {
+            ports.reportDetachedRefreshError?.('initial-survey-refresh', error);
+          }
         }
       }
 

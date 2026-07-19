@@ -7,6 +7,15 @@ import {
 import {
   json as jsonResponse,
 } from './responseKvHelpers.js';
+import {
+  attachSessionSecretRpcForGateRuntime,
+  resolveSessionSecretRpcUrlListForGateRuntime,
+} from './gateRpcResolution.js';
+import {
+  buildSafeRpcFailure,
+  createRpcDiagnosticMasker,
+  sanitizeRpcFailureDetails,
+} from './rpcDiagnosticSafety.js';
 
 const DEFAULT_GAS_PRICE_HEX = '0x3b9aca00';
 const DEFAULT_ACCESS_DENIED_ERROR = 'Access denied.';
@@ -54,10 +63,22 @@ export const faucet = async ({
   const validateFaucetEligibilityRequest = (
     deps?.validateFaucetEligibilityRequest || validateFaucetEligibilityRequestBoundary
   );
+  const runtimeConfig = attachSessionSecretRpcForGateRuntime({ config, secrets });
+  const privateRpcUrls = [
+    secrets?.customRpcUrl,
+    ...resolveSessionSecretRpcUrlListForGateRuntime({
+      config: runtimeConfig,
+      gateChainId: runtimeConfig?.networkChainId,
+    }),
+  ];
+  const maskRpcUrl = createRpcDiagnosticMasker({
+    privateRpcUrls,
+    maskRpcUrl: deps?.maskRpcUrl,
+  });
 
   const normalizedFaucet = normalizeFaucetRequest({
     payload,
-    config,
+    config: runtimeConfig,
     secrets,
     deps: {
       toStr: deps?.toStr,
@@ -66,12 +87,29 @@ export const faucet = async ({
       isAddress: deps?.isAddress,
       parseEther: deps?.parseEther,
       resolveFaucetRpcUrls: deps?.resolveFaucetRpcUrls,
-      maskRpcUrl: deps?.maskRpcUrl,
+      maskRpcUrl,
     },
     defaults,
   });
   if (normalizedFaucet?.logContext) {
-    log('[faucet] request', normalizedFaucet.logContext);
+    const normalizedRpcUrls = Array.isArray(normalizedFaucet?.normalized?.rpcUrls)
+      ? normalizedFaucet.normalized.rpcUrls
+      : [];
+    const logContext = { ...normalizedFaucet.logContext };
+    if (normalizedRpcUrls.length) {
+      logContext.rpcUrl = maskRpcUrl(normalizedRpcUrls[0]);
+      logContext.rpcUrls = normalizedRpcUrls.map((rpcUrl) => maskRpcUrl(rpcUrl));
+    } else {
+      if (/^https?:\/\//i.test(toTrimmedString(logContext.rpcUrl, deps))) {
+        logContext.rpcUrl = maskRpcUrl(logContext.rpcUrl);
+      }
+      if (Array.isArray(logContext.rpcUrls)) {
+        logContext.rpcUrls = logContext.rpcUrls.map((rpcUrl) => (
+          /^https?:\/\//i.test(toTrimmedString(rpcUrl, deps)) ? maskRpcUrl(rpcUrl) : rpcUrl
+        ));
+      }
+    }
+    log('[faucet] request', logContext);
   }
   if (!normalizedFaucet?.ok) {
     return json(
@@ -96,9 +134,17 @@ export const faucet = async ({
     expectedChainId,
   } = normalizedFaucet.normalized || {};
 
+  if (!expectedChainId) {
+    return json(
+      { error: 'Invalid faucet chain configuration.' },
+      500,
+      baseHeaders,
+    );
+  }
+
   const faucetEligibility = await validateFaucetEligibilityRequest({
     payload,
-    config,
+    config: runtimeConfig,
     slug,
     requesterAddress,
     tokenHasFaucetScope,
@@ -113,7 +159,7 @@ export const faucet = async ({
       readResourceGateOnChain: deps?.readResourceGateOnChain,
       resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,
       checkSbtGate: deps?.checkSbtGate,
-      maskRpcUrl: deps?.maskRpcUrl,
+      maskRpcUrl,
       findSessionGateForSbt: deps?.findSessionGateForSbt,
       readSbtFaucetValidationState: deps?.readSbtFaucetValidationState,
       validateSbtPasswordForFaucet: deps?.validateSbtPasswordForFaucet,
@@ -125,11 +171,16 @@ export const faucet = async ({
     },
   });
   if (!faucetEligibility?.ok) {
+    const safeDetails = sanitizeRpcFailureDetails(faucetEligibility?.details, {
+      maskRpcUrl,
+      privateRpcUrls,
+      errorLabel: 'Faucet eligibility RPC request failed.',
+    });
     return json(
       {
         error: faucetEligibility?.error || DEFAULT_ACCESS_DENIED_ERROR,
         reason: faucetEligibility?.reason || '',
-        details: faucetEligibility?.details || null,
+        details: Array.isArray(faucetEligibility?.details) ? safeDetails : null,
       },
       faucetEligibility?.status || 403,
       baseHeaders,
@@ -140,8 +191,6 @@ export const faucet = async ({
   const rpcRequest = deps?.rpcRequest;
   const toBigInt = deps?.toBigInt;
   const formatEther = deps?.formatEther;
-  const maskRpcUrl = deps?.maskRpcUrl;
-
   const errors = [];
   const wallet = new Wallet(privateKey);
   const fromAddress = wallet.address;
@@ -154,11 +203,27 @@ export const faucet = async ({
       const chainHex = await rpcRequest({ rpcUrl: rpc, method: 'eth_chainId', params: [] });
       chainId = deps?.toChainId?.(chainHex) || 0;
     } catch (err) {
-      errors.push({ rpcUrl: masked, error: err?.message || 'Failed to resolve chain id.' });
+      const failure = buildSafeRpcFailure({
+        rpcUrl: rpc,
+        error: err,
+        errorLabel: 'RPC chain check failed.',
+        maskRpcUrl,
+        privateRpcUrls,
+      });
+      errors.push({ ...failure, chainId: null });
       continue;
     }
 
-    if (expectedChainId && chainId && chainId !== expectedChainId) {
+    if (!chainId) {
+      errors.push({
+        rpcUrl: masked,
+        chainId: null,
+        error: 'RPC did not return a valid chainId.',
+      });
+      continue;
+    }
+
+    if (expectedChainId && chainId !== expectedChainId) {
       warn('[faucet] chainId mismatch', {
         rpcUrl: masked,
         rpcChainId: chainId,
@@ -183,7 +248,14 @@ export const faucet = async ({
       });
       currentBalanceWei = toBigInt(balanceHex);
     } catch (err) {
-      errors.push({ rpcUrl: masked, chainId, error: err?.message || 'Failed to fetch balance.' });
+      const failure = buildSafeRpcFailure({
+        rpcUrl: rpc,
+        error: err,
+        errorLabel: 'RPC balance check failed.',
+        maskRpcUrl,
+        privateRpcUrls,
+      });
+      errors.push({ ...failure, chainId });
       continue;
     }
 
@@ -209,11 +281,14 @@ export const faucet = async ({
         params: [fromAddress, 'pending'],
       });
     } catch (err) {
-      errors.push({
-        rpcUrl: masked,
-        chainId,
-        error: err?.message || 'Failed to fetch faucet nonce.',
+      const failure = buildSafeRpcFailure({
+        rpcUrl: rpc,
+        error: err,
+        errorLabel: 'RPC nonce lookup failed.',
+        maskRpcUrl,
+        privateRpcUrls,
       });
+      errors.push({ ...failure, chainId });
       continue;
     }
 
@@ -240,7 +315,7 @@ export const faucet = async ({
       errors.push({
         rpcUrl: masked,
         chainId,
-        error: err?.message || 'Failed to sign faucet transaction.',
+        error: 'Faucet transaction signing failed.',
       });
       continue;
     }
@@ -264,18 +339,29 @@ export const faucet = async ({
         baseHeaders,
       );
     } catch (err) {
+      const failure = buildSafeRpcFailure({
+        rpcUrl: rpc,
+        error: err,
+        errorLabel: 'RPC transaction submission failed.',
+        maskRpcUrl,
+        privateRpcUrls,
+      });
       error('[faucet] send failed', {
-        rpcUrl: masked,
+        rpcUrl: failure.rpcUrl,
         rpcChainId: chainId,
         registryChainId,
         networkChainId,
         faucetChainId,
-        error: toTrimmedString(err?.message || err, deps),
+        error: failure.error,
+        rpcStatus: failure.status,
+        rpcCode: failure.code ?? null,
       });
       errors.push({
-        rpcUrl: masked,
+        rpcUrl: failure.rpcUrl,
         chainId,
-        error: err?.message || 'Failed to send faucet transaction.',
+        status: failure.status,
+        ...(failure.code != null ? { code: failure.code } : {}),
+        error: failure.error,
       });
     }
   }
@@ -283,7 +369,7 @@ export const faucet = async ({
   return json(
     {
       error: errors[errors.length - 1]?.error || 'Faucet transfer failed.',
-      rpcUrl: rpcMasked,
+      rpcUrl: (rpcUrls || []).length ? maskRpcUrl(rpcUrls[0]) : maskRpcUrl(rpcMasked),
       chainId: expectedChainId || null,
       registryChainId,
       networkChainId,

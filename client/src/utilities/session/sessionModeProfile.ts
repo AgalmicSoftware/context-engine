@@ -275,7 +275,22 @@ export const SESSION_MODE_PRESETS: Readonly<Record<Exclude<SessionModePresetId, 
       preset: SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
       authority: { mode: 'worker_canonical' },
       evm: { registryChainId: null },
-      storage: { backend: 'cloudflare' },
+      storage: {
+        backend: 'cloudflare',
+        // Regression guard: the default has no registry/RPC. Keep admin access and
+        // authenticated participant storage explicit instead of falling back to SBT.
+        payloadAccessControl: {
+          gate: 'role_gate',
+          encryption: 'worker_envelope',
+          accessConditions: {
+            match: 'any',
+            conditions: [
+              { kind: 'worker_role', role: 'admin' },
+              { kind: 'agent_grant_scope', scope: 'storage' },
+            ],
+          },
+        },
+      },
       identity: { default: 'passkey', enabled: ['passkey'] },
       authorization: { mechanisms: ['worker_roles'] },
       encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
@@ -334,6 +349,7 @@ export const mergeSessionModeProfileStorageAccess = (
   storageProfile: unknown,
 ): SessionModeProfile => {
   const next = deepClone(profile);
+  if (!isRecord(storageProfile) || !trim(storageProfile.backend)) return next;
   const storage = isRecord(storageProfile) ? storageProfile : {};
   const backend = normalizeStorageBackend(storage.backend);
   if (backend === STORAGE_BACKENDS.CLOUDFLARE && isRecord(storage.payloadAccessControl)) {

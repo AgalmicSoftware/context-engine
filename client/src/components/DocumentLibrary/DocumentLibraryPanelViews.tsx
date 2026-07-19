@@ -724,7 +724,9 @@ export const DocumentLibraryList = ({
   litHooks,
 }: DocumentLibraryListProps) => (
   <div className={styles.list}>
-    {!docs.length && !loading && canList && <div className={styles.empty}>No documents found yet.</div>}
+    {!docs.length && !loading && canList && (
+      <div className={styles.empty}>{cursor ? 'No accessible documents on this page.' : 'No documents found yet.'}</div>
+    )}
     {docs.map((doc) => {
       const tagMap = doc?.tagMap || {};
       const storage = toStr(tagMap['CE-DocStorage']).trim().toLowerCase();
@@ -829,7 +831,7 @@ export const DocumentLibraryList = ({
       </div>
     )}
 
-    {canList && docs.length > 0 && (
+    {canList && (docs.length > 0 || !!cursor) && (
       <div className={styles.pagination}>
         <Button type="button" color="secondary" outline size="sm" onClick={onLoadMore} disabled={loading || !cursor}>
           Load more

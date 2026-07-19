@@ -22,12 +22,54 @@ describe('sessionPublishDispatch', () => {
       buildSessionPublishReducerPlan({
         shouldAutoDeployWorker: true,
         shouldDeployPendingSbts: true,
+        shouldPersistWorkerConfig: false,
         shouldUploadMetadata: false,
+        shouldRegisterSession: true,
+        shouldRefreshRegistryCache: true,
       }),
     ).toEqual({
       autoDeployWorker: true,
       deployPendingSbts: true,
+      persistWorkerConfig: false,
       uploadMetadata: false,
+      registerSession: true,
+      refreshRegistryCache: true,
+    });
+  });
+
+  it('builds a worker-canonical reducer plan without registry or metadata effects', () => {
+    expect(
+      buildSessionPublishReducerPlan({
+        shouldAutoDeployWorker: false,
+        shouldDeployPendingSbts: false,
+        shouldPersistWorkerConfig: true,
+        shouldUploadMetadata: false,
+        shouldRegisterSession: false,
+        shouldRefreshRegistryCache: false,
+      }),
+    ).toEqual({
+      autoDeployWorker: false,
+      deployPendingSbts: false,
+      persistWorkerConfig: true,
+      uploadMetadata: false,
+      registerSession: false,
+      refreshRegistryCache: false,
+    });
+  });
+
+  it('preserves decentralized reducer defaults when explicit capability fields are omitted', () => {
+    expect(
+      buildSessionPublishReducerPlan({
+        shouldAutoDeployWorker: false,
+        shouldDeployPendingSbts: false,
+        shouldUploadMetadata: true,
+      }),
+    ).toEqual({
+      autoDeployWorker: false,
+      deployPendingSbts: false,
+      persistWorkerConfig: false,
+      uploadMetadata: true,
+      registerSession: true,
       refreshRegistryCache: true,
     });
   });
@@ -43,7 +85,9 @@ describe('sessionPublishDispatch', () => {
         plan: {
           autoDeployWorker: false,
           deployPendingSbts: false,
+          persistWorkerConfig: false,
           uploadMetadata: true,
+          registerSession: true,
           refreshRegistryCache: true,
         },
       },

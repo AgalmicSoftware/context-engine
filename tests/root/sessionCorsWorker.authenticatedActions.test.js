@@ -605,8 +605,11 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
     expect(firstResponse.status).toBe(200);
     expect(secondResponse.status).toBe(429);
     expect(secondPayload?.error).toBe('Rate limit exceeded.');
+    // Registry membership, SBT proof, and faucet transfer each attest the
+    // endpoint used for their distinct authority boundary.
+    expect(rpcMethods.filter((method) => method === 'eth_chainId')).toHaveLength(3);
     expect(rpcMethods.filter((method) => method === 'eth_sendRawTransaction')).toHaveLength(1);
-    expect(fetchMock.mock.calls.filter(([url]) => url === RPC_URL)).toHaveLength(9);
+    expect(fetchMock.mock.calls.filter(([url]) => url === RPC_URL)).toHaveLength(11);
   });
 
   it('rejects request_test_eth when session secrets are missing', async () => {

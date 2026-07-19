@@ -120,6 +120,9 @@ The recency fields are used when merging profile data back into live question-re
 
 - One `userCache` object exists per session slug, so profile pages aggregate across multiple
   `dg:userCache:<slug>` keys.
+- Survey, question, and response cache hydration update only the data arrays and activity
+  watermarks they produce. Atomic merges retain independent profile/SBT scan flags and
+  unrelated data arrays from the latest user-cache snapshot.
 - `UserPage` can fall back across chain buckets when the active chain bucket is missing but
   another cached chain bucket for the same address contains data.
 - List-scope profile scans can keep `attemptedSlugs` scoped while still allowing off-list SBT fanout,

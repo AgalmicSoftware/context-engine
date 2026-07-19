@@ -28,6 +28,12 @@ Starter files shipped in this folder:
   - if you omit `--admin-secret`, the script generates one and prints it after deploy
   - if you omit `--allowed-origins`, the CLI seeds the stable Context Engine hosted/local defaults used by `/new`
   - unlike the in-browser `/new` flow, the CLI cannot infer your current self-hosted app origin, so custom hosts must still pass `--allowed-origins https://your-app.example,...`
+  - the upload binds `CE_SESSION_COORDINATOR` and installs the SQLite-backed
+    `SessionWriteCoordinator` migration; a repeat deploy keeps the binding and
+    retries without replaying an already-installed migration
+  - this does not add a third token permission: `Workers Scripts: Edit` covers
+    the module, Durable Object binding, and class migration, while `Workers KV
+    Storage: Edit` covers `DEPLOY_HELPER_KV`
 
 Quick command:
 
@@ -50,7 +56,13 @@ Typical first-worker bootstrap:
 Required binding:
 
 - `DEPLOY_HELPER_KV`
-  - used for the optional `/admin/origins` KV override
+  - stores the optional `/admin/origins` override and the secret-free deploy
+    request journal used for response-loss recovery
+- `CE_SESSION_COORDINATOR`
+  - Durable Object namespace for the exported SQLite-backed
+    `SessionWriteCoordinator` class
+  - serializes each stable `deploymentRequestId` before Cloudflare mutation and
+    replays terminal safe receipts without repeating deployment side effects
 
 Recommended env vars / secrets:
 
@@ -74,8 +86,28 @@ Wrangler is the preferred deploy path. The checked-in `worker.js` imports `../sh
   - input: `{ apiToken }`
   - output: `{ accountId, accountName }`
 - `POST /deploy`
-  - input: Cloudflare token, worker name, worker bundle (`bundleUrl` or `bundleText`), and initial session config/secrets
-  - output: absolute `workerUrl` plus `subdomainStatus`, `subdomainEnabled`, `subdomainError`, `scriptSubdomainEnabled`, and `scriptSubdomainError` so callers can surface `workers.dev` activation state
+  - input: Cloudflare token, worker name, worker bundle (`bundleUrl` or
+    `bundleText`), initial session config/secrets, and optional
+    `deploymentRequestId` (the first-party wizard always supplies one)
+  - output: absolute `workerUrl`, the non-secret `deploymentId` ownership marker,
+    and `subdomainStatus`, `subdomainEnabled`, `subdomainError`,
+    `scriptSubdomainEnabled`, and `scriptSubdomainError` so callers can surface
+    `workers.dev` activation state and clean up only exactly owned test resources
+  - the requested worker name is a readable prefix, not an exact physical
+    script name. Requests with `deploymentRequestId` derive a stable suffix and
+    KV title marker; legacy requests without it use a random suffix. The helper
+    reserves stable requests in `SessionWriteCoordinator` before mutation,
+    keeps the resumable step journal in KV, replays a terminal safe receipt for
+    response-loss retries, and rejects reuse of the ID with a conflicting
+    immutable identity. Coordinator and journal state contain no raw tokens,
+    secrets, or bundle bytes
+  - if Cloudflare definitively rejects an uploaded bundle after the stable KV
+    namespace is staged, the helper retains a separate non-secret recovery
+    marker. The same request may retry corrected bundle bytes while every
+    non-bundle deploy field remains fixed. Visible Workers must still match all
+    ownership/binding markers, and replacement uploads preserve secret-text
+    bindings. Recovery remains pending until terminal receipt persistence and
+    recovery-marker cleanup both succeed
 - `GET /admin/origins`
   - requires `Authorization: Bearer <ADMIN_SECRET>`
   - returns `{ origins, source }`

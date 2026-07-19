@@ -3,6 +3,8 @@ import {
   createWorkerTopLevelRuntimeWithWorkerDeps as createWorkerTopLevelRuntimeWithWorkerDepsBoundary,
 } from './workerTopLevelBinding.js';
 
+export { SessionWriteCoordinator } from './sessionWriteCoordinator.js';
+
 let workerDebugLogsEnabled = false;
 
 const isWorkerDebugLogsEnabled = (value) => {

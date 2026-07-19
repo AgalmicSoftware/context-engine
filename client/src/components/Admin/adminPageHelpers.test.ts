@@ -7,6 +7,7 @@ import {
   normalizeAiProvider,
   normalizeSlug,
   normalizeWorkerUrl,
+  resolveAdminCapabilities,
 } from './adminPageHelpers';
 
 describe('adminPageHelpers', () => {
@@ -40,5 +41,27 @@ describe('adminPageHelpers', () => {
     expect(buildTxExplorerUrl('0xabc', 84532)).toMatch(/\/tx\/0xabc$/);
     expect(buildTxExplorerUrl('', 84532)).toBe('');
     expect(buildTxExplorerUrl('0xabc', 0)).toBe('');
+  });
+
+  it('keeps worker and registry admin capabilities independent', () => {
+    const sessionConfig = {
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+      __registry: {
+        registryChainId: 84532,
+        adminAddress: '0x00000000000000000000000000000000000000bb',
+      },
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+
+    expect(resolveAdminCapabilities({ account: sessionConfig.adminAddress, sessionConfig })).toMatchObject({
+      isWorkerCanonicalSession: true,
+      hasRegistryEntry: true,
+      canAdminWorker: true,
+      canAdminRegistry: false,
+    });
+    expect(resolveAdminCapabilities({ account: sessionConfig.__registry.adminAddress, sessionConfig })).toMatchObject({
+      canAdminWorker: false,
+      canAdminRegistry: true,
+    });
   });
 });

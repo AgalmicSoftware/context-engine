@@ -32,7 +32,7 @@ import {
   resolveDocLibraryProvider,
 } from '../../utilities/docLibrary/config.js';
 import { listArweaveTransactionsByTags } from '../../utilities/docLibrary/arweaveGraphql.js';
-import { listSessionStorageRefs, readSessionStorageBlob } from '../../utilities/storage/storageClient.js';
+import { listSessionStorageRefsPage, readSessionStorageBlob } from '../../utilities/storage/storageClient.js';
 import { STORAGE_BACKENDS, normalizeStorageBackend, normalizeStorageRef } from '../../utilities/storage/storageRefs.js';
 import {
   resolveDocUploadsGate,
@@ -177,13 +177,19 @@ const normalizeDocStorageRef = normalizeStorageRef as (
   opts?: NormalizeStorageRefOptions,
 ) => StorageRef | null;
 
-const listSessionStorageRefsForDocs = listSessionStorageRefs as (opts: {
+const listSessionStorageRefsPageForDocs = listSessionStorageRefsPage as (opts: {
   sessionSlug?: string;
   sessionConfig?: SessionConfig;
   context?: SessionStorageContext | null;
   workerUrl?: string;
   resource?: string;
-}) => Promise<Record<string, unknown>[]>;
+  cursor?: string | null;
+  limit?: number;
+}) => Promise<{
+  items: Record<string, unknown>[];
+  cursor: string | null;
+  listComplete: boolean;
+}>;
 
 const readSessionStorageBlobForDocs = readSessionStorageBlob as (opts: {
   storageRef: StorageRef;
@@ -768,25 +774,31 @@ export default function DocumentLibraryPanel({
       setLoading(true);
       try {
         const after = reset ? null : cursorRef.current;
-        const edges =
-          docProvider === STORAGE_BACKENDS.CLOUDFLARE
-            ? ((
-                await listSessionStorageRefsForDocs({
-                  sessionSlug,
-                  sessionConfig,
-                  context: { account, providerLike: provider, chainId: network?.id || null },
-                  resource: 'docsContext',
-                })
-              )
-                .map((item: Record<string, unknown>) => buildDocRecordFromStorageItem(item))
-                .filter(Boolean) as DocRecord[])
-            : ((await listArweaveTransactionsByTags({
-                graphqlUrl,
-                graphqlUrls,
-                tags: listFilters,
-                first: pageSize,
-                after,
-              })) as DocRecord[]);
+        let nextCursor: string | null = null;
+        let edges: DocRecord[] = [];
+        if (docProvider === STORAGE_BACKENDS.CLOUDFLARE) {
+          const page = await listSessionStorageRefsPageForDocs({
+            sessionSlug,
+            sessionConfig,
+            context: { account, providerLike: provider, chainId: network?.id || null },
+            resource: 'docsContext',
+            cursor: after,
+            limit: pageSize,
+          });
+          edges = (Array.isArray(page?.items) ? page.items : [])
+            .map((item: Record<string, unknown>) => buildDocRecordFromStorageItem(item))
+            .filter(Boolean) as DocRecord[];
+          nextCursor = toStr(page?.cursor).trim() || null;
+        } else {
+          edges = (await listArweaveTransactionsByTags({
+            graphqlUrl,
+            graphqlUrls,
+            tags: listFilters,
+            first: pageSize,
+            after,
+          })) as DocRecord[];
+          nextCursor = edges.length ? edges[edges.length - 1].cursor : null;
+        }
 
         if (listRequestSeqRef.current !== requestSeq || activeListQueryKeyRef.current !== expectedQueryKey) return;
 
@@ -822,8 +834,6 @@ export default function DocumentLibraryPanel({
           });
           return next;
         });
-        const nextCursor =
-          docProvider === STORAGE_BACKENDS.CLOUDFLARE ? null : edges.length ? edges[edges.length - 1].cursor : null;
         cursorRef.current = nextCursor;
         setCursor(nextCursor);
       } catch (err) {

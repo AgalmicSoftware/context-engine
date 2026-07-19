@@ -6,6 +6,8 @@ import {
 } from '../../utilities/arweave/sponsoredBundles.js';
 import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
 import type { AnyRecord } from '../shellTypes';
+import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
+import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
 
 export const LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH = '/dist/sessionCorsWorker.bundle.js';
 export const CLOUDFLARE_MISSING_HANDLER_ERROR = 'no registered event handlers';
@@ -47,16 +49,28 @@ export const buildSessionWizardPublishPlan = ({
   shouldAutoDeployWorker = false,
   hasPendingDrafts = false,
   hasManualMetadata = false,
+  sessionModeProfile = null,
 }: {
   shouldAutoDeployWorker?: boolean;
   hasPendingDrafts?: boolean;
   hasManualMetadata?: boolean;
+  sessionModeProfile?: SessionModeProfile | null;
 } = {}) => {
+  const modeRequirements = resolveSessionWizardModeRequirements(sessionModeProfile);
+  const shouldDeployPendingSbts =
+    !!hasPendingDrafts && (!modeRequirements.selected || modeRequirements.publish.deployPendingSbts);
   const steps: string[] = [];
   if (shouldAutoDeployWorker) steps.push('deploy-worker');
-  if (hasPendingDrafts) steps.push('deploy-sbts');
-  if (!hasManualMetadata) steps.push('upload-metadata');
-  steps.push('register-session');
+  if (shouldDeployPendingSbts) steps.push('deploy-sbts');
+  if (modeRequirements.selected && modeRequirements.publish.persistWorkerConfig) {
+    steps.push('persist-worker-config');
+  }
+  if ((!modeRequirements.selected || modeRequirements.publish.uploadMetadata) && !hasManualMetadata) {
+    steps.push('upload-metadata');
+  }
+  if (!modeRequirements.selected || modeRequirements.publish.registerSession) {
+    steps.push('register-session');
+  }
   steps.push('done');
   return steps;
 };
@@ -141,6 +155,7 @@ export const buildSessionWizardPublishExecutionPlan = ({
   hasPendingDrafts = false,
   hasManualMetadata = false,
   canUploadMetadataNow = false,
+  sessionModeProfile = null,
 }: {
   workerMode?: unknown;
   sponsoredAutoDeployReady?: boolean;
@@ -148,25 +163,40 @@ export const buildSessionWizardPublishExecutionPlan = ({
   hasPendingDrafts?: boolean;
   hasManualMetadata?: boolean;
   canUploadMetadataNow?: boolean;
+  sessionModeProfile?: SessionModeProfile | null;
 } = {}) => {
+  const modeRequirements = resolveSessionWizardModeRequirements(sessionModeProfile);
   const shouldAutoDeployWorker = resolveSessionWizardShouldAutoDeployWorker({
     workerMode,
     sponsoredAutoDeployReady,
     deployComplete,
   });
-  const shouldDeployPendingSbts = !!hasPendingDrafts;
-  const shouldUploadMetadata = (!!canUploadMetadataNow || !!sponsoredAutoDeployReady) && !hasManualMetadata;
+  // Pending SBT drafts live outside the selected profile. Suppress them unless
+  // the profile explicitly retains on-chain SBT authorization so switching to
+  // worker-canonical mode cannot silently reintroduce wallet/gas work.
+  const shouldDeployPendingSbts =
+    !!hasPendingDrafts && (!modeRequirements.selected || modeRequirements.publish.deployPendingSbts);
+  const shouldUploadMetadata =
+    (!modeRequirements.selected || modeRequirements.publish.uploadMetadata) &&
+    (!!canUploadMetadataNow || !!sponsoredAutoDeployReady) &&
+    !hasManualMetadata;
+  const shouldPersistWorkerConfig = modeRequirements.selected && modeRequirements.publish.persistWorkerConfig;
+  const shouldRegisterSession = !modeRequirements.selected || modeRequirements.publish.registerSession;
+  const shouldRefreshRegistryCache = !modeRequirements.selected || modeRequirements.publish.refreshRegistryCache;
   const steps = buildSessionWizardPublishPlan({
     shouldAutoDeployWorker,
     hasPendingDrafts: shouldDeployPendingSbts,
     hasManualMetadata,
+    sessionModeProfile,
   });
 
   return {
     shouldAutoDeployWorker,
     shouldDeployPendingSbts,
     shouldUploadMetadata,
-    shouldRegisterSession: true,
+    shouldPersistWorkerConfig,
+    shouldRegisterSession,
+    shouldRefreshRegistryCache,
     steps,
     stepNumbers: steps.reduce<Record<string, number>>((acc, stepKey, index) => {
       acc[stepKey] = index + 1;
@@ -569,9 +599,11 @@ export const buildSessionWizardPublishProgressSteps = ({
             ? `Deploy ${normalizedSbtLabel}`
             : key === 'upload-metadata'
               ? 'Upload Arweave'
-              : key === 'register-session'
-                ? 'Register On-chain'
-                : 'Done',
+              : key === 'persist-worker-config'
+                ? 'Verify Worker Config'
+                : key === 'register-session'
+                  ? 'Register On-chain'
+                  : 'Done',
       state: isActive ? 'active' : isComplete ? 'complete' : 'pending',
     };
   });

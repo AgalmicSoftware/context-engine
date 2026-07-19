@@ -16,17 +16,48 @@ describe('sessionModeProfile', () => {
     const compiled = compileSessionModeProfile(profile);
 
     expect(profile).toEqual(SESSION_MODE_PRESETS.fast_cheap_cloudflare);
+    expect(profile.storage.payloadAccessControl).toEqual({
+      gate: 'role_gate',
+      encryption: 'worker_envelope',
+      accessConditions: {
+        match: 'any',
+        conditions: [
+          { kind: 'worker_role', role: 'admin' },
+          { kind: 'agent_grant_scope', scope: 'storage' },
+        ],
+      },
+    });
     expect(compiled.storageProfile).toEqual(
       expect.objectContaining({
         backend: 'cloudflare',
-        payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
+        payloadAccessControl: {
+          gate: 'role_gate',
+          encryption: 'worker_envelope',
+          accessConditions: {
+            match: 'any',
+            conditions: [
+              { kind: 'worker_role', role: 'admin' },
+              { kind: 'agent_grant_scope', scope: 'storage' },
+            ],
+          },
+        },
         resources: expect.objectContaining({
           questions: 'active',
           responses: 'active',
         }),
       }),
     );
-    expect(compiled.payloadAccessControl).toEqual({ gate: 'sbt_gate', encryption: 'worker_envelope' });
+    expect(compiled.payloadAccessControl).toEqual({
+      gate: 'role_gate',
+      encryption: 'worker_envelope',
+      accessConditions: {
+        match: 'any',
+        conditions: [
+          { kind: 'worker_role', role: 'admin' },
+          { kind: 'agent_grant_scope', scope: 'storage' },
+        ],
+      },
+    });
     expect(compiled.payloadAccessMode).toBe('worker_sbt_gate');
     expect(compiled.resultsExposure).toEqual({
       aggregateResultsEnabled: true,
@@ -94,11 +125,31 @@ describe('sessionModeProfile', () => {
     expect(compiled.storageProfile).toEqual(
       expect.objectContaining({
         backend: 'cloudflare',
-        payloadAccessControl: { gate: 'sbt_gate', encryption: 'worker_envelope' },
+        payloadAccessControl: {
+          gate: 'role_gate',
+          encryption: 'worker_envelope',
+          accessConditions: {
+            match: 'any',
+            conditions: [
+              { kind: 'worker_role', role: 'admin' },
+              { kind: 'agent_grant_scope', scope: 'storage' },
+            ],
+          },
+        },
         cloudflare: { payloadAccessMode: 'worker_sbt_gate' },
       }),
     );
-    expect(compiled.payloadAccessControl).toEqual({ gate: 'sbt_gate', encryption: 'worker_envelope' });
+    expect(compiled.payloadAccessControl).toEqual({
+      gate: 'role_gate',
+      encryption: 'worker_envelope',
+      accessConditions: {
+        match: 'any',
+        conditions: [
+          { kind: 'worker_role', role: 'admin' },
+          { kind: 'agent_grant_scope', scope: 'storage' },
+        ],
+      },
+    });
     expect(compiled.payloadAccessMode).toBe('worker_sbt_gate');
   });
 
@@ -133,7 +184,7 @@ describe('sessionModeProfile', () => {
     expect(compiled.storageProfile).toEqual(
       expect.objectContaining({
         payloadAccessControl: {
-          gate: 'sbt_gate',
+          gate: 'role_gate',
           encryption: 'worker_envelope',
           accessConditions: profile.encryption.accessConditions,
         },
@@ -171,7 +222,7 @@ describe('sessionModeProfile', () => {
       expect.objectContaining({
         preset: 'custom',
         authority: { mode: 'worker_canonical' },
-        storage: { backend: 'cloudflare' },
+        storage: expect.objectContaining({ backend: 'cloudflare' }),
       }),
     );
     expect(telegramProfile.surfaces).toEqual(

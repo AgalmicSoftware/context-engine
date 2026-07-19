@@ -1,5 +1,10 @@
 export type QueryKeyScalar = string | number | boolean | null;
 
+export type AppQueryKeyRoot = Readonly<{
+  scope: 'ce-app';
+  persist: false;
+}>;
+
 export type QueryKeyScope = {
   chainId?: number | string | null;
   sessionSlug?: string | null;
@@ -8,6 +13,7 @@ export type QueryKeyScope = {
 };
 
 export type ScopedQueryKey = readonly [
+  root: AppQueryKeyRoot,
   domain: string,
   entity: string,
   chainId: number | null,
@@ -15,6 +21,11 @@ export type ScopedQueryKey = readonly [
   address: string | null,
   ...ids: QueryKeyScalar[],
 ];
+
+export const APP_QUERY_KEY_ROOT: AppQueryKeyRoot = Object.freeze({
+  scope: 'ce-app',
+  persist: false,
+});
 
 const normalizeRequiredPart = (value: string, label: string): string => {
   const normalized = String(value || '').trim();
@@ -46,11 +57,17 @@ const normalizeIds = (ids: readonly QueryKeyScalar[] = []): QueryKeyScalar[] =>
   });
 
 export const queryKeys = Object.freeze({
-  domain: (domain: string): readonly [string] => Object.freeze([normalizeRequiredPart(domain, 'domain')]),
-  entity: (domain: string, entity: string): readonly [string, string] =>
-    Object.freeze([normalizeRequiredPart(domain, 'domain'), normalizeRequiredPart(entity, 'entity')]),
+  domain: (domain: string): readonly [AppQueryKeyRoot, string] =>
+    Object.freeze([APP_QUERY_KEY_ROOT, normalizeRequiredPart(domain, 'domain')]),
+  entity: (domain: string, entity: string): readonly [AppQueryKeyRoot, string, string] =>
+    Object.freeze([
+      APP_QUERY_KEY_ROOT,
+      normalizeRequiredPart(domain, 'domain'),
+      normalizeRequiredPart(entity, 'entity'),
+    ]),
   scoped: (domain: string, entity: string, scope: QueryKeyScope = {}): ScopedQueryKey =>
     Object.freeze([
+      APP_QUERY_KEY_ROOT,
       normalizeRequiredPart(domain, 'domain'),
       normalizeRequiredPart(entity, 'entity'),
       normalizeChainId(scope.chainId),

@@ -121,6 +121,18 @@ test('resolveTopLevelRouteSelection exposes the resource-presence route without 
   );
 });
 
+test('resolveTopLevelRouteSelection exposes worker-canonical config bootstrap without wallet auth', () => {
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/session-config',
+      method: 'GET',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'session-config' },
+  );
+});
+
 test('resolveTopLevelRouteSelection preserves trimmed authorization behavior for anonymous ai/transcribe classification', () => {
   assert.deepEqual(
     resolveTopLevelRouteSelection({

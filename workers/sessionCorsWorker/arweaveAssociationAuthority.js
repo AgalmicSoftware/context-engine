@@ -3,6 +3,8 @@ import {
   getArweaveTagValue,
   setArweaveTagValue,
 } from './arweaveCeTagNormalization.js';
+import { attestRpcEndpointChain } from './rpcChainAttestation.js';
+import { resolveRegistryChainId } from './chainIdNormalization.js';
 
 const SESSION_ID_MISMATCH_ERROR = 'CE-SessionId does not match authenticated session.';
 const SBT_PAIR_ERROR = 'CE-SbtChainId and CE-SbtAddress must be provided together.';
@@ -17,7 +19,7 @@ const toErrorMessage = (value, deps) => (
     : (typeof value === 'string' ? value : value == null ? '' : String(value)).trim()
 );
 
-const resolveSessionIdHexForSlug = async ({ config, slug, deps }) => {
+const resolveSessionIdHexForSlug = async ({ config, slug, chainAttestationCache, deps }) => {
   const registryAddress = deps.toStr(config?.registryAddress).trim();
   const registryRpcUrls = deps.resolveRegistryRpcUrls(config);
   if (!deps.isAddress(registryAddress) || !registryRpcUrls.length) {
@@ -29,6 +31,8 @@ const resolveSessionIdHexForSlug = async ({ config, slug, deps }) => {
     registryAddress,
     registryRpcUrls,
     registrySlug,
+    expectedChainId: resolveRegistryChainId(config),
+    chainAttestationCache,
   });
   if (!tupleRead?.ok) {
     throw tupleRead?.error || new Error('Failed to resolve sessionId from SessionRegistry.');
@@ -50,6 +54,7 @@ export const resolveArweaveSessionIdAssociation = async ({
   tags,
   slug,
   config,
+  chainAttestationCache,
   deps,
 } = {}) => {
   const normalizedTags = Array.isArray(tags) ? tags : [];
@@ -66,7 +71,7 @@ export const resolveArweaveSessionIdAssociation = async ({
 
   let expectedSessionId = '';
   try {
-    expectedSessionId = await resolveSessionIdHexForSlug({ config, slug, deps });
+    expectedSessionId = await resolveSessionIdHexForSlug({ config, slug, chainAttestationCache, deps });
   } catch (err) {
     return {
       ok: false,
@@ -102,6 +107,7 @@ export const authorizeArweaveSbtAssociation = async ({
   config,
   tags,
   uploaderAddress,
+  chainAttestationCache,
   deps,
 } = {}) => {
   const normalizedTags = Array.isArray(tags) ? tags : [];
@@ -173,10 +179,22 @@ export const authorizeArweaveSbtAssociation = async ({
 
   const erc721 = deps.getErc721Interface();
   const adminIface = deps.getSbtAdminInterface();
+  const requestChainAttestationCache = chainAttestationCache instanceof Map
+    ? chainAttestationCache
+    : new Map();
 
   for (const rpcUrl of rpcUrls) {
+    // Each association request re-attests endpoints; the cache lives only for
+    // this request and prevents duplicate probes across holder/admin/owner reads.
+    const attestation = await attestRpcEndpointChain({
+      rpcUrl,
+      expectedChainId: chainId,
+      rpcRequest: deps.rpcRequest,
+      toChainId: deps.toChainId,
+      cache: requestChainAttestationCache,
+    });
+    if (!attestation.ok) continue;
     try {
-      // eslint-disable-next-line no-await-in-loop
       const decodedBal = await deps.callContractFunction({
         rpcUrl,
         contractAddress: sbtAddress,
@@ -194,7 +212,6 @@ export const authorizeArweaveSbtAssociation = async ({
     }
 
     try {
-      // eslint-disable-next-line no-await-in-loop
       const decodedAdmin = await deps.callContractFunction({
         rpcUrl,
         contractAddress: sbtAddress,
@@ -212,7 +229,6 @@ export const authorizeArweaveSbtAssociation = async ({
     }
 
     try {
-      // eslint-disable-next-line no-await-in-loop
       const decodedOwner = await deps.callContractFunction({
         rpcUrl,
         contractAddress: sbtAddress,

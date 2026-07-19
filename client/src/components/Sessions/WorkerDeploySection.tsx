@@ -19,7 +19,6 @@ type DeployForm = {
   workerName?: string;
   bundleUrl?: string;
   apiToken?: string;
-  accountId?: string;
   adminAddress?: string;
 };
 
@@ -100,14 +99,17 @@ const WorkerDeploySection = ({
     deployStatusText: '',
     isError: false,
   };
+  const cloudflareTokenTemplateHref = buildCloudflareTokenTemplateUrl({
+    slug: cloudflareTokenSlug,
+  });
   const updateApiToken = (nextApiToken: string) => {
     setDeployForm((prev) => {
-      const previousToken = String(prev?.apiToken ?? '');
-      const shouldClearAccountId = !!previousToken && previousToken !== nextApiToken;
+      const { accountId: _discardedAccountId, ...accountIndependentForm } = (prev || {}) as DeployForm & {
+        accountId?: string;
+      };
       return {
-        ...prev,
+        ...accountIndependentForm,
         apiToken: nextApiToken,
-        ...(shouldClearAccountId ? { accountId: '' } : {}),
       };
     });
   };
@@ -274,7 +276,7 @@ const WorkerDeploySection = ({
                 {renderTooltip({
                   id: 'gw-cf-token-tip',
                   content:
-                    'Use the prefilled template link below. It includes Workers, R2 objects, D1 or KV metadata indexes, and Durable Objects for signer coordination only. Add Account Settings: Edit only when creating or changing the workers.dev subdomain.',
+                    'The default template requests only Workers Scripts: Edit and Workers KV Storage: Edit. KV stores canonical config, encrypted payload envelopes and indexes, groups, audit rows, and deploy state.',
                   placement: 'right',
                   testId: 'ce-wizard-worker-tooltip-gw-cf-token-tip',
                   ariaLabel: 'Cloudflare API token info',
@@ -293,18 +295,27 @@ const WorkerDeploySection = ({
                 </div>
               )}
               <div className={styles.helperText}>
-                <Button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={() => window.open(buildCloudflareTokenTemplateUrl({ slug: cloudflareTokenSlug }), '_blank')}
+                <a
+                  href={cloudflareTokenTemplateHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`${styles.secondaryButton} btn btn-secondary`}
+                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_CREATE_LINK}
                 >
                   Create prefilled API token
-                </Button>
+                </a>
               </div>
               <div className={styles.helperText}>
-                You must be logged into Cloudflare before using the prefilled API token button.
+                You must be logged into Cloudflare before using the prefilled API token link. Create the token, copy its
+                generated value, then paste it into the field above.
               </div>
-              <div className={styles.helperText}>Account is inferred from the API token during deploy.</div>
+              <div className={styles.helperText}>
+                Cloudflare may preselect All accounts. Before creating the token, restrict Account Resources to the one
+                account where this worker will run.
+              </div>
+              <div className={styles.helperText}>
+                Account is inferred during deploy only when the token can see exactly one account.
+              </div>
             </FormGroup>
             <FormGroup>
               <Label>Admin address</Label>

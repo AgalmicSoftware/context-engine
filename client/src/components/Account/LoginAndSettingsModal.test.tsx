@@ -179,6 +179,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     mockedReadWorkerResourcePresence.mockResolvedValue(null);
     localStorage.clear();
     mockedGetSessionNetwork.mockReturnValue({ id: 84532, chainId: 84532, name: 'Base Sepolia' });
+    window.history.replaceState({}, '', '/');
   });
 
   it('does not update local state after unmount while session restore is pending', async () => {
@@ -358,6 +359,31 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     subject.componentDidUpdate(prevProps, subject.state);
 
     expect(getWorkerSessionToken).not.toHaveBeenCalled();
+  });
+
+  it('uses the explicit worker route slug when requesting a passkey session token', async () => {
+    window.history.replaceState({}, '', '/session/worker-login?worker=https%3A%2F%2Fworker-login.example.com');
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: PASSKEY_ADDRESS,
+          provider: 'passkey_eoa',
+          loginComplete: true,
+          activeSessionSlug: 'stale-registry-session',
+        }),
+      ),
+    );
+
+    await subject.ensureWorkerSessionToken();
+
+    expect(getWorkerSessionToken).toHaveBeenCalledWith({
+      sessionSlug: 'worker-login',
+      context: {
+        account: PASSKEY_ADDRESS,
+        providerLike: 'passkey_eoa',
+        chainId: 84532,
+      },
+    });
   });
 
   it('adds the target network with a non-PATH RPC URL', async () => {

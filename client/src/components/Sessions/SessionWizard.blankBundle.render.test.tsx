@@ -54,6 +54,20 @@ const buildMockSponsoredBundle = () => ({
   },
 });
 
+const selectDecentralizedProfile = async () => {
+  const preset = screen.getByTestId('ce-new-preset-trustless_public_decentralized');
+  const originalConfirm = window.confirm;
+  window.confirm = jest.fn(() => true);
+  try {
+    fireEvent.click(preset);
+  } finally {
+    window.confirm = originalConfirm;
+  }
+  await waitFor(() => {
+    expect(preset).toHaveAttribute('aria-checked', 'true');
+  });
+};
+
 jest.mock('../SBTs/SBTSelector', () => () => <div data-testid="mock-wizard-sbt-selector" />);
 jest.mock('../SBTs/CreateSBTGroup', () => () => null);
 jest.mock('../Gates/GateMultiSelectLock', () => () => <div data-testid="mock-wizard-gate-lock" />);
@@ -297,7 +311,7 @@ describe('SessionWizard blank bundle render regression', () => {
     });
 
     window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -333,6 +347,7 @@ describe('SessionWizard blank bundle render regression', () => {
       target: { value: 'Sponsored Publish Blank Bundle URL' },
     });
 
+    await selectDecentralizedProfile();
     fireEvent.click(screen.getByRole('button', { name: /step \d+: worker/i }));
 
     const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
@@ -380,7 +395,7 @@ describe('SessionWizard blank bundle render regression', () => {
     });
 
     window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -416,6 +431,7 @@ describe('SessionWizard blank bundle render regression', () => {
       target: { value: 'Sponsored Publish Blank Bundle File' },
     });
 
+    await selectDecentralizedProfile();
     fireEvent.click(screen.getByRole('button', { name: /step \d+: worker/i }));
 
     const cloudflareTokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
@@ -461,7 +477,7 @@ describe('SessionWizard blank bundle render regression', () => {
     const staleAdvancedBundleUrl = 'https://assets.example.test/stale-advanced-sessionCorsWorker.bundle.js';
     const fallbackFetch = createDefaultFetchMock();
 
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         deployForm: {
@@ -499,6 +515,7 @@ describe('SessionWizard blank bundle render regression', () => {
       target: { value: 'Blank Bundle Regression Session' },
     });
 
+    await selectDecentralizedProfile();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
     fireEvent.click(await screen.findByRole('button', { name: 'Use My Own' }));

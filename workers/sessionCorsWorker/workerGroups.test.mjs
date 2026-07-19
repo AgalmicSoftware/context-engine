@@ -142,6 +142,66 @@ test('worker groups operate on storage index KV without a D1 binding', async () 
   assert.equal(memberships.ok, true);
   assert.equal(memberships.store, 'kv');
   assert.deepEqual(memberships.memberships.map((entry) => entry.group.groupId), ['fresh-worker']);
+  assert.equal(memberships.memberships[0].memberCount, 1);
+});
+
+test('worker groups ignore session-worker D1 bindings and keep KV authoritative', async () => {
+  const d1BindingNames = [
+    'CE_WORKER_GROUPS_D1',
+    'CE_STORAGE_AUDIT_D1',
+    'STORAGE_AUDIT_D1',
+    'D1',
+    'DB',
+  ];
+
+  for (const bindingName of d1BindingNames) {
+    const kv = createMockKv();
+    let d1Calls = 0;
+    const d1 = {
+      async exec() {
+        d1Calls += 1;
+        throw new Error(`${bindingName} must not be used for worker groups`);
+      },
+      prepare() {
+        d1Calls += 1;
+        throw new Error(`${bindingName} must not be used for worker groups`);
+      },
+    };
+    // eslint-disable-next-line no-await-in-loop
+    const created = await createWorkerGroup({
+      env: {
+        CE_STORAGE_INDEX_KV: kv,
+        [bindingName]: d1,
+      },
+      slug: 'session-a',
+      input: {
+        groupId: `kv-${bindingName.toLowerCase()}`,
+        label: `KV authority for ${bindingName}`,
+        joinMode: 'admin_add',
+      },
+      actorPrincipal: actor,
+    });
+
+    assert.equal(created.ok, true, bindingName);
+    assert.equal(created.store, 'kv', bindingName);
+    assert.equal(d1Calls, 0, bindingName);
+
+    // eslint-disable-next-line no-await-in-loop
+    const d1Only = await createWorkerGroup({
+      env: { [bindingName]: d1 },
+      slug: 'session-a',
+      input: {
+        groupId: `d1-${bindingName.toLowerCase()}`,
+        label: `No D1 fallback for ${bindingName}`,
+        joinMode: 'admin_add',
+      },
+      actorPrincipal: actor,
+    });
+    assert.equal(d1Only.ok, false, bindingName);
+    assert.equal(d1Only.status, 501, bindingName);
+    assert.equal(d1Only.reason, 'worker_group_store_not_configured', bindingName);
+    assert.equal(d1Calls, 0, bindingName);
+  }
 });
 
 test('worker groups reject deferred join modes and malformed principals fail closed', async () => {
@@ -235,6 +295,7 @@ test('member routes respect visibility and open join mode', async () => {
   const memberships = await listWorkerGroupMemberships({ env, slug: 'session-a', principal: member });
   assert.equal(memberships.ok, true);
   assert.deepEqual(memberships.memberships.map((entry) => entry.group.groupId), ['open-review']);
+  assert.equal(memberships.memberships[0].memberCount, 1);
 });
 
 test('worker group deletion revokes membership checks', async () => {

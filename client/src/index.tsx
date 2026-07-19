@@ -2,8 +2,10 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { initLogging } from 'utilities/logging.js';
+import { initializeRuntimeConfig } from 'utilities/session/runtimeConfig';
 import App from 'components/App';
 
+initializeRuntimeConfig();
 initLogging({ showGuide: process.env.NODE_ENV !== 'production' });
 
 const container = document.getElementById('root');

@@ -2,6 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { dispatchAdminRequest } from './adminRequestDispatch.js';
+import {
+  getSessionConfig,
+  getSessionSecrets,
+  putSessionConfig,
+  putSessionSecrets,
+} from './sessionConfigSecretsStore.js';
+import { mergeWorkerConfigRecords } from './sessionConfigNormalization.js';
+import { applySessionConfigMutation } from './sessionConfigMutation.js';
 
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
@@ -12,34 +20,103 @@ const createSignedBody = (overrides = {}) => ({
   ...overrides,
 });
 
-const createAdminDeps = (overrides = {}) => ({
-  json: createJsonStub(),
-  resolveAdminRequestAuthority: async () => ({
-    ok: true,
-    address: '0xabc',
-    existingConfig: { adminAddress: '0xabc' },
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
-    targetSlug: 'session-a',
-  }),
-  mergeWorkerConfigRecords: ({ existingConfig, incomingConfig, slug }) => ({
+const createMemoryKv = () => {
+  const values = new Map();
+  return {
+    get: async (key) => values.get(key) || null,
+    put: async (key, value) => {
+      values.set(key, value);
+    },
+  };
+};
+
+const createAdminDeps = (overrides = {}) => {
+  const defaultMergeConfig = ({ existingConfig, incomingConfig, slug }) => ({
     existingConfig,
     incomingConfig,
     slug,
     merged: true,
-  }),
-  mergeWorkerLimitRecords: ({ existingConfig, incomingLimits, slug }) => ({
+  });
+  const defaultMergeLimits = ({ existingConfig, incomingLimits, slug }) => ({
     existingConfig,
     incomingLimits,
     slug,
     merged: true,
-  }),
-  putSessionConfig: async () => {},
-  getSessionSecrets: async () => ({ openaiKey: 'sk-existing' }),
-  normalizeSecretValue: (value) => value,
-  putSessionSecrets: async () => {},
-  MISSING_SLUG_ERROR: 'Missing sessionSlug.',
-  ...overrides,
-});
+  });
+  const deps = {
+    json: createJsonStub(),
+    resolveAdminRequestAuthority: async () => ({
+      ok: true,
+      address: '0xabc',
+      existingConfig: { adminAddress: '0xabc' },
+      headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+      targetSlug: 'session-a',
+    }),
+    mergeWorkerConfigRecords: defaultMergeConfig,
+    mergeWorkerLimitRecords: defaultMergeLimits,
+    putSessionConfig: async () => {},
+    getSessionSecrets: async () => ({ openaiKey: 'sk-existing' }),
+    normalizeSecretValue: (value) => value,
+    putSessionSecrets: async () => {},
+    MISSING_SLUG_ERROR: 'Missing sessionSlug.',
+    ...overrides,
+  };
+  if (!overrides.applySessionConfigMutation) {
+    deps.applySessionConfigMutation = ({ existingConfig, mutation, slug }) => {
+      const applied = applySessionConfigMutation({ existingConfig, mutation, slug });
+      if (!applied.ok || applied.skipPersistence) return applied;
+
+      let nextConfig = applied.config;
+      if (mutation.kind === 'set-config' && deps.mergeWorkerConfigRecords !== mergeWorkerConfigRecords) {
+        nextConfig = deps.mergeWorkerConfigRecords({
+          existingConfig,
+          incomingConfig: mutation.incomingConfig,
+          slug,
+        });
+      } else if (mutation.kind === 'set-limits') {
+        nextConfig = deps.mergeWorkerLimitRecords({
+          existingConfig,
+          incomingLimits: mutation.incomingLimits,
+          slug,
+        });
+      } else if (mutation.kind === 'merge-lit-credentials' && deps.mergeWorkerConfigRecords !== mergeWorkerConfigRecords) {
+        nextConfig = deps.mergeWorkerConfigRecords({
+          existingConfig,
+          incomingConfig: {
+            litCredentials: {
+              ...((existingConfig?.litCredentials && typeof existingConfig.litCredentials === 'object')
+                ? existingConfig.litCredentials
+                : {}),
+              ...mutation.litCredentials,
+            },
+          },
+          slug,
+        });
+      }
+      return { ...applied, config: nextConfig };
+    };
+  }
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'executeCoordinatedSessionConfigMutation')) {
+    deps.executeCoordinatedSessionConfigMutation = async ({
+      env,
+      slug,
+      existingConfig,
+      mutation,
+    }) => {
+      const result = deps.applySessionConfigMutation({ existingConfig, mutation, slug });
+      if (!result?.ok) {
+        return {
+          ok: false,
+          status: result?.status || 400,
+          body: { error: result?.error || 'Session config mutation failed.' },
+        };
+      }
+      if (!result.skipPersistence) await deps.putSessionConfig(env, slug, result.config);
+      return { ok: true, status: 200, body: { ok: true } };
+    };
+  }
+  return deps;
+};
 
 test('dispatchAdminRequest preserves invalid-json failure before signed request handling', async () => {
   let authorityCalled = false;
@@ -68,6 +145,31 @@ test('dispatchAdminRequest preserves invalid-json failure before signed request 
     status: 400,
     headers: { 'Access-Control-Allow-Origin': '*' },
   });
+});
+
+test('dispatchAdminRequest fails closed without a coordinator binding', async () => {
+  let putCalls = 0;
+  const deps = createAdminDeps({
+    executeCoordinatedSessionConfigMutation: null,
+    putSessionConfig: async () => { putCalls += 1; },
+  });
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        config: { sessionName: 'Persist directly' },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps,
+  });
+
+  assert.equal(result.status, 503);
+  assert.match(result.body.error, /coordination is unavailable/i);
+  assert.equal(putCalls, 0);
 });
 
 test('dispatchAdminRequest merges config and persists the result after authority resolution', async () => {
@@ -120,6 +222,291 @@ test('dispatchAdminRequest merges config and persists the result after authority
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
+});
+
+test('dispatchAdminRequest preserves a freshly stored storage envelope during the next config mutation', async () => {
+  const env = { GROUP_KV: createMemoryKv() };
+  const storageEnvelope = {
+    version: 1,
+    keyProvider: 'worker_secret',
+    sessionKey: {
+      version: 1,
+      alg: 'AES-256-GCM',
+      wrapAlg: 'AES-GCM-KW-v1',
+      keyId: 'session:session-a:fresh-envelope',
+      createdAt: '2026-07-15T00:00:00.000Z',
+      iv: 'public-iv',
+      wrappedKey: 'encrypted-key-material',
+    },
+  };
+  await putSessionConfig(env, 'session-a', {
+    slug: 'session-a',
+    adminAddress: '0xabc',
+    sessionName: 'Before mutation',
+    storageEnvelope,
+  });
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        config: { sessionName: 'After mutation' },
+      }),
+    },
+    env,
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        address: '0xabc',
+        existingConfig: await getSessionConfig(env, 'session-a'),
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      applySessionConfigMutation,
+      mergeWorkerConfigRecords,
+      putSessionConfig,
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  const persisted = await getSessionConfig(env, 'session-a');
+  assert.equal(persisted.sessionName, 'After mutation');
+  assert.deepEqual(persisted.storageEnvelope, storageEnvelope);
+});
+
+test('dispatchAdminRequest rejects changes to an initialized worker-canonical identity', async () => {
+  const existingConfig = {
+    slug: 'session-a',
+    sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    corsWorkerUrl: 'https://session-a.workers.dev',
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    sessionName: 'Canonical Session',
+  };
+  const unsafePatches = [
+    {
+      label: 'slug',
+      config: { sessionName: 'Cross-slug update' },
+      targetSlug: 'session-b',
+    },
+    {
+      label: 'session id',
+      config: { sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+    },
+    {
+      label: 'authority mode',
+      config: { sessionModeProfile: { authority: { mode: 'registry' } } },
+    },
+    {
+      label: 'worker URL',
+      config: { corsWorkerUrl: 'https://replacement.workers.dev' },
+    },
+  ];
+
+  for (const { label, config, targetSlug = 'session-a' } of unsafePatches) {
+    let writes = 0;
+    const result = await dispatchAdminRequest({
+      request: {
+        json: async () => createSignedBody({ config }),
+      },
+      env: { GROUP_KV: {} },
+      baseHeaders: {},
+      slug: 'session-a',
+      action: 'set-config',
+      deps: createAdminDeps({
+        resolveAdminRequestAuthority: async () => ({
+          ok: true,
+          existingConfig,
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+          targetSlug,
+        }),
+        mergeWorkerConfigRecords,
+        putSessionConfig: async () => { writes += 1; },
+      }),
+    });
+
+    assert.equal(writes, 0, label);
+    assert.deepEqual(result, {
+      body: { error: 'Worker-canonical session identity cannot be changed after initialization.' },
+      status: 409,
+      headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+    }, label);
+  }
+});
+
+test('dispatchAdminRequest treats sessionId and sessionIdHex as one immutable canonical identity', async () => {
+  const existingConfig = {
+    slug: 'session-a',
+    sessionIdHex: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    corsWorkerUrl: 'https://session-a.workers.dev',
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+  };
+
+  for (const config of [
+    { sessionIdHex: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+    { sessionId: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+  ]) {
+    let writes = 0;
+    const result = await dispatchAdminRequest({
+      request: { json: async () => createSignedBody({ config }) },
+      env: { GROUP_KV: {} },
+      baseHeaders: {},
+      slug: 'session-a',
+      action: 'set-config',
+      deps: createAdminDeps({
+        resolveAdminRequestAuthority: async () => ({
+          ok: true,
+          existingConfig,
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+          targetSlug: 'session-a',
+        }),
+        mergeWorkerConfigRecords,
+        putSessionConfig: async () => { writes += 1; },
+      }),
+    });
+
+    assert.equal(result.status, 409);
+    assert.equal(writes, 0);
+  }
+
+  const writes = [];
+  const equivalentResult = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        config: { sessionId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      mergeWorkerConfigRecords,
+      putSessionConfig: async (...args) => { writes.push(args); },
+    }),
+  });
+
+  assert.equal(equivalentResult.status, 200);
+  assert.equal(writes.length, 1);
+});
+
+test('dispatchAdminRequest finalizes the first canonical publication revision and rejects stale wizard revisions', async () => {
+  const deploymentConfig = {
+    slug: 'session-a',
+    sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    configRevision: 'deployment-seed',
+    corsWorkerUrl: 'https://session-a.workers.dev',
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    sessionName: 'Deployment seed',
+  };
+  let persistedConfig = deploymentConfig;
+  let writeCount = 0;
+  const runSetConfig = async (config) => dispatchAdminRequest({
+    request: { json: async () => createSignedBody({ config }) },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: persistedConfig,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      mergeWorkerConfigRecords,
+      putSessionConfig: async (_env, _slug, nextConfig) => {
+        writeCount += 1;
+        persistedConfig = nextConfig;
+      },
+    }),
+  });
+
+  const firstPublishConfig = {
+    sessionName: 'Published session',
+    configRevision: 'publication-a',
+  };
+  assert.equal((await runSetConfig(firstPublishConfig)).status, 200);
+  assert.equal(persistedConfig.configRevision, 'publication-a');
+  assert.equal(persistedConfig.workerCanonicalPublicationRevision, 'publication-a');
+
+  // An exact transport replay is idempotent and cannot reapply stale fields.
+  const writesAfterPublish = writeCount;
+  assert.equal((await runSetConfig(firstPublishConfig)).status, 200);
+  assert.equal(writeCount, writesAfterPublish);
+  assert.equal(persistedConfig.workerCanonicalPublicationRevision, 'publication-a');
+
+  const sameRevisionConflict = await runSetConfig({
+    sessionName: 'Conflicting same-revision payload',
+    configRevision: 'publication-a',
+  });
+  assert.equal(sameRevisionConflict.status, 409);
+  assert.equal(writeCount, writesAfterPublish);
+  assert.equal(persistedConfig.sessionName, 'Published session');
+
+  const beforeStaleWrite = structuredClone(persistedConfig);
+  const staleResult = await runSetConfig({
+    sessionName: 'Stale tab overwrite',
+    configRevision: 'publication-b',
+  });
+  assert.equal(staleResult.status, 409);
+  assert.deepEqual(persistedConfig, beforeStaleWrite);
+
+  // Later admin patches omit configRevision and preserve the finalized revision.
+  assert.equal((await runSetConfig({ allowOrigins: ['https://admin.example.test'] })).status, 200);
+  assert.equal(persistedConfig.configRevision, 'publication-a');
+  assert.equal(persistedConfig.workerCanonicalPublicationRevision, 'publication-a');
+  assert.deepEqual(persistedConfig.allowOrigins, ['https://admin.example.test']);
+
+  const writesAfterAdminPatch = writeCount;
+  assert.equal((await runSetConfig(firstPublishConfig)).status, 200);
+  assert.equal(writeCount, writesAfterAdminPatch);
+  assert.deepEqual(persistedConfig.allowOrigins, ['https://admin.example.test']);
+});
+
+test('dispatchAdminRequest permits non-identity updates to an initialized worker-canonical session', async () => {
+  const existingConfig = {
+    slug: 'session-a',
+    sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    corsWorkerUrl: 'https://session-a.workers.dev',
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    sessionName: 'Canonical Session',
+  };
+  const writes = [];
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        config: { sessionName: 'Updated Canonical Session' },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      mergeWorkerConfigRecords,
+      putSessionConfig: async (...args) => { writes.push(args); },
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0][2].sessionName, 'Updated Canonical Session');
+  assert.equal(writes[0][2].sessionId, existingConfig.sessionId);
 });
 
 test('dispatchAdminRequest seeds bootstrap adminAddress from the top-level body when the first config patch omits it', async () => {
@@ -175,6 +562,189 @@ test('dispatchAdminRequest seeds bootstrap adminAddress from the top-level body 
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
+});
+
+test('dispatchAdminRequest rejects Cloudflare deployment tokens in session config before persistence', async () => {
+  let writes = 0;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        config: {
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          nested: { cloudflareApiToken: 'cf-never-store' },
+        },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      putSessionConfig: async () => { writes += 1; },
+    }),
+  });
+
+  assert.equal(writes, 0);
+  assert.deepEqual(result, {
+    body: { error: 'Cloudflare deployment tokens are not allowed in session config.' },
+    status: 400,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
+test('dispatchAdminRequest rejects secret-like values in open config subtrees before persistence', async () => {
+  let writes = 0;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        config: {
+          ai: {
+            models: { fast: { provider: 'openai', model: 'gpt-5' } },
+            headers: { Authorization: 'Bearer secret' },
+          },
+        },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      putSessionConfig: async () => { writes += 1; },
+    }),
+  });
+
+  assert.equal(writes, 0);
+  assert.deepEqual(result, {
+    body: { error: 'Secret-like values are not allowed in public session config fields.' },
+    status: 400,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
+test('dispatchAdminRequest rejects secret-like limit mutations before config persistence', async () => {
+  let writes = 0;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        limits: { providerApiKey: 'limit-secret-must-not-persist' },
+      }),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-limits',
+    deps: createAdminDeps({
+      applySessionConfigMutation,
+      putSessionConfig: async () => { writes += 1; },
+    }),
+  });
+
+  assert.equal(writes, 0);
+  assert.deepEqual(result, {
+    body: { error: 'Secret-like values are not allowed in public session config fields.' },
+    status: 400,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
+test('dispatchAdminRequest rejects secret-like Lit descriptor merges before config persistence', async () => {
+  let writes = 0;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({}),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'lit-chipotle-bootstrap-session',
+    deps: createAdminDeps({
+      getSessionSecrets: async () => ({}),
+      bootstrapLitChipotleSession: async () => ({
+        ok: true,
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litAccountApiKey: 'lit-secret-must-not-persist',
+        },
+      }),
+      applySessionConfigMutation,
+      putSessionConfig: async () => { writes += 1; },
+    }),
+  });
+
+  assert.equal(writes, 0);
+  assert.deepEqual(result, {
+    body: { error: 'Secret-like values are not allowed in public session config fields.' },
+    status: 400,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+});
+
+test('dispatchAdminRequest rejects nested provider secret aliases and generic top-level keys', async () => {
+  const unsafeConfigs = [
+    { ai: { models: { fast: { apiKeys: { primary: 'secret' } } } } },
+    { ai: { models: { fast: { providerKeys: ['secret'] } } } },
+    { ai: { models: { fast: { authorization: 'Bearer secret' } } } },
+    { ai: { models: { fast: { apiCredential: 'secret' } } } },
+    { nested: { provider: { apiKeys: { primary: 'secret' } } } },
+    { nested: { customProviderKey: 'secret' } },
+    { nested: { requestKey: 'secret' } },
+    { authorization: 'Bearer secret' },
+    { sessionModeProfile: { authorization: 'Bearer secret' } },
+    { sessionModeProfile: { authorization: ['Bearer secret'] } },
+    { requestKey: 'secret' },
+    { customProviderKey: 'secret' },
+  ];
+  let writes = 0;
+
+  for (const config of unsafeConfigs) {
+    const result = await dispatchAdminRequest({
+      request: { json: async () => createSignedBody({ config }) },
+      env: { GROUP_KV: {} },
+      baseHeaders: {},
+      slug: 'session-a',
+      action: 'set-config',
+      deps: createAdminDeps({
+        putSessionConfig: async () => { writes += 1; },
+      }),
+    });
+
+    assert.equal(result.status, 400, JSON.stringify(config));
+    assert.equal(
+      result.body.error,
+      'Secret-like values are not allowed in public session config fields.',
+      JSON.stringify(config),
+    );
+  }
+
+  assert.equal(writes, 0);
+});
+
+test('dispatchAdminRequest preserves explicitly public key fields and structural authorization', async () => {
+  const writes = [];
+  const config = {
+    keyProvider: 'worker_secret',
+    publicKey: 'public-id',
+    resourceKey: 'default',
+    authorization: { roles: { moderator: ['0x00000000000000000000000000000000000000aa'] } },
+    sessionModeProfile: {
+      authorization: { mechanisms: ['worker_roles'] },
+    },
+  };
+
+  const result = await dispatchAdminRequest({
+    request: { json: async () => createSignedBody({ config }) },
+    env: { GROUP_KV: {} },
+    baseHeaders: {},
+    slug: 'session-a',
+    action: 'set-config',
+    deps: createAdminDeps({
+      putSessionConfig: async (...args) => { writes.push(args); },
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  assert.equal(writes.length, 1);
 });
 
 test('dispatchAdminRequest filters and normalizes allowed secrets before persisting', async () => {
@@ -826,84 +1396,46 @@ test('dispatchAdminRequest does not export envelopes when admin authority fails'
   assert.equal(exportCalled, false);
 });
 
-test('dispatchAdminRequest rewraps deployment KEK without returning secret material', async () => {
-  const calls = [];
-  const result = await dispatchAdminRequest({
-    request: {
-      json: async () => createSignedBody({
-        newDeploymentKek: 'new deployment envelope kek',
-      }),
-    },
-    env: { CE_STORAGE_INDEX_KV: {} },
-    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
-    slug: 'session-a',
-    action: 'rewrap-envelope-deployment-key',
-    deps: createAdminDeps({
-      resolveAdminRequestAuthority: async () => ({
-        ok: true,
-        existingConfig: { storageEnvelope: { keyProvider: 'worker_secret' } },
-        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
-        targetSlug: 'session-a',
-      }),
-      rewrapStorageEnvelopeSessionKeyForDeployment: async (value) => {
-        calls.push(value);
-        return {
-          ok: true,
-          rewrappedAt: '2026-01-04T03:04:05.000Z',
-          keyProvider: 'worker_secret',
-        };
-      },
-    }),
-  });
-
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].slug, 'session-a');
-  assert.equal(calls[0].newDeploymentKek, 'new deployment envelope kek');
-  assert.deepEqual(result, {
-    body: {
-      ok: true,
-      rewrappedAt: '2026-01-04T03:04:05.000Z',
-      keyProvider: 'worker_secret',
-    },
-    status: 200,
-    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
-  });
-  assert.doesNotMatch(JSON.stringify(result), /new deployment envelope kek/);
-});
-
-test('dispatchAdminRequest returns explicit unknown-action failures after admin verification', async () => {
+test('dispatchAdminRequest leaves removed key-changing actions unknown and non-mutating', async () => {
   let putCalled = false;
-
-  const result = await dispatchAdminRequest({
-    request: {
-      json: async () => createSignedBody(),
-    },
-    env: { GROUP_KV: {} },
-    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
-    slug: '',
-    action: 'not-a-route',
-    deps: createAdminDeps({
-      resolveAdminRequestAuthority: async () => ({
-        ok: true,
-        existingConfig: { adminAddress: '0xabc' },
-        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
-        targetSlug: 'session-a',
+  const actions = [
+    'not-a-route',
+    'rotate-envelope-keys',
+    'rewrap-envelope-deployment-key',
+  ];
+  const results = [];
+  for (const action of actions) {
+    results.push(await dispatchAdminRequest({
+      request: {
+        json: async () => createSignedBody(),
+      },
+      env: { GROUP_KV: {} },
+      baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+      slug: '',
+      action,
+      deps: createAdminDeps({
+        resolveAdminRequestAuthority: async () => ({
+          ok: true,
+          existingConfig: { adminAddress: '0xabc' },
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+          targetSlug: 'session-a',
+        }),
+        putSessionConfig: async () => {
+          putCalled = true;
+        },
+        putSessionSecrets: async () => {
+          putCalled = true;
+        },
       }),
-      putSessionConfig: async () => {
-        putCalled = true;
-      },
-      putSessionSecrets: async () => {
-        putCalled = true;
-      },
-    }),
-  });
+    }));
+  }
 
   assert.equal(putCalled, false);
-  assert.deepEqual(result, {
+  assert.deepEqual(results, actions.map(() => ({
     body: { error: 'Unknown admin action.' },
     status: 400,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
-  });
+  })));
 });
 
 
@@ -1131,4 +1663,279 @@ test('dispatchAdminRequest bootstraps a per-session Lit account and writes both 
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
+});
+
+test('dispatchAdminRequest persists a signed Lit descriptor through the real config store', async () => {
+  const env = { GROUP_KV: createMemoryKv() };
+  const litCredentials = {
+    litApiBase: 'https://api.chipotle.litprotocol.com',
+    litGroupId: 'group_123',
+    litPkpId: 'pkp_123',
+    litActionCid: 'bafy123',
+  };
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        adminAddress: '0xabc',
+        config: {
+          slug: 'session-a',
+          sessionName: 'Worker Lit Session',
+          litCredentials,
+        },
+      }),
+    },
+    env,
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: null,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      isAddress: (value) => value === '0xabc',
+      mergeWorkerConfigRecords,
+      putSessionConfig,
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(await getSessionConfig(env, 'session-a'), {
+    slug: 'session-a',
+    adminAddress: '0xabc',
+    sessionName: 'Worker Lit Session',
+    litCredentials,
+    limits: {},
+    scopes: {},
+  });
+});
+
+test('dispatchAdminRequest rejects deeply nested secrets through the real config store', async () => {
+  const unsafeConfigs = [
+    { nested: { faucet: 'secret' } },
+    { arbitrary: [{ deeper: { faucet: { amountEth: '0.001' } } }] },
+    { nested: { password: 'secret' } },
+    { arbitrary: [{ deeper: { token: 'secret' } }] },
+    { arbitrary: [{ deeper: { arweaveJwk: { kty: 'RSA' } } }] },
+  ];
+
+  for (const config of unsafeConfigs) {
+    const env = { GROUP_KV: createMemoryKv() };
+    const result = await dispatchAdminRequest({
+      request: {
+        json: async () => createSignedBody({
+          adminAddress: '0xabc',
+          config: {
+            slug: 'session-a',
+            sessionName: 'Worker Session',
+            ...config,
+          },
+        }),
+      },
+      env,
+      baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+      slug: '',
+      action: 'set-config',
+      deps: createAdminDeps({
+        resolveAdminRequestAuthority: async () => ({
+          ok: true,
+          existingConfig: null,
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+          targetSlug: 'session-a',
+        }),
+        isAddress: (value) => value === '0xabc',
+        mergeWorkerConfigRecords,
+        putSessionConfig,
+      }),
+    });
+
+    assert.equal(result.status, 400, JSON.stringify(config));
+    assert.equal(
+      result.body.error,
+      'Secret-like values are not allowed in public session config fields.',
+      JSON.stringify(config),
+    );
+    assert.equal(await getSessionConfig(env, 'session-a'), null, JSON.stringify(config));
+  }
+});
+
+test('dispatchAdminRequest persists boolean scope permissions through the real config store', async () => {
+  const env = { GROUP_KV: createMemoryKv() };
+  const scopes = {
+    ai: true,
+    faucet: false,
+    token: false,
+    password: false,
+    arweaveJwk: false,
+  };
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        adminAddress: '0xabc',
+        config: {
+          slug: 'session-a',
+          sessionName: 'Worker Session',
+          scopes,
+        },
+      }),
+    },
+    env,
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'set-config',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: null,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      isAddress: (value) => value === '0xabc',
+      mergeWorkerConfigRecords,
+      putSessionConfig,
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(await getSessionConfig(env, 'session-a'), {
+    slug: 'session-a',
+    adminAddress: '0xabc',
+    sessionName: 'Worker Session',
+    scopes,
+    limits: {},
+  });
+});
+
+test('dispatchAdminRequest provisions Lit descriptors through the real worker config store', async () => {
+  const env = { GROUP_KV: createMemoryKv(), LIT_ACCOUNT_API_KEY: 'account-key' };
+  const existingConfig = {
+    slug: 'session-a',
+    adminAddress: '0xabc',
+    litCredentials: {
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+    },
+  };
+  await putSessionConfig(env, 'session-a', existingConfig);
+  await putSessionSecrets(env, 'session-a', { litAccountApiKey: 'account-key' });
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        actionCode: 'async function main() { return { ok: true }; }',
+        actionName: 'ce-sbt-gated-crypto-v3',
+      }),
+    },
+    env,
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'lit-chipotle-provision',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      getSessionSecrets,
+      mergeWorkerConfigRecords,
+      putSessionConfig,
+      resolveLitChipotleProvisioningRuntime: () => ({
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litManagementApiKey: 'account-key',
+        litGroupId: 'group_123',
+        litPkpId: 'pkp_123',
+      }),
+      provisionLitChipotleAction: async () => ({
+        ok: true,
+        apiBase: 'https://api.chipotle.litprotocol.com',
+        litActionCid: 'bafy123',
+        litGroupId: 'group_123',
+        litPkpId: 'pkp_123',
+      }),
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual((await getSessionConfig(env, 'session-a'))?.litCredentials, {
+    litApiBase: 'https://api.chipotle.litprotocol.com',
+    litGroupId: 'group_123',
+    litPkpId: 'pkp_123',
+    litActionCid: 'bafy123',
+  });
+});
+
+test('dispatchAdminRequest bootstraps Lit config and secrets through the real worker stores', async () => {
+  const env = { GROUP_KV: createMemoryKv() };
+  const existingConfig = {
+    slug: 'session-a',
+    adminAddress: '0xabc',
+    litCredentials: {
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+    },
+  };
+  await putSessionConfig(env, 'session-a', existingConfig);
+  await putSessionSecrets(env, 'session-a', { openaiKey: 'sk-existing' });
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        sessionName: 'Session A',
+      }),
+    },
+    env,
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'lit-chipotle-bootstrap-session',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      getSessionSecrets,
+      putSessionSecrets,
+      mergeWorkerConfigRecords,
+      putSessionConfig,
+      bootstrapLitChipotleSession: async () => ({
+        ok: true,
+        bootstrapMode: 'session-account',
+        apiBase: 'https://api.chipotle.litprotocol.com',
+        litActionCid: 'bafy123',
+        litGroupId: 'group_123',
+        litPkpId: 'pkp_123',
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litActionCid: 'bafy123',
+          litGroupId: 'group_123',
+          litPkpId: 'pkp_123',
+        },
+        secretOutputs: {
+          litAccountApiKey: 'account-key',
+          litUsageApiKey: 'usage-key',
+        },
+      }),
+    }),
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual((await getSessionConfig(env, 'session-a'))?.litCredentials, {
+    litApiBase: 'https://api.chipotle.litprotocol.com',
+    litActionCid: 'bafy123',
+    litGroupId: 'group_123',
+    litPkpId: 'pkp_123',
+  });
+  assert.deepEqual(await getSessionSecrets(env, 'session-a'), {
+    openaiKey: 'sk-existing',
+    litAccountApiKey: 'account-key',
+    litUsageApiKey: 'usage-key',
+  });
+  assert.equal(Object.prototype.hasOwnProperty.call(result.body, 'litCredentials'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(result.body, 'secretOutputs'), false);
 });

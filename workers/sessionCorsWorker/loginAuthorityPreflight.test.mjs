@@ -48,15 +48,18 @@ test('resolveLoginAuthorityContext fails before session reads when registry conf
 
 test('resolveLoginAuthorityContext returns the canonical registry context when session authority exists', async () => {
   const calls = [];
+  const chainAttestationCache = new Map();
 
   const result = await resolveLoginAuthorityContext({
     slug: 'debate',
     address: '0xabc123',
     config: {
       registryAddress: REGISTRY_ADDRESS,
+      registryChainId: 84532,
       rpcUrl: 'https://rpc.example',
     },
     deps: createDeps({
+      chainAttestationCache,
       readSessionExistsOnChain: async (value) => {
         calls.push(value);
         return {
@@ -73,6 +76,8 @@ test('resolveLoginAuthorityContext returns the canonical registry context when s
     registryAddress: REGISTRY_ADDRESS,
     registryRpcUrls: ['https://rpc.example'],
     registrySlug: 'rxc',
+    expectedChainId: 84532,
+    chainAttestationCache,
   }]);
   assert.deepEqual(result, {
     registryAddress: REGISTRY_ADDRESS,
@@ -161,4 +166,38 @@ test('resolveLoginAuthorityContext preserves session-check-unavailable warning a
       rpcError: 'rpc unavailable',
     },
   ]]);
+});
+
+test('resolveLoginAuthorityContext uses persisted worker-canonical config without registry reads', async () => {
+  let registryReads = 0;
+  const result = await resolveLoginAuthorityContext({
+    slug: 'session-worker',
+    address: '0xabc123',
+    config: {
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      workerAuthority: { version: 1, participantScopes: ['storage'] },
+    },
+    deps: createDeps({
+      resolveRegistryRpcUrls: () => [],
+      readSessionExistsOnChain: async () => {
+        registryReads += 1;
+        return { exists: false, errors: [], error: null };
+      },
+    }),
+  });
+
+  assert.equal(registryReads, 0);
+  assert.deepEqual(result, {
+    authorityMode: 'worker_canonical',
+    registryAddress: '',
+    registryRpcUrls: [],
+    registrySlug: 'session-worker',
+    sessionCheck: {
+      exists: true,
+      source: 'worker-config',
+      rpcUrl: '',
+      errors: [],
+      error: null,
+    },
+  });
 });

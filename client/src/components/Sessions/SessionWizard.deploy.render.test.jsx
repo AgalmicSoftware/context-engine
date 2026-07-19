@@ -303,10 +303,10 @@ import SessionWizard, {
   finalizeSessionWizardPendingSbtDraft,
   persistSessionWizardSbtRecoveryCodes,
   promotePendingSbtSelectionsAfterDeploy,
-  resolveSessionWizardChipotleHookConfig,
   resolveSessionWizardSelectorSourceConfig,
   resolveSessionWizardWorkerBaseUrl,
 } from './SessionWizard';
+import { resolveSessionWizardChipotleHookConfig } from './sessionWizardWorkerSecretSupport';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
 const createTooltipStore = (tooltipsEnabled = true) =>
@@ -451,7 +451,7 @@ describe('SessionWizard deploy render validation', () => {
       }),
     }));
     const verifyMessageSpy = jest.spyOn(ethers.utils, 'verifyMessage').mockReturnValue(TEST_ADMIN_ADDRESS);
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         workerSecretsEnabled: true,
@@ -560,7 +560,7 @@ describe('SessionWizard deploy render validation', () => {
       expect(deployPayload.secrets.litPayerAddress).toBeUndefined();
 
       await waitFor(() => {
-        const cached = JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+        const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
         expect(cached.provisionedSponsoredContext?.fields?.sponsored_lit).toBe('0');
       });
     } finally {
@@ -720,7 +720,7 @@ describe('SessionWizard deploy render validation', () => {
       );
 
       await waitFor(() => {
-        const cachedRaw = localStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
+        const cachedRaw = sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
         expect(JSON.parse(cachedRaw)).toEqual(
           expect.objectContaining({
             provisionedSponsoredContext: expect.objectContaining({
@@ -792,7 +792,7 @@ describe('SessionWizard deploy render validation', () => {
     });
 
     try {
-      localStorage.setItem(
+      sessionStorage.setItem(
         'ce:sessionWizardDraft:v1',
         JSON.stringify({
           workerSecretsEnabled: true,
@@ -940,7 +940,7 @@ describe('SessionWizard deploy render validation', () => {
     });
 
     try {
-      localStorage.setItem(
+      sessionStorage.setItem(
         'ce:sessionWizardDraft:v1',
         JSON.stringify({
           workerSecretsEnabled: true,

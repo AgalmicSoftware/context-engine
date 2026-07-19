@@ -76,7 +76,7 @@ import {
 } from '../../utilities/session/resourceKeys.js';
 import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilities/worker/workerAuth.js';
 import type { WorkerResourcePresence } from '../../utilities/worker/workerResourcePresence';
-import { resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { resolveActiveSessionSlug, resolveSessionSlugFromPathname } from '../../utilities/session/sessionNaming.js';
 import { markUserExplicitlyDisconnected } from '../../utilities/web3/wagmiDisconnectState.js';
 import { notify } from '../../utilities/ui/notify.js';
 import {
@@ -487,6 +487,14 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     }
     if (scope === 'list' && effectiveListPrimary) return effectiveListPrimary;
     return scope === 'list' && propListPrimary ? normalizeSettingsSessionSlug(propListPrimary) : effectiveListPrimary;
+  };
+
+  getWorkerAuthSessionSlug = () => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search || '').has('worker')) {
+      const routeSlug = resolveSessionSlugFromPathname(window.location.pathname || '');
+      if (routeSlug !== null) return routeSlug;
+    }
+    return this.getActiveSessionSlug();
   };
 
   getTargetNetwork = () => {
@@ -933,7 +941,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     if (!this.props.loginComplete || !this.props.account) return;
     try {
       const chainId = (this.props.network as any)?.id || (this.props.network as any)?.chainId || null;
-      const sessionSlug = this.getActiveSessionSlug();
+      const sessionSlug = this.getWorkerAuthSessionSlug();
       await getWorkerSessionToken({
         sessionSlug,
         context: {

@@ -6,6 +6,7 @@ type ResolveSessionWizardDeployStatusDisplayStateArgs = {
   deployInFlight?: unknown;
   deployStatus?: unknown;
   deployVerifiedInUi?: unknown;
+  workerCanonicalPublishCompleted?: unknown;
 };
 export type SessionWizardDeployStatusDisplayState = {
   deployButtonDisabled: boolean;
@@ -88,11 +89,12 @@ export const resolveSessionWizardDeployStatusDisplayState = ({
   deployInFlight = false,
   deployStatus = '',
   deployVerifiedInUi = false,
+  workerCanonicalPublishCompleted = false,
 }: ResolveSessionWizardDeployStatusDisplayStateArgs = {}): SessionWizardDeployStatusDisplayState => {
   const deployStatusText = toStr(deployStatus);
   const deployStatusLower = deployStatusText.toLowerCase();
   return {
-    deployButtonDisabled: !!deployInFlight,
+    deployButtonDisabled: !!deployInFlight || !!workerCanonicalPublishCompleted,
     deployStatusText,
     isError:
       !!deployStatusText && !deployInFlight && !deployVerifiedInUi && !deployStatusLower.includes('worker deployed'),
@@ -115,6 +117,72 @@ export const formatSessionWizardDeployBundleDiagnostics = (bundleDiagnostics: un
   return parts.join(' ');
 };
 
+const RETAINED_KV_CLEANUP_STATUSES = new Set([
+  'retained-live-worker',
+  'retained-upload-pending',
+  'retained-pre-existing',
+  'retained-config-propagation-pending',
+]);
+
+const WORKER_MAY_STILL_OWN_KV_STATUSES = new Set([
+  'preserved-existing',
+  'retained-pre-existing',
+  'retained-config-propagation-pending',
+  'ownership-changed',
+  'ownership-unverified',
+]);
+
+const buildRetainedKvGuidance = ({
+  kvNamespaceId,
+  kvCleanupStatus,
+}: {
+  kvNamespaceId: string;
+  kvCleanupStatus: string;
+}): string => {
+  if (kvCleanupStatus === 'retained-upload-pending') {
+    return ` KV namespace ${kvNamespaceId} was retained for safe deployment retry. Retry normally so Context Engine can recover the same deployment. Do not delete the namespace while recovery is pending.`;
+  }
+  if (kvCleanupStatus === 'retained-pre-existing') {
+    return ` KV namespace ${kvNamespaceId} belongs to the existing deployment and was retained. Retry normally or inspect its Worker binding in Cloudflare. Do not delete the namespace before ownership is verified.`;
+  }
+  if (kvCleanupStatus === 'retained-config-propagation-pending') {
+    return ` KV namespace ${kvNamespaceId} remains bound while worker config propagation completes. Retry normally so Context Engine can finish verification. Do not delete the namespace.`;
+  }
+  return ` KV namespace ${kvNamespaceId} was retained because it remains or may remain bound to the live worker. Do not delete it before recovery or ownership verification.`;
+};
+
+export const formatSessionWizardDeployOrphanResources = (value: unknown = {}): string => {
+  const resources = asDeployRecord(value);
+  const workerName = toStr(resources?.workerName).trim();
+  const kvNamespaceId = toStr(resources?.kvNamespaceId).trim();
+  const kvCleanupStatus = toStr(resources?.kvCleanupStatus).trim();
+  const workerCleanupStatus = toStr(resources?.workerCleanupStatus).trim();
+  const workerMayStillOwnKv = WORKER_MAY_STILL_OWN_KV_STATUSES.has(workerCleanupStatus);
+  const retainedKv =
+    !!kvNamespaceId && (RETAINED_KV_CLEANUP_STATUSES.has(kvCleanupStatus) || (!kvCleanupStatus && workerMayStillOwnKv));
+  const labels = [
+    workerName && workerCleanupStatus === 'owned-delete-failed' ? `worker ${workerName}` : '',
+    kvNamespaceId && !retainedKv ? `KV namespace ${kvNamespaceId}` : '',
+  ].filter(Boolean);
+  const cleanupInstruction = labels.length
+    ? ` Cleanup incomplete: remove ${labels.join(' and ')} in Cloudflare before retrying.`
+    : '';
+  const ownershipNote =
+    workerCleanupStatus === 'preserved-existing'
+      ? ' The pre-existing worker was preserved.'
+      : workerCleanupStatus === 'retained-pre-existing'
+        ? ' The existing worker and deployment state were preserved.'
+        : workerCleanupStatus === 'retained-config-propagation-pending'
+          ? ' Worker config propagation is still pending; the deployment was preserved for recovery.'
+          : workerCleanupStatus === 'ownership-changed'
+            ? ' A newer or foreign worker deployment was detected and preserved.'
+            : workerCleanupStatus === 'ownership-unverified'
+              ? ' Worker ownership could not be verified, so no worker deletion was attempted.'
+              : '';
+  const retainedKvNote = retainedKv ? buildRetainedKvGuidance({ kvNamespaceId, kvCleanupStatus }) : '';
+  return `${cleanupInstruction}${ownershipNote}${retainedKvNote}`;
+};
+
 export const normalizeSessionWizardDeployErrorMessage = ({
   err,
   helperBase,
@@ -130,39 +198,55 @@ export const normalizeSessionWizardDeployErrorMessage = ({
   const statusCode = Number(error?.statusCode || 0);
   const responseError = toStr(error?.responseError).trim();
   const responseLower = responseError.toLowerCase();
+  const isTerminalDeploymentConflict =
+    error?.responseDeploymentRequestConflict === true && error?.responseDeploymentRequestTerminal === true;
   const bundleDiagnostics = error?.responseBundleDiagnostics;
   const diagnosticsSummary = bundleDiagnostics ? formatSessionWizardDeployBundleDiagnostics(bundleDiagnostics) : '';
+  const orphanResourcesSummary = formatSessionWizardDeployOrphanResources(error?.responseOrphanResources);
+  const withOrphanResources = (message: string): string => `${message}${orphanResourcesSummary}`;
 
   if ((statusCode === 403 && responseLower.includes('origin')) || responseLower.includes('origin not allowed')) {
-    return buildSessionWizardDeployHelperCorsMessage({
-      helperBase,
-      detail: responseError || 'Origin not allowed',
-      currentOrigin,
-    });
+    return withOrphanResources(
+      buildSessionWizardDeployHelperCorsMessage({
+        helperBase,
+        detail: responseError || 'Origin not allowed',
+        currentOrigin,
+      }),
+    );
   }
   if (lowered.includes('origin not allowed')) {
-    return buildSessionWizardDeployHelperCorsMessage({
-      helperBase,
-      detail: raw,
-      currentOrigin,
-    });
+    return withOrphanResources(
+      buildSessionWizardDeployHelperCorsMessage({
+        helperBase,
+        detail: raw,
+        currentOrigin,
+      }),
+    );
   }
   if (lowered.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR) || responseLower.includes(DEPLOY_HELPER_BUNDLE_FETCH_ERROR)) {
-    return raw || responseError;
+    return withOrphanResources(raw || responseError);
   }
   if (lowered.includes('failed to fetch') || lowered.includes('networkerror')) {
     const helper = toStr(helperBase).trim() || 'deploy-helper';
     const origin = resolveCurrentOrigin(currentOrigin) || '<current-origin>';
-    return `Deploy request could not reach ${helper}. This is usually CORS or helper availability; ensure ${origin} is allowed and retry.`;
+    return withOrphanResources(
+      `Deploy request could not reach ${helper}. This is usually CORS or helper availability; ensure ${origin} is allowed and retry.`,
+    );
   }
   if (
     (lowered.includes(CLOUDFLARE_MISSING_HANDLER_ERROR) || responseLower.includes(CLOUDFLARE_MISSING_HANDLER_ERROR)) &&
     diagnosticsSummary
   ) {
     const base = raw || responseError || 'Worker deploy failed.';
-    return `${base} Bundle diagnostics: ${diagnosticsSummary}`;
+    return withOrphanResources(`${base} Bundle diagnostics: ${diagnosticsSummary}`);
   }
-  if (raw) return raw;
-  if (statusCode > 0) return `Worker deploy failed (${statusCode}).`;
-  return 'Worker deploy failed.';
+  if (isTerminalDeploymentConflict) {
+    const base = raw || responseError || 'This deployment attempt cannot be reused.';
+    return withOrphanResources(
+      `${base} Review the account and session details, then click Deploy worker again to start a fresh deployment attempt.`,
+    );
+  }
+  if (raw) return withOrphanResources(raw);
+  if (statusCode > 0) return withOrphanResources(`Worker deploy failed (${statusCode}).`);
+  return withOrphanResources('Worker deploy failed.');
 };

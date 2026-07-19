@@ -58,25 +58,56 @@ export const normalizeSessionWizardWorkerUrl = (url: unknown): string => normali
 const resolveBrowserOrigin = (): string =>
   typeof window !== 'undefined' && window.location ? toStr(window.location.origin).trim() : '';
 
-export const buildSessionWizardSessionUrl = ({ slug, origin }: { slug?: unknown; origin?: string }): string => {
+const normalizeShareableWorkerOrigin = (value: unknown): string => {
+  try {
+    const parsed = new URL(toStr(value).trim());
+    if (!/^https?:$/.test(parsed.protocol) || parsed.username || parsed.password) return '';
+    if (parsed.pathname !== '/' || parsed.search || parsed.hash) return '';
+    return parsed.origin;
+  } catch {
+    return '';
+  }
+};
+
+export const buildSessionWizardSessionUrl = ({
+  slug,
+  origin,
+  workerOrigin,
+}: {
+  slug?: unknown;
+  origin?: string;
+  workerOrigin?: unknown;
+}): string => {
   const normalizedSlug = normalizeSessionWizardSlug(slug);
   if (!normalizedSlug) return '';
   const base = toStr(origin).trim() || resolveBrowserOrigin();
-  return `${base}/session/${encodeURIComponent(normalizedSlug)}`;
+  const params = new URLSearchParams();
+  const normalizedWorkerOrigin = normalizeShareableWorkerOrigin(workerOrigin);
+  if (normalizedWorkerOrigin) params.set('worker', normalizedWorkerOrigin);
+  const query = params.toString();
+  return `${base}/session/${encodeURIComponent(normalizedSlug)}${query ? `?${query}` : ''}`;
 };
 
 export const buildSessionWizardAdminUrl = ({
   sessionId,
+  sessionSlug,
   chainId,
   origin,
+  workerOrigin,
 }: {
   sessionId?: unknown;
+  sessionSlug?: unknown;
   chainId?: unknown;
   origin?: string;
+  workerOrigin?: unknown;
 }): string => {
   const params = new URLSearchParams();
   if (sessionId) params.set('sessionId', String(sessionId));
+  const normalizedSessionSlug = normalizeSessionWizardSlug(sessionSlug);
+  if (normalizedSessionSlug) params.set('sessionSlug', normalizedSessionSlug);
   if (chainId) params.set('chainId', String(chainId));
+  const normalizedWorkerOrigin = normalizeShareableWorkerOrigin(workerOrigin);
+  if (normalizedWorkerOrigin) params.set('worker', normalizedWorkerOrigin);
   const base = toStr(origin).trim() || resolveBrowserOrigin();
   const query = params.toString();
   return `${base}/admin${query ? `?${query}` : ''}`;

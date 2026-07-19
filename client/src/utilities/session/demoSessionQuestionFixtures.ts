@@ -64,11 +64,7 @@ const buildDemoQuestionFromComment = (
     id: canonicalQuestionId || ethers.utils.id(`${TEMPORARY_DEMO_QUESTION_SLUG}:${sourceCommentId}`),
     type,
     prompt,
-    tags: uniqueStrings([
-      fixtureType,
-      comment?.category,
-      ...splitSources(comment?.sources),
-    ]),
+    tags: uniqueStrings([fixtureType, comment?.category, ...splitSources(comment?.sources)]),
     creator: String(comment?.authorId || ''),
     associatedSurveyId: ZERO_SURVEY_ID,
     sessionName: String(sessionConfig?.sessionName || TEMPORARY_DEMO_QUESTION_SLUG),

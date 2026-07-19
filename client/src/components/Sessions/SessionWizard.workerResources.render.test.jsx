@@ -40,6 +40,51 @@ describe('SessionWizard worker resource rendering', () => {
 
   const selectFastCheapPreset = async () => selectPreset('fast_cheap_cloudflare');
   const selectTrustlessPublicPreset = async () => selectPreset('trustless_public_decentralized');
+  const selectLitProfile = async (selectBasePreset) => {
+    await selectBasePreset();
+    fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
+    const encryptionOptions = within(screen.getByRole('radiogroup', { name: /encryption/i }));
+    fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
+    await waitFor(() => {
+      expect(encryptionOptions.getByRole('radio', { name: 'Lit' })).toHaveAttribute('aria-checked', 'true');
+    });
+  };
+  const selectCloudflareLitProfile = async () => selectLitProfile(selectFastCheapPreset);
+  const selectDecentralizedLitProfile = async () => selectLitProfile(selectTrustlessPublicPreset);
+
+  it('shows only the AI resource for the default Cloudflare two-key profile', async () => {
+    renderLoggedInSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectFastCheapPreset();
+    selectNormalModeCard('Worker');
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)).toHaveLength(1);
+    });
+    expect(getWizardResourceCard('ai')).toBeTruthy();
+    expect(getWizardResourceCard('arweave')).toBeUndefined();
+    expect(getWizardResourceCard('rpc')).toBeUndefined();
+    expect(getWizardResourceCard('txGas')).toBeUndefined();
+    expect(getWizardResourceCard('lit')).toBeUndefined();
+  });
+
+  it('preserves decentralized resource requirements while leaving Lit opt-in', async () => {
+    renderLoggedInSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectTrustlessPublicPreset();
+    selectNormalModeCard('Worker');
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)).toHaveLength(4);
+    });
+    expect(getWizardResourceCard('ai')).toBeTruthy();
+    expect(getWizardResourceCard('arweave')).toBeTruthy();
+    expect(getWizardResourceCard('rpc')).toBeTruthy();
+    expect(getWizardResourceCard('txGas')).toBeTruthy();
+    expect(getWizardResourceCard('lit')).toBeUndefined();
+  });
 
   it('keeps session storage profile selection in advanced mode and defaults to Arweave', async () => {
     renderLoggedInSessionWizard();
@@ -64,7 +109,7 @@ describe('SessionWizard worker resource rendering', () => {
       expect(arweaveOption).toHaveAttribute('aria-checked', 'false');
       expect(cloudflareOption).toHaveAttribute('aria-checked', 'true');
     });
-    expect(screen.getByText(/R2 for blobs, D1 or KV for metadata\/indexes/)).toBeInTheDocument();
+    expect(screen.getByText(/R2 for blobs, KV for metadata, indexes, and audits/)).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Public read' })).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByRole('radio', { name: 'Worker SBT gate' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: 'Lit encrypted' })).toHaveAttribute('aria-checked', 'false');
@@ -109,37 +154,26 @@ describe('SessionWizard worker resource rendering', () => {
     expect(screen.queryByText(/Cloudflare stores canonical CE payloads/i)).not.toBeInTheDocument();
   });
 
-  it('shows Lit-encrypted Cloudflare copy while keeping Arweave credentials in worker resources', async () => {
+  it('shows only AI, RPC, and Lit resources when Cloudflare Lit encryption is explicitly selected', async () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectTrustlessPublicPreset();
+    await selectCloudflareLitProfile();
     enableAdvancedMode();
-    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Cloudflare' }));
-    fireEvent.click(screen.getByRole('radio', { name: 'Lit encrypted' }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('radio', { name: 'Lit encrypted' })).toHaveAttribute('aria-checked', 'true');
-    });
-    expect(
-      screen.getByText(/Lit-encrypted mode is configured for encrypted Cloudflare payload envelopes/i),
-    ).toBeInTheDocument();
-
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
-    const arweaveCard = await waitFor(() => {
-      const card = getWizardResourceCard('arweave');
-      expect(card).toBeTruthy();
-      return card;
+    await waitFor(() => {
+      expect(screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)).toHaveLength(3);
     });
-    expect(within(arweaveCard).getByText('Arweave JWK *')).toBeInTheDocument();
-    expect(within(arweaveCard).getByTestId(E2E_TESTIDS.WIZARD_SECRET_ARWEAVE_JWK)).toBeInTheDocument();
+    expect(getWizardResourceCard('ai')).toBeTruthy();
+    expect(getWizardResourceCard('rpc')).toBeTruthy();
+    expect(getWizardResourceCard('lit')).toBeTruthy();
+    expect(getWizardResourceCard('arweave')).toBeUndefined();
+    expect(getWizardResourceCard('txGas')).toBeUndefined();
   });
 
   it('blocks publishing worker resources with unrepresentable All gate groups', async () => {
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -172,7 +206,7 @@ describe('SessionWizard worker resource rendering', () => {
 
     renderLoggedInSessionWizard();
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectFastCheapPreset();
+    await selectTrustlessPublicPreset();
     enableAdvancedMode();
 
     const publishButton = await openPublishSection();
@@ -192,7 +226,7 @@ describe('SessionWizard worker resource rendering', () => {
   });
 
   it('hides Lit worker inputs for Cloudflare worker SBT gate mode and restores them for Lit encrypted mode', async () => {
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -214,7 +248,7 @@ describe('SessionWizard worker resource rendering', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).not.toBeInTheDocument();
 
     firstRender.unmount();
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -299,6 +333,7 @@ describe('SessionWizard worker resource rendering', () => {
   it('renders only the Chipotle Lit API key in the normal-mode worker secret view', async () => {
     renderSessionWizard();
 
+    await selectDecentralizedLitProfile();
     selectNormalModeCard('Worker');
     const litCard = (await screen.findByText('LIT')).closest(`[data-testid="${E2E_TESTIDS.WIZARD_RESOURCE_CARD}"]`);
 
@@ -316,6 +351,7 @@ describe('SessionWizard worker resource rendering', () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     litProtocol.createLitHooks.mockClear();
     renderSessionWizard();
+    await selectDecentralizedLitProfile();
     selectNormalModeCard('Worker');
 
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY), {
@@ -330,7 +366,7 @@ describe('SessionWizard worker resource rendering', () => {
   it('waits for a worker URL before enabling Chipotle wizard hooks', async () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     litProtocol.createLitHooks.mockClear();
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         workerSecretsEnabled: true,
@@ -346,6 +382,7 @@ describe('SessionWizard worker resource rendering', () => {
     renderSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectDecentralizedLitProfile();
     selectNormalModeCard('Worker');
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_LIT_ACCOUNT_API_KEY)).toBeInTheDocument();
 
@@ -359,6 +396,7 @@ describe('SessionWizard worker resource rendering', () => {
     jest.useFakeTimers();
     try {
       renderSessionWizard();
+      await selectDecentralizedLitProfile();
       selectNormalModeCard('Worker');
 
       const trigger = await screen.findByTestId('ce-wizard-resource-tooltip-lit');
@@ -383,10 +421,11 @@ describe('SessionWizard worker resource rendering', () => {
     jest.useFakeTimers();
     try {
       renderSessionWizard();
+      await selectDecentralizedLitProfile();
       selectNormalModeCard('Worker');
 
       const tooltipCases = [
-        ['ai', 'Session-funded OpenAI key used for text generation and transcription.'],
+        ['ai', 'Session-funded provider key used by the selected AI models.'],
         ['rpc', 'Authenticated RPC endpoint used by the worker for chain reads and related operations.'],
         ['arweave', 'Account used to pay for Arweave uploads and storage.'],
         ['txGas', 'Faucet signer used to send small testnet funding grants.'],
@@ -482,7 +521,7 @@ describe('SessionWizard worker resource rendering', () => {
   it('keeps Chipotle Lit UI visible while stripping cached legacy payer secrets from saved drafts', async () => {
     const litProtocol = require('../../utilities/crypto/litProtocol.js');
     const cachedLitKey = '0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5';
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         workerSecretsEnabled: true,
@@ -501,6 +540,7 @@ describe('SessionWizard worker resource rendering', () => {
     );
 
     renderSessionWizard();
+    await selectDecentralizedLitProfile();
     selectNormalModeCard('Worker');
 
     expect(screen.getByText('LIT')).toBeInTheDocument();
@@ -514,7 +554,7 @@ describe('SessionWizard worker resource rendering', () => {
     });
 
     await waitFor(() => {
-      const cached = JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+      const cached = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
       expect(cached.workerSecrets?.litPayerPrivateKey).toBeUndefined();
       expect(cached.workerSecrets?.litPayerAddress).toBeUndefined();
       expect(cached.provisionedSponsoredContext?.fields?.sponsored_lit).toBe('1');

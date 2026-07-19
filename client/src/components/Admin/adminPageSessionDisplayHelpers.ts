@@ -19,8 +19,39 @@ type AdminChainRegistryDisplayArgs = {
   registryChainId?: unknown;
 };
 
+type AdminPageSessionIdentityArgs = {
+  initialSessionId?: unknown;
+  initialRegistryChainId?: unknown;
+  initialSessionConfig?: unknown;
+};
+
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+export const buildAdminPageSessionIdentityKey = ({
+  initialSessionId,
+  initialRegistryChainId,
+  initialSessionConfig,
+}: AdminPageSessionIdentityArgs = {}): string => {
+  const config = asRecord(initialSessionConfig);
+  const registry = asRecord(config.__registry);
+  // Regression guard: worker bootstrap accepts either canonical session-ID
+  // field, so both must participate in route-driven Admin runtime remounts.
+  const canonicalSessionId =
+    [config.sessionId, config.sessionIdHex, registry.sessionIdHex]
+      .map((value) => toStr(value).trim().toLowerCase())
+      .find(Boolean) || '';
+  return [
+    toStr(initialSessionId).trim().toLowerCase(),
+    normalizeSlug(config.slug),
+    canonicalSessionId,
+    toStr(config.corsWorkerUrl ?? config.workerUrl)
+      .trim()
+      .replace(/\/+$/, '')
+      .toLowerCase(),
+    toStr(initialRegistryChainId ?? registry.registryChainId ?? registry.chainId ?? config.networkChainId).trim(),
+  ].join('|');
+};
 
 const buildStableComparableValue = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(buildStableComparableValue);

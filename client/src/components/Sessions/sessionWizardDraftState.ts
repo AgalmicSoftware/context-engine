@@ -16,6 +16,7 @@ import {
   resolveSessionWizardAutoFeatureBySessionSlug,
 } from './sessionWizardAiConfig';
 import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
+import { WORKER_SECRET_CACHE_SAFE_FIELDS } from './sessionWizardWorkerSecretSupport';
 import {
   compileSessionModeProfile,
   hasLegacyTelegramFirstSessionFlags,
@@ -384,6 +385,7 @@ export const buildSessionWizardCacheWritePayload = ({
   deployForm = {},
   deployComplete = false,
   deployWorkerUrl = '',
+  workerRequirementProof = null,
   provisionedSponsoredContext = null,
 }: AnyRecord = {}): AnyRecord => {
   const workerSecretsRecord =
@@ -392,14 +394,14 @@ export const buildSessionWizardCacheWritePayload = ({
       : {};
   const redactedSecrets: AnyRecord = {};
   Object.keys(workerSecretsRecord).forEach((key) => {
-    redactedSecrets[key] = workerSecretsRecord[key] ? '[redacted]' : '';
+    const value = toStr(workerSecretsRecord[key]).trim();
+    redactedSecrets[key] = WORKER_SECRET_CACHE_SAFE_FIELDS.includes(key) ? value : value ? '[redacted]' : '';
   });
   const deployFormRecord =
     deployForm && typeof deployForm === 'object' && !Array.isArray(deployForm) ? (deployForm as AnyRecord) : {};
   const durableDeployForm = {
     workerName: toStr(deployFormRecord.workerName || '').trim(),
     adminAddress: toStr(deployFormRecord.adminAddress || '').trim() || undefined,
-    accountId: toStr(deployFormRecord.accountId || '').trim(),
     bundleUrl: toStr(deployFormRecord.bundleUrl || '').trim(),
   };
 
@@ -425,7 +427,9 @@ export const buildSessionWizardCacheWritePayload = ({
     persistWorkerSecrets: !!effectivePersistWorkerSecrets,
     workerSecrets: effectivePersistWorkerSecrets ? workerSecretsRecord : redactedSecrets,
     deployForm: durableDeployForm,
-    deployComplete,
+    // Remote requirement evidence is intentionally live-memory only. A reload
+    // must replay the stable deployment request and reverify the same worker.
+    deployComplete: workerRequirementProof ? false : deployComplete,
     deployWorkerUrl,
     provisionedSponsoredContext,
   };

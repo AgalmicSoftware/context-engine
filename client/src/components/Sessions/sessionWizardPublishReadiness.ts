@@ -4,6 +4,8 @@ import {
   resolveSessionWizardPublishProgressDisplayState,
   type SessionWizardPublishProgressDisplayState,
 } from './sessionWizardPublishFlow';
+import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
+import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
 
 export type SessionWizardPublishReadinessInput = {
   resolvedWorkerBaseUrl: string;
@@ -14,6 +16,7 @@ export type SessionWizardPublishReadinessInput = {
   canUseSponsoredAutoDeployNow: boolean;
   manualMetadataUrl: string;
   metadataUrl: string;
+  sessionModeProfile?: SessionModeProfile | null;
 };
 
 export type SessionWizardPublishReadinessDescriptor = {
@@ -27,7 +30,7 @@ export type SessionWizardPublishReadinessDescriptor = {
 };
 
 export type SessionWizardPublishReadinessKind =
-  'blocked' | 'manual-metadata' | 'sponsored-auto-deploy' | 'uploaded-metadata' | 'worker-upload';
+  'blocked' | 'manual-metadata' | 'sponsored-auto-deploy' | 'uploaded-metadata' | 'worker-config' | 'worker-upload';
 
 export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput & {
   buildMetadataGatewayUrl?: SessionWizardPublishMetadataGatewayUrlBuilder | null;
@@ -38,6 +41,7 @@ export type SessionWizardPublishUiPlanInput = SessionWizardPublishReadinessInput
   isNormalMode?: boolean;
   publishAdvancedOpen?: boolean;
   publishBusy?: boolean;
+  publishCompleted?: boolean;
   publishStep?: number;
   publishStepElapsedMs?: number;
   sbtsLabel?: unknown;
@@ -70,7 +74,7 @@ export type SessionWizardPublishActionDisplayState = {
   publishAdvancedOpen: boolean;
   publishBusy: boolean;
   publishButtonDisabled: boolean;
-  publishButtonLabel: 'Deploy Session' | 'Publish';
+  publishButtonLabel: 'Deploy Session' | 'Publish' | 'Session Created';
   settingsButtonActive: boolean;
 };
 
@@ -93,6 +97,7 @@ export type SessionWizardPublishRequestDescriptorInput = {
   sponsoredAutoDeployReady?: boolean;
   deployComplete?: boolean;
   canUploadMetadataNow?: boolean;
+  sessionModeProfile?: SessionModeProfile | null;
 };
 
 export type SessionWizardPublishRequestDescriptor = {
@@ -111,31 +116,46 @@ export function resolveSessionWizardPublishReadiness({
   canUseSponsoredAutoDeployNow,
   manualMetadataUrl,
   metadataUrl,
+  sessionModeProfile = null,
 }: SessionWizardPublishReadinessInput): SessionWizardPublishReadinessDescriptor {
+  const modeRequirements = resolveSessionWizardModeRequirements(sessionModeProfile);
   const canUploadMetadataNow =
-    !!resolvedWorkerBaseUrl &&
-    (workerMode === 'default' || usesDefaultWorkerUrl || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
+    !!resolvedWorkerBaseUrl && (workerMode === 'default' || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
   const uploadBlockedReason = !resolvedWorkerBaseUrl
     ? 'Set a worker URL before uploading metadata.'
-    : workerMode !== 'default' && !usesDefaultWorkerUrl && !deployVerifiedInUi
+    : workerMode !== 'default' && !deployVerifiedInUi
       ? 'Custom worker mode requires a successful deploy in this run before metadata upload.'
-      : workerMode !== 'default' && !usesDefaultWorkerUrl && deployVerifiedInUi && !deployWorkerMatchesConfiguredUrl
+      : workerMode !== 'default' && deployVerifiedInUi && !deployWorkerMatchesConfiguredUrl
         ? 'Configured worker URL differs from the last successful deploy URL; re-deploy or reset to the verified URL.'
         : 'Deploy the worker and ensure the worker URL is set before uploading metadata.';
   const hasManualMetadata = !!normalizeSessionWizardArweaveUri(manualMetadataUrl);
   const hasUploadedMetadata = !!normalizeSessionWizardArweaveUri(metadataUrl);
-  const canPublishNow =
-    canUploadMetadataNow || canUseSponsoredAutoDeployNow || hasManualMetadata || hasUploadedMetadata;
-  const readinessKind: SessionWizardPublishReadinessKind = hasManualMetadata
-    ? 'manual-metadata'
-    : hasUploadedMetadata
-      ? 'uploaded-metadata'
-      : canUploadMetadataNow
-        ? 'worker-upload'
-        : canUseSponsoredAutoDeployNow
-          ? 'sponsored-auto-deploy'
-          : 'blocked';
-  const showUploadBlockedReason = !canPublishNow && !hasManualMetadata && !hasUploadedMetadata;
+  // Regression guard: a URL only proves where a custom worker lives. It does
+  // not prove that post-deploy config and required secrets reached that worker.
+  const canPersistWorkerConfigNow =
+    modeRequirements.isWorkerCanonical &&
+    !!resolvedWorkerBaseUrl &&
+    ((workerMode === 'default' && usesDefaultWorkerUrl) || (deployVerifiedInUi && deployWorkerMatchesConfiguredUrl));
+  const canPublishNow = modeRequirements.isWorkerCanonical
+    ? canPersistWorkerConfigNow || canUseSponsoredAutoDeployNow
+    : canUploadMetadataNow || canUseSponsoredAutoDeployNow || hasManualMetadata || hasUploadedMetadata;
+  const readinessKind: SessionWizardPublishReadinessKind = modeRequirements.isWorkerCanonical
+    ? canPersistWorkerConfigNow
+      ? 'worker-config'
+      : canUseSponsoredAutoDeployNow
+        ? 'sponsored-auto-deploy'
+        : 'blocked'
+    : hasManualMetadata
+      ? 'manual-metadata'
+      : hasUploadedMetadata
+        ? 'uploaded-metadata'
+        : canUploadMetadataNow
+          ? 'worker-upload'
+          : canUseSponsoredAutoDeployNow
+            ? 'sponsored-auto-deploy'
+            : 'blocked';
+  const showUploadBlockedReason =
+    !modeRequirements.isWorkerCanonical && !canPublishNow && !hasManualMetadata && !hasUploadedMetadata;
 
   return {
     canUploadMetadataNow,
@@ -155,6 +175,7 @@ export function resolveSessionWizardPublishRequestDescriptor({
   sponsoredAutoDeployReady = false,
   deployComplete = false,
   canUploadMetadataNow = false,
+  sessionModeProfile = null,
 }: SessionWizardPublishRequestDescriptorInput = {}): SessionWizardPublishRequestDescriptor {
   const normalizedPendingDraftSnapshot = Array.isArray(pendingDraftSnapshot) ? pendingDraftSnapshot : [];
   const hasPendingDrafts = normalizedPendingDraftSnapshot.some((entry) => entry?.deployed !== true);
@@ -166,6 +187,7 @@ export function resolveSessionWizardPublishRequestDescriptor({
     hasPendingDrafts,
     hasManualMetadata,
     canUploadMetadataNow,
+    sessionModeProfile,
   });
 
   return {
@@ -235,19 +257,21 @@ export function resolveSessionWizardPublishActionDisplayState({
   isNormalMode = false,
   publishAdvancedOpen = false,
   publishBusy = false,
+  publishCompleted = false,
 }: {
   canPublishNow?: boolean;
   isNormalMode?: boolean;
   publishAdvancedOpen?: boolean;
   publishBusy?: boolean;
+  publishCompleted?: boolean;
 } = {}): SessionWizardPublishActionDisplayState {
   return {
     canPublishNow,
     displayMode: isNormalMode ? 'normal' : 'advanced',
     publishAdvancedOpen,
     publishBusy,
-    publishButtonDisabled: publishBusy || !canPublishNow,
-    publishButtonLabel: isNormalMode ? 'Deploy Session' : 'Publish',
+    publishButtonDisabled: publishCompleted || publishBusy || !canPublishNow,
+    publishButtonLabel: publishCompleted ? 'Session Created' : isNormalMode ? 'Deploy Session' : 'Publish',
     settingsButtonActive: publishAdvancedOpen,
   };
 }
@@ -261,6 +285,7 @@ export function resolveSessionWizardPublishUiPlan({
   isNormalMode = false,
   publishAdvancedOpen = false,
   publishBusy = false,
+  publishCompleted = false,
   publishStep = 0,
   publishStepElapsedMs = 0,
   sbtsLabel = 'SBTs',
@@ -274,6 +299,7 @@ export function resolveSessionWizardPublishUiPlan({
     hasPendingDrafts,
     hasManualMetadata: publishReadiness.hasManualMetadata,
     canUploadMetadataNow: publishReadiness.canUploadMetadataNow,
+    sessionModeProfile: readinessInput.sessionModeProfile,
   });
   const publishProgressDisplayState = resolveSessionWizardPublishProgressDisplayState({
     elapsedMs: publishStepElapsedMs,
@@ -299,6 +325,7 @@ export function resolveSessionWizardPublishUiPlan({
     isNormalMode,
     publishAdvancedOpen,
     publishBusy,
+    publishCompleted,
   });
 
   return {

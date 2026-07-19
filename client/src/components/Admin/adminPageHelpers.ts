@@ -2,6 +2,12 @@ import { getChainById } from '../../variables/chains.js';
 import { normalizeSlug as canonicalizeSlug, toStr } from '../../utilities/shared/primitives.js';
 import { normalizeWorkerUrl as normalizeWorkerBaseUrl } from '../../utilities/worker/workerUrl.js';
 
+type AdminCapabilitySessionConfig = {
+  adminAddress?: unknown;
+  __registry?: { registryChainId?: unknown; chainId?: unknown; adminAddress?: unknown } | null;
+  sessionModeProfile?: { authority?: { mode?: unknown } | null } | null;
+};
+
 export const getErrorMessage = (error: unknown, fallback = 'Unknown error'): string => {
   const message =
     error && typeof error === 'object' && 'message' in error ? (error as { message?: unknown }).message : null;
@@ -36,6 +42,33 @@ export const countSessionsForChain = (entries: unknown = [], chainId: unknown = 
 };
 
 export const normalizeWorkerUrl = (url: unknown): string => normalizeWorkerBaseUrl(url);
+
+export const resolveAdminCapabilities = ({
+  account,
+  sessionConfig,
+}: {
+  account?: unknown;
+  sessionConfig?: AdminCapabilitySessionConfig | null;
+} = {}) => {
+  const accountLower = toStr(account).trim().toLowerCase();
+  const workerAdminAddress = toStr(sessionConfig?.adminAddress).trim().toLowerCase();
+  const registryAdminAddress = toStr(sessionConfig?.__registry?.adminAddress).trim().toLowerCase();
+  const isWorkerCanonicalSession =
+    toStr(sessionConfig?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === 'worker_canonical';
+  const hasRegistryEntry =
+    Number(sessionConfig?.__registry?.registryChainId || sessionConfig?.__registry?.chainId || 0) > 0;
+  const isWorkerAdmin = !!accountLower && accountLower === workerAdminAddress;
+  const isRegistryAdmin = !!accountLower && accountLower === registryAdminAddress;
+  // Worker ownership and registry ownership are independent capabilities: a
+  // worker admin must never inherit on-chain authority from a mismatched entry.
+  return {
+    isWorkerCanonicalSession,
+    workerAdminAddress,
+    hasRegistryEntry,
+    canAdminWorker: !!sessionConfig && (isWorkerCanonicalSession ? isWorkerAdmin : hasRegistryEntry && isRegistryAdmin),
+    canAdminRegistry: !!sessionConfig && hasRegistryEntry && isRegistryAdmin,
+  };
+};
 
 export const normalizeAiProvider = (raw: unknown, fallback: unknown = 'openai'): string => {
   const provider = toStr(raw).trim().toLowerCase();

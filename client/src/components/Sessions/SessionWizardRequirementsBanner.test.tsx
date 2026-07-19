@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SessionWizardRequirementsBanner, { SESSION_WIZARD_REQUIREMENT_LINKS } from './SessionWizardRequirementsBanner';
 
 describe('SessionWizardRequirementsBanner', () => {
@@ -58,5 +59,81 @@ describe('SessionWizardRequirementsBanner', () => {
       screen.getByText('No Lit key is required for Cloudflare worker-enforced SBT access control'),
     ).toBeInTheDocument();
     expect(screen.getByText('Anvil ETH for on-chain registration')).toBeInTheDocument();
+  });
+
+  it('renders exactly the two profile-derived Cloudflare requirements without not-required notices', () => {
+    render(
+      <SessionWizardRequirementsBanner
+        cloudflareTokenSlug="onboarding-demo"
+        fundingRequirementLabel="OP Sepolia ETH"
+        onDismiss={jest.fn()}
+        requiredRequirementIds={['cloudflareApiToken', 'aiProviderKey']}
+      />,
+    );
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    const cloudflareTokenLink = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK);
+    expect(cloudflareTokenLink).toHaveAccessibleName('Cloudflare API token');
+    expect(cloudflareTokenLink).toHaveAttribute('target', '_blank');
+    expect(cloudflareTokenLink).toHaveAttribute('rel', 'noopener noreferrer');
+    const cloudflareTokenUrl = new URL(String(cloudflareTokenLink.getAttribute('href')));
+    expect(cloudflareTokenUrl.origin).toBe('https://dash.cloudflare.com');
+    expect(cloudflareTokenUrl.pathname).toBe('/profile/api-tokens');
+    expect(cloudflareTokenUrl.searchParams.get('accountId')).toBe('*');
+    expect(cloudflareTokenUrl.searchParams.get('zoneId')).toBe('all');
+    expect(cloudflareTokenUrl.searchParams.get('name')).toContain('onboarding-demo');
+    expect(JSON.parse(cloudflareTokenUrl.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
+      { key: 'workers_scripts', type: 'edit' },
+      { key: 'workers_kv_storage', type: 'edit' },
+    ]);
+    expect(screen.getByText(/copy the generated token, and paste it into the Worker step/i)).toBeInTheDocument();
+    expect(screen.getByText(/restrict Account Resources to the account/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'AI provider key' })).toBeInTheDocument();
+    expect(screen.queryByText(/Arweave|Lit|RPC|wallet|faucet|funding|gas/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not required/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/turnkey tool/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'contextengine@protonmail.com' })).not.toBeInTheDocument();
+  });
+
+  it('preserves explicit decentralized and Lit requirements without the legacy faucet notice', () => {
+    const { rerender } = render(
+      <SessionWizardRequirementsBanner
+        fundingRequirementHref={SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet}
+        fundingRequirementLabel="OP Sepolia ETH"
+        onDismiss={jest.fn()}
+        requiredRequirementIds={['aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding']}
+      />,
+    );
+
+    expect(screen.getByRole('link', { name: 'Arweave wallet (JWK)' })).toBeInTheDocument();
+    expect(screen.getByText(/RPC URL or provider key/i)).toBeInTheDocument();
+    expect(screen.getByText(/connected wallet/i)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Lit API key' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/faucet private key/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/turnkey tool/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'contextengine@protonmail.com' })).toBeInTheDocument();
+
+    rerender(
+      <SessionWizardRequirementsBanner
+        fundingRequirementHref={SESSION_WIZARD_REQUIREMENT_LINKS.optimismSepoliaFaucet}
+        fundingRequirementLabel="OP Sepolia ETH"
+        onDismiss={jest.fn()}
+        requiredRequirementIds={['aiProviderKey', 'arweaveJwk', 'rpc', 'wallet', 'funding', 'lit']}
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Lit API key' })).toBeInTheDocument();
+  });
+
+  it('describes the wallet as an SBT publishing requirement when that is the transaction purpose', () => {
+    render(
+      <SessionWizardRequirementsBanner
+        fundingRequirementLabel="OP Sepolia ETH for on-chain SBT publishing"
+        onDismiss={jest.fn()}
+        requiredRequirementIds={['aiProviderKey', 'rpc', 'wallet', 'funding']}
+      />,
+    );
+
+    expect(screen.getByText('A connected wallet for on-chain SBT publishing')).toBeInTheDocument();
+    expect(screen.queryByText('A connected wallet for on-chain registration')).not.toBeInTheDocument();
   });
 });

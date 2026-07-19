@@ -9,6 +9,7 @@ import type { SessionWizardPublishActionDisplayState } from './sessionWizardPubl
 
 export type SessionPublishActionControlsDisplayProps = {
   displayState: SessionWizardPublishActionDisplayState;
+  showSettingsButton: boolean;
 };
 
 export type SessionPublishActionExecutionProps = {
@@ -23,6 +24,7 @@ const SessionPublishActionControls = ({
   displayState,
   onPublish,
   onTogglePublishAdvanced,
+  showSettingsButton,
 }: SessionPublishActionControlsProps): React.ReactElement => {
   const { displayMode, publishBusy, publishButtonDisabled, publishButtonLabel, settingsButtonActive } = displayState;
   const isNormalMode = displayMode === 'normal';
@@ -50,15 +52,17 @@ const SessionPublishActionControls = ({
           </>
         )}
       </Button>
-      <button
-        type="button"
-        className={settingsButtonClassName}
-        onClick={onTogglePublishAdvanced}
-        title="Advanced publish settings"
-        aria-label="Advanced publish settings"
-      >
-        <FontAwesomeIcon icon={faCog} />
-      </button>
+      {showSettingsButton ? (
+        <button
+          type="button"
+          className={settingsButtonClassName}
+          onClick={onTogglePublishAdvanced}
+          title="Advanced publish settings"
+          aria-label="Advanced publish settings"
+        >
+          <FontAwesomeIcon icon={faCog} />
+        </button>
+      ) : null}
     </div>
   );
 };

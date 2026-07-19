@@ -9,7 +9,12 @@
  */
 import { toStr, normalizeSlug as normalizeBaseSlug } from '../shared/primitives.js';
 import { USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
-import { AUTHORITY_MATRIX, AUTHORITY_SOURCES, isDemoSourceAllowed } from './sessionAuthorityMatrix.js';
+import {
+  AUTHORITY_MATRIX,
+  AUTHORITY_SOURCES,
+  isDemoSourceAllowed,
+  resolveSessionAuthorityGroup,
+} from './sessionAuthorityMatrix.js';
 import {
   parseSessionIdentity,
   parseSessionMetadata,
@@ -74,6 +79,7 @@ type ResolveCanonicalSessionContextOptions = {
   requestedSlug?: unknown;
   routeContext?: unknown;
   registrySession?: unknown;
+  validatedWorkerCanonicalSource?: unknown;
   metadata?: unknown;
   workerConfig?: unknown;
   localOverrides?: unknown;
@@ -140,6 +146,8 @@ export const isReservedSessionSlugKey = (rawSlug: unknown): boolean =>
 // chainId should not suppress the route identity or mark resolution as authoritative.
 const hasIdentityValue = (identity: ParsedSessionIdentity | UnknownRecord | null | undefined): boolean =>
   !!(identity && (identity.slug || identity.sessionId || identity.metadataURI));
+const hasWorkerCanonicalIdentityValue = (identity: ParsedSessionIdentity | UnknownRecord | null | undefined): boolean =>
+  !!(identity?.slug && identity?.sessionId);
 const collectPrefixedErrors = (target: string[], prefix: string, entries: string[] = []): void => {
   entries.forEach((entry) => {
     target.push(`${prefix}: ${entry}`);
@@ -170,6 +178,38 @@ const buildRegistryIdentityInput = (registrySession: unknown): UnknownRecord => 
     chainId: registry.chainId ?? registry.networkChainId ?? registryMeta.chainId ?? registryMeta.registryChainId,
   };
 };
+const resolveValidatedWorkerCanonicalConfig = (source: unknown): UnknownRecord | null => {
+  // Regression guard: the worker query is routing data only. Authority can switch
+  // to worker KV only after the discovery boundary supplies this validated wrapper.
+  if (!isObj(source) || source.validated !== true || source.source !== AUTHORITY_SOURCES.WORKER_KV) return null;
+  const config = isObj(source.config) ? source.config : null;
+  const profile = config && isObj(config.sessionModeProfile) ? config.sessionModeProfile : null;
+  const authority = profile && isObj(profile.authority) ? profile.authority : null;
+  return config && authority?.mode === 'worker_canonical' ? config : null;
+};
+const buildWorkerCanonicalIdentityInput = (config: unknown): UnknownRecord => {
+  const source = isObj(config) ? config : {};
+  return {
+    slug: source.slug,
+    sessionId: source.sessionIdHex ?? source.sessionId,
+  };
+};
+const restoreWorkerCanonicalGateFields = (
+  metadata: SessionMetadataRecord,
+  config: UnknownRecord,
+): SessionMetadataRecord => {
+  const next = cloneValue(metadata);
+  const gateAuthority = resolveSessionAuthorityGroup('gates', 'worker_canonical');
+  (gateAuthority?.fields || []).forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(config, field)) next[field] = cloneValue(config[field]);
+  });
+  return next;
+};
+const pickAuthorityFields = (value: UnknownRecord, fields: string[]): UnknownRecord =>
+  fields.reduce((next: UnknownRecord, field) => {
+    if (Object.prototype.hasOwnProperty.call(value, field)) next[field] = cloneValue(value[field]);
+    return next;
+  }, {});
 const buildDemoIdentityInput = (requestedSlug: unknown, demoSession: unknown): UnknownRecord => {
   const demo = isObj(demoSession) ? demoSession : {};
   return {
@@ -386,6 +426,7 @@ export const resolveCanonicalSessionContext = ({
   requestedSlug,
   routeContext,
   registrySession,
+  validatedWorkerCanonicalSource,
   metadata,
   workerConfig,
   localOverrides,
@@ -395,24 +436,42 @@ export const resolveCanonicalSessionContext = ({
   const warnings: string[] = [];
   const errors: string[] = [];
   const normalizedMode = typeof mode === 'string' ? mode : '';
+  const hasExplicitWorkerCanonicalSource =
+    validatedWorkerCanonicalSource !== undefined && validatedWorkerCanonicalSource !== null;
+  const workerCanonicalConfig = resolveValidatedWorkerCanonicalConfig(validatedWorkerCanonicalSource);
+  const workerCanonicalAuthorityActive = !!workerCanonicalConfig;
+  const authorityMode = workerCanonicalAuthorityActive ? 'worker_canonical' : '';
+  if (hasExplicitWorkerCanonicalSource && !workerCanonicalConfig) {
+    errors.push('Invalid validated worker-canonical source.');
+  }
 
   const routeIdentity = parseSessionIdentity(buildRouteIdentityInput(requestedSlug, routeContext));
   const registryIdentity = parseSessionIdentity(buildRegistryIdentityInput(registrySession));
-  const demoIdentityAllowed = isDemoSourceAllowed('identity', normalizedMode);
+  const workerCanonicalIdentity = workerCanonicalAuthorityActive
+    ? parseSessionIdentity(buildWorkerCanonicalIdentityInput(workerCanonicalConfig))
+    : EMPTY_IDENTITY;
+  const demoIdentityAllowed = !workerCanonicalAuthorityActive && isDemoSourceAllowed('identity', normalizedMode);
   const demoIdentity = demoIdentityAllowed
     ? parseSessionIdentity(buildDemoIdentityInput(requestedSlug, demoSession))
     : EMPTY_IDENTITY;
 
   collectPrefixedErrors(errors, 'route identity', routeIdentity.errors);
   collectPrefixedErrors(errors, 'registry identity', registryIdentity.errors);
+  if (workerCanonicalAuthorityActive) {
+    collectPrefixedErrors(errors, 'worker-canonical identity', workerCanonicalIdentity.errors);
+  }
   if (demoIdentityAllowed) {
     collectPrefixedErrors(errors, 'demo identity', demoIdentity.errors);
   }
   const authoritativeIdentityRequired = normalizedMode !== 'demo' && normalizedMode !== 'off-chain';
+  const identityAuthority = resolveSessionAuthorityGroup('identity', authorityMode) || AUTHORITY_MATRIX.identity;
 
   let effectiveIdentity = cloneValue(routeIdentity);
   let identityProvenance = 'route';
-  if (hasIdentityValue(registryIdentity)) {
+  if (workerCanonicalAuthorityActive) {
+    effectiveIdentity = cloneValue(workerCanonicalIdentity);
+    identityProvenance = AUTHORITY_SOURCES.WORKER_KV;
+  } else if (hasIdentityValue(registryIdentity)) {
     effectiveIdentity = cloneValue(registryIdentity);
     identityProvenance = AUTHORITY_SOURCES.REGISTRY;
   } else if (demoIdentityAllowed && hasIdentityValue(demoIdentity)) {
@@ -429,13 +488,16 @@ export const resolveCanonicalSessionContext = ({
     } as ParsedSessionIdentity;
   }
 
-  if (authoritativeIdentityRequired && !hasIdentityValue(registryIdentity)) {
+  const hasRequiredAuthoritativeIdentity = workerCanonicalAuthorityActive
+    ? hasWorkerCanonicalIdentityValue(workerCanonicalIdentity)
+    : hasIdentityValue(registryIdentity);
+  if (authoritativeIdentityRequired && !hasRequiredAuthoritativeIdentity) {
     errors.push('Missing authoritative session identity source.');
   } else if (!hasIdentityValue(effectiveIdentity)) {
     errors.push('Missing authoritative session identity source.');
-  } else if (identityProvenance !== AUTHORITY_MATRIX.identity.authoritativeSource) {
+  } else if (identityProvenance !== identityAuthority.authoritativeSource) {
     warnings.push(
-      `Using ${identityProvenance} session identity fallback; ${AUTHORITY_MATRIX.identity.authoritativeSource} is authoritative.`,
+      `Using ${identityProvenance} session identity fallback; ${identityAuthority.authoritativeSource} is authoritative.`,
     );
   }
 
@@ -445,12 +507,15 @@ export const resolveCanonicalSessionContext = ({
     );
   }
 
-  const metadataProvided = metadata !== undefined && metadata !== null;
+  const metadataProvided = !workerCanonicalAuthorityActive && metadata !== undefined && metadata !== null;
   const metadataIsCache = isObj(metadata) && !!metadata.__fromCache;
   const metadataParsed: ParsedSessionMetadata = metadataProvided
     ? parseSessionMetadata(metadata)
     : { ok: true, metadata: {}, errors: [] };
-  const demoMetadataAllowed = isDemoSourceAllowed('textMetadata', normalizedMode);
+  const workerCanonicalMetadataParsed: ParsedSessionMetadata = workerCanonicalAuthorityActive
+    ? parseSessionMetadata(workerCanonicalConfig)
+    : { ok: true, metadata: {}, errors: [] };
+  const demoMetadataAllowed = !workerCanonicalAuthorityActive && isDemoSourceAllowed('textMetadata', normalizedMode);
   const demoMetadataParsed: ParsedSessionMetadata =
     demoMetadataAllowed && demoSession !== undefined && demoSession !== null
       ? parseSessionMetadata(demoSession)
@@ -459,13 +524,19 @@ export const resolveCanonicalSessionContext = ({
   if (metadataProvided) {
     collectPrefixedErrors(errors, 'session metadata', metadataParsed.errors);
   }
+  if (workerCanonicalAuthorityActive) {
+    collectPrefixedErrors(errors, 'worker-canonical config', workerCanonicalMetadataParsed.errors);
+  }
   if (demoMetadataAllowed && demoSession !== undefined && demoSession !== null) {
     collectPrefixedErrors(errors, 'demo metadata', demoMetadataParsed.errors);
   }
 
   let effectiveMetadata: SessionMetadataRecord = {};
   let metadataProvenance = 'cache';
-  if (metadataProvided && !metadataIsCache && isObj(metadata)) {
+  if (workerCanonicalAuthorityActive) {
+    effectiveMetadata = restoreWorkerCanonicalGateFields(workerCanonicalMetadataParsed.metadata, workerCanonicalConfig);
+    metadataProvenance = AUTHORITY_SOURCES.WORKER_KV;
+  } else if (metadataProvided && !metadataIsCache && isObj(metadata)) {
     effectiveMetadata = cloneValue(metadataParsed.metadata);
     metadataProvenance = AUTHORITY_SOURCES.ARWEAVE;
   } else {
@@ -481,13 +552,15 @@ export const resolveCanonicalSessionContext = ({
     }
   }
 
+  const metadataAuthority =
+    resolveSessionAuthorityGroup('textMetadata', authorityMode) || AUTHORITY_MATRIX.textMetadata;
   if (metadataProvenance === AUTHORITY_SOURCES.DEMO) {
     warnings.push(
-      `Using ${AUTHORITY_SOURCES.DEMO} session metadata fallback; ${AUTHORITY_MATRIX.textMetadata.authoritativeSource} is authoritative.`,
+      `Using ${AUTHORITY_SOURCES.DEMO} session metadata fallback; ${metadataAuthority.authoritativeSource} is authoritative.`,
     );
   } else if (metadataProvenance === 'cache' && hasOwnKeys(effectiveMetadata)) {
     warnings.push(
-      `Using cached session metadata replica; ${AUTHORITY_MATRIX.textMetadata.authoritativeSource} metadata is authoritative.`,
+      `Using cached session metadata replica; ${metadataAuthority.authoritativeSource} metadata is authoritative.`,
     );
   } else if (!hasOwnKeys(effectiveMetadata)) {
     warnings.push('Session metadata unavailable from authoritative sources.');
@@ -499,9 +572,10 @@ export const resolveCanonicalSessionContext = ({
     );
   }
 
-  const workerProvided = workerConfig !== undefined && workerConfig !== null;
+  const workerConfigInput = workerCanonicalAuthorityActive ? workerCanonicalConfig : workerConfig;
+  const workerProvided = workerConfigInput !== undefined && workerConfigInput !== null;
   const workerParsed: ParsedWorkerConfig = workerProvided
-    ? parseWorkerConfig(workerConfig)
+    ? parseWorkerConfig(workerConfigInput)
     : { ok: true, config: buildEmptyWorkerConfig(), errors: [] };
   if (workerProvided) {
     collectPrefixedErrors(errors, 'worker config', workerParsed.errors);
@@ -529,10 +603,23 @@ export const resolveCanonicalSessionContext = ({
   const metadataValue = cloneValue(effectiveMetadata);
   const workerValue = cloneValue(workerParsed.config);
   const localValue = cloneValue(localParsed.overrides);
+  const workerCanonicalGateValue = workerCanonicalAuthorityActive
+    ? pickAuthorityFields(
+        workerCanonicalConfig,
+        (resolveSessionAuthorityGroup('gates', authorityMode) || AUTHORITY_MATRIX.gates).fields,
+      )
+    : {};
+  const effectiveIdentityValue = workerCanonicalAuthorityActive
+    ? {
+        slug: identityValue.slug,
+        sessionId: identityValue.sessionId,
+      }
+    : identityValue;
   const effective = {
     ...stripEffectiveMetadataOverrides(metadataValue),
+    ...workerCanonicalGateValue,
     ...cloneValue(workerValue),
-    ...cloneValue(identityValue),
+    ...cloneValue(effectiveIdentityValue),
     localPreferences: cloneValue(localValue),
   };
 

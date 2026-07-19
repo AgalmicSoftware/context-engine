@@ -1,4 +1,5 @@
 import { resolveSessionWizardNewSessionRequirementsDisplayState } from './sessionWizardRequirementsDisplay';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('sessionWizardRequirementsDisplay', () => {
   it('shows manual new-session requirements when no sponsored bundle owns the entry flow', () => {
@@ -73,6 +74,84 @@ describe('sessionWizardRequirementsDisplay', () => {
     ).toMatchObject({
       hasNewSessionLitRequirementCovered: true,
       newSessionRequiresLitCredential: false,
+    });
+  });
+
+  it('treats the default Cloudflare profile as a two-key sponsored setup', () => {
+    expect(
+      resolveSessionWizardNewSessionRequirementsDisplayState({
+        currentWorkerSecrets: { openaiKey: 'openai' },
+        hasSponsoredBundleLink: true,
+        isNewSessionWizardRoute: true,
+        normalizedAppliedSponsoredBundle: { deployGrantToken: 'cloudflare-deploy' },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        sponsoredBundleStatus: { tone: 'success' },
+      }),
+    ).toMatchObject({
+      hasNewSessionArweaveRequirementCovered: true,
+      hasNewSessionFundingRequirementCovered: true,
+      hasNewSessionLitRequirementCovered: true,
+      newSessionRequiresLitCredential: false,
+      requiredRequirementIds: ['cloudflareApiToken', 'aiProviderKey'],
+      sponsoredBundleCoversNewSessionRequirements: true,
+    });
+  });
+
+  it('shows SBT transaction requirements only while an undeployed draft is pending', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = 'custom';
+    profile.authorization.mechanisms.push('sbt_onchain');
+
+    const settled = resolveSessionWizardNewSessionRequirementsDisplayState({
+      sessionModeProfile: profile,
+    });
+    const pending = resolveSessionWizardNewSessionRequirementsDisplayState({
+      hasPendingSbtDrafts: true,
+      sessionModeProfile: profile,
+    });
+
+    expect(settled.requiredRequirementIds).toEqual(['cloudflareApiToken', 'aiProviderKey', 'rpc']);
+    expect(pending.requiredRequirementIds).toEqual(['cloudflareApiToken', 'aiProviderKey', 'rpc', 'wallet', 'funding']);
+  });
+
+  it.each(['anthropicKey', 'openrouterKey'])('does not accept unselected %s for the default OpenAI models', (key) => {
+    expect(
+      resolveSessionWizardNewSessionRequirementsDisplayState({
+        currentWorkerSecrets: { [key]: 'provider-secret' },
+        hasSponsoredBundleLink: true,
+        isNewSessionWizardRoute: true,
+        normalizedAppliedSponsoredBundle: { deployGrantToken: 'cloudflare-deploy' },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        sponsoredBundleStatus: { tone: 'success' },
+      }),
+    ).toMatchObject({
+      hasNewSessionAiRequirementCovered: false,
+      sponsoredBundleCoversNewSessionRequirements: false,
+    });
+  });
+
+  it.each([
+    ['anthropic', 'anthropicKey'],
+    ['openrouter', 'openrouterKey'],
+  ])('accepts the configured %s key when that provider is selected', (provider, key) => {
+    expect(
+      resolveSessionWizardNewSessionRequirementsDisplayState({
+        currentWorkerSecrets: { [key]: 'provider-secret', openaiKey: 'transcription-secret' },
+        hasSponsoredBundleLink: true,
+        isNewSessionWizardRoute: true,
+        normalizedAppliedSponsoredBundle: { deployGrantToken: 'cloudflare-deploy' },
+        sessionAi: {
+          models: {
+            fast: { provider },
+            thinking: { provider },
+          },
+        },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        sponsoredBundleStatus: { tone: 'success' },
+      }),
+    ).toMatchObject({
+      hasNewSessionAiRequirementCovered: true,
+      sponsoredBundleCoversNewSessionRequirements: true,
     });
   });
 });

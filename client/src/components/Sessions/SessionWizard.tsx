@@ -12,19 +12,16 @@ import {
   CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED,
   DEFAULT_CHAIN_ID,
 } from '../../variables/appConfig.js';
-import {
-  getChainById,
-  getDefaultHttpRpc,
-  getSessionRegistryAddress,
-  getSessionRegistryChains,
-} from '../../variables/chains.js';
+import { getChainById, getDefaultHttpRpc, getSessionRegistryChains } from '../../variables/chains.js';
 import type { SessionConfig, UnknownRecord } from '../../utilities/session/sessionTypes.js';
+import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { createLogger } from '../../utilities/logging';
 import {
   getSessionWizardContractDefaults,
   resolveSessionWizardContractViewerPlan,
+  resolveSessionWizardInitialRegistryChainId,
   resolveSessionWizardRegistryAddress,
 } from './sessionWizardContracts.js';
 import { resolveSessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
@@ -53,6 +50,10 @@ import useSessionWizardSponsoredBundleController from './hooks/useSessionWizardS
 import useSessionWizardWorkerSecretsController from './hooks/useSessionWizardWorkerSecretsController';
 import useSessionWizardPendingSbtController from './hooks/useSessionWizardPendingSbtController';
 import useSessionWizardWorkerResourceRenderer from './hooks/useSessionWizardWorkerResourceRenderer';
+import useSessionWizardCachedInitialState, {
+  type SessionWizardEncryptionGateState as EncryptionGateState,
+} from './hooks/useSessionWizardCachedInitialState';
+import useSessionWizardWorkerSettlementLifecycle from './hooks/useSessionWizardWorkerSettlementLifecycle';
 import {
   arweavePublishAdapter,
   sbtFactoryReceiptPublishAdapter,
@@ -69,7 +70,6 @@ import {
 import {
   beginSessionPublishReducerAttempt,
   markSessionPublishEffectFailed,
-  markSessionPublishEffectSucceeded,
   runSessionPublishEffect,
 } from '../../domains/sessions/publish/sessionPublishDispatch.js';
 import {
@@ -96,24 +96,26 @@ import {
   appendSessionWizardRegisterTxEntry,
   isSessionWizardRegisterDuplicatePreflightError,
   resolveSessionWizardPublishCompletionRequest,
+  resolveSessionWizardRemainingPendingDrafts,
   resolveSessionWizardPublishFailureSettlementDescriptor,
   resolveSessionWizardRegisterFailureSettlementDescriptor,
   resolveSessionWizardRegisterDuplicateCheckDescriptor,
   resolveSessionWizardRegisterIdentityDescriptor,
   resolveSessionWizardRegisterSuccessSettlementDescriptor,
   resolveSessionWizardRegisterPreflightDescriptor,
-  resolveSessionWizardRegisterStepRequest,
   resolveSessionWizardPublishMetadataUploadRequest,
   resolveSessionWizardPublishStartPreflightDescriptor,
   resolveSessionWizardPublishAdminPreflightDescriptor,
   runSessionWizardRegisterStepController,
   runSessionWizardPublishMetadataUploadController,
   runSessionWizardPublishCompletionController,
-  runSessionWizardPublishController,
   type SessionWizardPublishWorkerSignerArgs,
   type SessionWizardRegisterGroupArgs,
   type SessionWizardRegisterTxEntry,
 } from './sessionWizardPublishController';
+import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
+import { createSessionWizardPublishRuntimeController } from './sessionWizardPublishRuntimeController';
+import { resolveSessionWizardWorkerPublishEvidence } from './sessionWizardWorkerPublishEvidence';
 import {
   resolveSessionWizardPublishRequestDescriptor,
   resolveSessionWizardPublishUiPlan,
@@ -139,12 +141,10 @@ import {
   buildPendingSbtDeployContextSignature,
   deploySessionWizardPendingSbtDraft,
   finalizeSessionWizardPendingSbtDraft,
-  normalizeFeaturedDraftGateAutoLink,
   persistSessionWizardSbtRecoveryCodes,
 } from './sessionWizardPendingSbtPublish';
 import {
   areSbtSelectionsEqual,
-  buildDefaultGateState,
   buildEmptyProvisionedSponsoredContext,
   buildEncryptionGate,
   buildResourceGateMap,
@@ -161,8 +161,8 @@ import {
 } from './sessionWizardSponsoredBundleSupport';
 import { __test__resetSessionWizardSponsoredBundleCacheKey } from './sessionWizardSponsoredBundleCache';
 import {
-  buildWorkerLitCredentialsConfig,
   getSessionWizardWorkerResourceKeys,
+  resolveSessionWizardChipotleHookConfig,
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode,
   sanitizeSessionWizardWorkerSecretsForLitMode,
 } from './sessionWizardWorkerSecretSupport';
@@ -205,6 +205,7 @@ import {
   useStableSerializedObject,
   writeSessionWizardCache,
 } from './sessionWizardLocalStateSupport';
+import { writeSessionWizardWorkerSettlement } from './sessionWizardWorkerSettlement';
 import {
   buildSessionWizardNewSessionBannerDismissalContextKey,
   isNewSessionWizardPathname,
@@ -298,43 +299,7 @@ export {
   resolveSessionWizardWorkerRpcUrl,
 } from './sessionWizardWorkerRpc';
 
-export const resolveSessionWizardChipotleHookConfig = ({
-  workerSecretsEnabled = true,
-  workerSecrets = {},
-  resolvedWorkerUrl = '',
-  draft = null,
-}: {
-  workerSecretsEnabled?: boolean;
-  workerSecrets?: WorkerSecretsLike | UnknownRecord;
-  resolvedWorkerUrl?: string;
-  draft?: UnknownRecord | null;
-} = {}) => {
-  if (!workerSecretsEnabled) return null;
-  const litCredentials = buildWorkerLitCredentialsConfig(workerSecrets);
-  const normalizedWorkerUrl = workerAuthPublishAdapter.normalizeWorkerUrl(resolvedWorkerUrl);
-  if (
-    !normalizedWorkerUrl ||
-    !toStr(litCredentials?.litApiBase).trim() ||
-    !toStr(litCredentials?.litPkpId).trim() ||
-    !toStr(litCredentials?.litActionCid).trim()
-  ) {
-    return null;
-  }
-  return {
-    enabled: true,
-    workerUrl: normalizedWorkerUrl,
-    sessionSlug: normalizeSlug(draft?.slug || ''),
-    litCredentials,
-    sessionConfig: {
-      ...(draft && typeof draft === 'object' ? draft : {}),
-      corsWorkerUrl: normalizedWorkerUrl,
-      litCredentials,
-    },
-  };
-};
-
 type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
-  accountId?: string;
   bundleUrl?: string;
 };
 
@@ -348,16 +313,6 @@ type GateSelectionState = UnknownRecord & {
 };
 
 type GateSelectionsState = Record<string, GateSelectionState>;
-
-type EncryptionGateState = UnknownRecord & {
-  id: string;
-  label?: string;
-  color?: string;
-  mode?: string;
-  chainId?: ChainIdLike | null;
-  perMemberLimit?: unknown;
-  sbts?: unknown[];
-};
 
 type DraftState = UnknownRecord &
   NonNullable<WorkerPanelProps['draft']> & {
@@ -478,6 +433,7 @@ const SessionWizard = ({
     typeof window === 'undefined' || !window.location ? '' : window.location.pathname;
   const isNewSessionWizardRoute = isNewSessionWizardPathname(currentSessionWizardPathname);
   const cachedWizard = useMemo(() => readSessionWizardCache(), []);
+  const wizardCacheSnapshotRef = useRef<unknown>(cachedWizard);
   const cachedDraftHasEmbeddedDeployHelperEnabled =
     typeof cachedWizard?.draft?.embeddedDeployHelperEnabled === 'boolean';
   const sourceEmbeddedDeployHelperDefault = useMemo(() => {
@@ -515,37 +471,16 @@ const SessionWizard = ({
     isNewSessionWizardRoute,
     sourceEmbeddedDeployHelperDefault,
   ]);
-  const initialGates = useMemo<EncryptionGateState[]>(() => {
-    const cachedGates = cachedWizard?.encryptionGates;
-    if (Array.isArray(cachedGates) && cachedGates.length) return cachedGates as EncryptionGateState[];
-    return [buildEncryptionGate(0) as EncryptionGateState];
-  }, [cachedWizard]);
-  const initialDefaultGateId = useMemo(() => {
-    const cachedId = toStr(cachedWizard?.defaultGateId).trim();
-    if (cachedId) return cachedId;
-    return initialGates[0]?.id || '';
-  }, [cachedWizard, initialGates]);
-  const initialGateSelections = useMemo(() => {
-    const cachedSelections = cachedWizard?.gateSelections;
-    if (cachedSelections && typeof cachedSelections === 'object') return cachedSelections;
-    return buildDefaultGateState(initialDraft.networkChainId || network?.id);
-  }, [cachedWizard, initialDraft.networkChainId, network?.id]);
-  const initialFeaturedDraftGateAutoLink = useMemo(
-    () =>
-      normalizeFeaturedDraftGateAutoLink(cachedWizard?.featuredDraftGateAutoLink as UnknownRecord | null | undefined),
-    [cachedWizard],
-  );
-  const initialSessionIdValue = useMemo(() => {
-    const fromQuery = sessionRegistryPublishAdapter.formatSessionId(initialSessionId);
-    if (fromQuery) return fromQuery;
-    const fromCache = sessionRegistryPublishAdapter.formatSessionId(cachedWizard?.sessionId);
-    if (fromCache) return fromCache;
-    return generateSessionId();
-  }, [cachedWizard?.sessionId, initialSessionId]);
+  const cachedInitialState = useSessionWizardCachedInitialState({
+    cachedWizard,
+    initialDraftNetworkChainId: initialDraft.networkChainId,
+    networkId: network?.id,
+    initialSessionId,
+  });
 
   const [draft, setDraft] = useState<DraftState>(() => initialDraft as DraftState);
   const draftRef = useRef<DraftState>(initialDraft as DraftState);
-  const [sessionId, setSessionId] = useState(() => initialSessionIdValue);
+  const [sessionId, setSessionId] = useState(() => cachedInitialState.initialSessionIdValue);
   const [sessionIdStatus, setSessionIdStatus] = useState('');
   const [isSessionIdRegenerating, setIsSessionIdRegenerating] = useState(false);
   const [privateSlugMode, setPrivateSlugMode] = useState(() => !!cachedWizard?.privateSlugMode);
@@ -593,19 +528,12 @@ const SessionWizard = ({
   const publishRequestInFlightRef = useRef(false);
   const [publishStepElapsedMs, setPublishStepElapsedMs] = useState(0);
   const [wizardMode, setWizardMode] = useState('normal');
-  const [registryChainId, setRegistryChainId] = useState<number>(() => {
-    const fromDraft = Number(draft.networkChainId || 0);
-    if (fromDraft && getSessionRegistryAddress(fromDraft)) return fromDraft;
-    const fromNetwork = Number(network?.id || 0);
-    if (fromNetwork && getSessionRegistryAddress(fromNetwork)) return fromNetwork;
-    const defaultRegistryChainId = Number(DEFAULT_CHAIN_ID || 0);
-    if (defaultRegistryChainId && getSessionRegistryAddress(defaultRegistryChainId)) {
-      return defaultRegistryChainId;
-    }
-    const available = getSessionRegistryChains();
-    if (available.length) return Number(available[0].id || 0) || 0;
-    return Number(DEFAULT_CHAIN_ID || 0) || 0;
-  });
+  const [registryChainId, setRegistryChainId] = useState<number>(() =>
+    resolveSessionWizardInitialRegistryChainId({
+      draftChainId: draft.networkChainId,
+      networkChainId: network?.id,
+    }),
+  );
   const checkSessionSlugExists = useCallback(
     async ({ registryChainId: chainId, slug }: SessionSlugExistsArgs): Promise<boolean> => {
       const registryRead = sessionRegistryPublishAdapter.getRegistryContract({
@@ -626,8 +554,7 @@ const SessionWizard = ({
     isReservedSlug: isReservedSessionSlug,
     sessionExists: checkSessionSlugExists,
   });
-  const initialGateRef = useRef<EncryptionGateState>(initialGates[0]);
-  const [encryptionGates, setEncryptionGates] = useState<EncryptionGateState[]>(() => initialGates);
+  const [encryptionGates, setEncryptionGates] = useState<EncryptionGateState[]>(() => cachedInitialState.initialGates);
   // Pending SBT drafts carry deploy secrets and claim codes, so keep them out
   // of localStorage while still surviving same-tab refreshes via sessionStorage.
   const { pendingSbtDrafts, setPendingSbtDrafts, normalizedPendingSbtDrafts, hasUndeployedPendingSbtDrafts } =
@@ -637,7 +564,7 @@ const SessionWizard = ({
   const [createSbtModalState, setCreateSbtModalState] = useState<CreateSbtModalState>(() => ({
     open: false,
     targetType: 'gate',
-    gateId: initialDefaultGateId || initialGateRef.current?.id || '',
+    gateId: cachedInitialState.initialDefaultGateId,
     sessionSlug: '',
     arweaveJwkOverride: '',
   }));
@@ -654,20 +581,20 @@ const SessionWizard = ({
   }, [encryptionGates]);
   const lastHasPrivateSbtNameRef = useRef(false);
   const [gateSelections, setGateSelections] = useState<GateSelectionsState>(
-    () => initialGateSelections as GateSelectionsState,
+    () => cachedInitialState.initialGateSelections as GateSelectionsState,
   );
-  const [defaultGateId, setDefaultGateId] = useState(() => initialDefaultGateId || initialGateRef.current.id);
-  const [createSbtTargetGateId, setCreateSbtTargetGateId] = useState(
-    () => initialDefaultGateId || initialGateRef.current?.id || '',
+  const [defaultGateId, setDefaultGateId] = useState(() => cachedInitialState.initialDefaultGateId);
+  const [createSbtTargetGateId, setCreateSbtTargetGateId] = useState(() => cachedInitialState.initialDefaultGateId);
+  const [featuredDraftGateAutoLink, setFeaturedDraftGateAutoLink] = useState(
+    () => cachedInitialState.initialFeaturedDraftGateAutoLink,
   );
-  const [featuredDraftGateAutoLink, setFeaturedDraftGateAutoLink] = useState(() => initialFeaturedDraftGateAutoLink);
   // Gate selection is always per-resource when multiple gates exist (no toggle needed).
   const [resourceGateMap, setResourceGateMap] = useState<ResourceGateMapState>(() => {
     const cachedMap = cachedWizard?.resourceGateMap;
     if (cachedMap && typeof cachedMap === 'object') return cachedMap as ResourceGateMapState;
     return buildResourceGateMap(
-      initialGates,
-      initialDefaultGateId || initialGateRef.current.id,
+      cachedInitialState.initialGates,
+      cachedInitialState.initialDefaultGateId,
     ) as ResourceGateMapState;
   });
   const [jsonCopied, setJsonCopied] = useState(false);
@@ -758,6 +685,8 @@ const SessionWizard = ({
     setDeployComplete,
     deployWorkerUrl,
     setDeployWorkerUrl,
+    workerRequirementProof,
+    setWorkerRequirementProof,
     provisionedSponsoredContext,
     setProvisionedSponsoredContext,
     workerSecrets,
@@ -781,8 +710,10 @@ const SessionWizard = ({
   const advancedBundleFileInputRef = useRef<HTMLInputElement | null>(null);
   const normalModeRetryBundleFileInputRef = useRef<HTMLInputElement | null>(null);
   const sponsoredPublishBundleFileInputRef = useRef<HTMLInputElement | null>(null);
-  const deployCompleteRef = useRef(!!cachedWizard?.deployComplete);
+  const deployCompleteRef = useRef(deployComplete);
   const deployWorkerUrlRef = useRef(normalizeBaseUrl(toStr(cachedWizard?.deployWorkerUrl).trim()));
+  deployCompleteRef.current = deployComplete;
+  deployWorkerUrlRef.current = deployWorkerUrl;
   const provisionedSponsoredContextRef = useRef<ProvisionedSponsoredContextState>(
     buildProvisionedSponsoredContextState(cachedWizard?.provisionedSponsoredContext),
   );
@@ -862,6 +793,7 @@ const SessionWizard = ({
     setDeployComplete,
     setWorkerMode,
     setDeployWorkerUrl,
+    setWorkerRequirementProof,
     setProvisionedSponsoredContext,
     setForceManualBundleFile,
     setNormalModeBundleUrlOverride,
@@ -871,6 +803,12 @@ const SessionWizard = ({
     setBundleFile,
     buildProvisionedSponsoredContextState,
   });
+  const getWorkerPublishEvidence = () =>
+    resolveSessionWizardWorkerPublishEvidence({
+      runtime: workerDeployRuntimeRef.current,
+      workerSecrets: getCurrentWorkerSecrets(),
+      defaultWorkerUrl: getSessionWizardDefaultWorkerUrl(),
+    });
   const {
     sessionHeaderMode,
     setSessionHeaderMode,
@@ -913,9 +851,20 @@ const SessionWizard = ({
     [draft?.storageProfile],
   );
   const cloudflareWorkerSbtGateMode = isWorkerSbtGateCloudflareStorageProfile(normalizedDraftStorageProfile);
-  const visibleWorkerResourceKeys = useMemo(
-    () => workerResourceKeys.filter((key) => !cloudflareWorkerSbtGateMode || key !== 'lit'),
-    [cloudflareWorkerSbtGateMode, workerResourceKeys],
+  const sessionModeRequirements = resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile, {
+    hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
+  });
+  const workerCanonicalSettlement = useSessionWizardWorkerSettlementLifecycle(cachedWizard, {
+    currentIdentity: { workerUrl: deployWorkerUrl || draft.corsWorkerUrl, slug: draft.slug, sessionId },
+    isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
+    publishStatus: sessionPublishState.status,
+    setSessionUrl,
+    setAdminUrl,
+  });
+  const visibleWorkerResourceKeys = workerResourceKeys.filter((key) =>
+    sessionModeRequirements.selected
+      ? sessionModeRequirements.visibleWorkerResourceKeys.includes(key)
+      : !cloudflareWorkerSbtGateMode || key !== 'lit',
   );
   const effectivePersistWorkerSecrets = DEV_PERSIST_WORKER_SECRETS && persistWorkerSecrets;
 
@@ -931,8 +880,16 @@ const SessionWizard = ({
         getChainById,
         getChainName,
         registryChainId,
+        purpose:
+          sessionModeRequirements.publish.deployPendingSbts && !sessionModeRequirements.publish.registerSession
+            ? 'SBT publishing'
+            : 'registration',
       }),
-    [registryChainId],
+    [
+      registryChainId,
+      sessionModeRequirements.publish.deployPendingSbts,
+      sessionModeRequirements.publish.registerSession,
+    ],
   );
   const newSessionFundingRequirementLabel = newSessionFundingRequirement.label;
   const newSessionFundingRequirementHref = newSessionFundingRequirement.href;
@@ -993,36 +950,34 @@ const SessionWizard = ({
   }, []);
 
   useEffect(() => {
-    // Persist wizard state between refreshes until deploy/upload clears them.
-    // Default: redact secret values so refresh requires re-entry (security: no keys in localStorage).
-    // Pending SBT drafts use sessionStorage so same-tab refresh can recover
-    // queued CREATE2 drafts without turning them into long-lived local secrets.
-    // Dev toggle: optionally persist secrets locally for faster iteration.
-    writeSessionWizardCache(
-      buildSessionWizardCacheWritePayload({
-        sessionId,
-        draft,
-        privateSlugMode,
-        lastManualSlug: lastManualSlugRef.current,
-        encryptionGates,
-        encryptedFieldGates,
-        gateSelections,
-        defaultGateId,
-        featuredDraftGateAutoLink,
-        resourceGateMap,
-        manualGasLimit,
-        manualGasPriceGwei,
-        manualMaxFeePerGasGwei,
-        manualMaxPriorityFeePerGasGwei,
-        workerSecretsEnabled,
-        effectivePersistWorkerSecrets,
-        workerSecrets,
-        deployForm,
-        deployComplete,
-        deployWorkerUrl,
-        provisionedSponsoredContext,
-      }),
-    );
+    // Redact secret values; live deployment evidence never enters localStorage.
+    if (workerCanonicalSettlement.isSettled) return;
+    const cachePayload = buildSessionWizardCacheWritePayload({
+      sessionId,
+      draft,
+      privateSlugMode,
+      lastManualSlug: lastManualSlugRef.current,
+      encryptionGates,
+      encryptedFieldGates,
+      gateSelections,
+      defaultGateId,
+      featuredDraftGateAutoLink,
+      resourceGateMap,
+      manualGasLimit,
+      manualGasPriceGwei,
+      manualMaxFeePerGasGwei,
+      manualMaxPriorityFeePerGasGwei,
+      workerSecretsEnabled,
+      effectivePersistWorkerSecrets,
+      workerSecrets,
+      deployForm,
+      deployComplete,
+      deployWorkerUrl,
+      workerRequirementProof,
+      provisionedSponsoredContext,
+    });
+    const result = writeSessionWizardCache(cachePayload, { expectedCachedPayload: wizardCacheSnapshotRef.current });
+    if (result.ok && result.status !== 'preserved-foreign-draft') wizardCacheSnapshotRef.current = cachePayload;
   }, [
     sessionId,
     draft,
@@ -1044,7 +999,9 @@ const SessionWizard = ({
     deployForm,
     deployComplete,
     deployWorkerUrl,
+    workerRequirementProof,
     provisionedSponsoredContext,
+    workerCanonicalSettlement.isSettled,
   ]);
 
   useEffect(() => {
@@ -1884,6 +1841,7 @@ const SessionWizard = ({
 
   const handleRegisterGroup = async ({
     metadataUriOverride,
+    preservedPendingSbtDrafts,
     sessionFieldsOverride,
   }: SessionWizardRegisterGroupArgs = {}) => {
     try {
@@ -1933,7 +1891,15 @@ const SessionWizard = ({
       setSessionUrl(registerSuccessSettlement.sessionUrl);
       setAdminUrl(registerSuccessSettlement.adminUrl);
       setAdminUrlStatus(registerSuccessSettlement.adminUrlStatus);
-      clearSessionWizardCache();
+      // Regression guard: persist drafts suppressed by this publish plan before
+      // identity rotation or registry refresh can leave the page mid-settlement.
+      const cacheClearResult = clearSessionWizardCache({
+        expectedPublicationIdentity: { slug: draft.slug, sessionId },
+        ...(Array.isArray(preservedPendingSbtDrafts) ? { preservedPendingSbtDrafts } : {}),
+      });
+      // A successful clear releases the next generated identity to own this tab's cache.
+      if (cacheClearResult.draft.ok && cacheClearResult.draft.status !== 'preserved-foreign-draft')
+        wizardCacheSnapshotRef.current = null;
       const nextSessionId = generateSessionId();
       setSessionId(nextSessionId);
       setSessionIdStatus(registerSuccessSettlement.nextSessionIdStatus);
@@ -1967,6 +1933,7 @@ const SessionWizard = ({
       setStatus('Publish already in progress.');
       return;
     }
+    if (workerCanonicalSettlement.preventDuplicatePublish(setStatus)) return;
     publishRequestInFlightRef.current = true;
     try {
       const publishStartPreflightDescriptor = resolveSessionWizardPublishStartPreflightDescriptor({
@@ -1989,13 +1956,15 @@ const SessionWizard = ({
         }
         return;
       }
-      try {
-        await resolveAvailableRegisterIdentity();
-      } catch (err) {
-        const publishFailureSettlement = resolveSessionWizardPublishFailureSettlementDescriptor({ error: err });
-        setStatus(publishFailureSettlement.errorMessage);
-        dispatchSessionPublish({ type: 'edit' });
-        return;
+      if (sessionModeRequirements.publish.registerSession) {
+        try {
+          await resolveAvailableRegisterIdentity();
+        } catch (err) {
+          const publishFailureSettlement = resolveSessionWizardPublishFailureSettlementDescriptor({ error: err });
+          setStatus(publishFailureSettlement.errorMessage);
+          dispatchSessionPublish({ type: 'edit' });
+          return;
+        }
       }
       dispatchSessionPublish({ type: 'edit' });
       setSessionUrl('');
@@ -2025,6 +1994,8 @@ const SessionWizard = ({
       try {
         const pendingDraftSnapshot = normalizePendingSbtDrafts(pendingSbtDrafts);
         const currentWorkerSecrets = getCurrentWorkerSecrets();
+        const liveRuntime = workerDeployRuntimeRef.current;
+        const liveDraft = liveRuntime?.draft || draftRef.current;
         const sponsoredAutoDeployState = resolveSessionWizardSponsoredAutoDeployReadiness({
           wizardMode,
           sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
@@ -2038,50 +2009,37 @@ const SessionWizard = ({
         const publishRequestDescriptor = resolveSessionWizardPublishRequestDescriptor({
           pendingDraftSnapshot,
           manualMetadataUrl,
-          workerMode,
+          workerMode: liveRuntime?.workerMode || workerMode,
           sponsoredAutoDeployReady: sponsoredAutoDeployState.ready,
-          deployComplete,
+          deployComplete: deployCompleteRef.current,
           canUploadMetadataNow,
+          sessionModeProfile: liveDraft.sessionModeProfile as SessionModeProfile,
         });
+        const liveWorkerEvidence = getWorkerPublishEvidence();
         const { publishExecutionPlan } = publishRequestDescriptor;
+        const publishAllowed =
+          publishUiPlan.publishReadiness.canPublishNow &&
+          (!publishExecutionPlan.shouldPersistWorkerConfig ||
+            publishExecutionPlan.shouldAutoDeployWorker ||
+            liveWorkerEvidence?.verified === true);
+        if (!publishAllowed) {
+          setStatus('Deploy and verify the selected worker before publishing.');
+          return;
+        }
         beginSessionPublishReducerAttempt(dispatchSessionPublish, publishExecutionPlan);
         let uploadResult = null;
         let workerUrlOverride = '';
         let deployedPendingDrafts = [];
-        const publishControllerResult = await runSessionWizardPublishController({
-          input: {
-            publishExecutionPlan,
-            signerAccountOverride,
-          },
-          ports: {
-            deployWorker: () =>
-              runSessionPublishEffect({
-                dispatch: dispatchSessionPublish,
-                effect: 'deployWorker',
-                getErrorMessage: getSessionWizardErrorMessage,
-                run: () =>
-                  runTrackedPublishEffect('deployWorker', () => handleDeployWorker({ forceSponsoredAutoDeploy: true })),
-                result: (deployResult) => ({ workerUrl: deployResult?.workerUrl || '' }),
-              }),
-            deployPendingSbts: ({ workerUrlOverride: pendingWorkerUrlOverride, signerAccountOverride }) =>
-              runSessionPublishEffect({
-                dispatch: dispatchSessionPublish,
-                effect: 'deployPendingSbts',
-                getErrorMessage: getSessionWizardErrorMessage,
-                run: () =>
-                  runTrackedPublishEffect('deployPendingSbts', () =>
-                    deployPendingSbtDrafts({
-                      workerUrlOverride: pendingWorkerUrlOverride,
-                      signerAccountOverride,
-                    }),
-                  ),
-                result: (deployedDrafts) => ({
-                  deployedPendingSbtCount: deployedDrafts.length,
-                }),
-              }),
-          },
-          callbacks: { setPublishStep: ignoreSessionPublishStep },
+        const publishControllerResult = await sessionWizardPublishRuntimeController.runPreparation({
+          publishAllowed,
+          publishExecutionPlan,
+          signerAccountOverride,
+          runTrackedPublishEffect,
         });
+        if (publishControllerResult.status === 'blocked') {
+          dispatchSessionPublish({ type: 'edit' });
+          return;
+        }
         workerUrlOverride = publishControllerResult.workerUrlOverride;
         deployedPendingDrafts = publishControllerResult.deployedPendingDrafts;
         const metadataUploadRequest = resolveSessionWizardPublishMetadataUploadRequest({
@@ -2104,18 +2062,19 @@ const SessionWizard = ({
           callbacks: { setPublishStep: ignoreSessionPublishStep },
         });
         uploadResult = metadataUploadControllerResult.uploadResult;
-        const registerStepRequest = resolveSessionWizardRegisterStepRequest({
+        const preservedPendingSbtDrafts = normalizePendingSbtDrafts(
+          resolveSessionWizardRemainingPendingDrafts({
+            deployedPendingDrafts: normalizePendingSbtDrafts(deployedPendingDrafts),
+            pendingDraftSnapshot: publishRequestDescriptor.pendingDraftSnapshot,
+          }),
+        );
+        await sessionWizardPublishRuntimeController.settleRegistration({
+          preservedPendingSbtDrafts,
           publishExecutionPlan,
           uploadResult,
+          publishControllerResult,
+          runTrackedPublishEffect,
         });
-        activeSessionPublishEffect = 'registerSession';
-        await runSessionPublishEffect({
-          dispatch: dispatchSessionPublish,
-          effect: 'registerSession',
-          getErrorMessage: getSessionWizardErrorMessage,
-          run: () => handleRegisterGroup(registerStepRequest.registerGroupArgs),
-        });
-        markSessionPublishEffectSucceeded(dispatchSessionPublish, 'refreshRegistryCache');
         const completionRequest = resolveSessionWizardPublishCompletionRequest({
           publishExecutionPlan,
           deployedPendingDrafts,
@@ -2131,7 +2090,8 @@ const SessionWizard = ({
           callbacks: {
             promoteDeployedPendingSbtSelections,
             setPublishedPendingSbtLinks,
-            clearPendingSbtDrafts: () => setPendingSbtDrafts([]),
+            replacePendingSbtDrafts: (remainingDrafts) =>
+              setPendingSbtDrafts(normalizePendingSbtDrafts(remainingDrafts)),
             setPublishStep: ignoreSessionPublishStep,
           },
         });
@@ -2378,6 +2338,10 @@ const SessionWizard = ({
     latestChainBlock,
     sessionId,
     sessionIdHex,
+    workerCanonicalPublishCompleted: workerCanonicalSettlement.publishCompleted,
+    deployComplete,
+    deployWorkerUrl,
+    workerRequirementProof,
     draft,
     deployForm,
   };
@@ -2401,6 +2365,32 @@ const SessionWizard = ({
     updateDeploymentState: updateSponsoredBundleDeploymentState,
     clearSelectedBundleFile,
     clearCachedWorkerSecretsAfterDeploy,
+  });
+
+  const sessionWizardPublishRuntimeController = createSessionWizardPublishRuntimeController({
+    runtimeRef: workerDeployRuntimeRef,
+    dispatch: dispatchSessionPublish,
+    getErrorMessage: getSessionWizardErrorMessage,
+    deployWorker: () => handleDeployWorker({ forceSponsoredAutoDeploy: true }),
+    deployPendingSbts: deployPendingSbtDrafts,
+    getWorkerPublishEvidence,
+    resolveWorkerRpcUrl,
+    resolveWorkerRpcUrlMap,
+    parseAllowOriginsInput,
+    resolveWorkerFaucetConfig,
+    signTypedAdminAction,
+    handleRegisterGroup,
+    generateSessionId,
+    callbacks: {
+      setSessionUrl,
+      setAdminUrl,
+      setAdminUrlStatus,
+      setWorkerCanonicalPublishSettled: workerCanonicalSettlement.setSettled,
+      clearSessionWizardCache,
+      writeSessionWizardWorkerSettlement,
+      setSessionId,
+      setSessionIdStatus,
+    },
   });
 
   const resourceGateOptions = useMemo(
@@ -2512,13 +2502,20 @@ const SessionWizard = ({
   const defaultWorkerUrl = normalizeWorkerUrl(getSessionWizardDefaultWorkerUrl());
   const deployedWorkerUrl = normalizeWorkerUrl(toStr(deployWorkerUrl).trim());
   const normalModeRequiresCustomWorker = isNormalMode && !NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED;
-  const { deployVerifiedInUi, effectiveConfiguredWorkerUrl } = resolveSessionWizardWorkerVerificationUiState({
-    configuredWorkerUrl,
-    deployWorkerUrl: deployedWorkerUrl,
-    defaultWorkerUrl,
-    deployComplete,
-    normalModeRequiresCustomWorker,
-  });
+  const { deployVerifiedInUi: deployIdentityVerifiedInUi, effectiveConfiguredWorkerUrl } =
+    resolveSessionWizardWorkerVerificationUiState({
+      configuredWorkerUrl,
+      deployWorkerUrl: deployedWorkerUrl,
+      defaultWorkerUrl,
+      deployComplete,
+      normalModeRequiresCustomWorker,
+    });
+  const currentWorkerSecrets = getCurrentWorkerSecrets();
+  const deployRequirementsVerified = workerRequirementProof
+    ? getWorkerPublishEvidence()?.verified === true
+    : !sessionModeRequirements.isWorkerCanonical;
+  // Derive current publish authority from the selected worker, profile, provider, and secrets.
+  const deployVerifiedInUi = deployIdentityVerifiedInUi && deployRequirementsVerified;
   const customWorkerSelected = normalModeRequiresCustomWorker || workerMode !== 'default';
   const hideNormalModeDefaultWorkerUrl =
     normalModeRequiresCustomWorker &&
@@ -2539,7 +2536,6 @@ const SessionWizard = ({
       visibleConfiguredWorkerUrl,
       workerMode,
     });
-  const currentWorkerSecrets = getCurrentWorkerSecrets();
   const sponsoredAutoDeployState = resolveSessionWizardSponsoredAutoDeployReadiness({
     wizardMode,
     sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
@@ -2621,16 +2617,19 @@ const SessionWizard = ({
   const normalizedAppliedSponsoredBundle = sponsoredBundlePublishAdapter.normalizeSparseSponsoredBundlePayload(
     sponsoredBundleAppliedBundleRef.current,
   );
-  const { newSessionRequiresLitCredential, showNewSessionRequirementsBanner } =
+  const { newSessionRequiresLitCredential, requiredRequirementIds, showNewSessionRequirementsBanner } =
     resolveSessionWizardNewSessionRequirementsDisplayState({
       cloudflareWorkerSbtGateMode,
       currentWorkerSecrets,
+      hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
       hasSponsoredBundleLink,
       isNewSessionWizardRoute,
       newSessionBannerDismissalContextKey,
       newSessionBannerDismissedContext,
       normalizedAppliedSponsoredBundle,
       persistedNewSessionBannerDismissed,
+      sessionAi: draft.ai,
+      sessionModeProfile: draft.sessionModeProfile,
       sponsoredBundleStatus,
     });
   const publishUiPlan = resolveSessionWizardPublishReducerUiPlan({
@@ -2648,8 +2647,10 @@ const SessionWizard = ({
     hasPendingDrafts: hasUndeployedPendingSbtDrafts,
     isNormalMode,
     publishAdvancedOpen,
+    publishCompleted: workerCanonicalSettlement.publishCompleted,
     publishStepElapsedMs,
     sbtsLabel: t('sbts'),
+    sessionModeProfile: draft.sessionModeProfile as SessionModeProfile,
   });
   const {
     publishProgressDisplayState: { publishStep },
@@ -2660,6 +2661,7 @@ const SessionWizard = ({
     deployInFlight,
     deployStatus,
     deployVerifiedInUi,
+    workerCanonicalPublishCompleted: workerCanonicalSettlement.publishCompleted,
   });
   const pendingDraftCount = normalizedPendingSbtDrafts.length;
   const sessionDetailsComplete = !!toStr(draft?.sessionName).trim() && !!toStr(draft?.sessionInfo).trim();
@@ -2843,6 +2845,7 @@ const SessionWizard = ({
       newSessionFundingRequirementHref={newSessionFundingRequirementHref}
       newSessionFundingRequirementLabel={newSessionFundingRequirementLabel}
       newSessionRequiresLitCredential={newSessionRequiresLitCredential}
+      newSessionRequiredRequirementIds={requiredRequirementIds}
       normalModeBundleHelpText={normalModeBundleHelpText}
       normalModeBundleUrl={normalModeBundleUrl}
       normalModeBundleUrlOverride={normalModeBundleUrlOverride}
@@ -2854,6 +2857,7 @@ const SessionWizard = ({
       onCloseDisplaySettings={() => setWizardDisplaySettingsOpen(false)}
       onCloseSessionHeaderPreviewModal={() => setSessionHeaderPreviewModalOpen(false)}
       onCopyDraftJson={handleCopyDraftJson}
+      onCreateAnotherSession={workerCanonicalSettlement.onCreateAnotherSession}
       onDismissNewSessionRequirementsBanner={handleDismissNewSessionRequirementsBanner}
       onEnterAdvancedMode={handleEnterAdvancedMode}
       onEnterNormalMode={handleEnterNormalMode}
@@ -2876,6 +2880,7 @@ const SessionWizard = ({
       primaryDraftEntries={primaryDraftEntries}
       provider={provider}
       publishUiPlan={publishUiPlan}
+      publishSettingsCapabilities={sessionModeRequirements.publishSettings}
       publishedPendingSbtLinks={publishedPendingSbtLinks}
       registerExplorerBaseUrl={registerExplorerBaseUrl}
       registerTxs={registerTxs}

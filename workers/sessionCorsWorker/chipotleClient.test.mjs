@@ -150,7 +150,6 @@ test('normalizeLitChipotleApiBase rejects unsafe API bases', () => {
   const rejectedBases = [
     'https://attacker.example',
     'http://api.chipotle.litprotocol.com',
-    'https://user:[redacted-email]',
     'https://api.chipotle.litprotocol.com.evil.example',
     'https://127.0.0.1:8787',
     'https://10.0.0.5',
@@ -170,6 +169,20 @@ test('normalizeLitChipotleApiBase rejects unsafe API bases', () => {
       apiBase,
     );
   }
+});
+
+test('normalizeLitChipotleApiBase rejects embedded URL credentials', () => {
+  const credentialedApiBase = new URL('https://api.chipotle.litprotocol.com');
+  credentialedApiBase.username = 'user';
+  credentialedApiBase.password = 'pass';
+
+  assert.throws(
+    () => normalizeLitChipotleApiBase(credentialedApiBase.toString()),
+    (error) => {
+      assert.equal(error.message, 'Lit Chipotle API base URL must not include credentials.');
+      return true;
+    },
+  );
 });
 
 test('normalizeLitChipotleApiBase allows only explicit localhost test bases', () => {
@@ -614,6 +627,45 @@ test('executeSessionLitChipotleAction validates source code and executes the con
   }));
 });
 
+test('executeSessionLitChipotleAction rejects malformed explicit gate chains instead of falling through', async () => {
+  for (const chainId of ['3.1337e4', '11155420.0', false]) {
+    let actionCalls = 0;
+    const fetchImpl = async (url) => {
+      if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+        return jsonResponse(TEST_ACTION_CID);
+      }
+      actionCalls += 1;
+      return jsonResponse({ has_error: false, response: { ok: true } });
+    };
+
+    await assert.rejects(
+      () => executeSessionLitChipotleAction({
+        config: {
+          networkChainId: 11155420,
+          litCredentials: {
+            litApiBase: 'https://api.chipotle.litprotocol.com',
+            litActionCid: TEST_ACTION_CID,
+            litPkpId: TEST_PKP_ID,
+          },
+        },
+        secrets: { litUsageApiKey: 'usage-key' },
+        request: {
+          actionCode: 'async function main() { return { ok: true }; }',
+          op: 'encrypt',
+          sbtAddresses: [TEST_GATE_ADDRESS],
+          chainId,
+          message: `0x${'12'.repeat(32)}`,
+        },
+        requesterAddress: TEST_REQUESTER,
+        fetchImpl,
+      }),
+      /requires a gate chain ID/i,
+      String(chainId),
+    );
+    assert.equal(actionCalls, 0, String(chainId));
+  }
+});
+
 test('executeSessionLitChipotleAction submits verified source code when configured action CID is not cached yet', async () => {
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
@@ -890,6 +942,50 @@ test('executeSessionLitChipotleAction falls back to a default public RPC for the
     policy: expectedPolicy,
     rpcUrl: 'https://op-sepolia-testnet.api.pocket.network/',
   });
+});
+
+test('executeSessionLitChipotleAction prefers the session-secret custom RPC over public fallbacks', async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push([String(url), options]);
+    if (String(url).endsWith('/core/v1/get_lit_action_ipfs_id')) {
+      return jsonResponse('QmAction123');
+    }
+    if (String(url).endsWith('/core/v1/lit_action')) {
+      return jsonResponse({
+        has_error: false,
+        logs: '',
+        response: { ok: true, allowed: true },
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+
+  await executeSessionLitChipotleAction({
+    config: {
+      networkChainId: 11155420,
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litActionCid: 'QmAction123',
+        litPkpId: '0xpkp123',
+      },
+    },
+    secrets: {
+      litUsageApiKey: 'usage-key',
+      customRpcUrl: 'https://rpc.example.test',
+    },
+    request: {
+      actionCode: 'async function main() { return { ok: true }; }',
+      op: 'check',
+      sbtAddresses: ['0x29563ff3aCC8AFb220D810F8022218095e25C1f6'],
+      chainId: 11155420,
+    },
+    requesterAddress: '0x00000000000000000000000000000000000000aa',
+    fetchImpl,
+  });
+
+  const body = JSON.parse(calls[1][1].body);
+  assert.equal(body.js_params.rpcUrl, 'https://rpc.example.test/');
 });
 
 

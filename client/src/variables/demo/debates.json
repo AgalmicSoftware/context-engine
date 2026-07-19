@@ -2032,13 +2032,6 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "metr_predeployment_inadequate_2025",
-        "corpus": "metr-evals-metrics",
-        "side": "a",
-        "stance_summary": "Why pre-deployment testing is not an adequate framework for AI risk management",
-        "relevance_score": 7
-      },
-      {
         "entry_url_or_id": "metr_dangerous_before_deployment_2025",
         "corpus": "metr-evals-metrics",
         "side": "a",
@@ -5625,14 +5618,14 @@
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "https://arxiv.org/abs/2406.06652",
+        "entry_url_or_id": "alignment_faking_large_language_models_greenblatt_2024",
         "corpus": "arxiv-ai-safety",
         "side": "a",
         "stance_summary": "Alignment Faking in Large Language Models",
         "relevance_score": 7
       },
       {
-        "entry_url_or_id": "cotra_ai_takeover_default",
+        "entry_url_or_id": "cotra_without_specific_countermeasures",
         "corpus": "lesswrong-posts",
         "side": "a",
         "stance_summary": "Without Specific Countermeasures, the Easiest Path to Transformative AI Likely L",
@@ -6596,21 +6589,14 @@
         "entry_url_or_id": "ai_content_labeling_watermarking",
         "corpus": "ai-laws-policy",
         "side": "a",
-        "stance_summary": "Content-labeling and watermarking policies aim to preserve provenance and user awareness for generated media.",
-        "relevance_score": 7
+        "stance_summary": "China synthetic-content labeling rules demonstrate a more mandatory traceability-oriented approach.",
+        "relevance_score": 8
       },
       {
         "entry_url_or_id": "california_ab_2885",
         "corpus": "ai-laws-policy",
         "side": "a",
         "stance_summary": "California AB 2885 provides a state-level digital-content authenticity and watermarking example.",
-        "relevance_score": 8
-      },
-      {
-        "entry_url_or_id": "china_011",
-        "corpus": "ai-laws-policy",
-        "side": "a",
-        "stance_summary": "China synthetic-content labeling rules demonstrate a more mandatory traceability-oriented approach.",
         "relevance_score": 8
       },
       {
@@ -6691,7 +6677,7 @@
       },
       {
         "from_corpus": "ai-laws-policy",
-        "from_id": "china_011",
+        "from_id": "ai_content_labeling_watermarking",
         "to_corpus": "ai-laws-policy",
         "to_id": "ai_content_labeling_watermarking",
         "relationship": "specific_jurisdictional_instance_of",

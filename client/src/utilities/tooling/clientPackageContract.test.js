@@ -35,6 +35,7 @@ const expectedLintCommand = [
   '"src/utilities/contracts/**/*.{ts,tsx}"',
   '"src/utilities/shared/**/*.{ts,tsx}"',
   '"src/utilities/ui/**/*.{ts,tsx}"',
+  '"src/utilities/storage/**/*.{ts,tsx}"',
   '"src/components/Shared/**/*.{ts,tsx}"',
   '"src/components/About/**/*.{ts,tsx}"',
   '"src/components/Footer/**/*.{ts,tsx}"',
@@ -82,6 +83,15 @@ describe('client package modernization contract', () => {
     );
   });
 
+  it('makes bundle analysis build its own sourcemaps without changing production builds', () => {
+    const pkg = readClientPackageJson();
+
+    expect(pkg.scripts.build).not.toContain('sourcemap');
+    expect(pkg.scripts.analyze).toBe(
+      "npm run build -- --sourcemap true && source-map-explorer 'build/assets/*.js' --no-border-checks --html build/bundle-report.html",
+    );
+  });
+
   it('keeps legacy Vite aliases and CRA fallback scripts removed from the client package contract', () => {
     const pkg = readClientPackageJson();
     const eslintConfig = readClientFile('eslint.config.mjs');
@@ -108,6 +118,8 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("const typedTagsUtilityFiles = ['src/utilities/tags/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedContractsUtilityFiles = ['src/utilities/contracts/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedSharedUtilityFiles = ['src/utilities/shared/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedStorageUtilityFiles = ['src/utilities/storage/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain('files: typedStorageUtilityFiles');
     expect(eslintConfig).toContain("const typedGateComponentFiles = ['src/components/Gates/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain(
       "const typedCommunityTabComponentFiles = ['src/components/CommunityTab/**/*.{ts,tsx}']",
@@ -205,7 +217,6 @@ describe('client package modernization contract', () => {
       'vendor-ethers',
       'vendor-wallet-core',
       'vendor-wallet-connectors',
-      'vendor-lit',
       'vendor-arweave',
       'vendor-visualization',
       'vendor-canvas',
@@ -226,6 +237,7 @@ describe('client package modernization contract', () => {
     expectedVendorChunks.forEach((chunkName) => {
       expect(viteConfig).toContain(chunkName);
     });
+    expect(viteConfig).not.toContain('vendor-lit');
     expect(viteConfig).toContain("'/node_modules/hash.js/'");
     expect(viteConfig).toContain("'/node_modules/inherits/'");
     expect(viteConfig).toContain("'/node_modules/minimalistic-assert/'");

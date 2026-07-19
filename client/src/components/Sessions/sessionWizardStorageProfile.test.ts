@@ -65,6 +65,23 @@ describe('sessionWizardStorageProfile', () => {
     expect(profile.payloadAccessControl.resources.surveys).toBe('surveyResponses');
     expect(profile.payloadAccessControl.resources.generatedArtifacts).toBe('surveyResponses');
     expect(profile.sbtGatedAccess.litRequired).toBe('not_required_worker_enforced');
+    expect(SESSION_STORAGE_CLOUDFLARE_PRIMITIVES).toEqual({
+      r2: [
+        'session_context_payloads',
+        'question_payloads',
+        'survey_payloads',
+        'response_payloads',
+        'media_blob_payloads',
+      ],
+      kv: [
+        'metadata_indexes',
+        'audit_events',
+        'short_lived_action_ids',
+        'webhook_replay_cache',
+        'ephemeral_start_params',
+      ],
+      durableObjects: ['signer_runtime_coordination_only', 'coordination_locks'],
+    });
     expect(profile.cloudflare.primitives).toEqual(SESSION_STORAGE_CLOUDFLARE_PRIMITIVES);
     expect(profile.cloudflare.payloadAccessMode).toBe(SESSION_STORAGE_PAYLOAD_ACCESS_MODES.WORKER_SBT_GATE);
     expect(profile.cloudflare.exposesAccountId).toBe(false);

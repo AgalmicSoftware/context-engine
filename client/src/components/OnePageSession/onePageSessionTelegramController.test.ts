@@ -15,9 +15,11 @@ import {
 } from './onePageSessionTelegramController';
 
 const buildEnvelope = (sessionSlug: string): AgentClientLoginEnvelope => ({
+  v: 2,
   sessionSlug,
   address: '0x0000000000000000000000000000000000000001',
-  credential: { token: 'ceagt_test' },
+  bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'ceagt_bridge_test' },
+  workerCredential: { kind: 'session_worker_jwt', token: 'jwt-worker-test' },
   agentBridgeUrl: 'https://bridge.example',
   capabilities: { submitAnswers: true },
   expiresAt: '2026-01-01T00:00:00.000Z',
@@ -127,7 +129,13 @@ describe('onePageSessionTelegramController', () => {
       detail: { envelope: buildEnvelope('beta') },
     });
     const missingToken = new CustomEvent('ce-agent-client-login', {
-      detail: { envelope: { sessionSlug: 'alpha', credential: {} } },
+      detail: {
+        envelope: {
+          sessionSlug: 'alpha',
+          bridgeCredential: {},
+          workerCredential: { token: 'jwt-worker-test' },
+        },
+      },
     });
 
     expect(resolveAgentClientLoginEnvelopeFromEvent(matching, 'alpha')).toBe(envelope);

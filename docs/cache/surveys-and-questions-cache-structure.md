@@ -68,6 +68,17 @@ Semantics:
 - `surveys[surveyId].sessionSlugExplicit`: `true` when metadata authoritatively declared the session slug; `false` when the cache derived a slug from legacy name mapping or rebucketed unresolved metadata to general
 - `surveyResponses[surveyId][responder]`: latest known response payload for a survey responder
 - `pendingSurveyMetadata[surveyId]`: retry/backoff state for survey metadata that failed to hydrate from Arweave
+- Survey discovery and `SurveyAdded` event commits merge only the surveys,
+  pending-metadata entries, and watermark produced by the active scan or event
+  into the latest snapshot. Unrelated surveys, responses, and retry entries are
+  retained, and discovery watermarks never move backward.
+- Targeted survey-response refreshes atomically merge only the fetched responder delta into the
+  latest managed-cache snapshot. Trusted newer chain positions win same-responder conflicts;
+  older or equal positions stay unchanged. Unorderable concurrent values are preserved and leave
+  the frontier retryable. The client publishes its response revision only after the write succeeds.
+- Initial response hydration follows the same responder-recency and contiguous-
+  frontier rules. Cache readiness and response revisions are published only
+  after the corresponding managed-cache write succeeds.
 
 `pendingSurveyMetadata` entries may contain:
 
@@ -173,6 +184,14 @@ Semantics:
 - `arweaveTxCache[txId]`: cached raw Arweave payload text
 - `arweaveTxFailureCache[txId]`: bounded negative cache for failed Arweave fetches
 - `questionHydrationMeta`: reserved per-question hydration metadata map
+- Question discovery, encrypted-metadata refresh, response hydration, and
+  `QuestionsAdded`/`ResponsesSubmitted` events merge their active field deltas
+  into the latest snapshot. Concurrent question metadata, response recency,
+  pending retries, Arweave caches, and unrelated network branches are retained.
+- A completed discovery pass clears `questionsDiscoveryCheckpointBlock` while
+  monotonically advancing `questionsLatestBlock`; a partial or failed pass keeps
+  its retryable frontier. Readiness and UI revisions are published only after
+  persistence succeeds.
 
 ## Important normalization rules
 

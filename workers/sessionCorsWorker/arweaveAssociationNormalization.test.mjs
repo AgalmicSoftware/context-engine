@@ -41,6 +41,7 @@ const createDeps = (overrides = {}) => ({
   readSessionBySlugOnChain: async () => ({ ok: true, tuple: ['', 0, '', '', '', 0, 0, SESSION_ID] }),
   resolveRegistryRpcUrls: () => [RPC_URL],
   resolveRpcUrlListForGate: () => [RPC_URL],
+  rpcRequest: async () => '0x14a34',
   toChainId: (value) => Number(value) || 0,
   toRegistrySessionSlug: (slug) => toStr(slug).trim() || 'general',
   toStr,
@@ -50,12 +51,17 @@ const createDeps = (overrides = {}) => ({
 test('normalizeArweaveAssociationTags canonicalizes CE-SessionId through the extracted helper path', async () => {
   const tags = [{ name: 'CE-SessionId', value: '11111111111111111111111111111111' }];
   const reads = [];
+  const chainAttestationCache = new Map();
 
   const result = await normalizeArweaveAssociationTags({
     tags,
     slug: 'session-a',
-    config: { registryAddress: '0x0000000000000000000000000000000000000001' },
+    config: {
+      registryAddress: '0x0000000000000000000000000000000000000001',
+      registryChainId: 84532,
+    },
     uploaderAddress: '',
+    chainAttestationCache,
     deps: createDeps({
       readSessionBySlugOnChain: async (value) => {
         reads.push(value);
@@ -69,6 +75,8 @@ test('normalizeArweaveAssociationTags canonicalizes CE-SessionId through the ext
     registryAddress: '0x0000000000000000000000000000000000000001',
     registryRpcUrls: [RPC_URL],
     registrySlug: 'session-a',
+    expectedChainId: 84532,
+    chainAttestationCache,
   }]);
   assert.deepEqual(tags, [{ name: 'CE-SessionId', value: SESSION_ID }]);
 });
@@ -79,7 +87,10 @@ test('normalizeArweaveAssociationTags preserves CE-SessionId mismatch failures',
   const result = await normalizeArweaveAssociationTags({
     tags,
     slug: 'session-b',
-    config: { registryAddress: '0x0000000000000000000000000000000000000001' },
+    config: {
+      registryAddress: '0x0000000000000000000000000000000000000001',
+      registryChainId: 84532,
+    },
     uploaderAddress: '',
     deps: createDeps(),
   });

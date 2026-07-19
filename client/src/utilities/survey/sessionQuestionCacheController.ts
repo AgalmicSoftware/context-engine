@@ -26,7 +26,7 @@ import {
 } from '../session/mainSiteProgressHelpers.js';
 import { MASKED_Q_DECRYPT_BACKOFF_MAX, MASKED_Q_DECRYPT_BACKOFF_TTL_MS } from '../cache/sessionCacheConstants.js';
 import { isMaskedQuestionPayload, pickBetterQuestionPayload } from './questionRouting.js';
-import { compareResponseRecency, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency';
+import { isResponseRecencyAtLeast, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency';
 
 type CacheRecord = Record<string, unknown>;
 type StateRecord = {
@@ -104,6 +104,7 @@ interface QuestionCacheNetworkNode extends CacheRecord {
 }
 
 type QuestionCache = Record<string, QuestionCacheNetworkNode>;
+type QuestionsCacheAtomicUpdater = (current: QuestionCache | null) => QuestionCache | Promise<QuestionCache>;
 
 interface CreatedQuestionEntry extends CacheRecord {
   id: string;
@@ -125,6 +126,7 @@ interface UserNetworkCache extends CacheRecord {
 }
 
 type UserCache = Record<string, Record<string, UserNetworkCache>>;
+type UserCacheAtomicUpdater = (current: UserCache | null) => UserCache | Promise<UserCache>;
 
 interface PendingQuestionRetryRow {
   qid: string;
@@ -197,7 +199,8 @@ export interface SessionQuestionCacheHost {
   getState?: () => StateRecord;
   isMounted?: () => boolean;
   dgRead?: (name: string, slug: string, opts?: CacheRecord) => CacheRecord | null | undefined;
-  dgWrite?: (name: string, slug: string, value: CacheRecord) => unknown;
+  updateQuestionsCacheAtomic: (slug: string, updater: QuestionsCacheAtomicUpdater) => Promise<boolean>;
+  updateUserCacheAtomic: (slug: string, updater: UserCacheAtomicUpdater) => Promise<boolean>;
   getActiveSessionSlug?: () => string | null | undefined;
   getSessionCfg?: (slug: string) => CacheRecord | null | undefined;
   getSessionChainId?: (slug: string) => string | number | null | undefined;
@@ -223,7 +226,7 @@ export interface SessionQuestionCacheHost {
     questionData: CacheRecord,
     networkID: string,
     opts?: CacheRecord,
-  ) => boolean | void;
+  ) => Promise<boolean>;
   queueLocalRevisionUpdate?: (opts?: QueueLocalRevisionUpdateOptions) => void;
 }
 
@@ -349,8 +352,10 @@ const mergePendingQuestionInitOpts = (
   };
 };
 
+class QuestionCachePersistenceError extends Error {}
+
 export const createSessionQuestionCacheController = (
-  host: SessionQuestionCacheHost = {},
+  host: SessionQuestionCacheHost,
 ): SessionQuestionCacheController => {
   let _questionInitInFlight: Record<string, Promise<void> | undefined> = {};
   let _questionInitPending: Record<string, QuestionInitOptions | undefined> = {};
@@ -374,8 +379,6 @@ export const createSessionQuestionCacheController = (
   const isMounted = (): boolean => (typeof host.isMounted === 'function' ? host.isMounted() : false);
   const dgRead = (...args: [string, string, CacheRecord?]): CacheRecord | null =>
     typeof host.dgRead === 'function' ? host.dgRead(...args) || null : null;
-  const dgWrite = (...args: [string, string, CacheRecord]): unknown =>
-    typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null;
   const getActiveSessionSlug = (): string =>
     String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
   const getSessionCfg = (slug: string): CacheRecord | null =>
@@ -430,10 +433,20 @@ export const createSessionQuestionCacheController = (
     typeof host.buildMetadataSessionCacheEnvelope === 'function'
       ? host.buildMetadataSessionCacheEnvelope(...args)
       : { metadata: args?.[0] || {}, targetSlug: normalizeSessionSlug(args?.[1] || '') };
-  const writeQuestionMetadataToCache = (
+  const writeQuestionMetadataToCache = async (
     ...args: [string, string, CacheRecord, string, CacheRecord?]
-  ): boolean | void =>
-    typeof host.writeQuestionMetadataToCache === 'function' ? host.writeQuestionMetadataToCache(...args) : false;
+  ): Promise<boolean> => {
+    try {
+      return typeof host.writeQuestionMetadataToCache === 'function'
+        ? await host.writeQuestionMetadataToCache(...args)
+        : false;
+    } catch (error: unknown) {
+      if (error instanceof QuestionCachePersistenceError) throw error;
+      throw new QuestionCachePersistenceError(
+        `Failed to persist questions cache for ${args[0]}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
   const queueLocalRevisionUpdate = (opts: QueueLocalRevisionUpdateOptions = {}): void => {
     if (typeof host.queueLocalRevisionUpdate === 'function') {
       host.queueLocalRevisionUpdate(opts);
@@ -602,6 +615,7 @@ export const createSessionQuestionCacheController = (
         mergeLegacyNumericNetworkKey(questionsCache, networkID);
       }
       const rebucketedQuestionIds = new Set<string>();
+      const hydratedQuestionIds = new Set<string>();
       const ensureLocalQuestionCacheNode = (initialLastBlockQuestion: number): QuestionCacheNetworkNode => {
         if (!questionsCache[networkID]) {
           questionsCache[networkID] = createEmptyQuestionNetworkCacheNode(initialLastBlockQuestion);
@@ -619,10 +633,10 @@ export const createSessionQuestionCacheController = (
         }
         return questionsCache[networkID];
       };
-      const seedTemporaryDemoQuestionFixtures = (initialLastBlockQuestion: number): number => {
-        const fixtureQuestions = getTemporaryDemoSessionQuestionFixtures(scopedSlug, sessionCfgForScan || {});
-        if (!fixtureQuestions.length) return 0;
-
+      const seedTemporaryDemoQuestionFixtures = async (
+        initialLastBlockQuestion: number,
+        fixtureQuestions: QuestionMetadata[],
+      ): Promise<number> => {
         const localNet = ensureLocalQuestionCacheNode(initialLastBlockQuestion);
         if (!localNet.questions || typeof localNet.questions !== 'object') {
           localNet.questions = {};
@@ -632,17 +646,18 @@ export const createSessionQuestionCacheController = (
         }
 
         let seeded = 0;
-        fixtureQuestions.forEach((questionRaw) => {
+        const seededQuestionIds = new Set<string>();
+        for (const questionRaw of fixtureQuestions) {
           const lowered = String(questionRaw?.id || '')
             .trim()
             .toLowerCase();
-          if (!lowered) return;
+          if (!lowered) continue;
           const cachedQuestion = localNet.questions[lowered];
           const cachedDemoFixture = isRecord(cachedQuestion?.demoFixture) ? cachedQuestion.demoFixture : null;
           const isCachedTemporaryDemoQuestion =
             cachedQuestion?.temporaryDemoSeed === true ||
             normalizeSessionSlug(cachedDemoFixture?.sourceSessionSlug || '') === 'demo';
-          if (hasHydratedQuestionMetadata(cachedQuestion) && !isCachedTemporaryDemoQuestion) return;
+          if (hasHydratedQuestionMetadata(cachedQuestion) && !isCachedTemporaryDemoQuestion) continue;
 
           const questionData = {
             ...questionRaw,
@@ -660,6 +675,7 @@ export const createSessionQuestionCacheController = (
 
           if (targetSlug === slug) {
             localNet.questions[lowered] = preparedQuestionData;
+            seededQuestionIds.add(lowered);
             try {
               delete localNet.pendingQuestionMetadata[lowered];
             } catch (e: unknown) {
@@ -667,15 +683,39 @@ export const createSessionQuestionCacheController = (
             }
           } else {
             rebucketedQuestionIds.add(lowered);
-            writeQuestionMetadataToCache(targetSlug, lowered, preparedQuestionData, networkID, {
+            const persisted = await writeQuestionMetadataToCache(targetSlug, lowered, preparedQuestionData, networkID, {
               enforceScopedIsolation: true,
             });
+            if (!persisted) {
+              throw new QuestionCachePersistenceError(`Failed to persist questions cache for ${targetSlug}`);
+            }
           }
           seeded += 1;
-        });
+        }
 
         if (seeded <= 0) return 0;
-        dgWrite('questionsCache', slug, questionsCache);
+        const persisted = await host.updateQuestionsCacheAtomic(slug, (current) => {
+          const next = (current && typeof current === 'object' ? current : {}) as QuestionCache;
+          mergeLegacyNumericNetworkKey(next, networkID);
+          const targetNet = next[networkID] || createEmptyQuestionNetworkCacheNode(initialLastBlockQuestion);
+          ensureQuestionArweaveCacheBranches(targetNet);
+          const sourceNet = questionsCache[networkID];
+          seededQuestionIds.forEach((qid) => {
+            const existing = targetNet.questions[qid];
+            const existingDemoFixture = isRecord(existing?.demoFixture) ? existing.demoFixture : null;
+            const isExistingTemporaryFixture =
+              existing?.temporaryDemoSeed === true ||
+              normalizeSessionSlug(existingDemoFixture?.sourceSessionSlug || '') === 'demo';
+            if (hasHydratedQuestionMetadata(existing) && !isExistingTemporaryFixture) return;
+            targetNet.questions[qid] = sourceNet.questions[qid];
+            delete targetNet.pendingQuestionMetadata[qid];
+          });
+          next[networkID] = targetNet;
+          return next;
+        });
+        if (!persisted) {
+          throw new QuestionCachePersistenceError(`Failed to persist questions cache for ${slug}`);
+        }
         mainSiteLog.info('[MainSite] Seeded temporary demo question fixture metadata', {
           group: slug,
           count: seeded,
@@ -690,7 +730,13 @@ export const createSessionQuestionCacheController = (
         return seeded;
       };
 
-      seedTemporaryDemoQuestionFixtures(initialLastBlockQuestionFromCfg);
+      const temporaryDemoQuestionFixtures = getTemporaryDemoSessionQuestionFixtures(
+        scopedSlug,
+        sessionCfgForScan || {},
+      ) as QuestionMetadata[];
+      if (temporaryDemoQuestionFixtures.length > 0) {
+        await seedTemporaryDemoQuestionFixtures(initialLastBlockQuestionFromCfg, temporaryDemoQuestionFixtures);
+      }
 
       let resolvedWindow: unknown = null;
       try {
@@ -748,14 +794,14 @@ export const createSessionQuestionCacheController = (
       }
 
       // Merge helper to avoid stomping concurrent responses writes
-      const mergeFreshIntoLocalCopy = () => {
+      const mergeFreshIntoLocalCopy = (localCache = questionsCache, freshCache?: QuestionCache | null) => {
         try {
-          const fresh = (dgRead('questionsCache', slug) || {}) as QuestionCache;
+          const fresh = (freshCache || dgRead('questionsCache', slug) || {}) as QuestionCache;
           const freshNet = fresh[networkID];
           if (!freshNet) return;
 
           // Merge questionResponses + recency metadata (qId -> responder -> {bn/txi/li/ts})
-          const localNet = questionsCache[networkID];
+          const localNet = localCache[networkID];
           ensureQuestionArweaveCacheBranches(localNet);
           if (!localNet.questionResponses || typeof localNet.questionResponses !== 'object') {
             localNet.questionResponses = {};
@@ -766,20 +812,6 @@ export const createSessionQuestionCacheController = (
           const freshQR = freshNet && typeof freshNet.questionResponses === 'object' ? freshNet.questionResponses : {};
           const freshQRMeta =
             freshNet && typeof freshNet.questionResponsesMeta === 'object' ? freshNet.questionResponsesMeta : {};
-          const shouldApplyIncomingResponse = ({
-            existingMeta,
-            incomingMeta,
-            hasExistingResponse,
-          }: {
-            existingMeta: unknown;
-            incomingMeta: ResponseRecencyPair;
-            hasExistingResponse: boolean;
-          }): boolean => {
-            if (!hasExistingResponse) return true;
-            const existing = toResponseRecencyPair(existingMeta);
-            const incoming = toResponseRecencyPair(incomingMeta);
-            return compareResponseRecency(incoming, existing) >= 0;
-          };
           const freshQuestionIds = new Set([...Object.keys(freshQR || {}), ...Object.keys(freshQRMeta || {})]);
           freshQuestionIds.forEach((qIdRaw) => {
             const qId = String(qIdRaw || '')
@@ -827,11 +859,11 @@ export const createSessionQuestionCacheController = (
               const incomingMeta = freshMetaByResponder[responderRaw] ?? freshMetaByResponder[responder] ?? null;
               const hasExistingResponse = Object.prototype.hasOwnProperty.call(localResponsesByResponder, responder);
               if (
-                !shouldApplyIncomingResponse({
-                  existingMeta: localMetaByResponder[responder],
-                  incomingMeta: toResponseRecencyPair(incomingMeta, incomingResponse),
-                  hasExistingResponse,
-                })
+                hasExistingResponse &&
+                !isResponseRecencyAtLeast(
+                  toResponseRecencyPair(incomingMeta, incomingResponse),
+                  localMetaByResponder[responder],
+                )
               ) {
                 return;
               }
@@ -859,7 +891,11 @@ export const createSessionQuestionCacheController = (
             if (!qidLower) return;
             if (qidLower && rebucketedQuestionIds.has(qidLower)) return;
             const existingQuestion = localNet.questions[qidLower] || localNet.questions[qid];
-            if (!existingQuestion || isPendingQuestionMetadataPlaceholder(existingQuestion)) {
+            if (
+              !hydratedQuestionIds.has(qidLower) ||
+              !existingQuestion ||
+              isPendingQuestionMetadataPlaceholder(existingQuestion)
+            ) {
               localNet.questions[qidLower] = freshQs[qid];
             }
           });
@@ -871,7 +907,13 @@ export const createSessionQuestionCacheController = (
           const localCheckpointBlk = Number(localNet.questionsDiscoveryCheckpointBlock) || 0;
           const freshCheckpointBlk = Number(freshNet.questionsDiscoveryCheckpointBlock) || 0;
           const mergedCheckpointBlk = Math.max(localCheckpointBlk, freshCheckpointBlk);
-          if (mergedCheckpointBlk > 0) {
+          const explicitlyClearedCompletedCheckpoint =
+            Object.prototype.hasOwnProperty.call(localNet, 'questionsDiscoveryCheckpointBlock') &&
+            localNet.questionsDiscoveryCheckpointBlock == null &&
+            Number(localNet.questionsLatestBlock || 0) >= freshCheckpointBlk;
+          if (explicitlyClearedCompletedCheckpoint) {
+            localNet.questionsDiscoveryCheckpointBlock = undefined;
+          } else if (mergedCheckpointBlk > 0) {
             localNet.questionsDiscoveryCheckpointBlock = mergedCheckpointBlk;
           } else if (Object.prototype.hasOwnProperty.call(localNet, 'questionsDiscoveryCheckpointBlock')) {
             localNet.questionsDiscoveryCheckpointBlock = undefined;
@@ -879,6 +921,10 @@ export const createSessionQuestionCacheController = (
 
           // Preserve immutable Arweave payload and failure caches across stale whole-object writes.
           mergeQuestionArweaveCacheBranches(localNet, freshNet);
+          localNet.questionHydrationMeta = {
+            ...(isRecord(localNet.questionHydrationMeta) ? localNet.questionHydrationMeta : {}),
+            ...(isRecord(freshNet.questionHydrationMeta) ? freshNet.questionHydrationMeta : {}),
+          };
 
           // Merge pending off-chain metadata retries (never resurrect entries for questions we already have)
           if (typeof localNet.pendingQuestionMetadata !== 'object' || !localNet.pendingQuestionMetadata) {
@@ -948,6 +994,53 @@ export const createSessionQuestionCacheController = (
       let lastQuestionCacheWriteMs = 0;
       let pendingQuestionCacheWriteOps = 0;
       let hasPendingQuestionCacheWrite = false;
+      let questionCachePersistenceTail = Promise.resolve();
+      let questionCachePersistenceError: unknown = null;
+      const cloneQuestionCache = (cache: QuestionCache): QuestionCache => {
+        const clone = JSON.parse(JSON.stringify(cache)) as QuestionCache;
+        const sourceNet = cache[networkID];
+        if (
+          sourceNet &&
+          Object.prototype.hasOwnProperty.call(sourceNet, 'questionsDiscoveryCheckpointBlock') &&
+          sourceNet.questionsDiscoveryCheckpointBlock == null &&
+          clone[networkID]
+        ) {
+          clone[networkID].questionsDiscoveryCheckpointBlock = undefined;
+        }
+        return clone;
+      };
+      const enqueueQuestionCachePersistence = (): void => {
+        const snapshot = cloneQuestionCache(questionsCache);
+        questionCachePersistenceTail = questionCachePersistenceTail.then(async () => {
+          if (questionCachePersistenceError) return;
+          try {
+            const persisted = await host.updateQuestionsCacheAtomic(slug, (current) => {
+              const fresh = (current && typeof current === 'object' ? current : {}) as QuestionCache;
+              mergeFreshIntoLocalCopy(snapshot, fresh);
+              return {
+                ...fresh,
+                [networkID]: snapshot[networkID],
+              };
+            });
+            if (!persisted) {
+              throw new QuestionCachePersistenceError(`Failed to persist questions cache for ${slug}`);
+            }
+          } catch (error: unknown) {
+            questionCachePersistenceError =
+              error instanceof QuestionCachePersistenceError
+                ? error
+                : new QuestionCachePersistenceError(
+                    `Failed to persist questions cache for ${slug}: ${
+                      error instanceof Error ? error.message : String(error)
+                    }`,
+                  );
+          }
+        });
+      };
+      const awaitQuestionCachePersistence = async (): Promise<void> => {
+        await questionCachePersistenceTail;
+        if (questionCachePersistenceError) throw questionCachePersistenceError;
+      };
       const flushQuestionCacheWrite = ({ force = false } = {}) => {
         const nowMs = Date.now();
         if (
@@ -963,8 +1056,7 @@ export const createSessionQuestionCacheController = (
         ) {
           return false;
         }
-        mergeFreshIntoLocalCopy();
-        dgWrite('questionsCache', slug, questionsCache);
+        enqueueQuestionCachePersistence();
         hasPendingQuestionCacheWrite = false;
         pendingQuestionCacheWriteOps = 0;
         lastQuestionCacheWriteMs = nowMs;
@@ -1135,7 +1227,8 @@ export const createSessionQuestionCacheController = (
             }
           });
           return removed;
-        } catch (_: unknown) {
+        } catch (error: unknown) {
+          if (error instanceof QuestionCachePersistenceError) throw error;
           return 0;
         }
       };
@@ -1212,6 +1305,7 @@ export const createSessionQuestionCacheController = (
                 };
                 if (preparedQuestion.targetSlug === slug) {
                   questionsCache[networkID].questions[lowered] = preparedQuestionData;
+                  hydratedQuestionIds.add(lowered);
                 } else {
                   rebucketedQuestionIds.add(lowered);
                   try {
@@ -1219,9 +1313,18 @@ export const createSessionQuestionCacheController = (
                   } catch (e: unknown) {
                     mainSiteLog.warn('MainSite: fallback', e);
                   }
-                  writeQuestionMetadataToCache(preparedQuestion.targetSlug, lowered, preparedQuestionData, networkID, {
-                    enforceScopedIsolation: true,
-                  });
+                  const persisted = await writeQuestionMetadataToCache(
+                    preparedQuestion.targetSlug,
+                    lowered,
+                    preparedQuestionData,
+                    networkID,
+                    { enforceScopedIsolation: true },
+                  );
+                  if (!persisted) {
+                    throw new QuestionCachePersistenceError(
+                      `Failed to persist questions cache for ${preparedQuestion.targetSlug}`,
+                    );
+                  }
                 }
                 clearPendingQuestion(lowered);
                 if (!item.skippedCached) recoveredCount += 1;
@@ -1237,8 +1340,10 @@ export const createSessionQuestionCacheController = (
           }
 
           flushQuestionCacheWrite({ force: true });
+          await awaitQuestionCachePersistence();
           return recoveredCount;
-        } catch (_: unknown) {
+        } catch (error: unknown) {
+          if (error instanceof QuestionCachePersistenceError) throw error;
           return 0;
         }
       };
@@ -1525,13 +1630,14 @@ export const createSessionQuestionCacheController = (
           );
         }
         // Even when logs are up-to-date, retry any pending off-chain metadata fetches.
-        const recoveredPendingCount = await retryPendingQuestionMetadata().catch(() => 0);
+        const recoveredPendingCount = await retryPendingQuestionMetadata();
         // Retry-only mode must not advance discovery watermark without a real log scan.
         if (!skipDiscoveryScan) finalizeDiscoveryWatermark(latestBlock);
         const cachedCount = countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions);
         const pendingCount = Object.keys(questionsCache?.[networkID]?.pendingQuestionMetadata || {}).length;
         const ready = cachedCount > 0 || pendingCount === 0;
         flushQuestionCacheWrite({ force: true });
+        await awaitQuestionCachePersistence();
         clearQueuedQuestionProgress();
         setQuestionState((prev) =>
           buildQuestionReadyStatePatch({
@@ -1547,6 +1653,7 @@ export const createSessionQuestionCacheController = (
       // Proactive user cache population
       let userCache = (dgRead('userCache', slug) || {}) as UserCache;
       let userCacheModified = false;
+      const touchedUserNodes = new Set<string>();
 
       const ensureUserNode = (addr: string, block: number): UserDataRecord => {
         const lower = addr.toLowerCase();
@@ -1557,10 +1664,12 @@ export const createSessionQuestionCacheController = (
             lastScanTimestamp: Math.floor(Date.now() / 1000),
             data: createEmptyUserDataRecord(),
           };
+          touchedUserNodes.add(lower);
         }
         if (block > userCache[lower][networkID].lastBlockScanned) {
           userCache[lower][networkID].lastBlockScanned = block;
           userCache[lower][networkID].lastScanTimestamp = Math.floor(Date.now() / 1000);
+          touchedUserNodes.add(lower);
         }
         return userCache[lower][networkID].data;
       };
@@ -1623,6 +1732,7 @@ export const createSessionQuestionCacheController = (
         const cachedCount = countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions);
         // If we have cached data, allow UI to proceed with it; otherwise keep the "ready" gate closed.
         flushQuestionCacheWrite({ force: true });
+        await awaitQuestionCachePersistence();
         clearQueuedQuestionProgress();
         setQuestionState({ isQuestionCacheReady: cachedCount > 0, questionCacheInitializationError: true });
         return;
@@ -1695,6 +1805,7 @@ export const createSessionQuestionCacheController = (
         finalNewQIDs.length === 0 &&
         pendingQuestionMetadataCountBeforeHydration === 0;
       if (shouldRaiseRangeLimitError) {
+        await awaitQuestionCachePersistence();
         clearQueuedQuestionProgress();
         setQuestionState((prev) => ({
           isQuestionCacheReady: true,
@@ -1718,11 +1829,11 @@ export const createSessionQuestionCacheController = (
       }
       if (finalNewQIDs.length === 0) {
         // No brand-new question IDs, just mark the block updated
-        const recoveredPendingCount = await retryPendingQuestionMetadata().catch(() => 0);
+        const recoveredPendingCount = await retryPendingQuestionMetadata();
         queueCappedDiscoveryRerun();
-        mergeFreshIntoLocalCopy(); // <-- prevent wiping concurrent responses
         questionsCache[networkID].questionsLatestBlock = latestBlock;
         queueQuestionCacheWrite({ force: true });
+        await awaitQuestionCachePersistence();
         mainSiteLog.log('No new question IDs to fetch. question cache up-to-date.');
         const cachedCount = countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions);
         const pendingCount = Object.keys(questionsCache?.[networkID]?.pendingQuestionMetadata || {}).length;
@@ -1777,7 +1888,7 @@ export const createSessionQuestionCacheController = (
         }
       };
       let failedFetchCount = 0;
-      const processHydrationResult = (item: QuestionHydrationResult): void => {
+      const processHydrationResult = async (item: QuestionHydrationResult): Promise<void> => {
         const lowered = String(item.qId || '').toLowerCase();
         if (item.questionData) {
           // Force ID to lowerCase. Also do item.questionData.id = qId
@@ -1793,6 +1904,7 @@ export const createSessionQuestionCacheController = (
           if (targetSlug === slug) {
             // Insert into our local structure
             questionsCache[networkID].questions[lowered] = preparedQuestionData;
+            hydratedQuestionIds.add(lowered);
           } else {
             rebucketedQuestionIds.add(lowered);
             try {
@@ -1800,9 +1912,12 @@ export const createSessionQuestionCacheController = (
             } catch (e: unknown) {
               mainSiteLog.warn('MainSite: fallback', e);
             }
-            writeQuestionMetadataToCache(targetSlug, lowered, preparedQuestionData, networkID, {
+            const persisted = await writeQuestionMetadataToCache(targetSlug, lowered, preparedQuestionData, networkID, {
               enforceScopedIsolation: true,
             });
+            if (!persisted) {
+              throw new QuestionCachePersistenceError(`Failed to persist questions cache for ${targetSlug}`);
+            }
           }
           clearPendingQuestion(lowered);
           hydratedSuccessCount += 1;
@@ -1814,6 +1929,7 @@ export const createSessionQuestionCacheController = (
             if (!uData.createdQuestions.some((q: CreatedQuestionEntry) => q.id === lowered)) {
               uData.createdQuestions.push({ id: lowered, data: preparedQuestionData });
               userCacheModified = true;
+              touchedUserNodes.add(String(preparedQuestionData.creator).toLowerCase());
             }
           }
         } else {
@@ -1831,8 +1947,9 @@ export const createSessionQuestionCacheController = (
 
         const forcePublish =
           !!item.questionData && countHydratedQuestionMetadata(questionsCache?.[networkID]?.questions) === 1;
-        // Save incremental progress as metadata arrives (merge to keep responses).
-        queueQuestionCacheWrite({ force: forcePublish });
+        // Published hydration progress must correspond to a durable cache snapshot.
+        queueQuestionCacheWrite({ force: true });
+        await awaitQuestionCachePersistence();
         updateHydrationProgress({
           hydratedCount: hydratedSuccessCount,
           failedCount: failedFetchCount,
@@ -1863,7 +1980,7 @@ export const createSessionQuestionCacheController = (
               mainSiteLog.warn(`Error fetching question data for ID ${qId}:`, err);
               result = { qId, questionData: null, err };
             }
-            processHydrationResult(result);
+            await processHydrationResult(result);
           }),
         );
         // small sleep to avoid rate-limits
@@ -1871,7 +1988,6 @@ export const createSessionQuestionCacheController = (
       }
 
       // 4) Mark the main "questionsLatestBlock" as fully updated (merge first)
-      mergeFreshIntoLocalCopy();
       if (failedFetchCount > 0) {
         mainSiteLog.warn(
           `initializeQuestionCacheForGroup: ${failedFetchCount}/${finalNewQIDs.length} question metadata fetches failed. ` +
@@ -1887,11 +2003,49 @@ export const createSessionQuestionCacheController = (
       // they observe hydratedQuestions advance, so the cache must already reflect
       // that final count or cold loads can freeze on the first 10-question batch.
       queueQuestionCacheWrite({ force: true });
+      await awaitQuestionCachePersistence();
       flushQueuedQuestionProgress({ force: true });
 
       // Write user cache
       if (userCacheModified) {
-        dgWrite('userCache', slug, userCache);
+        const persisted = await host.updateUserCacheAtomic(slug, (current) => {
+          const next = (current && typeof current === 'object' ? current : {}) as UserCache;
+          touchedUserNodes.forEach((address) => {
+            const sourceNode = userCache[address]?.[networkID];
+            if (!sourceNode) return;
+            if (!next[address]) next[address] = {};
+            const targetNode = next[address][networkID] || {
+              lastBlockScanned: 0,
+              lastScanTimestamp: 0,
+              data: createEmptyUserDataRecord(),
+            };
+            const targetData = targetNode.data || createEmptyUserDataRecord();
+            const sourceData = sourceNode.data || createEmptyUserDataRecord();
+            const createdQuestions = Array.isArray(targetData.createdQuestions)
+              ? targetData.createdQuestions.slice()
+              : [];
+            const indexes = new Map(createdQuestions.map((row, index) => [String(row?.id || '').toLowerCase(), index]));
+            (sourceData.createdQuestions || []).forEach((row) => {
+              const id = String(row?.id || '').toLowerCase();
+              if (id && indexes.has(id)) createdQuestions[indexes.get(id)!] = row;
+              else {
+                if (id) indexes.set(id, createdQuestions.length);
+                createdQuestions.push(row);
+              }
+            });
+            next[address][networkID] = {
+              ...targetNode,
+              lastBlockScanned: Math.max(targetNode.lastBlockScanned || 0, sourceNode.lastBlockScanned || 0),
+              lastScanTimestamp: Math.max(targetNode.lastScanTimestamp || 0, sourceNode.lastScanTimestamp || 0),
+              data: {
+                ...targetData,
+                createdQuestions,
+              },
+            };
+          });
+          return next;
+        });
+        if (!persisted) throw new QuestionCachePersistenceError(`Failed to persist user cache for ${slug}`);
       }
 
       const totalCachedQuestions = countHydratedQuestionMetadata(questionsCache[networkID].questions);
@@ -2096,6 +2250,7 @@ export const createSessionQuestionCacheController = (
       };
 
       let changed = 0;
+      const improvedQuestions = new Map<string, QuestionMetadata>();
       for (let i = 0; i < toProcess.length; i += BATCH_SIZE) {
         const batch = toProcess.slice(i, i + BATCH_SIZE);
         const refreshedBatch: RefreshQuestionPayloadResult[] = await Promise.all(batch.map(refreshQuestionPayload));
@@ -2106,12 +2261,28 @@ export const createSessionQuestionCacheController = (
           const picked = pickBetterQuestionPayload(prev, next);
           if (!picked) continue;
           questionMap[qid] = { ...prev, ...picked, id: qid };
+          improvedQuestions.set(qid, questionMap[qid]);
           changed += 1;
         }
       }
 
       if (changed) {
-        dgWrite('questionsCache', slug, questionsCache);
+        const persisted = await host.updateQuestionsCacheAtomic(slug, (current) => {
+          const next = (current && typeof current === 'object' ? current : {}) as QuestionCache;
+          mergeLegacyNumericNetworkKey(next, networkID);
+          const targetNet = next[networkID] || createEmptyQuestionNetworkCacheNode(0);
+          ensureQuestionArweaveCacheBranches(targetNet);
+          improvedQuestions.forEach((incoming, qid) => {
+            const existing = targetNet.questions[qid] || {};
+            const picked = pickBetterQuestionPayload(existing, incoming);
+            if (picked) targetNet.questions[qid] = { ...existing, ...picked, id: qid };
+          });
+          next[networkID] = targetNet;
+          return next;
+        });
+        if (!persisted) {
+          throw new QuestionCachePersistenceError(`Failed to persist questions cache for ${slug}`);
+        }
         queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
       }
 

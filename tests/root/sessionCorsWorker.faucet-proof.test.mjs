@@ -326,6 +326,92 @@ test('proof-backed faucet requests succeed even when the auth token lacks faucet
   }
 });
 
+test('worker-canonical faucet transactions use the authenticated session-secret RPC without exposing it publicly', async () => {
+  const originalFetch = global.fetch;
+  const originalCrypto = global.crypto;
+  Object.defineProperty(global, 'crypto', {
+    configurable: true,
+    value: webcrypto,
+  });
+
+  const sessionSlug = 'worker-canonical-secret-rpc';
+  const secretRpcUrl = 'https://private-op-rpc.example.test';
+  const wallet = new ethers.Wallet('0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5');
+  const faucetWallet = new ethers.Wallet('0x8b3a350cf5c34c9194ca3a545d3f6f9f4c7e2d36505f8b0e62be5285bdcf0582');
+  const env = {
+    GROUP_KV: createMemoryKv({
+      [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify({
+        slug: sessionSlug,
+        networkChainId: 84532,
+        allowOrigins: [LOGIN_ORIGIN],
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        workerAuthority: {
+          version: 1,
+          participantScopes: ['faucet'],
+          anonymousScopes: [],
+        },
+      }),
+      [SESSION_SECRETS_KEY(sessionSlug)]: JSON.stringify({
+        faucetPrivateKey: faucetWallet.privateKey,
+        customRpcUrl: secretRpcUrl,
+      }),
+    }),
+    TOKEN_HMAC_SECRET: 'test-secret',
+  };
+
+  try {
+    global.fetch = buildWorkerRpcFetch({
+      rpcUrl: secretRpcUrl,
+      chainId: 84532,
+      txHash: '0xworkercanonicalrpc123',
+    });
+    const token = await issueWorkerLoginToken({
+      env,
+      wallet,
+      sessionSlug,
+    });
+
+    const response = await sessionCorsWorker.fetch(
+      makeActionRequest({
+        token,
+        sessionSlug,
+        body: {
+          action: 'request_test_eth',
+          address: wallet.address,
+          amountEth: '0.0000001',
+        },
+      }),
+      env,
+      {},
+    );
+    const payload = await response.json();
+    const rpcUrls = global.fetch.calls.map(([url]) => url);
+
+    assert.equal(response.status, 200);
+    assert.equal(payload?.txHash, '0xworkercanonicalrpc123');
+    assert.ok(rpcUrls.length > 0);
+    assert.deepEqual([...new Set(rpcUrls)], [secretRpcUrl]);
+
+    const publicResponse = await sessionCorsWorker.fetch(
+      makeJsonRequest('/session-config', null, {
+        method: 'GET',
+        headers: { 'X-Session-Slug': sessionSlug },
+      }),
+      env,
+      {},
+    );
+    const publicPayload = await publicResponse.json();
+    assert.equal(publicResponse.status, 200);
+    assert.equal(JSON.stringify(publicPayload).includes(secretRpcUrl), false);
+  } finally {
+    global.fetch = originalFetch;
+    Object.defineProperty(global, 'crypto', {
+      configurable: true,
+      value: originalCrypto,
+    });
+  }
+});
+
 test('proof-backed faucet requests without faucet scope must fund the authenticated wallet', async () => {
   const originalFetch = global.fetch;
   const originalCrypto = global.crypto;

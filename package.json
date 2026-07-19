@@ -13,6 +13,10 @@
   },
   "homepage": "https://contextengine.xyz/",
   "private": true,
+  "engines": {
+    "npm": "^10.0.0",
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "scripts": {
     "chain:start": "anvil --silent --port 8545 --chain-id 31337 --mnemonic \"test test test test test test test test test test test junk\"",
     "abi:sync": "node scripts/sync-abis.mjs",
@@ -40,6 +44,7 @@
     "test:client": "cd client && CI=1 npm test -- --watchAll=false --runInBand --coverage --coverageReporters=lcov --coverageReporters=json-summary --coverageReporters=text-summary",
     "test:root:jest": "cd client && npm test -- --watchAll=false --runInBand --testMatch '<rootDir>/../tests/root/deployHelper.worker.test.js' '<rootDir>/../tests/root/sessionCorsWorker.admin.test.js' '<rootDir>/../tests/root/sessionCorsWorker.arweave.test.js' '<rootDir>/../tests/root/sessionCorsWorker.auth.test.js' '<rootDir>/../tests/root/sessionCorsWorker.authenticatedActions.test.js' '<rootDir>/../tests/root/sessionCorsWorker.authenticatedRoutes.test.js' '<rootDir>/../tests/root/sessionCorsWorker.gates.test.js' '<rootDir>/../tests/root/sessionCorsWorker.health.test.js'",
     "test:worker:session-cors": "npm --prefix workers/sessionCorsWorker test",
+    "test:worker:agent-bridge": "node scripts/run-agent-bridge-worker-tests.js",
     "test:node": "node scripts/run-node-tests.js",
     "test:node:tracked": "node scripts/run-node-tests.js --tracked-only",
     "client-boundaries:check": "node scripts/check-client-boundaries.mjs",
@@ -51,7 +56,7 @@
     "typecheck:client": "npm --prefix client run typecheck",
     "type-debt:check": "node scripts/check-type-debt-ratchet.mjs",
     "coverage-floor:check": "node scripts/check-coverage-floor.mjs",
-    "test:ci": "npm run test:wiring && npm run type-debt:check && npm run verify:release && npm run test:contracts && npm run test:client && npm run coverage-floor:check && npm run test:root:jest && npm run test:worker:session-cors && npm run test:node && npm run test:cache-guard",
+    "test:ci": "npm run test:wiring && npm run type-debt:check && npm run verify:release && npm run test:contracts && npm run test:client && npm run coverage-floor:check && npm run test:root:jest && npm run test:worker:session-cors && npm run test:worker:agent-bridge && npm run test:node && npm run test:cache-guard",
     "test:e2e": "npm run -s test:e2e:smoke",
     "test:e2e:quick": "npm run -s test:e2e:smoke",
     "test:e2e:smoke": "npm run -s ai:test-nav:smoke",

@@ -2064,7 +2064,11 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
       await runSurveyResultsManualRefreshStatusApplicationController({
         ports: {
           applyRefreshState: (statePatch, afterApply) => {
-            setState(asSurveyResultsStatePatch(statePatch), afterApply);
+            return new Promise<void>((resolve, reject) => {
+              setState(asSurveyResultsStatePatch(statePatch), () => {
+                void Promise.resolve().then(afterApply).then(resolve, reject);
+              });
+            });
           },
           dispatchManualRefresh: () =>
             runSurveyResultsManualRefreshDispatchController({
@@ -2184,6 +2188,9 @@ const SurveyResults = (props: SurveyResultsProps): React.ReactElement => {
         handleUrlBasedView,
         handleUrlChange,
         queueResultsRefresh,
+        reportDetachedRefreshError: (operation, error) => {
+          surveyLog.error(`[SurveyResults] ${operation} failed:`, error);
+        },
         subscribeCacheUpdates: (listener) => surveyResultsCachePort.subscribeCacheUpdates(listener),
         updateLocalStoragePollingState,
         updateParentWithCurrentFiltersForUrl,

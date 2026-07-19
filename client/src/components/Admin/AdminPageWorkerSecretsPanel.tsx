@@ -41,7 +41,7 @@ type InlineResourceSummaryProps = {
 type AdminPageWorkerSecretsPanelProps = {
   workerSecretsOpen: boolean;
   onToggle: () => void;
-  canAdmin: boolean;
+  canAdminWorker: boolean;
   selectedConfig: unknown;
   workerUrl: string;
   selectedConfigWorkerUrl: string;
@@ -105,7 +105,7 @@ const InlineResourceSummary = ({ label, resource, onRefresh, refreshLabel }: Inl
 const AdminPageWorkerSecretsPanel = ({
   workerSecretsOpen,
   onToggle,
-  canAdmin,
+  canAdminWorker,
   selectedConfig,
   workerUrl,
   selectedConfigWorkerUrl,
@@ -293,12 +293,12 @@ const AdminPageWorkerSecretsPanel = ({
             );
           })}
         </div>
-        {canAdmin && workerSecretsDirty && (
+        {canAdminWorker && workerSecretsDirty && (
           <Button
             color="primary"
             className={styles.actionButton}
             onClick={handleSaveWorkerSecrets}
-            disabled={!canAdmin}
+            disabled={!canAdminWorker}
           >
             Save worker secrets
           </Button>

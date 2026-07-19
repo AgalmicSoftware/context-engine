@@ -17,6 +17,7 @@ import {
   type SessionModeResultsVisibility,
   type SessionModeSurface,
 } from '../../utilities/session/sessionModeProfile';
+import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
 
 type SessionModeProfileFieldProps = {
   registryChainId?: number | null;
@@ -32,16 +33,13 @@ const PRESET_CARDS = [
     id: SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
     title: 'Fast & Cheap (Cloudflare)',
     badge: 'Recommended',
-    copy:
-      'Hosted on Cloudflare with worker-managed encryption by default. Session-scoped, not permanent, and optionally anchored later.',
-    keys: ['Cloudflare API token', 'AI provider key', 'Arweave JWK', 'RPC URL/key', 'Lit key only for Lit encryption'],
+    copy: 'Hosted on Cloudflare with worker-managed encryption by default. Session-scoped, not permanent, and optionally anchored later.',
   },
   {
     id: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
     title: 'Trustless & Public (Decentralized)',
     badge: '',
     copy: 'Published publicly and permanently unless you enable encryption. Slower and more expensive to set up.',
-    keys: ['Arweave wallet/JWK', 'RPC URL/key', 'AI provider key', 'Lit API key if encryption is enabled'],
   },
 ] as const;
 
@@ -185,6 +183,9 @@ const SessionModeProfileField = ({
       <div className={styles.modePresetGrid} role="radiogroup" aria-label="Session mode presets">
         {PRESET_CARDS.map((preset) => {
           const selected = selectedPreset === preset.id;
+          const presetKeyChips = resolveSessionWizardModeRequirements(
+            presetForChain(preset.id, registryChainId || null),
+          ).presetKeyChips;
           return (
             <button
               key={preset.id}
@@ -204,7 +205,7 @@ const SessionModeProfileField = ({
               <span className={styles.modePresetKeys}>
                 <span className={styles.modePresetKeysLabel}>Keys needed</span>
                 <span className={styles.modePresetKeyList}>
-                  {preset.keys.map((key) => (
+                  {presetKeyChips.map((key) => (
                     <span key={key} className={styles.modePresetKey}>
                       {key}
                     </span>

@@ -1,4 +1,6 @@
 import { toTrimmedString } from './stringCoercion.js';
+import { isWorkerCanonicalSessionConfig } from './workerCanonicalAuthority.js';
+import { resolveRegistryChainId } from './chainIdNormalization.js';
 
 export const resolveLoginAuthorityContext = async ({
   slug,
@@ -21,17 +23,35 @@ export const resolveLoginAuthorityContext = async ({
     : (value) => toTrimmedString(value, deps);
   const warn = typeof deps?.warn === 'function' ? deps.warn : () => {};
 
+  const registrySlug = toRegistrySessionSlug(slug);
+  if (isWorkerCanonicalSessionConfig(config)) {
+    return {
+      authorityMode: 'worker_canonical',
+      registryAddress: '',
+      registryRpcUrls: [],
+      registrySlug,
+      sessionCheck: {
+        exists: true,
+        source: 'worker-config',
+        rpcUrl: '',
+        errors: [],
+        error: null,
+      },
+    };
+  }
+
   const registryAddress = toTrimmedString(config?.registryAddress, deps);
   const registryRpcUrls = resolveRegistryRpcUrls(config);
   if (!isAddress(registryAddress) || !registryRpcUrls.length) {
     throw new Error('Session registry not configured (registryAddress + rpcUrl required).');
   }
 
-  const registrySlug = toRegistrySessionSlug(slug);
   const sessionCheck = await readSessionExistsOnChain({
     registryAddress,
     registryRpcUrls,
     registrySlug,
+    expectedChainId: resolveRegistryChainId(config),
+    chainAttestationCache: deps?.chainAttestationCache,
   });
   if (sessionCheck?.exists !== true) {
     const reason = sessionCheck?.exists === false ? 'session-not-registered' : 'session-check-unavailable';

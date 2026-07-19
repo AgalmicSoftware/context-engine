@@ -7,6 +7,7 @@ import SessionWizardSponsoredStatus from './SessionWizardSponsoredStatus';
 
 type SessionWizardIntroStatusRailProps = {
   activeNormalModeIndex: number;
+  cloudflareTokenSlug?: string;
   collapsedSections: Record<string, boolean>;
   fundingRequirementHref?: string;
   fundingRequirementLabel: string;
@@ -16,6 +17,7 @@ type SessionWizardIntroStatusRailProps = {
   onDismissRequirements: () => void;
   onFocusNormalModeSection: (key: string) => void;
   onRetrySponsoredBundle: () => void;
+  requiredRequirementIds?: React.ComponentProps<typeof SessionWizardRequirementsBanner>['requiredRequirementIds'];
   showNewSessionRequirementsBanner: boolean;
   showNormalModeRail?: boolean;
   sponsoredBundleStatus?: React.ComponentProps<typeof SessionWizardSponsoredStatus>['status'];
@@ -23,6 +25,7 @@ type SessionWizardIntroStatusRailProps = {
 
 const SessionWizardIntroStatusRail = ({
   activeNormalModeIndex,
+  cloudflareTokenSlug = '',
   collapsedSections,
   fundingRequirementHref = '',
   fundingRequirementLabel,
@@ -32,6 +35,7 @@ const SessionWizardIntroStatusRail = ({
   onDismissRequirements,
   onFocusNormalModeSection,
   onRetrySponsoredBundle,
+  requiredRequirementIds,
   showNewSessionRequirementsBanner,
   showNormalModeRail = true,
   sponsoredBundleStatus = null,
@@ -39,10 +43,12 @@ const SessionWizardIntroStatusRail = ({
   <>
     {showNewSessionRequirementsBanner ? (
       <SessionWizardRequirementsBanner
+        cloudflareTokenSlug={cloudflareTokenSlug}
         fundingRequirementHref={fundingRequirementHref}
         fundingRequirementLabel={fundingRequirementLabel}
         newSessionRequiresLitCredential={newSessionRequiresLitCredential}
         onDismiss={onDismissRequirements}
+        requiredRequirementIds={requiredRequirementIds}
       />
     ) : null}
 

@@ -246,7 +246,7 @@ describe('OnePageSession view gating', () => {
     expect(screen.getByTestId('survey-page-pile')).toBeInTheDocument();
   });
 
-  it('shows a Telegram-first sign-in prompt instead of the web session UI when unauthenticated', async () => {
+  it('shows a transport-neutral agent sign-in prompt instead of the web session UI when unauthenticated', async () => {
     render(
       <OnePageSession
         {...buildProps()}
@@ -259,7 +259,7 @@ describe('OnePageSession view gating', () => {
     );
 
     expect(await screen.findByTestId(E2E_TESTIDS.SESSION_TELEGRAM_ONLY_NOTICE)).toHaveTextContent(
-      /Telegram-first session/i,
+      /Agent-enabled session/i,
     );
     expect(screen.getByTestId('ce-session-telegram-login-open')).toBeInTheDocument();
     expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
@@ -268,18 +268,58 @@ describe('OnePageSession view gating', () => {
 
   it('renders telegram parity surfaces from an exchanged envelope', async () => {
     writeAgentClientLoginEnvelope({
-      v: 1,
+      v: 2,
       sessionSlug: 'edge',
       expiresAt: '2027-07-05T00:00:00.000Z',
       address: '0x3333333333333333333333333333333333333333',
-      capabilities: { readQuestions: true, readResults: true, submitAnswers: false },
-      credential: { kind: 'session_worker_jwt', token: 'jwt-session-token' },
+      capabilities: { readQuestions: true, readResults: true, readGroups: true, submitAnswers: false },
+      bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'bridge-browser-token' },
+      workerCredential: { kind: 'session_worker_jwt', token: 'jwt-session-token' },
+      workerUrl: 'https://worker.example',
       agentBridgeUrl: 'https://bridge.example',
     });
     Object.defineProperty(global, 'fetch', {
       writable: true,
-      value: jest.fn(async (url) => {
+      value: jest.fn(async (url, options) => {
         const parsed = new URL(String(url));
+        if (parsed.pathname.endsWith('/groups/list')) {
+          expect(new Headers(options?.headers).get('Authorization')).toBe('Bearer jwt-session-token');
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              groups: [
+                {
+                  groupId: 'open-reviewers',
+                  label: 'Open reviewers',
+                  joinMode: 'open',
+                  memberVisibility: 'session',
+                },
+              ],
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
+        }
+        if (parsed.pathname.endsWith('/groups/my-memberships')) {
+          expect(new Headers(options?.headers).get('Authorization')).toBe('Bearer jwt-session-token');
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              memberships: [
+                {
+                  group: {
+                    groupId: 'members',
+                    label: 'Worker members',
+                    joinMode: 'admin_add',
+                    memberVisibility: 'members',
+                  },
+                  member: { principalKey: 'evm:0x3333333333333333333333333333333333333333' },
+                  memberCount: 4,
+                },
+              ],
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
+        }
         if (parsed.pathname.endsWith('/api/agent/session-meta')) {
           return new Response(
             JSON.stringify({
@@ -361,6 +401,7 @@ describe('OnePageSession view gating', () => {
       /Should the client render Telegram questions/i,
     );
     expect(await screen.findByTestId('ce-session-telegram-report-approx')).toHaveTextContent(/Approximate report/i);
+    expect(await screen.findByTestId('ce-session-worker-groups')).toHaveTextContent(/Worker members/i);
     expect(await screen.findByTestId('polis-report')).toBeInTheDocument();
     expect(screen.queryByTestId('survey-page-pile')).not.toBeInTheDocument();
   });

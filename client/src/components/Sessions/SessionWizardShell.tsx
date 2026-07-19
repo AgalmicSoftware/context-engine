@@ -102,6 +102,7 @@ export type SessionWizardShellProps = {
   newSessionFundingRequirementHref: IntroStatusRailProps['fundingRequirementHref'];
   newSessionFundingRequirementLabel: IntroStatusRailProps['fundingRequirementLabel'];
   newSessionRequiresLitCredential: IntroStatusRailProps['newSessionRequiresLitCredential'];
+  newSessionRequiredRequirementIds: IntroStatusRailProps['requiredRequirementIds'];
   normalizeSbtSelection: WizardModalsProps['normalizeSbtSelection'];
   normalModeBundleHelpText: WorkerPanelProps['normalModeBundleHelpText'];
   normalModeBundleUrl: WorkerPanelProps['normalModeBundleUrl'];
@@ -114,6 +115,7 @@ export type SessionWizardShellProps = {
   onCloseDisplaySettings: HeaderProps['onCloseDisplaySettings'];
   onCloseSessionHeaderPreviewModal: WizardModalsProps['onCloseSessionHeaderPreviewModal'];
   onCopyDraftJson: MetadataEditorProps['onCopyDraftJson'];
+  onCreateAnotherSession?: PublishSectionProps['onCreateAnotherSession'];
   onDismissNewSessionRequirementsBanner: IntroStatusRailProps['onDismissRequirements'];
   onEnterAdvancedMode: HeaderProps['onEnterAdvancedMode'];
   onEnterNormalMode: HeaderProps['onEnterNormalMode'];
@@ -136,6 +138,7 @@ export type SessionWizardShellProps = {
   primaryDraftEntries: MetadataEditorProps['primaryEntries'];
   provider: WizardModalsProps['provider'];
   publishUiPlan: PublishSectionProps['publishUiPlan'];
+  publishSettingsCapabilities: PublishSectionProps['publishSettingsCapabilities'];
   publishedPendingSbtLinks: PublishSectionProps['publishedPendingSbtLinks'];
   registerExplorerBaseUrl: PublishSectionProps['registerExplorerBaseUrl'];
   registerTxs: PublishSectionProps['registerTxs'];
@@ -263,6 +266,7 @@ const SessionWizardShell = ({
   newSessionFundingRequirementHref,
   newSessionFundingRequirementLabel,
   newSessionRequiresLitCredential,
+  newSessionRequiredRequirementIds,
   normalizeSbtSelection,
   normalModeBundleHelpText,
   normalModeBundleUrl,
@@ -275,6 +279,7 @@ const SessionWizardShell = ({
   onCloseDisplaySettings,
   onCloseSessionHeaderPreviewModal,
   onCopyDraftJson,
+  onCreateAnotherSession,
   onDismissNewSessionRequirementsBanner,
   onEnterAdvancedMode,
   onEnterNormalMode,
@@ -297,6 +302,7 @@ const SessionWizardShell = ({
   primaryDraftEntries,
   provider,
   publishUiPlan,
+  publishSettingsCapabilities,
   publishedPendingSbtLinks,
   registerExplorerBaseUrl,
   registerTxs,
@@ -389,6 +395,7 @@ const SessionWizardShell = ({
 
       <SessionWizardIntroStatusRail
         activeNormalModeIndex={activeNormalModeIndex}
+        cloudflareTokenSlug={draft.slug}
         collapsedSections={collapsedSections}
         fundingRequirementHref={newSessionFundingRequirementHref}
         fundingRequirementLabel={newSessionFundingRequirementLabel}
@@ -398,6 +405,7 @@ const SessionWizardShell = ({
         onDismissRequirements={onDismissNewSessionRequirementsBanner}
         onFocusNormalModeSection={focusNormalModeSection}
         onRetrySponsoredBundle={onRetrySponsoredBundle}
+        requiredRequirementIds={newSessionRequiredRequirementIds}
         showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
         showNormalModeRail
         sponsoredBundleStatus={sponsoredBundleStatus}
@@ -530,6 +538,7 @@ const SessionWizardShell = ({
           isNormalMode={isNormalMode}
           onToggleCollapsed={() => toggleSection('publish')}
           normalModePublishSummary={normalModePublishSummary}
+          onCreateAnotherSession={onCreateAnotherSession}
           onPublish={onPublish}
           onTogglePublishAdvanced={() => onTogglePublishAdvanced()}
           showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
@@ -544,6 +553,7 @@ const SessionWizardShell = ({
           localWorkerBundleFallbackFilePath={localWorkerBundleFallbackFilePath}
           sponsoredManualBundleRetryMessage={sponsoredManualBundleRetryMessage}
           publishUiPlan={publishUiPlan}
+          publishSettingsCapabilities={publishSettingsCapabilities}
           renderInfoTooltip={renderSessionWizardInfoTooltip}
           resolvedWorkerBaseUrl={resolvedWorkerBaseUrl}
           workerUrlSource={workerUrlSource}

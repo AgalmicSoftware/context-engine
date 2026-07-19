@@ -82,6 +82,8 @@ test('createAuthCorsAdminAdaptersWithWorkerDeps preserves worker-specific auth/C
           resolveRegistryRpcUrls: 'resolveRegistryRpcUrls',
           getHatsInterface: 'getHatsInterface',
           callContractFunction: 'callContractFunction',
+          rpcRequest: 'rpcRequest',
+          toChainId: 'toChainId',
         });
         return responses.admin;
       },
@@ -100,6 +102,8 @@ test('createAuthCorsAdminAdaptersWithWorkerDeps preserves worker-specific auth/C
       resolveRegistryRpcUrls: 'resolveRegistryRpcUrls',
       getHatsInterface: 'getHatsInterface',
       callContractFunction: 'callContractFunction',
+      rpcRequest: 'rpcRequest',
+      toChainId: 'toChainId',
     },
     constants: {
       missingSlugError: 'Missing sessionSlug.',

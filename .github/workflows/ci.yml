@@ -209,6 +209,9 @@ jobs:
       - name: Run sessionCorsWorker tests
         run: npm run test:worker:session-cors
 
+      - name: Run agentBridgeWorker tests
+        run: npm run test:worker:agent-bridge
+
   e2e-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 10

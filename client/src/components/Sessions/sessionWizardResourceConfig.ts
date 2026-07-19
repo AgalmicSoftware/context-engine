@@ -3,7 +3,7 @@ import { normalizeAiProvider } from './sessionWizardAiConfig';
 
 type SessionWizardSecretFieldType = 'password' | 'text' | 'textarea';
 
-type SessionWizardSecretField = {
+export type SessionWizardSecretField = {
   key: string;
   label: string;
   type: SessionWizardSecretFieldType;
@@ -38,7 +38,7 @@ export const RESOURCE_LABELS: Record<string, string> = {
 };
 
 export const RESOURCE_SECTION_TOOLTIPS: Readonly<Record<string, string>> = Object.freeze({
-  ai: 'Session-funded OpenAI key used for text generation and transcription.',
+  ai: 'Session-funded provider key used by the selected AI models.',
   rpc: 'Authenticated RPC endpoint used by the worker for chain reads and related operations.',
   arweave: `${t('wallet')} used to pay for Arweave uploads and storage.`,
   txGas: 'Faucet signer used to send small testnet funding grants.',
@@ -46,7 +46,7 @@ export const RESOURCE_SECTION_TOOLTIPS: Readonly<Record<string, string>> = Objec
 });
 
 const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Object.freeze({
-  ai: [{ key: 'openaiKey', label: 'OpenAI key', type: 'password', required: true }],
+  ai: [],
   rpc: [
     { key: 'customRpcUrl', label: 'Custom RPC URL', type: 'text', placeholder: 'https://...' },
     // Intentionally hidden until PATH gateway auth is supported.
@@ -58,22 +58,33 @@ const RESOURCE_SECRET_FIELDS: Record<string, SessionWizardSecretField[]> = Objec
   lit: [{ key: 'litAccountApiKey', label: 'Lit API key', type: 'password' }],
 });
 
+const AI_PROVIDER_SECRET_FIELDS: Readonly<Record<string, SessionWizardSecretField>> = Object.freeze({
+  openai: { key: 'openaiKey', label: 'OpenAI key', type: 'password', required: true },
+  anthropic: { key: 'anthropicKey', label: 'Anthropic key', type: 'password', required: true },
+  openrouter: { key: 'openrouterKey', label: 'OpenRouter key', type: 'password', required: true },
+});
+
 export const resolveSessionWizardAiModelProviders = (
   ai: unknown,
 ): {
   fastProvider: string;
   thinkingProvider: string;
+  transcriptionProvider: string;
 } => {
   const fastProvider = readAiModelProvider(ai, 'fast');
   const thinkingProvider = readAiModelProvider(ai, 'thinking');
-  return { fastProvider, thinkingProvider };
+  const transcriptionProvider = readAiModelProvider(ai, 'transcription');
+  return { fastProvider, thinkingProvider, transcriptionProvider };
 };
 
 export const resolveSessionWizardResourceSecretFields = (
   resourceKey: string,
   ai: unknown,
 ): SessionWizardSecretField[] => {
-  void ai;
   if (resourceKey !== 'ai') return [...(RESOURCE_SECRET_FIELDS[resourceKey] || [])];
-  return [...RESOURCE_SECRET_FIELDS.ai];
+  const providers = resolveSessionWizardAiModelProviders(ai);
+  return [...new Set([providers.fastProvider, providers.thinkingProvider, providers.transcriptionProvider])]
+    .map((provider) => AI_PROVIDER_SECRET_FIELDS[provider])
+    .filter((field): field is SessionWizardSecretField => !!field)
+    .map((field) => ({ ...field }));
 };

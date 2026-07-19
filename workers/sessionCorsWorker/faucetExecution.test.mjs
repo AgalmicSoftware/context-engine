@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { faucet } from './faucetExecution.js';
+import { resolveRpcUrlListForGate } from './gateRpcResolution.js';
+import { PRIVATE_SESSION_RPC_LABEL } from './rpcDiagnosticSafety.js';
 
 const BASE_HEADERS = { 'Access-Control-Allow-Origin': 'https://allowed.example' };
 const RECIPIENT = '0x00000000000000000000000000000000000000aa';
@@ -10,6 +12,7 @@ const PRIMARY_RPC = 'https://rpc-1.example';
 const SECONDARY_RPC = 'https://rpc-2.example';
 const MASKED_PRIMARY_RPC = 'masked:https://rpc-1.example';
 const MASKED_SECONDARY_RPC = 'masked:https://rpc-2.example';
+const SECRET_RPC = 'https://TENANT_SECRET.rpc.example/v2/ALCHEMY_SECRET';
 
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
@@ -157,15 +160,29 @@ test('faucet preserves normalized request failure passthrough and request loggin
   ]);
 });
 
-test('faucet preserves eligibility failure passthrough after request normalization', async () => {
+test('faucet returns proof failures without exposing session RPC credentials or raw rpc errors', async () => {
   let walletConstructed = false;
   const deps = createDeps({
+    normalizeFaucetRequest: () => createNormalizedResult({
+      logContext: { to: RECIPIENT, rpcUrl: SECRET_RPC, rpcUrls: [SECRET_RPC] },
+      normalized: {
+        ...createNormalizedResult().normalized,
+        rpcUrls: [SECRET_RPC],
+        rpcMasked: SECRET_RPC,
+        expectedChainId: 31337,
+      },
+    }),
     validateFaucetEligibilityRequest: async () => ({
       ok: false,
       status: 403,
       error: 'Requested resource gate is unavailable.',
       reason: 'sbt-validation-unavailable',
-      details: [{ rpcUrl: MASKED_PRIMARY_RPC, error: 'boom' }],
+      details: [{
+        rpcUrl: SECRET_RPC,
+        status: 502,
+        error: `provider failed at ${SECRET_RPC}`,
+        rpcError: { code: -32000, message: `upstream echoed ${SECRET_RPC}` },
+      }],
     }),
     Wallet: class WalletShouldNotConstruct {
       constructor() {
@@ -174,18 +191,90 @@ test('faucet preserves eligibility failure passthrough after request normalizati
     },
   });
 
-  const result = await runFaucet(deps, { tokenHasFaucetScope: false });
+  const result = await runFaucet(deps, {
+    tokenHasFaucetScope: false,
+    config: {
+      networkChainId: 31337,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      faucet: { chainId: 31337 },
+    },
+    secrets: { faucetPrivateKey: '0xabc123', customRpcUrl: SECRET_RPC },
+  });
 
   assert.equal(walletConstructed, false);
   assert.deepEqual(result, {
     body: {
       error: 'Requested resource gate is unavailable.',
       reason: 'sbt-validation-unavailable',
-      details: [{ rpcUrl: MASKED_PRIMARY_RPC, error: 'boom' }],
+      details: [{
+        rpcUrl: PRIVATE_SESSION_RPC_LABEL,
+        status: 502,
+        code: -32000,
+        error: 'Faucet eligibility RPC request failed.',
+      }],
     },
     status: 403,
     headers: BASE_HEADERS,
   });
+  const serialized = JSON.stringify({ result, logs: deps.__logs });
+  assert.equal(serialized.includes('TENANT_SECRET'), false);
+  assert.equal(serialized.includes('ALCHEMY_SECRET'), false);
+  assert.equal(serialized.includes('rpcError'), false);
+});
+
+test('faucet supplies the session-secret RPC to normalization and every eligibility gate helper', async () => {
+  const secretRpcUrl = 'https://private-rpc.example.test/eth';
+  const publicConfig = {
+    networkChainId: 31337,
+    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    faucet: { chainId: 31337 },
+  };
+  const observedRpcLists = [];
+  const resolveRuntimeRpc = (runtimeConfig, gateChainId) => resolveRpcUrlListForGate({
+    config: runtimeConfig,
+    gateChainId,
+  });
+  const deps = createDeps({
+    normalizeFaucetRequest: ({ config }) => {
+      observedRpcLists.push(resolveRuntimeRpc(config, 31337));
+      return createNormalizedResult({
+        normalized: {
+          ...createNormalizedResult().normalized,
+          rpcUrls: [secretRpcUrl],
+          rpcMasked: `masked:${secretRpcUrl}`,
+          registryChainId: 0,
+          networkChainId: 31337,
+          faucetChainId: 31337,
+          expectedChainId: 31337,
+        },
+      });
+    },
+    validateFaucetEligibilityRequest: async ({ config, deps: eligibilityDeps }) => {
+      observedRpcLists.push(eligibilityDeps.resolveRpcUrlListForGate(config, 31337));
+      return { ok: true, flow: 'authenticated-token', resourceKey: 'txGas' };
+    },
+    resolveRpcUrlListForGate: resolveRuntimeRpc,
+    rpcRequest: async ({ method }) => {
+      if (method === 'eth_chainId') return '0x7a69';
+      if (method === 'eth_getBalance') return '0x0';
+      if (method === 'eth_getTransactionCount') return '0x1';
+      if (method === 'eth_gasPrice') return '0x2';
+      if (method === 'eth_sendRawTransaction') return '0xtxhash';
+      throw new Error(`Unexpected method: ${method}`);
+    },
+  });
+
+  const result = await runFaucet(deps, {
+    config: publicConfig,
+    secrets: {
+      faucetPrivateKey: '0xabc123',
+      customRpcUrl: secretRpcUrl,
+    },
+  });
+
+  assert.equal(result.status, 200);
+  assert.deepEqual(observedRpcLists, [[secretRpcUrl], [secretRpcUrl]]);
+  assert.equal(JSON.stringify(publicConfig).includes(secretRpcUrl), false);
 });
 
 test('faucet preserves threshold rejection when current balance is above threshold', async () => {
@@ -305,6 +394,58 @@ test('faucet preserves chainId mismatch accumulation and final failure normaliza
   ]);
 });
 
+test('faucet fails closed when an RPC returns an unusable chain id', async () => {
+  const rpcCalls = [];
+  const deps = createDeps({
+    rpcRequest: async (value) => {
+      rpcCalls.push(value);
+      assert.equal(value.method, 'eth_chainId');
+      return '0x0';
+    },
+  });
+
+  const result = await runFaucet(deps);
+
+  assert.equal(result.status, 502);
+  assert.deepEqual(rpcCalls.map(({ method }) => method), ['eth_chainId']);
+  assert.deepEqual(result.body.attempts, [{
+    rpcUrl: MASKED_PRIMARY_RPC,
+    chainId: null,
+    error: 'RPC did not return a valid chainId.',
+  }]);
+});
+
+test('faucet fails closed before eligibility or RPC work when no expected chain is configured', async () => {
+  let eligibilityCalls = 0;
+  let rpcCalls = 0;
+  const deps = createDeps({
+    normalizeFaucetRequest: () => createNormalizedResult({
+      normalized: {
+        ...createNormalizedResult().normalized,
+        registryChainId: 0,
+        networkChainId: 0,
+        faucetChainId: 0,
+        expectedChainId: 0,
+      },
+    }),
+    validateFaucetEligibilityRequest: async () => {
+      eligibilityCalls += 1;
+      return { ok: true };
+    },
+    rpcRequest: async () => {
+      rpcCalls += 1;
+      return '0x14a34';
+    },
+  });
+
+  const result = await runFaucet(deps);
+
+  assert.equal(result.status, 500);
+  assert.equal(result.body.error, 'Invalid faucet chain configuration.');
+  assert.equal(eligibilityCalls, 0);
+  assert.equal(rpcCalls, 0);
+});
+
 test('faucet preserves gas price fallback to 0x3b9aca00 on successful send', async () => {
   let capturedPrivateKey = '';
   let capturedTxRequest = null;
@@ -395,7 +536,7 @@ test('faucet preserves signTransaction failure accumulation', async () => {
 
   assert.deepEqual(result, {
     body: {
-      error: 'sign failed',
+      error: 'Faucet transaction signing failed.',
       rpcUrl: MASKED_PRIMARY_RPC,
       chainId: 84532,
       registryChainId: 84532,
@@ -405,7 +546,7 @@ test('faucet preserves signTransaction failure accumulation', async () => {
         {
           rpcUrl: MASKED_PRIMARY_RPC,
           chainId: 84532,
-          error: 'sign failed',
+          error: 'Faucet transaction signing failed.',
         },
       ],
     },
@@ -414,12 +555,24 @@ test('faucet preserves signTransaction failure accumulation', async () => {
   });
 });
 
-test('faucet preserves send failure logging and accumulated attempts in final failure response', async () => {
+test('faucet redacts private RPC provenance and raw downstream errors from send failure logs and responses', async () => {
   const deps = createDeps({
+    normalizeFaucetRequest: () => createNormalizedResult({
+      logContext: { to: RECIPIENT, rpcUrl: SECRET_RPC, rpcUrls: [SECRET_RPC] },
+      normalized: {
+        ...createNormalizedResult().normalized,
+        rpcUrls: [SECRET_RPC],
+        rpcMasked: SECRET_RPC,
+        registryChainId: 0,
+        networkChainId: 31337,
+        faucetChainId: 31337,
+        expectedChainId: 31337,
+      },
+    }),
     rpcRequest: async ({ method }) => {
       switch (method) {
         case 'eth_chainId':
-          return '0x14a34';
+          return '0x7a69';
         case 'eth_getBalance':
           return '0';
         case 'eth_getTransactionCount':
@@ -427,28 +580,42 @@ test('faucet preserves send failure logging and accumulated attempts in final fa
         case 'eth_gasPrice':
           return '0x6';
         case 'eth_sendRawTransaction':
-          throw new Error('send failed');
+          {
+            const rpcError = new Error(`send failed at ${SECRET_RPC}`);
+            rpcError.rpcStatus = 502;
+            rpcError.rpcError = { code: -32000, message: `upstream echoed ${SECRET_RPC}` };
+            throw rpcError;
+          }
         default:
           throw new Error(`Unexpected method: ${method}`);
       }
     },
   });
 
-  const result = await runFaucet(deps);
+  const result = await runFaucet(deps, {
+    config: {
+      networkChainId: 31337,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      faucet: { chainId: 31337 },
+    },
+    secrets: { faucetPrivateKey: '0xabc123', customRpcUrl: SECRET_RPC },
+  });
 
   assert.deepEqual(result, {
     body: {
-      error: 'send failed',
-      rpcUrl: MASKED_PRIMARY_RPC,
-      chainId: 84532,
-      registryChainId: 84532,
-      networkChainId: 84532,
-      faucetChainId: 84532,
+      error: 'RPC transaction submission failed.',
+      rpcUrl: PRIVATE_SESSION_RPC_LABEL,
+      chainId: 31337,
+      registryChainId: 0,
+      networkChainId: 31337,
+      faucetChainId: 31337,
       attempts: [
         {
-          rpcUrl: MASKED_PRIMARY_RPC,
-          chainId: 84532,
-          error: 'send failed',
+          rpcUrl: PRIVATE_SESSION_RPC_LABEL,
+          chainId: 31337,
+          status: 502,
+          code: -32000,
+          error: 'RPC transaction submission failed.',
         },
       ],
     },
@@ -456,14 +623,24 @@ test('faucet preserves send failure logging and accumulated attempts in final fa
     headers: BASE_HEADERS,
   });
   assert.deepEqual(deps.__logs, [
-    ['[faucet] request', createNormalizedResult().logContext],
+    ['[faucet] request', {
+      to: RECIPIENT,
+      rpcUrl: PRIVATE_SESSION_RPC_LABEL,
+      rpcUrls: [PRIVATE_SESSION_RPC_LABEL],
+    }],
     ['[faucet] send failed', {
-      rpcUrl: MASKED_PRIMARY_RPC,
-      rpcChainId: 84532,
-      registryChainId: 84532,
-      networkChainId: 84532,
-      faucetChainId: 84532,
-      error: 'send failed',
+      rpcUrl: PRIVATE_SESSION_RPC_LABEL,
+      rpcChainId: 31337,
+      registryChainId: 0,
+      networkChainId: 31337,
+      faucetChainId: 31337,
+      error: 'RPC transaction submission failed.',
+      rpcStatus: 502,
+      rpcCode: -32000,
     }],
   ]);
+  const serialized = JSON.stringify({ result, logs: deps.__logs });
+  assert.equal(serialized.includes('TENANT_SECRET'), false);
+  assert.equal(serialized.includes('ALCHEMY_SECRET'), false);
+  assert.equal(serialized.includes('rpcError'), false);
 });

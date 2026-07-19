@@ -2,6 +2,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ethers } from 'ethers';
 import { createLogger } from '../../../utilities/logging';
+import {
+  removeKeys,
+  safeJsonWrite,
+  type RemoveKeysResult,
+  type SafeJsonWriteResult,
+} from '../../../utilities/cache/storageJson.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
 import type { AnyRecord } from '../../shellTypes';
 
@@ -53,26 +59,46 @@ export const readSessionWizardPendingSbtDraftsCache = (): PendingSbtDraft[] => {
   }
 };
 
-export const writeSessionWizardPendingSbtDraftsCache = (payload: PendingSbtDraft[] = []): void => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return;
+type SessionStorageLike = {
+  getItem?: (key: string) => string | null;
+  setItem?: (key: string, value: string) => void;
+  removeItem?: (key: string) => void;
+};
+
+type PendingSbtDraftStorageResult = RemoveKeysResult | SafeJsonWriteResult;
+
+const getSessionStorage = (storage?: SessionStorageLike | null): SessionStorageLike | null => {
+  if (storage !== undefined) return storage;
   try {
-    const normalized = normalizePendingSbtDrafts(payload);
-    if (!normalized.length) {
-      sessionStorage.removeItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
-      return;
-    }
-    sessionStorage.setItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY, JSON.stringify(normalized));
-  } catch (e) {
-    log.warn('SessionWizard: fallback', e);
+    return typeof window !== 'undefined' ? window.sessionStorage : null;
+  } catch (_) {
+    return null;
   }
 };
 
-export const clearSessionWizardPendingSbtDraftsCache = (): void => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return;
+export const writeSessionWizardPendingSbtDraftsCache = (
+  payload: PendingSbtDraft[] = [],
+  { storage }: { storage?: SessionStorageLike | null } = {},
+): PendingSbtDraftStorageResult => {
+  const storageRef = getSessionStorage(storage);
+  const normalized = normalizePendingSbtDrafts(payload);
+  const result = normalized.length
+    ? safeJsonWrite(storageRef, SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY, normalized, { maxBytes: 4 * 1024 * 1024 })
+    : removeKeys(storageRef, SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
+  if (!result.ok) log.warn('SessionWizard: fallback', result.status);
+  return result;
+};
+
+export const clearSessionWizardPendingSbtDraftsCache = ({
+  storage,
+}: {
+  storage?: SessionStorageLike | null;
+} = {}): RemoveKeysResult => {
+  const storageRef = getSessionStorage(storage);
   try {
-    sessionStorage.removeItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
-  } catch (e) {
-    log.warn('SessionWizard: fallback', e);
+    return removeKeys(storageRef, SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
+  } catch (_) {
+    return { ok: false, removed: 0, failed: 1, status: 'partial-failure' };
   }
 };
 

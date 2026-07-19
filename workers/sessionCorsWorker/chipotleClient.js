@@ -8,6 +8,10 @@ import {
   normalizeChipotleSbtAddresses,
   normalizeLitChipotleMetadataVersion,
 } from './litChipotlePolicyCore.mjs';
+import {
+  resolveChainIdWithLegacyFallback,
+  toChainId,
+} from './chainIdNormalization.js';
 
 const DEFAULT_LIT_API_BASE = 'https://api.chipotle.litprotocol.com';
 const CHIPOTLE_API_PREFIX = '/core/v1';
@@ -28,10 +32,6 @@ const toTrimmedString = (value) => (
 );
 
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
-const toChainId = (value) => {
-  const parsed = Number(value || 0);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-};
 
 const normalizeChipotleRpcCandidateList = (value = []) => {
   const out = [];
@@ -1422,11 +1422,15 @@ export const executeSessionLitChipotleAction = async ({
   }
 
   const gateMode = normalizeGateMode(requestBody.gateMode);
-  const gateChainId = toChainId(
-    requestBody.chainId ||
-    requestBody.gateChainId ||
-    config?.networkChainId ||
-    config?.registryChainId
+  const gateChainId = resolveChainIdWithLegacyFallback(
+    requestBody.chainId,
+    resolveChainIdWithLegacyFallback(
+      requestBody.gateChainId,
+      resolveChainIdWithLegacyFallback(
+        config?.networkChainId,
+        resolveChainIdWithLegacyFallback(config?.registryChainId, 0),
+      ),
+    ),
   );
   if (!gateChainId) {
     throw new Error('Lit Chipotle requires a gate chain ID.');

@@ -14,7 +14,7 @@ import {
 describe('SessionWizard deploy payload rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
-  it('includes a cached Cloudflare account id in the deploy-helper payload', async () => {
+  it('ignores a stale cached Cloudflare account id in the deploy-helper payload', async () => {
     const originalFetch = global.fetch;
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
@@ -25,7 +25,7 @@ describe('SessionWizard deploy payload rendering', () => {
       }),
     }));
     const verifyMessageSpy = jest.spyOn(ethers.utils, 'verifyMessage').mockReturnValue(TEST_ADMIN_ADDRESS);
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         deployForm: {
@@ -108,7 +108,7 @@ describe('SessionWizard deploy payload rendering', () => {
       });
 
       const deployPayload = JSON.parse(deployCall[1].body);
-      expect(deployPayload.accountId).toBe('cf-account-1');
+      expect(deployPayload.accountId).toBeUndefined();
       expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/account'))).toBe(false);
     } finally {
       global.fetch = originalFetch;

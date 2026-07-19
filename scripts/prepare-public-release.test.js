@@ -7,12 +7,14 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const SCRIPT_SOURCE_PATH = path.join(__dirname, 'prepare-public-release.sh');
+const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
 const HELPER_SOURCE_PATH = path.join(__dirname, 'lib', 'public-release-strip-patterns.sh');
 const SURFACE_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-surface.js');
 const DOCS_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-docs.js');
 const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js');
 const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-prepare-public-release-tests');
+const REPO_ROOT = path.join(__dirname, '..');
 
 function writeFile(rootDir, relativePath, contents) {
   const absolutePath = path.join(rootDir, relativePath);
@@ -41,6 +43,11 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('scripts', 'prepare-public-release.sh'), fs.readFileSync(SCRIPT_SOURCE_PATH, 'utf8'));
     writeFile(
       sourceDir,
+      path.join('scripts', 'scrub-public-package-json.js'),
+      fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
+    );
+    writeFile(
+      sourceDir,
       path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),
       fs.readFileSync(HELPER_SOURCE_PATH, 'utf8'),
     );
@@ -65,6 +72,16 @@ test('prepare-public-release strips private surfaces without publishing an inven
       fs.readFileSync(TEXT_VERIFIER_SOURCE_PATH, 'utf8'),
     );
     fs.chmodSync(path.join(sourceDir, 'scripts', 'prepare-public-release.sh'), 0o755);
+
+    for (const relativePath of [
+      '.github/ISSUE_TEMPLATE/config.yml',
+      'client/src/components/Sessions/sessionWizardUrlSupport.test.ts',
+      'client/src/components/Sessions/sessionWizardWorkerConfigPersistence.test.ts',
+      'client/src/variables/publicRepoMetadata.ts',
+      'workers/sessionCorsWorker/chipotleClient.test.mjs',
+    ]) {
+      writeFile(sourceDir, relativePath, fs.readFileSync(path.join(REPO_ROOT, relativePath), 'utf8'));
+    }
 
     writeFile(
       sourceDir,
@@ -99,6 +116,16 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('ai-discourse-corpus', 'corpuses', '_local_helper.js'), 'local helper script\n');
     writeFile(sourceDir, path.join('.tmp-review', 'review.js'), 'temporary review snapshot\n');
     writeFile(sourceDir, 'private-pack.manifest.json', 'tracked root manifest that should be replaced\n');
+    writeFile(
+      sourceDir,
+      path.join('outreach-and-applications', 'applications', 'draft.md'),
+      'private opportunity and application state\n',
+    );
+    writeFile(
+      sourceDir,
+      path.join('grant-applications', 'legacy-draft.md'),
+      'legacy private application state\n',
+    );
     writeFile(sourceDir, path.join('TODO', 'secret.md'), 'private planning\n');
     writeFile(sourceDir, path.join('TODO', `${'PR'}${'D'}s`, '123_private-roadmap.md'), 'private roadmap\n');
     writeFile(sourceDir, path.join('contextEngine-cc', 'secret.txt'), 'private companion surface\n');
@@ -110,9 +137,19 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(sourceDir, path.join('docs', 'agent-native-contract.md'), 'private agent contract\n');
     writeFile(sourceDir, path.join('docs', 'agent-native-bridge.md'), 'private agent bridge\n');
     writeFile(sourceDir, path.join('client', 'public', 'skill.md'), 'private agent skill\n');
-    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'private bridge worker\n');
-    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'README.md'), 'private bridge docs\n');
-    writeFile(sourceDir, path.join('scripts', 'run-agent-bridge-worker-tests.js'), 'private bridge test runner\n');
+    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'worker.js'), 'public agent bridge worker\n');
+    writeFile(sourceDir, path.join('workers', 'agentBridgeWorker', 'README.md'), 'agent bridge docs\n');
+    writeFile(
+      sourceDir,
+      path.join('workers', 'agentBridgeWorker', 'PUBLIC_RELEASE_CUTOVER'),
+      [
+        'context-engine-agent-bridge-public-cutover-v1',
+        'audited=2025-01-04',
+        'scope=workers/agentBridgeWorker,scripts/run-agent-bridge-worker-tests.js',
+        '',
+      ].join('\n'),
+    );
+    writeFile(sourceDir, path.join('scripts', 'run-agent-bridge-worker-tests.js'), 'agent bridge test runner\n');
     writeFile(sourceDir, path.join('scripts', 'run-contextengine-cc-tests.js'), 'private companion test runner\n');
     writeFile(sourceDir, path.join('scripts', 'run-contextengine-cc-tests.test.js'), 'private companion runner test\n');
     writeFile(sourceDir, path.join('scripts', 'e2e-env-example.test.js'), 'private E2E env fixture test\n');
@@ -154,9 +191,31 @@ test('prepare-public-release strips private surfaces without publishing an inven
       fs.readFileSync(path.join(outputDir, 'public.txt'), 'utf8'),
       `keep [redacted-email] and /redacted-home and contextengine${'@'}protonmail.com and ContextEngine${'@'}Protonmail.COM and [redacted-email]\n`,
     );
+    assert.match(
+      fs.readFileSync(path.join(outputDir, '.github/ISSUE_TEMPLATE/config.yml'), 'utf8'),
+      /mailto:contextengine@protonmail\.com/,
+    );
+    assert.match(
+      fs.readFileSync(path.join(outputDir, 'client/src/variables/publicRepoMetadata.ts'), 'utf8'),
+      /PUBLIC_SECURITY_EMAIL = 'contextengine@protonmail\.com'/,
+    );
+    const publicChipotleTest = fs.readFileSync(
+      path.join(outputDir, 'workers/sessionCorsWorker/chipotleClient.test.mjs'),
+      'utf8',
+    );
+    assert.match(publicChipotleTest, /credentialedApiBase/);
+    assert.match(publicChipotleTest, /must not include credentials/);
+    assert.doesNotMatch(publicChipotleTest, /\[redacted-email\]/);
+    const publicWorkerConfigPersistenceTest = fs.readFileSync(
+      path.join(outputDir, 'client/src/components/Sessions/sessionWizardWorkerConfigPersistence.test.ts'),
+      'utf8',
+    );
+    assert.match(publicWorkerConfigPersistenceTest, /credential-bearing Lit API base/);
+    assert.doesNotMatch(publicWorkerConfigPersistenceTest, /\[redacted-email\]/);
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(outputDir, 'package.json'), 'utf8')).scripts, {
       test: 'node scripts/run-node-tests.js',
       'test:ci': 'npm run test',
+      'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
       tests: 'npm run test',
     });
     assert.equal(fs.existsSync(path.join(outputDir, '.DS_Store')), false);
@@ -186,6 +245,8 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'AGENTS.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'ai-discourse-corpus', 'corpuses', '_local_helper.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, '.tmp-review')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'outreach-and-applications')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'grant-applications')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'TODO', `${'PR'}${'D'}s`)), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'contextEngine-cc')), false);
@@ -195,9 +256,13 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-contract.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'docs', 'agent-native-bridge.md')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'client', 'public', 'skill.md')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'worker.js')), false);
-    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-agent-bridge-worker-tests.js')), false);
+    assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker')), true);
+    assert.equal(fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'worker.js')), true);
+    assert.equal(
+      fs.existsSync(path.join(outputDir, 'workers', 'agentBridgeWorker', 'PUBLIC_RELEASE_CUTOVER')),
+      true,
+    );
+    assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-agent-bridge-worker-tests.js')), true);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'run-contextengine-cc-tests.test.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'e2e-env-example.test.js')), false);
@@ -205,6 +270,13 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'restore-private-pack.sh')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'scripts', 'lib', 'passkey-wallet-derivation.js')), false);
     assert.equal(fs.existsSync(path.join(outputDir, 'private-pack.manifest.json')), false);
+    assert.match(
+      fs.readFileSync(
+        path.join(outputDir, 'client', 'src', 'components', 'Sessions', 'sessionWizardUrlSupport.test.ts'),
+        'utf8',
+      ),
+      /https:\/\/user:secret@127\.0\.0\.1\/path/,
+    );
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }
@@ -218,6 +290,11 @@ test('prepare-public-release fails if private planning paths survive strip rules
 
   try {
     writeFile(sourceDir, path.join('scripts', 'prepare-public-release.sh'), fs.readFileSync(SCRIPT_SOURCE_PATH, 'utf8'));
+    writeFile(
+      sourceDir,
+      path.join('scripts', 'scrub-public-package-json.js'),
+      fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
+    );
     writeFile(
       sourceDir,
       path.join('scripts', 'lib', 'public-release-strip-patterns.sh'),

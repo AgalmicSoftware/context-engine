@@ -55,7 +55,7 @@ test('verifyPublicDocs rejects private markers, unavailable commands, and broken
     const planningId = `${'PR'}${'D'} 123`;
     writeFile(rootDir, 'docs/guide.md', [
       `Internal ${planningId} status lives under TODO/ and artifacts/runs/.`,
-      'The private branch includes contextEngine-cc and workers/agentBridgeWorker.',
+      'The private branch includes contextEngine-cc. The public worker is workers/agentBridgeWorker.',
       'Run `npm run ai:private-flow`.',
       'See [missing](missing.md).',
       'Stale source path: `client/src/missingFeature.js`.',
@@ -69,7 +69,7 @@ test('verifyPublicDocs rejects private markers, unavailable commands, and broken
     assert.match(formatted, /private artifact path/);
     assert.match(formatted, /private release branch/);
     assert.match(formatted, /private companion path/);
-    assert.match(formatted, /private bridge path/);
+    assert.doesNotMatch(formatted, /private bridge path/);
     assert.match(formatted, /missing public npm script: ai:private-flow/);
     assert.match(formatted, /broken local Markdown link: missing\.md/);
     assert.match(formatted, /missing inline repository path: client\/src\/missingFeature\.js/);

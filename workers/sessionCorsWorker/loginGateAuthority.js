@@ -1,4 +1,6 @@
-import { toChainId as defaultToChainId } from './chainIdNormalization.js';
+import { resolveRegistryChainId } from './chainIdNormalization.js';
+import { isSessionSecretRpcUrlForGateRuntime } from './gateRpcResolution.js';
+import { PRIVATE_SESSION_RPC_LABEL } from './rpcDiagnosticSafety.js';
 import { toTrimmedString } from './stringCoercion.js';
 
 const maskRpcUrlList = (rpcUrls, deps) => {
@@ -7,6 +9,25 @@ const maskRpcUrlList = (rpcUrls, deps) => {
     : (value) => toTrimmedString(value, deps);
   return (Array.isArray(rpcUrls) ? rpcUrls : []).map(maskRpcUrl);
 };
+
+const maskGateRpcUrl = ({ config, gateChainId, rpcUrl, deps }) => {
+  if (isSessionSecretRpcUrlForGateRuntime({ config, gateChainId, rpcUrl })) {
+    return PRIVATE_SESSION_RPC_LABEL;
+  }
+  const maskRpcUrl = typeof deps?.maskRpcUrl === 'function'
+    ? deps.maskRpcUrl
+    : (value) => toTrimmedString(value, deps);
+  return maskRpcUrl(rpcUrl);
+};
+
+const maskGateRpcUrlList = ({ config, gateChainId, rpcUrls, deps }) => (
+  (Array.isArray(rpcUrls) ? rpcUrls : []).map((rpcUrl) => maskGateRpcUrl({
+    config,
+    gateChainId,
+    rpcUrl,
+    deps,
+  }))
+);
 
 export const resolveLoginGateAuthority = async ({
   address,
@@ -37,9 +58,6 @@ export const resolveLoginGateAuthority = async ({
   const maskRpcUrl = typeof deps?.maskRpcUrl === 'function'
     ? deps.maskRpcUrl
     : (value) => toTrimmedString(value, deps);
-  const toChainId = typeof deps?.toChainId === 'function'
-    ? deps.toChainId
-    : defaultToChainId;
   const log = typeof deps?.log === 'function' ? deps.log : () => {};
   const warn = (
     (typeof deps?.log?.warn === 'function' ? deps.log.warn : null) ||
@@ -49,8 +67,12 @@ export const resolveLoginGateAuthority = async ({
   );
 
   const gateResults = {};
+  const registryChainId = resolveRegistryChainId(config);
   let didProbeRegistryRpc = false;
   let didCheckRegistryCode = false;
+  const chainAttestationCache = deps?.chainAttestationCache instanceof Map
+    ? deps.chainAttestationCache
+    : new Map();
 
   for (const key of keys) {
     let gate = null;
@@ -65,6 +87,8 @@ export const resolveLoginGateAuthority = async ({
       registryRpcUrls,
       registrySlug,
       resourceKey: key,
+      expectedChainId: registryChainId,
+      chainAttestationCache,
     });
     if (gateRead.ok) {
       registryRpcUrlUsed = gateRead.rpcUrl;
@@ -105,6 +129,8 @@ export const resolveLoginGateAuthority = async ({
           const codeCheck = await readRegistryCodeOnChain({
             registryAddress,
             registryRpcUrls,
+            expectedChainId: registryChainId,
+            chainAttestationCache,
           });
           warn('[gating] registry code probe', {
             slug: registrySlug,
@@ -138,7 +164,7 @@ export const resolveLoginGateAuthority = async ({
         slug: registrySlug,
         address,
         gateChainId: gate.chainId || null,
-        registryChainId: toChainId(config?.registryChainId),
+        registryChainId,
         registryAddress,
         registryRpcUrls: maskRpcUrlList(registryRpcUrls, deps),
         source: gateSource,
@@ -154,6 +180,12 @@ export const resolveLoginGateAuthority = async ({
         rpcUrl,
         mode: gate.mode,
         chainId: gate.chainId,
+        rpcUrlIsPrivate: isSessionSecretRpcUrlForGateRuntime({
+          config,
+          gateChainId: gate.chainId,
+          rpcUrl,
+        }),
+        chainAttestationCache,
       });
       if (candidate) {
         ok = true;
@@ -171,9 +203,19 @@ export const resolveLoginGateAuthority = async ({
         mode: gate.mode,
         sbtCount: gate.sbtAddresses.length,
         sbtAddresses: gate.sbtAddresses,
-        rpcUrl: rpcUrlUsed ? maskRpcUrl(rpcUrlUsed) : '',
-        rpcUrls: maskRpcUrlList(rpcUrls, deps),
-        registryChainId: toChainId(config?.registryChainId),
+        rpcUrl: rpcUrlUsed ? maskGateRpcUrl({
+          config,
+          gateChainId: gate.chainId,
+          rpcUrl: rpcUrlUsed,
+          deps,
+        }) : '',
+        rpcUrls: maskGateRpcUrlList({
+          config,
+          gateChainId: gate.chainId,
+          rpcUrls,
+          deps,
+        }),
+        registryChainId,
       });
     }
   }

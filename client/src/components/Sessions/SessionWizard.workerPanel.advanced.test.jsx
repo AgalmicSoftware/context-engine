@@ -108,7 +108,7 @@ describe('SessionWizard worker panel rendering', () => {
       admin: TEST_ADMIN_ADDRESS,
     });
 
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -157,7 +157,7 @@ describe('SessionWizard worker panel rendering', () => {
   });
 
   it('hides an empty cached worker URL in normal mode until a real worker exists', async () => {
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -176,13 +176,13 @@ describe('SessionWizard worker panel rendering', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).not.toBeInTheDocument();
     expect(screen.getByText('Worker URL appears here after a successful custom worker deploy.')).toBeInTheDocument();
     await waitFor(() => {
-      const cachedRaw = localStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
+      const cachedRaw = sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
       expect(JSON.parse(cachedRaw).draft.corsWorkerUrl).toBe('');
     });
   });
 
   it('does not resurrect a stale cached deploy URL after deploy verification was cleared', async () => {
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {
@@ -204,7 +204,7 @@ describe('SessionWizard worker panel rendering', () => {
 
   it('shows the worker URL in normal mode after a worker has been deployed', async () => {
     const deployedWorkerUrl = 'https://deployed.example.test';
-    localStorage.setItem(
+    sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
         draft: {

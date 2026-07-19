@@ -184,6 +184,42 @@ test('createWorkerRouteShellWithWorkerDeps preserves resource-presence branch wi
   assert.equal(await routeShell.fetch(request, env), response);
 });
 
+test('createWorkerRouteShellWithWorkerDeps preserves session-config bootstrap branch wiring', async () => {
+  const request = createRequest('/session-config', 'GET', { 'X-Session-Slug': 'demo-1' });
+  const env = { GROUP_KV: { id: 'kv' }, DEFAULT_SESSION_SLUG: 'demo-1' };
+  const baseHeaders = { 'Access-Control-Allow-Origin': 'https://allowed.example' };
+  const response = new Response('ok');
+
+  const routeShell = createWorkerRouteShellWithWorkerDeps({
+    deps: {
+      ...createBaseDeps(),
+      resolveTopLevelRouteSelection: () => ({ kind: 'session-config' }),
+      getRouteBaseHeaders: () => baseHeaders,
+      getDefaultWorkerSessionSlug: () => 'demo-1',
+      dispatchSessionConfigBootstrapRequest: async (value) => {
+        assert.equal(value.request, request);
+        assert.equal(value.env, env);
+        assert.equal(value.slugHint, 'demo-1');
+        assert.equal(value.baseHeaders, baseHeaders);
+        assert.deepEqual(value.deps, {
+          resolveRequestSlugWithoutToken: 'resolveRequestSlugWithoutToken',
+          getSessionConfig: 'getSessionConfig',
+          getCorsContext: 'getCorsContext',
+          json: 'json',
+        });
+        assert.deepEqual(value.constants, {
+          missingSlugError: 'Missing sessionSlug.',
+          sessionConfigNotFoundError: 'Session config not found.',
+        });
+        return response;
+      },
+    },
+    constants: createBaseConstants(),
+  });
+
+  assert.equal(await routeShell.fetch(request, env), response);
+});
+
 test('createWorkerRouteShellWithWorkerDeps preserves auth-nonce branch wiring', async () => {
   const request = createRequest('/auth/nonce');
   const env = { GROUP_KV: { id: 'kv' } };

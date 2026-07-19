@@ -45,6 +45,16 @@ test('verifyPublicText permits release guard files to encode forbidden patterns'
       '}',
       '',
     ].join('\n'));
+    writeFile(
+      rootDir,
+      'scripts/scrub-public-package-json.js',
+      "const privateRunner = 'scripts/run-contextengine-cc-tests.js';\n",
+    );
+    writeFile(
+      rootDir,
+      'scripts/scrub-public-package-json.test.js',
+      "const privateRunner = 'scripts/run-contextengine-cc-tests.js';\n",
+    );
     writeFile(rootDir, 'README.md', '# Public\n');
 
     const result = verifyPublicText(rootDir);

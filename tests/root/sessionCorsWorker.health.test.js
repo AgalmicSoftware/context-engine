@@ -74,6 +74,57 @@ describe('sessionCorsWorker /health and request validation routes', () => {
     expect(response.headers.get('Vary')).toBe('Origin');
   });
 
+  it('returns a redacted worker-canonical session bootstrap through the public CORS route', async () => {
+    const sessionSlug = 'worker-bootstrap';
+    const env = {
+      GROUP_KV: createMemoryKv({
+        [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify({
+          slug: sessionSlug,
+          sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          configRevision: 'revision-a',
+          sessionName: 'Worker Bootstrap',
+          corsWorkerUrl: 'https://worker.example',
+          allowOrigins: ['https://app.example'],
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          workerAuthority: { version: 1, participantScopes: ['storage'] },
+          rpcUrl: 'https://rpc.example/secret',
+          litCredentials: { litActionCid: 'secret-cid' },
+          secrets: { openaiKey: 'sk-secret' },
+        }),
+      }),
+    };
+
+    const response = await sessionCorsWorker.fetch(
+      makeRequest('/session-config', {
+        method: 'GET',
+        headers: {
+          Origin: 'https://app.example',
+          'X-Session-Slug': sessionSlug,
+        },
+      }),
+      env,
+      {},
+    );
+    const payload = await response.json();
+    const serialized = JSON.stringify(payload);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://app.example');
+    expect(payload).toMatchObject({
+      ok: true,
+      sessionSlug,
+      config: {
+        slug: sessionSlug,
+        sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        configRevision: 'revision-a',
+        sessionName: 'Worker Bootstrap',
+      },
+    });
+    expect(serialized).not.toContain('sk-secret');
+    expect(serialized).not.toContain('secret-cid');
+    expect(serialized).not.toContain('rpc.example');
+  });
+
   it('returns /health for a valid token even if the session config is later removed', async () => {
     const sessionSlug = 'health-check';
     const kv = createMemoryKv({

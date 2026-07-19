@@ -1,7 +1,11 @@
 import {
   E2E_TESTIDS,
   act,
+  createPendingFeaturedDraft,
   fireEvent,
+  mockCreateSBT,
+  mockFetchSessionFromRegistry,
+  mockPendingSbtAddress,
   mockRegisterSessionOnChain,
   renderLoggedInSessionWizard,
   resetSessionWizardWorkerPanelTestState,
@@ -10,6 +14,8 @@ import {
   within,
   enableAdvancedMode,
 } from './SessionWizard.workerPanel.testUtils';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
+import { getSessionWizardWorkerSettlementStorageKey } from './sessionWizardWorkerSettlement';
 
 const chooseCustomWorkerWithoutDeploy = async () => {
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
@@ -21,12 +27,44 @@ const openPublishSection = async () => {
   return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
 };
 
+const deployVerifiedCustomWorker = async ({ sessionName, sessionInfo, openaiKey }) => {
+  const fastPreset = screen.queryByTestId('ce-new-preset-fast_cheap_cloudflare');
+  if (fastPreset) {
+    const previousConfirm = window.confirm;
+    window.confirm = jest.fn(() => true);
+    fireEvent.click(fastPreset);
+    window.confirm = previousConfirm;
+  }
+  const continueButton = screen.queryByTestId('ce-new-preset-continue');
+  if (continueButton && !continueButton.disabled) fireEvent.click(continueButton);
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+    target: { value: sessionName },
+  });
+  fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_INFO), {
+    target: { value: sessionInfo },
+  });
+  await chooseCustomWorkerWithoutDeploy();
+  fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_HELPER_URL), {
+    target: { value: 'https://deploy-helper.example.test' },
+  });
+  const tokenInput = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN);
+  const reactPropsKey = Object.keys(tokenInput).find((key) => key.startsWith('__reactProps$'));
+  act(() => tokenInput[reactPropsKey].onChange({ target: { value: 'cf-test-token' } }));
+  const openAiKeyInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SECRET_OPENAI_KEY);
+  fireEvent.change(openAiKeyInput, { target: { value: openaiKey } });
+  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
+  await waitFor(() => {
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_STATUS)).toHaveTextContent('Worker deployed.');
+  });
+  return openAiKeyInput;
+};
+
 const seedVerifiedWorkerCache = (workerUrl = 'https://worker.example.test', overrides = {}) => {
   const draft = {
     corsWorkerUrl: workerUrl,
     ...(overrides.draft || {}),
   };
-  localStorage.setItem(
+  sessionStorage.setItem(
     'ce:sessionWizardDraft:v1',
     JSON.stringify({
       ...overrides,
@@ -64,7 +102,7 @@ const enableGeneralInfoLogging = () => {
   };
 };
 
-const readWizardCache = () => JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
+const readWizardCache = () => JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}');
 
 describe('SessionWizard publish boundary rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
@@ -239,6 +277,272 @@ describe('SessionWizard publish boundary rendering', () => {
     await waitFor(() => {
       expect(publishButton).not.toBeDisabled();
     });
+  });
+
+  it('keeps stale legacy shared residue isolated from tab autosave after decentralized completion', async () => {
+    const manualMetadataUri = `ar://${'f'.repeat(43)}`;
+    let resolveRegister = () => {};
+    const registerPromise = new Promise((resolve) => {
+      resolveRegister = resolve;
+    });
+    mockRegisterSessionOnChain.mockImplementation(async () => registerPromise);
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Published Tab Session' },
+    });
+    await chooseCustomWorkerWithoutDeploy();
+    const publishButton = await openPublishSection();
+    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+      target: { value: manualMetadataUri },
+    });
+    await waitFor(() => {
+      expect(readWizardCache().draft?.slug).toBe('published-tab-session');
+      expect(publishButton).not.toBeDisabled();
+    });
+    const publishedSessionId = readWizardCache().sessionId;
+    expect(publishedSessionId).toEqual(expect.any(String));
+
+    fireEvent.click(publishButton);
+    await waitFor(() => expect(mockRegisterSessionOnChain).toHaveBeenCalledTimes(1));
+    const foreignDraft = {
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      draft: { slug: 'foreign-tab-session', sessionName: 'Keep this foreign draft' },
+    };
+    localStorage.setItem('ce:sessionWizardDraft:v1', JSON.stringify(foreignDraft));
+
+    await act(async () => {
+      resolveRegister({ txs: [] });
+      await registerPromise;
+    });
+
+    await waitFor(() => {
+      expect(JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}')).toEqual(foreignDraft);
+      const nextTabDraft = readWizardCache();
+      expect(nextTabDraft.sessionId).toEqual(expect.any(String));
+      expect(nextTabDraft.sessionId).not.toBe(publishedSessionId);
+    });
+
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Next Tab Session' },
+    });
+
+    await waitFor(() => {
+      const currentTabDraft = readWizardCache();
+      expect(currentTabDraft.sessionId).toEqual(expect.any(String));
+      expect(currentTabDraft.sessionId).not.toBe(publishedSessionId);
+      expect(currentTabDraft.draft).toEqual(expect.objectContaining({ sessionName: 'Next Tab Session' }));
+      expect(JSON.parse(localStorage.getItem('ce:sessionWizardDraft:v1') || '{}')).toEqual(foreignDraft);
+    });
+  });
+
+  it('preserves suppressed pending SBT drafts while post-registration refresh is still pending', async () => {
+    const manualMetadataUri = `ar://${'g'.repeat(43)}`;
+    const customRegistryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    customRegistryProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    customRegistryProfile.authorization = { mechanisms: [] };
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          sessionModeProfile: customRegistryProfile,
+          storageProfile: { backend: 'arweave' },
+        },
+      }),
+    );
+    let resolveRegistryRefresh = () => {};
+    const registryRefreshPromise = new Promise((resolve) => {
+      resolveRegistryRefresh = resolve;
+    });
+    mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
+    mockFetchSessionFromRegistry.mockImplementation(() => registryRefreshPromise);
+
+    renderLoggedInSessionWizard();
+    enableAdvancedMode();
+    fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
+      target: { value: 'Deferred Group Registry Session' },
+    });
+    await chooseCustomWorkerWithoutDeploy();
+    await createPendingFeaturedDraft();
+
+    const publishButton = await openPublishSection();
+    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
+    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
+      target: { value: manualMetadataUri },
+    });
+    await waitFor(() => {
+      expect(publishButton).not.toBeDisabled();
+    });
+    fireEvent.click(publishButton);
+
+    await waitFor(() => {
+      expect(mockFetchSessionFromRegistry).toHaveBeenCalledTimes(1);
+    });
+    expect(mockCreateSBT).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toContain(mockPendingSbtAddress);
+
+    await act(async () => {
+      resolveRegistryRefresh(null);
+      await registryRefreshPromise;
+    });
+  });
+
+  it('blocks the actual worker-canonical publish action after secret, provider, or profile requirement edits', async () => {
+    const originalFetch = global.fetch;
+    const workerUrl = 'https://requirement-proof-worker.example.test';
+    global.fetch = jest.fn(async (url) => {
+      if (String(url).endsWith('/deploy')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl,
+            configVerified: true,
+            writesSessionConfig: true,
+            writesSessionSecrets: true,
+          }),
+        };
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true, nonce: 'wizard-admin-nonce' }) };
+    });
+
+    try {
+      renderLoggedInSessionWizard();
+      enableAdvancedMode();
+      const openAiKeyInput = await deployVerifiedCustomWorker({
+        sessionName: 'Requirement Proof Session',
+        sessionInfo: 'Verified custom worker requirement snapshot.',
+        openaiKey: 'sk-remotely-verified',
+      });
+      const publishButton = await openPublishSection();
+      await waitFor(() => expect(publishButton).not.toBeDisabled());
+
+      fireEvent.change(openAiKeyInput, { target: { value: 'sk-locally-edited' } });
+      await waitFor(() => expect(publishButton).toBeDisabled());
+      fireEvent.click(publishButton);
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(0);
+
+      fireEvent.change(openAiKeyInput, { target: { value: 'sk-remotely-verified' } });
+      await waitFor(() => expect(publishButton).not.toBeDisabled());
+      fireEvent.click(screen.getByRole('button', { name: 'ai expand' }));
+      const fastModelGroup = screen.getByText('fast').parentElement?.parentElement;
+      const fastProviderSelect = within(fastModelGroup).getAllByRole('combobox')[1];
+      fireEvent.change(fastProviderSelect, { target: { value: 'anthropic' } });
+      await waitFor(() => expect(publishButton).toBeDisabled());
+
+      fireEvent.change(fastProviderSelect, { target: { value: 'openai' } });
+      await waitFor(() => expect(publishButton).not.toBeDisabled());
+      fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
+      const encryptionOptions = within(screen.getByRole('radiogroup', { name: /encryption/i }));
+      fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
+      await waitFor(() => expect(publishButton).toBeDisabled());
+      fireEvent.click(publishButton);
+
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(0);
+      expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('locks a completed worker-canonical session against a second publish to the same worker', async () => {
+    const originalFetch = global.fetch;
+    const workerUrl = 'https://single-session-worker.example.test';
+    let persistedConfig = null;
+    window.history.replaceState({}, '', '/new');
+    global.fetch = jest.fn(async (url, init = {}) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl,
+            configVerified: true,
+            writesSessionConfig: true,
+            writesSessionSecrets: true,
+          }),
+        };
+      }
+      if (normalizedUrl.endsWith('/admin/set-config')) {
+        persistedConfig = JSON.parse(String(init.body || '{}')).config;
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      if (normalizedUrl.endsWith('/session-config')) {
+        const { litCredentials: _privateLitDescriptor, ...publicConfig } = persistedConfig || {};
+        if (publicConfig.ai) publicConfig.ai = { models: publicConfig.ai.models };
+        return { ok: true, status: 200, json: async () => ({ config: publicConfig }) };
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    });
+
+    try {
+      const firstView = renderLoggedInSessionWizard();
+      enableAdvancedMode();
+      await deployVerifiedCustomWorker({
+        sessionName: 'Single Worker Session',
+        sessionInfo: 'One canonical session per worker.',
+        openaiKey: 'sk-existing-worker',
+      });
+      const publishButton = await openPublishSection();
+      const deployButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER);
+
+      await waitFor(() => {
+        expect(publishButton).not.toBeDisabled();
+        expect(deployButton).not.toBeDisabled();
+      });
+      fireEvent.click(publishButton);
+
+      await waitFor(() => {
+        expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
+        expect(publishButton).toBeDisabled();
+        expect(deployButton).toBeDisabled();
+      });
+      expect(publishButton).toHaveTextContent('Session Created');
+      expect(screen.getByRole('button', { name: 'Create another session' })).toBeInTheDocument();
+      const publishedSessionId = persistedConfig.sessionId;
+      const expectedSettlement = {
+        workerUrl,
+        slug: 'single-worker-session',
+        sessionId: publishedSessionId,
+      };
+      expect(readWizardCache()).toEqual({
+        terminalWorkerSettlement: expect.objectContaining(expectedSettlement),
+      });
+      expect(
+        JSON.parse(localStorage.getItem(getSessionWizardWorkerSettlementStorageKey(expectedSettlement)) || '{}'),
+      ).toEqual(expect.objectContaining(expectedSettlement));
+
+      fireEvent.click(publishButton);
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
+
+      firstView.unmount();
+      renderLoggedInSessionWizard();
+      enableAdvancedMode();
+      await chooseCustomWorkerWithoutDeploy();
+      const reloadedPublishButton = await openPublishSection();
+      const reloadedDeployButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER);
+      await waitFor(() => {
+        expect(reloadedPublishButton).toBeDisabled();
+        expect(reloadedDeployButton).toBeDisabled();
+      });
+      const restoredSessionUrl = `${window.location.origin}/session/single-worker-session?worker=${encodeURIComponent(workerUrl)}`;
+      const restoredAdminUrl = `${window.location.origin}/admin?sessionId=${publishedSessionId}&sessionSlug=single-worker-session&worker=${encodeURIComponent(workerUrl)}`;
+      expect(screen.getByRole('link', { name: restoredSessionUrl })).toHaveAttribute('href', restoredSessionUrl);
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_URL)).toHaveAttribute('href', restoredAdminUrl);
+      fireEvent.click(reloadedPublishButton);
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
+      expect(readWizardCache()).toEqual({
+        terminalWorkerSettlement: expect.objectContaining(expectedSettlement),
+      });
+      expect(screen.getByRole('button', { name: 'Create another session' })).toBeInTheDocument();
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 
   it('passes manual metadata through the register boundary with pinned register args', async () => {

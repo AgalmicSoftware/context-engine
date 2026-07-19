@@ -6,6 +6,10 @@ import {
   resolveWorkerSessionConfigBySlug,
   resolveWorkerSessionContext,
 } from './workerSessionResolution.js';
+import {
+  markWorkerCanonicalSessionBootstrapVerified,
+  upsertWorkerCanonicalSessionBootstrap,
+} from '../session/sessionWorkerConfigCache.js';
 
 const mockGetState = jest.fn();
 const mockGetRegistrySessionConfig = jest.fn();
@@ -47,6 +51,8 @@ describe('workerSessionResolution', () => {
       },
     });
     mockGetRegistrySessionConfig.mockReturnValue(null);
+    localStorage.clear();
+    window.history.replaceState({}, '', '/');
   });
 
   it('lets explicit allowDemoFallback override the injected default policy', () => {
@@ -138,6 +144,54 @@ describe('workerSessionResolution', () => {
       sessionName: 'Registry Edge',
       corsWorkerUrl: 'https://registry-edge.example',
     });
+  });
+
+  it('resolves a currently verified worker-canonical login target without registry identity', () => {
+    const workerOrigin = 'https://worker-login.example.com';
+    const sessionId = '0xaabbccddeeff00112233445566778899';
+    const config = {
+      slug: 'worker-login',
+      sessionId,
+      corsWorkerUrl: workerOrigin,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    upsertWorkerCanonicalSessionBootstrap({
+      slug: config.slug,
+      sessionIdHex: sessionId,
+      workerOrigin,
+      config,
+    });
+    expect(
+      markWorkerCanonicalSessionBootstrapVerified({ slug: config.slug, sessionIdHex: sessionId, workerOrigin }),
+    ).toBe(true);
+    window.history.replaceState({}, '', `/session/worker-login?worker=${encodeURIComponent(workerOrigin)}`);
+
+    expect(resolveWorkerSessionConfigBySlug({ sessionSlug: 'worker-login' })).toEqual(config);
+    expect(resolveWorkerSessionContext()).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'worker-login',
+        sessionConfig: config,
+        sessionConfigSource: 'resolved',
+      }),
+    );
+    expect(mockGetRegistrySessionConfig).not.toHaveBeenCalled();
+  });
+
+  it('does not use registry fallback for an unverified or invalid explicit worker target', () => {
+    mockGetRegistrySessionConfig.mockReturnValue({
+      slug: 'worker-login',
+      corsWorkerUrl: 'https://registry-worker.example.com',
+    });
+    window.history.replaceState({}, '', '/session/worker-login?worker=https%3A%2F%2Funverified-worker.example.com');
+    expect(resolveWorkerSessionConfigBySlug({ sessionSlug: 'worker-login' })).toBeNull();
+
+    window.history.replaceState(
+      {},
+      '',
+      '/session/worker-login?worker=https%3A%2F%2Ffirst.example.com&worker=https%3A%2F%2Fsecond.example.com',
+    );
+    expect(resolveWorkerSessionConfigBySlug({ sessionSlug: 'worker-login' })).toBeNull();
+    expect(mockGetRegistrySessionConfig).not.toHaveBeenCalled();
   });
 
   it('resolves worker session context from the active store slug when no explicit slug is provided', () => {

@@ -31,6 +31,7 @@ import {
   profileFromLegacyConfig,
   type SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
+import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
 import type {
   AnyRecord,
   ChainIdLike,
@@ -83,6 +84,20 @@ const defaultNormalizeAiModels = (raw: AnyRecord = {}): AnyRecord => (isObj(raw)
 
 const defaultNormalizeAiModelForProvider = (_modelType: string, _providerValue: string, modelValue: unknown): string =>
   trimString(modelValue);
+
+const buildSessionWizardPublicAiConfig = (value: unknown): AnyRecord => {
+  const next = isObj(value) ? (cloneValue(value) as AnyRecord) : {};
+  if (!isObj(next.models) || !isObj(next.models.transcription)) return next;
+
+  const transcription = next.models.transcription as AnyRecord;
+  // The draft keeps a browser-side transcription endpoint, including an empty
+  // default. Worker config is public and provider endpoints belong in secrets.
+  next.models.transcription = {
+    ...(trimString(transcription.provider) ? { provider: trimString(transcription.provider) } : {}),
+    ...(trimString(transcription.model) ? { model: trimString(transcription.model) } : {}),
+  };
+  return next;
+};
 
 export const sanitizeSessionWizardMetadataPayload = (
   metadata: AnyRecord,
@@ -296,31 +311,67 @@ export const buildSessionWizardWorkerConfigPayload = ({
       draft: resolvedDraft,
       deployPayload: resolvedDeployPayload,
     });
+  const modeRequirements = resolveSessionWizardModeRequirements(effectiveSessionModeProfile);
+  const isWorkerCanonical = modeRequirements.isWorkerCanonical;
+  const workerAuthority = isObj(resolvedDeployPayload.workerAuthority)
+    ? cloneValue(resolvedDeployPayload.workerAuthority)
+    : isWorkerCanonical
+      ? {
+          version: 1,
+          participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
+          anonymousScopes: [],
+        }
+      : undefined;
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
-    registryAddress: trimString(resolvedDeployPayload.registryAddress || registryAddress),
-    registryChainId: Number(resolvedDeployPayload.registryChainId || registryChainId || chainId || 0) || 0,
-    networkChainId: chainId || null,
+    sessionName: trimString(resolvedDraft.sessionName),
+    sessionInfo: trimString(resolvedDraft.sessionInfo),
+    sessionHeaderImg: trimString(resolvedDraft.sessionHeaderImg),
+    ai: buildSessionWizardPublicAiConfig(resolvedDraft.ai),
+    registryAddress: isWorkerCanonical ? '' : trimString(resolvedDeployPayload.registryAddress || registryAddress),
+    registryChainId: isWorkerCanonical
+      ? 0
+      : Number(resolvedDeployPayload.registryChainId || registryChainId || chainId || 0) || 0,
+    networkChainId: modeRequirements.requiresRpc ? chainId || null : isWorkerCanonical ? null : chainId || null,
     corsWorkerUrl: trimString(workerUrl || resolvedDeployPayload.corsWorkerUrl || resolvedDraft.corsWorkerUrl),
-    rpcUrl: trimString(resolvedDeployPayload.rpcUrl),
-    rpcUrlsByChainId: isObj(resolvedDeployPayload.rpcUrlsByChainId)
-      ? cloneValue(resolvedDeployPayload.rpcUrlsByChainId)
-      : {},
+    rpcUrl: !isWorkerCanonical || modeRequirements.requiresRpc ? trimString(resolvedDeployPayload.rpcUrl) : '',
+    rpcUrlsByChainId:
+      (!isWorkerCanonical || modeRequirements.requiresRpc) && isObj(resolvedDeployPayload.rpcUrlsByChainId)
+        ? cloneValue(resolvedDeployPayload.rpcUrlsByChainId)
+        : {},
     allowOrigins: Array.isArray(resolvedDeployPayload.allowOrigins)
       ? cloneValue(resolvedDeployPayload.allowOrigins)
       : [],
     limits: isObj(resolvedDeployPayload.limits) ? cloneValue(resolvedDeployPayload.limits) : {},
     scopes: isObj(resolvedDeployPayload.scopes) ? cloneValue(resolvedDeployPayload.scopes) : {},
-    faucet: isObj(resolvedDeployPayload.faucet)
-      ? cloneValue(resolvedDeployPayload.faucet)
-      : cloneValue(resolveWorkerFaucetConfig()),
-    litCredentials: isWorkerSbtGateCloudflareStorageProfile(storageProfile)
-      ? {}
-      : buildWorkerLitCredentialsConfig(workerSecrets),
+    faucet:
+      !isWorkerCanonical && isObj(resolvedDeployPayload.faucet)
+        ? cloneValue(resolvedDeployPayload.faucet)
+        : !isWorkerCanonical
+          ? cloneValue(resolveWorkerFaucetConfig())
+          : {},
+    litCredentials:
+      isWorkerSbtGateCloudflareStorageProfile(storageProfile) ||
+      (modeRequirements.selected && !modeRequirements.requiresLit)
+        ? {}
+        : buildWorkerLitCredentialsConfig(workerSecrets),
     ...(effectiveSessionModeProfile ? { sessionModeProfile: cloneValue(effectiveSessionModeProfile) } : {}),
+    ...(workerAuthority ? { workerAuthority } : {}),
     storageProfile,
   };
+
+  if (isWorkerCanonical) {
+    delete next.registryAddress;
+    delete next.registryChainId;
+    delete next.faucet;
+    delete next.rpcUrl;
+    delete next.rpcUrlsByChainId;
+    if (!modeRequirements.requiresRpc) delete next.networkChainId;
+    if (!modeRequirements.requiresLit) {
+      delete next.litCredentials;
+    }
+  }
 
   if (
     typeof resolvedDeployPayload.embeddedDeployHelperEnabled === 'boolean' ||
@@ -330,11 +381,11 @@ export const buildSessionWizardWorkerConfigPayload = ({
       (resolvedDeployPayload.embeddedDeployHelperEnabled ?? resolvedDraft.embeddedDeployHelperEnabled) !== false;
   }
 
-  const blockLimits = normalizeBlockLimits(resolvedDraft.blockLimits, latestChainBlock);
+  const blockLimits = !isWorkerCanonical ? normalizeBlockLimits(resolvedDraft.blockLimits, latestChainBlock) : null;
   if (blockLimits) {
     next.blockLimits = blockLimits;
   }
-  if (Object.keys(normalizedContracts).length) {
+  if (!isWorkerCanonical && Object.keys(normalizedContracts).length) {
     next.contracts = normalizedContracts;
   }
 

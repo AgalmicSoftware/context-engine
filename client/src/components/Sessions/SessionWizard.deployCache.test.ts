@@ -32,7 +32,8 @@ describe('SessionWizard deploy cache authority', () => {
   it('does not trust partial deploys until the config reseed actually succeeds', () => {
     expect(
       shouldCacheSessionWorkerConfigAfterDeploy({
-        deployStatusCode: 207,
+        deployStatusCode: 200,
+        deployPartial: true,
         configSyncStatus: { synced: false, warning: 'Config reseed failed' },
         workerUrl: 'https://worker.example',
       }),

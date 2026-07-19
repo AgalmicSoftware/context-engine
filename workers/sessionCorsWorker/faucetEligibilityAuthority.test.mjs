@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { resolveFaucetEligibilityAuthority } from './faucetEligibilityAuthority.js';
+import { attachSessionSecretRpcForGateRuntime } from './gateRpcResolution.js';
+import { PRIVATE_SESSION_RPC_LABEL } from './rpcDiagnosticSafety.js';
 
 const ZERO_BYTES32 = `0x${'0'.repeat(64)}`;
 const REQUESTER = '0x00000000000000000000000000000000000000aa';
@@ -14,6 +16,7 @@ const isBytes32Hex = (value) => /^0x[0-9a-fA-F]{64}$/.test(toStr(value).trim());
 const createDeps = (overrides = {}) => ({
   toStr,
   isBytes32Hex,
+  maskRpcUrl: (value) => new URL(value).origin,
   findSessionGateForSbt: async ({ sbtAddress }) => ({
     ok: true,
     resourceKey: 'txGas',
@@ -70,11 +73,25 @@ test('resolveFaucetEligibilityAuthority preserves session-gate lookup failures',
 });
 
 test('resolveFaucetEligibilityAuthority preserves validation-state fail-closed behavior', async () => {
+  const secretRpcUrl = 'https://TENANT_SECRET.rpc.example/v2/ALCHEMY_SECRET';
+  const runtimeConfig = attachSessionSecretRpcForGateRuntime({
+    config: {
+      networkChainId: 84532,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    },
+    secrets: { customRpcUrl: secretRpcUrl },
+  });
   const result = await resolveFaucetEligibilityAuthority(createRequest({
+    config: runtimeConfig,
     deps: createDeps({
       readSbtFaucetValidationState: async () => ({
         ok: false,
-        errors: [{ rpcUrl: 'https://rpc.example', error: 'boom' }],
+        errors: [{
+          rpcUrl: secretRpcUrl,
+          status: 502,
+          error: `proof failed at ${secretRpcUrl}`,
+          rpcError: { code: -32000, message: `upstream echoed ${secretRpcUrl}` },
+        }],
       }),
     }),
   }));
@@ -84,8 +101,16 @@ test('resolveFaucetEligibilityAuthority preserves validation-state fail-closed b
     status: 403,
     error: 'Requested resource gate is unavailable.',
     reason: 'sbt-validation-unavailable',
-    details: [{ rpcUrl: 'https://rpc.example', error: 'boom' }],
+    details: [{
+      rpcUrl: PRIVATE_SESSION_RPC_LABEL,
+      status: 502,
+      code: -32000,
+      error: 'SBT validation RPC request failed.',
+    }],
   });
+  assert.equal(JSON.stringify(result).includes('TENANT_SECRET'), false);
+  assert.equal(JSON.stringify(result).includes('ALCHEMY_SECRET'), false);
+  assert.equal(JSON.stringify(result).includes('rpcError'), false);
 });
 
 test('resolveFaucetEligibilityAuthority preserves password-mint authority branches', async () => {
@@ -128,7 +153,11 @@ test('resolveFaucetEligibilityAuthority preserves password-mint authority branch
       status: 403,
       error: 'Requested resource gate is unavailable.',
       reason: 'password-validation-unavailable',
-      details: [{ rpcUrl: 'https://rpc.example', error: 'bad rpc' }],
+      details: [{
+        rpcUrl: 'https://rpc.example',
+        status: null,
+        error: 'SBT password validation RPC request failed.',
+      }],
     }
   );
 

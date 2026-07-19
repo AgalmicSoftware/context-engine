@@ -35,11 +35,24 @@ describe('agentClientLogin', () => {
         new Response(
           JSON.stringify({
             ok: true,
-            tokenType: 'session_worker_jwt',
             sessionSlug: 'alpha',
             accountAddress: '0x1111111111111111111111111111111111111111',
             workerUrl: 'https://session-worker.example',
-            workerToken: 'jwt-session-token',
+            bridgeCredential: {
+              kind: 'agent_bridge_browser_token',
+              token: 'bridge-browser-token',
+            },
+            workerCredential: {
+              kind: 'session_worker_jwt',
+              token: 'jwt-session-token',
+            },
+            capabilities: {
+              readQuestions: true,
+              readResults: true,
+              submitAnswers: false,
+              admin: false,
+              export: false,
+            },
             expiresAt: '2027-07-05T00:00:00.000Z',
             buckets: {
               categories: [{ categoryId: 'role', label: 'Role', options: [{ optionId: 'builder', label: 'Builder' }] }],
@@ -64,13 +77,30 @@ describe('agentClientLogin', () => {
         body: expect.stringContaining(RAW_TOKEN),
       }),
     );
-    expect(envelope.credential.token).toBe('jwt-session-token');
+    expect(envelope).toMatchObject({
+      bridgeCredential: {
+        kind: 'agent_bridge_browser_token',
+        token: 'bridge-browser-token',
+      },
+      workerCredential: {
+        kind: 'session_worker_jwt',
+        token: 'jwt-session-token',
+      },
+      capabilities: {
+        readQuestions: true,
+        readResults: true,
+        submitAnswers: false,
+        admin: false,
+        export: false,
+      },
+    });
     expect(envelope.buckets).toBeTruthy();
 
     expect(JSON.stringify(window.localStorage)).not.toContain(RAW_TOKEN);
     expect(window.location.href).not.toContain(RAW_TOKEN);
     const persistedValues = Object.values(window.sessionStorage);
     expect(persistedValues.join('\n')).not.toContain(RAW_TOKEN);
+    expect(persistedValues.join('\n')).toContain('bridge-browser-token');
     expect(persistedValues.join('\n')).toContain('jwt-session-token');
     expect(readAgentClientLoginEnvelope('alpha')?.buckets).toBeNull();
   });
@@ -128,12 +158,13 @@ describe('agentClientLogin', () => {
 
   it('clears expired stored envelopes into the re-paste flow', () => {
     writeAgentClientLoginEnvelope({
-      v: 1,
+      v: 2,
       sessionSlug: 'alpha',
       expiresAt: '2020-01-01T00:00:00.000Z',
       address: '0x1111111111111111111111111111111111111111',
       capabilities: { readQuestions: true },
-      credential: { kind: 'session_worker_jwt', token: 'expired-jwt' },
+      bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'expired-bridge-token' },
+      workerCredential: { kind: 'session_worker_jwt', token: 'expired-worker-token' },
     });
 
     expect(readAgentClientLoginEnvelope('alpha')).toBeNull();

@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
 
@@ -238,8 +238,8 @@ describe('SessionWizard sponsored bundle flow', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
-    expect(screen.queryByText('Anthropic key *')).not.toBeInTheDocument();
-    expect(screen.queryByText('OpenRouter key')).not.toBeInTheDocument();
+    expect(getFieldInputByLabel('Anthropic key *')).toHaveValue('sponsored-anthropic');
+    expect(getFieldInputByLabel('OpenRouter key *')).toHaveValue('sponsored-openrouter');
     expect(getFieldInputByLabel('Arweave JWK *')).toHaveValue('{"kty":"RSA"}');
     expect(getFieldInputByLabel('Faucet private key')).toHaveValue('0xsponsoredfaucet');
     expect(getFieldInputByLabel('Lit API key')).toHaveValue('lit-account-secret');
@@ -255,7 +255,7 @@ describe('SessionWizard sponsored bundle flow', () => {
     });
 
     await waitFor(() => {
-      const cachedRaw = localStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
+      const cachedRaw = sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
       expect(cachedRaw).not.toContain('sponsored-openai');
       expect(cachedRaw).not.toContain('sponsored-rpc.example.test');
       expect(JSON.parse(cachedRaw)).toEqual(
@@ -340,7 +340,7 @@ describe('SessionWizard sponsored bundle flow', () => {
     await expectSponsoredStatus('Sponsored resources applied.');
 
     await waitFor(() => {
-      const cachedRaw = localStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
+      const cachedRaw = sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
       expect(JSON.parse(cachedRaw)).toEqual(
         expect.objectContaining({
           deployComplete: false,
@@ -623,6 +623,12 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     await expectSponsoredStatus('Sponsored resources applied.');
 
+    fireEvent.click(screen.getByRole('button', { name: /Advanced options/i }));
+    const encryptionOptions = within(screen.getByRole('radiogroup', { name: /Encryption/i }));
+    fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
+    await waitFor(() => {
+      expect(encryptionOptions.getByRole('radio', { name: 'Lit' })).toHaveAttribute('aria-checked', 'true');
+    });
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
