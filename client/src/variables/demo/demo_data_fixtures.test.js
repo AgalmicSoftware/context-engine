@@ -105,7 +105,7 @@ describe('demo data fixture cleanup', () => {
         'https://x.com/Gregory_C_Allen/status/1898040379611504983',
         'https://x.com/PalisadeAI/status/1926084635903025621',
       ],
-      ai_laws_policy: ['eu_ai_act', 'eu_gdpr_article_22', 'council_of_europe_ai_convention'],
+      ai_laws_policy: ['eu_ai_act', 'eu_gdpr_article_22', 'coe_framework_convention_ai'],
       arxiv_ai_safety: [
         'gpt3_language_models_few_shot',
         'gpt4_technical_report',
@@ -118,7 +118,7 @@ describe('demo data fixture cleanup', () => {
         'debate_predeployment_eval_adequacy',
       ],
       dwarkesh_lab_insiders: [
-        'amodei_dario_dwarkesh_2026_scaling',
+        'amodei_dario_dwarkesh_2026_end_of_exponential',
         'hassabis_demis_dwarkesh_2024_superhuman',
         'amodei_dario_dwarkesh_2023_scaling',
       ],
