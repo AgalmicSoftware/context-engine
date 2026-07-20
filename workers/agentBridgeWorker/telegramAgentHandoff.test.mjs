@@ -40,6 +40,11 @@ import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mj
 import { persistTelegramSubmitRecord } from './telegramSubmitQueue.mjs';
 import { persistTelegramProposedQuestion } from './telegramQuestionProposals.mjs';
 
+const HISTORICAL_AGENT_ONLY_WINDOWING = Object.freeze({
+  launchOpensAt: '2026-06-12T08:00:00-07:00',
+  launchClosesAt: '2026-06-15T08:00:00-07:00',
+});
+
 class MemoryKv {
   constructor() {
     this.store = new Map();
@@ -435,7 +440,7 @@ test('exchanged members submit Wrapped answers without Telegram or an agent-orig
   const configResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/api/agent/admin/agent-only/config?sessionSlug=alpha', {
       method: 'POST',
-      body: { enabledQuestionIds: [questionId] },
+      body: { enabledQuestionIds: [questionId], windowing: HISTORICAL_AGENT_ONLY_WINDOWING },
     }),
     env,
   });
@@ -611,6 +616,15 @@ test('fixed-date delegation token fixtures declare an explicit TTL', () => {
     }
   }
   assert.deepEqual(unsafeLines, []);
+});
+
+test('agent HTTP routing normalizes legacy aliases to canonical internal paths at the adapter edge', () => {
+  const source = readFileSync(new URL('./telegramAgentHandoff.mjs', import.meta.url), 'utf8');
+  assert.match(source, /const routePathname = toCanonicalAgentApiPathname\(url\.pathname\)/);
+  assert.doesNotMatch(source, /const routePathname = toLegacyAgentApiPathname\(url\.pathname\)/);
+  assert.doesNotMatch(source, /pathname = toLegacyAgentApiPathname\(new URL\(request\.url\)\.pathname\)/);
+  assert.match(source, /const LEGACY_AGENT_API_PREFIX = '\/telegram\/agent\/api'/);
+  assert.match(source, /const CANONICAL_AGENT_API_PREFIX = '\/api\/agent'/);
 });
 
 async function jsonBody(response) {
@@ -2067,6 +2081,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       body: {
         enabledQuestionIds: questionIds,
         evalTypesByQuestionId: { [questionIds[0]]: 'human_split' },
+        windowing: HISTORICAL_AGENT_ONLY_WINDOWING,
       },
     }),
     env,
@@ -2454,14 +2469,23 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       body: {
         window_id: 'w-2026-06-12',
         run_id: 'route-run-1',
+        mode: 'political_compass',
         createdAt: '2026-06-12T15:08:00.000Z',
       },
     }),
     env,
   });
   const wrappedMissingKey = await jsonBody(wrappedMissingKeyResponse);
-  assert.equal(wrappedMissingKeyResponse.status, 503);
-  assert.equal(wrappedMissingKey.reason, 'openai_key_missing');
+  assert.equal(wrappedMissingKeyResponse.status, 200);
+  assert.equal(wrappedMissingKey.ok, true);
+  assert.equal(wrappedMissingKey.model, 'local-deterministic-v1');
+  assert.equal(wrappedMissingKey.media_kind, 'deterministic_svg_poster');
+  assert.equal(wrappedMissingKey.image_content_type, 'image/svg+xml');
+  for (const [key, value] of [...env.AGENT_ACTION_KV.store.entries()]) {
+    if (String(value).includes(wrappedMissingKey.image_id) || String(value).includes(wrappedMissingKey.image_view_id)) {
+      await env.AGENT_ACTION_KV.delete(key);
+    }
+  }
 
   const votesResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/token-votes/bulk?sessionSlug=alpha', {
@@ -2480,7 +2504,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     env,
   });
   assert.equal(votesResponse.status, 200);
-  env.AGENT_BRIDGE_OPENAI_API_KEY = 'sk-bridge-openai';
+  env.AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY = 'sk-bridge-openai';
   env.AGENT_BRIDGE_PUBLIC_URL = 'https://bridge.example';
   let openAiRequestForm = null;
   const fakeImageFetch = async (url, init = {}) => {
@@ -2504,6 +2528,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         format: 'json_url',
         include_base64: false,
         include_prompt: true,
+        poster_renderer: 'openai',
       },
     }),
     env,
@@ -2709,9 +2734,9 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   )), true);
   assert.equal(attemptRows.some((row) => (
     row.stage === 'wrapped_image' &&
-    row.ok === false &&
-    row.status === 503 &&
-    row.reason === 'openai_key_missing' &&
+    row.ok === true &&
+    row.status === 200 &&
+    row.mode === 'political_compass' &&
     row.agent_response_count === 5
   )), true);
   assert.equal(attemptRows.some((row) => (
@@ -2834,6 +2859,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         window_id: 'w-2026-06-12',
         run_id: 'route-run-1',
         mode: 'political_compass',
+        poster_renderer: 'openai',
         style_hint: 'make it a partisan election poster',
         createdAt: '2026-06-12T15:10:00.000Z',
       },

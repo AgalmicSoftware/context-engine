@@ -31,6 +31,7 @@ import {
 } from './telegramAgentOnlyMode.mjs';
 import { persistTelegramProposedQuestion } from './telegramQuestionProposals.mjs';
 import { persistTelegramSubmitRecord } from './telegramSubmitQueue.mjs';
+import { __test__sessionQuestions } from './sessionQuestions.mjs';
 
 class MemoryKv {
   constructor() {
@@ -90,6 +91,11 @@ function normalizedUser(id = '1001') {
   };
 }
 
+const HISTORICAL_LAUNCH_WINDOWING = Object.freeze({
+  launchOpensAt: '2026-06-12T08:00:00-07:00',
+  launchClosesAt: '2026-06-15T08:00:00-07:00',
+});
+
 async function seedQuestions(testEnv, sessionSlug = 'alpha') {
   const binary = await persistTelegramProposedQuestion({
     env: testEnv,
@@ -127,6 +133,7 @@ async function seedQuestions(testEnv, sessionSlug = 'alpha') {
     patch: {
       enabledQuestionIds: ids,
       evalTypesByQuestionId: { [ids[0]]: 'human_split' },
+      windowing: HISTORICAL_LAUNCH_WINDOWING,
     },
     createdAt: '2026-06-12T15:01:00.000Z',
   });
@@ -134,28 +141,39 @@ async function seedQuestions(testEnv, sessionSlug = 'alpha') {
 }
 
 test('windowBoundariesAround handles launch, regular boundary, DST, and edited launch close', () => {
-  assert.equal(windowBoundariesAround(Date.parse('2026-06-12T14:59:59.000Z')), null);
-  assert.deepEqual(windowBoundariesAround(Date.parse('2026-06-12T15:00:00.000Z')), {
+  assert.equal(windowBoundariesAround(Date.parse('2026-06-12T14:59:59.000Z'), HISTORICAL_LAUNCH_WINDOWING), null);
+  assert.deepEqual(windowBoundariesAround(Date.parse('2026-06-12T15:00:00.000Z'), HISTORICAL_LAUNCH_WINDOWING), {
     windowId: 'w-2026-06-12',
     opensAt: '2026-06-12T15:00:00.000Z',
     closesAt: '2026-06-15T15:00:00.000Z',
   });
-  assert.deepEqual(windowBoundariesAround(Date.parse('2026-06-15T15:00:00.000Z')), {
+  assert.deepEqual(windowBoundariesAround(Date.parse('2026-06-15T15:00:00.000Z'), HISTORICAL_LAUNCH_WINDOWING), {
     windowId: 'w-2026-06-15',
     opensAt: '2026-06-15T15:00:00.000Z',
     closesAt: '2026-06-22T15:00:00.000Z',
   });
-  assert.deepEqual(windowBoundariesAround(Date.parse('2026-11-02T16:00:00.000Z')), {
+  assert.deepEqual(windowBoundariesAround(Date.parse('2026-11-02T16:00:00.000Z'), HISTORICAL_LAUNCH_WINDOWING), {
     windowId: 'w-2026-11-02',
     opensAt: '2026-11-02T16:00:00.000Z',
     closesAt: '2026-11-09T16:00:00.000Z',
   });
   assert.equal(
     windowBoundariesAround(Date.parse('2026-06-16T15:00:00.000Z'), {
+      ...HISTORICAL_LAUNCH_WINDOWING,
       launchClosesAt: '2026-06-19T08:00:00-07:00',
     }).windowId,
     'w-2026-06-12',
   );
+});
+
+test('ordinary Wrapped window defaults contain no stale launch campaign dates', () => {
+  const source = readFileSync(new URL('./telegramAgentOnlyMode.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /DEFAULT_LAUNCH_(?:OPENS|CLOSES)_AT|2026-06-12T08:00:00-07:00|2026-06-15T08:00:00-07:00/);
+  assert.deepEqual(windowBoundariesAround(Date.parse('2026-07-20T15:00:00.000Z')), {
+    windowId: 'w-2026-07-20',
+    opensAt: '2026-07-20T15:00:00.000Z',
+    closesAt: '2026-07-27T15:00:00.000Z',
+  });
 });
 
 test('start payload pins path-only endpoints and instruction size', () => {
@@ -209,7 +227,9 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /"run_id": "<fresh_run_id>"/);
   assert.match(payload.instructions, /Use one private helper script after credential resolution/);
   assert.match(payload.instructions, /Helper stdout may contain only one compact final JSON object/);
-  assert.match(payload.instructions, /\/telegram\/agent\/api\/agent-only\/statements\?limit=5&compact=1/);
+  assert.match(payload.instructions, /\/api\/agent\/agent-only\/statements\?limit=5&compact=1/);
+  assert.doesNotMatch(payload.instructions, /\/telegram\/agent\/api|Context Engine Bot|t\.me\/contextengineer_bot/);
+  assert.match(payload.instructions, /configured Session Wrapped interface/);
   assert.match(payload.instructions, /Compact, low-output execution is the default path/);
   assert.doesNotMatch(payload.instructions, /compact direct HTTP calls/);
   assert.match(payload.instructions, /unique request_id values/);
@@ -218,7 +238,7 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /map local indexes back to exact statement_id values/);
   assert.match(payload.instructions, /multichoice uses values arrays/);
   assert.match(payload.instructions, /Skip token allocations for the default Wrapped run/);
-  assert.match(payload.instructions, /Do not POST \/telegram\/agent\/api\/agent-only\/token-votes\/bulk/);
+  assert.match(payload.instructions, /Do not POST \/api\/agent\/agent-only\/token-votes\/bulk/);
   assert.match(payload.instructions, /standard Wrapped image can be generated from predictions alone/);
   assert.match(payload.instructions, /90-95 only for direct memory\/profile evidence/);
   assert.match(payload.instructions, /Use 100 only for an exact prior answer/);
@@ -226,16 +246,15 @@ test('start payload pins path-only endpoints and instruction size', () => {
   assert.match(payload.instructions, /"format": "json_url"/);
   assert.match(payload.instructions, /"include_base64": false/);
   assert.match(payload.instructions, /Do not include process notes, debugging, script names, parallelization/);
-  assert.match(payload.instructions, /To inspect or change your agent's responses/);
+  assert.match(payload.instructions, /configured Session Wrapped interface to inspect or change the agent's responses/);
   assert.doesNotMatch(payload.instructions, /shareable story version/);
-  assert.match(payload.instructions, /\[Context Engine Bot\]\(https:\/\/t\.me\/contextengineer_bot\?start=agent_onboarding__session-wrapped\)/);
   assert.match(payload.instructions, /extra links/);
   assert.match(payload.instructions, /where the principal lives\/is from\/currently is/);
   assert.match(payload.instructions, /Abstract location evidence into non-location preferences/);
   assert.doesNotMatch(payload.instructions, /Review or edit your agent's responses in Context Engine Telegram Bot/);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) >= 250);
   assert.ok(agentOnlyInstructionWordCount(AGENT_ONLY_INSTRUCTIONS) <= 700);
-  assert.equal((payload.instructions.match(/https?:\/\//gi) || []).length, 1);
+  assert.equal((payload.instructions.match(/https?:\/\//gi) || []).length, 0);
 
   const storyDefaultPayload = buildAgentOnlyStartPayload({
     sessionSlug: 'alpha',
@@ -947,7 +966,7 @@ test('rating snapshots preserve uploaded 1-5 scales and reject out-of-scale valu
   await saveAgentOnlyModeConfig({
     env: testEnv,
     sessionSlug: 'alpha',
-    patch: { enabledQuestionIds: [rating.questionId] },
+    patch: { enabledQuestionIds: [rating.questionId], windowing: HISTORICAL_LAUNCH_WINDOWING },
     createdAt: '2026-06-12T15:02:00.000Z',
   });
 
@@ -1180,7 +1199,7 @@ test('initial window creation verifies the active config after write', async () 
   await saveAgentOnlyModeConfig({
     env: testEnv,
     sessionSlug: 'alpha',
-    patch: { enabledQuestionIds: [firstQuestion.questionId] },
+    patch: { enabledQuestionIds: [firstQuestion.questionId], windowing: HISTORICAL_LAUNCH_WINDOWING },
     createdAt: '2026-06-12T15:00:00.000Z',
   });
 
@@ -1233,7 +1252,7 @@ test('initial window creation removes a stale just-created snapshot when windowi
   await saveAgentOnlyModeConfig({
     env: testEnv,
     sessionSlug: 'alpha',
-    patch: { enabledQuestionIds: [question.questionId] },
+    patch: { enabledQuestionIds: [question.questionId], windowing: HISTORICAL_LAUNCH_WINDOWING },
     createdAt: '2026-06-12T15:00:00.000Z',
   });
 
@@ -1279,7 +1298,7 @@ test('initial window creation removes stale snapshot when windowing changes to a
   await saveAgentOnlyModeConfig({
     env: testEnv,
     sessionSlug: 'alpha',
-    patch: { enabledQuestionIds: [question.questionId] },
+    patch: { enabledQuestionIds: [question.questionId], windowing: HISTORICAL_LAUNCH_WINDOWING },
     createdAt: '2026-06-13T14:55:00.000Z',
   });
 
@@ -1553,7 +1572,7 @@ test('explicit historical windows are not backfilled when no snapshot exists', a
   assert.equal(testEnv.AGENT_ACTION_KV.store.has(`${AGENT_ONLY_WINDOW_KV_PREFIX}alpha:w-2026-06-12`), false);
 });
 
-test('agent-only prediction reads do not materialize windows before config exists', async () => {
+test('agent-only prediction reads do not materialize ordinary Wrapped windows', async () => {
   const testEnv = env();
   const predictions = await loadAgentOnlyPredictionsForPrincipal({
     env: testEnv,
@@ -1568,8 +1587,90 @@ test('agent-only prediction reads do not materialize windows before config exist
     now: '2026-06-12T15:05:00.000Z',
   });
   assert.equal(opened.ok, false);
-  assert.equal(opened.reason, 'agent_only_not_configured');
+  assert.equal(opened.reason, 'question_rpc_url_missing');
   assert.equal((await testEnv.AGENT_ACTION_KV.list({ prefix: AGENT_ONLY_WINDOW_KV_PREFIX })).keys.length, 0);
+});
+
+test('ordinary Wrapped windows use canonical session questions without proposal config', async () => {
+  const testEnv = env();
+  const questionId = `0x${'ab'.repeat(32)}`;
+  await testEnv.AGENT_ACTION_KV.put('telegram:questions:v5:alpha', JSON.stringify({
+    ok: true,
+    source: 'telegram_worker_question_index',
+    cachedAtMs: Date.now(),
+    complete: true,
+    questions: [{
+      questionId,
+      id: questionId,
+      sessionSlug: 'alpha',
+      prompt: 'Should Alpha use the canonical session statement?',
+      questionText: 'Should Alpha use the canonical session statement?',
+      questionType: 'binary',
+      visibility: 'public',
+    }],
+  }));
+
+  const opened = await materializeAgentOnlyWindow({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    now: '2026-06-22T15:05:00.000Z',
+  });
+
+  assert.equal(opened.ok, true);
+  assert.equal(opened.snapshot.questionSourceMode, 'canonical_session');
+  assert.equal(opened.snapshot.questionSource, 'telegram_worker_question_index');
+  assert.deepEqual(opened.snapshot.statements.map((statement) => statement.statement_id), [questionId]);
+  assert.equal(
+    testEnv.AGENT_ACTION_KV.store.has('telegram:agent-mode-config:v1:alpha'),
+    false,
+    'ordinary source selection must not persist implicit config',
+  );
+});
+
+test('active ordinary Wrapped windows sync the canonical session question set', async () => {
+  const testEnv = env();
+  const firstId = `0x${'ab'.repeat(32)}`;
+  const secondId = `0x${'cd'.repeat(32)}`;
+  const writeQuestionCache = async (questions) => {
+    __test__sessionQuestions.clearCaches();
+    await testEnv.AGENT_ACTION_KV.put('telegram:questions:v5:alpha', JSON.stringify({
+      ok: true,
+      source: 'telegram_worker_question_index',
+      cachedAtMs: Date.now(),
+      complete: true,
+      questions,
+    }));
+  };
+  const question = (questionId, prompt) => ({
+    questionId,
+    id: questionId,
+    sessionSlug: 'alpha',
+    prompt,
+    questionText: prompt,
+    questionType: 'binary',
+    visibility: 'public',
+  });
+  await writeQuestionCache([question(firstId, 'First canonical statement?')]);
+  const opened = await materializeAgentOnlyWindow({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    now: '2026-06-22T15:05:00.000Z',
+  });
+  assert.equal(opened.ok, true);
+
+  await writeQuestionCache([
+    question(firstId, 'First canonical statement?'),
+    question(secondId, 'Second canonical statement?'),
+  ]);
+  const synced = await materializeAgentOnlyWindow({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    now: '2026-06-22T15:06:00.000Z',
+  });
+
+  assert.equal(synced.ok, true);
+  assert.equal(synced.extended, true);
+  assert.deepEqual(synced.snapshot.statements.map((statement) => statement.statement_id), [firstId, secondId]);
 });
 
 test('single-select multichoice snapshots enforce one selected value', () => {
@@ -2167,9 +2268,13 @@ test('Wrapped predictions, corrections, run state, and posters remain isolated b
   assert.equal(stateB.byStatement[ids[0]].agent.confidence, 52);
   assert.equal(Object.hasOwn(stateB.byStatement[ids[0]], 'human'), false);
 
-  const imageFetch = async () => new Response(JSON.stringify({
-    data: [{ b64_json: Buffer.from('isolated-poster').toString('base64') }],
-  }), { status: 200, headers: { 'content-type': 'application/json' } });
+  let imageFetchCalls = 0;
+  const imageFetch = async () => {
+    imageFetchCalls += 1;
+    return new Response(JSON.stringify({
+      data: [{ b64_json: Buffer.from('isolated-poster').toString('base64') }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
   const [posterA, posterB] = await Promise.all([
     generateAgentOnlyWrappedImage({
       env: testEnv,
@@ -2191,9 +2296,13 @@ test('Wrapped predictions, corrections, run state, and posters remain isolated b
   assert.equal(posterA.ok, true);
   assert.equal(posterA.privacy_skip_count, 1);
   assert.equal(posterA.agent_prediction_count, 3);
+  assert.equal(posterA.model, 'local-deterministic-v1');
+  assert.equal(posterA.media_kind, 'deterministic_svg_poster');
+  assert.equal(posterA.image_content_type, 'image/svg+xml');
   assert.equal(posterB.ok, true);
   assert.equal(posterB.privacy_skip_count, 0);
   assert.equal(posterB.agent_prediction_count, 4);
+  assert.equal(imageFetchCalls, 0, 'generic Bridge AI configuration must not select the optional poster provider');
   assert.notEqual(posterA.image_id, posterB.image_id);
 
   const crossPrincipalRun = await generateAgentOnlyWrappedImage({

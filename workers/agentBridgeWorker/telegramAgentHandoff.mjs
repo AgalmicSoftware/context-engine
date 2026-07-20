@@ -222,15 +222,6 @@ function safeJsonParse(value, fallback = null) {
   }
 }
 
-function toLegacyAgentApiPathname(pathname = '') {
-  const path = safeString(pathname);
-  if (path === CANONICAL_AGENT_API_PREFIX) return LEGACY_AGENT_API_PREFIX;
-  if (path.startsWith(`${CANONICAL_AGENT_API_PREFIX}/`)) {
-    return `${LEGACY_AGENT_API_PREFIX}${path.slice(CANONICAL_AGENT_API_PREFIX.length)}`;
-  }
-  return path;
-}
-
 function toCanonicalAgentApiPathname(pathname = '') {
   const path = safeString(pathname);
   if (path === LEGACY_AGENT_API_PREFIX) return CANONICAL_AGENT_API_PREFIX;
@@ -619,15 +610,15 @@ function jsonClientLogin(request, env, data, init = {}) {
 // Token-personalized browser reads (web client results/questions panels). Uses the
 // client-login allow-list — NOT a wildcard — because responses vary per user token.
 const AGENT_BROWSER_READ_CORS_PATHS = Object.freeze([
-  '/telegram/agent/api/questions',
-  '/telegram/agent/api/results',
-  '/telegram/agent/api/preferences',
+  '/api/agent/questions',
+  '/api/agent/results',
+  '/api/agent/preferences',
 ]);
 
 const AGENT_BROWSER_CORS_METHODS_BY_PATH = Object.freeze({
-  '/telegram/agent/api/questions': ['GET'],
-  '/telegram/agent/api/results': ['GET'],
-  '/telegram/agent/api/preferences': ['POST'],
+  '/api/agent/questions': ['GET'],
+  '/api/agent/results': ['GET'],
+  '/api/agent/preferences': ['POST'],
 });
 
 function agentBrowserReadCorsHeaders(request, env = {}, pathname = '') {
@@ -652,7 +643,7 @@ function applyAgentBrowserReadCors(request, env, response) {
   const methodName = safeString(request.method).toUpperCase();
   let pathname = '';
   try {
-    pathname = toLegacyAgentApiPathname(new URL(request.url).pathname);
+    pathname = toCanonicalAgentApiPathname(new URL(request.url).pathname);
   } catch {
     return response;
   }
@@ -950,16 +941,16 @@ function inputFromRequest(request, body = {}) {
 
 function delegationScopeForRequest(pathname = '', method = 'GET') {
   const methodName = safeString(method).toUpperCase();
-  if (pathname === '/telegram/agent/api/questions') {
+  if (pathname === '/api/agent/questions') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/tags') {
+  if (pathname === '/api/agent/tags') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/questions/next') {
+  if (pathname === '/api/agent/questions/next') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/actions') {
+  if (pathname === '/api/agent/actions') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (
@@ -970,76 +961,76 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   ) {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL;
   }
-  if (pathname === '/telegram/agent/api/mini-app-launch') {
+  if (pathname === '/api/agent/mini-app-launch') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS;
   }
-  if (pathname === '/telegram/agent/api/results') {
+  if (pathname === '/api/agent/results') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/results-image') {
+  if (pathname === '/api/agent/results-image') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/result-view-cache') {
+  if (pathname === '/api/agent/result-view-cache') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/geo-backlink') {
+  if (pathname === '/api/agent/geo-backlink') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/admin/status') {
+  if (pathname === '/api/agent/admin/status') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/admin/metrics') {
+  if (pathname === '/api/agent/admin/metrics') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (
-    pathname === '/telegram/agent/api/admin/agent-only/config' ||
-    pathname === '/telegram/agent/api/admin/agent-only/window/open' ||
-    pathname === '/telegram/agent/api/admin/agent-only/export'
+    pathname === '/api/agent/admin/agent-only/config' ||
+    pathname === '/api/agent/admin/agent-only/window/open' ||
+    pathname === '/api/agent/admin/agent-only/export'
   ) {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/admin/questions/delete') {
+  if (pathname === '/api/agent/admin/questions/delete') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/admin/default-session') {
+  if (pathname === '/api/agent/admin/default-session') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/admin/skill-update') {
+  if (pathname === '/api/agent/admin/skill-update') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/onboarding') {
+  if (pathname === '/api/agent/onboarding') {
     return methodName === 'POST'
       ? TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS
       : TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/question-queue/plan') {
+  if (pathname === '/api/agent/question-queue/plan') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/question-queue/apply') {
+  if (pathname === '/api/agent/question-queue/apply') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
   if (
-    pathname === '/telegram/agent/api/group-approval-link' ||
-    pathname === '/telegram/agent/api/group-approval-revoke'
+    pathname === '/api/agent/group-approval-link' ||
+    pathname === '/api/agent/group-approval-revoke'
   ) {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.MANAGE_GROUP_APPROVALS;
   }
-  if (pathname === '/telegram/agent/api/question-votes/recommend') {
+  if (pathname === '/api/agent/question-votes/recommend') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.RECOMMEND_QUESTION_VOTES;
   }
-  if (pathname === '/telegram/agent/api/question-votes/apply') {
+  if (pathname === '/api/agent/question-votes/apply') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.APPLY_QUESTION_VOTES;
   }
-  if (pathname === '/telegram/agent/api/preferences') {
+  if (pathname === '/api/agent/preferences') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS;
   }
-  if (pathname === '/telegram/agent/api/questions/pose' || pathname === '/telegram/agent/api/questions/create') {
+  if (pathname === '/api/agent/questions/pose' || pathname === '/api/agent/questions/create') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.POSE_QUESTIONS;
   }
-  if (pathname === '/telegram/agent/api/groups' && methodName === 'GET') {
+  if (pathname === '/api/agent/groups' && methodName === 'GET') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_GROUPS;
   }
-  if (pathname === '/telegram/agent/api/groups/propose') {
+  if (pathname === '/api/agent/groups/propose') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.PROPOSE_GROUPS;
   }
   return '';
@@ -2958,7 +2949,7 @@ async function handleResultViewCacheHttpRequest({ request, env = {} } = {}) {
       reason: 'result_view_cache_write_root_token_required',
     }, { status: 403 });
   }
-  const delegated = applyDelegationToInput(auth, inputFromRequest(request, body), toLegacyAgentApiPathname(url.pathname), request.method);
+  const delegated = applyDelegationToInput(auth, inputFromRequest(request, body), toCanonicalAgentApiPathname(url.pathname), request.method);
   if (!delegated.ok) {
     return jsonResultViewCache(request, env, {
       ok: false,
@@ -5432,10 +5423,10 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     ...(draftEditMetrics.length ? { draftEditMetrics } : {}),
     reviewRequired: finalReviewRequired,
     review: !finalReviewRequired ? {
-      route: '/telegram/agent/api/preferences',
+      route: '/api/agent/preferences',
       note: 'Human-approved answers were submitted without requiring Mini App finalization.',
     } : submitted.length ? {
-      route: '/telegram/agent/api/preferences',
+      route: '/api/agent/preferences',
       note: 'Human-approved answers were submitted; remaining drafts are saved for user review.',
     } : {
       route: '/telegram/mini-app',
@@ -6340,26 +6331,26 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   fetchImpl = globalThis.fetch,
 } = {}) {
   const url = new URL(request.url);
-  const routePathname = toLegacyAgentApiPathname(url.pathname);
-  if (routePathname === '/telegram/agent/api/credentials/service') {
+  const routePathname = toCanonicalAgentApiPathname(url.pathname);
+  if (routePathname === '/api/agent/credentials/service') {
     return handleServiceCredentialBootstrapRequest({ request, env });
   }
-  if (routePathname === '/telegram/agent/api/invite/onboard') {
+  if (routePathname === '/api/agent/invite/onboard') {
     return handleInviteOnboardRequest({ request, env });
   }
-  if (routePathname === '/telegram/agent/api/miniapp/onboard') {
+  if (routePathname === '/api/agent/miniapp/onboard') {
     return handleMiniAppOnboardRequest({ request, env });
   }
-  if (routePathname === '/telegram/agent/api/client-login/exchange') {
+  if (routePathname === '/api/agent/client-login/exchange') {
     return handleClientLoginExchangeRequest({ request, env, fetchImpl });
   }
-  if (routePathname === '/telegram/agent/api/wrapped/member-exchange') {
+  if (routePathname === '/api/agent/wrapped/member-exchange') {
     return handleWrappedMemberExchangeRequest({ request, env, fetchImpl });
   }
-  if (routePathname === '/telegram/agent/api/result-view-cache') {
+  if (routePathname === '/api/agent/result-view-cache') {
     return handleResultViewCacheHttpRequest({ request, env });
   }
-  if (routePathname === '/telegram/agent/api/session-meta') {
+  if (routePathname === '/api/agent/session-meta') {
     return handleSessionMetaHttpRequest({ request, env });
   }
   if (routePathname === AGENT_ONLY_ENDPOINTS.start) {
@@ -6386,21 +6377,21 @@ async function handleTelegramAgentHandoffRequestUnsafe({
     }
     return new Response(null, { status: 204, headers: cors || {} });
   }
-  if (routePathname === '/telegram/agent/api/skill-version' && request.method === 'GET') {
+  if (routePathname === '/api/agent/skill-version' && request.method === 'GET') {
     const payload = await skillVersionPayloadWithFlag(env);
     return json(payload);
   }
-  if (routePathname === '/telegram/agent/api/skill' && request.method === 'GET') {
+  if (routePathname === '/api/agent/skill' && request.method === 'GET') {
     return skillRedirectResponse();
   }
-  if (routePathname === '/telegram/agent/api/session-wrapped/skill-version' && request.method === 'GET') {
+  if (routePathname === '/api/agent/session-wrapped/skill-version' && request.method === 'GET') {
     return json(sessionWrappedSkillVersionPayload(env));
   }
-  if ((routePathname === '/telegram/agent/api/session-wrapped/skill' || url.pathname === '/session-wrapped') && (request.method === 'GET' || request.method === 'HEAD')) {
+  if ((routePathname === '/api/agent/session-wrapped/skill' || url.pathname === '/session-wrapped') && (request.method === 'GET' || request.method === 'HEAD')) {
     return sessionWrappedSkillRedirectResponse();
   }
 
-  if (routePathname === '/telegram/agent/api/admin/questions/delete') {
+  if (routePathname === '/api/agent/admin/questions/delete') {
     const auth = await authenticateAgentHandoff(request, env);
     if (!auth.ok) {
       return json({
@@ -6453,9 +6444,9 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   }
 
   const adminAgentOnlyPaths = new Set([
-    '/telegram/agent/api/admin/agent-only/config',
-    '/telegram/agent/api/admin/agent-only/window/open',
-    '/telegram/agent/api/admin/agent-only/export',
+    '/api/agent/admin/agent-only/config',
+    '/api/agent/admin/agent-only/window/open',
+    '/api/agent/admin/agent-only/export',
   ]);
   if (adminAgentOnlyPaths.has(routePathname)) {
     const auth = await authenticateAgentHandoff(request, env);
@@ -6504,13 +6495,13 @@ async function handleTelegramAgentHandoffRequestUnsafe({
       }
       input = delegated.input;
     }
-    if (routePathname === '/telegram/agent/api/admin/agent-only/config') {
+    if (routePathname === '/api/agent/admin/agent-only/config') {
       return handleAdminAgentOnlyConfigRequest({ env, input, body, method: request.method });
     }
-    if (routePathname === '/telegram/agent/api/admin/agent-only/window/open' && request.method === 'POST') {
+    if (routePathname === '/api/agent/admin/agent-only/window/open' && request.method === 'POST') {
       return handleAdminAgentOnlyWindowOpenRequest({ env, input, body });
     }
-    if (routePathname === '/telegram/agent/api/admin/agent-only/export' && request.method === 'GET') {
+    if (routePathname === '/api/agent/admin/agent-only/export' && request.method === 'GET') {
       return handleAdminAgentOnlyExportRequest({ env, input });
     }
     return json({ ok: false, reason: 'method_not_allowed' }, { status: 405 });
@@ -6536,7 +6527,7 @@ async function handleTelegramAgentHandoffRequestUnsafe({
       sessionSlug: delegated.sessionSlug || '',
     }, { status: delegated.status || 403 });
   }
-  const input = routePathname === '/telegram/agent/api/group-approval-revoke'
+  const input = routePathname === '/api/agent/group-approval-revoke'
     ? {
       ...delegated.input,
       chatId: safeString(delegated.input.chatId || delegated.input.groupChatId),
@@ -6544,24 +6535,24 @@ async function handleTelegramAgentHandoffRequestUnsafe({
     }
     : delegated.input;
   const routeRequiresQuestionAuthoring = ![
-    '/telegram/agent/api/admin/status',
-    '/telegram/agent/api/admin/metrics',
-    '/telegram/agent/api/admin/default-session',
-    '/telegram/agent/api/admin/skill-update',
-    '/telegram/agent/api/tags',
-    '/telegram/agent/api/question-queue',
-    '/telegram/agent/api/question-queue/plan',
-    '/telegram/agent/api/question-queue/apply',
-    '/telegram/agent/api/group-approval-link',
-    '/telegram/agent/api/group-approval-revoke',
-    '/telegram/agent/api/onboarding',
+    '/api/agent/admin/status',
+    '/api/agent/admin/metrics',
+    '/api/agent/admin/default-session',
+    '/api/agent/admin/skill-update',
+    '/api/agent/tags',
+    '/api/agent/question-queue',
+    '/api/agent/question-queue/plan',
+    '/api/agent/question-queue/apply',
+    '/api/agent/group-approval-link',
+    '/api/agent/group-approval-revoke',
+    '/api/agent/onboarding',
     AGENT_ONLY_ENDPOINTS.statements,
     AGENT_ONLY_ENDPOINTS.answersBulk,
     AGENT_ONLY_ENDPOINTS.tokenVotesBulk,
     AGENT_ONLY_ENDPOINTS.wrappedImage,
-    '/telegram/agent/api/results',
-    '/telegram/agent/api/results-image',
-    '/telegram/agent/api/geo-backlink',
+    '/api/agent/results',
+    '/api/agent/results-image',
+    '/api/agent/geo-backlink',
   ].includes(routePathname);
   const context = await resolveHandoffContext({
     env,
@@ -6570,7 +6561,7 @@ async function handleTelegramAgentHandoffRequestUnsafe({
     requireQuestionAuthoring: routeRequiresQuestionAuthoring,
   });
   if (!context.ok) {
-    if (routePathname === '/telegram/agent/api/tags' && context.status === 404) {
+    if (routePathname === '/api/agent/tags' && context.status === 404) {
       if (safeString(input.sessionSlug)) {
         return json({
           ok: false,
@@ -6597,10 +6588,10 @@ async function handleTelegramAgentHandoffRequestUnsafe({
     return json({ ok: false, reason: context.reason, sessionSlug: context.sessionSlug || '' }, { status: context.status });
   }
 
-  if (routePathname === '/telegram/agent/api/questions' && (request.method === 'GET' || request.method === 'POST')) {
+  if (routePathname === '/api/agent/questions' && (request.method === 'GET' || request.method === 'POST')) {
     return handleQuestionsRequest({ env, context, input, waitUntil });
   }
-  if (routePathname === '/telegram/agent/api/tags' && (request.method === 'GET' || request.method === 'POST')) {
+  if (routePathname === '/api/agent/tags' && (request.method === 'GET' || request.method === 'POST')) {
     return handleTagsRequest({ env, context, waitUntil });
   }
   if (routePathname === AGENT_ONLY_ENDPOINTS.statements && request.method === 'GET') {
@@ -6615,76 +6606,76 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   if (routePathname === AGENT_ONLY_ENDPOINTS.wrappedImage && request.method === 'POST') {
     return handleAgentOnlyWrappedImageRequest({ env, context, input, body, fetchImpl });
   }
-  if (routePathname === '/telegram/agent/api/admin/status' && (request.method === 'GET' || request.method === 'POST')) {
+  if (routePathname === '/api/agent/admin/status' && (request.method === 'GET' || request.method === 'POST')) {
     return handleAdminStatusRequest({ env, context, input });
   }
-  if (routePathname === '/telegram/agent/api/admin/metrics' && (request.method === 'GET' || request.method === 'POST')) {
+  if (routePathname === '/api/agent/admin/metrics' && (request.method === 'GET' || request.method === 'POST')) {
     return handleAdminMetricsRequest({ env, context, input });
   }
-  if (routePathname === '/telegram/agent/api/admin/default-session') {
+  if (routePathname === '/api/agent/admin/default-session') {
     return handleAdminDefaultSessionRequest({ env, context, input, method: request.method });
   }
-  if (routePathname === '/telegram/agent/api/admin/skill-update') {
+  if (routePathname === '/api/agent/admin/skill-update') {
     return handleAdminSkillUpdateRequest({ env, context, input, method: request.method });
   }
-  if (routePathname === '/telegram/agent/api/onboarding' && (request.method === 'GET' || request.method === 'POST')) {
+  if (routePathname === '/api/agent/onboarding' && (request.method === 'GET' || request.method === 'POST')) {
     return handleOnboardingRequest({ env, context, input, body, method: request.method });
   }
-  if (routePathname === '/telegram/agent/api/question-queue' && (request.method === 'GET' || request.method === 'POST')) {
+  if (routePathname === '/api/agent/question-queue' && (request.method === 'GET' || request.method === 'POST')) {
     return handleQuestionQueueRequest({ env, context, input, waitUntil, method: request.method });
   }
-  if (routePathname === '/telegram/agent/api/question-queue/plan' && request.method === 'POST') {
+  if (routePathname === '/api/agent/question-queue/plan' && request.method === 'POST') {
     return handleQuestionQueuePlanRequest({ env, context, input, waitUntil });
   }
-  if (routePathname === '/telegram/agent/api/question-queue/apply' && request.method === 'POST') {
+  if (routePathname === '/api/agent/question-queue/apply' && request.method === 'POST') {
     return handleQuestionQueueApplyRequest({ env, context, input, waitUntil });
   }
-  if (routePathname === '/telegram/agent/api/group-approval-link' && request.method === 'POST') {
+  if (routePathname === '/api/agent/group-approval-link' && request.method === 'POST') {
     return handleGroupApprovalLinkRequest({ env, context, input });
   }
-  if (routePathname === '/telegram/agent/api/group-approval-revoke' && request.method === 'POST') {
+  if (routePathname === '/api/agent/group-approval-revoke' && request.method === 'POST') {
     return handleGroupApprovalRevokeRequest({ env, context, input });
   }
-  if (routePathname === '/telegram/agent/api/questions/next' && (request.method === 'GET' || request.method === 'POST')) {
+  if (routePathname === '/api/agent/questions/next' && (request.method === 'GET' || request.method === 'POST')) {
     return handleNextQuestionRequest({ env, context, input, waitUntil });
   }
-  if (routePathname === '/telegram/agent/api/question-votes/recommend' && request.method === 'POST') {
+  if (routePathname === '/api/agent/question-votes/recommend' && request.method === 'POST') {
     return handleQuestionVoteRecommendationsRequest({ env, context, input, waitUntil });
   }
-  if (routePathname === '/telegram/agent/api/question-votes/apply' && request.method === 'POST') {
+  if (routePathname === '/api/agent/question-votes/apply' && request.method === 'POST') {
     return handleQuestionVoteApplyRequest({ env, context, input, waitUntil });
   }
-  if (routePathname === '/telegram/agent/api/actions' && request.method === 'GET') {
+  if (routePathname === '/api/agent/actions' && request.method === 'GET') {
     return handleActionsRequest({ env, context, input });
   }
-  if (routePathname === '/telegram/agent/api/mini-app-launch' && request.method === 'POST') {
+  if (routePathname === '/api/agent/mini-app-launch' && request.method === 'POST') {
     return handleMiniAppLaunchRequest({ env, context, input, waitUntil });
   }
-  if (routePathname === '/telegram/agent/api/results' && (request.method === 'GET' || request.method === 'POST')) {
+  if (routePathname === '/api/agent/results' && (request.method === 'GET' || request.method === 'POST')) {
     return handleResultsRequest({ env, context, input, fetchImpl });
   }
-  if (routePathname === '/telegram/agent/api/results-image' && request.method === 'GET') {
+  if (routePathname === '/api/agent/results-image' && request.method === 'GET') {
     return handleResultsImageRequest({ env, context, input, fetchImpl });
   }
-  if (routePathname === '/telegram/agent/api/geo-backlink' && (request.method === 'GET' || request.method === 'POST')) {
+  if (routePathname === '/api/agent/geo-backlink' && (request.method === 'GET' || request.method === 'POST')) {
     return handleGeoBacklinkRequest({ env, context, input, waitUntil });
   }
-  if (routePathname === '/telegram/agent/api/preferences' && request.method === 'POST') {
+  if (routePathname === '/api/agent/preferences' && request.method === 'POST') {
     return handlePreferencesRequest({ env, context, input, waitUntil });
   }
-  if (routePathname === '/telegram/agent/api/questions/create' && request.method === 'POST') {
+  if (routePathname === '/api/agent/questions/create' && request.method === 'POST') {
     return handleCreateQuestionsRequest({ env, context, input });
   }
-  if (routePathname === '/telegram/agent/api/questions/pose' && request.method === 'POST') {
+  if (routePathname === '/api/agent/questions/pose' && request.method === 'POST') {
     return handlePoseRequest({ env, context, input, fetchImpl });
   }
-  if (routePathname === '/telegram/agent/api/groups' && request.method === 'GET') {
+  if (routePathname === '/api/agent/groups' && request.method === 'GET') {
     return handleGroupsRequest({ env, context });
   }
-  if (routePathname === '/telegram/agent/api/groups/propose' && request.method === 'POST') {
+  if (routePathname === '/api/agent/groups/propose' && request.method === 'POST') {
     return handleGroupProposalRequest({ env, context, input });
   }
-  if (routePathname === '/telegram/agent/api/sessions/child' && request.method === 'POST') {
+  if (routePathname === '/api/agent/sessions/child' && request.method === 'POST') {
     return handleChildSessionRequest({ env, context, input });
   }
   return json({ ok: false, reason: 'telegram_agent_route_not_found' }, { status: 404 });
