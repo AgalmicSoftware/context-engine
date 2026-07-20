@@ -46,7 +46,7 @@ const SURFACE_LABELS: Array<{ value: SessionModeSurface; label: string; fixed?: 
   { value: 'web', label: 'Website', fixed: true },
   { value: 'telegram', label: 'Telegram' },
   { value: 'miniApp', label: 'Mini App' },
-  { value: 'agentHttp', label: 'Agent API' },
+  { value: 'agentHttp', label: 'Agent Session Wrapped' },
 ];
 
 const DEFAULT_CUSTOM_ACCESS_CONDITIONS: SessionModeAccessConditionDocument = {
@@ -139,6 +139,10 @@ const SessionModeProfileSections = ({
             </Label>
           ))}
         </div>
+        <p className={styles.helperText}>
+          Agent Session Wrapped deploys an additional per-session Worker/Bridge. Telegram stays optional and is off by
+          default.
+        </p>
       </section>
     );
   }

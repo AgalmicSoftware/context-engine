@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
   executeAgentSessionWrappedDeployment,
+  persistAgentSessionWrappedCapability,
 } from '../shared/agentSessionWrappedDeployment.mjs';
 import { executeDeployHelperRequest } from '../shared/deployHelperCore.mjs';
 
@@ -295,4 +296,74 @@ test('existing deploy-helper coordination executes and safely replays a dedicate
   assert.deepEqual(replay.body.resources, first.body.resources);
   assert.equal(harness.calls.length, callCountAfterFirst);
   assert.equal(JSON.stringify(replay).includes('cf-request-only-token'), false);
+});
+
+test('capability publication preserves live session config and verifies the durable write', async () => {
+  const sessionWorkerOrigin = 'https://session-worker.example.workers.dev';
+  const capability = {
+    version: 1,
+    enabled: true,
+    origin: 'https://ce-wrapped-alpha.tenant.workers.dev',
+    protocolVersion: 'agent-session-wrapped-v1',
+    revision: 'wrapped-0123456789abcdef',
+    verifiedAt: '2026-07-20T18:00:00.000Z',
+  };
+  let stored = {
+    slug: 'wrapped-alpha',
+    corsWorkerUrl: sessionWorkerOrigin,
+    customRuntimeMarker: { retained: true },
+  };
+  const calls = [];
+  const cfFetchImpl = async (_token, path, init = {}) => {
+    calls.push({ path, method: init.method || 'GET' });
+    if ((init.method || 'GET') === 'PUT') stored = JSON.parse(init.body);
+    return cloudflareSuccess(stored);
+  };
+
+  const result = await persistAgentSessionWrappedCapability({
+    apiToken: 'cf-request-only-token',
+    accountId: 'account-123',
+    kvNamespaceId: 'kv-session',
+    sessionConfigKey: 'session:wrapped-alpha:config',
+    sessionSlug: 'wrapped-alpha',
+    sessionWorkerOrigin,
+    capability,
+    cfFetchImpl,
+  });
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(stored.customRuntimeMarker, { retained: true });
+  assert.deepEqual(stored.agentSessionWrapped, capability);
+  assert.deepEqual(calls.map((call) => call.method), ['GET', 'PUT', 'GET']);
+});
+
+test('capability publication fails closed when the live config belongs to another Worker origin', async () => {
+  const calls = [];
+  const result = await persistAgentSessionWrappedCapability({
+    apiToken: 'cf-request-only-token',
+    accountId: 'account-123',
+    kvNamespaceId: 'kv-session',
+    sessionConfigKey: 'session:wrapped-alpha:config',
+    sessionSlug: 'wrapped-alpha',
+    sessionWorkerOrigin: 'https://session-worker.example.workers.dev',
+    capability: {
+      version: 1,
+      enabled: true,
+      origin: 'https://ce-wrapped-alpha.tenant.workers.dev',
+      protocolVersion: 'agent-session-wrapped-v1',
+      revision: 'wrapped-0123456789abcdef',
+      verifiedAt: '2026-07-20T18:00:00.000Z',
+    },
+    cfFetchImpl: async (_token, path, init = {}) => {
+      calls.push({ path, method: init.method || 'GET' });
+      return cloudflareSuccess({
+        slug: 'wrapped-alpha',
+        corsWorkerUrl: 'https://other-worker.example.workers.dev',
+      });
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 409);
+  assert.deepEqual(calls.map((call) => call.method), ['GET']);
 });

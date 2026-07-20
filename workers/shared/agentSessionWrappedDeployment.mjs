@@ -135,6 +135,80 @@ const listMatchingKvNamespaces = async ({ apiToken, accountId, title, cfFetchImp
   return { ok: true, match: matches[0] || null };
 };
 
+const normalizeCapability = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const origin = normalizeHttpsOrigin(value.origin);
+  const protocolVersion = toStr(value.protocolVersion);
+  const revision = toStr(value.revision);
+  const verifiedAt = toStr(value.verifiedAt);
+  if (
+    Number(value.version) !== 1 ||
+    value.enabled !== true ||
+    !origin ||
+    protocolVersion !== AGENT_SESSION_WRAPPED_PROTOCOL_VERSION ||
+    !/^wrapped-[0-9a-f]{16}$/.test(revision) ||
+    !Number.isFinite(Date.parse(verifiedAt))
+  ) return null;
+  return { version: 1, enabled: true, origin, protocolVersion, revision, verifiedAt };
+};
+
+export async function persistAgentSessionWrappedCapability({
+  apiToken = '',
+  accountId = '',
+  kvNamespaceId = '',
+  sessionConfigKey = '',
+  sessionSlug = '',
+  sessionWorkerOrigin = '',
+  capability = null,
+  cfFetchImpl,
+} = {}) {
+  const token = toStr(apiToken);
+  const account = toStr(accountId);
+  const kvId = toStr(kvNamespaceId);
+  const configKey = toStr(sessionConfigKey);
+  const slug = safeSlug(sessionSlug);
+  const workerOrigin = normalizeHttpsOrigin(sessionWorkerOrigin);
+  const normalizedCapability = normalizeCapability(capability);
+  if (!token || !account || !kvId || !configKey || !slug || !workerOrigin || !normalizedCapability) {
+    return failure(400, 'capability_config_validate', 'Wrapped capability publication inputs are invalid.');
+  }
+  if (typeof cfFetchImpl !== 'function') {
+    return failure(500, 'capability_config_validate', 'Cloudflare deployment client is unavailable.');
+  }
+  const path = `/accounts/${account}/storage/kv/namespaces/${kvId}/values/${configKey}`;
+  const current = await cfFetchImpl(token, path, { method: 'GET' });
+  const currentConfig = current?.data?.result || current?.data || {};
+  if (!current.ok) {
+    return failure(502, 'capability_config_read', current.error || 'Session Worker config is unavailable.');
+  }
+  if (
+    safeSlug(currentConfig.slug) !== slug ||
+    normalizeHttpsOrigin(currentConfig.corsWorkerUrl) !== workerOrigin
+  ) {
+    return failure(409, 'capability_config_identity', 'Live session config does not match the paired session Worker.');
+  }
+  const nextConfig = { ...currentConfig, agentSessionWrapped: normalizedCapability };
+  const written = await cfFetchImpl(token, path, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(nextConfig),
+  });
+  if (!written.ok) {
+    return failure(502, 'capability_config_write', written.error || 'Wrapped capability config write failed.');
+  }
+  const verified = await cfFetchImpl(token, path, { method: 'GET' });
+  const verifiedConfig = verified?.data?.result || verified?.data || {};
+  if (
+    !verified.ok ||
+    safeSlug(verifiedConfig.slug) !== slug ||
+    normalizeHttpsOrigin(verifiedConfig.corsWorkerUrl) !== workerOrigin ||
+    JSON.stringify(normalizeCapability(verifiedConfig.agentSessionWrapped)) !== JSON.stringify(normalizedCapability)
+  ) {
+    return failure(502, 'capability_config_verify', 'Wrapped capability did not verify in session Worker config.');
+  }
+  return response(true, 200, { ok: true, agentSessionWrapped: normalizedCapability });
+}
+
 export async function executeAgentSessionWrappedDeployment({
   body = {},
   env = {},

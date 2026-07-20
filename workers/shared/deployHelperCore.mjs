@@ -7,6 +7,7 @@ import { buildSessionSecretsEnvelope } from './sessionSecretsEnvelope.mjs';
 import {
   AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
   executeAgentSessionWrappedDeployment,
+  persistAgentSessionWrappedCapability,
 } from './agentSessionWrappedDeployment.mjs';
 import { resolveCloudflareApiBaseUrl } from './deployHelperEndpointConfig.mjs';
 import {
@@ -2181,6 +2182,50 @@ const executeDeployHelperRequestCore = async ({
     }
     envelopeKekSecretSet = true;
     deploymentPayload.envelopeKekSecretSet = true;
+  }
+
+  if (body?.sessionModeProfile?.surfaces?.agentHttp === true) {
+    const wrappedDeploy = await executeAgentSessionWrappedDeployment({
+      body: {
+        deploymentKind: AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
+        apiToken,
+        sessionSlug: displaySlug,
+        sessionWorkerOrigin: workerUrl,
+        sessionDeploymentIdentity: body?.agentSessionWrappedDeploymentIdentity,
+        authorityMode: body?.sessionModeProfile?.authority?.mode,
+        bundleUrl: body?.agentBridgeBundleUrl,
+      },
+      env,
+      accountId,
+      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
+      fetchImpl,
+      markMutationStarted: idempotencyContext?.markMutationStarted,
+    });
+    if (!wrappedDeploy.ok) {
+      return buildDeploymentFailure(wrappedDeploy.status, {
+        ...(wrappedDeploy.body || {}),
+        partial: true,
+        deploymentRequestPending: true,
+      }, { fallbackEligible: wrappedDeploy.status >= 500 });
+    }
+    const capabilityWrite = await persistAgentSessionWrappedCapability({
+      apiToken,
+      accountId,
+      kvNamespaceId: kvId,
+      sessionConfigKey,
+      sessionSlug: displaySlug,
+      sessionWorkerOrigin: workerUrl,
+      capability: wrappedDeploy.body.agentSessionWrapped,
+      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
+    });
+    if (!capabilityWrite.ok) {
+      return buildDeploymentFailure(capabilityWrite.status, {
+        ...(capabilityWrite.body || {}),
+        partial: true,
+        deploymentRequestPending: true,
+      }, { fallbackEligible: capabilityWrite.status >= 500 });
+    }
+    deploymentPayload.agentSessionWrapped = capabilityWrite.body.agentSessionWrapped;
   }
 
   return buildSuccess(200, deploymentPayload);

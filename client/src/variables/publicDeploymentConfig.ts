@@ -27,6 +27,11 @@ export const WORKER_BUNDLE_URL = readPublicEnv(
   buildPublicRepoLatestReleaseAssetUrl('sessionCorsWorker.bundle.js'),
 );
 
+export const AGENT_BRIDGE_WORKER_BUNDLE_URL = readPublicEnv(
+  'REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL',
+  buildPublicRepoLatestReleaseAssetUrl('agentBridgeWorker.bundle.js'),
+);
+
 export const DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = readPublicBoolEnv(
   'REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED',
   true,

@@ -116,6 +116,18 @@ describe('SessionModeProfileSections', () => {
 
     expect(screen.getByRole('region', { name: 'Participation channels' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Website' })).toBeChecked();
+    const wrapped = screen.getByRole('checkbox', { name: 'Agent Session Wrapped' });
+    expect(wrapped).not.toBeChecked();
+    expect(screen.getByText(/additional per-session Worker\/Bridge/i)).toBeInTheDocument();
+    expect(screen.getByText(/Telegram stays optional/i)).toBeInTheDocument();
+    fireEvent.click(wrapped);
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        preset: 'custom',
+        surfaces: expect.objectContaining({ agentHttp: true, telegram: false }),
+      }),
+      expect.any(Object),
+    );
     fireEvent.click(screen.getByRole('checkbox', { name: 'Telegram' }));
 
     expect(onChange).toHaveBeenLastCalledWith(
