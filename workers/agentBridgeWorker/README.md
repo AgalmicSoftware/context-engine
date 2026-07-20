@@ -530,17 +530,20 @@ npm run deploy:apply -- --apply
 
 `deploy:apply` is a dry-run by default. The explicit `--apply` mode creates or
 reuses Cloudflare resources, uploads the worker through the Cloudflare API,
-writes deployed Worker secrets, enables the workers.dev route, sets the Telegram
-webhook, and verifies `/health`.
+writes deployed Worker secrets, enables the workers.dev route, and verifies
+`/health`. Telegram is an optional adapter: set `TELEGRAM_BRIDGE_ENABLED=true`
+or pass `--enable-telegram` to require its credentials and run bot/webhook
+configuration. A Wrapped-only deployment emits no Telegram vars or secrets and
+makes no Telegram API request.
 
 Required values:
 
 | Value | Where it goes |
 | --- | --- |
-| `TELEGRAM_BOT_TOKEN` from BotFather | Paste into untracked `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `TELEGRAM_BOT_TOKEN` |
-| `TELEGRAM_BOT_USERNAME` from BotFather, without `@` | Paste into `.dev.vars`; deployed as plain Worker var |
+| Optional `TELEGRAM_BOT_TOKEN` from BotFather | Required only when Telegram is enabled; paste into untracked `.dev.vars` and live apply writes it as a Worker secret |
+| Optional `TELEGRAM_BOT_USERNAME` from BotFather, without `@` | Required only when Telegram is enabled; deployed as a plain Worker var |
 | Optional Telegram bot display name | Set `TELEGRAM_BOT_NAME` or `AGENT_BRIDGE_TELEGRAM_BOT_NAME` to override the default `Context Engine`; live apply calls Telegram `setMyName` |
-| `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `TELEGRAM_WEBHOOK_SECRET`; Telegram sends it as `X-Telegram-Bot-Api-Secret-Token` |
+| Optional `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Required only when Telegram is enabled; live apply writes it as a Worker secret and Telegram sends it as `X-Telegram-Bot-Api-Secret-Token` |
 | `DEMO_SIGNER_ROOT_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `DEMO_SIGNER_ROOT_SECRET` |
 | `AGENT_BRIDGE_AGENT_API_TOKEN` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes the root/bootstrap and break-glass secret. Use it to mint named service credentials; do not distribute it as an integration token |
 | Production web client origins | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.sh,https://www.contextengine.sh,https://contextengine.xyz,https://www.contextengine.xyz` so the canonical `.sh` clients can exchange agent credentials and read result-view cache entries while the redirecting `.xyz` origins remain compatible during migration. Result-view cache writes require root authority. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges |
@@ -565,8 +568,8 @@ Required values:
 | Managed demo root secret | `DEMO_SIGNER_ROOT_SECRET` is required for deterministic testnet managed-account derivation; deployment fails closed when it is absent |
 | Draft-generation AI policy | `AGENT_AI_PROVIDER=ce_session_policy`; use sponsored/session AI through allowed session policy and do not duplicate canonical session secrets in this worker |
 
-`deploy:apply -- --apply` sets the webhook and Telegram slash-command menu
-automatically. The visible command menu advertises the active
+When Telegram is enabled, `deploy:apply -- --apply` sets the webhook and
+Telegram slash-command menu automatically. The visible command menu advertises the active
 session/question/result/account commands and omits legacy `actions`, `settings`,
 and `join`. For manual webhook diagnosis, the equivalent Telegram API call is:
 
@@ -1144,7 +1147,8 @@ cd workers/agentBridgeWorker
 npm run deploy:plan -- --worker-name ce-agent-bridge-worker --workers-subdomain <workers-subdomain>
 ```
 
-The helper accepts `CLOUDFLARE_API_TOKEN` and the required Telegram/session vars
+The helper accepts `CLOUDFLARE_API_TOKEN`, required Bridge/session vars,
+and optional Telegram vars
 from local environment, prints only redacted secret presence, and models the
 direct Cloudflare API calls still needed. `CLOUDFLARE_ACCOUNT_ID` is no longer a
 required pasted value; the helper models account lookup as
@@ -1157,11 +1161,13 @@ multiple accounts are visible because account selection is not implemented yet:
   or `--enable-doc-storage`.
 - D1 database for event/audit/index records only when
   `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` or `--enable-doc-storage`.
-- Worker secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
-  `DEMO_SIGNER_ROOT_SECRET`, `AGENT_BRIDGE_AGENT_API_TOKEN`.
-- Worker vars: `TELEGRAM_BOT_USERNAME`, `AGENT_BRIDGE_PUBLIC_URL`,
-  `CE_SESSION_WORKER_BASE_URL`, `DEFAULT_CHAIN_ID`, `DEFAULT_RPC_URL`, and
-  optional `ADDITIONAL_RPC_URL`.
+- Worker secrets: `DEMO_SIGNER_ROOT_SECRET` and
+  `AGENT_BRIDGE_AGENT_API_TOKEN`; Telegram-enabled deployments additionally
+  write `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET`.
+- Worker vars: `AGENT_BRIDGE_PUBLIC_URL`, `CE_SESSION_WORKER_BASE_URL`,
+  `DEFAULT_CHAIN_ID`, `DEFAULT_RPC_URL`, and optional `ADDITIONAL_RPC_URL`;
+  Telegram-enabled deployments additionally write `TELEGRAM_BRIDGE_ENABLED`
+  and `TELEGRAM_BOT_USERNAME`.
 - Script-level Workers.dev enablement for
   `https://<worker-name>.<workers-subdomain>.workers.dev`.
 

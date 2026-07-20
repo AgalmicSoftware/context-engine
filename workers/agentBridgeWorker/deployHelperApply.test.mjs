@@ -15,6 +15,7 @@ function completeEnv(overrides = {}) {
     CLOUDFLARE_API_TOKEN: 'cf-test-token',
     CLOUDFLARE_ACCOUNT_ID: 'account-123',
     CLOUDFLARE_WORKERS_SUBDOMAIN: 'tenant-subdomain',
+    TELEGRAM_BRIDGE_ENABLED: 'true',
     TELEGRAM_BOT_TOKEN: '123456:test-token',
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
@@ -91,6 +92,50 @@ test('deploy apply validation rejects placeholder session worker URLs before mut
   assert.equal(result.ok, false);
   assert.equal(result.error, 'deploy:apply validation failed before making resource changes');
   assert.equal(result.validation.missing.some((entry) => entry.includes('CE_SESSION_WORKER_BASE_URL')), true);
+});
+
+test('Telegram-disabled deploy writes no Telegram secrets and performs no bot action', async () => {
+  const calls = [];
+  const fetchMock = async (url, options = {}) => {
+    const method = options.method || 'GET';
+    calls.push({ url: String(url), method, options });
+    if (String(url).endsWith('/storage/kv/namespaces?per_page=100')) {
+      return jsonResponse({ success: true, result: [{ id: 'kv-existing', title: 'ContextEngineAgentBridgeActions:ce-agent-bridge-worker' }] });
+    }
+    if (String(url).endsWith('/workers/scripts/ce-agent-bridge-worker') && method === 'PUT') {
+      return jsonResponse({ success: true, result: { id: 'script-created' } });
+    }
+    if (String(url).endsWith('/workers/scripts/ce-agent-bridge-worker/secrets') && method === 'PUT') {
+      return jsonResponse({ success: true, result: { name: 'secret' } });
+    }
+    if (String(url).endsWith('/accounts/account-123/workers/subdomain') && method === 'GET') {
+      return jsonResponse({ success: true, result: { subdomain: 'tenant-subdomain', status: 'active' } });
+    }
+    if (String(url).endsWith('/workers/scripts/ce-agent-bridge-worker/subdomain') && method === 'POST') {
+      return jsonResponse({ success: true, result: { enabled: true } });
+    }
+    throw new Error(`Unexpected fetch ${method} ${url}`);
+  };
+
+  const result = await executeAgentBridgeDeployApply({
+    flags: { apply: true, 'skip-health-check': true },
+    env: completeEnv({
+      TELEGRAM_BRIDGE_ENABLED: '',
+      TELEGRAM_BOT_TOKEN: '',
+      TELEGRAM_BOT_USERNAME: '',
+      TELEGRAM_WEBHOOK_SECRET: '',
+    }),
+    fetchImpl: fetchMock,
+  });
+
+  const writtenSecrets = calls
+    .filter((call) => call.url.endsWith('/workers/scripts/ce-agent-bridge-worker/secrets'))
+    .map((call) => JSON.parse(call.options.body || '{}').name);
+  assert.equal(result.ok, true);
+  assert.equal(result.webhookUrl, null);
+  assert.deepEqual(result.telegram, { ok: true, skipped: true, reason: 'telegram_disabled' });
+  assert.deepEqual(writtenSecrets.sort(), ['AGENT_BRIDGE_AGENT_API_TOKEN', 'DEMO_SIGNER_ROOT_SECRET']);
+  assert.equal(calls.some((call) => call.url.startsWith('https://api.telegram.org/')), false);
 });
 
 test('writeAgentBridgeWorkerSecrets stores optional bridge secrets when present', async () => {

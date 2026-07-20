@@ -13,6 +13,7 @@ import {
   buildAgentBridgeWorkerUploadMetadata,
   OPTIONAL_AGENT_BRIDGE_SECRET_NAMES,
   REQUIRED_AGENT_BRIDGE_SECRET_NAMES,
+  REQUIRED_AGENT_BRIDGE_TELEGRAM_SECRET_NAMES,
   resolveAgentBridgeDeployConfigForLive,
   validateAgentBridgeDeployConfig,
 } from './deployHelperPlan.mjs';
@@ -122,6 +123,7 @@ export function parseAgentBridgeApplyArgs(argv = process.argv.slice(2)) {
     'apply',
     'dry-run',
     'enable-doc-storage',
+    'enable-telegram',
     'help',
     'include-workers-dev-subdomain-setup',
     'json',
@@ -528,6 +530,7 @@ export async function writeAgentBridgeWorkerSecrets({
   apiToken = '',
   accountId = '',
   workerName = '',
+  config = {},
   env = {},
   fetchImpl = globalThis.fetch,
 } = {}) {
@@ -536,7 +539,10 @@ export async function writeAgentBridgeWorkerSecrets({
     AGENT_BRIDGE_OPENAI_API_KEY: safeString(env.AGENT_BRIDGE_OPENAI_API_KEY || env.OPENAI_API_KEY || env.E2E_OPENAI_KEY),
   };
   const secrets = [
-    ...REQUIRED_AGENT_BRIDGE_SECRET_NAMES.map((name) => ({
+    ...[
+      ...REQUIRED_AGENT_BRIDGE_SECRET_NAMES,
+      ...(config.telegramEnabled ? REQUIRED_AGENT_BRIDGE_TELEGRAM_SECRET_NAMES : []),
+    ].map((name) => ({
       name,
       text: safeString(env[name]),
       required: true,
@@ -875,6 +881,7 @@ export async function executeAgentBridgeDeployApply({
     accountId,
     workerName,
     config,
+    config,
     resourceIds,
     fetchImpl,
     workerDir,
@@ -887,6 +894,7 @@ export async function executeAgentBridgeDeployApply({
     apiToken,
     accountId,
     workerName,
+    config,
     env: resolvedEnv,
     fetchImpl,
   });
@@ -900,10 +908,14 @@ export async function executeAgentBridgeDeployApply({
     fetchImpl,
   });
   const publicUrl = safeString(workersDev.workerUrl).replace(/\/+$/, '') || plan.publicUrl;
-  const webhookUrl = `${publicUrl.replace(/\/+$/, '')}/telegram/webhook`;
+  const webhookUrl = config.telegramEnabled
+    ? `${publicUrl.replace(/\/+$/, '')}/telegram/webhook`
+    : null;
 
-  const telegram = flags['skip-telegram-webhook'] === true
-    ? { ok: true, skipped: true }
+  const telegram = !config.telegramEnabled
+    ? { ok: true, skipped: true, reason: 'telegram_disabled' }
+    : flags['skip-telegram-webhook'] === true
+      ? { ok: true, skipped: true, reason: 'telegram_actions_skipped' }
     : await (async () => {
       const webhook = await setAgentBridgeTelegramWebhook({
         botToken: resolvedEnv.TELEGRAM_BOT_TOKEN,
@@ -995,13 +1007,14 @@ function printUsage() {
     '',
     'Environment:',
     '  Reads workers/agentBridgeWorker/.dev.vars by default, then overlays process.env.',
-    '  Keep TELEGRAM_BOT_TOKEN, CLOUDFLARE_API_TOKEN, TELEGRAM_WEBHOOK_SECRET, DEMO_SIGNER_ROOT_SECRET, and AGENT_BRIDGE_AGENT_API_TOKEN out of git.',
+    '  Keep CLOUDFLARE_API_TOKEN, DEMO_SIGNER_ROOT_SECRET, AGENT_BRIDGE_AGENT_API_TOKEN, and any optional Telegram secrets out of git.',
     '',
     'Flags:',
-    '  --apply                         Execute live Cloudflare upload, Worker secret writes, Telegram setup, and health check',
+    '  --apply                         Execute live Cloudflare upload, Worker secret writes, optional Telegram setup, and health check',
     '  --enable-doc-storage            Also provision and bind bridge-owned R2/D1 demo storage resources',
+    '  --enable-telegram               Configure the optional Telegram adapter and bot actions',
     '  --env-file <path>               Read a different dotenv-style env file',
-    '  --skip-telegram-webhook         Deploy without setting Telegram setWebhook or bot commands',
+    '  --skip-telegram-webhook         Diagnose a Telegram-enabled deploy without bot actions',
     '  --skip-health-check             Deploy without verifying /health',
     '  --include-workers-dev-subdomain-setup',
     '                                  Allow account-level workers.dev subdomain create/change when needed',

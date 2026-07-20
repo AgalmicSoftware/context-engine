@@ -19,6 +19,7 @@ function completeEnv(overrides = {}) {
     CLOUDFLARE_API_TOKEN: 'cf-test-token',
     CLOUDFLARE_ACCOUNT_ID: 'account-123',
     CLOUDFLARE_WORKERS_SUBDOMAIN: 'tenant-subdomain',
+    TELEGRAM_BRIDGE_ENABLED: 'true',
     TELEGRAM_BOT_TOKEN: '123456:test-token',
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
@@ -78,7 +79,7 @@ test('validateAgentBridgeDeployConfig requires only live deploy credentials, not
   }));
 
   assert.equal(missing.ok, false);
-  assert.equal(missing.missing.includes('TELEGRAM_BOT_TOKEN'), true);
+  assert.equal(missing.missing.includes('TELEGRAM_BOT_TOKEN'), false);
   assert.equal(missing.missing.includes('AGENT_BRIDGE_AGENT_API_TOKEN'), true);
   assert.equal(missing.missing.includes('DEFAULT_RPC_URL'), false);
   assert.equal(missing.missing.includes('CLOUDFLARE_ACCOUNT_ID'), false);
@@ -86,6 +87,28 @@ test('validateAgentBridgeDeployConfig requires only live deploy credentials, not
   assert.equal(missingWorkersSubdomain.missing.includes('CLOUDFLARE_WORKERS_SUBDOMAIN'), true);
   assert.equal(completeWithoutManualAccountId.ok, true);
   assert.deepEqual(completeWithoutManualAccountId.missing, []);
+});
+
+test('Telegram-disabled deployment has no Telegram config, secrets, or plan actions', () => {
+  const config = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      TELEGRAM_BRIDGE_ENABLED: '',
+      TELEGRAM_BOT_TOKEN: '',
+      TELEGRAM_BOT_USERNAME: '',
+      TELEGRAM_WEBHOOK_SECRET: '',
+      AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: '2026-05-20T00:00:00.000Z',
+    }),
+  });
+  const validation = validateAgentBridgeDeployConfig(config);
+  const plan = buildAgentBridgeDeployPlan(config);
+
+  assert.equal(config.telegramEnabled, false);
+  assert.equal(validation.ok, true);
+  assert.deepEqual(Object.keys(config.vars).filter((name) => name.includes('TELEGRAM')), []);
+  assert.deepEqual(Object.keys(config.secrets).filter((name) => name.includes('TELEGRAM')), []);
+  assert.equal(plan.webhookUrl, null);
+  assert.equal(JSON.stringify(plan).includes('TELEGRAM_'), false);
+  assert.equal(JSON.stringify(plan).includes('api.telegram.org'), false);
 });
 
 test('validateAgentBridgeDeployConfig rejects local-only Telegram preview vars', () => {
@@ -209,7 +232,8 @@ test('live account lookup blocks multiple visible accounts without falling back 
 test('generated secrets are high entropy hex values and never appear in deploy plans', () => {
   const fakeRandomBytes = (length) => Buffer.from(Array.from({ length }, (_, index) => (index + 7) % 256));
   const webhookSecret = generateAgentBridgeSecret({ randomBytesImpl: fakeRandomBytes });
-  const generated = buildAgentBridgeGeneratedSecrets({ randomBytesImpl: fakeRandomBytes });
+  const generated = buildAgentBridgeGeneratedSecrets({ telegramEnabled: true, randomBytesImpl: fakeRandomBytes });
+  const wrappedOnly = buildAgentBridgeGeneratedSecrets({ randomBytesImpl: fakeRandomBytes });
   const config = resolveAgentBridgeDeployConfig({
     env: completeEnv({
       TELEGRAM_WEBHOOK_SECRET: generated.TELEGRAM_WEBHOOK_SECRET,
@@ -224,6 +248,7 @@ test('generated secrets are high entropy hex values and never appear in deploy p
   assert.match(generated.TELEGRAM_WEBHOOK_SECRET, /^[0-9a-f]{64}$/);
   assert.match(generated.DEMO_SIGNER_ROOT_SECRET, /^[0-9a-f]{64}$/);
   assert.match(generated.AGENT_BRIDGE_AGENT_API_TOKEN, /^[0-9a-f]{64}$/);
+  assert.equal(Object.hasOwn(wrappedOnly, 'TELEGRAM_WEBHOOK_SECRET'), false);
   assert.equal(serialized.includes(generated.TELEGRAM_WEBHOOK_SECRET), false);
   assert.equal(serialized.includes(generated.DEMO_SIGNER_ROOT_SECRET), false);
   assert.equal(serialized.includes(generated.AGENT_BRIDGE_AGENT_API_TOKEN), false);
