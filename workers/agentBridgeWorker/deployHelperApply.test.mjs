@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   bundleAgentBridgeWorkerModule,
   buildAgentBridgeWorkerUploadForm,
@@ -40,6 +41,11 @@ function completeEnv(overrides = {}) {
     ...overrides,
   };
 }
+
+test('deploy apply passes one unambiguous config object into Worker upload', () => {
+  const source = readFileSync(new URL('./deployHelperApply.mjs', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /uploadAgentBridgeWorker\(\{[\s\S]*?\bconfig,\s*config,/);
+});
 
 function jsonResponse(body, init = {}) {
   return new Response(JSON.stringify(body), {

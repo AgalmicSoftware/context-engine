@@ -882,7 +882,6 @@ export async function executeAgentBridgeDeployApply({
     accountId,
     workerName,
     config,
-    config,
     resourceIds,
     fetchImpl,
     workerDir,
