@@ -83,8 +83,9 @@ export function resolvePinnedSessionWorkerAuthority({
   if (defaultSessionSlug !== sessionSlug) {
     return { ok: false, reason: 'dedicated session policy default must match its only session slug' };
   }
-  if (session.sessionModeProfile?.surfaces?.agentHttp !== true) {
-    return { ok: false, reason: 'dedicated session policy requires surfaces.agentHttp=true' };
+  const accessEnabled = session.sessionModeProfile?.surfaces?.agentHttp;
+  if (typeof accessEnabled !== 'boolean') {
+    return { ok: false, reason: 'dedicated session policy requires an explicit surfaces.agentHttp boolean' };
   }
   const configuredOrigin = normalizeHttpsOrigin(sessionWorkerOrigin);
   const policyOrigin = normalizeHttpsOrigin(
@@ -98,6 +99,7 @@ export function resolvePinnedSessionWorkerAuthority({
   }
   return {
     ok: true,
+    accessEnabled,
     sessionSlug,
     sessionWorkerOrigin: configuredOrigin,
   };

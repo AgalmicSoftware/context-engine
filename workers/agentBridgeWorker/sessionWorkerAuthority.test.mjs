@@ -37,9 +37,31 @@ test('resolvePinnedSessionWorkerAuthority requires one agentHttp session and exa
     sessionWorkerOrigin: origin,
   });
 
-  assert.deepEqual(valid, { ok: true, sessionSlug: 'alpha', sessionWorkerOrigin: origin });
+  assert.deepEqual(valid, { ok: true, accessEnabled: true, sessionSlug: 'alpha', sessionWorkerOrigin: origin });
   assert.equal(multiple.ok, false);
   assert.match(multiple.reason, /exactly one session/);
+});
+
+test('resolvePinnedSessionWorkerAuthority keeps disabled dedicated policy pinned without enabling access', () => {
+  const disabled = resolvePinnedSessionWorkerAuthority({
+    policyJson: JSON.stringify({
+      version: 1,
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionWorkerUrl: origin,
+        sessionModeProfile: { surfaces: { agentHttp: false } },
+      }],
+    }),
+    sessionWorkerOrigin: origin,
+  });
+
+  assert.deepEqual(disabled, {
+    ok: true,
+    accessEnabled: false,
+    sessionSlug: 'alpha',
+    sessionWorkerOrigin: origin,
+  });
 });
 
 test('verifySessionWorkerMembership calls only the pinned identity endpoint and binds its principal', async () => {

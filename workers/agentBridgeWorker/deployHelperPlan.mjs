@@ -254,11 +254,13 @@ export function resolveAgentBridgeDeployConfig({
         },
     workerName,
     telegramEnabled,
-    dedicatedSession: dedicatedSessionPolicy.ok ? {
+    dedicatedSession: dedicatedSessionPolicy.ok && dedicatedSessionPolicy.accessEnabled ? {
       sessionSlug: dedicatedSessionPolicy.sessionSlug,
       sessionWorkerOrigin: dedicatedSessionPolicy.sessionWorkerOrigin,
     } : null,
-    dedicatedSessionPolicyError: dedicatedSessionPolicy.ok ? '' : dedicatedSessionPolicy.reason,
+    dedicatedSessionPolicyError: dedicatedSessionPolicy.ok
+      ? 'dedicated session policy requires surfaces.agentHttp=true'
+      : dedicatedSessionPolicy.reason,
     workersSubdomain,
     compatibilityDate: safeString(flags['compatibility-date'] || env.AGENT_BRIDGE_COMPATIBILITY_DATE || DEFAULT_COMPATIBILITY_DATE),
     includeWorkersDevSubdomainSetup: flags['include-workers-dev-subdomain-setup'] === true

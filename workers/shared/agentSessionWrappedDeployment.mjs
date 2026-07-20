@@ -50,7 +50,7 @@ const deriveSecret = async ({ apiToken, deploymentId, purpose }) => {
 const response = (ok, status, body) => ({ ok, status, body });
 const failure = (status, step, error) => response(false, status, { ok: false, step, error: toStr(error) });
 
-const policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode }) => ({
+const policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled = true }) => ({
   version: 1,
   defaultSessionSlug: sessionSlug,
   sessions: [{
@@ -58,7 +58,7 @@ const policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode }) => ({
     sessionWorkerUrl: sessionWorkerOrigin,
     telegramBridgeEnabled: false,
     sessionModeProfile: {
-      surfaces: { agentHttp: true, telegram: false },
+      surfaces: { agentHttp: agentHttpEnabled, telegram: false },
       authority: { mode: authorityMode },
     },
   }],
@@ -143,13 +143,13 @@ const normalizeCapability = (value) => {
   const verifiedAt = toStr(value.verifiedAt);
   if (
     Number(value.version) !== 1 ||
-    value.enabled !== true ||
+    typeof value.enabled !== 'boolean' ||
     !origin ||
     protocolVersion !== AGENT_SESSION_WRAPPED_PROTOCOL_VERSION ||
     !/^wrapped-[0-9a-f]{16}$/.test(revision) ||
     !Number.isFinite(Date.parse(verifiedAt))
   ) return null;
-  return { version: 1, enabled: true, origin, protocolVersion, revision, verifiedAt };
+  return { version: 1, enabled: value.enabled, origin, protocolVersion, revision, verifiedAt };
 };
 
 export async function persistAgentSessionWrappedCapability({
@@ -235,10 +235,11 @@ export async function executeAgentSessionWrappedDeployment({
   const sessionWorkerOrigin = normalizeHttpsOrigin(body.sessionWorkerOrigin || body.sessionWorkerUrl);
   const sessionDeploymentIdentity = safeDeploymentIdentity(body.sessionDeploymentIdentity);
   const authorityMode = normalizeAuthorityMode(body.authorityMode);
+  const agentHttpEnabled = body.agentHttpEnabled === undefined ? true : body.agentHttpEnabled;
   if (body.deploymentKind !== AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
     return fail(400, 'validate', 'Invalid deployment kind.');
   }
-  if (!apiToken || !resolvedAccountId || !sessionSlug || !sessionWorkerOrigin || !sessionDeploymentIdentity || !authorityMode) {
+  if (!apiToken || !resolvedAccountId || !sessionSlug || !sessionWorkerOrigin || !sessionDeploymentIdentity || !authorityMode || typeof agentHttpEnabled !== 'boolean') {
     return fail(400, 'validate', 'Dedicated Wrapped deployment requires token, account, session identity, authority mode, and HTTPS session Worker origin.');
   }
   if (typeof cfFetchImpl !== 'function') return fail(500, 'validate', 'Cloudflare deployment client is unavailable.');
@@ -264,7 +265,7 @@ export async function executeAgentSessionWrappedDeployment({
     return fail(502, 'workers_dev_subdomain', accountSubdomain.error || 'Cloudflare workers.dev subdomain is unavailable.');
   }
   const workerUrl = `https://${workerName}.${subdomain}.workers.dev`;
-  const policyJson = JSON.stringify(policyFor({ sessionSlug, sessionWorkerOrigin, authorityMode }));
+  const policyJson = JSON.stringify(policyFor({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled }));
   const plainBindings = [
     { name: 'AGENT_BRIDGE_DEPLOYMENT_ID', type: 'plain_text', text: deploymentId },
     { name: 'AGENT_BRIDGE_BUNDLE_SHA256', type: 'plain_text', text: bundleSha256 },
@@ -387,13 +388,18 @@ export async function executeAgentSessionWrappedDeployment({
     health?.ok === true &&
     health?.worker === 'agentBridgeWorker' &&
     health?.protocolVersion === AGENT_SESSION_WRAPPED_PROTOCOL_VERSION &&
-    health?.agentSessionWrappedReady === true &&
+    health?.agentSessionWrappedConfigured === true &&
+    health?.agentSessionWrappedReady === agentHttpEnabled &&
     safeSlug(health?.dedicatedSession?.sessionSlug) === sessionSlug &&
-    normalizeHttpsOrigin(health?.dedicatedSession?.sessionWorkerOrigin) === sessionWorkerOrigin;
+    normalizeHttpsOrigin(health?.dedicatedSession?.sessionWorkerOrigin) === sessionWorkerOrigin &&
+    health?.dedicatedSession?.accessEnabled === agentHttpEnabled;
   if (!authorityReady) {
     return fail(503, 'authority_health_probe', 'Wrapped Worker health, protocol, or pinned authority did not verify.');
   }
 
+  const revisionDigest = agentHttpEnabled
+    ? bundleSha256
+    : await sha256Hex(`${bundleSha256}:agent-http-disabled`);
   const verifiedAt = now().toISOString();
   return response(true, 200, {
     ok: true,
@@ -407,13 +413,18 @@ export async function executeAgentSessionWrappedDeployment({
     resources: { kvNamespaceId: kvId, kvReused },
     upload: { reused: bundleAlreadyUploaded, bundleSha256, metadata: uploadMetadata ? { main_module: uploadMetadata.main_module } : null },
     secrets: { generated, preserved },
-    health: { ok: true, protocolVersion: health.protocolVersion, authorityPinned: true },
+    health: {
+      ok: true,
+      protocolVersion: health.protocolVersion,
+      authorityPinned: true,
+      accessEnabled: agentHttpEnabled,
+    },
     agentSessionWrapped: {
       version: 1,
-      enabled: true,
+      enabled: agentHttpEnabled,
       origin: workerUrl,
       protocolVersion: AGENT_SESSION_WRAPPED_PROTOCOL_VERSION,
-      revision: `wrapped-${bundleSha256.slice(0, 16)}`,
+      revision: `wrapped-${revisionDigest.slice(0, 16)}`,
       verifiedAt,
     },
   });

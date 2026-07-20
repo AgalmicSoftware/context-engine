@@ -26,7 +26,7 @@ const jsonResponse = (value, status = 200) => new Response(JSON.stringify(value)
 const cloudflareSuccess = (result = {}) => ({ ok: true, status: 200, data: { success: true, result } });
 const cloudflareMissing = () => ({ ok: false, status: 404, error: 'not found' });
 
-function successfulHarness({ existing = false, healthOk = true } = {}) {
+function successfulHarness({ existing = false, healthOk = true, accessEnabled = true } = {}) {
   const calls = [];
   let uploadMetadata = null;
   let workerName = '';
@@ -99,8 +99,10 @@ function successfulHarness({ existing = false, healthOk = true } = {}) {
       ok: true,
       worker: 'agentBridgeWorker',
       protocolVersion: 'agent-session-wrapped-v1',
-      agentSessionWrappedReady: true,
+      agentSessionWrappedConfigured: true,
+      agentSessionWrappedReady: accessEnabled,
       dedicatedSession: {
+        accessEnabled,
         sessionSlug: 'wrapped-alpha',
         sessionWorkerOrigin: 'https://session-worker.example.workers.dev',
       },
@@ -178,6 +180,26 @@ test('dedicated Wrapped deployment awaits upload, secrets, activation, and autho
   assert.equal(orderedKinds.indexOf('upload') < orderedKinds.indexOf('secret'), true);
   assert.equal(orderedKinds.lastIndexOf('secret') < orderedKinds.indexOf('activate'), true);
   assert.equal(orderedKinds.indexOf('activate') < orderedKinds.indexOf('health'), true);
+});
+
+test('dedicated Wrapped deployment disables access in place through the sole agentHttp bit', async () => {
+  const harness = successfulHarness({ accessEnabled: false });
+  const result = await executeAgentSessionWrappedDeployment({
+    body: body({ agentHttpEnabled: false }),
+    accountId: 'account-123',
+    cfFetchImpl: harness.cfFetchImpl,
+    fetchImpl: harness.fetchImpl,
+    now: () => new Date('2026-07-20T18:00:00.000Z'),
+  });
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(result.body.agentSessionWrapped.enabled, false);
+  assert.notEqual(result.body.agentSessionWrapped.revision, 'wrapped-3f79d113c075d982');
+  assert.equal(result.body.health.accessEnabled, false);
+  const metadata = harness.getUploadMetadata();
+  const policyBinding = metadata.bindings.find((binding) => binding.name === 'AGENT_BRIDGE_SESSION_POLICY_JSON');
+  const policy = JSON.parse(policyBinding.text);
+  assert.equal(policy.sessions[0].sessionModeProfile.surfaces.agentHttp, false);
 });
 
 test('dedicated Wrapped retry reuses Worker, KV, and secrets without mutation when the bundle is unchanged', async () => {

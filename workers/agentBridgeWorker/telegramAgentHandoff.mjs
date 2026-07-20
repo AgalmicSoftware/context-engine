@@ -6254,6 +6254,9 @@ async function handleWrappedMemberExchangeRequest({
   if (!authority.ok) {
     return json({ ok: false, reason: authority.reason }, { status: 503 });
   }
+  if (!authority.accessEnabled) {
+    return json({ ok: false, reason: 'agent_http_disabled' }, { status: 403 });
+  }
   const requestedSessionSlug = sanitizeSessionSlug(body.sessionSlug);
   if (requestedSessionSlug && requestedSessionSlug !== authority.sessionSlug) {
     return json({

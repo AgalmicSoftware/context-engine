@@ -192,6 +192,33 @@ test('worker health proves its exact dedicated session Worker authority', async 
   assert.equal(response.status, 200);
   assert.equal(body.agentSessionWrappedReady, true);
   assert.deepEqual(body.dedicatedSession, {
+    accessEnabled: true,
+    sessionSlug: 'alpha',
+    sessionWorkerOrigin,
+  });
+});
+
+test('worker health distinguishes configured authority from disabled Wrapped access', async () => {
+  const sessionWorkerOrigin = 'https://session-alpha.example.workers.dev';
+  const response = await worker.fetch(new Request('https://bridge.example/health'), {
+    CE_SESSION_WORKER_BASE_URL: sessionWorkerOrigin,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      version: 1,
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionWorkerUrl: sessionWorkerOrigin,
+        sessionModeProfile: { surfaces: { agentHttp: false, telegram: false } },
+      }],
+    }),
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.agentSessionWrappedConfigured, true);
+  assert.equal(body.agentSessionWrappedReady, false);
+  assert.deepEqual(body.dedicatedSession, {
+    accessEnabled: false,
     sessionSlug: 'alpha',
     sessionWorkerOrigin,
   });

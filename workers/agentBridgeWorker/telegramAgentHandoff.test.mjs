@@ -347,6 +347,44 @@ test('member exchange accepts Worker credentials only in a header or body and re
   assert.equal((await jsonBody(queryOnly)).reason, 'session_worker_credential_missing');
 });
 
+test('member exchange fails closed before Worker verification when dedicated access is disabled', async () => {
+  const disabledPolicy = JSON.stringify({
+    version: 1,
+    defaultSessionSlug: 'alpha',
+    sessions: [{
+      sessionSlug: 'alpha',
+      sessionWorkerUrl: 'https://session-worker.example',
+      sessionModeProfile: {
+        surfaces: { agentHttp: false, telegram: false },
+        authority: { mode: 'worker_canonical' },
+      },
+    }],
+  });
+  let fetchCalls = 0;
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/wrapped/member-exchange', {
+      method: 'POST',
+      token: workerJwt({
+        sub: '0x2222222222222222222222222222222222222222',
+        slug: 'alpha',
+        scopes: { groups: true },
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        jti: 'disabled-access-jti',
+      }),
+      body: { sessionSlug: 'alpha' },
+    }),
+    env: memberExchangeEnv('worker_canonical', { AGENT_BRIDGE_SESSION_POLICY_JSON: disabledPolicy }),
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      throw new Error('disabled access must not reach the session Worker');
+    },
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal((await jsonBody(response)).reason, 'agent_http_disabled');
+  assert.equal(fetchCalls, 0);
+});
+
 test('member exchange denial matrix fails closed without issuing Bridge credentials', async () => {
   const address = '0x3333333333333333333333333333333333333333';
   const validClaims = {

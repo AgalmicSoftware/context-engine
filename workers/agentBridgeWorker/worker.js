@@ -218,8 +218,10 @@ export default {
         privateRelease: true,
         broadcastEnabled: directSubmitFeatureEnabled(env),
         protocolVersion: AGENT_SESSION_WRAPPED_PROTOCOL_VERSION,
-        agentSessionWrappedReady: authority.ok,
+        agentSessionWrappedConfigured: authority.ok,
+        agentSessionWrappedReady: authority.ok && authority.accessEnabled,
         dedicatedSession: authority.ok ? {
+          accessEnabled: authority.accessEnabled,
           sessionSlug: authority.sessionSlug,
           sessionWorkerOrigin: authority.sessionWorkerOrigin,
         } : null,
