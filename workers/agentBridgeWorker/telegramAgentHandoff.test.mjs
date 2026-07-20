@@ -523,6 +523,20 @@ test('exchanged members submit Wrapped answers without Telegram or an agent-orig
   assert.equal(answer.accepted, 1);
   assert.equal(answer.replay, false);
   assert.equal(authorityCalls, 1);
+  assert.equal(JSON.stringify(answer).includes('telegramUserId'), false);
+  const submittedRecords = Array.from(env.AGENT_ACTION_KV.store.values())
+    .map((value) => {
+      try { return JSON.parse(value); } catch { return null; }
+    })
+    .filter((record) => record?.questionId === questionId && record?.telegramUserId);
+  assert.equal(
+    submittedRecords.some((record) => record.telegramUserId === exchange.principal.principalId),
+    true,
+  );
+  assert.equal(
+    submittedRecords.some((record) => record.telegramUserId === address.toLowerCase()),
+    false,
+  );
 });
 
 async function seedAgentOnlyProposedQuestions(env, sessionSlug = 'alpha', count = 4) {
@@ -616,6 +630,33 @@ test('fixed-date delegation token fixtures declare an explicit TTL', () => {
     }
   }
   assert.deepEqual(unsafeLines, []);
+});
+
+test('delegated handoff input keeps non-Telegram principals out of Telegram identity fields', () => {
+  const result = __test__telegramAgentHandoff.applyDelegationToInput({
+    authMode: 'agent_credential',
+    delegation: {
+      sessionSlug: 'alpha',
+      scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS],
+      principal: {
+        principalId: 'cesvc_principal-neutral',
+        kind: AGENT_CREDENTIAL_KINDS.SERVICE,
+        adapter: 'service',
+        label: 'Reader',
+      },
+    },
+  }, {
+    sessionSlug: 'alpha',
+    telegramUserId: 'caller-selected-telegram-user',
+    groupChatId: '-100-caller-selected',
+  }, '/api/agent/questions', 'GET');
+
+  assert.equal(result.ok, true);
+  assert.equal(result.input.principalId, 'cesvc_principal-neutral');
+  assert.equal(result.input.principalAdapter, 'service');
+  assert.equal(result.input.telegramUserId, '');
+  assert.equal(result.input.groupChatId, '');
+  assert.deepEqual(result.input.adapterMetadata, {});
 });
 
 test('agent HTTP routing normalizes legacy aliases to canonical internal paths at the adapter edge', () => {

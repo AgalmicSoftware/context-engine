@@ -1638,14 +1638,27 @@ function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = '
   }
   const principal = delegation.principal || {};
   const principalUserId = safeString(principal.adapterUserId || principal.principalId);
+  const principalAdapter = lower(principal.adapter);
+  const isTelegramPrincipal = principalAdapter === 'telegram';
   return {
     ok: true,
     input: {
       ...input,
-      telegramUserId: principalUserId,
+      principalId: safeString(principal.principalId || principalUserId),
+      principalAdapter,
+      adapterMetadata: isTelegramPrincipal ? {
+        telegram: {
+          userId: principalUserId,
+          username: safeString(input.username || principal.label),
+          groupChatId: safeString(input.groupChatId),
+          chatId: safeString(input.chatId),
+        },
+      } : {},
+      telegramUserId: isTelegramPrincipal ? principalUserId : '',
       username: safeString(input.username || principal.label),
       sessionSlug: delegatedSessionSlug,
-      groupChatId: safeString(input.groupChatId),
+      groupChatId: isTelegramPrincipal ? safeString(input.groupChatId) : '',
+      chatId: isTelegramPrincipal ? safeString(input.chatId) : '',
     },
   };
 }
@@ -1658,13 +1671,39 @@ async function resolveHandoffContext({
   ignoreSessionBinding = false,
 } = {}) {
   const policy = await loadSessionPolicy(env);
-  const normalized = normalizeAgentTelegramContext(input);
-  if (!normalized.user.telegramUserId) {
+  const delegation = auth.authMode === 'agent_credential' ? auth.delegation : null;
+  const delegatedPrincipal = delegation?.principal || null;
+  const legacyTelegramUserId = safeString(input.telegramUserId);
+  const principalId = safeString(input.principalId || delegatedPrincipal?.principalId || legacyTelegramUserId);
+  const principalAdapter = lower(input.principalAdapter || delegatedPrincipal?.adapter || (legacyTelegramUserId ? 'telegram' : 'http'));
+  if (!principalId) {
     return { ok: false, status: 400, reason: 'telegram_user_required' };
   }
-  const groupBinding = ignoreSessionBinding ? null : await readGroupSessionBinding(env, normalized);
-  let privateBinding = ignoreSessionBinding ? null : await readPrivateSessionBinding(env, normalized);
-  const delegation = auth.authMode === 'agent_credential' ? auth.delegation : null;
+  const storageSubjectId = principalAdapter === 'telegram'
+    ? safeString(legacyTelegramUserId || delegatedPrincipal?.adapterUserId || principalId)
+    : principalId;
+  const storageContext = normalizeAgentTelegramContext({
+    ...input,
+    telegramUserId: storageSubjectId,
+    groupChatId: principalAdapter === 'telegram' ? safeString(input.groupChatId) : '',
+    chatId: principalAdapter === 'telegram' ? safeString(input.chatId) : '',
+  });
+  const adapterMetadata = principalAdapter === 'telegram' ? {
+    telegram: {
+      userId: legacyTelegramUserId || safeString(input.adapterMetadata?.telegram?.userId),
+      username: safeString(input.username || input.adapterMetadata?.telegram?.username),
+      groupChatId: safeString(input.groupChatId || input.adapterMetadata?.telegram?.groupChatId),
+      chatId: safeString(input.chatId || input.adapterMetadata?.telegram?.chatId),
+    },
+  } : {};
+  const principal = delegatedPrincipal || {
+    principalId,
+    kind: AGENT_CREDENTIAL_KINDS.USER,
+    adapter: principalAdapter,
+    ...(principalAdapter === 'telegram' && legacyTelegramUserId ? { adapterUserId: legacyTelegramUserId } : {}),
+  };
+  const groupBinding = ignoreSessionBinding ? null : await readGroupSessionBinding(env, storageContext);
+  let privateBinding = ignoreSessionBinding ? null : await readPrivateSessionBinding(env, storageContext);
   const requestedSessionSlug = sanitizeSessionSlug(input.sessionSlug);
   const groupBindingSlug = delegation ? '' : bindingSessionSlug(groupBinding, policy);
   const privateBindingSlug = bindingSessionSlug(privateBinding, policy);
@@ -1686,8 +1725,8 @@ async function resolveHandoffContext({
   const effectivePrivateBinding = privateBinding?.followDefault === true
     ? { ...privateBinding, sessionSlug: resolved.session.sessionSlug }
     : privateBinding;
-  if (normalized.chat?.isPrivate !== true) {
-    const groupAccess = await evaluateTelegramGroupSessionAccessForEnv({ env, session: resolved.session, normalized });
+  if (storageContext.chat?.isPrivate !== true) {
+    const groupAccess = await evaluateTelegramGroupSessionAccessForEnv({ env, session: resolved.session, normalized: storageContext });
     if (!groupAccess.ok) {
       return {
         ok: false,
@@ -1702,7 +1741,7 @@ async function resolveHandoffContext({
   if (requireQuestionAuthoring) {
     permission = evaluateTelegramQuestionAuthoringPermission({
       env,
-      normalized,
+      normalized: storageContext,
       session: resolved.session,
       groupBinding: effectiveGroupBinding,
       privateBinding: effectivePrivateBinding || (delegation ? {
@@ -1719,7 +1758,11 @@ async function resolveHandoffContext({
     ok: true,
     policy,
     session: resolved.session,
-    normalized,
+    principal,
+    principalId,
+    storageSubjectId,
+    adapterMetadata,
+    storageContext,
     groupBinding: effectiveGroupBinding,
     privateBinding: effectivePrivateBinding,
     permission,
@@ -1860,7 +1903,7 @@ async function loadAgentQuestionAnswerState({
   context = {},
   questions = [],
 } = {}) {
-  const telegramUserId = safeString(context.normalized?.user?.telegramUserId);
+  const telegramUserId = safeString(context.storageContext?.user?.telegramUserId);
   const questionByRef = new Map();
   const sessionSlugs = new Set();
   (Array.isArray(questions) ? questions : []).forEach((question) => {
@@ -2161,7 +2204,7 @@ async function handleNextQuestionRequest({ env = {}, context = {}, input = {}, w
   const selected = await selectNextTelegramQuestion({
     env,
     sessionSlug: context.session.sessionSlug,
-    telegramUserId: context.normalized.user.telegramUserId,
+    telegramUserId: context.storageContext.user.telegramUserId,
     questions: ranked.questions,
     sponsoredQuestionIds: queueConfig.sponsoredQuestionIds,
     input,
@@ -2394,14 +2437,14 @@ function isQuestionQueueClearRequested(input = {}) {
 async function loadAgentAdminStatus({ env = {}, context = {}, input = {} } = {}) {
   const manager = await canManageResponseExportAllowlist({
     env,
-    normalized: context.normalized,
+    normalized: context.storageContext,
     session: context.session,
     createdAt: input.createdAt || null,
   });
   return {
     ok: true,
     sessionSlug: context.session.sessionSlug,
-    telegramUserId: context.normalized.user.telegramUserId,
+    telegramUserId: context.storageContext.user.telegramUserId,
     accountAddress: manager.accountAddress || '',
     admin: manager.ok === true,
     reason: manager.ok ? 'admin_allowed' : manager.reason,
@@ -2423,7 +2466,7 @@ async function requireQuestionQueueAdmin({
   }
   const manager = await canManageResponseExportAllowlist({
     env,
-    normalized: context.normalized,
+    normalized: context.storageContext,
     session: context.session,
     createdAt: input.createdAt || null,
   });
@@ -2693,7 +2736,7 @@ async function handleOnboardingRequest({
   method = 'GET',
 } = {}) {
   const sessionSlug = context.session.sessionSlug;
-  const telegramUserId = context.normalized.user.telegramUserId;
+  const telegramUserId = context.storageContext.user.telegramUserId;
   const current = await loadTelegramAgentSettings({ env, sessionSlug, telegramUserId });
   if (safeString(method).toUpperCase() !== 'POST') {
     const groups = await loadTelegramLightweightGroups({
@@ -3150,7 +3193,7 @@ async function buildAdminMetricsSnapshot({
 async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } = {}) {
   const manager = await canManageResponseExportAllowlist({
     env,
-    normalized: context.normalized,
+    normalized: context.storageContext,
     session: context.session,
     createdAt: input.createdAt || null,
   });
@@ -3282,7 +3325,7 @@ async function handleAgentOnlyAnswersBulkRequest({
   const result = await submitAgentOnlyAnswersBulk({
     env,
     sessionSlug: context.session.sessionSlug,
-    telegramUserId: input.telegramUserId,
+    telegramUserId: context.storageSubjectId,
     body,
     now: agentOnlyRequestNow(env),
   });
@@ -3290,7 +3333,7 @@ async function handleAgentOnlyAnswersBulkRequest({
   await recordAgentOnlyAttemptEventQuietly({
     env,
     sessionSlug: context.session.sessionSlug,
-    telegramUserId: input.telegramUserId,
+    telegramUserId: context.storageSubjectId,
     stage: 'answers_bulk',
     status,
     result,
@@ -3310,7 +3353,7 @@ async function handleAgentOnlyTokenVotesBulkRequest({
   const result = await submitAgentOnlyTokenVotesBulk({
     env,
     sessionSlug: context.session.sessionSlug,
-    telegramUserId: input.telegramUserId,
+    telegramUserId: context.storageSubjectId,
     body,
     now: agentOnlyRequestNow(env),
   });
@@ -3318,7 +3361,7 @@ async function handleAgentOnlyTokenVotesBulkRequest({
   await recordAgentOnlyAttemptEventQuietly({
     env,
     sessionSlug: context.session.sessionSlug,
-    telegramUserId: input.telegramUserId,
+    telegramUserId: context.storageSubjectId,
     stage: 'token_votes_bulk',
     status,
     result,
@@ -3384,7 +3427,7 @@ async function handleAgentOnlyWrappedImageRequest({
   const result = await generateAgentOnlyWrappedImage({
     env,
     sessionSlug: context.session.sessionSlug,
-    telegramUserId: input.telegramUserId,
+    telegramUserId: context.storageSubjectId,
     body: { ...body, format: input.format || body.format },
     now: agentOnlyRequestNow(env),
     fetchImpl,
@@ -3393,7 +3436,7 @@ async function handleAgentOnlyWrappedImageRequest({
   await recordAgentOnlyAttemptEventQuietly({
     env,
     sessionSlug: context.session.sessionSlug,
-    telegramUserId: input.telegramUserId,
+    telegramUserId: context.storageSubjectId,
     stage: 'wrapped_image',
     status,
     result,
@@ -3680,7 +3723,7 @@ async function handleQuestionQueueApplyRequest({
   for (const draft of plan.draftQuestions) {
     const saved = await persistTelegramProposedQuestion({
       env,
-      normalized: context.normalized,
+      normalized: context.storageContext,
       sessionSlug: context.session.sessionSlug,
       prompt: draft.prompt,
       questionType: draft.questionType,
@@ -3726,7 +3769,7 @@ async function handleQuestionQueueApplyRequest({
     env,
     sessionSlug: context.session.sessionSlug,
     sponsoredQuestionIds: nextIds,
-    updatedByTelegramUserId: context.normalized.user.telegramUserId,
+    updatedByTelegramUserId: context.storageContext.user.telegramUserId,
     updatedByAccountAddress: plan.admin.accountAddress,
     createdAt: input.createdAt || null,
   });
@@ -3807,7 +3850,7 @@ async function handleQuestionQueueRequest({
       env,
       sessionSlug: context.session.sessionSlug,
       sponsoredQuestionIds: clearRequested ? [] : resolved.ids,
-      updatedByTelegramUserId: context.normalized.user.telegramUserId,
+      updatedByTelegramUserId: context.storageContext.user.telegramUserId,
       updatedByAccountAddress: admin.manager.accountAddress,
       createdAt: input.createdAt || null,
     });
@@ -3863,7 +3906,7 @@ async function handleGroupApprovalLinkRequest({
   const minted = await mintTelegramGroupApprovalLink({
     env,
     session: context.session,
-    approvedByTelegramUserId: context.normalized.user.telegramUserId,
+    approvedByTelegramUserId: context.storageContext.user.telegramUserId,
     approvedByAccountAddress: admin.manager.accountAddress,
     createdAt: input.createdAt || null,
   });
@@ -4056,7 +4099,7 @@ async function persistAgentQuestionVoteRecommendations({
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.put !== 'function') return { ok: false, reason: 'question_vote_recommendation_storage_unavailable' };
-  const telegramUserId = safeString(context.normalized?.user?.telegramUserId);
+  const telegramUserId = safeString(context.storageContext?.user?.telegramUserId);
   const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug);
   if (!telegramUserId || !sessionSlug) return { ok: false, reason: 'question_vote_recommendation_context_incomplete' };
   const requestId = safeString(input.requestId || input.idempotencyKey) ||
@@ -4174,7 +4217,7 @@ async function applyAgentQuestionVotes({
   if (!kv || typeof kv.put !== 'function') {
     return { ok: false, reason: 'question_vote_storage_unavailable' };
   }
-  const telegramUserId = safeString(context.normalized?.user?.telegramUserId);
+  const telegramUserId = safeString(context.storageContext?.user?.telegramUserId);
   const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug);
   if (!telegramUserId || !sessionSlug) return { ok: false, reason: 'question_vote_context_incomplete' };
   const settings = await loadTelegramAgentSettings({ env, sessionSlug, telegramUserId });
@@ -4353,7 +4396,7 @@ async function handleQuestionVoteRecommendationsRequest({
   const settings = await loadTelegramAgentSettings({
     env,
     sessionSlug: context.session.sessionSlug,
-    telegramUserId: context.normalized.user.telegramUserId,
+    telegramUserId: context.storageContext.user.telegramUserId,
   });
   let autoApply = null;
   if (input.autoApply === true || lower(input.applyMode) === 'auto') {
@@ -4427,7 +4470,7 @@ async function handleActionsRequest({
   const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug || input.sessionSlug);
   const items = await listTelegramAgentActivity({
     env,
-    telegramUserId: context.normalized.user.telegramUserId,
+    telegramUserId: context.storageContext.user.telegramUserId,
     sessionSlugs: sessionSlug ? [sessionSlug] : [],
     includeContent: true,
     limit: Number(input.limit || 50) || 50,
@@ -4436,7 +4479,7 @@ async function handleActionsRequest({
   return json({
     ok: true,
     sessionSlug,
-    telegramUserId: context.normalized.user.telegramUserId,
+    telegramUserId: context.storageContext.user.telegramUserId,
     actions: items,
   });
 }
@@ -4560,7 +4603,7 @@ async function handleMiniAppLaunchRequest({
   if (!stored.ok) return json({ ok: false, reason: stored.reason || 'action_record_unavailable' }, { status: 503 });
   await persistLatestMiniAppLaunchPointer({
     env,
-    telegramUserId: context.normalized?.user?.telegramUserId,
+    telegramUserId: context.storageContext?.user?.telegramUserId,
     sessionSlug: context.session.sessionSlug,
     launch: callback.callbackData,
     questionIds: resolved.ids,
@@ -5296,7 +5339,7 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
   const settings = await loadTelegramAgentSettings({
     env,
     sessionSlug: context.session.sessionSlug,
-    telegramUserId: context.normalized?.user?.telegramUserId,
+    telegramUserId: context.storageContext?.user?.telegramUserId,
   });
   const draftEditOptIn = settings.draftDivergenceOptIn === true;
   let reviewRequired = false;
@@ -5322,14 +5365,14 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     const previousDraft = draftEditOptIn
       ? await readAnswerDraft({
         env,
-        normalized: context.normalized,
+        normalized: context.storageContext,
         sessionSlug: context.session.sessionSlug,
         selectedQuestionId: questionId,
       })
       : null;
     const saved = await persistAnswerDraft({
       env,
-      normalized: context.normalized,
+      normalized: context.storageContext,
       sessionSlug: context.session.sessionSlug,
       selectedQuestionId: questionId,
       answerLabel: draft.label,
@@ -5360,7 +5403,7 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
       if (initialAnswer) {
         const metric = await persistDraftEditMetric({
           env,
-          telegramUserId: context.normalized?.user?.telegramUserId,
+          telegramUserId: context.storageContext?.user?.telegramUserId,
           sessionSlug: context.session.sessionSlug,
           questionId,
           questionType: question.questionType,
@@ -5389,7 +5432,7 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     if (shouldSubmit) {
       const submit = await persistTelegramSubmitRequest({
         env,
-        normalized: context.normalized,
+        normalized: context.storageContext,
         draft: draftRecord,
         sessionSlug: context.session.sessionSlug,
         selectedQuestionId: questionId,
@@ -5538,7 +5581,7 @@ async function handleCreateQuestionsRequest({
     try {
       saved = await persistTelegramProposedQuestion({
         env,
-        normalized: context.normalized,
+        normalized: context.storageContext,
         sessionSlug: context.session.sessionSlug,
         prompt,
         questionType: question.questionType || question.type || 'binary',
@@ -5646,7 +5689,7 @@ async function handlePoseRequest({
   if (!questionId && prompt) {
     const saved = await persistTelegramProposedQuestion({
       env,
-      normalized: context.normalized,
+      normalized: context.storageContext,
       sessionSlug: context.session.sessionSlug,
       prompt,
       questionType: input.questionType || 'freeform',
@@ -5677,13 +5720,13 @@ async function handlePoseRequest({
       message_id: Number(input.messageId || 1) || 1,
       text: `/q ${questionId}`,
       chat: {
-        id: Number(context.permission.groupChatId || context.normalized.chat.chatId),
+        id: Number(context.permission.groupChatId || context.storageContext.chat.chatId),
         type: 'supergroup',
         title: 'Context Engine Group',
       },
       from: {
-        id: Number(context.normalized.user.telegramUserId),
-        username: context.normalized.user.username || 'agent',
+        id: Number(context.storageContext.user.telegramUserId),
+        username: context.storageContext.user.username || 'agent',
       },
     },
   };
@@ -5727,7 +5770,7 @@ async function handleGroupsRequest({ env = {}, context = {} } = {}) {
   const groups = await loadTelegramLightweightGroups({
     env,
     session: context.session,
-    telegramUserId: context.normalized.user.telegramUserId,
+    telegramUserId: context.storageContext.user.telegramUserId,
   });
   return json({
     ok: true,
@@ -5743,7 +5786,7 @@ async function handleGroupProposalRequest({ env = {}, context = {}, input = {} }
   const saved = await persistTelegramLightweightGroupProposal({
     env,
     session: context.session,
-    normalized: context.normalized,
+    normalized: context.storageContext,
     input,
     metadata: {
       source: 'agent_handoff',
@@ -5761,7 +5804,7 @@ async function handleChildSessionRequest({ env = {}, context = {}, input = {} } 
   const saved = await persistTelegramChildSession({
     env,
     parentSession: context.session,
-    normalized: context.normalized,
+    normalized: context.storageContext,
     input,
     createdAt: input.createdAt || null,
   });
@@ -6113,7 +6156,17 @@ async function handleClientLoginExchangeRequest({
   const context = await resolveHandoffContext({
     env,
     input: {
-      telegramUserId: safeString(delegated.record.principal?.adapterUserId || delegated.record.principal?.principalId),
+      principalId: safeString(delegated.record.principal?.principalId),
+      principalAdapter: safeString(delegated.record.principal?.adapter),
+      adapterMetadata: delegated.record.principal?.adapter === 'telegram' ? {
+        telegram: {
+          userId: safeString(delegated.record.principal?.adapterUserId),
+          username: safeString(delegated.record.principal?.label),
+        },
+      } : {},
+      telegramUserId: delegated.record.principal?.adapter === 'telegram'
+        ? safeString(delegated.record.principal?.adapterUserId)
+        : '',
       username: safeString(delegated.record.principal?.label),
       sessionSlug: requestedSessionSlug,
     },
@@ -6172,7 +6225,7 @@ async function handleClientLoginExchangeRequest({
   const groups = await loadTelegramLightweightGroups({
     env,
     session: context.session,
-    telegramUserId: safeString(delegated.record.principal?.adapterUserId || delegated.record.principal?.principalId),
+    telegramUserId: context.principalId,
     accountAddress: login.accountAddress,
   });
   const payload = {
@@ -6703,6 +6756,7 @@ export const __test__telegramAgentHandoff = {
   CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION,
   CE_SESSION_WRAPPED_SKILL_VERSION,
   authenticateAgentHandoff,
+  applyDelegationToInput,
   normalizeAgentTelegramContext,
   normalizeDraftForQuestion,
   normalizePreferenceTagHints,
