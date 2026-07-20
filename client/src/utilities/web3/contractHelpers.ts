@@ -686,7 +686,7 @@ export function createContractHelperMethods(deps: ContractHelperDeps): ContractH
           } catch (e: unknown) {
             contractsLog.warn('contractHelpers: fallback', e);
           }
-          contractsLog.warn('[blockLimits] Recovered missing blockLimits.start from SessionRegistry.SessionCreated.', {
+          contractsLog.warn('[blockLimits] Recovered missing blockLimits.start from SessionRegistry creation data.', {
             slug: slugLabel,
             chainId: extractChainId(cfg) || null,
             start: fallbackStart,

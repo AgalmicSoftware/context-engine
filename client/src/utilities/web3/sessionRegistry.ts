@@ -1314,6 +1314,7 @@ const mergeSessionFieldsIntoCachedConfig = ({
     metadataURI: session?.metadataURI || registryMeta.metadataURI || '',
     encryptedMetadataURI: session?.encryptedMetadataURI || registryMeta.encryptedMetadataURI || '',
     adminAddress: session?.adminAddress || registryMeta.adminAddress || null,
+    createdAt: session?.createdAt || registryMeta.createdAt || null,
     updatedAt: session?.updatedAt || registryMeta.updatedAt || null,
     sessionId: sessionId || registryMeta.sessionId || null,
     sessionIdHex: sessionIdHex || registryMeta.sessionIdHex || null,
