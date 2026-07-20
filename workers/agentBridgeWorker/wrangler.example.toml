@@ -11,14 +11,6 @@ compatibility_flags = ["nodejs_compat"]
 # derives the account from CLOUDFLARE_API_TOKEN and blocks if multiple accounts
 # are visible. Developers may add account_id locally only as a Wrangler fallback.
 
-durable_objects.bindings = [
-  { name = "MANAGED_DEMO_SIGNER", class_name = "ManagedDemoSignerDurableObject" },
-]
-
-[[migrations]]
-tag = "v1"
-new_sqlite_classes = ["ManagedDemoSignerDurableObject"]
-
 kv_namespaces = [
   { binding = "AGENT_ACTION_KV", id = "YOUR_SHORT_LIVED_ACTION_KV_NAMESPACE_ID" },
 ]

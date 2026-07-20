@@ -1,5 +1,4 @@
 import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
-export { ManagedDemoSignerDurableObject } from './durableObjectSigner.mjs';
 import { directSubmitFeatureEnabled } from './onChainResponses.mjs';
 import { runMockTelegramDemoFlow } from './transportMock.mjs';
 import { handleTelegramAgentHandoffRequest } from './telegramAgentHandoff.mjs';

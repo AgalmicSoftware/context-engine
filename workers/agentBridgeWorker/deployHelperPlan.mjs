@@ -15,7 +15,6 @@ const WORKERS_DEV_SETUP_PERMISSION = Object.freeze({ key: 'account_settings', ty
 export const AGENT_BRIDGE_BASE_CLOUDFLARE_TOKEN_PERMISSIONS = Object.freeze([
   { key: 'workers_scripts', type: 'edit' },
   { key: 'workers_kv_storage', type: 'edit' },
-  { key: 'workers_durable_objects', type: 'edit' },
 ]);
 
 export const AGENT_BRIDGE_DOC_STORAGE_CLOUDFLARE_TOKEN_PERMISSIONS = Object.freeze([
@@ -248,8 +247,6 @@ export function resolveAgentBridgeDeployConfig({
       actionKvTitle: safeString(flags['action-kv-title'] || env.AGENT_ACTION_KV_TITLE || `ContextEngineAgentBridgeActions:${workerName}`),
       r2BucketName: enableDocStorage ? safeString(flags['r2-bucket'] || env.AGENT_DOCS_R2_BUCKET || `${workerName}-demo-artifacts`) : '',
       d1DatabaseName: enableDocStorage ? safeString(flags['d1-database'] || env.AGENT_DOCS_D1_DATABASE || `${workerName}-events`) : '',
-      durableObjectBinding: 'MANAGED_DEMO_SIGNER',
-      durableObjectClassName: 'ManagedDemoSignerDurableObject',
     },
     vars: {
       TELEGRAM_BOT_USERNAME: safeString(flags['telegram-bot-username'] || env.TELEGRAM_BOT_USERNAME),
@@ -500,11 +497,6 @@ export function buildAgentBridgeWorkerUploadMetadata(config = {}) {
     );
   }
   bindings.push(
-    {
-      name: config.resources?.durableObjectBinding || 'MANAGED_DEMO_SIGNER',
-      type: 'durable_object_namespace',
-      class_name: config.resources?.durableObjectClassName || 'ManagedDemoSignerDurableObject',
-    },
     ...Object.entries(vars).map(([name, text]) => ({
       name,
       type: 'plain_text',
@@ -516,11 +508,6 @@ export function buildAgentBridgeWorkerUploadMetadata(config = {}) {
     compatibility_date: safeString(config.compatibilityDate || DEFAULT_COMPATIBILITY_DATE),
     compatibility_flags: ['nodejs_compat', 'global_fetch_strictly_public'],
     bindings,
-    migrations: {
-      old_tag: '',
-      new_tag: 'v1',
-      new_sqlite_classes: [config.resources?.durableObjectClassName || 'ManagedDemoSignerDurableObject'],
-    },
   };
 }
 
@@ -559,7 +546,7 @@ export function buildAgentBridgeDeployPlan(config = {}) {
     },
     ...docStorageCalls,
     {
-      purpose: 'Upload agentBridgeWorker module with bindings, vars, Durable Object binding, and migration metadata',
+      purpose: 'Upload agentBridgeWorker module with bindings and vars',
       method: 'PUT',
       path: `/accounts/${accountId}/workers/scripts/${workerName}`,
       multipartMetadata: metadata,

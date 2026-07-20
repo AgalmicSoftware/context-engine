@@ -448,7 +448,7 @@ Decrypted prompt/context text is private-chat or Mini App only.
 
 ## Attachments
 
-The worker contract models R2 document bytes, D1 metadata/index status, and KV short-lived action records. The default live Telegram smoke binds only KV plus the Worker/Durable Object runtime; bridge-owned R2/D1 resources are opt-in with `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` or `--enable-doc-storage`. Supported file types are:
+The worker contract models R2 document bytes, D1 metadata/index status, and KV short-lived action records. The default deployment binds only KV plus the Worker runtime; bridge-owned R2/D1 resources are opt-in with `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` or `--enable-doc-storage`. Supported file types are:
 
 - Markdown: `md`
 - PDF: `pdf`
@@ -562,7 +562,7 @@ Required values:
 | KV namespace | `deploy:apply -- --apply` creates or reuses and binds as `AGENT_ACTION_KV` for opaque callback/action IDs and replay cache |
 | R2 bucket | Optional. `deploy:apply -- --apply --enable-doc-storage` or `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` creates or reuses and binds `AGENT_DOCS_R2` for bridge-owned demo artifact and document bytes |
 | D1 database | Optional. `deploy:apply -- --apply --enable-doc-storage` or `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` creates or reuses and binds `AGENT_DOCS_D1` for bridge-owned event/audit/index records |
-| Durable Object binding | `deploy:apply -- --apply` binds `MANAGED_DEMO_SIGNER` and includes the SQLite-backed `ManagedDemoSignerDurableObject` migration |
+| Managed demo root secret | `DEMO_SIGNER_ROOT_SECRET` is required for deterministic testnet managed-account derivation; deployment fails closed when it is absent |
 | Draft-generation AI policy | `AGENT_AI_PROVIDER=ce_session_policy`; use sponsored/session AI through allowed session policy and do not duplicate canonical session secrets in this worker |
 
 `deploy:apply -- --apply` sets the webhook and Telegram slash-command menu
@@ -1157,8 +1157,6 @@ multiple accounts are visible because account selection is not implemented yet:
   or `--enable-doc-storage`.
 - D1 database for event/audit/index records only when
   `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` or `--enable-doc-storage`.
-- SQLite-backed Durable Object binding and migration for managed demo
-  signer/runtime.
 - Worker secrets: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`,
   `DEMO_SIGNER_ROOT_SECRET`, `AGENT_BRIDGE_AGENT_API_TOKEN`.
 - Worker vars: `TELEGRAM_BOT_USERNAME`, `AGENT_BRIDGE_PUBLIC_URL`,
@@ -1167,8 +1165,8 @@ multiple accounts are visible because account selection is not implemented yet:
 - Script-level Workers.dev enablement for
   `https://<worker-name>.<workers-subdomain>.workers.dev`.
 
-The default Telegram smoke token needs Workers Scripts, Workers KV, and Durable
-Objects edit scopes. R2 and D1 edit scopes are needed only when bridge-owned
+The default Bridge token needs Workers Scripts and Workers KV edit scopes. R2
+and D1 edit scopes are needed only when bridge-owned
 demo doc/artifact storage is explicitly enabled. `Account Settings: Edit` is
 needed only when the helper must create or change the account-level workers.dev
 subdomain; if the account already has a workers.dev subdomain, the first demo
@@ -1233,8 +1231,8 @@ IDs.
 
 1. Create the Telegram bot in BotFather and record `TELEGRAM_BOT_TOKEN` plus
    `TELEGRAM_BOT_USERNAME` without `@`.
-2. Create a scoped Cloudflare token with Workers Scripts, Workers KV, and
-   Durable Objects edit scopes. Add R2 and D1 edit scopes only when testing
+2. Create a scoped Cloudflare token with Workers Scripts and Workers KV edit
+   scopes. Add R2 and D1 edit scopes only when testing
    bridge-owned doc/artifact storage with `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true`
    or `--enable-doc-storage`. Add `Account Settings: Edit` only when the
    account-level workers.dev subdomain must be created or changed.

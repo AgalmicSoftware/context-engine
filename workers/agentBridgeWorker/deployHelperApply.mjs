@@ -469,15 +469,11 @@ function withCreatedBindings(metadata = {}, resources = {}) {
 export function buildAgentBridgeWorkerUploadForm({
   config = {},
   resourceIds = {},
-  omitMigrations = false,
   workerDir = WORKER_DIR,
   readFileImpl = readFileSync,
   existsImpl = existsSync,
 } = {}) {
   const metadata = withCreatedBindings(buildAgentBridgeWorkerUploadMetadata(config), resourceIds);
-  if (omitMigrations) {
-    delete metadata.migrations;
-  }
   const bundledModule = bundleAgentBridgeWorkerModule({
     workerDir,
     entrypoint: DEFAULT_ENTRYPOINT,
@@ -496,15 +492,6 @@ export function buildAgentBridgeWorkerUploadForm({
       bytes: Buffer.byteLength(module.source),
     })),
   };
-}
-
-function isDurableObjectMigrationPreconditionFailure(response = {}) {
-  const errorText = [
-    response.error,
-    ...(Array.isArray(response.detail) ? response.detail.map((entry) => entry?.message) : []),
-  ].join('\n');
-  return Number(response.status || 0) === 412
-    && /migration tag precondition failed/i.test(errorText);
 }
 
 export async function uploadAgentBridgeWorker({
@@ -529,27 +516,6 @@ export async function uploadAgentBridgeWorker({
     method: 'PUT',
     body: upload.form,
   }, { fetchImpl });
-  if (!response.ok && isDurableObjectMigrationPreconditionFailure(response)) {
-    const retryUpload = buildAgentBridgeWorkerUploadForm({
-      config,
-      resourceIds,
-      omitMigrations: true,
-      workerDir,
-      readFileImpl,
-      existsImpl,
-    });
-    const retryResponse = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}`, {
-      method: 'PUT',
-      body: retryUpload.form,
-    }, { fetchImpl });
-    if (!retryResponse.ok) return normalizeCfFailure('worker_upload', retryResponse);
-    return {
-      ok: true,
-      metadata: retryUpload.metadata,
-      modules: retryUpload.modules,
-      migrationRetry: 'omitted_existing_migration',
-    };
-  }
   if (!response.ok) return normalizeCfFailure('worker_upload', response);
   return {
     ok: true,
@@ -1002,7 +968,6 @@ export async function executeAgentBridgeDeployApply({
     upload: {
       moduleCount: upload.modules.length,
       mainModule: upload.metadata.main_module,
-      migrationRetry: upload.migrationRetry || null,
     },
     secrets: {
       written: secrets.written,

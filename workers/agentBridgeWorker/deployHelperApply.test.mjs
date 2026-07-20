@@ -133,7 +133,7 @@ test('collectAgentBridgeWorkerModules includes the worker entrypoint and transit
 
   assert.equal(names.includes('worker.js'), true);
   assert.equal(names.includes('telegramCommands.mjs'), true);
-  assert.equal(names.includes('durableObjectSigner.mjs'), true);
+  assert.equal(names.includes('durableObjectSigner.mjs'), false);
   assert.equal(modules.every((module) => module.source.length > 0), true);
 });
 
@@ -147,33 +147,14 @@ test('bundleAgentBridgeWorkerModule folds package imports into one upload module
   assert.equal(bundle.source.includes("from './onChainResponses.mjs'"), false);
 });
 
-test('buildAgentBridgeWorkerUploadForm can omit migrations for already-migrated Durable Objects', () => {
-  const firstUpload = buildAgentBridgeWorkerUploadForm({
-    config: {
-      resources: {
-        durableObjectBinding: 'MANAGED_DEMO_SIGNER',
-        durableObjectClassName: 'ManagedDemoSignerDurableObject',
-      },
-      vars: {},
-    },
+test('buildAgentBridgeWorkerUploadForm has no Durable Object binding or migration', () => {
+  const upload = buildAgentBridgeWorkerUploadForm({
+    config: { resources: {}, vars: {} },
     resourceIds: { kvNamespaceId: 'kv-id' },
-  });
-  const retryUpload = buildAgentBridgeWorkerUploadForm({
-    config: {
-      resources: {
-        durableObjectBinding: 'MANAGED_DEMO_SIGNER',
-        durableObjectClassName: 'ManagedDemoSignerDurableObject',
-      },
-      vars: {},
-    },
-    resourceIds: { kvNamespaceId: 'kv-id' },
-    omitMigrations: true,
   });
 
-  assert.equal(firstUpload.metadata.migrations.new_tag, 'v1');
-  assert.equal(firstUpload.metadata.migrations.old_tag, '');
-  assert.equal(Array.isArray(firstUpload.metadata.migrations), false);
-  assert.equal(Object.hasOwn(retryUpload.metadata, 'migrations'), false);
+  assert.equal(upload.metadata.bindings.some((binding) => binding.type === 'durable_object_namespace'), false);
+  assert.equal(Object.hasOwn(upload.metadata, 'migrations'), false);
 });
 
 test('deploy apply creates smoke resources without requiring R2/D1, uploads modules, writes secrets, sets webhook, and checks health', async () => {
@@ -278,7 +259,7 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
   assert.equal(JSON.stringify(result).includes('demo-root-secret'), false);
 });
 
-test('deploy apply retries worker upload without migrations after migration tag precondition failure', async () => {
+test('deploy apply does not retry an upload through a stale Durable Object migration path', async () => {
   const workerUploadCalls = [];
   const fetchMock = async (url, options = {}) => {
     const method = options.method || 'GET';
@@ -287,13 +268,10 @@ test('deploy apply retries worker upload without migrations after migration tag 
     }
     if (String(url).endsWith('/workers/scripts/ce-agent-bridge-worker') && method === 'PUT') {
       workerUploadCalls.push(options.body);
-      if (workerUploadCalls.length === 1) {
-        return jsonResponse({
-          success: false,
-          errors: [{ code: 10079, message: "Actor migration tag precondition failed, got tag 'v1' when expected tag ''." }],
-        }, { status: 412 });
-      }
-      return jsonResponse({ success: true, result: { id: 'script-created' } });
+      return jsonResponse({
+        success: false,
+        errors: [{ code: 10079, message: 'upload precondition failed' }],
+      }, { status: 412 });
     }
     if (String(url).endsWith('/workers/scripts/ce-agent-bridge-worker/secrets') && method === 'PUT') {
       return jsonResponse({ success: true, result: { name: 'secret' } });
@@ -313,9 +291,9 @@ test('deploy apply retries worker upload without migrations after migration tag 
     fetchImpl: fetchMock,
   });
 
-  assert.equal(result.ok, true);
-  assert.equal(result.upload.migrationRetry, 'omitted_existing_migration');
-  assert.equal(workerUploadCalls.length, 2);
+  assert.equal(result.ok, false);
+  assert.equal(result.step, 'worker_upload');
+  assert.equal(workerUploadCalls.length, 1);
 });
 
 test('deploy apply provisions R2/D1 only when doc storage is explicitly enabled', async () => {

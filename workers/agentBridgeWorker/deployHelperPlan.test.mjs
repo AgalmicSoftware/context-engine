@@ -257,6 +257,10 @@ test('validateAgentBridgeTokenScope treats Account Settings: Edit as workers.dev
   });
 
   assert.equal(base.ok, true);
+  assert.deepEqual(AGENT_BRIDGE_CLOUDFLARE_TOKEN_PERMISSIONS, [
+    { key: 'workers_scripts', type: 'edit' },
+    { key: 'workers_kv_storage', type: 'edit' },
+  ]);
   assert.equal(base.accountSettingsEditRequired, false);
   assert.equal(needsDocStorage.ok, false);
   assert.deepEqual(needsDocStorage.missing, AGENT_BRIDGE_DOC_STORAGE_CLOUDFLARE_TOKEN_PERMISSIONS);
@@ -268,7 +272,7 @@ test('validateAgentBridgeTokenScope treats Account Settings: Edit as workers.dev
   assert.equal(withWorkersDevSetup.ok, true);
 });
 
-test('buildAgentBridgeWorkerUploadMetadata defaults to smoke bindings without R2/D1', () => {
+test('buildAgentBridgeWorkerUploadMetadata defaults to the KV-only runtime shape', () => {
   const config = resolveAgentBridgeDeployConfig({
     env: completeEnv({ ADDITIONAL_RPC_URL: 'https://infura.example.test/op-sepolia' }),
   });
@@ -280,16 +284,8 @@ test('buildAgentBridgeWorkerUploadMetadata defaults to smoke bindings without R2
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_ACTION_KV' && binding.type === 'kv_namespace'), true);
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_R2'), false);
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_D1'), false);
-  assert.equal(metadata.bindings.some((binding) => (
-    binding.name === 'MANAGED_DEMO_SIGNER' &&
-    binding.type === 'durable_object_namespace' &&
-    binding.class_name === 'ManagedDemoSignerDurableObject'
-  )), true);
-  assert.deepEqual(metadata.migrations, {
-    old_tag: '',
-    new_tag: 'v1',
-    new_sqlite_classes: ['ManagedDemoSignerDurableObject'],
-  });
+  assert.equal(metadata.bindings.some((binding) => binding.type === 'durable_object_namespace'), false);
+  assert.equal(Object.hasOwn(metadata, 'migrations'), false);
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_PUBLIC_URL' &&
     binding.text === 'https://ce-agent-bridge-worker.tenant-subdomain.workers.dev'
@@ -462,6 +458,8 @@ test('buildAgentBridgeDeployPlan documents remaining direct Cloudflare API calls
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/storage/kv/namespaces')), true);
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/r2/buckets')), false);
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/d1/database')), false);
+  assert.equal(JSON.stringify(plan).includes('Durable Object'), false);
+  assert.equal(JSON.stringify(plan).includes('MANAGED_DEMO_SIGNER'), false);
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/workers/scripts/ce-agent-bridge-worker/secrets')), true);
   assert.equal(plan.remainingDirectApiCalls[0].path, '/accounts?per_page=2');
   assert.equal(plan.optionalTokenPermissions.length, 1);
