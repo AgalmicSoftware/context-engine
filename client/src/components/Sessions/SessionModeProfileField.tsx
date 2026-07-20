@@ -29,16 +29,13 @@ const PRESET_CARDS = [
     id: SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
     title: 'Fast & Cheap (Cloudflare)',
     badge: 'Recommended',
-    copy:
-      'Hosted on Cloudflare with worker-managed encryption by default. Session-scoped, not permanent, and optionally anchored later.',
-    keys: ['Cloudflare API token', 'AI provider key', 'Arweave JWK', 'RPC URL/key', 'Lit key only for Lit encryption'],
+    bullets: ['Fastest setup', 'Private, encrypted storage', 'Can anchor on-chain later'],
   },
   {
     id: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
     title: 'Trustless & Public (Decentralized)',
     badge: '',
-    copy: 'Published publicly and permanently unless you enable encryption. Slower and more expensive to set up.',
-    keys: ['Arweave wallet/JWK', 'RPC URL/key', 'AI provider key', 'Lit API key if encryption is enabled'],
+    bullets: ['Public, permanent storage', 'Optional encryption', 'More setup and cost'],
   },
 ] as const;
 
@@ -158,7 +155,7 @@ const SessionModeProfileField = ({
     <section className={styles.modeProfilePanel} aria-label="Session mode">
       <div className={styles.modeProfileHeader}>
         <div>
-          <h2 className={styles.modeProfileTitle}>Choose session mode</h2>
+          <h2 className={styles.modeProfileTitle}>Choose how to host your session</h2>
           {profile?.preset === SESSION_MODE_PRESET_IDS.CUSTOM ? (
             <span className={styles.modeProfileChip}>Custom</span>
           ) : null}
@@ -194,7 +191,21 @@ const SessionModeProfileField = ({
                 {preset.badge ? <span className={styles.modePresetBadge}>{preset.badge}</span> : null}
                 {selected ? <FontAwesomeIcon icon={faCheck} className={styles.modePresetCheck} /> : null}
               </span>
-              <span className={styles.modePresetCopy}>{preset.copy}</span>
+              <ul className={styles.modePresetCopy}>
+                {preset.bullets.map((bullet) => (
+                  <li key={bullet}>{bullet}</li>
+                ))}
+              </ul>
+              <span className={styles.modePresetKeys}>
+                <span className={styles.modePresetKeysLabel}>Keys needed</span>
+                <span className={styles.modePresetKeyList}>
+                  {presetKeyChips.map((key) => (
+                    <span key={key} className={styles.modePresetKey}>
+                      {key}
+                    </span>
+                  ))}
+                </span>
+              </span>
             </button>
           );
         })}

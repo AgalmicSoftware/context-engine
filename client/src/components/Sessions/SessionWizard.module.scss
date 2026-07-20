@@ -2781,8 +2781,11 @@ $muted-text: tokens.$ce-muted-text;
 
 .modeProfileTitle {
   margin: 0;
-  font-size: 1.05rem;
-  line-height: 1.3;
+  color: #f7f9ff;
+  font-size: clamp(1.25rem, 2vw, 1.55rem);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
 .modeProfileChip,
@@ -2836,9 +2839,47 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .modePresetCopy {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 1.2rem;
   font-size: 0.9rem;
-  line-height: 1.45;
-  color: rgba(244, 247, 255, 0.74);
+  line-height: 1.35;
+  color: #eef2ff;
+}
+
+.modePresetKeys {
+  display: grid;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.modePresetKeysLabel {
+  color: #e0e7ff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.modePresetKeyList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.modePresetKey {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #8fa9ff;
+  border-radius: 999px;
+  background: #25335d;
+  color: #f5f7ff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 5px 8px;
 }
 
 .modePresetCheck {

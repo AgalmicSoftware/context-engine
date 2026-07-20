@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Clarified the session hosting chooser with a prominent high-contrast heading
+  and three brief comparison bullets per mode while preserving the existing
+  key requirements and publishing behavior.
 - Made `contextengine.sh` the canonical public URL across site metadata,
   discovery assets, documentation, and Agent Bridge links. Worker and Bridge
   bootstrap allowlists now prefer `.sh` while retaining `.xyz` as redirect
