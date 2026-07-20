@@ -137,6 +137,69 @@ function isHttpsUrl(value = '') {
   return /^https:\/\/[^/\s<>]+(?:\/.*)?$/i.test(safeString(value));
 }
 
+function parseJsonObject(value = '') {
+  try {
+    const parsed = JSON.parse(safeString(value));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeHttpsOrigin(value = '') {
+  try {
+    const parsed = new URL(safeString(value));
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return '';
+    if (parsed.pathname !== '/' || parsed.search || parsed.hash) return '';
+    return parsed.origin;
+  } catch {
+    return '';
+  }
+}
+
+export function inspectDedicatedAgentBridgeSessionPolicy({
+  policyJson = '',
+  sessionWorkerOrigin = '',
+} = {}) {
+  const policy = parseJsonObject(policyJson);
+  if (!policy) {
+    return { ok: false, reason: 'dedicated session policy must be valid JSON' };
+  }
+  const sessions = Array.isArray(policy.sessions)
+    ? policy.sessions
+    : (Array.isArray(policy.linkedSessions) ? policy.linkedSessions : []);
+  if (sessions.length !== 1 || !sessions[0] || typeof sessions[0] !== 'object' || Array.isArray(sessions[0])) {
+    return { ok: false, reason: 'dedicated session policy must contain exactly one session' };
+  }
+  const session = sessions[0];
+  const sessionSlug = safeString(session.sessionSlug || session.slug).toLowerCase();
+  if (!/^[a-z0-9_-]{1,128}$/.test(sessionSlug)) {
+    return { ok: false, reason: 'dedicated session policy requires one valid session slug' };
+  }
+  const defaultSessionSlug = safeString(policy.defaultSessionSlug || policy.defaultSession).toLowerCase();
+  if (defaultSessionSlug !== sessionSlug) {
+    return { ok: false, reason: 'dedicated session policy default must match its only session slug' };
+  }
+  if (session.sessionModeProfile?.surfaces?.agentHttp !== true) {
+    return { ok: false, reason: 'dedicated session policy requires surfaces.agentHttp=true' };
+  }
+  const configuredOrigin = normalizeHttpsOrigin(sessionWorkerOrigin);
+  const policyOrigin = normalizeHttpsOrigin(
+    session.sessionWorkerOrigin ||
+    session.sessionWorkerUrl ||
+    session.workerUrl ||
+    session.corsWorkerUrl
+  );
+  if (!configuredOrigin || !policyOrigin || configuredOrigin !== policyOrigin) {
+    return { ok: false, reason: 'dedicated session policy must pin the configured session Worker origin' };
+  }
+  return {
+    ok: true,
+    sessionSlug,
+    sessionWorkerOrigin: configuredOrigin,
+  };
+}
+
 export function generateAgentBridgeSecret({ byteLength = 32, randomBytesImpl = randomBytes } = {}) {
   const length = Math.max(32, Math.floor(Number(byteLength || 0) || 32));
   return randomBytesImpl(length).toString('hex');
@@ -235,6 +298,10 @@ export function resolveAgentBridgeDeployConfig({
     buildWorkersDevUrl(workerName, workersSubdomain),
   ).replace(/\/+$/, '');
   const accountId = safeString(flags['account-id'] || env.CLOUDFLARE_ACCOUNT_ID);
+  const dedicatedSessionPolicy = inspectDedicatedAgentBridgeSessionPolicy({
+    policyJson: env.AGENT_BRIDGE_SESSION_POLICY_JSON,
+    sessionWorkerOrigin: flags['session-worker-url'] || env.CE_SESSION_WORKER_BASE_URL,
+  });
   const config = {
     apiTokenPresent: tokenPresent(flags['api-token'] || env.CLOUDFLARE_API_TOKEN),
     accountId,
@@ -247,6 +314,11 @@ export function resolveAgentBridgeDeployConfig({
         },
     workerName,
     telegramEnabled,
+    dedicatedSession: dedicatedSessionPolicy.ok ? {
+      sessionSlug: dedicatedSessionPolicy.sessionSlug,
+      sessionWorkerOrigin: dedicatedSessionPolicy.sessionWorkerOrigin,
+    } : null,
+    dedicatedSessionPolicyError: dedicatedSessionPolicy.ok ? '' : dedicatedSessionPolicy.reason,
     workersSubdomain,
     compatibilityDate: safeString(flags['compatibility-date'] || env.AGENT_BRIDGE_COMPATIBILITY_DATE || DEFAULT_COMPATIBILITY_DATE),
     includeWorkersDevSubdomainSetup: flags['include-workers-dev-subdomain-setup'] === true
@@ -428,6 +500,9 @@ export async function resolveAgentBridgeDeployConfigForLive({
 
 export function validateAgentBridgeDeployConfig(config = {}) {
   const missing = [];
+  if (!config.dedicatedSession) {
+    missing.push(config.dedicatedSessionPolicyError || 'dedicated session policy is required');
+  }
   if (!config.apiTokenPresent) missing.push('CLOUDFLARE_API_TOKEN');
   if (config.accountLookup?.mode === 'derive_from_token_failed') {
     missing.push(`CLOUDFLARE_ACCOUNT_ID derivation failed: ${config.accountLookup.blocker || 'account lookup failed'}`);
@@ -616,6 +691,7 @@ export function buildAgentBridgeDeployPlan(config = {}) {
       ? `${safeString(config.vars?.AGENT_BRIDGE_PUBLIC_URL || buildWorkersDevUrl(workerName, config.workersSubdomain)).replace(/\/+$/, '')}/telegram/webhook`
       : null,
     resources: config.resources,
+    dedicatedSession: config.dedicatedSession,
     requiredTokenPermissions: buildAgentBridgeCloudflareTokenPermissions(config),
     optionalTokenPermissions: config.includeWorkersDevSubdomainSetup === true
       ? AGENT_BRIDGE_OPTIONAL_TOKEN_PERMISSIONS

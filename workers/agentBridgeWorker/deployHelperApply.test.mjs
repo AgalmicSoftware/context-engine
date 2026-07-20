@@ -11,6 +11,7 @@ import {
 } from './deployHelperApply.mjs';
 
 function completeEnv(overrides = {}) {
+  const sessionWorkerOrigin = overrides.CE_SESSION_WORKER_BASE_URL || 'https://session-worker.tenant-subdomain.workers.dev';
   return {
     CLOUDFLARE_API_TOKEN: 'cf-test-token',
     CLOUDFLARE_ACCOUNT_ID: 'account-123',
@@ -21,7 +22,19 @@ function completeEnv(overrides = {}) {
     TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
     DEMO_SIGNER_ROOT_SECRET: 'demo-root-secret',
     AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-api-token',
-    CE_SESSION_WORKER_BASE_URL: 'https://session-worker.tenant-subdomain.workers.dev',
+    CE_SESSION_WORKER_BASE_URL: sessionWorkerOrigin,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      version: 1,
+      defaultSessionSlug: 'wrapped-alpha',
+      sessions: [{
+        sessionSlug: 'wrapped-alpha',
+        sessionWorkerUrl: sessionWorkerOrigin,
+        sessionModeProfile: {
+          surfaces: { agentHttp: true, telegram: true },
+          authority: { mode: 'worker_canonical' },
+        },
+      }],
+    }),
     DEFAULT_CHAIN_ID: '11155420',
     DEFAULT_RPC_URL: 'https://rpc.example.test',
     ...overrides,

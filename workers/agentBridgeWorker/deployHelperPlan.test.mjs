@@ -15,6 +15,7 @@ import {
 } from './deployHelperPlan.mjs';
 
 function completeEnv(overrides = {}) {
+  const sessionWorkerOrigin = overrides.CE_SESSION_WORKER_BASE_URL || 'https://session-worker.tenant-subdomain.workers.dev';
   return {
     CLOUDFLARE_API_TOKEN: 'cf-test-token',
     CLOUDFLARE_ACCOUNT_ID: 'account-123',
@@ -25,7 +26,19 @@ function completeEnv(overrides = {}) {
     TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
     DEMO_SIGNER_ROOT_SECRET: 'demo-root',
     AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-api-token',
-    CE_SESSION_WORKER_BASE_URL: 'https://session-worker.tenant-subdomain.workers.dev',
+    CE_SESSION_WORKER_BASE_URL: sessionWorkerOrigin,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      version: 1,
+      defaultSessionSlug: 'wrapped-alpha',
+      sessions: [{
+        sessionSlug: 'wrapped-alpha',
+        sessionWorkerUrl: sessionWorkerOrigin,
+        sessionModeProfile: {
+          surfaces: { agentHttp: true, telegram: true },
+          authority: { mode: 'worker_canonical' },
+        },
+      }],
+    }),
     DEFAULT_CHAIN_ID: '11155420',
     DEFAULT_RPC_URL: 'https://rpc.example.test',
     ...overrides,
@@ -109,6 +122,59 @@ test('Telegram-disabled deployment has no Telegram config, secrets, or plan acti
   assert.equal(plan.webhookUrl, null);
   assert.equal(JSON.stringify(plan).includes('TELEGRAM_'), false);
   assert.equal(JSON.stringify(plan).includes('api.telegram.org'), false);
+});
+
+test('dedicated deployment requires one explicit agentHttp session pinned to its Worker origin', () => {
+  const valid = resolveAgentBridgeDeployConfig({ env: completeEnv() });
+  const missingPolicy = resolveAgentBridgeDeployConfig({
+    env: completeEnv({ AGENT_BRIDGE_SESSION_POLICY_JSON: '' }),
+  });
+  const multipleSessions = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'wrapped-alpha',
+        sessions: [
+          { sessionSlug: 'wrapped-alpha', sessionWorkerUrl: 'https://session-worker.tenant-subdomain.workers.dev', sessionModeProfile: { surfaces: { agentHttp: true } } },
+          { sessionSlug: 'wrapped-beta', sessionWorkerUrl: 'https://session-worker.tenant-subdomain.workers.dev', sessionModeProfile: { surfaces: { agentHttp: true } } },
+        ],
+      }),
+    }),
+  });
+  const mismatchedOrigin = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'wrapped-alpha',
+        sessions: [{
+          sessionSlug: 'wrapped-alpha',
+          sessionWorkerUrl: 'https://caller-selected.example.test',
+          sessionModeProfile: { surfaces: { agentHttp: true } },
+        }],
+      }),
+    }),
+  });
+  const disabledAgentHttp = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'wrapped-alpha',
+        sessions: [{
+          sessionSlug: 'wrapped-alpha',
+          sessionWorkerUrl: 'https://session-worker.tenant-subdomain.workers.dev',
+          sessionModeProfile: { surfaces: { agentHttp: false } },
+        }],
+      }),
+    }),
+  });
+
+  assert.equal(validateAgentBridgeDeployConfig(valid).ok, true);
+  assert.deepEqual(valid.dedicatedSession, {
+    sessionSlug: 'wrapped-alpha',
+    sessionWorkerOrigin: 'https://session-worker.tenant-subdomain.workers.dev',
+  });
+  for (const config of [missingPolicy, multipleSessions, mismatchedOrigin, disabledAgentHttp]) {
+    const validation = validateAgentBridgeDeployConfig(config);
+    assert.equal(validation.ok, false);
+    assert.equal(validation.missing.some((entry) => entry.includes('dedicated session policy')), true);
+  }
 });
 
 test('validateAgentBridgeDeployConfig rejects local-only Telegram preview vars', () => {

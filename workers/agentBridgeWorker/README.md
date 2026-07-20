@@ -1155,6 +1155,14 @@ required pasted value; the helper models account lookup as
 `GET /accounts?per_page=2`, accepts exactly one visible account, and blocks if
 multiple accounts are visible because account selection is not implemented yet:
 
+The dedicated deployment also requires `AGENT_BRIDGE_SESSION_POLICY_JSON` to
+contain exactly one session, an explicit matching default slug,
+`sessionModeProfile.surfaces.agentHttp=true`, and a session Worker origin that
+exactly matches `CE_SESSION_WORKER_BASE_URL`. Missing, multi-session, mismatched,
+or caller-selected origins fail before any mutation. This guarantees the
+registry/default fallback in the generic policy loader cannot activate for a
+dedicated Bridge.
+
 - Workers script upload with vars and bindings.
 - KV namespace for opaque action IDs and webhook replay cache.
 - R2 bucket for demo artifacts only when `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true`
