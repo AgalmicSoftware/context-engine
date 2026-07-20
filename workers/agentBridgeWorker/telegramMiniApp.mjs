@@ -95,7 +95,6 @@ import {
   extractGeneratedQuestionItems,
   fetchUrlQuestionSource,
   loadQuestionsForSession,
-  loadSessionPolicy,
   deleteAnswerDraft,
   formatCounts,
   loadSubmittedResultRecords,
@@ -116,8 +115,8 @@ import {
   bridgeOpenAiApiKey,
   withBridgeOpenAiApiKey,
   writeDraftLifecycleEvent,
-  writeResultsExposureOverride,
 } from './telegramCommands.mjs';
+import { loadSessionPolicy, writeResultsExposureOverride } from './sessionPolicyLoader.mjs';
 import { normalizeTelegramPrincipal } from './telegramUpdates.mjs';
 import {
   TELEGRAM_MINI_APP_LOADING_GIF_BASE64,

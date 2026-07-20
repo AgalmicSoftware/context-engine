@@ -10,7 +10,6 @@ import {
   clearAgentSkillUpdateFlag,
   consensusQuestionsForResults,
   loadQuestionsForSession,
-  loadSessionPolicy,
   loadSubmittedResultRecords,
   mintTelegramGroupApprovalLink,
   parseAgentOnboardingStartParam,
@@ -29,6 +28,7 @@ import {
   writeAgentSkillUpdateFlag,
   writeAdminDefaultSessionOverride,
 } from './telegramCommands.mjs';
+import { loadSessionPolicy } from './sessionPolicyLoader.mjs';
 import { deriveManagedDemoAccount } from './managedAccounts.mjs';
 import { buildResultsImage } from './resultImage.mjs';
 import { loadOrBuildTelegramTopicMap } from './telegramTopicMap.mjs';
