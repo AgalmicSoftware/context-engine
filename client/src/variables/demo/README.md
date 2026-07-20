@@ -151,6 +151,15 @@ The breakdown tab now uses [`demo_analysis_data.json`](./demo_analysis_data.json
   - fall back to [`demo_polis_data.json`](./demo_polis_data.json) when a question is unmapped, when the mapping drifts, or when a persona has no tree vote for that node
 - Keep [`demo_polis_data.json`](./demo_polis_data.json) unchanged unless you also intend to refresh `PolisReport` precomputed cluster metadata
 
+## Reconciling Simulated Profile Answers
+
+[`historical_figure_users.json`](./historical_figure_users.json) binary answers are kept consistent with the canonical vote fixtures instead of being freely hand-edited:
+
+- Reconcile from the repo root with `npm run demo:sim-answers:reconcile`
+- The script lives at [`scripts/reconcile-sim-profile-answers.mjs`](../../../../scripts/reconcile-sim-profile-answers.mjs)
+- Profile questions reference the `all_300_questions.json` policy list via `commentIndex`. Evidence priority per answer: the figure's POLIS vote on the demo comment linked by a verbatim `key_tension` match, then the figure's atlas tree vote on the validated node for that comment from [`demo_analysis_generation_config.json`](./demo_analysis_generation_config.json), then a manually validated bank-question node mapping from [`sim_profile_answer_reconciliation.json`](./sim_profile_answer_reconciliation.json). Answers without evidence are left unchanged.
+- Tree-node mappings are only allowed on nodes whose tree votes empirically agree with the node's anchor POLIS statements for at least 80% of figures with both signals; [`sim_profile_answer_consistency.test.js`](./sim_profile_answer_consistency.test.js) enforces this plus the POLIS-link consistency invariant.
+
 ## Naming And Compatibility Notes
 
 - Most JSON fixtures in this folder use `snake_case`.

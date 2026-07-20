@@ -3,14 +3,21 @@ import assert from 'node:assert/strict';
 import { ethers } from 'ethers';
 import { ACCOUNT_MODES, RISK_CEILINGS, TELEGRAM_BRIDGE_ACTIONS } from './constants.mjs';
 import {
+  ManagedDemoSignerDurableObject,
+  createMemoryDurableObjectState,
+} from './durableObjectSigner.mjs';
+import {
   assertManagedDemoAccountMode,
-  buildDemoKeyExportRecord,
-  deriveDemoPrivateKeyMaterial,
   deriveManagedDemoAccount,
-  evaluateManagedAccountGrant,
   recoverManagedDemoAccountFromKey,
-  summarizeDemoKeyExportForAudit,
 } from './managedAccounts.mjs';
+
+function makeSigner() {
+  return new ManagedDemoSignerDurableObject(createMemoryDurableObjectState(), {
+    AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
+    DEMO_SIGNER_ROOT_SECRET: 'root-a',
+  });
+}
 
 test('same Telegram principal and deployment recover the same managed demo account', async () => {
   const first = await deriveManagedDemoAccount({
@@ -38,7 +45,6 @@ test('same Telegram principal and deployment recover the same managed demo accou
   assert.equal(first.accountAddress, second.accountAddress);
   assert.notEqual(first.accountId, differentPrincipal.accountId);
   assert.notEqual(first.accountId, differentDeployment.accountId);
-  assert.equal(first.signerBoundary, 'deterministic_worker_managed_demo_signer');
   assert.equal(JSON.stringify(first).includes('root-a'), false);
 });
 
@@ -74,30 +80,26 @@ test('managed account issuance fails closed without a root secret', async () => 
 });
 
 test('managed demo account address is derived from the exportable demo key', async () => {
-  const account = await deriveManagedDemoAccount({
+  const signer = makeSigner();
+  const account = await signer.getOrCreateAccount({
     principal: { telegramUserId: '42' },
-    deploymentId: 'deploy-a',
-    rootSecret: 'root-a',
   });
-  const revealed = await buildDemoKeyExportRecord({
+  const revealed = await signer.exportDemoKey({
     account,
     principal: account.principal,
-    deploymentId: account.workerDeploymentId,
-    rootSecret: 'root-a',
     reveal: true,
   });
 
   assert.equal(revealed.ok, true);
-  assert.equal(new ethers.Wallet(revealed.record.privateKey).address, account.accountAddress);
+  assert.equal(new ethers.Wallet(revealed.reveal.privateKey).address, account.accountAddress);
 });
 
-test('managed demo grant checks bound signing to the granted session, action, and risk', async () => {
-  const account = await deriveManagedDemoAccount({
+test('Durable Object signer creates signed canonical demo envelopes after grant checks', async () => {
+  const signer = makeSigner();
+  const account = await signer.getOrCreateAccount({
     principal: { telegramUserId: '42' },
-    deploymentId: 'deploy-a',
-    rootSecret: 'root-a',
   });
-  const allowed = evaluateManagedAccountGrant({
+  const signed = await signer.signCanonicalDemoEnvelope({
     account,
     grant: {
       status: 'active',
@@ -108,9 +110,21 @@ test('managed demo grant checks bound signing to the granted session, action, an
     sessionSlug: 'alpha',
     action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
     requestedRisk: RISK_CEILINGS.SUBMIT,
+    canonicalPayload: {
+      questionId: 'question-1',
+      answerRef: 'answer-ref-1',
+    },
   });
 
-  const denied = evaluateManagedAccountGrant({
+  assert.equal(signed.ok, true);
+  assert.equal(signed.signedEnvelope.broadcast, false);
+  assert.equal(signed.signedEnvelope.chainScope, 'testnet');
+  assert.equal(signed.signedEnvelope.signerBoundary, 'durable_object_managed_demo_signer');
+  assert.match(signed.signedEnvelope.signature, /^0x[0-9a-f]{64}$/);
+  assert.equal(Object.hasOwn(signed.signedEnvelope, 'privateKey'), false);
+  assert.equal(JSON.stringify(signed.events).includes(signed.signedEnvelope.signature), false);
+
+  const denied = await signer.signCanonicalDemoEnvelope({
     account,
     grant: {
       status: 'active',
@@ -122,53 +136,50 @@ test('managed demo grant checks bound signing to the granted session, action, an
     action: TELEGRAM_BRIDGE_ACTIONS.DIRECT_SUBMIT_RESPONSE,
     requestedRisk: RISK_CEILINGS.SUBMIT,
   });
-  assert.equal(allowed.ok, true);
   assert.equal(denied.ok, false);
   assert.equal(denied.reason, 'risk_ceiling_exceeded');
 });
 
-test('raw demo key export and recover are explicit private-only demo paths with redacted audit records', async () => {
-  const account = await deriveManagedDemoAccount({
+test('raw demo key export and recover are explicit private-only demo paths with redacted audit logs', async () => {
+  const signer = makeSigner();
+  const account = await signer.getOrCreateAccount({
     principal: { telegramUserId: '42' },
-    deploymentId: 'deploy-a',
-    rootSecret: 'root-a',
   });
-  const hidden = await buildDemoKeyExportRecord({
+  const hidden = await signer.exportDemoKey({
     account,
     principal: account.principal,
-    deploymentId: account.workerDeploymentId,
-    rootSecret: 'root-a',
     reveal: false,
   });
-  const revealed = await buildDemoKeyExportRecord({
+  const revealed = await signer.exportDemoKey({
     account,
     principal: account.principal,
-    deploymentId: account.workerDeploymentId,
-    rootSecret: 'root-a',
     reveal: true,
   });
 
   assert.equal(hidden.ok, true);
-  assert.equal(hidden.record.privateKey, null);
-  assert.match(revealed.record.privateKey, /^0x[0-9a-f]{64}$/);
-  assert.equal(summarizeDemoKeyExportForAudit(revealed.record).privateKey, '[redacted]');
+  assert.equal(hidden.reveal.privateKey, null);
+  assert.match(revealed.reveal.privateKey, /^0x[0-9a-f]{64}$/);
+  assert.equal(revealed.audit.privateKey, '[redacted]');
+  assert.equal(JSON.stringify(revealed.events).includes(revealed.reveal.privateKey), false);
 
-  const recovered = recoverManagedDemoAccountFromKey({
+  const recovered = signer.recoverDemoKey({
     accountMode: ACCOUNT_MODES.MANAGED_TELEGRAM_DEMO,
-    privateKey: revealed.record.privateKey,
+    privateKey: revealed.reveal.privateKey,
     account,
   });
   assert.equal(recovered.ok, true);
   assert.equal(recovered.account.lifecycle, 'account_recovered');
   assert.equal(recovered.audit.privateKey, '[redacted]');
-  assert.equal(JSON.stringify(recovered.audit).includes(revealed.record.privateKey), false);
-  assert.equal(
-    await deriveDemoPrivateKeyMaterial({
-      principal: account.principal,
-      deploymentId: account.workerDeploymentId,
-      rootSecret: 'root-a',
-    }),
-    revealed.record.privateKey,
+  assert.equal(JSON.stringify(recovered.events).includes(revealed.reveal.privateKey), false);
+});
+
+test('managed demo signer refuses account issuance without a root secret', async () => {
+  const signer = new ManagedDemoSignerDurableObject(createMemoryDurableObjectState(), {
+    AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
+  });
+  await assert.rejects(
+    signer.getOrCreateAccount({ principal: { telegramUserId: '42' } }),
+    /managed_demo_root_secret_missing/,
   );
 });
 

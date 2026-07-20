@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import {
   __test__telegramMiniApp,
@@ -22,11 +21,6 @@ import {
   saveAgentOnlyModeConfig,
   submitAgentOnlyAnswersBulk,
 } from './telegramAgentOnlyMode.mjs';
-
-const HISTORICAL_AGENT_ONLY_WINDOWING = Object.freeze({
-  launchOpensAt: '2026-06-12T08:00:00-07:00',
-  launchClosesAt: '2026-06-15T08:00:00-07:00',
-});
 
 class MemoryKv {
   constructor() {
@@ -176,18 +170,6 @@ test('Mini App explains how to recover an expired launch', async () => {
   assert.match(state.message, /send \/start/);
   assert.equal(state.launchRecovery.command, '/start');
   assert.equal(state.launchRecovery.botUrl, 'https://t.me/contextengineer_bot');
-});
-
-test('Mini App browser asset is owned outside the Worker auth and resource handler host', () => {
-  const serverSource = readFileSync(new URL('./telegramMiniApp.mjs', import.meta.url), 'utf8');
-  const browserSource = readFileSync(new URL('./telegramMiniAppBrowserAsset.mjs', import.meta.url), 'utf8');
-  assert.match(serverSource, /from '\.\/telegramMiniAppBrowserAsset\.mjs'/);
-  assert.doesNotMatch(serverSource, /<!doctype html>|<style>|<script>/);
-  assert.match(browserSource, /export function renderTelegramMiniAppBrowserAsset/);
-  assert.match(browserSource, /<!doctype html>/);
-  assert.match(browserSource, /<style>/);
-  assert.match(browserSource, /<script>/);
-  assert.doesNotMatch(browserSource, /AGENT_ACTION_KV|validateTelegramMiniAppInitData|authenticateSessionWorker/);
 });
 
 test('Mini App renders agree-style controls in client order with client colors', () => {
@@ -2337,7 +2319,7 @@ test('Mini App exposes agent-only sidecar state, human votes, confirm, and edit-
   await saveAgentOnlyModeConfig({
     env,
     sessionSlug: 'alpha',
-    patch: { enabledQuestionIds: [proposed.questionId], windowing: HISTORICAL_AGENT_ONLY_WINDOWING },
+    patch: { enabledQuestionIds: [proposed.questionId] },
     createdAt: '2026-06-12T15:01:00.000Z',
   });
   await materializeAgentOnlyWindow({
@@ -2507,10 +2489,7 @@ test('Mini App classifies agent-only confirm/edit by answer semantics, not displ
   await saveAgentOnlyModeConfig({
     env,
     sessionSlug: 'alpha',
-    patch: {
-      enabledQuestionIds: [freeform.questionId, multichoice.questionId],
-      windowing: HISTORICAL_AGENT_ONLY_WINDOWING,
-    },
+    patch: { enabledQuestionIds: [freeform.questionId, multichoice.questionId] },
     createdAt: '2026-06-12T15:01:00.000Z',
   });
   await materializeAgentOnlyWindow({
@@ -2716,7 +2695,7 @@ test('Mini App submit contains agent-only review failures after persisting the h
   await saveAgentOnlyModeConfig({
     env,
     sessionSlug: 'alpha',
-    patch: { enabledQuestionIds: [proposed.questionId], windowing: HISTORICAL_AGENT_ONLY_WINDOWING },
+    patch: { enabledQuestionIds: [proposed.questionId] },
     createdAt: '2026-06-12T15:01:00.000Z',
   });
   await materializeAgentOnlyWindow({

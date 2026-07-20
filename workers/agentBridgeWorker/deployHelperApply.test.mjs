@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import {
   bundleAgentBridgeWorkerModule,
   buildAgentBridgeWorkerUploadForm,
@@ -12,40 +11,21 @@ import {
 } from './deployHelperApply.mjs';
 
 function completeEnv(overrides = {}) {
-  const sessionWorkerOrigin = overrides.CE_SESSION_WORKER_BASE_URL || 'https://session-worker.tenant-subdomain.workers.dev';
   return {
     CLOUDFLARE_API_TOKEN: 'cf-test-token',
     CLOUDFLARE_ACCOUNT_ID: 'account-123',
     CLOUDFLARE_WORKERS_SUBDOMAIN: 'tenant-subdomain',
-    TELEGRAM_BRIDGE_ENABLED: 'true',
     TELEGRAM_BOT_TOKEN: '123456:test-token',
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
     DEMO_SIGNER_ROOT_SECRET: 'demo-root-secret',
     AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-api-token',
-    CE_SESSION_WORKER_BASE_URL: sessionWorkerOrigin,
-    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
-      version: 1,
-      defaultSessionSlug: 'wrapped-alpha',
-      sessions: [{
-        sessionSlug: 'wrapped-alpha',
-        sessionWorkerUrl: sessionWorkerOrigin,
-        sessionModeProfile: {
-          surfaces: { agentHttp: true, telegram: true },
-          authority: { mode: 'worker_canonical' },
-        },
-      }],
-    }),
+    CE_SESSION_WORKER_BASE_URL: 'https://session-worker.tenant-subdomain.workers.dev',
     DEFAULT_CHAIN_ID: '11155420',
     DEFAULT_RPC_URL: 'https://rpc.example.test',
     ...overrides,
   };
 }
-
-test('deploy apply passes one unambiguous config object into Worker upload', () => {
-  const source = readFileSync(new URL('./deployHelperApply.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /uploadAgentBridgeWorker\(\{[\s\S]*?\bconfig,\s*config,/);
-});
 
 function jsonResponse(body, init = {}) {
   return new Response(JSON.stringify(body), {
@@ -113,50 +93,6 @@ test('deploy apply validation rejects placeholder session worker URLs before mut
   assert.equal(result.validation.missing.some((entry) => entry.includes('CE_SESSION_WORKER_BASE_URL')), true);
 });
 
-test('Telegram-disabled deploy writes no Telegram secrets and performs no bot action', async () => {
-  const calls = [];
-  const fetchMock = async (url, options = {}) => {
-    const method = options.method || 'GET';
-    calls.push({ url: String(url), method, options });
-    if (String(url).endsWith('/storage/kv/namespaces?per_page=100')) {
-      return jsonResponse({ success: true, result: [{ id: 'kv-existing', title: 'ContextEngineAgentBridgeActions:ce-agent-bridge-worker' }] });
-    }
-    if (String(url).endsWith('/workers/scripts/ce-agent-bridge-worker') && method === 'PUT') {
-      return jsonResponse({ success: true, result: { id: 'script-created' } });
-    }
-    if (String(url).endsWith('/workers/scripts/ce-agent-bridge-worker/secrets') && method === 'PUT') {
-      return jsonResponse({ success: true, result: { name: 'secret' } });
-    }
-    if (String(url).endsWith('/accounts/account-123/workers/subdomain') && method === 'GET') {
-      return jsonResponse({ success: true, result: { subdomain: 'tenant-subdomain', status: 'active' } });
-    }
-    if (String(url).endsWith('/workers/scripts/ce-agent-bridge-worker/subdomain') && method === 'POST') {
-      return jsonResponse({ success: true, result: { enabled: true } });
-    }
-    throw new Error(`Unexpected fetch ${method} ${url}`);
-  };
-
-  const result = await executeAgentBridgeDeployApply({
-    flags: { apply: true, 'skip-health-check': true },
-    env: completeEnv({
-      TELEGRAM_BRIDGE_ENABLED: '',
-      TELEGRAM_BOT_TOKEN: '',
-      TELEGRAM_BOT_USERNAME: '',
-      TELEGRAM_WEBHOOK_SECRET: '',
-    }),
-    fetchImpl: fetchMock,
-  });
-
-  const writtenSecrets = calls
-    .filter((call) => call.url.endsWith('/workers/scripts/ce-agent-bridge-worker/secrets'))
-    .map((call) => JSON.parse(call.options.body || '{}').name);
-  assert.equal(result.ok, true);
-  assert.equal(result.webhookUrl, null);
-  assert.deepEqual(result.telegram, { ok: true, skipped: true, reason: 'telegram_disabled' });
-  assert.deepEqual(writtenSecrets.sort(), ['AGENT_BRIDGE_AGENT_API_TOKEN', 'DEMO_SIGNER_ROOT_SECRET']);
-  assert.equal(calls.some((call) => call.url.startsWith('https://api.telegram.org/')), false);
-});
-
 test('writeAgentBridgeWorkerSecrets stores optional bridge secrets when present', async () => {
   const written = [];
   const result = await writeAgentBridgeWorkerSecrets({
@@ -175,36 +111,6 @@ test('writeAgentBridgeWorkerSecrets stores optional bridge secrets when present'
   assert.equal(result.ok, true);
   assert.equal(result.written.includes('AGENT_BRIDGE_OPENAI_API_KEY'), true);
   assert.equal(written.find((entry) => entry.name === 'AGENT_BRIDGE_OPENAI_API_KEY')?.text, 'sk-bridge-openai');
-  assert.equal(result.written.includes('AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY'), false);
-});
-
-test('writeAgentBridgeWorkerSecrets writes the Wrapped poster key only from its dedicated input', async () => {
-  const written = [];
-  const result = await writeAgentBridgeWorkerSecrets({
-    apiToken: 'cf-token',
-    accountId: 'account-123',
-    workerName: 'ce-agent-bridge-worker',
-    env: completeEnv({
-      OPENAI_API_KEY: 'sk-session-fallback',
-      AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY: 'sk-wrapped-poster',
-    }),
-    fetchImpl: async (url, init = {}) => {
-      written.push(JSON.parse(init.body || '{}'));
-      return jsonResponse({ success: true, result: {} });
-    },
-  });
-
-  assert.equal(result.ok, true);
-  assert.equal(
-    written.find((entry) => entry.name === 'AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY')?.text,
-    'sk-wrapped-poster',
-  );
-  assert.equal(
-    written.some(
-      (entry) => entry.name === 'AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY' && entry.text === 'sk-session-fallback',
-    ),
-    false,
-  );
 });
 
 test('verifyAgentBridgeHealth returns structured network failures', async () => {
@@ -227,7 +133,7 @@ test('collectAgentBridgeWorkerModules includes the worker entrypoint and transit
 
   assert.equal(names.includes('worker.js'), true);
   assert.equal(names.includes('telegramCommands.mjs'), true);
-  assert.equal(names.includes('durableObjectSigner.mjs'), false);
+  assert.equal(names.includes('durableObjectSigner.mjs'), true);
   assert.equal(modules.every((module) => module.source.length > 0), true);
 });
 
@@ -241,14 +147,33 @@ test('bundleAgentBridgeWorkerModule folds package imports into one upload module
   assert.equal(bundle.source.includes("from './onChainResponses.mjs'"), false);
 });
 
-test('buildAgentBridgeWorkerUploadForm has no Durable Object binding or migration', () => {
-  const upload = buildAgentBridgeWorkerUploadForm({
-    config: { resources: {}, vars: {} },
+test('buildAgentBridgeWorkerUploadForm can omit migrations for already-migrated Durable Objects', () => {
+  const firstUpload = buildAgentBridgeWorkerUploadForm({
+    config: {
+      resources: {
+        durableObjectBinding: 'MANAGED_DEMO_SIGNER',
+        durableObjectClassName: 'ManagedDemoSignerDurableObject',
+      },
+      vars: {},
+    },
     resourceIds: { kvNamespaceId: 'kv-id' },
   });
+  const retryUpload = buildAgentBridgeWorkerUploadForm({
+    config: {
+      resources: {
+        durableObjectBinding: 'MANAGED_DEMO_SIGNER',
+        durableObjectClassName: 'ManagedDemoSignerDurableObject',
+      },
+      vars: {},
+    },
+    resourceIds: { kvNamespaceId: 'kv-id' },
+    omitMigrations: true,
+  });
 
-  assert.equal(upload.metadata.bindings.some((binding) => binding.type === 'durable_object_namespace'), false);
-  assert.equal(Object.hasOwn(upload.metadata, 'migrations'), false);
+  assert.equal(firstUpload.metadata.migrations.new_tag, 'v1');
+  assert.equal(firstUpload.metadata.migrations.old_tag, '');
+  assert.equal(Array.isArray(firstUpload.metadata.migrations), false);
+  assert.equal(Object.hasOwn(retryUpload.metadata, 'migrations'), false);
 });
 
 test('deploy apply creates smoke resources without requiring R2/D1, uploads modules, writes secrets, sets webhook, and checks health', async () => {
@@ -353,7 +278,7 @@ test('deploy apply creates smoke resources without requiring R2/D1, uploads modu
   assert.equal(JSON.stringify(result).includes('demo-root-secret'), false);
 });
 
-test('deploy apply does not retry an upload through a stale Durable Object migration path', async () => {
+test('deploy apply retries worker upload without migrations after migration tag precondition failure', async () => {
   const workerUploadCalls = [];
   const fetchMock = async (url, options = {}) => {
     const method = options.method || 'GET';
@@ -362,10 +287,13 @@ test('deploy apply does not retry an upload through a stale Durable Object migra
     }
     if (String(url).endsWith('/workers/scripts/ce-agent-bridge-worker') && method === 'PUT') {
       workerUploadCalls.push(options.body);
-      return jsonResponse({
-        success: false,
-        errors: [{ code: 10079, message: 'upload precondition failed' }],
-      }, { status: 412 });
+      if (workerUploadCalls.length === 1) {
+        return jsonResponse({
+          success: false,
+          errors: [{ code: 10079, message: "Actor migration tag precondition failed, got tag 'v1' when expected tag ''." }],
+        }, { status: 412 });
+      }
+      return jsonResponse({ success: true, result: { id: 'script-created' } });
     }
     if (String(url).endsWith('/workers/scripts/ce-agent-bridge-worker/secrets') && method === 'PUT') {
       return jsonResponse({ success: true, result: { name: 'secret' } });
@@ -385,9 +313,9 @@ test('deploy apply does not retry an upload through a stale Durable Object migra
     fetchImpl: fetchMock,
   });
 
-  assert.equal(result.ok, false);
-  assert.equal(result.step, 'worker_upload');
-  assert.equal(workerUploadCalls.length, 1);
+  assert.equal(result.ok, true);
+  assert.equal(result.upload.migrationRetry, 'omitted_existing_migration');
+  assert.equal(workerUploadCalls.length, 2);
 });
 
 test('deploy apply provisions R2/D1 only when doc storage is explicitly enabled', async () => {

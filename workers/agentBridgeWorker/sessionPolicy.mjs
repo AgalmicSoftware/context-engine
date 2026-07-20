@@ -341,9 +341,6 @@ export function normalizeSessionPolicy(input = {}, {
     telegramBridgeEnabled: profileTelegramEnabled === null
       ? session.telegramBridgeEnabled !== false
       : profileTelegramEnabled,
-    agentHttpEnabled: sessionModeProfileSurfaces(session)
-      ? sessionModeProfileSurfaces(session).agentHttp === true
-      : normalizeBool(session.agentHttpEnabled || session.agentHttp),
     telegramOnly: profileTelegramFirst === null ? legacyTelegramOnlySession(session) : profileTelegramFirst,
     sessionModeProfile: sessionModeProfile(session) ? { ...sessionModeProfile(session) } : null,
     managedAccountSubmitAllowed: session.managedAccountSubmitAllowed === true,
@@ -514,21 +511,6 @@ export function resolveSessionInvocation(policyInput = {}, sessionNameOrSlug = '
   ));
   if (!session) return { ok: false, reason: 'session_not_linked', sessionSlug: lookup };
   if (session.telegramBridgeEnabled !== true) return { ok: false, reason: 'telegram_bridge_disabled', sessionSlug: session.sessionSlug };
-  return { ok: true, session, policy };
-}
-
-export function resolveAgentHttpSessionInvocation(policyInput = {}, sessionNameOrSlug = '') {
-  const policy = policyInput?.type === 'agent_bridge_session_policy' && Array.isArray(policyInput.linkedSessions)
-    ? policyInput
-    : normalizeSessionPolicy(policyInput);
-  const lookup = safeString(sessionNameOrSlug || policy.defaultSessionSlug).toLowerCase();
-  const session = policy.linkedSessions.find((entry) => (
-    entry.sessionSlug === lookup || entry.sessionName.toLowerCase() === lookup
-  ));
-  if (!session) return { ok: false, reason: 'session_not_linked', sessionSlug: lookup };
-  if (session.agentHttpEnabled !== true) {
-    return { ok: false, reason: 'agent_http_disabled', sessionSlug: session.sessionSlug };
-  }
   return { ok: true, session, policy };
 }
 

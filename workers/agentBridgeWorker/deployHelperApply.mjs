@@ -13,7 +13,6 @@ import {
   buildAgentBridgeWorkerUploadMetadata,
   OPTIONAL_AGENT_BRIDGE_SECRET_NAMES,
   REQUIRED_AGENT_BRIDGE_SECRET_NAMES,
-  REQUIRED_AGENT_BRIDGE_TELEGRAM_SECRET_NAMES,
   resolveAgentBridgeDeployConfigForLive,
   validateAgentBridgeDeployConfig,
 } from './deployHelperPlan.mjs';
@@ -123,7 +122,6 @@ export function parseAgentBridgeApplyArgs(argv = process.argv.slice(2)) {
     'apply',
     'dry-run',
     'enable-doc-storage',
-    'enable-telegram',
     'help',
     'include-workers-dev-subdomain-setup',
     'json',
@@ -471,11 +469,15 @@ function withCreatedBindings(metadata = {}, resources = {}) {
 export function buildAgentBridgeWorkerUploadForm({
   config = {},
   resourceIds = {},
+  omitMigrations = false,
   workerDir = WORKER_DIR,
   readFileImpl = readFileSync,
   existsImpl = existsSync,
 } = {}) {
   const metadata = withCreatedBindings(buildAgentBridgeWorkerUploadMetadata(config), resourceIds);
+  if (omitMigrations) {
+    delete metadata.migrations;
+  }
   const bundledModule = bundleAgentBridgeWorkerModule({
     workerDir,
     entrypoint: DEFAULT_ENTRYPOINT,
@@ -494,6 +496,15 @@ export function buildAgentBridgeWorkerUploadForm({
       bytes: Buffer.byteLength(module.source),
     })),
   };
+}
+
+function isDurableObjectMigrationPreconditionFailure(response = {}) {
+  const errorText = [
+    response.error,
+    ...(Array.isArray(response.detail) ? response.detail.map((entry) => entry?.message) : []),
+  ].join('\n');
+  return Number(response.status || 0) === 412
+    && /migration tag precondition failed/i.test(errorText);
 }
 
 export async function uploadAgentBridgeWorker({
@@ -518,6 +529,27 @@ export async function uploadAgentBridgeWorker({
     method: 'PUT',
     body: upload.form,
   }, { fetchImpl });
+  if (!response.ok && isDurableObjectMigrationPreconditionFailure(response)) {
+    const retryUpload = buildAgentBridgeWorkerUploadForm({
+      config,
+      resourceIds,
+      omitMigrations: true,
+      workerDir,
+      readFileImpl,
+      existsImpl,
+    });
+    const retryResponse = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}`, {
+      method: 'PUT',
+      body: retryUpload.form,
+    }, { fetchImpl });
+    if (!retryResponse.ok) return normalizeCfFailure('worker_upload', retryResponse);
+    return {
+      ok: true,
+      metadata: retryUpload.metadata,
+      modules: retryUpload.modules,
+      migrationRetry: 'omitted_existing_migration',
+    };
+  }
   if (!response.ok) return normalizeCfFailure('worker_upload', response);
   return {
     ok: true,
@@ -530,20 +562,15 @@ export async function writeAgentBridgeWorkerSecrets({
   apiToken = '',
   accountId = '',
   workerName = '',
-  config = {},
   env = {},
   fetchImpl = globalThis.fetch,
 } = {}) {
   const written = [];
   const optionalSecretValues = {
     AGENT_BRIDGE_OPENAI_API_KEY: safeString(env.AGENT_BRIDGE_OPENAI_API_KEY || env.OPENAI_API_KEY || env.E2E_OPENAI_KEY),
-    AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY: safeString(env.AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY),
   };
   const secrets = [
-    ...[
-      ...REQUIRED_AGENT_BRIDGE_SECRET_NAMES,
-      ...(config.telegramEnabled ? REQUIRED_AGENT_BRIDGE_TELEGRAM_SECRET_NAMES : []),
-    ].map((name) => ({
+    ...REQUIRED_AGENT_BRIDGE_SECRET_NAMES.map((name) => ({
       name,
       text: safeString(env[name]),
       required: true,
@@ -894,7 +921,6 @@ export async function executeAgentBridgeDeployApply({
     apiToken,
     accountId,
     workerName,
-    config,
     env: resolvedEnv,
     fetchImpl,
   });
@@ -908,14 +934,10 @@ export async function executeAgentBridgeDeployApply({
     fetchImpl,
   });
   const publicUrl = safeString(workersDev.workerUrl).replace(/\/+$/, '') || plan.publicUrl;
-  const webhookUrl = config.telegramEnabled
-    ? `${publicUrl.replace(/\/+$/, '')}/telegram/webhook`
-    : null;
+  const webhookUrl = `${publicUrl.replace(/\/+$/, '')}/telegram/webhook`;
 
-  const telegram = !config.telegramEnabled
-    ? { ok: true, skipped: true, reason: 'telegram_disabled' }
-    : flags['skip-telegram-webhook'] === true
-      ? { ok: true, skipped: true, reason: 'telegram_actions_skipped' }
+  const telegram = flags['skip-telegram-webhook'] === true
+    ? { ok: true, skipped: true }
     : await (async () => {
       const webhook = await setAgentBridgeTelegramWebhook({
         botToken: resolvedEnv.TELEGRAM_BOT_TOKEN,
@@ -980,6 +1002,7 @@ export async function executeAgentBridgeDeployApply({
     upload: {
       moduleCount: upload.modules.length,
       mainModule: upload.metadata.main_module,
+      migrationRetry: upload.migrationRetry || null,
     },
     secrets: {
       written: secrets.written,
@@ -1007,14 +1030,13 @@ function printUsage() {
     '',
     'Environment:',
     '  Reads workers/agentBridgeWorker/.dev.vars by default, then overlays process.env.',
-    '  Keep CLOUDFLARE_API_TOKEN, DEMO_SIGNER_ROOT_SECRET, AGENT_BRIDGE_AGENT_API_TOKEN, and any optional Telegram secrets out of git.',
+    '  Keep TELEGRAM_BOT_TOKEN, CLOUDFLARE_API_TOKEN, TELEGRAM_WEBHOOK_SECRET, DEMO_SIGNER_ROOT_SECRET, and AGENT_BRIDGE_AGENT_API_TOKEN out of git.',
     '',
     'Flags:',
-    '  --apply                         Execute live Cloudflare upload, Worker secret writes, optional Telegram setup, and health check',
+    '  --apply                         Execute live Cloudflare upload, Worker secret writes, Telegram setup, and health check',
     '  --enable-doc-storage            Also provision and bind bridge-owned R2/D1 demo storage resources',
-    '  --enable-telegram               Configure the optional Telegram adapter and bot actions',
     '  --env-file <path>               Read a different dotenv-style env file',
-    '  --skip-telegram-webhook         Diagnose a Telegram-enabled deploy without bot actions',
+    '  --skip-telegram-webhook         Deploy without setting Telegram setWebhook or bot commands',
     '  --skip-health-check             Deploy without verifying /health',
     '  --include-workers-dev-subdomain-setup',
     '                                  Allow account-level workers.dev subdomain create/change when needed',

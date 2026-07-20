@@ -11,7 +11,6 @@ export const AGENT_CREDENTIAL_KV_PREFIX = 'agent:credential:v2:';
 export const AGENT_CREDENTIAL_SLOT_KV_PREFIX = 'agent:credential-slot:v2:';
 export const AGENT_CREDENTIAL_DEFAULT_TTL_SECONDS = 28 * 24 * 60 * 60;
 export const AGENT_BROWSER_CREDENTIAL_TTL_SECONDS = 60 * 60;
-export const AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS = 24 * 60 * 60;
 
 export const AGENT_CREDENTIAL_AUDIENCES = Object.freeze({
   AGENT_BRIDGE: 'agent_bridge',
@@ -22,7 +21,6 @@ export const AGENT_CREDENTIAL_KINDS = Object.freeze({
   USER: 'user',
   SERVICE: 'service',
   BROWSER: 'browser',
-  MEMBER: 'member',
   AGENT_ONLY: 'agent_only',
 });
 

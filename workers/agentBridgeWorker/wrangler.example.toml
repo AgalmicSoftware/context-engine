@@ -11,6 +11,14 @@ compatibility_flags = ["nodejs_compat"]
 # derives the account from CLOUDFLARE_API_TOKEN and blocks if multiple accounts
 # are visible. Developers may add account_id locally only as a Wrangler fallback.
 
+durable_objects.bindings = [
+  { name = "MANAGED_DEMO_SIGNER", class_name = "ManagedDemoSignerDurableObject" },
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ManagedDemoSignerDurableObject"]
+
 kv_namespaces = [
   { binding = "AGENT_ACTION_KV", id = "YOUR_SHORT_LIVED_ACTION_KV_NAMESPACE_ID" },
 ]
@@ -55,15 +63,14 @@ bucket_name = "ce-agent-docs-private"
 
 [vars]
 AGENT_BRIDGE_DEPLOYMENT_ID = "local-demo"
+TELEGRAM_BRIDGE_ENABLED = "false"
+TELEGRAM_BOT_USERNAME = "YOUR_BOT_USERNAME"
 AGENT_BRIDGE_PUBLIC_URL = "https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev"
 CE_SESSION_WORKER_BASE_URL = "https://<session-worker>.<workers-subdomain>.workers.dev"
 DEFAULT_CHAIN_ID = "11155420"
 DEFAULT_RPC_URL = "https://op-sepolia-testnet.api.pocket.network"
 # Optional additive fallback, not a replacement for DEFAULT_RPC_URL:
 # ADDITIONAL_RPC_URL = "https://your-op-sepolia-rpc.example"
-# Optional Telegram adapter; leave all Telegram values absent for Wrapped-only deployments.
-# TELEGRAM_BRIDGE_ENABLED = "true"
-# TELEGRAM_BOT_USERNAME = "YOUR_BOT_USERNAME"
 # Default question source is live. Use "fixture" only for local preview/demo copy.
 # Mock Telegram preview routes are disabled by default; enable only for local browser/copy testing.
 # AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW = "true"
@@ -85,9 +92,11 @@ DEFAULT_RPC_URL = "https://op-sepolia-testnet.api.pocket.network"
 # Edge City 2026 demo session policy. Production should set this as the
 # Cloudflare `AGENT_BRIDGE_SESSION_POLICY_JSON` env var, not as a secret. Keep
 # `ee-26-test` visible while smoke testing; after the organizers/users sessions
-# Dedicated deployments require exactly one explicit session whose Worker URL
-# matches CE_SESSION_WORKER_BASE_URL and whose agentHttp surface is enabled.
-AGENT_BRIDGE_SESSION_POLICY_JSON = "{\"version\":1,\"defaultSessionSlug\":\"YOUR_SESSION_SLUG\",\"sessions\":[{\"sessionSlug\":\"YOUR_SESSION_SLUG\",\"sessionWorkerUrl\":\"https://<session-worker>.<workers-subdomain>.workers.dev\",\"sessionModeProfile\":{\"surfaces\":{\"agentHttp\":true,\"telegram\":false},\"authority\":{\"mode\":\"worker_canonical\"}}}]}"
+# are created, set AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER to a timestamp
+# after the test session's createdAt and before the public sessions' createdAt.
+# Non-default sessions without createdAt metadata are hidden while a cutoff is set.
+# AGENT_BRIDGE_SESSION_POLICY_JSON = "{\"default\":\"ee-26-organizers\",\"defaultSessionSchedule\":[{\"sessionSlug\":\"ee-26-organizers\",\"until\":\"2026-05-30T00:00:00Z\"},{\"sessionSlug\":\"ee-26-users\",\"from\":\"2026-05-30T00:00:00Z\"}],\"sessions\":[{\"sessionSlug\":\"ee-26-test\",\"sessionName\":\"EE26 Test\",\"telegramOnly\":true,\"telegramBridgeEnabled\":true,\"createdAt\":\"2026-05-29T00:00:00Z\"},{\"sessionSlug\":\"ee-26-organizers\",\"sessionName\":\"EE26 Organizers\",\"telegramOnly\":true,\"telegramBridgeEnabled\":true,\"createdAt\":\"2026-05-29T01:00:00Z\"},{\"sessionSlug\":\"ee-26-users\",\"sessionName\":\"EE26 Users\",\"telegramOnly\":true,\"telegramBridgeEnabled\":true,\"createdAt\":\"2026-05-29T02:00:00Z\"}]}"
+# AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER = "2026-05-29T01:00:00Z"
 # Live question scans prefer metadata blockLimits, then SessionCreated for the slug.
 # AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK = "0"
 # AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK = ""
@@ -103,8 +112,10 @@ AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN = "true"
 # CE_SESSION_WORKER_BASE_URL, Surveys address config from the linked session,
 # AGENT_BRIDGE_SURVEYS_ADDRESS, or the OP Sepolia default, plus
 # managedAccountSubmitAllowed=true in AGENT_BRIDGE_SESSION_POLICY_JSON.
-# The single session may enable surfaces.telegram when the optional adapter is
-# configured. Set
+# Telegram-visible worker-backed sessions should set telegramOnly=true,
+# sessionMode=telegram_only, or Cloudflare question storage without an explicit
+# on-chain question mode so ordinary registry sessions are not listed
+# accidentally. Set
 # either broadcast flag to "false" to force canonical submit-request records
 # instead of broadcasting.
 # Optional override for session worker auth. Defaults to AGENT_BRIDGE_PUBLIC_URL
@@ -119,10 +130,10 @@ AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN = "true"
 
 # deploy:apply writes these secrets through Cloudflare API. If debugging a
 # manual Wrangler deployment, set secrets with Wrangler, never in this file:
+#   npx wrangler secret put TELEGRAM_BOT_TOKEN
+#   npx wrangler secret put TELEGRAM_WEBHOOK_SECRET
 #   npx wrangler secret put DEMO_SIGNER_ROOT_SECRET
 #   npx wrangler secret put AGENT_BRIDGE_AGENT_API_TOKEN
 #   npx wrangler secret put AGENT_BRIDGE_OPENAI_API_KEY
-# Telegram-enabled deployments additionally set TELEGRAM_BOT_TOKEN and
-# TELEGRAM_WEBHOOK_SECRET; Wrapped-only deployments do not create them.
 # Keep CLOUDFLARE_API_TOKEN out of deployed Worker secrets. Use it only from an
 # untracked local shell/.env/.dev.vars for deploy planning or apply automation.

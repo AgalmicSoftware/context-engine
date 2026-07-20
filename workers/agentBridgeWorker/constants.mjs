@@ -1,5 +1,4 @@
 export const AGENT_BRIDGE_WORKER_VERSION = 'agent-bridge-worker-private-v1';
-export const AGENT_SESSION_WRAPPED_PROTOCOL_VERSION = 'agent-session-wrapped-v1';
 
 export const AGENT_BRIDGE_EVENT_TYPES = Object.freeze({
   GROUP_CARD_POSTED: 'group_card_posted',
