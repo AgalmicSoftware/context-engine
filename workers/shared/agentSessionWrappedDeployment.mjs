@@ -1,8 +1,3 @@
-import {
-  fetchExpectedWorkerBundleDigest,
-  normalizeWorkerBundleSha256,
-} from './workerReleaseManifest.mjs';
-
 export const AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND = 'agent_session_wrapped';
 export const AGENT_SESSION_WRAPPED_PROTOCOL_VERSION = 'agent-session-wrapped-v1';
 
@@ -47,19 +42,15 @@ const normalizeAuthorityMode = (value) => {
 const encode = (value) => new TextEncoder().encode(String(value || ''));
 const bytesToHex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 const sha256Hex = async (value) => bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256', encode(value))));
-const randomSecret = () => {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return bytesToHex(bytes);
+const deriveSecret = async ({ apiToken, deploymentId, purpose }) => {
+  const key = await crypto.subtle.importKey('raw', encode(apiToken), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('HMAC', key, encode(`context-engine:agent-session-wrapped:v1:${deploymentId}:${purpose}`));
+  return bytesToHex(new Uint8Array(signature));
 };
 const response = (ok, status, body) => ({ ok, status, body });
 const failure = (status, step, error) => response(false, status, { ok: false, step, error: toStr(error) });
-const isAmbiguousMutationFailure = (result = {}) => {
-  const status = Number(result?.status || 0);
-  return !status || status >= 500 || [408, 409, 412, 425, 429, 499].includes(status);
-};
 
-const policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled = true }) => ({
+const policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode }) => ({
   version: 1,
   defaultSessionSlug: sessionSlug,
   sessions: [{
@@ -67,7 +58,7 @@ const policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpE
     sessionWorkerUrl: sessionWorkerOrigin,
     telegramBridgeEnabled: false,
     sessionModeProfile: {
-      surfaces: { agentHttp: agentHttpEnabled, telegram: false },
+      surfaces: { agentHttp: true, telegram: false },
       authority: { mode: authorityMode },
     },
   }],
@@ -144,80 +135,6 @@ const listMatchingKvNamespaces = async ({ apiToken, accountId, title, cfFetchImp
   return { ok: true, match: matches[0] || null };
 };
 
-const normalizeCapability = (value) => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const origin = normalizeHttpsOrigin(value.origin);
-  const protocolVersion = toStr(value.protocolVersion);
-  const revision = toStr(value.revision);
-  const verifiedAt = toStr(value.verifiedAt);
-  if (
-    Number(value.version) !== 1 ||
-    typeof value.enabled !== 'boolean' ||
-    !origin ||
-    protocolVersion !== AGENT_SESSION_WRAPPED_PROTOCOL_VERSION ||
-    !/^wrapped-[0-9a-f]{16}$/.test(revision) ||
-    !Number.isFinite(Date.parse(verifiedAt))
-  ) return null;
-  return { version: 1, enabled: value.enabled, origin, protocolVersion, revision, verifiedAt };
-};
-
-export async function persistAgentSessionWrappedCapability({
-  apiToken = '',
-  accountId = '',
-  kvNamespaceId = '',
-  sessionConfigKey = '',
-  sessionSlug = '',
-  sessionWorkerOrigin = '',
-  capability = null,
-  cfFetchImpl,
-} = {}) {
-  const token = toStr(apiToken);
-  const account = toStr(accountId);
-  const kvId = toStr(kvNamespaceId);
-  const configKey = toStr(sessionConfigKey);
-  const slug = safeSlug(sessionSlug);
-  const workerOrigin = normalizeHttpsOrigin(sessionWorkerOrigin);
-  const normalizedCapability = normalizeCapability(capability);
-  if (!token || !account || !kvId || !configKey || !slug || !workerOrigin || !normalizedCapability) {
-    return failure(400, 'capability_config_validate', 'Wrapped capability publication inputs are invalid.');
-  }
-  if (typeof cfFetchImpl !== 'function') {
-    return failure(500, 'capability_config_validate', 'Cloudflare deployment client is unavailable.');
-  }
-  const path = `/accounts/${account}/storage/kv/namespaces/${kvId}/values/${configKey}`;
-  const current = await cfFetchImpl(token, path, { method: 'GET' });
-  const currentConfig = current?.data?.result || current?.data || {};
-  if (!current.ok) {
-    return failure(502, 'capability_config_read', current.error || 'Session Worker config is unavailable.');
-  }
-  if (
-    safeSlug(currentConfig.slug) !== slug ||
-    normalizeHttpsOrigin(currentConfig.corsWorkerUrl) !== workerOrigin
-  ) {
-    return failure(409, 'capability_config_identity', 'Live session config does not match the paired session Worker.');
-  }
-  const nextConfig = { ...currentConfig, agentSessionWrapped: normalizedCapability };
-  const written = await cfFetchImpl(token, path, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(nextConfig),
-  });
-  if (!written.ok) {
-    return failure(502, 'capability_config_write', written.error || 'Wrapped capability config write failed.');
-  }
-  const verified = await cfFetchImpl(token, path, { method: 'GET' });
-  const verifiedConfig = verified?.data?.result || verified?.data || {};
-  if (
-    !verified.ok ||
-    safeSlug(verifiedConfig.slug) !== slug ||
-    normalizeHttpsOrigin(verifiedConfig.corsWorkerUrl) !== workerOrigin ||
-    JSON.stringify(normalizeCapability(verifiedConfig.agentSessionWrapped)) !== JSON.stringify(normalizedCapability)
-  ) {
-    return failure(502, 'capability_config_verify', 'Wrapped capability did not verify in session Worker config.');
-  }
-  return response(true, 200, { ok: true, agentSessionWrapped: normalizedCapability });
-}
-
 export async function executeAgentSessionWrappedDeployment({
   body = {},
   env = {},
@@ -226,7 +143,6 @@ export async function executeAgentSessionWrappedDeployment({
   fetchImpl = globalThis.fetch,
   now = () => new Date(),
   markMutationStarted = null,
-  randomSecretImpl = randomSecret,
 } = {}) {
   let mutationMarked = false;
   const beforeMutation = async () => {
@@ -245,35 +161,15 @@ export async function executeAgentSessionWrappedDeployment({
   const sessionWorkerOrigin = normalizeHttpsOrigin(body.sessionWorkerOrigin || body.sessionWorkerUrl);
   const sessionDeploymentIdentity = safeDeploymentIdentity(body.sessionDeploymentIdentity);
   const authorityMode = normalizeAuthorityMode(body.authorityMode);
-  const agentHttpEnabled = body.agentHttpEnabled === undefined ? true : body.agentHttpEnabled;
   if (body.deploymentKind !== AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
     return fail(400, 'validate', 'Invalid deployment kind.');
   }
-  if (!apiToken || !resolvedAccountId || !sessionSlug || !sessionWorkerOrigin || !sessionDeploymentIdentity || !authorityMode || typeof agentHttpEnabled !== 'boolean') {
+  if (!apiToken || !resolvedAccountId || !sessionSlug || !sessionWorkerOrigin || !sessionDeploymentIdentity || !authorityMode) {
     return fail(400, 'validate', 'Dedicated Wrapped deployment requires token, account, session identity, authority mode, and HTTPS session Worker origin.');
   }
   if (typeof cfFetchImpl !== 'function') return fail(500, 'validate', 'Cloudflare deployment client is unavailable.');
   if (body.telegramEnabled === true || toStr(body.telegramBotToken || body.telegramWebhookSecret)) {
     return fail(400, 'validate', 'Telegram configuration is not part of the default dedicated Wrapped deployment.');
-  }
-
-  const suppliedBundleSha256 = toStr(body.bundleSha256);
-  let expectedBundleSha256 = normalizeWorkerBundleSha256(suppliedBundleSha256);
-  if (suppliedBundleSha256 && !expectedBundleSha256) {
-    return fail(400, 'bundle_provenance', 'bundleSha256 must be a complete SHA-256 hex digest.');
-  }
-  if (!toStr(body.bundleText) && toStr(body.bundleManifestUrl)) {
-    const manifestDigest = await fetchExpectedWorkerBundleDigest({
-      manifestUrl: body.bundleManifestUrl,
-      artifactFile: 'agentBridgeWorker.bundle.js',
-      artifactKind: 'agent-bridge-worker',
-      fetchImpl,
-    });
-    if (!manifestDigest.ok) return fail(502, 'bundle_provenance', manifestDigest.error);
-    if (expectedBundleSha256 && expectedBundleSha256 !== manifestDigest.digest) {
-      return fail(409, 'bundle_provenance', 'Worker release manifest digest conflicts with bundleSha256.');
-    }
-    expectedBundleSha256 = manifestDigest.digest;
   }
 
   const bundle = await readBundle({ body, env, fetchImpl });
@@ -282,9 +178,6 @@ export async function executeAgentSessionWrappedDeployment({
     sha256Hex(`context-engine:agent-session-wrapped:deployment:v1:${sessionDeploymentIdentity}`),
     sha256Hex(bundle.source),
   ]);
-  if (expectedBundleSha256 && bundleSha256 !== expectedBundleSha256) {
-    return fail(409, 'bundle_provenance', 'Agent Bridge bundle SHA-256 does not match the verified release manifest.');
-  }
   const workerName = workerNameFor({ sessionSlug, deploymentId });
 
   const accountSubdomain = await cfFetchImpl(
@@ -297,7 +190,7 @@ export async function executeAgentSessionWrappedDeployment({
     return fail(502, 'workers_dev_subdomain', accountSubdomain.error || 'Cloudflare workers.dev subdomain is unavailable.');
   }
   const workerUrl = `https://${workerName}.${subdomain}.workers.dev`;
-  const policyJson = JSON.stringify(policyFor({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled }));
+  const policyJson = JSON.stringify(policyFor({ sessionSlug, sessionWorkerOrigin, authorityMode }));
   const plainBindings = [
     { name: 'AGENT_BRIDGE_DEPLOYMENT_ID', type: 'plain_text', text: deploymentId },
     { name: 'AGENT_BRIDGE_BUNDLE_SHA256', type: 'plain_text', text: bundleSha256 },
@@ -382,30 +275,19 @@ export async function executeAgentSessionWrappedDeployment({
   }
   const generated = [];
   const preserved = [];
-  const secretsPath = `/accounts/${resolvedAccountId}/workers/scripts/${workerName}/secrets`;
   for (const name of REQUIRED_SECRET_NAMES) {
     if (existingSecrets.has(name)) {
       preserved.push(name);
       continue;
     }
     await beforeMutation();
-    const text = randomSecretImpl();
+    const text = await deriveSecret({ apiToken, deploymentId, purpose: name.toLowerCase() });
     const written = await cfFetchImpl(
       apiToken,
-      secretsPath,
+      `/accounts/${resolvedAccountId}/workers/scripts/${workerName}/secrets`,
       { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, type: 'secret_text', text }) },
     );
-    if (!written.ok) {
-      let reconciled = false;
-      if (isAmbiguousMutationFailure(written)) {
-        const inventory = await cfFetchImpl(apiToken, secretsPath, { method: 'GET' });
-        reconciled = inventory.ok && Array.isArray(inventory.data?.result) &&
-          inventory.data.result.some((entry) => (
-            toStr(entry?.type) === 'secret_text' && toStr(entry?.name) === name
-          ));
-      }
-      if (!reconciled) return fail(502, `worker_secret_${name}`, written.error || `Failed to write ${name}.`);
-    }
+    if (!written.ok) return fail(502, `worker_secret_${name}`, written.error || `Failed to write ${name}.`);
     generated.push(name);
   }
 
@@ -431,18 +313,13 @@ export async function executeAgentSessionWrappedDeployment({
     health?.ok === true &&
     health?.worker === 'agentBridgeWorker' &&
     health?.protocolVersion === AGENT_SESSION_WRAPPED_PROTOCOL_VERSION &&
-    health?.agentSessionWrappedConfigured === true &&
-    health?.agentSessionWrappedReady === agentHttpEnabled &&
+    health?.agentSessionWrappedReady === true &&
     safeSlug(health?.dedicatedSession?.sessionSlug) === sessionSlug &&
-    normalizeHttpsOrigin(health?.dedicatedSession?.sessionWorkerOrigin) === sessionWorkerOrigin &&
-    health?.dedicatedSession?.accessEnabled === agentHttpEnabled;
+    normalizeHttpsOrigin(health?.dedicatedSession?.sessionWorkerOrigin) === sessionWorkerOrigin;
   if (!authorityReady) {
     return fail(503, 'authority_health_probe', 'Wrapped Worker health, protocol, or pinned authority did not verify.');
   }
 
-  const revisionDigest = agentHttpEnabled
-    ? bundleSha256
-    : await sha256Hex(`${bundleSha256}:agent-http-disabled`);
   const verifiedAt = now().toISOString();
   return response(true, 200, {
     ok: true,
@@ -456,18 +333,13 @@ export async function executeAgentSessionWrappedDeployment({
     resources: { kvNamespaceId: kvId, kvReused },
     upload: { reused: bundleAlreadyUploaded, bundleSha256, metadata: uploadMetadata ? { main_module: uploadMetadata.main_module } : null },
     secrets: { generated, preserved },
-    health: {
-      ok: true,
-      protocolVersion: health.protocolVersion,
-      authorityPinned: true,
-      accessEnabled: agentHttpEnabled,
-    },
+    health: { ok: true, protocolVersion: health.protocolVersion, authorityPinned: true },
     agentSessionWrapped: {
       version: 1,
-      enabled: agentHttpEnabled,
+      enabled: true,
       origin: workerUrl,
       protocolVersion: AGENT_SESSION_WRAPPED_PROTOCOL_VERSION,
-      revision: `wrapped-${revisionDigest.slice(0, 16)}`,
+      revision: `wrapped-${bundleSha256.slice(0, 16)}`,
       verifiedAt,
     },
   });

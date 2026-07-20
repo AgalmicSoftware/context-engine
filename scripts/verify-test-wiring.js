@@ -438,6 +438,9 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
       failures.push(`${workflowPath} has non-immutable action references: ${unpinned.join(', ')}`);
     }
   }
+  if (!publishWorkflow.includes('dist/agentBridgeWorker.bundle.js')) {
+    failures.push('publish-worker-bundles workflow must upload dist/agentBridgeWorker.bundle.js');
+  }
   if (trackedDistFiles.includes('dist/sessionCorsWorker.bundle.js')) {
     failures.push('dist/sessionCorsWorker.bundle.js must not be tracked by git');
   }

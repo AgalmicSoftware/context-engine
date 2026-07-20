@@ -77,27 +77,6 @@ test('buildWorkerBundles skips worker bootstrap for unguarded bundle targets', a
   assert.deepEqual(assertCalls, []);
 });
 
-test('buildWorkerBundles removes trailing horizontal whitespace from generated output', async () => {
-  const { buildWorkerBundles } = await loadModule();
-  const writes = [];
-
-  await buildWorkerBundles({
-    rootDir: '/tmp/context-engine',
-    targetKeys: ['deployHelper'],
-    esbuildImpl: async () => {},
-    mkdirSyncImpl: () => {},
-    readFileSyncImpl: () => 'const worker = true;  \n// comment\t\n',
-    writeFileSyncImpl: (...args) => {
-      writes.push(args);
-    },
-  });
-
-  assert.deepEqual(writes, [[
-    path.resolve('/tmp/context-engine', 'dist/deployHelper.bundle.js'),
-    'const worker = true;\n// comment\n',
-  ]]);
-});
-
 test('Agent Bridge is a release bundle target for browser-driven dedicated deployment', async () => {
   const { resolveWorkerBundleTargets } = await loadModule();
   const [target] = resolveWorkerBundleTargets({

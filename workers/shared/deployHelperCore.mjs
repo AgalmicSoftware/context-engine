@@ -4,6 +4,17 @@ import {
   normalizeStorageBackend,
 } from '../sessionCorsWorker/storageRefNormalization.js';
 import { buildSessionSecretsEnvelope } from './sessionSecretsEnvelope.mjs';
+import {
+  AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
+  executeAgentSessionWrappedDeployment,
+} from './agentSessionWrappedDeployment.mjs';
+import { resolveCloudflareApiBaseUrl } from './deployHelperEndpointConfig.mjs';
+import {
+  findForbiddenCloudflareDeploymentTokenPath,
+  findForbiddenWorkerConfigSecretPath,
+  sanitizeWorkerConfigOpenSubtree,
+  selectDeployWorkerSessionConfigFields,
+} from './workerSessionConfig.mjs';
 
 const { getPathRpcUrl } = rpcDefaults;
 
@@ -381,6 +392,349 @@ export const sanitizeBlockLimits = (incoming) => {
     end: normalizedEnd,
   };
 };
+
+const normalizeWorkerAuthorityScopes = (value, field) => {
+  if (!Array.isArray(value)) {
+    return { ok: false, error: `Worker-canonical authority ${field} must be an array.` };
+  }
+  const normalized = value.map((scope) => toStr(scope).trim().toLowerCase());
+  if (normalized.some((scope) => !ALLOWED_WORKER_AUTHORITY_SCOPES.has(scope))) {
+    return { ok: false, error: `Worker-canonical authority ${field} contains an unsupported scope.` };
+  }
+  return { ok: true, value: [...new Set(normalized)] };
+};
+
+const normalizeWorkerAuthorityLoginGate = (value) => {
+  if (value == null) return { ok: true, value: null };
+  if (!isObj(value) || !Array.isArray(value.conditions)) {
+    return { ok: false, error: 'Worker-canonical authority loginGate must contain a conditions array.' };
+  }
+  const match = toStr(value.match).trim().toLowerCase();
+  if (match && match !== 'any' && match !== 'all') {
+    return { ok: false, error: 'Worker-canonical authority loginGate.match must be "any" or "all".' };
+  }
+  const conditions = [];
+  for (const condition of value.conditions) {
+    if (!isObj(condition)) {
+      return { ok: false, error: 'Worker-canonical authority loginGate contains an invalid condition.' };
+    }
+    const kind = toStr(condition.kind).trim().toLowerCase();
+    if (kind === 'worker_role') {
+      const role = toStr(condition.role || 'admin').trim().toLowerCase() || 'admin';
+      conditions.push({ kind, role });
+      continue;
+    }
+    if (kind === 'worker_group') {
+      const groupId = toStr(condition.groupId).trim();
+      if (!groupId) {
+        return { ok: false, error: 'Worker-canonical worker_group conditions require groupId.' };
+      }
+      conditions.push({ kind, groupId });
+      continue;
+    }
+    return { ok: false, error: 'Worker-canonical authority loginGate contains an unsupported condition.' };
+  }
+  return {
+    ok: true,
+    value: {
+      match: match || 'any',
+      conditions,
+    },
+  };
+};
+
+const resolveWorkerCanonicalAuthorityForDeploy = (incoming) => {
+  if (incoming == null) {
+    return {
+      ok: true,
+      value: {
+        version: DEFAULT_WORKER_CANONICAL_AUTHORITY.version,
+        participantScopes: [...DEFAULT_WORKER_CANONICAL_AUTHORITY.participantScopes],
+        anonymousScopes: [...DEFAULT_WORKER_CANONICAL_AUTHORITY.anonymousScopes],
+      },
+    };
+  }
+  if (!isObj(incoming) || Number(incoming.version) !== 1) {
+    return { ok: false, error: 'Worker-canonical authority policy must use version 1.' };
+  }
+  const participantScopes = normalizeWorkerAuthorityScopes(incoming.participantScopes, 'participantScopes');
+  if (!participantScopes.ok) return participantScopes;
+  const anonymousScopes = normalizeWorkerAuthorityScopes(incoming.anonymousScopes, 'anonymousScopes');
+  if (!anonymousScopes.ok) return anonymousScopes;
+  const loginGate = normalizeWorkerAuthorityLoginGate(incoming.loginGate);
+  if (!loginGate.ok) return loginGate;
+  return {
+    ok: true,
+    value: {
+      version: 1,
+      participantScopes: participantScopes.value,
+      anonymousScopes: anonymousScopes.value,
+      ...(loginGate.value ? { loginGate: loginGate.value } : {}),
+    },
+  };
+};
+
+const workerAuthorityPoliciesMatch = (expected, actual) => (
+  JSON.stringify(expected || null) === JSON.stringify(actual || null)
+);
+
+const buildFreshDeploymentName = (requestedName, deploymentId) => {
+  const base = toStr(requestedName)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 50) || 'ce-session-worker';
+  return `${base}-${toStr(deploymentId).slice(0, 12)}`;
+};
+
+const normalizeDeploymentRequestId = (value) => {
+  const normalized = toStr(value).trim();
+  return DEPLOYMENT_REQUEST_ID_RE.test(normalized) ? normalized : '';
+};
+
+const collectKnownRequestCredentials = (body) => {
+  const credentials = new Set();
+  const visit = (value, sensitive = false) => {
+    if (typeof value === 'string') {
+      const normalized = value.trim();
+      if (sensitive && normalized.length >= 4) credentials.add(normalized);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((entry) => visit(entry, sensitive));
+      return;
+    }
+    if (!isObj(value)) return;
+    Object.entries(value).forEach(([key, entry]) => {
+      const credentialField = sensitive || /(?:token|secret|password|api[_-]?key|private[_-]?key)/i.test(key);
+      visit(entry, credentialField);
+    });
+  };
+  visit(body);
+  return [...credentials].sort((a, b) => b.length - a.length);
+};
+
+const redactKnownCredentials = (value, credentials) => {
+  let redacted = toStr(value);
+  credentials.forEach((credential) => {
+    redacted = redacted.split(credential).join('[REDACTED]');
+  });
+  return redacted;
+};
+
+const buildSafeDeployJournalResult = (result = {}, credentials = []) => {
+  const incomingBody = isObj(result?.body) ? result.body : {};
+  const body = {};
+  [
+    'ok',
+    'error',
+    'step',
+    'deploymentKind',
+    'accountId',
+    'workerName',
+    'workerUrl',
+    'sessionSlug',
+    'sessionWorkerOrigin',
+    'telegramConfigured',
+    'resolvedSlug',
+    'kvNamespaceId',
+    'deploymentId',
+    'sessionConfigKey',
+    'sessionSecretsKey',
+    'sessionKvPrefix',
+    'partial',
+    'writesSessionConfig',
+    'writesSessionSecrets',
+    'tokenSecretSet',
+    'tokenSecretPreserved',
+    'envelopeKekSecretSet',
+    'envelopeKekSecretPreserved',
+    'subdomain',
+    'subdomainStatus',
+    'subdomainEnabled',
+    'subdomainError',
+    'scriptSubdomainEnabled',
+    'scriptSubdomainError',
+    'configVerified',
+    'deploymentRequestPending',
+    'deploymentRequestConflict',
+  ].forEach((key) => {
+    const value = incomingBody[key];
+    if (typeof value === 'string') {
+      body[key] = redactKnownCredentials(value, credentials);
+    } else if (typeof value === 'boolean' || Number.isFinite(value)) {
+      body[key] = value;
+    }
+  });
+  if (isObj(incomingBody.orphanResources)) {
+    body.orphanResources = {};
+    ['kvNamespaceId', 'kvCleanupStatus', 'workerName', 'workerCleanupStatus'].forEach((key) => {
+      const value = incomingBody.orphanResources[key];
+      if (typeof value === 'string') body.orphanResources[key] = value;
+    });
+  }
+  if (isObj(incomingBody.bundleDiagnostics)) {
+    body.bundleDiagnostics = {};
+    [
+      'source',
+      'length',
+      'sha256',
+      'hasAnyExport',
+      'hasExportDefault',
+      'hasNamedDefaultExport',
+      'hasStringExportWrapper',
+      'hasFetchHandler',
+      'hasServiceWorkerFetch',
+    ].forEach((key) => {
+      const value = incomingBody.bundleDiagnostics[key];
+      if (typeof value === 'string' || typeof value === 'boolean' || Number.isFinite(value)) {
+        body.bundleDiagnostics[key] = value;
+      }
+    });
+  }
+  if (isObj(incomingBody.resources)) {
+    body.resources = {};
+    ['kvNamespaceId', 'kvReused'].forEach((key) => {
+      const value = incomingBody.resources[key];
+      if (typeof value === 'string') body.resources[key] = redactKnownCredentials(value, credentials);
+      else if (typeof value === 'boolean' || Number.isFinite(value)) body.resources[key] = value;
+    });
+  }
+  if (isObj(incomingBody.upload)) {
+    body.upload = {};
+    ['reused', 'bundleSha256'].forEach((key) => {
+      const value = incomingBody.upload[key];
+      if (typeof value === 'string') body.upload[key] = redactKnownCredentials(value, credentials);
+      else if (typeof value === 'boolean' || Number.isFinite(value)) body.upload[key] = value;
+    });
+    if (isObj(incomingBody.upload.metadata) && typeof incomingBody.upload.metadata.main_module === 'string') {
+      body.upload.metadata = { main_module: incomingBody.upload.metadata.main_module };
+    } else if (incomingBody.upload.metadata === null) {
+      body.upload.metadata = null;
+    }
+  }
+  if (isObj(incomingBody.secrets)) {
+    body.secrets = {};
+    ['generated', 'preserved'].forEach((key) => {
+      if (Array.isArray(incomingBody.secrets[key])) {
+        body.secrets[key] = incomingBody.secrets[key]
+          .filter((value) => typeof value === 'string')
+          .map((value) => redactKnownCredentials(value, credentials));
+      }
+    });
+  }
+  if (isObj(incomingBody.health)) {
+    body.health = {};
+    ['ok', 'protocolVersion', 'authorityPinned'].forEach((key) => {
+      const value = incomingBody.health[key];
+      if (typeof value === 'string') body.health[key] = redactKnownCredentials(value, credentials);
+      else if (typeof value === 'boolean' || Number.isFinite(value)) body.health[key] = value;
+    });
+  }
+  if (isObj(incomingBody.agentSessionWrapped)) {
+    body.agentSessionWrapped = {};
+    ['version', 'enabled', 'origin', 'protocolVersion', 'revision', 'verifiedAt'].forEach((key) => {
+      const value = incomingBody.agentSessionWrapped[key];
+      if (typeof value === 'string') body.agentSessionWrapped[key] = redactKnownCredentials(value, credentials);
+      else if (typeof value === 'boolean' || Number.isFinite(value)) body.agentSessionWrapped[key] = value;
+    });
+  }
+  if (result?.ok !== true) body.deploymentRequestTerminal = true;
+  return {
+    ok: result?.ok === true,
+    status: Number(result?.status || 0) || 500,
+    body,
+    fallbackEligible: result?.fallbackEligible === true,
+  };
+};
+
+const resolveDeployJournalBinding = (env) => {
+  for (const binding of [env?.DEPLOY_HELPER_KV, env?.GROUP_KV]) {
+    if (typeof binding?.get === 'function' && typeof binding?.put === 'function') return binding;
+  }
+  return null;
+};
+
+const buildDeploymentRequestContext = async ({ body, requestOrigin = '' } = {}) => {
+  const deploymentRequestId = normalizeDeploymentRequestId(body?.deploymentRequestId);
+  if (!deploymentRequestId) return null;
+  const digestBody = { ...(isObj(body) ? body : {}) };
+  delete digestBody.deploymentRequestId;
+  delete digestBody.accountId;
+  digestBody.apiToken = toStr(digestBody.apiToken || digestBody.token).trim();
+  delete digestBody.token;
+  const requestDigest = await sha256Hex(stableCanonicalSerialize({
+    body: digestBody,
+    requestOrigin: normalizeOrigin(requestOrigin) || toStr(requestOrigin).trim(),
+  }));
+  const immutableIdentityDigest = await sha256Hex(stableCanonicalSerialize({
+    requestOrigin: normalizeOrigin(requestOrigin) || toStr(requestOrigin).trim(),
+    deploymentKind: toStr(body?.deploymentKind).trim(),
+    sessionDeploymentIdentity: toStr(body?.sessionDeploymentIdentity).trim(),
+    requestedWorkerName: toStr(body?.workerName).trim(),
+    sessionSlug: toStr(body?.sessionSlug).trim(),
+    sessionWorkerOrigin: toStr(body?.sessionWorkerOrigin || body?.sessionWorkerUrl).trim(),
+    authorityMode: toStr(body?.authorityMode).trim(),
+    sessionId: toStr(body?.sessionId).trim().toLowerCase(),
+    sessionIdHex: toStr(body?.sessionIdHex).trim().toLowerCase(),
+    adminAddress: toStr(body?.adminAddress).trim().toLowerCase(),
+  }));
+  const bundleCorrectionBody = { ...(isObj(body) ? body : {}) };
+  delete bundleCorrectionBody.deploymentRequestId;
+  delete bundleCorrectionBody.accountId;
+  delete bundleCorrectionBody.apiToken;
+  delete bundleCorrectionBody.token;
+  delete bundleCorrectionBody.bundleText;
+  delete bundleCorrectionBody.bundleUrl;
+  const bundleCorrectionDigest = await sha256Hex(stableCanonicalSerialize({
+    body: bundleCorrectionBody,
+    requestOrigin: normalizeOrigin(requestOrigin) || toStr(requestOrigin).trim(),
+  }));
+  const deploymentId = await sha256Hex(`context-engine-deployment:${deploymentRequestId}`);
+  return {
+    deploymentRequestId,
+    requestDigest,
+    // Keep the payload-specific digest even when coordinated recovery swaps
+    // requestDigest for a stable infrastructure identity below.
+    fullRequestDigest: requestDigest,
+    immutableIdentityDigest,
+    bundleCorrectionDigest,
+    deploymentId,
+    requestMarker: deploymentId.slice(0, 16),
+    workerName: buildFreshDeploymentName(body?.workerName, deploymentId),
+    journalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}`,
+    uploadJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:upload`,
+    uploadRejectedJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:upload-rejected`,
+    terminalJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:terminal`,
+    isReplay: false,
+  };
+};
+
+const readDeployJournalRecord = async (binding, key) => {
+  const raw = await binding.get(key);
+  if (!raw) return null;
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return isObj(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeDeployJournalRecord = async (binding, key, record) => binding.put(
+  key,
+  JSON.stringify(record),
+  { expirationTtl: DEPLOYMENT_JOURNAL_TTL_SECONDS },
+);
+
+// A rejected bundle may need correction after the ordinary replay journals
+// expire. Keep this non-secret authority until a terminal receipt commits;
+// using a distinct key also avoids Workers KV's same-key write-rate limit.
+const writeDurableDeployJournalRecord = async (binding, key, record) => binding.put(
+  key,
+  JSON.stringify(record),
+);
 
 const normalizeResourceStage = (value, fallback) => {
   const normalized = toStr(value).trim().toLowerCase();
