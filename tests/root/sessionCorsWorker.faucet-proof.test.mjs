@@ -11,7 +11,6 @@ const SESSION_CONFIG_KEY = (slug) => `session:${slug}:config`;
 const SESSION_SECRETS_KEY = (slug) => `session:${slug}:secrets`;
 const LOGIN_ORIGIN = 'https://contextengine.sh';
 const LOGIN_DOMAIN = 'contextengine.sh';
-const WORKER_CANONICAL_SESSION_ID = '0x00112233445566778899aabbccddeeff';
 
 const registryIface = new ethers.utils.Interface([
   'function getResourceGate(string,string) view returns (address[] sbtAddresses, uint256 chainId, uint8 mode, uint256 perMemberLimit)',

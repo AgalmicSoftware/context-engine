@@ -11,7 +11,7 @@
   "bugs": {
     "url": "https://github.com/AgalmicSoftware/context-engine/issues"
   },
-  "homepage": "https://contextengine.xyz/",
+  "homepage": "https://contextengine.sh/",
   "engines": {
     "npm": "^10.0.0",
     "node": "^20.19.0 || >=22.12.0"

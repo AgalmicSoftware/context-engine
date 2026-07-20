@@ -35,7 +35,7 @@ AGENT_BRIDGE_AUTO_FAUCET_ON_JOIN=true
 # Optional Mini App overrides. Defaults to $AGENT_BRIDGE_PUBLIC_URL/telegram/mini-app.
 # AGENT_BRIDGE_MINI_APP_URL=https://ce-agent-bridge-worker.your-workers-subdomain.workers.dev/telegram/mini-app
 # Optional production web origins allowed to exchange Telegram client tokens.
-# AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.xyz,https://www.contextengine.xyz
+# AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.sh,https://www.contextengine.sh,https://contextengine.xyz,https://www.contextengine.xyz
 # Optional Mini App origins; these are also accepted for client-login exchanges.
 # AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS=https://ce-agent-bridge-worker.your-workers-subdomain.workers.dev
 # AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS=86400

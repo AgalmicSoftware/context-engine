@@ -24,28 +24,7 @@ Context Engine is designed to keep workflows and product-facing capability bound
 - **Operator-managed public deployment — available:** host the static client, operate the Cloudflare worker in your account, and connect it to supported Arweave and public-EVM services.
 - **Company-operated edition — planned, with design work underway:** planning and adapter design are in progress for a packaged edition that runs on existing company hardware, on-premises environments, and private clouds. It will be made available after the adapter, packaging, security, and conformance work is complete, with support for connecting approved storage, identity and access, key-management, AI, and observability services. It is not yet generally available.
 
-## Why Context Engine?
-
-Organizations make high-stakes decisions with incomplete memory.
-
-The final decision may be documented, but the reasoning behind it often disappears:
-
-- What did people believe before the outcome was known?
-- Which assumptions mattered most?
-- Where did people disagree?
-- Who was confident, uncertain, or dissenting?
-- Which predictions later proved accurate?
-- What should future teams and AI agents learn from the decision?
-
-Context Engine captures this missing layer of organizational context. It records beliefs, predictions, disagreement, and confidence in a format that can later be searched, summarized, compared, and exported.
-
-## Example: Strategy Decision Review
-
-Before a major roadmap decision, a team creates a private Context Engine session.
-
-Participants submit expected outcomes, key assumptions, risks and failure modes, confidence levels, and dissenting views. Responses can stay private during collection, then be reviewed later alongside the actual outcome.
-
-The result is a decision record that captures not only what the organization decided, but what it believed at the time.
+[contextengine.sh](https://contextengine.sh) is the hosted public web interface, and the static client can also be self-hosted. The former `.xyz` address redirects to this canonical site. App hosting, public/private session access, and the session infrastructure profile are separate choices. Participants never need deployer API keys.
 
 ## Quick Start
 

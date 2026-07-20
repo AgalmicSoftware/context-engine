@@ -131,7 +131,11 @@ describe('client package modernization contract', () => {
     expect(viteConfig).toContain("outDir: path.resolve(__dirname, 'build')");
     expect(viteConfig).not.toContain("outDir: path.resolve(__dirname, 'build-vite')");
     expect(viteIndex).toContain('__PUBLIC_URL__');
-    expect(viteIndex).toContain('/src/viteEntry.js');
+    expect(viteIndex).toContain('/src/viteEntry.ts');
+    expect(viteIndex).toContain('https://contextengine.sh/assets/img/context-engine-social-preview-square.png');
+    expect(
+      fs.existsSync(path.resolve(__dirname, '../../../public/assets/img/context-engine-social-preview-square.png')),
+    ).toBe(true);
     expect(viteEntry).toContain("import 'assets/css/contextEngine.scss';");
     expect(viteEntry).toContain("import('./index.js')");
     expect(appEntry).not.toContain("import 'assets/css/contextEngine.scss';");

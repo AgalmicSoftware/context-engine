@@ -2254,7 +2254,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.match(wrappedPrompt, /compact top-left "Session Lab" wordmark/);
   assert.match(wrappedPrompt, /attached Session Lab logo image as the style reference/);
   assert.match(wrappedPrompt, /lay "SESSION" and "LAB" side-by-side/);
-  assert.match(wrappedPrompt, /contextengine\.xyz/);
+  assert.match(wrappedPrompt, /contextengine\.sh/);
   assert.doesNotMatch(wrappedPrompt, /Review or edit your agent's responses in Context Engine/);
   assert.doesNotMatch(wrappedPrompt, /What Your Agent Upvoted/);
 

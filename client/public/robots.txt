@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://contextengine.xyz/sitemap.xml
+Sitemap: https://contextengine.sh/sitemap.xml

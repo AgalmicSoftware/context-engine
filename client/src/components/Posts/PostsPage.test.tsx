@@ -62,7 +62,7 @@ const manifest = {
 const firstPostMarkdown = [
   '# First Post',
   '',
-  'This **post** links to [Context Engine](https://contextengine.xyz) and keeps `inline code`.',
+  'This **post** links to [Context Engine](https://contextengine.sh) and keeps `inline code`.',
   '',
   '![Two robots read papers at an outdoor table.](attachments/agent-village.png "Agent Village media example")',
   '',
@@ -225,7 +225,7 @@ describe('PostsPage', () => {
     expect(fullscreenImage).toHaveAttribute('src', '/posts/first-post/attachments/agent-village.png');
     expect(fullscreenImage).toHaveAttribute('alt', '');
     expect(screen.getByText('Agent Village media example')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Context Engine' })).toHaveAttribute('href', 'https://contextengine.xyz');
+    expect(screen.getByRole('link', { name: 'Context Engine' })).toHaveAttribute('href', 'https://contextengine.sh');
     expect(screen.getByText(/<script>alert\("no html"\)<\/script>/)).toBeInTheDocument();
     expect(document.querySelector('script')).not.toBeInTheDocument();
     expect(screen.getByText('Theme distribution')).toBeInTheDocument();

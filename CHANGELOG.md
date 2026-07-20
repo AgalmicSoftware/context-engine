@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Made `contextengine.sh` the canonical public URL across site metadata,
+  discovery assets, documentation, and Agent Bridge links. Worker and Bridge
+  bootstrap allowlists now prefer `.sh` while retaining `.xyz` as redirect
+  compatibility.
 - Replaced the placeholder emoji favicon family with an optically centered
   Context Engine circuit C on white across browser, Apple touch, and Android icons.
 - Added a repository-owned Netlify build contract for strict, Node 20 client
@@ -58,6 +62,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Kept registry-backed session scans bounded when Arweave metadata is temporarily
+  unavailable by deriving the creation block from the registry tuple timestamp
+  before attempting legacy event-log recovery.
 - Kept history-preserving public releases self-testing when the Agent Bridge
   cutover follows a source-only baseline by restoring its narrow root test
   command alongside the audited worker and runner snapshot, while using the

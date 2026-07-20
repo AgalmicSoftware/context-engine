@@ -566,7 +566,7 @@ test('wrapped image prompt uses importance wording and suppresses decorative tex
   assert.doesNotMatch(prompt, /civic introductions/);
   assert.doesNotMatch(prompt, /public repair norm/);
   assert.doesNotMatch(prompt, /exactly 3 precise evidence artifacts/);
-  assert.match(prompt, /contextengine\.xyz/);
+  assert.match(prompt, /contextengine\.sh/);
   assert.match(prompt, /do not reserve a dedicated bottom footer row/);
   assert.match(prompt, /blend with the design/);
   assert.doesNotMatch(prompt, /Review or edit your agent's responses in Context Engine/);

@@ -38,10 +38,10 @@ canonical `/api/agent/*` routes:
 Hosted origin allowlists for the bridge live in deploy environment variables,
 not repo source: `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS` for browser token
 exchange/result cache reads and `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS` for Mini
-App origins. The current first-party set should include
-`https://contextengine.xyz`, `https://www.contextengine.xyz`, and the planned
-`https://contextengine.sh`, `https://www.contextengine.sh` origins before DNS
-cutover.
+App origins. The current first-party set should include the canonical
+`https://contextengine.sh`, `https://www.contextengine.sh` origins and the
+redirect-compatible `https://contextengine.xyz`, `https://www.contextengine.xyz`
+origins.
 
 ## OSS worker model
 

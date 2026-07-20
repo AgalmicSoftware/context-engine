@@ -34,9 +34,9 @@ export const DEFAULT_PUBLIC_PAGE_TITLE = 'Context Engine | Deliberation Toolkit'
 export const DEFAULT_PUBLIC_PAGE_DESCRIPTION =
   'Context Engine is a toolkit for AI-enhanced deliberation and sensemaking in large groups, with public and private participation, permanent records, and cryptographic access control.';
 
-export const DEFAULT_PUBLIC_PAGE_IMAGE = 'https://contextengine.xyz/android-chrome-512x512.png';
+export const DEFAULT_PUBLIC_PAGE_IMAGE = 'https://contextengine.sh/assets/img/context-engine-social-preview-square.png';
 export const DEFAULT_PUBLIC_SITE_NAME = 'Context Engine';
-export const DEFAULT_PUBLIC_SITE_URL = 'https://contextengine.xyz/';
+export const DEFAULT_PUBLIC_SITE_URL = 'https://contextengine.sh/';
 
 const PUBLIC_ORGANIZATION_ID = `${DEFAULT_PUBLIC_SITE_URL}#organization`;
 const PUBLIC_SOURCE_CODE_ID = `${DEFAULT_PUBLIC_SITE_URL}#source`;

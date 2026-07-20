@@ -2724,7 +2724,7 @@ ${tokenUsageLine || 'No submitted token usage metric; omit token numbers and do 
       prompt: `${common}
 
 Screen 1 of 5: "What your agent thinks it knows about you".
-Make this a hero screen: one large abstract image, one bold archetype label, and one memorable one-liner about what the agent predicts about the principal. Use the agent-about-user analysis if present; otherwise synthesize cautiously from predicted-answer evidence. The image should feel like a phone wallpaper or album-cover opener, not a table. Include only the Session Lab wordmark, the title, the archetype, the one-liner, and a subtle contextengine.xyz mark.
+Make this a hero screen: one large abstract image, one bold archetype label, and one memorable one-liner about what the agent predicts about the principal. Use the agent-about-user analysis if present; otherwise synthesize cautiously from predicted-answer evidence. The image should feel like a phone wallpaper or album-cover opener, not a table. Include only the Session Lab wordmark, the title, the archetype, the one-liner, and a subtle contextengine.sh mark.
 
 ${evidence}`,
     },
@@ -2889,7 +2889,7 @@ ${cautiousLines || 'No visible items; omit this section entirely.'}
 Agent guesses, if available:
 ${agentGuessLines || 'No visible items; omit this section entirely.'}
 
-Include a compact "Why here?" strip with exactly 3 evidence chips when at least 3 concrete evidence items exist. Each chip must have a precise icon and 2-4 word label derived directly from one specific question or prediction above. Do not use generic abstract icons, random symbols, or decorative filler. Put only a faint small "contextengine.xyz" link in the bottom-right corner. Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative filler text, other users, or fake data.`;
+Include a compact "Why here?" strip with exactly 3 evidence chips when at least 3 concrete evidence items exist. Each chip must have a precise icon and 2-4 word label derived directly from one specific question or prediction above. Do not use generic abstract icons, random symbols, or decorative filler. Put only a faint small "contextengine.sh" link in the bottom-right corner. Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative filler text, other users, or fake data.`;
 }
 
 export function buildAgentOnlyWrappedImagePrompt({
@@ -2985,7 +2985,7 @@ Binary answer styling: for binary choice prediction rows only, render exactly on
 
 Agent Comparison: compare the principal to a historical figure or fictional/book character only if it feels supported by the predicted human responses or the agent-about-user evidence; if unsupported, omit the comparison card instead of showing unavailable text. Prefer historically accurate deep cuts when supported by the evidence: recognizable but less generic comparisons are better than defaulting to Benjamin Franklin, Leonardo da Vinci, or other obvious polymath icons. Keep this compact in the bottom-right corner or right side of the shared bottom band: a small stylized portrait/silhouette, the comparison name, and one brief description line of no more than 10 words. It should take less space than Agent Guesses and must not create a large empty illustration panel. Do not include Agent Guesses in this section. Do not add the old trio of comparison evidence icons, artifact tiles, or extra proof objects beside the historical figure.
 
-Footer: remove the review/edit sentence entirely and do not reserve a dedicated bottom footer row. Put only a small low-contrast but readable "contextengine.xyz" link tucked into the bottom-right corner; it should blend with the design, not be barely invisible.
+Footer: remove the review/edit sentence entirely and do not reserve a dedicated bottom footer row. Put only a small low-contrast but readable "contextengine.sh" link tucked into the bottom-right corner; it should blend with the design, not be barely invisible.
 
 Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative text, lorem ipsum, fake UI labels, or random numbers. Keep the graphic memeable, premium, and screenshot-friendly. Make all major text legible and avoid overcrowding.`;
   assertNoSecretShape({ prompt }, 'Agent-only wrapped image prompt must not serialize secrets.');

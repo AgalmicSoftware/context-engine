@@ -40,16 +40,16 @@ If the default public branch changes, update:
 
 ## Google Crawl Checklist
 
-1. Deploy the updated client build so the new public files are live at `https://contextengine.xyz/`.
-2. In Google Search Console, add the `https://contextengine.xyz/` property if it is not already verified.
-3. Submit `https://contextengine.xyz/sitemap.xml`.
+1. Deploy the updated client build so the new public files are live at `https://contextengine.sh/`.
+2. In Google Search Console, add the `https://contextengine.sh/` property if it is not already verified.
+3. Submit `https://contextengine.sh/sitemap.xml`.
 4. Use URL Inspection and request indexing for:
-   - `https://contextengine.xyz/`
-   - `https://contextengine.xyz/discoverability.html`
+   - `https://contextengine.sh/`
+   - `https://contextengine.sh/discoverability.html`
 5. Confirm the live raw HTML really contains the repo links:
-   - `curl -s https://contextengine.xyz/ | rg "AgalmicSoftware/context-engine|discoverability.html|llms.txt"`
+   - `curl -s https://contextengine.sh/ | rg "AgalmicSoftware/context-engine|discoverability.html|llms.txt"`
 6. Confirm the sitemap is live:
-   - `curl -s https://contextengine.xyz/sitemap.xml`
+   - `curl -s https://contextengine.sh/sitemap.xml`
 7. Keep SPA-only routes such as `/about` and `/contracts` out of the static
    sitemap until they have distinct raw-HTML or prerendered metadata.
 
@@ -64,13 +64,13 @@ paste the live `main` branch link or the relevant raw document URL directly.
 
 Canonical production-site discovery URLs stay fixed at:
 
-- `https://contextengine.xyz/discoverability.html`
-- `https://contextengine.xyz/llms.txt`
+- `https://contextengine.sh/discoverability.html`
+- `https://contextengine.sh/llms.txt`
 
 Use those canonical URLs when an external reference explicitly needs to point at
 the production site.
 
 Deployment-relative discovery asset URLs are emitted by `syncPublicPageHead()`
 at runtime for the current deployment origin plus the configured `PUBLIC_URL`
-base path. On `https://contextengine.xyz/` they match the canonical URLs. On
+base path. On `https://contextengine.sh/` they match the canonical URLs. On
 preview hosts or subpath deployments, they resolve to that deployment instead.

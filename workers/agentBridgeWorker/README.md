@@ -543,7 +543,7 @@ Required values:
 | `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `TELEGRAM_WEBHOOK_SECRET`; Telegram sends it as `X-Telegram-Bot-Api-Secret-Token` |
 | `DEMO_SIGNER_ROOT_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `DEMO_SIGNER_ROOT_SECRET` |
 | `AGENT_BRIDGE_AGENT_API_TOKEN` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes the root/bootstrap and break-glass secret. Use it to mint named service credentials; do not distribute it as an integration token |
-| Production web client origins | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.xyz,https://www.contextengine.xyz,https://contextengine.sh,https://www.contextengine.sh` so hosted clients can exchange agent credentials and read result-view cache entries during the current `.xyz` deployment and the planned `.sh` cutover. Result-view cache writes require root authority. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges |
+| Production web client origins | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.sh,https://www.contextengine.sh,https://contextengine.xyz,https://www.contextengine.xyz` so the canonical `.sh` clients can exchange agent credentials and read result-view cache entries while the redirecting `.xyz` origins remain compatible during migration. Result-view cache writes require root authority. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges |
 | Optional one-time onboarding invite | Store a SHA-256 hash in `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES`, or use `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON` records with `tokenHash`, `sessionSlug`, `label`, and `source`. The agent sends the plaintext invite only in the JSON body of `POST /api/agent/invite/onboard`. Telegram identity may be included by a Telegram adapter but is not required |
 | Optional OpenAI key for Telegram AI | Paste into untracked `.dev.vars` as `AGENT_BRIDGE_OPENAI_API_KEY` or `OPENAI_API_KEY`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_OPENAI_API_KEY`. Telegram question generation, AI search, add-question formatting, group analysis, and transcription pass it as a request-local `apiKey` to the configured session worker when that session worker has no per-session `openaiKey` secret |
 | Public deployed `agentBridgeWorker` URL | Paste or derive the Workers.dev base URL as `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev`; live apply can derive it when the token can read the account workers.dev subdomain |
@@ -946,7 +946,8 @@ Current v0 scope:
   `AGENT_BRIDGE_PUBLIC_URL`. If a session worker rejects one candidate with
   `Origin not allowed` or a trusted-login origin error, the bridge retries with
   standard Context Engine origins such as `http://localhost:3000`,
-  `https://contextengine.xyz`, and `http://localhost:7391`. Direct-submit auth
+  `https://contextengine.sh`, the redirect-compatible `https://contextengine.xyz`, and
+  `http://localhost:7391`. Direct-submit auth
   failures return a stable reason plus the upstream worker stage/detail so
   deployment origin or gate mistakes are visible in the Mini App without
   exposing secrets. Deploy metadata includes the Cloudflare
