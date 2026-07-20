@@ -233,7 +233,7 @@ describe('AdminPage rendered interactions', () => {
     expect(screen.queryByText('Connect a wallet to continue.')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Toggle Sessions section' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh sessions' })).toBeInTheDocument();
-    expect(screen.queryByTestId('ce-admin-worker-groups')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-admin-worker-groups')).toHaveTextContent(/Worker access groups/i);
     expect(screen.getByTestId('ce-admin-agent-session-wrapped')).toHaveTextContent(/Agent Session Wrapped/i);
 
     const sessionLink = screen.getByRole('link', { name: 'Open session' });

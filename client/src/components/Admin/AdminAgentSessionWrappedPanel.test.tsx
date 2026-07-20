@@ -1,6 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AdminAgentSessionWrappedPanel from './AdminAgentSessionWrappedPanel';
-import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const capability = {
   version: 1 as const,
@@ -11,19 +10,15 @@ const capability = {
   verifiedAt: '2026-07-20T18:00:00.000Z',
 };
 
-const registryModeProfile = (agentHttp = false) => {
-  const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
-  profile.surfaces.agentHttp = agentHttp;
-  if (agentHttp) profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-  return profile;
-};
-
 const sessionConfig = (overrides: Record<string, unknown> = {}) => ({
   slug: 'alpha',
   sessionId: '0x01',
   networkChainId: 11155420,
   corsWorkerUrl: 'https://session-worker.example.workers.dev',
-  sessionModeProfile: registryModeProfile(),
+  sessionModeProfile: {
+    surfaces: { web: true, telegram: false, agentHttp: false },
+    authority: { mode: 'evm_registry_canonical' },
+  },
   __registry: {
     registryChainId: 11155420,
     adminAddress: '0x1111111111111111111111111111111111111111',
@@ -105,7 +100,10 @@ describe('AdminAgentSessionWrappedPanel', () => {
         {...baseProps}
         sessionConfig={sessionConfig({
           agentSessionWrapped: capability,
-          sessionModeProfile: registryModeProfile(true),
+          sessionModeProfile: {
+            surfaces: { web: true, telegram: false, agentHttp: true },
+            authority: { mode: 'evm_registry_canonical' },
+          },
         })}
       />,
     );

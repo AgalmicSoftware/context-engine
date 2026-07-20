@@ -34,11 +34,6 @@ export const ADMIN_SECRET_CARDS: readonly AdminSecretCard[] = Object.freeze([
   { key: 'lit', label: 'Lit', fields: ['litAccountApiKey', 'litUsageApiKey'] },
 ]);
 
-export const filterAdminSecretCards = (keys: readonly string[] = []): readonly AdminSecretCard[] => {
-  const allowed = new Set(keys);
-  return ADMIN_SECRET_CARDS.filter((card) => allowed.has(card.key));
-};
-
 export const buildAdminSecretPresenceTargetKey = ({
   slug,
   workerUrl,

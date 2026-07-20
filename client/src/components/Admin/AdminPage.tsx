@@ -86,8 +86,6 @@ import {
   getAdminSessionDisplayUrl,
   shortAddress,
 } from './adminPageSessionDisplayHelpers';
-import type { AdminTestResults } from './adminPageTestResultHelpers';
-import { renderAdminTestResult } from './adminPageTestResultHelpers';
 import {
   buildAdminSecretPresenceTargetKey,
   normalizeAdminSecretPresence,
@@ -179,9 +177,6 @@ export const __adminPageTestUtils = {
   getAdminSessionDisplayUrl,
   getSessionReadRpcConfig,
 };
-
-const asAdminSessionConfig = (value: unknown): AdminSessionConfigLike =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as AdminSessionConfigLike) : {};
 
 const asAdminSessionConfig = (value: unknown): AdminSessionConfigLike =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as AdminSessionConfigLike) : {};
@@ -870,18 +865,19 @@ const AdminPage = ({
       ),
     [selectedConfig, selectedSlug],
   );
-  const selectedSessionHasUsableWorker = useMemo(
+  const agentSessionWrappedWorkerUrl = useMemo(
     () =>
-      hasUsableSessionWorkerConfig({
-        slug: selectedSlug,
+      resolveAdminAgentSessionWrappedWorkerOrigin({
+        editedWorkerUrl: workerUrl,
         sessionConfig: selectedConfig,
-        allowSharedFallback: true,
+        sessionSlug: selectedSlug,
+        workerUrlEditable,
       }),
-    [selectedConfig, selectedSlug],
+    [selectedConfig, selectedSlug, workerUrl, workerUrlEditable],
   );
   const secretPresenceTargetKey = useMemo(
     () =>
-      buildSecretPresenceTargetKey({
+      buildAdminSecretPresenceTargetKey({
         slug: selectedSlug,
         workerUrl: workerUrl || selectedConfigWorkerUrl,
       }),
@@ -1151,7 +1147,7 @@ const AdminPage = ({
       const slug = normalizeSlug(selectedSlug);
       baseUrl = normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
       if (!baseUrl) throw new Error('Worker URL is missing.');
-      targetKey = buildSecretPresenceTargetKey({ slug, workerUrl: baseUrl });
+      targetKey = buildAdminSecretPresenceTargetKey({ slug, workerUrl: baseUrl });
       requestId = secretPresenceRequestRef.current + 1;
       secretPresenceRequestRef.current = requestId;
       setSecretPresenceStatus('loading');
@@ -1613,6 +1609,15 @@ const AdminPage = ({
   const testSessionConfig = selectedConfig
     ? { ...selectedConfig, corsWorkerUrl: baseWorkerUrl || selectedConfigWorkerUrl || '' }
     : null;
+  const {
+    ensureSessionWorkerAttached: ensureAgentSessionWrappedWorkerAttached,
+    handleConfigUpdated: handleAgentSessionWrappedConfigUpdated,
+  } = useAdminAgentSessionWrappedConfigUpdate({
+    selectedConfig,
+    selectedSlug: normalizeSlug(selectedSlug),
+    setSessions,
+    providerLike: provider,
+  });
   const ensureWorkerSessionConfig = useCallback(
     async ({
       sessionConfigOverride,
@@ -2830,6 +2835,23 @@ const AdminPage = ({
             </>
           )}
         </section>
+
+        <AdminAgentSessionWrappedPanel
+          canAdminWorker={canAdminWorker}
+          sessionConfig={selectedConfig}
+          sessionSlug={normalizeSlug(selectedSlug)}
+          sessionWorkerUrl={agentSessionWrappedWorkerUrl}
+          postSignedRequest={postSignedAdminRequest}
+          ensureSessionWorkerAttached={ensureAgentSessionWrappedWorkerAttached}
+          onConfigUpdated={handleAgentSessionWrappedConfigUpdated}
+        />
+
+        <AdminWorkerGroupsPanel
+          canAdminWorker={canAdminWorker}
+          sessionSlug={normalizeSlug(selectedSlug)}
+          workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
+          postSignedRequest={postSignedAdminRequest}
+        />
 
         <AdminPageWorkerSecretsPanel
           workerSecretsOpen={workerSecretsOpen}
