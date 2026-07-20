@@ -460,6 +460,24 @@ accept a replacement deployment secret in an Admin request.
 
 Groups are canonical in `sessionCorsWorker`; the Agent Bridge's demographic research buckets are separate profile data and never grant worker access, and the Bridge does not mirror worker group definitions or memberships. Agent-enabled sessions use the session-worker JWT returned by client login to call `/groups/list`, `/groups/my-memberships`, and `/groups/join` directly. A dedicated Agent Session Wrapped Bridge may also validate that same JWT at its deployment-pinned `/groups/my-memberships` endpoint before issuing a shorter, session-bound Bridge credential; the Bridge does not evaluate the login's SIWE, registry, RPC, SBT, or gate logic. The Admin page uses the existing signed worker-admin request path for group and member management. These routes require the explicit `groups` scope; successful registry-backed participant login grants that scope after the default session gate passes, and session configuration may still disable it explicitly. The legacy `arweave` compatibility scope applies only to storage routes. Group membership is visible to the worker/operator by design. This is the same trust domain as worker-enforced gates.
 
+That single-verifier model is identical for worker-canonical and
+registry-canonical sessions: the latter's session-Worker login evaluates the
+configured registry/on-chain gates before `/groups/my-memberships` can attest
+the principal. A registry session may use Wrapped only with an already usable
+or newly attached compatible Worker. A permanently locked workerless session
+fails closed because it cannot attach a new `corsWorkerUrl`. After exchange,
+Wrapped answer submission is HTTPS/KV and requires no agent-originated EVM
+transaction. The Bridge member credential expires at the earlier of 24 hours
+or the remaining Worker-JWT lifetime, which is also the maximum propagation
+delay after either authority revokes access.
+
+The non-secret version-1 `agentSessionWrapped` session-config record contains
+only `enabled`, the verified dedicated origin, protocol/revision identifiers,
+and `verifiedAt`. `sessionModeProfile.surfaces.agentHttp` is its sole product
+enablement bit; Telegram remains independently optional. The record is written
+only after the dedicated Bridge proves its exact session slug and pinned Worker
+origin. Failed deploy/redeploy attempts preserve the last verified record.
+
 Group records and membership rows are stored separately in KV. The worker uses `CE_WORKER_GROUPS_KV` when present, otherwise the storage index KV aliases. D1 and envelope-audit bindings are never group stores, so adding an unrelated database cannot switch group authority away from existing KV state. Membership rows are keyed by normalized principals and are not embedded in group objects.
 
 Implemented routes:

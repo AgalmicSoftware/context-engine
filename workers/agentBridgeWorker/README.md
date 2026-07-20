@@ -76,6 +76,18 @@ Member credentials expire at the earlier of 24 hours or the remaining
 session-worker credential lifetime. Revoking either credential therefore takes
 effect for Wrapped access no later than that remaining bound.
 
+`sessionModeProfile.surfaces.agentHttp` is the only product enablement bit.
+`surfaces.telegram` controls only the optional Telegram adapter. `/new` can
+deploy a dedicated Bridge alongside a compatible Cloudflare-backed session;
+`/admin` can later enable, disable access without deleting resources, check
+health, or explicitly redeploy. Both flows publish a version-1
+`agentSessionWrapped` capability only after upload, secrets, bindings,
+activation, health, protocol, pinned-authority probing, and durable session
+config write succeed. A failed operation preserves the last verified origin
+and revision. The Cloudflare API token is request-only: initial setup may reuse
+the current request value, while later Admin operations require re-entry and
+clear it after the request.
+
 ## Agent API Catalog
 
 The bridge exposes a scaffolded Telegram agent surface through
@@ -167,9 +179,13 @@ without overwriting earlier research events or accidentally reusing a prior
 poster. The worker computes the active window from server-side time; public
 `createdAt` query/body values are ignored for agent-only window selection.
 
-The wrapped-image endpoint supports the standard `wrapped` PNG poster and the
-optional `political_compass` PNG. MP4 story/video output is not enabled in the
-current runtime skill. The old `wrapped_story` SVG storyboard path is
+The wrapped-image endpoint uses the deterministic local SVG renderer for the
+standard `wrapped` poster by default and supports an optional
+`political_compass` PNG. An operator can explicitly select the OpenAI poster
+renderer, but its separately named key is optional and is never inferred from
+the Bridge's general AI key or from a session Worker's AI-provider key. MP4
+story/video output is not enabled in the current runtime skill. The old
+`wrapped_story` SVG storyboard path is
 experimental-only and is not advertised to Hermes runs; adding real video output
 requires a separate media encoder service.
 
@@ -209,14 +225,15 @@ GET  /api/agent/admin/agent-only/export?view=answers&format=jsonl
 GET  /api/agent/admin/agent-only/export?view=attempts&format=jsonl
 ```
 
-The config is stored in `AGENT_ACTION_KV`. The active window snapshot syncs to
-the current enabled `ceq_...` ids whenever the window is materialized, so newly
-enabled questions can be added and archived/deleted questions can be hidden
-without waiting for the next window. Existing answer/vote events remain
-append-only. Historical snapshots remain stable once their window is no longer
-active. The launch window defaults to `2026-06-12T08:00:00-07:00` through
-`2026-06-15T08:00:00-07:00`; regular windows start Mondays at 08:00
-America/Los_Angeles and use ids such as `w-2026-06-15`.
+The config is stored in `AGENT_ACTION_KV`. Ordinary Session Wrapped windows use
+the canonical session question/statement source. Persisted legacy configs and
+an explicit `agent_only_proposals` source mode retain the Bridge-KV proposal
+window and its existing `telegram:agent-only:*` storage prefixes. The one
+source-selection seam syncs active canonical or proposal-backed windows without
+changing append-only answer/vote events, pagination, or retry frontiers.
+Historical snapshots remain stable once their window is no longer active.
+Unless an explicit historical launch window is configured, regular windows
+start Mondays at 08:00 America/Los_Angeles.
 
 The `attempts` export is intentionally lightweight failure telemetry for
 answer, vote, and wrapped-image POSTs. It records stage, status, reason,
@@ -570,6 +587,7 @@ Required values:
 | Production web client origins | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.sh,https://www.contextengine.sh,https://contextengine.xyz,https://www.contextengine.xyz` so the canonical `.sh` clients can exchange agent credentials and read result-view cache entries while the redirecting `.xyz` origins remain compatible during migration. Result-view cache writes require root authority. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges |
 | Optional one-time onboarding invite | Store a SHA-256 hash in `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES`, or use `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON` records with `tokenHash`, `sessionSlug`, `label`, and `source`. The agent sends the plaintext invite only in the JSON body of `POST /api/agent/invite/onboard`. Telegram identity may be included by a Telegram adapter but is not required |
 | Optional OpenAI key for Telegram AI | Paste into untracked `.dev.vars` as `AGENT_BRIDGE_OPENAI_API_KEY` or `OPENAI_API_KEY`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_OPENAI_API_KEY`. Telegram question generation, AI search, add-question formatting, group analysis, and transcription pass it as a request-local `apiKey` to the configured session worker when that session worker has no per-session `openaiKey` secret |
+| Optional OpenAI key for Wrapped posters | The deterministic local SVG renderer is the default and needs no key. To opt into OpenAI poster generation, set `AGENT_BRIDGE_WRAPPED_POSTER_RENDERER=openai` and provide only `AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY`; the deploy helper writes that separately named Worker secret and never copies the general Bridge or session-Worker AI key into it |
 | Public deployed `agentBridgeWorker` URL | Paste or derive the Workers.dev base URL as `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev`; live apply can derive it when the token can read the account workers.dev subdomain |
 | CE/session worker base URL | Paste into `CE_SESSION_WORKER_BASE_URL`, for example `https://<session-worker>.<workers-subdomain>.workers.dev` |
 | Default chain and RPC URL | Use `DEFAULT_CHAIN_ID=11155420` and preserve `DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network` unless the selected session resolves another supported chain |
@@ -1192,7 +1210,10 @@ dedicated Bridge.
   `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` or `--enable-doc-storage`.
 - Worker secrets: `DEMO_SIGNER_ROOT_SECRET` and
   `AGENT_BRIDGE_AGENT_API_TOKEN`; Telegram-enabled deployments additionally
-  write `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET`.
+  write `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET`. An explicitly
+  selected OpenAI Wrapped renderer may additionally write
+  `AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY`; local poster rendering needs no
+  provider secret.
 - Worker vars: `AGENT_BRIDGE_PUBLIC_URL`, `CE_SESSION_WORKER_BASE_URL`,
   `DEFAULT_CHAIN_ID`, `DEFAULT_RPC_URL`, and optional `ADDITIONAL_RPC_URL`;
   Telegram-enabled deployments additionally write `TELEGRAM_BRIDGE_ENABLED`

@@ -231,7 +231,9 @@ technical popover. Profile settings follow the existing stages:
 - Privacy owns storage, encryption, decryption access, result visibility, and
   small-group protection.
 - Worker owns optional participation channels such as Telegram, Mini App, and
-  Agent API. The website remains enabled.
+  Agent Session Wrapped. The website remains enabled. Wrapped is off by
+  default, deploys one additional dedicated per-session Bridge, and does not
+  implicitly enable Telegram.
 - Deploy owns the export policy and any selected-channel export filter.
 
 Changing one of these values flips the profile to `custom`. Profile-based
@@ -399,6 +401,35 @@ What happens during deploy:
   without `deploymentRequestId` receive random names. The helper still verifies
   its ownership marker after upload and stops before hostname/secret activation
   if ownership does not match.
+
+When `Agent Session Wrapped` is selected, the same request-only Cloudflare
+token may also deploy the dedicated Bridge in that setup operation. The Bridge
+receives an explicit one-session policy and the exact paired session-Worker
+origin. Setup does not publish its version-1 `agentSessionWrapped` capability or
+report success until upload, secrets, bindings, activation, health, protocol,
+authority probing, and the durable session-config write have all succeeded.
+Failure preserves the prior verified capability, if any, and leaves the
+session config intact. Telegram is a separate optional surface and remains off
+unless selected.
+
+Compatibility is determined by the paired session Worker:
+
+- Worker-canonical sessions use their canonical Worker directly.
+- Registry-canonical sessions use the same Wrapped flow when their existing
+  `corsWorkerUrl` is usable or when an unlocked registry session can first
+  attach a compatible Worker. The session Worker—not the Bridge—performs SIWE,
+  registry/RPC, chain-gate, and SBT checks.
+- An unlocked workerless registry session must attach a Worker before Wrapped
+  can be enabled. That owner attachment may require an Admin registry
+  transaction.
+- A permanently locked workerless session cannot attach a new Worker and fails
+  closed without a partial Bridge deployment.
+
+After a member has a session-Worker credential, the agent exchanges it for a
+shorter session-bound `ceagt_` credential and submits Wrapped answers over
+HTTPS/KV. The agent performs no EVM transaction. The Bridge credential lasts
+at most 24 hours and never outlives the Worker credential, so access revocation
+propagates no later than that shorter remaining lifetime.
 
 What gets stored where:
 
@@ -599,6 +630,18 @@ Confirm that `/admin` can resolve:
 - canonical name/content from Worker KV for `worker_canonical`
 - metadata URI, registry chain/address, and sponsored flags for decentralized
   sessions
+
+### Manage Agent Session Wrapped
+
+Compatible worker-canonical and registry-canonical sessions show an Agent
+Session Wrapped panel in `/admin`. Enter a fresh request-only Cloudflare token
+for each enable, disable-access, or explicit redeploy operation; the browser
+clears it when the request finishes and does not restore it from storage.
+`Check health` verifies the recorded protocol, session slug, access bit, and
+pinned session-Worker origin. Disabling access retains deployed resources and
+publishes `enabled: false`; resource deletion is a separate confirmed live
+operation. An unhealthy or failed redeploy does not replace the last verified
+origin/revision.
 
 ### Test worker health
 

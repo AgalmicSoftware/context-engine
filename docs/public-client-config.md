@@ -12,6 +12,34 @@ stays centralized in `client/src/variables/publicDeploymentConfig.ts`.
 - Runtime reader/re-export surface: `client/src/variables/appConfig.ts`
 - Shared env parsing helpers: `client/src/variables/publicEnv.ts`
 
+## Session Wrapped Capability Record
+
+Agent Session Wrapped discovery is session-scoped public config, not a
+browser environment secret. A successfully verified dedicated deployment may
+publish exactly this versioned record in the canonical session config:
+
+```json
+{
+  "agentSessionWrapped": {
+    "version": 1,
+    "enabled": true,
+    "origin": "https://<dedicated-bridge>.<workers-subdomain>.workers.dev",
+    "protocolVersion": "agent-session-wrapped-v1",
+    "revision": "wrapped-<safe-revision>",
+    "verifiedAt": "<ISO-8601 timestamp>"
+  }
+}
+```
+
+The client accepts an HTTPS origin with no credentials, path, query, or
+fragment and safe bounded protocol/revision identifiers. The record contains
+no Cloudflare token, worker secret, member credential, Telegram credential, or
+provider key. `sessionModeProfile.surfaces.agentHttp` is the only enablement
+bit; it must mirror `agentSessionWrapped.enabled`. `surfaces.telegram` is a
+separate optional adapter bit. Deploy and redeploy code preserves the last
+verified record until the replacement Worker has passed activation, health,
+protocol, pinned-authority, and durable-config checks.
+
 ## How to Configure
 
 1. Copy the example file: `cp client/.env.example client/.env`

@@ -40,6 +40,20 @@ All notable changes to this project will be documented in this file.
   one-time invites can onboard an opaque non-Telegram user, the root token is
   limited to bootstrap/break-glass semantics, and browser exchange returns
   separate Bridge and session-worker credentials.
+- Added the hybrid Agent Session Wrapped path for worker-canonical and
+  registry-canonical sessions through one deployment-pinned session-Worker
+  membership verifier. Dedicated Bridges now require explicit one-session
+  policy, use the sole `surfaces.agentHttp` capability bit, deploy without the
+  unused Durable Object or Telegram resources by default, exchange Worker
+  credentials for at-most-24-hour session-bound `ceagt_` member credentials,
+  and accept Wrapped answers over HTTPS/KV without an agent-originated EVM
+  transaction. Session Setup and Admin support request-only enable, retained-
+  resource disable-access, health, and idempotent redeploy controls with
+  capability publication only after durable verification. Ordinary Wrapped
+  uses canonical session questions, explicit historical/agent-only configs
+  retain proposal windows and storage prefixes, and posters default to the
+  deterministic local renderer with separately configured optional OpenAI
+  generation.
 - Added direct session-worker access-group views and open self-join controls to
   agent-enabled sessions, plus signed group and member administration in the
   existing Admin surface. The Agent Bridge does not proxy or mirror this state.
