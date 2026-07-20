@@ -5,7 +5,7 @@ description: "Run a generic Context Engine session wrapped flow: onboard by invi
 
 # Context Engine Session Wrapped Runtime
 
-**Skill version:** 2026-07-04 (session-wrapped-v1)
+**Skill version:** 2026-07-20 (session-wrapped-v1.1)
 **Protocol version:** Context Engine agent bridge v42
 
 Use this skill only to run a generic Context Engine session wrapped flow. Do
@@ -42,7 +42,9 @@ Small fixture question bank for dry-run planning only:
 ```
 
 The fixture bank is not a live source of truth. Live runs must fetch current
-statements from the worker.
+statements from the worker. Ordinary Session Wrapped runs use the canonical
+session question source. Only an explicitly configured historical or
+agent-only proposal mode uses its preserved proposal-window snapshot.
 
 ## Forwarded Input
 
@@ -203,6 +205,12 @@ https://ce-agent-bridge-worker.agalmic.workers.dev
 If the result request reports incomplete coverage, submit missing predictions
 or privacy skips, then retry with the same `run_id`.
 
+The standard poster is rendered locally and deterministically when no optional
+poster provider is configured, so a missing AI image key is not an error. The
+returned image may be SVG or PNG; use its reported URL/content type without
+rewriting it. Provider selection and keys are operator configuration, not
+agent inputs.
+
 Do not request `mode: "political_compass"` during the default run. Generate an
 optional comparison map only if the user asks after the standard image is
 shown. Do not request `mode: "wrapped_story"`; MP4 story video is not enabled
@@ -225,5 +233,5 @@ QA tools. Do not describe or critique the poster.
 After the one image line, send only:
 
 ```text
-Your Session Wrapped result is ready. To inspect or change your agent's responses, open the Context Engine Mini App from the session bot. Want the optional comparison map too?
+Your Session Wrapped result is ready. To inspect or change your agent's responses, open the configured Context Engine session interface (the Context Engine Mini App when provided). Want the optional comparison map too?
 ```

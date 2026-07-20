@@ -230,7 +230,7 @@ test('worker serves the short Session Wrapped skill route', async () => {
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-07-04-session-wrapped-v1-/);
+  assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
 });
 
 test('worker serves the short Session Wrapped skill route to HEAD probes', async () => {
@@ -239,7 +239,7 @@ test('worker serves the short Session Wrapped skill route to HEAD probes', async
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-07-04-session-wrapped-v1-/);
+  assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
 });
 
 test('worker dispatches canonical agent API routes', async () => {

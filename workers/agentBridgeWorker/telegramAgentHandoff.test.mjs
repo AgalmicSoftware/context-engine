@@ -792,7 +792,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(wrapped, /name:\s+ce-session-wrapped/);
   assert.match(wrapped, /^# Context Engine Session Wrapped Runtime/m);
-  assert.match(wrapped, /\*\*Skill version:\*\* 2026-07-04 \(session-wrapped-v1\)/);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-07-20 \(session-wrapped-v1\.1\)/);
   assert.match(wrapped, /Use this skill only to run a generic Context Engine session wrapped flow/);
   assert.match(wrapped, /not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
@@ -858,6 +858,8 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.doesNotMatch(wrapped, /visualDefaults\.wrapped_story/);
   assert.doesNotMatch(wrapped, /shareable story version/);
   assert.match(wrapped, /Context Engine Mini App/);
+  assert.match(wrapped, /configured Context Engine session interface/);
+  assert.doesNotMatch(wrapped, /session bot/i);
   assert.doesNotMatch(wrapped, /question-queue\/apply/);
   assert.doesNotMatch(wrapped, /results-image/);
 });
@@ -905,7 +907,7 @@ test('Telegram agent handoff exposes dedicated Session Wrapped skill metadata', 
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-07-04 (session-wrapped-v1)');
+  assert.equal(body.version, '2026-07-20 (session-wrapped-v1.1)');
   assert.equal(body.protocolVersion, '2026-07-18 (v42)');
   assert.equal(body.skill, 'ce-session-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-session-wrapped/SKILL.md');
@@ -935,7 +937,7 @@ test('Telegram agent handoff serves a dedicated Session Wrapped skill redirect',
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-07-04-session-wrapped-v1-/);
+  assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
 });
 
 test('Telegram agent handoff serves a short Session Wrapped skill alias', async () => {
@@ -947,7 +949,7 @@ test('Telegram agent handoff serves a short Session Wrapped skill alias', async 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-07-04-session-wrapped-v1-/);
+  assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
 });
 
 test('Telegram agent handoff serves a short Session Wrapped skill alias to HEAD probes', async () => {
@@ -959,7 +961,7 @@ test('Telegram agent handoff serves a short Session Wrapped skill alias to HEAD 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-07-04-session-wrapped-v1-/);
+  assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
