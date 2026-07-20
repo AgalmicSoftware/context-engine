@@ -80,6 +80,25 @@ test('resolveAgentBridgeDeployConfig builds the default workers.dev public URL a
   assert.equal(staging.vars.AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT, 'true');
 });
 
+test('Wrapped poster OpenAI configuration is separately named and never inferred from another AI key', () => {
+  const genericOnly = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      AGENT_BRIDGE_OPENAI_API_KEY: 'sk-generic-bridge',
+      OPENAI_API_KEY: 'sk-session-fallback',
+    }),
+  });
+  assert.equal(genericOnly.secrets.AGENT_BRIDGE_OPENAI_API_KEY, '[set]');
+  assert.equal(genericOnly.secrets.AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY, '[missing]');
+
+  const posterConfigured = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY: 'sk-wrapped-poster',
+    }),
+  });
+  assert.equal(posterConfigured.secrets.AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY, '[set]');
+  assert.equal(JSON.stringify(posterConfigured).includes('sk-wrapped-poster'), false);
+});
+
 test('validateAgentBridgeDeployConfig requires only live deploy credentials, not unit-test credentials', () => {
   const missing = validateAgentBridgeDeployConfig(resolveAgentBridgeDeployConfig({
     env: {},

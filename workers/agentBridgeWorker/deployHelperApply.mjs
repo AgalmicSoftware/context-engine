@@ -537,6 +537,7 @@ export async function writeAgentBridgeWorkerSecrets({
   const written = [];
   const optionalSecretValues = {
     AGENT_BRIDGE_OPENAI_API_KEY: safeString(env.AGENT_BRIDGE_OPENAI_API_KEY || env.OPENAI_API_KEY || env.E2E_OPENAI_KEY),
+    AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY: safeString(env.AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY),
   };
   const secrets = [
     ...[

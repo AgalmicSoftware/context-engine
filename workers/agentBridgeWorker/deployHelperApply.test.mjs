@@ -169,6 +169,36 @@ test('writeAgentBridgeWorkerSecrets stores optional bridge secrets when present'
   assert.equal(result.ok, true);
   assert.equal(result.written.includes('AGENT_BRIDGE_OPENAI_API_KEY'), true);
   assert.equal(written.find((entry) => entry.name === 'AGENT_BRIDGE_OPENAI_API_KEY')?.text, 'sk-bridge-openai');
+  assert.equal(result.written.includes('AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY'), false);
+});
+
+test('writeAgentBridgeWorkerSecrets writes the Wrapped poster key only from its dedicated input', async () => {
+  const written = [];
+  const result = await writeAgentBridgeWorkerSecrets({
+    apiToken: 'cf-token',
+    accountId: 'account-123',
+    workerName: 'ce-agent-bridge-worker',
+    env: completeEnv({
+      OPENAI_API_KEY: 'sk-session-fallback',
+      AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY: 'sk-wrapped-poster',
+    }),
+    fetchImpl: async (url, init = {}) => {
+      written.push(JSON.parse(init.body || '{}'));
+      return jsonResponse({ success: true, result: {} });
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(
+    written.find((entry) => entry.name === 'AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY')?.text,
+    'sk-wrapped-poster',
+  );
+  assert.equal(
+    written.some(
+      (entry) => entry.name === 'AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY' && entry.text === 'sk-session-fallback',
+    ),
+    false,
+  );
 });
 
 test('verifyAgentBridgeHealth returns structured network failures', async () => {
