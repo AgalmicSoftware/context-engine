@@ -24,21 +24,82 @@ describe('SessionWizard worker resource rendering', () => {
     return screen.findByTestId(E2E_TESTIDS.WIZARD_PUBLISH);
   };
 
-  it('keeps session storage profile selection in advanced mode and defaults to Arweave', async () => {
+  const selectPreset = async (presetId) => {
+    const testId = `ce-new-preset-${presetId}`;
+    const originalConfirm = window.confirm;
+    window.confirm = jest.fn(() => true);
+    try {
+      fireEvent.click(screen.getByTestId(testId));
+    } finally {
+      window.confirm = originalConfirm;
+    }
+    await waitFor(() => {
+      expect(screen.getByTestId(testId)).toHaveAttribute('aria-checked', 'true');
+    });
+  };
+
+  const selectFastCheapPreset = async () => selectPreset('fast_cheap_cloudflare');
+  const selectTrustlessPublicPreset = async () => selectPreset('trustless_public_decentralized');
+  const selectLitProfile = async (selectBasePreset) => {
+    await selectBasePreset();
+    fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
+    const encryptionOptions = within(screen.getByRole('radiogroup', { name: /encryption/i }));
+    fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
+    await waitFor(() => {
+      expect(encryptionOptions.getByRole('radio', { name: 'Lit' })).toHaveAttribute('aria-checked', 'true');
+    });
+  };
+  const selectCloudflareLitProfile = async () => selectLitProfile(selectFastCheapPreset);
+  const selectDecentralizedLitProfile = async () => selectLitProfile(selectTrustlessPublicPreset);
+
+  it('shows only the AI resource for the default Cloudflare two-key profile', async () => {
+    renderLoggedInSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectFastCheapPreset();
+    selectNormalModeCard('Worker');
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)).toHaveLength(1);
+    });
+    expect(getWizardResourceCard('ai')).toBeTruthy();
+    expect(getWizardResourceCard('arweave')).toBeUndefined();
+    expect(getWizardResourceCard('rpc')).toBeUndefined();
+    expect(getWizardResourceCard('txGas')).toBeUndefined();
+    expect(getWizardResourceCard('lit')).toBeUndefined();
+  });
+
+  it('preserves decentralized resource requirements while leaving Lit opt-in', async () => {
+    renderLoggedInSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    await selectTrustlessPublicPreset();
+    selectNormalModeCard('Worker');
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)).toHaveLength(4);
+    });
+    expect(getWizardResourceCard('ai')).toBeTruthy();
+    expect(getWizardResourceCard('arweave')).toBeTruthy();
+    expect(getWizardResourceCard('rpc')).toBeTruthy();
+    expect(getWizardResourceCard('txGas')).toBeTruthy();
+    expect(getWizardResourceCard('lit')).toBeUndefined();
+  });
+
+  it('uses the Privacy storage control instead of a second Session Storage editor', async () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
 
     enableAdvancedMode();
-
-    expect(await screen.findByText('Session Storage')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
-
-    const arweaveOption = screen.getByRole('radio', { name: 'Arweave' });
-    const cloudflareOption = screen.getByRole('radio', { name: 'Cloudflare' });
+    fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
+    const storageOptions = within(await screen.findByRole('radiogroup', { name: 'Data storage' }));
+    const arweaveOption = storageOptions.getByRole('radio', { name: 'Arweave' });
+    const cloudflareOption = storageOptions.getByRole('radio', { name: 'Cloudflare' });
     expect(arweaveOption).toHaveAttribute('aria-checked', 'true');
     expect(cloudflareOption).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
 
     fireEvent.click(cloudflareOption);
 
@@ -46,48 +107,9 @@ describe('SessionWizard worker resource rendering', () => {
       expect(arweaveOption).toHaveAttribute('aria-checked', 'false');
       expect(cloudflareOption).toHaveAttribute('aria-checked', 'true');
     });
-    expect(screen.getByText(/R2 for blobs, KV for metadata, indexes, and audits/)).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Public read' })).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByRole('radio', { name: 'Worker SBT gate' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: 'Lit encrypted' })).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByText(/worker-enforced access control, not end-to-end encryption/i)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Public read' }));
-    expect(screen.getByRole('radio', { name: 'Public read' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText(/serves reads through the session worker without wallet auth/i)).toBeInTheDocument();
-  });
-
-  it('keeps Arweave storage choices separate from Cloudflare payload access controls', async () => {
-    renderLoggedInSessionWizard();
-
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    enableAdvancedMode();
-    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
-
-    expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Worker SBT gate' })).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Lit encrypted' })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Lit-Arweave' }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('radio', { name: 'Lit-Arweave' })).toHaveAttribute('aria-checked', 'true');
-    });
-    expect(screen.getByText(/Lit-Arweave stores encrypted Arweave payloads/i)).toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Cloudflare stores canonical CE payloads/i)).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Cloudflare' }));
-    expect(screen.getByRole('radio', { name: 'Worker SBT gate' })).toHaveAttribute('aria-checked', 'true');
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Arweave' }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
-    });
-    expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Cloudflare stores canonical CE payloads/i)).not.toBeInTheDocument();
   });
 
   it('shows Lit-encrypted Cloudflare copy while keeping Arweave credentials in worker resources', async () => {

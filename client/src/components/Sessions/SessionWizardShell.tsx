@@ -166,6 +166,9 @@ export type SessionWizardShellProps = {
   sessionHeaderPreviewSrc: WizardModalsProps['sessionHeaderPreviewSrc'];
   sessionMetadataHeaderAccessory: MetadataEditorProps['headerAccessory'];
   sessionModeProfileControl?: React.ReactNode;
+  sessionModeProfilePrivacyControl?: EncryptionPanelBoundaryProps['sessionModeProfilePrivacyControl'];
+  sessionModeProfileWorkerControl?: WorkerPanelProps['sessionModeProfileWorkerControl'];
+  sessionModeProfilePublishControl?: PublishSectionProps['sessionModeProfilePublishControl'];
   sessionModeProfileStepComplete?: boolean;
   sessionUrl: PublishSectionProps['sessionUrl'];
   setBundleFile: WorkerPanelProps['setBundleFile'];
@@ -333,6 +336,9 @@ const SessionWizardShell = ({
   sessionHeaderPreviewSrc,
   sessionMetadataHeaderAccessory,
   sessionModeProfileControl = null,
+  sessionModeProfilePrivacyControl = null,
+  sessionModeProfileWorkerControl = null,
+  sessionModeProfilePublishControl = null,
   sessionModeProfileStepComplete = true,
   sessionUrl,
   setBundleFile,
@@ -469,6 +475,7 @@ const SessionWizardShell = ({
             addEncryptionGate={addEncryptionGate}
             pendingSbtDrafts={pendingSbtDrafts}
             removePendingSbtDraft={removePendingSbtDraft}
+            sessionModeProfilePrivacyControl={isNormalMode ? null : sessionModeProfilePrivacyControl}
           />
         )}
 
@@ -558,6 +565,7 @@ const SessionWizardShell = ({
             displayedWorkerUrl={displayedWorkerUrl}
             renderField={renderField}
             workerUrlAutoFilled={workerUrlAutoFilled}
+            sessionModeProfileWorkerControl={isNormalMode ? null : sessionModeProfileWorkerControl}
           />
         )}
 
@@ -601,6 +609,7 @@ const SessionWizardShell = ({
           onCopyAdminUrl={handleCopyAdminUrl}
           adminUrlStatus={adminUrlStatus}
           status={status}
+          sessionModeProfilePublishControl={isNormalMode ? null : sessionModeProfilePublishControl}
         />
 
         <SessionWizardModals

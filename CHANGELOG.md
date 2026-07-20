@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Integrated hosting customization into the existing session setup stages:
+  storage, encryption, decryption access, and result visibility now live in
+  Privacy; optional participation channels live in Worker; and export policy
+  lives in Deploy. The compact header no longer opens a large technical
+  popover, profile-based drafts no longer show a duplicate legacy storage
+  editor, and custom decryption rules stay hidden until the creator overrides
+  the session's access rules.
 - Moved session hosting selection into a compact header control, kept the
   selected Cloudflare, decentralized, or custom profile visible in the title,
   and previewed Corporate hosting as unavailable without changing publishing

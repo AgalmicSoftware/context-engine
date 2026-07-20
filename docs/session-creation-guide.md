@@ -224,10 +224,19 @@ chosen mode; there is no separate Continue action on this entry screen:
   wallet/JWK, RPC URL/key, AI provider key, and optional Lit key needed when
   encryption is enabled.
 
-After selection, the profile remains visible above the setup stages. Advanced
-options let creators switch Cloudflare sessions between Cloudflare-internal and
-Lit encryption, or change storage, authority, and other axes independently;
-those edits flip the profile to `custom`. New session publishes write the
+After selection, the profile remains visible in the setup header. `Customize`
+switches to Advanced mode and opens Privacy instead of opening a separate
+technical popover. Profile settings follow the existing stages:
+
+- Privacy owns storage, encryption, decryption access, result visibility, and
+  small-group protection.
+- Worker owns optional participation channels such as Telegram, Mini App, and
+  Agent API. The website remains enabled.
+- Deploy owns the export policy and any selected-channel export filter.
+
+Changing one of these values flips the profile to `custom`. Profile-based
+drafts do not also show the older `Session Storage` metadata editor, so storage
+has one visible authority. New session publishes write the
 `sessionModeProfile` profile as the source of truth and compile it down to the
 existing storage profile / payload-access fields for runtime compatibility.
 Legacy `telegramOnly` fields are read only as a migration fallback and are not
@@ -273,8 +282,9 @@ What gets stored where:
   select `worker_sbt_gate`, where the session worker checks the requester's SBT
   gate with configured chain/RPC before serving bytes. That is worker-enforced
   access control, not end-to-end encryption.
-- Advanced encryption options are `none` (payload bytes are stored as provided), `lit` (Cloudflare stores caller-supplied Lit ciphertext and rejects plaintext uploads until the Lit path sends `payloadEncrypted=true`), and `worker_envelope`: Encrypted at rest. Keys are held by the session worker; decryption is gated by session conditions. `worker_envelope` is available only with Cloudflare storage. The operator and Cloudflare runtime can decrypt; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime.
-- Worker-envelope key provider is fixed to `worker_secret` in this release. Session-level conditions may use `worker_role`, `sbt_onchain`, or `agent_grant_scope` with `match: any|all`; the wizard writes them to `storageProfile.payloadAccessControl.accessConditions` for the worker.
+- Advanced encryption options are `none` (payload bytes are stored as provided), `lit` (Cloudflare stores caller-supplied Lit ciphertext and rejects plaintext uploads until the Lit path sends `payloadEncrypted=true`), and Cloudflare `worker_envelope`: data is encrypted before Cloudflare stores it, and the session worker decrypts only after checking access. `worker_envelope` is available only with Cloudflare storage. The operator and Cloudflare runtime can decrypt; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime.
+- When `/new` deploys a custom worker for Cloudflare storage, the deploy helper receives the normalized storage profile before Worker upload so it can bind the storage index KV and any requested R2 bucket. If `worker_envelope` is selected, the helper also generates the worker secret used as the deployment KEK; the generated value is not written to session metadata.
+- Worker-envelope key provider is fixed to `worker_secret` in this release. By default, decryption reuses the session access rules. An explicit override can combine Session role (`worker_role`), SBT holders (`sbt_onchain`), or Authorized agents (`agent_grant_scope`) rules with any/all matching; the wizard writes those conditions to `storageProfile.payloadAccessControl.accessConditions` for the worker.
 - `SessionRegistry` does not store long-form content directly. Decentralized
   profiles store a metadata URI pointer plus minimal session identity fields;
   the default worker-canonical profile skips registry writes entirely.

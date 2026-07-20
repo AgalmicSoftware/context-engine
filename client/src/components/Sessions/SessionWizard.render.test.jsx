@@ -912,9 +912,11 @@ describe('SessionWizard rendered validation', () => {
       expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
 
       enableAdvancedMode();
-      fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
-      expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
-      expect(screen.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'false');
+      fireEvent.click(screen.getByRole('button', { name: 'Groups allowed to decrypt locked fields' }));
+      const storageOptions = within(await screen.findByRole('radiogroup', { name: 'Data storage' }));
+      expect(storageOptions.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
+      expect(storageOptions.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'false');
+      expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
     },
   );
 

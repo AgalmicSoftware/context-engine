@@ -122,11 +122,7 @@ import {
 import SessionWizardInfoTooltip, { type SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 import SessionWizardShell from './SessionWizardShell';
 import SessionWizardSessionIdBadge from './SessionWizardSessionIdBadge';
-import SessionWizardSessionModeProfileControl from './SessionWizardSessionModeProfileControl';
-import {
-  applySessionModeProfileSelectionToDraft,
-  applyStorageProfileChangeToModeDraft,
-} from './sessionWizardModeProfileDraftController';
+import useSessionWizardModeProfileControls from './hooks/useSessionWizardModeProfileControls';
 import { buildNormalModeCards, buildNormalModePublishSummary } from './sessionWizardNormalModeCards';
 import {
   LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
@@ -4720,23 +4716,18 @@ const SessionWizard = ({
         sessionIdDisplay={sessionIdDisplay}
       />
     ) : null;
-  const handleSessionModeProfileContinue = useCallback(() => {
-    setSessionModeProfileStepComplete(true);
-  }, []);
   const showSessionModeProfileEntryStep = isNewSessionWizardRoute && !effectiveSessionModeProfileStepComplete;
-  const sessionModeProfileControl = (
-    <SessionWizardSessionModeProfileControl
-      registryChainId={registryChainId}
-      value={draft.sessionModeProfile}
-      onChange={(profile, compiled) => {
-        setDraft((prev) => {
-          const next = applySessionModeProfileSelectionToDraft(prev, profile, compiled);
-          draftRef.current = next;
-          return next;
-        });
-      }}
-    />
-  );
+  const sessionModeProfileControls = useSessionWizardModeProfileControls({
+    draft,
+    draftRef,
+    entryOnly: showSessionModeProfileEntryStep,
+    onContinue: () => setSessionModeProfileStepComplete(true),
+    onEnterAdvancedMode: handleEnterAdvancedMode,
+    registryChainId,
+    setCollapsedSections,
+    setDraft,
+    showContinue: showSessionModeProfileEntryStep || !isNewSessionWizardRoute,
+  });
 
   return (
     <SessionWizardShell
@@ -4855,7 +4846,10 @@ const SessionWizard = ({
       sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
       sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
       sessionMetadataHeaderAccessory={sessionMetadataHeaderAccessory}
-      sessionModeProfileControl={sessionModeProfileControl}
+      sessionModeProfileControl={sessionModeProfileControls.header}
+      sessionModeProfilePrivacyControl={sessionModeProfileControls.privacy}
+      sessionModeProfileWorkerControl={sessionModeProfileControls.worker}
+      sessionModeProfilePublishControl={sessionModeProfileControls.publish}
       sessionModeProfileStepComplete={effectiveSessionModeProfileStepComplete}
       sessionUrl={sessionUrl}
       setBundleFile={setBundleFile}

@@ -125,6 +125,7 @@ const SessionPublishSummary = ({
       ) : null}
       {isNormalDisplayMode || !isCollapsed ? (
         <div className={styles.panelBody}>
+          {sessionModeProfilePublishControl}
           {isNormalDisplayMode ? (
             <div className={styles.publishHero}>
               <div className={styles.publishSummaryGrid}>

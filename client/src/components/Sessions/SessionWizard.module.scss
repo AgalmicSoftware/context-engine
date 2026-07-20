@@ -2852,21 +2852,43 @@ $muted-text: tokens.$ce-muted-text;
   gap: 10px;
 }
 
-.modeAdvancedGrid {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  z-index: 40;
+.modeSection {
   display: grid;
-  gap: 14px;
-  width: min(720px, calc(100vw - 48px));
-  max-height: min(72vh, 720px);
-  overflow: auto;
-  padding: 16px;
-  border: 1px solid rgba(122, 255, 203, 0.3);
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid rgba(122, 255, 203, 0.24);
   border-radius: var(--ce-radius-lg);
-  background: rgba(14, 18, 42, 0.98);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.46);
+  background: rgba(77, 255, 164, 0.045);
+}
+
+.modeSectionEmpty {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 215, 130, 0.32);
+  border-radius: var(--ce-radius-10);
+  color: #ffe2a6;
+  background: rgba(255, 215, 130, 0.06);
+}
+
+.modeSectionHeading {
+  display: grid;
+  gap: 4px;
+
+  h3,
+  p {
+    margin: 0;
+  }
+
+  h3 {
+    color: #ffffff;
+    font-size: 1rem;
+  }
+
+  p {
+    color: rgba(244, 247, 255, 0.72);
+    font-size: 0.82rem;
+  }
 }
 
 .modeAdvancedRow {
@@ -2885,6 +2907,71 @@ $muted-text: tokens.$ce-muted-text;
 .modeAdvancedControl {
   display: grid;
   gap: 8px;
+}
+
+.modeAdvancedNested,
+.modeRuleBuilder {
+  display: grid;
+  gap: 12px;
+}
+
+.modeSummaryList {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 1.15rem;
+  color: rgba(244, 247, 255, 0.76);
+  font-size: 0.82rem;
+}
+
+.modeFieldLabel {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  color: rgba(244, 247, 255, 0.84);
+  font-weight: 700;
+}
+
+.modeRuleCard {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--ce-radius-10);
+  background: rgba(7, 12, 28, 0.42);
+}
+
+.modeRuleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modeRuleRemove {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 155, 155, 0.24);
+  border-radius: var(--ce-radius-round);
+  background: rgba(255, 155, 155, 0.06);
+  color: #ffb2b2;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    border-color: rgba(255, 155, 155, 0.56);
+    background: rgba(255, 155, 155, 0.14);
+  }
+}
+
+.modeSbtRuleFields {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.65fr) minmax(200px, 1.35fr) minmax(220px, 1fr);
+  gap: 10px;
 }
 
 .modeCheckboxRow {
@@ -2992,10 +3079,11 @@ $muted-text: tokens.$ce-muted-text;
     display: none;
   }
 
-  .modeAdvancedGrid {
-    right: 0;
-    left: 0;
-    width: auto;
-    max-height: min(70vh, 600px);
+  .modeSection {
+    padding: 14px;
+  }
+
+  .modeSbtRuleFields {
+    grid-template-columns: 1fr;
   }
 }
