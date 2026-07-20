@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { resolve } from 'path';
 import { randomBytes } from 'crypto';
 import rpcDefaults from '../../client/src/variables/rpcDefaults.js';
+import { resolvePinnedSessionWorkerAuthority } from './sessionWorkerAuthority.mjs';
 
 const DEFAULT_WORKER_NAME = 'ce-agent-bridge-worker';
 const DEFAULT_COMPATIBILITY_DATE = '2024-09-02';
@@ -137,68 +138,7 @@ function isHttpsUrl(value = '') {
   return /^https:\/\/[^/\s<>]+(?:\/.*)?$/i.test(safeString(value));
 }
 
-function parseJsonObject(value = '') {
-  try {
-    const parsed = JSON.parse(safeString(value));
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function normalizeHttpsOrigin(value = '') {
-  try {
-    const parsed = new URL(safeString(value));
-    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return '';
-    if (parsed.pathname !== '/' || parsed.search || parsed.hash) return '';
-    return parsed.origin;
-  } catch {
-    return '';
-  }
-}
-
-export function inspectDedicatedAgentBridgeSessionPolicy({
-  policyJson = '',
-  sessionWorkerOrigin = '',
-} = {}) {
-  const policy = parseJsonObject(policyJson);
-  if (!policy) {
-    return { ok: false, reason: 'dedicated session policy must be valid JSON' };
-  }
-  const sessions = Array.isArray(policy.sessions)
-    ? policy.sessions
-    : (Array.isArray(policy.linkedSessions) ? policy.linkedSessions : []);
-  if (sessions.length !== 1 || !sessions[0] || typeof sessions[0] !== 'object' || Array.isArray(sessions[0])) {
-    return { ok: false, reason: 'dedicated session policy must contain exactly one session' };
-  }
-  const session = sessions[0];
-  const sessionSlug = safeString(session.sessionSlug || session.slug).toLowerCase();
-  if (!/^[a-z0-9_-]{1,128}$/.test(sessionSlug)) {
-    return { ok: false, reason: 'dedicated session policy requires one valid session slug' };
-  }
-  const defaultSessionSlug = safeString(policy.defaultSessionSlug || policy.defaultSession).toLowerCase();
-  if (defaultSessionSlug !== sessionSlug) {
-    return { ok: false, reason: 'dedicated session policy default must match its only session slug' };
-  }
-  if (session.sessionModeProfile?.surfaces?.agentHttp !== true) {
-    return { ok: false, reason: 'dedicated session policy requires surfaces.agentHttp=true' };
-  }
-  const configuredOrigin = normalizeHttpsOrigin(sessionWorkerOrigin);
-  const policyOrigin = normalizeHttpsOrigin(
-    session.sessionWorkerOrigin ||
-    session.sessionWorkerUrl ||
-    session.workerUrl ||
-    session.corsWorkerUrl
-  );
-  if (!configuredOrigin || !policyOrigin || configuredOrigin !== policyOrigin) {
-    return { ok: false, reason: 'dedicated session policy must pin the configured session Worker origin' };
-  }
-  return {
-    ok: true,
-    sessionSlug,
-    sessionWorkerOrigin: configuredOrigin,
-  };
-}
+export const inspectDedicatedAgentBridgeSessionPolicy = resolvePinnedSessionWorkerAuthority;
 
 export function generateAgentBridgeSecret({ byteLength = 32, randomBytesImpl = randomBytes } = {}) {
   const length = Math.max(32, Math.floor(Number(byteLength || 0) || 32));

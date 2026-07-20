@@ -45,7 +45,11 @@ import {
   sessionContextFromPolicySession,
 } from './telegramQuestionProposals.mjs';
 import { evaluateTelegramQuestionAuthoringPermission } from './telegramAuthoringPermissions.mjs';
-import { normalizeSessionPolicy, resolveSessionInvocation } from './sessionPolicy.mjs';
+import {
+  normalizeSessionPolicy,
+  resolveAgentHttpSessionInvocation,
+  resolveSessionInvocation,
+} from './sessionPolicy.mjs';
 import {
   deleteTelegramGroupApproval,
   evaluateTelegramGroupSessionAccessForEnv,
@@ -84,6 +88,7 @@ import {
   AGENT_BROWSER_CREDENTIAL_TTL_SECONDS,
   AGENT_CREDENTIAL_AUDIENCES,
   AGENT_CREDENTIAL_KINDS,
+  AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS,
   createOpaqueAgentPrincipalId,
   createTelegramAgentDelegationToken,
   delegationTokenHasScope,
@@ -95,6 +100,12 @@ import {
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
 } from './agentCredentials.mjs';
+import {
+  persistSessionWorkerMemberExchange,
+  readSessionWorkerMemberExchange,
+  resolvePinnedSessionWorkerAuthority,
+  verifySessionWorkerMembership,
+} from './sessionWorkerAuthority.mjs';
 import {
   AGENT_ONLY_ENDPOINTS,
   agentOnlyTokenTtlSeconds,
@@ -1672,7 +1683,9 @@ async function resolveHandoffContext({
     privateBindingSlug ||
     policy.defaultSessionSlug
   );
-  const resolved = resolveSessionInvocation(policy, sessionSlug);
+  const resolved = delegation?.credentialKind === AGENT_CREDENTIAL_KINDS.MEMBER
+    ? resolveAgentHttpSessionInvocation(policy, sessionSlug)
+    : resolveSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
     return { ok: false, status: 404, reason: resolved.reason || 'session_not_found', sessionSlug };
   }
@@ -6209,6 +6222,114 @@ async function handleClientLoginExchangeRequest({
   return jsonClientLogin(request, env, payload);
 }
 
+function suppliedSessionWorkerCredential(request, body = {}) {
+  const authorization = safeString(request.headers.get('authorization'));
+  const bearer = authorization.match(/^Bearer\s+(.+)$/i);
+  return safeString(
+    bearer?.[1] ||
+    request.headers.get('x-ce-session-worker-token') ||
+    body.sessionWorkerCredential ||
+    body.workerCredential ||
+    body.sessionWorkerToken
+  );
+}
+
+async function handleWrappedMemberExchangeRequest({
+  request,
+  env = {},
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  if (request.method !== 'POST') {
+    return json({ ok: false, reason: 'method_not_allowed' }, { status: 405 });
+  }
+  const body = await readRequestJson(request);
+  const credential = suppliedSessionWorkerCredential(request, body);
+  if (!credential) {
+    return json({ ok: false, reason: 'session_worker_credential_missing' }, { status: 401 });
+  }
+  const authority = resolvePinnedSessionWorkerAuthority({
+    policyJson: env.AGENT_BRIDGE_SESSION_POLICY_JSON,
+    sessionWorkerOrigin: env.CE_SESSION_WORKER_BASE_URL,
+  });
+  if (!authority.ok) {
+    return json({ ok: false, reason: authority.reason }, { status: 503 });
+  }
+  const requestedSessionSlug = sanitizeSessionSlug(body.sessionSlug);
+  if (requestedSessionSlug && requestedSessionSlug !== authority.sessionSlug) {
+    return json({
+      ok: false,
+      reason: 'session_worker_credential_session_mismatch',
+      sessionSlug: authority.sessionSlug,
+    }, { status: 403 });
+  }
+  const replay = await readSessionWorkerMemberExchange({ env, credential });
+  if (!replay.ok) return json({ ok: false, reason: replay.reason }, { status: 503 });
+  if (replay.consumed) {
+    return json({ ok: false, reason: 'session_worker_credential_replayed' }, { status: 409 });
+  }
+  const membership = await verifySessionWorkerMembership({
+    authority,
+    credential,
+    fetchImpl,
+  });
+  if (!membership.ok) {
+    return json({ ok: false, reason: membership.reason }, { status: membership.status || 403 });
+  }
+  const principalAddress = safeString(membership.principal.address).toLowerCase();
+  const principal = {
+    principalId: `session-worker:${membership.principal.kind}:${principalAddress}`,
+    kind: AGENT_CREDENTIAL_KINDS.USER,
+    adapter: 'session_worker',
+    adapterUserId: principalAddress,
+    label: 'Session member',
+  };
+  const ttlSeconds = Math.min(
+    AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS,
+    membership.remainingTtlSeconds,
+  );
+  const issued = await issueAgentCredential({
+    env,
+    principal,
+    sessionSlug: authority.sessionSlug,
+    accountAddress: membership.principal.address,
+    scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL],
+    audience: AGENT_CREDENTIAL_AUDIENCES.AGENT_BRIDGE,
+    credentialKind: AGENT_CREDENTIAL_KINDS.MEMBER,
+    ttlSeconds,
+  });
+  if (!issued.ok) {
+    return json({ ok: false, reason: issued.reason }, {
+      status: issued.reason === 'agent_token_storage_unavailable' ? 503 : 500,
+    });
+  }
+  const consumed = await persistSessionWorkerMemberExchange({
+    env,
+    credential,
+    sessionSlug: authority.sessionSlug,
+    principalId: issued.record.principal.principalId,
+    ttlSeconds: membership.remainingTtlSeconds,
+  });
+  if (!consumed.ok) {
+    await revokeAgentCredentialHash({ env, tokenHash: issued.tokenHash });
+    return json({ ok: false, reason: consumed.reason }, { status: 503 });
+  }
+  const payload = {
+    ok: true,
+    token: issued.token,
+    sessionSlug: authority.sessionSlug,
+    principal: issued.record.principal,
+    accountAddress: membership.principal.address,
+    scopes: issued.record.scopes,
+    audience: issued.record.audience,
+    expiresAt: issued.record.expiresAt,
+    workerCredentialExpiresAt: membership.workerCredentialExpiresAt,
+    revocationBoundSeconds: ttlSeconds,
+  };
+  const { token: _token, ...secretFree } = payload;
+  assertNoSecretShape(secretFree, 'Wrapped member exchange metadata must not serialize bearer credentials.');
+  return json(payload);
+}
+
 async function handleTelegramAgentHandoffRequestUnsafe({
   request,
   env = {},
@@ -6228,6 +6349,9 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   }
   if (routePathname === '/telegram/agent/api/client-login/exchange') {
     return handleClientLoginExchangeRequest({ request, env, fetchImpl });
+  }
+  if (routePathname === '/telegram/agent/api/wrapped/member-exchange') {
+    return handleWrappedMemberExchangeRequest({ request, env, fetchImpl });
   }
   if (routePathname === '/telegram/agent/api/result-view-cache') {
     return handleResultViewCacheHttpRequest({ request, env });

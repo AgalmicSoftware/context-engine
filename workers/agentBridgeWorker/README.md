@@ -59,11 +59,22 @@ The bridge has one versioned `ceagt_` credential model:
   credential for the Bridge audience. It returns a short-lived Bridge browser
   credential and a separate session-worker JWT; the child credential cannot be
   exchanged again.
+- `POST /api/agent/wrapped/member-exchange` accepts an existing session-worker
+  credential in a Bearer header or JSON body. The dedicated Bridge validates it
+  only through the deployment-pinned session Worker's authenticated
+  `/groups/my-memberships` endpoint, then issues a session-, audience-, and
+  `agent_autofill`-scope-bound `ceagt_` member credential. The same exchange is
+  used for worker-canonical and registry-canonical sessions because the session
+  Worker remains the sole membership and gate verifier; the Bridge does not
+  evaluate SIWE, chain gates, or SBT balances.
 
 Bearer credentials are accepted in authorization headers, never query strings.
 Rotating a credential publishes the replacement before retiring the previous
 record. A credential remains pinned to its issued session; callers cannot move
 it by supplying another `sessionSlug` or by changing Telegram defaults.
+Member credentials expire at the earlier of 24 hours or the remaining
+session-worker credential lifetime. Revoking either credential therefore takes
+effect for Wrapped access no later than that remaining bound.
 
 ## Agent API Catalog
 
@@ -85,6 +96,7 @@ Initial Telegram-facing capabilities:
 | Questions | `GET /api/agent/questions` | group, private, Mini App | worker-local index until canonical |
 | Client session metadata | `GET /api/agent/session-meta` | web client, private | implemented telegram-first classification |
 | Client token exchange | `POST /api/agent/client-login/exchange` | web client, private | implemented short-lived browser credential exchange |
+| Wrapped member exchange | `POST /api/agent/wrapped/member-exchange` | direct HTTPS, private | implemented pinned session-Worker verification |
 | Response submit request | `POST /api/agent/responses/submit-request` | private, Mini App | direct on-chain when enabled; otherwise pending canonical handoff |
 | SBT claim/create, decrypt, storage access | existing `/api/agent/*` routes in the catalog | private or Mini App unless explicitly group-safe | planned or contract-only |
 
@@ -125,6 +137,15 @@ Agent-only onboarding reuses `POST /api/agent/invite/onboard` with
 `agent_autofill` only in its own credential-kind slot, leaving any normal user
 credential slot untouched. Agent-only tokens default to 7 days; set
 `AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS` to override.
+
+For an ordinary session member, the alternative onboarding path is
+`POST /api/agent/wrapped/member-exchange` with an already authenticated
+session-worker credential. Telegram is not required. Once exchanged, statement
+reads, answer submission, and Wrapped generation remain HTTPS/KV operations;
+the agent does not submit an EVM transaction. A registry-canonical session uses
+this path when its configured session Worker is reachable and owns the
+registry/on-chain gate login. A locked session without an already usable Worker
+cannot attach one and must fail closed.
 
 The public start payload is `GET /api/agent/agent-only/start`. Scoped
 agent-only tokens can read the current window snapshot at

@@ -15,6 +15,7 @@ import {
   buildAgentOnlyMetrics,
   canonicalAgentOnlyAnswerProjection,
   exportAgentOnlyData,
+  generateAgentOnlyWrappedImage,
   getAgentOnlyStatementsPage,
   loadAgentOnlyPredictionsForPrincipal,
   loadAgentOnlyModeConfig,
@@ -2066,6 +2067,146 @@ test('admin metrics count distinct principals once across multiple windows', asy
     metrics.perWindow.map((window) => [window.windowId, window.distinctPrincipals]),
     [['w-2026-06-12', 1], ['w-2026-06-15', 1]],
   );
+});
+
+test('Wrapped predictions, corrections, run state, and posters remain isolated between principals', async () => {
+  const testEnv = env({ AGENT_BRIDGE_OPENAI_API_KEY: 'unit-openai-key' });
+  const { ids } = await seedQuestions(testEnv);
+  await materializeAgentOnlyWindow({ env: testEnv, sessionSlug: 'alpha', now: '2026-06-12T15:05:00.000Z' });
+  const principalA = 'session-worker:evm_address:0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const principalB = 'session-worker:evm_address:0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+  const common = {
+    window_id: 'w-2026-06-12',
+    agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+  };
+  const acceptedA = await submitAgentOnlyAnswersBulk({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    telegramUserId: principalA,
+    now: '2026-06-12T15:10:00.000Z',
+    body: {
+      ...common,
+      run_id: 'run-principal-a',
+      request_id: 'answers-principal-a',
+      answers: [
+        { statement_id: ids[0], answer: { value: 'agree' }, confidence: 91 },
+        { statement_id: ids[1], skipped: true, skip_reason: 'privacy_protective' },
+        { statement_id: ids[2], answer: { value: 8 }, confidence: 81 },
+        { statement_id: ids[3], answer: { values: ['Pizza'] }, confidence: 71 },
+      ],
+    },
+  });
+  const acceptedB = await submitAgentOnlyAnswersBulk({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    telegramUserId: principalB,
+    now: '2026-06-12T15:10:30.000Z',
+    body: {
+      ...common,
+      run_id: 'run-principal-b',
+      request_id: 'answers-principal-b',
+      answers: [
+        { statement_id: ids[0], answer: { value: 'disagree' }, confidence: 52 },
+        { statement_id: ids[1], answer: { text: 'Keep the sessions shorter.' }, confidence: 62 },
+        { statement_id: ids[2], answer: { value: 3 }, confidence: 72 },
+        { statement_id: ids[3], answer: { values: ['Sushi'] }, confidence: 82 },
+      ],
+    },
+  });
+  assert.equal(acceptedA.ok, true);
+  assert.equal(acceptedA.skipsRecorded, 1);
+  assert.equal(acceptedB.ok, true);
+  assert.equal(acceptedB.skipsRecorded, 0);
+
+  const correctionA = await recordAgentOnlyHumanReview({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    windowId: 'w-2026-06-12',
+    telegramUserId: principalA,
+    questionId: ids[0],
+    answer: { questionType: 'agree_unsure_disagree', value: 'disagree' },
+    kind: 'edit',
+    now: '2026-06-12T15:11:00.000Z',
+  });
+  assert.equal(correctionA.recorded, true);
+
+  const [readA, readB] = await Promise.all([
+    loadAgentOnlyPredictionsForPrincipal({
+      env: testEnv,
+      sessionSlug: 'alpha',
+      telegramUserId: principalA,
+      now: '2026-06-12T15:12:00.000Z',
+    }),
+    loadAgentOnlyPredictionsForPrincipal({
+      env: testEnv,
+      sessionSlug: 'alpha',
+      telegramUserId: principalB,
+      now: '2026-06-12T15:12:00.000Z',
+    }),
+  ]);
+  assert.equal(readA.predictionsByQuestionId[ids[0]].valueLabel, 'Agree');
+  assert.equal(readA.predictionsByQuestionId[ids[0]].reviewed, true);
+  assert.equal(Object.hasOwn(readA.predictionsByQuestionId, ids[1]), false);
+  assert.equal(readB.predictionsByQuestionId[ids[0]].valueLabel, 'Disagree');
+  assert.equal(readB.predictionsByQuestionId[ids[0]].reviewed, false);
+  assert.equal(readB.predictionsByQuestionId[ids[1]].valueLabel, 'Keep the sessions shorter.');
+
+  const stateA = JSON.parse(await testEnv.AGENT_ACTION_KV.get(
+    __test__telegramAgentOnlyMode.answerStateKey('alpha', 'w-2026-06-12', principalA),
+  ));
+  const stateB = JSON.parse(await testEnv.AGENT_ACTION_KV.get(
+    __test__telegramAgentOnlyMode.answerStateKey('alpha', 'w-2026-06-12', principalB),
+  ));
+  assert.equal(stateA.byStatement[ids[0]].agent.runId, 'run-principal-a');
+  assert.equal(stateA.byStatement[ids[0]].agent.confidence, 91);
+  assert.equal(stateA.byStatement[ids[1]].agent, null);
+  assert.equal(stateA.byStatement[ids[1]].agentSkip.reason, 'privacy_protective');
+  assert.equal(stateA.byStatement[ids[1]].agentSkip.runId, 'run-principal-a');
+  assert.equal(stateA.byStatement[ids[0]].human.kind, 'edit');
+  assert.equal(stateB.byStatement[ids[0]].agent.runId, 'run-principal-b');
+  assert.equal(stateB.byStatement[ids[0]].agent.confidence, 52);
+  assert.equal(Object.hasOwn(stateB.byStatement[ids[0]], 'human'), false);
+
+  const imageFetch = async () => new Response(JSON.stringify({
+    data: [{ b64_json: Buffer.from('isolated-poster').toString('base64') }],
+  }), { status: 200, headers: { 'content-type': 'application/json' } });
+  const [posterA, posterB] = await Promise.all([
+    generateAgentOnlyWrappedImage({
+      env: testEnv,
+      sessionSlug: 'alpha',
+      telegramUserId: principalA,
+      body: { window_id: 'w-2026-06-12', run_id: 'run-principal-a' },
+      now: '2026-06-12T15:13:00.000Z',
+      fetchImpl: imageFetch,
+    }),
+    generateAgentOnlyWrappedImage({
+      env: testEnv,
+      sessionSlug: 'alpha',
+      telegramUserId: principalB,
+      body: { window_id: 'w-2026-06-12', run_id: 'run-principal-b' },
+      now: '2026-06-12T15:13:00.000Z',
+      fetchImpl: imageFetch,
+    }),
+  ]);
+  assert.equal(posterA.ok, true);
+  assert.equal(posterA.privacy_skip_count, 1);
+  assert.equal(posterA.agent_prediction_count, 3);
+  assert.equal(posterB.ok, true);
+  assert.equal(posterB.privacy_skip_count, 0);
+  assert.equal(posterB.agent_prediction_count, 4);
+  assert.notEqual(posterA.image_id, posterB.image_id);
+
+  const crossPrincipalRun = await generateAgentOnlyWrappedImage({
+    env: testEnv,
+    sessionSlug: 'alpha',
+    telegramUserId: principalB,
+    body: { window_id: 'w-2026-06-12', run_id: 'run-principal-a' },
+    now: '2026-06-12T15:14:00.000Z',
+    fetchImpl: async () => { throw new Error('cross-principal poster must fail before generation'); },
+  });
+  assert.equal(crossPrincipalRun.ok, false);
+  assert.equal(crossPrincipalRun.status, 409);
+  assert.equal(crossPrincipalRun.reason, 'agent_only_wrapped_incomplete_predictions');
 });
 
 test('rating zero predictions keep a visible label and matching semantic fingerprint', async () => {

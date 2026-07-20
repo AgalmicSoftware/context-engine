@@ -32,6 +32,7 @@ import {
   evaluateTelegramGroupSessionAccess,
   evaluateSponsoredResourceEligibility,
   normalizeSessionPolicy,
+  resolveAgentHttpSessionInvocation,
   resolveSessionInvocation,
 } from './sessionPolicy.mjs';
 
@@ -79,6 +80,22 @@ test('session policy resolves defaults and invocation by slug or name', () => {
     resolveSessionInvocation(exportScopePolicy, 'envelope-export').session.exportScope,
     'encrypted_envelopes_only'
   );
+});
+
+test('agentHttp invocation remains enabled when the optional Telegram surface is off', () => {
+  const policy = normalizeSessionPolicy({
+    defaultSessionSlug: 'wrapped-alpha',
+    sessions: [{
+      sessionSlug: 'wrapped-alpha',
+      sessionModeProfile: {
+        surfaces: { agentHttp: true, telegram: false },
+        authority: { mode: 'registry_canonical' },
+      },
+    }],
+  });
+
+  assert.equal(resolveSessionInvocation(policy, 'wrapped-alpha').reason, 'telegram_bridge_disabled');
+  assert.equal(resolveAgentHttpSessionInvocation(policy, 'wrapped-alpha').session.sessionSlug, 'wrapped-alpha');
 });
 
 test('session policy prefers sessionModeProfile with legacy fallback', () => {

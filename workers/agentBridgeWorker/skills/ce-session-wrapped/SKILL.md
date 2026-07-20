@@ -89,7 +89,15 @@ preference, research, or confirmation question when this line is present.
 
 ## Credential
 
-If the forwarded message contains an invite-token line, use it first. A
+If the host supplies an active session-worker credential through the current
+private auth context, exchange it once at
+`POST /api/agent/wrapped/member-exchange` with `sessionSlug`. Send the worker
+credential only as Bearer auth or in the JSON `sessionWorkerCredential` field,
+never in a URL. Use the returned `ceagt_` token privately for the rest of the
+run. This path works for worker-canonical and registry-canonical sessions and
+does not require Telegram or an agent-originated EVM transaction.
+
+Otherwise, if the forwarded message contains an invite-token line, use it. A
 Telegram/Hermes runtime may include its verified Telegram id, but Telegram is
 optional. A non-Telegram host omits that field and CE creates an opaque
 principal. POST once to:
