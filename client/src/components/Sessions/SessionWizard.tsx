@@ -4856,7 +4856,6 @@ const SessionWizard = ({
       sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
       sessionMetadataHeaderAccessory={sessionMetadataHeaderAccessory}
       sessionModeProfileControl={sessionModeProfileControl}
-      showSessionModeProfileControlInSetup={effectiveSessionModeProfileStepComplete}
       sessionModeProfileStepComplete={effectiveSessionModeProfileStepComplete}
       sessionUrl={sessionUrl}
       setBundleFile={setBundleFile}

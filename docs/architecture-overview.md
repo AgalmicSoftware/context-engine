@@ -37,6 +37,15 @@ flowchart TD
   PublicRelease --> DeployHelper
 ```
 
+Static app hosting, public/private session access, and the session
+infrastructure profile are independent choices. The `/new` screen does not
+automatically preselect a hosting option; `Fast & Cheap (Cloudflare)` is the implemented
+default/recommended path once chosen, and
+`Trustless & Public (Decentralized)` is the implemented opt-in path. The
+Company-Operated branch is a planned adapter architecture, not a shipped
+corporate package. It can target entirely off-chain infrastructure; a private
+EVM would be only a possible future adapter, never a requirement.
+
 Primary source entry points are `client/src/components/MainSite/AppShell.tsx`,
 `client/src/components/SurveyTool/SurveyTool.tsx`,
 `client/src/components/Sessions/SessionWizard.tsx`, and

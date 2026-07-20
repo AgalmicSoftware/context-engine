@@ -103,10 +103,9 @@ $muted-text: tokens.$ce-muted-text;
 
 .headerTitleBlock {
   display: grid;
-  flex: 0 0 auto;
+  flex: 1 1 300px;
   gap: 6px;
-  min-width: 0;
-  max-width: 100%;
+  min-width: 280px;
 }
 
 .headerActions {
@@ -115,7 +114,6 @@ $muted-text: tokens.$ce-muted-text;
   align-items: flex-start;
   gap: 12px;
   flex-wrap: wrap;
-  min-width: 0;
   max-width: 100%;
   margin-left: auto;
 }
@@ -125,28 +123,6 @@ $muted-text: tokens.$ce-muted-text;
   justify-items: end;
   gap: 7px;
   min-width: 0;
-  max-width: 100%;
-}
-
-.headerProfileSelectionStep {
-  align-items: stretch;
-
-  .headerTitleBlock {
-    flex-basis: 100%;
-    min-width: 0;
-    text-align: center;
-  }
-
-  .headerActions {
-    flex: 1 1 100%;
-    width: 100%;
-    margin-left: 0;
-  }
-
-  .headerControlStack {
-    width: 100%;
-    justify-items: stretch;
-  }
 }
 
 .headerSecondaryActions {
@@ -155,6 +131,13 @@ $muted-text: tokens.$ce-muted-text;
   justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.modeHint {
+  max-width: 620px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: $muted-text;
 }
 
 .headerChainSelector {
@@ -2758,139 +2741,132 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .modeProfilePanel {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 18px;
-  border: 1px solid rgba(244, 247, 255, 0.12);
-  border-radius: var(--ce-radius-lg);
-  background: rgba(10, 14, 24, 0.72);
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  min-width: 0;
 }
 
-.modeProfileHeader,
-.modePresetTitleRow,
+.modeProfileCompactLabel {
+  color: rgba(244, 247, 255, 0.66);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.modePresetToggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ce-radius-pill);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.modePresetButton {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--ce-radius-pill);
+  background: transparent;
+  color: rgba(244, 247, 255, 0.78);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 750;
+  white-space: nowrap;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.modePresetButton:hover,
+.modePresetButton:focus-visible {
+  border-color: rgba(77, 255, 164, 0.42);
+  background: rgba(77, 255, 164, 0.1);
+  color: #ffffff;
+}
+
+.modePresetButton:focus-visible {
+  outline: 2px solid #8fffc4;
+  outline-offset: 2px;
+}
+
+.modePresetButtonSelected {
+  border-color: rgba(77, 255, 164, 0.52);
+  background: rgba(77, 255, 164, 0.14);
+  color: #ffffff;
+}
+
+.modePresetButtonDisabled,
+.modePresetButtonDisabled:hover {
+  border-color: transparent;
+  background: transparent;
+  color: rgba(244, 247, 255, 0.46);
+  cursor: not-allowed;
+}
+
+.modePresetBadge,
+.modePresetSoon {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--ce-radius-pill);
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 3px 5px;
+  text-transform: uppercase;
+}
+
+.modePresetBadge {
+  border: 1px solid rgba(122, 255, 203, 0.34);
+  color: rgba(161, 255, 221, 0.96);
+}
+
+.modePresetSoon {
+  border: 1px solid rgba(244, 247, 255, 0.18);
+  color: rgba(244, 247, 255, 0.52);
+}
+
+.modeProfilePanel .moreOptionsToggle {
+  min-height: 34px;
+  padding: 5px 9px;
+  border-radius: var(--ce-radius-pill);
+  font-size: 0.7rem;
+}
+
 .modeCheckboxRow {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.modeProfileHeader {
-  justify-content: space-between;
-}
-
-.modeProfileTitle {
-  margin: 0;
-  color: #f7f9ff;
-  font-size: clamp(1.25rem, 2vw, 1.55rem);
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-}
-
-.modeProfileChip,
-.modePresetBadge {
-  display: inline-flex;
-  align-items: center;
-  width: fit-content;
-  border-radius: 999px;
-  border: 1px solid rgba(122, 255, 203, 0.34);
-  color: rgba(161, 255, 221, 0.96);
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 1;
-  padding: 5px 8px;
-}
-
-.modePresetGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.modePresetCard {
-  appearance: none;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-height: 148px;
-  padding: 16px;
-  text-align: left;
-  color: rgba(244, 247, 255, 0.9);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(244, 247, 255, 0.14);
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.modePresetCard:hover,
-.modePresetCard:focus-visible {
-  border-color: rgba(122, 255, 203, 0.62);
-}
-
-.modePresetCardSelected {
-  border-color: rgba(122, 255, 203, 0.86);
-  background: rgba(122, 255, 203, 0.08);
-}
-
-.modePresetTitle {
-  font-size: 1rem;
-  font-weight: 800;
-}
-
-.modePresetCopy {
-  display: grid;
-  gap: 5px;
-  margin: 0;
-  padding-left: 1.2rem;
-  font-size: 0.9rem;
-  line-height: 1.35;
-  color: #eef2ff;
-}
-
-.modePresetKeys {
-  display: grid;
-  gap: 8px;
-  margin-top: auto;
-}
-
-.modePresetKeysLabel {
-  color: #e0e7ff;
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  line-height: 1.2;
-  text-transform: uppercase;
-}
-
-.modePresetKeyList {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.modePresetKey {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid #8fa9ff;
-  border-radius: 999px;
-  background: #25335d;
-  color: #f5f7ff;
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1.2;
-  padding: 5px 8px;
-}
-
-.modePresetCheck {
-  margin-left: auto;
-  color: rgba(122, 255, 203, 0.96);
-}
-
 .modeAdvancedGrid {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 40;
   display: grid;
   gap: 14px;
-  padding-top: 2px;
+  width: min(720px, calc(100vw - 48px));
+  max-height: min(72vh, 720px);
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid rgba(122, 255, 203, 0.3);
+  border-radius: var(--ce-radius-lg);
+  background: rgba(14, 18, 42, 0.98);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.46);
 }
 
 .modeAdvancedRow {
@@ -2988,17 +2964,38 @@ $muted-text: tokens.$ce-muted-text;
     }
   }
 
-  .modeProfileHeader,
   .modeAdvancedRow {
     grid-template-columns: 1fr;
   }
 
-  .modeProfileHeader {
-    align-items: flex-start;
-    flex-direction: column;
+  .modeProfilePanel {
+    box-sizing: border-box;
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: flex-start;
   }
 
-  .modePresetGrid {
-    grid-template-columns: 1fr;
+  .modeProfileCompactLabel {
+    width: 100%;
+  }
+
+  .modePresetToggle {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .modePresetButton {
+    flex: 1 0 auto;
+  }
+
+  .modePresetBadge {
+    display: none;
+  }
+
+  .modeAdvancedGrid {
+    right: 0;
+    left: 0;
+    width: auto;
+    max-height: min(70vh, 600px);
   }
 }

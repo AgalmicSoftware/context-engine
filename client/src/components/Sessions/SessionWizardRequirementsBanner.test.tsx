@@ -86,8 +86,12 @@ describe('SessionWizardRequirementsBanner', () => {
       { key: 'workers_scripts', type: 'edit' },
       { key: 'workers_kv_storage', type: 'edit' },
     ]);
-    expect(screen.getByText(/copy the generated token, and paste it into the Worker step/i)).toBeInTheDocument();
-    expect(screen.getByText(/restrict Account Resources to the account/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/if you're already logged into Cloudflare, this link opens a token form/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/permissions prefilled/i)).toBeInTheDocument();
+    expect(screen.getByText(/copy it into the Worker step/i)).toBeInTheDocument();
+    expect(screen.getByText(/Under Account Resources, choose only the account/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'AI provider key' })).toBeInTheDocument();
     expect(screen.queryByText(/Arweave|Lit|RPC|wallet|faucet|funding|gas/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/not required/i)).not.toBeInTheDocument();

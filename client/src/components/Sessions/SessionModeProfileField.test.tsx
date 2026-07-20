@@ -5,7 +5,7 @@ import SessionModeProfileField from './SessionModeProfileField';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('SessionModeProfileField', () => {
-  it('starts with no selected preset and no entry Continue button', () => {
+  it('renders compact hosting choices with Corporate visibly unavailable', () => {
     const onChange = jest.fn();
     render(<SessionModeProfileField registryChainId={11155420} onChange={onChange} />);
 
@@ -13,23 +13,13 @@ describe('SessionModeProfileField', () => {
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
     expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Choose how to host your session' })).toBeInTheDocument();
-    expect(screen.getByText('Fastest setup')).toBeInTheDocument();
-    expect(screen.getByText('Private, encrypted storage')).toBeInTheDocument();
-    expect(screen.getByText('Can anchor on-chain later')).toBeInTheDocument();
-    expect(screen.getByText('Public, permanent storage')).toBeInTheDocument();
-    expect(screen.getByText('Optional encryption')).toBeInTheDocument();
-    expect(screen.getByText('More setup and cost')).toBeInTheDocument();
-    const cloudflareCard = within(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
-    expect(cloudflareCard.getByText('Cloudflare API token')).toBeInTheDocument();
-    expect(cloudflareCard.getByText('AI provider key')).toBeInTheDocument();
-    expect(cloudflareCard.queryByText(/Arweave|RPC|Lit/)).not.toBeInTheDocument();
-    expect(screen.getAllByText('AI provider key')).toHaveLength(2);
-    expect(screen.getByText('Arweave JWK')).toBeInTheDocument();
-    expect(screen.getByText('Arweave wallet/JWK')).toBeInTheDocument();
-    expect(screen.getAllByText('RPC URL/key')).toHaveLength(2);
-    expect(screen.getByText('Lit key only for Lit encryption')).toBeInTheDocument();
-    expect(screen.getByText('Lit API key if encryption is enabled')).toBeInTheDocument();
+    const selector = screen.getByRole('radiogroup', { name: 'Session hosting profile' });
+    expect(within(selector).getByRole('radio', { name: /Cloudflare/i })).toBeInTheDocument();
+    expect(within(selector).getByRole('radio', { name: 'Decentralized' })).toBeInTheDocument();
+    expect(within(selector).getByRole('radio', { name: /Corporate.*coming later/i })).toBeDisabled();
+    expect(screen.queryByRole('heading', { name: 'Choose how to host your session' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Fastest setup')).not.toBeInTheDocument();
+    expect(screen.queryByText('Keys needed')).not.toBeInTheDocument();
   });
 
   it('can render selected setup mode without the entry Continue button', () => {
@@ -101,6 +91,7 @@ describe('SessionModeProfileField', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
 
+    expect(screen.getByRole('region', { name: 'Advanced hosting options' })).toBeInTheDocument();
     const encryptionOptions = within(screen.getByRole('radiogroup', { name: /encryption/i }));
     expect(encryptionOptions.getByRole('radio', { name: 'Cloudflare internal' })).toHaveAttribute(
       'aria-checked',
@@ -117,9 +108,7 @@ describe('SessionModeProfileField', () => {
   it('marks profile custom after an advanced override', () => {
     const onChange = jest.fn();
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    const { rerender } = render(
-      <SessionModeProfileField registryChainId={11155420} value={profile} onChange={onChange} />,
-    );
+    render(<SessionModeProfileField registryChainId={11155420} value={profile} onChange={onChange} />);
 
     fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
     fireEvent.click(
@@ -135,11 +124,6 @@ describe('SessionModeProfileField', () => {
         storageProfile: expect.objectContaining({ backend: 'arweave' }),
       }),
     );
-
-    rerender(
-      <SessionModeProfileField registryChainId={11155420} value={onChange.mock.calls[0][0]} onChange={onChange} />,
-    );
-    expect(screen.getByText('Custom')).toBeInTheDocument();
   });
 
   it('confirms before switching away from customized settings', () => {

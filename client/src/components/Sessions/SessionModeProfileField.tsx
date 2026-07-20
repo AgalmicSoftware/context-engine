@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Button, Input, Label, UncontrolledTooltip } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faCheck, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCaretDown, faCaretUp, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 
 import styles from './SessionWizard.module.scss';
 import type { AnyRecord } from '../shellTypes';
@@ -17,25 +17,24 @@ import {
   type SessionModeResultsVisibility,
   type SessionModeSurface,
 } from '../../utilities/session/sessionModeProfile';
-
 type SessionModeProfileFieldProps = {
   registryChainId?: number | null;
   value?: unknown;
   onChange: (profile: SessionModeProfile, compiled: { storageProfile: AnyRecord }) => void;
 };
 
-const PRESET_CARDS = [
+const HOSTING_PRESETS = [
   {
     id: SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
-    title: 'Fast & Cheap (Cloudflare)',
-    badge: 'Recommended',
-    bullets: ['Fastest setup', 'Private, encrypted storage', 'Can anchor on-chain later'],
+    label: 'Cloudflare',
+    ariaLabel: 'Cloudflare (recommended)',
+    recommended: true,
   },
   {
     id: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
-    title: 'Trustless & Public (Decentralized)',
-    badge: '',
-    bullets: ['Public, permanent storage', 'Optional encryption', 'More setup and cost'],
+    label: 'Decentralized',
+    ariaLabel: 'Decentralized',
+    recommended: false,
   },
 ] as const;
 
@@ -152,29 +151,10 @@ const SessionModeProfileField = ({
       : 'Worker envelope encryption is available only with Cloudflare storage. Use Lit for encrypted Arweave artifacts.';
 
   return (
-    <section className={styles.modeProfilePanel} aria-label="Session mode">
-      <div className={styles.modeProfileHeader}>
-        <div>
-          <h2 className={styles.modeProfileTitle}>Choose how to host your session</h2>
-          {profile?.preset === SESSION_MODE_PRESET_IDS.CUSTOM ? (
-            <span className={styles.modeProfileChip}>Custom</span>
-          ) : null}
-        </div>
-        {showContinue && !entryOnly ? (
-          <Button
-            type="button"
-            color="primary"
-            disabled={!profile}
-            data-testid="ce-new-preset-continue"
-            onClick={onContinue}
-          >
-            Continue
-          </Button>
-        ) : null}
-      </div>
-
-      <div className={styles.modePresetGrid} role="radiogroup" aria-label="Session mode presets">
-        {PRESET_CARDS.map((preset) => {
+    <section className={styles.modeProfilePanel} aria-label="Session hosting">
+      <span className={styles.modeProfileCompactLabel}>Hosting</span>
+      <div className={styles.modePresetToggle} role="radiogroup" aria-label="Session hosting profile">
+        {HOSTING_PRESETS.map((preset) => {
           const selected = selectedPreset === preset.id;
           return (
             <button
@@ -182,33 +162,28 @@ const SessionModeProfileField = ({
               type="button"
               role="radio"
               aria-checked={selected}
-              className={`${styles.modePresetCard} ${selected ? styles.modePresetCardSelected : ''}`}
+              aria-label={preset.ariaLabel}
+              className={`${styles.modePresetButton} ${selected ? styles.modePresetButtonSelected : ''}`}
               data-testid={`ce-new-preset-${preset.id}`}
               onClick={() => selectPreset(preset.id)}
             >
-              <span className={styles.modePresetTitleRow}>
-                <span className={styles.modePresetTitle}>{preset.title}</span>
-                {preset.badge ? <span className={styles.modePresetBadge}>{preset.badge}</span> : null}
-                {selected ? <FontAwesomeIcon icon={faCheck} className={styles.modePresetCheck} /> : null}
-              </span>
-              <ul className={styles.modePresetCopy}>
-                {preset.bullets.map((bullet) => (
-                  <li key={bullet}>{bullet}</li>
-                ))}
-              </ul>
-              <span className={styles.modePresetKeys}>
-                <span className={styles.modePresetKeysLabel}>Keys needed</span>
-                <span className={styles.modePresetKeyList}>
-                  {presetKeyChips.map((key) => (
-                    <span key={key} className={styles.modePresetKey}>
-                      {key}
-                    </span>
-                  ))}
-                </span>
-              </span>
+              <span>{preset.label}</span>
+              {preset.recommended ? <span className={styles.modePresetBadge}>Recommended</span> : null}
             </button>
           );
         })}
+        <button
+          type="button"
+          role="radio"
+          aria-label="Corporate (coming later)"
+          aria-checked="false"
+          className={`${styles.modePresetButton} ${styles.modePresetButtonDisabled}`}
+          title="Corporate hosting is coming later"
+          disabled
+        >
+          <span>Corporate</span>
+          <span className={styles.modePresetSoon}>Later</span>
+        </button>
       </div>
 
       {!entryOnly ? (
@@ -217,13 +192,26 @@ const SessionModeProfileField = ({
           className={styles.moreOptionsToggle}
           onClick={() => setAdvancedOpen((prev) => !prev)}
           aria-expanded={advancedOpen}
+          aria-label="Customize hosting (advanced options)"
         >
-          Advanced options <FontAwesomeIcon icon={advancedOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 6 }} />
+          Customize <FontAwesomeIcon icon={advancedOpen ? faCaretUp : faCaretDown} style={{ marginLeft: 6 }} />
         </button>
       ) : null}
 
-      {advancedOpen ? (
-        <div className={styles.modeAdvancedGrid}>
+      {showContinue && !entryOnly ? (
+        <Button
+          type="button"
+          color="primary"
+          disabled={!profile}
+          data-testid="ce-new-preset-continue"
+          onClick={onContinue}
+        >
+          Continue
+        </Button>
+      ) : null}
+
+      {!entryOnly && advancedOpen ? (
+        <div className={styles.modeAdvancedGrid} role="region" aria-label="Advanced hosting options">
           {!profile ? (
             <div className={styles.helperText}>Choose a preset before editing per-axis options.</div>
           ) : (

@@ -6,9 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Clarified the session hosting chooser with a prominent high-contrast heading
-  and three brief comparison bullets per mode while preserving the existing
-  key requirements and publishing behavior.
+- Moved session hosting selection into a compact header control, kept the
+  selected Cloudflare, decentralized, or custom profile visible in the title,
+  and previewed Corporate hosting as unavailable without changing publishing
+  semantics. Cloudflare token guidance now explains that the linked form
+  prefills permissions for users already signed in.
 - Made `contextengine.sh` the canonical public URL across site metadata,
   discovery assets, documentation, and Agent Bridge links. Worker and Bridge
   bootstrap allowlists now prefer `.sh` while retaining `.xyz` as redirect

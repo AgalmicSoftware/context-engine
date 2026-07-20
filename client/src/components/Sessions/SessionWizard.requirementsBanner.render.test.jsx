@@ -58,7 +58,8 @@ describe('SessionWizard new-session requirements banner', () => {
       { key: 'workers_scripts', type: 'edit' },
       { key: 'workers_kv_storage', type: 'edit' },
     ]);
-    expect(screen.getByText(/copy the generated token, and paste it into the Worker step/i)).toBeInTheDocument();
+    expect(screen.getByText(/opens a token form with permissions prefilled/i)).toBeInTheDocument();
+    expect(screen.getByText(/Under Account Resources, choose only the account/i)).toBeInTheDocument();
   });
 
   it('renders the decentralized requirements copy and contact link on /session/new', async () => {

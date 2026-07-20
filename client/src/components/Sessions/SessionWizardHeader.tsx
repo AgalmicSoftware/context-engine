@@ -32,8 +32,6 @@ type SessionWizardHeaderProps = {
   wizardMode?: string;
   sessionModeProfileControl?: React.ReactNode;
   sessionModeProfileLabel?: string;
-  sessionModeProfileSelectionStep?: boolean;
-  showNetworkSelector?: boolean;
 };
 
 const SessionWizardHeader = ({
@@ -44,22 +42,56 @@ const SessionWizardHeader = ({
   registryChainName = '',
   registryChainOptions = [],
   renderInfoTooltip,
+  wizardDisplaySettingsOpen = false,
+  wizardMode = 'normal',
   sessionModeProfileControl = null,
   sessionModeProfileLabel = '',
-  sessionModeProfileSelectionStep = false,
-  showNetworkSelector = true,
 }: SessionWizardHeaderProps): React.ReactElement => {
   return (
     <header className={`${styles.header} ${sessionModeProfileSelectionStep ? styles.headerProfileSelectionStep : ''}`}>
       <div className={styles.headerTitleBlock}>
-        <h1>Session Setup</h1>
+        <h1>Session Setup{sessionModeProfileLabel ? ` (${sessionModeProfileLabel})` : ''}</h1>
         {!isNormalMode && <div className={styles.modeHint}>Advanced mode shows the full session configuration.</div>}
       </div>
       <div className={styles.headerActions}>
         <div className={styles.headerControlStack}>
           {sessionModeProfileControl}
-          {!sessionModeProfileSelectionStep && !isNormalMode && showNetworkSelector ? (
-            <div className={styles.headerSecondaryActions}>
+          <div className={styles.headerSecondaryActions}>
+            {hasSponsoredBundleLink ? (
+              <div className={styles.wizardSettingsMenu}>
+                {wizardDisplaySettingsOpen ? (
+                  <button
+                    type="button"
+                    className={styles.wizardSettingsBackdrop}
+                    aria-label="Close session wizard display settings"
+                    onClick={onCloseDisplaySettings}
+                  />
+                ) : null}
+                <button
+                  type="button"
+                  className={`${styles.iconButton} ${styles.wizardSettingsButton} ${wizardDisplaySettingsOpen ? styles.iconButtonActive : ''}`}
+                  onClick={onToggleDisplaySettings}
+                  title="Session wizard display settings"
+                  aria-label="Session wizard display settings"
+                  aria-expanded={wizardDisplaySettingsOpen}
+                  aria-haspopup="dialog"
+                >
+                  <FontAwesomeIcon icon={faCog} />
+                </button>
+                <div
+                  className={styles.wizardSettingsPanel}
+                  role="dialog"
+                  aria-label="Session wizard display settings"
+                  hidden={!wizardDisplaySettingsOpen}
+                >
+                  <div className={styles.wizardSettingsLabel}>Display mode</div>
+                  {wizardModeControls}
+                </div>
+              </div>
+            ) : (
+              wizardModeControls
+            )}
+            {wizardMode === 'advanced' && (
               <div className={styles.headerChainSelector}>
                 <span className={styles.headerChainLabel}>Network:</span>
                 <Input
@@ -88,41 +120,9 @@ const SessionWizardHeader = ({
                   ariaLabel: 'Registry chain info',
                 })}
               </div>
-            </div>
+            )}
           </div>
-        ) : (
-          wizardModeControls
-        )}
-        {wizardMode === 'advanced' && (
-          <div className={styles.headerChainSelector}>
-            <span className={styles.headerChainLabel}>Network:</span>
-            <Input
-              type="select"
-              value={registryChainId || ''}
-              onChange={(event) => onRegistryChainIdChange(event.target.value)}
-              className={styles.headerChainInput}
-            >
-              {registryChainOptions.length ? (
-                registryChainOptions.map((chain) => (
-                  <option key={chain.id} value={chain.id}>
-                    {chain.name} ({chain.id})
-                  </option>
-                ))
-              ) : (
-                <option value={registryChainId || ''}>
-                  {registryChainName || registryChainId || 'Select a chain'}
-                </option>
-              )}
-            </Input>
-            {renderInfoTooltip({
-              id: 'gw-registry-chain',
-              content: `Chain for session deployment. Registry: ${registryAddress || 'Unavailable'}`,
-              placement: 'bottom',
-              testId: 'ce-wizard-tooltip-gw-registry-chain',
-              ariaLabel: 'Registry chain info',
-            })}
-          </div>
-        )}
+        </div>
       </div>
     </header>
   );

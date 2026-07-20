@@ -216,11 +216,13 @@ chosen mode; there is no separate Continue action on this entry screen:
 
 - `Fast & Cheap (Cloudflare)` compiles to a Cloudflare-backed,
   worker-canonical session shape with Cloudflare-internal worker encryption
-  (`worker_envelope`) enabled by default. Its card lists exactly the Cloudflare
-  API token and one AI-provider key. It does not ask for Arweave, Lit, RPC,
-  funding, faucet, or gas inputs.
+  (`worker_envelope`) enabled by default. After selection, the requirements
+  banner lists exactly the Cloudflare API token and one AI-provider key. It does
+  not ask for Arweave, Lit, RPC, funding, faucet, or gas inputs.
 - `Trustless & Public (Decentralized)` compiles to the public Arweave +
-  EVM-registry session shape.
+  EVM-registry session shape. Its requirements banner lists the Arweave
+  wallet/JWK, RPC URL/key, AI provider key, and optional Lit key needed when
+  encryption is enabled.
 
 After selection, the profile remains visible above the setup stages. Advanced
 options let creators switch Cloudflare sessions between Cloudflare-internal and

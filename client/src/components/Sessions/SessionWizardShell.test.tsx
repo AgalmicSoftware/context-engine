@@ -5,7 +5,8 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SessionWizardShell, { type SessionWizardShellProps } from './SessionWizardShell';
 
 jest.mock('./SessionWizardHeader', () => (props: any) => (
-  <div data-testid="shell-header" data-mode={props.wizardMode}>
+  <div data-testid="shell-header" data-mode={props.wizardMode} data-profile-label={props.sessionModeProfileLabel || ''}>
+    {props.sessionModeProfileControl}
     <button type="button" onClick={props.onEnterAdvancedMode}>
       advanced
     </button>
@@ -182,6 +183,7 @@ const baseProps = (): SessionWizardShellProps => ({
   deployWorkerUrl: '',
   displayedWorkerUrl: 'https://worker.example.test',
   draft: { sessionModeProfile: { preset: 'fast_cheap_cloudflare' } },
+  effectivePersistWorkerSecrets: false,
   embeddedDeployHelperEnabled: true,
   encryptionGates: [],
   ensureLightSbtUniverse: jest.fn(),
@@ -314,9 +316,6 @@ const baseProps = (): SessionWizardShellProps => ({
   sessionHeaderPreviewSrc: '',
   sessionMetadataHeaderAccessory: <span data-testid="shell-session-id">session-id</span>,
   sessionModeProfileControl: <section data-testid="shell-mode-profile">mode profile</section>,
-  sessionModeProfilePrivacyControl: <section data-testid="shell-mode-profile-privacy">profile privacy</section>,
-  sessionModeProfileWorkerControl: <section data-testid="shell-mode-profile-worker">profile worker</section>,
-  sessionModeProfilePublishControl: <section data-testid="shell-mode-profile-publish">profile publish</section>,
   sessionModeProfileStepComplete: true,
   sessionUrl: '/session/demo-session',
   setBundleFile: jest.fn(),
@@ -456,7 +455,7 @@ describe('SessionWizardShell', () => {
     render(<SessionWizardShell {...props} />);
 
     expect(screen.getByTestId('shell-mode-profile')).toBeInTheDocument();
-    expect(screen.getByTestId('shell-header')).toHaveAttribute('data-profile-selection-step', 'true');
+    expect(screen.getByTestId('shell-header')).toBeInTheDocument();
     expect(screen.queryByTestId('shell-requirements')).not.toBeInTheDocument();
     expect(screen.queryByTestId('shell-sponsored-status')).not.toBeInTheDocument();
     expect(screen.queryByTestId('shell-normal-rail')).not.toBeInTheDocument();

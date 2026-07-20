@@ -74,8 +74,9 @@ const SessionWizardRequirementsBanner = ({
               >
                 Lit API key
               </a>{' '}
-              with the required permissions prefilled. Create it, copy the generated token, and paste it into the Worker
-              step. Before creating it, restrict Account Resources to the account that will own the session worker.
+              — if you&apos;re already logged into Cloudflare, this link opens a token form with permissions prefilled.
+              Under Account Resources, choose only the account that will own the session Worker; create the token, then
+              copy it into the Worker step.
             </li>
           ) : null}
           {requires('aiProviderKey') ? (

@@ -166,6 +166,7 @@ export type SessionWizardShellProps = {
   sessionHeaderPreviewSrc: WizardModalsProps['sessionHeaderPreviewSrc'];
   sessionMetadataHeaderAccessory: MetadataEditorProps['headerAccessory'];
   sessionModeProfileControl?: React.ReactNode;
+  sessionModeProfileStepComplete?: boolean;
   sessionUrl: PublishSectionProps['sessionUrl'];
   setBundleFile: WorkerPanelProps['setBundleFile'];
   setBundleMode: WorkerPanelProps['setBundleMode'];
@@ -332,6 +333,7 @@ const SessionWizardShell = ({
   sessionHeaderPreviewSrc,
   sessionMetadataHeaderAccessory,
   sessionModeProfileControl = null,
+  sessionModeProfileStepComplete = true,
   sessionUrl,
   setBundleFile,
   setBundleMode,
@@ -404,18 +406,18 @@ const SessionWizardShell = ({
       renderInfoTooltip={renderSessionWizardInfoTooltip}
       sessionModeProfileControl={sessionModeProfileControl}
       sessionModeProfileLabel={sessionModeProfileLabel}
-      sessionModeProfileSelectionStep={showSessionModeProfileGate}
       wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
       wizardMode={wizardMode}
-      showNetworkSelector={showNetworkSelector}
     />
   );
 
   if (showSessionModeProfileGate) {
-    return <div className={styles.groupWizard}>{sessionModeProfileControl}</div>;
+    return <div className={styles.groupWizard}>{header}</div>;
   }
 
-    {sessionModeProfileControl}
+  return (
+    <div className={styles.groupWizard}>
+      {header}
 
       <SessionWizardIntroStatusRail
         activeNormalModeIndex={activeNormalModeIndex}
@@ -440,8 +442,6 @@ const SessionWizardShell = ({
       />
 
       <>
-        {!isNormalMode ? sessionModeProfilePrivacyControl : null}
-
         {(!isNormalMode || !collapsedSections.encryption) && (
           <EncryptionPanel
             isNormalMode={isNormalMode}
