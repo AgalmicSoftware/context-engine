@@ -3,13 +3,7 @@ import React from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { CLOUDFLARE_NATIVE_DEPLOY_URL } from '../../variables/publicDeploymentConfig.js';
-import { createCloudflareNativeSetupSecrets } from '../../utilities/worker/cloudflareNativeDeploy.js';
-import type {
-  fetchWorkerCanonicalSessionBootstrap,
-  WorkerCanonicalSessionBootstrap,
-} from '../../utilities/session/sessionWorkerDiscovery';
-import { buildCloudflareTokenTemplateUrl, CLOUDFLARE_TOKEN_SETUP_GUIDE_URL } from './cloudflareTokenTemplate.js';
+import { buildCloudflareTokenTemplateUrl, CLOUDFLARE_API_TOKENS_URL } from './cloudflareTokenTemplate.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
@@ -147,6 +141,7 @@ const WorkerDeploySection = ({
     accountId: deployForm.accountId,
     slug: cloudflareTokenSlug,
   });
+  const cloudflareTokenReceiver = String(deployHelperUrl || '').trim();
   const updateApiToken = (nextApiToken: string) => {
     setDeployForm((prev) => {
       const previousToken = String(prev?.apiToken ?? '');
@@ -465,6 +460,26 @@ const WorkerDeploySection = ({
               </div>
               <div className={styles.helperText}>
                 Account is inferred during deploy only when the token can see exactly one account.
+              </div>
+              <div className={styles.helperText}>
+                This browser sends this token only for this deployment attempt to the deploy helper
+                {cloudflareTokenReceiver ? (
+                  <>
+                    {' '}at <code>{cloudflareTokenReceiver}</code>
+                  </>
+                ) : (
+                  ' at the deploy-helper URL shown above'
+                )}
+                . The helper uses it to call Cloudflare; it is not saved to the session draft or browser storage and
+                is not installed in the deployed Session Worker.
+              </div>
+              <div className={styles.helperText}>
+                Set the earliest expiration Cloudflare permits that still covers setup and an immediate retry. Revoke
+                the token as soon as deployment succeeds or you abandon the attempt from{' '}
+                <a href={CLOUDFLARE_API_TOKENS_URL} target="_blank" rel="noopener noreferrer">
+                  Cloudflare API Tokens
+                </a>
+                .
               </div>
             </FormGroup>
             <FormGroup>

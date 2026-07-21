@@ -76,7 +76,8 @@ const SessionWizardRequirementsBanner = ({
               </a>{' '}
               — if you&apos;re already logged into Cloudflare, this link opens a token form with permissions prefilled.
               Under Account Resources, choose only the account that will own the session Worker; create the token, then
-              copy it into the Worker step.
+              copy it into the Worker step. Set the earliest expiration Cloudflare permits that still covers setup and
+              an immediate retry; revoke it after deployment succeeds or you abandon the attempt.
             </li>
           ) : null}
           {requires('aiProviderKey') ? (

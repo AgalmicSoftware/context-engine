@@ -356,18 +356,19 @@ describe('WorkerDeploySection', () => {
     );
   });
 
-  it('links to token handling documentation instead of repeating operational guidance', () => {
+  it('discloses the raw-token receiver, shortest lifetime, and revocation step', () => {
     renderWorkerDeploySection({
       deployHelperUrl: 'https://deploy-helper.example.test',
     });
 
-    expect(screen.queryByText(/browser sends this token only for this deployment attempt/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/not saved to the session draft or browser storage/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/earliest expiration Cloudflare permits/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/revoke the token as soon as deployment succeeds/i)).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Cloudflare API token setup and security guide' })).toHaveAttribute(
+    expect(screen.getByText('https://deploy-helper.example.test')).toBeInTheDocument();
+    expect(screen.getByText(/browser sends this token only for this deployment attempt to the deploy helper/i)).toBeInTheDocument();
+    expect(screen.getByText(/not saved to the session draft or browser storage/i)).toBeInTheDocument();
+    expect(screen.getByText(/earliest expiration Cloudflare permits/i)).toBeInTheDocument();
+    expect(screen.getByText(/revoke the token as soon as deployment succeeds or you abandon the attempt/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cloudflare API Tokens' })).toHaveAttribute(
       'href',
-      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
+      'https://dash.cloudflare.com/profile/api-tokens',
     );
   });
 

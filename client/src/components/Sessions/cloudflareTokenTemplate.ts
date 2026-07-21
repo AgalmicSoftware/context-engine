@@ -6,6 +6,8 @@ type CloudflareTokenPermission = {
   type: string;
 };
 
+export const CLOUDFLARE_API_TOKENS_URL = 'https://dash.cloudflare.com/profile/api-tokens';
+
 export const CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS = Object.freeze([
   { key: 'workers_scripts', type: 'edit' },
   { key: 'workers_kv_storage', type: 'edit' },

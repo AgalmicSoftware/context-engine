@@ -90,8 +90,13 @@ For the default `Fast & Cheap (Cloudflare)` preset:
      pre-fills the form: create the token, copy its generated value, and paste it into the
      password field in the Worker step.
    - CLI equivalent for agents/local setup: `npm run -s cloudflare:token-link -- --slug <session-slug>`
-     Add `--include-workers-dev-subdomain-setup` only when the account does not already have a
-     workers.dev subdomain or when intentionally changing it.
+     Add `--include-r2-storage` only for an advanced deployment that manages an existing R2 bucket;
+     the flag does not create the bucket.
+   - When the template preselects `All accounts`, restrict Account Resources to the one account
+     where the session worker will run before creating the token.
+   - Set the earliest expiration Cloudflare permits that still covers setup and an immediate
+     retry. Revoke the token from the Cloudflare API Tokens page as soon as deployment succeeds
+     or the attempt is abandoned.
    - The template auto-names the token as `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMAM` or `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMPM` (local time).
    - The first-party wizard derives the worker name and does not ask for a
      Cloudflare account ID. The deploy-helper resolves exactly one visible
@@ -100,8 +105,10 @@ For the default `Fast & Cheap (Cloudflare)` preset:
    - On the direct default `/new` path, the token is deploy-helper request input
      only. It is rejected from canonical session config and must not appear in
      worker config/secrets, URLs, metadata, logs, analytics, or browser/durable
-     storage. The separate legacy sponsored deploy-grant path below retains its
-     existing short-lived server-side grant record.
+     storage. The Worker step displays the exact deploy-helper URL that receives
+     the one-attempt HTTPS request; that helper is the component that presents
+     the token to Cloudflare. The separate legacy sponsored deploy-grant path
+     below retains its existing short-lived server-side grant record.
 2) Click "Deploy worker". The default preset does not ask for an Arweave JWK,
    Lit key, user RPC URL/key, faucet key, wallet connector, funding, or gas.
    Those inputs remain available only when an explicit Lit, decentralized, or
