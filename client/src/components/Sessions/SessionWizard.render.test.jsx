@@ -877,7 +877,6 @@ describe('SessionWizard rendered validation', () => {
         'ce:sessionWizardDraft:v1',
         JSON.stringify({
           draft: {
-            sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
             storageProfile: { backend: 'cloudflare' },
           },
         }),
@@ -919,6 +918,31 @@ describe('SessionWizard rendered validation', () => {
       expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
     },
   );
+
+  it('offers to continue a cached custom profile on /new without silently replacing it', async () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.surfaces.agentHttp = true;
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          sessionName: 'Saved custom session',
+          sessionModeProfile: profile,
+          storageProfile: { backend: 'cloudflare' },
+        },
+      }),
+    );
+    window.history.replaceState({}, '', '/new');
+
+    renderSessionWizard();
+
+    expect(screen.getByRole('heading', { name: 'Session Setup (Custom)' })).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with saved settings' }));
+
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toHaveValue('Saved custom session');
+  });
 
   it('checks session slug collisions before publish upload or register side effects', async () => {
     const { arweaveScripts } = require('../../utilities/arweave/arweaveScripts.js');

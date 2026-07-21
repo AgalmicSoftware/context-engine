@@ -49,7 +49,7 @@ import {
 } from '../../variables/appConfig.js';
 import { getChainById, getDefaultHttpRpc, getSessionRegistryChains } from '../../variables/chains.js';
 import type { SessionConfig, UnknownRecord } from '../../utilities/session/sessionTypes.js';
-import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
+import { validateSessionModeProfile, type SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../utilities/session/sponsoredFlags.js';
@@ -528,34 +528,22 @@ const SessionWizard = ({
         ? null
         : sourceEmbeddedDeployHelperDefault,
     });
-  }, [cachedDraftHasEmbeddedDeployHelperEnabled, cachedWizard, sourceEmbeddedDeployHelperDefault]);
-  const initialGates = useMemo(() => {
-    const cachedGates = cachedWizard?.encryptionGates;
-    if (Array.isArray(cachedGates) && cachedGates.length) return cachedGates;
-    return [buildEncryptionGate(0)];
-  }, [cachedWizard]);
-  const initialDefaultGateId = useMemo(() => {
-    const cachedId = toStr(cachedWizard?.defaultGateId).trim();
-    if (cachedId) return cachedId;
-    return initialGates[0]?.id || '';
-  }, [cachedWizard, initialGates]);
-  const initialGateSelections = useMemo(() => {
-    const cachedSelections = cachedWizard?.gateSelections;
-    if (cachedSelections && typeof cachedSelections === 'object') return cachedSelections;
-    return buildDefaultGateState(initialDraft.networkChainId || network?.id);
-  }, [cachedWizard, initialDraft.networkChainId, network?.id]);
-  const initialFeaturedDraftGateAutoLink = useMemo(
-    () =>
-      normalizeFeaturedDraftGateAutoLink(cachedWizard?.featuredDraftGateAutoLink as UnknownRecord | null | undefined),
-    [cachedWizard],
-  );
-  const initialSessionIdValue = useMemo(() => {
-    const fromQuery = sessionRegistryUtils.formatSessionId(initialSessionId);
-    if (fromQuery) return fromQuery;
-    const fromCache = sessionRegistryUtils.formatSessionId(cachedWizard?.sessionId);
-    if (fromCache) return fromCache;
-    return generateSessionId();
-  }, [cachedWizard?.sessionId, initialSessionId]);
+    if (!isNewSessionWizardRoute || cachedWizard?.draft?.sessionModeProfile) return draftFromCache;
+    const freshNewSessionDraft = { ...draftFromCache };
+    delete freshNewSessionDraft.sessionModeProfile;
+    return freshNewSessionDraft;
+  }, [
+    cachedDraftHasEmbeddedDeployHelperEnabled,
+    cachedWizard,
+    isNewSessionWizardRoute,
+    sourceEmbeddedDeployHelperDefault,
+  ]);
+  const cachedInitialState = useSessionWizardCachedInitialState({
+    cachedWizard,
+    initialDraftNetworkChainId: initialDraft.networkChainId,
+    networkId: network?.id,
+    initialSessionId,
+  });
 
   const [draft, setDraft] = useState<DraftState>(() => initialDraft as DraftState);
   const draftRef = useRef<DraftState>(initialDraft as DraftState);
@@ -3603,6 +3591,13 @@ const SessionWizard = ({
   const handlePublish = async () => {
     if (!draft?.sessionModeProfile) {
       setStatus('Choose a session mode before publishing.');
+      return;
+    }
+    const sessionModeValidation = validateSessionModeProfile(draft.sessionModeProfile as SessionModeProfile);
+    if (!sessionModeValidation.valid) {
+      setStatus(
+        `Fix the session hosting settings before publishing: ${sessionModeValidation.issues[0]?.message || 'Invalid session mode profile.'}`,
+      );
       return;
     }
     if (publishRequestInFlightRef.current) {

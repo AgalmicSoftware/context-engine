@@ -455,6 +455,20 @@ export const validateSessionModeProfile = (
   if (profile.export?.scope === 'encrypted_envelopes_only' && profile.encryption?.mode === 'none') {
     addIssue('export.scope', 'encrypted_export_requires_encryption', 'Encrypted-envelope export requires encryption.');
   }
+  if (profile.export?.scope === 'selected_surfaces') {
+    addIssue(
+      'export.scope',
+      'selected_surface_export_not_implemented',
+      'Selected-channel export is not available yet. Choose another export policy.',
+    );
+  }
+  if (['private_admin', 'public_redacted_snapshot'].includes(profile.results?.visibility)) {
+    addIssue(
+      'results.visibility',
+      'results_visibility_not_implemented',
+      'That results visibility option is not available yet. Choose an enforced results policy.',
+    );
+  }
   const mechanisms = Array.isArray(profile.authorization?.mechanisms) ? profile.authorization.mechanisms : [];
   if (
     mechanisms.length === 1 &&
@@ -469,6 +483,9 @@ export const validateSessionModeProfile = (
   }
   if (profile.surfaces?.web !== true) {
     addIssue('surfaces.web', 'web_surface_fixed_on', 'The web surface is fixed on in v1.');
+  }
+  if (profile.surfaces?.miniApp === true && profile.surfaces?.telegram !== true) {
+    addIssue('surfaces.miniApp', 'mini_app_requires_telegram', 'Telegram Mini App requires the Telegram channel.');
   }
 
   return { valid: issues.length === 0, issues };

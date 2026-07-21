@@ -2846,6 +2846,22 @@ $muted-text: tokens.$ce-muted-text;
   font-size: 0.7rem;
 }
 
+.modeSavedProfile {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(244, 247, 255, 0.76);
+  font-size: 0.7rem;
+  white-space: nowrap;
+
+  :global(.btn) {
+    min-height: 34px;
+    padding: 5px 10px;
+    border-radius: var(--ce-radius-pill);
+    font-size: 0.7rem;
+  }
+}
+
 .modeCheckboxRow {
   display: flex;
   align-items: center;

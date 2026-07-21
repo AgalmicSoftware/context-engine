@@ -86,6 +86,44 @@ describe('SessionModeProfileField', () => {
     expect(onContinue).toHaveBeenCalledTimes(1);
   });
 
+  it('continues an existing saved profile without replacing its custom settings', () => {
+    const onContinue = jest.fn();
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.surfaces.agentHttp = true;
+
+    render(
+      <SessionModeProfileField
+        registryChainId={11155420}
+        value={profile}
+        onChange={jest.fn()}
+        onContinue={onContinue}
+        entryOnly
+      />,
+    );
+
+    expect(screen.getByText('Saved custom settings')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with saved settings' }));
+
+    expect(onContinue).toHaveBeenCalledTimes(1);
+  });
+
+  it('supports arrow-key selection within the hosting radio group', () => {
+    const onChange = jest.fn();
+    const onContinue = jest.fn();
+    render(
+      <SessionModeProfileField registryChainId={11155420} onChange={onChange} onContinue={onContinue} entryOnly />,
+    );
+
+    fireEvent.keyDown(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'), { key: 'ArrowRight' });
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ preset: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED }),
+      expect.any(Object),
+    );
+    expect(onContinue).toHaveBeenCalledTimes(1);
+  });
+
   it('confirms before switching away from customized settings', () => {
     const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
     const onChange = jest.fn();

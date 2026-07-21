@@ -85,11 +85,28 @@ const SessionModeProfileField = ({
     if (entryOnly && typeof onContinue === 'function') onContinue();
   };
 
+  const handlePresetKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+    const direction = ['ArrowRight', 'ArrowDown'].includes(event.key)
+      ? 1
+      : ['ArrowLeft', 'ArrowUp'].includes(event.key)
+        ? -1
+        : 0;
+    if (!direction) return;
+    event.preventDefault();
+    const nextIndex = (currentIndex + direction + HOSTING_PRESETS.length) % HOSTING_PRESETS.length;
+    const nextPreset = HOSTING_PRESETS[nextIndex];
+    const enabledRadios = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+      '[role="radio"]:not(:disabled)',
+    );
+    enabledRadios?.[nextIndex]?.focus();
+    selectPreset(nextPreset.id);
+  };
+
   return (
     <section className={styles.modeProfilePanel} aria-label="Session hosting">
       <span className={styles.modeProfileCompactLabel}>Hosting</span>
       <div className={styles.modePresetToggle} role="radiogroup" aria-label="Session hosting profile">
-        {HOSTING_PRESETS.map((preset) => {
+        {HOSTING_PRESETS.map((preset, index) => {
           const selected = selectedPreset === preset.id;
           return (
             <button
@@ -100,7 +117,9 @@ const SessionModeProfileField = ({
               aria-label={preset.ariaLabel}
               className={`${styles.modePresetButton} ${selected ? styles.modePresetButtonSelected : ''}`}
               data-testid={`ce-new-preset-${preset.id}`}
+              tabIndex={selected || (!selectedPreset && index === 0) ? 0 : -1}
               onClick={() => selectPreset(preset.id)}
+              onKeyDown={(event) => handlePresetKeyDown(event, index)}
             >
               <span>{preset.label}</span>
               {preset.recommended ? <span className={styles.modePresetBadge}>Recommended</span> : null}
@@ -115,11 +134,21 @@ const SessionModeProfileField = ({
           className={`${styles.modePresetButton} ${styles.modePresetButtonDisabled}`}
           title="Corporate hosting is coming later"
           disabled
+          tabIndex={-1}
         >
           <span>Corporate</span>
           <span className={styles.modePresetSoon}>Later</span>
         </button>
       </div>
+
+      {entryOnly && profile ? (
+        <div className={styles.modeSavedProfile}>
+          <span>Saved {profile.preset === SESSION_MODE_PRESET_IDS.CUSTOM ? 'custom' : 'hosting'} settings</span>
+          <Button type="button" color="primary" onClick={onContinue}>
+            Continue with saved settings
+          </Button>
+        </div>
+      ) : null}
 
       {!entryOnly ? (
         <button

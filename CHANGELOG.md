@@ -6,13 +6,25 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Hardened new-session profile continuity and enforcement: explicit saved
+  profiles now survive `/new` reloads behind a clear continue action, invalid
+  profiles fail before publish side effects, stage-local errors identify the
+  setting to fix, storage backend changes preserve an explicit Cloudflare role
+  gate without carrying Cloudflare fields into Arweave, and unsupported
+  result/export promises remain visible but unavailable. The compact selectors
+  now support arrow keys and editable multi-digit group thresholds.
+- Made Telegram Mini App an independently enforced session surface that still
+  requires Telegram, while keeping Agent Session Wrapped independent. The
+  Bridge now consumes canonical nested result-exposure settings before legacy
+  aliases and excludes Mini-App-disabled sessions from every Mini App picker
+  and route.
 - Integrated hosting customization into the existing session setup stages:
   storage, encryption, decryption access, and result visibility now live in
   Privacy; optional participation channels live in Worker; and export policy
   lives in Deploy. The compact header no longer opens a large technical
   popover, profile-based drafts no longer show a duplicate legacy storage
   editor, and custom decryption rules stay hidden until the creator overrides
-  the session's access rules.
+  the explicit Cloudflare defaults.
 - Moved session hosting selection into a compact header control, kept the
   selected Cloudflare, decentralized, or custom profile visible in the title,
   and previewed Corporate hosting as unavailable without changing publishing

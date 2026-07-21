@@ -43,14 +43,15 @@ describe('SessionModeProfileSections', () => {
     expect(screen.queryByText('Export scope')).not.toBeInTheDocument();
   });
 
-  it('uses session access rules by default and reveals plain-language custom rules only on override', () => {
+  it('uses the explicit Cloudflare defaults and reveals plain-language custom rules only on override', () => {
     const { onChange } = renderSection('privacy');
 
-    const useSessionRules = screen.getByRole('checkbox', { name: 'Use session access rules for decryption' });
-    expect(useSessionRules).toBeChecked();
+    const useDefaultRules = screen.getByRole('checkbox', { name: 'Use default Cloudflare access rules' });
+    expect(useDefaultRules).toBeChecked();
+    expect(screen.getByText(/configured admins and agents granted the storage scope/i)).toBeInTheDocument();
     expect(screen.queryByLabelText('Grant access when')).not.toBeInTheDocument();
 
-    fireEvent.click(useSessionRules);
+    fireEvent.click(useDefaultRules);
 
     expect(screen.getByLabelText('Grant access when')).toBeInTheDocument();
     expect(screen.getByText('Session role')).toBeInTheDocument();
@@ -81,7 +82,7 @@ describe('SessionModeProfileSections', () => {
 
   it('describes SBT conditions with the network name and participant-facing labels', () => {
     renderSection('privacy');
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Use session access rules for decryption' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Use default Cloudflare access rules' }));
     fireEvent.click(screen.getByTestId('ce-new-envelope-add-sbt-onchain'));
 
     expect(screen.getByText('SBT holders')).toBeInTheDocument();
@@ -111,7 +112,54 @@ describe('SessionModeProfileSections', () => {
     expect(screen.getByTestId('ce-new-encryption-worker_envelope')).toBeDisabled();
   });
 
-  it('places optional participation channels in Worker and preserves Telegram-to-Mini-App coupling', () => {
+  it('shows privacy validation beside the invalid privacy rule', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [{ kind: 'sbt_onchain', chainId: 11155420, contract: '', anyOrAll: 'any' }],
+    };
+    profile.evm.registryChainId = 11155420;
+
+    renderSection('privacy', profile);
+
+    expect(screen.getByText('SBT envelope conditions require a contract address.')).toBeInTheDocument();
+  });
+
+  it('switches decentralized storage to an explicit Cloudflare role gate', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const { onChange } = renderSection('privacy', profile);
+
+    const storage = screen.getByRole('radiogroup', { name: 'Data storage' });
+    fireEvent.click(within(storage).getByRole('radio', { name: 'Cloudflare' }));
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        storage: expect.objectContaining({
+          backend: 'cloudflare',
+          payloadAccessControl: expect.objectContaining({ gate: 'role_gate' }),
+        }),
+      }),
+      expect.objectContaining({
+        storageProfile: expect.objectContaining({
+          payloadAccessControl: expect.objectContaining({ gate: 'role_gate' }),
+        }),
+      }),
+    );
+  });
+
+  it('supports arrow-key selection in segmented radio controls', () => {
+    const { onChange } = renderSection('privacy');
+
+    const storage = screen.getByRole('radiogroup', { name: 'Data storage' });
+    fireEvent.keyDown(within(storage).getByRole('radio', { name: 'Cloudflare' }), { key: 'ArrowRight' });
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ storage: expect.objectContaining({ backend: 'arweave' }) }),
+      expect.any(Object),
+    );
+  });
+
+  it('places optional participation channels in Worker and keeps the Telegram Mini App dependent on Telegram', () => {
     const { onChange } = renderSection('worker');
 
     expect(screen.getByRole('region', { name: 'Participation channels' })).toBeInTheDocument();
@@ -128,7 +176,7 @@ describe('SessionModeProfileSections', () => {
       }),
       expect.any(Object),
     );
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Telegram' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Telegram Mini App' }));
 
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -137,16 +185,54 @@ describe('SessionModeProfileSections', () => {
       }),
       expect.any(Object),
     );
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Telegram' }));
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        surfaces: expect.objectContaining({ telegram: false, miniApp: false }),
+      }),
+      expect.any(Object),
+    );
   });
 
-  it('places export policy in Deploy and keeps selected-channel filtering', () => {
+  it('does not offer unenforced selected-channel exports', () => {
     renderSection('publish');
 
     const exportPolicy = screen.getByRole('combobox', { name: 'Export policy' });
-    fireEvent.change(exportPolicy, { target: { value: 'selected_surfaces' } });
-
-    const filter = screen.getByRole('group', { name: 'Channels included in exports' });
-    expect(within(filter).getByRole('checkbox', { name: 'Website' })).toBeChecked();
+    expect(within(exportPolicy).getByRole('option', { name: /Export selected channels only/i })).toBeDisabled();
+    expect(screen.queryByRole('group', { name: 'Channels included in exports' })).not.toBeInTheDocument();
     expect(screen.queryByText('Results visibility')).not.toBeInTheDocument();
+  });
+
+  it('marks result modes without complete enforcement as unavailable', () => {
+    renderSection('privacy');
+
+    const visibility = screen.getByRole('combobox', { name: 'Who can see results' });
+    expect(within(visibility).getByRole('option', { name: /Admins only/i })).toBeDisabled();
+    expect(within(visibility).getByRole('option', { name: /redacted summary/i })).toBeDisabled();
+  });
+
+  it('lets a minimum group size be cleared while editing before committing a valid integer', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.results.exposure = {
+      aggregateResultsEnabled: true,
+      anonymizedGroupsEnabled: true,
+      minGroupSize: 2,
+    };
+    const { onChange } = renderSection('privacy', profile);
+    const input = screen.getByRole('spinbutton', { name: 'Minimum group size' });
+
+    fireEvent.change(input, { target: { value: '' } });
+    expect(input).toHaveValue(null);
+    expect(onChange).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: '10' } });
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        results: expect.objectContaining({
+          exposure: expect.objectContaining({ minGroupSize: 10 }),
+        }),
+      }),
+      expect.any(Object),
+    );
   });
 });

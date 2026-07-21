@@ -210,9 +210,12 @@ Registration cost notes:
 
 Open `/new`. The app canonicalizes that route to `/session/new`, but `/new` is the intended entry point.
 
-The first screen is the session-mode choice. Nothing is preselected. Choosing
-a preset immediately opens the four-stage setup with fields prefilled from the
-chosen mode; there is no separate Continue action on this entry screen:
+The first screen is the session-mode choice. A blank draft has nothing
+preselected. If this browser already has an explicit saved profile, the header
+shows that profile and offers `Continue with saved settings` instead of silently
+discarding or replacing it. Choosing a new preset immediately opens the
+four-stage setup with fields prefilled from the chosen mode; there is no
+separate Continue action for a new selection:
 
 - `Fast & Cheap (Cloudflare)` compiles to a Cloudflare-backed,
   worker-canonical session shape with Cloudflare-internal worker encryption
@@ -229,18 +232,26 @@ switches to Advanced mode and opens Privacy instead of opening a separate
 technical popover. Profile settings follow the existing stages:
 
 - Privacy owns storage, encryption, decryption access, result visibility, and
-  small-group protection.
-- Worker owns optional participation channels such as Telegram, Mini App, and
+  small-group protection. Switching from Arweave to Cloudflare installs an
+  explicit role gate; switching back removes Cloudflare-only access fields.
+  Admin-only and public-redacted result modes remain visible as unavailable
+  until their complete read paths are enforced.
+- Worker owns optional participation channels such as Telegram, Telegram Mini App, and
   Agent Session Wrapped. The website remains enabled. Wrapped is off by
   default, deploys one additional dedicated per-session Bridge, and does not
-  implicitly enable Telegram.
-- Deploy owns the export policy and any selected-channel export filter.
+  implicitly enable Telegram. Telegram Mini App is independently selectable but
+  requires Telegram; disabling Telegram also disables its Mini App.
+- Deploy owns the export policy. Selected-channel export remains visible as
+  unavailable until the export runtime consumes that filter.
 
 Changing one of these values flips the profile to `custom`. Profile-based
 drafts do not also show the older `Session Storage` metadata editor, so storage
 has one visible authority. New session publishes write the
 `sessionModeProfile` profile as the source of truth and compile it down to the
 existing storage profile / payload-access fields for runtime compatibility.
+The wizard validates that profile again at the publish boundary before upload,
+worker, or registry side effects begin. Invalid settings are also shown in the
+stage where they are edited.
 Legacy `telegramOnly` fields are read only as a migration fallback and are not
 written by new sessions.
 
@@ -286,7 +297,7 @@ What gets stored where:
   access control, not end-to-end encryption.
 - Advanced encryption options are `none` (payload bytes are stored as provided), `lit` (Cloudflare stores caller-supplied Lit ciphertext and rejects plaintext uploads until the Lit path sends `payloadEncrypted=true`), and Cloudflare `worker_envelope`: data is encrypted before Cloudflare stores it, and the session worker decrypts only after checking access. `worker_envelope` is available only with Cloudflare storage. The operator and Cloudflare runtime can decrypt; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime.
 - When `/new` deploys a custom worker for Cloudflare storage, the deploy helper receives the normalized storage profile before Worker upload so it can bind the storage index KV and any requested R2 bucket. If `worker_envelope` is selected, the helper also generates the worker secret used as the deployment KEK; the generated value is not written to session metadata.
-- Worker-envelope key provider is fixed to `worker_secret` in this release. By default, decryption reuses the session access rules. An explicit override can combine Session role (`worker_role`), SBT holders (`sbt_onchain`), or Authorized agents (`agent_grant_scope`) rules with any/all matching; the wizard writes those conditions to `storageProfile.payloadAccessControl.accessConditions` for the worker.
+- Worker-envelope key provider is fixed to `worker_secret` in this release. The default Cloudflare rule permits configured session admins or agents granted the `storage` scope; normal participant responses use their dedicated submission route. An explicit override can combine Session role (`worker_role`), SBT holders (`sbt_onchain`), or Authorized agents (`agent_grant_scope`) rules with any/all matching; the wizard writes those conditions to `storageProfile.payloadAccessControl.accessConditions` for the worker.
 - `SessionRegistry` does not store long-form content directly. Decentralized
   profiles store a metadata URI pointer plus minimal session identity fields;
   the default worker-canonical profile skips registry writes entirely.

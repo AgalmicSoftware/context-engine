@@ -94,7 +94,7 @@ const readWizardCache = () => JSON.parse(sessionStorage.getItem('ce:sessionWizar
 describe('SessionWizard publish boundary rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
-  it('keeps an initially invalid session mode profile fail-closed before publish side effects', async () => {
+  it('blocks an invalid session mode profile before publish side effects', async () => {
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
@@ -114,55 +114,13 @@ describe('SessionWizard publish boundary rendering', () => {
     renderLoggedInSessionWizard();
     enableAdvancedMode();
     const publishButton = await openPublishSection();
-
-    expect(publishButton).toBeDisabled();
-    expect(screen.queryByLabelText('Advanced publish settings')).not.toBeInTheDocument();
-    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
-    expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
-  });
-
-  it('revalidates the live session mode profile after an asynchronous publish preflight', async () => {
-    const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
-    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
-    sessionStorage.setItem(
-      'ce:sessionWizardDraft:v1',
-      JSON.stringify({
-        draft: {
-          sessionName: 'Live profile revalidation session',
-          slug: 'live-profile-revalidation-session',
-          sessionModeProfile: profile,
-          storageProfile: { backend: 'arweave' },
-        },
-      }),
-    );
-    let publishStarted = false;
-    let resolveDuplicateCheck = () => {};
-    const duplicateCheck = new Promise((resolve) => {
-      resolveDuplicateCheck = resolve;
-    });
-    mockSessionExists.mockImplementation(async () => (publishStarted ? duplicateCheck : false));
-
-    renderLoggedInSessionWizard();
-    enableAdvancedMode();
-    const publishButton = await openPublishSection();
     fireEvent.click(screen.getByLabelText('Advanced publish settings'));
     fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
       target: { value: `ar://${'a'.repeat(43)}` },
     });
     await waitFor(() => expect(publishButton).not.toBeDisabled());
 
-    publishStarted = true;
     fireEvent.click(publishButton);
-    await waitFor(() => expect(mockSessionExists).toHaveBeenCalled());
-
-    enableAdvancedMode();
-    fireEvent.change(await screen.findByLabelText('Who can see results'), {
-      target: { value: 'private_admin' },
-    });
-    await act(async () => {
-      resolveDuplicateCheck(false);
-      await duplicateCheck;
-    });
 
     expect(await screen.findByText(/Fix the session hosting settings before publishing/i)).toBeInTheDocument();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();

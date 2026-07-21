@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Input, Label } from 'reactstrap';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash } from '@fortawesome/free-solid-svg-icons';
@@ -14,6 +14,7 @@ import {
   type SessionModeEncryptionMode,
   type SessionModeExportScope,
   type SessionModeProfile,
+  type SessionModeProfileValidationIssue,
   type SessionModeResultsVisibility,
   type SessionModeSurface,
 } from '../../utilities/session/sessionModeProfile';
@@ -27,25 +28,29 @@ export type SessionModeProfileSectionsProps = {
   onChange: (profile: SessionModeProfile, compiled: { storageProfile: AnyRecord }) => void;
 };
 
-const RESULT_VISIBILITY_OPTIONS: Array<{ value: SessionModeResultsVisibility; label: string }> = [
-  { value: 'private_admin', label: 'Admins only' },
+const RESULT_VISIBILITY_OPTIONS: Array<{ value: SessionModeResultsVisibility; label: string; available?: boolean }> = [
+  { value: 'private_admin', label: 'Admins only (not available yet)', available: false },
   { value: 'participant_aggregate', label: 'Participants can see the combined summary' },
   { value: 'session_member_aggregate', label: 'Session members can see the combined summary' },
-  { value: 'public_redacted_snapshot', label: 'Anyone can see a redacted summary' },
+  {
+    value: 'public_redacted_snapshot',
+    label: 'Anyone can see a redacted summary (not available yet)',
+    available: false,
+  },
   { value: 'public_full_if_storage_public', label: 'Anyone can see the public stored results' },
 ];
 
-const EXPORT_SCOPE_OPTIONS: Array<{ value: SessionModeExportScope; label: string }> = [
+const EXPORT_SCOPE_OPTIONS: Array<{ value: SessionModeExportScope; label: string; available?: boolean }> = [
   { value: 'admin_raw', label: 'Admins can export raw results' },
   { value: 'all_session', label: 'Export the complete session' },
-  { value: 'selected_surfaces', label: 'Export selected channels only' },
+  { value: 'selected_surfaces', label: 'Export selected channels only (not available yet)', available: false },
   { value: 'encrypted_envelopes_only', label: 'Export encrypted records only' },
 ];
 
 const SURFACE_LABELS: Array<{ value: SessionModeSurface; label: string; fixed?: boolean }> = [
   { value: 'web', label: 'Website', fixed: true },
   { value: 'telegram', label: 'Telegram' },
-  { value: 'miniApp', label: 'Mini App' },
+  { value: 'miniApp', label: 'Telegram Mini App' },
   { value: 'agentHttp', label: 'Agent Session Wrapped' },
 ];
 
@@ -55,6 +60,17 @@ const DEFAULT_CUSTOM_ACCESS_CONDITIONS: SessionModeAccessConditionDocument = {
     { kind: 'worker_role', role: 'admin' },
     { kind: 'agent_grant_scope', scope: 'storage' },
   ],
+};
+
+const defaultCloudflarePayloadAccessControl = (): NonNullable<SessionModeProfile['storage']['payloadAccessControl']> =>
+  JSON.parse(
+    JSON.stringify(cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE).storage.payloadAccessControl),
+  );
+
+const validationIssueBelongsToSection = (path: string, section: SessionModeProfileSection): boolean => {
+  if (section === 'publish') return path.startsWith('export.');
+  if (section === 'worker') return path.startsWith('surfaces.') || path.startsWith('identity.');
+  return !path.startsWith('export.') && !path.startsWith('surfaces.') && !path.startsWith('identity.');
 };
 
 const isProfile = (value: unknown): value is SessionModeProfile =>
@@ -94,6 +110,10 @@ const SessionModeProfileSections = ({
     () => (profile ? validateSessionModeProfile(profile) : { valid: false, issues: [] }),
     [profile],
   );
+  const sectionValidationIssues = useMemo(
+    () => validation.issues.filter((issue) => validationIssueBelongsToSection(issue.path, section)),
+    [section, validation.issues],
+  );
 
   const updateProfile = (mutate: (draft: SessionModeProfile) => void) => {
     const base = profile
@@ -132,6 +152,8 @@ const SessionModeProfileSections = ({
                   updateProfile((draft) => {
                     draft.surfaces[surface.value] = surface.fixed ? true : event.target.checked;
                     if (surface.value === 'telegram' && event.target.checked) draft.surfaces.miniApp = true;
+                    if (surface.value === 'telegram' && !event.target.checked) draft.surfaces.miniApp = false;
+                    if (surface.value === 'miniApp' && event.target.checked) draft.surfaces.telegram = true;
                   })
                 }
               />{' '}
@@ -143,11 +165,10 @@ const SessionModeProfileSections = ({
           Agent Session Wrapped deploys an additional per-session Worker/Bridge. Telegram stays optional and is off by
           default.
         </p>
+        <ValidationIssues issues={sectionValidationIssues} />
       </section>
     );
   }
-
-  const selectedSurfaceFilter = new Set(profile.export.surfaceFilter || []);
 
   if (section === 'publish') {
     return (
@@ -175,40 +196,16 @@ const SessionModeProfileSections = ({
             <option
               key={option.value}
               value={option.value}
-              disabled={option.value === 'encrypted_envelopes_only' && profile.encryption.mode === 'none'}
+              disabled={
+                option.available === false ||
+                (option.value === 'encrypted_envelopes_only' && profile.encryption.mode === 'none')
+              }
             >
               {option.label}
             </option>
           ))}
         </Input>
-        {profile.export.scope === 'selected_surfaces' ? (
-          <div className={styles.modeCheckboxRow} role="group" aria-label="Channels included in exports">
-            {SURFACE_LABELS.map((surface) => (
-              <Label key={surface.value} check className={styles.modeCheckboxLabel}>
-                <Input
-                  type="checkbox"
-                  checked={selectedSurfaceFilter.has(surface.value)}
-                  onChange={(event) =>
-                    updateProfile((draft) => {
-                      const next = new Set(draft.export.surfaceFilter || []);
-                      if (event.target.checked) next.add(surface.value);
-                      else next.delete(surface.value);
-                      draft.export.surfaceFilter = Array.from(next);
-                    })
-                  }
-                />{' '}
-                {surface.label}
-              </Label>
-            ))}
-          </div>
-        ) : null}
-        {!validation.valid ? (
-          <div className={styles.modeValidationList} role="status">
-            {validation.issues.map((issue) => (
-              <div key={`${issue.path}:${issue.code}`}>{issue.message}</div>
-            ))}
-          </div>
-        ) : null}
+        <ValidationIssues issues={sectionValidationIssues} />
       </section>
     );
   }
@@ -219,7 +216,7 @@ const SessionModeProfileSections = ({
     profile.storage.backend === 'cloudflare'
       ? ''
       : 'Cloudflare encryption requires Cloudflare storage. Choose Lit to encrypt Arweave data.';
-  const useSessionAccessRules = !profile.encryption.accessConditions?.conditions.length;
+  const useDefaultCloudflareAccessRules = !profile.encryption.accessConditions?.conditions.length;
 
   return (
     <section className={styles.modeSection} aria-label="Hosting and privacy settings">
@@ -241,12 +238,23 @@ const SessionModeProfileSections = ({
               draft.storage.backend = backend as SessionModeProfile['storage']['backend'];
               if (backend === 'cloudflare') {
                 draft.authority.mode = 'worker_canonical';
+                const defaultAccess = defaultCloudflarePayloadAccessControl();
+                draft.storage.payloadAccessControl = {
+                  ...defaultAccess,
+                  encryption:
+                    draft.encryption.mode === 'worker_envelope'
+                      ? 'worker_envelope'
+                      : draft.encryption.mode === 'lit'
+                        ? 'lit'
+                        : 'none',
+                };
                 if (draft.results.visibility === 'public_full_if_storage_public') {
                   draft.results.visibility = 'participant_aggregate';
                 }
               } else {
                 draft.authority.mode = 'evm_registry_canonical';
                 draft.evm.registryChainId = draft.evm.registryChainId || registryChainId || 11155420;
+                delete draft.storage.payloadAccessControl;
                 if (draft.encryption.mode === 'worker_envelope') draft.encryption = { mode: 'none' };
                 if (draft.export.scope === 'encrypted_envelopes_only' && draft.encryption.mode === 'none') {
                   draft.export.scope = 'admin_raw';
@@ -276,6 +284,10 @@ const SessionModeProfileSections = ({
               draft.encryption = { mode: mode as SessionModeEncryptionMode };
               if (mode === 'lit') draft.evm.registryChainId = draft.evm.registryChainId || registryChainId || 11155420;
               if (mode === 'worker_envelope') draft.encryption.keyProvider = 'worker_secret';
+              if (draft.storage.backend === 'cloudflare' && draft.storage.payloadAccessControl) {
+                draft.storage.payloadAccessControl.encryption =
+                  mode === 'worker_envelope' ? 'worker_envelope' : mode === 'lit' ? 'lit' : 'none';
+              }
               if (mode === 'none' && draft.export.scope === 'encrypted_envelopes_only') {
                 draft.export.scope = 'admin_raw';
               }
@@ -294,7 +306,7 @@ const SessionModeProfileSections = ({
             <Label check className={styles.modeCheckboxLabel}>
               <Input
                 type="checkbox"
-                checked={useSessionAccessRules}
+                checked={useDefaultCloudflareAccessRules}
                 onChange={(event) =>
                   updateProfile((draft) => {
                     if (event.target.checked) {
@@ -311,11 +323,11 @@ const SessionModeProfileSections = ({
                   })
                 }
               />{' '}
-              Use session access rules for decryption
+              Use default Cloudflare access rules
             </Label>
-            {useSessionAccessRules ? (
+            {useDefaultCloudflareAccessRules ? (
               <p className={styles.helperText}>
-                The worker uses this session&apos;s access policy; no separate decryption rules are added.
+                The worker grants storage access to configured admins and agents granted the storage scope.
               </p>
             ) : (
               <WorkerEnvelopeOptions
@@ -346,7 +358,10 @@ const SessionModeProfileSections = ({
             <option
               key={option.value}
               value={option.value}
-              disabled={option.value === 'public_full_if_storage_public' && profile.storage.backend === 'cloudflare'}
+              disabled={
+                option.available === false ||
+                (option.value === 'public_full_if_storage_public' && profile.storage.backend === 'cloudflare')
+              }
             >
               {option.label}
             </option>
@@ -370,27 +385,65 @@ const SessionModeProfileSections = ({
             Hide small groups in summaries
           </Label>
           {profile.results.exposure?.anonymizedGroupsEnabled ? (
-            <Label className={styles.modeNumberLabel}>
-              Minimum group size
-              <Input
-                type="number"
-                min={2}
-                value={profile.results.exposure?.minGroupSize || 2}
-                onChange={(event) =>
-                  updateProfile((draft) => {
-                    draft.results.exposure = {
-                      aggregateResultsEnabled: draft.results.exposure?.aggregateResultsEnabled !== false,
-                      anonymizedGroupsEnabled: true,
-                      minGroupSize: Math.max(2, Number(event.target.value || 2) || 2),
-                    };
-                  })
-                }
-              />
-            </Label>
+            <MinGroupSizeInput profile={profile} updateProfile={updateProfile} />
           ) : null}
         </div>
       </FormRow>
+      <ValidationIssues issues={sectionValidationIssues} />
     </section>
+  );
+};
+
+const ValidationIssues = ({ issues }: { issues: SessionModeProfileValidationIssue[] }): React.ReactElement | null =>
+  issues.length ? (
+    <div className={styles.modeValidationList} role="status">
+      {issues.map((issue) => (
+        <div key={`${issue.path}:${issue.code}`}>{issue.message}</div>
+      ))}
+    </div>
+  ) : null;
+
+type MinGroupSizeInputProps = {
+  profile: SessionModeProfile;
+  updateProfile: (mutate: (draft: SessionModeProfile) => void) => void;
+};
+
+const MinGroupSizeInput = ({ profile, updateProfile }: MinGroupSizeInputProps): React.ReactElement => {
+  const committedValue = Math.max(2, Math.floor(Number(profile.results.exposure?.minGroupSize || 2) || 2));
+  const [inputValue, setInputValue] = useState(String(committedValue));
+
+  useEffect(() => {
+    setInputValue(String(committedValue));
+  }, [committedValue]);
+
+  const commitValue = (value: string) => {
+    if (!/^\d+$/.test(value)) return;
+    const nextValue = Math.floor(Number(value));
+    if (!Number.isFinite(nextValue) || nextValue < 2) return;
+    updateProfile((draft) => {
+      draft.results.exposure = {
+        aggregateResultsEnabled: draft.results.exposure?.aggregateResultsEnabled !== false,
+        anonymizedGroupsEnabled: true,
+        minGroupSize: nextValue,
+      };
+    });
+  };
+
+  return (
+    <Label className={styles.modeNumberLabel}>
+      Minimum group size
+      <Input
+        type="number"
+        min={2}
+        inputMode="numeric"
+        value={inputValue}
+        onChange={(event) => {
+          setInputValue(event.target.value);
+          commitValue(event.target.value);
+        }}
+        onBlur={() => setInputValue(String(committedValue))}
+      />
+    </Label>
   );
 };
 
@@ -420,25 +473,51 @@ const SegmentedButtons = ({
   value,
   onChange,
   dataTestIdPrefix = '',
-}: SegmentedButtonsProps): React.ReactElement => (
-  <div className={styles.inlineToggleRow} role="radiogroup" aria-label={ariaLabel}>
-    {options.map((option) => (
-      <Button
-        key={option.value}
-        type="button"
-        role="radio"
-        aria-checked={value === option.value}
-        disabled={option.disabled}
-        title={option.title}
-        data-testid={dataTestIdPrefix ? `${dataTestIdPrefix}-${option.value}` : undefined}
-        className={`${styles.workerModePill} ${value === option.value ? styles.workerModePillActive : ''}`}
-        onClick={() => onChange(option.value)}
-      >
-        {option.label}
-      </Button>
-    ))}
-  </div>
-);
+}: SegmentedButtonsProps): React.ReactElement => {
+  const enabledOptions = options.filter((option) => !option.disabled);
+  const selectedEnabledIndex = enabledOptions.findIndex((option) => option.value === value);
+
+  return (
+    <div className={styles.inlineToggleRow} role="radiogroup" aria-label={ariaLabel}>
+      {options.map((option) => {
+        const enabledIndex = enabledOptions.findIndex((entry) => entry.value === option.value);
+        const isSelected = value === option.value;
+        return (
+          <Button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={isSelected}
+            disabled={option.disabled}
+            title={option.title}
+            tabIndex={option.disabled || (!isSelected && !(selectedEnabledIndex < 0 && enabledIndex === 0)) ? -1 : 0}
+            data-testid={dataTestIdPrefix ? `${dataTestIdPrefix}-${option.value}` : undefined}
+            className={`${styles.workerModePill} ${isSelected ? styles.workerModePillActive : ''}`}
+            onClick={() => onChange(option.value)}
+            onKeyDown={(event) => {
+              const direction = ['ArrowRight', 'ArrowDown'].includes(event.key)
+                ? 1
+                : ['ArrowLeft', 'ArrowUp'].includes(event.key)
+                  ? -1
+                  : 0;
+              if (!direction || enabledIndex < 0 || enabledOptions.length < 2) return;
+              event.preventDefault();
+              const nextIndex = (enabledIndex + direction + enabledOptions.length) % enabledOptions.length;
+              const nextOption = enabledOptions[nextIndex];
+              const enabledRadios = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                '[role="radio"]:not(:disabled)',
+              );
+              enabledRadios?.[nextIndex]?.focus();
+              onChange(nextOption.value);
+            }}
+          >
+            {option.label}
+          </Button>
+        );
+      })}
+    </div>
+  );
+};
 
 type WorkerEnvelopeOptionsProps = {
   profile: SessionModeProfile;

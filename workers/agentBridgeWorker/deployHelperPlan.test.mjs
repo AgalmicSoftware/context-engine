@@ -15,16 +15,30 @@ import {
 } from './deployHelperPlan.mjs';
 
 function completeEnv(overrides = {}) {
+  const sessionWorkerOrigin = overrides.CE_SESSION_WORKER_BASE_URL || 'https://session-worker.tenant-subdomain.workers.dev';
   return {
     CLOUDFLARE_API_TOKEN: 'cf-test-token',
     CLOUDFLARE_ACCOUNT_ID: 'account-123',
     CLOUDFLARE_WORKERS_SUBDOMAIN: 'tenant-subdomain',
+    TELEGRAM_BRIDGE_ENABLED: 'true',
     TELEGRAM_BOT_TOKEN: '123456:test-token',
     TELEGRAM_BOT_USERNAME: 'ce_demo_bot',
     TELEGRAM_WEBHOOK_SECRET: 'webhook-secret',
     DEMO_SIGNER_ROOT_SECRET: 'demo-root',
     AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-api-token',
-    CE_SESSION_WORKER_BASE_URL: 'https://session-worker.tenant-subdomain.workers.dev',
+    CE_SESSION_WORKER_BASE_URL: sessionWorkerOrigin,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      version: 1,
+      defaultSessionSlug: 'wrapped-alpha',
+      sessions: [{
+        sessionSlug: 'wrapped-alpha',
+        sessionWorkerUrl: sessionWorkerOrigin,
+        sessionModeProfile: {
+          surfaces: { agentHttp: true, telegram: true },
+          authority: { mode: 'worker_canonical' },
+        },
+      }],
+    }),
     DEFAULT_CHAIN_ID: '11155420',
     DEFAULT_RPC_URL: 'https://rpc.example.test',
     ...overrides,
@@ -66,6 +80,25 @@ test('resolveAgentBridgeDeployConfig builds the default workers.dev public URL a
   assert.equal(staging.vars.AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT, 'true');
 });
 
+test('Wrapped poster OpenAI configuration is separately named and never inferred from another AI key', () => {
+  const genericOnly = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      AGENT_BRIDGE_OPENAI_API_KEY: 'sk-generic-bridge',
+      OPENAI_API_KEY: 'sk-session-fallback',
+    }),
+  });
+  assert.equal(genericOnly.secrets.AGENT_BRIDGE_OPENAI_API_KEY, '[set]');
+  assert.equal(genericOnly.secrets.AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY, '[missing]');
+
+  const posterConfigured = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY: 'sk-wrapped-poster',
+    }),
+  });
+  assert.equal(posterConfigured.secrets.AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY, '[set]');
+  assert.equal(JSON.stringify(posterConfigured).includes('sk-wrapped-poster'), false);
+});
+
 test('validateAgentBridgeDeployConfig requires only live deploy credentials, not unit-test credentials', () => {
   const missing = validateAgentBridgeDeployConfig(resolveAgentBridgeDeployConfig({
     env: {},
@@ -78,7 +111,7 @@ test('validateAgentBridgeDeployConfig requires only live deploy credentials, not
   }));
 
   assert.equal(missing.ok, false);
-  assert.equal(missing.missing.includes('TELEGRAM_BOT_TOKEN'), true);
+  assert.equal(missing.missing.includes('TELEGRAM_BOT_TOKEN'), false);
   assert.equal(missing.missing.includes('AGENT_BRIDGE_AGENT_API_TOKEN'), true);
   assert.equal(missing.missing.includes('DEFAULT_RPC_URL'), false);
   assert.equal(missing.missing.includes('CLOUDFLARE_ACCOUNT_ID'), false);
@@ -86,6 +119,81 @@ test('validateAgentBridgeDeployConfig requires only live deploy credentials, not
   assert.equal(missingWorkersSubdomain.missing.includes('CLOUDFLARE_WORKERS_SUBDOMAIN'), true);
   assert.equal(completeWithoutManualAccountId.ok, true);
   assert.deepEqual(completeWithoutManualAccountId.missing, []);
+});
+
+test('Telegram-disabled deployment has no Telegram config, secrets, or plan actions', () => {
+  const config = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      TELEGRAM_BRIDGE_ENABLED: '',
+      TELEGRAM_BOT_TOKEN: '',
+      TELEGRAM_BOT_USERNAME: '',
+      TELEGRAM_WEBHOOK_SECRET: '',
+      AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER: '2026-05-20T00:00:00.000Z',
+    }),
+  });
+  const validation = validateAgentBridgeDeployConfig(config);
+  const plan = buildAgentBridgeDeployPlan(config);
+
+  assert.equal(config.telegramEnabled, false);
+  assert.equal(validation.ok, true);
+  assert.deepEqual(Object.keys(config.vars).filter((name) => name.includes('TELEGRAM')), []);
+  assert.deepEqual(Object.keys(config.secrets).filter((name) => name.includes('TELEGRAM')), []);
+  assert.equal(plan.webhookUrl, null);
+  assert.equal(JSON.stringify(plan).includes('TELEGRAM_'), false);
+  assert.equal(JSON.stringify(plan).includes('api.telegram.org'), false);
+});
+
+test('dedicated deployment requires one explicit agentHttp session pinned to its Worker origin', () => {
+  const valid = resolveAgentBridgeDeployConfig({ env: completeEnv() });
+  const missingPolicy = resolveAgentBridgeDeployConfig({
+    env: completeEnv({ AGENT_BRIDGE_SESSION_POLICY_JSON: '' }),
+  });
+  const multipleSessions = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'wrapped-alpha',
+        sessions: [
+          { sessionSlug: 'wrapped-alpha', sessionWorkerUrl: 'https://session-worker.tenant-subdomain.workers.dev', sessionModeProfile: { surfaces: { agentHttp: true } } },
+          { sessionSlug: 'wrapped-beta', sessionWorkerUrl: 'https://session-worker.tenant-subdomain.workers.dev', sessionModeProfile: { surfaces: { agentHttp: true } } },
+        ],
+      }),
+    }),
+  });
+  const mismatchedOrigin = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'wrapped-alpha',
+        sessions: [{
+          sessionSlug: 'wrapped-alpha',
+          sessionWorkerUrl: 'https://caller-selected.example.test',
+          sessionModeProfile: { surfaces: { agentHttp: true } },
+        }],
+      }),
+    }),
+  });
+  const disabledAgentHttp = resolveAgentBridgeDeployConfig({
+    env: completeEnv({
+      AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+        defaultSessionSlug: 'wrapped-alpha',
+        sessions: [{
+          sessionSlug: 'wrapped-alpha',
+          sessionWorkerUrl: 'https://session-worker.tenant-subdomain.workers.dev',
+          sessionModeProfile: { surfaces: { agentHttp: false } },
+        }],
+      }),
+    }),
+  });
+
+  assert.equal(validateAgentBridgeDeployConfig(valid).ok, true);
+  assert.deepEqual(valid.dedicatedSession, {
+    sessionSlug: 'wrapped-alpha',
+    sessionWorkerOrigin: 'https://session-worker.tenant-subdomain.workers.dev',
+  });
+  for (const config of [missingPolicy, multipleSessions, mismatchedOrigin, disabledAgentHttp]) {
+    const validation = validateAgentBridgeDeployConfig(config);
+    assert.equal(validation.ok, false);
+    assert.equal(validation.missing.some((entry) => entry.includes('dedicated session policy')), true);
+  }
 });
 
 test('validateAgentBridgeDeployConfig rejects local-only Telegram preview vars', () => {
@@ -209,7 +317,8 @@ test('live account lookup blocks multiple visible accounts without falling back 
 test('generated secrets are high entropy hex values and never appear in deploy plans', () => {
   const fakeRandomBytes = (length) => Buffer.from(Array.from({ length }, (_, index) => (index + 7) % 256));
   const webhookSecret = generateAgentBridgeSecret({ randomBytesImpl: fakeRandomBytes });
-  const generated = buildAgentBridgeGeneratedSecrets({ randomBytesImpl: fakeRandomBytes });
+  const generated = buildAgentBridgeGeneratedSecrets({ telegramEnabled: true, randomBytesImpl: fakeRandomBytes });
+  const wrappedOnly = buildAgentBridgeGeneratedSecrets({ randomBytesImpl: fakeRandomBytes });
   const config = resolveAgentBridgeDeployConfig({
     env: completeEnv({
       TELEGRAM_WEBHOOK_SECRET: generated.TELEGRAM_WEBHOOK_SECRET,
@@ -224,6 +333,7 @@ test('generated secrets are high entropy hex values and never appear in deploy p
   assert.match(generated.TELEGRAM_WEBHOOK_SECRET, /^[0-9a-f]{64}$/);
   assert.match(generated.DEMO_SIGNER_ROOT_SECRET, /^[0-9a-f]{64}$/);
   assert.match(generated.AGENT_BRIDGE_AGENT_API_TOKEN, /^[0-9a-f]{64}$/);
+  assert.equal(Object.hasOwn(wrappedOnly, 'TELEGRAM_WEBHOOK_SECRET'), false);
   assert.equal(serialized.includes(generated.TELEGRAM_WEBHOOK_SECRET), false);
   assert.equal(serialized.includes(generated.DEMO_SIGNER_ROOT_SECRET), false);
   assert.equal(serialized.includes(generated.AGENT_BRIDGE_AGENT_API_TOKEN), false);
@@ -257,6 +367,10 @@ test('validateAgentBridgeTokenScope treats Account Settings: Edit as workers.dev
   });
 
   assert.equal(base.ok, true);
+  assert.deepEqual(AGENT_BRIDGE_CLOUDFLARE_TOKEN_PERMISSIONS, [
+    { key: 'workers_scripts', type: 'edit' },
+    { key: 'workers_kv_storage', type: 'edit' },
+  ]);
   assert.equal(base.accountSettingsEditRequired, false);
   assert.equal(needsDocStorage.ok, false);
   assert.deepEqual(needsDocStorage.missing, AGENT_BRIDGE_DOC_STORAGE_CLOUDFLARE_TOKEN_PERMISSIONS);
@@ -268,7 +382,7 @@ test('validateAgentBridgeTokenScope treats Account Settings: Edit as workers.dev
   assert.equal(withWorkersDevSetup.ok, true);
 });
 
-test('buildAgentBridgeWorkerUploadMetadata defaults to smoke bindings without R2/D1', () => {
+test('buildAgentBridgeWorkerUploadMetadata defaults to the KV-only runtime shape', () => {
   const config = resolveAgentBridgeDeployConfig({
     env: completeEnv({ ADDITIONAL_RPC_URL: 'https://infura.example.test/op-sepolia' }),
   });
@@ -280,16 +394,8 @@ test('buildAgentBridgeWorkerUploadMetadata defaults to smoke bindings without R2
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_ACTION_KV' && binding.type === 'kv_namespace'), true);
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_R2'), false);
   assert.equal(metadata.bindings.some((binding) => binding.name === 'AGENT_DOCS_D1'), false);
-  assert.equal(metadata.bindings.some((binding) => (
-    binding.name === 'MANAGED_DEMO_SIGNER' &&
-    binding.type === 'durable_object_namespace' &&
-    binding.class_name === 'ManagedDemoSignerDurableObject'
-  )), true);
-  assert.deepEqual(metadata.migrations, {
-    old_tag: '',
-    new_tag: 'v1',
-    new_sqlite_classes: ['ManagedDemoSignerDurableObject'],
-  });
+  assert.equal(metadata.bindings.some((binding) => binding.type === 'durable_object_namespace'), false);
+  assert.equal(Object.hasOwn(metadata, 'migrations'), false);
   assert.equal(metadata.bindings.some((binding) => (
     binding.name === 'AGENT_BRIDGE_PUBLIC_URL' &&
     binding.text === 'https://ce-agent-bridge-worker.tenant-subdomain.workers.dev'
@@ -462,6 +568,8 @@ test('buildAgentBridgeDeployPlan documents remaining direct Cloudflare API calls
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/storage/kv/namespaces')), true);
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/r2/buckets')), false);
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/d1/database')), false);
+  assert.equal(JSON.stringify(plan).includes('Durable Object'), false);
+  assert.equal(JSON.stringify(plan).includes('MANAGED_DEMO_SIGNER'), false);
   assert.equal(plan.remainingDirectApiCalls.some((call) => call.path.includes('/workers/scripts/ce-agent-bridge-worker/secrets')), true);
   assert.equal(plan.remainingDirectApiCalls[0].path, '/accounts?per_page=2');
   assert.equal(plan.optionalTokenPermissions.length, 1);

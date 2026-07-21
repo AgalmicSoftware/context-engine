@@ -18,7 +18,9 @@ import {
 } from './telegramDraftEditMetrics.mjs';
 import {
   AGENT_CREDENTIAL_KV_PREFIX,
+  AGENT_CREDENTIAL_AUDIENCES,
   AGENT_CREDENTIAL_KINDS,
+  AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS,
   AGENT_CREDENTIAL_SLOT_KV_PREFIX,
   createTelegramAgentDelegationToken,
   issueAgentCredential,
@@ -37,6 +39,11 @@ import {
 import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mjs';
 import { persistTelegramSubmitRecord } from './telegramSubmitQueue.mjs';
 import { persistTelegramProposedQuestion } from './telegramQuestionProposals.mjs';
+
+const HISTORICAL_AGENT_ONLY_WINDOWING = Object.freeze({
+  launchOpensAt: '2026-06-12T08:00:00-07:00',
+  launchClosesAt: '2026-06-15T08:00:00-07:00',
+});
 
 class MemoryKv {
   constructor() {
@@ -222,6 +229,316 @@ function agentRequest(path, {
   });
 }
 
+function workerJwt(claims = {}) {
+  const encode = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(claims)}.test-signature`;
+}
+
+function memberExchangeEnv(authorityMode = 'worker_canonical', overrides = {}) {
+  const sessionWorkerUrl = 'https://session-worker.example';
+  return baseEnv({
+    CE_SESSION_WORKER_BASE_URL: sessionWorkerUrl,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      version: 1,
+      defaultSessionSlug: 'alpha',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        sessionWorkerUrl,
+        sessionModeProfile: {
+          surfaces: { agentHttp: true, telegram: false },
+          authority: { mode: authorityMode },
+        },
+      }],
+    }),
+    ...overrides,
+  });
+}
+
+test('member exchange issues the same short-lived Wrapped credential for worker and registry canonical sessions', async () => {
+  const address = '0x1111111111111111111111111111111111111111';
+  for (const authorityMode of ['worker_canonical', 'registry_canonical']) {
+    const env = memberExchangeEnv(authorityMode);
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const workerCredential = workerJwt({
+      sub: address,
+      slug: 'alpha',
+      scopes: { groups: true },
+      exp,
+      jti: `${authorityMode}-jti`,
+    });
+    const calls = [];
+    const response = await handleTelegramAgentHandoffRequest({
+      request: agentRequest('/api/agent/wrapped/member-exchange', {
+        method: 'POST',
+        token: workerCredential,
+        body: {
+          sessionSlug: 'alpha',
+          sessionWorkerOrigin: 'https://caller-selected.example',
+        },
+      }),
+      env,
+      fetchImpl: async (url, init = {}) => {
+        calls.push({ url: String(url), init });
+        return new Response(JSON.stringify({
+          ok: true,
+          principal: { kind: 'evm_address', address },
+          memberships: [],
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      },
+    });
+    const payload = await jsonBody(response);
+    assert.equal(response.status, 200, JSON.stringify(payload));
+    assert.match(payload.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+    assert.equal(payload.sessionSlug, 'alpha');
+    assert.equal(payload.revocationBoundSeconds <= 3600, true);
+    assert.equal(payload.revocationBoundSeconds <= AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS, true);
+    assert.deepEqual(calls.map((call) => call.url), ['https://session-worker.example/groups/my-memberships']);
+    assert.equal(calls[0].url.includes(workerCredential), false);
+    const loaded = await loadAgentCredential({ env, token: payload.token });
+    assert.equal(loaded.ok, true);
+    assert.equal(loaded.record.audience, AGENT_CREDENTIAL_AUDIENCES.AGENT_BRIDGE);
+    assert.equal(loaded.record.credentialKind, AGENT_CREDENTIAL_KINDS.MEMBER);
+    assert.deepEqual(loaded.record.scopes, [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL]);
+    assert.equal(loaded.record.principal.adapter, 'session_worker');
+    assert.equal(loaded.record.principal.principalId.includes(address.toLowerCase()), true);
+  }
+});
+
+test('member exchange accepts Worker credentials only in a header or body and rejects replay', async () => {
+  const env = memberExchangeEnv();
+  const address = '0x2222222222222222222222222222222222222222';
+  const credential = workerJwt({
+    sub: address,
+    slug: 'alpha',
+    scopes: { groups: true },
+    exp: Math.floor(Date.now() / 1000) + 3600,
+    jti: 'replay-jti',
+  });
+  let fetchCalls = 0;
+  const fetchImpl = async () => {
+    fetchCalls += 1;
+    return new Response(JSON.stringify({
+      ok: true,
+      principal: { kind: 'evm_address', address },
+      memberships: [],
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  const exchange = () => handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/wrapped/member-exchange', {
+      method: 'POST',
+      token: '',
+      body: { sessionSlug: 'alpha', sessionWorkerCredential: credential },
+    }),
+    env,
+    fetchImpl,
+  });
+
+  assert.equal((await exchange()).status, 200);
+  const replay = await exchange();
+  assert.equal(replay.status, 409);
+  assert.equal((await jsonBody(replay)).reason, 'session_worker_credential_replayed');
+  assert.equal(fetchCalls, 1);
+
+  const queryOnly = await handleTelegramAgentHandoffRequest({
+    request: agentRequest(`/api/agent/wrapped/member-exchange?sessionWorkerCredential=${encodeURIComponent(credential)}`, {
+      method: 'POST',
+      token: '',
+    }),
+    env: memberExchangeEnv(),
+    fetchImpl: async () => { throw new Error('query credential must not be used'); },
+  });
+  assert.equal(queryOnly.status, 401);
+  assert.equal((await jsonBody(queryOnly)).reason, 'session_worker_credential_missing');
+});
+
+test('member exchange fails closed before Worker verification when dedicated access is disabled', async () => {
+  const disabledPolicy = JSON.stringify({
+    version: 1,
+    defaultSessionSlug: 'alpha',
+    sessions: [{
+      sessionSlug: 'alpha',
+      sessionWorkerUrl: 'https://session-worker.example',
+      sessionModeProfile: {
+        surfaces: { agentHttp: false, telegram: false },
+        authority: { mode: 'worker_canonical' },
+      },
+    }],
+  });
+  let fetchCalls = 0;
+  const response = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/wrapped/member-exchange', {
+      method: 'POST',
+      token: workerJwt({
+        sub: '0x2222222222222222222222222222222222222222',
+        slug: 'alpha',
+        scopes: { groups: true },
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        jti: 'disabled-access-jti',
+      }),
+      body: { sessionSlug: 'alpha' },
+    }),
+    env: memberExchangeEnv('worker_canonical', { AGENT_BRIDGE_SESSION_POLICY_JSON: disabledPolicy }),
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      throw new Error('disabled access must not reach the session Worker');
+    },
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal((await jsonBody(response)).reason, 'agent_http_disabled');
+  assert.equal(fetchCalls, 0);
+});
+
+test('member exchange denial matrix fails closed without issuing Bridge credentials', async () => {
+  const address = '0x3333333333333333333333333333333333333333';
+  const validClaims = {
+    sub: address,
+    slug: 'alpha',
+    scopes: { groups: true },
+    exp: Math.floor(Date.now() / 1000) + 3600,
+    jti: 'denial-jti',
+  };
+  const cases = [
+    ['wrong-session', { ...validClaims, slug: 'beta' }, 200, { ok: true, principal: { kind: 'evm_address', address }, memberships: [] }, 403, 'session_worker_credential_session_mismatch'],
+    ['wrong-audience', { ...validClaims, aud: 'https://other.example' }, 200, { ok: true, principal: { kind: 'evm_address', address }, memberships: [] }, 403, 'session_worker_credential_audience_mismatch'],
+    ['expired', { ...validClaims, exp: 1 }, 200, { ok: true, principal: { kind: 'evm_address', address }, memberships: [] }, 401, 'session_worker_credential_expired'],
+    ['revoked', validClaims, 401, { ok: false, reason: 'session_worker_credential_revoked' }, 401, 'session_worker_credential_revoked'],
+    ['admin-only', validClaims, 200, { ok: true, principal: { kind: 'agent', grantId: 'admin' }, memberships: [] }, 403, 'session_worker_principal_ineligible'],
+    ['wrong-chain', validClaims, 403, { ok: false, reason: 'wrong_chain' }, 403, 'session_worker_membership_denied'],
+    ['rpc-unavailable', validClaims, 503, { ok: false, reason: 'rpc_unavailable' }, 503, 'session_worker_authority_unavailable'],
+  ];
+  for (const [label, claims, upstreamStatus, upstreamBody, expectedStatus, expectedReason] of cases) {
+    const env = memberExchangeEnv();
+    const response = await handleTelegramAgentHandoffRequest({
+      request: agentRequest('/api/agent/wrapped/member-exchange', {
+        method: 'POST',
+        token: workerJwt({ ...claims, jti: `${claims.jti}-${label}` }),
+        body: { sessionSlug: 'alpha' },
+      }),
+      env,
+      fetchImpl: async () => new Response(JSON.stringify(upstreamBody), {
+        status: upstreamStatus,
+        headers: { 'content-type': 'application/json' },
+      }),
+    });
+    assert.equal(response.status, expectedStatus, label);
+    assert.equal((await jsonBody(response)).reason, expectedReason, label);
+    assert.equal(
+      Array.from(env.AGENT_ACTION_KV.store.keys()).some((key) => String(key).startsWith('agent:credential:v2:')),
+      false,
+      label,
+    );
+  }
+});
+
+test('exchanged members submit Wrapped answers without Telegram or an agent-originated chain transaction', async () => {
+  const env = memberExchangeEnv('registry_canonical', {
+    AGENT_BRIDGE_AGENT_ONLY_TEST_NOW: '2026-06-12T15:06:00.000Z',
+  });
+  const [questionId] = await seedAgentOnlyProposedQuestions(env, 'alpha', 1);
+  const configResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/admin/agent-only/config?sessionSlug=alpha', {
+      method: 'POST',
+      body: { enabledQuestionIds: [questionId], windowing: HISTORICAL_AGENT_ONLY_WINDOWING },
+    }),
+    env,
+  });
+  assert.equal(configResponse.status, 200);
+  const windowResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/admin/agent-only/window/open?sessionSlug=alpha', {
+      method: 'POST',
+      body: { createdAt: '2026-06-12T15:05:00.000Z' },
+    }),
+    env,
+  });
+  assert.equal(windowResponse.status, 200);
+
+  const address = '0x4444444444444444444444444444444444444444';
+  let authorityCalls = 0;
+  const authorityFetch = async (url) => {
+    authorityCalls += 1;
+    assert.equal(String(url), 'https://session-worker.example/groups/my-memberships');
+    return new Response(JSON.stringify({
+      ok: true,
+      principal: { kind: 'evm_address', address },
+      memberships: [],
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  const exchangeResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/wrapped/member-exchange', {
+      method: 'POST',
+      token: workerJwt({
+        sub: address,
+        slug: 'alpha',
+        scopes: { groups: true },
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        jti: 'registry-no-chain-submit',
+      }),
+      body: { sessionSlug: 'alpha' },
+    }),
+    env,
+    fetchImpl: authorityFetch,
+  });
+  const exchange = await jsonBody(exchangeResponse);
+  assert.equal(exchangeResponse.status, 200, JSON.stringify(exchange));
+  assert.equal(authorityCalls, 1);
+
+  const noNetworkFetch = async () => {
+    throw new Error('Wrapped read and answer submission must not perform a network or chain request');
+  };
+  const statementsResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/agent-only/statements?sessionSlug=alpha', {
+      token: exchange.token,
+    }),
+    env,
+    fetchImpl: noNetworkFetch,
+  });
+  const statements = await jsonBody(statementsResponse);
+  assert.equal(statementsResponse.status, 200, JSON.stringify(statements));
+  assert.equal(statements.window_id, 'w-2026-06-12');
+  assert.deepEqual(statements.statements.map((statement) => statement.statement_id), [questionId]);
+
+  const answerResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/agent-only/answers/bulk?sessionSlug=alpha', {
+      method: 'POST',
+      token: exchange.token,
+      body: {
+        window_id: statements.window_id,
+        run_id: 'registry-member-run',
+        request_id: 'registry-member-answer',
+        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+        answers: [{
+          statement_id: questionId,
+          answer: { value: 'agree' },
+          confidence: 82,
+        }],
+      },
+    }),
+    env,
+    fetchImpl: noNetworkFetch,
+  });
+  const answer = await jsonBody(answerResponse);
+  assert.equal(answerResponse.status, 200, JSON.stringify(answer));
+  assert.equal(answer.accepted, 1);
+  assert.equal(answer.replay, false);
+  assert.equal(authorityCalls, 1);
+  assert.equal(JSON.stringify(answer).includes('telegramUserId'), false);
+  const submittedRecords = Array.from(env.AGENT_ACTION_KV.store.values())
+    .map((value) => {
+      try { return JSON.parse(value); } catch { return null; }
+    })
+    .filter((record) => record?.questionId === questionId && record?.telegramUserId);
+  assert.equal(
+    submittedRecords.some((record) => record.telegramUserId === exchange.principal.principalId),
+    true,
+  );
+  assert.equal(
+    submittedRecords.some((record) => record.telegramUserId === address.toLowerCase()),
+    false,
+  );
+});
+
 async function seedAgentOnlyProposedQuestions(env, sessionSlug = 'alpha', count = 4) {
   const types = ['binary', 'freeform', 'rating', 'multichoice'];
   const ids = [];
@@ -313,6 +630,42 @@ test('fixed-date delegation token fixtures declare an explicit TTL', () => {
     }
   }
   assert.deepEqual(unsafeLines, []);
+});
+
+test('delegated handoff input keeps non-Telegram principals out of Telegram identity fields', () => {
+  const result = __test__telegramAgentHandoff.applyDelegationToInput({
+    authMode: 'agent_credential',
+    delegation: {
+      sessionSlug: 'alpha',
+      scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS],
+      principal: {
+        principalId: 'cesvc_principal-neutral',
+        kind: AGENT_CREDENTIAL_KINDS.SERVICE,
+        adapter: 'service',
+        label: 'Reader',
+      },
+    },
+  }, {
+    sessionSlug: 'alpha',
+    telegramUserId: 'caller-selected-telegram-user',
+    groupChatId: '-100-caller-selected',
+  }, '/api/agent/questions', 'GET');
+
+  assert.equal(result.ok, true);
+  assert.equal(result.input.principalId, 'cesvc_principal-neutral');
+  assert.equal(result.input.principalAdapter, 'service');
+  assert.equal(result.input.telegramUserId, '');
+  assert.equal(result.input.groupChatId, '');
+  assert.deepEqual(result.input.adapterMetadata, {});
+});
+
+test('agent HTTP routing normalizes legacy aliases to canonical internal paths at the adapter edge', () => {
+  const source = readFileSync(new URL('./telegramAgentHandoff.mjs', import.meta.url), 'utf8');
+  assert.match(source, /const routePathname = toCanonicalAgentApiPathname\(url\.pathname\)/);
+  assert.doesNotMatch(source, /const routePathname = toLegacyAgentApiPathname\(url\.pathname\)/);
+  assert.doesNotMatch(source, /pathname = toLegacyAgentApiPathname\(new URL\(request\.url\)\.pathname\)/);
+  assert.match(source, /const LEGACY_AGENT_API_PREFIX = '\/telegram\/agent\/api'/);
+  assert.match(source, /const CANONICAL_AGENT_API_PREFIX = '\/api\/agent'/);
 });
 
 async function jsonBody(response) {
@@ -439,7 +792,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 
   assert.match(wrapped, /name:\s+ce-session-wrapped/);
   assert.match(wrapped, /^# Context Engine Session Wrapped Runtime/m);
-  assert.match(wrapped, /\*\*Skill version:\*\* 2026-07-04 \(session-wrapped-v1\)/);
+  assert.match(wrapped, /\*\*Skill version:\*\* 2026-07-20 \(session-wrapped-v1\.1\)/);
   assert.match(wrapped, /Use this skill only to run a generic Context Engine session wrapped flow/);
   assert.match(wrapped, /not use the broader\s+`context-engine` skill/);
   assert.match(wrapped, /main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
@@ -505,6 +858,8 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.doesNotMatch(wrapped, /visualDefaults\.wrapped_story/);
   assert.doesNotMatch(wrapped, /shareable story version/);
   assert.match(wrapped, /Context Engine Mini App/);
+  assert.match(wrapped, /configured Context Engine session interface/);
+  assert.doesNotMatch(wrapped, /session bot/i);
   assert.doesNotMatch(wrapped, /question-queue\/apply/);
   assert.doesNotMatch(wrapped, /results-image/);
 });
@@ -552,7 +907,7 @@ test('Telegram agent handoff exposes dedicated Session Wrapped skill metadata', 
 
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
-  assert.equal(body.version, '2026-07-04 (session-wrapped-v1)');
+  assert.equal(body.version, '2026-07-20 (session-wrapped-v1.1)');
   assert.equal(body.protocolVersion, '2026-07-18 (v42)');
   assert.equal(body.skill, 'ce-session-wrapped');
   assert.equal(body.skillUrl, 'https://example.test/skills/ce-session-wrapped/SKILL.md');
@@ -582,7 +937,7 @@ test('Telegram agent handoff serves a dedicated Session Wrapped skill redirect',
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-07-04-session-wrapped-v1-/);
+  assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
 });
 
 test('Telegram agent handoff serves a short Session Wrapped skill alias', async () => {
@@ -594,7 +949,7 @@ test('Telegram agent handoff serves a short Session Wrapped skill alias', async 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-07-04-session-wrapped-v1-/);
+  assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
 });
 
 test('Telegram agent handoff serves a short Session Wrapped skill alias to HEAD probes', async () => {
@@ -606,7 +961,7 @@ test('Telegram agent handoff serves a short Session Wrapped skill alias to HEAD 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
   assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
-  assert.match(location, /v=2026-07-04-session-wrapped-v1-/);
+  assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
@@ -1769,6 +2124,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       body: {
         enabledQuestionIds: questionIds,
         evalTypesByQuestionId: { [questionIds[0]]: 'human_split' },
+        windowing: HISTORICAL_AGENT_ONLY_WINDOWING,
       },
     }),
     env,
@@ -2156,14 +2512,23 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       body: {
         window_id: 'w-2026-06-12',
         run_id: 'route-run-1',
+        mode: 'political_compass',
         createdAt: '2026-06-12T15:08:00.000Z',
       },
     }),
     env,
   });
   const wrappedMissingKey = await jsonBody(wrappedMissingKeyResponse);
-  assert.equal(wrappedMissingKeyResponse.status, 503);
-  assert.equal(wrappedMissingKey.reason, 'openai_key_missing');
+  assert.equal(wrappedMissingKeyResponse.status, 200);
+  assert.equal(wrappedMissingKey.ok, true);
+  assert.equal(wrappedMissingKey.model, 'local-deterministic-v1');
+  assert.equal(wrappedMissingKey.media_kind, 'deterministic_svg_poster');
+  assert.equal(wrappedMissingKey.image_content_type, 'image/svg+xml');
+  for (const [key, value] of [...env.AGENT_ACTION_KV.store.entries()]) {
+    if (String(value).includes(wrappedMissingKey.image_id) || String(value).includes(wrappedMissingKey.image_view_id)) {
+      await env.AGENT_ACTION_KV.delete(key);
+    }
+  }
 
   const votesResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/token-votes/bulk?sessionSlug=alpha', {
@@ -2182,7 +2547,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     env,
   });
   assert.equal(votesResponse.status, 200);
-  env.AGENT_BRIDGE_OPENAI_API_KEY = 'sk-bridge-openai';
+  env.AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY = 'sk-bridge-openai';
   env.AGENT_BRIDGE_PUBLIC_URL = 'https://bridge.example';
   let openAiRequestForm = null;
   const fakeImageFetch = async (url, init = {}) => {
@@ -2206,6 +2571,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         format: 'json_url',
         include_base64: false,
         include_prompt: true,
+        poster_renderer: 'openai',
       },
     }),
     env,
@@ -2411,9 +2777,9 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   )), true);
   assert.equal(attemptRows.some((row) => (
     row.stage === 'wrapped_image' &&
-    row.ok === false &&
-    row.status === 503 &&
-    row.reason === 'openai_key_missing' &&
+    row.ok === true &&
+    row.status === 200 &&
+    row.mode === 'political_compass' &&
     row.agent_response_count === 5
   )), true);
   assert.equal(attemptRows.some((row) => (
@@ -2536,6 +2902,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         window_id: 'w-2026-06-12',
         run_id: 'route-run-1',
         mode: 'political_compass',
+        poster_renderer: 'openai',
         style_hint: 'make it a partisan election poster',
         createdAt: '2026-06-12T15:10:00.000Z',
       },
