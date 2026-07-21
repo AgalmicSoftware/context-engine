@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -69,9 +69,16 @@ jobs:
           git fetch --no-tags --depth=1 origin main
           node scripts/resolve-baseline-monotonicity-base.mjs --github-output "$GITHUB_OUTPUT"
 
+      - name: Resolve baseline growth approval
+        id: baseline-growth-approval
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BASELINE_GROWTH_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/resolve-baseline-growth-approval.mjs
+
       - name: Check baseline monotonicity
         env:
-          BASELINE_MONOTONICITY_BASE: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}
+          BASELINE_MONOTONICITY_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
           BASELINE_MONOTONICITY_APPROVED: ${{ steps.baseline-growth-approval.outputs.approved }}
         run: |
           set -euo pipefail

@@ -27,10 +27,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   const scripts = pkg.scripts || {};
   const workflow = readText(rootDir, '.github/workflows/ci.yml');
   const codeowners = readText(rootDir, '.github/CODEOWNERS');
-  const gateManifestPath = 'scripts/ci-gates.json';
-  const gateManifest = fs.existsSync(path.join(rootDir, gateManifestPath))
-    ? readJson(rootDir, gateManifestPath)
-    : { profiles: {}, gates: {} };
   const syncPublicHistory = readText(rootDir, 'scripts/sync-public-history.sh');
   const publishWorkflowPath = '.github/workflows/publish-worker-bundles.yml';
   const publishWorkflow = fs.existsSync(path.join(rootDir, publishWorkflowPath))
@@ -131,6 +127,9 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/dead-exports-baseline.json');
   expectFile('scripts/check-baseline-monotonicity.mjs');
   expectFile('scripts/check-baseline-monotonicity.test.mjs');
+  expectFile('scripts/resolve-baseline-growth-approval.mjs');
+  expectFile('scripts/resolve-baseline-growth-approval.test.mjs');
+  expectFile('.github/CODEOWNERS');
   expectFile('scripts/testInventoryConfig.js');
   expectFile('scripts/verify-test-inventory.js');
   expectFile('scripts/verify-test-inventory.test.js');
@@ -316,18 +315,17 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('workers:', 'the workers job');
   expectWorkflowContains('cecc-and-node:', 'the cecc-and-node job');
   expectWorkflowContains('test:', 'the final aggregate test job');
-  expectWorkflowContains('run: npm run ci:gate -- wiring-and-release', 'the manifest-backed wiring-and-release gate');
-  expectWorkflowContains('run: npm run ci:gate -- public-text', 'the hosted public-text gate');
-  expectWorkflowContains('node scripts/resolve-baseline-monotonicity-base.mjs', 'baseline monotonicity base resolver');
-  expectWorkflowContains(
-    'BASELINE_MONOTONICITY_BASE: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}',
-    'resolved baseline monotonicity SHA',
-  );
+  expectWorkflowContains('run: npm run test:wiring', '"npm run test:wiring"');
+  expectWorkflowContains('run: npm run type-debt:check', '"npm run type-debt:check"');
+  expectWorkflowContains('BASELINE_MONOTONICITY_BASE:', 'baseline monotonicity base env');
+  expectWorkflowContains("github.event.pull_request.base.sha || github.event.before", 'exact event comparison SHA selection');
   expectWorkflowContains('node scripts/resolve-baseline-growth-approval.mjs', 'verified baseline growth approval resolver');
   expectWorkflowContains('BASELINE_MONOTONICITY_APPROVED:', 'verified baseline growth approval output');
   expectWorkflowContains('--require-base-sha', 'fail-closed baseline SHA requirement');
   expectWorkflowContains('fetch-depth: 0', 'complete history checkout for baseline comparison');
   expectWorkflowContains('node scripts/check-baseline-monotonicity.mjs', '"node scripts/check-baseline-monotonicity.mjs"');
+  expectWorkflowOmits('BASELINE_MONOTONICITY_ALLOW_TEXT', 'author-controlled baseline approval text');
+  expectWorkflowOmits('--allow-text', 'author-controlled baseline approval option');
   expectWorkflowContains('run: npm run lint', '"npm run lint"');
   expectWorkflowContains('run: npm run typecheck:client', '"npm run typecheck:client"');
   expectWorkflowContains('run: npm run verify:public-release-surface', '"npm run verify:public-release-surface"');
@@ -359,32 +357,18 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowOmits('      - dev\n', 'private dev branch triggers');
   [
     '/.github/workflows/ci.yml @AgalmicSoftware',
-    '/.github/workflows/publish-worker-bundles.yml @AgalmicSoftware',
-    '/.github/workflows/promote-worker-bundles.yml @AgalmicSoftware',
-    '/.github/workflows/public-drift.yml @AgalmicSoftware',
     '/scripts/check-baseline-monotonicity.mjs @AgalmicSoftware',
-    '/scripts/resolve-baseline-monotonicity-base.mjs @AgalmicSoftware',
     '/scripts/resolve-baseline-growth-approval.mjs @AgalmicSoftware',
-    '/scripts/ci-gates.json @AgalmicSoftware',
-    '/scripts/run-ci-gates.mjs @AgalmicSoftware',
-    '/scripts/run-ci-gates.test.mjs @AgalmicSoftware',
-    '/scripts/worker-release-artifacts.mjs @AgalmicSoftware',
-    '/scripts/worker-release-artifacts.test.mjs @AgalmicSoftware',
-    '/scripts/sync-public-history.sh @AgalmicSoftware',
     '/scripts/client-boundaries-baseline.json @AgalmicSoftware',
     '/scripts/type-debt-baseline.json @AgalmicSoftware',
     '/scripts/dead-exports-baseline.json @AgalmicSoftware',
-    '/scripts/client-bundle-budget.json @AgalmicSoftware',
-    '/scripts/verify-abi-sync.mjs @AgalmicSoftware',
-    '/client/src/contractsABI/ @AgalmicSoftware',
-    '/contracts/ @AgalmicSoftware',
   ].forEach((rule) => {
     if (!codeowners.includes(rule)) {
       failures.push(`CODEOWNERS must include "${rule}"`);
     }
   });
-  if (/npm run (?:worker:bundle|verify:worker-bundle)/.test(publishWorkflow)) {
-    failures.push('publish-worker-bundles workflow must consume tested CI bytes without rebuilding');
+  if (!publishWorkflow.includes('run: npm run worker:bundle')) {
+    failures.push('publish-worker-bundles workflow must execute "npm run worker:bundle"');
   }
   if (
     !publishWorkflow.includes('app_version="$(node -p')

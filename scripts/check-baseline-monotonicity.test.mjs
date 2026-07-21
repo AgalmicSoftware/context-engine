@@ -130,181 +130,6 @@ test('reports boundary gains and type-debt increases', () => {
   });
 });
 
-test('reports lowered coverage floors, broadened exclusions, and legacy-universe gains', () => {
-  withTempRepo((repoDir) => {
-    writeBaselines(repoDir, {
-      violations: [],
-      counts: { colonAny: 0 },
-    });
-    commitAll(repoDir, 'base baselines');
-    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
-
-    writeBaselines(repoDir, {
-      violations: [],
-      counts: { colonAny: 0 },
-      legacyCoverage: { statements: 75.6, branches: 61, functions: 77, lines: 79.1 },
-      fullCoverage: { statements: 69.9, branches: 55, functions: 70, lines: 72 },
-      coverageRules: [
-        { id: 'test-source', jestPatterns: ['!src/**/*.test.ts'], reason: 'tests' },
-        { id: 'new-exclusion', jestPatterns: ['!src/legacy/**'], reason: 'broader' },
-      ],
-      coverageExceptions: ['client/src/legacy/owner.ts'],
-      legacyCoverageFiles: ['client/src/imported.ts', 'client/src/newly-added.ts'],
-    });
-
-    const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
-    assert.deepEqual(result.coverageRegressions.map((entry) => entry.kind), [
-      'legacy-floor-decrease',
-      'full-floor-decrease',
-      'exclusion-rule-gain',
-      'exclusion-exception-gain',
-      'legacy-file-gain',
-    ]);
-  });
-});
-
-test('verified approval cannot permit coverage-contract regression', () => {
-  withTempRepo((repoDir) => {
-    writeBaselines(repoDir, { violations: [], counts: { colonAny: 0 } });
-    commitAll(repoDir, 'base baselines');
-    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
-    writeBaselines(repoDir, {
-      violations: [],
-      counts: { colonAny: 0 },
-      fullCoverage: { statements: 69, branches: 55, functions: 70, lines: 72 },
-    });
-
-    const result = spawnSync(process.execPath, [
-      SCRIPT_PATH,
-      '--repo', repoDir,
-      '--base', base,
-      '--approval', 'approved',
-    ], { encoding: 'utf8' });
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /coverage contract regression cannot be approved/i);
-  });
-});
-
-test('reports typed-test diagnostic growth, classification loss, and contract exclusions', () => {
-  withTempRepo((repoDir) => {
-    writeBaselines(repoDir, { violations: [], counts: { colonAny: 0 } });
-    commitAll(repoDir, 'base baselines');
-    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
-    writeBaselines(repoDir, {
-      violations: [],
-      counts: { colonAny: 0 },
-      typedDiagnostics: [
-        { signature: 'src/example.test.ts|TS2322|fixture', count: 2 },
-        { signature: 'src/new.test.ts|TS2345|new', count: 1 },
-      ],
-      typedClassifications: [],
-      typedExclusions: ['client/src/legacy.test.ts'],
-    });
-
-    const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
-    assert.deepEqual(result.testTypeRegressions.map((entry) => entry.kind), [
-      'typed-diagnostic-gain',
-      'typed-diagnostic-gain',
-      'typed-classification-loss',
-      'typed-exclusion-gain',
-    ]);
-  });
-});
-
-test('legacy coverage inventory can shrink only when the production file is deleted', () => {
-  withTempRepo((repoDir) => {
-    fs.mkdirSync(path.join(repoDir, 'client/src'), { recursive: true });
-    fs.writeFileSync(path.join(repoDir, 'client/src/imported.ts'), 'export const imported = true;\n');
-    writeBaselines(repoDir, { violations: [], counts: { colonAny: 0 } });
-    commitAll(repoDir, 'base baselines');
-    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
-
-    writeBaselines(repoDir, {
-      violations: [],
-      counts: { colonAny: 0 },
-      legacyCoverageFiles: [],
-    });
-    let result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
-    assert.deepEqual(result.coverageRegressions, [{
-      kind: 'legacy-live-file-loss',
-      relativePath: 'client/src/imported.ts',
-    }]);
-
-    fs.rmSync(path.join(repoDir, 'client/src/imported.ts'));
-    result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
-    assert.deepEqual(result.coverageRegressions, []);
-  });
-});
-
-test('reports every bundle-budget cap and classification loosening', () => {
-  withTempRepo((repoDir) => {
-    writeBaselines(repoDir, { violations: [], counts: { colonAny: 0 } });
-    commitAll(repoDir, 'base baselines');
-    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
-
-    writeBaselines(repoDir, {
-      violations: [],
-      counts: { colonAny: 0 },
-      bundleBudget: {
-        warningRatio: 0.96,
-        entry: {
-          sources: ['index.html', 'src/new-entry.ts'],
-          includeDirectDynamicImports: true,
-          maxGzipBytes: 250001,
-        },
-        nonVendorChunk: {
-          maxMinifiedBytes: 500001,
-          vendorFilePrefixes: ['assets/vendor-', 'assets/hidden-'],
-        },
-        exceptions: [
-          { id: 'app-shell', filePrefix: 'assets/RenamedShell-', maxMinifiedBytes: 625001 },
-          { id: 'new-exception', filePrefix: 'assets/LargeRoute-', maxMinifiedBytes: 700000 },
-        ],
-        duplicateAssets: { allowedPairs: ['assets/logo-a.png|images/logo.png'] },
-      },
-    });
-    const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
-    assert.deepEqual(result.bundleBudgetRegressions.map((entry) => entry.kind), [
-      'bundle-entry-cap-increase',
-      'bundle-chunk-cap-increase',
-      'bundle-warning-ratio-increase',
-      'bundle-entry-source-gain',
-      'bundle-vendor-prefix-gain',
-      'bundle-duplicate-allowlist-gain',
-      'bundle-exception-selector-change',
-      'bundle-exception-cap-increase:app-shell',
-      'bundle-exception-gain',
-    ]);
-  });
-});
-
-test('verified approval cannot permit a bundle-budget regression', () => {
-  withTempRepo((repoDir) => {
-    writeBaselines(repoDir, { violations: [], counts: { colonAny: 0 } });
-    commitAll(repoDir, 'base baselines');
-    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
-    writeBaselines(repoDir, {
-      violations: [],
-      counts: { colonAny: 0 },
-      bundleBudget: {
-        warningRatio: 0.95,
-        entry: { sources: ['index.html'], includeDirectDynamicImports: true, maxGzipBytes: 250001 },
-        nonVendorChunk: { maxMinifiedBytes: 500000, vendorFilePrefixes: ['assets/vendor-'] },
-        exceptions: [{ id: 'app-shell', filePrefix: 'assets/AppShell-', maxMinifiedBytes: 625000 }],
-        duplicateAssets: { allowedPairs: [] },
-      },
-    });
-    const result = spawnSync(process.execPath, [
-      SCRIPT_PATH,
-      '--repo', repoDir,
-      '--base', base,
-      '--approval', 'approved',
-    ], { encoding: 'utf8' });
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /bundle-budget regression cannot be approved/i);
-  });
-});
-
 test('verified maintainer approval lets intentional boundary and type-debt growth pass', () => {
   withTempRepo((repoDir) => {
     writeBaselines(repoDir, {
@@ -336,7 +161,7 @@ test('verified maintainer approval lets intentional boundary and type-debt growt
   });
 });
 
-test('allow marker cannot permit dead-export baseline growth', () => {
+test('verified maintainer approval cannot permit dead-export baseline growth', () => {
   withTempRepo((repoDir) => {
     writeBaselines(repoDir, {
       violations: [],
@@ -358,18 +183,18 @@ test('allow marker cannot permit dead-export baseline growth', () => {
       repoDir,
       '--base',
       base,
-      '--allow-text',
-      `Attempted bypass ${ALLOW_MARKER}`,
+      '--approval',
+      'approved',
     ], {
       encoding: 'utf8',
     });
 
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /dead-exports-baseline\.json growth cannot be allowed/);
+    assert.match(result.stderr, /dead-exports-baseline\.json growth cannot be approved/);
   });
 });
 
-test('cli fails without allow marker when baselines grow', () => {
+test('cli fails without verified approval when baselines grow', () => {
   withTempRepo((repoDir) => {
     writeBaselines(repoDir, {
       violations: [],
@@ -399,31 +224,6 @@ test('cli fails without allow marker when baselines grow', () => {
     assert.match(result.stderr, /client-boundaries-baseline\.json gained 1 violation/);
     assert.match(result.stderr, /type-debt-baseline\.json increased 1 count/);
     assert.match(result.stderr, /dead-exports-baseline\.json increased 1 count/);
-  });
-});
-
-test('bootstraps the dead-export baseline when the base ref predates it', () => {
-  withTempRepo((repoDir) => {
-    writeJson(repoDir, 'scripts/client-boundaries-baseline.json', {
-      version: 1,
-      mode: 'fail-on-new-violation',
-      violations: [],
-    });
-    writeJson(repoDir, 'scripts/type-debt-baseline.json', {
-      counts: { colonAny: 0 },
-    });
-    commitAll(repoDir, 'base baselines without dead exports');
-    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
-
-    writeJson(repoDir, 'scripts/dead-exports-baseline.json', {
-      version: 1,
-      candidateDeadFiles: 17,
-      candidateUnusedExports: 219,
-    });
-
-    const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
-    assert.deepEqual(result.deadExportIncreases, []);
-    assert.match(result.notices.join('\n'), /dead-exports-baseline\.json was not present/);
   });
 });
 

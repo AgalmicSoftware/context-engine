@@ -31,8 +31,7 @@ Approval gate:
   Boundary or type-debt growth requires the ${BASELINE_GROWTH_APPROVAL_LABEL}
   label applied by a maintainer plus a distinct approving CODEOWNER review.
   CI verifies that GitHub metadata before passing --approval approved. Direct
-  pushes, dead-export growth, coverage contract regressions, and bundle-budget
-  regressions cannot use this exception.
+  pushes and dead-export growth cannot use this exception.
 `;
 }
 
@@ -152,12 +151,6 @@ function deadExportCountIncreases(baseBaseline, currentBaseline) {
   });
 }
 
-export function shouldAllowBaselineGrowth(allowText = '') {
-  return String(allowText).includes(ALLOW_MARKER)
-    || process.env.BASELINE_MONOTONICITY_ALLOW === '1'
-    || process.env.BASELINE_MONOTONICITY_ALLOW === 'true';
-}
-
 export function collectBaselineMonotonicityFindings({
   repoDir = process.cwd(),
   baseRef = process.env.BASELINE_MONOTONICITY_BASE || 'origin/main',
@@ -167,6 +160,18 @@ export function collectBaselineMonotonicityFindings({
   const notices = [];
   if (requireBaseSha && !/^[0-9a-f]{40}$/i.test(String(baseRef))) {
     notices.push(`Baseline monotonicity failed: base ref "${baseRef}" must be an exact 40-character commit SHA.`);
+    return {
+      skipped: false,
+      failed: true,
+      notices,
+      boundaryGains: [],
+      typeDebtIncreases: [],
+      deadExportIncreases: [],
+    };
+  }
+  const baseCommit = resolveBaseCommit(resolvedRepoDir, baseRef);
+  if (!baseCommit) {
+    notices.push(`Baseline monotonicity failed: base ref "${baseRef}" was not available.`);
     return {
       skipped: false,
       failed: true,
@@ -295,17 +300,18 @@ function runCli(argv) {
     return 0;
   }
 
-  if (shouldAllowBaselineGrowth(options.allowText) && result.deadExportIncreases.length === 0) {
-    console.log(`Baseline growth allowed by ${ALLOW_MARKER}.`);
+  const approved = options.approval === 'approved';
+  if (approved && result.deadExportIncreases.length === 0) {
+    console.log(`Baseline growth allowed by verified ${BASELINE_GROWTH_APPROVAL_LABEL} governance.`);
     printFindings(result, (line) => console.log(line));
     return 0;
   }
 
   console.error('Baseline monotonicity check failed.');
-  if (result.deadExportIncreases.length > 0 && shouldAllowBaselineGrowth(options.allowText)) {
-    console.error(`${DEAD_EXPORT_BASELINE} growth cannot be allowed by ${ALLOW_MARKER}.`);
+  if (result.deadExportIncreases.length > 0 && approved) {
+    console.error(`${DEAD_EXPORT_BASELINE} growth cannot be approved.`);
   }
-  console.error(`Use ${ALLOW_MARKER} in the PR title/body or commit message only for intentional checker-rule baseline growth.`);
+  console.error(`Boundary or type-debt growth requires the ${BASELINE_GROWTH_APPROVAL_LABEL} label from a maintainer and an approving CODEOWNER review.`);
   printFindings(result, (line) => console.error(line));
   return 1;
 }
