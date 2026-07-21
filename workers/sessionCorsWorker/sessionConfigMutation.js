@@ -251,15 +251,7 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
       return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
     }
-    if (!validGroupCreationPolicy(incomingConfig)) {
-      return { ok: false, status: 400, error: 'Invalid group creation policy.' };
-    }
-    // A patch may update the profile without resending the already-persisted
-    // canonical storage object. The complete merged record below remains
-    // strict and is the only record eligible for persistence.
-    const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig, {
-      allowPartialProfileStorage: true,
-    });
+    const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig);
     if (!incomingModeValidation.ok) {
       return {
         ok: false,
@@ -302,9 +294,6 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
     return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
   }
-  if (!validGroupCreationPolicy(mergedConfig)) {
-    return { ok: false, status: 400, error: 'Invalid group creation policy.' };
-  }
   const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
   if (!mergedModeValidation.ok) {
     return {
@@ -312,13 +301,6 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
       status: 400,
       error: `Invalid session config mode at ${mergedModeValidation.path}.`,
     };
-  }
-  if (kind === 'set-config') {
-    const fieldValidation = validateWorkerCanonicalIncomingFields({
-      incomingConfig,
-      mergedConfig,
-    });
-    if (!fieldValidation.ok) return fieldValidation;
   }
 
   if (changesInitializedWorkerCanonicalIdentity({ existingConfig: authorityExisting, mergedConfig })) {

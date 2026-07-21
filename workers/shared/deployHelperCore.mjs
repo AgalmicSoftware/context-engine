@@ -16,6 +16,7 @@ import {
   sanitizeWorkerConfigOpenSubtree,
   selectDeployWorkerSessionConfigFields,
 } from './workerSessionConfig.mjs';
+import { validateDeploymentModeValues } from './workerConfigModeValidation.mjs';
 
 const { getPathRpcUrl } = rpcDefaults;
 
@@ -1188,6 +1189,10 @@ const executeDeployHelperRequestCore = async ({
   }
 
   const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
+  const modeValidation = validateDeploymentModeValues(body);
+  if (!modeValidation.ok) {
+    return buildFailure(400, { error: `Invalid deployment mode at ${modeValidation.path}.` });
+  }
   const storageProfile = normalizeDeployStorageProfile(rawStorageProfile);
   const storageBindingPlan = resolveDeployStorageBindingPlan(rawStorageProfile, storageProfile);
   if (!storageBindingPlan.ok) {

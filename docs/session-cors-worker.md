@@ -403,6 +403,13 @@ The worker still read-normalizes legacy `payloadAccessControl.mode`, `cloudflare
 - `worker_sbt_gate` -> `{ "gate": "sbt_gate", "encryption": "none" }`
 - `lit_encrypted` -> `{ "gate": "none", "encryption": "lit" }`
 
+That compatibility is read-only. Deploy requests and signed config mutations
+must use the exact canonical values shown above. Explicit blanks, aliases such
+as `public` / `public-read` / `plaintext`, unknown values, reserved key
+providers, or malformed mode containers return `400` before account lookup,
+Cloudflare mutation, coordinator persistence, or KV write. Omit an optional
+field to select its documented default; do not send an empty value.
+
 Where older clients still need one string, the worker and client derive the legacy `payloadAccessMode` from the v2 object.
 
 - `gate: "sbt_gate"` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain before upload, list, or read bytes are exposed. Worker-canonical same-network checks prefer the private `customRpcUrl` session secret; Cloudflare storage loads that secret lazily only when an SBT condition or policy is evaluated. Public/group/role reads do not read it, and an unavailable secret store fails closed only for the affected SBT check. Before a contract read, the Worker calls `eth_chainId` and rejects an endpoint that cannot prove the expected chain.
@@ -1174,12 +1181,9 @@ Admin requests require a fresh signed SIWE message (no session token):
 Never return secrets in responses.
 
 `/admin/set-config` notes:
-
 - Security-sensitive `sessionModeProfile` and `storageProfile` enum values are
   validated before merge and again on the complete record before persistence.
-  Read compatibility for legacy values is not a write-time fallback. A
-  profile-bearing complete record must retain the canonical, coherent
-  `storageProfile` described above.
+  Read compatibility for legacy values is not a write-time fallback.
 - The session slug is taken from the signed request context, not trusted from `config.slug`.
 - After a worker-canonical session is initialized, its slug, worker URL, authority
   mode, and normalized `sessionId`/`sessionIdHex` identity are immutable. Attempts

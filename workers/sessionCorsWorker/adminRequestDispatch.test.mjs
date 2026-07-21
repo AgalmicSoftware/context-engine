@@ -290,27 +290,22 @@ test('dispatchAdminRequest merges config and persists the result after authority
 });
 
 test('dispatchAdminRequest rejects explicit invalid security modes before config persistence', async () => {
-  const invalidAuthority = createWorkerSessionModeProfile();
-  invalidAuthority.authority.mode = 'registry';
-  const invalidEncryption = createWorkerSessionModeProfile();
-  invalidEncryption.encryption.mode = 'mystery';
-  const invalidKeyProvider = createWorkerSessionModeProfile();
-  invalidKeyProvider.encryption = {
-    mode: 'worker_envelope',
-    keyProvider: 'cloudflare_secrets_store',
-  };
   const invalidConfigs = [
     {
       path: 'sessionModeProfile.authority.mode',
-      config: { sessionModeProfile: invalidAuthority },
+      config: { sessionModeProfile: { authority: { mode: 'registry' } } },
     },
     {
       path: 'sessionModeProfile.encryption.mode',
-      config: { sessionModeProfile: invalidEncryption },
+      config: { sessionModeProfile: { encryption: { mode: 'mystery' } } },
     },
     {
       path: 'sessionModeProfile.encryption.keyProvider',
-      config: { sessionModeProfile: invalidKeyProvider },
+      config: {
+        sessionModeProfile: {
+          encryption: { mode: 'worker_envelope', keyProvider: 'cloudflare_secrets_store' },
+        },
+      },
     },
     {
       path: 'storageProfile.payloadAccessControl.gate',
@@ -430,10 +425,7 @@ test('dispatchAdminRequest rejects changes to an initialized worker-canonical id
     },
     {
       label: 'authority mode',
-      config: {
-        sessionModeProfile: createRegistrySessionModeProfile(),
-        storageProfile: { backend: 'arweave' },
-      },
+      config: { sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } } },
     },
     {
       label: 'worker URL',
