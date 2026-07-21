@@ -1688,6 +1688,54 @@ test('Mini App onboarding endpoint validates Telegram initData and mints a scope
   assert.equal(refreshedLoaded.record.principal.adapterUserId, '42');
 });
 
+test('Mini App onboarding rejects a session whose Mini App surface is disabled', async () => {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS: 'https://mini.example',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        telegramGroupOpenAccess: true,
+        sessionModeProfile: {
+          authority: { mode: 'worker_canonical' },
+          surfaces: { telegram: true, miniApp: false, agentHttp: false },
+        },
+      }],
+    }),
+  });
+  const initData = signInitData({
+    auth_date: String(nowSeconds),
+    query_id: 'mini-onboard-disabled-query',
+    user: JSON.stringify({ id: 42, username: 'participant' }),
+  }, env.TELEGRAM_BOT_TOKEN);
+
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/telegram/agent/api/miniapp/onboard', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://mini.example',
+      },
+      body: JSON.stringify({
+        initData,
+        startParam: 'onboard__alpha',
+      }),
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 403);
+  assert.equal(body.reason, 'mini_app_disabled');
+  assert.equal(await env.AGENT_ACTION_KV.get('telegram:private-session:42'), null);
+});
+
 test('Mini App onboarding endpoint rejects disallowed origins and invalid initData', async () => {
   const env = telegramOnlyEnv({
     AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS: 'https://mini.example',

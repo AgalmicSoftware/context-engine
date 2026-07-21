@@ -393,10 +393,11 @@ link; the worker transcribes it through the configured session worker and
 applies it to that user's latest Mini App draft under the same rate-limit
 settings used for Mini App transcription.
 
-Mini App activity and settings routes re-evaluate the current session policy on
-every request. If the Mini App surface has been disabled, no eligible session
-remains, or a launch for one session attempts to update another, the route
-returns a denial before reading activity or persisting settings.
+Mini App onboarding, activity, and settings routes re-evaluate the current
+session policy on every request. If the Mini App surface has been disabled,
+onboarding does not mint a credential; if no eligible session remains or a
+launch for one session attempts to update another, the route returns a denial
+before reading activity or persisting settings.
 
 ## Bot Commands
 

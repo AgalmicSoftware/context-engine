@@ -18,8 +18,9 @@ All notable changes to this project will be documented in this file.
   requires Telegram, while keeping Agent Session Wrapped independent. The
   Bridge now consumes canonical nested result-exposure settings before legacy
   aliases and excludes Mini-App-disabled sessions from every Mini App picker
-  and route; activity and settings requests fail closed when no enabled session
-  remains, and launch-bound settings cannot target a different session.
+  and route; onboarding cannot mint a credential for a disabled Mini App,
+  activity and settings requests fail closed when no enabled session remains,
+  and launch-bound settings cannot target a different session.
 - Made direct Agent HTTP authorization independent of Telegram for user invite,
   service bootstrap, and ordinary authenticated API requests. Explicit session
   profiles now enforce `surfaces.agentHttp`; pre-profile Bridge records retain

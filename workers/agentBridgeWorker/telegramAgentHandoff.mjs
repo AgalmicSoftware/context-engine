@@ -48,6 +48,7 @@ import { evaluateTelegramQuestionAuthoringPermission } from './telegramAuthoring
 import {
   normalizeSessionPolicy,
   resolveAgentHttpSessionInvocation,
+  resolveMiniAppSessionInvocation,
   resolveSessionInvocation,
 } from './sessionPolicy.mjs';
 import {
@@ -5877,6 +5878,14 @@ async function handleMiniAppOnboardRequest({
       reason: resolved.reason || 'session_not_found',
       sessionSlug: resolved.sessionSlug || sessionSlug || '',
     }, { status: 404 });
+  }
+  const miniAppResolved = resolveMiniAppSessionInvocation(policy, resolved.session.sessionSlug);
+  if (!miniAppResolved.ok) {
+    return jsonMiniAppOnboard(request, env, {
+      ok: false,
+      reason: miniAppResolved.reason || 'mini_app_session_unavailable',
+      sessionSlug: miniAppResolved.sessionSlug || resolved.session.sessionSlug,
+    }, { status: miniAppResolved.reason === 'session_not_linked' ? 404 : 403 });
   }
 
   const account = await deriveManagedDemoAccount({
