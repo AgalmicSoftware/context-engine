@@ -79,7 +79,11 @@ effect for Wrapped access no later than that remaining bound.
 `sessionModeProfile.surfaces.agentHttp` is the only product enablement bit.
 `surfaces.telegram` controls only the optional Telegram adapter, while
 `surfaces.miniApp` separately enables the Telegram Mini App and is accepted
-only when Telegram is also enabled. `/new` can
+only when Telegram is also enabled. Invite onboarding, service bootstrap, and
+authenticated `/api/agent/*` requests all resolve through the Agent HTTP bit;
+they do not require Telegram. Legacy policy entries created before session mode
+profiles retain their historical direct API behavior unless they explicitly set
+`agentHttpEnabled=false`. `/new` can
 deploy a dedicated Bridge alongside a compatible Cloudflare-backed session;
 `/admin` can later enable, disable access without deleting resources, check
 health, or explicitly redeploy. Both flows publish a version-1
@@ -388,6 +392,11 @@ send a native Telegram voice message in the private bot DM after opening the
 link; the worker transcribes it through the configured session worker and
 applies it to that user's latest Mini App draft under the same rate-limit
 settings used for Mini App transcription.
+
+Mini App activity and settings routes re-evaluate the current session policy on
+every request. If the Mini App surface has been disabled, no eligible session
+remains, or a launch for one session attempts to update another, the route
+returns a denial before reading activity or persisting settings.
 
 ## Bot Commands
 

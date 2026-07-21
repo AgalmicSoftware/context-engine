@@ -358,7 +358,9 @@ export function normalizeSessionPolicy(input = {}, {
         : telegramBridgeEnabled,
     agentHttpEnabled: sessionModeProfileSurfaces(session)
       ? sessionModeProfileSurfaces(session).agentHttp === true
-      : normalizeBool(session.agentHttpEnabled || session.agentHttp),
+      : session.agentHttpEnabled === undefined && session.agentHttp === undefined
+        ? telegramBridgeEnabled
+        : normalizeBool(session.agentHttpEnabled || session.agentHttp),
     telegramOnly: profileTelegramFirst === null ? legacyTelegramOnlySession(session) : profileTelegramFirst,
     sessionModeProfile: sessionModeProfile(session) ? { ...sessionModeProfile(session) } : null,
     managedAccountSubmitAllowed: session.managedAccountSubmitAllowed === true,

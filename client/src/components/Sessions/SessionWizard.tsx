@@ -3666,6 +3666,18 @@ const SessionWizard = ({
       try {
         const pendingDraftSnapshot = normalizePendingSbtDrafts(pendingSbtDrafts);
         const currentWorkerSecrets = getCurrentWorkerSecrets();
+        const liveRuntime = workerDeployRuntimeRef.current;
+        const liveDraft = liveRuntime?.draft || draftRef.current;
+        const liveSessionModeProfile = liveDraft?.sessionModeProfile as SessionModeProfile | undefined;
+        const liveSessionModeValidation = liveSessionModeProfile
+          ? validateSessionModeProfile(liveSessionModeProfile)
+          : { valid: false, issues: [] };
+        if (!liveSessionModeValidation.valid) {
+          setStatus(
+            `Fix the session hosting settings before publishing: ${liveSessionModeValidation.issues[0]?.message || 'Invalid session mode profile.'}`,
+          );
+          return;
+        }
         const sponsoredAutoDeployState = resolveSessionWizardSponsoredAutoDeployReadiness({
           wizardMode,
           sponsoredBundle: sponsoredBundleAppliedBundleRef.current,

@@ -4381,6 +4381,17 @@ async function handleActivityRequest({
       ? requestedSessionSlugs.filter((slug) => linkedSessionLookup.has(slug))
       : linkedSessions.slice(0, 1).map((session) => session.sessionSlug);
   }
+  if (!sessionSlugs.length) {
+    const deniedSessionSlug = requestedSessionSlugs[0]
+      || launchSessionSlug(launchRecord, env)
+      || policy.defaultSessionSlug;
+    const denied = resolveMiniAppSessionInvocation(policy, deniedSessionSlug);
+    return json({
+      ok: false,
+      error: denied.ok ? 'mini_app_session_unavailable' : denied.reason,
+      sessionSlug: sanitizeSessionSlug(deniedSessionSlug),
+    }, { status: denied.reason === 'session_not_linked' ? 404 : 403 });
+  }
   const actions = await listTelegramAgentActivity({
     env,
     telegramUserId: auth.user?.telegramUserId,
@@ -5477,6 +5488,10 @@ async function handleSettingsRequest({
   const url = new URL(request.url);
   const launch = safeString(body.launch || url.searchParams.get('launch') || url.searchParams.get('tgWebAppStartParam'));
   const launchRecord = await resolveLaunchRecord(env, launch);
+  const policy = await loadSessionPolicy(env);
+  const sessionSlug = sanitizeSessionSlug(
+    body.sessionSlug || (launchRecord ? launchSessionSlug(launchRecord, env) : policy.defaultSessionSlug)
+  );
   if (auth.authMode === 'telegram') {
     if (!launchRecord) {
       return json({ ok: false, error: 'mini_app_launch_invalid' }, { status: 404 });
@@ -5487,6 +5502,17 @@ async function handleSettingsRequest({
   } else if (launchRecord && !miniAppLaunchAllowsAgentWrite(launchRecord)) {
     return json({ ok: false, error: 'mini_app_launch_mismatch' }, { status: 403 });
   }
+  if (launchRecord && !miniAppLaunchAllowsSession(launchRecord, sessionSlug)) {
+    return json({ ok: false, error: 'mini_app_launch_mismatch' }, { status: 403 });
+  }
+  const resolved = resolveMiniAppSessionInvocation(policy, sessionSlug);
+  if (!resolved.ok) {
+    return json({
+      ok: false,
+      error: resolved.reason || 'mini_app_session_unavailable',
+      sessionSlug,
+    }, { status: resolved.reason === 'session_not_linked' ? 404 : 403 });
+  }
   let normalizedPatch;
   try {
     normalizedPatch = normalizeAgentSettingsInput(body.settings || body.patch || {});
@@ -5496,11 +5522,10 @@ async function handleSettingsRequest({
   if (!normalizedPatch.ok) {
     return json({ ok: false, error: normalizedPatch.reason || 'settings_patch_invalid' }, { status: 400 });
   }
-  const sessionSlug = sanitizeSessionSlug(body.sessionSlug || launchSessionSlug(launchRecord, env));
   const savedSettings = await saveTelegramAgentSettingsPatch({
     env,
     telegramUserId: auth.user?.telegramUserId,
-    sessionSlug,
+    sessionSlug: resolved.session.sessionSlug,
     patch: normalizedPatch.publicSummary,
     createdAt,
   });
@@ -5510,7 +5535,7 @@ async function handleSettingsRequest({
   const requestRecord = await persistSettingsUpdateRequest({
     env,
     auth,
-    sessionSlug,
+    sessionSlug: resolved.session.sessionSlug,
     patch: normalizedPatch.publicSummary,
     createdAt,
   });

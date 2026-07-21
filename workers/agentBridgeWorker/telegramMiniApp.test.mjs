@@ -2400,6 +2400,113 @@ test('Mini App action routes reject a stale question action after the Mini App s
   assert.equal(clearBody.error, 'mini_app_disabled');
 });
 
+test('Mini App activity fails closed when no requested session remains enabled', async () => {
+  const kv = new MemoryKv();
+  await persistAnswerDraft({
+    env: { AGENT_ACTION_KV: kv },
+    normalized: { user: { telegramUserId: 'preview-user' }, chat: { chatId: 'preview-user' } },
+    sessionSlug: 'disabled-session',
+    selectedQuestionId: 'q-disabled-activity',
+    answerLabel: 'Private draft',
+    answerValue: JSON.stringify({ questionType: 'freeform', value: 'Private draft' }),
+    controlType: 'freeform',
+    submitLane: 'telegram_mini_app',
+    createdAt: '2026-07-21T12:00:00.000Z',
+  });
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'disabled-session',
+      sessions: [{
+        sessionSlug: 'disabled-session',
+        sessionName: 'Disabled session',
+        sessionModeProfile: {
+          authority: { mode: 'worker_canonical' },
+          surfaces: { telegram: true, miniApp: false },
+        },
+      }],
+    }),
+  };
+
+  const response = await handleTelegramMiniAppRequest({
+    request: new Request(
+      'https://bridge.example/telegram/mini-app/api/activity?sessionSlug=disabled-session',
+    ),
+    env,
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 403);
+  assert.equal(body.ok, false);
+  assert.equal(body.error, 'mini_app_disabled');
+  assert.equal(JSON.stringify(body).includes('Private draft'), false);
+});
+
+test('Mini App settings reject disabled sessions and launch-session mismatches before writing', async () => {
+  const kv = new MemoryKv();
+  const enabledProfile = {
+    authority: { mode: 'worker_canonical' },
+    surfaces: { telegram: true, miniApp: true },
+  };
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [
+        { sessionSlug: 'alpha', sessionName: 'Alpha', sessionModeProfile: enabledProfile },
+        { sessionSlug: 'beta', sessionName: 'Beta', sessionModeProfile: enabledProfile },
+        {
+          sessionSlug: 'disabled-session',
+          sessionName: 'Disabled session',
+          sessionModeProfile: {
+            ...enabledProfile,
+            surfaces: { telegram: true, miniApp: false },
+          },
+        },
+      ],
+    }),
+  };
+
+  const disabledResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/settings', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionSlug: 'disabled-session',
+        settings: { draftStyle: 'concise' },
+      }),
+    }),
+    env,
+  });
+  assert.equal(disabledResponse.status, 403);
+  assert.equal((await disabledResponse.json()).error, 'mini_app_disabled');
+
+  const launch = 'cecb_settingsalphalaunch';
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'edit_agent_settings',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionSlug: 'alpha' },
+  }));
+  const mismatchResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/settings', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        launch,
+        sessionSlug: 'beta',
+        settings: { draftStyle: 'concise' },
+      }),
+    }),
+    env,
+  });
+  assert.equal(mismatchResponse.status, 403);
+  assert.equal((await mismatchResponse.json()).error, 'mini_app_launch_mismatch');
+  assert.equal(Array.from(kv.store.keys()).some((key) => key.includes('agent-settings')), false);
+});
+
 test('Mini App exposes agent-only sidecar state, human votes, confirm, and edit-after-agent events', async () => {
   const kv = new MemoryKv();
   const env = {

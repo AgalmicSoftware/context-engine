@@ -249,9 +249,11 @@ drafts do not also show the older `Session Storage` metadata editor, so storage
 has one visible authority. New session publishes write the
 `sessionModeProfile` profile as the source of truth and compile it down to the
 existing storage profile / payload-access fields for runtime compatibility.
-The wizard validates that profile again at the publish boundary before upload,
-worker, or registry side effects begin. Invalid settings are also shown in the
-stage where they are edited.
+The wizard validates that profile at the publish boundary and rechecks the live
+draft after asynchronous identity and duplicate-session preflight. A profile
+edit made while preflight is running therefore still stops before upload,
+worker, or registry side effects. Invalid settings are also shown in the stage
+where they are edited.
 Legacy `telegramOnly` fields are read only as a migration fallback and are not
 written by new sessions.
 

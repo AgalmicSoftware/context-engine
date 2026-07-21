@@ -8,7 +8,8 @@ All notable changes to this project will be documented in this file.
 
 - Hardened new-session profile continuity and enforcement: explicit saved
   profiles now survive `/new` reloads behind a clear continue action, invalid
-  profiles fail before publish side effects, stage-local errors identify the
+  profiles fail before publish side effects and are rechecked against the live
+  draft after asynchronous preflight, stage-local errors identify the
   setting to fix, storage backend changes preserve an explicit Cloudflare role
   gate without carrying Cloudflare fields into Arweave, and unsupported
   result/export promises remain visible but unavailable. The compact selectors
@@ -17,7 +18,12 @@ All notable changes to this project will be documented in this file.
   requires Telegram, while keeping Agent Session Wrapped independent. The
   Bridge now consumes canonical nested result-exposure settings before legacy
   aliases and excludes Mini-App-disabled sessions from every Mini App picker
-  and route.
+  and route; activity and settings requests fail closed when no enabled session
+  remains, and launch-bound settings cannot target a different session.
+- Made direct Agent HTTP authorization independent of Telegram for user invite,
+  service bootstrap, and ordinary authenticated API requests. Explicit session
+  profiles now enforce `surfaces.agentHttp`; pre-profile Bridge records retain
+  their historical direct API behavior unless they explicitly disable it.
 - Integrated hosting customization into the existing session setup stages:
   storage, encryption, decryption access, and result visibility now live in
   Privacy; optional participation channels live in Worker; and export policy

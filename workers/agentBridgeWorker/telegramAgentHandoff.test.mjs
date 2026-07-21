@@ -161,6 +161,26 @@ function telegramOnlyEnv(overrides = {}) {
   });
 }
 
+function agentHttpOnlyEnv(overrides = {}) {
+  return baseEnv({
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      riskCeiling: 'submit',
+      sessions: [{
+        sessionSlug: 'alpha',
+        sessionName: 'Alpha Session',
+        default: true,
+        sessionModeProfile: {
+          authority: { mode: 'worker_canonical' },
+          surfaces: { agentHttp: true, telegram: false, miniApp: false },
+        },
+        managedAccountSubmitAllowed: true,
+      }],
+    }),
+    ...overrides,
+  });
+}
+
 function multiTelegramOnlyEnv({
   defaultSessionSlug = 'alpha',
   sessions = ['alpha', 'beta', 'gamma'],
@@ -1783,7 +1803,7 @@ test('Invite onboarding mints a user token from a configured Geo invite', async 
 });
 
 test('Invite onboarding creates a transport-neutral user credential and rejects persisted replay', async () => {
-  const env = telegramOnlyEnv({
+  const env = agentHttpOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: '',
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
     AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
@@ -1831,7 +1851,7 @@ test('Invite onboarding creates a transport-neutral user credential and rejects 
 });
 
 test('Root bootstrap mints a named scoped service credential', async () => {
-  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'root-bootstrap-token' });
+  const env = agentHttpOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'root-bootstrap-token' });
   const response = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/api/agent/credentials/service', {
       method: 'POST',
@@ -1872,7 +1892,7 @@ test('Root bootstrap mints a named scoped service credential', async () => {
 });
 
 test('Credential issuance reports missing managed signer configuration', async () => {
-  const env = telegramOnlyEnv({
+  const env = agentHttpOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: 'root-bootstrap-token',
     DEMO_SIGNER_ROOT_SECRET: '',
   });
@@ -5087,7 +5107,7 @@ test('session-member aggregate results require a canonical worker group at the s
         sessionModeProfile: {
           authority: { mode: 'worker_canonical' },
           authorization: { mechanisms: ['worker_groups'] },
-          surfaces: { web: true, telegram: true },
+          surfaces: { web: true, telegram: true, agentHttp: true },
           results: { visibility: 'session_member_aggregate' },
         },
         resultsExposure: { aggregateResultsEnabled: true, minGroupSize: 2 },

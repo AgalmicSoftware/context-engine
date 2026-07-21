@@ -99,6 +99,18 @@ test('agentHttp invocation remains enabled when the optional Telegram surface is
   assert.equal(resolveAgentHttpSessionInvocation(policy, 'wrapped-alpha').session.sessionSlug, 'wrapped-alpha');
 });
 
+test('legacy Bridge sessions retain Agent HTTP unless they explicitly disable it', () => {
+  const policy = normalizeSessionPolicy({
+    sessions: [
+      { sessionSlug: 'legacy-bridge', telegramBridgeEnabled: true },
+      { sessionSlug: 'legacy-disabled', telegramBridgeEnabled: true, agentHttpEnabled: false },
+    ],
+  });
+
+  assert.equal(resolveAgentHttpSessionInvocation(policy, 'legacy-bridge').ok, true);
+  assert.equal(resolveAgentHttpSessionInvocation(policy, 'legacy-disabled').reason, 'agent_http_disabled');
+});
+
 test('Mini App invocation requires both Telegram and the Telegram Mini App surface', () => {
   const policy = normalizeSessionPolicy({
     sessions: [

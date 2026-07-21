@@ -802,7 +802,7 @@ async function handleServiceCredentialBootstrapRequest({ request, env = {}, crea
     return json({ ok: false, reason: 'service_scopes_invalid' }, { status: 400 });
   }
   const policy = await loadSessionPolicy(env);
-  const resolved = resolveSessionInvocation(policy, sessionSlug);
+  const resolved = resolveAgentHttpSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
     return json({ ok: false, reason: resolved.reason || 'session_not_found', sessionSlug }, { status: 404 });
   }
@@ -1713,9 +1713,7 @@ async function resolveHandoffContext({
     privateBindingSlug ||
     policy.defaultSessionSlug
   );
-  const resolved = delegation?.credentialKind === AGENT_CREDENTIAL_KINDS.MEMBER
-    ? resolveAgentHttpSessionInvocation(policy, sessionSlug)
-    : resolveSessionInvocation(policy, sessionSlug);
+  const resolved = resolveAgentHttpSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
     return { ok: false, status: 404, reason: resolved.reason || 'session_not_found', sessionSlug };
   }
@@ -6006,7 +6004,7 @@ async function handleInviteOnboardRequest({
   };
   const resolved = telegramUserId
     ? await resolveAgentTokenSession({ env, normalized, policy, explicitSessionSlug })
-    : resolveSessionInvocation(policy, explicitSessionSlug || policy.defaultSessionSlug);
+    : resolveAgentHttpSessionInvocation(policy, explicitSessionSlug || policy.defaultSessionSlug);
   if (!resolved.ok) {
     const payload = {
       ok: false,
