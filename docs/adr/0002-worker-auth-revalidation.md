@@ -2,8 +2,7 @@
 
 ## Status
 
-Accepted; amended 2026-07-21 to fail closed on missing or empty `jti` and to
-revalidate route authorization against current policy.
+Accepted; amended 2026-07-21 to fail closed on missing or empty `jti`.
 
 ## Context
 
@@ -33,21 +32,6 @@ Use KV claim tokens plus shorter login tokens and current-policy route checks:
   out, using the existing `401 { error: "Invalid token." }` response shape.
 - The former legacy no-`jti` compatibility window is closed. The worker neither
   mints nor accepts no-`jti` tokens.
-- Session config owns a server-managed non-negative `authzEpoch`. Effective
-  signed `set-config` writes increment it; rejected and idempotent writes do
-  not. Authenticated routes reject a token whose epoch differs from current
-  config before route dispatch.
-- Each protected route re-evaluates the current default gate and only the
-  route-specific resource gate required by that scope. The signed scope and
-  the current scope must both allow the route. Policy-read errors fail closed.
-- A legacy config and token with no epoch are interpreted as epoch zero. The
-  first effective config change advances the config to epoch one and
-  invalidates those tokens.
-- Nonce issuance and consumption are serialized in one Durable Object per
-  session/address boundary. Nonce, authenticated, anonymous, and faucet route
-  limits are serialized per session/route/identity boundary.
-- Missing or unreachable Durable Object coordination fails closed; there is no
-  KV or isolate-local authorization fallback.
 
 The existing nonce, used-nonce, rate-window, and token TTLs remain unchanged.
 SIWE origin/freshness validation and current-policy scope computation keep their
@@ -55,11 +39,10 @@ existing contracts.
 
 ## Consequences
 
-Config changes invalidate earlier tokens immediately through the authorization
-epoch. Registry gate and membership changes take effect on the next protected
-request through live route-specific revalidation, so authorization freshness no
-longer depends on the four-hour token lifetime. A token can also be invalidated
-directly by deleting its `authToken:{slug}:{sub}:{jti}` KV record.
+Stale-scope exposure is bounded to 4 hours for minted tokens,
+and a token can be invalidated by deleting its `authToken:{slug}:{sub}:{jti}` KV
+record. A small revocation helper exists for that marker, but no gate-change call
+site currently performs token revocation automatically.
 
 ADR-0004 records the earlier risk acceptance and its 2026-07-21 supersession by
 the Durable Object authority.
@@ -70,13 +53,6 @@ Worker tests cover:
 
 - Token payloads include `jti` and login fails closed when marker persistence
   fails.
-- Token payloads bind the current `authzEpoch`; stale or malformed epochs fail
-  before protected route dispatch.
-- Protected routes require both their signed scope and a successful current
-  route-specific policy check, including a regression where a gate is disabled
-  after login.
-- Effective config mutation increments the epoch exactly once, while rejected,
-  idempotent, limit-only, and Lit-credential writes do not.
 - Verification rejects missing or blank `jti` claims.
 - Every authenticated token requires a live KV marker.
 - Revoking or aging out the marker invalidates the token.
@@ -89,7 +65,6 @@ Worker tests cover:
 
 ## Rollback
 
-Rollback must not silently restore no-`jti` acceptance, disable the KV marker
-check, remove epoch binding, or trust signed scopes without current-policy
-revalidation. Any of those changes would expand stale-token exposure and
-requires an explicit security decision plus a separately reviewed rollback.
+Rollback must not silently restore no-`jti` acceptance or disable the KV marker
+check. Either change would remove revocation and expand stale-token exposure, so
+it requires an explicit security decision and a separately reviewed rollback.
