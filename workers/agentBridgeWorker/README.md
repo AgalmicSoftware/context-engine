@@ -1230,7 +1230,12 @@ dedicated Bridge.
   write `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET`. An explicitly
   selected OpenAI Wrapped renderer may additionally write
   `AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY`; local poster rendering needs no
-  provider secret.
+  provider secret. The dedicated Agent Session Wrapped deployment generates its
+  two required runtime secrets independently with 256 bits from Web Crypto;
+  neither is derived from the request-only Cloudflare token, deployment
+  identity, or the other secret. Existing bindings are preserved on replay,
+  and an ambiguous write must be confirmed by an exact secret-name inventory
+  before activation continues.
 - Worker vars: `AGENT_BRIDGE_PUBLIC_URL`, `CE_SESSION_WORKER_BASE_URL`,
   `DEFAULT_CHAIN_ID`, `DEFAULT_RPC_URL`, and optional `ADDITIONAL_RPC_URL`;
   Telegram-enabled deployments additionally write `TELEGRAM_BRIDGE_ENABLED`

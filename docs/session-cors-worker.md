@@ -535,8 +535,10 @@ R2 / Durable Objects:
   duplicate. There is no upload receipt journal or key-rotation state machine.
 
 Vars:
-- `TOKEN_HMAC_SECRET` (HMAC secret for session tokens)
-- `CE_STORAGE_ENVELOPE_KEK` (Worker secret for `worker_envelope`; required only when sessions use `encryption: "worker_envelope"`. `/new` custom-worker deploys that select worker-envelope storage ask the deploy helper to generate and set this secret during Worker provisioning; manual deployments must set it themselves.)
+- `TOKEN_HMAC_SECRET` (HMAC secret for session tokens; automated deployment
+  generates an independent 256-bit Web Crypto value and never derives it from
+  the Cloudflare credential or another runtime secret.)
+- `CE_STORAGE_ENVELOPE_KEK` (Worker secret for `worker_envelope`; required only when sessions use `encryption: "worker_envelope"`. `/new` custom-worker deploys that select worker-envelope storage ask the deploy helper to generate a separate 256-bit Web Crypto value and set this secret during Worker provisioning; manual deployments must set it themselves.)
 - `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` (temporary break-glass unwrap fallback after a mistaken deployment-secret replacement; restore the original current KEK, verify access, then remove the fallback)
 - `CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION` (optional; defaults to `100`)
 - `CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP` (optional; defaults to `1000`)
@@ -1571,15 +1573,24 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
     Cloudflare using the API token and fails on zero or multiple accounts.
   - Provide either `bundleUrl` (release asset) or `bundleText` (raw bundle contents) from the `/new` UI.
 - The helper fetches the latest bundled worker asset and configures KV + bindings.
-- Worker-canonical deploys use a unique physical script suffix and require an
-  authoritative preflight `404` before creating it. Rollback deletes only
-  resources that still prove ownership by the current deployment id.
-- Every deploy requires the resolved physical script name to be absent. If a
-  legacy or custom named worker already exists, the helper returns `409` before
-  creating KV, uploading a script, or changing runtime secrets. Choose a fresh
-  worker name; preserving an existing worker requires a separate explicit
-  state-migration workflow because its KV may contain auth markers, groups,
-  storage indexes, and wrapped envelope keys that are not in the deploy request.
+- The helper generates `TOKEN_HMAC_SECRET` and, when required,
+  `CE_STORAGE_ENVELOPE_KEK` independently with 256 bits from Web Crypto. These
+  values are never derived from the Cloudflare API token, account, Worker name,
+  deployment ID, provider keys, or each other, and are never returned to the
+  browser. Stable-request recovery inventories existing secret binding names
+  before writing; an ambiguous secret-write response is inventoried again and
+  accepted only when the exact binding is present. Otherwise the owned Worker
+  and KV namespace remain pending for a later safe replay.
+- Every fresh deploy treats the requested worker name as a readable prefix. An
+  idempotent request derives a stable physical suffix and KV title marker from
+  `deploymentRequestId`; a legacy request without that ID receives a random
+  suffix. The helper requires authoritative preflight `404` responses before
+  staging and immediately before upload. Rollback deletes only resources that
+  still prove ownership by the current deployment id.
+- In-place redeploy remains disabled. Preserving or replacing an existing
+  physical worker requires a separate explicit state-migration workflow because
+  its KV may contain auth markers, groups, storage indexes, and wrapped envelope
+  keys that are not present in a fresh deploy request.
 - Rollback deletes a staged KV namespace only after the uploaded script is
   confirmed absent or the exact deployment-id owner is deleted. If ownership
   changed, cannot be verified, or script deletion fails, the helper retains and

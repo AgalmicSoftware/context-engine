@@ -2006,7 +2006,7 @@ const executeDeployHelperRequestCore = async ({
     ? ''
     : randomSecret();
   const envelopeKekSecret = envelopeKekSecretRequired && !envelopeKekSecretPreserved
-    ? candidateEnvelopeKekSecret
+    ? randomSecret()
     : '';
 
   const {
@@ -2143,29 +2143,28 @@ const executeDeployHelperRequestCore = async ({
   }
 
   // Runtime secrets are written only after the public worker URL and canonical
-  // config have both been verified. Existing scripts never reach this path.
-  if (!deploymentPayload.tokenSecretSet) {
-    const secretResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'TOKEN_HMAC_SECRET', type: 'secret_text', text: tokenSecret }),
-    }, cfFetchOptions);
-    if (!secretResp.ok) {
-      const orphanResources = await cleanupDeploymentResources();
-      return buildFailure(502, {
-        error: secretResp.error,
-        detail: secretResp.detail,
-        orphanResources,
-      }, {
-        fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretResp),
-      });
-    }
-    deploymentPayload.tokenSecretSet = true;
-  }
-
+  // config have both been verified. Storage readiness comes first; the HMAC
+  // secret is the final activation gate that makes login possible.
+  const runtimeSecretsPath = `/accounts/${accountId}/workers/scripts/${workerName}/secrets`;
+  const reconcileRuntimeSecretWrite = async (name, result) => {
+    const pending = !!idempotencyContext && isAmbiguousCloudflareMutationFailure(result);
+    if (!pending) return { ok: false, pending: false };
+    const inventory = await cfFetch(apiToken, runtimeSecretsPath, { method: 'GET' }, cfFetchOptions);
+    const committed = inventory.ok && Array.isArray(inventory?.data?.result) &&
+      inventory.data.result.some((entry) => (
+        toStr(entry?.type).trim() === 'secret_text' && toStr(entry?.name).trim() === name
+      ));
+    return { ok: committed, pending: !committed };
+  };
+  const retainedRuntimeSecretResources = () => ({
+    kvNamespaceId: kvId,
+    kvCleanupStatus: 'retained-runtime-secret-pending',
+    workerName,
+    workerCleanupStatus: 'retained-runtime-secret-pending',
+  });
   if (envelopeKekSecretRequired) {
     if (!deploymentPayload.envelopeKekSecretPreserved) {
-      const envelopeKekResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
+      const envelopeKekResp = await cfFetch(apiToken, runtimeSecretsPath, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2175,18 +2174,50 @@ const executeDeployHelperRequestCore = async ({
         }),
       }, cfFetchOptions);
       if (!envelopeKekResp.ok) {
-        const orphanResources = await cleanupDeploymentResources();
-        return buildFailure(502, {
-          error: envelopeKekResp.error,
-          detail: envelopeKekResp.detail,
+        const reconciled = await reconcileRuntimeSecretWrite(
+          STORAGE_ENVELOPE_KEK_SECRET_NAME,
+          envelopeKekResp,
+        );
+        if (!reconciled.ok) {
+          const orphanResources = reconciled.pending
+            ? retainedRuntimeSecretResources()
+            : await cleanupDeploymentResources();
+          return buildDeploymentFailure(502, {
+            error: envelopeKekResp.error,
+            detail: envelopeKekResp.detail,
+            orphanResources,
+            ...(reconciled.pending ? { deploymentRequestPending: true } : {}),
+          }, {
+            fallbackEligible: shouldAllowFallbackForCloudflareFailure(envelopeKekResp),
+          });
+        }
+      }
+    }
+  }
+
+  if (!deploymentPayload.tokenSecretSet && !deploymentPayload.tokenSecretPreserved) {
+    const secretResp = await cfFetch(apiToken, runtimeSecretsPath, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'TOKEN_HMAC_SECRET', type: 'secret_text', text: tokenSecret }),
+    }, cfFetchOptions);
+    if (!secretResp.ok) {
+      const reconciled = await reconcileRuntimeSecretWrite('TOKEN_HMAC_SECRET', secretResp);
+      if (!reconciled.ok) {
+        const orphanResources = reconciled.pending
+          ? retainedRuntimeSecretResources()
+          : await cleanupDeploymentResources();
+        return buildDeploymentFailure(502, {
+          error: secretResp.error,
+          detail: secretResp.detail,
           orphanResources,
+          ...(reconciled.pending ? { deploymentRequestPending: true } : {}),
         }, {
-          fallbackEligible: shouldAllowFallbackForCloudflareFailure(envelopeKekResp),
+          fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretResp),
         });
       }
     }
-    envelopeKekSecretSet = true;
-    deploymentPayload.envelopeKekSecretSet = true;
+    deploymentPayload.tokenSecretSet = true;
   }
 
   if (body?.sessionModeProfile?.surfaces?.agentHttp === true) {

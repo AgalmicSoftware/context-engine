@@ -42,13 +42,17 @@ const normalizeAuthorityMode = (value) => {
 const encode = (value) => new TextEncoder().encode(String(value || ''));
 const bytesToHex = (bytes) => Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
 const sha256Hex = async (value) => bytesToHex(new Uint8Array(await crypto.subtle.digest('SHA-256', encode(value))));
-const deriveSecret = async ({ apiToken, deploymentId, purpose }) => {
-  const key = await crypto.subtle.importKey('raw', encode(apiToken), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
-  const signature = await crypto.subtle.sign('HMAC', key, encode(`context-engine:agent-session-wrapped:v1:${deploymentId}:${purpose}`));
-  return bytesToHex(new Uint8Array(signature));
+const randomSecret = () => {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return bytesToHex(bytes);
 };
 const response = (ok, status, body) => ({ ok, status, body });
 const failure = (status, step, error) => response(false, status, { ok: false, step, error: toStr(error) });
+const isAmbiguousMutationFailure = (result = {}) => {
+  const status = Number(result?.status || 0);
+  return !status || status >= 500 || [408, 409, 412, 425, 429, 499].includes(status);
+};
 
 const policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled = true }) => ({
   version: 1,
@@ -217,6 +221,7 @@ export async function executeAgentSessionWrappedDeployment({
   fetchImpl = globalThis.fetch,
   now = () => new Date(),
   markMutationStarted = null,
+  randomSecretImpl = randomSecret,
 } = {}) {
   let mutationMarked = false;
   const beforeMutation = async () => {
@@ -350,19 +355,30 @@ export async function executeAgentSessionWrappedDeployment({
   }
   const generated = [];
   const preserved = [];
+  const secretsPath = `/accounts/${resolvedAccountId}/workers/scripts/${workerName}/secrets`;
   for (const name of REQUIRED_SECRET_NAMES) {
     if (existingSecrets.has(name)) {
       preserved.push(name);
       continue;
     }
     await beforeMutation();
-    const text = await deriveSecret({ apiToken, deploymentId, purpose: name.toLowerCase() });
+    const text = randomSecretImpl();
     const written = await cfFetchImpl(
       apiToken,
-      `/accounts/${resolvedAccountId}/workers/scripts/${workerName}/secrets`,
+      secretsPath,
       { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, type: 'secret_text', text }) },
     );
-    if (!written.ok) return fail(502, `worker_secret_${name}`, written.error || `Failed to write ${name}.`);
+    if (!written.ok) {
+      let reconciled = false;
+      if (isAmbiguousMutationFailure(written)) {
+        const inventory = await cfFetchImpl(apiToken, secretsPath, { method: 'GET' });
+        reconciled = inventory.ok && Array.isArray(inventory.data?.result) &&
+          inventory.data.result.some((entry) => (
+            toStr(entry?.type) === 'secret_text' && toStr(entry?.name) === name
+          ));
+      }
+      if (!reconciled) return fail(502, `worker_secret_${name}`, written.error || `Failed to write ${name}.`);
+    }
     generated.push(name);
   }
 
