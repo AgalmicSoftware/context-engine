@@ -253,7 +253,10 @@ The wizard validates that profile at the publish boundary and rechecks the live
 draft after asynchronous identity and duplicate-session preflight. A profile
 edit made while preflight is running therefore still stops before upload,
 worker, or registry side effects. Invalid settings are also shown in the stage
-where they are edited.
+where they are edited. Mode values are exact enums at every write boundary:
+explicit blanks, friendly aliases, unknown values, and reserved key providers
+are rejected rather than normalized to a less-protective default. Legacy aliases
+remain readable only for stored compatibility.
 Legacy `telegramOnly` fields are read only as a migration fallback and are not
 written by new sessions.
 
