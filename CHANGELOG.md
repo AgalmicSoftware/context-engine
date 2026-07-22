@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Bound Worker releases to the exact bytes produced by successful aggregate
+  CI. SHA-keyed artifacts now carry source/replay/tree, builder-run, recipe,
+  lockfile, and bundle-digest provenance; publication refuses failed or
+  mismatched runs and never rebuilds. Immutable releases no longer move
+  `latest` automatically, while a serialized, protected manual promotion keeps
+  stable and previous rollback refs. GitHub Actions are pinned immutably.
 - Unified local and hosted CI behind `scripts/ci-gates.json`. The local
   aggregate now runs the full client coverage and tracked root Node universes once,
   hosted jobs execute the same named gates, aggregate results fail closed

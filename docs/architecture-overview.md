@@ -35,6 +35,9 @@ flowchart TD
   PublicRelease["public release tree"] --> Browser
   PublicRelease --> SessionWorker
   PublicRelease --> DeployHelper
+  AggregateCI["successful aggregate CI<br/>tested Worker bytes + provenance"] --> ImmutableWorkerRelease["immutable SHA-keyed Worker release"]
+  ImmutableWorkerRelease --> ProtectedPromotion["manual protected stable/latest promotion"]
+  ProtectedPromotion --> Hosted
 ```
 
 Static app hosting, public/private session access, and the session
