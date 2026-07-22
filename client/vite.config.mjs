@@ -7,7 +7,7 @@ import { defineConfig, loadEnv, transformWithEsbuild } from 'vite';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, 'src');
 const publicDir = path.resolve(__dirname, 'public');
-const metaMaskImageFilename = 'metamask_icon_white.png';
+const postsDir = path.resolve(__dirname, '..', 'posts');
 const headers = {
   'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
   'Cross-Origin-Embedder-Policy': 'unsafe-none',
@@ -444,20 +444,6 @@ const jsxInJsCompatibilityPlugin = () => ({
   },
 });
 
-const copyStaticImageAssetsPlugin = (metaMaskConnectorEnabled) => ({
-  name: 'ce-copy-static-image-assets',
-  apply: 'build',
-  writeBundle(options) {
-    const sourceDir = path.resolve(srcDir, 'assets', 'img');
-    const outputDir = path.resolve(options.dir || path.resolve(__dirname, 'build'), 'images');
-    if (!fs.existsSync(sourceDir)) return;
-    fs.cpSync(sourceDir, outputDir, {
-      recursive: true,
-      filter: (source) => metaMaskConnectorEnabled || path.basename(source) !== metaMaskImageFilename,
-    });
-  },
-});
-
 const walletProfileBundleGuardPlugin = (walletRuntimeProfile) => ({
   name: 'ce-wallet-profile-bundle-guard',
   apply: 'build',
@@ -551,7 +537,6 @@ export default defineConfig(({ mode }) => {
       react(),
       jsToTsCompatibilityPlugin(),
       litContractsSubpathShim(),
-      copyStaticImageAssetsPlugin(walletRuntimeProfile.metaMaskConnectorEnabled),
       walletProfileBundleGuardPlugin(walletRuntimeProfile),
       publicAssetsCompatibilityPlugin(),
       postsAssetsCompatibilityPlugin(),
@@ -597,6 +582,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: path.resolve(__dirname, 'build'),
       emptyOutDir: true,
+      manifest: 'vite-bundle-manifest.json',
       rollupOptions: {
         input: path.resolve(__dirname, 'index.html'),
       },

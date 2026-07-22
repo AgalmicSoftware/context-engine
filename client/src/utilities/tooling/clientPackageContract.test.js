@@ -110,7 +110,12 @@ describe('client package modernization contract', () => {
     const viteIndex = readClientFile('index.html');
 
     expect(viteConfig).toContain("outDir: path.resolve(__dirname, 'build')");
+    expect(viteConfig).toContain("manifest: 'vite-bundle-manifest.json'");
     expect(viteConfig).not.toContain("outDir: path.resolve(__dirname, 'build-vite')");
+    expect(viteConfig).not.toContain('copyStaticImageAssetsPlugin');
+    expect(viteConfig).not.toContain('ce-copy-static-image-assets');
+    expect(viteConfig).not.toContain('ce-raw-loader-compatibility');
+    expect(viteConfig).not.toContain('!!raw-loader!');
     expect(viteIndex).toContain('__PUBLIC_URL__');
     expect(viteIndex).toContain('/src/viteEntry.ts');
     expect(viteIndex).toContain('https://contextengine.sh/assets/img/context-engine-social-preview-square.png');
@@ -169,6 +174,7 @@ describe('client package modernization contract', () => {
     expect(viteConfig).toContain("'walletConnectorProfile.metamask.ts'");
     expect(viteConfig).toContain("fileName: 'ce-wallet-profile.json'");
     expect(viteConfig).toContain('findPasskeyOnlyForbiddenModules(moduleIds)');
+    expect(viteConfig).not.toContain('metamask_icon_white.png');
   });
 
   it('keeps Vite browser polyfill dependencies limited to imported runtime shims', () => {

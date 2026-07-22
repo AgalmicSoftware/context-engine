@@ -94,6 +94,14 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
       failures.push(`CI gate "${gateName}" must not include "${unexpected}"`);
     }
   };
+  const expectGateAfter = (gateName, before, after) => {
+    const commands = gateCommandText(gateName);
+    const beforeIndex = commands.indexOf(before);
+    const afterIndex = commands.indexOf(after);
+    if (beforeIndex < 0 || afterIndex <= beforeIndex) {
+      failures.push(`CI gate "${gateName}" must run "${after}" after "${before}"`);
+    }
+  };
   const expectProfileContains = (profileName, gateName) => {
     if (!(gateManifest.profiles?.[profileName] || []).includes(gateName)) {
       failures.push(`CI profile "${profileName}" must include gate "${gateName}"`);
@@ -133,6 +141,10 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/clientTestTypeUniverse.test.js');
   expectFile('scripts/client-test-type-contract.json');
   expectFile('scripts/client-test-type-diagnostics-baseline.json');
+  expectFile('scripts/client-bundle-budget.json');
+  expectFile('scripts/check-client-bundle-budget.mjs');
+  expectFile('scripts/check-client-bundle-budget.test.mjs');
+  expectFile('docs/bundle-budget.md');
   expectFile('scripts/check-dead-exports-advisory.mjs');
   expectFile('scripts/check-dead-exports-advisory.test.mjs');
   expectFile('scripts/dead-exports-baseline.json');
@@ -230,6 +242,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:public-text', 'scripts/verify-public-text.js');
   expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
   expectScriptContains('coverage-floor:check', 'scripts/check-client-coverage-floors.mjs');
+  expectScriptContains('client:bundle-budget:check', 'scripts/check-client-bundle-budget.mjs');
   expectScriptContains('dead-exports:advisory', 'scripts/check-dead-exports-advisory.mjs');
   expectScriptContains('dead-exports:check', 'scripts/check-dead-exports-advisory.mjs --check');
   expectScriptContains('verify:release', 'scripts/run-ci-gates.mjs --profile release');
@@ -269,6 +282,12 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'npm run verify:worker-bundle',
     'npm --prefix client run build',
   ].forEach((command) => expectGateContains('wiring-and-release', command));
+  expectGateContains('wiring-and-release', 'npm run client:bundle-budget:check');
+  expectGateAfter(
+    'wiring-and-release',
+    'npm --prefix client run build',
+    'npm run client:bundle-budget:check',
+  );
   expectGateContains('public-text', 'npm run verify:public-text');
   expectGateContains('contracts', 'npm run test:contracts');
   expectGateContains('contracts', 'npm run abi:check');
@@ -295,6 +314,12 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'npm run verify:worker-bundle',
     'npm --prefix client run build',
   ].forEach((command) => expectGateContains('release', command));
+  expectGateContains('release', 'npm run client:bundle-budget:check');
+  expectGateAfter(
+    'release',
+    'npm --prefix client run build',
+    'npm run client:bundle-budget:check',
+  );
 
   expectSyncPublicHistoryContains('npm run test:wiring', '"npm run test:wiring"');
   expectSyncPublicHistoryContains('npm run type-debt:check', '"npm run type-debt:check"');
@@ -356,6 +381,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     '/scripts/client-boundaries-baseline.json @AgalmicSoftware',
     '/scripts/type-debt-baseline.json @AgalmicSoftware',
     '/scripts/dead-exports-baseline.json @AgalmicSoftware',
+    '/scripts/client-bundle-budget.json @AgalmicSoftware',
     '/scripts/verify-abi-sync.mjs @AgalmicSoftware',
     '/client/src/contractsABI/ @AgalmicSoftware',
     '/contracts/ @AgalmicSoftware',

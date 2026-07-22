@@ -16,6 +16,7 @@ const COVERAGE_EXCLUSIONS_BASELINE = 'scripts/client-coverage-exclusions.json';
 const LEGACY_COVERAGE_FILES_BASELINE = 'scripts/client-coverage-legacy-files.json';
 const TEST_TYPE_DIAGNOSTICS_BASELINE = 'scripts/client-test-type-diagnostics-baseline.json';
 const TEST_TYPE_CONTRACT_BASELINE = 'scripts/client-test-type-contract.json';
+const CLIENT_BUNDLE_BUDGET_BASELINE = 'scripts/client-bundle-budget.json';
 const COVERAGE_METRICS = ['statements', 'branches', 'functions', 'lines'];
 
 function usage() {
@@ -29,6 +30,8 @@ Fails if baseline files grow relative to a base ref:
     and the fixed legacy comparable file set must not grow.
   - Typed-test diagnostics must not grow, classifications must not shrink, and
     explicit test-source exclusions must not grow.
+  - Client bundle caps and warning coverage must not loosen, and exception,
+    vendor, entry, or duplicate-asset allowlists must not grow.
 
 Options:
   --base <ref>        Base git ref to compare against. Defaults to
@@ -42,8 +45,8 @@ Approval gate:
   Boundary or type-debt growth requires the ${BASELINE_GROWTH_APPROVAL_LABEL}
   label applied by a maintainer plus a distinct approving CODEOWNER review.
   CI verifies that GitHub metadata before passing --approval approved. Direct
-  pushes, dead-export growth, and coverage contract regressions cannot use this
-  exception.
+  pushes, dead-export growth, coverage contract regressions, and bundle-budget
+  regressions cannot use this exception.
 `;
 }
 
@@ -283,6 +286,79 @@ function testTypeContractRegressions({
   return regressions;
 }
 
+function clientBundleBudgetRegressions(baseBudget, currentBudget) {
+  if (!baseBudget || !currentBudget) return [];
+  const regressions = [];
+  const compareCap = (kind, base, current) => {
+    const baseValue = Number(base);
+    const currentValue = Number(current);
+    if (!Number.isFinite(baseValue) || !Number.isFinite(currentValue) || currentValue > baseValue) {
+      regressions.push({ kind, base: baseValue, current: currentValue });
+    }
+  };
+  compareCap(
+    'bundle-entry-cap-increase',
+    baseBudget.entry?.maxGzipBytes,
+    currentBudget.entry?.maxGzipBytes,
+  );
+  compareCap(
+    'bundle-chunk-cap-increase',
+    baseBudget.nonVendorChunk?.maxMinifiedBytes,
+    currentBudget.nonVendorChunk?.maxMinifiedBytes,
+  );
+  compareCap(
+    'bundle-warning-ratio-increase',
+    baseBudget.warningRatio,
+    currentBudget.warningRatio,
+  );
+  compareCap(
+    'bundle-entry-dynamic-import-expansion',
+    baseBudget.entry?.includeDirectDynamicImports ? 1 : 0,
+    currentBudget.entry?.includeDirectDynamicImports ? 1 : 0,
+  );
+
+  const recordGains = (kind, baseValues, currentValues) => {
+    const base = new Set(baseValues || []);
+    (currentValues || []).forEach((value) => {
+      if (!base.has(value)) regressions.push({ kind, value });
+    });
+  };
+  recordGains('bundle-entry-source-gain', baseBudget.entry?.sources, currentBudget.entry?.sources);
+  recordGains(
+    'bundle-vendor-prefix-gain',
+    baseBudget.nonVendorChunk?.vendorFilePrefixes,
+    currentBudget.nonVendorChunk?.vendorFilePrefixes,
+  );
+  recordGains(
+    'bundle-duplicate-allowlist-gain',
+    baseBudget.duplicateAssets?.allowedPairs,
+    currentBudget.duplicateAssets?.allowedPairs,
+  );
+
+  const baseExceptions = new Map((baseBudget.exceptions || []).map((entry) => [entry.id, entry]));
+  (currentBudget.exceptions || []).forEach((entry) => {
+    const base = baseExceptions.get(entry.id);
+    if (!base) {
+      regressions.push({ kind: 'bundle-exception-gain', value: entry.id });
+      return;
+    }
+    if (entry.filePrefix !== base.filePrefix) {
+      regressions.push({
+        kind: 'bundle-exception-selector-change',
+        value: entry.id,
+        base: base.filePrefix,
+        current: entry.filePrefix,
+      });
+    }
+    compareCap(
+      `bundle-exception-cap-increase:${entry.id}`,
+      base.maxMinifiedBytes,
+      entry.maxMinifiedBytes,
+    );
+  });
+  return regressions;
+}
+
 export function collectBaselineMonotonicityFindings({
   repoDir = process.cwd(),
   baseRef = process.env.BASELINE_MONOTONICITY_BASE || 'origin/main',
@@ -301,6 +377,7 @@ export function collectBaselineMonotonicityFindings({
       deadExportIncreases: [],
       coverageRegressions: [],
       testTypeRegressions: [],
+      bundleBudgetRegressions: [],
     };
   }
   const baseCommit = resolveBaseCommit(resolvedRepoDir, baseRef);
@@ -315,6 +392,7 @@ export function collectBaselineMonotonicityFindings({
       deadExportIncreases: [],
       coverageRegressions: [],
       testTypeRegressions: [],
+      bundleBudgetRegressions: [],
     };
   }
 
@@ -334,6 +412,7 @@ export function collectBaselineMonotonicityFindings({
       deadExportIncreases: [],
       coverageRegressions: [],
       testTypeRegressions: [],
+      bundleBudgetRegressions: [],
     };
   }
 
@@ -354,6 +433,7 @@ export function collectBaselineMonotonicityFindings({
     LEGACY_COVERAGE_FILES_BASELINE,
     TEST_TYPE_DIAGNOSTICS_BASELINE,
     TEST_TYPE_CONTRACT_BASELINE,
+    CLIENT_BUNDLE_BUDGET_BASELINE,
   ];
   const baseOptionalCoverage = {};
   const currentOptionalCoverage = {};
@@ -392,6 +472,10 @@ export function collectBaselineMonotonicityFindings({
       baseContract: baseOptionalCoverage[TEST_TYPE_CONTRACT_BASELINE],
       currentContract: currentOptionalCoverage[TEST_TYPE_CONTRACT_BASELINE],
     }),
+    bundleBudgetRegressions: clientBundleBudgetRegressions(
+      baseOptionalCoverage[CLIENT_BUNDLE_BUDGET_BASELINE],
+      currentOptionalCoverage[CLIENT_BUNDLE_BUDGET_BASELINE],
+    ),
   };
 }
 
@@ -448,6 +532,13 @@ function printFindings(result, writeLine) {
       writeLine(`  - ${regression.kind}: ${regression.signature || regression.relativePath || regression.classification}`);
     });
   }
+  if (result.bundleBudgetRegressions.length > 0) {
+    writeLine(`Client bundle budget regressed in ${result.bundleBudgetRegressions.length} place${result.bundleBudgetRegressions.length === 1 ? '' : 's'}:`);
+    result.bundleBudgetRegressions.forEach((regression) => {
+      const detail = regression.value || `${regression.base} -> ${regression.current}`;
+      writeLine(`  - ${regression.kind}: ${detail}`);
+    });
+  }
 }
 
 export function hasBaselineGrowth(result) {
@@ -455,7 +546,8 @@ export function hasBaselineGrowth(result) {
     || result.typeDebtIncreases.length > 0
     || result.deadExportIncreases.length > 0
     || result.coverageRegressions.length > 0
-    || result.testTypeRegressions.length > 0;
+    || result.testTypeRegressions.length > 0
+    || result.bundleBudgetRegressions.length > 0;
 }
 
 function runCli(argv) {
@@ -499,6 +591,7 @@ function runCli(argv) {
     && result.deadExportIncreases.length === 0
     && result.coverageRegressions.length === 0
     && result.testTypeRegressions.length === 0
+    && result.bundleBudgetRegressions.length === 0
   ) {
     console.log(`Baseline growth allowed by verified ${BASELINE_GROWTH_APPROVAL_LABEL} governance.`);
     printFindings(result, (line) => console.log(line));
@@ -514,6 +607,9 @@ function runCli(argv) {
   }
   if (result.testTypeRegressions.length > 0 && approved) {
     console.error('Typed-test contract regression cannot be approved.');
+  }
+  if (result.bundleBudgetRegressions.length > 0 && approved) {
+    console.error('Client bundle-budget regression cannot be approved.');
   }
   console.error(`Boundary or type-debt growth requires the ${BASELINE_GROWTH_APPROVAL_LABEL} label from a maintainer and an approving CODEOWNER review.`);
   printFindings(result, (line) => console.error(line));

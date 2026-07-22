@@ -43,6 +43,13 @@ function writeBaselines(
     typedDiagnostics = [{ signature: 'src/example.test.ts|TS2322|fixture', count: 1 }],
     typedClassifications = [{ id: 'test-source', pattern: 'client/src/**/*.test.ts' }],
     typedExclusions = [],
+    bundleBudget = {
+      warningRatio: 0.95,
+      entry: { sources: ['index.html'], includeDirectDynamicImports: true, maxGzipBytes: 250000 },
+      nonVendorChunk: { maxMinifiedBytes: 500000, vendorFilePrefixes: ['assets/vendor-'] },
+      exceptions: [{ id: 'app-shell', filePrefix: 'assets/AppShell-', maxMinifiedBytes: 625000 }],
+      duplicateAssets: { allowedPairs: [] },
+    },
   },
 ) {
   writeJson(repoDir, 'scripts/client-boundaries-baseline.json', {
@@ -69,6 +76,7 @@ function writeBaselines(
     classifications: typedClassifications,
     explicitExclusions: typedExclusions,
   });
+  writeJson(repoDir, 'scripts/client-bundle-budget.json', bundleBudget);
 }
 
 function commitAll(repoDir, message) {
@@ -257,6 +265,75 @@ test('legacy coverage inventory can shrink only when the production file is dele
     fs.rmSync(path.join(repoDir, 'client/src/imported.ts'));
     result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
     assert.deepEqual(result.coverageRegressions, []);
+  });
+});
+
+test('reports every bundle-budget cap and classification loosening', () => {
+  withTempRepo((repoDir) => {
+    writeBaselines(repoDir, { violations: [], counts: { colonAny: 0 } });
+    commitAll(repoDir, 'base baselines');
+    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
+
+    writeBaselines(repoDir, {
+      violations: [],
+      counts: { colonAny: 0 },
+      bundleBudget: {
+        warningRatio: 0.96,
+        entry: {
+          sources: ['index.html', 'src/new-entry.ts'],
+          includeDirectDynamicImports: true,
+          maxGzipBytes: 250001,
+        },
+        nonVendorChunk: {
+          maxMinifiedBytes: 500001,
+          vendorFilePrefixes: ['assets/vendor-', 'assets/hidden-'],
+        },
+        exceptions: [
+          { id: 'app-shell', filePrefix: 'assets/RenamedShell-', maxMinifiedBytes: 625001 },
+          { id: 'new-exception', filePrefix: 'assets/LargeRoute-', maxMinifiedBytes: 700000 },
+        ],
+        duplicateAssets: { allowedPairs: ['assets/logo-a.png|images/logo.png'] },
+      },
+    });
+    const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
+    assert.deepEqual(result.bundleBudgetRegressions.map((entry) => entry.kind), [
+      'bundle-entry-cap-increase',
+      'bundle-chunk-cap-increase',
+      'bundle-warning-ratio-increase',
+      'bundle-entry-source-gain',
+      'bundle-vendor-prefix-gain',
+      'bundle-duplicate-allowlist-gain',
+      'bundle-exception-selector-change',
+      'bundle-exception-cap-increase:app-shell',
+      'bundle-exception-gain',
+    ]);
+  });
+});
+
+test('verified approval cannot permit a bundle-budget regression', () => {
+  withTempRepo((repoDir) => {
+    writeBaselines(repoDir, { violations: [], counts: { colonAny: 0 } });
+    commitAll(repoDir, 'base baselines');
+    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
+    writeBaselines(repoDir, {
+      violations: [],
+      counts: { colonAny: 0 },
+      bundleBudget: {
+        warningRatio: 0.95,
+        entry: { sources: ['index.html'], includeDirectDynamicImports: true, maxGzipBytes: 250001 },
+        nonVendorChunk: { maxMinifiedBytes: 500000, vendorFilePrefixes: ['assets/vendor-'] },
+        exceptions: [{ id: 'app-shell', filePrefix: 'assets/AppShell-', maxMinifiedBytes: 625000 }],
+        duplicateAssets: { allowedPairs: [] },
+      },
+    });
+    const result = spawnSync(process.execPath, [
+      SCRIPT_PATH,
+      '--repo', repoDir,
+      '--base', base,
+      '--approval', 'approved',
+    ], { encoding: 'utf8' });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /bundle-budget regression cannot be approved/i);
   });
 });
 

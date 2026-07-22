@@ -58,6 +58,7 @@
     "typecheck:client-tests": "node scripts/check-client-test-types.mjs",
     "type-debt:check": "node scripts/check-type-debt-ratchet.mjs",
     "coverage-floor:check": "node scripts/check-client-coverage-floors.mjs",
+    "client:bundle-budget:check": "node scripts/check-client-bundle-budget.mjs",
     "ci:gate": "node scripts/run-ci-gates.mjs --gate",
     "ci:gates:check-hosted": "node scripts/run-ci-gates.mjs --check-results hosted",
     "test:ci": "node scripts/run-ci-gates.mjs --profile ci",

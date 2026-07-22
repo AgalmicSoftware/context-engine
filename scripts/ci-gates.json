@@ -125,6 +125,14 @@
             "run",
             "build"
           ]
+        },
+        {
+          "label": "Check client bundle budget",
+          "command": "npm",
+          "args": [
+            "run",
+            "client:bundle-budget:check"
+          ]
         }
       ]
     },
@@ -310,6 +318,14 @@
             "client",
             "run",
             "build"
+          ]
+        },
+        {
+          "label": "Check client bundle budget",
+          "command": "npm",
+          "args": [
+            "run",
+            "client:bundle-budget:check"
           ]
         }
       ]
