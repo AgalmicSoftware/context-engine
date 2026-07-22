@@ -79,6 +79,15 @@ function isAllowedFailedRequest(requestUrl, baseUrl) {
   );
 }
 
+function isExpectedLoadedMediaAbort(request = {}, loadedMediaUrls = []) {
+  return (
+    request.resourceType === 'media' &&
+    request.failure === 'net::ERR_ABORTED' &&
+    Array.isArray(loadedMediaUrls) &&
+    loadedMediaUrls.includes(request.url)
+  );
+}
+
 function isAllowedConsoleIssue(issue) {
   if (issue.type === 'warning') {
     return true;
@@ -153,6 +162,12 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
       .map((link) => link.href);
     const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
     const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const loadedMediaUrls = Array.from(new Set(
+      Array.from(document.querySelectorAll('video, audio'))
+        .filter((media) => media.readyState >= 1 && !media.error)
+        .map((media) => media.currentSrc)
+        .filter(Boolean)
+    ));
     const isInViewport = (rect) => (
       rect.bottom > 0 &&
       rect.right > 0 &&
@@ -210,24 +225,29 @@ async function inspectRoute(browser, baseUrl, route, options = {}) {
       bodyTextPreview: bodyText.slice(0, 240),
       styleCount: styleTags + linkedStyles.length,
       layoutIssues,
+      loadedMediaUrls,
     };
   }, layoutProbeSelectors);
 
   await page.close();
 
-  const unexpectedFailedRequests = failedRequests
+  const { loadedMediaUrls: rawLoadedMediaUrls, ...reportInfo } = info;
+  const loadedMediaUrls = Array.isArray(rawLoadedMediaUrls) ? rawLoadedMediaUrls : [];
+  const reportableFailedRequests = failedRequests
+    .filter((request) => !isExpectedLoadedMediaAbort(request, loadedMediaUrls));
+  const unexpectedFailedRequests = reportableFailedRequests
     .filter((request) => !isAllowedFailedRequest(request.url, baseUrl));
   const unexpectedConsoleIssues = consoleIssues
     .filter((issue) => !isAllowedConsoleIssue(issue));
   const expectedText = options.expectedText?.[route] || DEFAULT_ROUTE_TEXT[route] || [];
-  const missingText = findMissingExpectedText(info.bodyTextPreview, expectedText);
+  const missingText = findMissingExpectedText(reportInfo.bodyTextPreview, expectedText);
 
   return {
     route,
     status: response?.status() || null,
-    ...info,
+    ...reportInfo,
     badResponses,
-    failedRequests,
+    failedRequests: reportableFailedRequests,
     unexpectedFailedRequests,
     consoleIssues,
     unexpectedConsoleIssues,
@@ -361,6 +381,7 @@ module.exports = {
   inspectRoute,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
+  isExpectedLoadedMediaAbort,
   normalizeBaseUrl,
   normalizeLayoutProbeSelectors,
   normalizeRoutes,

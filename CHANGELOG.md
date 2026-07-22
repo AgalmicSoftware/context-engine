@@ -53,6 +53,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Replaced the About-page Google Drive video embed and thumbnail dependency
+  with the repository-owned `about-demo.mp4` on desktop and mobile, so public
+  playback no longer depends on third-party cookies or Drive playback limits.
 - Kept history-preserving public releases self-testing when the Agent Bridge
   cutover follows a source-only baseline by restoring its narrow root test
   command alongside the audited worker and runner snapshot, while using the
