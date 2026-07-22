@@ -1,6 +1,7 @@
 # Client Build Asset Inventory
 
-Last checked: 2026-07-21 with `npm --prefix client run build`.
+Last checked: 2026-07-21 with `npm --prefix client run build` and
+`npm run client:bundle-budget:check`.
 
 This page tracks current Vite outputs above 500 KiB and their stable source
 owners. Output filenames are content-hashed, so this inventory records stable
@@ -10,7 +11,7 @@ source/module names rather than hashes that change after unrelated builds.
 
 | Build output family | Current size | Source / owner | Safe next action |
 | --- | ---: | --- | --- |
-| `AppShell-*.js` | 1,106.77 KiB | Main app shell and shared route runtime | Continue route/vendor boundary work; do not raise the bundle budget to hide growth. |
+| `AppShell-*.js` | 609.65 KiB | Main app shell and shared route runtime | Fixed 625,000-byte temporary exception; continue route/provider work without raising it. |
 | `ce_circuit_logo-*.png` | 1,838.90 KiB | `client/src/assets/img/ce_circuit_logo.png` | Keep; replacement or compression needs visual review. |
 | `magnifying_glass-*.png` | 1,363.57 KiB | `client/src/assets/img/magnifying_glass.png` | Keep; candidate for future lazy media loading or lossless optimization. |
 | `explainer_first-*.png` | 1,331.07 KiB | `client/src/assets/img/explainer_first.png` | Keep; candidate for welcome-slide media optimization. |
@@ -24,6 +25,10 @@ source/module names rather than hashes that change after unrelated builds.
 The `SurveyTool-*.js` route bundle is currently about 160.69 KiB, below the
 warning threshold. The old opaque `jump.png` is no longer referenced or emitted;
 the goals slide uses `jump_transparent.png` (about 232.73 KiB source/output).
+Runtime-owned source images are emitted only once as hashed Vite assets. The
+obsolete `build/images` compatibility copy was removed after source and built
+consumer scans found no local raw-path contract; the build gate rejects a
+future byte-identical compatibility copy.
 
 ## Large Source Assets Not Emitted By Vite
 

@@ -25,7 +25,9 @@ public-safe root Jest, both public Worker suites, Context Engine CC, the tracked
 root Node universe, and the managed-cache guard. The coverage-enabled full
 client universe and tracked Node universe each run exactly once. The wiring
 lane also verifies that every tracked typed client test/support source is in
-the monotonic test-typecheck universe.
+the monotonic test-typecheck universe. Build-owning gates immediately run the
+manifest-backed bundle budget against the bytes they just produced, without a
+second build.
 
 `scripts/ci-gates.json` is the explicit command manifest. Local CI consumes
 its serial `ci` profile; GitHub Actions consumes the same named gates as split

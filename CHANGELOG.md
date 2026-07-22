@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Enforced client entry, non-vendor chunk, and temporary AppShell byte budgets
+  from Vite's build manifest, with protected no-growth policy and generated-doc
+  drift checks. Removed an unconsumed static-image compatibility copy that
+  duplicated 21 emitted assets (16,618,799 bytes); future cross-tree image
+  duplicates now fail the post-build gate.
 - Made client test-universe claims complete and monotonic. One instrumented
   Jest run now accounts for every tracked production source while preserving a
   fixed legacy comparison metric; recursive Node discovery closes nested test
