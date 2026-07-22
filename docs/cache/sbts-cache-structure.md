@@ -176,12 +176,6 @@ metadata cache above:
 - If WebCrypto or IndexedDB is unavailable, the UI falls back to export-only
   behavior without writing plaintext.
 
-Run the browser-native encryption smoke against a running Vite client with:
-
-```bash
-npm run ai:test-sbt:encrypted-recovery
-```
-
 ## LocalStorage-only readiness flags
 
 These are documented centrally in [`docs/cache/README.md`](README.md):
