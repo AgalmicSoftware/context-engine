@@ -3,8 +3,8 @@
 This Worker can be the canonical identity, content/config, auth, AI, and payload
 storage authority for a `worker_canonical` session. It also keeps the existing
 AI proxy, transcription, Arweave, fetch-helper, and testnet-faucet capabilities
-for profiles that enable them. Session secrets use the separate versioned
-Worker KV secrets envelope; public config never contains API keys, private
+for profiles that enable them. Session secrets use a separate AES-GCM-encrypted,
+versioned Worker KV envelope; public config never contains API keys, private
 keys, JWKs, bearer tokens, credentials, RPC/faucet settings, or URL-embedded
 credentials.
 
@@ -432,6 +432,13 @@ Lit credentials are required only for `lit-arweave` storage or Cloudflare `encry
 `worker_envelope` uses WebCrypto AES-256-GCM and the existing session config/index stores:
 
 - Deployment KEK: read from the Worker secret `CE_STORAGE_ENVELOPE_KEK` through the `worker_secret` key provider. The plaintext KEK is never stored in KV or R2. Keep this secret stable for the lifetime of the encrypted session. Automatically provisioned Workers do not return this secret to the client. `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` is a temporary break-glass unwrap fallback after a mistaken replacement, not a rotation mechanism: restore the original value as `CE_STORAGE_ENVELOPE_KEK`, verify reads, and then remove the fallback.
+- Session-secret record: every Session Worker derives a domain-separated
+  AES-256-GCM key from the deployment KEK and writes only `cipher`, `keyRef`,
+  session-bound authenticated data, IV, and ciphertext to
+  `session:<slug>:secrets`. Legacy plaintext records remain read-only compatible
+  and migrate on the next signed secret mutation. Missing keys, wrong-session
+  copies, tampering, and decrypt failure fail closed; writes never use the
+  previous KEK.
 - Session KEK: generated locally on the first envelope write for a session and wrapped by the deployment KEK before coordination. The per-session `SessionWriteCoordinator` adopts one wrapped candidate, keeps that wrapped record authoritative, and projects it to `session:{slug}:config` under `storageEnvelope.sessionKey`. Raw session keys and the deployment KEK never pass through coordinator state. A missing coordinator binding fails closed instead of falling back to a racing KV write.
 - Payload DEK: generated per payload, used to encrypt the stored bytes, wrapped by the session KEK, and stored in payload metadata with the envelope algorithm, IVs, key id, and condition reference.
 
@@ -545,8 +552,14 @@ Vars:
 - `TOKEN_HMAC_SECRET` (HMAC secret for session tokens; automated deployment
   generates an independent 256-bit Web Crypto value and never derives it from
   the Cloudflare credential or another runtime secret.)
-- `CE_STORAGE_ENVELOPE_KEK` (Worker secret for `worker_envelope`; required only when sessions use `encryption: "worker_envelope"`. `/new` custom-worker deploys that select worker-envelope storage ask the deploy helper to generate a separate 256-bit Web Crypto value and set this secret during Worker provisioning; manual deployments must set it themselves.)
-- `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` (temporary break-glass unwrap fallback after a mistaken deployment-secret replacement; restore the original current KEK, verify access, then remove the fallback)
+- `CE_STORAGE_ENVELOPE_KEK` (required Worker secret for every Session Worker.
+  It protects the canonical session-secret KV record and, when selected, the
+  worker-envelope payload key hierarchy. Automated deployment generates a
+  separate 256-bit Web Crypto value; manual deployments must set one.)
+- `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` (temporary break-glass decrypt fallback
+  for both session-secret records and worker-envelope payloads after a mistaken
+  deployment-secret replacement; restore the original current KEK, verify
+  access, then remove the fallback)
 - `CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION` (optional; defaults to `100`)
 - `CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP` (optional; defaults to `1000`)
 - `CE_WORKER_GROUPS_BOOTSTRAP` (manual fresh-namespace assertion for the
@@ -1578,14 +1591,20 @@ Scripts: Edit` and `Workers KV Storage: Edit`; the Durable Object module
     Cloudflare using the API token and fails on zero or multiple accounts.
   - Provide either `bundleUrl` (release asset) or `bundleText` (raw bundle contents) from the `/new` UI.
 - The helper fetches the latest bundled worker asset and configures KV + bindings.
-- The helper generates `TOKEN_HMAC_SECRET` and, when required,
-  `CE_STORAGE_ENVELOPE_KEK` independently with 256 bits from Web Crypto. These
+- The helper generates `TOKEN_HMAC_SECRET` and
+  `CE_STORAGE_ENVELOPE_KEK` independently with 256 bits from Web Crypto for
+  every Session Worker. These
   values are never derived from the Cloudflare API token, account, Worker name,
   deployment ID, provider keys, or each other, and are never returned to the
   browser. Stable-request recovery inventories existing secret binding names
   before writing; an ambiguous secret-write response is inventoried again and
   accepted only when the exact binding is present. Otherwise the owned Worker
   and KV namespace remain pending for a later safe replay.
+- The fresh KV secret record is encrypted before upload with the same in-memory
+  KEK that is installed as the Worker binding. If an exact owned upload is
+  recovered before either runtime binding exists, retry replaces only the
+  unreachable ciphertext with encrypted empty state, installs a new KEK, and
+  requires signed post-deploy secret sync. Existing KEK bindings are preserved.
 - Every fresh deploy treats the requested worker name as a readable prefix. An
   idempotent request derives a stable physical suffix and KV title marker from
   `deploymentRequestId`; a legacy request without that ID receives a random

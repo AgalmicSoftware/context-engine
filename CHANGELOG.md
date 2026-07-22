@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Encrypted every canonical Session Worker secret record at rest with
+  session-bound AES-256-GCM before deploy-helper or signed-admin KV writes.
+  Current/previous KEK recovery is bounded, legacy plaintext records are
+  read-only compatible and migrate on signed update, all new deployments
+  receive an independent KEK, and interrupted activation cannot silently bind
+  ciphertext to a lost replacement key.
 - Closed the legacy first-signer Worker bootstrap path. Initial session config
   now requires either the deployment-bound bootstrap admin or an existing
   registry session whose on-chain admin matches; missing registry wiring and

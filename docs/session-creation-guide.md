@@ -145,9 +145,10 @@ stops if the token exposes zero or multiple accounts.
 
 Provide one key for the provider used by the selected fast/thinking models. The
 default OpenAI model choices require one OpenAI key; choosing another provider
-changes which single provider key is required. The key is stored in the
-per-session worker secrets envelope, not the public session config returned to
-browsers.
+changes which single provider key is required. The key is AES-GCM encrypted in
+the per-session Worker KV secrets envelope under a Worker-only KEK; it is never
+stored in the public session config returned to browsers. This protects KV
+contents at rest, but the session Worker and Cloudflare runtime can decrypt it.
 
 ### 3. A signing identity
 

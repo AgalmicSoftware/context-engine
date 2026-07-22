@@ -3,7 +3,7 @@ import {
   STORAGE_BACKENDS,
   normalizeStorageBackend,
 } from '../sessionCorsWorker/storageRefNormalization.js';
-import { buildSessionSecretsEnvelope } from './sessionSecretsEnvelope.mjs';
+import { buildEncryptedSessionSecretsEnvelope } from './sessionSecretsEnvelope.mjs';
 import {
   AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
   executeAgentSessionWrappedDeployment,
@@ -1823,27 +1823,6 @@ const executeDeployHelperRequestCore = async ({
     }
   }
 
-  // Stage both canonical records before a new script can become reachable.
-  // This avoids a first-write or missing-secret interval during fresh deploys.
-  const secretsPut = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(secretsEnvelope),
-  }, cfFetchOptions);
-  if (!secretsPut.ok) {
-    const orphanKv = await cleanupStagedKv();
-    return buildFailure(502, {
-      error: secretsPut.error,
-      detail: secretsPut.detail,
-      orphanResources: { ...orphanKv, workerName: '' },
-    }, {
-      fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretsPut),
-    });
-  }
-
-  const envelopeKekSecretRequired = deployStorageRequiresEnvelopeKek(storageProfile);
-  const tokenSecret = randomSecret();
-  const envelopeKekSecret = envelopeKekSecretRequired ? randomSecret() : '';
   const metadata = {
     main_module: 'worker.mjs',
     bindings: [
@@ -1998,7 +1977,7 @@ const executeDeployHelperRequestCore = async ({
     ? ''
     : randomSecret();
   const envelopeKekSecret = envelopeKekSecretRequired && !envelopeKekSecretPreserved
-    ? randomSecret()
+    ? candidateEnvelopeKekSecret
     : '';
 
   const {
@@ -2132,6 +2111,46 @@ const executeDeployHelperRequestCore = async ({
       });
     }
     deploymentPayload.configVerified = configExactlyVerified;
+  }
+
+  if (
+    resumeUploadedWorker &&
+    !envelopeKekSecretPreserved &&
+    !tokenSecretPreserved
+  ) {
+    // A prior invocation uploaded the exact owned script but stopped before
+    // either runtime secret was installed. Its staged ciphertext was bound to
+    // an in-memory KEK that Cloudflare cannot reveal. Replace only that
+    // unreachable record with an encrypted empty payload under this retry's
+    // KEK; the caller then performs the normal signed secret sync because the
+    // response retains writesSessionSecrets=false.
+    const recoveryEnvelope = await buildEncryptedSessionSecretsEnvelope({}, {
+      env: { [STORAGE_ENVELOPE_KEK_SECRET_NAME]: candidateEnvelopeKekSecret },
+      slug: sessionSlug || displaySlug,
+    });
+    const recoverySecretsPut = await cfFetch(
+      apiToken,
+      `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(recoveryEnvelope),
+      },
+      cfFetchOptions,
+    );
+    if (!recoverySecretsPut.ok) {
+      return buildDeploymentFailure(503, {
+        error: recoverySecretsPut.error || 'Failed to recover encrypted session secrets staging.',
+        detail: recoverySecretsPut.detail,
+        deploymentRequestPending: true,
+        orphanResources: {
+          kvNamespaceId: kvId,
+          kvCleanupStatus: 'retained-runtime-secret-pending',
+          workerName,
+          workerCleanupStatus: 'retained-runtime-secret-pending',
+        },
+      }, { fallbackEligible: true });
+    }
   }
 
   // Runtime secrets are written only after the public worker URL and canonical
