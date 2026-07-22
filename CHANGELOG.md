@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Unified local and hosted CI behind `scripts/ci-gates.json`. The local
+  aggregate now runs the full client coverage and tracked root Node universes once,
+  hosted jobs execute the same named gates, aggregate results fail closed
+  against the hosted profile, and `verify:release` remains a separate
+  non-coverage release rehearsal. Public-package scrubbing keeps retained gate
+  commands aligned with retained scripts.
 - Hardened new-session profile continuity and enforcement: explicit saved
   profiles now survive `/new` reloads behind a clear continue action, invalid
   profiles fail before publish side effects and are rechecked against the live

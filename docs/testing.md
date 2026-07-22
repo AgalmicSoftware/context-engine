@@ -19,10 +19,27 @@ nvm use 20
 npm test
 ```
 
-This runs the canonical root gate (`npm run test:ci`), which includes wiring
-checks, the release-sanity gate, contract tests, client coverage, public-safe
-root Jest tests, public `sessionCorsWorker` module tests, Node-side tests, and
-cache guards.
+This runs the canonical root gate (`npm run test:ci`): wiring and ratchets,
+release-surface checks and builds, contract/ABI parity, client coverage,
+public-safe root Jest, both public Worker suites, Context Engine CC, the tracked
+root Node universe, and the managed-cache guard. The coverage-enabled full
+client universe and tracked Node universe each run exactly once.
+
+`scripts/ci-gates.json` is the explicit command manifest. Local CI consumes
+its serial `ci` profile; GitHub Actions consumes the same named gates as split
+jobs so slow lanes remain visible. The final hosted `test` job compares all
+reported results with the manifest's `hosted` profile and fails for missing,
+extra, failed, canceled, or skipped lanes. Event-specific baseline-growth
+authorization remains a protected workflow step beside the manifest-backed
+gate.
+
+`npm run verify:release` is the standalone `release` profile. It retains the
+non-coverage full client and tracked-Node release rehearsal but is no longer
+nested inside `test:ci`.
+
+The manifest uses `test:node:tracked` for reproducible CI. The broader
+`test:node` alias remains available to operators with ignored private E2E
+helpers installed, but it is not a clean-checkout gate.
 
 ### Client-Only Tests
 
@@ -38,28 +55,13 @@ Use the client workflow when you are working only in `client/` and do not need t
 The client test runner is standalone Jest 30 configured by `client/jest.config.cjs`.
 Babel-Jest uses explicit Babel presets, and jsdom setup lives under
 `client/scripts/jest/`.
-Client linting runs ESLint 9 through `client/eslint.config.mjs`; the flat
-config preserves the existing JavaScript/JSX lint surface plus React, React
-Hooks, and parser rule intent. TypeScript lint coverage starts with the
-`client/src/utilities/ui` utility boundary and shared UI components under
-`client/src/components/Shared`, then extends to informational UI components
-under `client/src/components/About`, `client/src/components/Footer`,
-`client/src/components/InformationModals`, and `client/src/components/Onboarding`,
-plus the home-tab surface under `client/src/components/MainContent` and
-auxiliary pages under `client/src/components/Agent`,
-`client/src/components/Bookmarks`, and `client/src/components/Sponsor`.
-Shell support coverage also includes `client/src/components/ErrorBoundary` and
-`client/src/components/RightSidebar`, and dev/E2E support coverage includes
-`client/src/components/E2E`. Gate UI coverage includes
-`client/src/components/Gates`. Community tab coverage includes
-`client/src/components/CommunityTab`, Polis report coverage includes
-`client/src/components/PolisReport`, and DebateMap coverage includes
-`client/src/components/DebateMap`. Navbar coverage includes
-`client/src/components/Navbar`, and ContractPage coverage includes
-`client/src/components/ContractPage`. Broad TS/TSX lint expansion should be
-handled as separate rule-tightening changes. `npm run typecheck` runs the
-production client TypeScript project with `tsc --noEmit`; Jest/spec helper files
-remain covered by the Jest command rather than the release typecheck gate.
+Client linting runs ESLint 9 through `client/eslint.config.mjs`. One command
+covers every tracked client JS, JSX, TS, and TSX source; specialized blocks
+tighten React/Hooks rules for their established surfaces, while catch-all typed
+and TSX blocks prevent new files from escaping baseline coverage. Unused disable
+directives are errors. `npm run typecheck` runs the production client
+TypeScript project with `tsc --noEmit`; Jest/spec helper files remain covered
+by lint and Jest rather than the release typecheck gate.
 
 ### Targeted Root Commands
 
@@ -70,8 +72,6 @@ npm run test:root:jest
 npm run test:worker:session-cors
 npm run test:node
 npm run test:client
-npm run coverage-floor:check
-npm run typecheck:client-tests
 npm run ci:gate -- workers
 ```
 
@@ -88,6 +88,10 @@ The inventory check keeps root tests classified as one of:
 
 Do not add live credentials, private deployment names, or identifying fixtures
 to root `package.json` scripts.
+
+Public artifact preparation removes manifest commands whose npm scripts were
+stripped, then drops any empty gate from its profiles. This keeps the retained
+public `test:ci` graph self-consistent.
 
 ### Public Release Checks
 
