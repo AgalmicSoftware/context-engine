@@ -211,31 +211,15 @@ const SbtPageAdminActions = ({
 
     {hasPasswordMint && (
       <div className={styles.inviteGenerationSection}>
-        <label>
-          <input
-            type="checkbox"
-            checked={encryptedRecoveryEnabled}
-            onChange={onEncryptedRecoveryChange}
-          />
-          Keep encrypted recovery on this browser
-        </label>
-        <p>
-          Optional AES-GCM browser-local recovery does not sync across devices and does not protect against a
-          compromised browser profile. Uncheck it to clear encrypted recovery for this group.
-        </p>
-        {encryptedRecoveryStatus === 'saved' && <p>Encrypted local recovery saved.</p>}
-        {encryptedRecoveryStatus === 'ready' && <p>New passwords will be kept encrypted on this browser.</p>}
-        {encryptedRecoveryStatus === 'unavailable' && <p>Encrypted recovery unavailable; export-only remains active.</p>}
-        {encryptedRecoveryStatus === 'unreadable' && <p>Encrypted recovery cannot be decrypted by this browser.</p>}
-        {encryptedRecoveryStatus === 'cleared' && <p>Encrypted local recovery cleared.</p>}
-        {hasLocalRecovery && (
-          <>
-            <p>Legacy recovery may contain plaintext. Clear local recovery after exporting anything you still need.</p>
-            <button type="button" onClick={onClearLocalRecovery} className={styles.actionButton}>
-              Clear local recovery
-            </button>
-          </>
-        )}
+        <SbtEncryptedRecoveryControl
+          checked={encryptedRecoveryEnabled}
+          clearButtonClassName={styles.actionButton}
+          hasLocalRecovery={hasLocalRecovery}
+          mode="admin"
+          onChange={onEncryptedRecoveryChange}
+          onClear={onClearLocalRecovery}
+          status={encryptedRecoveryStatus}
+        />
       </div>
     )}
 

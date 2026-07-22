@@ -1,13 +1,11 @@
-import { render, screen } from '@testing-library/react';
 import {
-  SbtEncryptedRecoveryControl,
   loadSbtRecoverySnapshot,
   selectCreateEncryptedRecovery,
 } from './SbtEncryptedRecoveryControl';
 
-describe('SBT tab-memory recovery UI controller', () => {
-  it('writes only to the injected memory port after explicit create-flow opt-in', async () => {
-    const write = jest.fn().mockResolvedValue({ ok: true, status: 'memory-only' });
+describe('SBT encrypted recovery UI controller', () => {
+  it('writes only after explicit create-flow opt-in and reports successful recovery', async () => {
+    const write = jest.fn().mockResolvedValue({ ok: true, status: 'ok' });
 
     await expect(
       selectCreateEncryptedRecovery({
@@ -24,7 +22,7 @@ describe('SBT tab-memory recovery UI controller', () => {
     expect(write).toHaveBeenCalledWith(expect.objectContaining({ mode: 'replace', passwords: ['code-one'] }));
   });
 
-  it('keeps export-only active when tab memory is unavailable', async () => {
+  it('keeps export-only active when browser encryption is unavailable', async () => {
     const write = jest.fn().mockResolvedValue({ ok: false, status: 'unavailable' });
 
     await expect(
@@ -40,32 +38,25 @@ describe('SBT tab-memory recovery UI controller', () => {
     });
   });
 
-  it('loads only the current tab-memory recovery snapshot', async () => {
-    const readMemory = jest.fn().mockResolvedValue({
+  it('combines read-only legacy recovery with decrypted opt-in recovery without duplicates', async () => {
+    const readLegacy = jest.fn(() => ['legacy-code', 'shared-code']);
+    const readEncrypted = jest.fn().mockResolvedValue({
       ok: true,
       status: 'ok',
-      passwords: ['shared-code', 'shared-code', 'memory-code'],
+      passwords: ['shared-code', 'encrypted-code'],
     });
 
     await expect(
       loadSbtRecoverySnapshot({
         chainId: 84532,
         sbtAddress: '0xabc0000000000000000000000000000000000000',
-        readMemory,
+        readEncrypted,
+        readLegacy,
       }),
     ).resolves.toEqual({
-      cachedPasswords: ['shared-code', 'memory-code'],
+      cachedPasswords: ['legacy-code', 'shared-code', 'encrypted-code'],
       encryptedRecoveryEnabled: true,
       encryptedRecoveryStatus: 'saved',
     });
-  });
-
-  it('states that export is durable and tab recovery disappears on reload', () => {
-    render(<SbtEncryptedRecoveryControl checked={false} mode="create" onChange={jest.fn()} status="idle" />);
-
-    expect(screen.getByText(/export is the only durable recovery path/i)).toBeInTheDocument();
-    expect(screen.getByText(/memory only/i)).toBeInTheDocument();
-    expect(screen.getByText(/reloading or closing the tab clears them/i)).toBeInTheDocument();
-    expect(screen.queryByText(/encrypted local recovery/i)).not.toBeInTheDocument();
   });
 });

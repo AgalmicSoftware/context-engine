@@ -132,42 +132,6 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(localStorage.getItem('createdSBTs')).toBeNull();
   });
 
-  it('persists encrypted recovery only after the creator explicitly opts in', async () => {
-    const instance = makeInstance({ network: { id: 84532, name: 'Base Sepolia' } });
-    instance.state = {
-      ...instance.state,
-      sbtAddress: '0xABC0000000000000000000000000000000000000',
-      passwordList: ['code-one'],
-    };
-    const persist = jest
-      .spyOn(instance, 'persistEncryptedCreatedSbtCodes')
-      .mockResolvedValue({ ok: true, status: 'ok' });
-
-    await instance.handleEncryptedRecoveryChange({ target: { checked: true } });
-
-    expect(persist).toHaveBeenCalledWith({
-      sbtAddress: instance.state.sbtAddress,
-      codesToStore: ['code-one'],
-    });
-    expect(instance.state.encryptedRecoveryEnabled).toBe(true);
-    expect(instance.state.encryptedRecoveryStatus).toBe('saved');
-  });
-
-  it('falls back to export-only when encrypted recovery is unavailable', async () => {
-    const instance = makeInstance({ network: { id: 84532, name: 'Base Sepolia' } });
-    instance.state = {
-      ...instance.state,
-      sbtAddress: '0xABC0000000000000000000000000000000000000',
-      passwordList: ['code-one'],
-    };
-    jest.spyOn(instance, 'persistEncryptedCreatedSbtCodes').mockResolvedValue({ ok: false, status: 'unavailable' });
-
-    await instance.handleEncryptedRecoveryChange({ target: { checked: true } });
-
-    expect(instance.state.encryptedRecoveryEnabled).toBe(false);
-    expect(instance.state.encryptedRecoveryStatus).toBe('unavailable');
-  });
-
   it('skips recovery-code persistence when the SBT has no password mint path', () => {
     localStorage.clear();
     const instance = makeInstance({

@@ -1,5 +1,6 @@
 import SBTPage from './SBTPage';
-import contractScripts from '../../utilities/web3/contractScripts.js';
+import contractScripts from '../../utilities/web3/chainGateway.js';
+import * as sbtEncryptedRecoveryUi from './SbtEncryptedRecoveryControl';
 import {
   SBT_PASSWORD_RECOVERY_KIND,
   SBT_PASSWORD_RECOVERY_STORAGE_KEY,
@@ -46,7 +47,7 @@ describe('SBTPage scoped password recovery store', () => {
     jest.restoreAllMocks();
   });
 
-  it('loads cached passwords from the scoped recovery store', () => {
+  it('loads cached passwords from the scoped recovery store', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000201';
     const sbtLower = sbtAddress.toLowerCase();
     const subject = createSubject({
@@ -73,12 +74,12 @@ describe('SBTPage scoped password recovery store', () => {
       }),
     );
 
-    subject.loadCachedPasswords();
+    await subject.loadCachedPasswords();
 
     expect(subject.state.cachedPasswords).toEqual(['scoped-code']);
   });
 
-  it('prefers the viewed SBT chain over the connected network when loading cached passwords', () => {
+  it('prefers the viewed SBT chain over the connected network when loading cached passwords', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000203';
     const sbtLower = sbtAddress.toLowerCase();
     const now = Date.now();
@@ -111,7 +112,7 @@ describe('SBTPage scoped password recovery store', () => {
       }),
     );
 
-    subject.loadCachedPasswords();
+    await subject.loadCachedPasswords();
 
     expect(subject.state.cachedPasswords).toEqual(['base-only-code']);
   });
@@ -152,17 +153,17 @@ describe('SBTPage scoped password recovery store', () => {
     jest.spyOn(subject, 'generateRandomPasswords').mockReturnValue(['admin-encrypted']);
     jest.spyOn(subject, 'cacheTransactionHash').mockImplementation(() => {});
     const persist = jest
-      .spyOn(subject, 'persistEncryptedAdminCodes')
+      .spyOn(sbtEncryptedRecoveryUi, 'appendEncryptedSbtRecovery')
       .mockResolvedValue({ ok: true, status: 'ok' });
     jest.spyOn(contractScripts, 'addHashedPasswords').mockResolvedValue({ transactionHash: '0x204' });
 
     await subject.handleGenerateAdminInvites();
 
-    expect(persist).toHaveBeenCalledWith(['admin-encrypted']);
+    expect(persist).toHaveBeenCalledWith(expect.objectContaining({ passwords: ['admin-encrypted'] }));
     expect(subject.state.encryptedRecoveryStatus).toBe('saved');
   });
 
-  it('combines compatible plaintext recovery with decrypted opt-in recovery', async () => {
+  it('applies the combined legacy and encrypted recovery snapshot', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000205';
     const subject = createSubject({ SBTAddress: sbtAddress, network: { id: 84532 } });
     const now = Date.now();
@@ -184,10 +185,10 @@ describe('SBTPage scoped password recovery store', () => {
         },
       }),
     );
-    jest.spyOn(subject, 'readEncryptedCachedPasswords').mockResolvedValue({
-      ok: true,
-      status: 'ok',
-      passwords: ['encrypted-code'],
+    jest.spyOn(sbtEncryptedRecoveryUi, 'loadSbtRecoverySnapshot').mockResolvedValue({
+      cachedPasswords: ['legacy-code', 'encrypted-code'],
+      encryptedRecoveryEnabled: true,
+      encryptedRecoveryStatus: 'saved',
     });
 
     await subject.loadCachedPasswords();
