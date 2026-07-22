@@ -95,15 +95,14 @@ const waitFor = async (
   const startedAt = Date.now();
   const maxMs = Math.max(100, Number(timeoutMs) || 0);
   const tick = Math.max(25, Number(tickMs) || 0);
-  // eslint-disable-next-line no-constant-condition
+
   while (true) {
-    // eslint-disable-next-line no-await-in-loop
     const ok = await Promise.resolve()
       .then(fn)
       .catch(() => false);
     if (ok) return true;
     if (Date.now() - startedAt > maxMs) return false;
-    // eslint-disable-next-line no-await-in-loop
+
     await sleep(tick);
   }
 };
@@ -383,7 +382,6 @@ const run = async (actions: unknown): Promise<CeAgentRunResult> => {
 
   const results = [];
   for (const action of arr) {
-    // eslint-disable-next-line no-await-in-loop
     const res = await perform(action);
     results.push(res);
     if (!res.ok) return { ok: false, results };

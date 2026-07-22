@@ -63,7 +63,7 @@ export const postSignedAdminWorkerRequest = async ({
     if (attempt < retryAttempts && isRetryableAdminNonceFailure({ responseStatus: response.status, responseError })) {
       // A concurrent admin action may have consumed the nonce. Re-sign rather
       // than surfacing a transient failure to the admin.
-      // eslint-disable-next-line no-await-in-loop
+
       await sleepImpl(250 * attempt);
       continue;
     }

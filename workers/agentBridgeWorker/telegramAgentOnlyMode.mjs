@@ -5,8 +5,12 @@ import {
   SESSION_LAB_LOGO_REFERENCE_FILENAME,
 } from './sessionLabLogoReference.mjs';
 import { buildTelegramQuestionAnswerSchema } from './questionUi.mjs';
-import { listTelegramProposedQuestionsForSession } from './telegramQuestionProposals.mjs';
 import { SUBMIT_REQUEST_USER_KV_PREFIX } from './telegramSubmitQueue.mjs';
+import {
+  WRAPPED_QUESTION_SOURCE_MODES,
+  loadWrappedQuestionSource,
+  resolveWrappedQuestionSourceMode,
+} from './wrappedQuestionSource.mjs';
 
 export const AGENT_ONLY_INSTRUCTIONS_VERSION = '2026-06-16.v41-agent-only.1';
 export const AGENT_ONLY_MODE_CONFIG_KV_PREFIX = 'telegram:agent-mode-config:v1:';
@@ -24,8 +28,6 @@ export const AGENT_ONLY_ATTEMPT_EVENT_KV_PREFIX = 'telegram:agent-only:attempt-e
 
 const DEFAULT_AGENT_ONLY_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
 const DEFAULT_TIMEZONE = 'America/Los_Angeles';
-const DEFAULT_LAUNCH_OPENS_AT = '2026-06-12T08:00:00-07:00';
-const DEFAULT_LAUNCH_CLOSES_AT = '2026-06-15T08:00:00-07:00';
 const MAX_AGENT_ONLY_QUESTIONS = 200;
 const MAX_BULK_ROWS = 50;
 const MAX_RECENT_REQUEST_IDS = 20;
@@ -55,11 +57,11 @@ const AGENT_ONLY_EVAL_TYPES = new Set([
 ]);
 
 export const AGENT_ONLY_ENDPOINTS = Object.freeze({
-  start: '/telegram/agent/api/agent-only/start',
-  statements: '/telegram/agent/api/agent-only/statements',
-  answersBulk: '/telegram/agent/api/agent-only/answers/bulk',
-  tokenVotesBulk: '/telegram/agent/api/agent-only/token-votes/bulk',
-  wrappedImage: '/telegram/agent/api/agent-only/wrapped-image',
+  start: '/api/agent/agent-only/start',
+  statements: '/api/agent/agent-only/statements',
+  answersBulk: '/api/agent/agent-only/answers/bulk',
+  tokenVotesBulk: '/api/agent/agent-only/token-votes/bulk',
+  wrappedImage: '/api/agent/agent-only/wrapped-image',
 });
 
 const LEGACY_AGENT_API_PREFIX = '/telegram/agent/api';
@@ -78,21 +80,21 @@ Answer for your principal, not yourself. Keep the credential secret; send it onl
 
 Quiet lifecycle. Use one private helper script after credential resolution. Do not make visible HTTP calls for statement pages, answer payloads, image JSON, or retries. Redirect raw responses to variables or files. Helper stdout may contain only one compact final JSON object with statement_count, submitted_count, skipped_count, and image_url.
 
-GET /telegram/agent/api/agent-only/statements?limit=5&compact=1 and follow cursor pagination until cursor is empty; do not stop after page one. Save window_id. If window_state is not_open, stop. Compact, low-output execution is the default path.
+GET /api/agent/agent-only/statements?limit=5&compact=1 and follow cursor pagination until cursor is empty; do not stop after page one. Save window_id. If window_state is not_open, stop. Compact, low-output execution is the default path.
 
 Create one fresh run_id for the full run. Optional token_usage before answering: make at most one quiet known-path SQLite attempt against state.db and /opt/data/state.db. Use Python sqlite3 only if immediately available. Use cutoff int(time.time()) - 2592000. Sum COALESCE(input_tokens,0) + COALESCE(output_tokens,0) + COALESCE(cache_read_tokens,0) + COALESCE(cache_write_tokens,0) from sessions where started_at >= cutoff and source = 'telegram'; group daily_usage_30d by date(CAST(started_at AS INTEGER), 'unixepoch', 'localtime'). Do not assume a precomputed aggregate column exists; do not use SQL datetime string filters against started_at. Do not discover files, inspect logs/configs/sessions, install tools, or run runtime-insights commands. Never print rows or command output. If unavailable or unclear, omit token_usage and continue. When available, include recent_sessions_total_tokens, daily_usage_30d, and source: "local sqlite3 query (including cache)" in agent_metadata.token_usage on every answer POST.
 
-Keep statements, prediction JSON, payloads, retries, and debug output out of chat/stdout. Internal prediction calls may return compact JSON keyed by local index; never print that JSON. Batch roughly 10-15 statements when useful, map local indexes back to exact statement_id values in code, and POST /telegram/agent/api/agent-only/answers/bulk in batches of up to 50 rows with the same run_id and unique request_id values.
+Keep statements, prediction JSON, payloads, retries, and debug output out of chat/stdout. Internal prediction calls may return compact JSON keyed by local index; never print that JSON. Batch roughly 10-15 statements when useful, map local indexes back to exact statement_id values in code, and POST /api/agent/agent-only/answers/bulk in batches of up to 50 rows with the same run_id and unique request_id values.
 
 Answer every statement or privacy-skip it. Validate before POSTing: multichoice uses values arrays, choice/rating use { "value": ... }, and freeform uses { "text": ... }. Confidence is required, 0-100. Use 90-95 only for direct memory/profile evidence or repeated stable preferences; 70-89 for supported inference; 40-69 for weak, mixed, transient, or population-prior evidence. Use 100 only for an exact prior answer to the same statement or a saved preference that entails it. Avoid flat repeated defaults. Optional rationale: one sentence under 200 chars. The only skip is privacy_protective, with skipped true and no answer, confidence, rationale, or explanation.
 
-Skip token allocations for the default Wrapped run. Do not POST /telegram/agent/api/agent-only/token-votes/bulk unless the principal explicitly asks for allocation research. The standard Wrapped image can be generated from predictions alone.
+Skip token allocations for the default Wrapped run. Do not POST /api/agent/agent-only/token-votes/bulk unless the principal explicitly asks for allocation research. The standard Wrapped image can be generated from predictions alone.
 
 After answers are submitted and visualDefaults.wrapped is true, POST to wrappedImageEndpoint with { "window_id": "<window_id>", "run_id": "<fresh_run_id>", "mode": "wrapped", "format": "json_url", "include_base64": false }. If incomplete, submit missing predictions/skips, then call again with the same run_id. Do not generate mode "political_compass" during the default run; only generate it if the principal asks for Agent Norms Compass after the image. Do not request mode "wrapped_story"; MP4 story video is disabled.
 
 The final chat output must start with exactly one Markdown image line using image_url: ![Session Wrapped](<image_url>). Do not use local paths, raw image_base64, duplicate raw links, JSON, logs, process notes, or "ready" text before the image. Do not decode base64 unless image_url is absent. Do not inspect, critique, describe, or summarize the poster.
 
-After the image line, say only: "Your Session Wrapped is ready. To inspect or change your agent's responses, open [Context Engine Bot](https://t.me/contextengineer_bot?start=agent_onboarding__session-wrapped) and tap Open Mini App. Want the optional Agent Norms Compass meme too?" Do not include process notes, debugging, script names, parallelization, killed jobs, retries, validation failures, window id, confidences, rationales, privacy skip count, token details, extra links, or where the principal lives/is from/currently is unless asked. Abstract location evidence into non-location preferences.`;
+After the image line, say only: "Your Session Wrapped is ready. Use the session's configured Session Wrapped interface to inspect or change the agent's responses. Want the optional Agent Norms Compass meme too?" Do not include process notes, debugging, script names, parallelization, killed jobs, retries, validation failures, window id, confidences, rationales, privacy skip count, token details, extra links, or where the principal lives/is from/currently is unless asked. Abstract location evidence into non-location preferences.`;
 
 function safeString(value) {
   return String(value || '').trim();
@@ -154,7 +156,9 @@ function sanitizeSessionSlug(value = '') {
 }
 
 function normalizeQuestionId(value = '') {
-  const id = safeString(value).replace(/[^A-Za-z0-9_-]+/g, '').slice(0, 96);
+  const raw = safeString(value);
+  if (/^0x[0-9a-fA-F]{64}$/.test(raw)) return raw.toLowerCase();
+  const id = raw.replace(/[^A-Za-z0-9_-]+/g, '').slice(0, 96);
   return id.startsWith('ceq_') ? id : '';
 }
 
@@ -433,10 +437,10 @@ function normalizeWindowingConfig(value = {}) {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   const launchOpensAt = Number.isFinite(Date.parse(safeString(source.launchOpensAt)))
     ? new Date(Date.parse(safeString(source.launchOpensAt))).toISOString()
-    : new Date(Date.parse(DEFAULT_LAUNCH_OPENS_AT)).toISOString();
+    : '';
   const launchClosesAt = Number.isFinite(Date.parse(safeString(source.launchClosesAt)))
     ? new Date(Date.parse(safeString(source.launchClosesAt))).toISOString()
-    : new Date(Date.parse(DEFAULT_LAUNCH_CLOSES_AT)).toISOString();
+    : '';
   return {
     timezone: safeString(source.timezone) || DEFAULT_TIMEZONE,
     launchOpensAt,
@@ -451,6 +455,7 @@ function defaultAgentOnlyModeConfig(sessionSlug = '') {
     type: 'telegram_agent_mode_config',
     version: 1,
     sessionSlug: sanitizeSessionSlug(sessionSlug),
+    questionSourceMode: WRAPPED_QUESTION_SOURCE_MODES.CANONICAL_SESSION,
     enabledQuestionIds: [],
     evalTypesByQuestionId: {},
     windowing: normalizeWindowingConfig(),
@@ -497,7 +502,15 @@ export function normalizeAgentOnlyModeConfigPatch(patch = {}, current = null) {
   const evalTypesByQuestionId = Object.hasOwn(input, 'evalTypesByQuestionId')
     ? normalizeEvalTypes(input.evalTypesByQuestionId, enabledQuestionIds)
     : normalizeEvalTypes(base.evalTypesByQuestionId, enabledQuestionIds);
+  const questionSourceMode = Object.hasOwn(input, 'questionSourceMode')
+    ? resolveWrappedQuestionSourceMode({ source: 'default', config: { questionSourceMode: input.questionSourceMode } })
+    : (
+        Object.hasOwn(input, 'enabledQuestionIds') && enabledQuestionIds.length > 0
+          ? WRAPPED_QUESTION_SOURCE_MODES.AGENT_ONLY_PROPOSALS
+          : resolveWrappedQuestionSourceMode({ source: 'default', config: base })
+      );
   return {
+    questionSourceMode,
     enabledQuestionIds,
     evalTypesByQuestionId,
     windowing: normalizeWindowingConfig({
@@ -519,6 +532,9 @@ export async function loadAgentOnlyModeConfig({ env = {}, sessionSlug = '' } = {
   }
   assertNoSecretShape(parsed, 'Telegram agent-only config records must not serialize secrets.');
   const normalized = normalizeAgentOnlyModeConfigPatch(parsed, fallback);
+  if (!Object.hasOwn(parsed, 'questionSourceMode')) {
+    normalized.questionSourceMode = WRAPPED_QUESTION_SOURCE_MODES.AGENT_ONLY_PROPOSALS;
+  }
   return {
     source: 'kv',
     config: {
@@ -675,8 +691,10 @@ function boundaryFromWindowId(windowId = '', windowingConfig = {}) {
     hour: config.regularBoundaryHour,
   });
   const launchOpenMs = Date.parse(config.launchOpensAt);
-  const launchLabel = dateLabelForMs(launchOpenMs, config.timezone);
-  const closesMs = safeString(windowId) === `w-${launchLabel}`
+  const launchCloseMs = Date.parse(config.launchClosesAt);
+  const hasLaunchWindow = Number.isFinite(launchOpenMs) && Number.isFinite(launchCloseMs) && launchCloseMs > launchOpenMs;
+  const launchLabel = hasLaunchWindow ? dateLabelForMs(launchOpenMs, config.timezone) : '';
+  const closesMs = hasLaunchWindow && safeString(windowId) === `w-${launchLabel}`
     ? Date.parse(config.launchClosesAt)
     : localDateTimeToUtcMs({
       timeZone: config.timezone,
@@ -694,10 +712,11 @@ export function windowBoundariesAround(nowMs = Date.now(), windowingConfig = {})
   const config = normalizeWindowingConfig(windowingConfig);
   const launchOpenMs = Date.parse(config.launchOpensAt);
   const launchCloseMs = Date.parse(config.launchClosesAt);
-  if (!Number.isFinite(nowMs) || !Number.isFinite(launchOpenMs) || !Number.isFinite(launchCloseMs)) return null;
-  if (nowMs < launchOpenMs) return null;
-  const launchWindowId = `w-${dateLabelForMs(launchOpenMs, config.timezone)}`;
-  if (nowMs < launchCloseMs) {
+  if (!Number.isFinite(nowMs)) return null;
+  const hasLaunchWindow = Number.isFinite(launchOpenMs) && Number.isFinite(launchCloseMs) && launchCloseMs > launchOpenMs;
+  if (hasLaunchWindow && nowMs < launchOpenMs) return null;
+  const launchWindowId = hasLaunchWindow ? `w-${dateLabelForMs(launchOpenMs, config.timezone)}` : '';
+  if (hasLaunchWindow && nowMs < launchCloseMs) {
     return {
       windowId: launchWindowId,
       opensAt: new Date(launchOpenMs).toISOString(),
@@ -722,7 +741,7 @@ export function windowBoundariesAround(nowMs = Date.now(), windowingConfig = {})
       hour: config.regularBoundaryHour,
     });
   }
-  while (boundaryMs < launchCloseMs) {
+  while (hasLaunchWindow && boundaryMs < launchCloseMs) {
     boundaryDate = localDateAddDays(boundaryDate, 7);
     boundaryMs = localDateTimeToUtcMs({
       timeZone: config.timezone,
@@ -848,6 +867,43 @@ function configEnablesAgentOnlyQuestions(loaded = {}) {
   return loaded.source === 'kv' || enabledQuestionIds.length > 0;
 }
 
+function wrappedQuestionIds(loaded = {}, questionSource = {}) {
+  if (questionSource.mode === WRAPPED_QUESTION_SOURCE_MODES.AGENT_ONLY_PROPOSALS) {
+    return Array.isArray(loaded.config?.enabledQuestionIds) ? loaded.config.enabledQuestionIds : [];
+  }
+  return (Array.isArray(questionSource.questions) ? questionSource.questions : [])
+    .map((question) => normalizeQuestionId(question?.questionId || question?.id))
+    .filter(Boolean);
+}
+
+function addWrappedSourceStatements(byId = new Map(), questionSource = {}) {
+  for (const question of Array.isArray(questionSource.questions) ? questionSource.questions : []) {
+    const statement = snapshotStatementFromQuestion(question);
+    if (statement && !byId.has(statement.statement_id)) byId.set(statement.statement_id, statement);
+  }
+  return byId;
+}
+
+async function loadWrappedQuestionSourceForSync({ env = {}, sessionSlug = '', loadedConfig = {}, knownQuestionIds = [] } = {}) {
+  const mode = resolveWrappedQuestionSourceMode(loadedConfig);
+  const enabledQuestionIds = Array.isArray(loadedConfig.config?.enabledQuestionIds)
+    ? loadedConfig.config.enabledQuestionIds
+    : [];
+  const known = new Set(knownQuestionIds.map(safeString).filter(Boolean));
+  if (
+    mode === WRAPPED_QUESTION_SOURCE_MODES.AGENT_ONLY_PROPOSALS &&
+    enabledQuestionIds.every((questionId) => known.has(questionId))
+  ) {
+    return {
+      ok: true,
+      mode,
+      source: 'bridge_kv_agent_only_proposals',
+      questions: [],
+    };
+  }
+  return loadWrappedQuestionSource({ env, sessionSlug, loadedConfig });
+}
+
 export async function materializeAgentOnlyWindow({
   env = {},
   sessionSlug = '',
@@ -856,9 +912,6 @@ export async function materializeAgentOnlyWindow({
 } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const loaded = await loadAgentOnlyModeConfig({ env, sessionSlug: slug });
-  if (!configEnablesAgentOnlyQuestions(loaded)) {
-    return { ok: false, status: 409, reason: 'agent_only_not_configured' };
-  }
   const nowMs = Date.parse(nowIso(now));
   const boundary = safeString(windowId)
     ? boundaryFromWindowId(windowId, loaded.config.windowing)
@@ -883,15 +936,6 @@ export async function materializeAgentOnlyWindow({
     let lastExtendedSnapshot = null;
     for (let attempt = 0; attempt < maxSyncAttempts; attempt += 1) {
       const latestLoaded = await loadAgentOnlyModeConfig({ env, sessionSlug: slug });
-      if (!configEnablesAgentOnlyQuestions(latestLoaded)) {
-        return {
-          ok: true,
-          snapshot: lastExtendedSnapshot || snapshot,
-          created: false,
-          extended: totalAddedStatementCount > 0 || totalPrunedStatementCount > 0 || totalEvalTypeChanged,
-          addedStatementCount: totalAddedStatementCount,
-        };
-      }
       const latestActiveBoundary = windowBoundariesAround(nowMs, latestLoaded.config.windowing);
       if (latestActiveBoundary?.windowId !== boundary.windowId) {
         return {
@@ -908,18 +952,23 @@ export async function materializeAgentOnlyWindow({
         .map((statement) => [safeString(statement?.statement_id), statement])
         .filter(([id]) => id));
       const latestStatementIds = latestStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
-      const latestMissingQuestionIds = latestLoaded.config.enabledQuestionIds.filter((questionId) => !latestById.has(questionId));
-      if (latestMissingQuestionIds.length) {
-        const questions = await listTelegramProposedQuestionsForSession(env, slug);
-        const byId = new Map((Array.isArray(questions) ? questions : [])
-          .map((question) => [normalizeQuestionId(question.questionId || question.id), question])
-          .filter(([id]) => id));
-        for (const questionId of latestMissingQuestionIds) {
-          const statement = snapshotStatementFromQuestion(byId.get(questionId));
-          if (statement) latestById.set(questionId, statement);
-        }
+      const latestQuestionSource = await loadWrappedQuestionSourceForSync({
+        env,
+        sessionSlug: slug,
+        loadedConfig: latestLoaded,
+        knownQuestionIds: latestStatementIds,
+      });
+      if (!latestQuestionSource.ok) {
+        return {
+          ok: true,
+          snapshot: lastExtendedSnapshot || snapshot,
+          created: false,
+          extended: totalAddedStatementCount > 0 || totalPrunedStatementCount > 0 || totalEvalTypeChanged,
+          addedStatementCount: totalAddedStatementCount,
+        };
       }
-      const targetStatements = latestLoaded.config.enabledQuestionIds
+      addWrappedSourceStatements(latestById, latestQuestionSource);
+      const targetStatements = wrappedQuestionIds(latestLoaded, latestQuestionSource)
         .map((questionId) => latestById.get(questionId))
         .filter(Boolean);
       const targetStatementIds = targetStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
@@ -950,10 +999,6 @@ export async function materializeAgentOnlyWindow({
       const preWriteSnapshot = await loadWindowSnapshot({ env, sessionSlug: slug, windowId: boundary.windowId }) || latestSnapshot;
       const preWriteStatements = Array.isArray(preWriteSnapshot.statements) ? preWriteSnapshot.statements : [];
       const preWriteLoaded = await loadAgentOnlyModeConfig({ env, sessionSlug: slug });
-      if (!configEnablesAgentOnlyQuestions(preWriteLoaded)) {
-        snapshot = preWriteSnapshot;
-        continue;
-      }
       const preWriteActiveBoundary = windowBoundariesAround(nowMs, preWriteLoaded.config.windowing);
       if (preWriteActiveBoundary?.windowId !== boundary.windowId) {
         snapshot = preWriteSnapshot;
@@ -962,18 +1007,18 @@ export async function materializeAgentOnlyWindow({
       const preWriteById = new Map(preWriteStatements
         .map((statement) => [safeString(statement?.statement_id), statement])
         .filter(([id]) => id));
-      const preWriteMissingQuestionIds = preWriteLoaded.config.enabledQuestionIds.filter((questionId) => !preWriteById.has(questionId));
-      if (preWriteMissingQuestionIds.length) {
-        const questions = await listTelegramProposedQuestionsForSession(env, slug);
-        const byId = new Map((Array.isArray(questions) ? questions : [])
-          .map((question) => [normalizeQuestionId(question.questionId || question.id), question])
-          .filter(([id]) => id));
-        for (const questionId of preWriteMissingQuestionIds) {
-          const statement = snapshotStatementFromQuestion(byId.get(questionId));
-          if (statement) preWriteById.set(questionId, statement);
-        }
+      const preWriteQuestionSource = await loadWrappedQuestionSourceForSync({
+        env,
+        sessionSlug: slug,
+        loadedConfig: preWriteLoaded,
+        knownQuestionIds: [...preWriteById.keys()],
+      });
+      if (!preWriteQuestionSource.ok) {
+        snapshot = preWriteSnapshot;
+        continue;
       }
-      const finalStatements = preWriteLoaded.config.enabledQuestionIds
+      addWrappedSourceStatements(preWriteById, preWriteQuestionSource);
+      const finalStatements = wrappedQuestionIds(preWriteLoaded, preWriteQuestionSource)
         .map((questionId) => preWriteById.get(questionId))
         .filter(Boolean);
       const preWriteStatementIds = preWriteStatements.map((statement) => safeString(statement?.statement_id)).filter(Boolean);
@@ -1006,6 +1051,8 @@ export async function materializeAgentOnlyWindow({
           ? normalizeQuestionIds(preWriteSnapshot.legacyCursorStatementIds)
           : preWriteStatementIds,
         sourceConfigUpdatedAt: safeString(preWriteLoaded.config.updatedAt),
+        questionSourceMode: preWriteQuestionSource.mode,
+        questionSource: preWriteQuestionSource.source,
         extendedAt: nowIso(now),
       };
       assertNoSecretShape(updated, 'Agent-only window snapshots must not serialize secrets.');
@@ -1032,12 +1079,21 @@ export async function materializeAgentOnlyWindow({
     return { ok: false, status: 409, reason: 'agent_only_window_historical_missing' };
   }
 
-  const questions = await listTelegramProposedQuestionsForSession(env, slug);
+  const questionSource = await loadWrappedQuestionSource({
+    env,
+    sessionSlug: slug,
+    loadedConfig: loaded,
+  });
+  if (!questionSource.ok) return questionSource;
+  const questions = questionSource.questions;
   const byId = new Map((Array.isArray(questions) ? questions : [])
     .map((question) => [normalizeQuestionId(question.questionId || question.id), question])
     .filter(([id]) => id));
   const statements = [];
-  for (const questionId of loaded.config.enabledQuestionIds) {
+  const sourceQuestionIds = questionSource.mode === WRAPPED_QUESTION_SOURCE_MODES.AGENT_ONLY_PROPOSALS
+    ? loaded.config.enabledQuestionIds
+    : [...byId.keys()];
+  for (const questionId of sourceQuestionIds) {
     const statement = snapshotStatementFromQuestion(byId.get(questionId));
     if (statement) statements.push(statement);
   }
@@ -1049,6 +1105,8 @@ export async function materializeAgentOnlyWindow({
     windowId: boundary.windowId,
     opensAt: boundary.opensAt,
     closesAt: boundary.closesAt,
+    questionSourceMode: questionSource.mode,
+    questionSource: questionSource.source,
     statements,
     evalTypesByQuestionId: loaded.config.evalTypesByQuestionId || {},
     createdAt,
@@ -2043,13 +2101,18 @@ function wrappedImageModeMetadata(mode = '') {
   return 'w';
 }
 
-function resolveWorkerOpenAiKey(env = {}) {
-  return safeString(
-    env.AGENT_BRIDGE_OPENAI_API_KEY ||
-    env.AGENT_BRIDGE_OPENAI_KEY ||
-    env.OPENAI_API_KEY ||
-    env.E2E_OPENAI_KEY,
+function resolveWrappedPosterOpenAiKey(env = {}) {
+  return safeString(env.AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY);
+}
+
+function resolveWrappedPosterRenderer(body = {}, env = {}) {
+  const renderer = lower(
+    body.poster_renderer ||
+    body.posterRenderer ||
+    body.renderer ||
+    env.AGENT_BRIDGE_WRAPPED_POSTER_RENDERER,
   );
+  return renderer === 'openai' ? 'openai' : 'local';
 }
 
 function wrappedPredictionRows(snapshot = {}, state = {}, { includeUnavailableGuesses = false, runId = '' } = {}) {
@@ -2724,7 +2787,7 @@ ${tokenUsageLine || 'No submitted token usage metric; omit token numbers and do 
       prompt: `${common}
 
 Screen 1 of 5: "What your agent thinks it knows about you".
-Make this a hero screen: one large abstract image, one bold archetype label, and one memorable one-liner about what the agent predicts about the principal. Use the agent-about-user analysis if present; otherwise synthesize cautiously from predicted-answer evidence. The image should feel like a phone wallpaper or album-cover opener, not a table. Include only the Session Lab wordmark, the title, the archetype, the one-liner, and a subtle contextengine.xyz mark.
+Make this a hero screen: one large abstract image, one bold archetype label, and one memorable one-liner about what the agent predicts about the principal. Use the agent-about-user analysis if present; otherwise synthesize cautiously from predicted-answer evidence. The image should feel like a phone wallpaper or album-cover opener, not a table. Include only the Session Lab wordmark, the title, the archetype, the one-liner, and a subtle contextengine.sh mark.
 
 ${evidence}`,
     },
@@ -2889,7 +2952,7 @@ ${cautiousLines || 'No visible items; omit this section entirely.'}
 Agent guesses, if available:
 ${agentGuessLines || 'No visible items; omit this section entirely.'}
 
-Include a compact "Why here?" strip with exactly 3 evidence chips when at least 3 concrete evidence items exist. Each chip must have a precise icon and 2-4 word label derived directly from one specific question or prediction above. Do not use generic abstract icons, random symbols, or decorative filler. Put only a faint small "contextengine.xyz" link in the bottom-right corner. Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative filler text, other users, or fake data.`;
+Include a compact "Why here?" strip with exactly 3 evidence chips when at least 3 concrete evidence items exist. Each chip must have a precise icon and 2-4 word label derived directly from one specific question or prediction above. Do not use generic abstract icons, random symbols, or decorative filler. Put only a faint small "contextengine.sh" link in the bottom-right corner. Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative filler text, other users, or fake data.`;
 }
 
 export function buildAgentOnlyWrappedImagePrompt({
@@ -2985,7 +3048,7 @@ Binary answer styling: for binary choice prediction rows only, render exactly on
 
 Agent Comparison: compare the principal to a historical figure or fictional/book character only if it feels supported by the predicted human responses or the agent-about-user evidence; if unsupported, omit the comparison card instead of showing unavailable text. Prefer historically accurate deep cuts when supported by the evidence: recognizable but less generic comparisons are better than defaulting to Benjamin Franklin, Leonardo da Vinci, or other obvious polymath icons. Keep this compact in the bottom-right corner or right side of the shared bottom band: a small stylized portrait/silhouette, the comparison name, and one brief description line of no more than 10 words. It should take less space than Agent Guesses and must not create a large empty illustration panel. Do not include Agent Guesses in this section. Do not add the old trio of comparison evidence icons, artifact tiles, or extra proof objects beside the historical figure.
 
-Footer: remove the review/edit sentence entirely and do not reserve a dedicated bottom footer row. Put only a small low-contrast but readable "contextengine.xyz" link tucked into the bottom-right corner; it should blend with the design, not be barely invisible.
+Footer: remove the review/edit sentence entirely and do not reserve a dedicated bottom footer row. Put only a small low-contrast but readable "contextengine.sh" link tucked into the bottom-right corner; it should blend with the design, not be barely invisible.
 
 Do not show access credentials, raw Telegram ids, confidence tables, rationales, privacy skip counts, linear/quadratic allocation mechanics, decorative text, lorem ipsum, fake UI labels, or random numbers. Keep the graphic memeable, premium, and screenshot-friendly. Make all major text legible and avoid overcrowding.`;
   assertNoSecretShape({ prompt }, 'Agent-only wrapped image prompt must not serialize secrets.');
@@ -3134,6 +3197,107 @@ function shouldRetryWrappedImageWithSaferPrompt(result = {}) {
   return /\bsafety\b|\bpolicy\b|\breject|\bmoderation\b|\bcontent\b|\bfiltered\b/.test(text);
 }
 
+function escapeWrappedPosterXml(value = '') {
+  return wrappedDisplayText(value, 180)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+function buildDeterministicWrappedPosterBase64({
+  sessionSlug = '',
+  snapshot = {},
+  state = {},
+  runId = '',
+  mode = 'wrapped',
+} = {}) {
+  const rows = wrappedPredictionRows(snapshot, state, { runId }).slice(0, 5);
+  const rowSvg = rows.map((row, index) => {
+    const y = 260 + index * 112;
+    const question = escapeWrappedPosterXml(row.question);
+    const answer = escapeWrappedPosterXml(row.answer);
+    return `<g transform="translate(112 ${y})"><rect width="1376" height="88" rx="18" fill="#ffffff" fill-opacity="0.08"/><text x="24" y="32" fill="#bfead0" font-family="system-ui,sans-serif" font-size="20">${question}</text><text x="24" y="64" fill="#ffffff" font-family="system-ui,sans-serif" font-size="25" font-weight="700">${answer}</text><text x="1328" y="64" text-anchor="end" fill="#7ee2a8" font-family="system-ui,sans-serif" font-size="20">${Math.max(0, Math.min(100, Number(row.confidence) || 0))}%</text></g>`;
+  }).join('');
+  const title = normalizeWrappedImageMode(mode) === 'political_compass'
+    ? 'Agent Norms Compass'
+    : 'What your agent thinks it knows about you';
+  const subtitle = `${sanitizeSessionSlug(sessionSlug)} · ${rows.length} predictions · privacy-first local render`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-label="Session Wrapped poster"><title>Session Wrapped poster</title><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#091d17"/><stop offset="1" stop-color="#17392d"/></linearGradient></defs><rect width="1600" height="900" fill="url(#bg)"/><circle cx="1450" cy="80" r="260" fill="#65d39a" fill-opacity="0.12"/><text x="112" y="98" fill="#7ee2a8" font-family="system-ui,sans-serif" font-size="28" font-weight="800" letter-spacing="3">SESSION LAB</text><text x="112" y="164" fill="#ffffff" font-family="system-ui,sans-serif" font-size="46" font-weight="750">${escapeWrappedPosterXml(title)}</text><text x="112" y="208" fill="#b8cfc4" font-family="system-ui,sans-serif" font-size="22">${escapeWrappedPosterXml(subtitle)}</text>${rowSvg}<text x="112" y="842" fill="#91aa9f" font-family="system-ui,sans-serif" font-size="18">Deterministic local renderer · no external image provider</text></svg>`;
+  return base64EncodeText(svg);
+}
+
+async function saveDeterministicWrappedPoster({
+  env = {},
+  sessionSlug = '',
+  snapshot = {},
+  state = {},
+  coverage = {},
+  telegramUserId = '',
+  runId = '',
+  imageMode = 'wrapped',
+  now = null,
+} = {}) {
+  const imageBase64 = buildDeterministicWrappedPosterBase64({
+    sessionSlug,
+    snapshot,
+    state,
+    runId,
+    mode: imageMode,
+  });
+  const model = 'local-deterministic-v1';
+  const size = '1600x900';
+  const quality = 'deterministic';
+  const prompt = `local-session-wrapped-v1:${sanitizeSessionSlug(sessionSlug)}:${safeString(snapshot.windowId)}:${runId}:${imageMode}`;
+  const savedImage = await saveAgentOnlyWrappedImage({
+    env,
+    sessionSlug,
+    windowId: snapshot.windowId,
+    telegramUserId,
+    runId,
+    mode: imageMode,
+    model,
+    size,
+    quality,
+    mediaKind: 'deterministic_svg_poster',
+    imageContentType: 'image/svg+xml',
+    imageBase64,
+    prompt,
+    now,
+  });
+  const payload = {
+    ok: true,
+    window_id: snapshot.windowId,
+    run_id: runId,
+    mode: imageMode,
+    statement_count: coverage.statementCount,
+    agent_prediction_count: coverage.agentPredictionCount,
+    agent_response_count: coverage.agentResponseCount,
+    privacy_skip_count: coverage.privacySkipCount,
+    all_statements_predicted: coverage.allStatementsPredicted,
+    all_statements_covered: coverage.allStatementsCovered,
+    model,
+    size,
+    quality,
+    reference_image: '',
+    media_kind: 'deterministic_svg_poster',
+    image_content_type: 'image/svg+xml',
+    image_base64: imageBase64,
+    image_safety_retried: false,
+    image_saved: savedImage.ok === true,
+    ...(savedImage.ok ? {
+      image_id: savedImage.imageId,
+      image_view_id: savedImage.imageViewId,
+      image_prompt_hash: savedImage.promptHash,
+    } : {
+      image_save_reason: savedImage.reason || 'wrapped_image_save_failed',
+    }),
+  };
+  assertNoSecretShape({ ...payload, image_base64: '[image omitted]' }, 'Local Wrapped poster response metadata must not serialize secrets.');
+  return payload;
+}
+
 export async function generateAgentOnlyWrappedImage({
   env = {},
   sessionSlug = '',
@@ -3202,22 +3366,23 @@ export async function generateAgentOnlyWrappedImage({
       ...cachedImage,
     };
   }
-  const openAiKey = resolveWorkerOpenAiKey(env);
+  const openAiKey = resolveWrappedPosterOpenAiKey(env);
+  const posterRenderer = resolveWrappedPosterRenderer(body, env);
+  if (imageMode !== 'wrapped_story' && (posterRenderer !== 'openai' || !openAiKey)) {
+    return saveDeterministicWrappedPoster({
+      env,
+      sessionSlug: slug,
+      snapshot,
+      state: stateForRun,
+      coverage,
+      telegramUserId,
+      runId,
+      imageMode,
+      now,
+    });
+  }
   if (!openAiKey) {
-    return {
-      ok: false,
-      status: 503,
-      reason: 'openai_key_missing',
-      window_id: snapshot.windowId,
-      run_id: runId,
-      mode: imageMode,
-      statement_count: coverage.statementCount,
-      agent_prediction_count: coverage.agentPredictionCount,
-      agent_response_count: coverage.agentResponseCount,
-      privacy_skip_count: coverage.privacySkipCount,
-      all_statements_predicted: coverage.allStatementsPredicted,
-      all_statements_covered: coverage.allStatementsCovered,
-    };
+    return { ok: false, status: 503, reason: 'wrapped_story_openai_key_missing' };
   }
   const loadedLinearVoteState = await loadVoteState({ env, sessionSlug: slug, windowId: snapshot.windowId, telegramUserId, mode: 'linear' });
   const loadedQuadraticVoteState = await loadVoteState({ env, sessionSlug: slug, windowId: snapshot.windowId, telegramUserId, mode: 'quadratic' });

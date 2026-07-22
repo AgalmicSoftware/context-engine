@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "classifications": [
+    {
+      "id": "test-source",
+      "pattern": "client/src/**/*.{test,spec}.{ts,tsx}"
+    },
+    {
+      "id": "test-helper",
+      "pattern": "client/src/**/*{testUtils,TestUtils,testHarness,TestHarness,testHelper,testHelpers,TestHelper,TestHelpers}.{ts,tsx}"
+    },
+    {
+      "id": "test-setup",
+      "pattern": "client/src/setupTests.ts"
+    }
+  ],
+  "explicitExclusions": []
+}

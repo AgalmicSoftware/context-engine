@@ -78,3 +78,55 @@ test('cache guard rejects dynamic DG localStorage access without a managed guard
     assert.match(result.stdout, /dynamic dg:\* localStorage usage without managed namespace guard/);
   });
 });
+
+test('cache guard rejects bracket-form managed cache access', () => {
+  withFixtureRepo((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/SurveyTool/SurveyTool.tsx',
+      [
+        "const cached = localStorage['getItem']('dg:questionsCache:general');",
+        'void cached;',
+      ].join('\n')
+    );
+
+    const result = runCacheGuard(rootDir);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /dg:questionsCache:general/);
+  });
+});
+
+test('cache guard rejects optional bracket-form dynamic DG access without a guard', () => {
+  withFixtureRepo((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/components/SurveyTool/SurveyTool.tsx',
+      [
+        'const key = `dg:${cacheName}:${sessionSlug}`;',
+        'const cached = localStorage?.["getItem"](key);',
+        'void cached;',
+      ].join('\n')
+    );
+
+    const result = runCacheGuard(rootDir);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /dynamic dg:\* localStorage usage without managed namespace guard/);
+  });
+});
+
+test('cache guard no longer exempts the obsolete root utilities cache path', () => {
+  withFixtureRepo((rootDir) => {
+    writeFile(
+      rootDir,
+      'client/src/utilities/cacheScripts.js',
+      "localStorage.setItem('bookmarksCache', 'unsafe');\n"
+    );
+
+    const result = runCacheGuard(rootDir);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stdout, /bookmarksCache/);
+  });
+});

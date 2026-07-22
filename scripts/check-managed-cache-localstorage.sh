@@ -9,9 +9,9 @@ search_tree() {
   local root="$2"
 
   if command -v rg >/dev/null 2>&1; then
-    rg -n "${pattern}" "${root}" --glob '!**/*.test.*' --glob '!**/utilities/cacheScripts.js'
+    rg -n "${pattern}" "${root}" --glob '!**/*.test.*'
   else
-    grep -RInE "${pattern}" "${root}" --exclude='*.test.*' --exclude='cacheScripts.js'
+    grep -RInE "${pattern}" "${root}" --exclude='*.test.*'
   fi
 }
 
@@ -36,7 +36,12 @@ filter_matches() {
   fi
 }
 
-RAW_MATCHES="$(search_tree "localStorage\\??\\.(getItem|setItem|removeItem)\\(" client/src || true)"
+DOT_MATCHES="$(search_tree "localStorage\\??\\.(getItem|setItem|removeItem)[[:space:]]*\\(" client/src || true)"
+BRACKET_MATCHES="$(search_tree "localStorage(\\?\\.)?\\[[[:space:]]*['\"](getItem|setItem|removeItem)['\"][[:space:]]*\\][[:space:]]*\\(" client/src || true)"
+RAW_MATCHES="${DOT_MATCHES}"
+if [[ -n "${BRACKET_MATCHES}" ]]; then
+  RAW_MATCHES+="${RAW_MATCHES:+$'\n'}${BRACKET_MATCHES}"
+fi
 
 if [[ -z "${RAW_MATCHES}" ]]; then
   echo "cache-guard: no localStorage calls found in client/src."
@@ -53,7 +58,9 @@ while IFS= read -r file; do
   HAS_DYNAMIC_DG_KEY="$(search_file 'dg:\$\{[A-Za-z_][A-Za-z0-9_]*\}:\$\{[A-Za-z_][A-Za-z0-9_]*\}' "${file}" || true)"
   [[ -z "${HAS_DYNAMIC_DG_KEY}" ]] && continue
 
-  HAS_DYNAMIC_LOCALSTORAGE_CALL="$(search_file "localStorage\\??\\.(getItem|setItem|removeItem)\\([[:space:]]*[A-Za-z_][A-Za-z0-9_]*" "${file}" || true)"
+  HAS_DYNAMIC_DOT_CALL="$(search_file "localStorage\\??\\.(getItem|setItem|removeItem)[[:space:]]*\\([[:space:]]*[A-Za-z_][A-Za-z0-9_]*" "${file}" || true)"
+  HAS_DYNAMIC_BRACKET_CALL="$(search_file "localStorage(\\?\\.)?\\[[[:space:]]*['\"](getItem|setItem|removeItem)['\"][[:space:]]*\\][[:space:]]*\\([[:space:]]*[A-Za-z_][A-Za-z0-9_]*" "${file}" || true)"
+  HAS_DYNAMIC_LOCALSTORAGE_CALL="${HAS_DYNAMIC_DOT_CALL}${HAS_DYNAMIC_BRACKET_CALL}"
   [[ -z "${HAS_DYNAMIC_LOCALSTORAGE_CALL}" ]] && continue
 
   HAS_MANAGED_GUARD="$(search_file 'is[A-Za-z0-9_]*ManagedDgCacheName\(' "${file}" || true)"

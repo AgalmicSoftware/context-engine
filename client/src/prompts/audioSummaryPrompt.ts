@@ -4,7 +4,6 @@
 //   <STYLE>           → style hint (default: "reading-group")
 //   <SESSION_TITLE?>  → optional title override (if omitted, model derives a concise title)
 
-/* eslint-disable max-len */
 export const audioSummaryPrompt = `
 ROLE
 You are a careful note-taker and editor. Transform the provided discussion into a neutral, inclusive, topic-agnostic **reading-group–style** Markdown report that general audiences can follow and experts still find meaningful.
@@ -68,4 +67,3 @@ TRANSCRIPT BEGINS
 <TRANSCRIPT>
 TRANSCRIPT ENDS
 `;
-/* eslint-enable max-len */

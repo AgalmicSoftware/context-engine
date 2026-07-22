@@ -136,7 +136,11 @@ export const resolveAuthLoginRequestAuthority = async ({
   if (!nonceResult?.ok) {
     return {
       ok: false,
-      response: deps?.json?.({ error: nonceResult?.error }, 400, headers),
+      response: deps?.json?.(
+        { error: nonceResult?.error },
+        Number(nonceResult?.status || 0) >= 500 ? Number(nonceResult.status) : 400,
+        headers,
+      ),
     };
   }
 

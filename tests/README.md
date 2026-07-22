@@ -21,7 +21,9 @@ If you are deciding where to add new files:
 
 ## How to run
 
-- Canonical PR gate: `npm run test:ci`
+- Canonical PR gate: `npm run test:ci` (serial `ci` profile from
+  `scripts/ci-gates.json`)
+- One named manifest gate: `npm run ci:gate -- <gate-name>`
 - Same canonical gate via npm default: `npm test`
 - Client Jest/RTL coverage gate: `npm run test:client`
 - Root `node:test` suites: `npm run test:node`

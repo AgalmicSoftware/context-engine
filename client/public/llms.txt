@@ -2,8 +2,8 @@
 
 > Context Engine is an open-source toolkit for AI-enhanced deliberation and large-group sensemaking, with public and private surveys, AI-assisted analysis, permanent records, and cryptographic access control.
 
-Canonical site: https://contextengine.xyz/
-Static summary: https://contextengine.xyz/discoverability.html
+Canonical site: https://contextengine.sh/
+Static summary: https://contextengine.sh/discoverability.html
 Canonical GitHub repository: https://github.com/AgalmicSoftware/context-engine
 Latest GitHub source tree: https://github.com/AgalmicSoftware/context-engine/tree/main
 

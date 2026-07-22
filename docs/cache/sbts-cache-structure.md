@@ -156,6 +156,26 @@ dg:sbtCache:edge
 dg:sbtCache:test-10
 ```
 
+## Password and invite recovery
+
+SBT password/invite recovery is intentionally separate from the managed SBT
+metadata cache above:
+
+- New codes are export-only by default and are not written to browser storage.
+- Explicit opt-in recovery writes `ce:sbtPasswordRecovery:v2` to localStorage.
+  Entries contain AES-GCM ciphertext scoped by chain ID and SBT address; the
+  non-extractable AES key is stored in IndexedDB database
+  `ce-sbt-password-recovery-keys`.
+- The authenticated encryption context binds the envelope version, record key,
+  chain, address, timestamps, cipher, and key reference. Tampered or missing-key
+  records fail closed.
+- Recovery does not sync across devices and does not protect against a browser
+  profile compromise. Export remains the primary recovery path.
+- Legacy `ce:sbtPasswordRecovery:v1` plaintext entries remain read-only
+  compatible until the user clears local recovery for that group.
+- If WebCrypto or IndexedDB is unavailable, the UI falls back to export-only
+  behavior without writing plaintext.
+
 ## LocalStorage-only readiness flags
 
 These are documented centrally in [`docs/cache/README.md`](README.md):

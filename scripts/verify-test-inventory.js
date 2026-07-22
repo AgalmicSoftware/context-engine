@@ -27,6 +27,21 @@ function listDirectTestFiles(rootDir, relativeDir, fileRe) {
     .map((entry) => path.join(relativeDir, entry));
 }
 
+function listRecursiveTestFiles(rootDir, relativeDir, fileRe) {
+  const absoluteDir = path.join(rootDir, relativeDir);
+  if (!fs.existsSync(absoluteDir) || !fs.statSync(absoluteDir).isDirectory()) {
+    return [];
+  }
+
+  return fs.readdirSync(absoluteDir, { withFileTypes: true })
+    .flatMap((entry) => {
+      const relativePath = path.join(relativeDir, entry.name);
+      if (entry.isDirectory()) return listRecursiveTestFiles(rootDir, relativePath, fileRe);
+      return entry.isFile() && fileRe.test(entry.name) ? [relativePath] : [];
+    })
+    .sort();
+}
+
 function readJson(rootDir, relativePath) {
   return JSON.parse(fs.readFileSync(path.join(rootDir, relativePath), 'utf8'));
 }
@@ -43,7 +58,7 @@ function verifyPackageScript(pkg, scriptName, expectedFragment, failures, label 
 }
 
 function verifyClassifiedRootTests(rootDir, failures) {
-  const existingRootTests = listDirectTestFiles(rootDir, path.join('tests', 'root'), ROOT_TEST_FILE_RE);
+  const existingRootTests = listRecursiveTestFiles(rootDir, path.join('tests', 'root'), ROOT_TEST_FILE_RE);
   const classified = new Set(ROOT_TEST_FILES);
 
   const unclassified = existingRootTests.filter(
@@ -81,8 +96,39 @@ function verifyRootScripts(rootDir, failures) {
   const pkg = readJson(rootDir, 'package.json');
   verifyPackageScript(pkg, 'test:root:jest', '--testMatch', failures);
   verifyPackageScript(pkg, 'test:worker:session-cors', 'npm --prefix workers/sessionCorsWorker test', failures);
-  verifyPackageScript(pkg, 'test:ci', 'npm run test:root:jest', failures);
-  verifyPackageScript(pkg, 'test:ci', 'npm run test:worker:session-cors', failures);
+  verifyPackageScript(pkg, 'typecheck:client-tests', 'scripts/check-client-test-types.mjs', failures);
+  verifyPackageScript(pkg, 'ci:gate', 'scripts/run-ci-gates.mjs --gate', failures);
+  verifyPackageScript(pkg, 'test:ci', 'scripts/run-ci-gates.mjs --profile ci', failures);
+
+  const manifestPath = path.join(rootDir, 'scripts', 'ci-gates.json');
+  if (!fs.existsSync(manifestPath)) {
+    failures.push('missing scripts/ci-gates.json');
+  } else {
+    const manifest = readJson(rootDir, path.join('scripts', 'ci-gates.json'));
+    const ciProfile = manifest?.profiles?.ci || [];
+    const gateCommands = (gateName) => (
+      (manifest?.gates?.[gateName]?.commands || [])
+        .map((entry) => [entry.command, ...(entry.args || [])].join(' '))
+    );
+    if (!ciProfile.includes('root-jest')) {
+      failures.push('scripts/ci-gates.json profile "ci" must include "root-jest"');
+    }
+    if (!ciProfile.includes('workers')) {
+      failures.push('scripts/ci-gates.json profile "ci" must include "workers"');
+    }
+    if (!gateCommands('root-jest').includes('npm run test:root:jest')) {
+      failures.push('scripts/ci-gates.json gate "root-jest" must run test:root:jest');
+    }
+    if (!gateCommands('workers').includes('npm run test:worker:session-cors')) {
+      failures.push('scripts/ci-gates.json gate "workers" must run test:worker:session-cors');
+    }
+    if (!gateCommands('wiring-and-release').includes('npm run typecheck:client-tests')) {
+      failures.push('scripts/ci-gates.json gate "wiring-and-release" must run typecheck:client-tests');
+    }
+    if (!gateCommands('release').includes('npm run typecheck:client-tests')) {
+      failures.push('scripts/ci-gates.json gate "release" must run typecheck:client-tests');
+    }
+  }
 
   const rootJestScript = String(pkg?.scripts?.['test:root:jest'] || '');
   ROOT_JEST_TEST_FILES.forEach((relativePath) => {
@@ -123,5 +169,6 @@ if (require.main === module) {
 
 module.exports = {
   listDirectTestFiles,
+  listRecursiveTestFiles,
   verifyTestInventory,
 };

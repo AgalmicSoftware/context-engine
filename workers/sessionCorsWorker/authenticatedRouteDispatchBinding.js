@@ -17,6 +17,7 @@ export const dispatchAuthenticatedRouteWithWorkerDeps = async ({
         env,
         deps: {
           evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+          computeScopesForLogin: deps?.computeScopesForLogin,
           resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
           checkRateLimit: deps?.checkRateLimit,
           getSessionSecrets: deps?.getSessionSecrets,
@@ -34,6 +35,7 @@ export const dispatchAuthenticatedRouteWithWorkerDeps = async ({
         env,
         deps: {
           evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+          computeScopesForLogin: deps?.computeScopesForLogin,
           fetchImage: deps?.fetchImage,
           fetchUrl: deps?.fetchUrl,
           checkRateLimit: deps?.checkRateLimit,
@@ -45,6 +47,7 @@ export const dispatchAuthenticatedRouteWithWorkerDeps = async ({
         env,
         deps: {
           evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+          computeScopesForLogin: deps?.computeScopesForLogin,
           resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
           normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
           proxyAnthropic: deps?.proxyAnthropic,

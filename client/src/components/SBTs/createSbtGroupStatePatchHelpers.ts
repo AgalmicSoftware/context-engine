@@ -249,6 +249,8 @@ export const buildCreateSbtEditResetPatch = ({
   startedMinting: false,
   mintingFailed: false,
   error: '',
+  encryptedRecoveryEnabled: false,
+  encryptedRecoveryStatus: 'idle',
   ...(resetUploadState === true
     ? {
         imageUploaded: false,

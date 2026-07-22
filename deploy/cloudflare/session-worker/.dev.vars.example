@@ -1,0 +1,4 @@
+# Cloudflare's Deploy to Cloudflare flow prompts for both values.
+# They must be independent 32-byte random values and must never be committed.
+TOKEN_HMAC_SECRET=replace-with-first-independent-64-hex-value
+CE_STORAGE_ENVELOPE_KEK=replace-with-second-independent-64-hex-value

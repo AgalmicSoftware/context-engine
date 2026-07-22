@@ -3,7 +3,12 @@ import {
   STORAGE_BACKENDS,
   normalizeStorageBackend,
 } from '../sessionCorsWorker/storageRefNormalization.js';
-import { buildSessionSecretsEnvelope } from './sessionSecretsEnvelope.mjs';
+import { buildEncryptedSessionSecretsEnvelope } from './sessionSecretsEnvelope.mjs';
+import {
+  AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
+  executeAgentSessionWrappedDeployment,
+  persistAgentSessionWrappedCapability,
+} from './agentSessionWrappedDeployment.mjs';
 import { resolveCloudflareApiBaseUrl } from './deployHelperEndpointConfig.mjs';
 import {
   findForbiddenCloudflareDeploymentTokenPath,
@@ -11,6 +16,11 @@ import {
   sanitizeWorkerConfigOpenSubtree,
   selectDeployWorkerSessionConfigFields,
 } from './workerSessionConfig.mjs';
+import { validateDeploymentModeValues } from './workerConfigModeValidation.mjs';
+import {
+  fetchExpectedWorkerBundleDigest,
+  normalizeWorkerBundleSha256,
+} from './workerReleaseManifest.mjs';
 
 const { getPathRpcUrl } = rpcDefaults;
 
@@ -315,10 +325,6 @@ export const sha256Hex = async (value) => {
     .join('');
 };
 
-const deriveIdempotentRuntimeSecret = async ({ apiToken, deploymentId, purpose }) => sha256Hex(
-  `context-engine:deploy-runtime-secret:v1:${purpose}\u0000${deploymentId}\u0000${apiToken}`,
-);
-
 const canonicalizeJsonValue = (value, arrayEntry = false) => {
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
@@ -562,8 +568,14 @@ const buildSafeDeployJournalResult = (result = {}, credentials = []) => {
   [
     'ok',
     'error',
+    'step',
+    'deploymentKind',
+    'accountId',
     'workerName',
     'workerUrl',
+    'sessionSlug',
+    'sessionWorkerOrigin',
+    'telegramConfigured',
     'resolvedSlug',
     'kvNamespaceId',
     'deploymentId',
@@ -620,6 +632,53 @@ const buildSafeDeployJournalResult = (result = {}, credentials = []) => {
       }
     });
   }
+  if (isObj(incomingBody.resources)) {
+    body.resources = {};
+    ['kvNamespaceId', 'kvReused'].forEach((key) => {
+      const value = incomingBody.resources[key];
+      if (typeof value === 'string') body.resources[key] = redactKnownCredentials(value, credentials);
+      else if (typeof value === 'boolean' || Number.isFinite(value)) body.resources[key] = value;
+    });
+  }
+  if (isObj(incomingBody.upload)) {
+    body.upload = {};
+    ['reused', 'bundleSha256'].forEach((key) => {
+      const value = incomingBody.upload[key];
+      if (typeof value === 'string') body.upload[key] = redactKnownCredentials(value, credentials);
+      else if (typeof value === 'boolean' || Number.isFinite(value)) body.upload[key] = value;
+    });
+    if (isObj(incomingBody.upload.metadata) && typeof incomingBody.upload.metadata.main_module === 'string') {
+      body.upload.metadata = { main_module: incomingBody.upload.metadata.main_module };
+    } else if (incomingBody.upload.metadata === null) {
+      body.upload.metadata = null;
+    }
+  }
+  if (isObj(incomingBody.secrets)) {
+    body.secrets = {};
+    ['generated', 'preserved'].forEach((key) => {
+      if (Array.isArray(incomingBody.secrets[key])) {
+        body.secrets[key] = incomingBody.secrets[key]
+          .filter((value) => typeof value === 'string')
+          .map((value) => redactKnownCredentials(value, credentials));
+      }
+    });
+  }
+  if (isObj(incomingBody.health)) {
+    body.health = {};
+    ['ok', 'protocolVersion', 'authorityPinned'].forEach((key) => {
+      const value = incomingBody.health[key];
+      if (typeof value === 'string') body.health[key] = redactKnownCredentials(value, credentials);
+      else if (typeof value === 'boolean' || Number.isFinite(value)) body.health[key] = value;
+    });
+  }
+  if (isObj(incomingBody.agentSessionWrapped)) {
+    body.agentSessionWrapped = {};
+    ['version', 'enabled', 'origin', 'protocolVersion', 'revision', 'verifiedAt'].forEach((key) => {
+      const value = incomingBody.agentSessionWrapped[key];
+      if (typeof value === 'string') body.agentSessionWrapped[key] = redactKnownCredentials(value, credentials);
+      else if (typeof value === 'boolean' || Number.isFinite(value)) body.agentSessionWrapped[key] = value;
+    });
+  }
   if (result?.ok !== true) body.deploymentRequestTerminal = true;
   return {
     ok: result?.ok === true,
@@ -650,8 +709,12 @@ const buildDeploymentRequestContext = async ({ body, requestOrigin = '' } = {}) 
   }));
   const immutableIdentityDigest = await sha256Hex(stableCanonicalSerialize({
     requestOrigin: normalizeOrigin(requestOrigin) || toStr(requestOrigin).trim(),
+    deploymentKind: toStr(body?.deploymentKind).trim(),
+    sessionDeploymentIdentity: toStr(body?.sessionDeploymentIdentity).trim(),
     requestedWorkerName: toStr(body?.workerName).trim(),
     sessionSlug: toStr(body?.sessionSlug).trim(),
+    sessionWorkerOrigin: toStr(body?.sessionWorkerOrigin || body?.sessionWorkerUrl).trim(),
+    authorityMode: toStr(body?.authorityMode).trim(),
     sessionId: toStr(body?.sessionId).trim().toLowerCase(),
     sessionIdHex: toStr(body?.sessionIdHex).trim().toLowerCase(),
     adminAddress: toStr(body?.adminAddress).trim().toLowerCase(),
@@ -905,11 +968,6 @@ export const normalizeDeployStorageProfile = (incoming) => {
   };
   return profile;
 };
-
-const deployStorageRequiresEnvelopeKek = (storageProfile) => (
-  storageProfile?.backend === STORAGE_BACKENDS.CLOUDFLARE &&
-  storageProfile?.payloadAccessControl?.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE
-);
 
 const firstTrimmed = (...values) => {
   for (const value of values) {
@@ -1203,6 +1261,27 @@ const executeDeployHelperRequestCore = async ({
   const apiToken = toStr(body?.apiToken || body?.token).trim();
   const apiBaseUrl = resolveCloudflareApiBaseUrl({ env });
   const cfFetchOptions = { fetchImpl, apiBaseUrl };
+  if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
+    if (!apiToken) return buildFailure(400, { error: 'Missing apiToken.' });
+    const accountLookup = toStr(resolvedAccountId).trim()
+      ? { ok: true, accountId: toStr(resolvedAccountId).trim() }
+      : await resolveDeploymentAccountId({ body, fetchImpl, apiBaseUrl, env });
+    if (!accountLookup.ok) {
+      const lookupStatus = Number(accountLookup.status || 0);
+      return buildFailure(lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502, {
+        error: accountLookup.error || 'Failed to resolve Cloudflare account.',
+        detail: accountLookup.detail,
+      }, { fallbackEligible: accountLookup.fallbackEligible === true });
+    }
+    return executeAgentSessionWrappedDeployment({
+      body,
+      env,
+      accountId: toStr(accountLookup.accountId).trim(),
+      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
+      fetchImpl,
+      markMutationStarted: idempotencyContext?.markMutationStarted,
+    });
+  }
   const requestedWorkerName = toStr(body?.workerName).trim();
   const defaultSlugInput = env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG ?? '';
   const defaultSlugCheck = validateInboundSlug(defaultSlugInput);
@@ -1218,9 +1297,17 @@ const executeDeployHelperRequestCore = async ({
   const hasBundleText = bundleText.trim() !== '';
   const bundleUrl = toStr(body?.bundleUrl || env?.WORKER_BUNDLE_URL).trim();
   const expectedInlineBundleSha256 = hasBundleText ? await sha256Hex(bundleText) : '';
+  const suppliedBundleSha256 = toStr(body?.bundleSha256).trim();
+  let expectedBundleSha256 = normalizeWorkerBundleSha256(suppliedBundleSha256);
+  let bundleSource = hasBundleText ? bundleText : '';
+  const bundleSourceKind = hasBundleText ? 'bundleText' : 'bundleUrl';
+  let bundleDiagnostics = null;
 
   if (!apiToken) return buildFailure(400, { error: 'Missing apiToken.' });
   if (!requestedWorkerName) return buildFailure(400, { error: 'Missing workerName.' });
+  if (suppliedBundleSha256 && !expectedBundleSha256) {
+    return buildFailure(400, { error: 'bundleSha256 must be a complete SHA-256 hex digest.' });
+  }
   if (!hasBundleText && !bundleUrl) {
     return buildFailure(400, {
       error: 'Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl).',
@@ -1228,10 +1315,56 @@ const executeDeployHelperRequestCore = async ({
   }
 
   const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
+  const modeValidation = validateDeploymentModeValues(body);
+  if (!modeValidation.ok) {
+    return buildFailure(400, { error: `Invalid deployment mode at ${modeValidation.path}.` });
+  }
   const storageProfile = normalizeDeployStorageProfile(rawStorageProfile);
   const storageBindingPlan = resolveDeployStorageBindingPlan(rawStorageProfile, storageProfile);
   if (!storageBindingPlan.ok) {
     return buildFailure(400, { error: storageBindingPlan.error });
+  }
+
+  if (!hasBundleText && toStr(body?.bundleManifestUrl).trim()) {
+    const manifestDigest = await fetchExpectedWorkerBundleDigest({
+      manifestUrl: toStr(body.bundleManifestUrl).trim(),
+      artifactFile: 'sessionCorsWorker.bundle.js',
+      artifactKind: 'session-cors-worker',
+      fetchImpl,
+    });
+    if (!manifestDigest.ok) {
+      return buildFailure(502, { error: manifestDigest.error });
+    }
+    if (expectedBundleSha256 && expectedBundleSha256 !== manifestDigest.digest) {
+      return buildFailure(409, { error: 'Worker release manifest digest conflicts with bundleSha256.' });
+    }
+    expectedBundleSha256 = manifestDigest.digest;
+  }
+
+  if (expectedBundleSha256 && !bundleSource) {
+    let bundleResponse;
+    try {
+      bundleResponse = await fetchImpl(bundleUrl);
+    } catch (error) {
+      return buildFailure(502, {
+        error: `Failed to fetch bundle: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
+      }, { fallbackEligible: true });
+    }
+    if (!bundleResponse.ok) {
+      return buildFailure(502, { error: `Failed to fetch bundle (${bundleResponse.status}).` }, {
+        fallbackEligible: bundleResponse.status >= 500 || bundleResponse.status === 429,
+      });
+    }
+    bundleSource = await bundleResponse.text();
+    bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
+  }
+  if (
+    expectedBundleSha256 &&
+    (bundleDiagnostics?.sha256 || expectedInlineBundleSha256) !== expectedBundleSha256
+  ) {
+    return buildFailure(409, {
+      error: 'Worker bundle SHA-256 does not match the verified release manifest.',
+    });
   }
 
   const accountLookup = toStr(resolvedAccountId).trim()
@@ -1357,9 +1490,6 @@ const executeDeployHelperRequestCore = async ({
     true
   );
 
-  let bundleSource = hasBundleText ? bundleText : '';
-  const bundleSourceKind = hasBundleText ? 'bundleText' : 'bundleUrl';
-  let bundleDiagnostics = null;
   const prepareBundleDiagnostics = async () => {
     if (bundleDiagnostics) return { ok: true };
     if (!bundleSource) {
@@ -1387,6 +1517,14 @@ const executeDeployHelperRequestCore = async ({
       bundleSource = await bundleResp.text();
     }
     bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
+    if (expectedBundleSha256 && bundleDiagnostics.sha256 !== expectedBundleSha256) {
+      return {
+        ok: false,
+        result: buildFailure(409, {
+          error: 'Worker bundle SHA-256 does not match the verified release manifest.',
+        }),
+      };
+    }
     consoleImpl?.log?.('[deploy-helper] bundle diagnostics', JSON.stringify({
       workerName,
       sessionSlug: displaySlug,
@@ -1401,6 +1539,7 @@ const executeDeployHelperRequestCore = async ({
 
   const config = {
     slug: sessionSlug,
+    authzEpoch: 1,
     adminAddress,
     allowOrigins,
     limits,
@@ -1440,7 +1579,15 @@ const executeDeployHelperRequestCore = async ({
   const sessionConfigKey = `session:${sessionSlug}:config`;
   const sessionSecretsKey = `session:${sessionSlug}:secrets`;
   const secrets = sanitizeSecrets(body?.secrets || {});
-  const secretsEnvelope = buildSessionSecretsEnvelope(secrets);
+  // Every Session Worker needs a KEK for its canonical secret record, even
+  // when payload-level worker-envelope encryption is not selected. The shared
+  // envelope helper derives a domain-separated AES key from this value.
+  const envelopeKekSecretRequired = true;
+  const candidateEnvelopeKekSecret = randomSecret();
+  const secretsEnvelope = await buildEncryptedSessionSecretsEnvelope(secrets, {
+    env: { [STORAGE_ENVELOPE_KEK_SECRET_NAME]: candidateEnvelopeKekSecret },
+    slug: sessionSlug || displaySlug,
+  });
 
   const requestMarker = toStr(idempotencyContext?.requestMarker).trim();
   const kvTitleSuffix = requestMarker ? `:req-${requestMarker}` : '';
@@ -1799,7 +1946,6 @@ const executeDeployHelperRequestCore = async ({
     }
   }
 
-  const envelopeKekSecretRequired = deployStorageRequiresEnvelopeKek(storageProfile);
   const metadata = {
     main_module: 'worker.mjs',
     bindings: [
@@ -2146,13 +2292,9 @@ const executeDeployHelperRequestCore = async ({
     resumedSecretBindings.has(STORAGE_ENVELOPE_KEK_SECRET_NAME);
   const tokenSecret = tokenSecretPreserved
     ? ''
-    : (idempotencyContext
-      ? await deriveIdempotentRuntimeSecret({ apiToken, deploymentId, purpose: 'token-hmac' })
-      : randomSecret());
+    : randomSecret();
   const envelopeKekSecret = envelopeKekSecretRequired && !envelopeKekSecretPreserved
-    ? (idempotencyContext
-      ? await deriveIdempotentRuntimeSecret({ apiToken, deploymentId, purpose: 'storage-envelope-kek' })
-      : randomSecret())
+    ? candidateEnvelopeKekSecret
     : '';
 
   const {
@@ -2288,12 +2430,69 @@ const executeDeployHelperRequestCore = async ({
     deploymentPayload.configVerified = configExactlyVerified;
   }
 
+  if (
+    resumeUploadedWorker &&
+    !envelopeKekSecretPreserved &&
+    !tokenSecretPreserved
+  ) {
+    // A prior invocation uploaded the exact owned script but stopped before
+    // either runtime secret was installed. Its staged ciphertext was bound to
+    // an in-memory KEK that Cloudflare cannot reveal. Replace only that
+    // unreachable record with an encrypted empty payload under this retry's
+    // KEK; the caller then performs the normal signed secret sync because the
+    // response retains writesSessionSecrets=false.
+    const recoveryEnvelope = await buildEncryptedSessionSecretsEnvelope({}, {
+      env: { [STORAGE_ENVELOPE_KEK_SECRET_NAME]: candidateEnvelopeKekSecret },
+      slug: sessionSlug || displaySlug,
+    });
+    const recoverySecretsPut = await cfFetch(
+      apiToken,
+      `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`,
+      {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(recoveryEnvelope),
+      },
+      cfFetchOptions,
+    );
+    if (!recoverySecretsPut.ok) {
+      return buildDeploymentFailure(503, {
+        error: recoverySecretsPut.error || 'Failed to recover encrypted session secrets staging.',
+        detail: recoverySecretsPut.detail,
+        deploymentRequestPending: true,
+        orphanResources: {
+          kvNamespaceId: kvId,
+          kvCleanupStatus: 'retained-runtime-secret-pending',
+          workerName,
+          workerCleanupStatus: 'retained-runtime-secret-pending',
+        },
+      }, { fallbackEligible: true });
+    }
+  }
+
   // Runtime secrets are written only after the public worker URL and canonical
   // config have both been verified. Storage readiness comes first; the HMAC
   // secret is the final activation gate that makes login possible.
+  const runtimeSecretsPath = `/accounts/${accountId}/workers/scripts/${workerName}/secrets`;
+  const reconcileRuntimeSecretWrite = async (name, result) => {
+    const pending = !!idempotencyContext && isAmbiguousCloudflareMutationFailure(result);
+    if (!pending) return { ok: false, pending: false };
+    const inventory = await cfFetch(apiToken, runtimeSecretsPath, { method: 'GET' }, cfFetchOptions);
+    const committed = inventory.ok && Array.isArray(inventory?.data?.result) &&
+      inventory.data.result.some((entry) => (
+        toStr(entry?.type).trim() === 'secret_text' && toStr(entry?.name).trim() === name
+      ));
+    return { ok: committed, pending: !committed };
+  };
+  const retainedRuntimeSecretResources = () => ({
+    kvNamespaceId: kvId,
+    kvCleanupStatus: 'retained-runtime-secret-pending',
+    workerName,
+    workerCleanupStatus: 'retained-runtime-secret-pending',
+  });
   if (envelopeKekSecretRequired) {
     if (!deploymentPayload.envelopeKekSecretPreserved) {
-      const envelopeKekResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
+      const envelopeKekResp = await cfFetch(apiToken, runtimeSecretsPath, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2303,14 +2502,23 @@ const executeDeployHelperRequestCore = async ({
         }),
       }, cfFetchOptions);
       if (!envelopeKekResp.ok) {
-        const orphanResources = await cleanupDeploymentResources();
-        return buildDeploymentFailure(502, {
-          error: envelopeKekResp.error,
-          detail: envelopeKekResp.detail,
-          orphanResources,
-        }, {
-          fallbackEligible: shouldAllowFallbackForCloudflareFailure(envelopeKekResp),
-        });
+        const reconciled = await reconcileRuntimeSecretWrite(
+          STORAGE_ENVELOPE_KEK_SECRET_NAME,
+          envelopeKekResp,
+        );
+        if (!reconciled.ok) {
+          const orphanResources = reconciled.pending
+            ? retainedRuntimeSecretResources()
+            : await cleanupDeploymentResources();
+          return buildDeploymentFailure(502, {
+            error: envelopeKekResp.error,
+            detail: envelopeKekResp.detail,
+            orphanResources,
+            ...(reconciled.pending ? { deploymentRequestPending: true } : {}),
+          }, {
+            fallbackEligible: shouldAllowFallbackForCloudflareFailure(envelopeKekResp),
+          });
+        }
       }
       envelopeKekSecretSet = true;
       deploymentPayload.envelopeKekSecretSet = true;
@@ -2318,28 +2526,150 @@ const executeDeployHelperRequestCore = async ({
   }
 
   if (!deploymentPayload.tokenSecretSet && !deploymentPayload.tokenSecretPreserved) {
-    const secretResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/secrets`, {
+    const secretResp = await cfFetch(apiToken, runtimeSecretsPath, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'TOKEN_HMAC_SECRET', type: 'secret_text', text: tokenSecret }),
     }, cfFetchOptions);
     if (!secretResp.ok) {
-      const orphanResources = await cleanupDeploymentResources();
-      return buildDeploymentFailure(502, {
-        error: secretResp.error,
-        detail: secretResp.detail,
-        orphanResources,
-      }, {
-        fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretResp),
-      });
+      const reconciled = await reconcileRuntimeSecretWrite('TOKEN_HMAC_SECRET', secretResp);
+      if (!reconciled.ok) {
+        const orphanResources = reconciled.pending
+          ? retainedRuntimeSecretResources()
+          : await cleanupDeploymentResources();
+        return buildDeploymentFailure(502, {
+          error: secretResp.error,
+          detail: secretResp.detail,
+          orphanResources,
+          ...(reconciled.pending ? { deploymentRequestPending: true } : {}),
+        }, {
+          fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretResp),
+        });
+      }
     }
     deploymentPayload.tokenSecretSet = true;
+  }
+
+  if (body?.sessionModeProfile?.surfaces?.agentHttp === true) {
+    const wrappedDeploy = await executeAgentSessionWrappedDeployment({
+      body: {
+        deploymentKind: AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
+        apiToken,
+        sessionSlug: displaySlug,
+        sessionWorkerOrigin: workerUrl,
+        sessionDeploymentIdentity: body?.agentSessionWrappedDeploymentIdentity,
+        authorityMode: body?.sessionModeProfile?.authority?.mode,
+        bundleUrl: body?.agentBridgeBundleUrl,
+        bundleManifestUrl: body?.agentBridgeBundleManifestUrl,
+        bundleSha256: body?.agentBridgeBundleSha256,
+      },
+      env,
+      accountId,
+      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
+      fetchImpl,
+      markMutationStarted: idempotencyContext?.markMutationStarted,
+    });
+    if (!wrappedDeploy.ok) {
+      return buildDeploymentFailure(wrappedDeploy.status, {
+        ...(wrappedDeploy.body || {}),
+        partial: true,
+        deploymentRequestPending: true,
+      }, { fallbackEligible: wrappedDeploy.status >= 500 });
+    }
+    const capabilityWrite = await persistAgentSessionWrappedCapability({
+      apiToken,
+      accountId,
+      kvNamespaceId: kvId,
+      sessionConfigKey,
+      sessionSlug: displaySlug,
+      sessionWorkerOrigin: workerUrl,
+      capability: wrappedDeploy.body.agentSessionWrapped,
+      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
+    });
+    if (!capabilityWrite.ok) {
+      return buildDeploymentFailure(capabilityWrite.status, {
+        ...(capabilityWrite.body || {}),
+        partial: true,
+        deploymentRequestPending: true,
+      }, { fallbackEligible: capabilityWrite.status >= 500 });
+    }
+    deploymentPayload.agentSessionWrapped = capabilityWrite.body.agentSessionWrapped;
   }
 
   return buildSuccess(200, deploymentPayload);
 };
 
+const resolveDeploymentBundleProvenance = async ({ body = {}, env = {}, fetchImpl = globalThis.fetch } = {}) => {
+  const resolvedBody = { ...(isObj(body) ? body : {}) };
+  if (!toStr(resolvedBody.bundleManifestUrl)) {
+    const defaultBundleManifestUrl = toStr(
+      resolvedBody.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND
+        ? env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL
+        : env?.WORKER_BUNDLE_MANIFEST_URL,
+    );
+    if (defaultBundleManifestUrl) resolvedBody.bundleManifestUrl = defaultBundleManifestUrl;
+  }
+  if (!toStr(resolvedBody.agentBridgeBundleManifestUrl)) {
+    const defaultAgentManifestUrl = toStr(env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL);
+    if (defaultAgentManifestUrl) resolvedBody.agentBridgeBundleManifestUrl = defaultAgentManifestUrl;
+  }
+  const resolveOne = async ({ manifestField, digestField, artifactFile, artifactKind }) => {
+    const manifestUrl = toStr(resolvedBody[manifestField]).trim();
+    if (!manifestUrl) return null;
+    const manifestDigest = await fetchExpectedWorkerBundleDigest({
+      manifestUrl,
+      artifactFile,
+      artifactKind,
+      fetchImpl,
+    });
+    if (!manifestDigest.ok) return buildFailure(502, { error: manifestDigest.error });
+    const supplied = toStr(resolvedBody[digestField]).trim();
+    const suppliedDigest = normalizeWorkerBundleSha256(supplied);
+    if (supplied && !suppliedDigest) {
+      return buildFailure(400, { error: `${digestField} must be a complete SHA-256 hex digest.` });
+    }
+    if (suppliedDigest && suppliedDigest !== manifestDigest.digest) {
+      return buildFailure(409, { error: `Worker release manifest digest conflicts with ${digestField}.` });
+    }
+    resolvedBody[digestField] = manifestDigest.digest;
+    return null;
+  };
+
+  if (resolvedBody.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
+    const failure = await resolveOne({
+      manifestField: 'bundleManifestUrl',
+      digestField: 'bundleSha256',
+      artifactFile: 'agentBridgeWorker.bundle.js',
+      artifactKind: 'agent-bridge-worker',
+    });
+    if (failure) return { ok: false, failure };
+  } else {
+    const sessionFailure = await resolveOne({
+      manifestField: 'bundleManifestUrl',
+      digestField: 'bundleSha256',
+      artifactFile: 'sessionCorsWorker.bundle.js',
+      artifactKind: 'session-cors-worker',
+    });
+    if (sessionFailure) return { ok: false, failure: sessionFailure };
+    const bridgeFailure = await resolveOne({
+      manifestField: 'agentBridgeBundleManifestUrl',
+      digestField: 'agentBridgeBundleSha256',
+      artifactFile: 'agentBridgeWorker.bundle.js',
+      artifactKind: 'agent-bridge-worker',
+    });
+    if (bridgeFailure) return { ok: false, failure: bridgeFailure };
+  }
+  return { ok: true, body: resolvedBody };
+};
+
 export const executeDeployHelperRequest = async (options = {}) => {
+  const provenance = await resolveDeploymentBundleProvenance({
+    body: options?.body,
+    env: options?.env,
+    fetchImpl: options?.fetchImpl,
+  });
+  if (!provenance.ok) return provenance.failure;
+  options = { ...options, body: provenance.body };
   const rawRequestId = toStr(options?.body?.deploymentRequestId).trim();
   if (!rawRequestId) return executeDeployHelperRequestCore(options);
 

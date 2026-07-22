@@ -231,6 +231,8 @@ export const buildSbtPageInitialState = ({ network = null }: BuildSbtPageInitial
   mintingAddressesFilterInitialized: false,
   includePreviousPasswords: false,
   exportFormat: 'json',
+  encryptedRecoveryEnabled: false,
+  encryptedRecoveryStatus: 'idle',
   cachedPasswords: [],
   newPasswords: [],
   lastMintTxHash: null,

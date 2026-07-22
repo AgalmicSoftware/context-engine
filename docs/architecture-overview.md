@@ -40,11 +40,14 @@ flowchart TD
   PublicRelease["public release tree"] --> Browser
   PublicRelease --> HostedWorker
   PublicRelease --> DeployHelper
+  AggregateCI["successful aggregate CI<br/>tested Worker bytes + provenance"] --> ImmutableWorkerRelease["immutable SHA-keyed Worker release"]
+  ImmutableWorkerRelease --> ProtectedPromotion["manual protected stable/latest promotion"]
+  ProtectedPromotion --> Hosted
 ```
 
 Static app hosting, public/private session access, and the session
 infrastructure profile are independent choices. The `/new` screen does not
-automatically preselect a card; `Fast & Cheap (Cloudflare)` is the implemented
+automatically preselect a hosting option; `Fast & Cheap (Cloudflare)` is the implemented
 default/recommended path once chosen, and
 `Trustless & Public (Decentralized)` is the implemented opt-in path. The
 Company-Operated branch is a planned adapter architecture, not a shipped
@@ -156,9 +159,10 @@ The tracked checks work together:
   unavailable npm commands, and broken local links.
 - `npm run test:wiring` verifies test inventory, boundary checks, and text
   hygiene.
-- `npm run verify:release` adds client lint, typecheck, full client tests,
-  worker bundle build/sync, public surface verification, and the production
-  client build.
+- `scripts/ci-gates.json` defines the serial local CI profile, the split hosted
+  gate set, and the standalone release profile. `test:ci` and GitHub Actions
+  consume the same named gates; `verify:release` runs its narrower release
+  profile without being nested in local CI.
 
 ## Worker Topology
 

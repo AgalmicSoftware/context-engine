@@ -7,7 +7,10 @@ describe('SessionWizard default allowOrigins', () => {
     expect(out[0]).toBe('https://custom.example');
     expect(out).toEqual(
       expect.arrayContaining([
+        'https://contextengine.sh',
+        'https://www.contextengine.sh',
         'https://contextengine.xyz',
+        'https://www.contextengine.xyz',
         'http://localhost:3000',
         'http://127.0.0.1:3001',
         'http://localhost:7391',
@@ -19,7 +22,7 @@ describe('SessionWizard default allowOrigins', () => {
   it('falls back to the stable default origin list when the current origin is unavailable', () => {
     const out = buildSessionWizardDefaultAllowedOrigins('');
 
-    expect(out[0]).toBe('https://contextengine.xyz');
+    expect(out[0]).toBe('https://contextengine.sh');
     expect(out).toEqual(
       expect.arrayContaining([
         'http://localhost:3000',

@@ -32,6 +32,8 @@ import {
   evaluateTelegramGroupSessionAccess,
   evaluateSponsoredResourceEligibility,
   normalizeSessionPolicy,
+  resolveAgentHttpSessionInvocation,
+  resolveMiniAppSessionInvocation,
   resolveSessionInvocation,
 } from './sessionPolicy.mjs';
 
@@ -79,6 +81,53 @@ test('session policy resolves defaults and invocation by slug or name', () => {
     resolveSessionInvocation(exportScopePolicy, 'envelope-export').session.exportScope,
     'encrypted_envelopes_only'
   );
+});
+
+test('agentHttp invocation remains enabled when the optional Telegram surface is off', () => {
+  const policy = normalizeSessionPolicy({
+    defaultSessionSlug: 'wrapped-alpha',
+    sessions: [{
+      sessionSlug: 'wrapped-alpha',
+      sessionModeProfile: {
+        surfaces: { agentHttp: true, telegram: false },
+        authority: { mode: 'registry_canonical' },
+      },
+    }],
+  });
+
+  assert.equal(resolveSessionInvocation(policy, 'wrapped-alpha').reason, 'telegram_bridge_disabled');
+  assert.equal(resolveAgentHttpSessionInvocation(policy, 'wrapped-alpha').session.sessionSlug, 'wrapped-alpha');
+});
+
+test('legacy Bridge sessions retain Agent HTTP unless they explicitly disable it', () => {
+  const policy = normalizeSessionPolicy({
+    sessions: [
+      { sessionSlug: 'legacy-bridge', telegramBridgeEnabled: true },
+      { sessionSlug: 'legacy-disabled', telegramBridgeEnabled: true, agentHttpEnabled: false },
+    ],
+  });
+
+  assert.equal(resolveAgentHttpSessionInvocation(policy, 'legacy-bridge').ok, true);
+  assert.equal(resolveAgentHttpSessionInvocation(policy, 'legacy-disabled').reason, 'agent_http_disabled');
+});
+
+test('Mini App invocation requires both Telegram and the Telegram Mini App surface', () => {
+  const policy = normalizeSessionPolicy({
+    sessions: [
+      {
+        sessionSlug: 'telegram-only',
+        sessionModeProfile: { surfaces: { telegram: true, miniApp: false } },
+      },
+      {
+        sessionSlug: 'mini-app',
+        sessionModeProfile: { surfaces: { telegram: true, miniApp: true } },
+      },
+    ],
+  });
+
+  assert.equal(resolveSessionInvocation(policy, 'telegram-only').ok, true);
+  assert.equal(resolveMiniAppSessionInvocation(policy, 'telegram-only').reason, 'mini_app_disabled');
+  assert.equal(resolveMiniAppSessionInvocation(policy, 'mini-app').session.sessionSlug, 'mini-app');
 });
 
 test('session policy prefers sessionModeProfile with legacy fallback', () => {
@@ -159,6 +208,29 @@ test('session policy keeps the shared aggregate privacy threshold at two or more
   const resolved = resolveSessionInvocation(policy, 'member-results');
   assert.equal(resolved.ok, true);
   assert.equal(resolved.session.resultsExposure.minGroupSize, 2);
+});
+
+test('session policy reads results exposure from the canonical session mode profile', () => {
+  const policy = normalizeSessionPolicy({
+    sessions: [{
+      sessionSlug: 'profile-exposure',
+      sessionModeProfile: {
+        surfaces: { telegram: true, miniApp: true },
+        results: {
+          exposure: {
+            aggregateResultsEnabled: false,
+            anonymizedGroupsEnabled: true,
+            minGroupSize: 9,
+          },
+        },
+      },
+    }],
+  });
+
+  const resolved = resolveMiniAppSessionInvocation(policy, 'profile-exposure');
+  assert.equal(resolved.session.resultsExposure.aggregateResultsEnabled, false);
+  assert.equal(resolved.session.resultsExposure.anonymizedGroupsEnabled, true);
+  assert.equal(resolved.session.resultsExposure.minGroupSize, 9);
 });
 
 test('session policy can switch the default Telegram demo session by date', () => {

@@ -78,7 +78,7 @@ export async function deriveManagedDemoAccount({
     chainScope: 'testnet',
     principal: normalizedPrincipal,
     workerDeploymentId: normalizedDeploymentId,
-    signerBoundary: 'durable_object_managed_demo_signer',
+    signerBoundary: 'deterministic_worker_managed_demo_signer',
     lifecycle: lifecycle === AGENT_BRIDGE_EVENT_TYPES.ACCOUNT_RECOVERED ? 'account_recovered' : 'account_created',
     rawKeyMaterialExportable: true,
     privateKeyAuthority: false,

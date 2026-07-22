@@ -1,6 +1,7 @@
 import type { SessionModeProfile, SessionModeResourceKey } from '../../utilities/session/sessionModeProfile';
 
 const SESSION_WIZARD_REQUIREMENT_IDS = Object.freeze({
+  CLOUDFLARE_ACCOUNT: 'cloudflareAccount',
   CLOUDFLARE_API_TOKEN: 'cloudflareApiToken',
   AI_PROVIDER_KEY: 'aiProviderKey',
   ARWEAVE_JWK: 'arweaveJwk',
@@ -91,6 +92,7 @@ export const resolveSessionWizardModeRequirements = (
   const authorityMode = String(profile.authority?.mode || '');
   const isWorkerCanonical = authorityMode === 'worker_canonical';
   const usesCloudflare = profile.storage?.backend === 'cloudflare';
+  const usesAgentSessionWrapped = profile.surfaces?.agentHttp === true;
   const requiresArweave = profile.storage?.backend === 'arweave';
   const requiresLit = profile.encryption?.mode === 'lit';
   const requiresRegistry = authorityMode === 'evm_registry_canonical';
@@ -109,7 +111,11 @@ export const resolveSessionWizardModeRequirements = (
   const requiresWallet = requiresRegistry || willDeployPendingSbts;
 
   const requiredRequirementIds: SessionWizardRequirementId[] = [];
-  if (usesCloudflare) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_API_TOKEN);
+  if (usesCloudflare) {
+    requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_ACCOUNT);
+  } else if (usesAgentSessionWrapped) {
+    requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_API_TOKEN);
+  }
   requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.AI_PROVIDER_KEY);
   if (requiresArweave) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.ARWEAVE_JWK);
   if (requiresRpc) requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.RPC);
@@ -129,12 +135,19 @@ export const resolveSessionWizardModeRequirements = (
 
   const presetKeyChips = usesCloudflare
     ? [
-        'Cloudflare API token',
+        'Cloudflare account',
         'AI provider key',
         ...(requiresRpc ? ['RPC URL/key'] : []),
         ...(requiresLit ? ['Lit API key'] : []),
       ]
-    : ['AI provider key', 'Arweave wallet/JWK', 'RPC URL/key', 'Lit API key if encryption is enabled'];
+    : usesAgentSessionWrapped
+      ? [
+          'Request-only Cloudflare API token',
+          'AI provider key',
+          ...(requiresRpc ? ['RPC URL/key'] : []),
+          ...(requiresLit ? ['Lit API key'] : []),
+        ]
+      : ['AI provider key', 'Arweave wallet/JWK', 'RPC URL/key', 'Lit API key if encryption is enabled'];
 
   return {
     selected: true,

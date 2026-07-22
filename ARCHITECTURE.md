@@ -262,14 +262,20 @@ Worker verifies signature, then evaluates profile-specific authorization:
   Hosted & Fast       -> worker-canonical roles/groups and session config
   Trustless/custom    -> selected SessionRegistry gates and SBT balances
 
-Worker  ──▸  { token, exp } with session-scoped permissions
+Worker  ──▸  { token, exp } with session-scoped permissions + config epoch
 Client  ──▸  authenticated Worker requests with Authorization: Bearer <token>
 ```
 
 Worker-canonical login does not query an EVM registry. Chain reads occur only
 when the selected profile uses on-chain authorization. Login tokens use a
 base64url payload plus HMAC, expire after four hours, and have a same-TTL
-`authToken:{slug}:{sub}:{jti}` KV marker.
+`authToken:{slug}:{sub}:{jti}` KV marker. Before protected route side effects,
+the Worker also requires the token's server-managed authorization epoch to
+match current config and re-evaluates the current default plus route-specific
+gate. Registry gate changes therefore take effect on the next request; config
+changes invalidate previously issued tokens. The mandatory Session coordinator
+Durable Object serializes nonce issue/consume and per-route counters across
+isolates; KV nonce markers are diagnostic mirrors only.
 
 ## Session Config Data Shape
 

@@ -150,7 +150,6 @@ const loadCacheScripts = ({
     createLogger: () => makeLogger(),
   }));
 
-  // eslint-disable-next-line global-require
   const cacheScripts = require('./cacheScripts.js');
   const emitBroadcastMessage = (data, name = BROADCAST_CHANNEL_NAME) => {
     broadcastChannels

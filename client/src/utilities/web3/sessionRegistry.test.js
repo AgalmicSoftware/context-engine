@@ -385,6 +385,7 @@ describe('loadSessionRegistryCache persistence', () => {
     expect(cache.sessions['demo-1']).toEqual(
       expect.objectContaining({ corsWorkerUrl: 'https://demo-1-worker.example' }),
     );
+    expect(cache.sessions['demo-1']?.__registry?.createdAt).toBe(1);
     expect(cache.sessions['cached-session']).toBeDefined();
   });
 });

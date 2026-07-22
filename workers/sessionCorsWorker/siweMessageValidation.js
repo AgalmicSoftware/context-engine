@@ -10,6 +10,8 @@ export {
 };
 
 export const TRUSTED_ORIGINS = Object.freeze([
+  'https://contextengine.sh',
+  'https://www.contextengine.sh',
   'https://contextengine.xyz',
   'https://www.contextengine.xyz',
   'http://localhost:3000',

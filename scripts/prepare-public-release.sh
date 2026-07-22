@@ -122,6 +122,9 @@ const path = require('node:path');
 
 const rootDir = path.resolve(process.argv[2]);
 const skipDirs = new Set(['.git', 'node_modules', 'build', 'dist', 'coverage']);
+const byteStableGeneratedFiles = new Set([
+  'deploy/cloudflare/session-worker/worker.mjs',
+]);
 const emailRe = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig;
 // Intentionally public addresses that must survive the sweep (e.g. the
 // SECURITY.md vulnerability-reporting contact). Keep in sync with the
@@ -143,6 +146,12 @@ function isProbablyBinary(buffer) {
 }
 
 function scrubFile(absolutePath) {
+  const relativePath = path.relative(rootDir, absolutePath).split(path.sep).join('/');
+  // Generated worker bytes are verified against their manifest and source.
+  // Rewriting email-shaped dependency data would invalidate that verification
+  // and can corrupt bundled wordlists, so leave this artifact byte-for-byte intact.
+  if (byteStableGeneratedFiles.has(relativePath)) return;
+
   const buffer = fs.readFileSync(absolutePath);
   if (isProbablyBinary(buffer)) return;
 

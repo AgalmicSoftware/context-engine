@@ -304,7 +304,28 @@ export const upsertSbtPasswordRecoveryCodes = ({
   };
 };
 
+export const clearSbtPasswordRecoveryCodes = ({
+  chainId,
+  sbtAddress,
+  storage,
+  now = Date.now(),
+}: {
+  chainId?: unknown;
+  sbtAddress?: unknown;
+  storage?: StorageLike | null;
+  now?: number;
+} = {}) => {
+  const key = getSbtPasswordRecoveryKey({ chainId, sbtAddress });
+  if (!key) return { ok: false, status: 'empty-recovery-key' };
+  const store = readSbtPasswordRecoveryStore({ storage, now });
+  delete store.entries[key];
+  store.updatedAt = now;
+  const write = writeSbtPasswordRecoveryStore(store, { storage, now });
+  return { ok: write.ok, status: write.ok ? 'cleared' : write.status };
+};
+
 const sbtPasswordRecoveryStore = {
+  clearSbtPasswordRecoveryCodes,
   getSbtPasswordRecoveryCodes,
   getSbtPasswordRecoveryKey,
   readSbtPasswordRecoveryStore,

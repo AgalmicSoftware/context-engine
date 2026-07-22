@@ -432,7 +432,7 @@ describe('sponsoredAccess cache behavior', () => {
 
       for (let i = 1; i <= 500; i += 1) {
         const account = `0x${String(i).padStart(40, '0')}`;
-        // eslint-disable-next-line no-await-in-loop
+
         await checkSponsoredAccess({
           sessionConfig: cfg,
           sessionSlug: 'edge',

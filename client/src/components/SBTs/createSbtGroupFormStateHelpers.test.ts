@@ -147,6 +147,8 @@ describe('createSbtGroupFormStateHelpers', () => {
         distributionOptionsCollapsed: true,
         numInviteLinks: 10,
         exportFormat: 'json',
+        encryptedRecoveryEnabled: false,
+        encryptedRecoveryStatus: 'idle',
         countdown: 12,
         copyJsonSuccess: false,
         copyLinkSuccess: false,

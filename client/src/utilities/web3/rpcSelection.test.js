@@ -8,7 +8,6 @@ const probeChainRpcWithFallback = async (chain, request) => {
   const attempts = [];
 
   for (const url of ordered) {
-    // eslint-disable-next-line no-await-in-loop
     const res = await request(url);
     attempts.push({ url, ok: !!res?.ok, status: Number(res?.status || 0) });
     if (res?.ok) {

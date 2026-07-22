@@ -48,7 +48,7 @@ test('dispatchAuthNonceRequestWithWorkerDeps preserves nonce-request wiring and 
         const builtNonce = value.deps.buildNonce();
         assert.equal(builtNonce, 'nonce-built');
 
-        await value.deps.putNonce(env, 'nonce:session-a:0xabc', builtNonce, 300);
+        await value.deps.issueNonce(env, 'session-a', '0xabc', builtNonce, 300);
         return response;
       },
       json: 'json',
@@ -64,6 +64,10 @@ test('dispatchAuthNonceRequestWithWorkerDeps preserves nonce-request wiring and 
         assert.equal(base64UrlEncode, 'base64UrlEncode');
         return 'nonce-built';
       },
+      issueNonce: async (...args) => {
+        writes.push(args);
+        return { ok: true };
+      },
       base64UrlEncode: 'base64UrlEncode',
     },
     constants: {
@@ -76,11 +80,15 @@ test('dispatchAuthNonceRequestWithWorkerDeps preserves nonce-request wiring and 
   });
 
   assert.equal(result, response);
-  assert.deepEqual(writes, [[
-    'nonce:session-a:0xabc',
+  assert.deepEqual(writes[0].slice(0, 5), [
+    env,
+    'session-a',
+    '0xabc',
     'nonce-built',
-    { expirationTtl: 300 },
-  ]]);
+    300,
+  ]);
+  assert.equal(writes[0][5].usedNonceTtlSeconds, undefined);
+  assert.equal(writes[0][5].now(), 1234567890);
 });
 
 test('dispatchAuthLoginRequestWithWorkerDeps preserves login-request wiring and used-nonce ttl binding', async () => {

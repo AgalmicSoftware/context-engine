@@ -14,6 +14,7 @@ import {
   normalizeLitMetadataNetwork,
 } from './sessionMetadata.js';
 import { readConfiguredSessionWorkerUrlCandidate } from './sessionWorkerUrlCompatibility.js';
+import { normalizeAgentSessionWrappedCapability } from './agentSessionWrapped.js';
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 import type {
   LocalResourceOverrides,
@@ -287,6 +288,16 @@ export const parseSessionMetadata = (raw: unknown): ParsedSessionMetadata => {
   normalizeOptionalStringField(metadata, 'orgInfoEncrypted', errors);
   normalizeOptionalStringField(metadata, 'encryptedOrgInfo', errors);
   normalizeOptionalStringField(metadata, 'litNetwork', errors);
+
+  if (hasOwn(metadata, 'agentSessionWrapped')) {
+    const capability = normalizeAgentSessionWrappedCapability(metadata.agentSessionWrapped);
+    if (capability) {
+      metadata.agentSessionWrapped = capability;
+    } else {
+      errors.push('agentSessionWrapped must be a valid version 1 capability record.');
+      delete metadata.agentSessionWrapped;
+    }
+  }
 
   if (hasOwn(metadata, 'lit')) {
     if (metadata.lit == null) {

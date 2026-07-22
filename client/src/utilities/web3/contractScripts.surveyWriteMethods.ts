@@ -676,7 +676,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
             family: 'question_response_payload',
             path: 'question response',
           });
-          // eslint-disable-next-line no-await-in-loop
+
           const responseUpload = await uploadJsonPayloadForContractPointer({
             payload: response,
             resource: STORAGE_RESOURCE_KEYS.RESPONSES,

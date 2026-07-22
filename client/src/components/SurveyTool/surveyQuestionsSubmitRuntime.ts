@@ -128,14 +128,13 @@ export const createSurveyQuestionsSubmitRuntime = (
         if (!lit) {
           throw new Error('Lit hooks unavailable; cannot encrypt gated responses.');
         }
-        // eslint-disable-next-line no-await-in-loop
+
         partial = await (cryptoUtils as SurveyQuestionsLegacyValue).encryptMultipleAnswers(group.slice, {
           ...baseOpts,
           onlyTheseQids: group.qids,
           lit,
         });
       } else {
-        // eslint-disable-next-line no-await-in-loop
         partial = await (cryptoUtils as SurveyQuestionsLegacyValue).encryptMultipleAnswers(group.slice, {
           ...baseOpts,
           onlyTheseQids: group.qids,

@@ -63,8 +63,10 @@ test('resolveDeployHelperDeployConfig falls back to the stable hosted/local boot
 
   assert.deepEqual(config.allowedOrigins, DEFAULT_DEPLOY_HELPER_ALLOWED_ORIGINS);
   assert.deepEqual(config.allowedOrigins, [
-    'https://contextengine.xyz', // intentional: production default hosted app origin
-    'https://www.contextengine.xyz', // intentional: production default hosted app origin
+    'https://contextengine.sh', // canonical production hosted app origin
+    'https://www.contextengine.sh', // canonical production hosted app origin
+    'https://contextengine.xyz', // redirect compatibility origin
+    'https://www.contextengine.xyz', // redirect compatibility origin
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'http://localhost:3001',
@@ -91,6 +93,7 @@ test('resolveDeployHelperDeployConfig normalizes explicit env allowlist values',
   const {
     DEFAULT_DEPLOY_HELPER_BUNDLE_PATH,
     DEFAULT_SESSION_WORKER_BUNDLE_URL,
+    DEFAULT_SESSION_WORKER_BUNDLE_MANIFEST_URL,
     resolveDeployHelperDeployConfig,
   } = await loadModule();
 
@@ -111,6 +114,7 @@ test('resolveDeployHelperDeployConfig normalizes explicit env allowlist values',
     'http://localhost:3000',
   ]);
   assert.equal(config.workerBundleUrl, DEFAULT_SESSION_WORKER_BUNDLE_URL);
+  assert.equal(config.workerBundleManifestUrl, DEFAULT_SESSION_WORKER_BUNDLE_MANIFEST_URL);
   assert.equal(
     config.bundlePath,
     path.resolve('/tmp/context-engine', DEFAULT_DEPLOY_HELPER_BUNDLE_PATH)
@@ -123,6 +127,7 @@ test('buildDeployHelperUploadMetadata writes the expected bindings', async () =>
     kvNamespaceId: 'kv-123',
     allowedOrigins: ['https://app.example.test', 'http://localhost:3000'],
     workerBundleUrl: 'https://assets.example.test/sessionCorsWorker.bundle.js',
+    workerBundleManifestUrl: 'https://assets.example.test/worker-release-manifest.json',
     compatibilityDate: '2025-01-01',
     workerCompatibilityDate: '2025-02-02',
     defaultSessionSlug: 'alpha',
@@ -138,6 +143,7 @@ test('buildDeployHelperUploadMetadata writes the expected bindings', async () =>
     },
     { name: 'ALLOWED_ORIGINS', type: 'plain_text', text: 'https://app.example.test,http://localhost:3000' },
     { name: 'WORKER_BUNDLE_URL', type: 'plain_text', text: 'https://assets.example.test/sessionCorsWorker.bundle.js' },
+    { name: 'WORKER_BUNDLE_MANIFEST_URL', type: 'plain_text', text: 'https://assets.example.test/worker-release-manifest.json' },
     { name: 'WORKER_COMPATIBILITY_DATE', type: 'plain_text', text: '2025-02-02' },
     { name: 'DEFAULT_SESSION_SLUG', type: 'plain_text', text: 'alpha' },
   ]);

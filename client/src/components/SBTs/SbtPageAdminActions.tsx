@@ -5,6 +5,7 @@ import { faCheck, faSpinner, faTimes } from '@fortawesome/free-solid-svg-icons';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import styles from './SBTPage.module.scss';
 import SbtPageOpenMintUrlCard from './SbtPageOpenMintUrlCard';
+import SbtEncryptedRecoveryControl from './SbtEncryptedRecoveryControl';
 import { buildSbtPagePasswordInviteLink } from './sbtPagePasswordExportHelpers';
 import type { SbtPageAdminActionDisplayPlan } from './sbtPageHelpers';
 
@@ -33,12 +34,17 @@ export type SbtPageAdminActionsProps = {
   burnSearchResultRecord: SbtPageBurnSearchResultRecord | null;
   displayPlan: SbtPageAdminActionDisplayPlan;
   exportFormat: unknown;
+  encryptedRecoveryEnabled: boolean;
+  encryptedRecoveryStatus: string;
+  hasLocalRecovery: boolean;
   onAdminBurn: React.MouseEventHandler<HTMLButtonElement>;
   onBurnSearchChange: React.ChangeEventHandler<HTMLInputElement>;
   onCopyOpenMintUrl: React.MouseEventHandler<HTMLButtonElement>;
   onExportFormatChange: React.ChangeEventHandler<HTMLSelectElement>;
   onExportPasswords: React.MouseEventHandler<HTMLButtonElement>;
   onGenerateAdminInvites: React.MouseEventHandler<HTMLButtonElement>;
+  onClearLocalRecovery: React.MouseEventHandler<HTMLButtonElement>;
+  onEncryptedRecoveryChange: React.ChangeEventHandler<HTMLInputElement>;
   onIncludePreviousPasswordsChange: React.ChangeEventHandler<HTMLInputElement>;
   onPasswordGenerationCountChange: React.ChangeEventHandler<HTMLInputElement>;
   openMintAutoJoinUrl: string;
@@ -128,17 +134,23 @@ const SbtPageAdminActions = ({
     adminBurnStatusButtonState,
     canAdminBurn,
     combinedPasswords,
+    hasPasswordMint,
     passwordExportControlsState,
     passwordGenerationButtonState,
     passwordInventoryDisplayState,
   },
   exportFormat,
+  encryptedRecoveryEnabled,
+  encryptedRecoveryStatus,
+  hasLocalRecovery,
   onAdminBurn,
   onBurnSearchChange,
   onCopyOpenMintUrl,
   onExportFormatChange,
   onExportPasswords,
   onGenerateAdminInvites,
+  onClearLocalRecovery,
+  onEncryptedRecoveryChange,
   onIncludePreviousPasswordsChange,
   onPasswordGenerationCountChange,
   openMintAutoJoinUrl,
@@ -197,6 +209,20 @@ const SbtPageAdminActions = ({
       </div>
     )}
 
+    {hasPasswordMint && (
+      <div className={styles.inviteGenerationSection}>
+        <SbtEncryptedRecoveryControl
+          checked={encryptedRecoveryEnabled}
+          clearButtonClassName={styles.actionButton}
+          hasLocalRecovery={hasLocalRecovery}
+          mode="admin"
+          onChange={onEncryptedRecoveryChange}
+          onClear={onClearLocalRecovery}
+          status={encryptedRecoveryStatus}
+        />
+      </div>
+    )}
+
     {passwordInventoryDisplayState.shouldRenderPasswordGenerationSection && (
       <div className={styles.inviteGenerationSection}>
         <h4>Generate Additional Password Invites</h4>
@@ -220,12 +246,15 @@ const SbtPageAdminActions = ({
         </div>
         {passwordInventoryDisplayState.shouldRenderGeneratedPasswordList ? (
           <div className={styles.generatedPasswordsList}>
-            <h5>Generated Passwords (including cached):</h5>
+            <h5>Generated Passwords (including legacy cached passwords):</h5>
             {SbtPagePasswordInviteRows({
               combinedPasswords,
               passwordInviteLinkContext,
             })}
-            <p>These passwords are stored in the local recovery cache and/or newly generated.</p>
+            <p>
+              Export remains the primary recovery path. New passwords are stored only when encrypted local recovery is
+              enabled.
+            </p>
             {SbtPagePasswordExportControls({
               exportFormat,
               onExportFormatChange,

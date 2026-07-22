@@ -129,6 +129,30 @@ describe('sessionParsers', () => {
     });
   });
 
+  it('normalizes Agent Session Wrapped public capability metadata', () => {
+    const parsed = parseSessionMetadata({
+      slug: 'session-a',
+      agentSessionWrapped: {
+        version: 1,
+        enabled: true,
+        origin: 'https://wrapped.example.workers.dev/',
+        protocolVersion: 'agent-session-wrapped-v1',
+        revision: 'wrapped-revision-1',
+        verifiedAt: '2026-07-20T18:00:00.000Z',
+      },
+    });
+
+    expect(parsed.ok).toBe(true);
+    expect(parsed.metadata.agentSessionWrapped).toEqual({
+      version: 1,
+      enabled: true,
+      origin: 'https://wrapped.example.workers.dev',
+      protocolVersion: 'agent-session-wrapped-v1',
+      revision: 'wrapped-revision-1',
+      verifiedAt: '2026-07-20T18:00:00.000Z',
+    });
+  });
+
   it('parses public Lit credential fields from worker config without accepting secret API keys', () => {
     const parsed = parseWorkerConfig({
       corsWorkerUrl: 'https://worker.example.com',

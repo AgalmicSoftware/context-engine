@@ -416,7 +416,7 @@ Optional fallback link shapes, using existing link builders only:
 
 ```text
 https://t.me/contextengineer_bot/<mini-app-short-name>?startapp=<payload-from-mini-app-launch>
-https://contextengine.xyz/session/<session-slug>/questions/results
+https://contextengine.sh/session/<session-slug>/questions/results
 ```
 
 This flow composes existing tags, questions, geo-linked questions, Mini App
@@ -1067,11 +1067,11 @@ view and materially new questions or responses create a new cache entry.
 
 When the user wants the full interactive report, send a client session link
 instead of asking them to connect a wallet. Use the public CE client origin
-(`https://contextengine.xyz` unless the operator gives you a different client
+(`https://contextengine.sh` unless the operator gives you a different client
 URL) and the current session slug:
 
 ```text
-https://contextengine.xyz/session/<session-slug>/questions/results
+https://contextengine.sh/session/<session-slug>/questions/results
 ```
 
 Do not put a raw `ceagt_...` token or copied install payload into the URL. The

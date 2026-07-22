@@ -150,6 +150,8 @@ describe('sbtPageHelpers', () => {
         mintingStatus: 'idle',
         burningStatus: 'idle',
         exportFormat: 'json',
+        encryptedRecoveryEnabled: false,
+        encryptedRecoveryStatus: 'idle',
         hasGroupPasswordMint: false,
         hasInviteMint: false,
         docModalOpen: false,

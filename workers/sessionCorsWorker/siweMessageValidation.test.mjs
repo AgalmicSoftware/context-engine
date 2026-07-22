@@ -255,6 +255,8 @@ test('admin typed-data constants preserve the expected domain and struct names',
 
 test('resolveTrustedAdminOrigins keeps the default hosted and local admin origins aligned', () => {
   assert.deepEqual(resolveTrustedAdminOrigins({}), [
+    'https://contextengine.sh',
+    'https://www.contextengine.sh',
     'https://contextengine.xyz',
     'https://www.contextengine.xyz',
     'http://localhost:3000',
@@ -264,6 +266,22 @@ test('resolveTrustedAdminOrigins keeps the default hosted and local admin origin
     'http://localhost:7391',
     'http://127.0.0.1:7391',
   ]);
+});
+
+test('validateAdminActionAudience trusts the canonical .sh hosted origin', () => {
+  assert.deepEqual(
+    validateAdminActionAudience({
+      audience: 'https://contextengine.sh',
+      request: {
+        url: 'https://worker.example/admin/set-config',
+        headers: new Headers({ Origin: 'https://contextengine.sh' }),
+      },
+    }),
+    {
+      ok: true,
+      audience: 'https://contextengine.sh',
+    },
+  );
 });
 
 test('validateAdminActionAudience trusts approved origins, configured allowOrigins, and falls back to worker origin for non-browser callers', () => {

@@ -92,7 +92,7 @@ describe('sessionWizardRequirementsDisplay', () => {
       hasNewSessionFundingRequirementCovered: true,
       hasNewSessionLitRequirementCovered: true,
       newSessionRequiresLitCredential: false,
-      requiredRequirementIds: ['cloudflareApiToken', 'aiProviderKey'],
+      requiredRequirementIds: ['cloudflareAccount', 'aiProviderKey'],
       sponsoredBundleCoversNewSessionRequirements: true,
     });
   });
@@ -110,8 +110,8 @@ describe('sessionWizardRequirementsDisplay', () => {
       sessionModeProfile: profile,
     });
 
-    expect(settled.requiredRequirementIds).toEqual(['cloudflareApiToken', 'aiProviderKey', 'rpc']);
-    expect(pending.requiredRequirementIds).toEqual(['cloudflareApiToken', 'aiProviderKey', 'rpc', 'wallet', 'funding']);
+    expect(settled.requiredRequirementIds).toEqual(['cloudflareAccount', 'aiProviderKey', 'rpc']);
+    expect(pending.requiredRequirementIds).toEqual(['cloudflareAccount', 'aiProviderKey', 'rpc', 'wallet', 'funding']);
   });
 
   it.each(['anthropicKey', 'openrouterKey'])('does not accept unselected %s for the default OpenAI models', (key) => {

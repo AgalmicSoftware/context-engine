@@ -45,6 +45,15 @@ describe('publicPageHead', () => {
     window.history.replaceState({}, '', '/');
   });
 
+  it('uses contextengine.sh for deployment-independent public metadata defaults', () => {
+    expect(DEFAULT_PUBLIC_SITE_URL).toBe('https://contextengine.sh/');
+    expect(DEFAULT_PUBLIC_PAGE_IMAGE).toBe(
+      'https://contextengine.sh/assets/img/context-engine-social-preview-square.png',
+    );
+    expect(PUBLIC_DISCOVERABILITY_URL).toBe('https://contextengine.sh/discoverability.html');
+    expect(PUBLIC_LLMS_URL).toBe('https://contextengine.sh/llms.txt');
+  });
+
   it('falls back to the live browser origin for router-style locations', () => {
     window.history.replaceState({}, '', '/session/current');
 
@@ -246,7 +255,7 @@ describe('publicPageHead', () => {
 
   it('publishes structured data with the GitHub repo in sameAs', () => {
     syncPublicPageHead({
-      location: new URL('https://contextengine.xyz/about?ref=welcome'),
+      location: new URL('https://contextengine.sh/about?ref=welcome'),
     });
 
     const structuredDataNode = document.head.querySelector(structuredDataSelector);
@@ -273,7 +282,7 @@ describe('publicPageHead', () => {
     );
     expect(webPage).toEqual(
       expect.objectContaining({
-        url: 'https://contextengine.xyz/about',
+        url: 'https://contextengine.sh/about',
         name: DEFAULT_PUBLIC_PAGE_TITLE,
         description: DEFAULT_PUBLIC_PAGE_DESCRIPTION,
         significantLink: [PUBLIC_REPO_URL, PUBLIC_REPO_SOURCE_URL, PUBLIC_DISCOVERABILITY_URL, PUBLIC_LLMS_URL],

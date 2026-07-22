@@ -93,6 +93,11 @@ function sessionModeProfileExport(session = {}) {
   return plainObject(profile?.export) ? profile.export : null;
 }
 
+function sessionModeProfileResultsExposure(session = {}) {
+  const profile = sessionModeProfile(session);
+  return plainObject(profile?.results?.exposure) ? profile.results.exposure : null;
+}
+
 function normalizeExportScope(value = '') {
   const scope = safeString(value).toLowerCase();
   return [
@@ -226,8 +231,11 @@ function selectDefaultSessionSlug({
 }
 
 function normalizeResultsExposurePolicy(session = {}) {
-  const source = plainObject(session.resultsExposure)
-    ? session.resultsExposure
+  const profileExposure = sessionModeProfileResultsExposure(session);
+  const source = profileExposure
+    ? profileExposure
+    : plainObject(session.resultsExposure)
+      ? session.resultsExposure
     : (
       plainObject(session.telegramResultsExposure)
         ? session.telegramResultsExposure
@@ -287,6 +295,10 @@ export function normalizeSessionPolicy(input = {}, {
   const linkedSessions = sessions.map((session) => {
     const profileTelegramEnabled = sessionModeProfileTelegramEnabled(session);
     const profileTelegramFirst = sessionModeProfileTelegramFirst(session);
+    const profileSurfaces = sessionModeProfileSurfaces(session);
+    const telegramBridgeEnabled = profileTelegramEnabled === null
+      ? session.telegramBridgeEnabled !== false
+      : profileTelegramEnabled;
     return {
     sessionMode: safeString(session.sessionMode || session.mode || session.telegramMode || session.telegram?.mode).toLowerCase(),
     sessionSlug: safeString(session.sessionSlug || session.slug || session.name).toLowerCase(),
@@ -338,9 +350,17 @@ export function normalizeSessionPolicy(input = {}, {
       .filter(Boolean)
       .slice(0, 20),
     default: session.default === true,
-    telegramBridgeEnabled: profileTelegramEnabled === null
-      ? session.telegramBridgeEnabled !== false
-      : profileTelegramEnabled,
+    telegramBridgeEnabled,
+    miniAppEnabled: profileSurfaces
+      ? profileSurfaces.miniApp === true
+      : session.miniAppEnabled === false
+        ? false
+        : telegramBridgeEnabled,
+    agentHttpEnabled: sessionModeProfileSurfaces(session)
+      ? sessionModeProfileSurfaces(session).agentHttp === true
+      : session.agentHttpEnabled === undefined && session.agentHttp === undefined
+        ? telegramBridgeEnabled
+        : normalizeBool(session.agentHttpEnabled || session.agentHttp),
     telegramOnly: profileTelegramFirst === null ? legacyTelegramOnlySession(session) : profileTelegramFirst,
     sessionModeProfile: sessionModeProfile(session) ? { ...sessionModeProfile(session) } : null,
     managedAccountSubmitAllowed: session.managedAccountSubmitAllowed === true,
@@ -501,7 +521,7 @@ export function normalizeSessionPolicy(input = {}, {
   };
 }
 
-export function resolveSessionInvocation(policyInput = {}, sessionNameOrSlug = '') {
+function resolveLinkedSessionInvocation(policyInput = {}, sessionNameOrSlug = '') {
   const policy = policyInput?.type === 'agent_bridge_session_policy' && Array.isArray(policyInput.linkedSessions)
     ? policyInput
     : normalizeSessionPolicy(policyInput);
@@ -510,8 +530,31 @@ export function resolveSessionInvocation(policyInput = {}, sessionNameOrSlug = '
     entry.sessionSlug === lookup || entry.sessionName.toLowerCase() === lookup
   ));
   if (!session) return { ok: false, reason: 'session_not_linked', sessionSlug: lookup };
-  if (session.telegramBridgeEnabled !== true) return { ok: false, reason: 'telegram_bridge_disabled', sessionSlug: session.sessionSlug };
   return { ok: true, session, policy };
+}
+
+export function resolveSessionInvocation(policyInput = {}, sessionNameOrSlug = '') {
+  const resolved = resolveLinkedSessionInvocation(policyInput, sessionNameOrSlug);
+  if (!resolved.ok || resolved.session.telegramBridgeEnabled === true) return resolved;
+  return { ok: false, reason: 'telegram_bridge_disabled', sessionSlug: resolved.session.sessionSlug };
+}
+
+export function resolveAgentHttpSessionInvocation(policyInput = {}, sessionNameOrSlug = '') {
+  const resolved = resolveLinkedSessionInvocation(policyInput, sessionNameOrSlug);
+  if (!resolved.ok || resolved.session.agentHttpEnabled === true) return resolved;
+  return { ok: false, reason: 'agent_http_disabled', sessionSlug: resolved.session.sessionSlug };
+}
+
+export function resolveMiniAppSessionInvocation(policyInput = {}, sessionNameOrSlug = '') {
+  const resolved = resolveLinkedSessionInvocation(policyInput, sessionNameOrSlug);
+  if (!resolved.ok) return resolved;
+  if (resolved.session.telegramBridgeEnabled !== true) {
+    return { ok: false, reason: 'telegram_bridge_disabled', sessionSlug: resolved.session.sessionSlug };
+  }
+  if (resolved.session.miniAppEnabled !== true) {
+    return { ok: false, reason: 'mini_app_disabled', sessionSlug: resolved.session.sessionSlug };
+  }
+  return resolved;
 }
 
 export function evaluateTelegramGroupSessionAccess(session = {}, {

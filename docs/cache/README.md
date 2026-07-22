@@ -42,6 +42,10 @@ trailing colon.
   - the cache layer does not immediately demote to localStorage on a single IndexedDB error
   - it falls back only after repeated consecutive IDB failures
 - Legacy localStorage keys are still migrated best-effort for older installs
+- `npm run test:cache-guard` scans all production client paths, including the
+  canonical cache implementation, and rejects direct managed-cache access in
+  dot, bracket, or optional-bracket form unless a dynamic namespace is guarded
+  by the maintained managed-cache predicate.
 - Survey and question discovery, response hydration, targeted refreshes, and
   application event ingestion commit domain deltas through the shared serialized
   atomic updater. Each updater receives the latest cache value, preserves unrelated

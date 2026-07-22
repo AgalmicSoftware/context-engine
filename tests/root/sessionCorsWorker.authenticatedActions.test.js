@@ -4,6 +4,8 @@ import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
 import {
   createMemoryKv,
   issueWorkerLoginToken,
+  installSessionCoordinatorBinding,
+  installRpcAwareUpstreamFetchMock,
 } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 
 const REGISTRY_ADDRESS = '0x0000000000000000000000000000000000000001';
@@ -47,10 +49,10 @@ const createWorkerEnv = ({ sessionSlug, config, secrets, tokenSecret = 'test-sec
   if (secrets !== undefined) {
     seed[SESSION_SECRETS_KEY(sessionSlug)] = JSON.stringify(secrets);
   }
-  return {
+  return installSessionCoordinatorBinding({
     GROUP_KV: createMemoryKv(seed),
     TOKEN_HMAC_SECRET: tokenSecret,
-  };
+  });
 };
 
 const createAuthOnlyWorkerEnv = (sourceEnv, tokenSecret = 'test-secret') => {
@@ -58,10 +60,10 @@ const createAuthOnlyWorkerEnv = (sourceEnv, tokenSecret = 'test-secret') => {
     [...sourceEnv.GROUP_KV._dump()]
       .filter(([key]) => String(key || '').startsWith('authToken:'))
   );
-  return {
+  return installSessionCoordinatorBinding({
     GROUP_KV: createMemoryKv(authTokenRecords),
     TOKEN_HMAC_SECRET: tokenSecret,
-  };
+  });
 };
 
 const buildHtmlFetchResponse = (html) => ({
@@ -292,9 +294,12 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
       registryAddress: REGISTRY_ADDRESS,
     });
 
-    global.fetch = jest.fn().mockResolvedValue(
-      buildHtmlFetchResponse('<html><body><main>' + 'a'.repeat(80) + '</main></body></html>')
-    );
+    const upstreamFetch = installRpcAwareUpstreamFetchMock({
+      rpcUrl: RPC_URL,
+      implementation: async () => (
+        buildHtmlFetchResponse('<html><body><main>' + 'a'.repeat(80) + '</main></body></html>')
+      ),
+    });
 
     const firstResponse = await sessionCorsWorker.fetch(
       makeActionRequest({
@@ -319,7 +324,7 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
     expect(firstResponse.status).toBe(200);
     expect(secondResponse.status).toBe(429);
     expect(secondPayload?.error).toBe('Rate limit exceeded.');
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(upstreamFetch).toHaveBeenCalledTimes(1);
   });
 
   it('rejects fetch_url when the url payload is missing', async () => {
@@ -396,7 +401,7 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
       rpcUrl: RPC_URL,
       registryAddress: REGISTRY_ADDRESS,
     });
-    global.fetch = jest.fn();
+    const upstreamFetch = installRpcAwareUpstreamFetchMock({ rpcUrl: RPC_URL });
 
     const response = await sessionCorsWorker.fetch(
       makeActionRequest({
@@ -411,7 +416,7 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
 
     expect(response.status).toBe(403);
     expect(payload?.error).toBe('URL target is not allowed');
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(upstreamFetch).not.toHaveBeenCalled();
   });
 
   it('rejects authenticated action requests when the origin is not allowed', async () => {
@@ -529,10 +534,13 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
       registryAddress: REGISTRY_ADDRESS,
     });
 
-    global.fetch = jest.fn().mockResolvedValue(new Response(null, {
-      status: 200,
-      headers: { 'content-type': 'text/plain' },
-    }));
+    const upstreamFetch = installRpcAwareUpstreamFetchMock({
+      rpcUrl: RPC_URL,
+      implementation: async () => new Response(null, {
+        status: 200,
+        headers: { 'content-type': 'text/plain' },
+      }),
+    });
 
     const response = await sessionCorsWorker.fetch(
       makeActionRequest({
@@ -547,6 +555,7 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
 
     expect(response.status).toBe(400);
     expect(payload?.error).toBe('URL must return an image');
+    expect(upstreamFetch).toHaveBeenCalledTimes(1);
   });
 
   it('rate limits request_test_eth before a second faucet transfer attempt', async () => {
@@ -605,11 +614,11 @@ describe('sessionCorsWorker authenticated fetch/faucet actions', () => {
     expect(firstResponse.status).toBe(200);
     expect(secondResponse.status).toBe(429);
     expect(secondPayload?.error).toBe('Rate limit exceeded.');
-    // Registry membership, SBT proof, and faucet transfer each attest the
-    // endpoint used for their distinct authority boundary.
-    expect(rpcMethods.filter((method) => method === 'eth_chainId')).toHaveLength(3);
+    // Both route preflights revalidate current default + faucet scope. Registry
+    // membership, SBT proof, and faucet transfer retain their own attestations.
+    expect(rpcMethods.filter((method) => method === 'eth_chainId')).toHaveLength(5);
     expect(rpcMethods.filter((method) => method === 'eth_sendRawTransaction')).toHaveLength(1);
-    expect(fetchMock.mock.calls.filter(([url]) => url === RPC_URL)).toHaveLength(11);
+    expect(fetchMock.mock.calls.filter(([url]) => url === RPC_URL)).toHaveLength(21);
   });
 
   it('rejects request_test_eth when session secrets are missing', async () => {

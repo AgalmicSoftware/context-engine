@@ -1,4 +1,6 @@
 import { toStr } from '../../utilities/shared/primitives.js';
+import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
+import { normalizeSlug } from './adminPageHelpers';
 
 export type AdminSecretCard = {
   key: string;
@@ -31,6 +33,18 @@ export const ADMIN_SECRET_CARDS: readonly AdminSecretCard[] = Object.freeze([
   { key: 'faucet', label: 'Faucet', fields: ['faucetPrivateKey'] },
   { key: 'lit', label: 'Lit', fields: ['litAccountApiKey', 'litUsageApiKey'] },
 ]);
+
+export const buildAdminSecretPresenceTargetKey = ({
+  slug,
+  workerUrl,
+}: {
+  slug?: unknown;
+  workerUrl?: unknown;
+} = {}): string => {
+  const normalizedSlug = normalizeSlug(slug);
+  const normalizedWorkerUrl = normalizeWorkerUrl(workerUrl);
+  return normalizedWorkerUrl ? `${normalizedSlug}\n${normalizedWorkerUrl}` : '';
+};
 
 const ADMIN_SECRET_FIELD_LABELS: Record<string, string> = Object.freeze({
   openaiKey: 'OpenAI API key',

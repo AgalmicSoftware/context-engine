@@ -16,6 +16,8 @@ concurrency:
 
 permissions:
   contents: read
+  issues: read
+  pull-requests: read
 
 jobs:
   wiring-and-release:
@@ -24,10 +26,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
@@ -45,55 +49,43 @@ jobs:
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
 
-      - name: Check test and release wiring
-        run: npm run test:wiring
-
-      - name: Check type debt ratchet
-        run: npm run type-debt:check
+      - name: Resolve baseline growth approval
+        id: baseline-growth-approval
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BASELINE_GROWTH_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/resolve-baseline-growth-approval.mjs
 
       - name: Check baseline monotonicity
         env:
-          BASELINE_MONOTONICITY_BASE: ${{ github.event.pull_request.base.sha || 'origin/main' }}
-          BASELINE_MONOTONICITY_ALLOW_TEXT: >-
-            ${{ github.event.pull_request.title }}
-            ${{ github.event.pull_request.body }}
-            ${{ github.event.head_commit.message }}
+          BASELINE_MONOTONICITY_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          BASELINE_MONOTONICITY_APPROVED: ${{ steps.baseline-growth-approval.outputs.approved }}
         run: |
           set -euo pipefail
-          git fetch --no-tags --depth=1 origin main || true
-          if [ "$BASELINE_MONOTONICITY_BASE" != "origin/main" ]; then
-            git fetch --no-tags --depth=1 origin "$BASELINE_MONOTONICITY_BASE" || true
-          fi
-          node scripts/check-baseline-monotonicity.mjs --base "$BASELINE_MONOTONICITY_BASE" --allow-text "$BASELINE_MONOTONICITY_ALLOW_TEXT"
+          node scripts/check-baseline-monotonicity.mjs \
+            --base "$BASELINE_MONOTONICITY_BASE" \
+            --require-base-sha \
+            --approval "$BASELINE_MONOTONICITY_APPROVED"
 
-      - name: Lint client
-        run: npm run lint
+      - name: Run wiring and release gate
+        run: npm run ci:gate -- wiring-and-release
 
-      - name: Check client formatting
-        run: npm --prefix client run format:check
+      - name: Run public text gate
+        run: npm run ci:gate -- public-text
 
-      - name: Lint workers
-        run: npm run lint:workers
+      - name: Stage tested Worker bundle candidate
+        run: >-
+          node scripts/worker-release-artifacts.mjs stage
+          --dist dist
+          --output "${{ runner.temp }}/worker-bundle-candidate"
 
-      - name: Typecheck client
-        run: npm run typecheck:client
-
-      - name: Verify public release surface
-        run: npm run verify:public-release-surface
-      - name: Verify public asset ownership
-        run: npm run verify:public-assets
-
-      - name: Verify public text exposure
-        run: npm run verify:public-text
-
-      - name: Build worker bundles
-        run: npm run worker:bundle
-
-      - name: Verify worker bundle sync
-        run: npm run verify:worker-bundle
-
-      - name: Build client
-        run: npm --prefix client run build
+      - name: Upload tested Worker bundle candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: worker-bundle-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/worker-bundle-candidate
+          if-no-files-found: error
+          retention-days: 1
 
   contracts:
     runs-on: ubuntu-latest
@@ -101,25 +93,25 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: package-lock.json
 
       - name: Setup Foundry
-        uses: foundry-rs/foundry-toolchain@v1
+        uses: foundry-rs/foundry-toolchain@b00af27efadbc7b4ca8b82abbd903b17cc874d2a # v1
         with:
           version: stable
 
       - name: Install root dependencies
         run: npm ci
 
-      - name: Run contract tests
-        run: npm run test:contracts
+      - name: Run contracts gate
+        run: npm run ci:gate -- contracts
 
   client:
     runs-on: ubuntu-latest
@@ -127,10 +119,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
@@ -139,15 +131,12 @@ jobs:
       - name: Install client dependencies
         run: npm --prefix client ci
 
-      - name: Run client coverage tests
-        run: npm run test:client
-
-      - name: Check client coverage floor
-        run: npm run coverage-floor:check
+      - name: Run client gate
+        run: npm run ci:gate -- client
 
       - name: Upload client coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: client-coverage
           path: client/coverage/lcov.info
@@ -159,10 +148,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
@@ -180,8 +169,8 @@ jobs:
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
 
-      - name: Run root Jest tests
-        run: npm run test:root:jest
+      - name: Run root Jest gate
+        run: npm run ci:gate -- root-jest
 
   workers:
     runs-on: ubuntu-latest
@@ -189,10 +178,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
@@ -206,11 +195,8 @@ jobs:
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
 
-      - name: Run sessionCorsWorker tests
-        run: npm run test:worker:session-cors
-
-      - name: Run agentBridgeWorker tests
-        run: npm run test:worker:agent-bridge
+      - name: Run Worker gates
+        run: npm run ci:gate -- workers
 
   e2e-smoke:
     runs-on: ubuntu-latest
@@ -218,10 +204,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
@@ -259,7 +245,7 @@ jobs:
             sleep 1
           done
           curl -fsS "$BASE_URL" >/dev/null
-          npm run test:e2e:smoke
+          npm run ci:gate -- e2e-smoke
 
   cecc-and-node:
     runs-on: ubuntu-latest
@@ -267,10 +253,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
           cache: npm
@@ -284,11 +270,8 @@ jobs:
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
 
-      - name: Run root Node tests
-        run: npm run test:node
-
-      - name: Run cache guard
-        run: npm run test:cache-guard
+      - name: Run Context Engine CC and Node gate
+        run: npm run ci:gate -- cecc-and-node
 
       - name: Run dead export advisory
         continue-on-error: true
@@ -308,32 +291,73 @@ jobs:
     if: ${{ always() }}
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 2
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+
       - name: Check split CI job results
         env:
-          WIRING_AND_RELEASE_RESULT: ${{ needs.wiring-and-release.result }}
-          CONTRACTS_RESULT: ${{ needs.contracts.result }}
-          CLIENT_RESULT: ${{ needs.client.result }}
-          ROOT_JEST_RESULT: ${{ needs.root-jest.result }}
-          WORKERS_RESULT: ${{ needs.workers.result }}
-          E2E_SMOKE_RESULT: ${{ needs.e2e-smoke.result }}
-          CECC_AND_NODE_RESULT: ${{ needs.cecc-and-node.result }}
+          CI_GATE_RESULTS_JSON: >-
+            {"wiring-and-release":"${{ needs.wiring-and-release.result }}","public-text":"${{ needs.wiring-and-release.result }}","contracts":"${{ needs.contracts.result }}","client":"${{ needs.client.result }}","root-jest":"${{ needs.root-jest.result }}","workers":"${{ needs.workers.result }}","e2e-smoke":"${{ needs.e2e-smoke.result }}","cecc-and-node":"${{ needs.cecc-and-node.result }}"}
+        run: npm run ci:gates:check-hosted
+
+      - name: Download tested Worker bundle candidate
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: worker-bundle-candidate-${{ github.sha }}
+          path: ${{ runner.temp }}/worker-release
+
+      - name: Resolve private-to-public replay provenance
+        if: ${{ github.event_name == 'push' }}
+        id: worker-source
+        run: >-
+          node scripts/worker-release-artifacts.mjs resolve-source
+          --root .
+          --commit "${{ github.sha }}"
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Create and verify immutable Worker artifact manifest
+        if: ${{ github.event_name == 'push' }}
         run: |
           set -euo pipefail
-          failed=0
-          for entry in \
-            "wiring-and-release:${WIRING_AND_RELEASE_RESULT}" \
-            "contracts:${CONTRACTS_RESULT}" \
-            "client:${CLIENT_RESULT}" \
-            "root-jest:${ROOT_JEST_RESULT}" \
-            "workers:${WORKERS_RESULT}" \
-            "e2e-smoke:${E2E_SMOKE_RESULT}" \
-            "cecc-and-node:${CECC_AND_NODE_RESULT}"
-          do
-            job="${entry%%:*}"
-            result="${entry#*:}"
-            printf '%s: %s\n' "$job" "$result"
-            if [ "$result" != "success" ]; then
-              failed=1
-            fi
-          done
-          exit "$failed"
+          npm_version="$(npm --version)"
+          node scripts/worker-release-artifacts.mjs create \
+            --root . \
+            --artifact-dir "${{ runner.temp }}/worker-release" \
+            --source-commit "${{ github.sha }}" \
+            --source-ref "${{ github.ref }}" \
+            --source-tree "${{ steps.worker-source.outputs.sourceTree }}" \
+            --repository "${{ github.repository }}" \
+            --private-source-commit "${{ steps.worker-source.outputs.privateSourceCommit }}" \
+            --public-replay-commit "${{ steps.worker-source.outputs.publicReplayCommit }}" \
+            --workflow "${{ github.workflow }}" \
+            --workflow-ref "${{ github.workflow_ref }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}" \
+            --npm-version "$npm_version"
+          node scripts/worker-release-artifacts.mjs verify \
+            --root . \
+            --artifact-dir "${{ runner.temp }}/worker-release" \
+            --source-commit "${{ github.sha }}" \
+            --source-ref "${{ github.ref }}" \
+            --source-tree "${{ steps.worker-source.outputs.sourceTree }}" \
+            --repository "${{ github.repository }}" \
+            --workflow "${{ github.workflow }}" \
+            --run-id "${{ github.run_id }}" \
+            --run-attempt "${{ github.run_attempt }}"
+
+      - name: Upload immutable Worker release artifact
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: worker-bundles-${{ github.sha }}
+          path: ${{ runner.temp }}/worker-release
+          if-no-files-found: error
+          retention-days: 30

@@ -72,6 +72,7 @@ describe('contractScripts.getRelevantBlockWindowForFilter scope windows', () => 
   });
 
   it('uses configured blockLimits.start for demo session windows', async () => {
+    localStorage.setItem('ce:sessionScanSlugs', JSON.stringify(['demo-1']));
     const cfg = makeGroupCfg('demo-1', 44967477);
     const windowForSlug = await contractScripts.getRelevantBlockWindowForFilter(cfg);
 
@@ -136,6 +137,35 @@ describe('contractScripts.getRelevantBlockWindowForFilter scope windows', () => 
     expect(windowForSlug).toEqual({ fromBlock: 41000000, toBlock: 50000000 });
     expect(queryFilter).toHaveBeenCalledTimes(1);
     expect(filters.SessionCreated).toHaveBeenCalledTimes(1);
+  });
+
+  it('recovers missing blockLimits.start from the registry creation timestamp without a broad log scan', async () => {
+    const getBlock = jest.fn(async (blockNumber) => ({
+      number: blockNumber,
+      timestamp: blockNumber < 42 ? 999 : 1000,
+    }));
+    const queryFilter = jest.fn();
+    getRegistryContractSpy.mockReturnValue({
+      provider: {
+        getBlockNumber: jest.fn().mockResolvedValue(100),
+        getBlock,
+      },
+      queryFilter,
+    });
+
+    const cfg = {
+      slug: 'timestamp-fallback-slug',
+      networkChainId: 84532,
+      blockLimits: { end: null },
+      contracts: {},
+      __registry: { createdAt: 1000 },
+      __ignoreSessionScanScope: true,
+    };
+    const windowForSlug = await contractScripts.getRelevantBlockWindowForFilter(cfg);
+
+    expect(windowForSlug).toEqual({ fromBlock: 42, toBlock: 50000000 });
+    expect(getBlock).toHaveBeenCalled();
+    expect(queryFilter).not.toHaveBeenCalled();
   });
 
   it('throws when blockLimits.start is missing and SessionRegistry fallback cannot recover', async () => {

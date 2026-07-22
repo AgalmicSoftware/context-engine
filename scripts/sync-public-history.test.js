@@ -100,15 +100,24 @@ function commitAll(rootDir, message, { authorDate, committerDate }) {
   fs.unlinkSync(messageFile);
 }
 
-function runSyncScript(sourceDir, args = []) {
+function runSyncScript(sourceDir, args = [], envOverrides = {}) {
   return spawnSync('bash', [path.join(sourceDir, 'scripts', 'sync-public-history.sh'), ...args], {
     cwd: sourceDir,
     encoding: 'utf8',
     env: {
       ...process.env,
+      ...envOverrides,
       TMPDIR: TEST_TMP_ROOT,
     },
   });
+}
+
+function syncFailureMessage(result) {
+  return [
+    `sync-public-history exited with status ${result.status}${result.signal ? ` (${result.signal})` : ''}`,
+    `stdout:\n${result.stdout || '<empty>'}`,
+    `stderr:\n${result.stderr || '<empty>'}`,
+  ].join('\n');
 }
 
 function setupSourceRepo() {
@@ -261,7 +270,7 @@ test('sync-public-history dry run reports replayed and skipped commits without c
   withSourceRepo(({ sourceDir }) => {
     const result = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
 
-    assert.equal(result.status, 0);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     assert.match(result.stdout, /Dry run complete\./);
     assert.match(result.stdout, /Would replay: 2/);
     assert.match(result.stdout, /Would skip: 2/);
@@ -279,7 +288,7 @@ test('sync-public-history accepts an explicit source branch', () => {
 
     const result = runSyncScript(sourceDir, ['--dry-run', '--source-branch', 'dev-public-sync', 'release-candidate']);
 
-    assert.equal(result.status, 0);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     assert.match(result.stdout, /Source branch: dev-public-sync/);
     assert.match(result.stdout, /Branch name: release-candidate/);
   });
@@ -303,7 +312,7 @@ test('sync-public-history can replay patch-new commits from a source branch dive
 
     const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
 
-    assert.equal(result.status, 0);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     assert.match(result.stderr, /using git cherry to replay patch-new non-merge commits/);
     assert.match(result.stdout, /Replay complete\./);
     assert.match(result.stdout, /Branch name: release-candidate/);
@@ -346,7 +355,7 @@ test('sync-public-history resolves replay deletes over public-main edits', () =>
 
     const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
 
-    assert.equal(result.status, 0);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     assert.match(result.stdout, /Replay complete\./);
     assert.match(result.stdout, /Replayed commits: 3/);
     assert.match(result.stdout, /Skipped commits: 2/);
@@ -365,7 +374,7 @@ test('sync-public-history installs the private dev push guard before replaying',
 
     const result = runSyncScript(sourceDir, ['--dry-run']);
 
-    assert.equal(result.status, 0);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     assert.equal(git(sourceDir, ['config', '--local', '--get', 'core.hooksPath']).trim(), '.githooks');
 
     const upstreamResult = spawnSync(
@@ -384,7 +393,7 @@ test('sync-public-history replays public commits, skips private-only commits, an
   withSourceRepo(({ sourceDir }) => {
     const result = runSyncScript(sourceDir);
 
-    assert.equal(result.status, 0);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     assert.match(result.stdout, /Replay complete\./);
     assert.match(result.stdout, /Branch name: release-staging/);
     assert.match(result.stdout, /Replayed commits: 2/);
@@ -413,10 +422,16 @@ test('sync-public-history replays public commits, skips private-only commits, an
       '--format=%H',
       'origin/main..release-staging',
     ]).trim().split('\n');
+    const sourceShasBySubject = new Map(
+      git(sourceDir, ['log', '--format=%s%x09%H', 'origin/main..dev'])
+        .trim()
+        .split('\n')
+        .map((line) => line.split('\t')),
+    );
     const commitBodies = replayedShas.map((sha) => git(sourceDir, ['show', '--quiet', '--format=%B', sha]));
     assert.deepEqual(commitBodies, [
-      'Public commit title\n\nPublic commit body line.\n\n',
-      'Mixed commit\n\n',
+      `Public commit title\n\nPublic commit body line.\n\nCE-Private-Source: ${sourceShasBySubject.get('Public commit title')}\n\n`,
+      `Mixed commit\n\nCE-Private-Source: ${sourceShasBySubject.get('Mixed commit')}\n\n`,
     ]);
 
     const preCutoverPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', replayedShas[0]]);
@@ -544,7 +559,7 @@ test('sync-public-history restores Agent Bridge package wiring at an explicit pu
       'release-candidate',
     ]);
 
-    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     const publicPackage = JSON.parse(git(sourceDir, ['show', 'release-candidate:package.json']));
     assert.equal(
       publicPackage.scripts['test:worker:agent-bridge'],
@@ -568,7 +583,7 @@ test('sync-public-history removes package commands whose runners are stripped', 
 
     const result = runSyncScript(sourceDir, ['release-candidate']);
 
-    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     const publicPackage = JSON.parse(git(sourceDir, ['show', 'release-candidate:package.json']));
     assert.equal(publicPackage.scripts['ai:test-private-e2e'], undefined);
     assert.equal(publicPackage.scripts['test:ci'], 'npm run test:node');
@@ -724,7 +739,7 @@ test('sync-public-history links source node_modules for public Node ESM imports 
 
     const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
 
-    assert.equal(result.status, 0);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     assert.match(result.stderr, /Linking source node_modules into public test checkout/);
     assert.match(result.stdout, /public node ESM fixture passed/);
   });
@@ -749,7 +764,7 @@ test('sync-public-history rejects planning identifiers in replay messages unless
       '--sanitize-private-replay-messages',
       'release-candidate',
     ]);
-    assert.equal(sanitized.status, 0);
+    assert.equal(sanitized.status, 0, syncFailureMessage(sanitized));
     assert.match(sanitized.stdout, /Would replay: 3/);
     assert.match(sanitized.stderr, /Sanitized private replay message tokens/);
   });
@@ -785,9 +800,25 @@ test('sync-public-history can sanitize private tokens in otherwise public replay
       committerDate: '2025-01-05T06:07:08Z',
     });
 
-    const result = runSyncScript(sourceDir, ['--sanitize-private-replay-messages', 'release-candidate']);
+    const inheritedHooksDir = path.join(sourceDir, 'inherited-hooks');
+    const inheritedConfigPath = path.join(sourceDir, 'inherited-gitconfig');
+    writeFile(sourceDir, path.join('inherited-hooks', 'pre-commit'), '#!/usr/bin/env bash\nexit 128\n');
+    fs.chmodSync(path.join(inheritedHooksDir, 'pre-commit'), 0o755);
+    fs.writeFileSync(inheritedConfigPath, [
+      '[core]',
+      `\thooksPath = ${inheritedHooksDir}`,
+      '[commit]',
+      '\tgpgSign = true',
+      '',
+    ].join('\n'));
 
-    assert.equal(result.status, 0);
+    const result = runSyncScript(
+      sourceDir,
+      ['--sanitize-private-replay-messages', 'release-candidate'],
+      { GIT_CONFIG_GLOBAL: inheritedConfigPath },
+    );
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
     assert.match(result.stderr, /Sanitized private replay message tokens/);
     assert.match(result.stdout, /Replayed commits: 3/);
 
@@ -821,7 +852,7 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
 
     const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
 
-    assert.equal(result.status, 0);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     assert.match(result.stderr, /Remote branch origin\/release-staging already exists and will be refreshed automatically with --force-with-lease\./);
     assert.match(result.stdout, /Branch name: release-staging/);
     assert.match(result.stdout, /Replayed commits: 2/);

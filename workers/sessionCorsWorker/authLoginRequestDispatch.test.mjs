@@ -18,6 +18,7 @@ const createAuthDeps = (overrides = {}) => ({
     ok: true,
     address: '0xabc',
     config: {
+      authzEpoch: 1,
       registryAddress: '0x0000000000000000000000000000000000000001',
     },
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
@@ -130,6 +131,37 @@ test('dispatchAuthLoginRequest preserves token-signing failure contract', async 
   });
 });
 
+test('dispatchAuthLoginRequest fails closed on an invalid authorization epoch', async () => {
+  let signTokenCalled = false;
+  const result = await dispatchAuthLoginRequest({
+    request: { json: async () => createSignedBody() },
+    env: { GROUP_KV: {}, TOKEN_HMAC_SECRET: 'test-secret' },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    deps: createAuthDeps({
+      resolveAuthLoginRequestAuthority: async () => ({
+        ok: true,
+        address: '0xabc',
+        config: { authzEpoch: 'invalid' },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        scopes: { ai: true },
+        targetSlug: 'session-a',
+      }),
+      signToken: async () => {
+        signTokenCalled = true;
+        return 'signed-token';
+      },
+    }),
+  });
+
+  assert.equal(signTokenCalled, false);
+  assert.deepEqual(result, {
+    body: { error: 'Session authorization epoch is invalid.' },
+    status: 500,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});
+
 test('dispatchAuthLoginRequest signs tokens with jti and persists the token marker', async () => {
   const scopes = {
     ai: true,
@@ -160,6 +192,7 @@ test('dispatchAuthLoginRequest signs tokens with jti and persists the token mark
         return {
           ok: true,
           address: '0xabc',
+          config: { authzEpoch: 7 },
           headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
           scopes,
           targetSlug: 'session-a',
@@ -198,6 +231,7 @@ test('dispatchAuthLoginRequest signs tokens with jti and persists the token mark
     ['signToken', {
       sub: '0xABC',
       slug: 'session-a',
+      authzEpoch: 7,
       scopes,
       exp: expectedExp,
       jti: 'jti-1',

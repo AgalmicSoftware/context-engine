@@ -1,0 +1,42 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "isolatedModules": false,
+    "types": [
+      "node",
+      "react",
+      "react-dom"
+    ]
+  },
+  "files": [
+    "types/jest-test-globals.d.ts"
+  ],
+  "include": [
+    "src/**/*.d.ts",
+    "src/setupTests.ts",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/*.spec.ts",
+    "src/**/*.spec.tsx",
+    "src/**/*testUtils.ts",
+    "src/**/*testUtils.tsx",
+    "src/**/*TestUtils.ts",
+    "src/**/*TestUtils.tsx",
+    "src/**/*testHarness.ts",
+    "src/**/*testHarness.tsx",
+    "src/**/*TestHarness.ts",
+    "src/**/*TestHarness.tsx",
+    "src/**/*testHelpers.ts",
+    "src/**/*testHelpers.tsx",
+    "src/**/*TestHelpers.ts",
+    "src/**/*TestHelpers.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "build",
+    "coverage",
+    ".jest-cache",
+    ".tmp-jest",
+    ".jest-tmp"
+  ]
+}

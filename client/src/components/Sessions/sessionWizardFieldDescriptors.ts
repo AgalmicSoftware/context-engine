@@ -207,7 +207,9 @@ export const shouldHideSessionWizardField = ({
 
 export const getSessionWizardOrderedDraftEntries = (draft: DraftLike | null | undefined): Array<[string, unknown]> => {
   const source = draft && typeof draft === 'object' ? draft : {};
-  const keys = Object.keys(source).filter((key) => !WORKER_ONLY_DRAFT_FIELDS.has(key));
+  const keys = Object.keys(source).filter(
+    (key) => !WORKER_ONLY_DRAFT_FIELDS.has(key) && !(key === 'storageProfile' && source.sessionModeProfile),
+  );
   const orderedKeys = [
     ...TOP_LEVEL_FIELD_ORDER.filter((key) => keys.includes(key)),
     ...keys.filter((key) => !TOP_LEVEL_FIELD_ORDER.includes(key)),

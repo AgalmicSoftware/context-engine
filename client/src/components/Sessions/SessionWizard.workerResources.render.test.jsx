@@ -86,7 +86,7 @@ describe('SessionWizard worker resource rendering', () => {
     expect(getWizardResourceCard('lit')).toBeUndefined();
   });
 
-  it('keeps session storage profile selection in advanced mode and defaults to Arweave', async () => {
+  it('uses the Privacy storage control instead of a second Session Storage editor', async () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -94,14 +94,13 @@ describe('SessionWizard worker resource rendering', () => {
     expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
 
     enableAdvancedMode();
-
-    expect(await screen.findByText('Session Storage')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
-
-    const arweaveOption = screen.getByRole('radio', { name: 'Arweave' });
-    const cloudflareOption = screen.getByRole('radio', { name: 'Cloudflare' });
+    fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
+    const storageOptions = within(await screen.findByRole('radiogroup', { name: 'Data storage' }));
+    const arweaveOption = storageOptions.getByRole('radio', { name: 'Arweave' });
+    const cloudflareOption = storageOptions.getByRole('radio', { name: 'Cloudflare' });
     expect(arweaveOption).toHaveAttribute('aria-checked', 'true');
     expect(cloudflareOption).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
 
     fireEvent.click(cloudflareOption);
 
@@ -109,49 +108,9 @@ describe('SessionWizard worker resource rendering', () => {
       expect(arweaveOption).toHaveAttribute('aria-checked', 'false');
       expect(cloudflareOption).toHaveAttribute('aria-checked', 'true');
     });
-    expect(screen.getByText(/R2 for blobs, KV for metadata, indexes, and audits/)).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Public read' })).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByRole('radio', { name: 'Worker SBT gate' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: 'Lit encrypted' })).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByText(/worker-enforced access control, not end-to-end encryption/i)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Public read' }));
-    expect(screen.getByRole('radio', { name: 'Public read' })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByText(/serves reads through the session worker without wallet auth/i)).toBeInTheDocument();
-  });
-
-  it('keeps Arweave storage choices separate from Cloudflare payload access controls', async () => {
-    renderLoggedInSessionWizard();
-
-    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await selectTrustlessPublicPreset();
-    enableAdvancedMode();
-    fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
-
-    expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Worker SBT gate' })).not.toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Lit encrypted' })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Lit-Arweave' }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('radio', { name: 'Lit-Arweave' })).toHaveAttribute('aria-checked', 'true');
-    });
-    expect(screen.getByText(/Lit-Arweave stores encrypted Arweave payloads/i)).toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Cloudflare stores canonical CE payloads/i)).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Cloudflare' }));
-    expect(screen.getByRole('radio', { name: 'Worker SBT gate' })).toHaveAttribute('aria-checked', 'true');
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Arweave' }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
-    });
-    expect(screen.queryByRole('radio', { name: 'Public read' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Cloudflare stores canonical CE payloads/i)).not.toBeInTheDocument();
   });
 
   it('shows only AI, RPC, and Lit resources when Cloudflare Lit encryption is explicitly selected', async () => {

@@ -1,5 +1,5 @@
 import { build } from 'esbuild';
-import { mkdirSync } from 'fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import {
@@ -22,6 +22,16 @@ export const WORKER_BUNDLE_TARGETS = Object.freeze({
     outputRelativePath: 'dist/deployHelper.bundle.js',
     enforceWorkerDependencyGuard: false,
   }),
+  agentBridgeWorker: Object.freeze({
+    key: 'agentBridgeWorker',
+    label: 'agentBridgeWorker',
+    entryRelativePath: 'workers/agentBridgeWorker/worker.js',
+    outputRelativePath: 'dist/agentBridgeWorker.bundle.js',
+    enforceWorkerDependencyGuard: false,
+    target: 'es2022',
+    legalComments: 'eof',
+    mainFields: ['browser', 'module', 'main'],
+  }),
 });
 
 export const resolveWorkerBundleTargets = ({
@@ -41,6 +51,11 @@ export const resolveWorkerBundleTargets = ({
   })
 );
 
+export const normalizeWorkerBundleText = (value) =>
+  String(value || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/[\t ]+$/gm, '');
+
 export const buildWorkerBundles = async ({
   rootDir = process.cwd(),
   targetKeys = Object.keys(WORKER_BUNDLE_TARGETS),
@@ -48,6 +63,8 @@ export const buildWorkerBundles = async ({
   assertWorkerDeps = assertWorkerDependencyVersions,
   esbuildImpl = build,
   mkdirSyncImpl = mkdirSync,
+  readFileSyncImpl = readFileSync,
+  writeFileSyncImpl = writeFileSync,
 } = {}) => {
   const targets = resolveWorkerBundleTargets({ rootDir, targetKeys });
   if (targets.some((target) => target.enforceWorkerDependencyGuard)) {
@@ -64,8 +81,16 @@ export const buildWorkerBundles = async ({
       bundle: true,
       platform: 'browser',
       format: 'esm',
-      target: ['es2020'],
+      preserveSymlinks: true,
+      target: [target.target || 'es2020'],
+      ...(target.legalComments ? { legalComments: target.legalComments } : {}),
+      ...(target.mainFields ? { mainFields: target.mainFields } : {}),
     });
+    const bundle = readFileSyncImpl(target.outputFile, 'utf8');
+    const normalizedBundle = normalizeWorkerBundleText(bundle);
+    if (normalizedBundle !== bundle) {
+      writeFileSyncImpl(target.outputFile, normalizedBundle);
+    }
     results.push(target);
   }
   return results;
@@ -102,10 +127,12 @@ const printUsage = () => {
     '  npm run worker:bundle',
     '  node scripts/worker-bundle.mjs --target sessionCorsWorker',
     '  node scripts/worker-bundle.mjs --target deployHelper',
+    '  node scripts/worker-bundle.mjs --target agentBridgeWorker',
     '',
     'Output:',
     '  dist/sessionCorsWorker.bundle.js',
     '  dist/deployHelper.bundle.js',
+    '  dist/agentBridgeWorker.bundle.js',
   ].join('\n'));
 };
 

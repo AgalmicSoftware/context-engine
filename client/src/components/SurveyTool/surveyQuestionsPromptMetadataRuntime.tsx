@@ -430,7 +430,6 @@ export const createSurveyQuestionsPromptMetadataRuntime = (
     setState(buildBulkPromptReloadingState(true));
     try {
       for (const qid of ids) {
-        // eslint-disable-next-line no-await-in-loop
         await handleReloadMaskedPrompt(qid);
       }
     } finally {

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "id": "test-source",
+      "jestPatterns": [
+        "!src/**/__tests__/**",
+        "!src/**/*.{test,spec}.{js,jsx,ts,tsx}"
+      ],
+      "reason": "Jest tests/specs are verification sources, not shipped production owners."
+    },
+    {
+      "id": "declaration",
+      "jestPatterns": [
+        "!src/**/*.d.ts"
+      ],
+      "reason": "TypeScript declarations contain no executable runtime statements."
+    },
+    {
+      "id": "test-setup",
+      "jestPatterns": [
+        "!src/setupTests.ts"
+      ],
+      "reason": "The Jest environment bootstrap is test-only setup."
+    },
+    {
+      "id": "test-helper",
+      "jestPatterns": [
+        "!src/**/*.{testUtils,TestUtils,testHarness,TestHarness,testHelper,testHelpers,TestHelper,TestHelpers}.{js,jsx,ts,tsx}"
+      ],
+      "reason": "Named test utilities and harnesses are test-only support modules."
+    }
+  ],
+  "explicitProductionFileExceptions": []
+}

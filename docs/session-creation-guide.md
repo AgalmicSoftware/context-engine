@@ -13,21 +13,25 @@ Related docs:
 
 ## What a New Session Needs
 
-For the default `Fast & Cheap (Cloudflare)` preset, the visible setup requires
-exactly two credentials:
+The first `/new` screen presents the two implemented setup paths as large cards
+with their required inputs. After a creator chooses one, the cards collapse to
+the compact Hosting selector in the wizard header so the profile can still be
+changed. The Fast & Cheap card summarizes its inputs as
+`Cloudflare login / AI API Key`.
 
-1. A Cloudflare API token with the least privileges needed to deploy the
-   per-session worker.
-2. One API key for the selected AI provider.
+For the default `Fast & Cheap (Cloudflare)` preset, the user needs a Cloudflare
+account and one API key for the selected AI provider. The native deploy button
+runs in Cloudflare and does not ask for a Cloudflare API token, OAuth token,
+Context Engine deploy helper, or local agent.
 
 The app's passkey-derived EOA supplies the admin identity and signs the worker
-config, but it does not submit a transaction and needs no gas. The Cloudflare
-token on this direct `/new` path is deploy-helper request input only: it must
-never be placed in the session or admin URL, public metadata, Worker session
-config, logs, analytics, browser storage, or any other durable store. The AI key
-is written only to the worker's session-secrets store. The separate legacy
-sponsored deploy-grant path is described below and retains its existing
-short-lived server-side grant record.
+config, but it does not submit a transaction and needs no gas. Context Engine
+generates two independent setup values, `TOKEN_HMAC_SECRET` and
+`CE_STORAGE_ENVELOPE_KEK`, for Cloudflare's encrypted Worker-secret fields.
+They are secrets for the new Session Worker, not Cloudflare credentials, and
+stay in the current browser tab during setup. The AI key is written only to the
+worker's session-secrets store. The legacy deploy-helper and sponsored
+deploy-grant paths remain explicit fallbacks.
 
 Use this matrix when choosing a non-default profile:
 
@@ -36,7 +40,7 @@ Use this matrix when choosing a non-default profile:
 | Passkey account | Supplies the admin identity and signs worker or on-chain actions | Yes; the default path creates it in the app | No |
 | OP Sepolia ETH | Pays registry/SBT transactions | Decentralized or other on-chain profiles only | Partially |
 | Cloudflare Worker | Hosts worker-canonical config, auth, AI, storage, fetch, and optional faucet routes | Yes for Cloudflare profiles | Yes, if the sponsor gives you a deploy-ready bundle |
-| Cloudflare API token | Deploys a new worker through the helper; request-only and nonpersistent on the direct default `/new` flow | Yes for the default self-deploy flow | Indirectly, through the separate legacy short-lived deploy-grant path |
+| Cloudflare API token | Used only by the legacy deploy-helper fallback | No for the native default | Indirectly, through the separate legacy short-lived deploy-grant path |
 | AI provider key | Powers AI generation, chat, and transcription routes for the selected provider | Yes for the default preset | Yes |
 | Arweave JWK | Pays for Arweave metadata/payload uploads | Decentralized or explicitly Arweave-backed profiles only | Yes |
 | RPC URL | Provides chain reads and writes | Decentralized, Lit/on-chain gating, or explicitly chain-backed profiles only | Yes |
@@ -114,34 +118,34 @@ without publishing the full pool.
 
 ## Prerequisites
 
-### 1. Cloudflare account and API token
+### 1. Cloudflare account
 
 The session worker is the canonical config, auth, AI, and payload-storage host
 for the default preset. A free Cloudflare account is enough for small sessions.
 
-You need:
+Create or sign in to a Cloudflare account at <https://dash.cloudflare.com/>.
+The native deploy button opens Cloudflare's deployment flow for the isolated
+package in `deploy/cloudflare/session-worker/`. Cloudflare provisions the
+Worker, KV namespace, and Durable Object in that account. Paste the slug, public
+admin address, and two generated Worker runtime secrets shown by the wizard;
+then deploy and paste the resulting `workers.dev` URL back into the wizard.
 
-- A Cloudflare account: <https://dash.cloudflare.com/>
-- An API token with Workers-related permissions. The wizard expects the same scope used by the deploy-helper flow described in [session-cors-worker.md](session-cors-worker.md).
-- Cloudflare token templates reference: <https://developers.cloudflare.com/fundamentals/api/how-to/account-owned-token-template/>
-
-The default deploy flow needs exactly `Workers Scripts: Edit` and `Workers KV Storage: Edit`. [Create a token with those permissions prefilled](https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22edit%22%7D%5D&accountId=%2A&zoneId=all&name=Context%20Engine%20Session%20Worker), or use the equivalent link in the wizard onboarding banner. Those scopes cover the worker script and secrets, workers.dev setup, the canonical session config, encrypted payload envelopes and indexes, groups, audit rows, and deploy state stored in KV. The script upload also installs the worker's `SessionWriteCoordinator` Durable Object class and binding; Cloudflare accepts that module upload through `Workers Scripts: Edit`, so the default token still has only these two permission groups. Add `R2: Edit` only for an advanced deployment that explicitly manages an existing R2 bucket; the token link does not create that bucket. D1, Durable Objects API, Account Settings, Workers AI, and Queues permissions are not required by the default path. When Cloudflare preselects `All accounts`, restrict Account Resources to the one account where the worker will run before creating the token. Cloudflare only pre-fills the creation form: create the token, copy its generated value, and paste it into the wizard's Worker step. Do not put real account IDs, bucket names, API tokens, or production config in committed files.
-
-The deploy helper consumes the direct `/new` Cloudflare token in the deploy
-request and does not return or persist it. A successfully published session URL
-contains only the public worker origin, never the token. This request-only rule
-is distinct from the existing sponsored deploy-grant workflow documented above.
-You do not need to paste or configure a Cloudflare account ID: the deploy helper
-uses the token to look up exactly one visible account through Cloudflare and
-stops if the token exposes zero or multiple accounts.
+The deploy URL must pin an exact 40-character commit so the reviewed source is
+immutable. A release enables the native card by setting
+`REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` to the reviewed public
+replay commit. The private source commit is not interchangeable with its public
+replay SHA. Moving branches, tags, abbreviated hashes, and non-GitHub sources
+are rejected. The token-based helper procedure later in this guide applies only
+to the legacy fallback.
 
 ### 2. AI provider key
 
 Provide one key for the provider used by the selected fast/thinking models. The
 default OpenAI model choices require one OpenAI key; choosing another provider
-changes which single provider key is required. The key is stored in the
-per-session worker secrets envelope, not the public session config returned to
-browsers.
+changes which single provider key is required. The key is AES-GCM encrypted in
+the per-session Worker KV secrets envelope under a Worker-only KEK; it is never
+stored in the public session config returned to browsers. This protects KV
+contents at rest, but the session Worker and Cloudflare runtime can decrypt it.
 
 ### 3. A signing identity
 
@@ -204,26 +208,53 @@ Registration cost notes:
 
 Open `/new`. The app canonicalizes that route to `/session/new`, but `/new` is the intended entry point.
 
-The first screen is the session-mode choice. Nothing is preselected. Choosing
-a preset immediately opens the four-stage setup with fields prefilled from the
-chosen mode; there is no separate Continue action on this entry screen:
+The first screen is the session-mode choice. A blank draft has nothing
+preselected. If this browser already has an explicit saved profile, the header
+shows that profile and offers `Continue with saved settings` instead of silently
+discarding or replacing it. Choosing a new preset immediately opens the
+four-stage setup with fields prefilled from the chosen mode; there is no
+separate Continue action for a new selection:
 
 - `Fast & Cheap (Cloudflare)` compiles to a Cloudflare-backed,
   worker-canonical session shape with Cloudflare-internal worker encryption
-  (`worker_envelope`) enabled by default. Its card lists exactly the Cloudflare
-  API token and one AI-provider key. It does not ask for Arweave, Lit, RPC,
-  funding, faucet, or gas inputs.
+  (`worker_envelope`) enabled by default. After selection, the requirements
+  banner lists exactly the Cloudflare API token and one AI-provider key. It does
+  not ask for Arweave, Lit, RPC, funding, faucet, or gas inputs.
 - `Trustless & Public (Decentralized)` compiles to the public Arweave +
-  EVM-registry session shape. Its card lists the Arweave wallet/JWK, RPC
-  URL/key, AI provider key, and optional Lit key needed when encryption is
-  enabled.
+  EVM-registry session shape. Its requirements banner lists the Arweave
+  wallet/JWK, RPC URL/key, AI provider key, and optional Lit key needed when
+  encryption is enabled.
 
-After selection, the profile remains visible above the setup stages. Advanced
-options let creators switch Cloudflare sessions between Cloudflare-internal and
-Lit encryption, or change storage, authority, and other axes independently;
-those edits flip the profile to `custom`. New session publishes write the
+After selection, the profile remains visible in the setup header. `Customize`
+switches to Advanced mode and opens Privacy instead of opening a separate
+technical popover. Profile settings follow the existing stages:
+
+- Privacy owns storage, encryption, decryption access, result visibility, and
+  small-group protection. Switching from Arweave to Cloudflare installs an
+  explicit role gate; switching back removes Cloudflare-only access fields.
+  Admin-only and public-redacted result modes remain visible as unavailable
+  until their complete read paths are enforced.
+- Worker owns optional participation channels such as Telegram, Telegram Mini App, and
+  Agent Session Wrapped. The website remains enabled. Wrapped is off by
+  default, deploys one additional dedicated per-session Bridge, and does not
+  implicitly enable Telegram. Telegram Mini App is independently selectable but
+  requires Telegram; disabling Telegram also disables its Mini App.
+- Deploy owns the export policy. Selected-channel export remains visible as
+  unavailable until the export runtime consumes that filter.
+
+Changing one of these values flips the profile to `custom`. Profile-based
+drafts do not also show the older `Session Storage` metadata editor, so storage
+has one visible authority. New session publishes write the
 `sessionModeProfile` profile as the source of truth and compile it down to the
 existing storage profile / payload-access fields for runtime compatibility.
+The wizard validates that profile at the publish boundary and rechecks the live
+draft after asynchronous identity and duplicate-session preflight. A profile
+edit made while preflight is running therefore still stops before upload,
+worker, or registry side effects. Invalid settings are also shown in the stage
+where they are edited. Mode values are exact enums at every write boundary:
+explicit blanks, friendly aliases, unknown values, and reserved key providers
+are rejected rather than normalized to a less-protective default. Legacy aliases
+remain readable only for stored compatibility.
 Legacy `telegramOnly` fields are read only as a migration fallback and are not
 written by new sessions.
 
@@ -267,9 +298,9 @@ What gets stored where:
   select `worker_sbt_gate`, where the session worker checks the requester's SBT
   gate with configured chain/RPC before serving bytes. That is worker-enforced
   access control, not end-to-end encryption.
-- Advanced encryption options are `none` (payload bytes are stored as provided), `lit` (Cloudflare stores caller-supplied Lit ciphertext and rejects plaintext uploads until the Lit path sends `payloadEncrypted=true`), and `worker_envelope`: Encrypted at rest. Keys are held by the session worker; decryption is gated by session conditions. `worker_envelope` is available only with Cloudflare storage. The operator and Cloudflare runtime can decrypt; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime.
+- Advanced encryption options are `none` (payload bytes are stored as provided), `lit` (Cloudflare stores caller-supplied Lit ciphertext and rejects plaintext uploads until the Lit path sends `payloadEncrypted=true`), and Cloudflare `worker_envelope`: data is encrypted before Cloudflare stores it, and the session worker decrypts only after checking access. `worker_envelope` is available only with Cloudflare storage. The operator and Cloudflare runtime can decrypt; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime.
 - When `/new` deploys a custom worker for Cloudflare storage, the deploy helper receives the normalized storage profile before Worker upload so it can bind the storage index KV and any requested R2 bucket. If `worker_envelope` is selected, the helper also generates the worker secret used as the deployment KEK; the generated value is not written to session metadata.
-- Worker-envelope key provider is fixed to `worker_secret` in this release. Session-level conditions may use `worker_role`, `sbt_onchain`, or `agent_grant_scope` with `match: any|all`; the wizard writes them to `storageProfile.payloadAccessControl.accessConditions` for the worker.
+- Worker-envelope key provider is fixed to `worker_secret` in this release. The default Cloudflare rule permits configured session admins or agents granted the `storage` scope; normal participant responses use their dedicated submission route. An explicit override can combine Session role (`worker_role`), SBT holders (`sbt_onchain`), or Authorized agents (`agent_grant_scope`) rules with any/all matching; the wizard writes those conditions to `storageProfile.payloadAccessControl.accessConditions` for the worker.
 - `SessionRegistry` does not store long-form content directly. Decentralized
   profiles store a metadata URI pointer plus minimal session identity fields;
   the default worker-canonical profile skips registry writes entirely.
@@ -383,6 +414,35 @@ What happens during deploy:
   without `deploymentRequestId` receive random names. The helper still verifies
   its ownership marker after upload and stops before hostname/secret activation
   if ownership does not match.
+
+When `Agent Session Wrapped` is selected, the same request-only Cloudflare
+token may also deploy the dedicated Bridge in that setup operation. The Bridge
+receives an explicit one-session policy and the exact paired session-Worker
+origin. Setup does not publish its version-1 `agentSessionWrapped` capability or
+report success until upload, secrets, bindings, activation, health, protocol,
+authority probing, and the durable session-config write have all succeeded.
+Failure preserves the prior verified capability, if any, and leaves the
+session config intact. Telegram is a separate optional surface and remains off
+unless selected.
+
+Compatibility is determined by the paired session Worker:
+
+- Worker-canonical sessions use their canonical Worker directly.
+- Registry-canonical sessions use the same Wrapped flow when their existing
+  `corsWorkerUrl` is usable or when an unlocked registry session can first
+  attach a compatible Worker. The session Worker—not the Bridge—performs SIWE,
+  registry/RPC, chain-gate, and SBT checks.
+- An unlocked workerless registry session must attach a Worker before Wrapped
+  can be enabled. That owner attachment may require an Admin registry
+  transaction.
+- A permanently locked workerless session cannot attach a new Worker and fails
+  closed without a partial Bridge deployment.
+
+After a member has a session-Worker credential, the agent exchanges it for a
+shorter session-bound `ceagt_` credential and submits Wrapped answers over
+HTTPS/KV. The agent performs no EVM transaction. The Bridge credential lasts
+at most 24 hours and never outlives the Worker credential, so access revocation
+propagates no later than that shorter remaining lifetime.
 
 What gets stored where:
 
@@ -544,6 +604,7 @@ Use this when you want to avoid Wrangler and upload the worker bundle manually.
 Recommended source files:
 
 - Bundled release asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
+- Adjacent provenance manifest: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/worker-release-manifest.json` (the deploy helper verifies its expected SHA-256 before Cloudflare mutation)
 - Generated repo-local fallback bundle after `nvm use 20 && npm run worker:bundle`: `dist/sessionCorsWorker.bundle.js`
 - Canonical worker source: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
 
@@ -578,6 +639,18 @@ Confirm that `/admin` can resolve:
 - canonical name/content from Worker KV for `worker_canonical`
 - metadata URI, registry chain/address, and sponsored flags for decentralized
   sessions
+
+### Manage Agent Session Wrapped
+
+Compatible worker-canonical and registry-canonical sessions show an Agent
+Session Wrapped panel in `/admin`. Enter a fresh request-only Cloudflare token
+for each enable, disable-access, or explicit redeploy operation; the browser
+clears it when the request finishes and does not restore it from storage.
+`Check health` verifies the recorded protocol, session slug, access bit, and
+pinned session-Worker origin. Disabling access retains deployed resources and
+publishes `enabled: false`; resource deletion is a separate confirmed live
+operation. An unhealthy or failed redeploy does not replace the last verified
+origin/revision.
 
 ### Test worker health
 

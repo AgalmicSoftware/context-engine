@@ -54,7 +54,6 @@ const TEST_ARWEAVE_GATEWAY = 'https://arweave.example.test';
 
 const flushMicrotasks = async (count = 5) => {
   for (let index = 0; index < count; index += 1) {
-    // eslint-disable-next-line no-await-in-loop
     await Promise.resolve();
   }
 };

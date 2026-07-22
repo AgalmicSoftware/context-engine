@@ -81,27 +81,27 @@ test('persistAuthTokenRecord stores a per-token KV marker with token-aligned ttl
   ]]);
 });
 
-test('validateAuthTokenRecord accepts legacy no-jti tokens without KV lookup', async () => {
+test('validateAuthTokenRecord rejects missing or blank jti values without KV lookup', async () => {
   let getCalled = false;
+  const env = {
+    GROUP_KV: {
+      get: async () => {
+        getCalled = true;
+        return null;
+      },
+    },
+  };
 
-  assert.deepEqual(
-    await validateAuthTokenRecord({
-      env: {
-        GROUP_KV: {
-          get: async () => {
-            getCalled = true;
-            return null;
-          },
-        },
-      },
-      payload: {
-        sub: '0xabc',
-        slug: 'session-a',
-      },
-      slug: 'session-a',
-    }),
-    { ok: true, legacy: true },
-  );
+  for (const payload of [
+    { sub: '0xabc', slug: 'session-a' },
+    { sub: '0xabc', slug: 'session-a', jti: '' },
+    { sub: '0xabc', slug: 'session-a', jti: '   ' },
+  ]) {
+    assert.deepEqual(
+      await validateAuthTokenRecord({ env, payload, slug: 'session-a' }),
+      { ok: false, error: 'Invalid token.' },
+    );
+  }
   assert.equal(getCalled, false);
 });
 

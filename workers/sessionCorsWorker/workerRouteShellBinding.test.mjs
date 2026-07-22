@@ -529,6 +529,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves authenticated fallback afte
           requireAuth: 'requireAuth',
           getSessionConfig: 'getSessionConfig',
           getCorsContext: 'getCorsContext',
+          computeScopesForLogin: 'computeScopesForLogin',
           toStr: 'toStr',
           dispatchAuthenticatedRoute: 'dispatchAuthenticatedRoute',
           dispatchAuthenticatedSecretPathRoute: 'dispatchAuthenticatedSecretPathRoute',

@@ -317,6 +317,8 @@ describe('createSbtGroupHelpers state patch helpers', () => {
       startedMinting: false,
       mintingFailed: false,
       error: '',
+      encryptedRecoveryEnabled: false,
+      encryptedRecoveryStatus: 'idle',
       imageUploaded: false,
       tokenUriUploaded: false,
     });
@@ -327,6 +329,8 @@ describe('createSbtGroupHelpers state patch helpers', () => {
       startedMinting: false,
       mintingFailed: false,
       error: '',
+      encryptedRecoveryEnabled: false,
+      encryptedRecoveryStatus: 'idle',
     });
     expect(buildCreateSbtErrorPatch({ error: 'Plain' })).toEqual({
       error: 'Plain',

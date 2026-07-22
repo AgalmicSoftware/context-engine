@@ -89,6 +89,8 @@ function resolveLoginOriginCandidates(env = {}, session = {}) {
   [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
+    'https://contextengine.sh',
+    'https://www.contextengine.sh',
     'https://contextengine.xyz',
     'https://www.contextengine.xyz',
     DEFAULT_LOGIN_ORIGIN,
@@ -859,6 +861,7 @@ export const __test__onChainResponses = {
   normalizeAnswerForPayload,
   resolveRpcUrls,
   resolveLoginOrigin,
+  resolveLoginOriginCandidates,
   selectReadyRpcUrl,
   waitForAccountBalance,
   uploadResponsePayload,

@@ -110,7 +110,7 @@ export const resolveAdminSignatureAuthority = async ({
   if (!nonceResult?.ok) {
     return {
       ok: false,
-      status: 400,
+      status: Number(nonceResult?.status || 0) >= 500 ? Number(nonceResult.status) : 400,
       error: nonceResult?.error,
       reason: 'nonce_invalid',
       logExtra: { error: nonceResult?.error },

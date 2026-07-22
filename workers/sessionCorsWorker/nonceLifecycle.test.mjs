@@ -5,6 +5,7 @@ import {
   buildNonce,
   checkNonceRateLimit,
   consumeNonce,
+  issueNonce,
 } from './nonceLifecycle.js';
 
 test('buildNonce fills a 16-byte buffer and encodes it with the provided base64url helper', () => {
@@ -26,303 +27,78 @@ test('buildNonce fills a 16-byte buffer and encodes it with the provided base64u
   assert.deepEqual(calls, [[1, 2, 3, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]);
 });
 
-test('consumeNonce rejects already-used nonces before writing a claim', async () => {
+test('issueNonce requires durable coordination before writing the KV compatibility mirror', async () => {
   const calls = [];
-  const env = {
-    GROUP_KV: {
-      get: async (key) => {
-        calls.push(['get', key]);
-        if (key === 'usedNonce:session-a:nonce-1') return '1';
-        return null;
-      },
-      put: async (...args) => calls.push(['put', ...args]),
-      delete: async (...args) => calls.push(['delete', ...args]),
-    },
-  };
-
-  assert.deepEqual(
-    await consumeNonce(env, 'session-a', '0xabc', 'nonce-1'),
-    { ok: false, error: 'Nonce already used.' }
-  );
-  assert.deepEqual(calls, [['get', 'usedNonce:session-a:nonce-1']]);
-});
-
-test('consumeNonce records nonce replays without blocking the failure response', async () => {
-  const events = [];
-  const env = {
-    GROUP_KV: {
-      get: async (key) => (key === 'usedNonce:session-a:nonce-1' ? '1' : null),
-    },
-  };
-
-  assert.deepEqual(
-    await consumeNonce(env, 'session-a', '0xabc', 'nonce-1', {
-      recordAbuseEvent: async (event) => {
-        events.push(event);
-        throw new Error('counter unavailable');
-      },
+  const env = { GROUP_KV: { put: async (...args) => calls.push(args) } };
+  const unavailable = await issueNonce(env, 'session-a', '0xabc', 'nonce-1', 300, {
+    issueCoordinatedAuthNonce: async () => ({
+      ok: false,
+      status: 503,
+      error: 'Authorization state coordination is unavailable.',
     }),
-    { ok: false, error: 'Nonce already used.' }
-  );
-  assert.equal(events.length, 1);
-  assert.equal(events[0].type, 'nonce_replays');
-});
+  });
+  assert.equal(unavailable.ok, false);
+  assert.deepEqual(calls, []);
 
-test('consumeNonce writes a claim before checking the active nonce and rolls claim back on mismatch', async () => {
-  const store = new Map();
-  const calls = [];
-  const env = {
-    GROUP_KV: {
-      get: async (key) => {
-        calls.push(['get', key]);
-        if (store.has(key)) return store.get(key);
-        if (key === 'nonce:session-a:0xabc') return 'different-nonce';
-        return null;
-      },
-      put: async (key, value, opts) => {
-        calls.push(['put', key, value, opts]);
-        store.set(key, value);
-      },
-      delete: async (key) => {
-        calls.push(['delete', key]);
-        store.delete(key);
-      },
+  const issued = await issueNonce(env, 'session-a', '0xabc', 'nonce-1', 300, {
+    usedNonceTtlSeconds: 600,
+    issueCoordinatedAuthNonce: async (value) => {
+      calls.push(value);
+      return { ok: true, status: 200 };
     },
-  };
-
-  assert.deepEqual(
-    await consumeNonce(env, 'session-a', '0xabc', 'nonce-1', {
-      buildClaimId: () => 'claim-1',
-      usedNonceTtlSeconds: 321,
-    }),
-    { ok: false, error: 'Nonce mismatch or expired.' }
-  );
-  assert.deepEqual(calls, [
-    ['get', 'usedNonce:session-a:nonce-1'],
-    ['put', 'usedNonce:session-a:nonce-1', 'claim-1', { expirationTtl: 321 }],
-    ['get', 'nonce:session-a:0xabc'],
-    ['get', 'usedNonce:session-a:nonce-1'],
-    ['delete', 'usedNonce:session-a:nonce-1'],
+  });
+  assert.equal(issued.ok, true);
+  assert.equal(calls[0].slug, 'session-a');
+  assert.equal(calls[0].usedNonceTtlSeconds, 600);
+  assert.deepEqual(calls[1], [
+    'nonce:session-a:0xabc',
+    'nonce-1',
+    { expirationTtl: 300 },
   ]);
 });
 
-test('consumeNonce stores the used marker, deletes the active nonce, and returns ok on success', async () => {
+test('consumeNonce trusts the durable verdict and mirrors successful consumption to KV', async () => {
   const calls = [];
   const env = {
     GROUP_KV: {
-      get: async (key) => {
-        calls.push(['get', key]);
-        if (key === 'nonce:session-a:0xabc') return 'nonce-1';
-        return null;
-      },
       put: async (...args) => calls.push(['put', ...args]),
       delete: async (...args) => calls.push(['delete', ...args]),
     },
   };
-
-  assert.deepEqual(
-    await consumeNonce(env, 'session-a', '0xabc', 'nonce-1', {
-      buildClaimId: () => 'claim-1',
-      usedNonceTtlSeconds: 321,
-    }),
-    { ok: true }
-  );
-  assert.deepEqual(calls, [
-    ['get', 'usedNonce:session-a:nonce-1'],
-    ['put', 'usedNonce:session-a:nonce-1', 'claim-1', { expirationTtl: 321 }],
-    ['get', 'nonce:session-a:0xabc'],
-    ['get', 'usedNonce:session-a:nonce-1'],
+  const result = await consumeNonce(env, 'session-a', '0xabc', 'nonce-1', {
+    usedNonceTtlSeconds: 321,
+    consumeCoordinatedAuthNonce: async (value) => {
+      calls.push(['coordinator', value]);
+      return { ok: true, status: 200 };
+    },
+  });
+  assert.deepEqual(result, { ok: true });
+  assert.equal(calls[0][1].nonce, 'nonce-1');
+  assert.deepEqual(calls.slice(1), [
+    ['put', 'usedNonce:session-a:nonce-1', '1', { expirationTtl: 321 }],
     ['delete', 'nonce:session-a:0xabc'],
   ]);
 });
 
-test('consumeNonce serializes concurrent reads for the same slug/address/nonce within an isolate', async () => {
-  const store = new Map([
-    ['nonce:session-a:0xabc', 'nonce-1'],
-  ]);
-  const calls = [];
-  let releaseClaimWrite = () => {};
-  const claimWriteBarrier = new Promise((resolve) => {
-    releaseClaimWrite = resolve;
-  });
-  let blockFirstClaimWrite = true;
-  let claimCounter = 0;
-
-  const env = {
-    GROUP_KV: {
-      get: async (key) => {
-        calls.push(['get', key]);
-        return store.has(key) ? store.get(key) : null;
-      },
-      put: async (key, value) => {
-        calls.push(['put', key, value]);
-        if (key === 'usedNonce:session-a:nonce-1' && blockFirstClaimWrite) {
-          blockFirstClaimWrite = false;
-          await claimWriteBarrier;
-        }
-        store.set(key, value);
-      },
-      delete: async (key) => {
-        calls.push(['delete', key]);
-        store.delete(key);
-      },
-    },
-  };
-
-  const buildClaimId = () => {
-    claimCounter += 1;
-    return `claim-${claimCounter}`;
-  };
-  const firstPromise = consumeNonce(env, 'session-a', '0xabc', 'nonce-1', { buildClaimId });
-  await new Promise((resolve) => setTimeout(resolve, 0));
-  const secondPromise = consumeNonce(env, 'session-a', '0xabc', 'nonce-1', { buildClaimId });
-  await new Promise((resolve) => setTimeout(resolve, 0));
-
-  assert.deepEqual(calls, [
-    ['get', 'usedNonce:session-a:nonce-1'],
-    ['put', 'usedNonce:session-a:nonce-1', 'claim-1'],
-  ]);
-
-  releaseClaimWrite();
-
-  const [first, second] = await Promise.all([firstPromise, secondPromise]);
-
-  assert.deepEqual(first, { ok: true });
-  assert.deepEqual(second, { ok: false, error: 'Nonce already used.' });
-});
-
-test('checkNonceRateLimit enforces a per-address fixed window limit', async () => {
-  const store = new Map();
-  const calls = [];
-  const env = {
-    GROUP_KV: {
-      get: async (key) => {
-        calls.push(['get', key]);
-        return store.get(key) || null;
-      },
-      put: async (key, value, opts) => {
-        calls.push(['put', key, value, opts]);
-        store.set(key, value);
-      },
-    },
-  };
-
-  const opts = {
-    env,
-    slug: 'session-a',
-    address: '0xAbC',
-    limit: 2,
-    now: () => 123_456,
-    windowMs: 60_000,
-    ttlSeconds: 61,
-  };
-
-  assert.deepEqual(await checkNonceRateLimit(opts), { ok: true });
-  assert.deepEqual(await checkNonceRateLimit(opts), { ok: true });
-  assert.deepEqual(await checkNonceRateLimit(opts), {
-    ok: false,
-    error: 'Too many nonce requests. Try again shortly.',
-    retryAfterSeconds: 61,
-  });
-
-  assert.deepEqual(calls, [
-    ['get', 'rate:authNonce:session-a:0xabc:120000'],
-    ['put', 'rate:authNonce:session-a:0xabc:120000', '1', { expirationTtl: 61 }],
-    ['get', 'rate:authNonce:session-a:0xabc:120000'],
-    ['put', 'rate:authNonce:session-a:0xabc:120000', '2', { expirationTtl: 61 }],
-    ['get', 'rate:authNonce:session-a:0xabc:120000'],
-    ['put', 'rate:authNonce:session-a:0xabc:120000', '3', { expirationTtl: 61 }],
-  ]);
-});
-
-test('checkNonceRateLimit records rate-limit trips', async () => {
-  const store = new Map();
+test('consumeNonce records durable replay verdicts without mutating KV mirrors', async () => {
   const events = [];
-  const env = {
-    GROUP_KV: {
-      get: async (key) => store.get(key) || null,
-      put: async (key, value) => {
-        store.set(key, value);
-      },
-    },
-  };
-
-  const result = await checkNonceRateLimit({
-    env,
-    slug: 'session-a',
-    identity: 'anon:client',
-    limit: 0.5,
-    now: () => 123_456,
-    recordAbuseEvent: async (event) => {
-      events.push(event);
-      return { ok: true };
-    },
-  });
-
-  assert.equal(result.ok, false);
-  assert.equal(events.length, 1);
-  assert.equal(events[0].type, 'rate_limit_trips');
-});
-
-test('checkNonceRateLimit preserves burst behavior inside one fixed window', async () => {
-  const store = new Map();
-  const env = {
-    GROUP_KV: {
-      get: async (key) => store.get(key) || null,
-      put: async (key, value) => {
-        store.set(key, value);
-      },
-    },
-  };
-  const opts = {
-    env,
-    slug: 'session-a',
-    identity: 'anon:cid:client_abc12345',
-    address: '0xAbC',
-    limit: 5,
-    now: () => 123_456,
-    windowMs: 60_000,
-    ttlSeconds: 61,
-  };
-
-  const results = [];
-  for (let index = 0; index < 6; index += 1) {
-    results.push(await checkNonceRateLimit(opts));
-  }
-
-  assert.deepEqual(results, [
-    { ok: true },
-    { ok: true },
-    { ok: true },
-    { ok: true },
-    { ok: true },
-    {
+  const env = { GROUP_KV: { put: async () => assert.fail(), delete: async () => assert.fail() } };
+  const result = await consumeNonce(env, 'session-a', '0xabc', 'nonce-1', {
+    consumeCoordinatedAuthNonce: async () => ({
       ok: false,
-      error: 'Too many nonce requests. Try again shortly.',
-      retryAfterSeconds: 61,
-    },
-  ]);
-  assert.equal(store.get('rate:authNonce:session-a:anon:cid:client_abc12345:120000'), '6');
+      status: 409,
+      error: 'Nonce already used.',
+    }),
+    recordAbuseEvent: async (event) => events.push(event),
+  });
+  assert.deepEqual(result, { ok: false, error: 'Nonce already used.', status: 409 });
+  assert.equal(events[0].type, 'nonce_replays');
 });
 
-test('checkNonceRateLimit prefers caller identity over the claimed wallet address', async () => {
-  const store = new Map();
+test('checkNonceRateLimit uses the caller identity and durable fixed-window verdict', async () => {
   const calls = [];
-  const env = {
-    GROUP_KV: {
-      get: async (key) => {
-        calls.push(['get', key]);
-        return store.get(key) || null;
-      },
-      put: async (key, value, opts) => {
-        calls.push(['put', key, value, opts]);
-        store.set(key, value);
-      },
-    },
-  };
-
-  await checkNonceRateLimit({
-    env,
+  const result = await checkNonceRateLimit({
+    env: {},
     slug: 'session-a',
     identity: 'anon:cid:client_abc12345',
     address: '0xVictimWallet',
@@ -330,10 +106,37 @@ test('checkNonceRateLimit prefers caller identity over the claimed wallet addres
     now: () => 123_456,
     windowMs: 60_000,
     ttlSeconds: 61,
+    checkCoordinatedAuthRateLimit: async (value) => {
+      calls.push(value);
+      return { ok: true, allowed: false, status: 200 };
+    },
   });
 
-  assert.deepEqual(calls, [
-    ['get', 'rate:authNonce:session-a:anon:cid:client_abc12345:120000'],
-    ['put', 'rate:authNonce:session-a:anon:cid:client_abc12345:120000', '1', { expirationTtl: 61 }],
-  ]);
+  assert.deepEqual(result, {
+    ok: false,
+    error: 'Too many nonce requests. Try again shortly.',
+    retryAfterSeconds: 61,
+  });
+  assert.equal(calls[0].identity, 'anon:cid:client_abc12345');
+  assert.equal(calls[0].route, 'authNonce');
+  assert.equal(calls[0].windowMs, 60_000);
+});
+
+test('checkNonceRateLimit fails closed distinctly when durable coordination is unavailable', async () => {
+  const result = await checkNonceRateLimit({
+    env: {},
+    slug: 'session-a',
+    address: '0xabc',
+    limit: 2,
+    checkCoordinatedAuthRateLimit: async () => ({
+      ok: false,
+      status: 503,
+      error: 'Authorization state coordination is unavailable.',
+    }),
+  });
+  assert.deepEqual(result, {
+    ok: false,
+    status: 503,
+    error: 'Authorization state coordination is unavailable.',
+  });
 });

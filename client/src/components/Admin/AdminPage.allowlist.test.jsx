@@ -467,7 +467,8 @@ describe('AdminPage allowlist controls', () => {
       expect.arrayContaining([
         'https://existing.example.test',
         'http://localhost:7391',
-        'https://contextengine.xyz', // intentional: production recommended origin assertion
+        'https://contextengine.sh', // canonical production recommended origin
+        'https://contextengine.xyz', // redirect compatibility origin
         window.location.origin,
       ]),
     );

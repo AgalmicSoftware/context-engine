@@ -601,7 +601,6 @@ export const createChainMetadataResolutionHelpers = (deps: MetadataResolutionDep
 
     let hasUnknownGate = false;
     for (const gate of gates) {
-      // eslint-disable-next-line no-await-in-loop
       const ok = await checkAccountSatisfiesSbtGate({
         account: ctx.account,
         chainId,

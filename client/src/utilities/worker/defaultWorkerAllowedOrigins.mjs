@@ -2,6 +2,8 @@
 // Session Wizard `/new`, admin tooling, and deploy-helper publish automation all
 // read from this module so the default self-host story stays aligned.
 export const DEFAULT_WORKER_ALLOWED_ORIGINS = [
+  'https://contextengine.sh',
+  'https://www.contextengine.sh',
   'https://contextengine.xyz',
   'https://www.contextengine.xyz',
   'http://localhost:3000',

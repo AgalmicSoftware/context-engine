@@ -200,6 +200,28 @@ const makeResumableDeploymentFetch = () => {
       if (fetchMock.bundleFetchResponses.length) return fetchMock.bundleFetchResponses.shift();
       return new Response('export default { fetch() {} };', { status: 200 });
     }
+    if (normalizedUrl === 'https://bundles.example.test/agentBridgeWorker.bundle.js') {
+      return new Response('export default { fetch() {} };', { status: 200 });
+    }
+    const wrappedHealthMatch = normalizedUrl.match(/^https:\/\/([^./]+)\.tenant-subdomain\.workers\.dev\/health$/);
+    if (method === 'GET' && wrappedHealthMatch) {
+      const bindings = workerBindings.get(wrappedHealthMatch[1]) || [];
+      const byName = new Map(bindings.map((binding) => [binding.name, binding]));
+      const policy = JSON.parse(byName.get('AGENT_BRIDGE_SESSION_POLICY_JSON')?.text || '{}');
+      const session = policy.sessions?.[0] || {};
+      return new Response(JSON.stringify({
+        ok: true,
+        worker: 'agentBridgeWorker',
+        protocolVersion: 'agent-session-wrapped-v1',
+        agentSessionWrappedConfigured: true,
+        agentSessionWrappedReady: true,
+        dedicatedSession: {
+          accessEnabled: true,
+          sessionSlug: session.sessionSlug,
+          sessionWorkerOrigin: byName.get('CE_SESSION_WORKER_BASE_URL')?.text,
+        },
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
     if (method === 'GET' && /\/accounts\?per_page=5$/.test(normalizedUrl)) {
       const authorization = init.headers instanceof Headers
         ? init.headers.get('Authorization')
@@ -286,6 +308,19 @@ const makeResumableDeploymentFetch = () => {
     if (method === 'PUT' && /\/workers\/scripts\/[^/]+\/secrets$/.test(normalizedUrl)) {
       const secretBody = JSON.parse(String(init.body || '{}'));
       workerSecretBodies.push(secretBody);
+      const workerName = normalizedUrl.match(/\/workers\/scripts\/([^/]+)\/secrets$/)?.[1];
+      const commitSecretBinding = () => {
+        if (!workerSecretBindings.has(workerName)) workerSecretBindings.set(workerName, new Map());
+        workerSecretBindings.get(workerName).set(secretBody.name, {
+          name: secretBody.name,
+          type: secretBody.type,
+        });
+      };
+      if (fetchMock.commitSecretPutThenThrowName === secretBody.name) {
+        fetchMock.commitSecretPutThenThrowName = '';
+        commitSecretBinding();
+        throw new TypeError('secret write response lost');
+      }
       let response;
       if (Array.isArray(fetchMock.workerSecretPutResponses) && fetchMock.workerSecretPutResponses.length) {
         response = fetchMock.workerSecretPutResponses.shift();
@@ -293,12 +328,7 @@ const makeResumableDeploymentFetch = () => {
         response = cfSuccess({});
       }
       if (response.ok) {
-        const workerName = normalizedUrl.match(/\/workers\/scripts\/([^/]+)\/secrets$/)?.[1];
-        if (!workerSecretBindings.has(workerName)) workerSecretBindings.set(workerName, new Map());
-        workerSecretBindings.get(workerName).set(secretBody.name, {
-          name: secretBody.name,
-          type: secretBody.type,
-        });
+        commitSecretBinding();
       }
       return response;
     }
@@ -331,6 +361,7 @@ const makeResumableDeploymentFetch = () => {
   fetchMock.scriptUploadMetadata = scriptUploadMetadata;
   fetchMock.scriptUploadResponses = [];
   fetchMock.workerSecretPutResponses = [];
+  fetchMock.commitSecretPutThenThrowName = '';
   fetchMock.secretListResponses = [];
   fetchMock.accountIdsByToken = new Map();
   fetchMock.getNamespaceCreateCount = () => namespaceCreates;
@@ -373,6 +404,7 @@ const makeCoordinatorEnv = (baseEnv = {}) => {
             const run = tail.then(() => callback({
               get: async (key) => store.get(key),
               put: async (key, value) => store.set(key, clone(value)),
+              delete: async (key) => store.delete(key),
             }));
             tail = run.catch(() => undefined);
             return run;
@@ -480,7 +512,54 @@ describe('deploy-helper worker', () => {
     });
   });
 
-  it('normalizes worker secrets before writing them to KV during deploy', async () => {
+  it('rejects release-manifest bundle drift before any Cloudflare request or mutation', async () => {
+    const calls = [];
+    const manifestUrl = 'https://bundles.example.test/worker-release-manifest.json';
+    const bundleUrl = 'https://bundles.example.test/sessionCorsWorker.bundle.js';
+    global.fetch = async (url) => {
+      calls.push(String(url));
+      if (String(url) === manifestUrl) {
+        return new Response(JSON.stringify({
+          schemaVersion: 1,
+          artifactSet: 'context-engine-worker-bundles',
+          source: { commit: 'a'.repeat(40), ref: 'refs/heads/main', tree: 'b'.repeat(40) },
+          replay: {
+            privateSourceCommit: 'c'.repeat(40),
+            publicReplayCommit: 'a'.repeat(40),
+            publicCommit: 'a'.repeat(40),
+            publicTree: 'b'.repeat(40),
+          },
+          builder: { workflow: 'CI', runId: '123' },
+          artifacts: [{
+            kind: 'session-cors-worker',
+            file: 'sessionCorsWorker.bundle.js',
+            bytes: 42,
+            sha256: 'd'.repeat(64),
+          }],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (String(url) === bundleUrl) {
+        return new Response('export default { fetch() {} };', { status: 200 });
+      }
+      throw new Error(`Cloudflare must not be reached: ${url}`);
+    };
+
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'cf-token',
+      accountId: 'acc-123',
+      workerName: 'provenance-worker',
+      sessionSlug: 'provenance-session',
+      bundleUrl,
+      bundleManifestUrl: manifestUrl,
+    }), {}, {});
+    const payload = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(payload.error).toMatch(/does not match the verified release manifest/i);
+    expect(calls).toEqual([manifestUrl, manifestUrl, bundleUrl]);
+  });
+
+  it('normalizes and encrypts worker secrets before writing them to KV during deploy', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
       new Response('export default { fetch() {} };', { status: 200 }),
@@ -515,7 +594,7 @@ describe('deploy-helper worker', () => {
       expect(response.status).toBe(200);
       expect(payload?.ok).toBe(true);
       expect(payload?.configVerified).toBe(true);
-      expect(fetchMock.calls.length).toBe(9);
+      expect(fetchMock.calls.length).toBe(10);
       expectBundleDiagnosticsLog(consoleLogSpy, 'bundleUrl');
 
       const scriptUpload = findScriptUploadCall(fetchMock);
@@ -538,9 +617,14 @@ describe('deploy-helper worker', () => {
       const workerSecretWrites = fetchMock.calls
         .filter(([url]) => String(url).endsWith(`/workers/scripts/${payload.workerName}/secrets`))
         .map(([, init]) => JSON.parse(init.body));
-      expect(workerSecretWrites.map((secret) => secret.name)).toEqual(['TOKEN_HMAC_SECRET']);
+      expect(workerSecretWrites.map((secret) => secret.name)).toEqual([
+        'CE_STORAGE_ENVELOPE_KEK',
+        'TOKEN_HMAC_SECRET',
+      ]);
+      expect(workerSecretWrites[0].text).not.toBe(workerSecretWrites[1].text);
 
       const configWrite = findConfigWriteCall(fetchMock);
+      expect(JSON.parse(configWrite[1].body).authzEpoch).toBe(1);
       expect(JSON.parse(configWrite[1].body).allowOrigins).toEqual([
         'http://localhost:3000',
       ]);
@@ -553,14 +637,19 @@ describe('deploy-helper worker', () => {
         kind: 'session-secrets',
         createdAt: expect.any(Number),
         updatedAt: expect.any(Number),
+        cipher: 'AES-256-GCM',
+        keyRef: 'worker_secret:CE_STORAGE_ENVELOPE_KEK',
+        aad: 'ce-session-secrets:v1:alpha-session:worker_secret:CE_STORAGE_ENVELOPE_KEK',
+        iv: expect.any(String),
+        encryptedSecrets: expect.any(String),
       }));
-      expect(secretsEnvelope.secrets).toEqual({
-        openaiKey: 'sk-openai',
-        arweaveJwk: '{"kty":"RSA","n":"abc"}',
-        faucetPrivateKey: '12345',
-        litAccountApiKey: 'lit-account-secret',
-        litUsageApiKey: 'lit-usage-secret',
-      });
+      expect(secretsEnvelope.secrets).toBeUndefined();
+      const serializedSecretsEnvelope = JSON.stringify(secretsEnvelope);
+      expect(serializedSecretsEnvelope).not.toContain('sk-openai');
+      expect(serializedSecretsEnvelope).not.toContain('RSA');
+      expect(serializedSecretsEnvelope).not.toContain('12345');
+      expect(serializedSecretsEnvelope).not.toContain('lit-account-secret');
+      expect(serializedSecretsEnvelope).not.toContain('lit-usage-secret');
 
       const configRewrite = [...fetchMock.calls].reverse().find(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':config')
@@ -594,6 +683,74 @@ describe('deploy-helper worker', () => {
     expect(response.status).toBe(409);
     expect(payload?.error).toMatch(/restrict the token to exactly one account/i);
     expect(fetchMock.calls).toHaveLength(0);
+  });
+
+  it('rejects explicit invalid deployment modes before any Cloudflare request', async () => {
+    const invalidRequests = [
+      {
+        path: 'sessionModeProfile.authority.mode',
+        value: { sessionModeProfile: { authority: { mode: 'registry' } } },
+      },
+      {
+        path: 'sessionModeProfile.encryption.mode',
+        value: { sessionModeProfile: { encryption: { mode: '' } } },
+      },
+      {
+        path: 'sessionModeProfile.encryption.keyProvider',
+        value: {
+          sessionModeProfile: {
+            encryption: { mode: 'worker_envelope', keyProvider: 'external_kms' },
+          },
+        },
+      },
+      {
+        path: 'storageProfile.payloadAccessControl.gate',
+        value: {
+          storageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { gate: 'public', encryption: 'none' },
+          },
+        },
+      },
+      {
+        path: 'storageProfile.payloadAccessControl.encryption',
+        value: {
+          storageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { gate: 'none', encryption: 'plaintext' },
+          },
+        },
+      },
+      {
+        path: 'storageProfile.payloadAccessControl.mode',
+        value: {
+          storageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { mode: 'public-read' },
+          },
+        },
+      },
+    ];
+
+    for (const { path, value } of invalidRequests) {
+      const fetchMock = jest.fn(async () => {
+        throw new Error('Cloudflare request must not run for invalid modes.');
+      });
+      global.fetch = fetchMock;
+
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-token',
+        accountId: 'acc-123',
+        workerName: 'test-worker',
+        sessionSlug: 'alpha-session',
+        bundleText: 'export default { fetch() {} };',
+        ...value,
+      }), {}, {});
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: `Invalid deployment mode at ${path}.` });
+      expect(fetchMock).not.toHaveBeenCalled();
+    }
   });
 
   it('retries the first config write while a new KV namespace is propagating', async () => {
@@ -791,7 +948,14 @@ describe('deploy-helper worker', () => {
       ));
       expect(secretWrites).toHaveLength(2);
       expect(secretWrites[0][1].body).toBe(secretWrites[1][1].body);
-      expect(JSON.parse(secretWrites[1][1].body).secrets.openaiKey).toBe('sk-retry-once');
+      const retriedEnvelope = JSON.parse(secretWrites[1][1].body);
+      expect(retriedEnvelope).toEqual(expect.objectContaining({
+        cipher: 'AES-256-GCM',
+        keyRef: 'worker_secret:CE_STORAGE_ENVELOPE_KEK',
+        encryptedSecrets: expect.any(String),
+      }));
+      expect(retriedEnvelope.secrets).toBeUndefined();
+      expect(secretWrites[1][1].body).not.toContain('sk-retry-once');
       expect(fetchMock.calls.some(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'DELETE' &&
         String(url).endsWith('/storage/kv/namespaces/kv-123')
@@ -1131,6 +1295,49 @@ describe('deploy-helper worker', () => {
     }
   });
 
+  it('composes Agent Session Wrapped before publishing its capability into the paired session Worker config', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    global.fetch = fetchMock;
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-request-only-token',
+        workerName: 'wrapped-session-worker',
+        sessionSlug: 'wrapped-alpha',
+        sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        agentSessionWrappedDeploymentIdentity: 'session:11155420:0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:wrapped-alpha',
+        agentBridgeBundleUrl: 'https://bundles.example.test/agentBridgeWorker.bundle.js',
+        adminAddress: '0x00000000000000000000000000000000000000aa',
+        sessionModeProfile: {
+          authority: { mode: 'worker_canonical' },
+          encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
+          surfaces: { web: true, telegram: false, miniApp: false, agentHttp: true },
+        },
+        bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' },
+        },
+      }), {}, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload.agentSessionWrapped).toEqual(expect.objectContaining({
+        version: 1,
+        enabled: true,
+        protocolVersion: 'agent-session-wrapped-v1',
+        origin: expect.stringMatching(/^https:\/\/ce-wrapped-wrapped-alpha-/),
+      }));
+      expect(fetchMock.getScriptUploadCount()).toBe(2);
+      const sessionConfigEntry = [...fetchMock.kvValues.entries()].find(([key]) => key.endsWith('/session:wrapped-alpha:config'));
+      expect(JSON.parse(sessionConfigEntry?.[1] || '{}').agentSessionWrapped).toEqual(payload.agentSessionWrapped);
+      expect(JSON.stringify([...fetchMock.workerSecretBodies])).not.toContain('cf-request-only-token');
+    } finally {
+      consoleLogSpy.mockRestore();
+    }
+  });
+
   it('keeps explicit-Lit worker RPC credentials in the secret-only record instead of canonical config', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const fetchMock = makeFetchSequence([
@@ -1180,11 +1387,15 @@ describe('deploy-helper worker', () => {
 
       const secretsWrite = fetchMock.calls.find(([url]) => String(url).endsWith(':secrets'));
       const secretsEnvelope = JSON.parse(secretsWrite[1].body);
-      expect(secretsEnvelope.secrets).toEqual({
-        customRpcUrl: 'https://rpc.example.test',
-        customRpcKey: 'rpc-secret',
-        litAccountApiKey: 'lit-secret',
-      });
+      expect(secretsEnvelope).toEqual(expect.objectContaining({
+        cipher: 'AES-256-GCM',
+        keyRef: 'worker_secret:CE_STORAGE_ENVELOPE_KEK',
+        encryptedSecrets: expect.any(String),
+      }));
+      expect(secretsEnvelope.secrets).toBeUndefined();
+      expect(secretsWrite[1].body).not.toContain('https://rpc.example.test');
+      expect(secretsWrite[1].body).not.toContain('rpc-secret');
+      expect(secretsWrite[1].body).not.toContain('lit-secret');
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -1319,7 +1530,7 @@ describe('deploy-helper worker', () => {
         storageProfile: {
           backend: 'cloudflare',
           resources: { questions: 'active', responses: 'active' },
-          payloadAccessControl: { mode: 'public-read' },
+          payloadAccessControl: { mode: 'public_read' },
           cloudflare: {
             payloadAccessMode: 'public_read',
             primitives: { r2: ['question_payloads'], kv: ['metadata_indexes'] },
@@ -2401,6 +2612,7 @@ describe('deploy-helper worker', () => {
       // exist. The corrected PUT must preserve them, then resume from the
       // uploaded settings instead of rotating the secret.
       fetchMock.workerSecretBindings.set(retryPayload.orphanResources.workerName, new Map([
+        ['CE_STORAGE_ENVELOPE_KEK', { name: 'CE_STORAGE_ENVELOPE_KEK', type: 'secret_text' }],
         ['TOKEN_HMAC_SECRET', { name: 'TOKEN_HMAC_SECRET', type: 'secret_text' }],
       ]));
 
@@ -2809,6 +3021,7 @@ describe('deploy-helper worker', () => {
       const workerName = rejectedPayload.orphanResources.workerName;
       fetchMock.workerBindings.set(workerName, fetchMock.scriptUploadMetadata[0].bindings);
       fetchMock.workerSecretBindings.set(workerName, new Map([
+        ['CE_STORAGE_ENVELOPE_KEK', { name: 'CE_STORAGE_ENVELOPE_KEK', type: 'secret_text' }],
         ['TOKEN_HMAC_SECRET', { name: 'TOKEN_HMAC_SECRET', type: 'secret_text' }],
       ]));
 
@@ -3084,6 +3297,27 @@ describe('deploy-helper worker', () => {
 
   it('resumes after secrets with mutable/token drift without rotating existing runtime secrets', async () => {
     const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const entropy = [
+      '33'.repeat(32),
+      '55'.repeat(12),
+      '44'.repeat(32),
+      '66'.repeat(32),
+      '77'.repeat(12),
+    ];
+    let entropyIndex = 0;
+    Object.defineProperty(global, 'crypto', {
+      configurable: true,
+      value: {
+        subtle: webcrypto.subtle,
+        randomUUID: () => '00000000-0000-4000-8000-000000000001',
+        getRandomValues: (bytes) => {
+          const next = Buffer.from(entropy[entropyIndex], 'hex');
+          entropyIndex += 1;
+          bytes.set(next);
+          return bytes;
+        },
+      },
+    });
     const fetchMock = makeResumableDeploymentFetch();
     global.fetch = fetchMock;
     const journalKv = makeKvBinding();
@@ -3144,11 +3378,21 @@ describe('deploy-helper worker', () => {
       expect(fetchMock.getScriptUploadCount()).toBe(1);
       expect(fetchMock.getFinalConfigPutCount()).toBe(0);
       expect(fetchMock.workerSecretBodies).toHaveLength(2);
+      expect(fetchMock.workerSecretBodies.map(({ name, text }) => ({ name, text }))).toEqual([
+        { name: 'CE_STORAGE_ENVELOPE_KEK', text: entropy[0] },
+        { name: 'TOKEN_HMAC_SECRET', text: entropy[2] },
+      ]);
+      expect(entropyIndex).toBe(5);
       const sessionSecretWrites = fetchMock.mock.calls.filter(([url, init = {}]) => (
         String(init.method || '').toUpperCase() === 'PUT' && String(url).endsWith(':secrets')
       ));
       expect(sessionSecretWrites).toHaveLength(1);
-      expect(sessionSecretWrites[0][1].body).toContain('sk-provider-before-resume');
+      expect(JSON.parse(sessionSecretWrites[0][1].body)).toEqual(expect.objectContaining({
+        cipher: 'AES-256-GCM',
+        keyRef: 'worker_secret:CE_STORAGE_ENVELOPE_KEK',
+        encryptedSecrets: expect.any(String),
+      }));
+      expect(sessionSecretWrites[0][1].body).not.toContain('sk-provider-before-resume');
       expect(sessionSecretWrites[0][1].body).not.toContain('sk-provider-after-resume');
       expect(fetchMock.workerSecretBodies.map(({ text }) => text)).toEqual(
         expect.arrayContaining([expect.stringMatching(/^[0-9a-f]{64}$/)]),
@@ -3172,6 +3416,47 @@ describe('deploy-helper worker', () => {
       expect(fetchMock.getNamespaceCreateCount()).toBe(1);
       expect(fetchMock.getScriptUploadCount()).toBe(1);
       expect(fetchMock.workerSecretBodies).toHaveLength(2);
+    } finally {
+      Object.defineProperty(global, 'crypto', {
+        configurable: true,
+        value: webcrypto,
+      });
+      consoleLogSpy.mockRestore();
+    }
+  });
+
+  it('reconciles an ambiguously committed runtime secret before writing the next activation secret', async () => {
+    const consoleLogSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const fetchMock = makeResumableDeploymentFetch();
+    fetchMock.commitSecretPutThenThrowName = 'CE_STORAGE_ENVELOPE_KEK';
+    global.fetch = fetchMock;
+    const env = makeCoordinatorEnv({ DEPLOY_HELPER_KV: makeKvBinding() });
+
+    try {
+      const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+        apiToken: 'cf-secret-reconcile-token',
+        deploymentRequestId: 'request-secret-reconcile-0001',
+        workerName: 'secret-reconcile-worker',
+        sessionSlug: 'secret-reconcile-session',
+        bundleText: 'export default { fetch() {} };',
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' },
+        },
+      }), env, {});
+      const payload = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(payload).toEqual(expect.objectContaining({
+        ok: true,
+        envelopeKekSecretSet: true,
+        tokenSecretSet: true,
+      }));
+      expect(fetchMock.workerSecretBodies.map(({ name }) => name)).toEqual([
+        'CE_STORAGE_ENVELOPE_KEK',
+        'TOKEN_HMAC_SECRET',
+      ]);
+      expect([...fetchMock.workerSecretBindings.values()][0].size).toBe(2);
     } finally {
       consoleLogSpy.mockRestore();
     }
@@ -3660,8 +3945,11 @@ describe('deploy-helper worker', () => {
       expect(fetchMock.getNamespaceCreateCount()).toBe(1);
       expect(fetchMock.getScriptUploadCount()).toBe(1);
       expect(fetchMock.getFinalConfigPutCount()).toBe(0);
-      expect(fetchMock.workerSecretBodies).toHaveLength(1);
-      expect(fetchMock.workerSecretBodies[0].name).toBe('TOKEN_HMAC_SECRET');
+      expect(fetchMock.workerSecretBodies).toHaveLength(2);
+      expect(fetchMock.workerSecretBodies.map(({ name }) => name)).toEqual([
+        'CE_STORAGE_ENVELOPE_KEK',
+        'TOKEN_HMAC_SECRET',
+      ]);
       expect(JSON.stringify([...journalKv.store.values()])).not.toMatch(
         /cf-token-after-partial-upload|Recovered after partial upload/,
       );

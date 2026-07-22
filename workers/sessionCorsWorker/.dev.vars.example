@@ -1,9 +1,10 @@
 # Local sessionCorsWorker placeholders only. Copy to untracked .dev.vars for wrangler dev.
 TOKEN_HMAC_SECRET=""
 
-# Required only for storageProfile.payloadAccessControl.encryption = "worker_envelope".
+# Required for every Session Worker: protects session secrets and, when selected,
+# the worker-envelope payload hierarchy. Use an independent high-entropy value.
 CE_STORAGE_ENVELOPE_KEK=""
 
-# Temporary break-glass unwrap fallback after a mistaken deployment-secret replacement.
+# Temporary break-glass decrypt fallback after a mistaken deployment-secret replacement.
 # Restore the original CE_STORAGE_ENVELOPE_KEK, verify reads, then remove this value.
 # CE_STORAGE_ENVELOPE_PREVIOUS_KEK=""

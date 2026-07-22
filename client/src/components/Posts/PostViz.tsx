@@ -757,7 +757,6 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                     r={8.4}
                     filter={`url(#${sphereShadowId})`}
                     aria-hidden="true"
-                    focusable="false"
                     pointerEvents="none"
                   />
                   <circle
@@ -776,7 +775,6 @@ const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
                     r={7.5}
                     fill={`url(#${sphereHighlightId})`}
                     aria-hidden="true"
-                    focusable="false"
                     pointerEvents="none"
                   />
                   <title>{ariaLabel}</title>

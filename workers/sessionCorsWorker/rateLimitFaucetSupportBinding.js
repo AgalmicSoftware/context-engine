@@ -6,9 +6,11 @@ import {
   ABUSE_COUNTER_TYPES,
   recordAbuseEvent as recordAbuseEventBoundary,
 } from './abuseObservability.js';
+import {
+  checkCoordinatedAuthRateLimit as checkCoordinatedAuthRateLimitBoundary,
+} from './sessionWriteCoordinator.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const DAY_TTL_SECONDS = 24 * 60 * 60;
 
 const recordRateLimitTrip = async ({ env, deps } = {}) => {
   try {
@@ -38,16 +40,17 @@ export const createRateLimitFaucetSupportWithWorkerDeps = ({
 
     const routeKey = toTrimmedString(route, deps).toLowerCase() || 'default';
     const identity = toTrimmedString(address, deps).toLowerCase() || 'anonymous';
-    const key = `rate:${slug}:${routeKey}:${identity}`;
-    const raw = await env.GROUP_KV.get(key);
-    let record = raw ? JSON.parse(raw) : null;
-    const now = typeof deps?.now === 'function' ? deps.now() : Date.now();
-    if (!record || !record.resetAt || now >= record.resetAt) {
-      record = { count: 0, resetAt: now + DAY_MS };
-    }
-    record.count += 1;
-    await env.GROUP_KV.put(key, JSON.stringify(record), { expirationTtl: DAY_TTL_SECONDS });
-    const allowed = record.count <= numeric;
+    const coordinate = deps?.checkCoordinatedAuthRateLimit || checkCoordinatedAuthRateLimitBoundary;
+    const result = await coordinate({
+      env,
+      slug,
+      route: routeKey,
+      identity,
+      limit: numeric,
+      windowMs: DAY_MS,
+      now: deps?.now,
+    });
+    const allowed = result?.ok === true && result?.allowed === true;
     if (!allowed) await recordRateLimitTrip({ env, deps });
     return allowed;
   };

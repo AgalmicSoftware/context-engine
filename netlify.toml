@@ -1,0 +1,19 @@
+# Canonical Netlify deployment contract. Dashboard settings should only select
+# the repository and production branch; build behavior lives here.
+[build]
+  base = "client"
+  command = "npm ci && REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT=$COMMIT_REF npm run build"
+  publish = "build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[redirects]]
+  from = "/demo/dacc"
+  to = "/about"
+  status = 301
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

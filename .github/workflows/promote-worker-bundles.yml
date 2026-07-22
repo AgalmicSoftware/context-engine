@@ -1,0 +1,154 @@
+name: Promote Worker Bundles
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful canonical CI run id whose immutable release should become latest
+        required: true
+        type: string
+
+concurrency:
+  group: worker-bundle-stable-promotion
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  promote-worker-bundles:
+    environment: worker-release-promotion
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Checkout trusted promotion verifier
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+
+      - name: Fetch and validate canonical CI run
+        id: run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELECTED_RUN_ID: ${{ inputs.run_id }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SELECTED_RUN_ID}" > "${RUNNER_TEMP}/ci-run.json"
+          node scripts/worker-release-artifacts.mjs validate-run \
+            --run-json "${RUNNER_TEMP}/ci-run.json" \
+            --repository "$GITHUB_REPOSITORY" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Checkout exact successful CI source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ steps.run.outputs.sourceCommit }}
+          fetch-depth: 2
+
+      - name: Download exact immutable CI artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: worker-bundles-${{ steps.run.outputs.sourceCommit }}
+          path: ${{ runner.temp }}/worker-release
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.run.outputs.runId }}
+          github-token: ${{ github.token }}
+
+      - name: Resolve checked-out replay provenance
+        id: source
+        run: >-
+          node scripts/worker-release-artifacts.mjs resolve-source
+          --root .
+          --commit "${{ steps.run.outputs.sourceCommit }}"
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Verify CI artifact and immutable release parity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_COMMIT: ${{ steps.run.outputs.sourceCommit }}
+          SOURCE_REF: ${{ steps.run.outputs.sourceRef }}
+          RUN_ID: ${{ steps.run.outputs.runId }}
+          RUN_ATTEMPT: ${{ steps.run.outputs.runAttempt }}
+          SOURCE_TREE: ${{ steps.source.outputs.sourceTree }}
+        run: |
+          set -euo pipefail
+          artifact_dir="${RUNNER_TEMP}/worker-release"
+          tag="worker-bundles-${SOURCE_COMMIT}"
+          node scripts/worker-release-artifacts.mjs verify \
+            --root . \
+            --artifact-dir "$artifact_dir" \
+            --source-commit "$SOURCE_COMMIT" \
+            --source-ref "$SOURCE_REF" \
+            --source-tree "$SOURCE_TREE" \
+            --repository "$GITHUB_REPOSITORY" \
+            --workflow CI \
+            --run-id "$RUN_ID" \
+            --run-attempt "$RUN_ATTEMPT"
+
+          release_commit="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${tag}" --jq '.object.sha')"
+          test "$release_commit" = "$SOURCE_COMMIT"
+          release_dir="${RUNNER_TEMP}/immutable-worker-release"
+          mkdir -p "$release_dir"
+          gh release download "$tag" --dir "$release_dir"
+          node scripts/worker-release-artifacts.mjs verify \
+            --root . \
+            --artifact-dir "$release_dir" \
+            --source-commit "$SOURCE_COMMIT" \
+            --source-ref "$SOURCE_REF" \
+            --source-tree "$SOURCE_TREE" \
+            --repository "$GITHUB_REPOSITORY" \
+            --workflow CI \
+            --run-id "$RUN_ID" \
+            --run-attempt "$RUN_ATTEMPT"
+          for file in "$artifact_dir"/*; do
+            cmp --silent "$file" "$release_dir/$(basename "$file")"
+          done
+
+      - name: Plan stable and previous rollback refs
+        id: promotion
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_COMMIT: ${{ steps.run.outputs.sourceCommit }}
+        run: |
+          set -euo pipefail
+          current="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/worker-bundles-stable" --jq '.object.sha' 2>/dev/null || true)"
+          previous="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/worker-bundles-previous" --jq '.object.sha' 2>/dev/null || true)"
+          node scripts/worker-release-artifacts.mjs plan-promotion \
+            --target-commit "$SOURCE_COMMIT" \
+            --current-commit "${current:-none}" \
+            --previous-commit "${previous:-none}" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Move protected stable channel and retain previous
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROMOTION_CHANGED: ${{ steps.promotion.outputs.promotionChanged }}
+          STABLE_COMMIT: ${{ steps.promotion.outputs.stableCommit }}
+          PREVIOUS_COMMIT: ${{ steps.promotion.outputs.previousCommit }}
+        run: |
+          set -euo pipefail
+          upsert_ref() {
+            name="$1"
+            sha="$2"
+            if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${name}" >/dev/null 2>&1; then
+              gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${name}" \
+                -f sha="$sha" -F force=true >/dev/null
+            else
+              gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+                -f ref="refs/tags/${name}" -f sha="$sha" >/dev/null
+            fi
+          }
+
+          if [ "$PROMOTION_CHANGED" = "true" ]; then
+            upsert_ref worker-bundles-previous "$PREVIOUS_COMMIT"
+            upsert_ref worker-bundles-stable "$STABLE_COMMIT"
+          fi
+          gh release edit "worker-bundles-${STABLE_COMMIT}" --latest

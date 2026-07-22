@@ -2,6 +2,8 @@ const SECRET_FIELD_RE = /(?:privatekey|private_key|worker.?token|bearer|jwt|auth
 const SECRET_VALUE_RE = /(?:bearer\s+[a-z0-9._:-]+|\bceagt_[A-Za-z0-9_-]{20,}\b|\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b|eyj[a-z0-9_-]*\.[a-z0-9_-]*\.|0x[0-9a-f]{64}|-----BEGIN [A-Z ]+PRIVATE KEY-----)/i;
 const SAFE_HASH_VALUE_KEYS = new Set([
   'questionid',
+  'statement_id',
+  'statementid',
   'contenthash',
   'hash',
   'txhash',
@@ -11,6 +13,7 @@ const SAFE_HASH_VALUE_KEYS = new Set([
 ]);
 const SAFE_HASH_VALUE_CONTAINER_KEYS = new Set([
   'numbertoquestionid',
+  'legacycursorstatementids',
 ]);
 const SAFE_AUTHORITY_METADATA_KEYS = new Set([
   'privatekeyauthority',

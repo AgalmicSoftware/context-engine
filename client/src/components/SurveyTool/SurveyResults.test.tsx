@@ -255,7 +255,6 @@ const mockQuestionReadScope = ({
 const settle = async (): Promise<void> => {
   await act(async () => {
     for (let i = 0; i < 5; i += 1) {
-      // eslint-disable-next-line no-await-in-loop
       await new Promise((resolve) => setTimeout(resolve, 0));
     }
   });

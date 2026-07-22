@@ -381,14 +381,13 @@ const fetchArweaveBlobWithFallback = async (
   for (const gw of gateways) {
     const url = arweaveClient.buildArweaveGatewayUrl(txId, gw);
     try {
-      // eslint-disable-next-line no-await-in-loop
       const resp = await fetch(url, { cache: 'no-store' });
       if (!resp.ok) {
         lastErr = new Error(`Arweave fetch failed (${resp.status})`);
         continue;
       }
       if (isCurrent && !isCurrent()) return { ok: false, error: '', stale: true };
-      // eslint-disable-next-line no-await-in-loop
+
       const blob = await resp.blob();
       if (isCurrent && !isCurrent()) return { ok: false, error: '', stale: true };
       const ct = resp.headers.get('content-type') || blob.type || '';

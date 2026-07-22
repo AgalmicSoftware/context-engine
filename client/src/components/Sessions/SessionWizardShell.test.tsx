@@ -5,7 +5,13 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import SessionWizardShell, { type SessionWizardShellProps } from './SessionWizardShell';
 
 jest.mock('./SessionWizardHeader', () => (props: any) => (
-  <div data-testid="shell-header" data-mode={props.wizardMode}>
+  <div
+    data-testid="shell-header"
+    data-mode={props.wizardMode}
+    data-profile-label={props.sessionModeProfileLabel || ''}
+    data-profile-selection-step={String(!!props.sessionModeProfileSelectionStep)}
+  >
+    {props.sessionModeProfileControl}
     <button type="button" onClick={props.onEnterAdvancedMode}>
       advanced
     </button>
@@ -56,6 +62,7 @@ jest.mock('./SessionWizardNormalModeRail', () => (props: any) => (
 
 jest.mock('./EncryptionPanel', () => (props: any) => (
   <section data-testid="shell-encryption" data-collapsed={String(props.isCollapsed)}>
+    {props.sessionModeProfilePrivacyControl}
     <button type="button" onClick={props.onToggleCollapsed}>
       toggle encryption
     </button>
@@ -85,6 +92,7 @@ jest.mock('./SessionMetadataEditor', () => (props: any) => (
 
 jest.mock('./WorkerPanel', () => (props: any) => (
   <section data-testid="shell-worker" data-worker-url={props.displayedWorkerUrl || ''}>
+    {props.sessionModeProfileWorkerControl}
     {props.deployHelperToggle}
     <button type="button" onClick={props.onToggleCollapsed}>
       toggle worker
@@ -107,6 +115,7 @@ jest.mock('./SessionPublishSummary', () => (props: any) => (
     data-publish-advanced-open={String(props.publishUiPlan?.publishActionDisplayState?.publishAdvancedOpen || false)}
     data-worker-source={props.workerUrlSource || ''}
   >
+    {props.sessionModeProfilePublishControl}
     <button type="button" onClick={props.onToggleCollapsed}>
       toggle publish
     </button>
@@ -181,7 +190,7 @@ const baseProps = (): SessionWizardShellProps => ({
   deployWorkerUrl: '',
   devPersistWorkerSecrets: false,
   displayedWorkerUrl: 'https://worker.example.test',
-  draft: {},
+  draft: { sessionModeProfile: { preset: 'fast_cheap_cloudflare' } },
   effectivePersistWorkerSecrets: false,
   embeddedDeployHelperEnabled: true,
   encryptionGates: [],
@@ -316,7 +325,9 @@ const baseProps = (): SessionWizardShellProps => ({
   sessionHeaderPreviewSrc: '',
   sessionMetadataHeaderAccessory: <span data-testid="shell-session-id">session-id</span>,
   sessionModeProfileControl: <section data-testid="shell-mode-profile">mode profile</section>,
-  showSessionModeProfileControlInSetup: false,
+  sessionModeProfilePrivacyControl: <section data-testid="shell-mode-profile-privacy">profile privacy</section>,
+  sessionModeProfileWorkerControl: <section data-testid="shell-mode-profile-worker">profile worker</section>,
+  sessionModeProfilePublishControl: <section data-testid="shell-mode-profile-publish">profile publish</section>,
   sessionModeProfileStepComplete: true,
   sessionUrl: '/session/demo-session',
   setBundleFile: jest.fn(),
@@ -379,7 +390,9 @@ describe('SessionWizardShell', () => {
     const publish = screen.getByTestId('shell-publish');
     const modals = screen.getByTestId('shell-modals');
 
-    expect(screen.queryByTestId('shell-mode-profile')).not.toBeInTheDocument();
+    const modeProfile = screen.getByTestId('shell-mode-profile');
+    expect(header).toContainElement(modeProfile);
+    expect(header).toHaveAttribute('data-profile-label', 'Cloudflare');
     expect(header.compareDocumentPosition(requirements) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(requirements.compareDocumentPosition(sponsoredStatus) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(sponsoredStatus.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -448,14 +461,14 @@ describe('SessionWizardShell', () => {
     expect(props.onCloseSessionHeaderPreviewModal).toHaveBeenCalledTimes(1);
   });
 
-  it('renders only the mode profile while it gates setup sections', () => {
+  it('keeps the compact header visible while the profile gates setup sections', () => {
     const props = baseProps();
     props.sessionModeProfileStepComplete = false;
 
     render(<SessionWizardShell {...props} />);
 
     expect(screen.getByTestId('shell-mode-profile')).toBeInTheDocument();
-    expect(screen.queryByTestId('shell-header')).not.toBeInTheDocument();
+    expect(screen.getByTestId('shell-header')).toHaveAttribute('data-profile-selection-step', 'true');
     expect(screen.queryByTestId('shell-requirements')).not.toBeInTheDocument();
     expect(screen.queryByTestId('shell-sponsored-status')).not.toBeInTheDocument();
     expect(screen.queryByTestId('shell-normal-rail')).not.toBeInTheDocument();
@@ -464,6 +477,25 @@ describe('SessionWizardShell', () => {
     expect(screen.queryByTestId('shell-worker')).not.toBeInTheDocument();
     expect(screen.queryByTestId('shell-publish')).not.toBeInTheDocument();
     expect(screen.queryByTestId('shell-modals')).not.toBeInTheDocument();
+  });
+
+  it('places profile settings in their advanced wizard sections instead of normal mode', () => {
+    const normalProps = baseProps();
+    const { unmount } = render(<SessionWizardShell {...normalProps} />);
+
+    expect(screen.queryByTestId('shell-mode-profile-privacy')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('shell-mode-profile-worker')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('shell-mode-profile-publish')).not.toBeInTheDocument();
+    unmount();
+
+    const advancedProps = baseProps();
+    advancedProps.isNormalMode = false;
+    advancedProps.wizardMode = 'advanced';
+    render(<SessionWizardShell {...advancedProps} />);
+
+    expect(screen.getByTestId('shell-encryption')).toContainElement(screen.getByTestId('shell-mode-profile-privacy'));
+    expect(screen.getByTestId('shell-worker')).toContainElement(screen.getByTestId('shell-mode-profile-worker'));
+    expect(screen.getByTestId('shell-publish')).toContainElement(screen.getByTestId('shell-mode-profile-publish'));
   });
 
   it('preserves section visibility and publish disabled state', () => {

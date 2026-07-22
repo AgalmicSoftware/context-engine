@@ -29,16 +29,18 @@ import { buildPublicRoute, readPublicUrlBasePath } from '../../utilities/ui/publ
 import { notify } from '../../utilities/ui/notify.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import {
-  getSbtPasswordRecoveryCodes,
-  upsertSbtPasswordRecoveryCodes,
-} from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { isCryptoMode, sbtBasePath, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import SbtPageAdminActions from './SbtPageAdminActions';
 import { renderSbtPageFullActionSurfaces, type SbtPageFullActionSurfaces } from './SbtPageFullActionButtons';
 import { renderSbtPageFullView, renderSbtPageFullViewLoading } from './SbtPageFullView';
 import SbtPageMiniCard from './SbtPageMiniCard';
 import SbtPageRelevantInfo from './SbtPageRelevantInfo';
+import {
+  appendEncryptedSbtRecovery,
+  clearAllSbtRecovery,
+  loadSbtRecoverySnapshot,
+  selectAdminEncryptedRecovery,
+} from './SbtEncryptedRecoveryControl';
 import { buildSbtPageMiniCardActionHandlers } from './sbtPageActionController';
 import {
   appendSbtPageBookmark,
@@ -56,7 +58,6 @@ import {
   buildSbtPageBurnSearchInputPatch,
   buildSbtPageBurnSearchResultPatch,
   buildSbtPageBurnSuccessPatch,
-  buildSbtPageCachedPasswordsPatch,
   buildSbtPageInitialState,
   buildSbtPageHolderListSignature,
   buildSbtPageIntervalIdPatch,
@@ -187,30 +188,6 @@ import type {
 const sbtLog = createLogger('sbt');
 const inviteLog = createLogger('inviteDebug');
 const encodeSbtPageGroupPassword = (code: string): string => encodeSbtPageGroupPasswordForUrl(code, cryptoUtils);
-type SbtPasswordRecoveryCodeLookupArgs = {
-  chainId?: unknown;
-  sbtAddress?: unknown;
-};
-type SbtPasswordRecoveryUpsertArgs = {
-  chainId?: unknown;
-  sbtAddress?: unknown;
-  passwords?: unknown;
-  mode?: 'replace' | 'append' | string;
-};
-type SbtPasswordRecoveryUpsertResult = Record<string, unknown> & {
-  ok: boolean;
-  status: string;
-  key?: string;
-  passwords?: string[];
-  expiresAt?: number;
-  write?: unknown;
-};
-const getSbtPasswordRecoveryCodesTyped = getSbtPasswordRecoveryCodes as unknown as (
-  args?: SbtPasswordRecoveryCodeLookupArgs,
-) => string[];
-const upsertSbtPasswordRecoveryCodesTyped = upsertSbtPasswordRecoveryCodes as unknown as (
-  args?: SbtPasswordRecoveryUpsertArgs,
-) => SbtPasswordRecoveryUpsertResult;
 type QueueLocalStorageJsonWriteOptions = {
   immediate?: boolean;
 };
@@ -407,6 +384,8 @@ type SbtPageState = Record<string, unknown> & {
   docModalBlobUrl: string;
   error: React.ReactNode;
   exportFormat: string;
+  encryptedRecoveryEnabled: boolean;
+  encryptedRecoveryStatus: string;
   filteredMintedUsers: unknown[];
   groupPasswordHash: unknown;
   groupPasswordHashLoaded: boolean;
@@ -453,6 +432,7 @@ class SBTPage extends Component<any, any> {
   _descDecryptTried: Record<string, boolean> = {}; // key: `${netId}:${addrLower}:${account}` => true
   _activeScanKey: string | null = null;
   _loadSbtInfoInFlight = false;
+  _passwordRecoveryLoadId = 0;
   _loadSbtInfoPending = false;
   _loadSbtInfoPendingForce = false;
   _loadSbtInfoPendingOptions: SbtPageLoadInfoOptions | null = null;
@@ -1895,16 +1875,13 @@ class SBTPage extends Component<any, any> {
     }
   }
 
-  loadCachedPasswords = (): void => {
-    const sbtAddress = resolveSbtAddress(this.props.SBTAddress);
-    const cached = getSbtPasswordRecoveryCodesTyped({
+  loadCachedPasswords = async (): Promise<void> => {
+    const loadId = ++this._passwordRecoveryLoadId;
+    const snapshot = await loadSbtRecoverySnapshot({
       chainId: this.getRecoveryCacheChainId(),
-      sbtAddress,
+      sbtAddress: resolveSbtAddress(this.props.SBTAddress),
     });
-
-    if (this._isMounted) {
-      this.setState(buildSbtPageCachedPasswordsPatch({ cachedPasswords: cached }));
-    }
+    if (this._isMounted && loadId === this._passwordRecoveryLoadId) this.setState(snapshot);
   };
 
   openMintedModal = (): void => {
@@ -3855,14 +3832,19 @@ class SBTPage extends Component<any, any> {
 
       this.cacheTransactionHash(tx.transactionHash);
 
-      const recoveryWrite = upsertSbtPasswordRecoveryCodesTyped({
-        chainId: this.getRecoveryCacheChainId(),
-        sbtAddress: sbtAddressOriginalCase,
-        passwords: newPasswordList,
-        mode: 'append',
-      });
-      if (!recoveryWrite.ok) {
-        sbtLog.warn('Failed to persist admin invite recovery codes:', recoveryWrite.status);
+      if (this.state.encryptedRecoveryEnabled) {
+        const recoveryWrite = await appendEncryptedSbtRecovery({
+          chainId: this.getRecoveryCacheChainId(),
+          passwords: newPasswordList,
+          sbtAddress: sbtAddressOriginalCase,
+        });
+        this.setState({
+          encryptedRecoveryEnabled: recoveryWrite.ok,
+          encryptedRecoveryStatus: recoveryWrite.ok ? 'saved' : 'unavailable',
+        });
+        if (!recoveryWrite.ok) {
+          notify.warn('Encrypted local recovery failed. Export the new passwords before leaving this page.');
+        }
       }
 
       if (this._isMounted)
@@ -3871,11 +3853,28 @@ class SBTPage extends Component<any, any> {
             passwordList: newPasswordList,
           }),
         );
-      this.loadCachedPasswords();
     } catch (error) {
       sbtLog.error('Error adding hashed passwords:', error);
       if (this._isMounted) this.setState(buildSbtPageErrorPatch({ error: getErrorMessage(error) }));
     }
+  };
+
+  handleEncryptedRecoveryChange = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const patch = await selectAdminEncryptedRecovery({
+      chainId: this.getRecoveryCacheChainId(),
+      enabled: event.target.checked === true,
+      sbtAddress: resolveSbtAddressString(this.props.SBTAddress),
+    });
+    this.setState(patch);
+  };
+
+  handleClearLocalRecovery = async (): Promise<void> => {
+    this.setState(
+      await clearAllSbtRecovery({
+        chainId: this.getRecoveryCacheChainId(),
+        sbtAddress: resolveSbtAddressString(this.props.SBTAddress),
+      }),
+    );
   };
 
   generateRandomPasswords = (count: unknown): string[] => {
@@ -4119,6 +4118,8 @@ class SBTPage extends Component<any, any> {
       cachedPasswords,
       includePreviousPasswords,
       exportFormat,
+      encryptedRecoveryEnabled,
+      encryptedRecoveryStatus,
       passwordGenerationCount,
     } = this.state;
     if (!userIsSbtAdmin || !sbtInfo) return null;
@@ -4165,11 +4166,15 @@ class SBTPage extends Component<any, any> {
       burnSearchResultRecord,
       displayPlan: adminActionDisplayPlan,
       exportFormat,
+      encryptedRecoveryEnabled,
+      encryptedRecoveryStatus,
       onAdminBurn: this.handleAdminBurn,
       onBurnSearchChange: this.handleBurnSearchChange,
       onCopyOpenMintUrl: () => this.copyToClipboard(openMintAutoJoinUrl, 'open-mint-url'),
       onExportFormatChange: this.handleExportFormatChange,
       onExportPasswords: this.exportPasswords,
+      onClearLocalRecovery: this.handleClearLocalRecovery,
+      onEncryptedRecoveryChange: this.handleEncryptedRecoveryChange,
       onGenerateAdminInvites: this.handleGenerateAdminInvites,
       onIncludePreviousPasswordsChange: this.handleIncludePreviousPasswordsChange,
       onPasswordGenerationCountChange: this.handlePasswordGenerationCountChange,
@@ -4177,6 +4182,7 @@ class SBTPage extends Component<any, any> {
       openMintUrlCopyIconState,
       passwordInviteLinkContext,
       passwordGenerationCount,
+      hasLocalRecovery: cachedPasswords.length > 0 || encryptedRecoveryEnabled,
       sbtLabel: t('sbt'),
     });
   };

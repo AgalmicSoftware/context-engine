@@ -28,7 +28,7 @@ const createBody = (overrides = {}) => ({
   },
 });
 
-test('validateBootstrapAdmin preserves legacy requested-admin match when the worker is not registry-configured', async () => {
+test('validateBootstrapAdmin rejects an unbound bootstrap when the worker is not registry-configured', async () => {
   let sessionCheckCalled = false;
 
   const result = await validateBootstrapAdmin({
@@ -45,7 +45,7 @@ test('validateBootstrapAdmin preserves legacy requested-admin match when the wor
   });
 
   assert.equal(sessionCheckCalled, false);
-  assert.equal(result, true);
+  assert.equal(result, false);
 });
 
 test('validateBootstrapAdmin requires the deployment-bound admin while KV config is unavailable', async () => {
@@ -72,7 +72,7 @@ test('validateBootstrapAdmin requires the deployment-bound admin while KV config
   assert.equal(mismatched, false);
 });
 
-test('validateBootstrapAdmin preserves legacy requested-admin match when the slug is not registered on-chain', async () => {
+test('validateBootstrapAdmin rejects bootstrap before the slug is registered on-chain', async () => {
   let registryReadCalled = false;
 
   const result = await validateBootstrapAdmin({
@@ -103,7 +103,7 @@ test('validateBootstrapAdmin preserves legacy requested-admin match when the slu
   });
 
   assert.equal(registryReadCalled, true);
-  assert.equal(result, true);
+  assert.equal(result, false);
 });
 
 test('validateBootstrapAdmin fails closed when the on-chain session existence check is unavailable', async () => {
@@ -248,7 +248,7 @@ test('validateBootstrapAdmin rejects malformed explicit registry chain ids inste
   }
 });
 
-test('validateBootstrapAdmin preserves absent and zero legacy fallbacks through network then env', async () => {
+test('validateBootstrapAdmin resolves absent and zero chain fallbacks before rejecting unregistered slugs', async () => {
   const seenChainIds = [];
   const readSessionExistsOnChain = async (value) => {
     seenChainIds.push(value.expectedChainId);
@@ -271,7 +271,7 @@ test('validateBootstrapAdmin preserves absent and zero legacy fallbacks through 
       body: { adminAddress: '0xabc123', config },
       deps: createDeps({ readSessionExistsOnChain }),
     });
-    assert.equal(result, true);
+    assert.equal(result, false);
   }
 
   assert.deepEqual(seenChainIds, [84532, 84532, 11155420]);

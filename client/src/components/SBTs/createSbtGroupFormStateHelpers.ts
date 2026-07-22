@@ -232,6 +232,8 @@ export const buildCreateSbtInitialState = ({
     numInviteLinks: 10,
     copiedLinkIndex: null,
     exportFormat: 'json',
+    encryptedRecoveryEnabled: false,
+    encryptedRecoveryStatus: 'idle',
     countdown: 12,
     countdownActive: false,
     sbtSymbol: '',

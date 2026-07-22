@@ -15,10 +15,11 @@ This directory contains demo and fixture data for the Context Engine survey plat
 | [`historical_figures_merged.json`](./historical_figures_merged.json) | Consolidated superset combining data from the richer figure sources. Used for demographic computation, avatar resolution, and shared profile question lookups. |
 | [`historical_figures_tree_qs_and_votes.json`](./historical_figures_tree_qs_and_votes.json) | Debate-oriented dataset for 66 figures with tree-structured questions, in-character comments, and vote stances. Used by debate tree and political compass views. |
 | [`demo_polis_data.json`](./demo_polis_data.json) | Polis-format clustering dataset with participants, vote arrays, and group assignments. Used by the demo analysis adapter and Polis report surfaces. |
-| [`demo_1_onchain_question_ids.json`](./demo_1_onchain_question_ids.json) | Canonical OP Sepolia `QuestionsAdded` IDs for the 42 `demo-1` Context corpus questions. Used to preload fast demo metadata while keeping responses answerable on-chain. |
+| [`demo_1_onchain_question_ids.json`](./demo_1_onchain_question_ids.json) | Stable IDs for the 42 Context corpus questions shared by legacy `demo-1` and Cloudflare-canonical `demo-sh`. |
 | [`demo_analysis_data.json`](./demo_analysis_data.json) | Dedicated breakdown-tab analysis fixture. Uses the canonical 42 questions and seeded historical-figure personas, then expands them with deterministic synthetic responses so the breakdown view has richer comparison density without hardcoding question content in the generator. Participant rows now also carry explicit profile metadata so the UI can distinguish baseline historical personas from modeled variants. |
 | [`demo_analysis_generation_config.json`](./demo_analysis_generation_config.json) | Corpus-backed curation config for the breakdown fixture generator. Keeps vetted question-to-node mappings, selected statement overrides, and deterministic synthetic-response settings in demo data, not in the generator script. Variant profiles include labels, rationale, and confidence so modeled rows stay inspectable. |
 | [`demo_sessions.json`](./demo_sessions.json) | Demo session definitions keyed by slug with metadata and worker configuration. Used by session resolution code and worker/cors proxy tests. |
+| [`sim_profile_answer_reconciliation.json`](./sim_profile_answer_reconciliation.json) | Curated evidence config for `scripts/reconcile-sim-profile-answers.mjs`. Pins the polarity of key_tension links between the policy question bank and demo comments, and whitelists tree-node fallbacks (with explicit polarity, anchors, and rationale) used to keep simulated profile answers consistent with the vote fixtures. |
 | [`demo_sbt_collection.json`](./demo_sbt_collection.json) | Sample SBT group metadata with per-figure demographic attributes such as gender, era, country, affiliation, and atlas category. |
 | [`expanded_tag_list.json`](./expanded_tag_list.json) | Taxonomy tag list for survey question classification and topic labeling. |
 | [`risk_matrix_data.json`](./risk_matrix_data.json) | Input data for the debate risk matrix visualization. |
@@ -53,11 +54,19 @@ The main consumers of this folder are:
 - [`CommunityTab.tsx`](../../components/CommunityTab/CommunityTab.tsx)
 - [`SimUserPage.tsx`](../../components/UserPage/SimUserPage.tsx)
 
-## Temporary Demo Session Seed
+## Default Cloudflare Demo Session
 
-`demo_sessions.json` keeps `demo-1` as a temporary display/question compatibility seed until the Cloudflare-backed demo session replaces the Arweave/on-chain preload path. Worker URLs, faucet sponsorship, and gate authority must stay in the live SessionRegistry plus Worker KV config, not in this fixture. Remove the preloaded question IDs when the pure Cloudflare demo session ships.
+`demo-sh` is the first/default public demo slug. Its dedicated full Session
+Worker is worker-canonical, uses Cloudflare KV for all 42 question payloads,
+accepts `https://contextengine.sh` and `https://www.contextengine.sh`, and has
+embedded deploy-helper capability disabled. The checked-in entry contains the
+public bootstrap identity and Worker URL needed to discover `/session-config`;
+the live Worker KV remains authoritative for operational configuration.
 
-When `demo-1` resolves from the live registry, the main session route applies this fixture only as a display overlay for temporary demo fields such as featured SBTs and seeded question compatibility. Registry-backed operational fields still win: `corsWorkerUrl`, sponsored flags, contract addresses, block windows, and resource gates must be updated through the admin wallet. For answer submissions, the live registry must expose an open `arweave`/`responses` gate and a truthy `sponsored_arweave` field after saving an Arweave JWK in the worker admin flow.
+The question fixture supplies an immediate client rendering of the same
+stable IDs and prompts stored in `demo-sh` KV. These rows are marked
+`cloudflareDemoSeed`, not `temporaryDemoSeed`. `demo-1` remains in the fixture
+as a temporary compatibility route while links migrate.
 
 ## Conceptual Data Pipeline
 
@@ -154,6 +163,15 @@ The breakdown tab now uses [`demo_analysis_data.json`](./demo_analysis_data.json
   - expand the seeded participant rows with deterministic synthetic variants using the same config file, preserving demographic lineage while increasing response density for the Breakdown view
   - keep those overrides semantically aligned with the explicit atlas node mapping; if a rewritten question is no longer equivalent to the mapped node, remove the mapping or rewrite the prompt again before regenerating
 - Keep [`demo_polis_data.json`](./demo_polis_data.json) unchanged unless you also intend to refresh `PolisReport` precomputed cluster metadata
+
+## Reconciling Simulated Profile Answers
+
+[`historical_figure_users.json`](./historical_figure_users.json) binary answers are kept consistent with the canonical vote fixtures instead of being freely hand-edited:
+
+- Reconcile from the repo root with `npm run demo:sim-answers:reconcile`
+- The script lives at [`scripts/reconcile-sim-profile-answers.mjs`](../../../../scripts/reconcile-sim-profile-answers.mjs)
+- Profile questions reference the `all_300_questions.json` policy list via `commentIndex`. Evidence priority per answer: the figure's POLIS vote on the demo comment linked by a verbatim `key_tension` match, then the figure's atlas tree vote on the validated node for that comment from [`demo_analysis_generation_config.json`](./demo_analysis_generation_config.json), then a manually validated bank-question node mapping from [`sim_profile_answer_reconciliation.json`](./sim_profile_answer_reconciliation.json). Answers without evidence are left unchanged.
+- Tree-node mappings are only allowed on nodes whose tree votes empirically agree with the node's anchor POLIS statements for at least 80% of figures with both signals; [`sim_profile_answer_consistency.test.js`](./sim_profile_answer_consistency.test.js) enforces this plus the POLIS-link consistency invariant.
 
 ## Naming And Compatibility Notes
 

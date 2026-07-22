@@ -3,14 +3,15 @@ import assert from 'node:assert/strict';
 import { ethers } from 'ethers';
 import { webcrypto } from 'crypto';
 import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
+import { installSessionCoordinatorBinding } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 
 const REGISTRY_ADDRESS = '0x0000000000000000000000000000000000000001';
 const RPC_URL = 'https://rpc.example';
 const ZERO_BYTES32 = `0x${'0'.repeat(64)}`;
 const SESSION_CONFIG_KEY = (slug) => `session:${slug}:config`;
 const SESSION_SECRETS_KEY = (slug) => `session:${slug}:secrets`;
-const LOGIN_ORIGIN = 'https://contextengine.xyz';
-const LOGIN_DOMAIN = 'contextengine.xyz';
+const LOGIN_ORIGIN = 'https://contextengine.sh';
+const LOGIN_DOMAIN = 'contextengine.sh';
 
 const registryIface = new ethers.utils.Interface([
   'function getResourceGate(string,string) view returns (address[] sbtAddresses, uint256 chainId, uint8 mode, uint256 perMemberLimit)',
@@ -254,13 +255,13 @@ test('proof-backed faucet requests succeed even when the auth token lacks faucet
   const wallet = new ethers.Wallet('0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5');
   const faucetWallet = new ethers.Wallet('0x8b3a350cf5c34c9194ca3a545d3f6f9f4c7e2d36505f8b0e62be5285bdcf0582');
   const hashedPassword = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('valid-claim-code'));
-  const env = {
+  const env = installSessionCoordinatorBinding({
     GROUP_KV: createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify(buildSessionConfig()),
       [SESSION_SECRETS_KEY(sessionSlug)]: JSON.stringify({ faucetPrivateKey: faucetWallet.privateKey }),
     }),
     TOKEN_HMAC_SECRET: 'test-secret',
-  };
+  });
 
   try {
     global.fetch = buildWorkerRpcFetch({
@@ -338,7 +339,7 @@ test('worker-canonical faucet transactions use the authenticated session-secret 
   const secretRpcUrl = 'https://private-op-rpc.example.test';
   const wallet = new ethers.Wallet('0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5');
   const faucetWallet = new ethers.Wallet('0x8b3a350cf5c34c9194ca3a545d3f6f9f4c7e2d36505f8b0e62be5285bdcf0582');
-  const env = {
+  const env = installSessionCoordinatorBinding({
     GROUP_KV: createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify({
         slug: sessionSlug,
@@ -357,7 +358,7 @@ test('worker-canonical faucet transactions use the authenticated session-secret 
       }),
     }),
     TOKEN_HMAC_SECRET: 'test-secret',
-  };
+  });
 
   try {
     global.fetch = buildWorkerRpcFetch({
@@ -426,13 +427,13 @@ test('proof-backed faucet requests without faucet scope must fund the authentica
   const otherRecipient = ethers.Wallet.createRandom().address;
   const faucetWallet = new ethers.Wallet('0x8b3a350cf5c34c9194ca3a545d3f6f9f4c7e2d36505f8b0e62be5285bdcf0582');
   const hashedPassword = ethers.utils.keccak256(ethers.utils.toUtf8Bytes('valid-claim-code'));
-  const env = {
+  const env = installSessionCoordinatorBinding({
     GROUP_KV: createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify(buildSessionConfig()),
       [SESSION_SECRETS_KEY(sessionSlug)]: JSON.stringify({ faucetPrivateKey: faucetWallet.privateKey }),
     }),
     TOKEN_HMAC_SECRET: 'test-secret',
-  };
+  });
 
   try {
     global.fetch = buildWorkerRpcFetch({
@@ -510,13 +511,13 @@ test('group-password faucet proofs reject public groupPasswordHash values withou
   const faucetWallet = new ethers.Wallet('0x8b3a350cf5c34c9194ca3a545d3f6f9f4c7e2d36505f8b0e62be5285bdcf0582');
   const groupPassword = 'shared-secret';
   const onChainGroupPasswordHash = buildGroupPasswordHash(groupPassword);
-  const env = {
+  const env = installSessionCoordinatorBinding({
     GROUP_KV: createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify(buildSessionConfig()),
       [SESSION_SECRETS_KEY(sessionSlug)]: JSON.stringify({ faucetPrivateKey: faucetWallet.privateKey }),
     }),
     TOKEN_HMAC_SECRET: 'test-secret',
-  };
+  });
 
   try {
     global.fetch = buildWorkerRpcFetch({
@@ -596,13 +597,13 @@ test('group-password faucet proofs accept a valid group mint signature', async (
     sbtAddress,
     recipientAddress: wallet.address,
   });
-  const env = {
+  const env = installSessionCoordinatorBinding({
     GROUP_KV: createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify(buildSessionConfig()),
       [SESSION_SECRETS_KEY(sessionSlug)]: JSON.stringify({ faucetPrivateKey: faucetWallet.privateKey }),
     }),
     TOKEN_HMAC_SECRET: 'test-secret',
-  };
+  });
 
   try {
     global.fetch = buildWorkerRpcFetch({

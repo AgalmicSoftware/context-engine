@@ -37,7 +37,7 @@ publish a sponsored URL backed by unrestricted production API keys.
   "links": [
     {
       "label": "Sponsored setup 1",
-      "url": "https://contextengine.xyz/new?sponsored=<txId>#k=<secret>",
+      "url": "https://contextengine.sh/new?sponsored=<txId>#k=<secret>",
       "active": true
     }
   ]

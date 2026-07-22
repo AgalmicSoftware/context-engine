@@ -53,6 +53,10 @@ test('evaluateAuthenticatedRoutePreflight allows missing scope when explicitly p
     limit: 3,
     headers: { 'Access-Control-Allow-Origin': '*' },
     deps: {
+      computeScopesForLogin: async (value) => {
+        assert.deepEqual(value.requestedScopes, ['faucet']);
+        return { faucet: false };
+      },
       checkRateLimit: async (value) => {
         received = value;
         return true;
@@ -87,6 +91,7 @@ test('evaluateAuthenticatedRoutePreflight preserves rate-limit rejection', async
     limit: 1,
     headers,
     deps: {
+      computeScopesForLogin: async () => ({ ai: true }),
       checkRateLimit: async () => false,
       json: createJsonStub(),
     },
@@ -114,6 +119,7 @@ test('evaluateAuthenticatedRoutePreflight preserves success shape for scoped rou
     limit: 5,
     headers: { 'Access-Control-Allow-Origin': '*' },
     deps: {
+      computeScopesForLogin: async () => ({ transcribe: true }),
       checkRateLimit: async () => true,
       json: createJsonStub(),
     },
@@ -122,5 +128,75 @@ test('evaluateAuthenticatedRoutePreflight preserves success shape for scoped rou
   assert.deepEqual(result, {
     ok: true,
     tokenHasScope: true,
+  });
+});
+
+test('evaluateAuthenticatedRoutePreflight intersects signed scope with current authorization', async () => {
+  let checkRateLimitCalled = false;
+  const headers = { 'Access-Control-Allow-Origin': '*' };
+  const config = { authzEpoch: 4, scopes: { ai: false } };
+  const result = await evaluateAuthenticatedRoutePreflight({
+    scopes: { ai: true },
+    scope: 'ai',
+    route: 'ai',
+    config,
+    env: { GROUP_KV: {} },
+    slug: 'session-a',
+    address: '0xabc',
+    limit: 5,
+    headers,
+    deps: {
+      computeScopesForLogin: async (value) => {
+        assert.equal(value.config, config);
+        assert.deepEqual(value.requestedScopes, ['ai']);
+        return { ai: false };
+      },
+      checkRateLimit: async () => {
+        checkRateLimitCalled = true;
+        return true;
+      },
+      json: createJsonStub(),
+    },
+  });
+
+  assert.equal(checkRateLimitCalled, false);
+  assert.deepEqual(result, {
+    ok: false,
+    tokenHasScope: false,
+    response: {
+      body: { error: 'Token missing ai scope.' },
+      status: 403,
+      headers,
+    },
+  });
+});
+
+test('evaluateAuthenticatedRoutePreflight fails closed when current authorization cannot be resolved', async () => {
+  const headers = { 'Access-Control-Allow-Origin': '*' };
+  const result = await evaluateAuthenticatedRoutePreflight({
+    scopes: { ai: true },
+    scope: 'ai',
+    route: 'ai',
+    env: { GROUP_KV: {} },
+    slug: 'session-a',
+    address: '0xabc',
+    headers,
+    deps: {
+      computeScopesForLogin: async () => {
+        throw new Error('registry unavailable');
+      },
+      checkRateLimit: async () => true,
+      json: createJsonStub(),
+    },
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    tokenHasScope: false,
+    response: {
+      body: { error: 'Current authorization check failed.' },
+      status: 403,
+      headers,
+    },
   });
 });

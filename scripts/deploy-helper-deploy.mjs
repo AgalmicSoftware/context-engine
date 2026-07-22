@@ -18,6 +18,7 @@ import { buildWorkerBundles, WORKER_BUNDLE_TARGETS } from './worker-bundle.mjs';
 
 export const DEFAULT_DEPLOY_HELPER_BUNDLE_PATH = WORKER_BUNDLE_TARGETS.deployHelper.outputRelativePath;
 export const DEFAULT_SESSION_WORKER_BUNDLE_URL = 'https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js';
+export const DEFAULT_SESSION_WORKER_BUNDLE_MANIFEST_URL = 'https://github.com/AgalmicSoftware/context-engine/releases/latest/download/worker-release-manifest.json';
 export const DEFAULT_DEPLOY_HELPER_NAMESPACE_TITLE_PREFIX = 'ContextEngineDeployHelper';
 export const DEFAULT_DEPLOY_HELPER_ALLOWED_ORIGINS = normalizeOriginList(DEFAULT_WORKER_ALLOWED_ORIGINS);
 const DEPLOY_HELPER_SESSION_COORDINATOR_BINDING = 'CE_SESSION_COORDINATOR';
@@ -65,6 +66,8 @@ export const printUsage = () => {
     '                                Self-hosted custom app origins are not discoverable here; pass --allowed-origins explicitly',
     '  --admin-secret <secret>       Optional ADMIN_SECRET (auto-generated when omitted)',
     '  --worker-bundle-url <url>     Optional default session worker bundle URL written into WORKER_BUNDLE_URL',
+    '  --worker-bundle-manifest-url <url>',
+    '                                Expected-digest manifest written into WORKER_BUNDLE_MANIFEST_URL',
     '  --compatibility-date <date>   Optional helper compatibility date (default from deployHelperCore)',
     '  --worker-compat-date <date>   Optional WORKER_COMPATIBILITY_DATE binding for deployed session workers',
     '  --default-session-slug <slug> Optional DEFAULT_SESSION_SLUG binding for the helper',
@@ -112,6 +115,12 @@ export const resolveDeployHelperDeployConfig = ({
     env.WORKER_BUNDLE_URL ||
     DEFAULT_SESSION_WORKER_BUNDLE_URL
   ).trim();
+  const workerBundleManifestUrl = toStr(
+    flags['worker-bundle-manifest-url'] ||
+    env.DEPLOY_HELPER_WORKER_BUNDLE_MANIFEST_URL ||
+    env.WORKER_BUNDLE_MANIFEST_URL ||
+    DEFAULT_SESSION_WORKER_BUNDLE_MANIFEST_URL
+  ).trim();
   const compatibilityDate = toStr(
     flags['compatibility-date'] ||
     env.DEPLOY_HELPER_COMPATIBILITY_DATE ||
@@ -143,6 +152,7 @@ export const resolveDeployHelperDeployConfig = ({
     allowedOrigins,
     adminSecret,
     workerBundleUrl,
+    workerBundleManifestUrl,
     compatibilityDate,
     workerCompatibilityDate,
     defaultSessionSlug,
@@ -247,6 +257,7 @@ export const buildDeployHelperUploadMetadata = ({
   kvNamespaceId,
   allowedOrigins = [],
   workerBundleUrl = '',
+  workerBundleManifestUrl = '',
   compatibilityDate = DEFAULT_COMPAT_DATE,
   workerCompatibilityDate = DEFAULT_COMPAT_DATE,
   defaultSessionSlug = '',
@@ -272,6 +283,13 @@ export const buildDeployHelperUploadMetadata = ({
       name: 'WORKER_BUNDLE_URL',
       type: 'plain_text',
       text: toStr(workerBundleUrl).trim(),
+    });
+  }
+  if (toStr(workerBundleManifestUrl).trim()) {
+    bindings.push({
+      name: 'WORKER_BUNDLE_MANIFEST_URL',
+      type: 'plain_text',
+      text: toStr(workerBundleManifestUrl).trim(),
     });
   }
   if (toStr(workerCompatibilityDate).trim()) {
@@ -331,6 +349,7 @@ export const deployDeployHelperWorker = async ({
   allowedOrigins = [],
   adminSecret = '',
   workerBundleUrl = DEFAULT_SESSION_WORKER_BUNDLE_URL,
+  workerBundleManifestUrl = DEFAULT_SESSION_WORKER_BUNDLE_MANIFEST_URL,
   compatibilityDate = DEFAULT_COMPAT_DATE,
   workerCompatibilityDate = DEFAULT_COMPAT_DATE,
   defaultSessionSlug = '',
@@ -371,6 +390,7 @@ export const deployDeployHelperWorker = async ({
     kvNamespaceId: kvNamespace.id,
     allowedOrigins,
     workerBundleUrl,
+    workerBundleManifestUrl,
     compatibilityDate,
     workerCompatibilityDate,
     defaultSessionSlug,

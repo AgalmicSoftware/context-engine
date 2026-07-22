@@ -7,12 +7,13 @@ import {
   DEPLOY_HELPER_URL,
   HEALTHCHECK_WORKER_URL,
   WORKER_BUNDLE_URL,
+  WORKER_RELEASE_MANIFEST_URL,
 } from './publicDeploymentConfig.js';
 
 const DEFAULT_SESSION_SCAN_SCOPE = 'list';
 // Demo-like sessions that should receive public demo UI affordances. The first
 // entry is the About-page CTA target; keep older slugs in the list while links migrate.
-const DEFAULT_DEMO_SESSION_SLUGS = Object.freeze(['demo-1', 'demo-3', 'demo-2', 'demo']);
+const DEFAULT_DEMO_SESSION_SLUGS = Object.freeze(['demo-sh', 'demo-1', 'demo-3', 'demo-2', 'demo']);
 // Default cross-session scans follow the active public demo while legacy slugs
 // remain demo-like for direct links during migration.
 const DEFAULT_SESSION_SCAN_SLUGS = Object.freeze([DEFAULT_DEMO_SESSION_SLUGS[0]]);
@@ -222,6 +223,7 @@ export const CLOUDFLARE_CORS_WORKER_URL = readPublicEnv('REACT_APP_CE_SHARED_WOR
 export const CLOUDFLARE_DEPLOY_HELPER_URL = DEPLOY_HELPER_URL;
 export const CLOUDFLARE_HEALTHCHECK_WORKER_URL = HEALTHCHECK_WORKER_URL;
 export const CLOUDFLARE_WORKER_BUNDLE_URL = WORKER_BUNDLE_URL;
+export const CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL = WORKER_RELEASE_MANIFEST_URL;
 export const CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED;
 // WALLECT CONNECT PROJECT ID (ReOwn - needed if upgrading rainbowkit / wagmi)
 // export const WALLETCONNECT_PROJECT_ID = "13b8465ab2e356ef5cf655f6a9061738";

@@ -3,6 +3,7 @@ import { webcrypto } from 'crypto';
 import sessionCorsWorker, {
   SessionWriteCoordinator,
 } from '../../workers/sessionCorsWorker/worker.js';
+import { getSessionSecrets } from '../../workers/sessionCorsWorker/sessionConfigSecretsStore.js';
 import {
   buildRpcFetchMock,
   createMemoryKv,
@@ -16,6 +17,7 @@ const SESSION_CONFIG_KEY = (slug) => `session:${slug}:config`;
 const SESSION_SECRETS_KEY = (slug) => `session:${slug}:secrets`;
 const HATS_ABI = ['function isWearerOfHat(address wearer, uint256 hatId) view returns (bool)'];
 const hatsIface = new ethers.utils.Interface(HATS_ABI);
+const SESSION_SECRETS_KEK = 'root-admin-session-secrets-test-kek';
 
 const readStoredJson = (kv, key) => {
   const raw = kv._dump().get(key);
@@ -23,7 +25,11 @@ const readStoredJson = (kv, key) => {
 };
 
 const createCoordinatorEnv = (kv, overrides = {}) => {
-  const env = { GROUP_KV: kv, ...overrides };
+  const env = {
+    GROUP_KV: kv,
+    CE_STORAGE_ENVELOPE_KEK: SESSION_SECRETS_KEK,
+    ...overrides,
+  };
   const instances = new Map();
   const clone = (value) => JSON.parse(JSON.stringify(value));
   env.CE_SESSION_COORDINATOR = {
@@ -39,6 +45,7 @@ const createCoordinatorEnv = (kv, overrides = {}) => {
             const run = tail.then(() => callback({
               get: async (key) => values.get(key),
               put: async (key, value) => values.set(key, clone(value)),
+              delete: async (key) => values.delete(key),
             }));
             tail = run.catch(() => undefined);
             return run;
@@ -83,9 +90,11 @@ describe('sessionCorsWorker admin routes', () => {
     });
   });
 
-  it('bootstraps worker config when no config exists and the signer matches the requested admin', async () => {
+  it('bootstraps worker config when deployment binds the signer as requested admin', async () => {
     const kv = createMemoryKv();
-    const env = createCoordinatorEnv(kv);
+    const env = createCoordinatorEnv(kv, {
+      BOOTSTRAP_ADMIN_ADDRESS: adminWallet.address,
+    });
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -100,7 +109,6 @@ describe('sessionCorsWorker admin routes', () => {
         },
       },
     });
-
     const response = await sessionCorsWorker.fetch(
       makeJsonRequest('/admin/set-config', body),
       env,
@@ -110,6 +118,7 @@ describe('sessionCorsWorker admin routes', () => {
     expect(response.status).toBe(200);
     expect(payload).toEqual({ ok: true });
     expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual({
+      authzEpoch: 1,
       adminAddress: adminWallet.address,
       allowOrigins: ['https://app.example'],
       scopes: { ai: true },
@@ -119,7 +128,10 @@ describe('sessionCorsWorker admin routes', () => {
 
   it('fails closed when the session coordinator binding is absent', async () => {
     const kv = createMemoryKv();
-    const env = { GROUP_KV: kv };
+    const env = {
+      GROUP_KV: kv,
+      BOOTSTRAP_ADMIN_ADDRESS: adminWallet.address,
+    };
     const body = await createSignedSiweBody({
       worker: sessionCorsWorker,
       env,
@@ -133,6 +145,7 @@ describe('sessionCorsWorker admin routes', () => {
         },
       },
     });
+    delete env.CE_SESSION_COORDINATOR;
 
     const response = await sessionCorsWorker.fetch(
       makeJsonRequest('/admin/set-config', body),
@@ -204,7 +217,7 @@ describe('sessionCorsWorker admin routes', () => {
     expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toBeNull();
   });
 
-  it('bootstraps worker config when the registry is configured but the slug is not registered on-chain yet', async () => {
+  it('rejects bootstrap when the registry slug is not registered on-chain yet', async () => {
     const kv = createMemoryKv();
     const env = createCoordinatorEnv(kv, {
       REGISTRY_ADDRESS,
@@ -238,16 +251,10 @@ describe('sessionCorsWorker admin routes', () => {
     );
     const payload = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(payload).toEqual({ ok: true });
+    expect(response.status).toBe(403);
+    expect(payload).toEqual({ error: 'Admin authorization failed.' });
     expect(global.fetch).toHaveBeenCalledTimes(2);
-    expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual({
-      adminAddress: adminWallet.address,
-      allowOrigins: ['https://app.example'],
-      networkChainId: 84532,
-      scopes: { ai: true },
-      limits: {},
-    });
+    expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toBeNull();
   });
 
   it('rejects set-config when the signer is not authorized for the session', async () => {
@@ -393,6 +400,7 @@ describe('sessionCorsWorker admin routes', () => {
 
     expect(response.status).toBe(200);
     expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual({
+      authzEpoch: 1,
       adminAddress: adminWallet.address,
       sessionName: 'Updated Session',
       registryAddress: '0x0000000000000000000000000000000000000001',
@@ -437,6 +445,7 @@ describe('sessionCorsWorker admin routes', () => {
 
     expect(response.status).toBe(200);
     expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual({
+      authzEpoch: 1,
       adminAddress: adminWallet.address,
       slug: sessionSlug,
       allowOrigins: ['https://allowed.example', 'https://second.example'],
@@ -483,6 +492,7 @@ describe('sessionCorsWorker admin routes', () => {
     expect(response.status).toBe(200);
     expect(readStoredJson(kv, SESSION_CONFIG_KEY(sessionSlug))).toEqual({
       adminAddress: adminWallet.address,
+      authzEpoch: 1,
       sessionName: 'Updated Session',
       limits: {
         perWalletPerDay: 3,
@@ -529,8 +539,13 @@ describe('sessionCorsWorker admin routes', () => {
       kind: 'session-secrets',
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
+      cipher: 'AES-256-GCM',
+      keyRef: 'worker_secret:CE_STORAGE_ENVELOPE_KEK',
+      encryptedSecrets: expect.any(String),
     }));
-    expect(stored.secrets).toEqual({
+    expect(stored.secrets).toBeUndefined();
+    expect(JSON.stringify(stored)).not.toMatch(/sk-openai|rpc\.example|RSA/);
+    expect(await getSessionSecrets(env, sessionSlug)).toEqual({
       openaiKey: 'sk-openai',
       customRpcUrl: 'https://rpc.example',
       arweaveJwk: '{"kty":"RSA"}',
@@ -571,8 +586,12 @@ describe('sessionCorsWorker admin routes', () => {
       kind: 'session-secrets',
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
+      cipher: 'AES-256-GCM',
+      encryptedSecrets: expect.any(String),
     }));
-    expect(stored.secrets).toEqual({
+    expect(stored.secrets).toBeUndefined();
+    expect(JSON.stringify(stored)).not.toMatch(/sk-openai|RSA|12345/);
+    expect(await getSessionSecrets(env, sessionSlug)).toEqual({
       openaiKey: 'sk-openai',
       arweaveJwk: '{"kty":"RSA","n":"abc"}',
       faucetPrivateKey: '12345',
@@ -616,8 +635,12 @@ describe('sessionCorsWorker admin routes', () => {
       kind: 'session-secrets',
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
+      cipher: 'AES-256-GCM',
+      encryptedSecrets: expect.any(String),
     }));
-    expect(stored.secrets).toEqual(existingSecrets);
+    expect(stored.secrets).toBeUndefined();
+    expect(JSON.stringify(stored)).not.toContain('sk-existing');
+    expect(await getSessionSecrets(env, sessionSlug)).toEqual(existingSecrets);
   });
 
   it('rejects set-secrets when the secrets payload is missing', async () => {

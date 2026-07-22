@@ -27,7 +27,7 @@ const createNonceDeps = (overrides = {}) => ({
   }),
   resolveTrustedAdminOrigins: () => ['http://localhost:3000'],
   buildNonce: () => 'nonce-1',
-  putNonce: async () => {},
+  issueNonce: async () => ({ ok: true }),
   MISSING_SLUG_ERROR: 'Missing sessionSlug.',
   NONCE_TTL_SECONDS: 60 * 5,
   ...overrides,
@@ -39,7 +39,7 @@ test('dispatchAuthNonceRequest preserves invalid-json failure before address, sl
   let slugCalled = false;
   let corsCalled = false;
   let buildNonceCalled = false;
-  let putNonceCalled = false;
+  let issueNonceCalled = false;
 
   const result = await dispatchAuthNonceRequest({
     request: {
@@ -71,8 +71,9 @@ test('dispatchAuthNonceRequest preserves invalid-json failure before address, sl
         buildNonceCalled = true;
         return 'nonce-1';
       },
-      putNonce: async () => {
-        putNonceCalled = true;
+      issueNonce: async () => {
+        issueNonceCalled = true;
+        return { ok: true };
       },
     }),
   });
@@ -82,7 +83,7 @@ test('dispatchAuthNonceRequest preserves invalid-json failure before address, sl
   assert.equal(slugCalled, false);
   assert.equal(corsCalled, false);
   assert.equal(buildNonceCalled, false);
-  assert.equal(putNonceCalled, false);
+  assert.equal(issueNonceCalled, false);
   assert.deepEqual(result, {
     body: { error: 'Invalid JSON.' },
     status: 400,
@@ -92,7 +93,7 @@ test('dispatchAuthNonceRequest preserves invalid-json failure before address, sl
 
 test('dispatchAuthNonceRequest preserves existing-session CORS passthrough before nonce creation and storage', async () => {
   let buildNonceCalled = false;
-  let putNonceCalled = false;
+  let issueNonceCalled = false;
   const corsResponse = new Response(JSON.stringify({ error: 'Origin not allowed.' }), {
     status: 403,
   });
@@ -114,14 +115,15 @@ test('dispatchAuthNonceRequest preserves existing-session CORS passthrough befor
         buildNonceCalled = true;
         return 'nonce-1';
       },
-      putNonce: async () => {
-        putNonceCalled = true;
+      issueNonce: async () => {
+        issueNonceCalled = true;
+        return { ok: true };
       },
     }),
   });
 
   assert.equal(buildNonceCalled, false);
-  assert.equal(putNonceCalled, false);
+  assert.equal(issueNonceCalled, false);
   assert.equal(result, corsResponse);
 });
 
@@ -136,7 +138,7 @@ test('dispatchAuthNonceRequest rejects missing and untrusted Origins before nonc
     baseHeaders: { 'Access-Control-Allow-Origin': '*' },
     slug: '',
     deps: createNonceDeps({
-      putNonce: async () => {
+      issueNonce: async () => {
         missingOriginNonceCalled = true;
       },
     }),
@@ -164,7 +166,7 @@ test('dispatchAuthNonceRequest rejects missing and untrusted Origins before nonc
         headers: { 'Access-Control-Allow-Origin': 'https://blocked.example' },
         config: { allowOrigins: ['https://allowed.example'] },
       }),
-      putNonce: async () => {
+      issueNonce: async () => {
         untrustedNonceCalled = true;
       },
     }),
@@ -227,7 +229,7 @@ test('dispatchAuthNonceRequest applies nonce rate limits before nonce creation',
 });
 
 test('dispatchAuthNonceRequest preserves trusted admin nonce recovery when LOGIN_TRUSTED_ORIGINS is narrower than admin origins', async () => {
-  let putNonceCalled = false;
+  let issueNonceCalled = false;
 
   const result = await dispatchAuthNonceRequest({
     request: {
@@ -249,14 +251,15 @@ test('dispatchAuthNonceRequest preserves trusted admin nonce recovery when LOGIN
         headers: { 'Access-Control-Allow-Origin': 'http://localhost:3000' },
         config: { allowOrigins: ['https://app.example'] },
       }),
-      putNonce: async () => {
-        putNonceCalled = true;
+      issueNonce: async () => {
+        issueNonceCalled = true;
+        return { ok: true };
       },
       buildNonce: () => 'nonce-admin',
     }),
   });
 
-  assert.equal(putNonceCalled, true);
+  assert.equal(issueNonceCalled, true);
   assert.deepEqual(result, {
     body: { nonce: 'nonce-admin' },
     status: 200,
@@ -265,15 +268,8 @@ test('dispatchAuthNonceRequest preserves trusted admin nonce recovery when LOGIN
 });
 
 test('dispatchAuthNonceRequest rate limits by requester identity rather than the claimed wallet address', async () => {
-  const rateLimitStore = new Map();
-  const env = {
-    GROUP_KV: {
-      get: async (key) => rateLimitStore.get(key) || null,
-      put: async (key, value) => {
-        rateLimitStore.set(key, value);
-      },
-    },
-  };
+  const identities = [];
+  const env = { GROUP_KV: {} };
   const createRequest = (anonymousClientId) => ({
     json: async () => createNonceBody({ address: '0xVictimWallet' }),
     headers: new Headers({
@@ -286,8 +282,11 @@ test('dispatchAuthNonceRequest rate limits by requester identity rather than the
     NONCE_RATE_LIMIT_MAX: 1,
     NONCE_RATE_LIMIT_WINDOW_MS: 60000,
     NONCE_RATE_LIMIT_TTL_SECONDS: 60,
-    checkNonceRateLimit,
-    putNonce: async () => {},
+    checkNonceRateLimit: async (value) => {
+      identities.push(value.identity);
+      return { ok: true };
+    },
+    issueNonce: async () => ({ ok: true }),
   });
 
   const first = await dispatchAuthNonceRequest({
@@ -307,12 +306,16 @@ test('dispatchAuthNonceRequest rate limits by requester identity rather than the
 
   assert.equal(first.status, 200);
   assert.equal(second.status, 200);
+  assert.deepEqual(identities, [
+    'anon:cid:client_alpha01',
+    'anon:cid:client_beta0002',
+  ]);
 });
 
 
 test('dispatchAuthNonceRequest preserves missing-slug failure before CORS and nonce storage', async () => {
   let corsCalled = false;
-  let putNonceCalled = false;
+  let issueNonceCalled = false;
 
   const result = await dispatchAuthNonceRequest({
     request: {
@@ -330,14 +333,14 @@ test('dispatchAuthNonceRequest preserves missing-slug failure before CORS and no
         corsCalled = true;
         return { ok: true, headers: {} };
       },
-      putNonce: async () => {
-        putNonceCalled = true;
+      issueNonce: async () => {
+        issueNonceCalled = true;
       },
     }),
   });
 
   assert.equal(corsCalled, false);
-  assert.equal(putNonceCalled, false);
+  assert.equal(issueNonceCalled, false);
   assert.deepEqual(result, {
     body: { error: 'Missing sessionSlug.' },
     status: 400,
@@ -390,8 +393,9 @@ test('dispatchAuthNonceRequest lowercases the nonce storage key, preserves ttl, 
         ok: true,
         targetSlug: 'session-b',
       }),
-      putNonce: async (...args) => {
+      issueNonce: async (...args) => {
         writes.push(args);
+        return { ok: true };
       },
       buildNonce: () => 'nonce-success',
       NONCE_TTL_SECONDS: 123,
@@ -400,7 +404,8 @@ test('dispatchAuthNonceRequest lowercases the nonce storage key, preserves ttl, 
 
   assert.deepEqual(writes, [[
     env,
-    'nonce:session-b:0xabcdef',
+    'session-b',
+    '0xabcdef',
     'nonce-success',
     123,
   ]]);
@@ -438,8 +443,9 @@ test('dispatchAuthNonceRequest accepts an explicit general-session slug without 
           config: { allowOrigins: ['https://allowed.example'] },
         };
       },
-      putNonce: async (...args) => {
+      issueNonce: async (...args) => {
         writes.push(args);
+        return { ok: true };
       },
       buildNonce: () => 'nonce-general',
     }),
@@ -447,7 +453,8 @@ test('dispatchAuthNonceRequest accepts an explicit general-session slug without 
 
   assert.deepEqual(writes, [[
     { GROUP_KV: {} },
-    'nonce::0xabc',
+    '',
+    '0xabc',
     'nonce-general',
     300,
   ]]);

@@ -58,7 +58,7 @@ describe('useSessionWizardWorkerState', () => {
     expect(buildProvisionedSponsoredContextState).toHaveBeenCalledWith(undefined);
   });
 
-  it('hydrates cached deploy, worker secret, and sponsored context state', () => {
+  it('hydrates non-secret deploy state but never restores a cached request-only token', () => {
     const { result } = renderWorkerState({
       cachedWizard: {
         workerSecretsEnabled: false,
@@ -101,7 +101,7 @@ describe('useSessionWizardWorkerState', () => {
     expect(result.current.deployWorkerUrl).toBe('https://worker.example/path');
     expect(result.current.workerRequirementProof).toBeNull();
     expect(result.current.deployForm).toEqual({
-      apiToken: 'token',
+      apiToken: '',
       workerName: 'worker',
       adminAddress: '0xAdmin',
       bundleUrl: 'https://cached.example/worker.js',

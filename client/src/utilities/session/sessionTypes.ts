@@ -3,6 +3,15 @@ export type JsonValue = JsonPrimitive | JsonValue[] | JsonRecord;
 export type JsonRecord = { [key: string]: JsonValue };
 export type UnknownRecord = { [key: string]: unknown };
 
+export interface AgentSessionWrappedCapability {
+  version: 1;
+  enabled: boolean;
+  origin: string;
+  protocolVersion: string;
+  revision: string;
+  verifiedAt: string;
+}
+
 export interface SessionIdentity {
   slug: string;
   sessionId: string;
@@ -53,6 +62,7 @@ export interface SessionMetadata extends UnknownRecord {
   blockLimits?: UnknownRecord;
   faucet?: UnknownRecord;
   ai?: UnknownRecord;
+  agentSessionWrapped?: AgentSessionWrappedCapability;
 }
 
 export interface RegistrySessionDetails extends UnknownRecord {

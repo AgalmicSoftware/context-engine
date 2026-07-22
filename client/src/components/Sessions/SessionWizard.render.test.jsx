@@ -874,7 +874,6 @@ describe('SessionWizard rendered validation', () => {
         'ce:sessionWizardDraft:v1',
         JSON.stringify({
           draft: {
-            sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
             storageProfile: { backend: 'cloudflare' },
           },
         }),
@@ -890,7 +889,8 @@ describe('SessionWizard rendered validation', () => {
       );
       expect(screen.queryByText('Custom')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
-      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeInTheDocument();
@@ -908,11 +908,38 @@ describe('SessionWizard rendered validation', () => {
       expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
 
       enableAdvancedMode();
-      fireEvent.click(screen.getByRole('button', { name: 'Session Storage expand' }));
-      expect(screen.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
-      expect(screen.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'false');
+      fireEvent.click(screen.getByRole('button', { name: 'Groups allowed to decrypt locked fields' }));
+      const storageOptions = within(await screen.findByRole('radiogroup', { name: 'Data storage' }));
+      expect(storageOptions.getByRole('radio', { name: 'Arweave' })).toHaveAttribute('aria-checked', 'true');
+      expect(storageOptions.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'false');
+      expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
     },
   );
+
+  it('offers to continue a cached custom profile on /new without silently replacing it', async () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.surfaces.agentHttp = true;
+    sessionStorage.setItem(
+      'ce:sessionWizardDraft:v1',
+      JSON.stringify({
+        draft: {
+          sessionName: 'Saved custom session',
+          sessionModeProfile: profile,
+          storageProfile: { backend: 'cloudflare' },
+        },
+      }),
+    );
+    window.history.replaceState({}, '', '/new');
+
+    renderSessionWizard();
+
+    expect(screen.getByRole('heading', { name: 'Session Setup (Custom)' })).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with saved settings' }));
+
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toHaveValue('Saved custom session');
+  });
 
   it('checks session slug collisions before publish upload or register side effects', async () => {
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');

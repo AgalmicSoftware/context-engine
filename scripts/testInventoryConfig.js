@@ -7,8 +7,8 @@ const ROOT_NODE_TEST_FILES = Object.freeze([
   'tests/root/e2eTestIds.compat.test.js',
   'tests/root/rpcDefaults.compat.test.js',
   'tests/root/sessionCorsWorker.faucet-proof.test.mjs',
-  'tests/root/sessionCorsWorker.package.test.js',
   'workers/shared/deployHelperEndpointConfig.test.mjs',
+  'workers/shared/workerConfigModeValidation.test.mjs',
 ]);
 
 // These tests belong to private E2E surfaces that are stripped from public

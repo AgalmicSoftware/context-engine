@@ -67,9 +67,9 @@ describe('vite PostCSS compatibility', () => {
       expect(html).toContain('property="og:type" content="article"');
       expect(html).toContain('name="twitter:card" content="summary_large_image"');
       expect(html).toContain(
-        'property="og:image" content="https://contextengine.xyz/posts/agent-village-wrapped/attachments/header.jpg"',
+        'property="og:image" content="https://contextengine.sh/posts/agent-village-wrapped/attachments/header.jpg"',
       );
-      expect(html).toContain('rel="canonical" href="https://contextengine.xyz/posts/agent-village-wrapped-2026"');
+      expect(html).toContain('rel="canonical" href="https://contextengine.sh/posts/agent-village-wrapped-2026"');
       expect(() => renderPostSocialPreviewHtml('<html><head></head></html>', { ...post, slug: '../private' })).toThrow(
         'Unsafe post slug',
       );

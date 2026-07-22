@@ -160,7 +160,6 @@ export const listArweaveTransactionsByTags = async ({
         body: requestBody,
       });
 
-      // eslint-disable-next-line no-await-in-loop
       const payload = (await res.json().catch(() => null)) as GraphqlPayload;
       if (!res.ok) {
         throw new Error(payload?.errors?.[0]?.message || payload?.error || `Arweave GraphQL error (${res.status})`);

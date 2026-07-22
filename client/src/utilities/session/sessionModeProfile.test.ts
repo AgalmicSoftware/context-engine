@@ -116,6 +116,82 @@ describe('sessionModeProfile', () => {
     );
   });
 
+  it('rejects unknown or blank mode enums instead of normalizing them to defaults', () => {
+    const cases: Array<{ path: string; profile: unknown }> = [
+      {
+        path: 'preset',
+        profile: { ...cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE), preset: '' },
+      },
+      {
+        path: 'authority.mode',
+        profile: {
+          ...cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          authority: { mode: 'registry' },
+        },
+      },
+      {
+        path: 'storage.backend',
+        profile: {
+          ...cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          storage: { backend: 'r2' },
+        },
+      },
+      {
+        path: 'storage.payloadAccessControl.gate',
+        profile: {
+          ...cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          storage: { backend: 'cloudflare', payloadAccessControl: { gate: 'public', encryption: 'none' } },
+        },
+      },
+      {
+        path: 'storage.payloadAccessControl.encryption',
+        profile: {
+          ...cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          storage: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'plaintext' } },
+        },
+      },
+      {
+        path: 'encryption.mode',
+        profile: {
+          ...cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          encryption: { mode: 'plaintext' },
+        },
+      },
+      {
+        path: 'encryption.keyProvider',
+        profile: {
+          ...cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          encryption: { mode: 'worker_envelope', keyProvider: 'browser_local' },
+        },
+      },
+    ];
+
+    for (const { path, profile } of cases) {
+      expect(validateSessionModeProfile(profile as SessionModeProfile).issues).toEqual(
+        expect.arrayContaining([expect.objectContaining({ path, code: 'invalid_enum' })]),
+      );
+    }
+  });
+
+  it('rejects a Telegram Mini App without Telegram and options that are not yet enforced', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.surfaces.miniApp = true;
+    profile.surfaces.telegram = false;
+    profile.results.visibility = 'private_admin';
+    profile.export.scope = 'selected_surfaces';
+    profile.export.surfaceFilter = ['web'];
+
+    const result = validateSessionModeProfile(profile);
+
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'mini_app_requires_telegram' }),
+        expect.objectContaining({ code: 'results_visibility_not_implemented' }),
+        expect.objectContaining({ code: 'selected_surface_export_not_implemented' }),
+      ]),
+    );
+  });
+
   it('accepts worker envelope for Cloudflare without a feature flag', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     profile.encryption = { mode: 'worker_envelope', keyProvider: 'worker_secret' };

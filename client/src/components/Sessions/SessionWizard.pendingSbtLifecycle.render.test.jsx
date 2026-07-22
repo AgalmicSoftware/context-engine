@@ -8,6 +8,7 @@ import {
   screen,
   selectNormalModeCard,
   waitFor,
+  within,
 } from './SessionWizard.workerPanel.testUtils';
 
 describe('SessionWizard pending SBT lifecycle rendering', () => {
@@ -53,7 +54,9 @@ describe('SessionWizard pending SBT lifecycle rendering', () => {
 
     enableAdvancedMode();
 
-    const chainSelect = screen.getByRole('combobox');
+    const chainSelectorWrap = screen.getByText('Network:').parentElement;
+    expect(chainSelectorWrap).toBeTruthy();
+    const chainSelect = within(chainSelectorWrap).getByRole('combobox');
     const alternateOption = Array.from(chainSelect.querySelectorAll('option')).find(
       (option) => option.value && option.value !== chainSelect.value,
     );

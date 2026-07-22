@@ -53,6 +53,48 @@ const rerenderWorkerDeploySection = (
 ) => rerender(<WorkerDeploySection {...buildWorkerDeploySectionProps(props)} />);
 
 describe('WorkerDeploySection', () => {
+  it('offers the Cloudflare-owned full Worker path without a Cloudflare token or deploy helper', () => {
+    const nativeDeployUrl =
+      'https://deploy.workers.cloudflare.com/?url=https%3A%2F%2Fgithub.com%2FAgalmicSoftware%2Fcontext-engine%2Ftree%2F0123456789abcdef0123456789abcdef01234567%2Fdeploy%2Fcloudflare%2Fsession-worker';
+    renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: nativeDeployUrl,
+      cloudflareTokenSlug: 'demo-sh',
+      account: '0x0000000000000000000000000000000000000001',
+    });
+
+    expect(screen.getByText(/No Cloudflare API token, Context Engine deploy helper/i)).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_SESSION_SLUG)).toHaveValue('demo-sh');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_ADMIN_ADDRESS)).toHaveValue(
+      '0x0000000000000000000000000000000000000001',
+    );
+    expect((screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC) as HTMLInputElement).value).toMatch(
+      /^[a-f0-9]{64}$/,
+    );
+    expect((screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK) as HTMLInputElement).value).toMatch(
+      /^[a-f0-9]{64}$/,
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY)).toHaveAttribute('href', nativeDeployUrl);
+    expect(screen.getByText('Legacy deploy-helper fallback')).toBeInTheDocument();
+    expect(screen.getByText('Legacy deploy-helper fallback').closest('details')).not.toHaveAttribute('open');
+  });
+
+  it('does not open native deployment until the admin address is available', () => {
+    renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: '',
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+
+    expect(screen.getByText(/Log in with the session admin passkey/i)).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY)).not.toBeInTheDocument();
+  });
+
   it('shows the sponsored auto-deploy note without manual controls in normal mode', () => {
     renderWorkerDeploySection({
       isNormalMode: true,
@@ -138,6 +180,26 @@ describe('WorkerDeploySection', () => {
     );
     expect(screen.getByTestId('ce-wizard-worker-tooltip-gw-cf-token-tip')).not.toHaveTextContent(
       /R2|D1|Durable Objects|Account Settings/,
+    );
+  });
+
+  it('discloses the raw-token receiver, shortest lifetime, and revocation step', () => {
+    renderWorkerDeploySection({
+      deployHelperUrl: 'https://deploy-helper.example.test',
+    });
+
+    expect(screen.getByText('https://deploy-helper.example.test')).toBeInTheDocument();
+    expect(
+      screen.getByText(/browser sends this token only for this deployment attempt to the deploy helper/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/not saved to the session draft or browser storage/i)).toBeInTheDocument();
+    expect(screen.getByText(/earliest expiration Cloudflare permits/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/revoke the token as soon as deployment succeeds or you abandon the attempt/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cloudflare API Tokens' })).toHaveAttribute(
+      'href',
+      'https://dash.cloudflare.com/profile/api-tokens',
     );
   });
 

@@ -49,6 +49,7 @@ export const dispatchAuthenticatedRouteEntryWithWorkerDeps = async ({
             dispatchAuthenticatedNonSecretActionRoute: deps?.dispatchAuthenticatedNonSecretActionRoute,
             dispatchAuthenticatedSecretActionRoute: deps?.dispatchAuthenticatedSecretActionRoute,
             evaluateAuthenticatedRoutePreflight: deps?.evaluateAuthenticatedRoutePreflight,
+            computeScopesForLogin: deps?.computeScopesForLogin,
             resolveAuthenticatedRouteSecrets: deps?.resolveAuthenticatedRouteSecrets,
             checkRateLimit: deps?.checkRateLimit,
             getSessionSecrets: deps?.getSessionSecrets,

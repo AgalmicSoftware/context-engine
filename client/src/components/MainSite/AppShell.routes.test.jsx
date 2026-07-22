@@ -2025,7 +2025,7 @@ describe('AppShell route render smoke', () => {
 
   it('preloads the primary demo session data when the about page mounts', async () => {
     const demoConfig = buildSessionConfig({
-      slug: 'demo-1',
+      slug: 'demo-sh',
       sessionName: 'Demo Session',
       networkChainId: DEFAULT_NETWORK.id,
       __registry: undefined,
@@ -2035,7 +2035,7 @@ describe('AppShell route render smoke', () => {
       activeSessionSlug: '',
       sessionConfig: null,
     });
-    getDemoSessionConfigBySlug.mockImplementation((slug) => (slug === 'demo-1' ? demoConfig : null));
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (slug === 'demo-sh' ? demoConfig : null));
     subject.applySessionFallbackRedirect = jest.fn(() => null);
     subject.syncSessionFallbackRedirectConsumption = jest.fn();
     subject.manageAutoHashPersistence = jest.fn();
@@ -2048,7 +2048,7 @@ describe('AppShell route render smoke', () => {
     subject.syncCacheHasLoadedFlagFromPersistent = jest.fn(async () => undefined);
     subject.syncCacheHasLoadedFlagOnTransition = jest.fn(async () => undefined);
     subject.getSessionNetwork = jest.fn(() => null);
-    subject.getDisplaySessionNetwork = jest.fn((slug) => (slug === 'demo-1' ? DEFAULT_NETWORK : null));
+    subject.getDisplaySessionNetwork = jest.fn((slug) => (slug === 'demo-sh' ? DEFAULT_NETWORK : null));
     subject.initializeQuestionCacheForGroup = jest.fn(async () => undefined);
     subject.fetchQuestionResponsesChunkedForGroup = jest.fn(async () => undefined);
     subject.initializeSurveyCacheForGroup = jest.fn(async () => undefined);
@@ -2069,11 +2069,11 @@ describe('AppShell route render smoke', () => {
       await subject.componentDidMount();
     });
 
-    expect(subject.getDisplaySessionNetwork).toHaveBeenCalledWith('demo-1');
-    expect(subject.initializeQuestionCacheForGroup).toHaveBeenCalledWith('demo-1', { background: true });
-    expect(subject.fetchQuestionResponsesChunkedForGroup).toHaveBeenCalledWith('demo-1', { background: true });
-    expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('demo-1', { background: true });
-    expect(subject.initializeSbtCacheForGroup).toHaveBeenCalledWith('demo-1', {
+    expect(subject.getDisplaySessionNetwork).toHaveBeenCalledWith('demo-sh');
+    expect(subject.initializeQuestionCacheForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
+    expect(subject.fetchQuestionResponsesChunkedForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
+    expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
+    expect(subject.initializeSbtCacheForGroup).toHaveBeenCalledWith('demo-sh', {
       mode: 'partial',
       background: true,
     });

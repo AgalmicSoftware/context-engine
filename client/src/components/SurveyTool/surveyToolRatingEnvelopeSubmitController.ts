@@ -288,7 +288,7 @@ export async function processRatingEnvelopesForSubmit(
 
       if (shouldEncryptField) {
         // Keep wallet prompts serialized during submit.
-        // eslint-disable-next-line no-await-in-loop
+
         respObj[envelopeKey] = await deps.encryptEnvelopeValue(value, {
           ...encryptionBaseOpts,
           ...(lit ? { lit } : {}),

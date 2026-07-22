@@ -61,7 +61,8 @@ const useSessionWizardWorkerState = <TProvisionedSponsoredContext>({
   );
   const [deployHelperUrl, setDeployHelperUrl] = useState(() => toStr(deployHelperUrlDefault));
   const [deployForm, setDeployForm] = useState<DeployFormState>({
-    apiToken: toStr(cachedDeployForm.apiToken || '').trim(),
+    // Cloudflare deployment tokens are request-only. Ignore legacy cache values.
+    apiToken: '',
     workerName: toStr(cachedDeployForm.workerName || '').trim(),
     adminAddress: toStr(cachedDeployForm.adminAddress || '').trim() || undefined,
     bundleUrl: toStr(cachedDeployForm.bundleUrl || normalizedWorkerBundleUrlDefault),
