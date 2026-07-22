@@ -1,6 +1,6 @@
 # Client Build Asset Inventory
 
-Last checked: 2026-07-10 with `npm --prefix client run build`.
+Last checked: 2026-07-21 with `npm --prefix client run build`.
 
 This page tracks current Vite outputs above 500 KiB and their stable source
 owners. Output filenames are content-hashed, so this inventory records stable
@@ -31,6 +31,7 @@ the goals slide uses `jump_transparent.png` (about 232.73 KiB source/output).
 | --- | --- | --- |
 | `client/src/assets/img/readme-header.png` | Root `README.md` hero | Keep; GitHub renders it directly. |
 | `client/src/assets/img/readme-architecture-deployment-modes.png` | Root `README.md` architecture diagram | Keep; GitHub renders it directly. |
+| `client/public/about-demo.mp4` | About-page demo video on desktop and mobile | Keep; first-party playback avoids Google Drive iframe, cookie, and viewer-limit dependencies. |
 
 ## Reference Checks
 

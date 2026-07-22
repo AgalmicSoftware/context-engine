@@ -113,6 +113,9 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Replaced the About-page Google Drive video embed and thumbnail dependency
+  with the repository-owned `about-demo.mp4` on desktop and mobile, so public
+  playback no longer depends on third-party cookies or Drive playback limits.
 - Kept registry-backed session scans bounded when Arweave metadata is temporarily
   unavailable by deriving the creation block from the registry tuple timestamp
   before attempting legacy event-log recovery.

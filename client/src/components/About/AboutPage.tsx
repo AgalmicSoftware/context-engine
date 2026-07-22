@@ -62,11 +62,7 @@ const HEADER_LINKS = [
   { url: PUBLIC_WHITEPAPER_URL, text: 'Whitepaper', testId: 'ce-about-link-whitepaper', external: true },
 ];
 
-const ABOUT_DEMO_VIDEO_VIEW_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/view';
-const ABOUT_DEMO_VIDEO_EMBED_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/preview';
 const ABOUT_DEMO_VIDEO_MEDIA_URL = buildPublicRoute('/about-demo.mp4');
-const ABOUT_DEMO_VIDEO_THUMBNAIL_URL =
-  'https://drive.google.com/thumbnail?id=1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf&sz=w1000';
 
 const RECOGNITION_GROUPS: RecognitionGroup[] = [
   {
@@ -383,7 +379,7 @@ const AboutPage = () => {
       setMobileDemoVideoStarted(true);
     } catch (error) {
       setMobileDemoVideoStarted(false);
-      setMobileDemoVideoError('Could not start the embedded video here.');
+      setMobileDemoVideoError('Could not start the demo video here.');
     }
   };
 
@@ -501,14 +497,17 @@ const AboutPage = () => {
           </div>
 
           <div className={styles.heroVideo}>
-            <iframe
-              src={ABOUT_DEMO_VIDEO_EMBED_URL}
+            <video
               className={styles.demoVideo}
-              allow="autoplay"
-              allowFullScreen
-              title="Context Engine demo video"
+              controls
+              playsInline
+              preload="metadata"
+              src={ABOUT_DEMO_VIDEO_MEDIA_URL}
               data-testid="ce-about-demo-video-desktop"
-            />
+              aria-label="Context Engine demo video player"
+            >
+              <a href={ABOUT_DEMO_VIDEO_MEDIA_URL}>Open the Context Engine demo video.</a>
+            </video>
             <div className={styles.mobileDemoVideo} data-testid="ce-about-demo-video-mobile">
               <div className={styles.mobileDemoVideoPlayerWrap}>
                 <video
@@ -517,7 +516,6 @@ const AboutPage = () => {
                   controls
                   playsInline
                   preload="none"
-                  poster={ABOUT_DEMO_VIDEO_THUMBNAIL_URL}
                   src={ABOUT_DEMO_VIDEO_MEDIA_URL}
                   data-testid="ce-about-demo-video-player"
                   aria-label="Context Engine demo video player"
@@ -527,12 +525,10 @@ const AboutPage = () => {
                   }}
                   onError={() => {
                     setMobileDemoVideoStarted(false);
-                    setMobileDemoVideoError('Could not start the embedded video here.');
+                    setMobileDemoVideoError('Could not start the demo video here.');
                   }}
                 >
-                  <a href={ABOUT_DEMO_VIDEO_VIEW_URL} target="_blank" rel="noopener noreferrer">
-                    Open the Context Engine demo video.
-                  </a>
+                  <a href={ABOUT_DEMO_VIDEO_MEDIA_URL}>Open the Context Engine demo video.</a>
                 </video>
                 {!mobileDemoVideoStarted && (
                   <button
