@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Closed the legacy first-signer Worker bootstrap path. Initial session config
+  now requires either the deployment-bound bootstrap admin or an existing
+  registry session whose on-chain admin matches; missing registry wiring and
+  unregistered slugs fail closed.
 - Enforced client entry, non-vendor chunk, and temporary AppShell byte budgets
   from Vite's build manifest, with protected no-growth policy and generated-doc
   drift checks. Removed an unconsumed static-image compatibility copy that

@@ -1062,9 +1062,7 @@ registry slug have no first-signer claim path. Worker-canonical deployment
 therefore stages the admin binding and canonical config before making the
 Worker reachable.
 
-1. `POST /auth/nonce` body:
-   `{ address, sessionSlug, sessionId }` for `worker_canonical`; registry
-   compatibility may omit `sessionId`.
+1) `POST /auth/nonce` body: `{ address, sessionSlug }`
    - Nonce request dispatch now also routes through a shared helper:
      it preserves nonce JSON parse failures, address validation, body/env slug resolution,
      missing-slug selection, existing-session CORS passthrough, lowercase nonce KV storage,
