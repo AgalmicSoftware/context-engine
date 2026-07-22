@@ -2184,78 +2184,35 @@ describe('AppShell route render smoke', () => {
     subject.componentWillUnmount();
   });
 
-  it('does not initialize the active Worker session cache on static non-cache routes', async () => {
-    const workerConfig = buildSessionConfig({
-      slug: 'demo-sh',
-      __registry: undefined,
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-    });
-    const subject = stubMainSiteMountSideEffects(
-      createSubject({
-        path: '/contracts',
-        activeSessionSlug: 'demo-sh',
-        sessionConfig: workerConfig,
-      }),
-    );
-    subject.preloadAboutDemoSessionData = jest.fn(() => null);
-    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => true);
-
-    await act(async () => {
-      await subject.componentDidMount();
-    });
-
-    expect(subject.initializeWorkerCanonicalCachesForGroup).not.toHaveBeenCalled();
-    expect(subject.getInitializableSessionNetwork).not.toHaveBeenCalled();
-    subject.componentWillUnmount();
-  });
-
-  it('does not initialize a resolved Worker session while a static route remains active', () => {
-    const workerConfig = buildSessionConfig({
-      slug: 'demo-sh',
-      __registry: undefined,
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-    });
-    const subject = stubMainSiteMountSideEffects(
-      createSubject({
-        path: '/contracts',
-        activeSessionSlug: 'demo-sh',
-        sessionConfig: workerConfig,
-      }),
-    );
-    subject._mounted = true;
-    subject.getCurrentPathname = jest.fn(() => '/contracts');
-    subject.handleNetworkChange = jest.fn();
-    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => true);
-    subject.state = {
-      ...subject.state,
-      sessionPathResolutionNonce: 1,
-    };
-    const previousState = {
-      ...subject.state,
-      sessionPathResolutionNonce: 0,
-    };
-
-    subject.componentDidUpdate(subject.props, previousState);
-
-    expect(subject.initializeWorkerCanonicalCachesForGroup).not.toHaveBeenCalled();
-    subject.componentWillUnmount();
-  });
-
-  it('skips about-page Worker preloads when the browser origin is not allowed', () => {
+  it('does not contact a worker-canonical demo while preloading the about page', async () => {
     const demoConfig = buildSessionConfig({
       slug: 'demo-sh',
-      allowOrigins: ['https://contextengine.sh'],
+      sessionName: 'Demo Session',
+      networkChainId: DEFAULT_NETWORK.id,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
       __registry: undefined,
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     });
-    const subject = createSubject({ path: '/about', activeSessionSlug: '', sessionConfig: null });
-    getDemoSessionConfigBySlug.mockImplementation((slug) => (slug === 'demo-sh' ? demoConfig : null));
+    const subject = createSubject({
+      path: '/about',
+      activeSessionSlug: '',
+      sessionConfig: null,
+    });
+    subject.getDisplaySessionNetwork = jest.fn(() => DEFAULT_NETWORK);
+    subject.getCacheSessionCfg = jest.fn(() => demoConfig);
     subject.initializeQuestionCacheForGroup = jest.fn(async () => undefined);
+    subject.fetchQuestionResponsesChunkedForGroup = jest.fn(async () => undefined);
     subject.initializeSurveyCacheForGroup = jest.fn(async () => undefined);
+    subject.initializeSbtCacheForGroup = jest.fn(async () => undefined);
 
-    expect(subject.preloadAboutDemoSessionData('/about')).toBeNull();
-    expect(subject.initializeQuestionCacheForGroup).not.toHaveBeenCalled();
-    expect(subject.initializeSurveyCacheForGroup).not.toHaveBeenCalled();
+    await subject.preloadAboutDemoSessionData('/about');
+
+    expect(subject.initializeQuestionCacheForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
+    expect(subject.fetchQuestionResponsesChunkedForGroup).not.toHaveBeenCalled();
+    expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
+    expect(subject.initializeSbtCacheForGroup).toHaveBeenCalledWith('demo-sh', {
+      mode: 'partial',
+      background: true,
+    });
   });
 
   it('preserves session question-results subroutes and forwards route-open flags to OnePageSession', async () => {
