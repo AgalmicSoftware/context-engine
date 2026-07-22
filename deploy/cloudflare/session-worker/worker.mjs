@@ -14638,19 +14638,19 @@ var require_interface = __commonJS({
       getSelector(fragment: ErrorFragment | FunctionFragment): string {
           if (typeof(fragment) === "string") {
               const matches: Array<Fragment> = [ ];
-      
+
               try { matches.push(this.getFunction(fragment)); } catch (error) { }
               try { matches.push(this.getError(<string>fragment)); } catch (_) { }
-      
+
               if (matches.length === 0) {
                   logger.throwArgumentError("unknown fragment", "key", fragment);
               } else if (matches.length > 1) {
                   logger.throwArgumentError("ambiguous fragment matches function and error", "key", fragment);
               }
-      
+
               fragment = matches[0];
           }
-      
+
           return dataSlice(id(fragment.format()), 0, 4);
       }
           */
@@ -14831,12 +14831,12 @@ var require_interface = __commonJS({
                   if (type. === "address") {
                   }
               };
-      
+
               const descend = function (inputs: Array<ParamType>, values: ReadonlyArray<any>) {
                   if (inputs.length !== values.length) { throw new Error("length mismatch"); }
-                  
+
               };
-      
+
               const result: Array<any> = [ ];
               values.forEach((value, index) => {
                   if (value == null) {
@@ -15986,7 +15986,7 @@ var require_provider = __commonJS({
           blockNumber,
           logsBloom,
           logs,
-          //byzantium, 
+          //byzantium,
           status,
           root
         } = this;
@@ -15994,7 +15994,7 @@ var require_provider = __commonJS({
           _type: "TransactionReceipt",
           blockHash,
           blockNumber,
-          //byzantium, 
+          //byzantium,
           contractAddress,
           cumulativeGasUsed: toJson2(this.cumulativeGasUsed),
           from,
@@ -17467,10 +17467,10 @@ var require_contract = __commonJS({
               const provider = getProvider(this.runner);
               assert(provider, "contract runner does not have a provider",
                   "UNSUPPORTED_OPERATION", { operation: "queryTransaction" });
-      
+
               const receipt = await provider.getTransactionReceipt(hash);
               if (receipt == null) { return null; }
-      
+
               return new ContractTransactionReceipt(this.interface, provider, receipt);
           }
           */
@@ -22790,19 +22790,19 @@ var require_provider_etherscan = __commonJS({
                       case "getLogs": {
                           // Needs to complain if more than one address is passed in
                           const args: Record<string, any> = { action: "getLogs" }
-          
+
                           if (params.filter.fromBlock) {
                               args.fromBlock = checkLogTag(params.filter.fromBlock);
                           }
-          
+
                           if (params.filter.toBlock) {
                               args.toBlock = checkLogTag(params.filter.toBlock);
                           }
-          
+
                           if (params.filter.address) {
                               args.address = params.filter.address;
                           }
-          
+
                           // @TODO: We can handle slightly more complicated logs using the logs API
                           if (params.filter.topics && params.filter.topics.length > 0) {
                               if (params.filter.topics.length > 1) {
@@ -22816,12 +22816,12 @@ var require_provider_etherscan = __commonJS({
                                   args.topic0 = topic0;
                               }
                           }
-          
+
                           const logs: Array<any> = await this.fetch("logs", args);
-          
+
                           // Cache txHash => blockHash
                           let blocks: { [tag: string]: string } = {};
-          
+
                           // Add any missing blockHash to the logs
                           for (let i = 0; i < logs.length; i++) {
                               const log = logs[i];
@@ -22832,10 +22832,10 @@ var require_provider_etherscan = __commonJS({
                                       blocks[log.blockNumber] = block.hash;
                                   }
                               }
-          
+
                               log.blockHash = blocks[log.blockNumber];
                           }
-          
+
                           return logs;
                       }
           */
@@ -23129,11 +23129,11 @@ var require_provider_socket = __commonJS({
       /*
           async _start(): Promise<void> {
               if (this.#ready) { return; }
-      
+
               for (const { payload } of this.#callbacks.values()) {
                   await this._write(JSON.stringify(payload));
               }
-      
+
               this.#ready = (async function() {
                   await super._start();
               })();
@@ -29581,7 +29581,7 @@ var require_webcrypto_driver = __commonJS({
             keyUsages: key.usages,
             saltLengthsAttempted: `0, 32, ${saltLengthN}`
           };
-          console.warn("Transaction Verification Failed! \n", `Details: ${JSON.stringify(details, null, 2)} 
+          console.warn("Transaction Verification Failed! \n", `Details: ${JSON.stringify(details, null, 2)}
 `, "N.B. ArweaveJS is only guaranteed to verify txs created using ArweaveJS.");
         }
         return result;
@@ -43557,19 +43557,19 @@ var _Interface = class _Interface {
   getSelector(fragment: ErrorFragment | FunctionFragment): string {
       if (typeof(fragment) === "string") {
           const matches: Array<Fragment> = [ ];
-  
+
           try { matches.push(this.getFunction(fragment)); } catch (error) { }
           try { matches.push(this.getError(<string>fragment)); } catch (_) { }
-  
+
           if (matches.length === 0) {
               logger.throwArgumentError("unknown fragment", "key", fragment);
           } else if (matches.length > 1) {
               logger.throwArgumentError("ambiguous fragment matches function and error", "key", fragment);
           }
-  
+
           fragment = matches[0];
       }
-  
+
       return dataSlice(id(fragment.format()), 0, 4);
   }
       */
@@ -43750,12 +43750,12 @@ var _Interface = class _Interface {
               if (type. === "address") {
               }
           };
-  
+
           const descend = function (inputs: Array<ParamType>, values: ReadonlyArray<any>) {
               if (inputs.length !== values.length) { throw new Error("length mismatch"); }
-              
+
           };
-  
+
           const result: Array<any> = [ ];
           values.forEach((value, index) => {
               if (value == null) {
@@ -44817,7 +44817,7 @@ var TransactionReceipt = class {
       blockNumber,
       logsBloom,
       logs,
-      //byzantium, 
+      //byzantium,
       status,
       root
     } = this;
@@ -44825,7 +44825,7 @@ var TransactionReceipt = class {
       _type: "TransactionReceipt",
       blockHash,
       blockNumber,
-      //byzantium, 
+      //byzantium,
       contractAddress,
       cumulativeGasUsed: toJson(this.cumulativeGasUsed),
       from,
@@ -46267,10 +46267,10 @@ var _BaseContract = class _BaseContract {
           const provider = getProvider(this.runner);
           assert(provider, "contract runner does not have a provider",
               "UNSUPPORTED_OPERATION", { operation: "queryTransaction" });
-  
+
           const receipt = await provider.getTransactionReceipt(hash);
           if (receipt == null) { return null; }
-  
+
           return new ContractTransactionReceipt(this.interface, provider, receipt);
       }
       */
@@ -51295,19 +51295,19 @@ var EtherscanProvider = class extends AbstractProvider {
                   case "getLogs": {
                       // Needs to complain if more than one address is passed in
                       const args: Record<string, any> = { action: "getLogs" }
-      
+
                       if (params.filter.fromBlock) {
                           args.fromBlock = checkLogTag(params.filter.fromBlock);
                       }
-      
+
                       if (params.filter.toBlock) {
                           args.toBlock = checkLogTag(params.filter.toBlock);
                       }
-      
+
                       if (params.filter.address) {
                           args.address = params.filter.address;
                       }
-      
+
                       // @TODO: We can handle slightly more complicated logs using the logs API
                       if (params.filter.topics && params.filter.topics.length > 0) {
                           if (params.filter.topics.length > 1) {
@@ -51321,12 +51321,12 @@ var EtherscanProvider = class extends AbstractProvider {
                               args.topic0 = topic0;
                           }
                       }
-      
+
                       const logs: Array<any> = await this.fetch("logs", args);
-      
+
                       // Cache txHash => blockHash
                       let blocks: { [tag: string]: string } = {};
-      
+
                       // Add any missing blockHash to the logs
                       for (let i = 0; i < logs.length; i++) {
                           const log = logs[i];
@@ -51337,10 +51337,10 @@ var EtherscanProvider = class extends AbstractProvider {
                                   blocks[log.blockNumber] = block.hash;
                               }
                           }
-      
+
                           log.blockHash = blocks[log.blockNumber];
                       }
-      
+
                       return logs;
                   }
       */
@@ -51611,11 +51611,11 @@ var SocketProvider = class extends JsonRpcApiProvider {
   /*
       async _start(): Promise<void> {
           if (this.#ready) { return; }
-  
+
           for (const { payload } of this.#callbacks.values()) {
               await this._write(JSON.stringify(payload));
           }
-  
+
           this.#ready = (async function() {
               await super._start();
           })();
