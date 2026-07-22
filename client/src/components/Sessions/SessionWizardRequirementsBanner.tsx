@@ -5,6 +5,7 @@ import { faTimes } from '@fortawesome/free-solid-svg-icons';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './SessionWizard.module.scss';
 import { buildCloudflareTokenTemplateUrl } from './cloudflareTokenTemplate.js';
+import { CLOUDFLARE_NATIVE_DEPLOY_URL } from '../../variables/publicDeploymentConfig.js';
 import type { SessionWizardRequirementId } from './sessionWizardModeRequirements';
 
 export const SESSION_WIZARD_REQUIREMENT_LINKS = Object.freeze({
@@ -36,7 +37,11 @@ const SessionWizardRequirementsBanner = ({
   const hasResolvedRequirements = Array.isArray(requiredRequirementIds);
   const requires = (requirementId: SessionWizardRequirementId): boolean =>
     !hasResolvedRequirements || requiredRequirementIds.includes(requirementId);
-  const showLegacySponsorshipCopy = !hasResolvedRequirements || !requiredRequirementIds.includes('cloudflareApiToken');
+  const showLegacySponsorshipCopy =
+    !hasResolvedRequirements ||
+    !requiredRequirementIds.some(
+      (requirementId) => requirementId === 'cloudflareAccount' || requirementId === 'cloudflareApiToken',
+    );
   const walletRequirementLabel = fundingRequirementLabel.includes('SBT publishing')
     ? 'A connected wallet for on-chain SBT publishing'
     : 'A connected wallet for on-chain registration';
@@ -63,6 +68,24 @@ const SessionWizardRequirementsBanner = ({
       </div>
       <div className={styles.newSessionBannerBody}>
         <ul className={styles.newSessionBannerList}>
+          {hasResolvedRequirements && requires('cloudflareAccount') ? (
+            <li>
+              {CLOUDFLARE_NATIVE_DEPLOY_URL ? (
+                <a
+                  href={CLOUDFLARE_NATIVE_DEPLOY_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.newSessionBannerLink}
+                >
+                  Cloudflare account
+                </a>
+              ) : (
+                'Cloudflare account'
+              )}{' '}
+              — the Worker step deploys the full Session Worker through Cloudflare&apos;s native flow. It does not ask
+              for a Cloudflare API token or use the Context Engine deploy helper.
+            </li>
+          ) : null}
           {requires('cloudflareApiToken') ? (
             <li>
               <a

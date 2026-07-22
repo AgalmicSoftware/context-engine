@@ -13,21 +13,19 @@ Related docs:
 
 ## What a New Session Needs
 
-For the default `Fast & Cheap (Cloudflare)` preset, the visible setup requires
-exactly two credentials:
-
-1. A Cloudflare API token with the least privileges needed to deploy the
-   per-session worker.
-2. One API key for the selected AI provider.
+For the default `Fast & Cheap (Cloudflare)` preset, the user needs a Cloudflare
+account and one API key for the selected AI provider. The native deploy button
+runs in Cloudflare and does not ask for a Cloudflare API token, OAuth token,
+Context Engine deploy helper, or local agent.
 
 The app's passkey-derived EOA supplies the admin identity and signs the worker
-config, but it does not submit a transaction and needs no gas. The Cloudflare
-token on this direct `/new` path is deploy-helper request input only: it must
-never be placed in the session or admin URL, public metadata, Worker session
-config, logs, analytics, browser storage, or any other durable store. The AI key
-is written only to the worker's session-secrets store. The separate legacy
-sponsored deploy-grant path is described below and retains its existing
-short-lived server-side grant record.
+config, but it does not submit a transaction and needs no gas. Context Engine
+generates two independent setup values, `TOKEN_HMAC_SECRET` and
+`CE_STORAGE_ENVELOPE_KEK`, for Cloudflare's encrypted Worker-secret fields.
+They are secrets for the new Session Worker, not Cloudflare credentials, and
+stay in the current browser tab during setup. The AI key is written only to the
+worker's session-secrets store. The legacy deploy-helper and sponsored
+deploy-grant paths remain explicit fallbacks.
 
 Use this matrix when choosing a non-default profile:
 
@@ -36,7 +34,7 @@ Use this matrix when choosing a non-default profile:
 | Passkey account | Supplies the admin identity and signs worker or on-chain actions | Yes; the default path creates it in the app | No |
 | OP Sepolia ETH | Pays registry/SBT transactions | Decentralized or other on-chain profiles only | Partially |
 | Cloudflare Worker | Hosts worker-canonical config, auth, AI, storage, fetch, and optional faucet routes | Yes for Cloudflare profiles | Yes, if the sponsor gives you a deploy-ready bundle |
-| Cloudflare API token | Deploys a new worker through the helper; request-only and nonpersistent on the direct default `/new` flow | Yes for the default self-deploy flow | Indirectly, through the separate legacy short-lived deploy-grant path |
+| Cloudflare API token | Used only by the legacy deploy-helper fallback | No for the native default | Indirectly, through the separate legacy short-lived deploy-grant path |
 | AI provider key | Powers AI generation, chat, and transcription routes for the selected provider | Yes for the default preset | Yes |
 | Arweave JWK | Pays for Arweave metadata/payload uploads | Decentralized or explicitly Arweave-backed profiles only | Yes |
 | RPC URL | Provides chain reads and writes | Decentralized, Lit/on-chain gating, or explicitly chain-backed profiles only | Yes |
@@ -120,26 +118,24 @@ without publishing the full pool.
 
 ## Prerequisites
 
-### 1. Cloudflare account and API token
+### 1. Cloudflare account
 
 The session worker is the canonical config, auth, AI, and payload-storage host
 for the default preset. A free Cloudflare account is enough for small sessions.
 
-You need:
+Create or sign in to a Cloudflare account at <https://dash.cloudflare.com/>.
+The native deploy button opens Cloudflare's deployment flow for the isolated
+package in `deploy/cloudflare/session-worker/`. Cloudflare provisions the
+Worker, KV namespace, and Durable Object in that account. Paste the slug, public
+admin address, and two generated Worker runtime secrets shown by the wizard;
+then deploy and paste the resulting `workers.dev` URL back into the wizard.
 
-- A Cloudflare account: <https://dash.cloudflare.com/>
-- An API token with Workers-related permissions. The wizard expects the same scope used by the deploy-helper flow described in [session-cors-worker.md](session-cors-worker.md).
-- Cloudflare token templates reference: <https://developers.cloudflare.com/fundamentals/api/how-to/account-owned-token-template/>
-
-The default deploy flow needs exactly `Workers Scripts: Edit` and `Workers KV Storage: Edit`. [Create a token with those permissions prefilled](https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22edit%22%7D%5D&accountId=%2A&zoneId=all&name=Context%20Engine%20Session%20Worker), or use the equivalent link in the wizard onboarding banner. Those scopes cover the worker script and secrets, workers.dev setup, the canonical session config, encrypted payload envelopes and indexes, groups, audit rows, and deploy state stored in KV. The script upload also installs the worker's `SessionWriteCoordinator` Durable Object class and binding; Cloudflare accepts that module upload through `Workers Scripts: Edit`, so the default token still has only these two permission groups. Add `R2: Edit` only for an advanced deployment that explicitly manages an existing R2 bucket; the token link does not create that bucket. D1, Durable Objects API, Account Settings, Workers AI, and Queues permissions are not required by the default path. When Cloudflare preselects `All accounts`, restrict Account Resources to the one account where the worker will run before creating the token. Cloudflare only pre-fills the creation form: create the token, copy its generated value, and paste it into the wizard's Worker step. Set the earliest expiration Cloudflare permits that still covers setup and an immediate retry, then revoke the token when deployment succeeds or the attempt is abandoned. The Worker step identifies the exact deploy-helper URL that receives the one-attempt HTTPS request; the helper, not the deployed Session Worker, uses the token against Cloudflare. Do not put real account IDs, bucket names, API tokens, or production config in committed files.
-
-The deploy helper consumes the direct `/new` Cloudflare token in the deploy
-request and does not return or persist it. A successfully published session URL
-contains only the public worker origin, never the token. This request-only rule
-is distinct from the existing sponsored deploy-grant workflow documented above.
-You do not need to paste or configure a Cloudflare account ID: the deploy helper
-uses the token to look up exactly one visible account through Cloudflare and
-stops if the token exposes zero or multiple accounts.
+The deploy URL must pin an exact 40-character commit so the reviewed source is
+immutable. The checked-in client pins the reviewed package commit; operators
+may override it with `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` only
+for another reviewed release. Moving branches, tags, abbreviated hashes, and
+non-GitHub sources are rejected. The token-based helper procedure later in this
+guide applies only to the legacy fallback.
 
 ### 2. AI provider key
 

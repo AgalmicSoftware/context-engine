@@ -46,14 +46,11 @@ origins.
 ## OSS worker model
 
 - The project hosts a worker for the `demo-sh` session with embedded deploy-helper capability disabled.
-- New sessions created via `/new` are bring-your-own-worker: the guided native
-  handoff opens Cloudflare's dashboard to install a full `sessionCorsWorker` on
-  a free Cloudflare Workers account.
+- New sessions created via `/new` are bring-your-own-worker: Cloudflare's native deploy button installs a full `sessionCorsWorker` on a free Cloudflare Workers account.
 - Native deploy does not use a Context Engine deploy helper, Cloudflare API token, OAuth token, or local agent. The legacy helper path remains an explicit fallback.
 - A full shared multi-session worker product is planned but not yet shipped.
 
 Preferred worker sources:
-
 - Native Cloudflare package: `deploy/cloudflare/session-worker/`
 - `sessionCorsWorker` source tree: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
 - `sessionCorsWorker` release bundle asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
@@ -77,7 +74,28 @@ The Worker source keeps runtime wiring explicit so route logic can be tested wit
 
 The route-shell bundle is intentionally still a large boundary object because it is where authenticated, anonymous, admin, AI, Arweave, storage, fetch, and faucet routes meet. Keep behavior changes inside the smaller route/execution modules when possible, and update the binding tests when the boundary adds or removes a dependency.
 
-## Wizard flow (/new + deploy-helper)
+## Native wizard flow (/new + Cloudflare deploy button)
+
+For the default `Fast & Cheap (Cloudflare)` preset:
+
+1. Context Engine shows the exact session slug, public passkey-derived admin
+   address, and two independently generated Worker runtime secrets.
+2. The deploy link opens Cloudflare with an immutable 40-character Git commit
+   and the isolated `deploy/cloudflare/session-worker/` package. Cloudflare
+   provisions the Worker, KV namespace, and Durable Object in the user's own
+   account.
+3. The user pastes the two runtime secrets into Cloudflare's encrypted secret
+   fields, deploys, and returns the resulting `workers.dev` URL to the wizard.
+4. The wizard verifies the Worker and performs the signed initial session
+   configuration write. No Cloudflare credential crosses a Context
+   Engine-operated origin.
+
+The generated runtime secrets are `TOKEN_HMAC_SECRET` and
+`CE_STORAGE_ENVELOPE_KEK`. They secure the deployed app runtime; they do not
+grant Cloudflare account access. The Worker is deployed with
+`DEPLOY_HELPER_ENABLED=0`.
+
+## Legacy wizard flow (/new + deploy-helper fallback)
 
 For the default `Fast & Cheap (Cloudflare)` preset:
 

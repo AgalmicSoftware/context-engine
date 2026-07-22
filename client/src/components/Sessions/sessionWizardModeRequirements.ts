@@ -115,7 +115,9 @@ export const resolveSessionWizardModeRequirements = (
   const requiresWallet = requiresRegistry || willDeployPendingSbts;
 
   const requiredRequirementIds: SessionWizardRequirementId[] = [];
-  if (usesCloudflare || usesAgentSessionWrapped) {
+  if (usesCloudflare) {
+    requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_ACCOUNT);
+  } else if (usesAgentSessionWrapped) {
     requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.CLOUDFLARE_API_TOKEN);
   }
   requiredRequirementIds.push(SESSION_WIZARD_REQUIREMENT_IDS.AI_PROVIDER_KEY);
@@ -135,10 +137,16 @@ export const resolveSessionWizardModeRequirements = (
   if (requiresFunding) visibleWorkerResourceKeys.push('txGas');
   if (requiresLit) visibleWorkerResourceKeys.push('lit');
 
-  const presetKeyChips =
-    usesCloudflare || usesAgentSessionWrapped
+  const presetKeyChips = usesCloudflare
+    ? [
+        'Cloudflare account',
+        'AI provider key',
+        ...(requiresRpc ? ['RPC URL/key'] : []),
+        ...(requiresLit ? ['Lit API key'] : []),
+      ]
+    : usesAgentSessionWrapped
       ? [
-          'Cloudflare API token',
+          'Request-only Cloudflare API token',
           'AI provider key',
           ...(requiresRpc ? ['RPC URL/key'] : []),
           ...(requiresLit ? ['Lit API key'] : []),

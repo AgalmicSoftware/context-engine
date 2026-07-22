@@ -3,6 +3,8 @@ import React from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { CLOUDFLARE_NATIVE_DEPLOY_URL } from '../../variables/publicDeploymentConfig.js';
+import { createCloudflareNativeSetupSecrets } from '../../utilities/worker/cloudflareNativeDeploy.js';
 import { buildCloudflareTokenTemplateUrl, CLOUDFLARE_API_TOKENS_URL } from './cloudflareTokenTemplate.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
@@ -127,6 +129,11 @@ const WorkerDeploySection = ({
   onNativeWorkerVerified,
   verifyNativeWorker,
 }: WorkerDeploySectionProps) => {
+  const [nativeSetupSecrets, setNativeSetupSecrets] = React.useState<{
+    tokenHmacSecret: string;
+    storageEnvelopeKek: string;
+  } | null>(null);
+  const [nativeSetupError, setNativeSetupError] = React.useState('');
   const renderTooltip = typeof renderInfoTooltip === 'function' ? renderInfoTooltip : () => null;
   const {
     deployButtonDisabled,
@@ -142,6 +149,24 @@ const WorkerDeploySection = ({
     slug: cloudflareTokenSlug,
   });
   const cloudflareTokenReceiver = String(deployHelperUrl || '').trim();
+  const nativeDeployUrl = String(cloudflareNativeDeployUrl || '').trim();
+  const nativeSessionSlug = String(cloudflareTokenSlug || '').trim();
+  const nativeAdminAddress = String(deployForm.adminAddress || account || '').trim();
+  const nativeDeployReady = !!(
+    nativeDeployUrl &&
+    nativeSetupSecrets &&
+    nativeSessionSlug &&
+    nativeAdminAddress
+  );
+  const generateNativeSetupSecrets = () => {
+    try {
+      setNativeSetupSecrets(createCloudflareNativeSetupSecrets());
+      setNativeSetupError('');
+    } catch (error) {
+      setNativeSetupSecrets(null);
+      setNativeSetupError(error instanceof Error ? error.message : 'Secure setup-secret generation failed.');
+    }
+  };
   const updateApiToken = (nextApiToken: string) => {
     setDeployForm((prev) => {
       const previousToken = String(prev?.apiToken ?? '');
@@ -177,47 +202,51 @@ const WorkerDeploySection = ({
             data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE}
             onClick={generateNativeSetupSecrets}
           >
-            {currentNativeSetupSecrets ? 'Replace setup values' : 'Generate setup values'}
+            {nativeSetupSecrets ? 'Replace setup values' : 'Generate setup values'}
           </Button>
-          {currentNativeSetupSecrets && (
-            <>
-              <ol data-testid="ce-wizard-cloudflare-native-checklist">
-                <li>Copy the four setup values below.</li>
-                <li>Open Cloudflare and complete the dashboard deployment in the new tab.</li>
-                <li>Return here and paste the resulting workers.dev URL into the Worker URL field.</li>
-                <li>
-                  Sign the initial config and AI-secret write, then verify canonical readback and browser-origin access.
-                </li>
-              </ol>
-              <div className={styles.cloudflareNativeDeployGrid}>
-                {renderCopyField(
-                  'DEFAULT_SESSION_SLUG',
-                  nativeSessionSlug,
-                  E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_SESSION_SLUG,
-                )}
-                {renderCopyField(
-                  'BOOTSTRAP_ADMIN_ADDRESS',
-                  nativeAdminAddress,
-                  E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_ADMIN_ADDRESS,
-                )}
-                {renderCopyField(
-                  'TOKEN_HMAC_SECRET',
-                  currentNativeSetupSecrets.tokenHmacSecret,
-                  E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC,
-                )}
-                {renderCopyField(
-                  'CE_STORAGE_ENVELOPE_KEK',
-                  currentNativeSetupSecrets.storageEnvelopeKek,
-                  E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK,
-                )}
-              </div>
-            </>
+          {nativeSetupSecrets && (
+            <div className={styles.cloudflareNativeDeployGrid}>
+              <FormGroup>
+                <Label>DEFAULT_SESSION_SLUG</Label>
+                <Input
+                  value={nativeSessionSlug}
+                  readOnly
+                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_SESSION_SLUG}
+                />
+              </FormGroup>
+              <FormGroup>
+                <Label>BOOTSTRAP_ADMIN_ADDRESS</Label>
+                <Input
+                  value={nativeAdminAddress}
+                  readOnly
+                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_ADMIN_ADDRESS}
+                />
+              </FormGroup>
+              <FormGroup>
+                <Label>TOKEN_HMAC_SECRET</Label>
+                <Input
+                  value={nativeSetupSecrets.tokenHmacSecret}
+                  readOnly
+                  autoComplete="off"
+                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC}
+                />
+              </FormGroup>
+              <FormGroup>
+                <Label>CE_STORAGE_ENVELOPE_KEK</Label>
+                <Input
+                  value={nativeSetupSecrets.storageEnvelopeKek}
+                  readOnly
+                  autoComplete="off"
+                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK}
+                />
+              </FormGroup>
+            </div>
           )}
           {nativeSetupError && <div className={styles.errorText}>{nativeSetupError}</div>}
-          {currentNativeSetupSecrets && !nativeSessionSlug && (
+          {nativeSetupSecrets && !nativeSessionSlug && (
             <div className={styles.errorText}>Enter the session slug before opening Cloudflare.</div>
           )}
-          {currentNativeSetupSecrets && !nativeAdminAddress && (
+          {nativeSetupSecrets && !nativeAdminAddress && (
             <div className={styles.errorText}>Log in with the session admin passkey before opening Cloudflare.</div>
           )}
           {nativeDeployReady && (
@@ -227,10 +256,6 @@ const WorkerDeploySection = ({
               rel="noopener noreferrer"
               className={`${styles.secondaryButton} btn btn-secondary`}
               data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY}
-              onClick={() => {
-                setNativeProgress('opened');
-                setNativeStatus('Cloudflare opened in a new tab. Finish deployment there, then return to verify.');
-              }}
             >
               Open Cloudflare deployment
             </a>
@@ -240,30 +265,6 @@ const WorkerDeploySection = ({
             runtime secrets, not Cloudflare credentials; they stay only in this tab and Cloudflare&apos;s encrypted
             Worker-secret store. After deployment, paste the resulting workers.dev URL into the Worker URL field.
           </div>
-          {currentNativeSetupSecrets ? (
-            <Button
-              type="button"
-              className={styles.secondaryButton}
-              data-testid="ce-wizard-cloudflare-native-verify"
-              disabled={nativeProgress === 'verifying'}
-              onClick={() => void verifyNativeDeployment()}
-            >
-              {nativeProgress === 'verifying'
-                ? 'Verifying Session Worker…'
-                : nativeVerificationIsCurrent
-                  ? 'Session Worker verified'
-                  : 'Verify Session Worker'}
-            </Button>
-          ) : null}
-          {nativeStatus ? (
-            <div
-              className={nativeVerificationIsCurrent ? styles.statusNote : styles.helperText}
-              role="status"
-              data-testid="ce-wizard-cloudflare-native-status"
-            >
-              {nativeStatus}
-            </div>
-          ) : null}
         </section>
       )}
       {shouldUseSponsoredAutoDeployFlow && (
@@ -275,7 +276,9 @@ const WorkerDeploySection = ({
         </div>
       )}
       {(!shouldUseSponsoredAutoDeployFlow || !isNormalMode) && (
-        <div className={styles.workerDeployPanel}>
+        <details className={styles.legacyWorkerDeployDetails} open={!nativeDeployUrl}>
+          <summary>{nativeDeployUrl ? 'Legacy deploy-helper fallback' : 'Worker deployment'}</summary>
+          <div className={styles.workerDeployPanel}>
           <div className={styles.workerDeployHeader}>
             {deployForm.workerName ? (
               <div className={styles.workerDeployName} data-testid={E2E_TESTIDS.WIZARD_WORKER_NAME}>
@@ -510,25 +513,7 @@ const WorkerDeploySection = ({
             >
               {deployStatusText}
             </div>
-            <div className={styles.workerDeployActions}>
-              <Button
-                type="button"
-                className={styles.actionButton}
-                data-testid={E2E_TESTIDS.WIZARD_DEPLOY_WORKER}
-                onClick={handleDeployWorker}
-                disabled={deployButtonDisabled}
-              >
-                Deploy worker
-              </Button>
-            </div>
-            {deployStatusText && (
-              <div
-                className={`${styles.copyStatus} ${deployStatusIsError ? styles.copyStatusError : ''}`}
-                data-testid={E2E_TESTIDS.WIZARD_DEPLOY_STATUS}
-              >
-                {deployStatusText}
-              </div>
-            )}
+          )}
           </div>
         </details>
       )}

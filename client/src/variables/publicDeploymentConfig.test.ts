@@ -20,6 +20,7 @@ const ORIGINAL_ENV = ENV_KEYS.reduce<Record<string, string | undefined>>((acc, k
 
 const EXPECTED_DEFAULT_SHARED_WORKER_URL = 'https://demo-worker-030226.agalmic.workers.dev'; // intentional: production default worker URL snapshot - must fail if defaults silently change
 const EXPECTED_DEPLOY_HELPER_URL = 'https://ce-deploy-helper.agalmic.workers.dev/'; // intentional: production default deploy URL snapshot - must fail if defaults silently change
+const EXPECTED_NATIVE_REPLAY_COMMIT = '64c18dbc74d7284983f89d29e77f1d290e3d89a8';
 
 const clearPublicDeploymentEnv = () => {
   ENV_KEYS.forEach((key) => {
@@ -73,8 +74,10 @@ describe('publicDeploymentConfig', () => {
       expect(config.DEFAULT_SHARED_WORKER_URL).toBe(EXPECTED_DEFAULT_SHARED_WORKER_URL);
       expect(config.DEPLOY_HELPER_URL).toBe(EXPECTED_DEPLOY_HELPER_URL);
       expect(config.HEALTHCHECK_WORKER_URL).toBe(EXPECTED_DEFAULT_SHARED_WORKER_URL);
-      expect(config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT).toBe('');
-      expect(config.CLOUDFLARE_NATIVE_DEPLOY_URL).toBe('');
+      expect(config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT).toBe(EXPECTED_NATIVE_REPLAY_COMMIT);
+      expect(decodeURIComponent(config.CLOUDFLARE_NATIVE_DEPLOY_URL)).toContain(
+        `/tree/${EXPECTED_NATIVE_REPLAY_COMMIT}/deploy/cloudflare/session-worker`,
+      );
     });
   });
 
@@ -94,6 +97,25 @@ describe('publicDeploymentConfig', () => {
     });
   });
 
+  it('enables Cloudflare-native deploy only for a full immutable public replay commit', () => {
+    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT =
+      '0123456789abcdef0123456789abcdef01234567';
+    jest.isolateModules(() => {
+      const config = require('./publicDeploymentConfig.js');
+      expect(config.CLOUDFLARE_NATIVE_DEPLOY_URL).toContain('https://deploy.workers.cloudflare.com/');
+      expect(decodeURIComponent(config.CLOUDFLARE_NATIVE_DEPLOY_URL)).toContain(
+        '/tree/0123456789abcdef0123456789abcdef01234567/deploy/cloudflare/session-worker',
+      );
+    });
+
+    jest.resetModules();
+    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = 'main';
+    jest.isolateModules(() => {
+      const config = require('./publicDeploymentConfig.js');
+      expect(config.CLOUDFLARE_NATIVE_DEPLOY_URL).toBe('');
+    });
+  });
+
   it('prefers REACT_APP_CE_* env overrides over fallback deployment URLs', () => {
     process.env.REACT_APP_CE_SHARED_WORKER_URL = 'https://shared.example.test/';
     process.env.REACT_APP_CE_DEPLOY_HELPER_URL = 'https://deploy-helper.example.test';
@@ -102,7 +124,8 @@ describe('publicDeploymentConfig', () => {
     process.env.REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL = 'https://assets.example.test/agentBridgeWorker.bundle.js';
     process.env.REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL = 'https://assets.example.test/worker-release-manifest.json';
     process.env.REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = 'false';
-    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = 'abcdef0123456789abcdef0123456789abcdef01';
+    process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT =
+      'abcdef0123456789abcdef0123456789abcdef01';
 
     jest.isolateModules(() => {
       const config = require('./publicDeploymentConfig.js');

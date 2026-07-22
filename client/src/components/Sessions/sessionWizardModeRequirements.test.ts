@@ -169,7 +169,7 @@ describe('sessionWizardModeRequirements', () => {
     const requirements = resolveSessionWizardModeRequirements(profile);
 
     expect(requirements.requiredRequirementIds).toContain('cloudflareApiToken');
-    expect(requirements.presetKeyChips[0]).toBe('Cloudflare API token');
+    expect(requirements.presetKeyChips[0]).toBe('Request-only Cloudflare API token');
   });
 
   it('returns an unselected descriptor instead of inventing legacy requirements', () => {
