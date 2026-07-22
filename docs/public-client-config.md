@@ -125,10 +125,16 @@ blank. Netlify then runs the following contract from the repository:
 
 ```text
 base: client
-command: npm ci && npm run build
+command: npm ci && REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT=$COMMIT_REF npm run build
 publish: build
 Node: 20
 ```
+
+`COMMIT_REF` is supplied by Netlify for Git-backed builds. Passing it through
+to `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` binds the native
+Cloudflare Deploy Button to the exact reviewed public commit that produced the
+client. Manual or local builds without `COMMIT_REF` keep the native button
+disabled rather than guessing a private or mutable source ref.
 
 Enable pull-request Deploy Previews so a candidate can be inspected before it
 reaches `main`. Leave general branch deploys disabled unless a named release
@@ -143,8 +149,10 @@ wildcard preview origin.
 For a manual fallback, drag `client/build/` into Netlify's deploy UI. Do not
 upload `client/build-vite/` or `client/vite-build/`. Those names are legacy
 ignored artifacts from older local builds and can contain partial or stale CSS
-output. If a deploy looks unstyled or low-contrast, rebuild from `client/` and
-upload the fresh `client/build/` directory.
+output. Set `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` to the exact
+public source commit before a manual build when the native Deploy Button must
+be available. If a deploy looks unstyled or low-contrast, rebuild from
+`client/` and upload the fresh `client/build/` directory.
 
 Because the app uses client-side routing, the root `netlify.toml` owns the Git
 deploy redirects. The matching `client/public/_redirects` file is retained in

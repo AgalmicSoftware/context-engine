@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Git-backed Netlify builds now bind the native Cloudflare Deploy Button to
+  Netlify's exact public `COMMIT_REF`; builds without a public commit remain
+  fail-closed with the native deployment card disabled.
 - SBT claim and invite codes now default to explicit export without silent
   browser persistence; existing scoped recovery entries remain readable for
   compatibility.

@@ -1,6 +1,6 @@
 import { PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 
-export const CLOUDFLARE_NATIVE_DEPLOY_PACKAGE_PATH = 'deploy/cloudflare/session-worker';
+const CLOUDFLARE_NATIVE_DEPLOY_PACKAGE_PATH = 'deploy/cloudflare/session-worker';
 export const CLOUDFLARE_NATIVE_DEPLOY_ORIGIN = 'https://deploy.workers.cloudflare.com/';
 
 const FULL_GIT_COMMIT_RE = /^[a-f0-9]{40}$/i;

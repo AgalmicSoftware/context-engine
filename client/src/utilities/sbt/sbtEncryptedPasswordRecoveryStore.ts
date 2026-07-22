@@ -258,20 +258,6 @@ const indexedDbKeyStore: SbtPasswordRecoveryKeyStore = {
   },
 };
 
-export const createMemorySbtPasswordRecoveryKeyStore = (
-  initialKey: CryptoKey | null = null,
-): SbtPasswordRecoveryKeyStore => {
-  let key = initialKey;
-  return {
-    async read() {
-      return key;
-    },
-    async write(nextKey) {
-      key = nextKey;
-    },
-  };
-};
-
 const resolveKeyStore = (keyStore?: SbtPasswordRecoveryKeyStore | null): SbtPasswordRecoveryKeyStore | null => {
   if (keyStore !== undefined) return keyStore;
   return typeof indexedDB === 'undefined' ? null : indexedDbKeyStore;

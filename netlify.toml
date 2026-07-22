@@ -2,7 +2,7 @@
 # the repository and production branch; build behavior lives here.
 [build]
   base = "client"
-  command = "npm ci && npm run build"
+  command = "npm ci && REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT=$COMMIT_REF npm run build"
   publish = "build"
 
 [build.environment]

@@ -4,12 +4,26 @@ import {
   SBT_ENCRYPTED_PASSWORD_RECOVERY_KIND,
   SBT_ENCRYPTED_PASSWORD_RECOVERY_STORAGE_KEY,
   clearEncryptedSbtPasswordRecoveryCodes,
-  createMemorySbtPasswordRecoveryKeyStore,
   readEncryptedSbtPasswordRecoveryCodes,
+  type SbtPasswordRecoveryKeyStore,
   upsertEncryptedSbtPasswordRecoveryCodes,
 } from './sbtEncryptedPasswordRecoveryStore.js';
 
 const cryptoApi = webcrypto as unknown as Crypto;
+
+const createMemorySbtPasswordRecoveryKeyStore = (
+  initialKey: CryptoKey | null = null,
+): SbtPasswordRecoveryKeyStore => {
+  let key = initialKey;
+  return {
+    async read() {
+      return key;
+    },
+    async write(nextKey) {
+      key = nextKey;
+    },
+  };
+};
 
 const createMemoryStorage = () => {
   const data = new Map<string, string>();

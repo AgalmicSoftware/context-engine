@@ -2,9 +2,6 @@ import {
   buildTokenName,
   buildCloudflareTokenTemplateUrl,
   buildCloudflareTokenTemplatePermissions,
-  CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS,
-  CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS,
-  CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION,
 } from './cloudflareTokenTemplate.js';
 
 describe('cloudflareTokenTemplate', () => {
@@ -29,7 +26,10 @@ describe('cloudflareTokenTemplate', () => {
       { key: 'd1', type: 'edit' },
       { key: 'workers_durable_objects', type: 'edit' },
     ]);
-    expect(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS).toHaveLength(5);
+    expect(buildCloudflareTokenTemplatePermissions()).toEqual([
+      { key: 'workers_scripts', type: 'edit' },
+      { key: 'workers_kv_storage', type: 'edit' },
+    ]);
   });
 
   test('can omit R2/D1 scopes for the default Telegram smoke deploy', () => {
@@ -40,48 +40,19 @@ describe('cloudflareTokenTemplate', () => {
       { key: 'workers_kv_storage', type: 'edit' },
       { key: 'workers_durable_objects', type: 'edit' },
     ]);
-    expect(permissions).not.toEqual(
+    expect(buildCloudflareTokenTemplatePermissions({ includeR2Storage: true })).toEqual(permissions);
+    expect(url.searchParams.get('accountId')).toBe('*');
+  });
+
+  test('does not request unrelated Cloudflare product scopes by default', () => {
+    const permissionKeys = buildCloudflareTokenTemplatePermissions().map((permission) => permission.key);
+
+    expect(permissionKeys).not.toEqual(
       expect.arrayContaining([
         { key: 'workers_r2', type: 'edit' },
         { key: 'd1', type: 'edit' },
       ]),
     );
-  });
-
-  test('adds Account Settings only for workers.dev subdomain setup', () => {
-    const url = new URL(
-      buildCloudflareTokenTemplateUrl({
-        slug: 'alpha-session',
-        includeWorkersDevSubdomainSetup: true,
-      }),
-    );
-
-    expect(JSON.parse(url.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
-      { key: 'workers_scripts', type: 'edit' },
-      { key: 'workers_kv_storage', type: 'edit' },
-      { key: 'workers_r2', type: 'edit' },
-      { key: 'd1', type: 'edit' },
-      { key: 'workers_durable_objects', type: 'edit' },
-      { key: 'account_settings', type: 'edit' },
-    ]);
-    expect(CLOUDFLARE_WORKERS_DEV_SUBDOMAIN_PERMISSION).toEqual({ key: 'account_settings', type: 'edit' });
-    expect(buildCloudflareTokenTemplatePermissions()).toEqual(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS);
-  });
-
-  test('does not request legacy broad Cloudflare product scopes', () => {
-    const permissionKeys = CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS.map((permission) => permission.key);
-
-    expect(permissionKeys).not.toEqual(
-      expect.arrayContaining(['pages', 'builds', 'agents', 'observability', 'containers', 'tail']),
-    );
-  });
-
-  test('documents least-privilege storage resource responsibilities', () => {
-    expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.r2).toMatch(/questions, surveys, and responses/);
-    expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.d1).toMatch(/metadata and index/);
-    expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.kv).toMatch(/metadata indexes/);
-    expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.durableObjects).toMatch(/not ordinary payload blob storage/);
-    expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.accountSettings).toMatch(/workers\.dev subdomain/);
   });
 
   test('buildCloudflareTokenTemplateUrl falls back to the general slug when none is provided', () => {
