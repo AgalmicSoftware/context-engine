@@ -9,6 +9,9 @@ All notable changes to this project will be documented in this file.
 - Git-backed Netlify builds now bind the native Cloudflare Deploy Button to
   Netlify's exact public `COMMIT_REF`; builds without a public commit remain
   fail-closed with the native deployment card disabled.
+- Public-release scrubbing now preserves the byte-stable generated Cloudflare
+  Worker package while continuing to scan its bundled dependency contacts,
+  preventing email-shaped wordlist data from being rewritten after hashing.
 - SBT claim and invite codes now default to explicit export without silent
   browser persistence; existing scoped recovery entries remain readable for
   compatibility.

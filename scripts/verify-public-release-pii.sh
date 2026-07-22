@@ -28,9 +28,9 @@ const knownFixturePrivateKeys = new Set([
   '1234567890123456789012345678901234567890123456789012345678901234',
 ]);
 const allowedGeneratedWorkerEmails = new Set([
-  ['0bje', 'bm.bwayc'].join('@'),
-  ['rfe', 'rm.rs'].join('@'),
-  ['me', 'ricmoo.com'].join('@'),
+  '[redacted-email]',
+  '[redacted-email]',
+  '[redacted-email]',
 ]);
 
 function toPosix(relativePath) {
@@ -120,6 +120,11 @@ function isAllowedPublicEmailPath(relativePath) {
     || relativePath.startsWith('client/src/data/ai-discourse-corpus/');
 }
 
+function isAllowedGeneratedWorkerEmail(relativePath, email) {
+  return relativePath === 'deploy/cloudflare/session-worker/worker.mjs'
+    && allowedGeneratedWorkerEmails.has(email.toLowerCase());
+}
+
 // Intentionally public addresses (e.g. the SECURITY.md vulnerability-reporting
 // contact). Keep in sync with the allowlist in scripts/prepare-public-release.sh.
 const allowedPublicEmailAddresses = new Set(['contextengine@protonmail.com']);
@@ -140,7 +145,11 @@ function scanTextFile(relativePath, text, findings, warnings) {
 
     emailRe.lastIndex = 0;
     while ((match = emailRe.exec(line)) !== null) {
-      if (isAllowedPublicEmailPath(relativePath) || allowedPublicEmailAddresses.has(match[0].toLowerCase())) {
+      if (
+        isAllowedPublicEmailPath(relativePath)
+        || isAllowedGeneratedWorkerEmail(relativePath, match[0])
+        || allowedPublicEmailAddresses.has(match[0].toLowerCase())
+      ) {
         addWarning(warnings, 'public-email', relativePath, lineNumber, match[0]);
       } else {
         addFinding(findings, 'email', relativePath, lineNumber, match[0]);
