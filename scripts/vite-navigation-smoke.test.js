@@ -9,6 +9,7 @@ const {
   findMissingExpectedText,
   isAllowedConsoleIssue,
   isAllowedFailedRequest,
+  isExpectedLoadedMediaAbort,
   normalizeBaseUrl,
   normalizeLayoutProbeSelectors,
   normalizeRoutes,
@@ -64,6 +65,36 @@ test('failed local chain probes are allowed without masking same-origin asset fa
   assert.equal(isAllowedFailedRequest('http://localhost:8545/', baseUrl), true);
   assert.equal(isAllowedFailedRequest('http://127.0.0.1:3000/src/main.tsx', baseUrl), false);
   assert.equal(isAllowedFailedRequest('http://cdn.example.test/chunk.js', baseUrl), false);
+});
+
+test('loaded media aborts are ignored without masking real request failures', () => {
+  const loadedMediaUrls = ['http://127.0.0.1:3000/about-demo.mp4'];
+
+  assert.equal(isExpectedLoadedMediaAbort({
+    url: loadedMediaUrls[0],
+    resourceType: 'media',
+    failure: 'net::ERR_ABORTED',
+  }, loadedMediaUrls), true);
+  assert.equal(isExpectedLoadedMediaAbort({
+    url: loadedMediaUrls[0],
+    resourceType: 'media',
+    failure: 'net::ERR_ABORTED',
+  }, []), false);
+  assert.equal(isExpectedLoadedMediaAbort({
+    url: loadedMediaUrls[0],
+    resourceType: 'media',
+    failure: 'net::ERR_CONNECTION_REFUSED',
+  }, loadedMediaUrls), false);
+  assert.equal(isExpectedLoadedMediaAbort({
+    url: loadedMediaUrls[0],
+    resourceType: 'script',
+    failure: 'net::ERR_ABORTED',
+  }, loadedMediaUrls), false);
+  assert.equal(isExpectedLoadedMediaAbort({
+    url: 'http://127.0.0.1:3000/other.mp4',
+    resourceType: 'media',
+    failure: 'net::ERR_ABORTED',
+  }, loadedMediaUrls), false);
 });
 
 test('console allowlist permits known dependency warnings but not app exceptions', () => {
