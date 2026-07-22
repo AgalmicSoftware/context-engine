@@ -305,30 +305,27 @@ export const upsertSbtPasswordRecoveryCodes = ({
   };
 };
 
-export const clearSbtPasswordRecoveryCodes = ({ chainId, sbtAddress, storage }: RecoveryScope = {}): {
-  ok: true;
-  status: 'cleared';
-  key: string;
-} => {
-  purgeLegacySbtPasswordRecoveryArtifacts({ storage });
+export const clearSbtPasswordRecoveryCodes = ({
+  chainId,
+  sbtAddress,
+  storage,
+  now = Date.now(),
+}: {
+  chainId?: unknown;
+  sbtAddress?: unknown;
+  storage?: StorageLike | null;
+  now?: number;
+} = {}) => {
   const key = getSbtPasswordRecoveryKey({ chainId, sbtAddress });
-  if (key) {
-    tabMemoryEntries.delete(key);
-    if (normalizeChainId(chainId)) tabMemoryEntries.delete(getSbtPasswordRecoveryKey({ sbtAddress }));
-  } else {
-    tabMemoryEntries.clear();
-  }
-  return { ok: true, status: 'cleared', key };
+  if (!key) return { ok: false, status: 'empty-recovery-key' };
+  const store = readSbtPasswordRecoveryStore({ storage, now });
+  delete store.entries[key];
+  store.updatedAt = now;
+  const write = writeSbtPasswordRecoveryStore(store, { storage, now });
+  return { ok: write.ok, status: write.ok ? 'cleared' : write.status };
 };
-
-export const clearAllSbtPasswordRecoveryMemory = (): void => {
-  tabMemoryEntries.clear();
-};
-
-purgeLegacySbtPasswordRecoveryArtifacts();
 
 const sbtPasswordRecoveryStore = {
-  clearAllSbtPasswordRecoveryMemory,
   clearSbtPasswordRecoveryCodes,
   getSbtPasswordRecoveryCodes,
   getSbtPasswordRecoveryKey,
