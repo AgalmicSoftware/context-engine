@@ -71,16 +71,13 @@ describe('WorkerDeploySection', () => {
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_ADMIN_ADDRESS)).toHaveValue(
       '0x0000000000000000000000000000000000000001',
     );
-    expect(
-      (screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC) as HTMLInputElement).value,
-    ).toMatch(/^[a-f0-9]{64}$/);
-    expect(
-      (screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK) as HTMLInputElement).value,
-    ).toMatch(/^[a-f0-9]{64}$/);
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY)).toHaveAttribute(
-      'href',
-      nativeDeployUrl,
+    expect((screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC) as HTMLInputElement).value).toMatch(
+      /^[a-f0-9]{64}$/,
     );
+    expect((screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK) as HTMLInputElement).value).toMatch(
+      /^[a-f0-9]{64}$/,
+    );
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY)).toHaveAttribute('href', nativeDeployUrl);
     expect(screen.getByText('Legacy deploy-helper fallback')).toBeInTheDocument();
     expect(screen.getByText('Legacy deploy-helper fallback').closest('details')).not.toHaveAttribute('open');
   });

@@ -11,9 +11,7 @@ import {
 
 const cryptoApi = webcrypto as unknown as Crypto;
 
-const createMemorySbtPasswordRecoveryKeyStore = (
-  initialKey: CryptoKey | null = null,
-): SbtPasswordRecoveryKeyStore => {
+const createMemorySbtPasswordRecoveryKeyStore = (initialKey: CryptoKey | null = null): SbtPasswordRecoveryKeyStore => {
   let key = initialKey;
   return {
     async read() {
@@ -112,7 +110,12 @@ describe('sbtEncryptedPasswordRecoveryStore', () => {
               return request;
             }),
             put: jest.fn(() => {
-              const request = { result: 'browser-local-v1', error: null, onsuccess: null as (() => void) | null, onerror: null };
+              const request = {
+                result: 'browser-local-v1',
+                error: null,
+                onsuccess: null as (() => void) | null,
+                onerror: null,
+              };
               setTimeout(() => {
                 request.onsuccess?.();
                 tx.error = new Error('key transaction aborted');

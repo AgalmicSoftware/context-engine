@@ -2859,8 +2859,10 @@ class CreateSBTGroup extends Component<any, any> {
   handleEncryptedRecoveryChange = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
     this.setState({ encryptedRecoveryStatus: 'saving' });
     const { patch, warning } = await selectCreateEncryptedRecovery({
-      chainId: this.getSelectedAuthoringChainId(), enabled: event.target.checked === true,
-      passwords: this.state.passwordList, sbtAddress: this.state.sbtAddress,
+      chainId: this.getSelectedAuthoringChainId(),
+      enabled: event.target.checked === true,
+      passwords: this.state.passwordList,
+      sbtAddress: this.state.sbtAddress,
     });
     this.setState(patch);
     if (warning) notify.warn(warning);
@@ -4557,7 +4559,12 @@ class CreateSBTGroup extends Component<any, any> {
         {successDisplayState.shouldRenderPasswordRecovery && (
           <div className={styles.sbtInviteLinks}>
             <h3>Password Recovery</h3>
-            <SbtEncryptedRecoveryControl checked={this.state.encryptedRecoveryEnabled === true} mode="create" onChange={this.handleEncryptedRecoveryChange} status={String(this.state.encryptedRecoveryStatus || 'idle')} />
+            <SbtEncryptedRecoveryControl
+              checked={this.state.encryptedRecoveryEnabled === true}
+              mode="create"
+              onChange={this.handleEncryptedRecoveryChange}
+              status={String(this.state.encryptedRecoveryStatus || 'idle')}
+            />
             <div className={styles.exportOptions}>
               <select
                 value={exportFormat}
@@ -4593,7 +4600,12 @@ class CreateSBTGroup extends Component<any, any> {
                 );
               })}
             </ul>
-            <SbtEncryptedRecoveryControl checked={this.state.encryptedRecoveryEnabled === true} mode="create" onChange={this.handleEncryptedRecoveryChange} status={String(this.state.encryptedRecoveryStatus || 'idle')} />
+            <SbtEncryptedRecoveryControl
+              checked={this.state.encryptedRecoveryEnabled === true}
+              mode="create"
+              onChange={this.handleEncryptedRecoveryChange}
+              status={String(this.state.encryptedRecoveryStatus || 'idle')}
+            />
             <div className={styles.exportOptions}>
               <select
                 value={exportFormat}

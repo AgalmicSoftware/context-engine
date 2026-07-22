@@ -3834,7 +3834,9 @@ class SBTPage extends Component<any, any> {
 
       if (this.state.encryptedRecoveryEnabled) {
         const recoveryWrite = await appendEncryptedSbtRecovery({
-          chainId: this.getRecoveryCacheChainId(), passwords: newPasswordList, sbtAddress: sbtAddressOriginalCase,
+          chainId: this.getRecoveryCacheChainId(),
+          passwords: newPasswordList,
+          sbtAddress: sbtAddressOriginalCase,
         });
         this.setState({
           encryptedRecoveryEnabled: recoveryWrite.ok,
@@ -3867,9 +3869,12 @@ class SBTPage extends Component<any, any> {
   };
 
   handleClearLocalRecovery = async (): Promise<void> => {
-    this.setState(await clearAllSbtRecovery({
-      chainId: this.getRecoveryCacheChainId(), sbtAddress: resolveSbtAddressString(this.props.SBTAddress),
-    }));
+    this.setState(
+      await clearAllSbtRecovery({
+        chainId: this.getRecoveryCacheChainId(),
+        sbtAddress: resolveSbtAddressString(this.props.SBTAddress),
+      }),
+    );
   };
 
   generateRandomPasswords = (count: unknown): string[] => {

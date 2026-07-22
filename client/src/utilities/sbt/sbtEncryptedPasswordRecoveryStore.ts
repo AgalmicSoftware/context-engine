@@ -251,7 +251,9 @@ const runKeyDbTransaction = async <T>(
 
 const indexedDbKeyStore: SbtPasswordRecoveryKeyStore = {
   async read() {
-    return (await runKeyDbTransaction('readonly', (store) => store.get(SBT_ENCRYPTED_PASSWORD_RECOVERY_KEY_REF))) || null;
+    return (
+      (await runKeyDbTransaction('readonly', (store) => store.get(SBT_ENCRYPTED_PASSWORD_RECOVERY_KEY_REF))) || null
+    );
   },
   async write(key) {
     await runKeyDbTransaction('readwrite', (store) => store.put(key, SBT_ENCRYPTED_PASSWORD_RECOVERY_KEY_REF));

@@ -121,13 +121,8 @@ export const getTemporaryDemoSessionQuestionFixtures = (
     : [];
   const questionIds = Array.isArray(demo1OnchainQuestionIds) ? demo1OnchainQuestionIds : [];
   return comments
-    .map((comment, index) => buildDemoQuestionFromComment(
-      comment,
-      index,
-      sessionConfig,
-      questionIds[index],
-      slug,
-      workerCanonical,
-    ))
+    .map((comment, index) =>
+      buildDemoQuestionFromComment(comment, index, sessionConfig, questionIds[index], slug, workerCanonical),
+    )
     .filter((question): question is DemoQuestion => !!question);
 };

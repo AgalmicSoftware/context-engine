@@ -4,10 +4,7 @@ import {
 } from '../../utilities/session/agentSessionWrapped.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability.js';
-import {
-  AGENT_BRIDGE_WORKER_BUNDLE_URL,
-  WORKER_RELEASE_MANIFEST_URL,
-} from '../../variables/publicDeploymentConfig.js';
+import { AGENT_BRIDGE_WORKER_BUNDLE_URL, WORKER_RELEASE_MANIFEST_URL } from '../../variables/publicDeploymentConfig.js';
 
 type AdminRecord = Record<string, unknown>;
 type PostSignedRequest = (args: {

@@ -333,11 +333,12 @@ const useSessionWizardWorkerDeploy = ({
           bundleUrl: currentDeployForm.bundleUrl,
           normalModeBundleUrlOverride: runtime.normalModeBundleUrlOverride,
         });
-        const { bundleText, bundleUrl, bundleManifestUrl, bundleSha256 } = await resolveSessionWizardDeployBundlePayload({
-          effectiveBundleMode,
-          bundleFile: runtime.bundleFile,
-          bundleUrl: requestedBundleUrl,
-        });
+        const { bundleText, bundleUrl, bundleManifestUrl, bundleSha256 } =
+          await resolveSessionWizardDeployBundlePayload({
+            effectiveBundleMode,
+            bundleFile: runtime.bundleFile,
+            bundleUrl: requestedBundleUrl,
+          });
         const allDeploySecrets = runtime.workerSecretsEnabled ? buildWorkerSecretsPayload(currentWorkerSecrets) : {};
         const { selectedSecrets: deploySecrets, requiredSecretFields: requiredWorkerSecretFields } =
           resolveSessionWizardWorkerSecretSelection({

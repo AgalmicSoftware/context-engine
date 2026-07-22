@@ -1,7 +1,4 @@
-import {
-  loadSbtRecoverySnapshot,
-  selectCreateEncryptedRecovery,
-} from './SbtEncryptedRecoveryControl';
+import { loadSbtRecoverySnapshot, selectCreateEncryptedRecovery } from './SbtEncryptedRecoveryControl';
 
 describe('SBT encrypted recovery UI controller', () => {
   it('writes only after explicit create-flow opt-in and reports successful recovery', async () => {

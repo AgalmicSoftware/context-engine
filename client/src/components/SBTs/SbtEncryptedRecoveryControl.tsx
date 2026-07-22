@@ -110,11 +110,7 @@ export const loadSbtRecoverySnapshot = async ({
   return {
     cachedPasswords: legacy,
     encryptedRecoveryEnabled: false,
-    encryptedRecoveryStatus: encrypted.ok
-      ? 'idle'
-      : encrypted.status === 'unavailable'
-        ? 'unavailable'
-        : 'unreadable',
+    encryptedRecoveryStatus: encrypted.ok ? 'idle' : encrypted.status === 'unavailable' ? 'unavailable' : 'unreadable',
   };
 };
 
