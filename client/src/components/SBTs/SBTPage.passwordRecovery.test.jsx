@@ -138,4 +138,62 @@ describe('SBTPage scoped password recovery store', () => {
     expect(subject.state.adminGeneratedPasswords).toEqual(['admin-one', 'admin-two']);
     expect(subject.state.cachedPasswords).toEqual([]);
   });
+
+  it('persists admin-generated invite codes when encrypted recovery is opted in', async () => {
+    const subject = createSubject({
+      SBTAddress: '0x0000000000000000000000000000000000000204',
+      network: { id: 84532, name: 'Base Sepolia' },
+    });
+    subject.state = {
+      ...subject.state,
+      encryptedRecoveryEnabled: true,
+      passwordGenerationCount: 1,
+    };
+    jest.spyOn(subject, 'generateRandomPasswords').mockReturnValue(['admin-encrypted']);
+    jest.spyOn(subject, 'cacheTransactionHash').mockImplementation(() => {});
+    const persist = jest
+      .spyOn(subject, 'persistEncryptedAdminCodes')
+      .mockResolvedValue({ ok: true, status: 'ok' });
+    jest.spyOn(contractScripts, 'addHashedPasswords').mockResolvedValue({ transactionHash: '0x204' });
+
+    await subject.handleGenerateAdminInvites();
+
+    expect(persist).toHaveBeenCalledWith(['admin-encrypted']);
+    expect(subject.state.encryptedRecoveryStatus).toBe('saved');
+  });
+
+  it('combines compatible plaintext recovery with decrypted opt-in recovery', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000205';
+    const subject = createSubject({ SBTAddress: sbtAddress, network: { id: 84532 } });
+    const now = Date.now();
+    localStorage.setItem(
+      SBT_PASSWORD_RECOVERY_STORAGE_KEY,
+      JSON.stringify({
+        v: 1,
+        kind: SBT_PASSWORD_RECOVERY_KIND,
+        updatedAt: now,
+        entries: {
+          [`84532:${sbtAddress}`]: {
+            chainId: 84532,
+            sbtAddress,
+            passwords: ['legacy-code'],
+            createdAt: now,
+            updatedAt: now,
+            expiresAt: now + 60_000,
+          },
+        },
+      }),
+    );
+    jest.spyOn(subject, 'readEncryptedCachedPasswords').mockResolvedValue({
+      ok: true,
+      status: 'ok',
+      passwords: ['encrypted-code'],
+    });
+
+    await subject.loadCachedPasswords();
+
+    expect(subject.state.cachedPasswords).toEqual(['legacy-code', 'encrypted-code']);
+    expect(subject.state.encryptedRecoveryEnabled).toBe(true);
+    expect(subject.state.encryptedRecoveryStatus).toBe('saved');
+  });
 });

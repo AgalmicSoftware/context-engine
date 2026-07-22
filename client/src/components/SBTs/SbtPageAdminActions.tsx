@@ -211,15 +211,31 @@ const SbtPageAdminActions = ({
 
     {hasPasswordMint && (
       <div className={styles.inviteGenerationSection}>
-        <SbtEncryptedRecoveryControl
-          checked={encryptedRecoveryEnabled}
-          clearButtonClassName={styles.actionButton}
-          hasLocalRecovery={hasLocalRecovery}
-          mode="admin"
-          onChange={onEncryptedRecoveryChange}
-          onClear={onClearLocalRecovery}
-          status={encryptedRecoveryStatus}
-        />
+        <label>
+          <input
+            type="checkbox"
+            checked={encryptedRecoveryEnabled}
+            onChange={onEncryptedRecoveryChange}
+          />
+          Keep encrypted recovery on this browser
+        </label>
+        <p>
+          Optional AES-GCM browser-local recovery does not sync across devices and does not protect against a
+          compromised browser profile. Uncheck it to clear encrypted recovery for this group.
+        </p>
+        {encryptedRecoveryStatus === 'saved' && <p>Encrypted local recovery saved.</p>}
+        {encryptedRecoveryStatus === 'ready' && <p>New passwords will be kept encrypted on this browser.</p>}
+        {encryptedRecoveryStatus === 'unavailable' && <p>Encrypted recovery unavailable; export-only remains active.</p>}
+        {encryptedRecoveryStatus === 'unreadable' && <p>Encrypted recovery cannot be decrypted by this browser.</p>}
+        {encryptedRecoveryStatus === 'cleared' && <p>Encrypted local recovery cleared.</p>}
+        {hasLocalRecovery && (
+          <>
+            <p>Legacy recovery may contain plaintext. Clear local recovery after exporting anything you still need.</p>
+            <button type="button" onClick={onClearLocalRecovery} className={styles.actionButton}>
+              Clear local recovery
+            </button>
+          </>
+        )}
       </div>
     )}
 
@@ -251,7 +267,10 @@ const SbtPageAdminActions = ({
               combinedPasswords,
               passwordInviteLinkContext,
             })}
-            <p>New passwords are export-only and are not stored by this browser. Save them before leaving this page.</p>
+            <p>
+              Export remains the primary recovery path. New passwords are stored only when encrypted local recovery is
+              enabled.
+            </p>
             {SbtPagePasswordExportControls({
               exportFormat,
               onExportFormatChange,

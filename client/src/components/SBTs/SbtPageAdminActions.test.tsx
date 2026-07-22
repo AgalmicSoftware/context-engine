@@ -163,22 +163,23 @@ describe('SbtPageAdminActions', () => {
     expect(onExportPasswords).toHaveBeenCalledTimes(1);
   });
 
-  it('exposes tab-memory recovery as an explicit opt-in', () => {
+  it('exposes encrypted local recovery as an explicit browser-only opt-in', () => {
     const onEncryptedRecoveryChange = jest.fn();
     render(<SbtPageAdminActions {...createProps({ onEncryptedRecoveryChange })} />);
 
-    const toggle = screen.getByRole('checkbox', { name: 'Keep recovery codes in this tab' });
+    const toggle = screen.getByRole('checkbox', { name: 'Keep encrypted recovery on this browser' });
     expect(toggle).not.toBeChecked();
     fireEvent.click(toggle);
     expect(onEncryptedRecoveryChange).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/reloading or closing the tab clears them/i)).toBeInTheDocument();
+    expect(screen.getByText(/does not protect against a compromised browser profile/i)).toBeInTheDocument();
   });
 
-  it('offers a scoped clear action for tab-memory recovery', () => {
+  it('offers a scoped clear action for legacy or encrypted local recovery', () => {
     const onClearLocalRecovery = jest.fn();
     render(<SbtPageAdminActions {...createProps({ onClearLocalRecovery })} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear tab recovery' }));
+    expect(screen.getByText(/legacy recovery may contain plaintext/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear local recovery' }));
     expect(onClearLocalRecovery).toHaveBeenCalledTimes(1);
   });
 

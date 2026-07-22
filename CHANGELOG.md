@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
 - SBT claim and invite codes now default to explicit export without silent
   browser persistence; existing scoped recovery entries remain readable for
   compatibility.
+- Added explicit opt-in encrypted SBT recovery using AES-GCM, authenticated
+  chain/address metadata, and a non-extractable IndexedDB key. Unsupported,
+  missing-key, and tampered records fail closed to export-only behavior, and
+  group-scoped local recovery can be cleared from the admin UI.
 - Made Worker authorization current at request time. Login tokens now bind a
   server-managed session authorization epoch, effective config changes
   invalidate prior tokens, and protected routes fail closed unless both the
