@@ -41,6 +41,141 @@
       }
     }
   },
+  "demo-sh": {
+    "networkChainId": 11155420,
+    "slug": "demo-sh",
+    "sessionId": "0xb822b3eca85bdc35cf83cb947bceb6b2",
+    "configRevision": "demo-sh-v1",
+    "sessionName": "Demo Session",
+    "sessionInfo": "Public Cloudflare-backed demo session seeded with the Context corpus questions.",
+    "sessionHeaderImg": null,
+    "corsWorkerUrl": "https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/",
+    "allowOrigins": [
+      "https://contextengine.sh",
+      "https://www.contextengine.sh"
+    ],
+    "defaultTags": "",
+    "questionsGenPrompt": "",
+    "defaultSbtTags": "",
+    "defaultFilterState": null,
+    "defaultFeaturedSBTs": [],
+    "autoFeatureSBTsBySessionSlug": false,
+    "HIGHLIGHTED_QUESTION_IDS": [],
+    "BLOCKED_QUESTION_IDS": [],
+    "HIGHLIGHTED_SURVEY_IDS": [],
+    "BLOCKED_SURVEY_IDS": [],
+    "ignored_SBTs_LIST": [],
+    "featured_SBTs_LIST": [],
+    "contracts": {},
+    "blockLimits": {
+      "start": null,
+      "end": null
+    },
+    "sessionModeProfile": {
+      "profileVersion": 1,
+      "preset": "custom",
+      "authority": {
+        "mode": "worker_canonical"
+      },
+      "evm": {
+        "registryChainId": null
+      },
+      "storage": {
+        "backend": "cloudflare",
+        "payloadAccessControl": {
+          "gate": "none",
+          "encryption": "none"
+        }
+      },
+      "identity": {
+        "default": "passkey",
+        "enabled": [
+          "passkey"
+        ]
+      },
+      "authorization": {
+        "mechanisms": [
+          "worker_roles"
+        ]
+      },
+      "encryption": {
+        "mode": "none"
+      },
+      "surfaces": {
+        "web": true,
+        "telegram": false,
+        "miniApp": false,
+        "agentHttp": false,
+        "mcp": false,
+        "ceCc": false
+      }
+    },
+    "storageProfile": {
+      "type": "session_storage_profile",
+      "version": "session-storage-profile-v1",
+      "backend": "cloudflare",
+      "sessionOwned": true,
+      "telegramOwned": false,
+      "resources": {
+        "docsContext": "active",
+        "questions": "active",
+        "surveys": "active",
+        "responses": "active",
+        "generatedArtifacts": "active",
+        "media": "active",
+        "images": "active"
+      },
+      "payloadAccessControl": {
+        "gate": "none",
+        "encryption": "none",
+        "mode": "public_read",
+        "enforcement": "session_worker_public_read",
+        "litRequired": false,
+        "label": "Public-read Cloudflare payloads"
+      }
+    },
+    "workerAuthority": {
+      "version": 1,
+      "participantScopes": [
+        "ai",
+        "transcribe",
+        "storage",
+        "groups",
+        "fetch"
+      ],
+      "anonymousScopes": [
+        "storage"
+      ]
+    },
+    "demoCompatibilitySeed": {
+      "temporary": false,
+      "workerCanonical": true,
+      "seededOn": "2026-07-21",
+      "sessionSlug": "demo-sh",
+      "sourceSessionSlug": "demo-1",
+      "questionFixture": "client/src/variables/demo/demo_polis_data.json#comments",
+      "questionCount": 42,
+      "questionIds": "client/src/variables/demo/demo_1_onchain_question_ids.json",
+      "questionsSha256": "08d00f2cc0c8687b0eef5c3f6455ff3834c26647d265d10ff472c649cbfeadae"
+    },
+    "ai": {
+      "reasoningEffort": "low",
+      "models": {
+        "fast": {
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        },
+        "thinking": {
+          "model": "gpt-4o-mini",
+          "provider": "openai"
+        },
+        "transcription": {
+          "provider": "openai",
+          "model": "whisper-1"
+        }
+      }
+    }
+  },
   "demo-1": {
     "networkChainId": 11155420,
     "slug": "demo-1",

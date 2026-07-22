@@ -13,7 +13,7 @@ import {
 const DEFAULT_SESSION_SCAN_SCOPE = 'list';
 // Demo-like sessions that should receive public demo UI affordances. The first
 // entry is the About-page CTA target; keep older slugs in the list while links migrate.
-const DEFAULT_DEMO_SESSION_SLUGS = Object.freeze(['demo-1', 'demo-3', 'demo-2', 'demo']);
+const DEFAULT_DEMO_SESSION_SLUGS = Object.freeze(['demo-sh', 'demo-1', 'demo-3', 'demo-2', 'demo']);
 // Default cross-session scans follow the active public demo while legacy slugs
 // remain demo-like for direct links during migration.
 const DEFAULT_SESSION_SCAN_SLUGS = Object.freeze([DEFAULT_DEMO_SESSION_SLUGS[0]]);
