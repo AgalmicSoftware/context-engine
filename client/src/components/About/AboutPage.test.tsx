@@ -9,10 +9,7 @@ import AboutPage, { getAboutDemoSessionPath, getConfiguredRecognitionIndividuals
 
 const mutableEnv = process.env as Record<string, string | undefined>;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
-const ABOUT_DEMO_VIDEO_EMBED_URL = 'https://drive.google.com/file/d/1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf/preview';
 const ABOUT_DEMO_VIDEO_MEDIA_URL = '/about-demo.mp4';
-const ABOUT_DEMO_VIDEO_THUMBNAIL_URL =
-  'https://drive.google.com/thumbnail?id=1nss6RZnF4yFwMFE6kjSW3ESi3ImpMcnf&sz=w1000';
 
 beforeEach(() => {
   if (typeof ORIGINAL_PUBLIC_URL === 'undefined') {
@@ -68,16 +65,21 @@ describe('AboutPage', () => {
       'href',
       'mailto:contextengine@protonmail.com',
     );
-    expect(desktopDemoVideo.tagName.toLowerCase()).toBe('iframe');
-    expect(desktopDemoVideo).toHaveAttribute('src', ABOUT_DEMO_VIDEO_EMBED_URL);
-    expect(desktopDemoVideo).toHaveAttribute('title', 'Context Engine demo video');
+    expect(desktopDemoVideo.tagName.toLowerCase()).toBe('video');
+    expect(desktopDemoVideo).toHaveAttribute('controls');
+    expect(desktopDemoVideo).toHaveAttribute('playsinline');
+    expect(desktopDemoVideo).toHaveAttribute('preload', 'metadata');
+    expect(desktopDemoVideo).toHaveAttribute('src', ABOUT_DEMO_VIDEO_MEDIA_URL);
+    expect(desktopDemoVideo).toHaveAccessibleName('Context Engine demo video player');
     expect(mobileDemoVideo).toBeInTheDocument();
     expect(mobileVideoPlayer.tagName.toLowerCase()).toBe('video');
     expect(mobileVideoPlayer).toHaveAttribute('controls');
     expect(mobileVideoPlayer).toHaveAttribute('playsinline');
     expect(mobileVideoPlayer).toHaveAttribute('preload', 'none');
-    expect(mobileVideoPlayer).toHaveAttribute('poster', ABOUT_DEMO_VIDEO_THUMBNAIL_URL);
+    expect(mobileVideoPlayer).not.toHaveAttribute('poster');
     expect(mobileVideoPlayer).toHaveAttribute('src', ABOUT_DEMO_VIDEO_MEDIA_URL);
+    expect(hero.querySelectorAll('iframe')).toHaveLength(0);
+    expect(hero.querySelectorAll('[src*="drive.google.com"]')).toHaveLength(0);
     expect(within(hero).getByRole('button', { name: /play context engine demo video/i })).toBeInTheDocument();
     expect(within(hero).queryByTestId('ce-about-demo-video-open')).not.toBeInTheDocument();
   });
@@ -97,7 +99,7 @@ describe('AboutPage', () => {
       expect(videoPlayer).toHaveAttribute('controls');
       expect(videoPlayer).toHaveAttribute('playsinline');
       expect(videoPlayer).toHaveAttribute('preload', 'none');
-      expect(videoPlayer).toHaveAttribute('poster', ABOUT_DEMO_VIDEO_THUMBNAIL_URL);
+      expect(videoPlayer).not.toHaveAttribute('poster');
       expect(videoPlayer).toHaveAttribute('src', ABOUT_DEMO_VIDEO_MEDIA_URL);
       expect(inlinePlayButton).toBeVisible();
       expect(within(hero).queryByTestId('ce-about-demo-video-drive-link')).not.toBeInTheDocument();
