@@ -86,7 +86,316 @@ const renderInline = (text: string): React.ReactNode[] => {
   return parts;
 };
 
-const renderBlock = ({ block, index, assetBasePath }: RenderBlockArgs) => {
+const splitHeadingSampleSize = (text: string): { label: string; sampleSize: string } | null => {
+  const match = text.match(/^(.*?)(?:\s+)(\(n=\d+\))$/i);
+  if (!match) return null;
+  return { label: match[1], sampleSize: match[2] };
+};
+
+const PostImageFigure = ({ block, assetBasePath }: { block: ImageBlock; assetBasePath?: string }) => {
+  const [isPreviewOpen, setPreviewOpen] = useState(false);
+  const src = sanitizeImageSrc(block.src, assetBasePath);
+
+  useEffect(() => {
+    if (!isPreviewOpen) return undefined;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setPreviewOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isPreviewOpen]);
+
+  if (!src) return null;
+
+  const openLabel = block.alt ? `Open image preview: ${block.alt}` : 'Open image preview';
+
+  return (
+    <figure className={styles.postImageFigure}>
+      <button
+        type="button"
+        className={styles.postImageButton}
+        onClick={() => setPreviewOpen(true)}
+        aria-label={openLabel}
+      >
+        <img className={styles.postImage} src={src} alt={block.alt} loading="lazy" decoding="async" />
+      </button>
+      {isPreviewOpen && (
+        <button
+          type="button"
+          className={`${styles.postImageFullscreen} ${styles.postImageFullscreenOpen}`}
+          onClick={() => setPreviewOpen(false)}
+          aria-label="Close image preview"
+        >
+          <img className={styles.postImageFullscreenImage} src={src} alt="" decoding="async" />
+        </button>
+      )}
+      {block.caption && <figcaption className={styles.postImageCaption}>{renderInline(block.caption)}</figcaption>}
+    </figure>
+  );
+};
+
+const VizGroupStack = ({ block, assetBasePath }: { block: VizGroupBlock; assetBasePath?: string }) => (
+  <div className={styles.vizGroupStack}>
+    {block.blocks.map((childBlock, childIndex) =>
+      childBlock.type === 'viz' ? (
+        <PostViz
+          key={`viz-group-stack-${childIndex}`}
+          spec={childBlock.spec}
+          error={childBlock.error}
+          presentation="slide"
+        />
+      ) : (
+        renderBlock({ block: childBlock, index: childIndex, assetBasePath })
+      ),
+    )}
+  </div>
+);
+
+const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; assetBasePath?: string }) => {
+  const slides = packCarouselSlides(block.blocks);
+  const slideCount = slides.length;
+  const [activeIndex, setActiveIndex] = useState(0);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const slideIntersectionRatiosRef = useRef<Map<Element, number>>(new Map());
+  // Regression guard: programmatic smooth scroll can leave the departing slide
+  // as the max-ratio slide mid-transit. Suppress observer updates until the
+  // requested destination arrives or the user takes over manually.
+  const pendingIndexRef = useRef<number | null>(null);
+  const pendingTimeoutRef = useRef<number | null>(null);
+  const slideTitles = slides.map((slideBlocks, slideIndex) => getCarouselSlideTitle(slideBlocks[0], slideIndex));
+
+  const clearPendingNavigation = useCallback(() => {
+    pendingIndexRef.current = null;
+
+    if (pendingTimeoutRef.current !== null) {
+      window.clearTimeout(pendingTimeoutRef.current);
+      pendingTimeoutRef.current = null;
+    }
+  }, []);
+
+  const restartPendingNavigationTimeout = useCallback(() => {
+    if (pendingTimeoutRef.current !== null) {
+      window.clearTimeout(pendingTimeoutRef.current);
+    }
+
+    pendingTimeoutRef.current = window.setTimeout(() => {
+      pendingIndexRef.current = null;
+      pendingTimeoutRef.current = null;
+    }, 1200);
+  }, []);
+
+  const setSlideIndex = (index: number) => {
+    if (slideCount === 0) return;
+
+    const nextIndex = clampSlideIndex(index, slideCount);
+    if (nextIndex !== activeIndex) {
+      pendingIndexRef.current = nextIndex;
+      restartPendingNavigationTimeout();
+    }
+
+    setActiveIndex(nextIndex);
+  };
+
+  useEffect(() => {
+    if (slideCount === 0) return;
+    setActiveIndex((index) => clampSlideIndex(index, slideCount));
+  }, [slideCount]);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    const slide = slideRefs.current[activeIndex];
+
+    if (!track || !slide || typeof track.scrollTo !== 'function') return;
+
+    track.scrollTo({
+      left: slide.offsetLeft,
+      behavior: getCarouselScrollBehavior(),
+    });
+  }, [activeIndex]);
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === 'undefined') return undefined;
+
+    const track = trackRef.current;
+    if (!track) return undefined;
+    const intersectionRatios = slideIntersectionRatiosRef.current;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          intersectionRatios.set(entry.target, entry.intersectionRatio);
+        });
+
+        let maxRatio = 0;
+        let visibleIndex = -1;
+
+        slideRefs.current.forEach((slide, index) => {
+          if (!slide) return;
+
+          const ratio = intersectionRatios.get(slide) ?? 0;
+          if (ratio > maxRatio) {
+            maxRatio = ratio;
+            visibleIndex = index;
+          }
+        });
+
+        if (visibleIndex >= 0 && maxRatio >= 0.5) {
+          const pendingIndex = pendingIndexRef.current;
+          if (pendingIndex !== null) {
+            if (visibleIndex === pendingIndex) {
+              clearPendingNavigation();
+            }
+
+            return;
+          }
+
+          setActiveIndex(visibleIndex);
+        }
+      },
+      {
+        root: track,
+        threshold: [0.55, 0.75],
+      },
+    );
+
+    slideRefs.current.forEach((slide) => {
+      if (slide) observer.observe(slide);
+    });
+
+    return () => {
+      observer.disconnect();
+      intersectionRatios.clear();
+    };
+  }, [clearPendingNavigation, slideCount]);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return undefined;
+
+    track.addEventListener('wheel', clearPendingNavigation, { passive: true });
+    track.addEventListener('touchstart', clearPendingNavigation, { passive: true });
+    track.addEventListener('pointerdown', clearPendingNavigation, { passive: true });
+
+    return () => {
+      track.removeEventListener('wheel', clearPendingNavigation);
+      track.removeEventListener('touchstart', clearPendingNavigation);
+      track.removeEventListener('pointerdown', clearPendingNavigation);
+    };
+  }, [clearPendingNavigation]);
+
+  useEffect(() => clearPendingNavigation, [clearPendingNavigation]);
+
+  const onCarouselKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+
+    const target = event.target as HTMLElement;
+    const control = target.closest('[data-carousel-control="true"]');
+    const isCarouselTarget = target === event.currentTarget;
+    const isCarouselControl = !!control && event.currentTarget.contains(control);
+
+    if (!isCarouselTarget && !isCarouselControl) return;
+
+    event.preventDefault();
+    setSlideIndex(activeIndex + (event.key === 'ArrowRight' ? 1 : -1));
+  };
+
+  if (slideCount === 0) {
+    return <p className={styles.vizFallback}>Visualization group has no items.</p>;
+  }
+
+  return (
+    <section
+      className={styles.vizCarousel}
+      role="group"
+      aria-roledescription="carousel"
+      aria-label={`${block.title} visualizations`}
+      data-testid="ce-posts-viz-carousel"
+      tabIndex={0}
+      onKeyDown={onCarouselKeyDown}
+    >
+      <div className={styles.vizCarouselTrack} ref={trackRef}>
+        {slides.map((slideBlocks, slideIndex) => (
+          <div
+            key={`viz-carousel-slide-${slideIndex}`}
+            className={styles.vizCarouselSlide}
+            role="group"
+            aria-roledescription="slide"
+            aria-label={`${slideIndex + 1} of ${slideCount}: ${slideTitles[slideIndex]}`}
+            data-active={slideIndex === activeIndex ? 'true' : 'false'}
+            ref={(element) => {
+              slideRefs.current[slideIndex] = element;
+            }}
+          >
+            {slideBlocks.map((childBlock, childIndex) =>
+              childBlock.type === 'viz' ? (
+                <PostViz
+                  key={`viz-carousel-slide-${slideIndex}-viz-${childIndex}`}
+                  spec={childBlock.spec}
+                  error={childBlock.error}
+                  presentation="slide"
+                />
+              ) : (
+                renderBlock({
+                  block: childBlock,
+                  index: childIndex,
+                  assetBasePath,
+                })
+              ),
+            )}
+          </div>
+        ))}
+      </div>
+      <div className={styles.vizCarouselControls}>
+        <button
+          type="button"
+          className={styles.vizCarouselButton}
+          aria-label="Previous visualization"
+          data-testid="ce-posts-viz-carousel-prev"
+          data-carousel-control="true"
+          disabled={activeIndex === 0}
+          onClick={() => setSlideIndex(activeIndex - 1)}
+        >
+          <FontAwesomeIcon icon={faArrowLeft} aria-hidden="true" />
+        </button>
+        <div className={styles.vizCarouselDots} role="group" aria-label="Choose visualization slide">
+          {slideTitles.map((slideTitle, slideIndex) => (
+            <button
+              key={`${slideTitle}-${slideIndex}`}
+              type="button"
+              className={styles.vizCarouselDot}
+              aria-label={`Go to slide ${slideIndex + 1}: ${slideTitle}`}
+              aria-current={activeIndex === slideIndex ? 'true' : undefined}
+              data-testid={`ce-posts-viz-carousel-dot-${slideIndex}`}
+              data-carousel-control="true"
+              onClick={() => setSlideIndex(slideIndex)}
+            />
+          ))}
+        </div>
+        <span className={styles.vizCarouselCounter} aria-live="polite">
+          {activeIndex + 1} / {slideCount}
+        </span>
+        <button
+          type="button"
+          className={styles.vizCarouselButton}
+          aria-label="Next visualization"
+          data-testid="ce-posts-viz-carousel-next"
+          data-carousel-control="true"
+          disabled={activeIndex === slideCount - 1}
+          onClick={() => setSlideIndex(activeIndex + 1)}
+        >
+          <FontAwesomeIcon icon={faArrowRight} aria-hidden="true" />
+        </button>
+      </div>
+    </section>
+  );
+};
+
+const renderBlock = ({ block, index, assetBasePath, vizDefaultOpen, nestedViz = false }: RenderBlockArgs) => {
   if (block.type === 'heading') {
     const HeadingTag = (`h${block.level}` as 'h1' | 'h2' | 'h3');
     return (

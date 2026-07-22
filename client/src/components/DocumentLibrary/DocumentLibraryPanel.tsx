@@ -349,7 +349,7 @@ const fetchArweaveBlobWithFallback = async (
         continue;
       }
       if (isCurrent && !isCurrent()) return { ok: false, error: '', stale: true };
-      // eslint-disable-next-line no-await-in-loop
+
       const blob = await resp.blob();
       if (isCurrent && !isCurrent()) return { ok: false, error: '', stale: true };
       const ct = resp.headers.get('content-type') || blob.type || '';

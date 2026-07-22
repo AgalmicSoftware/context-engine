@@ -97,7 +97,6 @@ const waitFor = async (
   const tick = Math.max(25, Number(tickMs) || 0);
 
   while (true) {
-    // eslint-disable-next-line no-await-in-loop
     const ok = await Promise.resolve()
       .then(fn)
       .catch(() => false);

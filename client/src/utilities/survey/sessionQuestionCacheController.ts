@@ -1238,7 +1238,7 @@ export const createSessionQuestionCacheController = (
 
           for (let i = 0; i < due.length; i += batchSize) {
             const batch = due.slice(i, i + batchSize);
-            // eslint-disable-next-line no-await-in-loop
+
             const results: PendingQuestionRetryResult[] = await Promise.all(
               batch.map(async ({ qid }) => {
                 const lowered = String(qid || '').toLowerCase();
@@ -1919,7 +1919,7 @@ export const createSessionQuestionCacheController = (
 
         // Parallel fetch each question's data from Arweave (group-aware), publishing
         // each result as soon as it lands so the UI can render the first card.
-        // eslint-disable-next-line no-loop-func
+
         await Promise.all(
           batch.map(async (qId: string) => {
             let result: QuestionHydrationResult;

@@ -144,7 +144,6 @@ declare global {
     __litTools?: LitDevToolsApi | null;
   }
 
-  // eslint-disable-next-line no-var
   var CE_E2E_LIT_MOCK: boolean | undefined;
 }
 

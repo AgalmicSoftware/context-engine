@@ -582,7 +582,421 @@ const readResponsePanels = (spec: VizRecord): ResponsePanelDatum[] => (
     .filter((entry): entry is ResponsePanelDatum => !!entry)
 );
 
-const ResponseTypeGridViz = ({ spec }: { spec: VizRecord }) => {
+type BinaryBeeswarmPlacement = {
+  x: number;
+  y: number;
+};
+
+type BinaryConfidenceScale = {
+  min: number;
+  max: number;
+  ticks: number[];
+};
+
+const BINARY_SWARM_WIDTH = 720;
+const BINARY_SWARM_HEIGHT = 300;
+const BINARY_SWARM_LEFT = 74;
+const BINARY_SWARM_RIGHT = 668;
+const BINARY_SWARM_TOP = 34;
+const BINARY_SWARM_BOTTOM = 232;
+const BINARY_SWARM_AXIS_Y = 254;
+const BINARY_SWARM_DOMAIN_MAX = 0.5;
+const BINARY_SWARM_DOT_GAP = 15;
+
+const getBinarySwarmX = (difference: number) =>
+  BINARY_SWARM_LEFT + (difference / BINARY_SWARM_DOMAIN_MAX) * (BINARY_SWARM_RIGHT - BINARY_SWARM_LEFT);
+
+const buildBinaryConfidenceScale = (items: BinaryBeeswarmQuestionDatum[]): BinaryConfidenceScale => {
+  const confidences = items.map((item) => item.averageConfidence).filter((confidence) => confidence > 0);
+
+  if (confidences.length === 0) {
+    return { min: 0, max: 100, ticks: [0, 50, 100] };
+  }
+
+  const min = clamp(Math.floor((Math.min(...confidences) - 4) / 10) * 10, 0, 90);
+  const max = clamp(Math.ceil((Math.max(...confidences) + 4) / 10) * 10, min + 10, 100);
+  const step = max - min > 60 ? 20 : 10;
+  const ticks: number[] = [];
+  for (let tick = min; tick <= max; tick += step) {
+    ticks.push(tick);
+  }
+
+  return { min, max, ticks };
+};
+
+const getBinarySwarmY = (confidence: number, scale: BinaryConfidenceScale) => {
+  if (confidence <= 0) return BINARY_SWARM_BOTTOM;
+  const ratio = clamp((confidence - scale.min) / (scale.max - scale.min), 0, 1);
+  return BINARY_SWARM_BOTTOM - ratio * (BINARY_SWARM_BOTTOM - BINARY_SWARM_TOP);
+};
+
+const buildBinaryBeeswarmPlacements = (items: BinaryBeeswarmQuestionDatum[], scale: BinaryConfidenceScale) => {
+  const placements = new Map<number, BinaryBeeswarmPlacement>();
+  const placed: BinaryBeeswarmPlacement[] = [];
+
+  items.forEach((item, index) => {
+    const base: BinaryBeeswarmPlacement = {
+      x: getBinarySwarmX(item.difference),
+      y: getBinarySwarmY(item.averageConfidence, scale),
+    };
+    let candidate = base;
+    let attempt = 0;
+
+    const collides = (point: BinaryBeeswarmPlacement) =>
+      placed.some((existing) => Math.hypot(existing.x - point.x, existing.y - point.y) < BINARY_SWARM_DOT_GAP);
+
+    while (collides(candidate) && attempt < 12) {
+      attempt += 1;
+      const direction = attempt % 2 === 0 ? 1 : -1;
+      const distance = Math.ceil(attempt / 2) * BINARY_SWARM_DOT_GAP;
+      candidate = {
+        x: clamp(base.x + direction * distance, BINARY_SWARM_LEFT, BINARY_SWARM_RIGHT),
+        y: base.y,
+      };
+    }
+
+    placed.push(candidate);
+    placements.set(index, candidate);
+  });
+
+  return placements;
+};
+
+const BinaryTooltipSplitBar = ({ counts }: { counts: ResponseCountDatum[] }) => {
+  const total = counts.reduce((sum, count) => sum + count.value, 0);
+  if (total <= 0) return null;
+
+  return (
+    <span className={styles.binaryTooltipSplitBar} aria-hidden="true">
+      {counts.map((count) => (
+        <span
+          key={count.label}
+          className={styles.binaryTooltipSplitSegment}
+          style={{
+            width: `${clamp((count.value / total) * 100, 0, 100)}%`,
+            backgroundColor: count.color,
+          }}
+        />
+      ))}
+    </span>
+  );
+};
+
+const BinaryBeeswarmViz = ({ spec, hideHeader = false }: VizBodyProps) => {
+  const title = toText(spec.title) || 'Binary question beeswarm';
+  const subtitle = toText(spec.subtitle);
+  const note = toText(spec.note);
+  const items = readBinaryBeeswarmItems(spec);
+  const scale = buildBinaryConfidenceScale(items);
+  const placements = buildBinaryBeeswarmPlacements(items, scale);
+  const [hoverIndex, setHoverIndex] = React.useState<number | null>(null);
+  const [pinnedIndex, setPinnedIndex] = React.useState<number | null>(null);
+  const reactId = React.useId().replace(/:/g, '');
+  const tooltipId = `binary-beeswarm-tooltip-${reactId}`;
+  const ticks = [0, 0.125, 0.25, 0.375, 0.5];
+  const activeIndex = pinnedIndex ?? hoverIndex;
+  const activeItem = activeIndex === null ? null : items[activeIndex] || null;
+  const activePlacement = activeIndex === null ? null : placements.get(activeIndex) || null;
+  const isPinned = pinnedIndex !== null;
+  const tooltipLeft = activePlacement ? clamp((activePlacement.x / BINARY_SWARM_WIDTH) * 100, 18, 82) : 50;
+  const tooltipTop = activePlacement ? clamp((activePlacement.y / BINARY_SWARM_HEIGHT) * 100, 16, 84) : 50;
+  const renderTooltipBelow = tooltipTop <= SWARM_TOOLTIP_FLIP_TOP_PERCENT;
+  const sphereHighlightId = `binary-beeswarm-sphere-highlight-${reactId}`;
+  const sphereShadowId = `binary-beeswarm-sphere-shadow-${reactId}`;
+  const tooltipStyle: TooltipPositionStyle = {
+    '--post-viz-tooltip-x': `${tooltipLeft}%`,
+    top: `${tooltipTop}%`,
+  };
+
+  const clearPin = React.useCallback(() => setPinnedIndex(null), []);
+  useEscapeToClear(pinnedIndex !== null, clearPin);
+
+  const [view, setView] = React.useState<'swarm' | 'list'>('swarm');
+  const [sortKey, setSortKey] = React.useState<'difference' | 'confidence'>('difference');
+
+  if (items.length === 0) {
+    return <p className={styles.vizFallback}>Visualization has no binary questions.</p>;
+  }
+
+  const switchView = (nextView: 'swarm' | 'list') => {
+    setView(nextView);
+    setPinnedIndex(null);
+    setHoverIndex(null);
+  };
+
+  const sortedItems = [...items].sort((a, b) => {
+    if (sortKey === 'confidence') return b.averageConfidence - a.averageConfidence;
+    return b.difference - a.difference || b.averageConfidence - a.averageConfidence;
+  });
+
+  const viewButtons: Array<{ id: 'swarm' | 'list'; label: string }> = [
+    { id: 'swarm', label: 'Swarm' },
+    { id: 'list', label: 'List' },
+  ];
+  const sortButtons: Array<{ id: 'difference' | 'confidence'; label: string }> = [
+    { id: 'difference', label: 'Most split' },
+    { id: 'confidence', label: 'Confidence' },
+  ];
+
+  return (
+    <section className={`${styles.vizCard} ${styles.binaryBeeswarmCard}`} aria-label={title}>
+      <VizHeader title={title} subtitle={subtitle} hidden={hideHeader} />
+      <div className={styles.vizToolbar}>
+        <div className={styles.vizToggleGroup} role="group" aria-label="Chart view">
+          {viewButtons.map((button) => (
+            <button
+              key={button.id}
+              type="button"
+              className={`${styles.vizToggleButton} ${view === button.id ? styles.vizToggleButtonActive : ''}`}
+              aria-pressed={view === button.id}
+              data-testid={`ce-posts-binary-view-${button.id}`}
+              onClick={() => switchView(button.id)}
+            >
+              {button.label}
+            </button>
+          ))}
+        </div>
+        {view === 'list' && (
+          <div className={styles.vizToggleGroup} role="group" aria-label="Sort questions">
+            <span className={styles.vizToolbarLabel}>Sort</span>
+            {sortButtons.map((button) => (
+              <button
+                key={button.id}
+                type="button"
+                className={`${styles.vizToggleButton} ${sortKey === button.id ? styles.vizToggleButtonActive : ''}`}
+                aria-pressed={sortKey === button.id}
+                data-testid={`ce-posts-binary-sort-${button.id}`}
+                onClick={() => setSortKey(button.id)}
+              >
+                {button.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {view === 'list' && (
+        <ul className={styles.binaryList} data-testid="ce-posts-binary-list">
+          {sortedItems.map((item) => (
+            <li key={item.label} className={styles.binaryListRow}>
+              <p className={styles.binaryListPrompt}>{item.prompt || item.label}</p>
+              <div className={styles.binaryListMeta}>
+                <span className={styles.binaryListBar}>
+                  <BinaryTooltipSplitBar counts={item.counts} />
+                </span>
+                <span className={styles.binaryListCounts}>{formatBinaryCountsLabel(item.counts)}</span>
+                {item.averageConfidence > 0 && (
+                  <span className={styles.binaryListConfidence}>
+                    avg confidence {formatValue(item.averageConfidence)}%
+                  </span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {view === 'swarm' && (
+        <div className={styles.binaryBeeswarmFrame}>
+          <svg
+            className={styles.binaryBeeswarmSvg}
+            viewBox={`0 0 ${BINARY_SWARM_WIDTH} ${BINARY_SWARM_HEIGHT}`}
+            role="img"
+            aria-label={title}
+            onClick={() => setPinnedIndex(null)}
+          >
+            <defs>
+              <radialGradient id={sphereHighlightId} cx="30%" cy="30%" r="68%">
+                <stop offset="0%" stopColor="rgba(255, 255, 255, 0.7)" />
+                <stop offset="36%" stopColor="rgba(255, 255, 255, 0.28)" />
+                <stop offset="72%" stopColor="rgba(255, 255, 255, 0)" />
+              </radialGradient>
+              <filter id={sphereShadowId} x="-70%" y="-70%" width="240%" height="240%" colorInterpolationFilters="sRGB">
+                <feDropShadow dx="0" dy="2" stdDeviation="2" floodColor="#000000" floodOpacity="0.34" />
+              </filter>
+            </defs>
+            {scale.ticks.map((tick) => {
+              const y = getBinarySwarmY(tick, scale);
+              return (
+                <g key={`confidence-${tick}`}>
+                  <line
+                    className={styles.binaryBeeswarmGridline}
+                    x1={BINARY_SWARM_LEFT}
+                    y1={y}
+                    x2={BINARY_SWARM_RIGHT}
+                    y2={y}
+                  />
+                  <text
+                    className={styles.binaryBeeswarmYTickLabel}
+                    x={BINARY_SWARM_LEFT - 10}
+                    y={y + 4}
+                    textAnchor="end"
+                  >
+                    {tick}%
+                  </text>
+                </g>
+              );
+            })}
+            <text
+              className={styles.binaryBeeswarmYAxisLabel}
+              transform={`rotate(-90 16 ${(BINARY_SWARM_TOP + BINARY_SWARM_BOTTOM) / 2})`}
+              x={16}
+              y={(BINARY_SWARM_TOP + BINARY_SWARM_BOTTOM) / 2}
+              textAnchor="middle"
+            >
+              Avg. confidence
+            </text>
+            <line
+              className={styles.binaryBeeswarmAxisBase}
+              x1={BINARY_SWARM_LEFT}
+              y1={BINARY_SWARM_AXIS_Y}
+              x2={BINARY_SWARM_RIGHT}
+              y2={BINARY_SWARM_AXIS_Y}
+            />
+            <line
+              className={styles.binaryBeeswarmAxis}
+              x1={BINARY_SWARM_LEFT}
+              y1={BINARY_SWARM_AXIS_Y}
+              x2={BINARY_SWARM_RIGHT}
+              y2={BINARY_SWARM_AXIS_Y}
+              stroke={BINARY_AXIS_COLOR}
+            />
+            {ticks.map((tick) => {
+              const x = getBinarySwarmX(tick);
+              return (
+                <line
+                  key={tick}
+                  className={styles.binaryBeeswarmTick}
+                  x1={x}
+                  y1={BINARY_SWARM_TOP - 6}
+                  x2={x}
+                  y2={BINARY_SWARM_AXIS_Y + 6}
+                />
+              );
+            })}
+            <text className={styles.binaryBeeswarmAxisLabel} x={BINARY_SWARM_LEFT} y={BINARY_SWARM_HEIGHT - 8}>
+              Consensus
+            </text>
+            <text
+              className={styles.binaryBeeswarmAxisLabel}
+              x={BINARY_SWARM_RIGHT}
+              y={BINARY_SWARM_HEIGHT - 8}
+              textAnchor="end"
+            >
+              Difference
+            </text>
+            {items.map((item, index) => {
+              const placement = placements.get(index) || {
+                x: getBinarySwarmX(item.difference),
+                y: (BINARY_SWARM_TOP + BINARY_SWARM_BOTTOM) / 2,
+              };
+              const countsLabel = formatBinaryCountsLabel(item.counts);
+              const confidenceLabel =
+                item.averageConfidence > 0 ? `, average confidence: ${formatValue(item.averageConfidence)}%` : '';
+              const promptLabel = item.prompt || item.label;
+              const ariaLabel = `${promptLabel}: ${countsLabel}${confidenceLabel}`;
+              const isActive = activeIndex === index;
+              const showTooltip = () => setHoverIndex(index);
+              const hideTooltip = () => setHoverIndex(null);
+              const togglePin = (event: React.SyntheticEvent) => {
+                event.stopPropagation();
+                setPinnedIndex((current) => (current === index ? null : index));
+              };
+              return (
+                <g
+                  key={`${item.label}-${index}`}
+                  className={`${styles.binaryBeeswarmPoint} ${isActive ? styles.binaryBeeswarmPointActive : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={ariaLabel}
+                  aria-pressed={pinnedIndex === index}
+                  aria-describedby={isActive ? tooltipId : undefined}
+                  onMouseEnter={showTooltip}
+                  onMouseLeave={hideTooltip}
+                  onFocus={showTooltip}
+                  onBlur={hideTooltip}
+                  onClick={togglePin}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      togglePin(event);
+                    }
+                  }}
+                >
+                  <circle
+                    className={styles.binaryBeeswarmHitArea}
+                    cx={placement.x}
+                    cy={placement.y}
+                    r={20}
+                    fill="transparent"
+                    onMouseEnter={showTooltip}
+                    onMouseLeave={hideTooltip}
+                  />
+                  <circle
+                    className={styles.binaryBeeswarmDotShadow}
+                    cx={placement.x}
+                    cy={placement.y + 1.2}
+                    r={8.4}
+                    filter={`url(#${sphereShadowId})`}
+                    aria-hidden="true"
+                    pointerEvents="none"
+                  />
+                  <circle
+                    className={styles.binaryBeeswarmDot}
+                    cx={placement.x}
+                    cy={placement.y}
+                    r={7.5}
+                    fill={BINARY_DOT_COLOR}
+                    onMouseEnter={showTooltip}
+                    onMouseLeave={hideTooltip}
+                  />
+                  <circle
+                    className={styles.binaryBeeswarmDotHighlight}
+                    cx={placement.x}
+                    cy={placement.y}
+                    r={7.5}
+                    fill={`url(#${sphereHighlightId})`}
+                    aria-hidden="true"
+                    pointerEvents="none"
+                  />
+                  <title>{ariaLabel}</title>
+                </g>
+              );
+            })}
+          </svg>
+          {activeItem && activePlacement && (
+            <div
+              id={tooltipId}
+              role="tooltip"
+              className={`${styles.binaryBeeswarmTooltip} ${renderTooltipBelow ? styles.binaryBeeswarmTooltipBelow : ''} ${isPinned ? styles.binaryBeeswarmTooltipPinned : ''}`}
+              style={tooltipStyle}
+            >
+              {isPinned && (
+                <button
+                  type="button"
+                  className={styles.binaryBeeswarmTooltipClose}
+                  onClick={() => setPinnedIndex(null)}
+                  aria-label="Close question details"
+                  data-testid="ce-posts-binary-swarm-tooltip-close"
+                >
+                  &times;
+                </button>
+              )}
+              <strong>{activeItem.label}</strong>
+              {activeItem.prompt && activeItem.prompt !== activeItem.label && <p>{activeItem.prompt}</p>}
+              <BinaryTooltipSplitBar counts={activeItem.counts} />
+              <span>{formatBinaryCountsLabel(activeItem.counts)}</span>
+              {activeItem.averageConfidence > 0 && (
+                <span>Average confidence: {formatValue(activeItem.averageConfidence)}%</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      {note && <p className={styles.vizNote}>{renderFormattedText(note)}</p>}
+    </section>
+  );
+};
+
+const ResponseTypeGridViz = ({ spec, hideHeader = false }: VizBodyProps) => {
   const title = toText(spec.title) || 'Response types';
   const subtitle = toText(spec.subtitle);
   const panels = readResponsePanels(spec);

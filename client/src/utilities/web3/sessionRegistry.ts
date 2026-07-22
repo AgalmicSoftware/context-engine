@@ -460,7 +460,7 @@ const sendWithNonceRetry = async ({
     try {
       const tx = await sendWithGasFallback({
         estimate,
-        // eslint-disable-next-line no-loop-func
+
         send: (overrides: TxFeeOverrides) =>
           send({
             ...overrides,

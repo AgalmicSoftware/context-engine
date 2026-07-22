@@ -16,28 +16,9 @@ const readClientFile = (relativePath) => {
   return fs.readFileSync(filePath, 'utf8');
 };
 
-const expectedLintCommand = [
-  'eslint src/',
-  '"src/utilities/ui/**/*.{ts,tsx}"',
-  '"src/components/Shared/**/*.{ts,tsx}"',
-  '"src/components/About/**/*.{ts,tsx}"',
-  '"src/components/Footer/**/*.{ts,tsx}"',
-  '"src/components/InformationModals/**/*.{ts,tsx}"',
-  '"src/components/Onboarding/**/*.{ts,tsx}"',
-  '"src/components/MainContent/**/*.{ts,tsx}"',
-  '"src/components/Agent/**/*.{ts,tsx}"',
-  '"src/components/Bookmarks/**/*.{ts,tsx}"',
-  '"src/components/Sponsor/**/*.{ts,tsx}"',
-  '"src/components/ErrorBoundary/**/*.{ts,tsx}"',
-  '"src/components/RightSidebar/**/*.{ts,tsx}"',
-  '"src/components/E2E/**/*.{ts,tsx}"',
-  '"src/components/Gates/**/*.{ts,tsx}"',
-  '"src/components/CommunityTab/**/*.{ts,tsx}"',
-  '"src/components/PolisReport/**/*.{ts,tsx}"',
-  '"src/components/DebateMap/**/*.{ts,tsx}"',
-  '"src/components/Navbar/**/*.{ts,tsx}"',
-  '"src/components/ContractPage/**/*.{ts,tsx}"',
-].join(' ');
+const readClientJestConfig = () => require(path.resolve(__dirname, '../../../jest.config.cjs'));
+
+const expectedLintCommand = 'eslint --no-error-on-unmatched-pattern "src/**/*.{js,jsx,mjs,cjs,ts,tsx}"';
 
 describe('client package modernization contract', () => {
   it('keeps canonical commands on the Vite and standalone Jest paths', () => {
@@ -320,6 +301,11 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("import tsParser from '@typescript-eslint/parser'");
     expect(eslintConfig).toContain("import reactHooksPlugin from 'eslint-plugin-react-hooks'");
     expect(eslintConfig).toContain("const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}']");
+    expect(eslintConfig).toContain("const typedFiles = ['src/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedReactFiles = ['src/**/*.tsx']");
+    expect(eslintConfig).toContain('files: typedFiles');
+    expect(eslintConfig).toContain('files: typedReactFiles');
+    expect(eslintConfig).toContain("reportUnusedDisableDirectives: 'error'");
     expect(eslintConfig).toContain("const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain('const typedInformationalComponentFiles = [');

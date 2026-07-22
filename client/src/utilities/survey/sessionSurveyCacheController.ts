@@ -620,7 +620,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
 
             for (let i = 0; i < due.length; i += batchSize) {
               const batch = due.slice(i, i + batchSize);
-              // eslint-disable-next-line no-await-in-loop
+
               const results: PendingSurveyRetryResult[] = await Promise.all(
                 batch.map(async ({ sid, entry }) => {
                   const sidLower = String(sid || '').toLowerCase();
@@ -874,7 +874,6 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
                 let surveyData: SurveyMetadata | null = null;
                 let surveyFetchErr: unknown = null;
                 try {
-                  // eslint-disable-next-line no-await-in-loop
                   surveyData = (await surveyContractScripts.getSurveyDataById('none', surveyID, slug, {
                     throwOnFailure: true,
                   })) as SurveyMetadata;

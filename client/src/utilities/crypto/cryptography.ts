@@ -707,7 +707,7 @@ const _getProvider = (providerLike: ProviderLike): Eip1193Provider => {
           }
         }
         // Avoid a hard module cycle at load time.
-        // eslint-disable-next-line global-require
+
         const walletModule = require('../../wallet/passkeyWallet.js');
         const buildPasskeyProvider =
           walletModule?.createPasskeyEip1193Provider || walletModule?.default?.createPasskeyEip1193Provider;
@@ -2077,7 +2077,6 @@ const decryptMultipleAnswers = async (
 
   const answers = slice.answers || {};
   for (const qId of Object.keys(answers)) {
-    // eslint-disable-next-line no-loop-func
     const entry = await tryField(qId, 'answer', answers[qId]).catch((err) => {
       if (throwOnError && !firstErr) firstErr = err instanceof Error ? err : new Error(String(err));
       return null;
@@ -2089,7 +2088,6 @@ const decryptMultipleAnswers = async (
   }
   const additionalComments = slice.additionalComments || {};
   for (const qId of Object.keys(additionalComments)) {
-    // eslint-disable-next-line no-loop-func
     const entry = await tryField(qId, 'additional', additionalComments[qId]).catch((err) => {
       if (throwOnError && !firstErr) firstErr = err instanceof Error ? err : new Error(String(err));
       return null;

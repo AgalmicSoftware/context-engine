@@ -362,10 +362,14 @@ describe('WorkerDeploySection', () => {
     });
 
     expect(screen.getByText('https://deploy-helper.example.test')).toBeInTheDocument();
-    expect(screen.getByText(/browser sends this token only for this deployment attempt to the deploy helper/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/browser sends this token only for this deployment attempt to the deploy helper/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/not saved to the session draft or browser storage/i)).toBeInTheDocument();
     expect(screen.getByText(/earliest expiration Cloudflare permits/i)).toBeInTheDocument();
-    expect(screen.getByText(/revoke the token as soon as deployment succeeds or you abandon the attempt/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/revoke the token as soon as deployment succeeds or you abandon the attempt/i),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Cloudflare API Tokens' })).toHaveAttribute(
       'href',
       'https://dash.cloudflare.com/profile/api-tokens',

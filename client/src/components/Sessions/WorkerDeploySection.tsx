@@ -465,13 +465,14 @@ const WorkerDeploySection = ({
                 This browser sends this token only for this deployment attempt to the deploy helper
                 {cloudflareTokenReceiver ? (
                   <>
-                    {' '}at <code>{cloudflareTokenReceiver}</code>
+                    {' '}
+                    at <code>{cloudflareTokenReceiver}</code>
                   </>
                 ) : (
                   ' at the deploy-helper URL shown above'
                 )}
-                . The helper uses it to call Cloudflare; it is not saved to the session draft or browser storage and
-                is not installed in the deployed Session Worker.
+                . The helper uses it to call Cloudflare; it is not saved to the session draft or browser storage and is
+                not installed in the deployed Session Worker.
               </div>
               <div className={styles.helperText}>
                 Set the earliest expiration Cloudflare permits that still covers setup and an immediate retry. Revoke

@@ -149,21 +149,11 @@ const SESSION_MODE_AUTHORITY_MODES = new Set<string>([
 ]);
 const SESSION_MODE_STORAGE_BACKENDS = new Set<string>(['cloudflare', 'arweave']);
 const SESSION_MODE_ENCRYPTION_MODES = new Set<string>(['none', 'lit', 'worker_envelope']);
-const SESSION_MODE_KEY_PROVIDERS = new Set<string>([
-  'worker_secret',
-  'cloudflare_secrets_store',
-  'external_kms',
-]);
-const SESSION_MODE_LEGACY_PAYLOAD_MODES = new Set<string>([
-  'public_read',
-  'worker_sbt_gate',
-  'lit_encrypted',
-]);
+const SESSION_MODE_KEY_PROVIDERS = new Set<string>(['worker_secret', 'cloudflare_secrets_store', 'external_kms']);
+const SESSION_MODE_LEGACY_PAYLOAD_MODES = new Set<string>(['public_read', 'worker_sbt_gate', 'lit_encrypted']);
 const SESSION_MODE_PRESET_VALUES = new Set<string>(Object.values(SESSION_MODE_PRESET_IDS));
 const SESSION_MODE_GATE_VALUES = new Set<string>(Object.values(SESSION_STORAGE_PAYLOAD_ACCESS_GATES));
-const SESSION_MODE_PAYLOAD_ENCRYPTION_VALUES = new Set<string>(
-  Object.values(SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES),
-);
+const SESSION_MODE_PAYLOAD_ENCRYPTION_VALUES = new Set<string>(Object.values(SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES));
 
 const trim = (value: unknown): string => String(value ?? '').trim();
 const lower = (value: unknown): string => trim(value).toLowerCase();
@@ -428,11 +418,7 @@ export const validateSessionModeProfile = (
     validateEnum('storage.backend', profile.storage?.backend, SESSION_MODE_STORAGE_BACKENDS);
     validateEnum('encryption.mode', profile.encryption?.mode, SESSION_MODE_ENCRYPTION_MODES);
     if (hasOwn(profile.encryption, 'keyProvider')) {
-      validateEnum(
-        'encryption.keyProvider',
-        profile.encryption?.keyProvider,
-        SESSION_MODE_KEY_PROVIDERS,
-      );
+      validateEnum('encryption.keyProvider', profile.encryption?.keyProvider, SESSION_MODE_KEY_PROVIDERS);
     }
     if (isRecord(profile.storage?.payloadAccessControl)) {
       if (hasOwn(profile.storage.payloadAccessControl, 'mode')) {

@@ -64,7 +64,7 @@ describe('litProtocol getKey memoization', () => {
     const realNow = Date.now;
     const cek = new Uint8Array(32).fill(9);
     let t = 1000;
-    // eslint-disable-next-line no-global-assign
+
     Date.now = () => t;
     try {
       const getKeyUncached = jest.fn(async () => {
@@ -87,7 +87,6 @@ describe('litProtocol getKey memoization', () => {
       await expect(getKey({ ...BASE_OPTS, requesterAddress: ADDR_A })).resolves.toBe(cek);
       expect(getKeyUncached).toHaveBeenCalledTimes(1);
     } finally {
-      // eslint-disable-next-line no-global-assign
       Date.now = realNow;
     }
   });
