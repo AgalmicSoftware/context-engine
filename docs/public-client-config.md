@@ -43,7 +43,7 @@ protocol, pinned-authority, and durable-config checks.
 ## How to Configure
 
 1. Copy the example file: `cp client/.env.example client/.env`
-2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows an empty `.env` file is valid. Native Cloudflare deployment uses the checked-in immutable replay commit; helper and healthcheck URLs are legacy/self-host overrides.
+2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows an empty `.env` file is valid. A production release enables native Cloudflare deployment with its reviewed public replay commit; helper and healthcheck URLs are legacy/self-host overrides.
 3. Restart the dev server: `cd client && npm run dev` (client env values are bundled when the dev server or production build starts)
 4. For production (Vercel, Netlify, Cloudflare Pages, etc.): set `REACT_APP_*` vars in your hosting platform's environment settings. Do not commit `client/.env` to git.
 

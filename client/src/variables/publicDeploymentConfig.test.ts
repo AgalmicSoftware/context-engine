@@ -20,7 +20,6 @@ const ORIGINAL_ENV = ENV_KEYS.reduce<Record<string, string | undefined>>((acc, k
 
 const EXPECTED_DEFAULT_SHARED_WORKER_URL = 'https://demo-worker-030226.agalmic.workers.dev'; // intentional: production default worker URL snapshot - must fail if defaults silently change
 const EXPECTED_DEPLOY_HELPER_URL = 'https://ce-deploy-helper.agalmic.workers.dev/'; // intentional: production default deploy URL snapshot - must fail if defaults silently change
-const EXPECTED_NATIVE_REPLAY_COMMIT = '64c18dbc74d7284983f89d29e77f1d290e3d89a8';
 
 const clearPublicDeploymentEnv = () => {
   ENV_KEYS.forEach((key) => {
@@ -74,10 +73,8 @@ describe('publicDeploymentConfig', () => {
       expect(config.DEFAULT_SHARED_WORKER_URL).toBe(EXPECTED_DEFAULT_SHARED_WORKER_URL);
       expect(config.DEPLOY_HELPER_URL).toBe(EXPECTED_DEPLOY_HELPER_URL);
       expect(config.HEALTHCHECK_WORKER_URL).toBe(EXPECTED_DEFAULT_SHARED_WORKER_URL);
-      expect(config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT).toBe(EXPECTED_NATIVE_REPLAY_COMMIT);
-      expect(decodeURIComponent(config.CLOUDFLARE_NATIVE_DEPLOY_URL)).toContain(
-        `/tree/${EXPECTED_NATIVE_REPLAY_COMMIT}/deploy/cloudflare/session-worker`,
-      );
+      expect(config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT).toBe('');
+      expect(config.CLOUDFLARE_NATIVE_DEPLOY_URL).toBe('');
     });
   });
 

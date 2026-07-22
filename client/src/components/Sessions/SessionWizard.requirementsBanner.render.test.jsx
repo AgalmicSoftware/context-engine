@@ -47,13 +47,7 @@ describe('SessionWizard new-session requirements banner', () => {
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     await selectCloudflarePreset();
 
-    const accountLink = screen.getByRole('link', { name: 'Cloudflare account' });
-    const deployUrl = new URL(accountLink.getAttribute('href'));
-
-    expect(deployUrl.origin).toBe('https://deploy.workers.cloudflare.com');
-    expect(decodeURIComponent(deployUrl.searchParams.get('url') || '')).toMatch(
-      /\/tree\/[a-f0-9]{40}\/deploy\/cloudflare\/session-worker$/,
-    );
+    expect(screen.queryByRole('link', { name: 'Cloudflare account' })).not.toBeInTheDocument();
     expect(screen.getByText(/does not ask for a Cloudflare API token/i)).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK)).not.toBeInTheDocument();
   });

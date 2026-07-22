@@ -131,11 +131,12 @@ admin address, and two generated Worker runtime secrets shown by the wizard;
 then deploy and paste the resulting `workers.dev` URL back into the wizard.
 
 The deploy URL must pin an exact 40-character commit so the reviewed source is
-immutable. The checked-in client pins the reviewed package commit; operators
-may override it with `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` only
-for another reviewed release. Moving branches, tags, abbreviated hashes, and
-non-GitHub sources are rejected. The token-based helper procedure later in this
-guide applies only to the legacy fallback.
+immutable. A release enables the native card by setting
+`REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` to the reviewed public
+replay commit. The private source commit is not interchangeable with its public
+replay SHA. Moving branches, tags, abbreviated hashes, and non-GitHub sources
+are rejected. The token-based helper procedure later in this guide applies only
+to the legacy fallback.
 
 ### 2. AI provider key
 

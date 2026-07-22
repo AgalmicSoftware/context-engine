@@ -15,7 +15,6 @@ import {
 const EMPTY_PUBLIC_DEPLOYMENT_ENDPOINT = '';
 const DEFAULT_PROJECT_DEPLOY_HELPER_URL = 'https://ce-deploy-helper.agalmic.workers.dev/';
 const DEFAULT_DEMO_WORKER_URL = 'https://demo-worker-030226.agalmic.workers.dev';
-const DEFAULT_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = '64c18dbc74d7284983f89d29e77f1d290e3d89a8';
 
 export const DEFAULT_SHARED_WORKER_URL = readPublicEnv('REACT_APP_CE_SHARED_WORKER_URL', DEFAULT_DEMO_WORKER_URL);
 
@@ -44,10 +43,7 @@ export const DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = readPublicBoolEnv(
 );
 
 export const CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = normalizeCloudflareNativeDeployCommit(
-  readPublicEnv(
-    'REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT',
-    DEFAULT_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT,
-  ),
+  readPublicEnv('REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT', ''),
 );
 
 export const CLOUDFLARE_NATIVE_DEPLOY_URL = buildCloudflareNativeDeployUrl({
