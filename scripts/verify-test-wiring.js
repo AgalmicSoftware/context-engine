@@ -115,9 +115,24 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/check-client-boundaries.test.mjs');
   expectFile('scripts/client-boundaries-baseline.json');
   expectFile('scripts/check-type-debt-ratchet.mjs');
-  expectFile('scripts/check-coverage-floor.mjs');
-  expectFile('scripts/check-coverage-floor.test.mjs');
+  expectFile('client/jest.full-universe.config.cjs');
+  expectFile('client/tsconfig.tests.json');
+  expectFile('client/types/jest-test-globals.d.ts');
+  expectFile('scripts/capture-client-coverage-baseline.mjs');
+  expectFile('scripts/check-client-coverage-floors.mjs');
+  expectFile('scripts/check-client-coverage-floors.test.mjs');
+  expectFile('scripts/clientCoverageUniverse.js');
+  expectFile('scripts/clientCoverageUniverse.test.js');
   expectFile('scripts/coverage-baseline.json');
+  expectFile('scripts/client-coverage-legacy-files.json');
+  expectFile('scripts/client-coverage-exclusions.json');
+  expectFile('scripts/client-coverage-full-baseline.json');
+  expectFile('scripts/check-client-test-types.mjs');
+  expectFile('scripts/check-client-test-types.test.mjs');
+  expectFile('scripts/clientTestTypeUniverse.js');
+  expectFile('scripts/clientTestTypeUniverse.test.js');
+  expectFile('scripts/client-test-type-contract.json');
+  expectFile('scripts/client-test-type-diagnostics-baseline.json');
   expectFile('scripts/check-dead-exports-advisory.mjs');
   expectFile('scripts/check-dead-exports-advisory.test.mjs');
   expectFile('scripts/dead-exports-baseline.json');
@@ -203,11 +218,10 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('test:wiring', 'dead-exports:check');
   expectScriptContains('test:wiring', 'scripts/verify-test-inventory.js');
   expectScriptContains('tests', 'npm run test:ci');
-  expectScriptContains('tests', 'npm run test:surveys-sbt');
-  expectScriptContains('test:client', '--coverage');
-  expectScriptContains('test:client', '--coverageReporters=json-summary');
+  expectScriptContains('test:client', 'test:coverage:full-universe');
   expectScriptContains('test:release:client', 'npm test -- --watchAll=false --runInBand');
   expectScriptContains('typecheck:client', 'npm --prefix client run typecheck');
+  expectScriptContains('typecheck:client-tests', 'scripts/check-client-test-types.mjs');
   expectScriptContains('worker:bundle', 'scripts/worker-bundle.mjs');
   expectScriptContains('deploy-helper:deploy', 'scripts/deploy-helper-deploy.mjs');
   expectScriptContains('verify:worker-bundle', 'scripts/verify-worker-bundle-sync.mjs');
@@ -215,7 +229,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:public-assets', 'scripts/verify-public-assets.js');
   expectScriptContains('verify:public-text', 'scripts/verify-public-text.js');
   expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
-  expectScriptContains('coverage-floor:check', 'scripts/check-coverage-floor.mjs');
+  expectScriptContains('coverage-floor:check', 'scripts/check-client-coverage-floors.mjs');
   expectScriptContains('dead-exports:advisory', 'scripts/check-dead-exports-advisory.mjs');
   expectScriptContains('dead-exports:check', 'scripts/check-dead-exports-advisory.mjs --check');
   expectScriptContains('verify:release', 'scripts/run-ci-gates.mjs --profile release');
@@ -248,6 +262,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'npm --prefix client run format:check',
     'npm run lint:workers',
     'npm run typecheck:client',
+    'npm run typecheck:client-tests',
     'npm run verify:public-release-surface',
     'npm run verify:public-assets',
     'npm run worker:bundle',
@@ -271,6 +286,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   [
     'npm run lint',
     'npm run typecheck:client',
+    'npm run typecheck:client-tests',
     'npm run test:node:tracked',
     'npm run test:release:client',
     'npm run verify:public-release-surface',

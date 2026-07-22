@@ -67,9 +67,12 @@
     "verify:passkey-only-bundle": "node scripts/verify-passkey-only-bundle.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "jest",
+    "test:coverage": "npm run test:coverage:full-universe",
+    "test:coverage:full-universe": "jest --config jest.full-universe.config.cjs --watchAll=false --runInBand --coverage --coverageReporters=json --coverageReporters=json-summary --coverageReporters=lcov --coverageReporters=text-summary",
     "parity:fixtures": "GENERATE_PARITY_FIXTURES=1 jest --runTestsByPath src/utilities/survey/parityFixtures.test.js --watchAll=false",
     "commonground:export": "GENERATE_COMMONGROUND_EXPORT=1 jest --runTestsByPath src/utilities/survey/commongroundExport.test.js --watchAll=false",
     "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc --project tsconfig.tests.json --noEmit",
     "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.{js,jsx,mjs,cjs,ts,tsx}\"",
     "format:check": "prettier --config .prettierrc.js --ignore-path ../.prettierignore --check \"src/**/*.{js,jsx,mjs,cjs,ts,tsx,css,scss}\""
   },

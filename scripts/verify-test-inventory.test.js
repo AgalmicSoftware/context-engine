@@ -61,6 +61,7 @@ function writeInventoryFixture(rootDir, overrides = {}) {
         ROOT_JEST_TEST_FILES.map((relativePath) => `'<rootDir>/${path.join('..', relativePath)}'`).join(' ')
       }`,
       'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
+      'typecheck:client-tests': 'node scripts/check-client-test-types.mjs',
       'ci:gate': 'node scripts/run-ci-gates.mjs --gate',
       'test:ci': 'node scripts/run-ci-gates.mjs --profile ci',
       'test:node': 'node scripts/run-node-tests.js',
@@ -78,6 +79,12 @@ function writeInventoryFixture(rootDir, overrides = {}) {
       },
       workers: {
         commands: [{ label: 'worker', command: 'npm', args: ['run', 'test:worker:session-cors'] }],
+      },
+      'wiring-and-release': {
+        commands: [{ label: 'types', command: 'npm', args: ['run', 'typecheck:client-tests'] }],
+      },
+      release: {
+        commands: [{ label: 'types', command: 'npm', args: ['run', 'typecheck:client-tests'] }],
       },
     },
   });
@@ -129,6 +136,7 @@ test('verifyTestInventory rejects root scripts that expose non-public worker pat
             ROOT_JEST_TEST_FILES.map((relativePath) => `'<rootDir>/${path.join('..', relativePath)}'`).join(' ')
           }`,
           'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
+          'typecheck:client-tests': 'node scripts/check-client-test-types.mjs',
           'test:private-worker': 'node --test workers/privateWorker/*.test.mjs',
           'ci:gate': 'node scripts/run-ci-gates.mjs --gate',
           'test:ci': 'node scripts/run-ci-gates.mjs --profile ci',

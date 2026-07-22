@@ -77,6 +77,14 @@
           ]
         },
         {
+          "label": "Verify typed client tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "typecheck:client-tests"
+          ]
+        },
+        {
           "label": "Verify public release surface",
           "command": "npm",
           "args": [
@@ -244,6 +252,14 @@
           "args": [
             "run",
             "typecheck:client"
+          ]
+        },
+        {
+          "label": "Verify typed client tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "typecheck:client-tests"
           ]
         },
         {

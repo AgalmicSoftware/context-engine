@@ -31,7 +31,19 @@ function writeJson(repoDir, relativePath, value) {
 
 function writeBaselines(
   repoDir,
-  { violations, counts, deadExports = { candidateDeadFiles: 4, candidateUnusedExports: 2 } },
+  {
+    violations,
+    counts,
+    deadExports = { candidateDeadFiles: 4, candidateUnusedExports: 2 },
+    legacyCoverage = { statements: 75.7, branches: 61, functions: 77, lines: 79.1 },
+    fullCoverage = { statements: 70, branches: 55, functions: 70, lines: 72 },
+    coverageRules = [{ id: 'test-source', jestPatterns: ['!src/**/*.test.ts'], reason: 'tests' }],
+    coverageExceptions = [],
+    legacyCoverageFiles = ['client/src/imported.ts'],
+    typedDiagnostics = [{ signature: 'src/example.test.ts|TS2322|fixture', count: 1 }],
+    typedClassifications = [{ id: 'test-source', pattern: 'client/src/**/*.test.ts' }],
+    typedExclusions = [],
+  },
 ) {
   writeJson(repoDir, 'scripts/client-boundaries-baseline.json', {
     version: 1,
@@ -44,6 +56,18 @@ function writeBaselines(
   writeJson(repoDir, 'scripts/dead-exports-baseline.json', {
     version: 1,
     ...deadExports,
+  });
+  writeJson(repoDir, 'scripts/coverage-baseline.json', { global: legacyCoverage });
+  writeJson(repoDir, 'scripts/client-coverage-full-baseline.json', { global: fullCoverage });
+  writeJson(repoDir, 'scripts/client-coverage-exclusions.json', {
+    rules: coverageRules,
+    explicitProductionFileExceptions: coverageExceptions,
+  });
+  writeJson(repoDir, 'scripts/client-coverage-legacy-files.json', { files: legacyCoverageFiles });
+  writeJson(repoDir, 'scripts/client-test-type-diagnostics-baseline.json', { diagnostics: typedDiagnostics });
+  writeJson(repoDir, 'scripts/client-test-type-contract.json', {
+    classifications: typedClassifications,
+    explicitExclusions: typedExclusions,
   });
 }
 
@@ -127,6 +151,112 @@ test('reports boundary gains and type-debt increases', () => {
     assert.deepEqual(result.deadExportIncreases, [
       { field: 'candidateDeadFiles', base: 4, current: 5 },
     ]);
+  });
+});
+
+test('reports lowered coverage floors, broadened exclusions, and legacy-universe gains', () => {
+  withTempRepo((repoDir) => {
+    writeBaselines(repoDir, {
+      violations: [],
+      counts: { colonAny: 0 },
+    });
+    commitAll(repoDir, 'base baselines');
+    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
+
+    writeBaselines(repoDir, {
+      violations: [],
+      counts: { colonAny: 0 },
+      legacyCoverage: { statements: 75.6, branches: 61, functions: 77, lines: 79.1 },
+      fullCoverage: { statements: 69.9, branches: 55, functions: 70, lines: 72 },
+      coverageRules: [
+        { id: 'test-source', jestPatterns: ['!src/**/*.test.ts'], reason: 'tests' },
+        { id: 'new-exclusion', jestPatterns: ['!src/legacy/**'], reason: 'broader' },
+      ],
+      coverageExceptions: ['client/src/legacy/owner.ts'],
+      legacyCoverageFiles: ['client/src/imported.ts', 'client/src/newly-added.ts'],
+    });
+
+    const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
+    assert.deepEqual(result.coverageRegressions.map((entry) => entry.kind), [
+      'legacy-floor-decrease',
+      'full-floor-decrease',
+      'exclusion-rule-gain',
+      'exclusion-exception-gain',
+      'legacy-file-gain',
+    ]);
+  });
+});
+
+test('verified approval cannot permit coverage-contract regression', () => {
+  withTempRepo((repoDir) => {
+    writeBaselines(repoDir, { violations: [], counts: { colonAny: 0 } });
+    commitAll(repoDir, 'base baselines');
+    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
+    writeBaselines(repoDir, {
+      violations: [],
+      counts: { colonAny: 0 },
+      fullCoverage: { statements: 69, branches: 55, functions: 70, lines: 72 },
+    });
+
+    const result = spawnSync(process.execPath, [
+      SCRIPT_PATH,
+      '--repo', repoDir,
+      '--base', base,
+      '--approval', 'approved',
+    ], { encoding: 'utf8' });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /coverage contract regression cannot be approved/i);
+  });
+});
+
+test('reports typed-test diagnostic growth, classification loss, and contract exclusions', () => {
+  withTempRepo((repoDir) => {
+    writeBaselines(repoDir, { violations: [], counts: { colonAny: 0 } });
+    commitAll(repoDir, 'base baselines');
+    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
+    writeBaselines(repoDir, {
+      violations: [],
+      counts: { colonAny: 0 },
+      typedDiagnostics: [
+        { signature: 'src/example.test.ts|TS2322|fixture', count: 2 },
+        { signature: 'src/new.test.ts|TS2345|new', count: 1 },
+      ],
+      typedClassifications: [],
+      typedExclusions: ['client/src/legacy.test.ts'],
+    });
+
+    const result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
+    assert.deepEqual(result.testTypeRegressions.map((entry) => entry.kind), [
+      'typed-diagnostic-gain',
+      'typed-diagnostic-gain',
+      'typed-classification-loss',
+      'typed-exclusion-gain',
+    ]);
+  });
+});
+
+test('legacy coverage inventory can shrink only when the production file is deleted', () => {
+  withTempRepo((repoDir) => {
+    fs.mkdirSync(path.join(repoDir, 'client/src'), { recursive: true });
+    fs.writeFileSync(path.join(repoDir, 'client/src/imported.ts'), 'export const imported = true;\n');
+    writeBaselines(repoDir, { violations: [], counts: { colonAny: 0 } });
+    commitAll(repoDir, 'base baselines');
+    const base = git(repoDir, ['rev-parse', 'HEAD']).trim();
+
+    writeBaselines(repoDir, {
+      violations: [],
+      counts: { colonAny: 0 },
+      legacyCoverageFiles: [],
+    });
+    let result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
+    assert.deepEqual(result.coverageRegressions, [{
+      kind: 'legacy-live-file-loss',
+      relativePath: 'client/src/imported.ts',
+    }]);
+
+    fs.rmSync(path.join(repoDir, 'client/src/imported.ts'));
+    result = collectBaselineMonotonicityFindings({ repoDir, baseRef: base });
+    assert.deepEqual(result.coverageRegressions, []);
   });
 });
 

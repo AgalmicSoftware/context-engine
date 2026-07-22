@@ -96,6 +96,7 @@ function verifyRootScripts(rootDir, failures) {
   const pkg = readJson(rootDir, 'package.json');
   verifyPackageScript(pkg, 'test:root:jest', '--testMatch', failures);
   verifyPackageScript(pkg, 'test:worker:session-cors', 'npm --prefix workers/sessionCorsWorker test', failures);
+  verifyPackageScript(pkg, 'typecheck:client-tests', 'scripts/check-client-test-types.mjs', failures);
   verifyPackageScript(pkg, 'ci:gate', 'scripts/run-ci-gates.mjs --gate', failures);
   verifyPackageScript(pkg, 'test:ci', 'scripts/run-ci-gates.mjs --profile ci', failures);
 
@@ -120,6 +121,12 @@ function verifyRootScripts(rootDir, failures) {
     }
     if (!gateCommands('workers').includes('npm run test:worker:session-cors')) {
       failures.push('scripts/ci-gates.json gate "workers" must run test:worker:session-cors');
+    }
+    if (!gateCommands('wiring-and-release').includes('npm run typecheck:client-tests')) {
+      failures.push('scripts/ci-gates.json gate "wiring-and-release" must run typecheck:client-tests');
+    }
+    if (!gateCommands('release').includes('npm run typecheck:client-tests')) {
+      failures.push('scripts/ci-gates.json gate "release" must run typecheck:client-tests');
     }
   }
 
