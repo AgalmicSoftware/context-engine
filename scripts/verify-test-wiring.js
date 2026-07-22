@@ -298,7 +298,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectGateContains('workers', 'npm run test:worker:session-cors');
   expectGateContains('workers', 'npm run test:worker:agent-bridge');
   expectGateContains('e2e-smoke', 'npm run test:e2e:smoke');
-  expectGateContains('cecc-and-node', 'npm run test:cc');
+  if (Object.prototype.hasOwnProperty.call(scripts, 'test:cc')) {
+    expectGateContains('cecc-and-node', 'npm run test:cc');
+  } else {
+    expectGateOmits('cecc-and-node', 'npm run test:cc');
+  }
   expectGateContains('cecc-and-node', 'npm run test:node:tracked');
   expectGateOmits('cecc-and-node', 'npm run test:node');
   expectGateContains('cecc-and-node', 'npm run test:cache-guard');

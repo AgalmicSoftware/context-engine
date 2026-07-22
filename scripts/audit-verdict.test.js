@@ -9,6 +9,7 @@ const test = require('node:test');
 
 const repoRoot = path.resolve(__dirname, '..');
 const helperPath = path.join(repoRoot, 'scripts/lib/audit-verdict.sh');
+const auditEntrypoints = ['scripts/audit-full.sh', 'scripts/audit-diff.sh'];
 
 const runVerdict = (content) => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-audit-verdict-'));
@@ -44,8 +45,12 @@ test('missing or malformed terminal verdict fails closed', () => {
   assert.match(missing.stderr, /missing terminal PASS or FAIL/);
 });
 
-test('both audit entrypoints resolve the saved report verdict', () => {
-  for (const relativePath of ['scripts/audit-full.sh', 'scripts/audit-diff.sh']) {
+test('both audit entrypoints resolve the saved report verdict', {
+  skip: auditEntrypoints.some((relativePath) => !fs.existsSync(path.join(repoRoot, relativePath)))
+    ? 'private audit entrypoints are not included in public release artifacts'
+    : false,
+}, () => {
+  for (const relativePath of auditEntrypoints) {
     const source = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
     assert.match(source, /lib\/audit-verdict\.sh/);
     assert.match(source, /resolve_audit_report_verdict "\$REPORT_FILE"/);

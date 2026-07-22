@@ -190,11 +190,14 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '/contracts/ @AgalmicSoftware',
       ].join('\n'),
     );
-    writeFile(
-      rootDir,
-      'scripts/ci-gates.json',
+    const publicGateManifest = JSON.parse(
       fs.readFileSync(path.join(__dirname, 'ci-gates.json'), 'utf8'),
     );
+    publicGateManifest.gates['cecc-and-node'].commands =
+      publicGateManifest.gates['cecc-and-node'].commands.filter((entry) => (
+        !entry.args.includes('test:cc')
+      ));
+    writeFile(rootDir, 'scripts/ci-gates.json', `${JSON.stringify(publicGateManifest, null, 2)}\n`);
     writeFile(
       rootDir,
       '.github/workflows/publish-worker-bundles.yml',
