@@ -404,6 +404,7 @@ const SessionWizardShell = ({
       renderInfoTooltip={renderSessionWizardInfoTooltip}
       sessionModeProfileControl={sessionModeProfileControl}
       sessionModeProfileLabel={sessionModeProfileLabel}
+      sessionModeProfileSelectionStep={showSessionModeProfileGate}
       wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
       wizardMode={wizardMode}
     />

@@ -5,18 +5,46 @@ import SessionModeProfileField from './SessionModeProfileField';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('SessionModeProfileField', () => {
-  it('renders compact hosting choices with Corporate visibly unavailable', () => {
+  it('renders two entry cards with the inputs needed for each setup path', () => {
     const onChange = jest.fn();
     render(<SessionModeProfileField registryChainId={11155420} onChange={onChange} entryOnly />);
 
     expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'How should this session run?' })).toBeInTheDocument();
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByText('Cloudflare login / AI API Key')).toBeInTheDocument();
+    expect(screen.getByText('AI API Key / Arweave wallet / RPC URL / testnet gas')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
     const selector = screen.getByRole('radiogroup', { name: 'Session hosting profile' });
-    expect(within(selector).getByRole('radio', { name: /Cloudflare/i })).toBeInTheDocument();
-    expect(within(selector).getByRole('radio', { name: 'Decentralized' })).toBeInTheDocument();
-    expect(within(selector).getByRole('radio', { name: /Corporate.*coming later/i })).toBeDisabled();
+    expect(within(selector).getByRole('radio', { name: 'Fast & Cheap (Cloudflare)' })).toBeInTheDocument();
+    expect(within(selector).getByRole('radio', { name: 'Trustless & Public (Decentralized)' })).toBeInTheDocument();
+    expect(within(selector).queryByRole('radio', { name: /Corporate/i })).not.toBeInTheDocument();
+  });
+
+  it('collapses the chosen entry card into the compact hosting selector', () => {
+    const Harness = () => {
+      const [profile, setProfile] = React.useState<ReturnType<typeof cloneSessionModePreset> | null>(null);
+      const [entryOnly, setEntryOnly] = React.useState(true);
+      return (
+        <SessionModeProfileField
+          registryChainId={11155420}
+          value={profile}
+          onChange={(nextProfile) => setProfile(nextProfile)}
+          onContinue={() => setEntryOnly(false)}
+          entryOnly={entryOnly}
+          showContinue={entryOnly}
+        />
+      );
+    };
+    render(<Harness />);
+
+    fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
+
+    expect(screen.queryByText('Cloudflare login / AI API Key')).not.toBeInTheDocument();
+    expect(screen.getByText('Hosting')).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Cloudflare (recommended)' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: /Corporate.*coming later/i })).toBeDisabled();
   });
 
   it('sends customization into the wizard instead of opening a header popover', () => {

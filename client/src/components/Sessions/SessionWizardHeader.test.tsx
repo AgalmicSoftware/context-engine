@@ -46,6 +46,21 @@ describe('SessionWizardHeader', () => {
     expect(baseProps.onEnterNormalMode).toHaveBeenCalledTimes(1);
   });
 
+  it('gives the initial profile cards the full header surface before setup continues', () => {
+    render(
+      <SessionWizardHeader
+        {...baseProps}
+        sessionModeProfileControl={<div data-testid="hosting-profile-control">hosting cards</div>}
+        sessionModeProfileSelectionStep
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
+    expect(screen.getByTestId('hosting-profile-control')).toHaveTextContent('hosting cards');
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();
+  });
+
   it('renders sponsored display settings without changing the mode test ids', () => {
     render(<SessionWizardHeader {...baseProps} hasSponsoredBundleLink wizardDisplaySettingsOpen />);
 

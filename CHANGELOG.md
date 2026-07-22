@@ -93,6 +93,10 @@ All notable changes to this project will be documented in this file.
   and previewed Corporate hosting as unavailable without changing publishing
   semantics. Cloudflare token guidance now explains that the linked form
   prefills permissions for users already signed in.
+- Restored the two primary `/new` setup choices as large, requirement-aware
+  entry cards. Selecting Fast & Cheap or Trustless & Public now transitions to
+  the existing compact header selector; the native fast path identifies its
+  creator inputs as a Cloudflare login and one AI API key.
 - Made `contextengine.sh` the canonical public URL across site metadata,
   discovery assets, documentation, and Agent Bridge links. Worker and Bridge
   bootstrap allowlists now prefer `.sh` while retaining `.xyz` as redirect

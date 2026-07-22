@@ -13,6 +13,12 @@ Related docs:
 
 ## What a New Session Needs
 
+The first `/new` screen presents the two implemented setup paths as large cards
+with their required inputs. After a creator chooses one, the cards collapse to
+the compact Hosting selector in the wizard header so the profile can still be
+changed. The Fast & Cheap card summarizes its inputs as
+`Cloudflare login / AI API Key`.
+
 For the default `Fast & Cheap (Cloudflare)` preset, the user needs a Cloudflare
 account and one API key for the selected AI provider. The native deploy button
 runs in Cloudflare and does not ask for a Cloudflare API token, OAuth token,

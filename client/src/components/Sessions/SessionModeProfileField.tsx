@@ -25,12 +25,20 @@ const HOSTING_PRESETS = [
     id: SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
     label: 'Cloudflare',
     ariaLabel: 'Cloudflare (recommended)',
+    entryLabel: 'Fast & Cheap',
+    entryProvider: 'Cloudflare',
+    entryDescription: 'Launch a dedicated Session Worker without an on-chain publish step.',
+    entryRequirements: 'Cloudflare login / AI API Key',
     recommended: true,
   },
   {
     id: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
     label: 'Decentralized',
     ariaLabel: 'Decentralized',
+    entryLabel: 'Trustless & Public',
+    entryProvider: 'Decentralized',
+    entryDescription: 'Publish session authority on-chain and store public data with Arweave.',
+    entryRequirements: 'AI API Key / Arweave wallet / RPC URL / testnet gas',
     recommended: false,
   },
 ] as const;
@@ -102,47 +110,90 @@ const SessionModeProfileField = ({
     selectPreset(nextPreset.id);
   };
 
+  const renderPreset = (preset: (typeof HOSTING_PRESETS)[number], index: number, entryCard: boolean) => {
+    const selected = selectedPreset === preset.id;
+    return (
+      <button
+        key={preset.id}
+        type="button"
+        role="radio"
+        aria-checked={selected}
+        aria-label={entryCard ? `${preset.entryLabel} (${preset.entryProvider})` : preset.ariaLabel}
+        className={
+          entryCard
+            ? `${styles.modePresetCard} ${selected ? styles.modePresetCardSelected : ''}`
+            : `${styles.modePresetButton} ${selected ? styles.modePresetButtonSelected : ''}`
+        }
+        data-testid={`ce-new-preset-${preset.id}`}
+        tabIndex={selected || (!selectedPreset && index === 0) ? 0 : -1}
+        onClick={() => selectPreset(preset.id)}
+        onKeyDown={(event) => handlePresetKeyDown(event, index)}
+      >
+        {entryCard ? (
+          <>
+            <span className={styles.modePresetCardHeader}>
+              <span>
+                <span className={styles.modePresetCardTitle}>{preset.entryLabel}</span>
+                <span className={styles.modePresetCardProvider}>{preset.entryProvider}</span>
+              </span>
+              {preset.recommended ? <span className={styles.modePresetCardBadge}>Recommended</span> : null}
+            </span>
+            <span className={styles.modePresetCardDescription}>{preset.entryDescription}</span>
+            <span className={styles.modePresetCardRequirements}>
+              <span className={styles.modePresetCardRequirementsLabel}>What you&apos;ll need</span>
+              <span className={styles.modePresetCardRequirementsValue}>{preset.entryRequirements}</span>
+            </span>
+          </>
+        ) : (
+          <>
+            <span>{preset.label}</span>
+            {preset.recommended ? <span className={styles.modePresetBadge}>Recommended</span> : null}
+          </>
+        )}
+      </button>
+    );
+  };
+
   return (
-    <section className={styles.modeProfilePanel} aria-label="Session hosting">
-      <span className={styles.modeProfileCompactLabel}>Hosting</span>
-      <div className={styles.modePresetToggle} role="radiogroup" aria-label="Session hosting profile">
-        {HOSTING_PRESETS.map((preset, index) => {
-          const selected = selectedPreset === preset.id;
-          return (
+    <section
+      className={`${styles.modeProfilePanel} ${entryOnly ? styles.modeProfileEntryPanel : ''}`}
+      aria-label="Session hosting"
+    >
+      {entryOnly ? (
+        <>
+          <div className={styles.modeProfileEntryIntro}>
+            <span className={styles.modeProfileEntryEyebrow}>Choose a setup</span>
+            <h2>How should this session run?</h2>
+            <p>Select the infrastructure path that matches the inputs you have available.</p>
+          </div>
+          <div className={styles.modePresetCards} role="radiogroup" aria-label="Session hosting profile">
+            {HOSTING_PRESETS.map((preset, index) => renderPreset(preset, index, true))}
+          </div>
+        </>
+      ) : (
+        <>
+          <span className={styles.modeProfileCompactLabel}>Hosting</span>
+          <div className={styles.modePresetToggle} role="radiogroup" aria-label="Session hosting profile">
+            {HOSTING_PRESETS.map((preset, index) => renderPreset(preset, index, false))}
             <button
-              key={preset.id}
               type="button"
               role="radio"
-              aria-checked={selected}
-              aria-label={preset.ariaLabel}
-              className={`${styles.modePresetButton} ${selected ? styles.modePresetButtonSelected : ''}`}
-              data-testid={`ce-new-preset-${preset.id}`}
-              tabIndex={selected || (!selectedPreset && index === 0) ? 0 : -1}
-              onClick={() => selectPreset(preset.id)}
-              onKeyDown={(event) => handlePresetKeyDown(event, index)}
+              aria-label="Corporate (coming later)"
+              aria-checked="false"
+              className={`${styles.modePresetButton} ${styles.modePresetButtonDisabled}`}
+              title="Corporate hosting is coming later"
+              disabled
+              tabIndex={-1}
             >
-              <span>{preset.label}</span>
-              {preset.recommended ? <span className={styles.modePresetBadge}>Recommended</span> : null}
+              <span>Corporate</span>
+              <span className={styles.modePresetSoon}>Later</span>
             </button>
-          );
-        })}
-        <button
-          type="button"
-          role="radio"
-          aria-label="Corporate (coming later)"
-          aria-checked="false"
-          className={`${styles.modePresetButton} ${styles.modePresetButtonDisabled}`}
-          title="Corporate hosting is coming later"
-          disabled
-          tabIndex={-1}
-        >
-          <span>Corporate</span>
-          <span className={styles.modePresetSoon}>Later</span>
-        </button>
-      </div>
+          </div>
+        </>
+      )}
 
       {entryOnly && profile ? (
-        <div className={styles.modeSavedProfile}>
+        <div className={`${styles.modeSavedProfile} ${styles.modeSavedProfileEntry}`}>
           <span>Saved {profile.preset === SESSION_MODE_PRESET_IDS.CUSTOM ? 'custom' : 'hosting'} settings</span>
           <Button type="button" color="primary" onClick={onContinue}>
             Continue with saved settings

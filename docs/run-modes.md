@@ -84,7 +84,8 @@ This is labeled `Fast & Cheap (Cloudflare)` in the wizard.
 - A creator deploys a per-session Cloudflare Worker with Cloudflare-backed
   canonical config and payload storage.
 - `worker_canonical` authority and `worker_envelope` encryption are the defaults.
-- Creator-facing setup needs a Cloudflare API token and one AI-provider key.
+- Creator-facing setup needs a Cloudflare login and one AI-provider key. The
+  native deploy flow does not ask the creator to copy a Cloudflare API token.
 - The passkey-derived EOA supplies signing and admin identity, but publishing
   this profile does not submit an EVM transaction or require gas.
 - EVM contracts, registry/RPC access, Arweave, and Lit are not dependencies of
