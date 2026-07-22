@@ -93,14 +93,16 @@ test('public-release style copies without .git still pass wiring checks', () => 
         'jobs:',
         '  wiring-and-release:',
         '    steps:',
-        '      - uses: actions/checkout@1111111111111111111111111111111111111111',
+        '      - uses: actions/checkout@v4',
         '        with:',
         '          fetch-depth: 0',
+        '      - run: npm run test:wiring',
+        '      - run: npm run type-debt:check',
         '      - run: node scripts/resolve-baseline-growth-approval.mjs',
-        '      - run: node scripts/resolve-baseline-monotonicity-base.mjs',
         '      - env:',
-        '          BASELINE_MONOTONICITY_BASE: ${{ github.event.pull_request.base.sha || \'origin/main\' }}',
-        '        run: node scripts/check-baseline-monotonicity.mjs',
+        '          BASELINE_MONOTONICITY_BASE: ${{ github.event_name == \'pull_request\' && github.event.pull_request.base.sha || github.event.before }}',
+        '          BASELINE_MONOTONICITY_APPROVED: ${{ steps.baseline-growth-approval.outputs.approved }}',
+        '        run: node scripts/check-baseline-monotonicity.mjs --require-base-sha',
         '      - run: npm run lint',
         '      - run: npm run typecheck:client',
         '      - run: npm run verify:public-release-surface',
@@ -156,35 +158,13 @@ test('public-release style copies without .git still pass wiring checks', () => 
       '.github/CODEOWNERS',
       [
         '/.github/workflows/ci.yml @AgalmicSoftware',
-        '/.github/workflows/publish-worker-bundles.yml @AgalmicSoftware',
-        '/.github/workflows/promote-worker-bundles.yml @AgalmicSoftware',
-        '/.github/workflows/public-drift.yml @AgalmicSoftware',
         '/scripts/check-baseline-monotonicity.mjs @AgalmicSoftware',
-        '/scripts/resolve-baseline-monotonicity-base.mjs @AgalmicSoftware',
         '/scripts/resolve-baseline-growth-approval.mjs @AgalmicSoftware',
-        '/scripts/ci-gates.json @AgalmicSoftware',
-        '/scripts/run-ci-gates.mjs @AgalmicSoftware',
-        '/scripts/run-ci-gates.test.mjs @AgalmicSoftware',
-        '/scripts/worker-release-artifacts.mjs @AgalmicSoftware',
-        '/scripts/worker-release-artifacts.test.mjs @AgalmicSoftware',
-        '/scripts/sync-public-history.sh @AgalmicSoftware',
         '/scripts/client-boundaries-baseline.json @AgalmicSoftware',
         '/scripts/type-debt-baseline.json @AgalmicSoftware',
         '/scripts/dead-exports-baseline.json @AgalmicSoftware',
-        '/scripts/client-bundle-budget.json @AgalmicSoftware',
-        '/scripts/verify-abi-sync.mjs @AgalmicSoftware',
-        '/client/src/contractsABI/ @AgalmicSoftware',
-        '/contracts/ @AgalmicSoftware',
       ].join('\n'),
     );
-    const publicGateManifest = JSON.parse(
-      fs.readFileSync(path.join(__dirname, 'ci-gates.json'), 'utf8'),
-    );
-    publicGateManifest.gates['cecc-and-node'].commands =
-      publicGateManifest.gates['cecc-and-node'].commands.filter((entry) => (
-        !entry.args.includes('test:cc')
-      ));
-    writeFile(rootDir, 'scripts/ci-gates.json', `${JSON.stringify(publicGateManifest, null, 2)}\n`);
     writeFile(
       rootDir,
       '.github/workflows/publish-worker-bundles.yml',
@@ -240,6 +220,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/dead-exports-baseline.json',
       'scripts/check-baseline-monotonicity.mjs',
       'scripts/check-baseline-monotonicity.test.mjs',
+      'scripts/resolve-baseline-growth-approval.mjs',
+      'scripts/resolve-baseline-growth-approval.test.mjs',
       'scripts/testInventoryConfig.js',
       'scripts/verify-test-inventory.js',
       'scripts/verify-test-inventory.test.js',
