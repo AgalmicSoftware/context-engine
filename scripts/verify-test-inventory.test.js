@@ -61,10 +61,25 @@ function writeInventoryFixture(rootDir, overrides = {}) {
         ROOT_JEST_TEST_FILES.map((relativePath) => `'<rootDir>/${path.join('..', relativePath)}'`).join(' ')
       }`,
       'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
-      'test:ci': 'npm run test:root:jest && npm run test:worker:session-cors && npm run test:node',
+      'ci:gate': 'node scripts/run-ci-gates.mjs --gate',
+      'test:ci': 'node scripts/run-ci-gates.mjs --profile ci',
       'test:node': 'node scripts/run-node-tests.js',
     },
     ...(overrides.packageJson || {}),
+  });
+  writeJson(rootDir, 'scripts/ci-gates.json', {
+    schemaVersion: 1,
+    profiles: {
+      ci: ['root-jest', 'workers'],
+    },
+    gates: {
+      'root-jest': {
+        commands: [{ label: 'root', command: 'npm', args: ['run', 'test:root:jest'] }],
+      },
+      workers: {
+        commands: [{ label: 'worker', command: 'npm', args: ['run', 'test:worker:session-cors'] }],
+      },
+    },
   });
 }
 
@@ -104,7 +119,8 @@ test('verifyTestInventory rejects root scripts that expose non-public worker pat
           }`,
           'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
           'test:private-worker': 'node --test workers/privateWorker/*.test.mjs',
-          'test:ci': 'npm run test:root:jest && npm run test:worker:session-cors && npm run test:node',
+          'ci:gate': 'node scripts/run-ci-gates.mjs --gate',
+          'test:ci': 'node scripts/run-ci-gates.mjs --profile ci',
           'test:node': 'node scripts/run-node-tests.js',
         },
       },

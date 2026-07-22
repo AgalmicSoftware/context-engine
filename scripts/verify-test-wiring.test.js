@@ -31,10 +31,16 @@ test('repo test wiring invariants hold', () => {
 test('agent bridge tests are reachable through root CI and the workers job', () => {
   const rootDir = path.resolve(__dirname, '..');
   const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+  const manifest = JSON.parse(fs.readFileSync(path.join(rootDir, 'scripts/ci-gates.json'), 'utf8'));
   const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
 
-  assert.match(pkg.scripts['test:ci'], /npm run test:worker:agent-bridge/);
-  assert.match(workflow, /run: npm run test:worker:agent-bridge/);
+  assert.match(pkg.scripts['test:ci'], /run-ci-gates\.mjs --profile ci/);
+  assert.ok(manifest.profiles.ci.includes('workers'));
+  assert.ok(
+    manifest.gates.workers.commands
+      .some((entry) => entry.args.join(' ') === 'run test:worker:agent-bridge'),
+  );
+  assert.match(workflow, /run: npm run ci:gate -- workers/);
 });
 
 test('agent bridge runner skips cleanly when a public artifact omits the worker', () => {
@@ -69,8 +75,11 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:e2e:quick': 'npm run -s test:e2e:smoke',
           'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',
           'ai:test-nav:smoke': 'node scripts/vite-navigation-smoke.js',
-          'test:ci':
-            'npm run test:wiring && npm run type-debt:check && npm run verify:release && npm run verify:abi-sync && npm run test:client && npm run coverage-floor:check && npm run test:root:jest && npm run test:worker:session-cors && npm run test:worker:agent-bridge && npm run test:node',
+          'type-debt:check': 'node scripts/check-type-debt-ratchet.mjs',
+          'coverage-floor:check': 'node scripts/check-coverage-floor.mjs',
+          'ci:gate': 'node scripts/run-ci-gates.mjs --gate',
+          'ci:gates:check-hosted': 'node scripts/run-ci-gates.mjs --check-results hosted',
+          'test:ci': 'node scripts/run-ci-gates.mjs --profile ci',
           'test:wiring':
             'node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check && npm run -s dead-exports:check',
           tests: 'npm run test:ci && npm run test:surveys-sbt',
@@ -83,8 +92,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'verify:public-assets': 'node scripts/verify-public-assets.js',
           'verify:public-text': 'node scripts/verify-public-text.js',
           'verify:public-release-pii': 'bash scripts/verify-public-release-pii.sh',
-          'verify:release':
-            'npm run lint && npm run typecheck:client && npm run -s test:node:tracked && npm run test:release:client && npm run verify:public-release-surface && npm run verify:public-assets && npm run worker:bundle && npm run verify:worker-bundle && npm --prefix client run build',
+          'verify:release': 'node scripts/run-ci-gates.mjs --profile release',
         },
       }),
     );
@@ -98,29 +106,20 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '      - uses: actions/checkout@v4',
         '        with:',
         '          fetch-depth: 0',
-        '      - run: npm run test:wiring',
-        '      - run: npm run type-debt:check',
         '      - run: node scripts/resolve-baseline-growth-approval.mjs',
         '      - env:',
         '          BASELINE_MONOTONICITY_BASE: ${{ github.event_name == \'pull_request\' && github.event.pull_request.base.sha || github.event.before }}',
         '          BASELINE_MONOTONICITY_APPROVED: ${{ steps.baseline-growth-approval.outputs.approved }}',
         '        run: node scripts/check-baseline-monotonicity.mjs --require-base-sha',
-        '      - run: npm run lint',
-        '      - run: npm run typecheck:client',
-        '      - run: npm run verify:public-release-surface',
-        '      - run: npm run verify:public-assets',
-        '      - run: npm run verify:public-text',
-        '      - run: npm run worker:bundle',
-        '      - run: npm run verify:worker-bundle',
-        '      - run: npm --prefix client run build',
+        '      - run: npm run ci:gate -- wiring-and-release',
+        '      - run: npm run ci:gate -- public-text',
         '  contracts:',
         '    steps:',
-        '      - run: npm run test:contracts',
-        '      - run: npm run verify:abi-sync',
+        '      - run: npm run ci:gate -- contracts',
         '  client:',
         '    steps:',
         '      - run: npm run ci:gate -- client',
-        '      - uses: actions/upload-artifact@1111111111111111111111111111111111111111',
+        '      - uses: actions/upload-artifact@v4',
         '        with:',
         '          path: client/coverage/lcov.info',
         '  root-jest:',
@@ -128,12 +127,14 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '      - run: npm run ci:gate -- root-jest',
         '  workers:',
         '    steps:',
-        '      - run: npm run test:worker:session-cors',
-        '      - run: npm run test:worker:agent-bridge',
+        '      - run: npm run ci:gate -- workers',
+        '  e2e-smoke:',
+        '    steps:',
+        '      - run: npm --prefix client run build',
+        '      - run: npm run ci:gate -- e2e-smoke',
         '  cecc-and-node:',
         '    steps:',
-        '      - run: npm run test:node',
-        '      - run: npm run test:cache-guard',
+        '      - run: npm run ci:gate -- cecc-and-node',
         '      - continue-on-error: true',
         '        run: npm run dead-exports:advisory',
         '  test:',
@@ -149,11 +150,6 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '      - env:',
         '          CI_GATE_RESULTS_JSON: {"wiring-and-release":"${{ needs.wiring-and-release.result }}","public-text":"${{ needs.wiring-and-release.result }}"}',
         '        run: npm run ci:gates:check-hosted',
-        '      - run: node scripts/worker-release-artifacts.mjs resolve-source',
-        '      - run: node scripts/worker-release-artifacts.mjs create',
-        '      - uses: actions/upload-artifact@1111111111111111111111111111111111111111',
-        '        with:',
-        '          name: worker-bundles-${{ github.sha }}',
       ].join('\n'),
     );
     writeFile(
@@ -163,6 +159,9 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '/.github/workflows/ci.yml @AgalmicSoftware',
         '/scripts/check-baseline-monotonicity.mjs @AgalmicSoftware',
         '/scripts/resolve-baseline-growth-approval.mjs @AgalmicSoftware',
+        '/scripts/ci-gates.json @AgalmicSoftware',
+        '/scripts/run-ci-gates.mjs @AgalmicSoftware',
+        '/scripts/run-ci-gates.test.mjs @AgalmicSoftware',
         '/scripts/client-boundaries-baseline.json @AgalmicSoftware',
         '/scripts/type-debt-baseline.json @AgalmicSoftware',
         '/scripts/dead-exports-baseline.json @AgalmicSoftware',
@@ -170,6 +169,11 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '/client/src/contractsABI/ @AgalmicSoftware',
         '/contracts/ @AgalmicSoftware',
       ].join('\n'),
+    );
+    writeFile(
+      rootDir,
+      'scripts/ci-gates.json',
+      fs.readFileSync(path.join(__dirname, 'ci-gates.json'), 'utf8'),
     );
     writeFile(
       rootDir,
@@ -228,6 +232,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/check-baseline-monotonicity.test.mjs',
       'scripts/resolve-baseline-growth-approval.mjs',
       'scripts/resolve-baseline-growth-approval.test.mjs',
+      'scripts/run-ci-gates.mjs',
+      'scripts/run-ci-gates.test.mjs',
       'scripts/verify-abi-sync.mjs',
       'scripts/verify-abi-sync.test.mjs',
       'scripts/lib/audit-verdict.sh',

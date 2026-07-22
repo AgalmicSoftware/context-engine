@@ -11,10 +11,12 @@
     ],
     "hosted": [
       "wiring-and-release",
+      "public-text",
       "contracts",
       "client",
       "root-jest",
       "workers",
+      "e2e-smoke",
       "cecc-and-node"
     ],
     "release": [
@@ -49,6 +51,16 @@
           ]
         },
         {
+          "label": "Check client formatting",
+          "command": "npm",
+          "args": [
+            "--prefix",
+            "client",
+            "run",
+            "format:check"
+          ]
+        },
+        {
           "label": "Lint workers",
           "command": "npm",
           "args": [
@@ -70,6 +82,14 @@
           "args": [
             "run",
             "verify:public-release-surface"
+          ]
+        },
+        {
+          "label": "Verify public asset ownership",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:public-assets"
           ]
         },
         {
@@ -100,6 +120,18 @@
         }
       ]
     },
+    "public-text": {
+      "commands": [
+        {
+          "label": "Verify public text exposure",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:public-text"
+          ]
+        }
+      ]
+    },
     "contracts": {
       "commands": [
         {
@@ -108,6 +140,14 @@
           "args": [
             "run",
             "test:contracts"
+          ]
+        },
+        {
+          "label": "Verify tracked contract ABIs",
+          "command": "npm",
+          "args": [
+            "run",
+            "abi:check"
           ]
         }
       ]
@@ -120,6 +160,14 @@
           "args": [
             "run",
             "test:client"
+          ]
+        },
+        {
+          "label": "Check client coverage floor",
+          "command": "npm",
+          "args": [
+            "run",
+            "coverage-floor:check"
           ]
         }
       ]
@@ -152,6 +200,18 @@
           "args": [
             "run",
             "test:worker:agent-bridge"
+          ]
+        }
+      ]
+    },
+    "e2e-smoke": {
+      "commands": [
+        {
+          "label": "Run tracked E2E smoke",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:e2e:smoke"
           ]
         }
       ]
@@ -200,6 +260,14 @@
           "args": [
             "run",
             "verify:public-release-surface"
+          ]
+        },
+        {
+          "label": "Verify public asset ownership",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:public-assets"
           ]
         },
         {

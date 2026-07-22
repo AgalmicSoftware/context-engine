@@ -81,8 +81,32 @@ function verifyRootScripts(rootDir, failures) {
   const pkg = readJson(rootDir, 'package.json');
   verifyPackageScript(pkg, 'test:root:jest', '--testMatch', failures);
   verifyPackageScript(pkg, 'test:worker:session-cors', 'npm --prefix workers/sessionCorsWorker test', failures);
-  verifyPackageScript(pkg, 'test:ci', 'npm run test:root:jest', failures);
-  verifyPackageScript(pkg, 'test:ci', 'npm run test:worker:session-cors', failures);
+  verifyPackageScript(pkg, 'ci:gate', 'scripts/run-ci-gates.mjs --gate', failures);
+  verifyPackageScript(pkg, 'test:ci', 'scripts/run-ci-gates.mjs --profile ci', failures);
+
+  const manifestPath = path.join(rootDir, 'scripts', 'ci-gates.json');
+  if (!fs.existsSync(manifestPath)) {
+    failures.push('missing scripts/ci-gates.json');
+  } else {
+    const manifest = readJson(rootDir, path.join('scripts', 'ci-gates.json'));
+    const ciProfile = manifest?.profiles?.ci || [];
+    const gateCommands = (gateName) => (
+      (manifest?.gates?.[gateName]?.commands || [])
+        .map((entry) => [entry.command, ...(entry.args || [])].join(' '))
+    );
+    if (!ciProfile.includes('root-jest')) {
+      failures.push('scripts/ci-gates.json profile "ci" must include "root-jest"');
+    }
+    if (!ciProfile.includes('workers')) {
+      failures.push('scripts/ci-gates.json profile "ci" must include "workers"');
+    }
+    if (!gateCommands('root-jest').includes('npm run test:root:jest')) {
+      failures.push('scripts/ci-gates.json gate "root-jest" must run test:root:jest');
+    }
+    if (!gateCommands('workers').includes('npm run test:worker:session-cors')) {
+      failures.push('scripts/ci-gates.json gate "workers" must run test:worker:session-cors');
+    }
+  }
 
   const rootJestScript = String(pkg?.scripts?.['test:root:jest'] || '');
   ROOT_JEST_TEST_FILES.forEach((relativePath) => {

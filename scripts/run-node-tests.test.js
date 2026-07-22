@@ -36,7 +36,6 @@ test('collectNodeTestFiles recursively includes classified root, script, and sha
     writeFile(rootDir, 'tests/root/e2eTestIds.compat.test.js');
     writeFile(rootDir, 'tests/root/rpcDefaults.compat.test.js');
     writeFile(rootDir, 'tests/root/sessionCorsWorker.faucet-proof.test.mjs');
-    writeFile(rootDir, 'tests/root/sessionCorsWorker.package.test.js');
     writeFile(rootDir, 'tests/root/private-runtime.private.test.mjs');
     writeFile(rootDir, 'scripts/verify-test-wiring.test.js');
     writeFile(rootDir, 'scripts/verify-public-release-pii.test.js');
@@ -55,7 +54,6 @@ test('collectNodeTestFiles recursively includes classified root, script, and sha
       'tests/root/e2eTestIds.compat.test.js',
       'tests/root/rpcDefaults.compat.test.js',
       'tests/root/sessionCorsWorker.faucet-proof.test.mjs',
-      'tests/root/sessionCorsWorker.package.test.js',
       path.join('workers', 'shared', 'deployHelperEndpointConfig.test.mjs'),
       path.join('scripts', 'e2e', 'cloudflare', 'session-worker-ui.test.js'),
       path.join('scripts', 'e2e', 'cloudflare', 'worker-login-result.test.js'),
@@ -78,13 +76,11 @@ test('collectNodeTestFiles recursively includes classified root, script, and sha
 test('collectNodeTestFiles tolerates stripped public copies without optional helper directories', () => {
   withTempRepo((rootDir) => {
     writeFile(rootDir, 'tests/root/arweave-metadata-uri.test.js');
-    writeFile(rootDir, 'tests/root/sessionCorsWorker.package.test.js');
     writeFile(rootDir, 'scripts/verify-worker-bundle-sync.test.js');
 
     const files = collectNodeTestFiles(rootDir);
     assert.deepEqual(files, [
       'tests/root/arweave-metadata-uri.test.js',
-      'tests/root/sessionCorsWorker.package.test.js',
       path.join('scripts', 'verify-worker-bundle-sync.test.js'),
     ]);
     assert.equal(files.some((entry) => entry.includes('*')), false);

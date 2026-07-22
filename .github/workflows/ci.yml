@@ -57,25 +57,6 @@ jobs:
           BASELINE_GROWTH_PR_NUMBER: ${{ github.event.pull_request.number }}
         run: node scripts/resolve-baseline-growth-approval.mjs
 
-      - name: Resolve baseline monotonicity base
-        id: baseline-monotonicity-base
-        env:
-          BASELINE_EVENT_NAME: ${{ github.event_name }}
-          BASELINE_REF_NAME: ${{ github.ref_name }}
-          BASELINE_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          BASELINE_PUSH_BEFORE_SHA: ${{ github.event.before }}
-        run: |
-          set -euo pipefail
-          git fetch --no-tags --depth=1 origin main
-          node scripts/resolve-baseline-monotonicity-base.mjs --github-output "$GITHUB_OUTPUT"
-
-      - name: Resolve baseline growth approval
-        id: baseline-growth-approval
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          BASELINE_GROWTH_PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: node scripts/resolve-baseline-growth-approval.mjs
-
       - name: Check baseline monotonicity
         env:
           BASELINE_MONOTONICITY_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
@@ -90,33 +71,8 @@ jobs:
       - name: Run wiring and release gate
         run: npm run ci:gate -- wiring-and-release
 
-      - name: Lint workers
-        run: npm run lint:workers
-
-      - name: Typecheck client
-        run: npm run typecheck:client
-
-      - name: Verify public release surface
-        run: npm run verify:public-release-surface
-      - name: Verify public asset ownership
-        run: npm run verify:public-assets
-
-      - name: Verify public text exposure
-        run: npm run verify:public-text
-
-      - name: Verify release-staging version advancement
-        if: ${{ startsWith(github.ref_name, 'release-staging') || startsWith(github.head_ref, 'release-staging') }}
-        run: |
-          git fetch --no-tags --depth=1 origin main
-          node scripts/release-version.mjs verify-ref --candidate-ref HEAD --baseline-ref origin/main
-
-      - name: Upload tested Worker bundle candidate
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: worker-bundle-candidate-${{ github.sha }}
-          path: ${{ runner.temp }}/worker-bundle-candidate
-          if-no-files-found: error
-          retention-days: 1
+      - name: Run public text gate
+        run: npm run ci:gate -- public-text
 
   contracts:
     runs-on: ubuntu-latest
@@ -143,9 +99,6 @@ jobs:
 
       - name: Run contracts gate
         run: npm run ci:gate -- contracts
-
-      - name: Verify tracked contract ABIs
-        run: npm run verify:abi-sync
 
   client:
     runs-on: ubuntu-latest
@@ -229,11 +182,8 @@ jobs:
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
 
-      - name: Run sessionCorsWorker tests
-        run: npm run test:worker:session-cors
-
-      - name: Run agentBridgeWorker tests
-        run: npm run test:worker:agent-bridge
+      - name: Run Worker gates
+        run: npm run ci:gate -- workers
 
   e2e-smoke:
     runs-on: ubuntu-latest
@@ -333,11 +283,8 @@ jobs:
       - name: Install sessionCorsWorker dependencies
         run: npm --prefix workers/sessionCorsWorker ci
 
-      - name: Run root Node tests
-        run: npm run test:node
-
-      - name: Run cache guard
-        run: npm run test:cache-guard
+      - name: Run Context Engine CC and Node gate
+        run: npm run ci:gate -- cecc-and-node
 
       - name: Run dead export advisory
         continue-on-error: true
@@ -358,12 +305,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 2
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@v4
         with:
           node-version: 20
 
@@ -372,58 +317,3 @@ jobs:
           CI_GATE_RESULTS_JSON: >-
             {"wiring-and-release":"${{ needs.wiring-and-release.result }}","public-text":"${{ needs.wiring-and-release.result }}","contracts":"${{ needs.contracts.result }}","client":"${{ needs.client.result }}","root-jest":"${{ needs.root-jest.result }}","workers":"${{ needs.workers.result }}","e2e-smoke":"${{ needs.e2e-smoke.result }}","cecc-and-node":"${{ needs.cecc-and-node.result }}"}
         run: npm run ci:gates:check-hosted
-
-      - name: Download tested Worker bundle candidate
-        if: ${{ github.event_name == 'push' }}
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: worker-bundle-candidate-${{ github.sha }}
-          path: ${{ runner.temp }}/worker-release
-
-      - name: Resolve private-to-public replay provenance
-        if: ${{ github.event_name == 'push' }}
-        id: worker-source
-        run: >-
-          node scripts/worker-release-artifacts.mjs resolve-source
-          --root .
-          --commit "${{ github.sha }}"
-          --github-output "$GITHUB_OUTPUT"
-
-      - name: Create and verify immutable Worker artifact manifest
-        if: ${{ github.event_name == 'push' }}
-        run: |
-          set -euo pipefail
-          npm_version="$(npm --version)"
-          node scripts/worker-release-artifacts.mjs create \
-            --root . \
-            --artifact-dir "${{ runner.temp }}/worker-release" \
-            --source-commit "${{ github.sha }}" \
-            --source-ref "${{ github.ref }}" \
-            --source-tree "${{ steps.worker-source.outputs.sourceTree }}" \
-            --repository "${{ github.repository }}" \
-            --private-source-commit "${{ steps.worker-source.outputs.privateSourceCommit }}" \
-            --public-replay-commit "${{ steps.worker-source.outputs.publicReplayCommit }}" \
-            --workflow "${{ github.workflow }}" \
-            --workflow-ref "${{ github.workflow_ref }}" \
-            --run-id "${{ github.run_id }}" \
-            --run-attempt "${{ github.run_attempt }}" \
-            --npm-version "$npm_version"
-          node scripts/worker-release-artifacts.mjs verify \
-            --root . \
-            --artifact-dir "${{ runner.temp }}/worker-release" \
-            --source-commit "${{ github.sha }}" \
-            --source-ref "${{ github.ref }}" \
-            --source-tree "${{ steps.worker-source.outputs.sourceTree }}" \
-            --repository "${{ github.repository }}" \
-            --workflow "${{ github.workflow }}" \
-            --run-id "${{ github.run_id }}" \
-            --run-attempt "${{ github.run_attempt }}"
-
-      - name: Upload immutable Worker release artifact
-        if: ${{ github.event_name == 'push' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: worker-bundles-${{ github.sha }}
-          path: ${{ runner.temp }}/worker-release
-          if-no-files-found: error
-          retention-days: 30

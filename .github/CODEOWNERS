@@ -4,6 +4,9 @@
 /scripts/check-baseline-monotonicity.test.mjs @AgalmicSoftware
 /scripts/resolve-baseline-growth-approval.mjs @AgalmicSoftware
 /scripts/resolve-baseline-growth-approval.test.mjs @AgalmicSoftware
+/scripts/ci-gates.json @AgalmicSoftware
+/scripts/run-ci-gates.mjs @AgalmicSoftware
+/scripts/run-ci-gates.test.mjs @AgalmicSoftware
 /scripts/client-boundaries-baseline.json @AgalmicSoftware
 /scripts/type-debt-baseline.json @AgalmicSoftware
 /scripts/dead-exports-baseline.json @AgalmicSoftware
