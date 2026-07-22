@@ -40,26 +40,22 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
   });
 
-  it('offers the least-privilege Cloudflare token template from the Fast & Cheap onboarding banner', async () => {
+  it('offers native Cloudflare deployment without a token from the Fast & Cheap onboarding banner', async () => {
     window.history.replaceState({}, '', '/session/new');
 
     renderSessionWizard();
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     await selectCloudflarePreset();
 
-    const tokenLink = screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK);
-    const tokenUrl = new URL(tokenLink.getAttribute('href'));
+    const accountLink = screen.getByRole('link', { name: 'Cloudflare account' });
+    const deployUrl = new URL(accountLink.getAttribute('href'));
 
-    expect(tokenUrl.origin).toBe('https://dash.cloudflare.com');
-    expect(tokenUrl.pathname).toBe('/profile/api-tokens');
-    expect(tokenUrl.searchParams.get('accountId')).toBe('*');
-    expect(tokenUrl.searchParams.get('zoneId')).toBe('all');
-    expect(JSON.parse(tokenUrl.searchParams.get('permissionGroupKeys') || '[]')).toEqual([
-      { key: 'workers_scripts', type: 'edit' },
-      { key: 'workers_kv_storage', type: 'edit' },
-    ]);
-    expect(screen.getByText(/opens a token form with permissions prefilled/i)).toBeInTheDocument();
-    expect(screen.getByText(/Under Account Resources, choose only the account/i)).toBeInTheDocument();
+    expect(deployUrl.origin).toBe('https://deploy.workers.cloudflare.com');
+    expect(decodeURIComponent(deployUrl.searchParams.get('url') || '')).toMatch(
+      /\/tree\/[a-f0-9]{40}\/deploy\/cloudflare\/session-worker$/,
+    );
+    expect(screen.getByText(/does not ask for a Cloudflare API token/i)).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK)).not.toBeInTheDocument();
   });
 
   it('renders the decentralized requirements copy and contact link on /session/new', async () => {
