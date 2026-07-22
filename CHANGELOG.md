@@ -12,6 +12,9 @@ All notable changes to this project will be documented in this file.
   mismatched runs and never rebuilds. Immutable releases no longer move
   `latest` automatically, while a serialized, protected manual promotion keeps
   stable and previous rollback refs. GitHub Actions are pinned immutably.
+  Session Setup and Admin Wrapped deploys now bind the corresponding manifest
+  digest before request coordination and reject changed bytes before any
+  Cloudflare mutation, including retry and repair paths.
 - Unified local and hosted CI behind `scripts/ci-gates.json`. The local
   aggregate now runs the full client coverage and tracked root Node universes once,
   hosted jobs execute the same named gates, aggregate results fail closed
