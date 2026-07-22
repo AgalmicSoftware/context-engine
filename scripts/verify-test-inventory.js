@@ -27,6 +27,21 @@ function listDirectTestFiles(rootDir, relativeDir, fileRe) {
     .map((entry) => path.join(relativeDir, entry));
 }
 
+function listRecursiveTestFiles(rootDir, relativeDir, fileRe) {
+  const absoluteDir = path.join(rootDir, relativeDir);
+  if (!fs.existsSync(absoluteDir) || !fs.statSync(absoluteDir).isDirectory()) {
+    return [];
+  }
+
+  return fs.readdirSync(absoluteDir, { withFileTypes: true })
+    .flatMap((entry) => {
+      const relativePath = path.join(relativeDir, entry.name);
+      if (entry.isDirectory()) return listRecursiveTestFiles(rootDir, relativePath, fileRe);
+      return entry.isFile() && fileRe.test(entry.name) ? [relativePath] : [];
+    })
+    .sort();
+}
+
 function readJson(rootDir, relativePath) {
   return JSON.parse(fs.readFileSync(path.join(rootDir, relativePath), 'utf8'));
 }
@@ -43,7 +58,7 @@ function verifyPackageScript(pkg, scriptName, expectedFragment, failures, label 
 }
 
 function verifyClassifiedRootTests(rootDir, failures) {
-  const existingRootTests = listDirectTestFiles(rootDir, path.join('tests', 'root'), ROOT_TEST_FILE_RE);
+  const existingRootTests = listRecursiveTestFiles(rootDir, path.join('tests', 'root'), ROOT_TEST_FILE_RE);
   const classified = new Set(ROOT_TEST_FILES);
 
   const unclassified = existingRootTests.filter(
@@ -147,5 +162,6 @@ if (require.main === module) {
 
 module.exports = {
   listDirectTestFiles,
+  listRecursiveTestFiles,
   verifyTestInventory,
 };

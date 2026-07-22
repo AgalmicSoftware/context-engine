@@ -109,6 +109,17 @@ test('verifyTestInventory flags unclassified root tests', () => {
   });
 });
 
+test('verifyTestInventory flags recursively nested unclassified root tests', () => {
+  withTempRepo((rootDir) => {
+    writeInventoryFixture(rootDir);
+    writeFile(rootDir, 'tests/root/nested/new-unwired.test.mjs');
+
+    assert.deepEqual(verifyTestInventory(rootDir), [
+      'unclassified root test files: tests/root/nested/new-unwired.test.mjs',
+    ]);
+  });
+});
+
 test('verifyTestInventory rejects root scripts that expose non-public worker paths', () => {
   withTempRepo((rootDir) => {
     writeInventoryFixture(rootDir, {

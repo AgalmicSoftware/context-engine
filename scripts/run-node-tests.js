@@ -54,6 +54,7 @@ function collectNodeTestFiles(rootDir = path.resolve(__dirname, '..'), options =
       files.push(relativePath);
     }
   });
+  files.push(...readOptionalTestDir(rootDir, path.join('workers', 'shared'), { recursive: true }));
   ROOT_OPTIONAL_NODE_TEST_FILES.forEach((relativePath) => {
     if (fs.existsSync(path.join(rootDir, relativePath))) {
       files.push(relativePath);
@@ -61,11 +62,12 @@ function collectNodeTestFiles(rootDir = path.resolve(__dirname, '..'), options =
   });
 
   files.push(
-    ...readOptionalTestDir(rootDir, path.join('tests', 'root'))
+    ...readOptionalTestDir(rootDir, path.join('tests', 'root'), { recursive: true })
       .filter((relativePath) => ROOT_PRIVATE_STRIPPED_TEST_FILE_RE.test(relativePath)),
   );
-  files.push(...readOptionalTestDir(rootDir, 'scripts'));
-  files.push(...readOptionalTestDir(rootDir, path.join('scripts', 'lib', 'e2e')));
+  files.push(...readOptionalTestDir(rootDir, 'scripts', { recursive: true }));
+
+  const uniqueFiles = [...new Set(files)];
 
   const uniqueFiles = [...new Set(files)];
 
@@ -81,7 +83,7 @@ function collectNodeTestFiles(rootDir = path.resolve(__dirname, '..'), options =
 
   // Regression guard: the clean-checkout release gate must not execute tests
   // whose helpers are intentionally absent from the public/clean tree.
-  return files.filter((relativePath) => {
+  return uniqueFiles.filter((relativePath) => {
     const normalized = relativePath.split(path.sep).join('/');
     return trackedFiles.has(normalized) && !isStrippedPath(normalized);
   });
@@ -165,7 +167,6 @@ module.exports = {
   collectNodeTestFiles,
   listTrackedFiles,
   parseRunNodeTestsArgs,
-  partitionNodeTestFiles,
   readOptionalTestDir,
   runNodeTests,
 };
