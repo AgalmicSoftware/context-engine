@@ -947,6 +947,25 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
   });
 
+  it('labels passkey registration as creation while it is in progress', () => {
+    const subject = new LoginAndSettingsModal(
+      buildProps({
+        loginComplete: false,
+        loginInProgress: true,
+        provider: 'passkey_eoa',
+      }),
+    );
+    subject.state = {
+      ...subject.state,
+      passkeyMode: 'create',
+    };
+
+    render(subject.getModalDisplay());
+
+    expect(screen.getByText('creating passkey...')).toBeInTheDocument();
+    expect(screen.queryByText('logging in...')).not.toBeInTheDocument();
+  });
+
   it('resets back to a logged-out state when passkey wallet sign-in fails', async () => {
     passkeyWallet.unlockPasskeyWallet.mockRejectedValue(new Error('passkey rejected'));
     const props = buildProps();

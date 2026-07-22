@@ -513,6 +513,62 @@ for (const resource of ['questions', 'surveys', 'responses']) {
   });
 }
 
+test('storageRoute binds response list metadata to the authenticated uploader', async () => {
+  const kv = createMockKv();
+  const uploaderAddress = '0x0000000000000000000000000000000000000aBc';
+  const config = {
+    storageProfile: {
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'none', encryption: 'none' },
+    },
+  };
+  const uploadResponse = await storageRoute({
+    path: '/storage/upload',
+    method: 'POST',
+    request: new Request('https://worker.example/storage/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: {
+          questionID: 'question-a',
+          responder: '0x0000000000000000000000000000000000000bad',
+          answer: { value: true },
+        },
+        contentType: 'application/json',
+        resource: 'responses',
+      }),
+    }),
+    env: { CE_STORAGE_INDEX_KV: kv },
+    config,
+    slug: 'session-a',
+    uploaderAddress,
+    baseHeaders: {},
+    deps: {
+      json,
+      randomBytes: fixedRandomBytes,
+      now: () => Date.parse('2026-07-22T12:00:00.000Z'),
+    },
+  });
+  assert.equal(uploadResponse.status, 200);
+
+  const listResponse = await storageRoute({
+    path: '/storage/list',
+    method: 'GET',
+    request: new Request('https://worker.example/storage/list?resource=responses'),
+    env: { CE_STORAGE_INDEX_KV: kv },
+    config,
+    slug: 'session-a',
+    uploaderAddress: '',
+    baseHeaders: {},
+    deps: { json },
+  });
+  const listed = await readJson(listResponse);
+
+  assert.equal(listResponse.status, 200);
+  assert.equal(listed.items[0].metadata.responder, uploaderAddress.toLowerCase());
+  assert.equal(Object.hasOwn(listed.items[0].storageRef, 'responder'), false);
+});
+
 for (const contentType of ['application/json; charset=utf-8', 'application/ld+json']) {
   test(`storageRoute serializes Cloudflare JSON object uploads for ${contentType}`, async () => {
     const r2 = createMockR2();

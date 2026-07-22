@@ -616,6 +616,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
 
       // Prepare data to upload and on-chain params.
       let questionResponseUploads: PayloadPointerUpload[] = [];
+      let surveyResponseUpload: PayloadPointerUpload | null = null;
       let surveyResponseHashBytes = ethers.constants.HashZero;
 
       let cfg = resolveSession(groupKeyOrCfg || '');
@@ -657,7 +658,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
             family: 'survey_response_payload',
             path: 'survey response',
           });
-          const surveyResponseUpload = await uploadJsonPayloadForContractPointer({
+          surveyResponseUpload = await uploadJsonPayloadForContractPointer({
             payload: surveyResponse,
             resource: STORAGE_RESOURCE_KEYS.RESPONSES,
             groupKeyOrCfg,
@@ -666,7 +667,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
             uploadWithRetry: true,
             storageContext: uploadContext,
           });
-          surveyResponseHashBytes = surveyResponseUpload.pointerBytes;
+          surveyResponseHashBytes = surveyResponseUpload?.pointerBytes || ethers.constants.HashZero;
         }
         // Upload response objects sequentially to avoid Arweave anchor/signature races
         // that can appear when multiple uploads are posted in parallel for one wallet.
@@ -700,6 +701,24 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       });
       if (hasSurveyResponse) {
         assertNonZeroBytes32(surveyResponseHashBytes, 'submitResponses: survey response hash');
+      }
+
+      const authorityMode = String(cfg?.sessionModeProfile?.authority?.mode || '')
+        .trim()
+        .toLowerCase();
+      if (authorityMode === 'worker_canonical' && canUseSessionStorage) {
+        const storageRefs = [
+          surveyResponseUpload?.storageRef,
+          ...questionResponseUploads.map((upload) => upload.storageRef),
+        ].filter(Boolean);
+        if (!storageRefs.length) {
+          throw new Error('Worker-canonical response submission did not return durable storage references.');
+        }
+        return {
+          workerCanonicalSubmission: true,
+          sessionSlug: resolveStorageSessionSlug(groupKeyOrCfg, cfg),
+          storageRefs,
+        };
       }
 
       // === Address resolution (group-aware; no SURVEYS_ADDRESS fallback)

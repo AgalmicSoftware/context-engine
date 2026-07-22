@@ -121,6 +121,18 @@ const CLOUDFLARE_GROUP_CFG = {
     backend: 'cloudflare',
   },
 };
+const WORKER_CANONICAL_GROUP_CFG = {
+  slug: 'demo-sh',
+  corsWorkerUrl: 'https://worker.example',
+  contracts: {},
+  sessionModeProfile: {
+    authority: { mode: 'worker_canonical' },
+  },
+  storageProfile: {
+    backend: 'cloudflare',
+    resources: { responses: 'active' },
+  },
+};
 
 const makeRpcProvider = ({ sendTxError } = {}) => ({
   request: jest.fn(async ({ method }) => {
@@ -371,6 +383,45 @@ describe('error paths', () => {
     ).rejects.toThrow('submitResponses: questionResponseHashes[0] cannot be zero.');
 
     expect(mockSurveyContract.interface.encodeFunctionData).not.toHaveBeenCalled();
+    expect(rpcProvider.request).not.toHaveBeenCalledWith(expect.objectContaining({ method: 'eth_sendTransaction' }));
+  });
+
+  it('persists worker-canonical responses without broadcasting an on-chain transaction', async () => {
+    const rpcProvider = makeRpcProvider();
+    window.ethereum = rpcProvider;
+    uploadDataToSessionStorage.mockResolvedValueOnce({
+      storageRef: {
+        backend: 'cloudflare',
+        id: CF_RESPONSE_ID,
+        resource: 'responses',
+      },
+    });
+
+    const result = await submitResponses(
+      'wagmi',
+      [QUESTION_ID],
+      [{ questionID: QUESTION_ID, answer: 'yes' }],
+      ethers.constants.HashZero,
+      null,
+      WORKER_CANONICAL_GROUP_CFG,
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        workerCanonicalSubmission: true,
+        sessionSlug: 'demo-sh',
+        storageRefs: [expect.objectContaining({ backend: 'cloudflare', id: CF_RESPONSE_ID })],
+      }),
+    );
+    expect(uploadDataToSessionStorage).toHaveBeenCalledWith(
+      expect.any(String),
+      'json',
+      expect.objectContaining({
+        sessionSlug: 'demo-sh',
+        sessionConfig: WORKER_CANONICAL_GROUP_CFG,
+        resource: 'responses',
+      }),
+    );
     expect(rpcProvider.request).not.toHaveBeenCalledWith(expect.objectContaining({ method: 'eth_sendTransaction' }));
   });
 

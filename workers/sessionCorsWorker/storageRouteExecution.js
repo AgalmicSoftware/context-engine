@@ -1130,6 +1130,9 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, auth
     uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : undefined,
     size: bytesToStore?.length || 0,
     createdAt,
+    ...(resource === 'responses' && trim(uploaderAddress)
+      ? { responder: trim(uploaderAddress).toLowerCase() }
+      : {}),
     payloadAccessMode: payloadAccess.mode,
     payloadAccessControl: {
       gate: payloadAccess.gate,
@@ -1470,6 +1473,9 @@ const handleCloudflareList = async ({ request, env, config, slug, uploaderAddres
         tags: normalizeTagsForMetadata(metadata?.tags),
         size: Number(metadata?.size || 0) || 0,
         createdAt: trim(metadata?.createdAt),
+        ...(storageRef.resource === 'responses' && trim(metadata?.responder)
+          ? { responder: trim(metadata.responder).toLowerCase() }
+          : {}),
         payloadAccessControl: {
           gate: metadataAccess.gate,
           encryption: metadataAccess.encryption,

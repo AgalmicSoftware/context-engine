@@ -31,6 +31,7 @@ describe('loginAndSettings auth controllers', () => {
     const notifyInfo = jest.fn();
     const changeAccount = jest.fn();
     const updateLoginInfo = jest.fn();
+    const setActionMode = jest.fn();
     const actions = createLoginPasskeyActions({
       accountLogError: jest.fn(),
       changeAccount,
@@ -47,6 +48,7 @@ describe('loginAndSettings auth controllers', () => {
         setPasskeyWalletChain: jest.fn(),
         unlockPasskeyWallet: async () => '0xbbb',
       },
+      setActionMode,
       setStatus: jest.fn(),
       startAction: () => 1,
       updateLoginInfo,
@@ -67,6 +69,39 @@ describe('loginAndSettings auth controllers', () => {
       loginComplete: true,
       provider: 'passkey_eoa',
     });
+  });
+
+  it('keeps passkey creation distinct from sign-in while the action is running', async () => {
+    const setActionMode = jest.fn();
+    const createPasskeyWallet = jest.fn(async () => '0xbbb');
+    const unlockPasskeyWallet = jest.fn(async () => '0xbbb');
+    const actions = createLoginPasskeyActions({
+      accountLogError: jest.fn(),
+      changeAccount: jest.fn(),
+      clearAllWorkerSessionTokens: jest.fn(),
+      getAccount: () => '',
+      getErrorMessage: () => '',
+      getProvider: () => '',
+      getTargetNetwork: () => ({ id: 11155420, name: 'OP Sepolia' }),
+      isCurrentAction: () => true,
+      normalizeAccountForComparison: (account) => String(account || '').toLowerCase(),
+      notifyInfo: jest.fn(),
+      passkeyWallet: {
+        createPasskeyWallet,
+        setPasskeyWalletChain: jest.fn(),
+        unlockPasskeyWallet,
+      },
+      setActionMode,
+      setStatus: jest.fn(),
+      startAction: () => 1,
+      updateLoginInfo: jest.fn(),
+    });
+
+    await actions.handlePasskeyWalletCreate();
+
+    expect(createPasskeyWallet).toHaveBeenCalledTimes(1);
+    expect(unlockPasskeyWallet).not.toHaveBeenCalled();
+    expect(setActionMode.mock.calls).toEqual([['create'], ['']]);
   });
 
   it('formats agent-token errors with current user-facing copy', () => {

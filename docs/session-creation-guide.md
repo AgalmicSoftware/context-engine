@@ -308,7 +308,10 @@ What gets stored where:
 Important:
 
 - `blockLimits.start` is required for chain-scanned profiles. The default
-  worker-canonical profile does not require a chain scan window.
+  worker-canonical profile does not require a chain scan window. After its
+  canonical worker config is verified, reloads keep that session out of EVM
+  discovery even when the original share URL has been normalized.
+- Chainless worker-canonical profiles do not request testnet faucet funds.
 - The wizard strips secrets and worker-only runtime config out of the Arweave payload before upload.
 
 ### 2. Privacy and access control
@@ -679,6 +682,20 @@ When questions/surveys are published:
 - decentralized sessions keep the existing Arweave payload and `Surveys`
   contract registration flow
 
+Participant responses follow the same authority boundary. For a
+worker-canonical session, the client keeps the verified session config through
+submission, uploads response resources to that session's dedicated Worker, and
+returns the durable Cloudflare storage references without sending an EVM
+transaction. Chain-backed profiles retain their existing contract submission
+path.
+
+On reload, the client paginates the dedicated Worker's `responses` index and
+hydrates the stable `worker` cache scope. It keys each row by responder metadata
+that the Worker bound to the authenticated uploader; a response payload cannot
+claim another participant's address. Workers deployed before this metadata was
+added must be upgraded before their newly stored rows can participate in fresh-
+browser response hydration.
+
 For payload examples, see [arweave-payloads.md](arweave-payloads.md).
 
 ### Share the session URL
@@ -715,6 +732,10 @@ If the helper can deploy the worker but setup still fails afterward:
 ### Questions are not loading
 
 The two most common causes are bad scan bounds and a missing `Surveys` contract reference.
+
+These checks apply to chain-scanned profiles. A verified worker-canonical
+session obtains its questions from its dedicated Worker and does not require
+`blockLimits.start` or a `Surveys` contract.
 
 Check:
 

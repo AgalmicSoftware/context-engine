@@ -1441,14 +1441,8 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     }
 
     const run = (async () => {
-      mainSiteLog.log('[About] Preloading public demo session data', { slug });
-      const questionPreload = this.initializeQuestionCacheForGroup(slug, { background: true });
-      const responsePreload = questionPreload.then(() =>
-        this.fetchQuestionResponsesChunkedForGroup(slug, { background: true }),
-      );
       const preloadResults = await Promise.allSettled([
-        questionPreload,
-        responsePreload,
+        this.initializeQuestionCacheForGroup(slug, { background: true }),
         this.initializeSurveyCacheForGroup(slug, { background: true }),
         this.initializeSbtCacheForGroup(slug, { mode: 'partial', background: true }),
       ]);

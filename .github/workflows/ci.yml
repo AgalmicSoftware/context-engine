@@ -239,7 +239,7 @@ jobs:
           PREVIEW_PID=$!
           trap 'kill "$PREVIEW_PID" 2>/dev/null || true' EXIT
           for _ in $(seq 1 60); do
-            if curl -fsS "$BASE_URL" >/dev/null; then
+            if curl -fs "$BASE_URL" >/dev/null; then
               break
             fi
             sleep 1

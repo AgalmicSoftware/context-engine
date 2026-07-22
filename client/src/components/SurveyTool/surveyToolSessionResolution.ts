@@ -40,6 +40,8 @@ type SurveyToolScopedContext = SessionResolutionResult & {
   networkSourceSlug: string;
 };
 
+const WORKER_CANONICAL_CACHE_SCOPE_KEY = 'worker';
+
 const hasNonBlankValue = (value: unknown): boolean => toStr(value).trim() !== '';
 const isPlainObject = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
@@ -53,6 +55,11 @@ const readSessionChainId = (sessionConfig: SessionConfigLike | null | undefined)
   readPositiveNumber(sessionConfig?.contracts?.sbtFactory?.chainId) ??
   readPositiveNumber(sessionConfig?.__registry?.chainId) ??
   readPositiveNumber(sessionConfig?.__registry?.registryChainId);
+const isWorkerCanonicalSessionConfig = (sessionConfig: SessionConfigLike | null | undefined): boolean => {
+  const profile = isPlainObject(sessionConfig?.sessionModeProfile) ? sessionConfig.sessionModeProfile : null;
+  const authority = isPlainObject(profile?.authority) ? profile.authority : null;
+  return authority?.mode === 'worker_canonical';
+};
 const normalizeQuestionIdList = (value: unknown): string[] =>
   Array.isArray(value)
     ? Array.from(new Set(value.map((entry) => toStr(entry).trim().toLowerCase()).filter(Boolean)))
@@ -148,17 +155,19 @@ const resolveSurveyToolNetworkScopedSessionContext = ({
     resolved.sessionSlug || normalizeSessionSlug(sessionSlug),
     ...(Array.isArray(fallbackSessionSlugs) ? fallbackSessionSlugs : []),
   ]);
-  let effectiveNetworkId =
-    // Prefer the session's configured chain over wallet-facing network props so
-    // cache reads/writes stay scoped to the session even when the wallet UI is on
-    // a different chain (for example Base mainnet vs Base Sepolia).
-    readSessionChainId(resolved.sessionConfig) ??
-    readPositiveNumber(networkChainId) ??
-    readPositiveNumber(network?.id) ??
-    readPositiveNumber(network?.chainId);
-  let effectiveNetworkSourceSlug = effectiveNetworkId ? resolved.sessionSlug : '';
+  const workerCanonical = isWorkerCanonicalSessionConfig(resolved.sessionConfig);
+  let effectiveNetworkId = workerCanonical
+    ? null
+    : // Prefer the session's configured chain over wallet-facing network props so
+      // cache reads/writes stay scoped to the session even when the wallet UI is on
+      // a different chain (for example Base mainnet vs Base Sepolia).
+      (readSessionChainId(resolved.sessionConfig) ??
+      readPositiveNumber(networkChainId) ??
+      readPositiveNumber(network?.id) ??
+      readPositiveNumber(network?.chainId));
+  let effectiveNetworkSourceSlug = effectiveNetworkId || workerCanonical ? resolved.sessionSlug : '';
 
-  if (effectiveNetworkId == null && typeof resolveBySlug === 'function') {
+  if (!workerCanonical && effectiveNetworkId == null && typeof resolveBySlug === 'function') {
     for (const fallbackSlug of scopedSessionSlugs) {
       const fallbackResolved =
         fallbackSlug === resolved.sessionSlug
@@ -179,7 +188,11 @@ const resolveSurveyToolNetworkScopedSessionContext = ({
     ...resolved,
     scopedSessionSlugs,
     networkId: effectiveNetworkId,
-    networkIdStr: effectiveNetworkId ? String(effectiveNetworkId) : '',
+    networkIdStr: effectiveNetworkId
+      ? String(effectiveNetworkId)
+      : workerCanonical
+        ? WORKER_CANONICAL_CACHE_SCOPE_KEY
+        : '',
     networkSourceSlug: effectiveNetworkSourceSlug,
   };
 };

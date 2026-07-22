@@ -44,11 +44,7 @@ import LoginPreLoginSettingsDisplay from './LoginPreLoginSettingsDisplay';
 import LoginDemoSurfaceToggleControl from './LoginDemoSurfaceToggleControl';
 
 // Smart contract interactions and config
-import {
-  DEFAULT_AUTO_REQUEST_TESTNET_FUNDS,
-  TESTNET_AUTO_SEND_THRESHOLD_ETH,
-  DEFAULT_CHAIN_ID,
-} from '../../variables/appConfig.js';
+import { DEFAULT_AUTO_REQUEST_TESTNET_FUNDS, DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import contractScripts, {
   getAllSessionSlugs,
   getDemoSessionConfigBySlug,
@@ -119,7 +115,7 @@ import {
 import LoginAgentTokenPanel from './LoginAgentTokenPanel';
 import { createLoginAgentActions } from './loginAndSettingsAgentTokenActions';
 import { createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
-import { loadLoginSettingsSponsoredAccess } from './loginSettingsSponsoredAccessRuntime';
+import type { PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
 const accountLog = createLogger('account');
 const normalizeAccountForComparison = (value: unknown): string =>
@@ -163,6 +159,7 @@ interface LoginAndSettingsModalState {
   testFundsStatusTone: string;
   passkeyWalletStatusMessage: string;
   passkeyWalletStatusTone: string;
+  passkeyMode: PasskeyWalletActionMode;
   autoRequestTestnetFundsEnabled: boolean;
   autoSendTriggered: boolean;
   aiSettings: any;
@@ -347,6 +344,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       testFundsStatusTone: '',
       passkeyWalletStatusMessage: '',
       passkeyWalletStatusTone: '',
+      passkeyMode: '',
       autoRequestTestnetFundsEnabled: DEFAULT_AUTO_REQUEST_TESTNET_FUNDS,
       autoSendTriggered: false,
       aiSettings: null,
@@ -404,6 +402,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     normalizeAccountForComparison,
     notifyInfo: (message) => notify.info(message),
     passkeyWallet,
+    setActionMode: (passkeyMode) => this.setStateIfMounted({ passkeyMode }),
     setStatus: (patch) => this.setStateIfMounted(patch),
     startAction: () => this.startPasskeyWalletAction(),
     updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
@@ -894,43 +893,16 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   }
 
   checkAndSendTestFundsIfNeeded = async () => {
-    const walletAccount = this.getWalletAccount();
-    if (!this.props.loginComplete || !walletAccount) {
-      const resetState: Partial<LoginAndSettingsModalState> = {};
-      if (this.state.autoSendTriggered) resetState.autoSendTriggered = false;
-      if (this.state.walletBalanceWei !== null) resetState.walletBalanceWei = null;
-      if (Object.keys(resetState).length) this.setStateIfMounted(resetState);
-      return;
-    }
-
-    const { balance: currentBalance, stale } = await this.syncWalletBalance();
-    if (stale) return;
-
-    if (!this.state.autoRequestTestnetFundsEnabled) {
-      if (this.state.autoSendTriggered) {
-        this.setStateIfMounted({ autoSendTriggered: false });
-      }
-      return;
-    }
-
-    let shouldTrigger = false;
-
-    try {
-      if (currentBalance != null) {
-        const threshold = ethers.utils.parseEther(TESTNET_AUTO_SEND_THRESHOLD_ETH);
-        shouldTrigger = currentBalance.lte(threshold);
-      }
-    } catch (e) {
-      accountLog.error('Error parsing wallet balance in auto-send check:', e);
-    }
-
-    if (shouldTrigger && !this.state.sendingTestFunds && !this.state.autoSendTriggered) {
-      this.autoSendTestFunds();
-    }
-
-    if (this.state.autoSendTriggered !== shouldTrigger) {
-      this.setStateIfMounted({ autoSendTriggered: shouldTrigger });
-    }
+    const { runLoginTestFundsAutoSend } = await import('./loginTestFundsAutoSendController');
+    await runLoginTestFundsAutoSend({
+      autoSendTestFunds: this.autoSendTestFunds,
+      getActiveSessionConfig: () => this.getDisplaySessionConfig(this.getActiveSessionSlug()),
+      loginComplete: this.props.loginComplete,
+      setState: (patch) => this.setStateIfMounted(patch),
+      state: this.state,
+      syncWalletBalance: () => this.syncWalletBalance(),
+      walletAccount: this.getWalletAccount(),
+    });
   };
 
   autoSendTestFunds = async () => {
@@ -1190,6 +1162,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const reqId = (this._sponsoredReqId = (this._sponsoredReqId || 0) + 1);
     this.setStateIfMounted({ sponsoredAccessLoading: true, workerResourcePresence: null });
     try {
+      const { loadLoginSettingsSponsoredAccess } = await import('./loginSettingsSponsoredAccessRuntime');
       const { accessMap, workerResourcePresence } = await loadLoginSettingsSponsoredAccess({
         slug,
         sessionConfig: getSessionConfigBySlugOrDefault(slug) || {},
@@ -2417,6 +2390,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       openCryptoModal: this.openCryptoModal,
       passkeyWalletStatusMessage: this.state.passkeyWalletStatusMessage,
       passkeyWalletStatusTone: this.state.passkeyWalletStatusTone,
+      passkeyMode: this.state.passkeyMode,
       provider: this.props.provider,
       renderAgentTokenLoginPanel: this.renderAgentTokenLoginPanel,
       showTestnetOnly,

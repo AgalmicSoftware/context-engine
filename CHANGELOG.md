@@ -169,6 +169,15 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- Corrected passkey account creation so Chromium-compatible registration offers
+  ES256 and RS256, uses PRF output from registration without an unconditional
+  sign-in-style second prompt, and labels the pending action as creation.
+  Worker-canonical sessions now retain their verified dedicated Worker during
+  response submission, skip chain-only block scans and automatic faucet calls,
+  finish durable Cloudflare response writes without an EVM transaction, and
+  hydrate those responses after reload under a stable chainless cache scope.
+  Response list metadata is bound to the authenticated Worker uploader instead
+  of trusting a self-claimed responder address in the stored JSON.
 - Replaced the About-page Google Drive video embed and thumbnail dependency
   with the repository-owned `about-demo.mp4` on desktop and mobile, so public
   playback no longer depends on third-party cookies or Drive playback limits.

@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBookmark, faFingerprint, faSignOutAlt, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import { MetaMaskLoginButton } from '../../app/runtime/walletUiRuntime.js';
 import styles from './Account.module.scss';
+import type { PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
 type AccountUserPageProps = {
   viewAddress?: string;
@@ -30,6 +31,7 @@ type LoginModalDisplayBodyProps = {
   openCryptoModal: () => void;
   passkeyWalletStatusMessage: string;
   passkeyWalletStatusTone: string;
+  passkeyMode: PasskeyWalletActionMode;
   provider: string;
   renderAgentTokenLoginPanel: () => React.ReactNode;
   showTestnetOnly: boolean;
@@ -56,6 +58,7 @@ const LoginModalDisplayBody = ({
   openCryptoModal,
   passkeyWalletStatusMessage,
   passkeyWalletStatusTone,
+  passkeyMode,
   provider,
   renderAgentTokenLoginPanel,
   showTestnetOnly,
@@ -84,6 +87,7 @@ const LoginModalDisplayBody = ({
               onClick={handlePasskeyWalletCreate}
               color="primary"
               className={`${styles.passkeyButton} ${styles.passkeyButtonPrimary}`}
+              data-testid="ce-passkey-wallet-create"
             >
               <FontAwesomeIcon icon={faFingerprint} size="2x" />
               <span>Create </span>
@@ -93,6 +97,7 @@ const LoginModalDisplayBody = ({
               color="secondary"
               outline
               className={`${styles.passkeyButton} ${styles.passkeyButtonOutline}`}
+              data-testid="ce-passkey-wallet-sign-in"
             >
               <FontAwesomeIcon icon={faFingerprint} size="2x" />
               <span> Login</span>
@@ -123,10 +128,11 @@ const LoginModalDisplayBody = ({
   }
 
   if (loginInProgress) {
+    const progressLabel = passkeyMode === 'create' ? 'creating passkey...' : 'logging in...';
     return (
       <CardBody>
         <div id={styles.loadingIconContainer}>
-          <h3 id={styles.verifyingText}> logging in... </h3>
+          <h3 id={styles.verifyingText}>{progressLabel}</h3>
           <FontAwesomeIcon icon={faSpinner} pulse id={styles.verifyingTXloadingIcon} />
         </div>
       </CardBody>
