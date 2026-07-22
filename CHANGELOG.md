@@ -78,7 +78,9 @@ All notable changes to this project will be documented in this file.
   bootstrap allowlists now prefer `.sh` while retaining `.xyz` as redirect
   compatibility.
 - Replaced the placeholder emoji favicon family with an optically centered
-  Context Engine circuit C on white across browser, Apple touch, and Android icons.
+  white Context Engine circuit C on transparent browser, Apple touch, and
+  Android icon backgrounds, using the high-resolution circuit artwork for the
+  larger touch and installed-app assets.
 - Added a repository-owned Netlify build contract for strict, Node 20 client
   builds from public `main`, with pull-request preview guidance and the existing
   manual-deploy redirect fallback retained.
