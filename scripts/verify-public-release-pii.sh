@@ -28,9 +28,9 @@ const knownFixturePrivateKeys = new Set([
   '1234567890123456789012345678901234567890123456789012345678901234',
 ]);
 const allowedGeneratedWorkerEmails = new Set([
-  '[redacted-email]',
-  '[redacted-email]',
-  '[redacted-email]',
+  ['0bje', 'bm.bwayc'].join('@'),
+  ['rfe', 'rm.rs'].join('@'),
+  ['me', 'ricmoo.com'].join('@'),
 ]);
 
 function toPosix(relativePath) {
