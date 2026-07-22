@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Made client test-universe claims complete and monotonic. One instrumented
+  Jest run now accounts for every tracked production source while preserving a
+  fixed legacy comparison metric; recursive Node discovery closes nested test
+  omissions; and every tracked typed test/helper is classified under a
+  real-framework-type diagnostic ratchet. Coverage exclusions, floors, legacy
+  membership, and typed-test debt now fail closed against protected baselines.
 - Bound Worker releases to the exact bytes produced by successful aggregate
   CI. SHA-keyed artifacts now carry source/replay/tree, builder-run, recipe,
   lockfile, and bundle-digest provenance; publication refuses failed or

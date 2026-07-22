@@ -23,7 +23,9 @@ This runs the canonical root gate (`npm run test:ci`): wiring and ratchets,
 release-surface checks and builds, contract/ABI parity, client coverage,
 public-safe root Jest, both public Worker suites, Context Engine CC, the tracked
 root Node universe, and the managed-cache guard. The coverage-enabled full
-client universe and tracked Node universe each run exactly once.
+client universe and tracked Node universe each run exactly once. The wiring
+lane also verifies that every tracked typed client test/support source is in
+the monotonic test-typecheck universe.
 
 `scripts/ci-gates.json` is the explicit command manifest. Local CI consumes
 its serial `ci` profile; GitHub Actions consumes the same named gates as split
@@ -61,7 +63,20 @@ tighten React/Hooks rules for their established surfaces, while catch-all typed
 and TSX blocks prevent new files from escaping baseline coverage. Unused disable
 directives are errors. `npm run typecheck` runs the production client
 TypeScript project with `tsc --noEmit`; Jest/spec helper files remain covered
-by lint and Jest rather than the release typecheck gate.
+by lint and Jest, and by the separate `npm run typecheck:client-tests` ratchet.
+That ratchet compiles all tracked typed tests and named helpers with Jest 30's
+real framework types, permits only the checked-in migration diagnostics, and
+fails on any new diagnostic signature or count. The raw test project is not
+yet zero-diagnostic, so the ratchet command—not a claim of clean standalone
+`tsc` output—is the current contract.
+
+`npm run test:client` performs one instrumented run with
+`client/jest.full-universe.config.cjs`. Every tracked executable JS, JSX, TS,
+and TSX production file under `client/src` enters the denominator, including
+never-imported files. `npm run coverage-floor:check` reuses that run's
+`coverage-final.json` to enforce both the fixed legacy imported-file metric and
+the separately banked whole-production metric. The two percentages are not
+directly comparable.
 
 ### Targeted Root Commands
 
@@ -72,6 +87,8 @@ npm run test:root:jest
 npm run test:worker:session-cors
 npm run test:node
 npm run test:client
+npm run coverage-floor:check
+npm run typecheck:client-tests
 npm run ci:gate -- workers
 ```
 
@@ -85,6 +102,11 @@ The inventory check keeps root tests classified as one of:
 - public-safe Jest tests run by `npm run test:root:jest`
 - local-chain tests maintained in the full development checkout
 - package-local tests run by their package's documented command
+
+The Node runner recursively discovers tracked `*.test.{js,cjs,mjs}` files
+under `tests/root`, `scripts`, and `workers/shared`, then applies the public
+strip contract and explicit Jest/local-chain classifications. A nested eligible
+test that is not reachable from a canonical runner fails inventory verification.
 
 Do not add live credentials, private deployment names, or identifying fixtures
 to root `package.json` scripts.
