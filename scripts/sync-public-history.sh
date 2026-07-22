@@ -808,9 +808,6 @@ fi
 
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/sync-public-history.XXXXXX")
 TEMP_CLONE="$TMP_ROOT/replay"
-RELEASE_CHANGED_PATHS_FILE="$TMP_ROOT/release-changed-paths.txt"
-RELEASE_SUBJECTS_FILE="$TMP_ROOT/release-subjects.txt"
-RELEASE_PLAN_FILE="$TMP_ROOT/release-plan.json"
 REPLAY_HOOKS_DIR="$TMP_ROOT/replay-hooks"
 mkdir -p "$REPLAY_HOOKS_DIR"
 

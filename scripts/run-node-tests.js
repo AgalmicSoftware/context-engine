@@ -167,6 +167,6 @@ module.exports = {
   collectNodeTestFiles,
   listTrackedFiles,
   parseRunNodeTestsArgs,
-  readOptionalTestDir,
+  partitionNodeTestFiles,
   runNodeTests,
 };

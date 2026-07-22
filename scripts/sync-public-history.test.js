@@ -294,13 +294,87 @@ test('sync-public-history accepts an explicit source branch', () => {
   });
 });
 
+test('sync-public-history can replay patch-new commits from a source branch diverged from main', () => {
+  withSourceRepo(({ sourceDir }) => {
+    git(sourceDir, ['checkout', '--quiet', 'main']);
+    writeFile(sourceDir, 'main-only.txt', 'direct main change\n');
+    commitAll(sourceDir, 'Direct main commit', {
+      authorDate: '2025-01-02T00:00:00Z',
+      committerDate: '2025-01-02T00:00:00Z',
+    });
+    git(sourceDir, ['push', '--quiet', 'origin', 'main']);
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+
+    const defaultResult = runSyncScript(sourceDir, ['--dry-run', 'release-candidate']);
+    assert.equal(defaultResult.status, 1);
+    assert.match(defaultResult.stderr, /origin\/main is not an ancestor of dev/);
+    assert.match(defaultResult.stderr, /--allow-diverged-source/);
+
+    const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stderr, /using git cherry to replay patch-new non-merge commits/);
+    assert.match(result.stdout, /Replay complete\./);
+    assert.match(result.stdout, /Branch name: release-candidate/);
+    assert.match(result.stdout, /Replayed commits: 2/);
+    assert.match(result.stdout, /Skipped commits: 2/);
+
+    const historySubjects = git(sourceDir, [
+      'log',
+      '--reverse',
+      '--format=%s',
+      'origin/main..release-candidate',
+    ]).trim().split('\n');
+    assert.deepEqual(historySubjects, [
+      'Public commit title',
+      'Mixed commit',
+    ]);
+
+    assert.equal(git(sourceDir, ['show', 'release-candidate:main-only.txt']), 'direct main change\n');
+    assert.equal(git(sourceDir, ['show', 'release-candidate:public.txt']), 'public one\npublic two\n');
+  });
+});
+
+test('sync-public-history resolves replay deletes over public-main edits', () => {
+  withSourceRepo(({ sourceDir }) => {
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+    fs.rmSync(path.join(sourceDir, 'README.md'));
+    commitAll(sourceDir, 'Remove stale public shim', {
+      authorDate: '2025-01-05T00:00:00Z',
+      committerDate: '2025-01-05T00:00:00Z',
+    });
+
+    git(sourceDir, ['checkout', '--quiet', 'main']);
+    writeFile(sourceDir, 'README.md', 'public main edit\n');
+    commitAll(sourceDir, 'Edit public readme on main', {
+      authorDate: '2025-01-04T00:00:00Z',
+      committerDate: '2025-01-04T00:00:00Z',
+    });
+    git(sourceDir, ['push', '--quiet', 'origin', 'main']);
+    git(sourceDir, ['checkout', '--quiet', 'dev']);
+
+    const result = runSyncScript(sourceDir, ['--allow-diverged-source', 'release-candidate']);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stdout, /Replay complete\./);
+    assert.match(result.stdout, /Replayed commits: 3/);
+    assert.match(result.stdout, /Skipped commits: 2/);
+
+    const readmeCheck = spawnSync('git', ['cat-file', '-e', 'release-candidate:README.md'], {
+      cwd: sourceDir,
+      encoding: 'utf8',
+    });
+    assert.notEqual(readmeCheck.status, 0);
+  });
+});
+
 test('sync-public-history installs the private dev push guard before replaying', () => {
   withSourceRepo(({ sourceDir }) => {
     git(sourceDir, ['branch', '--set-upstream-to=origin/main', 'dev'], { stdio: 'ignore' });
 
     const result = runSyncScript(sourceDir, ['--dry-run']);
 
-    assert.equal(result.status, 0);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     assert.equal(git(sourceDir, ['config', '--local', '--get', 'core.hooksPath']).trim(), '.githooks');
 
     const upstreamResult = spawnSync(
@@ -530,7 +604,7 @@ test('sync-public-history restores Agent Bridge package wiring at an explicit pu
       'release-candidate',
     ]);
 
-    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     const publicPackage = JSON.parse(git(sourceDir, ['show', 'release-candidate:package.json']));
     assert.equal(
       publicPackage.scripts['test:worker:agent-bridge'],
@@ -554,7 +628,7 @@ test('sync-public-history removes package commands whose runners are stripped', 
 
     const result = runSyncScript(sourceDir, ['release-candidate']);
 
-    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     const publicPackage = JSON.parse(git(sourceDir, ['show', 'release-candidate:package.json']));
     assert.equal(publicPackage.scripts['ai:test-private-e2e'], undefined);
     assert.equal(publicPackage.scripts['test:ci'], 'npm run test:node');
@@ -710,7 +784,7 @@ test('sync-public-history links source node_modules for public Node ESM imports 
 
     const result = runSyncScript(sourceDir, ['--push', 'release-staging']);
 
-    assert.equal(result.status, 0);
+    assert.equal(result.status, 0, syncFailureMessage(result));
     assert.match(result.stderr, /Linking source node_modules into public test checkout/);
     assert.match(result.stdout, /public node ESM fixture passed/);
   });
@@ -735,7 +809,7 @@ test('sync-public-history rejects planning identifiers in replay messages unless
       '--sanitize-private-replay-messages',
       'release-candidate',
     ]);
-    assert.equal(sanitized.status, 0);
+    assert.equal(sanitized.status, 0, syncFailureMessage(sanitized));
     assert.match(sanitized.stdout, /Would replay: 3/);
     assert.match(sanitized.stderr, /Sanitized private replay message tokens/);
   });
