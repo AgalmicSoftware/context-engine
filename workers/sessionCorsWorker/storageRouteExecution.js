@@ -552,6 +552,9 @@ const handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, payl
     uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : undefined,
     size: bytesToStore?.length || 0,
     createdAt,
+    ...(resource === 'responses' && trim(uploaderAddress)
+      ? { responder: trim(uploaderAddress).toLowerCase() }
+      : {}),
     payloadAccessMode: payloadAccess.mode,
     storageLayer,
   };

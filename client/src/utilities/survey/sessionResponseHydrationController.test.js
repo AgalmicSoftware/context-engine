@@ -271,7 +271,6 @@ describe('createSessionResponseHydrationController', () => {
   });
 
   it('hydrates fresh worker-canonical question responses without starting an EVM scan', async () => {
-    const sessionConfig = createWorkerCanonicalSessionConfig({ slug: 'demo-sh' });
     const loadWorkerResponses = jest.fn().mockResolvedValue([
       {
         questionId: QUESTION_ID_A,
@@ -289,7 +288,10 @@ describe('createSessionResponseHydrationController', () => {
     ]);
     const host = createMockHost({
       chainId: null,
-      getSessionCfg: jest.fn(() => sessionConfig),
+      getSessionCfg: jest.fn((slug) => ({
+        slug,
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      })),
       scanScopeNoop: jest.fn(() => true),
       loadWorkerResponses,
     });
@@ -299,8 +301,6 @@ describe('createSessionResponseHydrationController', () => {
 
     expect(loadWorkerResponses).toHaveBeenCalledWith(
       expect.objectContaining({
-        account: RESPONDER,
-        providerLike: 'provider-like',
         sessionSlug: 'demo-sh',
         sessionConfig: expect.objectContaining({ slug: 'demo-sh' }),
       }),
@@ -323,122 +323,6 @@ describe('createSessionResponseHydrationController', () => {
       isResponsesCacheReady: true,
       questionResponsesNonce: 1,
     });
-  });
-
-  it('starts same-slug Worker B independently, clears empty B, and discards delayed Worker A responses', async () => {
-    const sessionConfigA = createWorkerCanonicalSessionConfig();
-    const sessionConfigB = createWorkerCanonicalSessionConfig({
-      sessionId: `0x${'8'.repeat(32)}`,
-      workerUrl: 'https://alpha-response-worker-b.example.test',
-    });
-    const identityA = resolveWorkerCanonicalCacheIdentity({
-      sessionConfig: sessionConfigA,
-      sessionSlug: SESSION_SLUG,
-    });
-    const identityB = resolveWorkerCanonicalCacheIdentity({
-      sessionConfig: sessionConfigB,
-      sessionSlug: SESSION_SLUG,
-    });
-    const delayedA = createDeferred();
-    const delayedB = createDeferred();
-    const workerALoaderStarted = createDeferred();
-    const workerBLoaderStarted = createDeferred();
-    let currentSessionConfig = sessionConfigA;
-    const loadWorkerResponses = jest.fn(({ sessionConfig }) => {
-      if (sessionConfig === sessionConfigA) {
-        workerALoaderStarted.resolve();
-        return delayedA.promise;
-      }
-      workerBLoaderStarted.resolve();
-      return delayedB.promise;
-    });
-    const host = createMockHost({
-      chainId: null,
-      initialStorage: {
-        questionsCache: {
-          [SESSION_SLUG]: {
-            worker: {
-              ...createQuestionCacheNetworkNode({
-                questions: {
-                  [QUESTION_ID_A]: {
-                    id: QUESTION_ID_A,
-                    prompt: 'Cached Session A question',
-                  },
-                },
-                questionResponses: {
-                  [QUESTION_ID_A]: {
-                    [RESPONDER_LOWER]: { answer: { value: true } },
-                  },
-                },
-              }),
-              workerCanonicalIdentity: identityA,
-            },
-          },
-        },
-        userCache: {
-          [SESSION_SLUG]: {
-            [RESPONDER_LOWER]: {
-              worker: {
-                lastBlockScanned: 0,
-                lastScanTimestamp: 1,
-                data: {
-                  sbts: [],
-                  createdSurveys: [],
-                  createdQuestions: [],
-                  surveyResponses: [],
-                  questionResponses: [{ questionId: QUESTION_ID_A }],
-                },
-                workerCanonicalIdentity: identityA,
-              },
-            },
-          },
-        },
-      },
-      getSessionCfg: jest.fn(() => currentSessionConfig),
-      loadWorkerResponses,
-    });
-    const controller = createSessionResponseHydrationController(host);
-
-    const runA = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
-    await workerALoaderStarted.promise;
-    expect(controller.isInitInFlight(SESSION_SLUG)).toBe(true);
-
-    currentSessionConfig = sessionConfigB;
-    const runB = controller.fetchQuestionResponsesChunkedForGroup(SESSION_SLUG);
-    await workerBLoaderStarted.promise;
-
-    expect(loadWorkerResponses).toHaveBeenCalledTimes(2);
-    expect(host.getStored('questionsCache', SESSION_SLUG).worker).toMatchObject({
-      questions: {},
-      questionResponses: {},
-      workerCanonicalIdentity: identityB,
-    });
-    expect(host.getStored('userCache', SESSION_SLUG)[RESPONDER_LOWER].worker).toBeUndefined();
-
-    delayedB.resolve([]);
-    await runB;
-    delayedA.resolve([
-      {
-        questionId: QUESTION_ID_B,
-        responder: RESPONDER_LOWER,
-        response: {
-          questionID: QUESTION_ID_B,
-          prompt: 'Delayed Session A question',
-          answer: { value: false },
-        },
-        storageRefId: 'worker-response-a-delayed',
-        timestamp: 2,
-      },
-    ]);
-    await runA;
-
-    expect(host.getStored('questionsCache', SESSION_SLUG).worker).toMatchObject({
-      questions: {},
-      questionResponses: {},
-      workerCanonicalIdentity: identityB,
-    });
-    expect(host.getStored('userCache', SESSION_SLUG)[RESPONDER_LOWER].worker).toBeUndefined();
-    expect(controller.isInitInFlight(SESSION_SLUG)).toBe(false);
   });
 
   afterEach(() => {

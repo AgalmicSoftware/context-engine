@@ -1,7 +1,6 @@
 import { ethers } from 'ethers';
 import { TESTNET_AUTO_SEND_THRESHOLD_ETH } from '../../variables/appConfig.js';
 import { createLogger } from '../../utilities/logging.js';
-import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 
 const accountLog = createLogger('account');
 
@@ -20,6 +19,14 @@ type AutoSendDeps = {
   state: AutoSendState;
   syncWalletBalance: () => Promise<{ balance: ethers.BigNumber | null; stale: boolean }>;
   walletAccount: string;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+export const isWorkerCanonicalSessionConfig = (sessionConfig: unknown): boolean => {
+  const sessionModeProfile = asRecord(asRecord(sessionConfig).sessionModeProfile);
+  return asRecord(sessionModeProfile.authority).mode === 'worker_canonical';
 };
 
 const clearAutoSendState = (state: AutoSendState, setState: AutoSendDeps['setState']) => {
@@ -42,7 +49,7 @@ export const runLoginTestFundsAutoSend = async ({
     clearAutoSendState(state, setState);
     return;
   }
-  if (!resolveSessionCapabilityProjection(getActiveSessionConfig()).usesFunding) {
+  if (isWorkerCanonicalSessionConfig(getActiveSessionConfig())) {
     clearAutoSendState(state, setState);
     return;
   }

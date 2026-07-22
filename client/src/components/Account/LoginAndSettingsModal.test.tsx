@@ -990,7 +990,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     mockedGetSessionConfigBySlugOrDefault.mockReturnValue(null);
     mockedGetDemoSessionConfigBySlug.mockReturnValue({
       slug: 'demo-sh',
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
     });
     const subject = mountClassSubject(
       new LoginAndSettingsModalSubject(

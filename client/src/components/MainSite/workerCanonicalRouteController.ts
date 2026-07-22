@@ -27,15 +27,18 @@ export const createWorkerCanonicalRouteController = (
 
     handleBootstrapResolved: (bootstrap) => {
       verifiedRouteKeys.add(buildVerifiedRouteKey(bootstrap.sessionSlug, bootstrap.workerOrigin));
+      verifiedRouteKeys.add(normalizeSessionSlug(bootstrap.sessionSlug));
       host.setState((previousState) => ({
         sessionPathResolutionNonce: Number(previousState.sessionPathResolutionNonce || 0) + 1,
       }));
     },
 
     isSessionSlug: (slug) => {
+      const normalizedSlug = normalizeSessionSlug(slug);
+      if (normalizedSlug && verifiedRouteKeys.has(normalizedSlug)) return true;
       const search = typeof window !== 'undefined' ? window.location.search || '' : '';
       const routeSlug = normalizeSessionSlug(host.getSessionTokenFromPath(host.getCurrentPathname()) || '');
-      const matchesExplicitRoute = !!routeSlug && routeSlug === normalizeSessionSlug(slug);
+      const matchesExplicitRoute = !!routeSlug && routeSlug === normalizedSlug;
       try {
         const workerOrigin = parseSessionWorkerDiscoveryQuery(search);
         return !!workerOrigin && matchesExplicitRoute;

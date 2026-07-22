@@ -19,6 +19,28 @@ type SubmitTransaction = UnknownRecord & {
 const isObjectRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
+export function resolveSurveySubmitSessionTarget({
+  sessionSlug,
+  sessionConfig,
+}: {
+  sessionSlug: unknown;
+  sessionConfig: unknown;
+}): string | UnknownRecord {
+  const slug = String(sessionSlug || '')
+    .trim()
+    .toLowerCase();
+  const config = isObjectRecord(sessionConfig) ? sessionConfig : {};
+  const profile = isObjectRecord(config.sessionModeProfile) ? config.sessionModeProfile : {};
+  const authority = isObjectRecord(profile.authority) ? profile.authority : {};
+  if (authority.mode !== 'worker_canonical') return slug;
+  return {
+    ...config,
+    slug: String(config.slug || slug)
+      .trim()
+      .toLowerCase(),
+  };
+}
+
 export interface FilteredSubmitPayload {
   questionIds: string[];
   questionResponses: SubmittedQuestionResponse[];

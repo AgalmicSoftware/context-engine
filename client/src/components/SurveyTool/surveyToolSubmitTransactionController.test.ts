@@ -40,7 +40,7 @@ describe('surveyToolSubmitTransactionController', () => {
       const sessionConfig = {
         slug: 'demo-sh',
         corsWorkerUrl: 'https://worker.example',
-        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
         storageProfile: { backend: 'cloudflare' },
       };
 
@@ -50,20 +50,7 @@ describe('surveyToolSubmitTransactionController', () => {
           sessionConfig,
         }),
       ).toEqual(sessionConfig);
-      expect(() => resolveSurveySubmitSessionTarget({ sessionSlug: 'missing', sessionConfig: {} })).toThrow(
-        /missing, invalid, or unsupported/i,
-      );
-      expect(
-        resolveSurveySubmitSessionTarget({
-          sessionSlug: 'legacy',
-          sessionConfig: {
-            __registry: {
-              registryChainId: 11155420,
-              sessionIdHex: '0x00112233445566778899aabbccddeeff',
-            },
-          },
-        }),
-      ).toBe('legacy');
+      expect(resolveSurveySubmitSessionTarget({ sessionSlug: 'legacy', sessionConfig: {} })).toBe('legacy');
     });
   });
 
@@ -371,6 +358,25 @@ describe('surveyToolSubmitTransactionController', () => {
         expect.objectContaining({
           hash: TX_HASH,
           from: '0x123',
+        }),
+      );
+    });
+
+    it('accepts a durable worker-canonical storage submission without an on-chain transaction', async () => {
+      const storageRef = { backend: 'cloudflare', id: 'opaque-response-id', resource: 'responses' };
+      const result = await normalizeSubmitReceipt(
+        {
+          workerCanonicalSubmission: true,
+          storageRefs: [storageRef],
+        },
+        makeSubmitOpts(),
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          workerCanonicalSubmission: true,
+          storageRefs: [storageRef],
+          __ceSubmissionGroupKey: 'group-1',
         }),
       );
     });

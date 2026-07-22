@@ -9,9 +9,22 @@ import {
 import { DEFAULT_SESSION_SCAN_MAX_BLOCK_RANGE, readSessionScanMaxBlockRange } from '../session/sessionScanScope.js';
 import { resolvePersistedQuestionResponsesWatermark } from './questionResponsesWatermark.js';
 import { shouldFlushCoalescedRun } from '../session/mainSiteProgressHelpers.js';
-import { compareResponseRecency, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency';
+import {
+  isResponseRecencyAtLeast,
+  isResponseRecencyNewer,
+  toResponseRecencyPair,
+  type ResponseRecencyPair,
+} from './responseRecency';
+import { mergeResponseHydrationInitOptions, type ResponseHydrationInitOptions } from './responseHydrationRunOptions';
 
 type CacheRecord = Record<string, unknown>;
+type WorkerCanonicalResponseRow = {
+  questionId: string;
+  responder: string;
+  response: CacheRecord;
+  storageRefId: string;
+  timestamp: number;
+};
 type StateRecord = {
   isQuestionCacheReady?: boolean;
   isResponsesCacheReady?: boolean;
@@ -155,7 +168,10 @@ export interface SessionResponseHydrationHost {
   checkAllCachesReady?: () => void;
   mergeLegacyNumericNetworkKey?: (cache: Record<string, unknown>, networkID: string) => boolean;
   queueLocalRevisionUpdate?: (opts?: QueueLocalRevisionUpdateOptions) => void;
-  loadWorkerResponses?: WorkerResponseHydrationLoader;
+  loadWorkerResponses?: (options: {
+    sessionSlug: string;
+    sessionConfig: CacheRecord;
+  }) => Promise<WorkerCanonicalResponseRow[]>;
 }
 
 export interface SessionResponseHydrationController {
@@ -592,33 +608,6 @@ export const createSessionResponseHydrationController = (
       forceArweaveFetch,
       notifyOnCompletion,
     };
-    const mergePendingResponseInitOpts = (
-      prevOpts: ResponseInitOptions | undefined,
-      nextOpts: ResponseInitOptions | undefined,
-    ): ResponseInitOptions => {
-      const nextBackground = !!(nextOpts && typeof nextOpts === 'object' && nextOpts.background === true);
-      const nextForceArweaveFetch = !!(nextOpts && typeof nextOpts === 'object' && nextOpts.forceArweaveFetch === true);
-      const nextNotifyOnCompletion = !!(
-        nextOpts &&
-        typeof nextOpts === 'object' &&
-        nextOpts.notifyOnCompletion === true
-      );
-      if (!prevOpts || typeof prevOpts !== 'object') {
-        return {
-          background: nextBackground,
-          forceArweaveFetch: nextForceArweaveFetch,
-          notifyOnCompletion: nextNotifyOnCompletion,
-        };
-      }
-      const prevBackground = !!(prevOpts.background === true);
-      const prevForceArweaveFetch = !!(prevOpts.forceArweaveFetch === true);
-      const prevNotifyOnCompletion = !!(prevOpts.notifyOnCompletion === true);
-      return {
-        background: prevBackground && nextBackground,
-        forceArweaveFetch: prevForceArweaveFetch || nextForceArweaveFetch,
-        notifyOnCompletion: prevNotifyOnCompletion || nextNotifyOnCompletion,
-      };
-    };
     const setResponseState = (nextState: SetStateArg, cb?: () => void): void => {
       if (suppressUiState || !isMounted()) return;
       setState(nextState, cb);
@@ -631,24 +620,10 @@ export const createSessionResponseHydrationController = (
       if (suppressUiState) return;
       checkAllCachesReady();
     };
-    if (
-      scanScopeNoop(slug, 'fetchQuestionResponsesChunkedForGroup', () => {
-        setResponseState(
-          (prev) => ({
-            isResponsesCacheReady: true,
-            questionResponsesNonce: (prev.questionResponsesNonce as number) + 1,
-          }),
-          checkAllCachesReady,
-        );
-        notifyBackgroundCompletion();
-      })
-    ) {
-      return;
-    }
     _responseInitInFlight = _responseInitInFlight || {};
     _responseInitPending = _responseInitPending || {};
     if (_responseInitInFlight[initRunKey]) {
-      _responseInitPending[initRunKey] = mergePendingResponseInitOpts(_responseInitPending[initRunKey], rerunOpts);
+      _responseInitPending[initRunKey] = mergeResponseHydrationInitOptions(_responseInitPending[initRunKey], rerunOpts);
       return _responseInitInFlight[initRunKey];
     }
     const trackResponseInitRun = async (run: Promise<void>): Promise<void> => {
@@ -670,32 +645,33 @@ export const createSessionResponseHydrationController = (
         }
       }
     };
-    if (workerRun) {
-      const hydrationRun = hydrateWorkerCanonicalResponses({
-        sessionSlug: slug,
-        sessionConfig: sessionConfig as CacheRecord,
-        run: workerRun,
-        loadWorkerResponses: host.loadWorkerResponses,
-        getCurrentSessionConfig: () => getSessionCfg(slug),
-        getAccount,
-        getProviderLike,
-        shouldAbort: () => _destroyed || !isMounted(),
-        markLoading: () => setResponseState({ isResponsesCacheReady: false }),
-        markReady: () => {
-          setResponseState((prev) => ({
-            isResponsesCacheReady: true,
-            questionResponsesNonce: Number(prev.questionResponsesNonce || 0) + 1,
-          }));
-          maybeCheckAllCachesReady();
-          notifyBackgroundCompletion();
-        },
-        updateQuestionsCacheAtomic: (updater) =>
-          host.updateQuestionsCacheAtomic(slug, (current) => updater(current) as QuestionCache),
-        updateUserCacheAtomic: (updater) =>
-          host.updateUserCacheAtomic(slug, (current) => updater(current) as UserCache),
-        createPersistenceError: (message) => new ResponseCachePersistenceError(message),
-      });
-      return trackResponseInitRun(hydrationRun);
+    const sessionConfig = host.getSessionCfg?.(slug) || null;
+    if (
+      (sessionConfig as { sessionModeProfile?: { authority?: { mode?: unknown } } } | null)?.sessionModeProfile
+        ?.authority?.mode === 'worker_canonical'
+    ) {
+      const workerRun = (async (): Promise<void> => {
+        setResponseState({ isResponsesCacheReady: false });
+        const workerHydration = await import('./workerResponseHydration.js');
+        const loadRows = host.loadWorkerResponses || workerHydration.loadWorkerResponses;
+        const rows = await loadRows({ sessionSlug: slug, sessionConfig: sessionConfig as CacheRecord });
+        if (_destroyed || !isMounted()) return;
+        await host.updateQuestionsCacheAtomic(
+          slug,
+          (current) => workerHydration.mergeWorkerQuestionResponses(current, rows, slug) as QuestionCache,
+        );
+        await host.updateUserCacheAtomic(
+          slug,
+          (current) => workerHydration.mergeWorkerUserResponses(current, rows) as UserCache,
+        );
+        setResponseState((prev) => ({
+          isResponsesCacheReady: true,
+          questionResponsesNonce: Number(prev.questionResponsesNonce || 0) + 1,
+        }));
+        maybeCheckAllCachesReady();
+        notifyBackgroundCompletion();
+      })();
+      return trackResponseInitRun(workerRun);
     }
     if (
       scanScopeNoop(slug, 'fetchQuestionResponsesChunkedForGroup', () => {

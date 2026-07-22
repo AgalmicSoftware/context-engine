@@ -8468,7 +8468,7 @@ export const createSurveyQuestionsRuntimeMethods = (
       questionResponses,
       hashedSurveyId,
       surveyResponse,
-      submissionGroupKey,
+      submissionTarget,
     );
 
     return normalizeSubmitReceipt(tx, {

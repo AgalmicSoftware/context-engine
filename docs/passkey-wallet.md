@@ -119,14 +119,21 @@ available at unlock time.
 ## Create Flow
 
 1. User clicks Create account or Continue.
-2. The app creates a WebAuthn credential under the configured RP ID.
-3. The app authenticates the credential with the WebAuthn PRF extension.
+2. The app creates a WebAuthn credential under the configured RP ID, offering
+   both ES256 and RS256 for platform-authenticator compatibility.
+3. When registration returns WebAuthn PRF output, the app uses it directly.
+   Authenticating the new credential is a compatibility fallback only when the
+   registration result omits PRF output; it is not an unconditional second
+   sign-in prompt.
 4. The app derives the EOA private key with HKDF-SHA256 over PRF output,
    configured RP ID, configured derivation namespace, and versioned derivation
    labels.
 5. The app records non-secret metadata such as credential ID and EVM address
    when browser storage is available.
 6. The app initializes the worker-held soft session.
+
+While registration is pending, the account modal labels the operation
+`creating passkey...` so it is distinguishable from the separate sign-in flow.
 
 Passkey-derived metadata shape:
 

@@ -130,6 +130,7 @@ import {
 import LoginAgentTokenPanel from './LoginAgentTokenPanel';
 import { createLoginAgentActions } from './loginAndSettingsAgentTokenActions';
 import { createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
+import type { PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
 const accountLog = createLogger('account');
 const normalizeAccountForComparison = (value: unknown): string =>
@@ -190,6 +191,7 @@ interface LoginAndSettingsModalState {
   testFundsStatusTone: string;
   passkeyWalletStatusMessage: string;
   passkeyWalletStatusTone: string;
+  passkeyMode: PasskeyWalletActionMode;
   autoRequestTestnetFundsEnabled: boolean;
   autoSendTriggered: boolean;
   aiSettings: any;
@@ -374,6 +376,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       testFundsStatusTone: '',
       passkeyWalletStatusMessage: '',
       passkeyWalletStatusTone: '',
+      passkeyMode: '',
       autoRequestTestnetFundsEnabled: DEFAULT_AUTO_REQUEST_TESTNET_FUNDS,
       autoSendTriggered: false,
       aiSettings: null,
@@ -430,6 +433,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     normalizeAccountForComparison,
     notifyInfo: (message) => notify.info(message),
     passkeyWallet,
+    setActionMode: (passkeyMode) => this.setStateIfMounted({ passkeyMode }),
     setStatus: (patch) => this.setStateIfMounted(patch),
     startAction: () => this.startPasskeyWalletAction(),
     updateLoginInfo: (payload) => this.props.updateLoginInfo(payload),
@@ -942,43 +946,16 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   }
 
   checkAndSendTestFundsIfNeeded = async () => {
-    const walletAccount = this.getWalletAccount();
-    if (!this.props.loginComplete || !walletAccount) {
-      const resetState: Partial<LoginAndSettingsModalState> = {};
-      if (this.state.autoSendTriggered) resetState.autoSendTriggered = false;
-      if (this.state.walletBalanceWei !== null) resetState.walletBalanceWei = null;
-      if (Object.keys(resetState).length) this.setStateIfMounted(resetState);
-      return;
-    }
-
-    const { balance: currentBalance, stale } = await this.syncWalletBalance();
-    if (stale) return;
-
-    if (!this.state.autoRequestTestnetFundsEnabled) {
-      if (this.state.autoSendTriggered) {
-        this.setStateIfMounted({ autoSendTriggered: false });
-      }
-      return;
-    }
-
-    let shouldTrigger = false;
-
-    try {
-      if (currentBalance != null) {
-        const threshold = ethers.utils.parseEther(TESTNET_AUTO_SEND_THRESHOLD_ETH);
-        shouldTrigger = currentBalance.lte(threshold);
-      }
-    } catch (e) {
-      accountLog.error('Error parsing wallet balance in auto-send check:', e);
-    }
-
-    if (shouldTrigger && !this.state.sendingTestFunds && !this.state.autoSendTriggered) {
-      this.autoSendTestFunds();
-    }
-
-    if (this.state.autoSendTriggered !== shouldTrigger) {
-      this.setStateIfMounted({ autoSendTriggered: shouldTrigger });
-    }
+    const { runLoginTestFundsAutoSend } = await import('./loginTestFundsAutoSendController');
+    await runLoginTestFundsAutoSend({
+      autoSendTestFunds: this.autoSendTestFunds,
+      getActiveSessionConfig: () => this.getDisplaySessionConfig(this.getActiveSessionSlug()),
+      loginComplete: this.props.loginComplete,
+      setState: (patch) => this.setStateIfMounted(patch),
+      state: this.state,
+      syncWalletBalance: () => this.syncWalletBalance(),
+      walletAccount: this.getWalletAccount(),
+    });
   };
 
   autoSendTestFunds = async () => {
@@ -1243,17 +1220,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const reqId = (this._sponsoredReqId = (this._sponsoredReqId || 0) + 1);
     this.setStateIfMounted({ sponsoredAccessLoading: true, workerResourcePresence: null });
     try {
-      const keys = ['ai', 'arweave', 'rpc', 'txGas'];
-      const results = await Promise.all(
-        keys.map((resourceKey: any) =>
-          checkSponsoredAccess({
-            sessionConfig: cfg,
-            sessionSlug: slug,
-            account,
-            resourceKey,
-          }),
-        ),
-      );
+      const { loadLoginSettingsSponsoredAccess } = await import('./loginSettingsSponsoredAccessRuntime');
+      const { accessMap, workerResourcePresence } = await loadLoginSettingsSponsoredAccess({
+        slug,
+        sessionConfig: getSessionConfigBySlugOrDefault(slug) || {},
+        account: this.props.account || '',
+        providerLike: this.props.provider || null,
+        fallbackChainId: this.getTargetNetwork()?.id,
+        // Regression guard: old workers may reject resource-presence. Only probe
+        // when the settings UI that consumes the result is actually visible.
+        includeWorkerResourcePresence: !!this.props.loginModalToggled,
+      });
       if (reqId !== this._sponsoredReqId) return;
       this.setStateIfMounted({
         sponsoredAccess: accessMap,
@@ -2866,134 +2843,30 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         ? activeSessionCapabilities.chainId
         : null;
 
-    // Login view
-    if (!this.props.loginComplete && !this.props.loginInProgress) {
-      return (
-        <CardBody>
-          <div className={styles.accountWarningContainer}>
-            <div className={styles.accountWarningMessage}>
-              <p>
-                Account is an{' '}
-                <a href="https://ethereum.org/en/wallets/" target="_blank" rel="noopener noreferrer">
-                  Ethereum wallet
-                </a>
-                :
-              </p>
-              <ul>
-                <li>controlled by you</li>
-                <li>no password</li>
-                {showTestnetOnly && <li>test network only</li>}
-              </ul>
-            </div>
-
-            {/* Passkey wallet buttons */}
-            <div className={styles.passkeyButtonContainer}>
-              <Button
-                onClick={this.handlePasskeyWalletCreate}
-                color="primary"
-                className={`${styles.passkeyButton} ${styles.passkeyButtonPrimary}`}
-              >
-                <FontAwesomeIcon icon={faFingerprint} size="2x" />
-                <span>Create </span>
-              </Button>
-              <Button
-                onClick={this.handlePasskeyWalletSignIn}
-                color="secondary"
-                outline
-                className={`${styles.passkeyButton} ${styles.passkeyButtonOutline}`}
-              >
-                <FontAwesomeIcon icon={faFingerprint} size="2x" />
-                <span> Login</span>
-              </Button>
-            </div>
-            {this.state.passkeyWalletStatusMessage && (
-              <div
-                className={`${styles.passkeyWalletStatus} ${
-                  this.state.passkeyWalletStatusTone === 'error' ? styles.passkeyWalletStatusError : ''
-                }`}
-                role="status"
-                data-testid="ce-passkey-wallet-status"
-              >
-                {this.state.passkeyWalletStatusMessage}
-              </div>
-            )}
-
-            {this.renderAgentTokenLoginPanel()}
-
-            <button
-              type="button"
-              aria-label="Open Crypto Login (RainbowKit)"
-              onClick={this.openCryptoModal}
-              className={styles.cryptoLoginLink}
-            >
-              <img src={MetaMaskLogo} alt="MetaMask" className={styles.cryptoLoginIcon} />
-            </button>
-          </div>
-        </CardBody>
-      );
-    }
-
-    if (this.props.loginInProgress) {
-      return (
-        <CardBody>
-          <div id={styles.loadingIconContainer}>
-            <h3 id={styles.verifyingText}> logging in... </h3>
-            <FontAwesomeIcon icon={faSpinner} pulse id={styles.verifyingTXloadingIcon} />
-          </div>
-        </CardBody>
-      );
-    }
-
-    // Logged-in view for all providers (passkey wallet, Wagmi)
-    if (this.props.loginComplete) {
-      const activeSessionSlug = this.getActiveSessionSlug();
-      const activeSessionConfig = this.getDisplaySessionConfig(activeSessionSlug);
-      return (
-        <CardBody id={styles.accountModalCard}>
-          <div id={styles.accountModalPanel}>
-            <div className={styles.accountModalBody}>
-              {this.props.account && (
-                <div className={styles.accountModalProfileShell}>
-                  <Suspense fallback={null}>
-                    <AccountUserPage
-                      viewAddress={this.props.account}
-                      account={this.props.account}
-                      provider={this.props.provider}
-                      minimized={true}
-                      network={this.props.network}
-                      activeSessionSlug={activeSessionSlug}
-                      sessionConfig={activeSessionConfig}
-                      networkChainId={activeSessionConfig?.networkChainId}
-                    />
-                  </Suspense>
-                </div>
-              )}
-              <div className={styles.accountModalControls}>
-                <Button color="secondary" size="sm" onClick={this.openBookmarks} className={styles.walletButton}>
-                  <FontAwesomeIcon icon={faBookmark} /> Bookmarks
-                </Button>
-                <Button color="danger" size="sm" onClick={this.handleLogout} className={styles.disconnectButton}>
-                  <FontAwesomeIcon icon={faSignOutAlt} /> Disconnect
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardBody>
-      );
-    }
-
-    return (
-      <CardBody>
-        <p>Please log in.</p>
-      </CardBody>
-    );
-  };
-
-  getModalTitle = () => {
-    if (!this.props.loginComplete && !this.props.loginInProgress) return 'LOGIN';
-    if (this.props.loginInProgress) return 'ACCOUNT';
-    if (this.props.loginComplete) return 'ACCOUNT';
-    return 'CONNECT';
+    return LoginModalDisplayBody({
+      account: this.props.account,
+      activeSessionConfig,
+      activeSessionSlug,
+      handleLogout: this.handleLogout,
+      handlePasskeyWalletCreate: this.handlePasskeyWalletCreate,
+      handlePasskeyWalletSignIn: this.handlePasskeyWalletSignIn,
+      loginComplete: this.props.loginComplete,
+      loginInProgress: this.props.loginInProgress,
+      network: this.props.network,
+      openBookmarks: () => {
+        this.closeLoginModal();
+        if (typeof window !== 'undefined') {
+          window.location.href = buildBookmarksRoutePath();
+        }
+      },
+      openCryptoModal: this.openCryptoModal,
+      passkeyWalletStatusMessage: this.state.passkeyWalletStatusMessage,
+      passkeyWalletStatusTone: this.state.passkeyWalletStatusTone,
+      passkeyMode: this.state.passkeyMode,
+      provider: this.props.provider,
+      renderAgentTokenLoginPanel: this.renderAgentTokenLoginPanel,
+      showTestnetOnly,
+    });
   };
 
   render() {

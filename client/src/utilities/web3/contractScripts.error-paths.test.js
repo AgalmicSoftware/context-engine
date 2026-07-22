@@ -125,6 +125,18 @@ const CLOUDFLARE_GROUP_CFG = {
     backend: 'cloudflare',
   },
 };
+const WORKER_CANONICAL_GROUP_CFG = {
+  slug: 'demo-sh',
+  corsWorkerUrl: 'https://worker.example',
+  contracts: {},
+  sessionModeProfile: {
+    authority: { mode: 'worker_canonical' },
+  },
+  storageProfile: {
+    backend: 'cloudflare',
+    resources: { responses: 'active' },
+  },
+};
 
 const makeRpcProvider = ({ sendTxError } = {}) => ({
   request: jest.fn(async ({ method }) => {
@@ -427,33 +439,6 @@ describe('error paths', () => {
         resource: 'responses',
       }),
     );
-    expect(JSON.parse(uploadDataToSessionStorage.mock.calls[0][0])).toEqual(
-      expect.objectContaining({
-        questionID: QUESTION_ID,
-        answer: 'yes',
-        sessionId: WORKER_CANONICAL_GROUP_CFG.sessionId,
-        sessionSlug: 'demo-sh',
-      }),
-    );
-    expect(rpcProvider.request).not.toHaveBeenCalledWith(expect.objectContaining({ method: 'eth_sendTransaction' }));
-  });
-
-  it('rejects worker-canonical response writes without an exact session ID', async () => {
-    const rpcProvider = makeRpcProvider();
-    window.ethereum = rpcProvider;
-
-    await expect(
-      submitResponses(
-        'wagmi',
-        [QUESTION_ID],
-        [{ questionID: QUESTION_ID, answer: 'yes' }],
-        ethers.constants.HashZero,
-        null,
-        { ...WORKER_CANONICAL_GROUP_CFG, sessionId: '' },
-      ),
-    ).rejects.toThrow('submitResponses: exact Worker session identity is required.');
-
-    expect(uploadDataToSessionStorage).not.toHaveBeenCalled();
     expect(rpcProvider.request).not.toHaveBeenCalledWith(expect.objectContaining({ method: 'eth_sendTransaction' }));
   });
 

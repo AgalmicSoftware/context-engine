@@ -77,6 +77,7 @@ import {
   ensureIdentifierHash,
   filterChangedResponsesForSubmit,
   normalizeSubmitReceipt,
+  resolveSurveySubmitSessionTarget,
 } from './surveyToolSubmitTransactionController';
 import {
   applyQuestionDecryptCompletionStatus as applyQuestionDecryptCompletionStatusHelper,
@@ -1493,6 +1494,7 @@ export interface SurveyQuestions {
     normalizeSingleQuestionMetadataForCache,
     normalizeSingleQuestionViewedResponseHelper,
     normalizeSubmitReceipt,
+    resolveSurveySubmitSessionTarget,
     normalizeSurveyToolFilterState,
     normalizeTransientSubmitFeedbackDurationMs,
     notify,
