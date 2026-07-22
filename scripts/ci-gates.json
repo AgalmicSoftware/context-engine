@@ -117,6 +117,14 @@
           ]
         },
         {
+          "label": "Verify Cloudflare-native Session Worker package",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:cloudflare-template"
+          ]
+        },
+        {
           "label": "Build client",
           "command": "npm",
           "args": [
@@ -308,6 +316,14 @@
           "args": [
             "run",
             "verify:worker-bundle"
+          ]
+        },
+        {
+          "label": "Verify Cloudflare-native Session Worker package",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:cloudflare-template"
           ]
         },
         {

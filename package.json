@@ -24,6 +24,8 @@
     "abi:check": "node scripts/verify-abi-sync.mjs",
     "verify:abi-sync": "forge build && npm run -s abi:check",
     "worker:bundle": "node scripts/worker-bundle.mjs",
+    "worker:cloudflare-template": "node scripts/cloudflare-session-template.mjs",
+    "verify:cloudflare-template": "node scripts/cloudflare-session-template.mjs --check",
     "demo:analysis:generate": "node scripts/generate-demo-analysis-fixture.mjs",
     "demo:sim-answers:reconcile": "node scripts/reconcile-sim-profile-answers.mjs",
     "deploy-helper:deploy": "node scripts/deploy-helper-deploy.mjs",

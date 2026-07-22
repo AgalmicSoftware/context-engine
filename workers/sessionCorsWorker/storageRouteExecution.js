@@ -647,15 +647,17 @@ const handleCloudflareRead = async ({ request, env, config, slug, uploaderAddres
   });
   if (!access.ok) return access.response;
   const contentType = trim(metadata?.contentType) || 'application/octet-stream';
-  return new Response(body, {
+  const responseHeaders = new Headers(baseHeaders || {});
+  responseHeaders.set('Content-Type', contentType);
+  responseHeaders.set('X-CE-Storage-Backend', STORAGE_BACKENDS.CLOUDFLARE);
+  responseHeaders.set('X-CE-Storage-Ref', id);
+  responseHeaders.set('X-CE-Payload-Access-Mode', deriveLegacyPayloadAccessMode(resolvedAccess));
+  if (resolvedAccess.encryption === PAYLOAD_ENCRYPTION_MODES.WORKER_ENVELOPE) {
+    responseHeaders.set('Cache-Control', 'private, no-store');
+  }
+  return new Response(responseBody, {
     status: 200,
-    headers: {
-      ...baseHeaders,
-      'Content-Type': contentType,
-      'X-CE-Storage-Backend': STORAGE_BACKENDS.CLOUDFLARE,
-      'X-CE-Storage-Ref': id,
-      'X-CE-Payload-Access-Mode': resolvePayloadAccessControl(config).mode,
-    },
+    headers: responseHeaders,
   });
 };
 

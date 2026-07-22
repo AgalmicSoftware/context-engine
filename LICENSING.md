@@ -24,6 +24,7 @@ The public open-source core is licensed under `MPL-2.0`. The root [LICENSE](LICE
 | `workers/` | MIT | Worker subtree. `workers/LICENSE` contains the MIT text for worker-side project code. |
 | `workers/sessionCorsWorker/` | MIT | Cloudflare worker/tooling package. `workers/sessionCorsWorker/package.json` declares `MIT`, and `workers/sessionCorsWorker/LICENSE` points to the subtree MIT text. |
 | `workers/deploy-helper/` | MIT | Helper worker source that stays on the worker side of the boundary. |
+| `deploy/cloudflare/session-worker/` | MIT | Isolated, generated Cloudflare-native deployment package for the Session Worker. Its local `LICENSE` contains the MIT text. |
 | `ai-discourse-corpus/` | Mixed upstream rights; `CC0-1.0` for project-authored annotations | No ownership is claimed over upstream linked/source material. See `ai-discourse-corpus/LICENSE.md` for the directory-specific rights notice covering summaries, tags, and structure. |
 
 This map does not override more specific file, directory, package, or third-party notices.

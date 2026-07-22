@@ -14638,19 +14638,19 @@ var require_interface = __commonJS({
       getSelector(fragment: ErrorFragment | FunctionFragment): string {
           if (typeof(fragment) === "string") {
               const matches: Array<Fragment> = [ ];
-
+      
               try { matches.push(this.getFunction(fragment)); } catch (error) { }
               try { matches.push(this.getError(<string>fragment)); } catch (_) { }
-
+      
               if (matches.length === 0) {
                   logger.throwArgumentError("unknown fragment", "key", fragment);
               } else if (matches.length > 1) {
                   logger.throwArgumentError("ambiguous fragment matches function and error", "key", fragment);
               }
-
+      
               fragment = matches[0];
           }
-
+      
           return dataSlice(id(fragment.format()), 0, 4);
       }
           */
@@ -14831,12 +14831,12 @@ var require_interface = __commonJS({
                   if (type. === "address") {
                   }
               };
-
+      
               const descend = function (inputs: Array<ParamType>, values: ReadonlyArray<any>) {
                   if (inputs.length !== values.length) { throw new Error("length mismatch"); }
-
+                  
               };
-
+      
               const result: Array<any> = [ ];
               values.forEach((value, index) => {
                   if (value == null) {
@@ -15986,7 +15986,7 @@ var require_provider = __commonJS({
           blockNumber,
           logsBloom,
           logs,
-          //byzantium,
+          //byzantium, 
           status,
           root
         } = this;
@@ -15994,7 +15994,7 @@ var require_provider = __commonJS({
           _type: "TransactionReceipt",
           blockHash,
           blockNumber,
-          //byzantium,
+          //byzantium, 
           contractAddress,
           cumulativeGasUsed: toJson2(this.cumulativeGasUsed),
           from,
@@ -17467,10 +17467,10 @@ var require_contract = __commonJS({
               const provider = getProvider(this.runner);
               assert(provider, "contract runner does not have a provider",
                   "UNSUPPORTED_OPERATION", { operation: "queryTransaction" });
-
+      
               const receipt = await provider.getTransactionReceipt(hash);
               if (receipt == null) { return null; }
-
+      
               return new ContractTransactionReceipt(this.interface, provider, receipt);
           }
           */
@@ -22790,19 +22790,19 @@ var require_provider_etherscan = __commonJS({
                       case "getLogs": {
                           // Needs to complain if more than one address is passed in
                           const args: Record<string, any> = { action: "getLogs" }
-
+          
                           if (params.filter.fromBlock) {
                               args.fromBlock = checkLogTag(params.filter.fromBlock);
                           }
-
+          
                           if (params.filter.toBlock) {
                               args.toBlock = checkLogTag(params.filter.toBlock);
                           }
-
+          
                           if (params.filter.address) {
                               args.address = params.filter.address;
                           }
-
+          
                           // @TODO: We can handle slightly more complicated logs using the logs API
                           if (params.filter.topics && params.filter.topics.length > 0) {
                               if (params.filter.topics.length > 1) {
@@ -22816,12 +22816,12 @@ var require_provider_etherscan = __commonJS({
                                   args.topic0 = topic0;
                               }
                           }
-
+          
                           const logs: Array<any> = await this.fetch("logs", args);
-
+          
                           // Cache txHash => blockHash
                           let blocks: { [tag: string]: string } = {};
-
+          
                           // Add any missing blockHash to the logs
                           for (let i = 0; i < logs.length; i++) {
                               const log = logs[i];
@@ -22832,10 +22832,10 @@ var require_provider_etherscan = __commonJS({
                                       blocks[log.blockNumber] = block.hash;
                                   }
                               }
-
+          
                               log.blockHash = blocks[log.blockNumber];
                           }
-
+          
                           return logs;
                       }
           */
@@ -23129,11 +23129,11 @@ var require_provider_socket = __commonJS({
       /*
           async _start(): Promise<void> {
               if (this.#ready) { return; }
-
+      
               for (const { payload } of this.#callbacks.values()) {
                   await this._write(JSON.stringify(payload));
               }
-
+      
               this.#ready = (async function() {
                   await super._start();
               })();
@@ -29581,7 +29581,7 @@ var require_webcrypto_driver = __commonJS({
             keyUsages: key.usages,
             saltLengthsAttempted: `0, 32, ${saltLengthN}`
           };
-          console.warn("Transaction Verification Failed! \n", `Details: ${JSON.stringify(details, null, 2)}
+          console.warn("Transaction Verification Failed! \n", `Details: ${JSON.stringify(details, null, 2)} 
 `, "N.B. ArweaveJS is only guaranteed to verify txs created using ArweaveJS.");
         }
         return result;
@@ -43557,19 +43557,19 @@ var _Interface = class _Interface {
   getSelector(fragment: ErrorFragment | FunctionFragment): string {
       if (typeof(fragment) === "string") {
           const matches: Array<Fragment> = [ ];
-
+  
           try { matches.push(this.getFunction(fragment)); } catch (error) { }
           try { matches.push(this.getError(<string>fragment)); } catch (_) { }
-
+  
           if (matches.length === 0) {
               logger.throwArgumentError("unknown fragment", "key", fragment);
           } else if (matches.length > 1) {
               logger.throwArgumentError("ambiguous fragment matches function and error", "key", fragment);
           }
-
+  
           fragment = matches[0];
       }
-
+  
       return dataSlice(id(fragment.format()), 0, 4);
   }
       */
@@ -43750,12 +43750,12 @@ var _Interface = class _Interface {
               if (type. === "address") {
               }
           };
-
+  
           const descend = function (inputs: Array<ParamType>, values: ReadonlyArray<any>) {
               if (inputs.length !== values.length) { throw new Error("length mismatch"); }
-
+              
           };
-
+  
           const result: Array<any> = [ ];
           values.forEach((value, index) => {
               if (value == null) {
@@ -44817,7 +44817,7 @@ var TransactionReceipt = class {
       blockNumber,
       logsBloom,
       logs,
-      //byzantium,
+      //byzantium, 
       status,
       root
     } = this;
@@ -44825,7 +44825,7 @@ var TransactionReceipt = class {
       _type: "TransactionReceipt",
       blockHash,
       blockNumber,
-      //byzantium,
+      //byzantium, 
       contractAddress,
       cumulativeGasUsed: toJson(this.cumulativeGasUsed),
       from,
@@ -46267,10 +46267,10 @@ var _BaseContract = class _BaseContract {
           const provider = getProvider(this.runner);
           assert(provider, "contract runner does not have a provider",
               "UNSUPPORTED_OPERATION", { operation: "queryTransaction" });
-
+  
           const receipt = await provider.getTransactionReceipt(hash);
           if (receipt == null) { return null; }
-
+  
           return new ContractTransactionReceipt(this.interface, provider, receipt);
       }
       */
@@ -51295,19 +51295,19 @@ var EtherscanProvider = class extends AbstractProvider {
                   case "getLogs": {
                       // Needs to complain if more than one address is passed in
                       const args: Record<string, any> = { action: "getLogs" }
-
+      
                       if (params.filter.fromBlock) {
                           args.fromBlock = checkLogTag(params.filter.fromBlock);
                       }
-
+      
                       if (params.filter.toBlock) {
                           args.toBlock = checkLogTag(params.filter.toBlock);
                       }
-
+      
                       if (params.filter.address) {
                           args.address = params.filter.address;
                       }
-
+      
                       // @TODO: We can handle slightly more complicated logs using the logs API
                       if (params.filter.topics && params.filter.topics.length > 0) {
                           if (params.filter.topics.length > 1) {
@@ -51321,12 +51321,12 @@ var EtherscanProvider = class extends AbstractProvider {
                               args.topic0 = topic0;
                           }
                       }
-
+      
                       const logs: Array<any> = await this.fetch("logs", args);
-
+      
                       // Cache txHash => blockHash
                       let blocks: { [tag: string]: string } = {};
-
+      
                       // Add any missing blockHash to the logs
                       for (let i = 0; i < logs.length; i++) {
                           const log = logs[i];
@@ -51337,10 +51337,10 @@ var EtherscanProvider = class extends AbstractProvider {
                                   blocks[log.blockNumber] = block.hash;
                               }
                           }
-
+      
                           log.blockHash = blocks[log.blockNumber];
                       }
-
+      
                       return logs;
                   }
       */
@@ -51611,11 +51611,11 @@ var SocketProvider = class extends JsonRpcApiProvider {
   /*
       async _start(): Promise<void> {
           if (this.#ready) { return; }
-
+  
           for (const { payload } of this.#callbacks.values()) {
               await this._write(JSON.stringify(payload));
           }
-
+  
           this.#ready = (async function() {
               await super._start();
           })();
@@ -56037,4855 +56037,10 @@ var toTrimmedString2 = (value, deps) => {
   return stringify3(value).trim();
 };
 
-// workers/sessionCorsWorker/sessionSlugResolution.js
-var toStr8 = (val) => typeof val === "string" ? val : val == null ? "" : String(val);
-var INVALID_SESSION_SLUG_ERROR = 'Invalid session slug. Use lowercase letters, numbers, "_" or "-".';
-var SLUG_MISMATCH_ERROR = "sessionSlug does not match worker session.";
-var SLUG_ALIAS_MISMATCH_ERROR = "sessionSlug aliases do not match.";
-var MISSING_SLUG_ERROR = "Missing sessionSlug.";
-var EMPTY_VALIDATION_RESULT = Object.freeze({
-  ok: true,
-  slug: "",
-  error: ""
-});
-var hasExplicitWorkerSlugInput = (raw) => raw != null && toStr8(raw).trim().length > 0;
-var canonicalizeReservedWorkerAlias = (slug = "") => {
-  if (!slug) return "";
-  if (slug === "general") return "";
-  if (slug === "debate") return "rxc";
-  return slug;
-};
-var normalizeWorkerSessionSlug = (raw) => {
-  const slug = toStr8(raw).trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
-  if (!slug) return "";
-  return canonicalizeReservedWorkerAlias(slug);
-};
-var validateInboundWorkerSessionSlug = (raw) => {
-  if (raw == null) return EMPTY_VALIDATION_RESULT;
-  const rawStr = toStr8(raw).trim();
-  if (!rawStr) return EMPTY_VALIDATION_RESULT;
-  if (rawStr.toLowerCase() === "general") return EMPTY_VALIDATION_RESULT;
-  const canonicalSlug = rawStr.toLowerCase().replace(/[^a-z0-9_-]/g, "");
-  if (rawStr !== canonicalSlug) {
-    return {
-      ok: false,
-      slug: "",
-      error: INVALID_SESSION_SLUG_ERROR
-    };
-  }
-  return { ok: true, slug: canonicalizeReservedWorkerAlias(canonicalSlug), error: "" };
-};
-var getDefaultWorkerSessionSlug = (env = {}) => normalizeWorkerSessionSlug(env.DEFAULT_SESSION_SLUG ?? env.DEFAULT_GROUP_SLUG);
-var hasExplicitDefaultWorkerSessionSlug = (env = {}) => hasExplicitWorkerSlugInput(env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG);
-var resolveWorkerTenantSlug = ({ envSlug, headerSlug, tokenSlug } = {}) => {
-  if (envSlug) return envSlug;
-  if (headerSlug) return headerSlug;
-  if (tokenSlug) return tokenSlug;
-  return "";
-};
-var resolveRequestedWorkerSlugPayload = (body = {}) => {
-  const source = body && typeof body === "object" ? body : {};
-  const hasSessionSlug = Object.prototype.hasOwnProperty.call(source, "sessionSlug") && source?.sessionSlug != null;
-  const hasGroupSlug = Object.prototype.hasOwnProperty.call(source, "groupSlug") && source?.groupSlug != null;
-  const sessionSlugResult = hasSessionSlug ? validateInboundWorkerSessionSlug(source?.sessionSlug) : EMPTY_VALIDATION_RESULT;
-  const groupSlugResult = hasGroupSlug ? validateInboundWorkerSessionSlug(source?.groupSlug) : EMPTY_VALIDATION_RESULT;
-  const sessionSlug = hasSessionSlug ? sessionSlugResult.slug : "";
-  const groupSlug = hasGroupSlug ? groupSlugResult.slug : "";
-  const invalidResult = !sessionSlugResult.ok ? sessionSlugResult : null;
-  return {
-    ok: !invalidResult,
-    error: invalidResult?.error || "",
-    hasSessionSlug,
-    hasGroupSlug,
-    hasAnySlug: hasSessionSlug,
-    sessionSlug,
-    groupSlug,
-    requestedSlug: sessionSlug,
-    aliasMismatch: hasSessionSlug && hasGroupSlug && groupSlugResult.ok && sessionSlug !== groupSlug
-  };
-};
-var resolveWorkerBodySlugContext = ({ body, env, slugHint } = {}) => {
-  const envSlug = getDefaultWorkerSessionSlug(env);
-  const slugPayload = resolveRequestedWorkerSlugPayload(body);
-  const normalizedHint = normalizeWorkerSessionSlug(slugHint);
-  const explicitSlugProvided = hasExplicitDefaultWorkerSessionSlug(env) || slugPayload.hasAnySlug || hasExplicitWorkerSlugInput(slugHint);
-  const targetSlug = envSlug || (slugPayload.hasAnySlug ? slugPayload.requestedSlug : normalizedHint);
-  if (!slugPayload.ok) {
-    return {
-      ok: false,
-      error: slugPayload.error,
-      envSlug,
-      slugPayload,
-      targetSlug,
-      explicitSlugProvided
-    };
-  }
-  if (slugPayload.aliasMismatch) {
-    return {
-      ok: false,
-      error: SLUG_ALIAS_MISMATCH_ERROR,
-      envSlug,
-      slugPayload,
-      targetSlug,
-      explicitSlugProvided
-    };
-  }
-  if (envSlug && slugPayload.requestedSlug && slugPayload.requestedSlug !== envSlug) {
-    return {
-      ok: false,
-      error: SLUG_MISMATCH_ERROR,
-      envSlug,
-      slugPayload,
-      targetSlug,
-      explicitSlugProvided
-    };
-  }
-  return {
-    ok: true,
-    error: "",
-    envSlug,
-    slugPayload,
-    targetSlug,
-    explicitSlugProvided
-  };
-};
-var resolveWorkerRequestSlugContext = ({
-  tokenSlug,
-  tokenHasSlug = false,
-  headerSlug,
-  env,
-  slugHint,
-  countEmptyHeaderAsExplicit = false
-} = {}) => {
-  const headerPresent = headerSlug != null;
-  const headerHasValue = headerPresent && toStr8(headerSlug).trim().length > 0;
-  const tokenSlugResult = validateInboundWorkerSessionSlug(tokenSlug);
-  if (tokenHasSlug && !tokenSlugResult.ok) {
-    return { ok: false, error: tokenSlugResult.error };
-  }
-  const headerSlugResult = validateInboundWorkerSessionSlug(headerSlug);
-  if (headerPresent && !headerSlugResult.ok) {
-    return { ok: false, error: headerSlugResult.error };
-  }
-  const envSlug = getDefaultWorkerSessionSlug(env);
-  const normalizedHint = normalizeWorkerSessionSlug(slugHint);
-  const resolvedTokenSlug = tokenHasSlug ? tokenSlugResult.slug : "";
-  const resolvedHeaderSlug = headerSlugResult.slug;
-  const slug = resolveWorkerTenantSlug({
-    envSlug,
-    headerSlug: resolvedHeaderSlug,
-    tokenSlug: resolvedTokenSlug
-  }) || normalizedHint;
-  const explicitHeaderProvided = countEmptyHeaderAsExplicit ? headerPresent : headerHasValue;
-  return {
-    ok: true,
-    error: "",
-    slug,
-    explicitSlugProvided: hasExplicitDefaultWorkerSessionSlug(env) || !!tokenHasSlug || hasExplicitWorkerSlugInput(slugHint) || explicitHeaderProvided,
-    envSlug,
-    tokenSlug: resolvedTokenSlug,
-    headerSlug: resolvedHeaderSlug,
-    headerPresent,
-    headerHasValue
-  };
-};
-
-// workers/shared/deployHelperCore.mjs
-var import_rpcDefaults3 = __toESM(require_rpcDefaults(), 1);
-
-// workers/sessionCorsWorker/storageRefNormalization.js
-var STORAGE_BACKENDS = Object.freeze({
-  ARWEAVE: "arweave",
-  LIT_ARWEAVE: "lit-arweave",
-  CLOUDFLARE: "cloudflare"
-});
-var CLOUDFLARE_REF_ID_RE = /^[a-z0-9][a-z0-9._:-]{5,160}$/i;
-var CLOUDFLARE_REF_FORBIDDEN_RE = /(r2:\/\/|d1:\/\/|kv:\/\/|\/|\\|https?:\/\/)/i;
-var toStr9 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-var isObj = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-var trim = (value) => toStr9(value).trim();
-var normalizeStorageBackend = (value, fallback = STORAGE_BACKENDS.ARWEAVE) => {
-  const raw = trim(value).toLowerCase();
-  if (raw === STORAGE_BACKENDS.CLOUDFLARE || raw === "cf" || raw === "r2") return STORAGE_BACKENDS.CLOUDFLARE;
-  if (raw === STORAGE_BACKENDS.LIT_ARWEAVE || raw === "lit" || raw === "lit_arweave" || raw === "encrypted-arweave") {
-    return STORAGE_BACKENDS.LIT_ARWEAVE;
-  }
-  if (raw === STORAGE_BACKENDS.ARWEAVE || raw === "ar") return STORAGE_BACKENDS.ARWEAVE;
-  return normalizeStorageBackend(fallback, STORAGE_BACKENDS.ARWEAVE);
-};
-var isArweaveStorageBackend = (value) => {
-  const backend = normalizeStorageBackend(value);
-  return backend === STORAGE_BACKENDS.ARWEAVE || backend === STORAGE_BACKENDS.LIT_ARWEAVE;
-};
-var isSafeCloudflareStorageRefId = (value) => {
-  const id2 = trim(value);
-  return !!id2 && CLOUDFLARE_REF_ID_RE.test(id2) && !CLOUDFLARE_REF_FORBIDDEN_RE.test(id2);
-};
-var assertNoCloudflarePrivateMaterial = (value) => {
-  const text = typeof value === "string" ? value : JSON.stringify(value || {});
-  if (/(r2:\/\/|d1:\/\/|kv:\/\/|bucket[-_\s]?name|account[-_\s]?id|api[-_\s]?token|worker[-_\s]?token|secret|private[-_\s]?key)/i.test(text)) {
-    throw new Error("Cloudflare storage references must not expose private storage identifiers or credentials.");
-  }
-  return true;
-};
-var normalizeCloudflareStorageUri = (id2) => `/storage/read?id=${encodeURIComponent(id2)}`;
-var normalizeStorageRef = (input = {}, opts = {}) => {
-  const raw = isObj(input) ? input : trim(input) ? { id: trim(input) } : {};
-  const backend = normalizeStorageBackend(raw.backend || raw.storage, opts.fallbackBackend);
-  const legacyTxId = trim(raw.arweaveTxId || raw.txId || opts.legacyArweaveTxId);
-  const id2 = trim(raw.id || raw.key || legacyTxId);
-  if (!id2) return null;
-  if (backend === STORAGE_BACKENDS.CLOUDFLARE && !isSafeCloudflareStorageRefId(id2)) return null;
-  const ref = { backend, id: id2 };
-  if (backend === STORAGE_BACKENDS.CLOUDFLARE) {
-    ref.uri = normalizeCloudflareStorageUri(id2);
-  } else {
-    ref.uri = backend === STORAGE_BACKENDS.LIT_ARWEAVE ? `lit-arweave://${id2}` : `ar://${id2}`;
-  }
-  const contentType = trim(raw.contentType || raw.mime || raw.type);
-  if (contentType) ref.contentType = contentType;
-  if (backend === STORAGE_BACKENDS.LIT_ARWEAVE || raw.encrypted === true || raw.payloadEncrypted === true) ref.encrypted = true;
-  const gate = trim(raw.gate || raw.gateResource || raw.resourceGate);
-  if (gate) ref.gate = gate;
-  const resource = trim(raw.resource || opts.resource);
-  if (resource) ref.resource = resource;
-  const createdAt = trim(raw.createdAt);
-  if (createdAt) ref.createdAt = createdAt;
-  if (backend === STORAGE_BACKENDS.CLOUDFLARE) assertNoCloudflarePrivateMaterial(ref);
-  return ref;
-};
-var deriveStorageRefFromLegacyArweaveTxId = (arweaveTxId, opts = {}) => {
-  const txId = trim(arweaveTxId);
-  if (!txId) return null;
-  return normalizeStorageRef({
-    backend: opts.backend || (opts.encrypted ? STORAGE_BACKENDS.LIT_ARWEAVE : STORAGE_BACKENDS.ARWEAVE),
-    id: txId,
-    contentType: opts.contentType,
-    gate: opts.gate,
-    resource: opts.resource
-  }, opts);
-};
-var resolvePayloadStorageRef = (record, opts = {}) => {
-  const raw = isObj(record) ? record : {};
-  const ref = raw.storageRef ? normalizeStorageRef(raw.storageRef, {
-    ...opts,
-    legacyArweaveTxId: raw.arweaveTxId || raw.txId || opts.legacyArweaveTxId
-  }) : null;
-  if (ref) return ref;
-  return deriveStorageRefFromLegacyArweaveTxId(raw.arweaveTxId || raw.txId || opts.legacyArweaveTxId, {
-    ...opts,
-    contentType: raw.contentType || raw.mime || opts.contentType,
-    encrypted: opts.encrypted ?? raw.encrypted ?? raw.payloadEncrypted,
-    backend: raw.backend || raw.storage || raw.profile || opts.backend,
-    gate: raw.gate || raw.gateResource || raw.resourceGate || opts.gate,
-    resource: raw.resource || opts.resource
-  });
-};
-var getLegacyArweaveTxId = (record, opts = {}) => {
-  if (!isObj(record)) return trim(record);
-  const storageRef = record.storageRef ? normalizeStorageRef(record.storageRef, {
-    ...opts,
-    legacyArweaveTxId: record.arweaveTxId || record.txId || opts.legacyArweaveTxId
-  }) : null;
-  if (storageRef) return isArweaveStorageBackend(storageRef.backend) ? storageRef.id : "";
-  return trim(record.arweaveTxId || record.txId || opts.legacyArweaveTxId);
-};
-var attachStorageRefCompatibilityFields = (record, opts = {}) => {
-  const source = isObj(record) ? { ...record } : {};
-  const storageRef = resolvePayloadStorageRef(source, opts);
-  if (!storageRef) return source;
-  source.storageRef = storageRef;
-  const arweaveTxId = getLegacyArweaveTxId(source, opts);
-  if (arweaveTxId && isArweaveStorageBackend(storageRef.backend)) {
-    source.arweaveTxId = arweaveTxId;
-  }
-  return source;
-};
-
-// workers/shared/sessionSecretsEnvelope.mjs
-var SESSION_SECRETS_ENVELOPE_VERSION = 1;
-var SESSION_SECRETS_ENVELOPE_KIND = "session-secrets";
-var SESSION_SECRETS_ENVELOPE_CIPHER = "AES-256-GCM";
-var SESSION_SECRETS_ENVELOPE_KEY_REF = "worker_secret:CE_STORAGE_ENVELOPE_KEK";
-var SESSION_SECRETS_CURRENT_KEK_NAME = "CE_STORAGE_ENVELOPE_KEK";
-var SESSION_SECRETS_PREVIOUS_KEK_NAME = "CE_STORAGE_ENVELOPE_PREVIOUS_KEK";
-var textEncoder = new TextEncoder();
-var textDecoder = new TextDecoder();
-var AES_GCM = "AES-GCM";
-var KEY_DERIVATION_DOMAIN = "ce-session-secrets-kek:v1";
-var isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
-var normalizeTimestampMs = (value) => {
-  const raw = Number(value || 0);
-  if (!Number.isFinite(raw) || raw <= 0) return 0;
-  return raw > 1e12 ? Math.trunc(raw) : Math.trunc(raw * 1e3);
-};
-var cloneRecord = (value) => isRecord(value) ? { ...value } : {};
-var toTrimmedString3 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var normalizeSlug = (value) => toTrimmedString3(value).toLowerCase() || "general";
-var getCryptoImpl = (deps = {}) => {
-  const cryptoImpl = deps.crypto || globalThis.crypto;
-  if (!cryptoImpl?.subtle) {
-    throw new Error("WebCrypto subtle crypto is required for session secret encryption.");
-  }
-  return cryptoImpl;
-};
-var randomBytes4 = (length, deps = {}) => {
-  const supplied = typeof deps.randomBytes === "function" ? deps.randomBytes(length) : null;
-  if (supplied && supplied.length >= length) {
-    return new Uint8Array(supplied).slice(0, length);
-  }
-  const bytes2 = new Uint8Array(length);
-  const cryptoImpl = getCryptoImpl(deps);
-  const getRandomValues = typeof deps.getRandomValues === "function" ? deps.getRandomValues : cryptoImpl.getRandomValues?.bind(cryptoImpl);
-  if (typeof getRandomValues !== "function") {
-    throw new Error("Secure randomness is required for session secret encryption.");
-  }
-  getRandomValues(bytes2);
-  return bytes2;
-};
-var bytesToBase64url = (value) => {
-  const bytes2 = value instanceof Uint8Array ? value : new Uint8Array(value || []);
-  if (typeof Buffer !== "undefined") {
-    return Buffer.from(bytes2).toString("base64url");
-  }
-  let binary = "";
-  bytes2.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-};
-var base64urlToBytes = (value) => {
-  const text = toTrimmedString3(value);
-  if (!/^[A-Za-z0-9_-]+$/.test(text)) {
-    throw new Error("Invalid encrypted session secrets encoding.");
-  }
-  const base64 = text.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(text.length / 4) * 4, "=");
-  if (typeof Buffer !== "undefined") return new Uint8Array(Buffer.from(base64, "base64"));
-  const binary = atob(base64);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-};
-var buildAad = (slug) => [
-  "ce-session-secrets",
-  `v${SESSION_SECRETS_ENVELOPE_VERSION}`,
-  normalizeSlug(slug),
-  SESSION_SECRETS_ENVELOPE_KEY_REF
-].join(":");
-var resolveKek = (env = {}, previous = false, deps = {}) => {
-  if (typeof deps.getSessionSecretsKek === "function") {
-    return deps.getSessionSecretsKek({
-      name: previous ? SESSION_SECRETS_PREVIOUS_KEK_NAME : SESSION_SECRETS_CURRENT_KEK_NAME,
-      previous
-    });
-  }
-  return previous ? env?.[SESSION_SECRETS_PREVIOUS_KEK_NAME] : env?.[SESSION_SECRETS_CURRENT_KEK_NAME];
-};
-var importKek = async (secret, usages, deps = {}) => {
-  const material = toTrimmedString3(secret);
-  if (!material) throw new Error(`${SESSION_SECRETS_CURRENT_KEK_NAME} is missing.`);
-  const cryptoImpl = getCryptoImpl(deps);
-  const digest = await cryptoImpl.subtle.digest(
-    "SHA-256",
-    textEncoder.encode(`${KEY_DERIVATION_DOMAIN}\0${material}`)
-  );
-  return cryptoImpl.subtle.importKey("raw", digest, { name: AES_GCM }, false, usages);
-};
-var isSessionSecretsEnvelope = (value) => isRecord(value) && Number(value.v || 0) === SESSION_SECRETS_ENVELOPE_VERSION && value.kind === SESSION_SECRETS_ENVELOPE_KIND;
-var isEncryptedSessionSecretsEnvelope = (value) => isSessionSecretsEnvelope(value) && value.cipher === SESSION_SECRETS_ENVELOPE_CIPHER && value.keyRef === SESSION_SECRETS_ENVELOPE_KEY_REF && typeof value.aad === "string" && typeof value.iv === "string" && typeof value.encryptedSecrets === "string";
-var hasEncryptedSessionSecretsFields = (value) => isRecord(value) && ["cipher", "keyRef", "aad", "iv", "encryptedSecrets"].some((field) => Object.prototype.hasOwnProperty.call(value, field));
-var unwrapSessionSecretsEnvelope = (value) => {
-  if (!isRecord(value)) return null;
-  if (hasEncryptedSessionSecretsFields(value) && (value.kind === SESSION_SECRETS_ENVELOPE_KIND || Object.prototype.hasOwnProperty.call(value, "v") || Object.prototype.hasOwnProperty.call(value, "version"))) {
-    throw new Error("Invalid or encrypted session secrets require authenticated decryption.");
-  }
-  if (isSessionSecretsEnvelope(value)) {
-    return cloneRecord(value.secrets);
-  }
-  if (Number(value.version || 0) === SESSION_SECRETS_ENVELOPE_VERSION && isRecord(value.secrets)) {
-    return cloneRecord(value.secrets);
-  }
-  return cloneRecord(value);
-};
-var buildEncryptedSessionSecretsEnvelope = async (secrets, {
-  env = {},
-  slug = "",
-  now,
-  previousEnvelope,
-  ...deps
-} = {}) => {
-  const nowMs = normalizeTimestampMs(typeof now === "function" ? now() : Date.now()) || Date.now();
-  const previousCreatedAt = isSessionSecretsEnvelope(previousEnvelope) ? normalizeTimestampMs(previousEnvelope.createdAt) : 0;
-  const aad = buildAad(slug);
-  const iv = randomBytes4(12, deps);
-  const key = await importKek(resolveKek(env, false, deps), ["encrypt"], deps);
-  const ciphertext = await getCryptoImpl(deps).subtle.encrypt(
-    {
-      name: AES_GCM,
-      iv,
-      additionalData: textEncoder.encode(aad)
-    },
-    key,
-    textEncoder.encode(JSON.stringify(cloneRecord(secrets)))
-  );
-  return {
-    v: SESSION_SECRETS_ENVELOPE_VERSION,
-    kind: SESSION_SECRETS_ENVELOPE_KIND,
-    createdAt: previousCreatedAt || nowMs,
-    updatedAt: nowMs,
-    cipher: SESSION_SECRETS_ENVELOPE_CIPHER,
-    keyRef: SESSION_SECRETS_ENVELOPE_KEY_REF,
-    aad,
-    iv: bytesToBase64url(iv),
-    encryptedSecrets: bytesToBase64url(new Uint8Array(ciphertext))
-  };
-};
-var decryptSessionSecretsEnvelope = async (value, { env = {}, slug = "", ...deps } = {}) => {
-  if (!isEncryptedSessionSecretsEnvelope(value)) {
-    throw new Error("Invalid encrypted session secrets envelope.");
-  }
-  const aad = buildAad(slug);
-  if (value.aad !== aad) {
-    throw new Error("Encrypted session secrets identity mismatch.");
-  }
-  const iv = base64urlToBytes(value.iv);
-  if (iv.length !== 12) throw new Error("Invalid encrypted session secrets IV.");
-  const ciphertext = base64urlToBytes(value.encryptedSecrets);
-  const attempts = [false, true];
-  let attempted = false;
-  for (const previous of attempts) {
-    const secret = resolveKek(env, previous, deps);
-    if (!toTrimmedString3(secret)) continue;
-    attempted = true;
-    try {
-      const key = await importKek(secret, ["decrypt"], deps);
-      const plaintext = await getCryptoImpl(deps).subtle.decrypt(
-        {
-          name: AES_GCM,
-          iv,
-          additionalData: textEncoder.encode(aad)
-        },
-        key,
-        ciphertext
-      );
-      const parsed = JSON.parse(textDecoder.decode(plaintext));
-      if (!isRecord(parsed)) throw new Error("Decrypted session secrets are invalid.");
-      return cloneRecord(parsed);
-    } catch {
-    }
-  }
-  if (!attempted) throw new Error(`${SESSION_SECRETS_CURRENT_KEK_NAME} is missing.`);
-  throw new Error("Session secrets decryption failed.");
-};
-
-// workers/shared/workerReleaseManifest.mjs
-var SHA_PATTERN = /^[a-f0-9]{40}$/;
-var SHA256_PATTERN = /^[a-f0-9]{64}$/;
-var RELEASE_MANIFEST_FILE = "worker-release-manifest.json";
-var ARTIFACT_SET = "context-engine-worker-bundles";
-var toStr10 = (value) => String(value ?? "").trim();
-var normalizeWorkerBundleSha256 = (value) => {
-  const normalized = toStr10(value).toLowerCase();
-  return SHA256_PATTERN.test(normalized) ? normalized : "";
-};
-var deriveWorkerReleaseManifestUrl = (bundleUrl) => {
-  try {
-    const parsed = new URL(toStr10(bundleUrl));
-    if (parsed.protocol !== "https:" || !parsed.pathname.includes("/")) return "";
-    parsed.pathname = `${parsed.pathname.slice(0, parsed.pathname.lastIndexOf("/") + 1)}${RELEASE_MANIFEST_FILE}`;
-    parsed.search = "";
-    parsed.hash = "";
-    return parsed.toString();
-  } catch (_) {
-    return "";
-  }
-};
-var readWorkerBundleDigestFromManifest = (manifest, { artifactFile, artifactKind }) => {
-  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
-    return { ok: false, error: "Worker release manifest must be an object." };
-  }
-  if (manifest.schemaVersion !== 1 || manifest.artifactSet !== ARTIFACT_SET) {
-    return { ok: false, error: "Worker release manifest schema or artifact set is unsupported." };
-  }
-  if (!SHA_PATTERN.test(toStr10(manifest.source?.commit)) || !SHA_PATTERN.test(toStr10(manifest.source?.tree)) || !toStr10(manifest.source?.ref).startsWith("refs/heads/") || !SHA_PATTERN.test(toStr10(manifest.replay?.privateSourceCommit)) || !SHA_PATTERN.test(toStr10(manifest.replay?.publicReplayCommit)) || toStr10(manifest.replay?.publicCommit) !== toStr10(manifest.source?.commit) || toStr10(manifest.replay?.publicTree) !== toStr10(manifest.source?.tree) || toStr10(manifest.builder?.workflow) !== "CI" || !/^[1-9][0-9]*$/.test(toStr10(manifest.builder?.runId))) {
-    return { ok: false, error: "Worker release manifest provenance is incomplete or inconsistent." };
-  }
-  const matches = (Array.isArray(manifest.artifacts) ? manifest.artifacts : []).filter((entry) => toStr10(entry?.file) === artifactFile && toStr10(entry?.kind) === artifactKind);
-  if (matches.length !== 1) {
-    return { ok: false, error: `Worker release manifest must contain exactly one ${artifactKind} artifact.` };
-  }
-  const digest = normalizeWorkerBundleSha256(matches[0]?.sha256);
-  if (!digest || !Number.isSafeInteger(matches[0]?.bytes) || matches[0].bytes <= 0) {
-    return { ok: false, error: `Worker release manifest has invalid ${artifactKind} digest metadata.` };
-  }
-  return { ok: true, digest };
-};
-var fetchExpectedWorkerBundleDigest = async ({
-  manifestUrl,
-  artifactFile,
-  artifactKind,
-  fetchImpl = globalThis.fetch
-}) => {
-  const normalizedUrl = deriveWorkerReleaseManifestUrl(manifestUrl);
-  if (!normalizedUrl || normalizedUrl !== toStr10(manifestUrl)) {
-    return { ok: false, error: "Worker release manifest URL must be an explicit HTTPS manifest asset URL." };
-  }
-  try {
-    const response2 = await fetchImpl(normalizedUrl, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      cache: "no-store"
-    });
-    if (!response2.ok) {
-      return { ok: false, error: `Failed to fetch Worker release manifest (${response2.status}).` };
-    }
-    const manifest = await response2.json();
-    return readWorkerBundleDigestFromManifest(manifest, { artifactFile, artifactKind });
-  } catch (error) {
-    return { ok: false, error: `Failed to read Worker release manifest: ${toStr10(error?.message || error)}` };
-  }
-};
-
-// workers/shared/agentSessionWrappedDeployment.mjs
-var AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND = "agent_session_wrapped";
-var AGENT_SESSION_WRAPPED_PROTOCOL_VERSION = "agent-session-wrapped-v1";
-var COMPATIBILITY_DATE = "2024-09-02";
-var REQUIRED_SECRET_NAMES = Object.freeze([
-  "DEMO_SIGNER_ROOT_SECRET",
-  "AGENT_BRIDGE_AGENT_API_TOKEN"
-]);
-var toStr11 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var safeSlug = (value) => {
-  const slug = toStr11(value).toLowerCase();
-  return /^[a-z0-9_-]{1,128}$/.test(slug) ? slug : "";
-};
-var safeDeploymentIdentity = (value) => {
-  const identity = toStr11(value);
-  return /^[A-Za-z0-9._:-]{8,180}$/.test(identity) ? identity : "";
-};
-var normalizeHttpsOrigin = (value) => {
-  try {
-    const parsed = new URL(toStr11(value));
-    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return "";
-    if (parsed.pathname !== "/" || parsed.search || parsed.hash) return "";
-    return parsed.origin;
-  } catch {
-    return "";
-  }
-};
-var normalizeHttpsUrl = (value) => {
-  try {
-    const parsed = new URL(toStr11(value));
-    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.hash) return "";
-    return parsed.toString();
-  } catch {
-    return "";
-  }
-};
-var normalizeAuthorityMode = (value) => {
-  const mode = toStr11(value).toLowerCase();
-  return ["worker_canonical", "evm_registry_canonical", "registry_canonical"].includes(mode) ? mode : "";
-};
-var encode = (value) => new TextEncoder().encode(String(value || ""));
-var bytesToHex2 = (bytes2) => Array.from(bytes2, (byte) => byte.toString(16).padStart(2, "0")).join("");
-var sha256Hex = async (value) => bytesToHex2(new Uint8Array(await crypto.subtle.digest("SHA-256", encode(value))));
-var randomSecret = () => {
-  const bytes2 = new Uint8Array(32);
-  crypto.getRandomValues(bytes2);
-  return bytesToHex2(bytes2);
-};
-var response = (ok, status, body) => ({ ok, status, body });
-var failure = (status, step, error) => response(false, status, { ok: false, step, error: toStr11(error) });
-var isAmbiguousMutationFailure = (result = {}) => {
-  const status = Number(result?.status || 0);
-  return !status || status >= 500 || [408, 409, 412, 425, 429, 499].includes(status);
-};
-var policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled = true }) => ({
-  version: 1,
-  defaultSessionSlug: sessionSlug,
-  sessions: [{
-    sessionSlug,
-    sessionWorkerUrl: sessionWorkerOrigin,
-    telegramBridgeEnabled: false,
-    sessionModeProfile: {
-      surfaces: { agentHttp: agentHttpEnabled, telegram: false },
-      authority: { mode: authorityMode }
-    }
-  }]
-});
-var workerNameFor = ({ sessionSlug, deploymentId }) => {
-  const prefix = `ce-wrapped-${sessionSlug}`.replace(/_/g, "-").replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
-  return `${prefix || "ce-wrapped-session"}-${deploymentId.slice(0, 12)}`;
-};
-var bindingMap = (bindings = []) => new Map(
-  (Array.isArray(bindings) ? bindings : []).map((binding) => [toStr11(binding?.name), binding])
-);
-var settingsOwnDeployment = ({ settings, expectedBindings, kvNamespaceId, verifyBundle = true }) => {
-  if (!settings?.ok) return false;
-  const result = settings.data?.result || {};
-  if (toStr11(result.main_module) && toStr11(result.main_module) !== "worker.mjs") return false;
-  const actual = bindingMap(result.bindings);
-  const kv = actual.get("AGENT_ACTION_KV");
-  if (toStr11(kv?.type) !== "kv_namespace" || toStr11(kv?.namespace_id) !== kvNamespaceId) return false;
-  return expectedBindings.filter((binding) => binding.type === "plain_text").filter((binding) => verifyBundle || binding.name !== "AGENT_BRIDGE_BUNDLE_SHA256").every((binding) => {
-    const observed = actual.get(binding.name);
-    return toStr11(observed?.type) === "plain_text" && toStr11(observed?.text) === binding.text;
-  });
-};
-var buildUploadForm = ({ bundleSource, bindings }) => {
-  const metadata = {
-    main_module: "worker.mjs",
-    compatibility_date: COMPATIBILITY_DATE,
-    compatibility_flags: ["nodejs_compat", "global_fetch_strictly_public"],
-    bindings
-  };
-  const form = new FormData();
-  form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }), "metadata.json");
-  form.append("worker.mjs", new Blob([bundleSource], { type: "application/javascript+module" }), "worker.mjs");
-  return { form, metadata };
-};
-var readBundle = async ({ body, env, fetchImpl }) => {
-  const inline = typeof body?.bundleText === "string" ? body.bundleText : "";
-  if (inline.trim()) return { ok: true, source: inline };
-  const url = normalizeHttpsUrl(body?.bundleUrl || env?.AGENT_BRIDGE_BUNDLE_URL);
-  if (!url) return { ok: false, error: "Missing a trusted Agent Bridge bundle." };
-  try {
-    const result = await fetchImpl(url, { method: "GET", cache: "no-store" });
-    if (!result.ok) return { ok: false, error: `Failed to fetch Agent Bridge bundle (${result.status}).` };
-    const source = await result.text();
-    return source.trim() ? { ok: true, source } : { ok: false, error: "Agent Bridge bundle is empty." };
-  } catch (error) {
-    return { ok: false, error: `Failed to fetch Agent Bridge bundle: ${toStr11(error?.message || error)}` };
-  }
-};
-var listMatchingKvNamespaces = async ({ apiToken, accountId, title, cfFetchImpl }) => {
-  const listed = await cfFetchImpl(
-    apiToken,
-    `/accounts/${accountId}/storage/kv/namespaces?per_page=100&page=1`,
-    { method: "GET" }
-  );
-  if (!listed.ok) return { ok: false, error: listed.error || "Failed to list KV namespaces." };
-  const matches = (Array.isArray(listed.data?.result) ? listed.data.result : []).filter((entry) => toStr11(entry?.title) === title && toStr11(entry?.id));
-  if (matches.length > 1) return { ok: false, status: 409, error: "Multiple KV namespaces match this Wrapped deployment identity." };
-  return { ok: true, match: matches[0] || null };
-};
-var normalizeCapability = (value) => {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const origin = normalizeHttpsOrigin(value.origin);
-  const protocolVersion = toStr11(value.protocolVersion);
-  const revision = toStr11(value.revision);
-  const verifiedAt = toStr11(value.verifiedAt);
-  if (Number(value.version) !== 1 || typeof value.enabled !== "boolean" || !origin || protocolVersion !== AGENT_SESSION_WRAPPED_PROTOCOL_VERSION || !/^wrapped-[0-9a-f]{16}$/.test(revision) || !Number.isFinite(Date.parse(verifiedAt))) return null;
-  return { version: 1, enabled: value.enabled, origin, protocolVersion, revision, verifiedAt };
-};
-async function persistAgentSessionWrappedCapability({
-  apiToken = "",
-  accountId = "",
-  kvNamespaceId = "",
-  sessionConfigKey = "",
-  sessionSlug = "",
-  sessionWorkerOrigin = "",
-  capability = null,
-  cfFetchImpl
-} = {}) {
-  const token = toStr11(apiToken);
-  const account = toStr11(accountId);
-  const kvId = toStr11(kvNamespaceId);
-  const configKey = toStr11(sessionConfigKey);
-  const slug = safeSlug(sessionSlug);
-  const workerOrigin = normalizeHttpsOrigin(sessionWorkerOrigin);
-  const normalizedCapability = normalizeCapability(capability);
-  if (!token || !account || !kvId || !configKey || !slug || !workerOrigin || !normalizedCapability) {
-    return failure(400, "capability_config_validate", "Wrapped capability publication inputs are invalid.");
-  }
-  if (typeof cfFetchImpl !== "function") {
-    return failure(500, "capability_config_validate", "Cloudflare deployment client is unavailable.");
-  }
-  const path = `/accounts/${account}/storage/kv/namespaces/${kvId}/values/${configKey}`;
-  const current = await cfFetchImpl(token, path, { method: "GET" });
-  const currentConfig = current?.data?.result || current?.data || {};
-  if (!current.ok) {
-    return failure(502, "capability_config_read", current.error || "Session Worker config is unavailable.");
-  }
-  if (safeSlug(currentConfig.slug) !== slug || normalizeHttpsOrigin(currentConfig.corsWorkerUrl) !== workerOrigin) {
-    return failure(409, "capability_config_identity", "Live session config does not match the paired session Worker.");
-  }
-  const nextConfig = { ...currentConfig, agentSessionWrapped: normalizedCapability };
-  const written = await cfFetchImpl(token, path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(nextConfig)
-  });
-  if (!written.ok) {
-    return failure(502, "capability_config_write", written.error || "Wrapped capability config write failed.");
-  }
-  const verified = await cfFetchImpl(token, path, { method: "GET" });
-  const verifiedConfig = verified?.data?.result || verified?.data || {};
-  if (!verified.ok || safeSlug(verifiedConfig.slug) !== slug || normalizeHttpsOrigin(verifiedConfig.corsWorkerUrl) !== workerOrigin || JSON.stringify(normalizeCapability(verifiedConfig.agentSessionWrapped)) !== JSON.stringify(normalizedCapability)) {
-    return failure(502, "capability_config_verify", "Wrapped capability did not verify in session Worker config.");
-  }
-  return response(true, 200, { ok: true, agentSessionWrapped: normalizedCapability });
-}
-async function executeAgentSessionWrappedDeployment({
-  body = {},
-  env = {},
-  accountId = "",
-  cfFetchImpl,
-  fetchImpl = globalThis.fetch,
-  now = () => /* @__PURE__ */ new Date(),
-  markMutationStarted = null,
-  randomSecretImpl = randomSecret
-} = {}) {
-  let mutationMarked = false;
-  const beforeMutation = async () => {
-    if (mutationMarked) return;
-    if (typeof markMutationStarted === "function") await markMutationStarted();
-    mutationMarked = true;
-  };
-  const fail = (status, step, error) => {
-    const result = failure(status, step, error);
-    if (mutationMarked) result.body.deploymentRequestPending = true;
-    return result;
-  };
-  const apiToken = toStr11(body.apiToken || body.token);
-  const resolvedAccountId = toStr11(accountId);
-  const sessionSlug = safeSlug(body.sessionSlug);
-  const sessionWorkerOrigin = normalizeHttpsOrigin(body.sessionWorkerOrigin || body.sessionWorkerUrl);
-  const sessionDeploymentIdentity = safeDeploymentIdentity(body.sessionDeploymentIdentity);
-  const authorityMode = normalizeAuthorityMode(body.authorityMode);
-  const agentHttpEnabled = body.agentHttpEnabled === void 0 ? true : body.agentHttpEnabled;
-  if (body.deploymentKind !== AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
-    return fail(400, "validate", "Invalid deployment kind.");
-  }
-  if (!apiToken || !resolvedAccountId || !sessionSlug || !sessionWorkerOrigin || !sessionDeploymentIdentity || !authorityMode || typeof agentHttpEnabled !== "boolean") {
-    return fail(400, "validate", "Dedicated Wrapped deployment requires token, account, session identity, authority mode, and HTTPS session Worker origin.");
-  }
-  if (typeof cfFetchImpl !== "function") return fail(500, "validate", "Cloudflare deployment client is unavailable.");
-  if (body.telegramEnabled === true || toStr11(body.telegramBotToken || body.telegramWebhookSecret)) {
-    return fail(400, "validate", "Telegram configuration is not part of the default dedicated Wrapped deployment.");
-  }
-  const suppliedBundleSha256 = toStr11(body.bundleSha256);
-  let expectedBundleSha256 = normalizeWorkerBundleSha256(suppliedBundleSha256);
-  if (suppliedBundleSha256 && !expectedBundleSha256) {
-    return fail(400, "bundle_provenance", "bundleSha256 must be a complete SHA-256 hex digest.");
-  }
-  if (!toStr11(body.bundleText) && toStr11(body.bundleManifestUrl)) {
-    const manifestDigest = await fetchExpectedWorkerBundleDigest({
-      manifestUrl: body.bundleManifestUrl,
-      artifactFile: "agentBridgeWorker.bundle.js",
-      artifactKind: "agent-bridge-worker",
-      fetchImpl
-    });
-    if (!manifestDigest.ok) return fail(502, "bundle_provenance", manifestDigest.error);
-    if (expectedBundleSha256 && expectedBundleSha256 !== manifestDigest.digest) {
-      return fail(409, "bundle_provenance", "Worker release manifest digest conflicts with bundleSha256.");
-    }
-    expectedBundleSha256 = manifestDigest.digest;
-  }
-  const bundle = await readBundle({ body, env, fetchImpl });
-  if (!bundle.ok) return fail(400, "bundle", bundle.error);
-  const [deploymentId, bundleSha256] = await Promise.all([
-    sha256Hex(`context-engine:agent-session-wrapped:deployment:v1:${sessionDeploymentIdentity}`),
-    sha256Hex(bundle.source)
-  ]);
-  if (expectedBundleSha256 && bundleSha256 !== expectedBundleSha256) {
-    return fail(409, "bundle_provenance", "Agent Bridge bundle SHA-256 does not match the verified release manifest.");
-  }
-  const workerName = workerNameFor({ sessionSlug, deploymentId });
-  const accountSubdomain = await cfFetchImpl(
-    apiToken,
-    `/accounts/${resolvedAccountId}/workers/subdomain`,
-    { method: "GET" }
-  );
-  const subdomain = toStr11(accountSubdomain.data?.result?.subdomain);
-  if (!accountSubdomain.ok || !subdomain) {
-    return fail(502, "workers_dev_subdomain", accountSubdomain.error || "Cloudflare workers.dev subdomain is unavailable.");
-  }
-  const workerUrl = `https://${workerName}.${subdomain}.workers.dev`;
-  const policyJson = JSON.stringify(policyFor({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled }));
-  const plainBindings = [
-    { name: "AGENT_BRIDGE_DEPLOYMENT_ID", type: "plain_text", text: deploymentId },
-    { name: "AGENT_BRIDGE_BUNDLE_SHA256", type: "plain_text", text: bundleSha256 },
-    { name: "AGENT_BRIDGE_PUBLIC_URL", type: "plain_text", text: workerUrl },
-    { name: "CE_SESSION_WORKER_BASE_URL", type: "plain_text", text: sessionWorkerOrigin },
-    { name: "AGENT_BRIDGE_SESSION_POLICY_JSON", type: "plain_text", text: policyJson },
-    { name: "AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED", type: "plain_text", text: "false" },
-    { name: "BROADCAST_ENABLED", type: "plain_text", text: "false" }
-  ];
-  const kvTitle = `ContextEngineAgentSessionWrapped:${sessionSlug}:${deploymentId.slice(0, 12)}`;
-  const inventory = await listMatchingKvNamespaces({
-    apiToken,
-    accountId: resolvedAccountId,
-    title: kvTitle,
-    cfFetchImpl
-  });
-  if (!inventory.ok) return fail(inventory.status || 502, "kv_inventory", inventory.error);
-  let kvId = toStr11(inventory.match?.id);
-  let kvReused = !!kvId;
-  if (!kvId) {
-    await beforeMutation();
-    const created = await cfFetchImpl(
-      apiToken,
-      `/accounts/${resolvedAccountId}/storage/kv/namespaces`,
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: kvTitle }) }
-    );
-    kvId = toStr11(created.data?.result?.id);
-    if (!created.ok || !kvId) return fail(502, "kv_create", created.error || "Cloudflare did not create Wrapped KV.");
-    kvReused = false;
-  }
-  const bindings = [
-    { name: "AGENT_ACTION_KV", type: "kv_namespace", namespace_id: kvId },
-    ...plainBindings
-  ];
-  const settingsPath = `/accounts/${resolvedAccountId}/workers/scripts/${workerName}/settings`;
-  const beforeSettings = await cfFetchImpl(apiToken, settingsPath, { method: "GET" });
-  const exists2 = beforeSettings.ok;
-  if (!exists2 && Number(beforeSettings.status || 0) !== 404) {
-    return fail(502, "worker_preflight", beforeSettings.error || "Unable to verify Wrapped Worker identity.");
-  }
-  if (exists2 && !settingsOwnDeployment({
-    settings: beforeSettings,
-    expectedBindings: plainBindings,
-    kvNamespaceId: kvId,
-    verifyBundle: false
-  })) {
-    return fail(409, "worker_preflight", "Existing Worker does not match this Wrapped deployment identity.");
-  }
-  const beforeBindingMap = bindingMap(beforeSettings.data?.result?.bindings);
-  const bundleAlreadyUploaded = exists2 && toStr11(beforeBindingMap.get("AGENT_BRIDGE_BUNDLE_SHA256")?.text) === bundleSha256;
-  let uploadMetadata = null;
-  if (!bundleAlreadyUploaded) {
-    await beforeMutation();
-    const upload = buildUploadForm({ bundleSource: bundle.source, bindings });
-    uploadMetadata = upload.metadata;
-    const uploaded = await cfFetchImpl(
-      apiToken,
-      `/accounts/${resolvedAccountId}/workers/scripts/${workerName}`,
-      { method: "PUT", body: upload.form }
-    );
-    if (!uploaded.ok) return fail(502, "worker_upload", uploaded.error || "Wrapped Worker upload failed.");
-  }
-  const verifiedSettings = await cfFetchImpl(apiToken, settingsPath, { method: "GET" });
-  if (!settingsOwnDeployment({ settings: verifiedSettings, expectedBindings: plainBindings, kvNamespaceId: kvId })) {
-    return fail(502, "worker_binding_verification", "Wrapped Worker bindings did not verify after upload.");
-  }
-  let existingSecrets = /* @__PURE__ */ new Set();
-  if (exists2) {
-    const listedSecrets = await cfFetchImpl(
-      apiToken,
-      `/accounts/${resolvedAccountId}/workers/scripts/${workerName}/secrets`,
-      { method: "GET" }
-    );
-    if (!listedSecrets.ok || !Array.isArray(listedSecrets.data?.result)) {
-      return fail(502, "worker_secret_inventory", listedSecrets.error || "Unable to verify existing Wrapped secrets.");
-    }
-    existingSecrets = new Set(listedSecrets.data.result.filter((entry) => toStr11(entry?.type) === "secret_text").map((entry) => toStr11(entry?.name)));
-  }
-  const generated = [];
-  const preserved = [];
-  const secretsPath = `/accounts/${resolvedAccountId}/workers/scripts/${workerName}/secrets`;
-  for (const name of REQUIRED_SECRET_NAMES) {
-    if (existingSecrets.has(name)) {
-      preserved.push(name);
-      continue;
-    }
-    await beforeMutation();
-    const text = randomSecretImpl();
-    const written = await cfFetchImpl(
-      apiToken,
-      secretsPath,
-      { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, type: "secret_text", text }) }
-    );
-    if (!written.ok) {
-      let reconciled = false;
-      if (isAmbiguousMutationFailure(written)) {
-        const inventory2 = await cfFetchImpl(apiToken, secretsPath, { method: "GET" });
-        reconciled = inventory2.ok && Array.isArray(inventory2.data?.result) && inventory2.data.result.some((entry) => toStr11(entry?.type) === "secret_text" && toStr11(entry?.name) === name);
-      }
-      if (!reconciled) return fail(502, `worker_secret_${name}`, written.error || `Failed to write ${name}.`);
-    }
-    generated.push(name);
-  }
-  await beforeMutation();
-  const activation = await cfFetchImpl(
-    apiToken,
-    `/accounts/${resolvedAccountId}/workers/scripts/${workerName}/subdomain`,
-    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: true }) }
-  );
-  if (!activation.ok || activation.data?.result?.enabled !== true) {
-    return fail(502, "worker_activation", activation.error || "Wrapped Worker workers.dev activation failed.");
-  }
-  let healthResponse;
-  let health;
-  try {
-    healthResponse = await fetchImpl(`${workerUrl}/health`, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
-    health = await healthResponse.json();
-  } catch (error) {
-    return fail(503, "authority_health_probe", toStr11(error?.message || error) || "Wrapped health request failed.");
-  }
-  const authorityReady = healthResponse.ok && health?.ok === true && health?.worker === "agentBridgeWorker" && health?.protocolVersion === AGENT_SESSION_WRAPPED_PROTOCOL_VERSION && health?.agentSessionWrappedConfigured === true && health?.agentSessionWrappedReady === agentHttpEnabled && safeSlug(health?.dedicatedSession?.sessionSlug) === sessionSlug && normalizeHttpsOrigin(health?.dedicatedSession?.sessionWorkerOrigin) === sessionWorkerOrigin && health?.dedicatedSession?.accessEnabled === agentHttpEnabled;
-  if (!authorityReady) {
-    return fail(503, "authority_health_probe", "Wrapped Worker health, protocol, or pinned authority did not verify.");
-  }
-  const revisionDigest = agentHttpEnabled ? bundleSha256 : await sha256Hex(`${bundleSha256}:agent-http-disabled`);
-  const verifiedAt = now().toISOString();
-  return response(true, 200, {
-    ok: true,
-    deploymentKind: AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
-    accountId: resolvedAccountId,
-    workerName,
-    workerUrl,
-    sessionSlug,
-    sessionWorkerOrigin,
-    telegramConfigured: false,
-    resources: { kvNamespaceId: kvId, kvReused },
-    upload: { reused: bundleAlreadyUploaded, bundleSha256, metadata: uploadMetadata ? { main_module: uploadMetadata.main_module } : null },
-    secrets: { generated, preserved },
-    health: {
-      ok: true,
-      protocolVersion: health.protocolVersion,
-      authorityPinned: true,
-      accessEnabled: agentHttpEnabled
-    },
-    agentSessionWrapped: {
-      version: 1,
-      enabled: agentHttpEnabled,
-      origin: workerUrl,
-      protocolVersion: AGENT_SESSION_WRAPPED_PROTOCOL_VERSION,
-      revision: `wrapped-${revisionDigest.slice(0, 16)}`,
-      verifiedAt
-    }
-  });
-}
-
-// workers/shared/deployHelperEndpointConfig.mjs
-var DEFAULT_CLOUDFLARE_API_BASE_URL = "https://api.cloudflare.com/client/v4";
-var CLOUDFLARE_API_BASE_URL_ENV = "CE_CLOUDFLARE_API_BASE_URL";
-var toTrimmedString4 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var stripTrailingSlashes = (value) => value.replace(/\/+$/u, "");
-var resolveCloudflareApiBaseUrl = ({
-  apiBaseUrl = "",
-  env = null
-} = {}) => stripTrailingSlashes(toTrimmedString4(apiBaseUrl)) || stripTrailingSlashes(toTrimmedString4(env?.[CLOUDFLARE_API_BASE_URL_ENV])) || DEFAULT_CLOUDFLARE_API_BASE_URL;
-
-// workers/shared/workerSessionConfig.mjs
-var isObj2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-var toStr12 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-var PUBLIC_CONFIG_KEYS = Object.freeze([
-  "slug",
-  "authzEpoch",
-  "sessionId",
-  "sessionIdHex",
-  "configRevision",
-  "sessionName",
-  "sessionInfo",
-  "sessionHeaderImg",
-  "sessionEndsAt",
-  "defaultTags",
-  "defaultGroupTags",
-  "defaultSbtTags",
-  "questionsGenPrompt",
-  "defaultFilterState",
-  "defaultFeaturedSBTs",
-  "autoFeatureSBTsBySessionSlug",
-  "HIGHLIGHTED_QUESTION_IDS",
-  "BLOCKED_QUESTION_IDS",
-  "HIGHLIGHTED_SURVEY_IDS",
-  "BLOCKED_SURVEY_IDS",
-  "ignored_SBTs_LIST",
-  "featured_SBTs_LIST",
-  "adminAddress",
-  "adminAddresses",
-  "corsWorkerUrl",
-  "allowOrigins",
-  "sessionModeProfile",
-  "agentSessionWrapped",
-  "workerAuthority",
-  "groupCreationPolicy",
-  "storageProfile",
-  "ai",
-  "limits",
-  "scopes",
-  "blockLimits",
-  "contracts",
-  "registryChainId",
-  "networkChainId",
-  "embeddedDeployHelperEnabled"
-]);
-var DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
-  "sessionId",
-  "sessionIdHex",
-  "configRevision",
-  "sessionName",
-  "sessionInfo",
-  "sessionHeaderImg",
-  "sessionEndsAt",
-  "defaultTags",
-  "defaultGroupTags",
-  "defaultSbtTags",
-  "questionsGenPrompt",
-  "defaultFilterState",
-  "defaultFeaturedSBTs",
-  "autoFeatureSBTsBySessionSlug",
-  "sessionModeProfile",
-  "workerAuthority",
-  "groupCreationPolicy",
-  "storageProfile",
-  "ai",
-  "networkChainId",
-  "contracts"
-]);
-var OPEN_CONFIG_SUBTREE_KEYS = Object.freeze([
-  "ai",
-  "contracts",
-  "limits",
-  "scopes",
-  "sessionModeProfile",
-  "storageProfile",
-  "workerAuthority"
-]);
-var normalizeKey = (value) => toStr12(value).replace(/[^a-z0-9]/gi, "").toLowerCase();
-var OMIT_PUBLIC_VALUE = Symbol("omit-public-worker-config-value");
-var SAFE_PUBLIC_KEY_FIELD_NAMES = /* @__PURE__ */ new Set(["keyprovider", "publickey", "resourcekey"]);
-var SAFE_STRUCTURAL_AUTHORIZATION_PATHS = /* @__PURE__ */ new Set([
-  "config.authorization",
-  "config.sessionModeProfile.authorization"
-]);
-var SAFE_WRAPPED_STORAGE_KEY_PATHS = /* @__PURE__ */ new Set([
-  "config.storageEnvelope.sessionKey",
-  "config.storageEnvelope.sessionKey.wrappedKey"
-]);
-var SAFE_BOOLEAN_SCOPE_PATH = "config.scopes";
-var SAFE_LEGACY_FAUCET_CONFIG_PATH = "config.faucet";
-var WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS = Object.freeze([
-  "litApiBase",
-  "litGroupId",
-  "litPkpId",
-  "litActionCid"
-]);
-var WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET = new Set(WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS);
-var TOP_LEVEL_PROVIDER_KEY_NAMES = /* @__PURE__ */ new Set([
-  "aikey",
-  "anthropickey",
-  "geminikey",
-  "googleaikey",
-  "groqkey",
-  "mistralkey",
-  "openaikey",
-  "openrouterkey"
-]);
-var hasSensitiveTokenValue = (value) => {
-  if (value == null || value === false) return false;
-  if (typeof value === "string") return value.trim() !== "";
-  return true;
-};
-var isRecursiveSecretAlias = ({ key, path, value }) => {
-  const normalized = normalizeKey(key);
-  const fieldPath = `${path}.${key}`;
-  if (SAFE_WRAPPED_STORAGE_KEY_PATHS.has(fieldPath)) return false;
-  if (SAFE_PUBLIC_KEY_FIELD_NAMES.has(normalized)) return false;
-  if (path === SAFE_BOOLEAN_SCOPE_PATH && typeof value === "boolean") return false;
-  if (fieldPath === SAFE_LEGACY_FAUCET_CONFIG_PATH && isObj2(value)) return false;
-  if (normalized.startsWith("exposes") && typeof value === "boolean") return false;
-  if (normalized === "authorization" && SAFE_STRUCTURAL_AUTHORIZATION_PATHS.has(fieldPath) && isObj2(value)) {
-    return false;
-  }
-  return normalized === "authorization" || normalized === "authorizationheader" || normalized.endsWith("apikeys") || normalized.endsWith("providerkeys") || normalized.endsWith("credential") || normalized.endsWith("credentials") || normalized.endsWith("key") || normalized.startsWith("faucet") || normalized.endsWith("secret") || normalized.endsWith("token") || normalized.endsWith("password") || normalized.endsWith("jwk");
-};
-var isSecretAdjacentKey = (key, value, path) => {
-  const normalized = normalizeKey(key);
-  const fieldPath = `${path}.${key}`;
-  if (SAFE_WRAPPED_STORAGE_KEY_PATHS.has(fieldPath)) return false;
-  if (SAFE_PUBLIC_KEY_FIELD_NAMES.has(normalized)) return false;
-  if (path === SAFE_BOOLEAN_SCOPE_PATH && typeof value === "boolean") return false;
-  if (normalized.startsWith("exposes") && typeof value === "boolean") return false;
-  if (normalized === "authorization" && SAFE_STRUCTURAL_AUTHORIZATION_PATHS.has(fieldPath) && isObj2(value)) {
-    return false;
-  }
-  if (isRecursiveSecretAlias({ key, path, value })) return true;
-  if (normalized.startsWith("faucet")) return true;
-  if (normalized === "litcredentials") return true;
-  if (normalized === "rpc" || normalized.includes("rpcurl") || normalized.includes("rpcendpoint")) return true;
-  return normalized === "auth" || normalized === "credential" || normalized === "headers" || normalized === "key" || normalized === "secrets" || normalized === "credentials" || normalized.endsWith("apikey") || normalized.endsWith("key") || normalized.endsWith("privatekey") || normalized.endsWith("secret") || normalized.endsWith("token") || normalized.endsWith("password") || normalized.endsWith("jwk");
-};
-var hasUrlCredentials = (value) => {
-  if (typeof value !== "string" || !/^https?:\/\//i.test(value.trim())) return false;
-  try {
-    const parsed = new URL(value);
-    return !!parsed.username || !!parsed.password;
-  } catch {
-    return false;
-  }
-};
-var sanitizePublicValue = (value, path = "config") => {
-  if (hasUrlCredentials(value)) return OMIT_PUBLIC_VALUE;
-  if (Array.isArray(value)) {
-    return value.map((entry, index) => sanitizePublicValue(entry, `${path}.${index}`)).filter((entry) => entry !== OMIT_PUBLIC_VALUE);
-  }
-  if (!isObj2(value)) return value;
-  return Object.keys(value).reduce((acc, key) => {
-    if (isSecretAdjacentKey(key, value[key], path)) return acc;
-    const sanitized = sanitizePublicValue(value[key], `${path}.${key}`);
-    if (sanitized !== OMIT_PUBLIC_VALUE) acc[key] = sanitized;
-    return acc;
-  }, {});
-};
-var projectPublicAiConfig = (value, path) => {
-  const ai = isObj2(value) ? value : {};
-  return selectFields(ai, ["models"], path);
-};
-var selectFields = (source, keys, path = "config") => keys.reduce((acc, key) => {
-  if (!Object.prototype.hasOwnProperty.call(source || {}, key)) return acc;
-  const fieldPath = `${path}.${key}`;
-  const sanitized = key === "ai" ? projectPublicAiConfig(source[key], fieldPath) : sanitizePublicValue(source[key], fieldPath);
-  if (sanitized !== OMIT_PUBLIC_VALUE) acc[key] = sanitized;
-  return acc;
-}, {});
-var findForbiddenCloudflareDeploymentTokenPath = (value, path = "config") => {
-  if (Array.isArray(value)) {
-    for (let index = 0; index < value.length; index += 1) {
-      const nested = findForbiddenCloudflareDeploymentTokenPath(value[index], `${path}.${index}`);
-      if (nested) return nested;
-    }
-    return "";
-  }
-  if (!isObj2(value)) return "";
-  for (const key of Object.keys(value)) {
-    const normalized = normalizeKey(key);
-    const normalizedPath = normalizeKey(path);
-    const isCloudflareContext = normalizedPath.includes("cloudflare") || normalized.startsWith("cloudflare");
-    const isCloudflareTokenAlias = [
-      "apitoken",
-      "cfapitoken",
-      "cloudflareapitoken",
-      "cloudflaretoken",
-      "cloudflareaccesstoken",
-      "cloudflareworkertoken"
-    ].includes(normalized) || isCloudflareContext && normalized.endsWith("token");
-    if (isCloudflareTokenAlias && hasSensitiveTokenValue(value[key])) {
-      return `${path}.${key}`;
-    }
-    const nested = findForbiddenCloudflareDeploymentTokenPath(value[key], `${path}.${key}`);
-    if (nested) return nested;
-  }
-  return "";
-};
-var findForbiddenOpenConfigSecretPath = (value, path) => {
-  if (hasUrlCredentials(value)) return path;
-  if (Array.isArray(value)) {
-    for (let index = 0; index < value.length; index += 1) {
-      const nested = findForbiddenOpenConfigSecretPath(value[index], `${path}.${index}`);
-      if (nested) return nested;
-    }
-    return "";
-  }
-  if (!isObj2(value)) return "";
-  for (const key of Object.keys(value)) {
-    if (isSecretAdjacentKey(key, value[key], path)) return `${path}.${key}`;
-    const nested = findForbiddenOpenConfigSecretPath(value[key], `${path}.${key}`);
-    if (nested) return nested;
-  }
-  return "";
-};
-var findForbiddenRecursiveSecretAliasPath = (value, path) => {
-  if (Array.isArray(value)) {
-    for (let index = 0; index < value.length; index += 1) {
-      const nested = findForbiddenRecursiveSecretAliasPath(value[index], `${path}.${index}`);
-      if (nested) return nested;
-    }
-    return "";
-  }
-  if (!isObj2(value)) return "";
-  for (const key of Object.keys(value)) {
-    if (isRecursiveSecretAlias({ key, path, value: value[key] })) return `${path}.${key}`;
-    const nested = findForbiddenRecursiveSecretAliasPath(value[key], `${path}.${key}`);
-    if (nested) return nested;
-  }
-  return "";
-};
-var findInvalidLitCredentialsDescriptorPath = (value, path = "config.litCredentials") => {
-  if (!isObj2(value)) return path;
-  for (const key of Object.keys(value)) {
-    const fieldPath = `${path}.${key}`;
-    if (!WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET.has(key)) return fieldPath;
-    if (typeof value[key] !== "string" || hasUrlCredentials(value[key])) return fieldPath;
-  }
-  return "";
-};
-var findForbiddenWorkerConfigSecretPath = (config, path = "config") => {
-  const source = isObj2(config) ? config : {};
-  if (Object.prototype.hasOwnProperty.call(source, "litCredentials")) {
-    const invalidLitCredentialsPath = findInvalidLitCredentialsDescriptorPath(
-      source.litCredentials,
-      `${path}.litCredentials`
-    );
-    if (invalidLitCredentialsPath) return invalidLitCredentialsPath;
-  }
-  for (const key of Object.keys(source)) {
-    const normalized = normalizeKey(key);
-    if (TOP_LEVEL_PROVIDER_KEY_NAMES.has(normalized) || !SAFE_PUBLIC_KEY_FIELD_NAMES.has(normalized) && normalized.endsWith("key")) {
-      return `${path}.${key}`;
-    }
-  }
-  for (const key of OPEN_CONFIG_SUBTREE_KEYS) {
-    if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
-    const nested = findForbiddenOpenConfigSecretPath(source[key], `${path}.${key}`);
-    if (nested) return nested;
-  }
-  const recursiveSource = { ...source };
-  delete recursiveSource.litCredentials;
-  return findForbiddenRecursiveSecretAliasPath(recursiveSource, path);
-};
-var projectPublicWorkerSessionConfig = (config) => selectFields(isObj2(config) ? config : {}, PUBLIC_CONFIG_KEYS);
-var profileUsesOnChainSbt = (profile) => {
-  if (profile?.authorization?.mechanisms?.includes?.("sbt_onchain")) return true;
-  return [
-    profile?.encryption?.accessConditions,
-    profile?.storage?.payloadAccessControl?.accessConditions
-  ].some((document) => document?.conditions?.some?.((condition) => condition?.kind === "sbt_onchain"));
-};
-var selectDeployWorkerSessionConfigFields = (body) => {
-  const source = isObj2(body) ? body : {};
-  const selected = selectFields(source, DEPLOY_CANONICAL_CONFIG_KEYS);
-  if (source?.sessionModeProfile?.authority?.mode !== "worker_canonical") return selected;
-  const usesOnChainSbt = profileUsesOnChainSbt(source.sessionModeProfile);
-  if (!usesOnChainSbt) {
-    delete selected.defaultSbtTags;
-    delete selected.defaultFeaturedSBTs;
-    delete selected.autoFeatureSBTsBySessionSlug;
-    delete selected.contracts;
-  } else if (isObj2(selected.contracts)) {
-    selected.contracts = selectFields(selected.contracts, ["sbtFactory"], "config.contracts");
-  }
-  if (!usesOnChainSbt && source?.sessionModeProfile?.encryption?.mode !== "lit") {
-    delete selected.networkChainId;
-  }
-  return selected;
-};
-var sanitizeWorkerConfigOpenSubtree = (value) => {
-  const sanitized = sanitizePublicValue(value, "config.open");
-  return sanitized === OMIT_PUBLIC_VALUE ? {} : sanitized;
-};
-
-// workers/shared/sessionLifecycle.mjs
-var toTrimmedString5 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var normalizeSessionEndsAt = (value) => {
-  const raw = toTrimmedString5(value);
-  if (!raw) return { ok: true, value: "" };
-  const timestamp = Date.parse(raw);
-  if (!Number.isFinite(timestamp)) {
-    return { ok: false, value: "" };
-  }
-  return {
-    ok: true,
-    value: new Date(timestamp).toISOString()
-  };
-};
-var resolveSessionLifecycle = (config, { now = Date.now } = {}) => {
-  const normalized = normalizeSessionEndsAt(config?.sessionEndsAt);
-  const nowMs = Number(typeof now === "function" ? now() : now);
-  return {
-    sessionEndsAt: normalized.ok ? normalized.value : "",
-    ended: normalized.ok && !!normalized.value && Number.isFinite(nowMs) && Date.parse(normalized.value) <= nowMs
-  };
-};
-var buildSessionEndedResponse = ({ config, headers, json: json2, now } = {}) => {
-  const lifecycle = resolveSessionLifecycle(config, { now });
-  if (!lifecycle.ended) return null;
-  return json2?.(
-    {
-      error: "This session has ended.",
-      code: "session_ended",
-      sessionEndsAt: lifecycle.sessionEndsAt
-    },
-    410,
-    headers
-  );
-};
-
-// workers/shared/workerConfigModeValidation.mjs
-var isObj3 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-var hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-var AUTHORITY_MODES = /* @__PURE__ */ new Set(["worker_canonical", "evm_registry_canonical"]);
-var SESSION_PRESETS = /* @__PURE__ */ new Set(["fast_cheap_cloudflare", "trustless_public_decentralized", "custom"]);
-var SESSION_STORAGE_BACKENDS = /* @__PURE__ */ new Set(["cloudflare", "arweave"]);
-var DEPLOY_STORAGE_BACKENDS = /* @__PURE__ */ new Set(["cloudflare", "arweave", "lit-arweave"]);
-var PAYLOAD_ACCESS_MODES = /* @__PURE__ */ new Set(["public_read", "worker_sbt_gate", "lit_encrypted"]);
-var PAYLOAD_ACCESS_GATES = /* @__PURE__ */ new Set(["none", "sbt_gate", "group_gate", "role_gate"]);
-var PAYLOAD_ENCRYPTION_MODES = /* @__PURE__ */ new Set(["none", "worker_envelope", "lit"]);
-var SESSION_KEY_PROVIDERS = /* @__PURE__ */ new Set(["worker_secret"]);
-var IDENTITY_DEFAULTS = /* @__PURE__ */ new Set(["passkey", "wallet", "telegram"]);
-var IDENTITY_METHODS = /* @__PURE__ */ new Set(["passkey", "wallet", "telegram", "agent_grant"]);
-var AUTHORIZATION_MECHANISMS = /* @__PURE__ */ new Set([
-  "worker_roles",
-  "worker_groups",
-  "sbt_onchain",
-  "evm_address_allowlist",
-  "telegram_account_role",
-  "agent_grant"
-]);
-var SURFACES = ["web", "telegram", "miniApp", "agentHttp", "mcp", "ceCc"];
-var RESULTS_VISIBILITIES = /* @__PURE__ */ new Set([
-  "participant_aggregate",
-  "session_member_aggregate",
-  "public_full_if_storage_public"
-]);
-var EXPORT_SCOPES = /* @__PURE__ */ new Set(["admin_raw", "all_session", "encrypted_envelopes_only"]);
-var ACCESS_MATCHES = /* @__PURE__ */ new Set(["any", "all"]);
-var ACCESS_KINDS = /* @__PURE__ */ new Set(["worker_role", "sbt_onchain", "agent_grant_scope"]);
-var RESOURCE_KEYS = /* @__PURE__ */ new Set([
-  "docsContext",
-  "questions",
-  "surveys",
-  "responses",
-  "generatedArtifacts",
-  "media",
-  "images"
-]);
-var EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
-var MAX_ACCESS_CONDITION_TEXT_LENGTH = 128;
-var CANONICAL_NAMED_SESSION_MODE_PROFILES = Object.freeze({
-  fast_cheap_cloudflare: {
-    profileVersion: 1,
-    preset: "fast_cheap_cloudflare",
-    authority: { mode: "worker_canonical" },
-    evm: { registryChainId: null },
-    storage: {
-      backend: "cloudflare",
-      payloadAccessControl: {
-        gate: "role_gate",
-        encryption: "worker_envelope",
-        accessConditions: {
-          match: "any",
-          conditions: [
-            { kind: "worker_role", role: "admin" },
-            { kind: "agent_grant_scope", scope: "storage" }
-          ]
-        }
-      }
-    },
-    identity: { default: "passkey", enabled: ["passkey"] },
-    authorization: { mechanisms: ["worker_roles"] },
-    encryption: { mode: "worker_envelope", keyProvider: "worker_secret" },
-    surfaces: {
-      web: true,
-      telegram: false,
-      miniApp: false,
-      agentHttp: false,
-      mcp: false,
-      ceCc: false
-    },
-    results: {
-      visibility: "participant_aggregate",
-      exposure: {
-        aggregateResultsEnabled: true,
-        anonymizedGroupsEnabled: false,
-        minGroupSize: 2
-      }
-    },
-    export: { scope: "admin_raw" }
-  },
-  trustless_public_decentralized: {
-    profileVersion: 1,
-    preset: "trustless_public_decentralized",
-    authority: { mode: "evm_registry_canonical" },
-    evm: { registryChainId: 11155420 },
-    storage: { backend: "arweave" },
-    identity: { default: "wallet", enabled: ["wallet", "passkey"] },
-    authorization: { mechanisms: ["sbt_onchain"] },
-    encryption: { mode: "none" },
-    surfaces: {
-      web: true,
-      telegram: false,
-      miniApp: false,
-      agentHttp: false,
-      mcp: false,
-      ceCc: false
-    },
-    results: {
-      visibility: "public_full_if_storage_public",
-      exposure: {
-        aggregateResultsEnabled: true,
-        anonymizedGroupsEnabled: false,
-        minGroupSize: 2
-      }
-    },
-    export: { scope: "all_session" }
-  }
-});
-var valid = () => ({ ok: true });
-var invalid = (path) => ({ ok: false, path });
-var stableSessionModeValue = (value) => {
-  if (Array.isArray(value)) return value.map(stableSessionModeValue);
-  if (!isObj3(value)) return value;
-  return Object.keys(value).sort().reduce((next, key) => {
-    if (typeof value[key] !== "undefined") next[key] = stableSessionModeValue(value[key]);
-    return next;
-  }, {});
-};
-var sessionModeValuesEqual = (left, right) => JSON.stringify(stableSessionModeValue(left)) === JSON.stringify(stableSessionModeValue(right));
-var validateEnumField = (record, key, path, allowed) => {
-  if (!hasOwn(record, key)) return valid();
-  const value = record[key];
-  return typeof value === "string" && allowed.has(value) ? valid() : invalid(path);
-};
-var validateRequiredEnumField = (record, key, path, allowed) => hasOwn(record, key) ? validateEnumField(record, key, path, allowed) : invalid(path);
-var validateObjectField = (record, key, path) => {
-  if (!hasOwn(record, key)) return { ok: true, value: null };
-  return isObj3(record[key]) ? { ok: true, value: record[key] } : { ok: false, path };
-};
-var validateExactKeys = (record, path, allowed) => {
-  const allowedKeys = new Set(allowed);
-  const unknownKey = Object.keys(record).find((key) => !allowedKeys.has(key));
-  return unknownKey ? invalid(path ? `${path}.${unknownKey}` : unknownKey) : valid();
-};
-var validateRequiredObjectField = (record, key, path, allowed) => {
-  const result = validateObjectField(record, key, path);
-  if (!result.ok || !result.value) return result.ok ? invalid(path) : result;
-  const keysResult = validateExactKeys(result.value, path, allowed);
-  return keysResult.ok ? result : keysResult;
-};
-var validateEnumArray = (value, path, allowed) => {
-  if (!Array.isArray(value) || !value.length) return invalid(path);
-  const invalidIndex = value.findIndex((entry) => typeof entry !== "string" || !allowed.has(entry));
-  if (invalidIndex >= 0) return invalid(`${path}.${invalidIndex}`);
-  if (new Set(value).size !== value.length) return invalid(path);
-  return { ok: true, value };
-};
-var positiveChainId = (value) => Number.isSafeInteger(value) && value > 0;
-var validateAccessConditions = (value, path) => {
-  if (!isObj3(value)) return invalid(path);
-  let result = validateExactKeys(value, path, ["match", "conditions"]);
-  if (!result.ok) return result;
-  result = validateRequiredEnumField(value, "match", `${path}.match`, ACCESS_MATCHES);
-  if (!result.ok) return result;
-  if (!Array.isArray(value.conditions) || !value.conditions.length) return invalid(`${path}.conditions`);
-  const sbtChainIds = [];
-  for (let index = 0; index < value.conditions.length; index += 1) {
-    const conditionPath = `${path}.conditions.${index}`;
-    const condition = value.conditions[index];
-    if (!isObj3(condition)) return invalid(conditionPath);
-    result = validateRequiredEnumField(condition, "kind", `${conditionPath}.kind`, ACCESS_KINDS);
-    if (!result.ok) return result;
-    if (condition.kind === "worker_role") {
-      result = validateExactKeys(condition, conditionPath, ["kind", "role"]);
-      if (!result.ok) return result;
-      if (typeof condition.role !== "string" || !condition.role.trim() || condition.role !== condition.role.trim() || condition.role.length > MAX_ACCESS_CONDITION_TEXT_LENGTH) {
-        return invalid(`${conditionPath}.role`);
-      }
-      continue;
-    }
-    if (condition.kind === "agent_grant_scope") {
-      result = validateExactKeys(condition, conditionPath, ["kind", "scope"]);
-      if (!result.ok) return result;
-      if (typeof condition.scope !== "string" || !condition.scope.trim() || condition.scope !== condition.scope.trim() || condition.scope.length > MAX_ACCESS_CONDITION_TEXT_LENGTH) {
-        return invalid(`${conditionPath}.scope`);
-      }
-      continue;
-    }
-    result = validateExactKeys(condition, conditionPath, ["kind", "chainId", "contract", "anyOrAll"]);
-    if (!result.ok) return result;
-    if (!positiveChainId(condition.chainId)) return invalid(`${conditionPath}.chainId`);
-    if (typeof condition.contract !== "string" || condition.contract !== condition.contract.trim() || !EVM_ADDRESS_PATTERN.test(condition.contract) || /^0x0{40}$/i.test(condition.contract)) {
-      return invalid(`${conditionPath}.contract`);
-    }
-    result = validateRequiredEnumField(condition, "anyOrAll", `${conditionPath}.anyOrAll`, ACCESS_MATCHES);
-    if (!result.ok) return result;
-    sbtChainIds.push(condition.chainId);
-  }
-  return { ok: true, sbtChainIds };
-};
-var validatePayloadAccessControl = (record, path) => {
-  if (!isObj3(record)) return invalid(path);
-  for (const [key, allowed] of [
-    ["mode", PAYLOAD_ACCESS_MODES],
-    ["gate", PAYLOAD_ACCESS_GATES],
-    ["encryption", PAYLOAD_ENCRYPTION_MODES]
-  ]) {
-    const result = validateEnumField(record, key, `${path}.${key}`, allowed);
-    if (!result.ok) return result;
-  }
-  return valid();
-};
-var validateStorageProfile = (profile, path, { allowString = false, requireCanonicalBackend = false } = {}) => {
-  if (allowString && typeof profile === "string") {
-    return DEPLOY_STORAGE_BACKENDS.has(profile) ? valid() : invalid(`${path}.backend`);
-  }
-  if (!isObj3(profile)) return invalid(path);
-  const backendKeys = ["backend", "profile", "storageProfile"].filter((key) => hasOwn(profile, key));
-  if (!backendKeys.length) return invalid(`${path}.backend`);
-  if (requireCanonicalBackend && !hasOwn(profile, "backend")) return invalid(`${path}.backend`);
-  for (const key of backendKeys) {
-    const result = validateEnumField(profile, key, `${path}.${key}`, DEPLOY_STORAGE_BACKENDS);
-    if (!result.ok) return result;
-  }
-  const backend = profile[backendKeys[0]];
-  const conflictingBackendKey = backendKeys.find((key) => profile[key] !== backend);
-  if (conflictingBackendKey) return invalid(`${path}.${conflictingBackendKey}`);
-  for (const key of ["payloadAccessMode", "accessControlMode"]) {
-    const result = validateEnumField(profile, key, `${path}.${key}`, PAYLOAD_ACCESS_MODES);
-    if (!result.ok) return result;
-  }
-  for (const [key, allowed] of [
-    ["gate", PAYLOAD_ACCESS_GATES],
-    ["encryption", PAYLOAD_ENCRYPTION_MODES]
-  ]) {
-    const result = validateEnumField(profile, key, `${path}.${key}`, allowed);
-    if (!result.ok) return result;
-  }
-  const payloadAccess = validateObjectField(profile, "payloadAccessControl", `${path}.payloadAccessControl`);
-  if (!payloadAccess.ok) return payloadAccess;
-  if (payloadAccess.value) {
-    const result = validatePayloadAccessControl(payloadAccess.value, `${path}.payloadAccessControl`);
-    if (!result.ok) return result;
-  }
-  const cloudflare = validateObjectField(profile, "cloudflare", `${path}.cloudflare`);
-  if (!cloudflare.ok) return cloudflare;
-  if (cloudflare.value) {
-    const result = validateEnumField(
-      cloudflare.value,
-      "payloadAccessMode",
-      `${path}.cloudflare.payloadAccessMode`,
-      PAYLOAD_ACCESS_MODES
-    );
-    if (!result.ok) return result;
-  }
-  return valid();
-};
-var validateVersionedSessionModeProfile = (profile, path) => {
-  let result = validateExactKeys(profile, path, [
-    "profileVersion",
-    "preset",
-    "authority",
-    "evm",
-    "storage",
-    "identity",
-    "authorization",
-    "encryption",
-    "surfaces",
-    "results",
-    "export"
-  ]);
-  if (!result.ok) return result;
-  if (profile.profileVersion !== 1) return invalid(`${path}.profileVersion`);
-  result = validateRequiredEnumField(profile, "preset", `${path}.preset`, SESSION_PRESETS);
-  if (!result.ok) return result;
-  const authority = validateRequiredObjectField(profile, "authority", `${path}.authority`, ["mode"]);
-  if (!authority.ok) return authority;
-  result = validateRequiredEnumField(authority.value, "mode", `${path}.authority.mode`, AUTHORITY_MODES);
-  if (!result.ok) return result;
-  const authorityMode = authority.value.mode;
-  const evm = validateRequiredObjectField(profile, "evm", `${path}.evm`, ["registryChainId"]);
-  if (!evm.ok) return evm;
-  if (evm.value.registryChainId !== null && !positiveChainId(evm.value.registryChainId)) {
-    return invalid(`${path}.evm.registryChainId`);
-  }
-  const storage = validateRequiredObjectField(profile, "storage", `${path}.storage`, [
-    "backend",
-    "payloadAccessControl",
-    "resources",
-    "mirrors"
-  ]);
-  if (!storage.ok) return storage;
-  result = validateRequiredEnumField(storage.value, "backend", `${path}.storage.backend`, SESSION_STORAGE_BACKENDS);
-  if (!result.ok) return result;
-  if (hasOwn(storage.value, "resources")) {
-    if (!isObj3(storage.value.resources)) return invalid(`${path}.storage.resources`);
-    const unknownResource = Object.keys(storage.value.resources).find((key) => !RESOURCE_KEYS.has(key));
-    return invalid(unknownResource ? `${path}.storage.resources.${unknownResource}` : `${path}.storage.resources`);
-  }
-  if (hasOwn(storage.value, "mirrors")) return invalid(`${path}.storage.mirrors`);
-  let payloadAccess = null;
-  let storageAccess = { ok: true, sbtChainIds: [] };
-  if (hasOwn(storage.value, "payloadAccessControl")) {
-    const payloadAccessResult = validateRequiredObjectField(
-      storage.value,
-      "payloadAccessControl",
-      `${path}.storage.payloadAccessControl`,
-      ["gate", "encryption", "mode", "accessConditions"]
-    );
-    if (!payloadAccessResult.ok) return payloadAccessResult;
-    payloadAccess = payloadAccessResult.value;
-    result = validateRequiredEnumField(
-      payloadAccess,
-      "gate",
-      `${path}.storage.payloadAccessControl.gate`,
-      PAYLOAD_ACCESS_GATES
-    );
-    if (!result.ok) return result;
-    if (!(/* @__PURE__ */ new Set(["none", "role_gate"])).has(payloadAccess.gate)) {
-      return invalid(`${path}.storage.payloadAccessControl.gate`);
-    }
-    result = validateRequiredEnumField(
-      payloadAccess,
-      "encryption",
-      `${path}.storage.payloadAccessControl.encryption`,
-      PAYLOAD_ENCRYPTION_MODES
-    );
-    if (!result.ok) return result;
-    if (hasOwn(payloadAccess, "mode")) return invalid(`${path}.storage.payloadAccessControl.mode`);
-    if (hasOwn(payloadAccess, "accessConditions")) {
-      storageAccess = validateAccessConditions(
-        payloadAccess.accessConditions,
-        `${path}.storage.payloadAccessControl.accessConditions`
-      );
-      if (!storageAccess.ok) return storageAccess;
-    }
-  }
-  if (storage.value.backend === "cloudflare" && !payloadAccess) {
-    return invalid(`${path}.storage.payloadAccessControl`);
-  }
-  if (storage.value.backend === "arweave" && payloadAccess) {
-    return invalid(`${path}.storage.payloadAccessControl`);
-  }
-  const identity = validateRequiredObjectField(profile, "identity", `${path}.identity`, ["default", "enabled"]);
-  if (!identity.ok) return identity;
-  result = validateRequiredEnumField(identity.value, "default", `${path}.identity.default`, IDENTITY_DEFAULTS);
-  if (!result.ok) return result;
-  const identities = validateEnumArray(identity.value.enabled, `${path}.identity.enabled`, IDENTITY_METHODS);
-  if (!identities.ok) return identities;
-  if (!identities.value.includes(identity.value.default)) return invalid(`${path}.identity.default`);
-  if (identities.value.some((method) => method === "telegram" || method === "agent_grant")) {
-    return invalid(`${path}.identity.enabled`);
-  }
-  const authorization = validateRequiredObjectField(profile, "authorization", `${path}.authorization`, ["mechanisms"]);
-  if (!authorization.ok) return authorization;
-  const mechanisms = validateEnumArray(
-    authorization.value.mechanisms,
-    `${path}.authorization.mechanisms`,
-    AUTHORIZATION_MECHANISMS
-  );
-  if (!mechanisms.ok) return mechanisms;
-  if (mechanisms.value.some(
-    (mechanism) => ["worker_groups", "evm_address_allowlist", "telegram_account_role", "agent_grant"].includes(mechanism)
-  )) {
-    return invalid(`${path}.authorization.mechanisms`);
-  }
-  const encryption = validateRequiredObjectField(profile, "encryption", `${path}.encryption`, [
-    "mode",
-    "keyProvider",
-    "accessConditions"
-  ]);
-  if (!encryption.ok) return encryption;
-  result = validateRequiredEnumField(encryption.value, "mode", `${path}.encryption.mode`, PAYLOAD_ENCRYPTION_MODES);
-  if (!result.ok) return result;
-  result = validateEnumField(encryption.value, "keyProvider", `${path}.encryption.keyProvider`, SESSION_KEY_PROVIDERS);
-  if (!result.ok) return result;
-  let encryptionAccess = { ok: true, sbtChainIds: [] };
-  if (hasOwn(encryption.value, "accessConditions")) {
-    encryptionAccess = validateAccessConditions(
-      encryption.value.accessConditions,
-      `${path}.encryption.accessConditions`
-    );
-    if (!encryptionAccess.ok) return encryptionAccess;
-  }
-  if (encryption.value.mode === "worker_envelope") {
-    if (encryption.value.keyProvider !== "worker_secret") return invalid(`${path}.encryption.keyProvider`);
-  } else if (hasOwn(encryption.value, "keyProvider")) {
-    return invalid(`${path}.encryption.keyProvider`);
-  }
-  if (encryption.value.mode !== "worker_envelope" && hasOwn(encryption.value, "accessConditions")) {
-    return invalid(`${path}.encryption.accessConditions`);
-  }
-  if (payloadAccess && payloadAccess.encryption !== encryption.value.mode) {
-    return invalid(`${path}.storage.payloadAccessControl.encryption`);
-  }
-  const surfaces = validateRequiredObjectField(profile, "surfaces", `${path}.surfaces`, SURFACES);
-  if (!surfaces.ok) return surfaces;
-  for (const surface of SURFACES) {
-    if (typeof surfaces.value[surface] !== "boolean") return invalid(`${path}.surfaces.${surface}`);
-  }
-  if (surfaces.value.web !== true) return invalid(`${path}.surfaces.web`);
-  if (surfaces.value.miniApp && !surfaces.value.telegram) return invalid(`${path}.surfaces.miniApp`);
-  if (surfaces.value.mcp) return invalid(`${path}.surfaces.mcp`);
-  if (surfaces.value.ceCc) return invalid(`${path}.surfaces.ceCc`);
-  const results = validateRequiredObjectField(profile, "results", `${path}.results`, ["visibility", "exposure"]);
-  if (!results.ok) return results;
-  result = validateRequiredEnumField(results.value, "visibility", `${path}.results.visibility`, RESULTS_VISIBILITIES);
-  if (!result.ok) return result;
-  if (results.value.visibility === "public_full_if_storage_public" && (encryption.value.mode !== "none" || storage.value.backend === "cloudflare" && (!payloadAccess || payloadAccess.gate !== "none" || hasOwn(payloadAccess, "accessConditions")))) {
-    return invalid(`${path}.results.visibility`);
-  }
-  const exposure = validateRequiredObjectField(results.value, "exposure", `${path}.results.exposure`, [
-    "aggregateResultsEnabled",
-    "anonymizedGroupsEnabled",
-    "minGroupSize"
-  ]);
-  if (!exposure.ok) return exposure;
-  if (exposure.value.aggregateResultsEnabled !== true) {
-    return invalid(`${path}.results.exposure.aggregateResultsEnabled`);
-  }
-  if (typeof exposure.value.anonymizedGroupsEnabled !== "boolean") {
-    return invalid(`${path}.results.exposure.anonymizedGroupsEnabled`);
-  }
-  if (!Number.isSafeInteger(exposure.value.minGroupSize) || exposure.value.minGroupSize < 2) {
-    return invalid(`${path}.results.exposure.minGroupSize`);
-  }
-  const exportConfig = validateRequiredObjectField(profile, "export", `${path}.export`, ["scope", "surfaceFilter"]);
-  if (!exportConfig.ok) return exportConfig;
-  result = validateRequiredEnumField(exportConfig.value, "scope", `${path}.export.scope`, EXPORT_SCOPES);
-  if (!result.ok) return result;
-  if (hasOwn(exportConfig.value, "surfaceFilter")) return invalid(`${path}.export.surfaceFilter`);
-  if (exportConfig.value.scope === "encrypted_envelopes_only" && encryption.value.mode === "none") {
-    return invalid(`${path}.export.scope`);
-  }
-  const sbtChainIds = [...storageAccess.sbtChainIds, ...encryptionAccess.sbtChainIds];
-  const hasSbtCondition = sbtChainIds.length > 0;
-  if (hasSbtCondition && encryption.value.mode !== "worker_envelope") {
-    return invalid(`${path}.encryption.mode`);
-  }
-  const chainRelevant = authorityMode === "evm_registry_canonical" || encryption.value.mode === "lit" || hasSbtCondition;
-  if (chainRelevant && !positiveChainId(evm.value.registryChainId)) {
-    return invalid(`${path}.evm.registryChainId`);
-  }
-  if (!chainRelevant && evm.value.registryChainId !== null) {
-    return invalid(`${path}.evm.registryChainId`);
-  }
-  if (positiveChainId(evm.value.registryChainId) && sbtChainIds.some((chainId) => chainId !== evm.value.registryChainId)) {
-    return invalid(`${path}.evm.registryChainId`);
-  }
-  if (authorityMode === "worker_canonical") {
-    if (storage.value.backend !== "cloudflare") return invalid(`${path}.storage.backend`);
-    if (identity.value.default !== "passkey" || !identities.value.includes("passkey") || identities.value.includes("wallet")) {
-      return invalid(`${path}.identity`);
-    }
-    if (!mechanisms.value.includes("worker_roles")) return invalid(`${path}.authorization.mechanisms`);
-    if (mechanisms.value.includes("sbt_onchain") && !hasSbtCondition) {
-      return invalid(`${path}.authorization.mechanisms`);
-    }
-  } else {
-    if (storage.value.backend !== "arweave") return invalid(`${path}.storage.backend`);
-    if (identity.value.default !== "wallet" || identities.value.length !== 2 || !identities.value.includes("wallet") || !identities.value.includes("passkey")) {
-      return invalid(`${path}.identity`);
-    }
-    if (mechanisms.value.length !== 1 || mechanisms.value[0] !== "sbt_onchain") {
-      return invalid(`${path}.authorization.mechanisms`);
-    }
-  }
-  const canonicalNamedProfile = CANONICAL_NAMED_SESSION_MODE_PROFILES[profile.preset];
-  if (canonicalNamedProfile && !sessionModeValuesEqual(profile, canonicalNamedProfile)) {
-    return invalid(`${path}.preset`);
-  }
-  return valid();
-};
-var validateSessionModeProfile = (profile, path) => {
-  if (!isObj3(profile)) return invalid(path);
-  if (!hasOwn(profile, "profileVersion")) return invalid(`${path}.profileVersion`);
-  return validateVersionedSessionModeProfile(profile, path);
-};
-var resolveProfileStorageSide = (config, { allowMissing = false, requirePersistedCanonicalKey = false } = {}) => {
-  const hasStorageProfile = hasOwn(config, "storageProfile");
-  const hasStorageBackend = hasOwn(config, "storageBackend");
-  if (hasStorageProfile && hasStorageBackend) return invalid("storageBackend");
-  if (!hasStorageProfile && !hasStorageBackend) {
-    return allowMissing ? { ok: true, value: null, key: "" } : invalid("storageProfile");
-  }
-  const key = hasStorageProfile ? "storageProfile" : "storageBackend";
-  if (requirePersistedCanonicalKey && key !== "storageProfile") return invalid("storageBackend");
-  const value = config[key];
-  return isObj3(value) ? { ok: true, value, key } : invalid("storageProfile");
-};
-var profileStorageBackendMatches = ({ profile, storageBackend }) => {
-  const profileBackend = profile?.storage?.backend;
-  if (profileBackend === "cloudflare") return storageBackend === "cloudflare";
-  if (profileBackend !== "arweave") return false;
-  if (profile?.encryption?.mode === "lit") {
-    return storageBackend === "arweave" || storageBackend === "lit-arweave";
-  }
-  return storageBackend === "arweave";
-};
-var validateCanonicalStorageAccessConditions = ({ profile, storageSide }) => {
-  for (const key of ["accessConditions", "conditions"]) {
-    if (hasOwn(storageSide, key)) return invalid(`storageProfile.${key}`);
-  }
-  const cloudflare = isObj3(storageSide.cloudflare) ? storageSide.cloudflare : {};
-  for (const key of ["accessConditions", "conditions"]) {
-    if (hasOwn(cloudflare, key)) return invalid(`storageProfile.cloudflare.${key}`);
-  }
-  const storageAccess = isObj3(storageSide.payloadAccessControl) ? storageSide.payloadAccessControl : {};
-  if (hasOwn(storageAccess, "conditions")) {
-    return invalid("storageProfile.payloadAccessControl.conditions");
-  }
-  const profileAccess = isObj3(profile?.storage?.payloadAccessControl) ? profile.storage.payloadAccessControl : {};
-  const profileEncryption = isObj3(profile?.encryption) ? profile.encryption : {};
-  const effectiveProfileConditions = hasOwn(profileEncryption, "accessConditions") ? profileEncryption.accessConditions : profileAccess.accessConditions;
-  const profileHasConditions = hasOwn(profileEncryption, "accessConditions") || hasOwn(profileAccess, "accessConditions");
-  const storageHasConditions = hasOwn(storageAccess, "accessConditions");
-  if (storageHasConditions) {
-    const result = validateAccessConditions(
-      storageAccess.accessConditions,
-      "storageProfile.payloadAccessControl.accessConditions"
-    );
-    if (!result.ok) return result;
-  }
-  if (profileHasConditions !== storageHasConditions || profileHasConditions && !sessionModeValuesEqual(effectiveProfileConditions, storageAccess.accessConditions)) {
-    return invalid("storageProfile.payloadAccessControl.accessConditions");
-  }
-  return valid();
-};
-var validateProfileStoragePolicyCoherence = ({ profile, storageSide }) => {
-  const profileStorage = isObj3(profile.storage) ? profile.storage : {};
-  const storageBackend = storageSide.backend;
-  if (!profileStorageBackendMatches({ profile, storageBackend })) {
-    return invalid("storageProfile.backend");
-  }
-  if (storageBackend !== "cloudflare") {
-    return hasOwn(storageSide, "payloadAccessControl") ? invalid("storageProfile.payloadAccessControl") : valid();
-  }
-  for (const key of ["gate", "encryption", "payloadAccessMode", "accessControlMode"]) {
-    if (hasOwn(storageSide, key)) return invalid(`storageProfile.${key}`);
-  }
-  const profileAccess = isObj3(profileStorage.payloadAccessControl) ? profileStorage.payloadAccessControl : {};
-  const storageAccess = isObj3(storageSide.payloadAccessControl) ? storageSide.payloadAccessControl : {};
-  const effectiveProfileGate = profile?.encryption?.mode === "lit" ? "none" : profileAccess.gate;
-  if (!hasOwn(storageAccess, "gate") || storageAccess.gate !== effectiveProfileGate) {
-    return invalid("storageProfile.payloadAccessControl.gate");
-  }
-  if (!hasOwn(storageAccess, "encryption") || storageAccess.encryption !== profileAccess.encryption) {
-    return invalid("storageProfile.payloadAccessControl.encryption");
-  }
-  return validateCanonicalStorageAccessConditions({ profile, storageSide });
-};
-var validateWorkerConfigModeValues = (config, { allowPartialProfileStorage = false } = {}) => {
-  if (!isObj3(config)) return invalid("config");
-  if (hasOwn(config, "sessionEndsAt") && !normalizeSessionEndsAt(config.sessionEndsAt).ok) {
-    return invalid("sessionEndsAt");
-  }
-  let profile = null;
-  if (hasOwn(config, "sessionModeProfile")) {
-    const result = validateSessionModeProfile(config.sessionModeProfile, "sessionModeProfile");
-    if (!result.ok) return result;
-    profile = config.sessionModeProfile;
-  }
-  if (profile && hasOwn(config, "sessionEndsAt") && profile?.authority?.mode !== "worker_canonical") {
-    return invalid("sessionEndsAt");
-  }
-  if (profile) {
-    const storageSource = resolveProfileStorageSide(config, {
-      allowMissing: allowPartialProfileStorage,
-      requirePersistedCanonicalKey: true
-    });
-    if (!storageSource.ok) return storageSource;
-    if (!storageSource.value) return valid();
-    const storageResult = validateStorageProfile(storageSource.value, "storageProfile", {
-      requireCanonicalBackend: true
-    });
-    if (!storageResult.ok) return storageResult;
-    return validateProfileStoragePolicyCoherence({
-      profile,
-      storageSide: storageSource.value
-    });
-  }
-  if (hasOwn(config, "storageProfile")) {
-    const result = validateStorageProfile(config.storageProfile, "storageProfile");
-    if (!result.ok) return result;
-  }
-  return valid();
-};
-var workerConfigAllowsAnonymousGroupDiscovery = (config) => {
-  if (!isObj3(config) || !validateWorkerConfigModeValues(config).ok) return false;
-  const profile = isObj3(config.sessionModeProfile) ? config.sessionModeProfile : {};
-  const authority = isObj3(profile.authority) ? profile.authority : {};
-  const storage = isObj3(profile.storage) ? profile.storage : {};
-  const payloadAccess = isObj3(storage.payloadAccessControl) ? storage.payloadAccessControl : {};
-  const encryption = isObj3(profile.encryption) ? profile.encryption : {};
-  const results = isObj3(profile.results) ? profile.results : {};
-  return authority.mode === "worker_canonical" && storage.backend === "cloudflare" && payloadAccess.gate === "none" && payloadAccess.encryption === "none" && !hasOwn(payloadAccess, "accessConditions") && encryption.mode === "none" && !hasOwn(encryption, "accessConditions") && results.visibility === "public_full_if_storage_public";
-};
-var validateDeploymentModeValues = (body) => {
-  if (!isObj3(body)) return invalid("request");
-  let profile = null;
-  if (hasOwn(body, "sessionModeProfile")) {
-    const result = validateSessionModeProfile(body.sessionModeProfile, "sessionModeProfile");
-    if (!result.ok) return result;
-    profile = body.sessionModeProfile;
-  }
-  if (profile) {
-    const storageSource = resolveProfileStorageSide(body);
-    if (!storageSource.ok) return storageSource;
-    const storageResult = validateStorageProfile(storageSource.value, "storageProfile", {
-      requireCanonicalBackend: true
-    });
-    if (!storageResult.ok) return storageResult;
-    return validateProfileStoragePolicyCoherence({
-      profile,
-      storageSide: storageSource.value
-    });
-  }
-  if (hasOwn(body, "storageProfile")) {
-    const result = validateStorageProfile(body.storageProfile, "storageProfile", { allowString: true });
-    if (!result.ok) return result;
-  } else if (hasOwn(body, "storageBackend")) {
-    const result = validateStorageProfile(body.storageBackend, "storageProfile", { allowString: true });
-    if (!result.ok) return result;
-  }
-  return valid();
-};
-
-// workers/shared/deployHelperCore.mjs
-var { getPathRpcUrl } = import_rpcDefaults3.default;
-var DEFAULT_COMPAT_DATE = "2024-09-02";
-var DEFAULT_FAUCET_RPC_URL = getPathRpcUrl(11155420) || "";
-var DEFAULT_FAUCET_AMOUNT_ETH = "0.0002";
-var DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH = "0.001";
-var DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = true;
-var DEFAULT_ALLOWED_ORIGINS = [
-  "http://localhost:3000"
-];
-var DEPLOYMENT_JOURNAL_PREFIX = "deploy-helper:deployment:";
-var DEPLOYMENT_JOURNAL_VERSION = 1;
-var DEPLOYMENT_JOURNAL_TTL_SECONDS = 7 * 24 * 60 * 60;
-var DEPLOYMENT_REQUEST_ID_RE = /^[a-z0-9._:-]{8,128}$/i;
-var KV_NAMESPACE_TITLE_MAX_LENGTH = 512;
-var SESSION_SLUG_MAX_LENGTH = 128;
-var TRUE_STRINGS = /* @__PURE__ */ new Set(["1", "true", "yes", "on"]);
-var FALSE_STRINGS = /* @__PURE__ */ new Set(["0", "false", "no", "off"]);
-var STORAGE_RESOURCE_STAGES = Object.freeze({
-  ACTIVE: "active",
-  STAGED: "staged"
-});
-var DEFAULT_STORAGE_RESOURCES = Object.freeze({
-  docsContext: STORAGE_RESOURCE_STAGES.ACTIVE,
-  questions: STORAGE_RESOURCE_STAGES.STAGED,
-  surveys: STORAGE_RESOURCE_STAGES.STAGED,
-  responses: STORAGE_RESOURCE_STAGES.STAGED,
-  generatedArtifacts: STORAGE_RESOURCE_STAGES.STAGED,
-  media: STORAGE_RESOURCE_STAGES.STAGED,
-  images: STORAGE_RESOURCE_STAGES.STAGED
-});
-var DEFAULT_PAYLOAD_ACCESS_RESOURCES = Object.freeze({
-  docsContext: "docUploads",
-  questions: "questionResponses",
-  surveys: "surveyResponses",
-  responses: "questionResponses",
-  generatedArtifacts: "surveyResponses",
-  media: "docUploads",
-  images: "docUploads"
-});
-var DEFAULT_CLOUDFLARE_PRIMITIVES = Object.freeze({
-  r2: ["session_context_payloads", "question_payloads", "survey_payloads", "response_payloads", "media_blob_payloads"],
-  kv: ["metadata_indexes", "audit_events", "short_lived_action_ids", "webhook_replay_cache", "ephemeral_start_params"],
-  durableObjects: ["signer_runtime_coordination_only", "coordination_locks"]
-});
-var PAYLOAD_ACCESS_MODES2 = Object.freeze({
-  PUBLIC_READ: "public_read",
-  WORKER_SBT_GATE: "worker_sbt_gate",
-  LIT_ENCRYPTED: "lit_encrypted"
-});
-var PAYLOAD_ACCESS_GATES2 = Object.freeze({
-  NONE: "none",
-  SBT_GATE: "sbt_gate",
-  GROUP_GATE: "group_gate",
-  ROLE_GATE: "role_gate"
-});
-var PAYLOAD_ENCRYPTION_MODES2 = Object.freeze({
-  NONE: "none",
-  WORKER_ENVELOPE: "worker_envelope",
-  LIT: "lit"
-});
-var STORAGE_ENVELOPE_KEK_SECRET_NAME = "CE_STORAGE_ENVELOPE_KEK";
-var DEPLOYMENT_ID_BINDING_NAME = "CE_DEPLOYMENT_ID";
-var DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME = "CE_DEPLOYMENT_REQUEST_DIGEST";
-var BUNDLE_SHA256_BINDING_NAME = "CE_BUNDLE_SHA256";
-var SESSION_COORDINATOR_BINDING_NAME = "CE_SESSION_COORDINATOR";
-var SESSION_COORDINATOR_CLASS_NAME = "SessionWriteCoordinator";
-var SESSION_COORDINATOR_MIGRATION_TAG = "ce-session-write-coordinator-v1";
-var R2_BUCKET_NAME_RE = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
-var ALLOWED_WORKER_AUTHORITY_SCOPES = /* @__PURE__ */ new Set([
-  "ai",
-  "transcribe",
-  "storage",
-  "groups",
-  "arweave",
-  "faucet",
-  "fetch",
-  "lit"
-]);
-var DEFAULT_WORKER_CANONICAL_AUTHORITY = Object.freeze({
-  version: 1,
-  participantScopes: Object.freeze(["ai", "transcribe", "storage", "groups", "fetch"]),
-  anonymousScopes: Object.freeze([])
-});
-var toStr13 = (val) => typeof val === "string" ? val : val == null ? "" : String(val);
-var isObj4 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-var hasScheme = (value) => /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value);
-var ensureHttpUrl = (raw) => {
-  const trimmed = toStr13(raw).trim();
-  if (!trimmed) return "";
-  if (hasScheme(trimmed)) return trimmed;
-  if (trimmed.startsWith("//")) return `https:${trimmed}`;
-  if (trimmed.startsWith("/")) return trimmed;
-  if (/^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|\/|$)/i.test(trimmed)) {
-    return `http://${trimmed}`;
-  }
-  return `https://${trimmed}`;
-};
-var normalizeOrigin = (raw) => {
-  const trimmed = toStr13(raw).trim();
-  if (!trimmed) return "";
-  const withScheme = ensureHttpUrl(trimmed);
-  if (withScheme.startsWith("/")) return "";
-  try {
-    return new URL(withScheme).origin;
-  } catch {
-    return "";
-  }
-};
-var normalizeOriginList = (list) => {
-  const entries = Array.isArray(list) ? list : [list];
-  const cleaned = entries.map((entry) => normalizeOrigin(entry)).filter(Boolean);
-  return Array.from(new Set(cleaned));
-};
-var normalizeAllowList = (list, fallback = DEFAULT_ALLOWED_ORIGINS) => {
-  const normalized = normalizeOriginList(list);
-  if (normalized.length) return normalized;
-  return normalizeOriginList(fallback);
-};
-var validateInboundSlug = (raw) => {
-  if (raw == null) return { ok: true, slug: "", error: "" };
-  const rawStr = toStr13(raw).trim();
-  if (!rawStr) return { ok: true, slug: "", error: "" };
-  if (rawStr.toLowerCase() === "general") return { ok: true, slug: "", error: "" };
-  const canonicalSlug = rawStr.toLowerCase().replace(/[^a-z0-9_-]/g, "");
-  if (rawStr !== canonicalSlug || canonicalSlug.length > SESSION_SLUG_MAX_LENGTH) {
-    return {
-      ok: false,
-      slug: "",
-      error: `Invalid session slug. Use at most ${SESSION_SLUG_MAX_LENGTH} lowercase letters, numbers, "_" or "-".`
-    };
-  }
-  return { ok: true, slug: canonicalSlug, error: "" };
-};
-var readJsonOrText = async (resp) => {
-  let text = "";
-  try {
-    text = await resp.text();
-  } catch {
-    return {};
-  }
-  const trimmed = toStr13(text).trim();
-  if (!trimmed) return {};
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    return { message: trimmed };
-  }
-};
-var cfFetch = async (token, path, options = {}, {
-  fetchImpl = globalThis.fetch,
-  apiBaseUrl = "",
-  env = null
-} = {}) => {
-  const cloudflareApiBaseUrl = resolveCloudflareApiBaseUrl({ apiBaseUrl, env });
-  let resp;
-  try {
-    resp = await fetchImpl(`${cloudflareApiBaseUrl}${path}`, {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...options.headers || {}
-      }
-    });
-  } catch (err) {
-    return {
-      ok: false,
-      error: `Cloudflare API request failed: ${toStr13(err?.message || err).trim() || "Unknown error."}`,
-      detail: void 0,
-      status: 502,
-      data: null
-    };
-  }
-  const data = await readJsonOrText(resp);
-  if (!resp.ok || data?.success === false) {
-    const err = data?.errors?.[0]?.message || data?.message || `Cloudflare API error (${resp.status})`;
-    const detail = data?.errors?.length ? data.errors : void 0;
-    return { ok: false, error: err, detail, status: resp.status, data };
-  }
-  return { ok: true, data };
-};
-var NEW_KV_NAMESPACE_RETRY_DELAYS_MS = Object.freeze([250, 500, 1e3]);
-var FINAL_CONFIG_READBACK_RETRY_DELAYS_MS = Object.freeze([250, 500, 1e3]);
-var isNewKvNamespacePropagationFailure = (result) => {
-  if (!result || result.ok || Number(result.status || 0) !== 404) return false;
-  const detail = Array.isArray(result.detail) ? result.detail : [];
-  if (detail.some((entry) => Number(entry?.code || 0) === 10013)) return true;
-  const message = [result.error, ...detail.map((entry) => entry?.message)].map((value) => toStr13(value).trim().toLowerCase()).filter(Boolean).join(" ");
-  return message.includes("get namespace") && message.includes("namespace not found");
-};
-var putFreshKvNamespaceValue = async ({ apiToken, path, options, cfFetchOptions }) => {
-  let result = await cfFetch(apiToken, path, options, cfFetchOptions);
-  for (const delayMs of NEW_KV_NAMESPACE_RETRY_DELAYS_MS) {
-    if (!isNewKvNamespacePropagationFailure(result)) return result;
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
-    result = await cfFetch(apiToken, path, options, cfFetchOptions);
-  }
-  return result;
-};
-var lookupCloudflareAccount = async ({
-  apiToken,
-  fetchImpl = globalThis.fetch,
-  apiBaseUrl = "",
-  env = null
-} = {}) => {
-  const accountsResp = await cfFetch(apiToken, "/accounts?per_page=5", {}, {
-    fetchImpl,
-    apiBaseUrl,
-    env
-  });
-  if (!accountsResp.ok) {
-    const status = Number(accountsResp.status || 0) || 502;
-    return {
-      ok: false,
-      error: accountsResp.error,
-      detail: accountsResp.detail,
-      status,
-      fallbackEligible: status >= 500 || status === 429
-    };
-  }
-  const accounts = Array.isArray(accountsResp.data?.result) ? accountsResp.data.result : [];
-  const totalCount = Number(accountsResp.data?.result_info?.total_count || accounts.length);
-  if (accounts.length > 1 || totalCount > 1) {
-    return {
-      ok: false,
-      error: "Multiple accounts are available for this token. Restrict the token to exactly one account and retry.",
-      detail: void 0,
-      status: 409,
-      fallbackEligible: false
-    };
-  }
-  const account = accounts[0] || null;
-  if (!account || !account.id) {
-    return {
-      ok: false,
-      error: "No accounts found for token.",
-      detail: void 0,
-      status: 404,
-      fallbackEligible: false
-    };
-  }
-  return {
-    ok: true,
-    accountId: account.id,
-    accountName: account.name || ""
-  };
-};
-var randomSecret2 = () => {
-  const bytes2 = new Uint8Array(32);
-  crypto.getRandomValues(bytes2);
-  return Array.from(bytes2).map((b2) => b2.toString(16).padStart(2, "0")).join("");
-};
-var sha256Hex2 = async (value) => {
-  const input = new TextEncoder().encode(toStr13(value));
-  const digest = await crypto.subtle.digest("SHA-256", input);
-  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-};
-var canonicalizeJsonValue = (value, arrayEntry = false) => {
-  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
-  if (Array.isArray(value)) {
-    return value.map((entry) => canonicalizeJsonValue(entry, true));
-  }
-  if (value && typeof value === "object") {
-    return Object.keys(value).sort().reduce((out, key) => {
-      const entry = value[key];
-      if (entry === void 0 || typeof entry === "function" || typeof entry === "symbol") return out;
-      out[key] = canonicalizeJsonValue(entry);
-      return out;
-    }, /* @__PURE__ */ Object.create(null));
-  }
-  return arrayEntry ? null : void 0;
-};
-var stableCanonicalSerialize = (value) => JSON.stringify(canonicalizeJsonValue(value));
-var buildBundleDiagnostics = async (bundleSource, sourceKind) => {
-  const normalized = toStr13(bundleSource);
-  return {
-    source: toStr13(sourceKind).trim() || "unknown",
-    length: normalized.length,
-    sha256: await sha256Hex2(normalized),
-    hasAnyExport: normalized.includes("export "),
-    hasExportDefault: normalized.includes("export default"),
-    hasNamedDefaultExport: normalized.includes(" as default") || normalized.includes("worker_default"),
-    hasStringExportWrapper: /^export\s+default\s+["'`]/.test(normalized) || /^module\.exports\s*=\s*["'`]/.test(normalized),
-    hasFetchHandler: normalized.includes("fetch("),
-    hasServiceWorkerFetch: normalized.includes(`addEventListener('fetch'`) || normalized.includes('addEventListener("fetch"'),
-    prefix: normalized.slice(0, 120),
-    suffix: normalized.slice(-120)
-  };
-};
-var formatBundleDiagnostics = (diagnostics = {}) => {
-  const sha2563 = toStr13(diagnostics?.sha256).trim();
-  return [
-    `source=${toStr13(diagnostics?.source).trim() || "unknown"}`,
-    `len=${Number(diagnostics?.length || 0) || 0}`,
-    `sha256=${sha2563 ? sha2563.slice(0, 16) : "n/a"}`,
-    `export=${diagnostics?.hasAnyExport === true ? "1" : "0"}`,
-    `default=${diagnostics?.hasExportDefault === true ? "1" : "0"}`,
-    `namedDefault=${diagnostics?.hasNamedDefaultExport === true ? "1" : "0"}`,
-    `stringWrap=${diagnostics?.hasStringExportWrapper === true ? "1" : "0"}`,
-    `fetch=${diagnostics?.hasFetchHandler === true ? "1" : "0"}`,
-    `swFetch=${diagnostics?.hasServiceWorkerFetch === true ? "1" : "0"}`
-  ].join(" ");
-};
-var normalizeSecretValue = (value) => {
-  if (value == null) return "";
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "object") {
-    try {
-      return JSON.stringify(value);
-    } catch {
-      return "";
-    }
-  }
-  return toStr13(value).trim();
-};
-var sanitizeSecrets = (incoming) => {
-  const allowed = [
-    "openaiKey",
-    "anthropicKey",
-    "openrouterKey",
-    "customRpcUrl",
-    "customRpcKey",
-    "arweaveJwk",
-    "faucetPrivateKey",
-    "litAccountApiKey",
-    "litUsageApiKey"
-  ];
-  const out = {};
-  allowed.forEach((key) => {
-    if (Object.prototype.hasOwnProperty.call(incoming || {}, key)) {
-      out[key] = normalizeSecretValue(incoming[key]);
-    }
-  });
-  return out;
-};
-var sanitizeBlockLimits = (incoming) => {
-  if (!incoming || typeof incoming !== "object") return null;
-  const start = Number(incoming.start);
-  if (!Number.isFinite(start) || start <= 0) return null;
-  const normalizedStart = Math.floor(start);
-  const endRaw = incoming.end;
-  const parsedEnd = endRaw == null || endRaw === "" ? null : Number(endRaw);
-  const normalizedEnd = Number.isFinite(parsedEnd) && parsedEnd > 0 && parsedEnd >= normalizedStart ? Math.floor(parsedEnd) : null;
-  return {
-    start: normalizedStart,
-    end: normalizedEnd
-  };
-};
-var normalizeWorkerAuthorityScopes = (value, field) => {
-  if (!Array.isArray(value)) {
-    return { ok: false, error: `Worker-canonical authority ${field} must be an array.` };
-  }
-  const normalized = value.map((scope) => toStr13(scope).trim().toLowerCase());
-  if (normalized.some((scope) => !ALLOWED_WORKER_AUTHORITY_SCOPES.has(scope))) {
-    return { ok: false, error: `Worker-canonical authority ${field} contains an unsupported scope.` };
-  }
-  return { ok: true, value: [...new Set(normalized)] };
-};
-var normalizeWorkerAuthorityLoginGate = (value) => {
-  if (value == null) return { ok: true, value: null };
-  if (!isObj4(value) || !Array.isArray(value.conditions)) {
-    return { ok: false, error: "Worker-canonical authority loginGate must contain a conditions array." };
-  }
-  const match = toStr13(value.match).trim().toLowerCase();
-  if (match && match !== "any" && match !== "all") {
-    return { ok: false, error: 'Worker-canonical authority loginGate.match must be "any" or "all".' };
-  }
-  const conditions = [];
-  for (const condition of value.conditions) {
-    if (!isObj4(condition)) {
-      return { ok: false, error: "Worker-canonical authority loginGate contains an invalid condition." };
-    }
-    const kind = toStr13(condition.kind).trim().toLowerCase();
-    if (kind === "worker_role") {
-      const role = toStr13(condition.role || "admin").trim().toLowerCase() || "admin";
-      conditions.push({ kind, role });
-      continue;
-    }
-    if (kind === "worker_group") {
-      const groupId = toStr13(condition.groupId).trim();
-      if (!groupId) {
-        return { ok: false, error: "Worker-canonical worker_group conditions require groupId." };
-      }
-      conditions.push({ kind, groupId });
-      continue;
-    }
-    return { ok: false, error: "Worker-canonical authority loginGate contains an unsupported condition." };
-  }
-  return {
-    ok: true,
-    value: {
-      match: match || "any",
-      conditions
-    }
-  };
-};
-var resolveWorkerCanonicalAuthorityForDeploy = (incoming) => {
-  if (incoming == null) {
-    return {
-      ok: true,
-      value: {
-        version: DEFAULT_WORKER_CANONICAL_AUTHORITY.version,
-        participantScopes: [...DEFAULT_WORKER_CANONICAL_AUTHORITY.participantScopes],
-        anonymousScopes: [...DEFAULT_WORKER_CANONICAL_AUTHORITY.anonymousScopes]
-      }
-    };
-  }
-  if (!isObj4(incoming) || Number(incoming.version) !== 1) {
-    return { ok: false, error: "Worker-canonical authority policy must use version 1." };
-  }
-  const participantScopes = normalizeWorkerAuthorityScopes(incoming.participantScopes, "participantScopes");
-  if (!participantScopes.ok) return participantScopes;
-  const anonymousScopes = normalizeWorkerAuthorityScopes(incoming.anonymousScopes, "anonymousScopes");
-  if (!anonymousScopes.ok) return anonymousScopes;
-  const loginGate = normalizeWorkerAuthorityLoginGate(incoming.loginGate);
-  if (!loginGate.ok) return loginGate;
-  return {
-    ok: true,
-    value: {
-      version: 1,
-      participantScopes: participantScopes.value,
-      anonymousScopes: anonymousScopes.value,
-      ...loginGate.value ? { loginGate: loginGate.value } : {}
-    }
-  };
-};
-var workerAuthorityPoliciesMatch = (expected, actual) => JSON.stringify(expected || null) === JSON.stringify(actual || null);
-var buildFreshDeploymentName = (requestedName, deploymentId) => {
-  const base = toStr13(requestedName).trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "ce-session-worker";
-  return `${base}-${toStr13(deploymentId).slice(0, 12)}`;
-};
-var normalizeDeploymentRequestId = (value) => {
-  const normalized = toStr13(value).trim();
-  return DEPLOYMENT_REQUEST_ID_RE.test(normalized) ? normalized : "";
-};
-var collectKnownRequestCredentials = (body) => {
-  const credentials = /* @__PURE__ */ new Set();
-  const visit = (value, sensitive = false) => {
-    if (typeof value === "string") {
-      const normalized = value.trim();
-      if (sensitive && normalized.length >= 4) credentials.add(normalized);
-      return;
-    }
-    if (Array.isArray(value)) {
-      value.forEach((entry) => visit(entry, sensitive));
-      return;
-    }
-    if (!isObj4(value)) return;
-    Object.entries(value).forEach(([key, entry]) => {
-      const credentialField = sensitive || /(?:token|secret|password|api[_-]?key|private[_-]?key)/i.test(key);
-      visit(entry, credentialField);
-    });
-  };
-  visit(body);
-  return [...credentials].sort((a, b2) => b2.length - a.length);
-};
-var redactKnownCredentials = (value, credentials) => {
-  let redacted = toStr13(value);
-  credentials.forEach((credential) => {
-    redacted = redacted.split(credential).join("[REDACTED]");
-  });
-  return redacted;
-};
-var buildSafeDeployJournalResult = (result = {}, credentials = []) => {
-  const incomingBody = isObj4(result?.body) ? result.body : {};
-  const body = {};
-  [
-    "ok",
-    "error",
-    "step",
-    "deploymentKind",
-    "accountId",
-    "workerName",
-    "workerUrl",
-    "sessionSlug",
-    "sessionWorkerOrigin",
-    "telegramConfigured",
-    "resolvedSlug",
-    "kvNamespaceId",
-    "deploymentId",
-    "sessionConfigKey",
-    "sessionSecretsKey",
-    "sessionKvPrefix",
-    "partial",
-    "writesSessionConfig",
-    "writesSessionSecrets",
-    "tokenSecretSet",
-    "tokenSecretPreserved",
-    "envelopeKekSecretSet",
-    "envelopeKekSecretPreserved",
-    "subdomain",
-    "subdomainStatus",
-    "subdomainEnabled",
-    "subdomainError",
-    "scriptSubdomainEnabled",
-    "scriptSubdomainError",
-    "configVerified",
-    "deploymentRequestPending",
-    "deploymentRequestConflict"
-  ].forEach((key) => {
-    const value = incomingBody[key];
-    if (typeof value === "string") {
-      body[key] = redactKnownCredentials(value, credentials);
-    } else if (typeof value === "boolean" || Number.isFinite(value)) {
-      body[key] = value;
-    }
-  });
-  if (isObj4(incomingBody.orphanResources)) {
-    body.orphanResources = {};
-    ["kvNamespaceId", "kvCleanupStatus", "workerName", "workerCleanupStatus"].forEach((key) => {
-      const value = incomingBody.orphanResources[key];
-      if (typeof value === "string") body.orphanResources[key] = value;
-    });
-  }
-  if (isObj4(incomingBody.bundleDiagnostics)) {
-    body.bundleDiagnostics = {};
-    [
-      "source",
-      "length",
-      "sha256",
-      "hasAnyExport",
-      "hasExportDefault",
-      "hasNamedDefaultExport",
-      "hasStringExportWrapper",
-      "hasFetchHandler",
-      "hasServiceWorkerFetch"
-    ].forEach((key) => {
-      const value = incomingBody.bundleDiagnostics[key];
-      if (typeof value === "string" || typeof value === "boolean" || Number.isFinite(value)) {
-        body.bundleDiagnostics[key] = value;
-      }
-    });
-  }
-  if (isObj4(incomingBody.resources)) {
-    body.resources = {};
-    ["kvNamespaceId", "kvReused"].forEach((key) => {
-      const value = incomingBody.resources[key];
-      if (typeof value === "string") body.resources[key] = redactKnownCredentials(value, credentials);
-      else if (typeof value === "boolean" || Number.isFinite(value)) body.resources[key] = value;
-    });
-  }
-  if (isObj4(incomingBody.upload)) {
-    body.upload = {};
-    ["reused", "bundleSha256"].forEach((key) => {
-      const value = incomingBody.upload[key];
-      if (typeof value === "string") body.upload[key] = redactKnownCredentials(value, credentials);
-      else if (typeof value === "boolean" || Number.isFinite(value)) body.upload[key] = value;
-    });
-    if (isObj4(incomingBody.upload.metadata) && typeof incomingBody.upload.metadata.main_module === "string") {
-      body.upload.metadata = { main_module: incomingBody.upload.metadata.main_module };
-    } else if (incomingBody.upload.metadata === null) {
-      body.upload.metadata = null;
-    }
-  }
-  if (isObj4(incomingBody.secrets)) {
-    body.secrets = {};
-    ["generated", "preserved"].forEach((key) => {
-      if (Array.isArray(incomingBody.secrets[key])) {
-        body.secrets[key] = incomingBody.secrets[key].filter((value) => typeof value === "string").map((value) => redactKnownCredentials(value, credentials));
-      }
-    });
-  }
-  if (isObj4(incomingBody.health)) {
-    body.health = {};
-    ["ok", "protocolVersion", "authorityPinned"].forEach((key) => {
-      const value = incomingBody.health[key];
-      if (typeof value === "string") body.health[key] = redactKnownCredentials(value, credentials);
-      else if (typeof value === "boolean" || Number.isFinite(value)) body.health[key] = value;
-    });
-  }
-  if (isObj4(incomingBody.agentSessionWrapped)) {
-    body.agentSessionWrapped = {};
-    ["version", "enabled", "origin", "protocolVersion", "revision", "verifiedAt"].forEach((key) => {
-      const value = incomingBody.agentSessionWrapped[key];
-      if (typeof value === "string") body.agentSessionWrapped[key] = redactKnownCredentials(value, credentials);
-      else if (typeof value === "boolean" || Number.isFinite(value)) body.agentSessionWrapped[key] = value;
-    });
-  }
-  if (result?.ok !== true) body.deploymentRequestTerminal = true;
-  return {
-    ok: result?.ok === true,
-    status: Number(result?.status || 0) || 500,
-    body,
-    fallbackEligible: result?.fallbackEligible === true
-  };
-};
-var resolveDeployJournalBinding = (env) => {
-  for (const binding of [env?.DEPLOY_HELPER_KV, env?.GROUP_KV]) {
-    if (typeof binding?.get === "function" && typeof binding?.put === "function") return binding;
-  }
-  return null;
-};
-var buildDeploymentRequestContext = async ({ body, requestOrigin = "" } = {}) => {
-  const deploymentRequestId = normalizeDeploymentRequestId(body?.deploymentRequestId);
-  if (!deploymentRequestId) return null;
-  const digestBody = { ...isObj4(body) ? body : {} };
-  delete digestBody.deploymentRequestId;
-  delete digestBody.accountId;
-  digestBody.apiToken = toStr13(digestBody.apiToken || digestBody.token).trim();
-  delete digestBody.token;
-  const requestDigest = await sha256Hex2(stableCanonicalSerialize({
-    body: digestBody,
-    requestOrigin: normalizeOrigin(requestOrigin) || toStr13(requestOrigin).trim()
-  }));
-  const immutableIdentityDigest = await sha256Hex2(stableCanonicalSerialize({
-    requestOrigin: normalizeOrigin(requestOrigin) || toStr13(requestOrigin).trim(),
-    deploymentKind: toStr13(body?.deploymentKind).trim(),
-    sessionDeploymentIdentity: toStr13(body?.sessionDeploymentIdentity).trim(),
-    requestedWorkerName: toStr13(body?.workerName).trim(),
-    sessionSlug: toStr13(body?.sessionSlug).trim(),
-    sessionWorkerOrigin: toStr13(body?.sessionWorkerOrigin || body?.sessionWorkerUrl).trim(),
-    authorityMode: toStr13(body?.authorityMode).trim(),
-    sessionId: toStr13(body?.sessionId).trim().toLowerCase(),
-    sessionIdHex: toStr13(body?.sessionIdHex).trim().toLowerCase(),
-    adminAddress: toStr13(body?.adminAddress).trim().toLowerCase()
-  }));
-  const bundleCorrectionBody = { ...isObj4(body) ? body : {} };
-  delete bundleCorrectionBody.deploymentRequestId;
-  delete bundleCorrectionBody.accountId;
-  delete bundleCorrectionBody.apiToken;
-  delete bundleCorrectionBody.token;
-  delete bundleCorrectionBody.bundleText;
-  delete bundleCorrectionBody.bundleUrl;
-  const bundleCorrectionDigest = await sha256Hex2(stableCanonicalSerialize({
-    body: bundleCorrectionBody,
-    requestOrigin: normalizeOrigin(requestOrigin) || toStr13(requestOrigin).trim()
-  }));
-  const deploymentId = await sha256Hex2(`context-engine-deployment:${deploymentRequestId}`);
-  return {
-    deploymentRequestId,
-    requestDigest,
-    // Keep the payload-specific digest even when coordinated recovery swaps
-    // requestDigest for a stable infrastructure identity below.
-    fullRequestDigest: requestDigest,
-    immutableIdentityDigest,
-    bundleCorrectionDigest,
-    deploymentId,
-    requestMarker: deploymentId.slice(0, 16),
-    workerName: buildFreshDeploymentName(body?.workerName, deploymentId),
-    journalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}`,
-    uploadJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:upload`,
-    uploadRejectedJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:upload-rejected`,
-    terminalJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:terminal`,
-    isReplay: false
-  };
-};
-var readDeployJournalRecord = async (binding, key) => {
-  const raw = await binding.get(key);
-  if (!raw) return null;
-  try {
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    return isObj4(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-};
-var writeDeployJournalRecord = async (binding, key, record) => binding.put(
-  key,
-  JSON.stringify(record),
-  { expirationTtl: DEPLOYMENT_JOURNAL_TTL_SECONDS }
-);
-var writeDurableDeployJournalRecord = async (binding, key, record) => binding.put(
-  key,
-  JSON.stringify(record)
-);
-var normalizeResourceStage = (value, fallback) => {
-  const normalized = toStr13(value).trim().toLowerCase();
-  if (normalized === STORAGE_RESOURCE_STAGES.ACTIVE) return STORAGE_RESOURCE_STAGES.ACTIVE;
-  if (normalized === STORAGE_RESOURCE_STAGES.STAGED) return STORAGE_RESOURCE_STAGES.STAGED;
-  return fallback;
-};
-var normalizePayloadAccessMode = (value) => {
-  const normalized = toStr13(value).trim().toLowerCase();
-  if (normalized === PAYLOAD_ACCESS_MODES2.PUBLIC_READ || normalized === "public" || normalized === "public-read") {
-    return PAYLOAD_ACCESS_MODES2.PUBLIC_READ;
-  }
-  if (normalized === PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED) return PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED;
-  return PAYLOAD_ACCESS_MODES2.WORKER_SBT_GATE;
-};
-var normalizePayloadAccessGate = (value, fallback = PAYLOAD_ACCESS_GATES2.SBT_GATE) => {
-  const normalized = toStr13(value).trim().toLowerCase().replace(/-/g, "_");
-  if (!normalized) return fallback;
-  if (normalized === "none" || normalized === "public" || normalized === PAYLOAD_ACCESS_MODES2.PUBLIC_READ) {
-    return PAYLOAD_ACCESS_GATES2.NONE;
-  }
-  if (normalized === "sbt" || normalized === "sbt_gate" || normalized === "worker_sbt" || normalized === PAYLOAD_ACCESS_MODES2.WORKER_SBT_GATE) {
-    return PAYLOAD_ACCESS_GATES2.SBT_GATE;
-  }
-  if (normalized === "group" || normalized === "group_gate" || normalized === "worker_group") {
-    return PAYLOAD_ACCESS_GATES2.GROUP_GATE;
-  }
-  if (normalized === "role" || normalized === "role_gate" || normalized === "worker_role") {
-    return PAYLOAD_ACCESS_GATES2.ROLE_GATE;
-  }
-  return fallback;
-};
-var normalizePayloadEncryptionMode = (value, fallback = PAYLOAD_ENCRYPTION_MODES2.NONE) => {
-  const raw = isObj4(value) ? value.mode : value;
-  const normalized = toStr13(raw).trim().toLowerCase().replace(/-/g, "_");
-  if (!normalized) return fallback;
-  if (normalized === "none" || normalized === "plain" || normalized === "plaintext") {
-    return PAYLOAD_ENCRYPTION_MODES2.NONE;
-  }
-  if (normalized === "worker_envelope" || normalized === "cloudflare_envelope") {
-    return PAYLOAD_ENCRYPTION_MODES2.WORKER_ENVELOPE;
-  }
-  if (normalized === "lit" || normalized === PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED) {
-    return PAYLOAD_ENCRYPTION_MODES2.LIT;
-  }
-  return fallback;
-};
-var deriveLegacyPayloadAccessMode = ({ gate, encryption }) => {
-  if (encryption === PAYLOAD_ENCRYPTION_MODES2.LIT) return PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED;
-  if (gate === PAYLOAD_ACCESS_GATES2.NONE) return PAYLOAD_ACCESS_MODES2.PUBLIC_READ;
-  return PAYLOAD_ACCESS_MODES2.WORKER_SBT_GATE;
-};
-var cloneAccessConditions = (source) => {
-  const conditions = isObj4(source?.accessConditions) ? source.accessConditions : isObj4(source?.conditions) ? source.conditions : null;
-  return conditions ? JSON.parse(JSON.stringify(conditions)) : null;
-};
-var normalizePayloadAccessControl = (raw) => {
-  const rawRecord = isObj4(raw) ? raw : {};
-  const rawAccess = isObj4(rawRecord.payloadAccessControl) ? rawRecord.payloadAccessControl : {};
-  const rawCloudflare = isObj4(rawRecord.cloudflare) ? rawRecord.cloudflare : {};
-  const legacyMode = normalizePayloadAccessMode(
-    rawAccess.mode || rawCloudflare.payloadAccessMode || rawRecord.payloadAccessMode || rawRecord.accessControlMode
-  );
-  const fallbackGate = legacyMode === PAYLOAD_ACCESS_MODES2.PUBLIC_READ || legacyMode === PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED ? PAYLOAD_ACCESS_GATES2.NONE : PAYLOAD_ACCESS_GATES2.SBT_GATE;
-  const fallbackEncryption = legacyMode === PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED ? PAYLOAD_ENCRYPTION_MODES2.LIT : PAYLOAD_ENCRYPTION_MODES2.NONE;
-  const directV2 = Object.prototype.hasOwnProperty.call(rawRecord, "gate") || Object.prototype.hasOwnProperty.call(rawRecord, "encryption");
-  const source = directV2 ? rawRecord : rawAccess;
-  const gate = normalizePayloadAccessGate(isObj4(source) ? source.gate : void 0, fallbackGate);
-  const encryption = normalizePayloadEncryptionMode(isObj4(source) ? source.encryption : void 0, fallbackEncryption);
-  const accessConditions = cloneAccessConditions(source);
-  return {
-    gate,
-    encryption,
-    mode: deriveLegacyPayloadAccessMode({ gate, encryption }),
-    ...accessConditions ? { accessConditions } : {}
-  };
-};
-var normalizeStorageProfileInput = (incoming) => {
-  if (incoming == null) return null;
-  if (isObj4(incoming)) return incoming;
-  const trimmed = toStr13(incoming).trim();
-  return trimmed ? { backend: trimmed } : null;
-};
-var normalizeDeployStorageProfile = (incoming) => {
-  const raw = normalizeStorageProfileInput(incoming);
-  if (!raw) return null;
-  const backend = normalizeStorageBackend(raw.backend || raw.profile || raw.storageProfile);
-  const rawResources = isObj4(raw.resources) ? raw.resources : {};
-  const defaultCanonicalStage = backend === STORAGE_BACKENDS.CLOUDFLARE ? STORAGE_RESOURCE_STAGES.ACTIVE : STORAGE_RESOURCE_STAGES.STAGED;
-  const docsContext = normalizeResourceStage(rawResources.docsContext || raw.docsContext, STORAGE_RESOURCE_STAGES.ACTIVE);
-  const profile = {
-    type: "session_storage_profile",
-    version: "session-storage-profile-v1",
-    backend,
-    sessionOwned: true,
-    telegramOwned: false,
-    resources: {
-      ...DEFAULT_STORAGE_RESOURCES,
-      docsContext,
-      questions: normalizeResourceStage(rawResources.questions || raw.questions, defaultCanonicalStage),
-      surveys: normalizeResourceStage(rawResources.surveys || raw.surveys, defaultCanonicalStage),
-      responses: normalizeResourceStage(rawResources.responses || raw.responses, defaultCanonicalStage),
-      generatedArtifacts: normalizeResourceStage(
-        rawResources.generatedArtifacts || raw.generatedArtifacts,
-        defaultCanonicalStage
-      ),
-      media: normalizeResourceStage(rawResources.media || raw.media, defaultCanonicalStage),
-      images: normalizeResourceStage(rawResources.images || raw.images, defaultCanonicalStage)
-    },
-    sbtGatedAccess: {
-      uploads: "session_worker_gate",
-      snippets: "session_worker_gate",
-      shortLivedReads: "session_worker_gate",
-      downloads: "session_worker_gate",
-      litRequired: "payload_encrypted_only"
-    },
-    cloudflare: null
-  };
-  if (backend !== STORAGE_BACKENDS.CLOUDFLARE) return profile;
-  const accessControl = normalizePayloadAccessControl(raw);
-  const accessMode = accessControl.mode;
-  const litEncrypted = accessMode === PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED;
-  const workerEnvelope = accessControl.encryption === PAYLOAD_ENCRYPTION_MODES2.WORKER_ENVELOPE;
-  const publicRead = accessMode === PAYLOAD_ACCESS_MODES2.PUBLIC_READ;
-  profile.payloadAccessControl = {
-    gate: accessControl.gate,
-    encryption: accessControl.encryption,
-    mode: accessMode,
-    enforcement: litEncrypted ? "lit_access_control_conditions" : workerEnvelope ? "session_worker_envelope_conditions" : publicRead ? "session_worker_public_read" : "session_worker_sbt_gate",
-    litRequired: litEncrypted,
-    label: litEncrypted ? "Lit-encrypted Cloudflare payloads" : workerEnvelope ? "Worker-envelope encrypted Cloudflare payloads" : publicRead ? "Public-read Cloudflare payloads" : "Worker-enforced SBT access control",
-    resources: {
-      ...DEFAULT_PAYLOAD_ACCESS_RESOURCES,
-      ...isObj4(raw.payloadAccessControl?.resources) ? raw.payloadAccessControl.resources : {}
-    },
-    ...accessControl.accessConditions ? { accessConditions: accessControl.accessConditions } : {}
-  };
-  profile.sbtGatedAccess = {
-    ...profile.sbtGatedAccess,
-    litRequired: litEncrypted ? "required_for_cloudflare_payload_encryption" : publicRead ? "not_required_public_read" : "not_required_worker_enforced"
-  };
-  profile.cloudflare = {
-    primitives: DEFAULT_CLOUDFLARE_PRIMITIVES,
-    payloadAccessMode: accessMode,
-    credentialSource: "worker_secret_or_cloudflare_binding",
-    exposesAccountId: false,
-    exposesBucketName: false,
-    exposesWorkerToken: false,
-    exposesRawStoragePath: false,
-    exposesLongLivedUrl: false
-  };
-  return profile;
-};
-var firstTrimmed = (...values) => {
-  for (const value of values) {
-    const trimmed = toStr13(value).trim();
-    if (trimmed) return trimmed;
-  }
-  return "";
-};
-var resolveRequestedR2BucketName = (incoming) => {
-  const raw = normalizeStorageProfileInput(incoming);
-  if (!raw) return "";
-  const cloudflare = isObj4(raw.cloudflare) ? raw.cloudflare : {};
-  const r2 = isObj4(cloudflare.r2) ? cloudflare.r2 : {};
-  return firstTrimmed(
-    raw.r2BucketName,
-    raw.r2Bucket,
-    raw.bucketName,
-    raw.bucket,
-    cloudflare.r2BucketName,
-    cloudflare.r2Bucket,
-    cloudflare.bucketName,
-    cloudflare.bucket,
-    r2.bucketName,
-    r2.bucket
-  );
-};
-var truthyR2Marker = (value) => {
-  if (value === true) return true;
-  const normalized = toStr13(value).trim().toLowerCase();
-  return normalized === "r2" || TRUE_STRINGS.has(normalized);
-};
-var hasExplicitR2Request = (incoming, bucketName = "") => {
-  if (bucketName) return true;
-  const raw = normalizeStorageProfileInput(incoming);
-  if (!raw) return false;
-  const cloudflare = isObj4(raw.cloudflare) ? raw.cloudflare : {};
-  return truthyR2Marker(raw.useR2) || truthyR2Marker(raw.payloadStorage) || truthyR2Marker(raw.storageLayer) || truthyR2Marker(cloudflare.useR2) || truthyR2Marker(cloudflare.payloadStorage) || truthyR2Marker(cloudflare.storageLayer) || truthyR2Marker(cloudflare.r2);
-};
-var resolveDeployStorageBindingPlan = (incoming, storageProfile) => {
-  if (!storageProfile || storageProfile.backend !== STORAGE_BACKENDS.CLOUDFLARE) {
-    return { ok: true, r2BucketName: "", requiresStorageIndexKv: false };
-  }
-  const r2BucketName = resolveRequestedR2BucketName(incoming);
-  if (r2BucketName && (!R2_BUCKET_NAME_RE.test(r2BucketName) || r2BucketName.includes("..") || r2BucketName.includes("-.") || r2BucketName.includes(".-"))) {
-    return {
-      ok: false,
-      error: "Invalid Cloudflare R2 bucket name. Use the existing bucket name without URLs, paths, or credentials."
-    };
-  }
-  if (hasExplicitR2Request(incoming, r2BucketName) && !r2BucketName) {
-    return {
-      ok: false,
-      error: "Cloudflare R2 storage requires r2BucketName when R2 is explicitly requested."
-    };
-  }
-  return {
-    ok: true,
-    r2BucketName,
-    requiresStorageIndexKv: true
-  };
-};
-var normalizeEmbeddedDeployHelperEnabled = (value, fallback = DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED) => {
-  if (typeof value === "boolean") return value;
-  const trimmed = toStr13(value).trim().toLowerCase();
-  if (!trimmed) return fallback;
-  if (TRUE_STRINGS.has(trimmed)) return true;
-  if (FALSE_STRINGS.has(trimmed)) return false;
-  return fallback;
-};
-var buildFailure = (status, body, { fallbackEligible = false } = {}) => ({
-  ok: false,
-  status,
-  body,
-  fallbackEligible
-});
-var buildSuccess = (status, body) => ({
-  ok: true,
-  status,
-  body,
-  fallbackEligible: false
-});
-var shouldAllowFallbackForCloudflareFailure = (result = {}) => {
-  const status = Number(result?.status || 0);
-  if (!status) return true;
-  return status >= 500 || status === 429;
-};
-var isAmbiguousCloudflareMutationFailure = (result = {}) => {
-  const status = Number(result?.status || 0);
-  return !status || status >= 500 || [408, 409, 412, 425, 429, 499].includes(status);
-};
-var isDefinitiveWorkerUploadRejection = (result = {}) => {
-  const status = Number(result?.status || 0);
-  if (status < 400 || status >= 500) return false;
-  return !(/* @__PURE__ */ new Set([408, 409, 412, 425, 429, 499])).has(status);
-};
-var ensureWorkersDevAccountSubdomain = async ({
-  apiToken,
-  accountId,
-  requestedSubdomain = "",
-  fetchImpl = globalThis.fetch,
-  apiBaseUrl = "",
-  env = null
-} = {}) => {
-  let subdomain = null;
-  let subdomainStatus = "";
-  let subdomainEnabled = false;
-  let subdomainError = "";
-  const activationFailures = [];
-  const fallbackSubdomain = accountId ? `ce-${toStr13(accountId).replace(/[^a-z0-9-]/gi, "").slice(0, 10)}` : "";
-  const cfFetchOptions = { fetchImpl, apiBaseUrl, env };
-  const subdomainResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/subdomain`, {}, cfFetchOptions);
-  if (subdomainResp.ok) {
-    subdomain = subdomainResp.data?.result?.subdomain || null;
-    subdomainStatus = subdomainResp.data?.result?.status || "";
-  } else {
-    activationFailures.push(subdomainResp);
-    subdomainError = subdomainResp.error || subdomainError;
-  }
-  const ensureAccountSubdomain = async (candidate) => {
-    if (!candidate) return;
-    const enableResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/subdomain`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subdomain: candidate })
-    }, cfFetchOptions);
-    if (enableResp.ok) {
-      subdomain = enableResp.data?.result?.subdomain || candidate;
-      subdomainStatus = enableResp.data?.result?.status || subdomainStatus || "active";
-      subdomainEnabled = true;
-      subdomainError = "";
-    } else {
-      activationFailures.push(enableResp);
-      subdomainError = enableResp.error || "Failed to enable workers.dev subdomain.";
-    }
-  };
-  if (!subdomain) {
-    await ensureAccountSubdomain(toStr13(requestedSubdomain).trim() || fallbackSubdomain);
-  } else if (subdomainStatus && subdomainStatus !== "active") {
-    await ensureAccountSubdomain(subdomain);
-  }
-  const fallbackEligible = !subdomain && activationFailures.length > 0 && activationFailures.every((failure2) => shouldAllowFallbackForCloudflareFailure(failure2));
-  return {
-    subdomain,
-    subdomainStatus,
-    subdomainEnabled,
-    subdomainError,
-    fallbackEligible
-  };
-};
-var ensureWorkersDevSubdomain = async ({
-  apiToken,
-  accountId,
-  workerName,
-  requestedSubdomain = "",
-  knownAccountSubdomain = null,
-  fetchImpl = globalThis.fetch,
-  apiBaseUrl = "",
-  env = null
-} = {}) => {
-  const cfFetchOptions = { fetchImpl, apiBaseUrl, env };
-  const accountSubdomain = knownAccountSubdomain || await ensureWorkersDevAccountSubdomain({
-    apiToken,
-    accountId,
-    requestedSubdomain,
-    fetchImpl,
-    apiBaseUrl,
-    env
-  });
-  const {
-    subdomain = null,
-    subdomainStatus = "",
-    subdomainEnabled = false,
-    subdomainError = ""
-  } = accountSubdomain;
-  let scriptSubdomainEnabled = false;
-  let scriptSubdomainError = "";
-  const activationFailures = [];
-  if (!subdomain && accountSubdomain?.fallbackEligible) activationFailures.push({ status: 503 });
-  if (subdomain) {
-    const scriptSubdomainResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/subdomain`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ enabled: true })
-    }, cfFetchOptions);
-    if (scriptSubdomainResp.ok) {
-      scriptSubdomainEnabled = scriptSubdomainResp.data?.result?.enabled === true;
-      if (!scriptSubdomainEnabled) {
-        activationFailures.push({ status: 503 });
-        scriptSubdomainError = "Cloudflare did not enable workers.dev for this Worker.";
-      }
-    } else {
-      activationFailures.push(scriptSubdomainResp);
-      scriptSubdomainError = scriptSubdomainResp.error || "Failed to enable workers.dev for script.";
-    }
-  }
-  const workerUrl = subdomain && scriptSubdomainEnabled ? `https://${workerName}.${subdomain}.workers.dev/` : "";
-  const fallbackEligible = !workerUrl && activationFailures.length > 0 && activationFailures.every((failure2) => shouldAllowFallbackForCloudflareFailure(failure2));
-  return {
-    subdomain,
-    subdomainStatus,
-    subdomainEnabled,
-    subdomainError,
-    scriptSubdomainEnabled,
-    scriptSubdomainError,
-    workerUrl,
-    fallbackEligible
-  };
-};
-var resolveDeploymentAccountId = async ({
-  body,
-  fetchImpl,
-  apiBaseUrl = "",
-  env = null
-} = {}) => {
-  const lookup = await lookupCloudflareAccount({
-    apiToken: toStr13(body?.apiToken || body?.token).trim(),
-    fetchImpl,
-    apiBaseUrl,
-    env
-  });
-  if (!lookup.ok) {
-    return lookup;
-  }
-  return lookup;
-};
-var executeDeployHelperRequestCore = async ({
-  body,
-  env,
-  requestOrigin = "",
-  fetchImpl = globalThis.fetch,
-  consoleImpl = console,
-  idempotencyContext = null,
-  resolvedAccountId = ""
-} = {}) => {
-  const sessionSlugCheck = validateInboundSlug(body?.sessionSlug);
-  if (!sessionSlugCheck.ok) {
-    return buildFailure(400, { error: sessionSlugCheck.error });
-  }
-  if (body?.groupSlug != null && body?.sessionSlug == null) {
-    return buildFailure(400, {
-      error: "Legacy groupSlug is no longer accepted. Use sessionSlug instead."
-    });
-  }
-  const apiToken = toStr13(body?.apiToken || body?.token).trim();
-  const apiBaseUrl = resolveCloudflareApiBaseUrl({ env });
-  const cfFetchOptions = { fetchImpl, apiBaseUrl };
-  if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
-    if (!apiToken) return buildFailure(400, { error: "Missing apiToken." });
-    const accountLookup2 = toStr13(resolvedAccountId).trim() ? { ok: true, accountId: toStr13(resolvedAccountId).trim() } : await resolveDeploymentAccountId({ body, fetchImpl, apiBaseUrl, env });
-    if (!accountLookup2.ok) {
-      const lookupStatus = Number(accountLookup2.status || 0);
-      return buildFailure(lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502, {
-        error: accountLookup2.error || "Failed to resolve Cloudflare account.",
-        detail: accountLookup2.detail
-      }, { fallbackEligible: accountLookup2.fallbackEligible === true });
-    }
-    return executeAgentSessionWrappedDeployment({
-      body,
-      env,
-      accountId: toStr13(accountLookup2.accountId).trim(),
-      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
-      fetchImpl,
-      markMutationStarted: idempotencyContext?.markMutationStarted
-    });
-  }
-  const requestedWorkerName = toStr13(body?.workerName).trim();
-  const defaultSlugInput = env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG ?? "";
-  const defaultSlugCheck = validateInboundSlug(defaultSlugInput);
-  if (body?.sessionSlug == null && !defaultSlugCheck.ok) {
-    return buildFailure(400, { error: defaultSlugCheck.error });
-  }
-  const defaultSlug = defaultSlugCheck.slug;
-  const sessionSlug = body?.sessionSlug != null ? sessionSlugCheck.slug : defaultSlug;
-  const displaySlug = sessionSlug || "general";
-  const bundleText = typeof body?.bundleText === "string" ? body.bundleText : toStr13(body?.bundleText);
-  const hasBundleText = bundleText.trim() !== "";
-  const bundleUrl = toStr13(body?.bundleUrl || env?.WORKER_BUNDLE_URL).trim();
-  const expectedInlineBundleSha256 = hasBundleText ? await sha256Hex2(bundleText) : "";
-  const suppliedBundleSha256 = toStr13(body?.bundleSha256).trim();
-  let expectedBundleSha256 = normalizeWorkerBundleSha256(suppliedBundleSha256);
-  let bundleSource = hasBundleText ? bundleText : "";
-  const bundleSourceKind = hasBundleText ? "bundleText" : "bundleUrl";
-  let bundleDiagnostics = null;
-  if (!apiToken) return buildFailure(400, { error: "Missing apiToken." });
-  if (!requestedWorkerName) return buildFailure(400, { error: "Missing workerName." });
-  if (suppliedBundleSha256 && !expectedBundleSha256) {
-    return buildFailure(400, { error: "bundleSha256 must be a complete SHA-256 hex digest." });
-  }
-  if (!hasBundleText && !bundleUrl) {
-    return buildFailure(400, {
-      error: "Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl)."
-    });
-  }
-  const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
-  const modeValidation = validateDeploymentModeValues(body);
-  if (!modeValidation.ok) {
-    return buildFailure(400, { error: `Invalid deployment mode at ${modeValidation.path}.` });
-  }
-  const storageProfile = normalizeDeployStorageProfile(rawStorageProfile);
-  const storageBindingPlan = resolveDeployStorageBindingPlan(rawStorageProfile, storageProfile);
-  if (!storageBindingPlan.ok) {
-    return buildFailure(400, { error: storageBindingPlan.error });
-  }
-  if (!hasBundleText && toStr13(body?.bundleManifestUrl).trim()) {
-    const manifestDigest = await fetchExpectedWorkerBundleDigest({
-      manifestUrl: toStr13(body.bundleManifestUrl).trim(),
-      artifactFile: "sessionCorsWorker.bundle.js",
-      artifactKind: "session-cors-worker",
-      fetchImpl
-    });
-    if (!manifestDigest.ok) {
-      return buildFailure(502, { error: manifestDigest.error });
-    }
-    if (expectedBundleSha256 && expectedBundleSha256 !== manifestDigest.digest) {
-      return buildFailure(409, { error: "Worker release manifest digest conflicts with bundleSha256." });
-    }
-    expectedBundleSha256 = manifestDigest.digest;
-  }
-  if (expectedBundleSha256 && !bundleSource) {
-    let bundleResponse;
-    try {
-      bundleResponse = await fetchImpl(bundleUrl);
-    } catch (error) {
-      return buildFailure(502, {
-        error: `Failed to fetch bundle: ${toStr13(error?.message || error).trim() || "Unknown error."}`
-      }, { fallbackEligible: true });
-    }
-    if (!bundleResponse.ok) {
-      return buildFailure(502, { error: `Failed to fetch bundle (${bundleResponse.status}).` }, {
-        fallbackEligible: bundleResponse.status >= 500 || bundleResponse.status === 429
-      });
-    }
-    bundleSource = await bundleResponse.text();
-    bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
-  }
-  if (expectedBundleSha256 && (bundleDiagnostics?.sha256 || expectedInlineBundleSha256) !== expectedBundleSha256) {
-    return buildFailure(409, {
-      error: "Worker bundle SHA-256 does not match the verified release manifest."
-    });
-  }
-  const accountLookup = toStr13(resolvedAccountId).trim() ? { ok: true, accountId: toStr13(resolvedAccountId).trim() } : await resolveDeploymentAccountId({
-    body: {
-      ...body,
-      apiToken
-    },
-    fetchImpl,
-    apiBaseUrl,
-    env
-  });
-  if (!accountLookup.ok) {
-    const lookupStatus = Number(accountLookup.status || 0);
-    const responseStatus = lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502;
-    return buildFailure(responseStatus, {
-      error: accountLookup.error || "Failed to resolve Cloudflare account.",
-      detail: accountLookup.detail
-    }, {
-      fallbackEligible: accountLookup.fallbackEligible === true
-    });
-  }
-  const accountId = toStr13(accountLookup.accountId).trim();
-  if (!accountId) {
-    return buildFailure(404, { error: "No accounts found for token." });
-  }
-  const registryAddress = toStr13(body?.registryAddress).trim();
-  const registryChainId = Number(body?.registryChainId || 0) || 0;
-  const hatsAddress = toStr13(body?.hatsAddress).trim();
-  const adminHatId = toStr13(body?.adminHatId).trim();
-  const adminAddress = toStr13(body?.adminAddress).trim();
-  const workerCanonicalRequested = toStr13(body?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === "worker_canonical";
-  const groupCreationPolicy = body?.groupCreationPolicy == null ? "admin_only" : toStr13(body.groupCreationPolicy).trim().toLowerCase();
-  if (!["admin_only", "participants"].includes(groupCreationPolicy)) {
-    return buildFailure(400, {
-      error: 'groupCreationPolicy must be "admin_only" or "participants".'
-    });
-  }
-  if (workerCanonicalRequested && !/^0x[0-9a-f]{40}$/i.test(adminAddress)) {
-    return buildFailure(400, { error: "A valid adminAddress is required for worker-canonical deploys." });
-  }
-  const workerCanonicalAuthority = workerCanonicalRequested ? resolveWorkerCanonicalAuthorityForDeploy(body?.workerAuthority) : { ok: true, value: null };
-  if (!workerCanonicalAuthority.ok) {
-    return buildFailure(400, { error: workerCanonicalAuthority.error });
-  }
-  const deploymentId = toStr13(idempotencyContext?.deploymentId).trim() || randomSecret2();
-  const workerName = toStr13(idempotencyContext?.workerName).trim() || buildFreshDeploymentName(requestedWorkerName, deploymentId);
-  const buildDeploymentFailure = (status, payload, options) => buildFailure(status, {
-    ...payload,
-    // This is the non-secret marker embedded in CE_DEPLOYMENT_ID. Preserve it
-    // on partial-deploy failures so a caller can verify ownership before
-    // retrying cleanup of any reported orphan resources.
-    ...Object.hasOwn(payload || {}, "orphanResources") ? { accountId, deploymentId } : {}
-  }, options);
-  const workerNamePreflight = await cfFetch(
-    apiToken,
-    `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
-    { method: "GET" },
-    cfFetchOptions
-  );
-  const workerNameConfirmedAbsent = !workerNamePreflight.ok && Number(workerNamePreflight.status || 0) === 404;
-  const mayResumeExistingWorker = workerNamePreflight.ok && !!toStr13(idempotencyContext?.requestMarker).trim();
-  if (!workerNamePreflight.ok && !workerNameConfirmedAbsent) {
-    return buildFailure(502, {
-      error: workerNamePreflight.error || "Failed to determine whether the worker already exists.",
-      detail: workerNamePreflight.detail
-    }, {
-      fallbackEligible: shouldAllowFallbackForCloudflareFailure(workerNamePreflight)
-    });
-  }
-  if (workerNamePreflight.ok && !mayResumeExistingWorker) {
-    return buildFailure(409, {
-      error: `Generated worker name "${workerName}" already exists. In-place redeploy is disabled to protect existing worker state. Retry to allocate a new physical worker name.`
-    });
-  }
-  const accountSubdomain = await ensureWorkersDevAccountSubdomain({
-    apiToken,
-    accountId,
-    requestedSubdomain: toStr13(body?.subdomain || body?.workersSubdomain).trim(),
-    fetchImpl,
-    apiBaseUrl,
-    env
-  });
-  if (!accountSubdomain.subdomain) {
-    return buildFailure(502, {
-      error: accountSubdomain.subdomainError || "Cloudflare did not return a workers.dev account subdomain."
-    }, {
-      fallbackEligible: accountSubdomain.fallbackEligible
-    });
-  }
-  const anticipatedWorkerUrl = `https://${workerName}.${accountSubdomain.subdomain}.workers.dev/`;
-  const rpcUrl = toStr13(body?.rpcUrl).trim();
-  const rpcUrlsByChainId = body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === "object" ? body.rpcUrlsByChainId : {};
-  const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
-  const allowOrigins = normalizeAllowList(
-    allowOriginsInput.length ? allowOriginsInput : [requestOrigin]
-  );
-  const limits = sanitizeWorkerConfigOpenSubtree(body?.limits || {});
-  const scopes = sanitizeWorkerConfigOpenSubtree(body?.scopes || {});
-  const faucetInput = body?.faucet && typeof body.faucet === "object" ? body.faucet : {};
-  const faucet2 = {
-    rpcUrl: toStr13(faucetInput.rpcUrl).trim() || DEFAULT_FAUCET_RPC_URL,
-    amountEth: toStr13(faucetInput.amountEth).trim() || DEFAULT_FAUCET_AMOUNT_ETH,
-    balanceThresholdEth: toStr13(faucetInput.balanceThresholdEth).trim() || DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH
-  };
-  const embeddedDeployHelperEnabled = normalizeEmbeddedDeployHelperEnabled(
-    body?.embeddedDeployHelperEnabled ?? body?.deployHelperEnabled,
-    true
-  );
-  const prepareBundleDiagnostics = async () => {
-    if (bundleDiagnostics) return { ok: true };
-    if (!bundleSource) {
-      let bundleResp;
-      try {
-        bundleResp = await fetchImpl(bundleUrl);
-      } catch (err) {
-        return {
-          ok: false,
-          result: buildFailure(502, {
-            error: `Failed to fetch bundle: ${toStr13(err?.message || err).trim() || "Unknown error."}`
-          }, { fallbackEligible: true })
-        };
-      }
-      if (!bundleResp.ok) {
-        return {
-          ok: false,
-          result: buildFailure(502, {
-            error: `Failed to fetch bundle (${bundleResp.status}).`
-          }, {
-            fallbackEligible: bundleResp.status >= 500 || bundleResp.status === 429
-          })
-        };
-      }
-      bundleSource = await bundleResp.text();
-    }
-    bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
-    if (expectedBundleSha256 && bundleDiagnostics.sha256 !== expectedBundleSha256) {
-      return {
-        ok: false,
-        result: buildFailure(409, {
-          error: "Worker bundle SHA-256 does not match the verified release manifest."
-        })
-      };
-    }
-    consoleImpl?.log?.("[deploy-helper] bundle diagnostics", JSON.stringify({
-      workerName,
-      sessionSlug: displaySlug,
-      diagnostics: {
-        ...bundleDiagnostics,
-        prefix: bundleDiagnostics.prefix,
-        suffix: bundleDiagnostics.suffix
-      }
-    }));
-    return { ok: true };
-  };
-  const config = {
-    slug: sessionSlug,
-    authzEpoch: 1,
-    workerGroupsBootstrap: {
-      version: 2,
-      state: "fresh_empty",
-      bootstrapId: deploymentId
-    },
-    adminAddress,
-    allowOrigins,
-    limits,
-    scopes,
-    corsWorkerUrl: anticipatedWorkerUrl,
-    embeddedDeployHelperEnabled,
-    ...!workerCanonicalRequested ? {
-      registryAddress,
-      registryChainId,
-      hatsAddress,
-      adminHatId,
-      rpcUrl,
-      rpcUrlsByChainId,
-      faucet: faucet2
-    } : {},
-    ...selectDeployWorkerSessionConfigFields(body),
-    groupCreationPolicy
-  };
-  if (workerCanonicalRequested) {
-    config.workerAuthority = workerCanonicalAuthority.value;
-  }
-  if (storageProfile) {
-    config.storageProfile = storageProfile;
-  }
-  const blockLimits = sanitizeBlockLimits(body?.blockLimits);
-  if (blockLimits && !workerCanonicalRequested) {
-    config.blockLimits = blockLimits;
-  }
-  if (findForbiddenCloudflareDeploymentTokenPath(config)) {
-    return buildFailure(400, { error: "Cloudflare deployment tokens are not allowed in session config." });
-  }
-  if (findForbiddenWorkerConfigSecretPath(config)) {
-    return buildFailure(400, { error: "Secret-like values are not allowed in public session config fields." });
-  }
-  const sessionConfigKey = `session:${sessionSlug}:config`;
-  const sessionSecretsKey = `session:${sessionSlug}:secrets`;
-  const secrets = sanitizeSecrets(body?.secrets || {});
-  const envelopeKekSecretRequired = true;
-  const candidateEnvelopeKekSecret = randomSecret2();
-  const secretsEnvelope = await buildEncryptedSessionSecretsEnvelope(secrets, {
-    env: { [STORAGE_ENVELOPE_KEK_SECRET_NAME]: candidateEnvelopeKekSecret },
-    slug: sessionSlug || displaySlug
-  });
-  const requestMarker = toStr13(idempotencyContext?.requestMarker).trim();
-  const kvTitleSuffix = requestMarker ? `:req-${requestMarker}` : "";
-  const kvTitlePrefix = `ContextEngineSessionCorsWorker:${displaySlug}`.slice(0, KV_NAMESPACE_TITLE_MAX_LENGTH - kvTitleSuffix.length);
-  const kvNamespaceTitle = `${kvTitlePrefix}${kvTitleSuffix}`;
-  const findRequestMarkedKvNamespaces = async () => {
-    const matches = [];
-    let page = 1;
-    let totalPages = 1;
-    do {
-      const listResult = await cfFetch(
-        apiToken,
-        `/accounts/${accountId}/storage/kv/namespaces?per_page=100&page=${page}`,
-        { method: "GET" },
-        cfFetchOptions
-      );
-      if (!listResult.ok) return { ok: false, result: listResult, matches: [] };
-      const namespaces = Array.isArray(listResult.data?.result) ? listResult.data.result : [];
-      matches.push(...namespaces.filter((namespace) => toStr13(namespace?.title).trim() === kvNamespaceTitle && toStr13(namespace?.id).trim()));
-      const reportedTotalPages = Number(listResult.data?.result_info?.total_pages || 1) || 1;
-      if (reportedTotalPages > 1e3) {
-        return {
-          ok: false,
-          result: { error: "KV namespace inventory is too large to reconcile safely.", status: 409 },
-          matches: []
-        };
-      }
-      totalPages = Math.max(1, reportedTotalPages);
-      page += 1;
-    } while (page <= totalPages);
-    return { ok: true, matches };
-  };
-  const workerSettingsMatchDeployment = (settingsResult, namespaceId, { ignoreBundleIdentity = false } = {}) => {
-    if (!settingsResult?.ok || !namespaceId) return false;
-    const settings = settingsResult.data?.result || {};
-    const bindings = Array.isArray(settings?.bindings) ? settings.bindings : [];
-    const named = (name) => bindings.filter((binding) => toStr13(binding?.name).trim() === name);
-    const hasExactPlainText = (name, expected, { caseInsensitive = false } = {}) => {
-      const matches = named(name);
-      if (matches.length !== 1 || toStr13(matches[0]?.type).trim() !== "plain_text") return false;
-      const actual = toStr13(matches[0]?.text).trim();
-      return caseInsensitive ? actual.toLowerCase() === expected.toLowerCase() : actual === expected;
-    };
-    const hasExactKv = (name, expectedNamespaceId) => {
-      const matches = named(name);
-      return matches.length === 1 && toStr13(matches[0]?.type).trim() === "kv_namespace" && toStr13(matches[0]?.namespace_id).trim() === expectedNamespaceId;
-    };
-    const hasExactR2 = (name, expectedBucketName) => {
-      const matches = named(name);
-      return matches.length === 1 && toStr13(matches[0]?.type).trim() === "r2_bucket" && toStr13(matches[0]?.bucket_name).trim() === expectedBucketName;
-    };
-    const hasExactDurableObject = (name, expectedClassName) => {
-      const matches = named(name);
-      return matches.length === 1 && toStr13(matches[0]?.type).trim() === "durable_object_namespace" && toStr13(matches[0]?.class_name).trim() === expectedClassName;
-    };
-    const observedMainModule = toStr13(settings?.main_module).trim();
-    const moduleIdentityMatches = !observedMainModule || observedMainModule === "worker.mjs";
-    const storageIndexMatches = storageBindingPlan.requiresStorageIndexKv ? hasExactKv("CE_STORAGE_INDEX_KV", namespaceId) : named("CE_STORAGE_INDEX_KV").length === 0;
-    const r2Matches = storageBindingPlan.r2BucketName ? hasExactR2("CE_STORAGE_R2", storageBindingPlan.r2BucketName) : named("CE_STORAGE_R2").length === 0;
-    const adminMatches = adminAddress ? hasExactPlainText("BOOTSTRAP_ADMIN_ADDRESS", adminAddress, { caseInsensitive: true }) : named("BOOTSTRAP_ADMIN_ADDRESS").length === 0;
-    const bundleIdentityBindings = named(BUNDLE_SHA256_BINDING_NAME);
-    const observedBundleSha256 = bundleIdentityBindings.length === 1 && toStr13(bundleIdentityBindings[0]?.type).trim() === "plain_text" ? toStr13(bundleIdentityBindings[0]?.text).trim().toLowerCase() : "";
-    const expectedBundleSha2562 = bundleDiagnostics?.sha256 || expectedInlineBundleSha256 || toStr13(idempotencyContext?.bundleSha256).trim().toLowerCase();
-    const bundleIdentityMatches = /^[0-9a-f]{64}$/.test(observedBundleSha256) && (ignoreBundleIdentity || !expectedBundleSha2562 || observedBundleSha256 === expectedBundleSha2562);
-    const requestDigestMatches = requestMarker ? hasExactPlainText(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, toStr13(idempotencyContext?.requestDigest).trim()) : named(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME).length === 0;
-    return moduleIdentityMatches && hasExactPlainText(DEPLOYMENT_ID_BINDING_NAME, deploymentId) && requestDigestMatches && bundleIdentityMatches && hasExactDurableObject(SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME) && hasExactKv("GROUP_KV", namespaceId) && storageIndexMatches && r2Matches && adminMatches && hasExactPlainText("DEFAULT_SESSION_SLUG", sessionSlug) && hasExactPlainText("DEPLOY_HELPER_ENABLED", embeddedDeployHelperEnabled ? "1" : "0");
-  };
-  const readWorkerBundleSha256 = (settingsResult) => {
-    const bindings = Array.isArray(settingsResult?.data?.result?.bindings) ? settingsResult.data.result.bindings : [];
-    const matches = bindings.filter((binding) => toStr13(binding?.name).trim() === BUNDLE_SHA256_BINDING_NAME && toStr13(binding?.type).trim() === "plain_text");
-    const value = matches.length === 1 ? toStr13(matches[0]?.text).trim().toLowerCase() : "";
-    return /^[0-9a-f]{64}$/.test(value) ? value : "";
-  };
-  let kvId = "";
-  let resumeUploadedWorker = false;
-  let resumeWorkerSettings = mayResumeExistingWorker ? workerNamePreflight : null;
-  let replaceRejectedWorker = idempotencyContext?.definitiveUploadRejected === true;
-  let createdKvThisInvocation = false;
-  let uploadedWorkerThisInvocation = false;
-  if (requestMarker) {
-    const existingMarkedNamespaces = await findRequestMarkedKvNamespaces();
-    if (!existingMarkedNamespaces.ok) {
-      const reconciliationRetryable = Number(existingMarkedNamespaces.result?.status || 0) === 404 || shouldAllowFallbackForCloudflareFailure(existingMarkedNamespaces.result);
-      return buildFailure(502, {
-        error: existingMarkedNamespaces.result?.error || "Failed to reconcile deployment KV namespace.",
-        detail: existingMarkedNamespaces.result?.detail,
-        ...reconciliationRetryable ? { deploymentRequestPending: true } : {}
-      }, {
-        fallbackEligible: reconciliationRetryable
-      });
-    }
-    if (existingMarkedNamespaces.matches.length > 1) {
-      return buildFailure(409, {
-        error: "Multiple KV namespaces share this deployment request marker; deployment stopped."
-      });
-    }
-    if (mayResumeExistingWorker && existingMarkedNamespaces.matches.length === 0) {
-      return buildFailure(503, {
-        error: "Existing worker is visible before its request-marked KV namespace. Retry the same deployment request.",
-        deploymentRequestPending: true
-      }, {
-        fallbackEligible: true
-      });
-    }
-    if (existingMarkedNamespaces.matches.length === 1) {
-      if (idempotencyContext?.isReplay !== true && !mayResumeExistingWorker) {
-        return buildFailure(409, {
-          error: "A KV namespace already uses this new deployment request marker; deployment stopped.",
-          deploymentRequestPending: true
-        });
-      }
-      kvId = toStr13(existingMarkedNamespaces.matches[0]?.id).trim();
-    }
-  }
-  if (!resumeWorkerSettings && workerNameConfirmedAbsent && idempotencyContext?.isReplay === true && idempotencyContext?.uploadStarted === true && kvId) {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const retrySettings = await cfFetch(
-        apiToken,
-        `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
-        { method: "GET" },
-        cfFetchOptions
-      );
-      if (retrySettings.ok) {
-        resumeWorkerSettings = retrySettings;
-        break;
-      }
-      if (Number(retrySettings.status || 0) !== 404) {
-        return buildFailure(502, {
-          error: retrySettings.error || "Failed to recheck deployment Worker during resume.",
-          detail: retrySettings.detail,
-          deploymentRequestPending: true
-        }, { fallbackEligible: true });
-      }
-    }
-  }
-  if (resumeWorkerSettings) {
-    if (idempotencyContext?.definitiveUploadRejected === true) {
-      const preparedBundle = await prepareBundleDiagnostics();
-      if (!preparedBundle.ok) return preparedBundle.result;
-      if (!workerSettingsMatchDeployment(resumeWorkerSettings, kvId, { ignoreBundleIdentity: true })) {
-        return buildFailure(409, {
-          error: "Existing worker does not match this deployment request; required bindings differ and resume stopped.",
-          deploymentRequestPending: true
-        });
-      }
-      if (readWorkerBundleSha256(resumeWorkerSettings) === bundleDiagnostics.sha256) {
-        resumeUploadedWorker = true;
-      } else {
-        replaceRejectedWorker = true;
-      }
-      idempotencyContext.mutationStarted = true;
-    } else if (!workerSettingsMatchDeployment(resumeWorkerSettings, kvId)) {
-      return buildFailure(409, {
-        error: "Existing worker does not match this deployment request; required bindings differ and resume stopped.",
-        deploymentRequestPending: true
-      });
-    } else {
-      resumeUploadedWorker = true;
-      idempotencyContext.mutationStarted = true;
-    }
-  }
-  if (!resumeUploadedWorker) {
-    const preparedBundle = await prepareBundleDiagnostics();
-    if (!preparedBundle.ok) return preparedBundle.result;
-    if (idempotencyContext?.bundleSha256 && toStr13(idempotencyContext.bundleSha256).trim().toLowerCase() !== bundleDiagnostics.sha256 && idempotencyContext?.definitiveUploadRejected !== true) {
-      return buildFailure(409, {
-        error: "Deployment bundle content changed after this request started; upload was stopped.",
-        deploymentRequestPending: true
-      });
-    }
-  }
-  let kvCreate = null;
-  if (!kvId) {
-    try {
-      await idempotencyContext?.markMutationStarted?.();
-    } catch (error) {
-      return buildFailure(503, {
-        error: `Failed to advance deployment request journal: ${toStr13(error?.message || error).trim() || "Unknown error."}`
-      }, { fallbackEligible: true });
-    }
-    kvCreate = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: kvNamespaceTitle })
-    }, cfFetchOptions);
-    kvId = toStr13(kvCreate.data?.result?.id).trim();
-    createdKvThisInvocation = kvCreate.ok && !!kvId;
-    if (!kvId && requestMarker) {
-      for (let attempt = 0; attempt <= NEW_KV_NAMESPACE_RETRY_DELAYS_MS.length; attempt += 1) {
-        const reconciled = await findRequestMarkedKvNamespaces();
-        if (!reconciled.ok) break;
-        if (reconciled.matches.length > 1) {
-          return buildFailure(409, {
-            error: "Multiple KV namespaces share this deployment request marker; deployment stopped."
-          });
-        }
-        if (reconciled.matches.length === 1) {
-          kvId = toStr13(reconciled.matches[0]?.id).trim();
-          break;
-        }
-        const delayMs = NEW_KV_NAMESPACE_RETRY_DELAYS_MS[attempt];
-        if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
-      }
-    }
-    if (!kvId) {
-      const createStatus = Number(kvCreate?.status || 0);
-      const createMayHaveCommitted = requestMarker && (kvCreate?.ok === true || createStatus === 400 || createStatus === 409 || shouldAllowFallbackForCloudflareFailure(kvCreate));
-      return buildFailure(createMayHaveCommitted ? 503 : 502, {
-        error: kvCreate?.error || "Failed to create or reconcile KV namespace.",
-        detail: kvCreate?.detail,
-        ...createMayHaveCommitted ? { deploymentRequestPending: true } : {}
-      }, {
-        fallbackEligible: kvCreate ? shouldAllowFallbackForCloudflareFailure(kvCreate) : true
-      });
-    }
-  }
-  const cleanupStagedKv = async () => {
-    if (!createdKvThisInvocation) {
-      return { kvNamespaceId: kvId, kvCleanupStatus: "retained-pre-existing" };
-    }
-    const kvCleanup = await cfFetch(
-      apiToken,
-      `/accounts/${accountId}/storage/kv/namespaces/${kvId}`,
-      { method: "DELETE" },
-      cfFetchOptions
-    );
-    return kvCleanup.ok ? { kvNamespaceId: "" } : { kvNamespaceId: kvId, kvCleanupStatus: "delete-failed" };
-  };
-  if (!resumeUploadedWorker && idempotencyContext?.definitiveUploadRejected !== true) {
-    const configPut = await putFreshKvNamespaceValue({
-      apiToken,
-      path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`,
-      options: {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config)
-      },
-      cfFetchOptions
-    });
-    if (!configPut.ok) {
-      const orphanKv = await cleanupStagedKv();
-      return buildDeploymentFailure(502, {
-        error: configPut.error,
-        detail: configPut.detail,
-        orphanResources: { ...orphanKv, workerName: "" }
-      }, {
-        fallbackEligible: shouldAllowFallbackForCloudflareFailure(configPut)
-      });
-    }
-    const secretsEnvelopeBody = JSON.stringify(secretsEnvelope);
-    const secretsPut = await putFreshKvNamespaceValue({
-      apiToken,
-      path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`,
-      options: {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: secretsEnvelopeBody
-      },
-      cfFetchOptions
-    });
-    if (!secretsPut.ok) {
-      const orphanKv = await cleanupStagedKv();
-      return buildDeploymentFailure(502, {
-        error: secretsPut.error,
-        detail: secretsPut.detail,
-        orphanResources: { ...orphanKv, workerName: "" }
-      }, {
-        fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretsPut)
-      });
-    }
-  }
-  const metadata = {
-    main_module: "worker.mjs",
-    bindings: [
-      { name: "GROUP_KV", type: "kv_namespace", namespace_id: kvId },
-      ...storageBindingPlan.requiresStorageIndexKv ? [{ name: "CE_STORAGE_INDEX_KV", type: "kv_namespace", namespace_id: kvId }] : [],
-      ...storageBindingPlan.r2BucketName ? [{ name: "CE_STORAGE_R2", type: "r2_bucket", bucket_name: storageBindingPlan.r2BucketName }] : [],
-      { name: "DEFAULT_SESSION_SLUG", type: "plain_text", text: sessionSlug },
-      ...adminAddress ? [{ name: "BOOTSTRAP_ADMIN_ADDRESS", type: "plain_text", text: adminAddress }] : [],
-      { name: DEPLOYMENT_ID_BINDING_NAME, type: "plain_text", text: deploymentId },
-      ...requestMarker ? [{ name: DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, type: "plain_text", text: idempotencyContext.requestDigest }] : [],
-      { name: BUNDLE_SHA256_BINDING_NAME, type: "plain_text", text: bundleDiagnostics?.sha256 || expectedInlineBundleSha256 },
-      {
-        name: SESSION_COORDINATOR_BINDING_NAME,
-        type: "durable_object_namespace",
-        class_name: SESSION_COORDINATOR_CLASS_NAME
-      },
-      { name: "DEPLOY_HELPER_ENABLED", type: "plain_text", text: embeddedDeployHelperEnabled ? "1" : "0" }
-    ],
-    migrations: {
-      old_tag: "",
-      new_tag: SESSION_COORDINATOR_MIGRATION_TAG,
-      new_sqlite_classes: [SESSION_COORDINATOR_CLASS_NAME]
-    },
-    compatibility_date: toStr13(env?.WORKER_COMPATIBILITY_DATE || DEFAULT_COMPAT_DATE),
-    compatibility_flags: ["nodejs_compat"]
-  };
-  const readWorkerSettingsAfterUpload = async () => {
-    let settingsResp = null;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      settingsResp = await cfFetch(
-        apiToken,
-        `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
-        { method: "GET" },
-        cfFetchOptions
-      );
-      if (settingsResp.ok) break;
-    }
-    return settingsResp;
-  };
-  const cleanupDeploymentResources = async () => {
-    let removableWorkerName = workerName;
-    let workerCleanupStatus = "";
-    const cleanupWorkerIfOwned = async () => {
-      if (!uploadedWorkerThisInvocation) {
-        workerCleanupStatus = "retained-pre-existing";
-        return false;
-      }
-      const settingsResp = await readWorkerSettingsAfterUpload();
-      if (!settingsResp.ok) {
-        workerCleanupStatus = "ownership-unverified";
-        return false;
-      }
-      const deploymentStillOwned = workerSettingsMatchDeployment(settingsResp, kvId);
-      if (!deploymentStillOwned) {
-        workerCleanupStatus = "ownership-changed";
-        return false;
-      }
-      const scriptCleanup = await cfFetch(
-        apiToken,
-        `/accounts/${accountId}/workers/scripts/${workerName}?force=true`,
-        { method: "DELETE" },
-        cfFetchOptions
-      );
-      if (!scriptCleanup.ok) {
-        workerCleanupStatus = isAmbiguousCloudflareMutationFailure(scriptCleanup) ? "owned-delete-failed" : "owned-delete-rejected";
-        return false;
-      }
-      removableWorkerName = "";
-      return true;
-    };
-    const workerConfirmedAbsent = await cleanupWorkerIfOwned();
-    if (!workerConfirmedAbsent) {
-      return {
-        kvNamespaceId: kvId,
-        kvCleanupStatus: "retained-live-worker",
-        workerName: removableWorkerName,
-        ...workerCleanupStatus ? { workerCleanupStatus } : {}
-      };
-    }
-    if (!createdKvThisInvocation) {
-      return {
-        kvNamespaceId: kvId,
-        kvCleanupStatus: "retained-pre-existing",
-        workerName: removableWorkerName,
-        ...workerCleanupStatus ? { workerCleanupStatus } : {}
-      };
-    }
-    const kvCleanup = await cfFetch(
-      apiToken,
-      `/accounts/${accountId}/storage/kv/namespaces/${kvId}`,
-      { method: "DELETE" },
-      cfFetchOptions
-    );
-    return {
-      kvNamespaceId: kvCleanup.ok ? "" : kvId,
-      ...!kvCleanup.ok ? { kvCleanupStatus: "delete-failed" } : {},
-      workerName: removableWorkerName,
-      ...workerCleanupStatus ? { workerCleanupStatus } : {}
-    };
-  };
-  const buildScriptUploadForm = ({ omitMigrations = false } = {}) => {
-    const uploadMetadata = {
-      ...metadata,
-      ...replaceRejectedWorker ? { keep_bindings: ["secret_text"] } : {}
-    };
-    if (omitMigrations) delete uploadMetadata.migrations;
-    const uploadForm = new FormData();
-    uploadForm.append(
-      "metadata",
-      new Blob([JSON.stringify(uploadMetadata)], { type: "application/json" }),
-      "metadata.json"
-    );
-    uploadForm.append(
-      "worker.mjs",
-      new Blob([bundleSource], { type: "application/javascript+module" }),
-      "worker.mjs"
-    );
-    return uploadForm;
-  };
-  const scriptUploadPath = `/accounts/${accountId}/workers/scripts/${workerName}`;
-  if (!resumeUploadedWorker) {
-    const finalWorkerNamePreflight = await cfFetch(
-      apiToken,
-      `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
-      { method: "GET" },
-      cfFetchOptions
-    );
-    if (finalWorkerNamePreflight.ok) {
-      if (requestMarker && idempotencyContext?.definitiveUploadRejected === true) {
-        if (!workerSettingsMatchDeployment(finalWorkerNamePreflight, kvId, { ignoreBundleIdentity: true })) {
-          return buildDeploymentFailure(409, {
-            error: "Existing worker does not match this deployment request; required bindings differ and resume stopped.",
-            deploymentRequestPending: true,
-            orphanResources: {
-              kvNamespaceId: kvId,
-              kvCleanupStatus: "retained-upload-pending",
-              workerName,
-              workerCleanupStatus: "ownership-changed"
-            }
-          });
-        }
-        if (readWorkerBundleSha256(finalWorkerNamePreflight) === bundleDiagnostics.sha256) {
-          resumeUploadedWorker = true;
-        } else {
-          replaceRejectedWorker = true;
-        }
-      } else if (requestMarker) {
-        return buildDeploymentFailure(503, {
-          error: "This deployment request is already advancing in another invocation. Retry the same request ID.",
-          deploymentRequestPending: true,
-          orphanResources: {
-            kvNamespaceId: kvId,
-            kvCleanupStatus: "retained-live-worker",
-            workerName
-          }
-        });
-      } else {
-        const orphanKv = await cleanupStagedKv();
-        return buildDeploymentFailure(409, {
-          error: `Generated worker name "${workerName}" became unavailable during deployment. No script was uploaded; retry to allocate a new physical worker name.`,
-          orphanResources: { ...orphanKv, workerName: "" }
-        });
-      }
-    }
-    if (!finalWorkerNamePreflight.ok && Number(finalWorkerNamePreflight.status || 0) !== 404) {
-      const orphanKv = await cleanupStagedKv();
-      return buildDeploymentFailure(502, {
-        error: finalWorkerNamePreflight.error || "Failed to re-verify worker-name availability.",
-        detail: finalWorkerNamePreflight.detail,
-        orphanResources: { ...orphanKv, workerName: "" }
-      }, {
-        fallbackEligible: shouldAllowFallbackForCloudflareFailure(finalWorkerNamePreflight)
-      });
-    }
-    if (!resumeUploadedWorker) {
-      try {
-        await idempotencyContext?.markUploadStarted?.(bundleDiagnostics?.sha256);
-      } catch (error) {
-        return buildDeploymentFailure(503, {
-          error: `Failed to journal deployment upload identity: ${toStr13(error?.message || error).trim() || "Unknown error."}`,
-          deploymentRequestPending: true,
-          orphanResources: {
-            kvNamespaceId: kvId,
-            kvCleanupStatus: "retained-upload-pending",
-            workerName
-          }
-        }, { fallbackEligible: true });
-      }
-      uploadedWorkerThisInvocation = true;
-      let scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
-        method: "PUT",
-        body: buildScriptUploadForm()
-      }, cfFetchOptions);
-      const migrationPreconditionFailure = Number(scriptUpload.status || 0) === 412 && /migration tag precondition failed/i.test([
-        scriptUpload.error,
-        ...Array.isArray(scriptUpload.detail) ? scriptUpload.detail.map((entry) => toStr13(entry?.message || entry)) : [scriptUpload.detail]
-      ].filter(Boolean).join("\n"));
-      if (migrationPreconditionFailure) {
-        scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
-          method: "PUT",
-          body: buildScriptUploadForm({ omitMigrations: true })
-        }, cfFetchOptions);
-      }
-      if (!scriptUpload.ok) {
-        consoleImpl?.error?.("[deploy-helper] script upload failed", JSON.stringify({
-          workerName,
-          sessionSlug: displaySlug,
-          error: scriptUpload.error,
-          detail: scriptUpload.detail,
-          diagnostics: bundleDiagnostics
-        }));
-        const bundleSummary = formatBundleDiagnostics(bundleDiagnostics);
-        const uploadWasDefinitivelyRejected = isDefinitiveWorkerUploadRejection(scriptUpload);
-        const stableUploadWasDefinitivelyRejected = uploadWasDefinitivelyRejected && !!requestMarker && !!kvId;
-        const stableUploadMayHaveCommitted = !uploadWasDefinitivelyRejected && !!requestMarker && !!kvId;
-        let rejectionJournalError = "";
-        if (stableUploadWasDefinitivelyRejected) {
-          try {
-            await idempotencyContext?.markDefinitiveUploadRejected?.(bundleDiagnostics?.sha256);
-          } catch (error) {
-            rejectionJournalError = toStr13(error?.message || error).trim() || "Unknown error.";
-          }
-        }
-        const orphanResources = stableUploadWasDefinitivelyRejected || stableUploadMayHaveCommitted ? {
-          kvNamespaceId: kvId,
-          kvCleanupStatus: "retained-upload-pending",
-          workerName
-        } : uploadWasDefinitivelyRejected ? { ...await cleanupStagedKv(), workerName: "" } : await cleanupDeploymentResources();
-        return buildDeploymentFailure(rejectionJournalError ? 503 : 502, {
-          error: rejectionJournalError ? `Failed to persist definitive upload rejection: ${rejectionJournalError}` : `${scriptUpload.error} Bundle diagnostics: ${bundleSummary}`,
-          detail: scriptUpload.detail,
-          bundleDiagnostics,
-          orphanResources,
-          ...stableUploadWasDefinitivelyRejected || stableUploadMayHaveCommitted ? { deploymentRequestPending: true } : {}
-        }, {
-          fallbackEligible: rejectionJournalError ? true : shouldAllowFallbackForCloudflareFailure(scriptUpload)
-        });
-      }
-      if (idempotencyContext?.definitiveUploadRejected === true) {
-        resumeUploadedWorker = true;
-      }
-    }
-  }
-  const uploadedWorkerSettings = await readWorkerSettingsAfterUpload();
-  const uploadedWorkerStillOwned = workerSettingsMatchDeployment(uploadedWorkerSettings, kvId);
-  if (!uploadedWorkerStillOwned) {
-    const settingsVisibilityPending = !uploadedWorkerSettings.ok && Number(uploadedWorkerSettings.status || 0) === 404;
-    const orphanResources = await cleanupDeploymentResources();
-    return buildDeploymentFailure(uploadedWorkerSettings.ok ? 409 : 502, {
-      error: uploadedWorkerSettings.ok ? "Worker ownership changed during deployment; runtime activation was stopped." : uploadedWorkerSettings.error || "Failed to verify worker ownership after upload.",
-      detail: uploadedWorkerSettings.detail,
-      orphanResources
-    }, {
-      fallbackEligible: settingsVisibilityPending || !uploadedWorkerSettings.ok && shouldAllowFallbackForCloudflareFailure(uploadedWorkerSettings)
-    });
-  }
-  let resumedSecretBindings = /* @__PURE__ */ new Set();
-  if (resumeUploadedWorker) {
-    const secretList = await cfFetch(
-      apiToken,
-      `/accounts/${accountId}/workers/scripts/${workerName}/secrets`,
-      { method: "GET" },
-      cfFetchOptions
-    );
-    const listedSecrets = secretList?.data?.result;
-    if (!secretList.ok || !Array.isArray(listedSecrets)) {
-      return buildDeploymentFailure(502, {
-        error: secretList.error || "Failed to verify existing Worker secret bindings during recovery.",
-        detail: secretList.detail,
-        deploymentRequestPending: true,
-        orphanResources: {
-          kvNamespaceId: kvId,
-          kvCleanupStatus: "retained-pre-existing",
-          workerName,
-          workerCleanupStatus: "retained-pre-existing"
-        }
-      }, { fallbackEligible: true });
-    }
-    resumedSecretBindings = new Set(listedSecrets.filter((binding) => toStr13(binding?.type).trim() === "secret_text").map((binding) => toStr13(binding?.name).trim()).filter(Boolean));
-  }
-  let envelopeKekSecretSet = false;
-  const tokenSecretPreserved = resumedSecretBindings.has("TOKEN_HMAC_SECRET");
-  const envelopeKekSecretPreserved = envelopeKekSecretRequired && resumedSecretBindings.has(STORAGE_ENVELOPE_KEK_SECRET_NAME);
-  const tokenSecret = tokenSecretPreserved ? "" : randomSecret2();
-  const envelopeKekSecret = envelopeKekSecretRequired && !envelopeKekSecretPreserved ? candidateEnvelopeKekSecret : "";
-  const {
-    subdomain,
-    subdomainStatus,
-    subdomainEnabled,
-    subdomainError,
-    scriptSubdomainEnabled,
-    scriptSubdomainError,
-    workerUrl,
-    fallbackEligible: activationFallbackEligible
-  } = await ensureWorkersDevSubdomain({
-    apiToken,
-    accountId,
-    workerName,
-    requestedSubdomain: toStr13(body?.subdomain || body?.workersSubdomain).trim(),
-    knownAccountSubdomain: accountSubdomain,
-    fetchImpl,
-    apiBaseUrl,
-    env
-  });
-  const deploymentPayload = {
-    ok: true,
-    accountId,
-    workerName,
-    workerUrl,
-    resolvedSlug: displaySlug,
-    kvNamespaceId: kvId,
-    deploymentId,
-    sessionConfigKey,
-    sessionSecretsKey,
-    sessionKvPrefix: "session",
-    writesSessionConfig: true,
-    // A resumed upload preserves the namespace's existing secret envelope.
-    // Mutable retry secrets must be applied by the signed post-deploy sync.
-    writesSessionSecrets: !resumeUploadedWorker,
-    tokenSecretSet: false,
-    tokenSecretPreserved,
-    envelopeKekSecretSet,
-    envelopeKekSecretPreserved,
-    subdomain,
-    subdomainStatus,
-    subdomainEnabled,
-    subdomainError,
-    scriptSubdomainEnabled,
-    scriptSubdomainError
-  };
-  if (!workerUrl) {
-    const orphanResources = await cleanupDeploymentResources();
-    return buildDeploymentFailure(502, {
-      error: subdomainError || scriptSubdomainError || "Cloudflare did not return a shareable worker URL.",
-      orphanResources
-    }, {
-      fallbackEligible: activationFallbackEligible
-    });
-  }
-  if (workerUrl) {
-    const configWithWorkerUrl = {
-      ...config,
-      corsWorkerUrl: workerUrl
-    };
-    const readbackMatches = (result) => {
-      const readbackConfig = result?.data?.result || result?.data || {};
-      return result?.ok && stableCanonicalSerialize(readbackConfig) === stableCanonicalSerialize(configWithWorkerUrl);
-    };
-    const configReadbackPath = `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`;
-    const resumedReadbackHasCompatibleIdentity = (result) => {
-      if (!resumeUploadedWorker || !result?.ok) return false;
-      const readbackConfig = result.data?.result || result.data || {};
-      if (Object.keys(readbackConfig).length === 0) return false;
-      return toStr13(readbackConfig.slug).trim() === toStr13(configWithWorkerUrl.slug).trim() && (!configWithWorkerUrl.sessionId || toStr13(readbackConfig.sessionId).trim() === toStr13(configWithWorkerUrl.sessionId).trim()) && (!configWithWorkerUrl.adminAddress || toStr13(readbackConfig.adminAddress).trim().toLowerCase() === toStr13(configWithWorkerUrl.adminAddress).trim().toLowerCase()) && (!workerCanonicalRequested || workerAuthorityPoliciesMatch(configWithWorkerUrl.workerAuthority, readbackConfig.workerAuthority));
-    };
-    const readbackIsRetryable = (result) => {
-      if (!result?.ok) {
-        return isNewKvNamespacePropagationFailure(result) || shouldAllowFallbackForCloudflareFailure(result);
-      }
-      const readbackConfig = result.data?.result || result.data || {};
-      if (Object.keys(readbackConfig).length === 0) return true;
-      return false;
-    };
-    const readConfigWithRetry = async () => {
-      let result = await cfFetch(apiToken, configReadbackPath, { method: "GET" }, cfFetchOptions);
-      for (const delayMs of FINAL_CONFIG_READBACK_RETRY_DELAYS_MS) {
-        if (readbackMatches(result)) break;
-        if (!readbackIsRetryable(result)) break;
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
-        result = await cfFetch(apiToken, configReadbackPath, { method: "GET" }, cfFetchOptions);
-      }
-      return result;
-    };
-    const configReadback = await readConfigWithRetry();
-    const configExactlyVerified = readbackMatches(configReadback);
-    const resumedCompatibleConfig = !configExactlyVerified && resumedReadbackHasCompatibleIdentity(configReadback);
-    if (resumedCompatibleConfig) {
-      deploymentPayload.partial = true;
-      deploymentPayload.writesSessionConfig = false;
-    }
-    const verified = configExactlyVerified || resumedCompatibleConfig;
-    if (!verified) {
-      const propagationPending = readbackIsRetryable(configReadback);
-      const orphanResources = propagationPending ? {
-        kvNamespaceId: kvId,
-        kvCleanupStatus: "retained-config-propagation-pending",
-        workerName,
-        workerCleanupStatus: "retained-config-propagation-pending"
-      } : await cleanupDeploymentResources();
-      return buildDeploymentFailure(502, {
-        error: "Worker config verification failed after deployment.",
-        orphanResources,
-        ...propagationPending ? { deploymentRequestPending: true } : {}
-      }, {
-        fallbackEligible: propagationPending
-      });
-    }
-    deploymentPayload.configVerified = configExactlyVerified;
-  }
-  if (resumeUploadedWorker && !envelopeKekSecretPreserved && !tokenSecretPreserved) {
-    const recoveryEnvelope = await buildEncryptedSessionSecretsEnvelope({}, {
-      env: { [STORAGE_ENVELOPE_KEK_SECRET_NAME]: candidateEnvelopeKekSecret },
-      slug: sessionSlug || displaySlug
-    });
-    const recoverySecretsPut = await cfFetch(
-      apiToken,
-      `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(recoveryEnvelope)
-      },
-      cfFetchOptions
-    );
-    if (!recoverySecretsPut.ok) {
-      return buildDeploymentFailure(503, {
-        error: recoverySecretsPut.error || "Failed to recover encrypted session secrets staging.",
-        detail: recoverySecretsPut.detail,
-        deploymentRequestPending: true,
-        orphanResources: {
-          kvNamespaceId: kvId,
-          kvCleanupStatus: "retained-runtime-secret-pending",
-          workerName,
-          workerCleanupStatus: "retained-runtime-secret-pending"
-        }
-      }, { fallbackEligible: true });
-    }
-  }
-  const runtimeSecretsPath = `/accounts/${accountId}/workers/scripts/${workerName}/secrets`;
-  const reconcileRuntimeSecretWrite = async (name, result) => {
-    const pending = !!idempotencyContext && isAmbiguousCloudflareMutationFailure(result);
-    if (!pending) return { ok: false, pending: false };
-    const inventory = await cfFetch(apiToken, runtimeSecretsPath, { method: "GET" }, cfFetchOptions);
-    const committed = inventory.ok && Array.isArray(inventory?.data?.result) && inventory.data.result.some((entry) => toStr13(entry?.type).trim() === "secret_text" && toStr13(entry?.name).trim() === name);
-    return { ok: committed, pending: !committed };
-  };
-  const retainedRuntimeSecretResources = () => ({
-    kvNamespaceId: kvId,
-    kvCleanupStatus: "retained-runtime-secret-pending",
-    workerName,
-    workerCleanupStatus: "retained-runtime-secret-pending"
-  });
-  if (envelopeKekSecretRequired) {
-    if (!deploymentPayload.envelopeKekSecretPreserved) {
-      const envelopeKekResp = await cfFetch(apiToken, runtimeSecretsPath, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: STORAGE_ENVELOPE_KEK_SECRET_NAME,
-          type: "secret_text",
-          text: envelopeKekSecret
-        })
-      }, cfFetchOptions);
-      if (!envelopeKekResp.ok) {
-        const reconciled = await reconcileRuntimeSecretWrite(
-          STORAGE_ENVELOPE_KEK_SECRET_NAME,
-          envelopeKekResp
-        );
-        if (!reconciled.ok) {
-          const orphanResources = reconciled.pending ? retainedRuntimeSecretResources() : await cleanupDeploymentResources();
-          return buildDeploymentFailure(502, {
-            error: envelopeKekResp.error,
-            detail: envelopeKekResp.detail,
-            orphanResources,
-            ...reconciled.pending ? { deploymentRequestPending: true } : {}
-          }, {
-            fallbackEligible: shouldAllowFallbackForCloudflareFailure(envelopeKekResp)
-          });
-        }
-      }
-      envelopeKekSecretSet = true;
-      deploymentPayload.envelopeKekSecretSet = true;
-    }
-  }
-  if (!deploymentPayload.tokenSecretSet && !deploymentPayload.tokenSecretPreserved) {
-    const secretResp = await cfFetch(apiToken, runtimeSecretsPath, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "TOKEN_HMAC_SECRET", type: "secret_text", text: tokenSecret })
-    }, cfFetchOptions);
-    if (!secretResp.ok) {
-      const reconciled = await reconcileRuntimeSecretWrite("TOKEN_HMAC_SECRET", secretResp);
-      if (!reconciled.ok) {
-        const orphanResources = reconciled.pending ? retainedRuntimeSecretResources() : await cleanupDeploymentResources();
-        return buildDeploymentFailure(502, {
-          error: secretResp.error,
-          detail: secretResp.detail,
-          orphanResources,
-          ...reconciled.pending ? { deploymentRequestPending: true } : {}
-        }, {
-          fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretResp)
-        });
-      }
-    }
-    deploymentPayload.tokenSecretSet = true;
-  }
-  if (body?.sessionModeProfile?.surfaces?.agentHttp === true) {
-    const wrappedDeploy = await executeAgentSessionWrappedDeployment({
-      body: {
-        deploymentKind: AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
-        apiToken,
-        sessionSlug: displaySlug,
-        sessionWorkerOrigin: workerUrl,
-        sessionDeploymentIdentity: body?.agentSessionWrappedDeploymentIdentity,
-        authorityMode: body?.sessionModeProfile?.authority?.mode,
-        bundleUrl: body?.agentBridgeBundleUrl,
-        bundleManifestUrl: body?.agentBridgeBundleManifestUrl,
-        bundleSha256: body?.agentBridgeBundleSha256
-      },
-      env,
-      accountId,
-      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
-      fetchImpl,
-      markMutationStarted: idempotencyContext?.markMutationStarted
-    });
-    if (!wrappedDeploy.ok) {
-      return buildDeploymentFailure(wrappedDeploy.status, {
-        ...wrappedDeploy.body || {},
-        partial: true,
-        deploymentRequestPending: true
-      }, { fallbackEligible: wrappedDeploy.status >= 500 });
-    }
-    const capabilityWrite = await persistAgentSessionWrappedCapability({
-      apiToken,
-      accountId,
-      kvNamespaceId: kvId,
-      sessionConfigKey,
-      sessionSlug: displaySlug,
-      sessionWorkerOrigin: workerUrl,
-      capability: wrappedDeploy.body.agentSessionWrapped,
-      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions)
-    });
-    if (!capabilityWrite.ok) {
-      return buildDeploymentFailure(capabilityWrite.status, {
-        ...capabilityWrite.body || {},
-        partial: true,
-        deploymentRequestPending: true
-      }, { fallbackEligible: capabilityWrite.status >= 500 });
-    }
-    deploymentPayload.agentSessionWrapped = capabilityWrite.body.agentSessionWrapped;
-  }
-  return buildSuccess(200, deploymentPayload);
-};
-var resolveDeploymentBundleProvenance = async ({ body = {}, env = {}, fetchImpl = globalThis.fetch } = {}) => {
-  const resolvedBody = { ...isObj4(body) ? body : {} };
-  if (!toStr13(resolvedBody.bundleManifestUrl)) {
-    const defaultBundleManifestUrl = toStr13(
-      resolvedBody.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND ? env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL : env?.WORKER_BUNDLE_MANIFEST_URL
-    );
-    if (defaultBundleManifestUrl) resolvedBody.bundleManifestUrl = defaultBundleManifestUrl;
-  }
-  if (!toStr13(resolvedBody.agentBridgeBundleManifestUrl)) {
-    const defaultAgentManifestUrl = toStr13(env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL);
-    if (defaultAgentManifestUrl) resolvedBody.agentBridgeBundleManifestUrl = defaultAgentManifestUrl;
-  }
-  const resolveOne = async ({ manifestField, digestField, artifactFile, artifactKind }) => {
-    const manifestUrl = toStr13(resolvedBody[manifestField]).trim();
-    if (!manifestUrl) return null;
-    const manifestDigest = await fetchExpectedWorkerBundleDigest({
-      manifestUrl,
-      artifactFile,
-      artifactKind,
-      fetchImpl
-    });
-    if (!manifestDigest.ok) return buildFailure(502, { error: manifestDigest.error });
-    const supplied = toStr13(resolvedBody[digestField]).trim();
-    const suppliedDigest = normalizeWorkerBundleSha256(supplied);
-    if (supplied && !suppliedDigest) {
-      return buildFailure(400, { error: `${digestField} must be a complete SHA-256 hex digest.` });
-    }
-    if (suppliedDigest && suppliedDigest !== manifestDigest.digest) {
-      return buildFailure(409, { error: `Worker release manifest digest conflicts with ${digestField}.` });
-    }
-    resolvedBody[digestField] = manifestDigest.digest;
-    return null;
-  };
-  if (resolvedBody.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
-    const failure2 = await resolveOne({
-      manifestField: "bundleManifestUrl",
-      digestField: "bundleSha256",
-      artifactFile: "agentBridgeWorker.bundle.js",
-      artifactKind: "agent-bridge-worker"
-    });
-    if (failure2) return { ok: false, failure: failure2 };
-  } else {
-    const sessionFailure = await resolveOne({
-      manifestField: "bundleManifestUrl",
-      digestField: "bundleSha256",
-      artifactFile: "sessionCorsWorker.bundle.js",
-      artifactKind: "session-cors-worker"
-    });
-    if (sessionFailure) return { ok: false, failure: sessionFailure };
-    const bridgeFailure = await resolveOne({
-      manifestField: "agentBridgeBundleManifestUrl",
-      digestField: "agentBridgeBundleSha256",
-      artifactFile: "agentBridgeWorker.bundle.js",
-      artifactKind: "agent-bridge-worker"
-    });
-    if (bridgeFailure) return { ok: false, failure: bridgeFailure };
-  }
-  return { ok: true, body: resolvedBody };
-};
-var executeDeployHelperRequest = async (options = {}) => {
-  const provenance = await resolveDeploymentBundleProvenance({
-    body: options?.body,
-    env: options?.env,
-    fetchImpl: options?.fetchImpl
-  });
-  if (!provenance.ok) return provenance.failure;
-  options = { ...options, body: provenance.body };
-  const rawRequestId = toStr13(options?.body?.deploymentRequestId).trim();
-  if (!rawRequestId) return executeDeployHelperRequestCore(options);
-  const context = await buildDeploymentRequestContext({
-    body: options?.body,
-    requestOrigin: options?.requestOrigin
-  });
-  if (!context) {
-    return buildFailure(400, {
-      error: "deploymentRequestId must contain 8-128 safe identifier characters."
-    });
-  }
-  const coordinatedRequestDigest = toStr13(options?.coordinatedRequestDigest).trim().toLowerCase();
-  if (options?.coordinationBypass === true && /^[0-9a-f]{64}$/.test(coordinatedRequestDigest)) {
-    context.requestDigest = coordinatedRequestDigest;
-  }
-  if (options?.coordinationBypass !== true) {
-    const coordinator = options?.env?.CE_SESSION_COORDINATOR;
-    if (!coordinator?.idFromName || !coordinator?.get) {
-      return buildFailure(503, {
-        error: "CE_SESSION_COORDINATOR is required for stable deployment requests; no Cloudflare mutation was attempted.",
-        deploymentRequestPending: true
-      }, { fallbackEligible: true });
-    }
-    const coordinatorName = await sha256Hex2(`direct-deploy:${context.deploymentId}`);
-    const stub = coordinator.get(coordinator.idFromName(coordinatorName));
-    let response2;
-    try {
-      response2 = await stub.fetch("https://session-coordinator.internal/deploy-helper", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          requestDigest: context.requestDigest,
-          immutableIdentityDigest: context.immutableIdentityDigest,
-          deployBody: options.body,
-          requestOrigin: options.requestOrigin || "",
-          sensitiveValues: collectKnownRequestCredentials(options.body)
-        })
-      });
-    } catch {
-      return buildFailure(503, {
-        error: "Deployment coordination was interrupted; retry the same request.",
-        deploymentRequestPending: true
-      }, { fallbackEligible: true });
-    }
-    const result2 = await response2.json().catch(() => ({}));
-    if (isObj4(result2?.body) && Number(result2?.status || 0)) {
-      return {
-        ok: result2.ok === true,
-        status: Number(result2.status),
-        body: result2.body,
-        fallbackEligible: result2.fallbackEligible === true
-      };
-    }
-    return buildFailure(Number(response2.status || 0) || 502, isObj4(result2) ? result2 : {
-      error: "Deployment coordinator returned an invalid response."
-    });
-  }
-  const journalBinding = resolveDeployJournalBinding(options?.env);
-  if (!journalBinding) {
-    return buildFailure(503, {
-      error: "DEPLOY_HELPER_KV or GROUP_KV is required for idempotent deployment requests."
-    }, { fallbackEligible: true });
-  }
-  const buildRequestDigestConflict = () => buildFailure(409, {
-    error: "deploymentRequestId was already used with a different request payload.",
-    deploymentRequestConflict: true
-  });
-  const clearRejectedBundleAuthority = async (required) => {
-    if (!required) return null;
-    if (typeof journalBinding.delete !== "function") {
-      return buildFailure(503, {
-        error: "Failed to clear rejected-bundle correction authority; retry the same deployment request.",
-        deploymentRequestPending: true
-      }, { fallbackEligible: true });
-    }
-    try {
-      await journalBinding.delete(context.uploadRejectedJournalKey);
-      return null;
-    } catch {
-      return buildFailure(503, {
-        error: "Failed to clear rejected-bundle correction authority; retry the same deployment request.",
-        deploymentRequestPending: true
-      }, { fallbackEligible: true });
-    }
-  };
-  const buildTerminalJournalReplay = (record) => {
-    const result2 = record?.result;
-    if (result2?.ok !== true) return result2;
-    const recordedFullRequestDigest = toStr13(record?.fullRequestDigest).trim().toLowerCase();
-    const fullRequestDigestMatches = recordedFullRequestDigest ? recordedFullRequestDigest === context.fullRequestDigest : context.requestDigest === context.fullRequestDigest;
-    if (fullRequestDigestMatches) return result2;
-    return {
-      ...result2,
-      body: {
-        ...isObj4(result2?.body) ? result2.body : {},
-        partial: true,
-        configVerified: false,
-        writesSessionConfig: false,
-        writesSessionSecrets: false
-      }
-    };
-  };
-  let existingRecord;
-  let terminalRecord;
-  let uploadRecord;
-  let uploadRejectedRecord;
-  try {
-    [terminalRecord, uploadRecord, uploadRejectedRecord, existingRecord] = await Promise.all([
-      readDeployJournalRecord(journalBinding, context.terminalJournalKey),
-      readDeployJournalRecord(journalBinding, context.uploadJournalKey),
-      readDeployJournalRecord(journalBinding, context.uploadRejectedJournalKey),
-      readDeployJournalRecord(journalBinding, context.journalKey)
-    ]);
-  } catch (error) {
-    return buildFailure(503, {
-      error: `Failed to read deployment request journal: ${toStr13(error?.message || error).trim() || "Unknown error."}`
-    }, { fallbackEligible: true });
-  }
-  if (terminalRecord) {
-    if (Number(terminalRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || toStr13(terminalRecord.requestDigest).trim() !== context.requestDigest) {
-      return buildRequestDigestConflict();
-    }
-    if (terminalRecord.state === "terminal" && isObj4(terminalRecord.result)) {
-      const authorityCleanupFailure2 = await clearRejectedBundleAuthority(true);
-      if (authorityCleanupFailure2) return authorityCleanupFailure2;
-      return buildTerminalJournalReplay(terminalRecord);
-    }
-    return buildFailure(409, { error: "Deployment request terminal journal state is invalid." });
-  }
-  if (uploadRejectedRecord) {
-    const rejectedBundleSha256 = toStr13(uploadRejectedRecord.bundleSha256).trim().toLowerCase();
-    if (toStr13(uploadRejectedRecord.requestDigest).trim() !== context.requestDigest) {
-      return buildRequestDigestConflict();
-    }
-    if (Number(uploadRejectedRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || uploadRejectedRecord.state !== "definitive_upload_rejected" || !/^[0-9a-f]{64}$/.test(toStr13(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase()) || toStr13(uploadRejectedRecord.deploymentId).trim() !== context.deploymentId || toStr13(uploadRejectedRecord.workerName).trim() !== context.workerName || toStr13(uploadRejectedRecord.requestMarker).trim() !== context.requestMarker || !/^[0-9a-f]{64}$/.test(rejectedBundleSha256)) {
-      return buildFailure(409, { error: "Deployment request upload-rejection journal state is invalid." });
-    }
-    if (toStr13(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase() !== context.bundleCorrectionDigest) {
-      return buildFailure(409, {
-        error: "A rejected deployment bundle may be corrected only when every non-bundle deployment field is unchanged.",
-        deploymentRequestConflict: true,
-        deploymentRequestPending: true
-      });
-    }
-    context.definitiveUploadRejected = true;
-    context.rejectedBundleSha256 = rejectedBundleSha256;
-  }
-  if (uploadRecord) {
-    if (toStr13(uploadRecord.requestDigest).trim() !== context.requestDigest) {
-      return buildRequestDigestConflict();
-    }
-    if (Number(uploadRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || uploadRecord.state !== "upload_started" || !/^[0-9a-f]{64}$/.test(toStr13(uploadRecord.bundleSha256).trim().toLowerCase())) {
-      return buildFailure(409, { error: "Deployment request upload journal state is invalid." });
-    }
-    context.uploadStarted = true;
-    context.bundleSha256 = toStr13(uploadRecord.bundleSha256).trim().toLowerCase();
-  }
-  if (context.definitiveUploadRejected === true && context.bundleSha256 && context.bundleSha256 !== context.rejectedBundleSha256) {
-    return buildFailure(409, { error: "Deployment request upload journal conflicts with its rejection state." });
-  }
-  if (context.definitiveUploadRejected === true && !context.bundleSha256) {
-    context.uploadStarted = true;
-    context.bundleSha256 = context.rejectedBundleSha256;
-  }
-  if (existingRecord) {
-    if (Number(existingRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || toStr13(existingRecord.requestDigest).trim() !== context.requestDigest) {
-      return buildRequestDigestConflict();
-    }
-    if (existingRecord.state === "terminal" && isObj4(existingRecord.result)) {
-      return buildTerminalJournalReplay(existingRecord);
-    }
-    if (existingRecord.state !== "reserved" && existingRecord.state !== "mutation_started") {
-      return buildFailure(409, { error: "Deployment request journal state is invalid." });
-    }
-    context.isReplay = true;
-    context.mutationStarted = existingRecord.state === "mutation_started";
-  } else {
-    try {
-      await writeDeployJournalRecord(journalBinding, context.journalKey, {
-        version: DEPLOYMENT_JOURNAL_VERSION,
-        state: "reserved",
-        requestDigest: context.requestDigest,
-        deploymentId: context.deploymentId,
-        workerName: context.workerName,
-        requestMarker: context.requestMarker
-      });
-    } catch (error) {
-      return buildFailure(503, {
-        error: `Failed to initialize deployment request journal: ${toStr13(error?.message || error).trim() || "Unknown error."}`
-      }, { fallbackEligible: true });
-    }
-  }
-  if (context.definitiveUploadRejected === true) context.isReplay = true;
-  context.markMutationStarted = async () => {
-    if (context.mutationStarted) return;
-    context.mutationStarted = true;
-  };
-  context.markUploadStarted = async (bundleSha256) => {
-    const normalizedBundleSha256 = toStr13(bundleSha256).trim().toLowerCase();
-    if (!/^[0-9a-f]{64}$/.test(normalizedBundleSha256)) {
-      throw new TypeError("Cannot journal an invalid deployment bundle identity.");
-    }
-    if (context.bundleSha256 && context.bundleSha256 !== normalizedBundleSha256 && context.definitiveUploadRejected !== true) {
-      throw new TypeError("Deployment bundle content changed after this request started.");
-    }
-    if (!context.uploadStarted) {
-      await writeDeployJournalRecord(journalBinding, context.uploadJournalKey, {
-        version: DEPLOYMENT_JOURNAL_VERSION,
-        state: "upload_started",
-        requestDigest: context.requestDigest,
-        deploymentId: context.deploymentId,
-        workerName: context.workerName,
-        requestMarker: context.requestMarker,
-        bundleSha256: normalizedBundleSha256
-      });
-      context.uploadStarted = true;
-      context.bundleSha256 = normalizedBundleSha256;
-    }
-  };
-  context.markDefinitiveUploadRejected = async (bundleSha256) => {
-    const normalizedBundleSha256 = toStr13(bundleSha256).trim().toLowerCase();
-    if (!/^[0-9a-f]{64}$/.test(normalizedBundleSha256)) {
-      throw new TypeError("Cannot journal an invalid rejected bundle identity.");
-    }
-    if (context.definitiveUploadRejected === true) return;
-    await writeDurableDeployJournalRecord(journalBinding, context.uploadRejectedJournalKey, {
-      version: DEPLOYMENT_JOURNAL_VERSION,
-      state: "definitive_upload_rejected",
-      requestDigest: context.requestDigest,
-      deploymentId: context.deploymentId,
-      workerName: context.workerName,
-      requestMarker: context.requestMarker,
-      bundleSha256: normalizedBundleSha256,
-      bundleCorrectionDigest: context.bundleCorrectionDigest
-    });
-    context.definitiveUploadRejected = true;
-    context.rejectedBundleSha256 = normalizedBundleSha256;
-  };
-  const result = await executeDeployHelperRequestCore({
-    ...options,
-    idempotencyContext: context
-  });
-  if (context.definitiveUploadRejected === true && result?.ok !== true) {
-    return {
-      ...result,
-      body: {
-        ...isObj4(result?.body) ? result.body : {},
-        deploymentRequestPending: true
-      }
-    };
-  }
-  if (result?.body?.deploymentRequestPending === true) return result;
-  if (result?.ok !== true && result?.fallbackEligible === true) {
-    if (context.mutationStarted === true) {
-      return {
-        ...result,
-        body: {
-          ...isObj4(result?.body) ? result.body : {},
-          deploymentRequestPending: true
-        }
-      };
-    }
-    return result;
-  }
-  const safeResult = buildSafeDeployJournalResult(
-    result,
-    collectKnownRequestCredentials(options?.body)
-  );
-  await writeDeployJournalRecord(journalBinding, context.terminalJournalKey, {
-    version: DEPLOYMENT_JOURNAL_VERSION,
-    state: "terminal",
-    requestDigest: context.requestDigest,
-    fullRequestDigest: context.fullRequestDigest,
-    deploymentId: context.deploymentId,
-    workerName: context.workerName,
-    requestMarker: context.requestMarker,
-    result: safeResult
-  });
-  const authorityCleanupFailure = await clearRejectedBundleAuthority(
-    context.definitiveUploadRejected === true
-  );
-  if (authorityCleanupFailure) return authorityCleanupFailure;
-  return safeResult;
-};
-
-// workers/sessionCorsWorker/sessionConfigNormalization.js
-var toStr14 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-var isObj5 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
-var hasOwn2 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-var normalizeEmbeddedDeployHelperEnabled2 = (raw) => {
-  if (raw == null) return true;
-  if (typeof raw === "boolean") return raw;
-  return null;
-};
-var cloneValue = (value) => {
-  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry));
-  if (isObj5(value)) {
-    return Object.keys(value).reduce((acc, key) => {
-      acc[key] = cloneValue(value[key]);
-      return acc;
-    }, {});
-  }
-  return trimIfString(value);
-};
-var appendListEntries = (target, raw) => {
-  if (Array.isArray(raw)) {
-    raw.forEach((entry) => appendListEntries(target, entry));
-    return;
-  }
-  const value = toStr14(raw).trim();
-  if (!value) return;
-  value.split(/[\n,]+/).map((entry) => entry.trim()).filter(Boolean).forEach((entry) => target.push(entry));
-};
-var normalizeWorkerAllowOrigins = (raw) => {
-  const entries = [];
-  appendListEntries(entries, raw);
-  const seen = /* @__PURE__ */ new Set();
-  return entries.filter((entry) => {
-    if (seen.has(entry)) return false;
-    seen.add(entry);
-    return true;
-  });
-};
-var normalizeWorkerRpcUrlsByChainId = (raw) => {
-  if (!isObj5(raw)) return {};
-  return Object.keys(raw).reduce((acc, key) => {
-    const urls = normalizeWorkerAllowOrigins(raw[key]);
-    if (urls.length) acc[key] = urls;
-    return acc;
-  }, {});
-};
-var normalizeWorkerConfigRecord = (raw, { slug } = {}) => {
-  if (!isObj5(raw)) return null;
-  const normalized = cloneValue(raw);
-  const normalizedSlug = normalizeWorkerSessionSlug(slug);
-  if (hasOwn2(normalized, "slug")) {
-    normalized.slug = normalizedSlug || normalizeWorkerSessionSlug(normalized.slug);
-  }
-  if (hasOwn2(normalized, "allowOrigins")) {
-    normalized.allowOrigins = normalizeWorkerAllowOrigins(normalized.allowOrigins);
-  }
-  if (hasOwn2(normalized, "limits")) {
-    normalized.limits = isObj5(normalized.limits) ? cloneValue(normalized.limits) : {};
-  }
-  if (hasOwn2(normalized, "scopes")) {
-    normalized.scopes = isObj5(normalized.scopes) ? cloneValue(normalized.scopes) : {};
-  }
-  if (hasOwn2(normalized, "faucet")) {
-    normalized.faucet = isObj5(normalized.faucet) ? cloneValue(normalized.faucet) : {};
-  }
-  if (hasOwn2(normalized, "rpcUrlsByChainId")) {
-    normalized.rpcUrlsByChainId = normalizeWorkerRpcUrlsByChainId(normalized.rpcUrlsByChainId);
-  }
-  const embeddedDeployHelperEnabledRaw = hasOwn2(normalized, "embeddedDeployHelperEnabled") ? normalized.embeddedDeployHelperEnabled : hasOwn2(normalized, "deployHelperEnabled") ? normalized.deployHelperEnabled : void 0;
-  if (embeddedDeployHelperEnabledRaw !== void 0) {
-    const embeddedDeployHelperEnabled = normalizeEmbeddedDeployHelperEnabled2(embeddedDeployHelperEnabledRaw);
-    if (embeddedDeployHelperEnabled === null) {
-      delete normalized.embeddedDeployHelperEnabled;
-    } else {
-      normalized.embeddedDeployHelperEnabled = embeddedDeployHelperEnabled;
-    }
-  }
-  delete normalized.deployHelperEnabled;
-  return normalized;
-};
-var mergeWorkerConfigRecords = ({
-  existingConfig,
-  incomingConfig,
-  slug
-} = {}) => {
-  const existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
-  const incoming = isObj5(incomingConfig) ? cloneValue(incomingConfig) : {};
-  const merged = {
-    ...existing,
-    ...incoming
-  };
-  merged.limits = {
-    ...isObj5(existing.limits) ? existing.limits : {},
-    ...isObj5(incoming.limits) ? cloneValue(incoming.limits) : {}
-  };
-  merged.scopes = {
-    ...isObj5(existing.scopes) ? existing.scopes : {},
-    ...isObj5(incoming.scopes) ? cloneValue(incoming.scopes) : {}
-  };
-  return normalizeWorkerConfigRecord(merged, { slug }) || {};
-};
-var mergeWorkerLimitRecords = ({
-  existingConfig,
-  incomingLimits,
-  slug
-} = {}) => {
-  const existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
-  return normalizeWorkerConfigRecord({
-    ...existing,
-    limits: {
-      ...isObj5(existing.limits) ? existing.limits : {},
-      ...isObj5(incomingLimits) ? cloneValue(incomingLimits) : {}
-    }
-  }, { slug }) || {};
-};
-
-// workers/sessionCorsWorker/authorizationScopeFreshness.js
-var AUTHORIZATION_EPOCH_KEY = "authzEpoch";
-var RESOURCE_GATE_BY_SCOPE = Object.freeze({
-  ai: "ai",
-  arweave: "arweave",
-  faucet: "txGas",
-  fetch: "rpc",
-  groups: "default",
-  lit: "lit",
-  storage: "arweave",
-  transcribe: "ai"
-});
-var normalizeAuthorizationEpoch = (value) => {
-  if (value == null) return 0;
-  return Number.isSafeInteger(value) && value >= 0 ? value : null;
-};
-var readAuthorizationEpoch = (config) => normalizeAuthorizationEpoch(config?.[AUTHORIZATION_EPOCH_KEY]);
-var incrementAuthorizationEpoch = (config) => {
-  const current = readAuthorizationEpoch(config);
-  if (current === null || current >= Number.MAX_SAFE_INTEGER) return null;
-  return current + 1;
-};
-var selectResourceGateKeysForScopes = (resourceKeys, requestedScopes) => {
-  const keys = Array.isArray(resourceKeys) ? resourceKeys : [];
-  if (!Array.isArray(requestedScopes) || requestedScopes.length === 0) return keys;
-  const required = /* @__PURE__ */ new Set(["default"]);
-  requestedScopes.forEach((scope) => {
-    const resourceKey = RESOURCE_GATE_BY_SCOPE[String(scope || "").trim().toLowerCase()];
-    if (resourceKey) required.add(resourceKey);
-  });
-  return keys.filter((key) => required.has(key));
-};
-
-// workers/sessionCorsWorker/sessionConfigMutation.js
-var WORKER_CANONICAL_PUBLICATION_REVISION_KEY = "workerCanonicalPublicationRevision";
-var WORKER_GROUPS_BOOTSTRAP_KEY = "workerGroupsBootstrap";
-var WORKER_CANONICAL_SET_CONFIG_KEYS = /* @__PURE__ */ new Set([
-  "slug",
-  "sessionId",
-  "sessionIdHex",
-  "configRevision",
-  "sessionName",
-  "sessionInfo",
-  "sessionHeaderImg",
-  "sessionEndsAt",
-  "defaultTags",
-  "defaultGroupTags",
-  "defaultSbtTags",
-  "questionsGenPrompt",
-  "defaultFilterState",
-  "defaultFeaturedSBTs",
-  "autoFeatureSBTsBySessionSlug",
-  "adminAddress",
-  "adminAddresses",
-  "corsWorkerUrl",
-  "allowOrigins",
-  "sessionModeProfile",
-  "agentSessionWrapped",
-  "workerAuthority",
-  "workerRoles",
-  "roles",
-  "authorization",
-  "groupCreationPolicy",
-  "storageProfile",
-  "storageEnvelope",
-  "ai",
-  "limits",
-  "scopes",
-  "networkChainId",
-  "contracts",
-  "embeddedDeployHelperEnabled",
-  "litCredentials",
-  WORKER_GROUPS_BOOTSTRAP_KEY
-]);
-var toTrimmedString6 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
-var hasOwn3 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
-var validGroupCreationPolicy = (config) => !hasOwn3(config, "groupCreationPolicy") || config?.groupCreationPolicy === "admin_only" || config?.groupCreationPolicy === "participants";
-var getWorkerAuthorityMode = (config) => toTrimmedString6(
-  config?.sessionModeProfile?.authority?.mode
-).toLowerCase();
-var workerCanonicalUsesOnChainSbt = (config) => {
-  const profile = config?.sessionModeProfile;
-  if (profile?.authorization?.mechanisms?.includes?.("sbt_onchain")) return true;
-  const conditionSources = [
-    profile?.encryption?.accessConditions,
-    profile?.storage?.payloadAccessControl?.accessConditions
-  ];
-  return conditionSources.some((source) => source?.conditions?.some?.((condition) => condition?.kind === "sbt_onchain"));
-};
-var workerCanonicalUsesChain = (config) => workerCanonicalUsesOnChainSbt(config) || config?.sessionModeProfile?.encryption?.mode === "lit";
-var validateWorkerCanonicalIncomingFields = ({ incomingConfig, mergedConfig } = {}) => {
-  if (getWorkerAuthorityMode(mergedConfig) !== "worker_canonical") return { ok: true };
-  const unsupportedKey = Object.keys(incomingConfig || {}).find(
-    (key) => !WORKER_CANONICAL_SET_CONFIG_KEYS.has(key)
-  );
-  if (unsupportedKey) {
-    return {
-      ok: false,
-      status: 400,
-      error: `Unsupported worker-canonical session config field: ${unsupportedKey}.`
-    };
-  }
-  const usesOnChainSbt = workerCanonicalUsesOnChainSbt(mergedConfig);
-  const sbtOnlyKeys = ["defaultSbtTags", "defaultFeaturedSBTs", "autoFeatureSBTsBySessionSlug"];
-  const unsupportedSbtKey = sbtOnlyKeys.find((key) => hasOwn3(incomingConfig, key) && !usesOnChainSbt);
-  if (unsupportedSbtKey) {
-    return {
-      ok: false,
-      status: 400,
-      error: `Worker-native Group sessions do not accept ${unsupportedSbtKey}.`
-    };
-  }
-  if (hasOwn3(incomingConfig, "networkChainId") && !workerCanonicalUsesChain(mergedConfig)) {
-    return {
-      ok: false,
-      status: 400,
-      error: "Worker-native Group sessions do not accept networkChainId."
-    };
-  }
-  if (hasOwn3(incomingConfig, "contracts")) {
-    const contractKeys = Object.keys(incomingConfig?.contracts || {});
-    if (!usesOnChainSbt || contractKeys.some((key) => key !== "sbtFactory")) {
-      return {
-        ok: false,
-        status: 400,
-        error: "Worker-canonical sessions accept only the on-chain SBT Group Factory contract."
-      };
-    }
-  }
-  return { ok: true };
-};
-var normalizeCanonicalSessionId = (value) => {
-  const raw = toTrimmedString6(value).toLowerCase();
-  if (!raw) return "";
-  const normalized = raw.replace(/^0x/, "").replace(/-/g, "");
-  return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? normalized : "";
-};
-var resolveCanonicalSessionIdentity = (config) => {
-  const rawValues = ["sessionId", "sessionIdHex"].filter((key) => hasOwn3(config, key) && toTrimmedString6(config?.[key])).map((key) => config[key]);
-  const normalizedValues = rawValues.map(normalizeCanonicalSessionId);
-  const uniqueValues = new Set(normalizedValues.filter(Boolean));
-  return {
-    invalid: normalizedValues.some((value) => !value) || uniqueValues.size > 1,
-    value: uniqueValues.size === 1 ? [...uniqueValues][0] : ""
-  };
-};
-var resolveCanonicalWorkerSessionIdHex = (config) => {
-  const identity = resolveCanonicalSessionIdentity(config);
-  return !identity.invalid && identity.value ? `0x${identity.value}` : "";
-};
-var normalizeConfigRevision = (value) => {
-  if (typeof value !== "string" || value !== value.trim()) return "";
-  return /^[a-z0-9._:-]{1,128}$/i.test(value) ? value : "";
-};
-var changesInitializedWorkerCanonicalIdentity = ({ existingConfig, mergedConfig } = {}) => {
-  if (getWorkerAuthorityMode(existingConfig) !== "worker_canonical") return false;
-  if (getWorkerAuthorityMode(mergedConfig) !== "worker_canonical") return true;
-  const existingSessionIdentity = resolveCanonicalSessionIdentity(existingConfig);
-  const mergedSessionIdentity = resolveCanonicalSessionIdentity(mergedConfig);
-  if (existingSessionIdentity.invalid || mergedSessionIdentity.invalid) return true;
-  if (existingSessionIdentity.value && mergedSessionIdentity.value !== existingSessionIdentity.value) return true;
-  return ["slug", "corsWorkerUrl"].some((key) => {
-    const existingValue = toTrimmedString6(existingConfig?.[key]);
-    return !!existingValue && toTrimmedString6(mergedConfig?.[key]) !== existingValue;
-  });
-};
-var resolveWorkerCanonicalPublicationWrite = ({
-  existingConfig,
-  incomingConfig,
-  mergedConfig
-} = {}) => {
-  if (hasOwn3(incomingConfig, WORKER_CANONICAL_PUBLICATION_REVISION_KEY)) {
-    return { ok: false, status: 400, error: "Worker-canonical publication state is server-managed." };
-  }
-  if (getWorkerAuthorityMode(mergedConfig) !== "worker_canonical") {
-    return { ok: true, config: mergedConfig };
-  }
-  const existingPublicationRevision = normalizeConfigRevision(
-    existingConfig?.[WORKER_CANONICAL_PUBLICATION_REVISION_KEY]
-  );
-  const incomingHasRevision = hasOwn3(incomingConfig, "configRevision");
-  const incomingRevision = incomingHasRevision ? normalizeConfigRevision(incomingConfig?.configRevision) : "";
-  if (incomingHasRevision && !incomingRevision) {
-    return { ok: false, status: 400, error: "Worker config revision is invalid." };
-  }
-  if (existingPublicationRevision && incomingHasRevision && incomingRevision !== existingPublicationRevision) {
-    return { ok: false, status: 409, error: "Worker-canonical publication is already finalized." };
-  }
-  if (existingPublicationRevision && incomingRevision === existingPublicationRevision) {
-    if (stableCanonicalSerialize(mergedConfig) !== stableCanonicalSerialize(existingConfig)) {
-      return {
-        ok: false,
-        status: 409,
-        error: "Worker-canonical publication revision was reused with different config."
-      };
-    }
-    return { ok: true, skipPersistence: true, config: existingConfig };
-  }
-  const publicationRevision = existingPublicationRevision || incomingRevision;
-  if (!publicationRevision) return { ok: true, config: mergedConfig };
-  return {
-    ok: true,
-    config: {
-      ...mergedConfig,
-      [WORKER_CANONICAL_PUBLICATION_REVISION_KEY]: publicationRevision
-    }
-  };
-};
-var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
-  const authorityExisting = normalizeWorkerConfigRecord(existingConfig) || {};
-  const existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
-  const kind = toTrimmedString6(mutation?.kind);
-  let incomingConfig;
-  let mergedConfig;
-  if (kind === "set-config") {
-    incomingConfig = mutation?.incomingConfig && typeof mutation.incomingConfig === "object" ? mutation.incomingConfig : null;
-    if (!incomingConfig) return { ok: false, status: 400, error: "Missing config." };
-    if (hasOwn3(incomingConfig, AUTHORIZATION_EPOCH_KEY)) {
-      return { ok: false, status: 400, error: "Authorization epoch is server-managed." };
-    }
-    if (hasOwn3(incomingConfig, WORKER_GROUPS_BOOTSTRAP_KEY) && (!hasOwn3(authorityExisting, WORKER_GROUPS_BOOTSTRAP_KEY) || stableCanonicalSerialize(incomingConfig[WORKER_GROUPS_BOOTSTRAP_KEY]) !== stableCanonicalSerialize(authorityExisting[WORKER_GROUPS_BOOTSTRAP_KEY]))) {
-      return { ok: false, status: 400, error: "Worker Group bootstrap state is server-managed." };
-    }
-    if (findForbiddenCloudflareDeploymentTokenPath(incomingConfig)) {
-      return { ok: false, status: 400, error: "Cloudflare deployment tokens are not allowed in session config." };
-    }
-    if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
-      return { ok: false, status: 400, error: "Secret-like values are not allowed in public session config fields." };
-    }
-    if (!validGroupCreationPolicy(incomingConfig)) {
-      return { ok: false, status: 400, error: "Invalid group creation policy." };
-    }
-    const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig, {
-      allowPartialProfileStorage: true
-    });
-    if (!incomingModeValidation.ok) {
-      return {
-        ok: false,
-        status: 400,
-        error: `Invalid session config mode at ${incomingModeValidation.path}.`
-      };
-    }
-    mergedConfig = mergeWorkerConfigRecords({ existingConfig: existing, incomingConfig, slug });
-  } else if (kind === "set-limits") {
-    const incomingLimits = mutation?.incomingLimits && typeof mutation.incomingLimits === "object" ? mutation.incomingLimits : null;
-    if (!incomingLimits) return { ok: false, status: 400, error: "Missing limits." };
-    incomingConfig = { limits: incomingLimits };
-    mergedConfig = mergeWorkerLimitRecords({ existingConfig: existing, incomingLimits, slug });
-  } else if (kind === "merge-lit-credentials") {
-    const litCredentials = mutation?.litCredentials && typeof mutation.litCredentials === "object" ? mutation.litCredentials : null;
-    if (!litCredentials) return { ok: false, status: 400, error: "Missing Lit credentials." };
-    incomingConfig = {
-      litCredentials: {
-        ...existing.litCredentials && typeof existing.litCredentials === "object" ? existing.litCredentials : {},
-        ...litCredentials
-      }
-    };
-    mergedConfig = mergeWorkerConfigRecords({ existingConfig: existing, incomingConfig, slug });
-  } else {
-    return { ok: false, status: 400, error: "Unsupported session config mutation." };
-  }
-  if (findForbiddenCloudflareDeploymentTokenPath(mergedConfig)) {
-    return { ok: false, status: 400, error: "Cloudflare deployment tokens are not allowed in session config." };
-  }
-  if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
-    return { ok: false, status: 400, error: "Secret-like values are not allowed in public session config fields." };
-  }
-  if (!validGroupCreationPolicy(mergedConfig)) {
-    return { ok: false, status: 400, error: "Invalid group creation policy." };
-  }
-  const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
-  if (!mergedModeValidation.ok) {
-    return {
-      ok: false,
-      status: 400,
-      error: `Invalid session config mode at ${mergedModeValidation.path}.`
-    };
-  }
-  if (kind === "set-config") {
-    const fieldValidation = validateWorkerCanonicalIncomingFields({
-      incomingConfig,
-      mergedConfig
-    });
-    if (!fieldValidation.ok) return fieldValidation;
-  }
-  if (changesInitializedWorkerCanonicalIdentity({ existingConfig: authorityExisting, mergedConfig })) {
-    return {
-      ok: false,
-      status: 409,
-      error: "Worker-canonical session identity cannot be changed after initialization."
-    };
-  }
-  const publicationWrite = resolveWorkerCanonicalPublicationWrite({
-    existingConfig: authorityExisting,
-    incomingConfig,
-    mergedConfig
-  });
-  if (!publicationWrite?.ok || publicationWrite.skipPersistence || kind !== "set-config") {
-    return publicationWrite;
-  }
-  const comparisonExisting = mergeWorkerConfigRecords({
-    existingConfig: authorityExisting,
-    incomingConfig: {},
-    slug
-  });
-  if (stableCanonicalSerialize(publicationWrite.config) === stableCanonicalSerialize(comparisonExisting)) {
-    return publicationWrite;
-  }
-  const nextEpoch = incrementAuthorizationEpoch(authorityExisting);
-  if (nextEpoch === null) {
-    return { ok: false, status: 409, error: "Authorization epoch is invalid." };
-  }
-  return {
-    ...publicationWrite,
-    config: {
-      ...publicationWrite.config,
-      [AUTHORIZATION_EPOCH_KEY]: nextEpoch
-    }
-  };
-};
-
 // workers/sessionCorsWorker/workerGroups.js
-var toStr15 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-var trim2 = (value) => toStr15(value).trim();
-var isObj6 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var toStr8 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
+var trim = (value) => toStr8(value).trim();
+var isObj = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var WORKER_GROUP_JOIN_MODES = Object.freeze({
   OPEN: "open",
   PASSWORD: "password",
@@ -60899,199 +56054,58 @@ var WORKER_GROUP_MEMBER_VISIBILITY = Object.freeze({
 });
 var DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION = 100;
 var DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP = 1e3;
-var MAX_WORKER_GROUP_IMAGE_URL_LENGTH = 2048;
-var MAX_WORKER_GROUP_DOCUMENT_URLS = 10;
-var MAX_WORKER_GROUP_TAGS = 20;
-var MAX_WORKER_GROUP_TAG_LENGTH = 64;
-var MAX_WORKER_GROUP_MEMBER_LIMIT = 1e3;
-var MAX_WORKER_GROUP_ID_LENGTH = 80;
-var MAX_WORKER_GROUP_SESSION_SLUG_LENGTH = 128;
-var DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
-var MAX_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
-var WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL = "fresh-template-v2";
-var IMPLEMENTED_JOIN_MODES = /* @__PURE__ */ new Set([WORKER_GROUP_JOIN_MODES.OPEN, WORKER_GROUP_JOIN_MODES.ADMIN_ADD]);
-var safeSlugPart = (value) => trim2(value || "general").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "general";
-var safeKeyPart = (value) => trim2(value || "id").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "id";
-var normalizeWorkerGroupId = (value) => {
-  const normalized = trim2(value).toLowerCase();
-  if (!normalized || normalized.length > MAX_WORKER_GROUP_ID_LENGTH) return "";
-  if (!/^[a-z0-9][a-z0-9._-]*$/.test(normalized)) return "";
-  return normalized;
-};
-var encodedPrincipalKeyPart = (value) => btoa(trim2(value || "id")).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "") || "id";
-var canonicalSessionIdKeyPart = (value) => {
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: value });
-  if (!canonicalSessionId) return "";
-  const hex = canonicalSessionId.slice(2);
-  let binary = "";
-  for (let index = 0; index < hex.length; index += 2) {
-    binary += String.fromCharCode(Number.parseInt(hex.slice(index, index + 2), 16));
-  }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-};
-var canonicalWorkerGroupSessionSlug = (value) => {
-  const validated = validateInboundWorkerSessionSlug(value);
-  if (!validated.ok) return "";
-  const slug = normalizeWorkerSessionSlug(validated.slug) || "general";
-  return slug.length <= MAX_WORKER_GROUP_SESSION_SLUG_LENGTH ? slug : "";
-};
+var IMPLEMENTED_JOIN_MODES = /* @__PURE__ */ new Set([
+  WORKER_GROUP_JOIN_MODES.OPEN,
+  WORKER_GROUP_JOIN_MODES.ADMIN_ADD
+]);
+var safeSlugPart = (value) => trim(value || "general").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "general";
+var safeKeyPart = (value) => trim(value || "id").toLowerCase().replace(/[^a-z0-9._:-]+/g, "-").replace(/^-+|-+$/g, "") || "id";
 var nowIso = (deps = {}) => new Date(deps.now?.() || Date.now()).toISOString();
 var parsePositiveInt = (value, fallback) => {
-  const parsed = Number.parseInt(trim2(value), 10);
+  const parsed = Number.parseInt(trim(value), 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
-var resolveWorkerGroupMemberPageRequest = ({ cursor, limit } = {}) => {
-  const normalizedCursor = cursor == null ? "" : cursor;
-  const normalizedLimit = limit == null || limit === "" ? DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE : Number(limit);
-  if (typeof normalizedCursor !== "string" || normalizedCursor.length > 1024 || !Number.isSafeInteger(normalizedLimit) || normalizedLimit < 1 || normalizedLimit > MAX_WORKER_GROUP_MEMBER_PAGE_SIZE) {
-    return {
-      ok: false,
-      status: 400,
-      reason: "worker_group_member_page_invalid"
-    };
-  }
-  return {
-    ok: true,
-    cursor: normalizedCursor,
-    limit: normalizedLimit
-  };
-};
-var WORKER_GROUP_MEMBER_CURSOR_PREFIX = "wg2:";
-var decodeWorkerGroupMemberCursor = (cursor = "") => {
-  if (!cursor.startsWith(WORKER_GROUP_MEMBER_CURSOR_PREFIX)) {
-    return { source: "canonical", cursor };
-  }
-  const encoded = cursor.slice(WORKER_GROUP_MEMBER_CURSOR_PREFIX.length);
-  const separatorIndex = encoded.indexOf(":");
-  const source = encoded.slice(0, separatorIndex);
-  if (separatorIndex < 0 || source !== "canonical" && source !== "legacy") {
-    throw new Error("Worker group member cursor is invalid.");
-  }
-  return {
-    source,
-    cursor: encoded.slice(separatorIndex + 1)
-  };
-};
-var encodeWorkerGroupMemberCursor = (source, cursor = "") => `${WORKER_GROUP_MEMBER_CURSOR_PREFIX}${source}:${cursor}`;
 var resolveWorkerGroupCaps = (env = {}) => ({
-  maxGroupsPerSession: parsePositiveInt(env.CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION, DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION),
-  maxMembersPerGroup: parsePositiveInt(env.CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP, DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP)
+  maxGroupsPerSession: parsePositiveInt(
+    env.CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION,
+    DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION
+  ),
+  maxMembersPerGroup: parsePositiveInt(
+    env.CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP,
+    DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP
+  )
 });
-var resolveWorkerGroupsKv = (env = {}) => env.CE_WORKER_GROUPS_KV || env.GROUP_KV || env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
+var resolveWorkerGroupsKv = (env = {}) => env.CE_WORKER_GROUPS_KV || env.CE_STORAGE_INDEX_KV || env.STORAGE_INDEX_KV || env.STORAGE_KV || null;
 var resolveWorkerGroupStore = (env = {}) => {
   const kv = resolveWorkerGroupsKv(env);
   if (kv && typeof kv.get === "function" && typeof kv.put === "function") return { kind: "kv", store: kv };
   return null;
 };
-var workerGroupIdentityKeyPrefix = ({ slug, sessionId }) => {
-  const canonicalSlug = canonicalWorkerGroupSessionSlug(slug);
-  const sessionIdPart = canonicalSessionIdKeyPart(sessionId);
-  if (!canonicalSlug || !sessionIdPart) {
-    throw new Error("Worker group session identity is invalid.");
-  }
-  return `${canonicalSlug}:${sessionIdPart}`;
-};
-var workerGroupRecordMatchesIdentity = ({ row, slug, sessionId }) => {
-  const canonicalSlug = canonicalWorkerGroupSessionSlug(slug);
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-  return isObj6(row) && !!canonicalSlug && !!canonicalSessionId && trim2(row.sessionSlug) === canonicalSlug && resolveCanonicalWorkerSessionIdHex({ sessionId: row.sessionId }) === canonicalSessionId;
-};
-var groupKey = ({ slug, sessionId, groupId }) => `ce-worker-group:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${normalizeWorkerGroupId(groupId)}`;
-var groupPrefix = ({ slug, sessionId }) => `ce-worker-group:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:`;
-var groupIndexKey = ({ slug, sessionId, groupId }) => `ce-worker-group-index:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${normalizeWorkerGroupId(groupId)}`;
-var groupIndexPrefix = ({ slug, sessionId }) => `ce-worker-group-index:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:`;
-var memberKey = ({ slug, sessionId, groupId, principalKey }) => `ce-worker-group-member:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${normalizeWorkerGroupId(groupId)}:${encodedPrincipalKeyPart(principalKey)}`;
-var memberIndexKey = ({ slug, sessionId, principalKey, groupId }) => `ce-worker-group-principal:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${encodedPrincipalKeyPart(principalKey)}:${normalizeWorkerGroupId(groupId)}`;
-var memberPrefix = ({ slug, sessionId, groupId }) => `ce-worker-group-member:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${normalizeWorkerGroupId(groupId)}:`;
-var principalPrefix = ({ slug, sessionId, principalKey }) => `ce-worker-group-principal:${workerGroupIdentityKeyPrefix({ slug, sessionId })}:${encodedPrincipalKeyPart(principalKey)}:`;
-var legacyGroupKey = ({ slug, groupId }) => `ce-worker-group:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}`;
-var legacyGroupPrefix = ({ slug }) => `ce-worker-group:${safeSlugPart(slug)}:`;
-var legacyGroupIndexKey = ({ slug, groupId }) => `ce-worker-group-index:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}`;
-var legacyGroupIndexPrefix = ({ slug }) => `ce-worker-group-index:${safeSlugPart(slug)}:`;
-var legacyEncodedMemberKey = ({ slug, groupId, principalKey }) => `ce-worker-group-member:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}:${encodedPrincipalKeyPart(principalKey)}`;
-var legacyCaseFoldedMemberKey = ({ slug, groupId, principalKey }) => `ce-worker-group-member:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}:${safeKeyPart(principalKey)}`;
-var legacyMemberPrefix = ({ slug, groupId }) => `ce-worker-group-member:${safeSlugPart(slug)}:${normalizeWorkerGroupId(groupId)}:`;
-var legacyEncodedPrincipalPrefix = ({ slug, principalKey }) => `ce-worker-group-principal:${safeSlugPart(slug)}:${encodedPrincipalKeyPart(principalKey)}:`;
-var legacyCaseFoldedPrincipalPrefix = ({ slug, principalKey }) => `ce-worker-group-principal:${safeSlugPart(slug)}:${safeKeyPart(principalKey)}:`;
-var legacyEncodedMemberIndexKey = ({ slug, principalKey, groupId }) => `${legacyEncodedPrincipalPrefix({ slug, principalKey })}${normalizeWorkerGroupId(groupId)}`;
-var legacyCaseFoldedMemberIndexKey = ({ slug, principalKey, groupId }) => `${legacyCaseFoldedPrincipalPrefix({ slug, principalKey })}${normalizeWorkerGroupId(groupId)}`;
+var groupKey = ({ slug, groupId }) => `ce-worker-group:${safeSlugPart(slug)}:${safeKeyPart(groupId)}`;
+var groupIndexKey = ({ slug, groupId }) => `ce-worker-group-index:${safeSlugPart(slug)}:${safeKeyPart(groupId)}`;
+var groupIndexPrefix = ({ slug }) => `ce-worker-group-index:${safeSlugPart(slug)}:`;
+var memberKey = ({ slug, groupId, principalKey }) => `ce-worker-group-member:${safeSlugPart(slug)}:${safeKeyPart(groupId)}:${safeKeyPart(principalKey)}`;
+var memberIndexKey = ({ slug, principalKey, groupId }) => `ce-worker-group-principal:${safeSlugPart(slug)}:${safeKeyPart(principalKey)}:${safeKeyPart(groupId)}`;
+var memberPrefix = ({ slug, groupId }) => `ce-worker-group-member:${safeSlugPart(slug)}:${safeKeyPart(groupId)}:`;
+var principalPrefix = ({ slug, principalKey }) => `ce-worker-group-principal:${safeSlugPart(slug)}:${safeKeyPart(principalKey)}:`;
 var jsonResponse = (deps, body, status, headers) => deps?.json?.(body, status, headers) || new Response(JSON.stringify(body), { status, headers });
 var normalizeJoinMode = (value) => {
-  const mode = trim2(value || WORKER_GROUP_JOIN_MODES.ADMIN_ADD).toLowerCase();
+  const mode = trim(value || WORKER_GROUP_JOIN_MODES.ADMIN_ADD).toLowerCase();
   if (Object.values(WORKER_GROUP_JOIN_MODES).includes(mode)) return mode;
   return "";
 };
 var normalizeMemberVisibility = (value) => {
-  const visibility = trim2(value || WORKER_GROUP_MEMBER_VISIBILITY.ADMIN_ONLY).toLowerCase();
+  const visibility = trim(value || WORKER_GROUP_MEMBER_VISIBILITY.ADMIN_ONLY).toLowerCase();
   if (Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(visibility)) return visibility;
   return "";
 };
-var normalizeImageUrl = (value) => {
-  const raw = trim2(value);
-  if (!raw) return { ok: true, value: "" };
-  if (raw.length > MAX_WORKER_GROUP_IMAGE_URL_LENGTH) return { ok: false };
-  try {
-    const parsed = new URL(raw);
-    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return { ok: false };
-    return { ok: true, value: parsed.href };
-  } catch {
-    return { ok: false };
-  }
-};
-var normalizeGroupTags = (value) => {
-  if (value == null) return { ok: true, value: [] };
-  if (!Array.isArray(value) || value.length > MAX_WORKER_GROUP_TAGS) return { ok: false };
-  const tags = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const candidate of value) {
-    if (typeof candidate !== "string") return { ok: false };
-    const tag = trim2(candidate);
-    if (!tag || tag.length > MAX_WORKER_GROUP_TAG_LENGTH) return { ok: false };
-    const key = tag.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    tags.push(tag);
-  }
-  return { ok: true, value: tags };
-};
-var normalizeGroupDocumentUrls = (value) => {
-  if (value == null) return { ok: true, value: [] };
-  if (!Array.isArray(value) || value.length > MAX_WORKER_GROUP_DOCUMENT_URLS) return { ok: false };
-  const documentURLs = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const candidate of value) {
-    if (typeof candidate !== "string") return { ok: false };
-    const normalized = normalizeImageUrl(candidate);
-    if (!normalized.ok || !normalized.value) return { ok: false };
-    if (seen.has(normalized.value)) continue;
-    seen.add(normalized.value);
-    documentURLs.push(normalized.value);
-  }
-  return { ok: true, value: documentURLs };
-};
-var normalizeGroupMemberLimit = (value) => {
-  if (value == null || value === "" || Number(value) === 0) return { ok: true, value: 0 };
-  const memberLimit = Number(value);
-  if (!Number.isSafeInteger(memberLimit) || memberLimit < 1 || memberLimit > MAX_WORKER_GROUP_MEMBER_LIMIT) {
-    return { ok: false };
-  }
-  return { ok: true, value: memberLimit };
-};
-var normalizeGroupJoinEndsAt = (value, deps = {}, { allowPast = false } = {}) => {
-  const raw = trim2(value);
-  if (!raw) return { ok: true, value: "" };
-  const timestamp = Date.parse(raw);
-  const now = Number(deps.now?.() || Date.now());
-  if (!Number.isFinite(timestamp) || !allowPast && timestamp <= now) return { ok: false };
-  return { ok: true, value: new Date(timestamp).toISOString() };
-};
 var normalizeEvmAddress = (value, deps = {}) => {
-  const address = trim2(value);
+  const address = trim(value);
   if (typeof deps.isAddress === "function" && !deps.isAddress(address)) return "";
   if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return "";
   if (typeof deps.getAddress === "function") {
     try {
-      const normalized = trim2(deps.getAddress(address));
+      const normalized = trim(deps.getAddress(address));
       if (/^0x[0-9a-fA-F]{40}$/.test(normalized)) return normalized;
     } catch {
       return "";
@@ -61100,16 +56114,12 @@ var normalizeEvmAddress = (value, deps = {}) => {
   return address.toLowerCase();
 };
 var normalizePrincipalId = (value) => {
-  const id2 = trim2(value);
+  const id2 = trim(value);
   if (!id2 || id2.length > 180) return "";
   if (!/^[A-Za-z0-9:_@./=-]+$/.test(id2)) return "";
   return id2;
 };
-var principalKeyFor = (kind, value) => {
-  const normalizedValue = trim2(value);
-  const keyValue = kind === "evm_address" || kind === "passkey_account" ? normalizedValue.toLowerCase() : normalizedValue;
-  return `${kind}:${keyValue}`;
-};
+var principalKeyFor = (kind, value) => `${kind}:${trim(value).toLowerCase()}`;
 var normalizeWorkerGroupPrincipal = (input, deps = {}) => {
   if (typeof input === "string") {
     const address = normalizeEvmAddress(input, deps);
@@ -61120,8 +56130,8 @@ var normalizeWorkerGroupPrincipal = (input, deps = {}) => {
       key: principalKeyFor("evm_address", address)
     };
   }
-  if (!isObj6(input)) return { ok: false, reason: "invalid_principal" };
-  const kind = trim2(input.kind || input.type).toLowerCase();
+  if (!isObj(input)) return { ok: false, reason: "invalid_principal" };
+  const kind = trim(input.kind || input.type).toLowerCase();
   if (kind === "passkey_account" || kind === "evm_address") {
     const address = normalizeEvmAddress(input.address || input.account || input.id, deps);
     if (!address) return { ok: false, reason: "invalid_principal_address" };
@@ -61153,32 +56163,27 @@ var normalizeWorkerGroupPrincipal = (input, deps = {}) => {
 };
 var resolveWorkerGroupPrincipal = ({ requesterAddress, authScopes, principal, deps = {} } = {}) => {
   if (principal) return normalizeWorkerGroupPrincipal(principal, deps);
-  const scopes = isObj6(authScopes) ? authScopes : {};
+  const scopes = isObj(authScopes) ? authScopes : {};
   const explicit = scopes.principal || scopes.workerPrincipal || scopes.subjectPrincipal || scopes.delegationPrincipal;
   if (explicit) return normalizeWorkerGroupPrincipal(explicit, deps);
-  const grantId = trim2(scopes.grantId || scopes.agentGrant?.grantId || scopes.agent_grant?.grantId || scopes.delegation?.grantId);
+  const grantId = trim(
+    scopes.grantId || scopes.agentGrant?.grantId || scopes.agent_grant?.grantId || scopes.delegation?.grantId
+  );
   if (grantId) return normalizeWorkerGroupPrincipal({ kind: "agent", grantId }, deps);
   const telegramPrincipal = scopes.telegramPrincipal || scopes.integrationPrincipal?.telegram || scopes.integrationPrincipal?.telegramPrincipal || scopes.integrationPrincipal?.principalId;
   if (telegramPrincipal) return normalizeWorkerGroupPrincipal({ kind: "telegram", principalId: telegramPrincipal }, deps);
-  const telegramId = trim2(
+  const telegramId = trim(
     scopes.telegramUserId || scopes.integrationPrincipal?.telegramUserId || scopes.integrationPrincipal?.telegram_user_id
   );
   if (telegramId) return normalizeWorkerGroupPrincipal({ kind: "telegram", principalId: `telegram:${telegramId}` }, deps);
   if (requesterAddress) return normalizeWorkerGroupPrincipal({ kind: "evm_address", address: requesterAddress }, deps);
   return { ok: false, reason: "missing_principal" };
 };
-var createWorkerGroupId = (deps = {}) => {
-  const supplied = trim2(deps.randomUUID?.());
-  if (supplied) {
-    const normalized = normalizeWorkerGroupId(supplied);
-    if (normalized) return normalized;
-    throw new Error("Generated worker group id is invalid.");
-  }
+var createGroupId = (deps = {}) => {
+  const supplied = trim(deps.randomUUID?.());
+  if (supplied) return safeKeyPart(supplied);
   const cryptoImpl = deps.crypto || globalThis.crypto;
-  if (typeof cryptoImpl?.randomUUID === "function") {
-    const normalized = normalizeWorkerGroupId(cryptoImpl.randomUUID());
-    if (normalized) return normalized;
-  }
+  if (typeof cryptoImpl?.randomUUID === "function") return safeKeyPart(cryptoImpl.randomUUID());
   const bytes2 = new Uint8Array(16);
   const getRandomValues = deps.getRandomValues || cryptoImpl?.getRandomValues?.bind(cryptoImpl);
   if (typeof getRandomValues !== "function") throw new Error("Secure randomness is required for worker group ids.");
@@ -61193,39 +56198,16 @@ var normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps =
   }
   const memberVisibility = normalizeMemberVisibility(input.memberVisibility || existing?.memberVisibility);
   if (!memberVisibility) return { ok: false, status: 400, reason: "invalid_member_visibility" };
-  const label = trim2(input.label || existing?.label);
+  const label = trim(input.label || existing?.label);
   if (!label || label.length > 120) return { ok: false, status: 400, reason: "invalid_group_label" };
-  const description = trim2(input.description ?? existing?.description);
+  const description = trim(input.description ?? existing?.description);
   if (description.length > 500) return { ok: false, status: 400, reason: "invalid_group_description" };
-  const imageUrlResult = normalizeImageUrl(input.imageUrl ?? existing?.imageUrl);
-  if (!imageUrlResult.ok) return { ok: false, status: 400, reason: "invalid_group_image_url" };
-  const tagsResult = normalizeGroupTags(input.tags ?? existing?.tags);
-  if (!tagsResult.ok) return { ok: false, status: 400, reason: "invalid_group_tags" };
-  const documentUrlsResult = normalizeGroupDocumentUrls(input.documentURLs ?? existing?.documentURLs);
-  if (!documentUrlsResult.ok) return { ok: false, status: 400, reason: "invalid_group_document_urls" };
-  const memberLimitResult = normalizeGroupMemberLimit(
-    Object.prototype.hasOwnProperty.call(input, "memberLimit") ? input.memberLimit : existing?.memberLimit
-  );
-  if (!memberLimitResult.ok) return { ok: false, status: 400, reason: "invalid_group_member_limit" };
-  const joinEndsAtResult = Object.prototype.hasOwnProperty.call(input, "joinEndsAt") ? normalizeGroupJoinEndsAt(input.joinEndsAt, deps, { allowPast: !!existing }) : { ok: true, value: trim2(existing?.joinEndsAt) };
-  if (!joinEndsAtResult.ok) return { ok: false, status: 400, reason: "invalid_group_join_end" };
-  const requestedAdminAddress = Object.prototype.hasOwnProperty.call(input, "adminAddress") ? trim2(input.adminAddress) : trim2(existing?.adminAddress || actorPrincipal?.address);
-  const adminAddress = requestedAdminAddress ? normalizeEvmAddress(requestedAdminAddress, deps) : "";
-  if (requestedAdminAddress && !adminAddress) {
-    return { ok: false, status: 400, reason: "invalid_group_admin_address" };
-  }
   const updatedAt = nowIso(deps);
   return {
     ok: true,
     patch: {
       label,
-      description: description || void 0,
-      imageUrl: imageUrlResult.value || void 0,
-      tags: tagsResult.value.length ? tagsResult.value : void 0,
-      documentURLs: documentUrlsResult.value.length ? documentUrlsResult.value : void 0,
-      memberLimit: memberLimitResult.value || void 0,
-      joinEndsAt: joinEndsAtResult.value || void 0,
-      adminAddress: adminAddress || void 0,
+      ...description ? { description } : {},
       joinMode,
       memberVisibility,
       updatedAt,
@@ -61236,1204 +56218,222 @@ var normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps =
     }
   };
 };
-var kvGetJsonStrict = async (kv, key) => {
-  const raw = await kv.get(key);
-  if (raw == null) return null;
-  if (typeof raw === "string") {
-    const parsed = JSON.parse(raw);
-    if (!isObj6(parsed)) throw new Error("Worker group KV record is malformed.");
-    return parsed;
-  }
-  if (!isObj6(raw)) throw new Error("Worker group KV record is malformed.");
-  return raw;
-};
-var kvGetLegacyJson = async (kv, key) => {
+var kvGetJson = async (kv, key) => {
   try {
-    return await kvGetJsonStrict(kv, key);
+    const raw = await kv.get(key);
+    return typeof raw === "string" ? JSON.parse(raw || "null") : raw;
   } catch {
     return null;
-  }
-};
-var resolveWorkerGroupBootstrap = async ({ env, slug, sessionId, requireExhaustiveEmptyScan = false } = {}) => {
-  const canonicalSlug = canonicalWorkerGroupSessionSlug(slug);
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-  if (!canonicalSlug || !canonicalSessionId) {
-    return { ok: false, status: 400, reason: "worker_group_session_identity_invalid" };
-  }
-  const explicitBootstrapId = trim2(env?.CE_WORKER_GROUPS_BOOTSTRAP);
-  if (explicitBootstrapId === WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL) {
-    const kv2 = resolveWorkerGroupsKv(env);
-    if (requireExhaustiveEmptyScan && typeof kv2?.list !== "function") {
-      return {
-        ok: false,
-        status: 503,
-        reason: "worker_group_capacity_state_unavailable"
-      };
-    }
-    if (typeof kv2?.list === "function") {
-      try {
-        const existingGroups = await scanWorkerGroupRecordsForIdentity({
-          store: { kind: "kv", store: kv2 },
-          slug: canonicalSlug,
-          sessionId: canonicalSessionId,
-          includeDeleted: true
-        });
-        if (existingGroups.length) {
-          return {
-            ok: false,
-            status: 503,
-            reason: "worker_group_capacity_reconciliation_required"
-          };
-        }
-      } catch {
-        return {
-          ok: false,
-          status: 503,
-          reason: "worker_group_capacity_state_unavailable"
-        };
-      }
-    }
-    return { ok: true, bootstrapId: explicitBootstrapId };
-  }
-  if (explicitBootstrapId) {
-    return {
-      ok: false,
-      status: 503,
-      reason: "worker_group_capacity_reconciliation_required"
-    };
-  }
-  const kv = resolveWorkerGroupsKv(env);
-  if (!kv?.get) {
-    return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
-  }
-  if (requireExhaustiveEmptyScan && typeof kv.list !== "function") {
-    return {
-      ok: false,
-      status: 503,
-      reason: "worker_group_capacity_state_unavailable"
-    };
-  }
-  try {
-    const configSlug = normalizeWorkerSessionSlug(canonicalSlug);
-    const config = await kvGetJsonStrict(kv, `session:${configSlug}:config`);
-    const bootstrap = isObj6(config?.workerGroupsBootstrap) ? config.workerGroupsBootstrap : null;
-    const configIdentity = normalizeWorkerSessionSlug(config?.slug);
-    const configSessionId = resolveCanonicalWorkerSessionIdHex(config);
-    const expectedIdentity = normalizeWorkerSessionSlug(canonicalSlug);
-    const bootstrapId = trim2(bootstrap?.bootstrapId);
-    if (Number(bootstrap?.version) === 2 && bootstrap?.state === "fresh_empty" && /^[0-9a-f]{64}$/.test(bootstrapId) && configIdentity === expectedIdentity && configSessionId === canonicalSessionId) {
-      const existingGroups = typeof kv.list === "function" ? await scanWorkerGroupRecordsForIdentity({
-        store: { kind: "kv", store: kv },
-        slug: canonicalSlug,
-        sessionId: canonicalSessionId,
-        includeDeleted: true
-      }) : [];
-      if (existingGroups.length) {
-        return {
-          ok: false,
-          status: 503,
-          reason: "worker_group_capacity_reconciliation_required"
-        };
-      }
-      return { ok: true, bootstrapId };
-    }
-    return {
-      ok: false,
-      status: 503,
-      reason: "worker_group_capacity_reconciliation_required"
-    };
-  } catch {
-    return {
-      ok: false,
-      status: 503,
-      reason: "worker_group_capacity_state_unavailable"
-    };
   }
 };
 var kvListKeys = async (kv, prefix) => {
   if (typeof kv.list !== "function") return [];
-  const keys = [];
-  const seenCursors = /* @__PURE__ */ new Set();
-  let cursor = "";
-  let hasMore = true;
-  while (hasMore) {
-    const listed = await kv.list({ prefix, ...cursor ? { cursor } : {} });
-    if (!listed || typeof listed !== "object" || !Array.isArray(listed.keys)) {
-      throw new Error("Worker group KV listing returned an invalid page.");
-    }
-    keys.push(...listed.keys.map((entry) => trim2(entry?.name || entry)).filter(Boolean));
-    if (listed.list_complete !== false) {
-      hasMore = false;
-      continue;
-    }
-    const nextCursor = trim2(listed.cursor);
-    if (!nextCursor || seenCursors.has(nextCursor)) {
-      throw new Error("Worker group KV listing did not provide a usable continuation cursor.");
-    }
-    seenCursors.add(nextCursor);
-    cursor = nextCursor;
-  }
-  return keys;
+  const listed = await kv.list({ prefix });
+  return Array.isArray(listed?.keys) ? listed.keys.map((entry) => trim(entry?.name || entry)).filter(Boolean) : [];
 };
-var kvListKeyPage = async (kv, prefix, { cursor = "", limit } = {}) => {
-  const listed = await kv.list({
-    prefix,
-    limit,
-    ...cursor ? { cursor } : {}
-  });
-  if (!listed || typeof listed !== "object" || !Array.isArray(listed.keys)) {
-    throw new Error("Worker group KV listing returned an invalid page.");
-  }
-  if (listed.keys.length > limit) {
-    throw new Error("Worker group KV listing exceeded the requested page size.");
-  }
-  const keys = listed.keys.map((entry) => trim2(entry?.name || entry)).filter(Boolean);
-  if (listed.list_complete !== false) return { keys, nextCursor: "" };
-  const nextCursor = typeof listed.cursor === "string" ? listed.cursor : "";
-  if (!nextCursor || nextCursor.length > 1024 || nextCursor === cursor) {
-    throw new Error("Worker group KV listing did not provide a usable continuation cursor.");
-  }
-  return { keys, nextCursor };
+var readGroupRecord = async ({ store, slug, groupId }) => {
+  return kvGetJson(store.store, groupKey({ slug, groupId }));
 };
-var readGroupRecord = async ({ store, slug, sessionId, groupId }) => {
-  const normalizedGroupId = normalizeWorkerGroupId(groupId);
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-  if (!normalizedGroupId) throw new Error("Worker group id is invalid.");
-  if (!canonicalSessionId) throw new Error("Worker group session identity is invalid.");
-  const canonicalKey = groupKey({
-    slug,
-    sessionId: canonicalSessionId,
-    groupId: normalizedGroupId
-  });
-  const canonicalRow = await kvGetJsonStrict(store.store, canonicalKey);
-  if (canonicalRow) {
-    if (!workerGroupRecordMatchesIdentity({
-      row: canonicalRow,
-      slug,
-      sessionId: canonicalSessionId
-    }) || normalizeWorkerGroupId(canonicalRow.groupId) !== normalizedGroupId) {
-      throw new Error("Worker group KV record does not match its key.");
-    }
-    return canonicalRow;
-  }
-  const legacyRow = await kvGetLegacyJson(store.store, legacyGroupKey({ slug, groupId: normalizedGroupId }));
-  if (!legacyRow || !workerGroupRecordMatchesIdentity({
-    row: legacyRow,
-    slug,
-    sessionId: canonicalSessionId
-  }) || normalizeWorkerGroupId(legacyRow.groupId) !== normalizedGroupId) {
-    return null;
-  }
-  await writeGroupRecord({
-    store,
-    slug,
-    sessionId: canonicalSessionId,
-    group: legacyRow
-  });
-  return legacyRow;
+var writeGroupRecord = async ({ store, slug, group }) => {
+  await store.store.put(groupKey({ slug, groupId: group.groupId }), JSON.stringify(group));
+  await store.store.put(groupIndexKey({ slug, groupId: group.groupId }), group.groupId);
 };
-var writeGroupRecord = async ({ store, slug, sessionId, group }) => {
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({
-    sessionId: sessionId || group?.sessionId
-  });
-  if (!canonicalSessionId || !workerGroupRecordMatchesIdentity({
-    row: group,
-    slug,
-    sessionId: canonicalSessionId
-  }) || !normalizeWorkerGroupId(group?.groupId)) {
-    throw new Error("Worker group record identity is invalid.");
-  }
-  await store.store.put(groupKey({ slug, sessionId: canonicalSessionId, groupId: group.groupId }), JSON.stringify(group));
-  await store.store.put(groupIndexKey({ slug, sessionId: canonicalSessionId, groupId: group.groupId }), group.groupId);
-};
-var listGroupRecords = async ({ store, slug, sessionId, includeDeleted = false }) => {
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-  if (!canonicalSessionId) throw new Error("Worker group session identity is invalid.");
-  const canonicalKeys = await kvListKeys(store.store, groupIndexPrefix({ slug, sessionId: canonicalSessionId }));
-  const legacyKeys = await kvListKeys(store.store, legacyGroupIndexPrefix({ slug }));
-  const groups = /* @__PURE__ */ new Map();
-  for (const key of canonicalKeys) {
+var listGroupRecords = async ({ store, slug, includeDeleted = false }) => {
+  const keys = await kvListKeys(store.store, groupIndexPrefix({ slug }));
+  const groups = [];
+  for (const key of keys) {
     const groupId = await store.store.get(key);
-    const normalizedGroupId = normalizeWorkerGroupId(groupId);
-    if (!normalizedGroupId || key !== groupIndexKey({
-      slug,
-      sessionId: canonicalSessionId,
-      groupId: normalizedGroupId
-    })) {
-      throw new Error("Worker group index record is malformed.");
-    }
-    const group = await readGroupRecord({
-      store,
-      slug,
-      sessionId: canonicalSessionId,
-      groupId: normalizedGroupId
-    });
-    if (!group) throw new Error("Worker group index points to a missing group.");
-    if (includeDeleted || !group.deletedAt) groups.set(normalizedGroupId, group);
+    const group = await readGroupRecord({ store, slug, groupId });
+    if (group && (includeDeleted || !group.deletedAt)) groups.push(group);
   }
-  for (const key of legacyKeys) {
-    let groupId;
-    try {
-      groupId = await store.store.get(key);
-    } catch {
-      continue;
-    }
-    const normalizedGroupId = normalizeWorkerGroupId(groupId);
-    if (!normalizedGroupId || key !== legacyGroupIndexKey({ slug, groupId: normalizedGroupId })) {
-      continue;
-    }
-    const group = await readGroupRecord({
-      store,
-      slug,
-      sessionId: canonicalSessionId,
-      groupId: normalizedGroupId
-    });
-    if (group && (includeDeleted || !group.deletedAt)) {
-      groups.set(normalizedGroupId, group);
-    }
-  }
-  return [...groups.values()];
+  return groups;
 };
-var scanWorkerGroupRecordsForIdentity = async ({ store, slug, sessionId, includeDeleted = false }) => {
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-  if (!canonicalSessionId) throw new Error("Worker group session identity is invalid.");
-  const canonicalKeys = await kvListKeys(store.store, groupPrefix({ slug, sessionId: canonicalSessionId }));
-  const legacyPrefix = legacyGroupPrefix({ slug });
-  const legacyKeys = (await kvListKeys(store.store, legacyPrefix)).filter((key) => !key.slice(legacyPrefix.length).includes(":"));
-  const groups = /* @__PURE__ */ new Map();
-  for (const key of canonicalKeys) {
-    const row = await kvGetJsonStrict(store.store, key);
-    const groupId = normalizeWorkerGroupId(row?.groupId);
-    if (!groupId || !workerGroupRecordMatchesIdentity({
-      row,
-      slug,
-      sessionId: canonicalSessionId
-    }) || groupKey({ slug, sessionId: canonicalSessionId, groupId }) !== key) {
-      throw new Error("Worker group KV record does not match its capacity key.");
-    }
-    if (includeDeleted || !row.deletedAt) groups.set(groupId, row);
-  }
-  for (const key of legacyKeys) {
-    const row = await kvGetLegacyJson(store.store, key);
-    const groupId = normalizeWorkerGroupId(row?.groupId);
-    if (!groupId || key !== legacyGroupKey({ slug, groupId }) || !workerGroupRecordMatchesIdentity({
-      row,
-      slug,
-      sessionId: canonicalSessionId
-    })) {
-      continue;
-    }
-    await writeGroupRecord({
-      store,
-      slug,
-      sessionId: canonicalSessionId,
-      group: row
-    });
-    if (includeDeleted || !row.deletedAt) groups.set(groupId, row);
-  }
-  return [...groups.values()];
+var writeMembershipRecord = async ({ store, slug, groupId, member }) => {
+  await store.store.put(memberKey({ slug, groupId, principalKey: member.principalKey }), JSON.stringify(member));
+  await store.store.put(memberIndexKey({ slug, principalKey: member.principalKey, groupId }), safeKeyPart(groupId));
 };
-var writeMembershipRecord = async ({ store, slug, sessionId, groupId, member }) => {
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({
-    sessionId: sessionId || member?.sessionId
-  });
-  const normalizedGroupId = normalizeWorkerGroupId(groupId);
-  const normalizedPrincipal = normalizeWorkerGroupPrincipal(member?.principal);
-  if (!canonicalSessionId || !normalizedGroupId || !workerGroupRecordMatchesIdentity({
-    row: member,
-    slug,
-    sessionId: canonicalSessionId
-  }) || normalizeWorkerGroupId(member?.groupId) !== normalizedGroupId || !normalizedPrincipal.ok || trim2(member?.principalKey) !== normalizedPrincipal.key) {
-    throw new Error("Worker group membership record identity is invalid.");
-  }
-  await store.store.put(
-    memberKey({
-      slug,
-      sessionId: canonicalSessionId,
-      groupId: normalizedGroupId,
-      principalKey: member.principalKey
-    }),
-    JSON.stringify(member)
-  );
-  await store.store.put(
-    memberIndexKey({
-      slug,
-      sessionId: canonicalSessionId,
-      principalKey: member.principalKey,
-      groupId: normalizedGroupId
-    }),
-    normalizedGroupId
-  );
+var readMembershipRecord = async ({ store, slug, groupId, principalKey }) => {
+  return kvGetJson(store.store, memberKey({ slug, groupId, principalKey }));
 };
-var canonicalizeMembershipRecord = ({ row, slug, sessionId, groupId, principalKey = "" }) => {
-  if (!row) return null;
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-  const normalizedPrincipal = normalizeWorkerGroupPrincipal(row.principal);
-  const canonicalPrincipalKey = normalizedPrincipal.ok ? normalizedPrincipal.key : "";
-  if (!canonicalSessionId || !canonicalPrincipalKey || principalKey && canonicalPrincipalKey !== principalKey || !workerGroupRecordMatchesIdentity({
-    row,
-    slug,
-    sessionId: canonicalSessionId
-  }) || normalizeWorkerGroupId(row.groupId) !== normalizeWorkerGroupId(groupId)) {
-    return null;
+var listMembershipRecords = async ({ store, slug, groupId = "", principalKey = "" }) => {
+  const prefix = groupId ? memberPrefix({ slug, groupId }) : principalPrefix({ slug, principalKey });
+  const keys = await kvListKeys(store.store, prefix);
+  const members = [];
+  for (const key of keys) {
+    const row = groupId ? await kvGetJson(store.store, key) : await readMembershipRecord({ store, slug, groupId: await store.store.get(key), principalKey });
+    if (row && !row.removedAt) members.push(row);
   }
-  return {
-    ...row,
-    principal: normalizedPrincipal.principal,
-    principalKey: canonicalPrincipalKey
-  };
-};
-var readMembershipRecord = async ({ store, slug, sessionId, groupId, principalKey }) => {
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-  if (!canonicalSessionId) throw new Error("Worker group session identity is invalid.");
-  const canonicalKey = memberKey({
-    slug,
-    sessionId: canonicalSessionId,
-    groupId,
-    principalKey
-  });
-  const canonicalRow = await kvGetJsonStrict(store.store, canonicalKey);
-  if (canonicalRow) {
-    const canonical = canonicalizeMembershipRecord({
-      row: canonicalRow,
-      slug,
-      sessionId: canonicalSessionId,
-      groupId,
-      principalKey
-    });
-    if (!canonical) {
-      throw new Error("Worker group membership KV record does not match its key.");
-    }
-    return canonical;
-  }
-  const legacyKeys = [legacyEncodedMemberKey({ slug, groupId, principalKey }), legacyCaseFoldedMemberKey({ slug, groupId, principalKey })];
-  for (const key of new Set(legacyKeys)) {
-    const row = await kvGetLegacyJson(store.store, key);
-    const canonical = canonicalizeMembershipRecord({
-      row,
-      slug,
-      sessionId: canonicalSessionId,
-      groupId,
-      principalKey
-    });
-    if (!canonical) continue;
-    await writeMembershipRecord({
-      store,
-      slug,
-      sessionId: canonicalSessionId,
-      groupId,
-      member: canonical
-    });
-    return canonical;
-  }
-  return null;
-};
-var listMembershipRecords = async ({ store, slug, sessionId, groupId = "", principalKey = "" }) => {
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-  if (!canonicalSessionId) throw new Error("Worker group session identity is invalid.");
-  const sources = groupId ? [
-    {
-      legacy: false,
-      prefix: memberPrefix({
-        slug,
-        sessionId: canonicalSessionId,
-        groupId
-      })
-    },
-    {
-      legacy: true,
-      prefix: legacyMemberPrefix({ slug, groupId })
-    }
-  ] : [
-    {
-      legacy: false,
-      prefix: principalPrefix({
-        slug,
-        sessionId: canonicalSessionId,
-        principalKey
-      })
-    },
-    {
-      legacy: true,
-      prefix: legacyEncodedPrincipalPrefix({ slug, principalKey })
-    },
-    {
-      legacy: true,
-      prefix: legacyCaseFoldedPrincipalPrefix({ slug, principalKey })
-    }
-  ];
-  const keyedSources = /* @__PURE__ */ new Map();
-  for (const source of sources) {
-    const keys = await kvListKeys(store.store, source.prefix);
-    for (const key of keys) {
-      const existing = keyedSources.get(key);
-      if (!existing || existing.legacy && !source.legacy) {
-        keyedSources.set(key, source);
-      }
-    }
-  }
-  const members = /* @__PURE__ */ new Map();
-  for (const [key, source] of keyedSources) {
-    let indexedGroupId = groupId;
-    if (!indexedGroupId) {
-      try {
-        indexedGroupId = await store.store.get(key);
-      } catch {
-        if (source.legacy) continue;
-        throw new Error("Worker group membership index is unavailable.");
-      }
-    }
-    if (!normalizeWorkerGroupId(indexedGroupId)) {
-      if (source.legacy) continue;
-      throw new Error("Worker group membership index is malformed.");
-    }
-    if (!groupId) {
-      const validIndexKey = source.legacy ? key === legacyEncodedMemberIndexKey({ slug, principalKey, groupId: indexedGroupId }) || key === legacyCaseFoldedMemberIndexKey({ slug, principalKey, groupId: indexedGroupId }) : key === memberIndexKey({
-        slug,
-        sessionId: canonicalSessionId,
-        principalKey,
-        groupId: indexedGroupId
-      });
-      if (!validIndexKey) {
-        if (source.legacy) continue;
-        throw new Error("Worker group membership index does not match its key.");
-      }
-    }
-    const rawRow = groupId ? source.legacy ? await kvGetLegacyJson(store.store, key) : await kvGetJsonStrict(store.store, key) : await readMembershipRecord({
-      store,
-      slug,
-      sessionId: canonicalSessionId,
-      groupId: indexedGroupId,
-      principalKey
-    });
-    const row = canonicalizeMembershipRecord({
-      row: rawRow,
-      slug,
-      sessionId: canonicalSessionId,
-      groupId: indexedGroupId,
-      principalKey
-    });
-    if (!row && !source.legacy && rawRow) {
-      throw new Error("Worker group membership KV record does not match its key.");
-    }
-    if (row && !row.removedAt && (!groupId || normalizeWorkerGroupId(row.groupId) === normalizeWorkerGroupId(groupId)) && (!principalKey || row.principalKey === principalKey)) {
-      if (source.legacy) {
-        await writeMembershipRecord({
-          store,
-          slug,
-          sessionId: canonicalSessionId,
-          groupId: indexedGroupId,
-          member: row
-        });
-      }
-      members.set(`${row.groupId}
-${row.principalKey}`, row);
-    }
-  }
-  return [...members.values()];
-};
-var listMembershipRecordPage = async ({ store, slug, sessionId, groupId, cursor, limit }) => {
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-  if (!canonicalSessionId) throw new Error("Worker group session identity is invalid.");
-  const decodedCursor = decodeWorkerGroupMemberCursor(cursor);
-  const members = /* @__PURE__ */ new Map();
-  const readPage = async ({ source, pageCursor = "", pageLimit }) => {
-    const legacy = source === "legacy";
-    const page = await kvListKeyPage(
-      store.store,
-      legacy ? legacyMemberPrefix({ slug, groupId }) : memberPrefix({ slug, sessionId: canonicalSessionId, groupId }),
-      {
-        cursor: pageCursor,
-        limit: pageLimit
-      }
-    );
-    for (const key of page.keys) {
-      const rawRow = legacy ? await kvGetLegacyJson(store.store, key) : await kvGetJsonStrict(store.store, key);
-      const row = canonicalizeMembershipRecord({
-        row: rawRow,
-        slug,
-        sessionId: canonicalSessionId,
-        groupId
-      });
-      if (!row) {
-        if (!legacy && rawRow) {
-          throw new Error("Worker group membership KV record does not match its key.");
-        }
-        continue;
-      }
-      const validKey = legacy ? key === legacyEncodedMemberKey({
-        slug,
-        groupId,
-        principalKey: row.principalKey
-      }) || key === legacyCaseFoldedMemberKey({
-        slug,
-        groupId,
-        principalKey: row.principalKey
-      }) : key === memberKey({
-        slug,
-        sessionId: canonicalSessionId,
-        groupId,
-        principalKey: row.principalKey
-      });
-      if (!validKey) {
-        if (!legacy) {
-          throw new Error("Worker group membership KV record does not match its key.");
-        }
-        continue;
-      }
-      if (legacy) {
-        await writeMembershipRecord({
-          store,
-          slug,
-          sessionId: canonicalSessionId,
-          groupId,
-          member: row
-        });
-      }
-      if (!row.removedAt) {
-        members.set(`${row.groupId}
-${row.principalKey}`, row);
-      }
-    }
-    return page;
-  };
-  if (decodedCursor.source === "legacy") {
-    const legacyPage2 = await readPage({
-      source: "legacy",
-      pageCursor: decodedCursor.cursor,
-      pageLimit: limit
-    });
-    return {
-      members: [...members.values()],
-      nextCursor: legacyPage2.nextCursor ? encodeWorkerGroupMemberCursor("legacy", legacyPage2.nextCursor) : ""
-    };
-  }
-  const canonicalPage = await readPage({
-    source: "canonical",
-    pageCursor: decodedCursor.cursor,
-    pageLimit: limit
-  });
-  if (canonicalPage.nextCursor) {
-    return {
-      members: [...members.values()],
-      nextCursor: encodeWorkerGroupMemberCursor("canonical", canonicalPage.nextCursor)
-    };
-  }
-  const remainingLimit = limit - members.size;
-  if (remainingLimit <= 0) {
-    return {
-      members: [...members.values()],
-      nextCursor: encodeWorkerGroupMemberCursor("legacy")
-    };
-  }
-  const legacyPage = await readPage({
-    source: "legacy",
-    pageLimit: remainingLimit
-  });
-  return {
-    members: [...members.values()],
-    nextCursor: legacyPage.nextCursor ? encodeWorkerGroupMemberCursor("legacy", legacyPage.nextCursor) : ""
-  };
+  return members;
 };
 var redactGroupForMember = (group) => ({
   groupId: group.groupId,
   sessionSlug: group.sessionSlug,
   label: group.label,
   ...group.description ? { description: group.description } : {},
-  ...group.imageUrl ? { imageUrl: group.imageUrl } : {},
-  ...Array.isArray(group.tags) && group.tags.length ? { tags: group.tags } : {},
-  ...Array.isArray(group.documentURLs) && group.documentURLs.length ? { documentURLs: group.documentURLs } : {},
-  ...Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? { memberLimit: group.memberLimit } : {},
-  ...group.joinEndsAt ? { joinEndsAt: group.joinEndsAt } : {},
-  ...group.adminAddress ? { adminAddress: group.adminAddress } : {},
   joinMode: group.joinMode,
   memberVisibility: group.memberVisibility,
   createdAt: group.createdAt,
   updatedAt: group.updatedAt
 });
-var isDefinitiveWorkerGroupMembershipMiss = (result) => Number(result?.status) === 403 && result?.reason === "worker_group_membership_denied" || Number(result?.status) === 404 && result?.reason === "worker_group_not_found";
-var normalizeWorkerGroupMembershipFailure = (result) => ({
-  ...result && typeof result === "object" ? result : {},
-  ok: false,
-  status: Number(result?.status || 0) || 503,
-  reason: result?.reason || "worker_group_coordination_unavailable"
-});
-var createWorkerGroup = async ({ env, slug, sessionId, input, actorPrincipal, capacityAuthorized = false, deps = {} } = {}) => {
+var createWorkerGroup = async ({ env, slug, input, actorPrincipal, deps = {} } = {}) => {
   const store = resolveWorkerGroupStore(env);
   if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
-  const canonicalSlug = canonicalWorkerGroupSessionSlug(slug);
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-  if (!canonicalSlug || !canonicalSessionId) {
-    return { ok: false, status: 400, reason: "worker_group_session_identity_invalid" };
-  }
-  if (!capacityAuthorized) {
-    const caps = resolveWorkerGroupCaps(env);
-    const existingGroups = await listGroupRecords({
-      store,
-      slug: canonicalSlug,
-      sessionId: canonicalSessionId
-    });
-    if (existingGroups.length >= caps.maxGroupsPerSession) {
-      return { ok: false, status: 409, reason: "worker_group_session_cap_exceeded" };
-    }
+  const caps = resolveWorkerGroupCaps(env);
+  const existingGroups = await listGroupRecords({ store, slug });
+  if (existingGroups.length >= caps.maxGroupsPerSession) {
+    return { ok: false, status: 409, reason: "worker_group_session_cap_exceeded" };
   }
   const normalized = normalizeGroupPatch({ input, actorPrincipal, deps });
   if (!normalized.ok) return normalized;
-  const requestedGroupId = trim2(input?.groupId);
-  const groupId = requestedGroupId ? normalizeWorkerGroupId(requestedGroupId) : createWorkerGroupId(deps);
-  if (!groupId) return { ok: false, status: 400, reason: "invalid_worker_group_id" };
-  const existing = await readGroupRecord({
-    store,
-    slug: canonicalSlug,
-    sessionId: canonicalSessionId,
-    groupId
-  });
-  if (existing) {
-    return {
-      ok: false,
-      status: 409,
-      reason: existing.deletedAt ? "worker_group_id_retired" : "worker_group_exists",
-      groupId
-    };
-  }
+  const groupId = safeKeyPart(input?.groupId) !== "id" ? safeKeyPart(input.groupId) : createGroupId(deps);
+  const existing = await readGroupRecord({ store, slug, groupId });
+  if (existing && !existing.deletedAt) return { ok: false, status: 409, reason: "worker_group_exists" };
   const group = {
     groupId,
-    sessionSlug: canonicalSlug,
-    sessionId: canonicalSessionId,
+    sessionSlug: safeSlugPart(slug),
     ...normalized.patch
   };
-  await writeGroupRecord({
-    store,
-    slug: canonicalSlug,
-    sessionId: canonicalSessionId,
-    group
-  });
-  return { ok: true, store: store.kind, group, created: true };
+  await writeGroupRecord({ store, slug, group });
+  return { ok: true, store: store.kind, group };
 };
-var updateWorkerGroup = async ({ env, slug, sessionId, groupId, input, actorPrincipal, deps = {} } = {}) => {
+var updateWorkerGroup = async ({ env, slug, groupId, input, actorPrincipal, deps = {} } = {}) => {
   const store = resolveWorkerGroupStore(env);
   if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
-  const existing = await readGroupRecord({ store, slug, sessionId, groupId });
+  const existing = await readGroupRecord({ store, slug, groupId });
   if (!existing || existing.deletedAt) return { ok: false, status: 404, reason: "worker_group_not_found" };
   const normalized = normalizeGroupPatch({ input, actorPrincipal, existing, deps });
   if (!normalized.ok) return normalized;
   const group = { ...existing, ...normalized.patch };
-  await writeGroupRecord({ store, slug, sessionId, group });
+  await writeGroupRecord({ store, slug, group });
   return { ok: true, store: store.kind, group };
 };
-var deleteWorkerGroup = async ({ env, slug, sessionId, groupId, actorPrincipal, deps = {} } = {}) => {
+var deleteWorkerGroup = async ({ env, slug, groupId, actorPrincipal, deps = {} } = {}) => {
   const store = resolveWorkerGroupStore(env);
   if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
-  const existing = await readGroupRecord({ store, slug, sessionId, groupId });
+  const existing = await readGroupRecord({ store, slug, groupId });
   if (!existing || existing.deletedAt) return { ok: false, status: 404, reason: "worker_group_not_found" };
   const deletedAt = nowIso(deps);
   const group = { ...existing, deletedAt, deletedBy: actorPrincipal, updatedAt: deletedAt };
-  await writeGroupRecord({ store, slug, sessionId, group });
-  if (typeof store.store.delete !== "function") {
-    throw new Error("Worker group KV deletion is unavailable.");
+  await writeGroupRecord({ store, slug, group });
+  const members = await listMembershipRecords({ store, slug, groupId });
+  for (const member of members) {
+    await writeMembershipRecord({
+      store,
+      slug,
+      groupId,
+      member: { ...member, removedAt: deletedAt, removedBy: actorPrincipal }
+    });
   }
-  await store.store.delete(groupIndexKey({ slug, sessionId, groupId }));
-  return {
-    ok: true,
-    store: store.kind,
-    groupId: normalizeWorkerGroupId(groupId),
-    membersInvalidated: true
-  };
+  return { ok: true, store: store.kind, groupId: safeKeyPart(groupId), removedMembers: members.length };
 };
-var addWorkerGroupMember = async ({
-  env,
-  slug,
-  sessionId,
-  groupId,
-  principal,
-  actorPrincipal,
-  capacityAuthorized = false,
-  deps = {}
-} = {}) => {
+var addWorkerGroupMember = async ({ env, slug, groupId, principal, actorPrincipal, deps = {} } = {}) => {
   const store = resolveWorkerGroupStore(env);
   if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
-  const group = await readGroupRecord({ store, slug, sessionId, groupId });
+  const group = await readGroupRecord({ store, slug, groupId });
   if (!group || group.deletedAt) return { ok: false, status: 404, reason: "worker_group_not_found" };
   const normalized = normalizeWorkerGroupPrincipal(principal, deps);
   if (!normalized.ok) return { ok: false, status: 400, reason: normalized.reason };
-  let existing;
-  if (capacityAuthorized) {
-    const existingRecord = await readMembershipRecord({
-      store,
-      slug,
-      sessionId,
-      groupId,
-      principalKey: normalized.key
-    });
-    existing = existingRecord && !existingRecord.removedAt ? existingRecord : null;
-  } else {
-    const caps = resolveWorkerGroupCaps(env);
-    const configuredMemberLimit = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? group.memberLimit : caps.maxMembersPerGroup;
-    const effectiveMemberLimit = Math.min(configuredMemberLimit, caps.maxMembersPerGroup);
-    const members = await listMembershipRecords({ store, slug, sessionId, groupId });
-    existing = members.find((member2) => member2.principalKey === normalized.key);
-    if (!existing && members.length >= effectiveMemberLimit) {
-      return { ok: false, status: 409, reason: "worker_group_member_cap_exceeded" };
-    }
+  const caps = resolveWorkerGroupCaps(env);
+  const members = await listMembershipRecords({ store, slug, groupId });
+  const existing = members.find((member2) => member2.principalKey === normalized.key);
+  if (!existing && members.length >= caps.maxMembersPerGroup) {
+    return { ok: false, status: 409, reason: "worker_group_member_cap_exceeded" };
   }
   const addedAt = nowIso(deps);
   const member = {
-    groupId: normalizeWorkerGroupId(groupId),
-    sessionSlug: canonicalWorkerGroupSessionSlug(slug),
-    sessionId: resolveCanonicalWorkerSessionIdHex({ sessionId }),
+    groupId: safeKeyPart(groupId),
+    sessionSlug: safeSlugPart(slug),
     principal: normalized.principal,
     principalKey: normalized.key,
     addedBy: actorPrincipal,
     addedAt: existing?.addedAt || addedAt
   };
-  await writeMembershipRecord({ store, slug, sessionId, groupId, member });
-  return {
-    ok: true,
-    store: store.kind,
-    group: redactGroupForMember(group),
-    member,
-    created: !existing
-  };
+  await writeMembershipRecord({ store, slug, groupId, member });
+  return { ok: true, store: store.kind, group: redactGroupForMember(group), member };
 };
-var removeWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, actorPrincipal, deps = {} } = {}) => {
+var removeWorkerGroupMember = async ({ env, slug, groupId, principal, actorPrincipal, deps = {} } = {}) => {
   const store = resolveWorkerGroupStore(env);
   if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
-  const group = await readGroupRecord({ store, slug, sessionId, groupId });
+  const group = await readGroupRecord({ store, slug, groupId });
   if (!group || group.deletedAt) return { ok: false, status: 404, reason: "worker_group_not_found" };
   const normalized = normalizeWorkerGroupPrincipal(principal, deps);
   if (!normalized.ok) return { ok: false, status: 400, reason: normalized.reason };
-  const existing = await readMembershipRecord({
-    store,
-    slug,
-    sessionId,
-    groupId,
-    principalKey: normalized.key
-  });
+  const existing = await readMembershipRecord({ store, slug, groupId, principalKey: normalized.key });
   if (!existing || existing.removedAt) return { ok: false, status: 404, reason: "worker_group_member_not_found" };
   const removedAt = nowIso(deps);
   const member = { ...existing, removedAt, removedBy: actorPrincipal };
-  await writeMembershipRecord({ store, slug, sessionId, groupId, member });
-  if (typeof store.store.delete !== "function") {
-    throw new Error("Worker group KV deletion is unavailable.");
-  }
-  await store.store.delete(
-    memberIndexKey({
-      slug,
-      sessionId,
-      principalKey: normalized.key,
-      groupId
-    })
-  );
-  return {
-    ok: true,
-    store: store.kind,
-    groupId: normalizeWorkerGroupId(groupId),
-    principal: normalized.principal
-  };
+  await writeMembershipRecord({ store, slug, groupId, member });
+  return { ok: true, store: store.kind, groupId: safeKeyPart(groupId), principal: normalized.principal };
 };
-var listWorkerGroups = async ({ env, slug, sessionId, actorPrincipalResult, admin = false, expectedGroupCount } = {}) => {
+var listWorkerGroups = async ({ env, slug, actorPrincipalResult, admin = false } = {}) => {
   const store = resolveWorkerGroupStore(env);
   if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
-  const authoritativeGroupCount = Number(expectedGroupCount);
-  if (!Number.isSafeInteger(authoritativeGroupCount) || authoritativeGroupCount < 0) {
-    return normalizeWorkerGroupMembershipFailure({
-      status: 503,
-      reason: "worker_group_projection_unavailable"
-    });
-  }
-  const groups = await listGroupRecords({ store, slug, sessionId });
-  if (!groups.length) {
-    return authoritativeGroupCount === 0 ? { ok: true, store: store.kind, groups: [] } : normalizeWorkerGroupMembershipFailure({
-      status: 503,
-      reason: "worker_group_projection_unavailable"
-    });
-  }
-  const catalog = await readCoordinatedWorkerGroupCatalog({
-    env,
-    slug,
-    sessionId,
-    groupIds: groups.map((group) => group.groupId),
-    principal: admin ? void 0 : actorPrincipalResult?.principal
-  });
-  if (!catalog.ok) return normalizeWorkerGroupMembershipFailure(catalog);
-  const authorityByGroupId = /* @__PURE__ */ new Map();
-  for (const authority of catalog.groups || []) {
-    const groupId = normalizeWorkerGroupId(authority?.groupId);
-    const joinMode = trim2(authority?.joinMode).toLowerCase();
-    const memberVisibility = trim2(authority?.memberVisibility).toLowerCase();
-    const memberCount = Number(authority?.memberCount);
-    if (!groupId || authorityByGroupId.has(groupId) || !IMPLEMENTED_JOIN_MODES.has(joinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) || !Number.isSafeInteger(memberCount) || memberCount < 0) {
-      return normalizeWorkerGroupMembershipFailure();
-    }
-    authorityByGroupId.set(groupId, {
-      joinMode,
-      memberVisibility,
-      memberCount,
-      isMember: authority?.isMember === true
-    });
-  }
-  if (authorityByGroupId.size !== authoritativeGroupCount) {
-    return normalizeWorkerGroupMembershipFailure({
-      status: 503,
-      reason: "worker_group_projection_unavailable"
-    });
-  }
+  const groups = await listGroupRecords({ store, slug });
+  const principalKey = actorPrincipalResult?.key || "";
   const visible = [];
   for (const group of groups) {
-    const authority = authorityByGroupId.get(normalizeWorkerGroupId(group.groupId));
-    if (!authority) continue;
-    const authoritativeGroup = {
-      ...group,
-      joinMode: authority.joinMode,
-      memberVisibility: authority.memberVisibility
-    };
-    if (admin || authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION) {
-      visible.push(redactGroupForMember(authoritativeGroup));
+    if (admin || group.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION) {
+      visible.push(redactGroupForMember(group));
       continue;
     }
-    if (authority.isMember && authority.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS) {
-      visible.push(redactGroupForMember(authoritativeGroup));
+    if (principalKey && group.memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS) {
+      const member = await readMembershipRecord({ store, slug, groupId: group.groupId, principalKey });
+      if (member && !member.removedAt) visible.push(redactGroupForMember(group));
     }
   }
   return { ok: true, store: store.kind, groups: visible };
 };
-var listWorkerGroupMembers = async ({ env, slug, sessionId, groupId, cursor, limit } = {}) => {
+var listWorkerGroupMembers = async ({ env, slug, groupId } = {}) => {
   const store = resolveWorkerGroupStore(env);
   if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
-  const pageRequest = resolveWorkerGroupMemberPageRequest({ cursor, limit });
-  if (!pageRequest.ok) return pageRequest;
-  const normalizedGroupId = normalizeWorkerGroupId(groupId);
-  if (!normalizedGroupId) {
-    return { ok: false, status: 400, reason: "invalid_worker_group_id" };
-  }
-  if (sessionId) {
-    const catalog = await readCoordinatedWorkerGroupCatalog({
-      env,
-      slug,
-      sessionId,
-      groupIds: [normalizedGroupId]
-    });
-    if (!catalog.ok) return normalizeWorkerGroupMembershipFailure(catalog);
-    if (!Array.isArray(catalog.groups) || catalog.groups.length !== 1 || normalizeWorkerGroupId(catalog.groups[0]?.groupId) !== normalizedGroupId) {
-      return { ok: false, status: 404, reason: "worker_group_not_found" };
-    }
-  }
-  const group = await readGroupRecord({ store, slug, sessionId, groupId });
+  const group = await readGroupRecord({ store, slug, groupId });
   if (!group || group.deletedAt) return { ok: false, status: 404, reason: "worker_group_not_found" };
-  const page = await listMembershipRecordPage({
-    store,
-    slug,
-    sessionId,
-    groupId,
-    cursor: pageRequest.cursor,
-    limit: pageRequest.limit
-  });
-  return {
-    ok: true,
-    store: store.kind,
-    group: redactGroupForMember(group),
-    members: page.members,
-    nextCursor: page.nextCursor
-  };
+  const members = await listMembershipRecords({ store, slug, groupId });
+  return { ok: true, store: store.kind, group: redactGroupForMember(group), members };
 };
-var redactWorkerGroupMemberForViewer = (member) => ({
-  groupId: normalizeWorkerGroupId(member?.groupId),
-  sessionSlug: normalizeWorkerSessionSlug(member?.sessionSlug),
-  principal: member?.principal,
-  addedAt: trim2(member?.addedAt)
-});
-var listWorkerGroupMembersForPrincipal = async ({
-  env,
-  slug,
-  sessionId,
-  groupId,
-  principal,
-  cursor,
-  limit,
-  deps = {}
-} = {}) => {
-  const normalizedGroupId = normalizeWorkerGroupId(groupId);
-  if (!normalizedGroupId) {
-    return { ok: false, status: 400, reason: "invalid_worker_group_id" };
-  }
-  const catalog = await (deps.readCoordinatedWorkerGroupCatalog || readCoordinatedWorkerGroupCatalog)({
-    env,
-    slug,
-    sessionId,
-    groupIds: [normalizedGroupId],
-    principal
-  });
-  if (!catalog.ok) return normalizeWorkerGroupMembershipFailure(catalog);
-  if (!Array.isArray(catalog.groups) || catalog.groups.length !== 1 || normalizeWorkerGroupId(catalog.groups[0]?.groupId) !== normalizedGroupId) {
-    return { ok: false, status: 404, reason: "worker_group_not_found" };
-  }
-  const authority = catalog.groups[0];
-  const memberVisibility = trim2(authority?.memberVisibility).toLowerCase();
-  const joinMode = trim2(authority?.joinMode).toLowerCase();
-  const memberCount = Number(authority?.memberCount);
-  if (!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) || !IMPLEMENTED_JOIN_MODES.has(joinMode) || !Number.isSafeInteger(memberCount) || memberCount < 0) {
-    return normalizeWorkerGroupMembershipFailure();
-  }
-  const canViewMembers = memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION || memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS && authority?.isMember === true;
-  if (!canViewMembers) {
-    return { ok: false, status: 403, reason: "worker_group_member_list_forbidden" };
-  }
-  const page = await (deps.listWorkerGroupMembers || listWorkerGroupMembers)({
-    env,
-    slug,
-    sessionId,
-    groupId: normalizedGroupId,
-    cursor,
-    limit
-  });
-  if (!page.ok) return page;
-  return {
-    ...page,
-    group: redactGroupForMember({
-      ...page.group,
-      joinMode,
-      memberVisibility
-    }),
-    members: (page.members || []).map(redactWorkerGroupMemberForViewer),
-    memberCount
-  };
-};
-var listWorkerGroupMemberships = async ({ env, slug, sessionId, principal, deps = {} } = {}) => {
+var listWorkerGroupMemberships = async ({ env, slug, principal, deps = {} } = {}) => {
   const store = resolveWorkerGroupStore(env);
   if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
   const normalized = normalizeWorkerGroupPrincipal(principal, deps);
   if (!normalized.ok) return { ok: false, status: 400, reason: normalized.reason };
-  const rows = await listMembershipRecords({
-    store,
-    slug,
-    sessionId,
-    principalKey: normalized.key
-  });
+  const rows = await listMembershipRecords({ store, slug, principalKey: normalized.key });
   const memberships = [];
   for (const row of rows) {
-    const authoritativeMembership = await isWorkerGroupMember({
-      env,
-      slug,
-      sessionId,
-      groupId: row.groupId,
-      principal: normalized.principal
-    });
-    if (!authoritativeMembership.ok) {
-      if (isDefinitiveWorkerGroupMembershipMiss(authoritativeMembership)) continue;
-      return normalizeWorkerGroupMembershipFailure(authoritativeMembership);
-    }
-    const authoritativeGroup = authoritativeMembership.group;
-    const authoritativeJoinMode = trim2(authoritativeGroup?.joinMode).toLowerCase();
-    const authoritativeVisibility = trim2(authoritativeGroup?.memberVisibility).toLowerCase();
-    const authoritativeMemberCount = Number(authoritativeGroup?.memberCount);
-    if (normalizeWorkerGroupId(authoritativeGroup?.groupId) !== normalizeWorkerGroupId(row.groupId) || !IMPLEMENTED_JOIN_MODES.has(authoritativeJoinMode) || !Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(authoritativeVisibility) || !Number.isSafeInteger(authoritativeMemberCount) || authoritativeMemberCount < 0) {
-      return normalizeWorkerGroupMembershipFailure();
-    }
-    const group = await readGroupRecord({ store, slug, sessionId, groupId: row.groupId });
+    const group = await readGroupRecord({ store, slug, groupId: row.groupId });
     if (!group || group.deletedAt) continue;
-    memberships.push({
-      group: redactGroupForMember({
-        ...group,
-        joinMode: authoritativeJoinMode,
-        memberVisibility: authoritativeVisibility
-      }),
-      member: row,
-      memberCount: authoritativeMemberCount
-    });
+    const groupMembers = await listMembershipRecords({ store, slug, groupId: row.groupId });
+    memberships.push({ group: redactGroupForMember(group), member: row, memberCount: groupMembers.length });
   }
   return { ok: true, store: store.kind, principal: normalized.principal, memberships };
 };
-var executeWorkerGroupMutation = async ({
-  env,
-  slug,
-  sessionId,
-  operation,
-  input,
-  groupId,
-  principal,
-  actorPrincipal,
-  capacityAuthorized = false,
-  deps = {}
-} = {}) => {
-  if (operation === "create") {
-    return createWorkerGroup({
-      env,
-      slug,
-      sessionId,
-      input,
-      actorPrincipal,
-      capacityAuthorized,
-      deps
-    });
-  }
-  if (operation === "update") {
-    return updateWorkerGroup({ env, slug, sessionId, groupId, input, actorPrincipal, deps });
-  }
-  if (operation === "delete") {
-    return deleteWorkerGroup({ env, slug, sessionId, groupId, actorPrincipal, deps });
-  }
-  if (operation === "add-member") {
-    return addWorkerGroupMember({
-      env,
-      slug,
-      sessionId,
-      groupId,
-      principal,
-      actorPrincipal,
-      capacityAuthorized,
-      deps
-    });
-  }
-  if (operation === "remove-member") {
-    return removeWorkerGroupMember({
-      env,
-      slug,
-      sessionId,
-      groupId,
-      principal,
-      actorPrincipal,
-      capacityAuthorized,
-      deps
-    });
-  }
-  if (operation === "join") {
-    const store = resolveWorkerGroupStore(env);
-    if (!store) {
-      return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
-    }
-    const group = await readGroupRecord({ store, slug, sessionId, groupId });
-    if (!group || group.deletedAt) {
-      return { ok: false, status: 404, reason: "worker_group_not_found" };
-    }
-    if (group.joinMode !== WORKER_GROUP_JOIN_MODES.OPEN) {
-      return { ok: false, status: 403, reason: "worker_group_join_denied" };
-    }
-    const joinEndsAt = Date.parse(trim2(group.joinEndsAt));
-    if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(deps.now?.() || Date.now())) {
-      return { ok: false, status: 403, reason: "worker_group_join_ended" };
-    }
-    return addWorkerGroupMember({
-      env,
-      slug,
-      sessionId,
-      groupId: group.groupId,
-      principal,
-      actorPrincipal,
-      capacityAuthorized,
-      deps
-    });
-  }
-  return { ok: false, status: 400, reason: "worker_group_mutation_invalid" };
-};
-var workerGroupCoordinationUnavailable = () => ({
-  ok: false,
-  status: 503,
-  reason: "worker_group_coordination_unavailable"
-});
-var callWorkerGroupCoordinator = async ({ env, slug, sessionId, path, payload = {} } = {}) => {
-  const sessionSlug = canonicalWorkerGroupSessionSlug(slug);
-  const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
-  if (!sessionSlug || !canonicalSessionId) {
-    return { ok: false, status: 400, reason: "worker_group_session_identity_invalid" };
-  }
-  const coordinator = env?.CE_WORKER_GROUP_COORDINATOR || env?.CE_SESSION_COORDINATOR;
-  if (!coordinator?.idFromName || !coordinator?.get) {
-    return workerGroupCoordinationUnavailable();
-  }
-  let stub;
-  try {
-    const coordinatorId = coordinator.idFromName(`worker-groups:${sessionSlug}:${canonicalSessionId}`);
-    stub = coordinator.get(coordinatorId);
-  } catch {
-    return workerGroupCoordinationUnavailable();
-  }
-  if (!stub?.fetch) return workerGroupCoordinationUnavailable();
-  try {
-    const response2 = await stub.fetch(`https://session-coordinator.internal${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, slug: sessionSlug, sessionId: canonicalSessionId })
-    });
-    const result = await response2.json().catch(() => null);
-    if (!result || typeof result !== "object") return workerGroupCoordinationUnavailable();
-    return {
-      ...result,
-      status: Number(result.status || 0) || response2.status
-    };
-  } catch {
-    return workerGroupCoordinationUnavailable();
-  }
-};
-var checkCoordinatedWorkerGroupReady = async ({ env, slug, sessionId } = {}) => callWorkerGroupCoordinator({
-  env,
-  slug,
-  sessionId,
-  path: "/worker-groups/ready"
-});
-var reconcileCoordinatedWorkerGroupCapacity = async ({ env, slug, sessionId } = {}) => callWorkerGroupCoordinator({
-  env,
-  slug,
-  sessionId,
-  path: "/worker-groups/reconcile-empty"
-});
-var readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, groupIds, principal } = {}) => callWorkerGroupCoordinator({
-  env,
-  slug,
-  sessionId,
-  path: "/worker-groups/catalog",
-  payload: {
-    groupIds,
-    ...principal ? { principal } : {}
-  }
-});
-var isWorkerGroupMember = async ({ env, slug, sessionId, groupId, principal, requesterAddress, authScopes, deps = {} } = {}) => {
+var isWorkerGroupMember = async ({ env, slug, groupId, principal, requesterAddress, authScopes, deps = {} } = {}) => {
+  const store = resolveWorkerGroupStore(env);
+  if (!store) return { ok: false, reason: "worker_group_store_not_configured" };
   const normalized = principal ? normalizeWorkerGroupPrincipal(principal, deps) : resolveWorkerGroupPrincipal({ requesterAddress, authScopes, deps });
-  const normalizedGroupId = normalizeWorkerGroupId(groupId);
-  if (!normalized.ok) {
-    return { ok: false, status: 400, reason: normalized.reason || "missing_principal" };
-  }
-  if (!normalizedGroupId) {
-    return { ok: false, status: 400, reason: "invalid_worker_group_id" };
-  }
-  return callWorkerGroupCoordinator({
-    env,
-    slug,
-    sessionId,
-    path: "/worker-groups/authorize",
-    payload: {
-      groupId: normalizedGroupId,
+  if (!normalized.ok) return { ok: false, reason: normalized.reason || "missing_principal" };
+  const group = await readGroupRecord({ store, slug, groupId });
+  if (!group || group.deletedAt) return { ok: false, reason: "worker_group_not_found" };
+  const member = await readMembershipRecord({ store, slug, groupId, principalKey: normalized.key });
+  if (!member || member.removedAt) {
+    return {
+      ok: false,
+      reason: "worker_group_membership_denied",
+      group: redactGroupForMember(group),
       principal: normalized.principal
-    }
-  });
-};
-var executeCoordinatedWorkerGroupMutation = async ({
-  env,
-  slug,
-  sessionId,
-  operation,
-  input,
-  groupId,
-  principal,
-  actorPrincipal
-} = {}) => {
-  return callWorkerGroupCoordinator({
-    env,
-    slug,
-    sessionId,
-    path: "/worker-groups/mutate",
-    payload: {
-      operation,
-      input,
-      groupId,
-      principal,
-      actorPrincipal
-    }
-  });
+    };
+  }
+  return {
+    ok: true,
+    store: store.kind,
+    group: redactGroupForMember(group),
+    principal: normalized.principal,
+    member
+  };
 };
 var parseRouteBody = async (request) => {
   try {
     const body = await request?.json?.();
-    return isObj6(body) ? { ok: true, body } : { ok: false, error: "Invalid JSON." };
+    return isObj(body) ? { ok: true, body } : { ok: false, error: "Invalid JSON." };
   } catch {
     return { ok: false, error: "Invalid JSON." };
   }
@@ -62444,89 +56444,15 @@ var routeError = (deps, result, headers) => jsonResponse(
   result.status || 403,
   headers
 );
-var resolveWorkerGroupSessionIdentity = ({ config, slug } = {}) => {
-  const sessionSlug = canonicalWorkerGroupSessionSlug(slug);
-  const sessionId = resolveCanonicalWorkerSessionIdHex(config);
-  if (!sessionSlug || !sessionId) {
-    return {
-      ok: false,
-      status: 503,
-      reason: "worker_group_session_identity_unavailable"
-    };
-  }
-  return { ok: true, sessionSlug, sessionId };
-};
-var participantGroupCreationAllowed = (config) => config?.groupCreationPolicy === "participants";
-var dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
-  const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
-  if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
-  if (!workerConfigAllowsAnonymousGroupDiscovery(config)) {
-    return routeError(
-      deps,
-      {
-        status: 403,
-        reason: "worker_group_discovery_not_public"
-      },
-      baseHeaders
-    );
-  }
-  let requestedSessionId = "";
-  try {
-    requestedSessionId = resolveCanonicalWorkerSessionIdHex({
-      sessionId: new URL(request?.url || "").searchParams.get("sessionId")
-    });
-  } catch {
-    requestedSessionId = "";
-  }
-  if (requestedSessionId !== sessionIdentity.sessionId) {
-    return routeError(
-      deps,
-      {
-        status: 409,
-        reason: "worker_group_session_identity_mismatch"
-      },
-      baseHeaders
-    );
-  }
-  const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
-    env,
-    slug,
-    sessionId: sessionIdentity.sessionId
-  });
-  if (!ready.ok) return routeError(deps, ready, baseHeaders);
-  let result;
-  try {
-    result = await (deps?.listWorkerGroups || listWorkerGroups)({
-      env,
-      slug,
-      sessionId: sessionIdentity.sessionId,
-      admin: false,
-      expectedGroupCount: ready.meta?.groupCount
-    });
-  } catch {
-    result = {
-      ok: false,
-      status: 503,
-      reason: "worker_group_projection_unavailable"
-    };
-  }
-  if (!result.ok) return routeError(deps, result, baseHeaders);
-  return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
-};
-var dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, headers, deps } = {}) => {
-  const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
-  if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, headers);
-  const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
-  if (!requestedSessionId || requestedSessionId !== sessionIdentity.sessionId) {
-    return routeError(
-      deps,
-      {
-        status: 409,
-        reason: "worker_group_session_identity_mismatch"
-      },
-      headers
-    );
-  }
+var dispatchAdminWorkerGroupRequest = async ({
+  action,
+  body,
+  env,
+  slug,
+  adminAddress,
+  headers,
+  deps
+} = {}) => {
   const actor = normalizeWorkerGroupPrincipal(
     body?.actorPrincipal || { kind: "evm_address", address: adminAddress || body?.address },
     deps
@@ -62534,188 +56460,82 @@ var dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, 
   if (!actor.ok) {
     return jsonResponse(deps, { error: "Invalid admin principal.", reason: actor.reason }, 400, headers);
   }
-  if (action === "groups/reconcile-empty") {
-    const result = await (deps?.reconcileCoordinatedWorkerGroupCapacity || reconcileCoordinatedWorkerGroupCapacity)({
-      env,
-      slug,
-      sessionId: sessionIdentity.sessionId
-    });
-    if (!result.ok) return routeError(deps, result, headers);
-    return jsonResponse(
-      deps,
-      {
-        ok: true,
-        ...sessionIdentity,
-        store: "durable_object",
-        repaired: result.repaired === true,
-        groupCount: Number(result.meta?.groupCount || 0)
-      },
-      200,
-      headers
-    );
-  }
-  const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
   if (action === "groups/create") {
-    const result = await mutate({
+    const result = await createWorkerGroup({
       env,
       slug,
-      sessionId: sessionIdentity.sessionId,
-      operation: "create",
       input: body?.group || body,
-      actorPrincipal: actor.principal
+      actorPrincipal: actor.principal,
+      deps
     });
     if (!result.ok) return routeError(deps, result, headers);
-    return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, group: result.group }, 200, headers);
+    return jsonResponse(deps, { ok: true, store: result.store, group: result.group }, 200, headers);
   }
   if (action === "groups/update") {
-    const result = await mutate({
+    const result = await updateWorkerGroup({
       env,
       slug,
-      sessionId: sessionIdentity.sessionId,
-      operation: "update",
       groupId: body?.groupId || body?.group?.groupId,
       input: body?.group || body,
-      actorPrincipal: actor.principal
+      actorPrincipal: actor.principal,
+      deps
     });
     if (!result.ok) return routeError(deps, result, headers);
-    return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, group: result.group }, 200, headers);
+    return jsonResponse(deps, { ok: true, store: result.store, group: result.group }, 200, headers);
   }
   if (action === "groups/delete") {
-    const result = await mutate({
+    const result = await deleteWorkerGroup({
       env,
       slug,
-      sessionId: sessionIdentity.sessionId,
-      operation: "delete",
       groupId: body?.groupId || body?.group?.groupId,
-      actorPrincipal: actor.principal
+      actorPrincipal: actor.principal,
+      deps
     });
     if (!result.ok) return routeError(deps, result, headers);
-    return jsonResponse(
-      deps,
-      {
-        ok: true,
-        ...sessionIdentity,
-        store: result.store,
-        groupId: result.groupId,
-        removedMembers: result.removedMembers
-      },
-      200,
-      headers
-    );
+    return jsonResponse(deps, { ok: true, store: result.store, groupId: result.groupId, removedMembers: result.removedMembers }, 200, headers);
   }
   if (action === "groups/add-member") {
-    const result = await mutate({
+    const result = await addWorkerGroupMember({
       env,
       slug,
-      sessionId: sessionIdentity.sessionId,
-      operation: "add-member",
       groupId: body?.groupId,
       principal: body?.principal || body?.member,
-      actorPrincipal: actor.principal
+      actorPrincipal: actor.principal,
+      deps
     });
     if (!result.ok) return routeError(deps, result, headers);
-    return jsonResponse(
-      deps,
-      {
-        ok: true,
-        ...sessionIdentity,
-        store: result.store,
-        group: result.group,
-        member: result.member
-      },
-      200,
-      headers
-    );
+    return jsonResponse(deps, { ok: true, store: result.store, group: result.group, member: result.member }, 200, headers);
   }
   if (action === "groups/remove-member") {
-    const result = await mutate({
+    const result = await removeWorkerGroupMember({
       env,
       slug,
-      sessionId: sessionIdentity.sessionId,
-      operation: "remove-member",
       groupId: body?.groupId,
       principal: body?.principal || body?.member,
-      actorPrincipal: actor.principal
+      actorPrincipal: actor.principal,
+      deps
     });
     if (!result.ok) return routeError(deps, result, headers);
-    return jsonResponse(
-      deps,
-      {
-        ok: true,
-        ...sessionIdentity,
-        store: result.store,
-        groupId: result.groupId,
-        principal: result.principal
-      },
-      200,
-      headers
-    );
+    return jsonResponse(deps, { ok: true, store: result.store, groupId: result.groupId, principal: result.principal }, 200, headers);
   }
   if (action === "groups/list") {
-    const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
+    const result = await listWorkerGroups({
       env,
       slug,
-      sessionId: sessionIdentity.sessionId
+      actorPrincipalResult: actor,
+      admin: true
     });
-    if (!ready.ok) return routeError(deps, ready, headers);
-    let result;
-    try {
-      result = await listWorkerGroups({
-        env,
-        slug,
-        sessionId: sessionIdentity.sessionId,
-        actorPrincipalResult: actor,
-        admin: true,
-        expectedGroupCount: ready.meta?.groupCount
-      });
-    } catch {
-      result = {
-        ok: false,
-        status: 503,
-        reason: "worker_group_projection_unavailable"
-      };
-    }
     if (!result.ok) return routeError(deps, result, headers);
-    return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, headers);
+    return jsonResponse(deps, { ok: true, store: result.store, groups: result.groups }, 200, headers);
   }
   if (action === "groups/list-members") {
-    const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
+    const result = await listWorkerGroupMembers({
       env,
       slug,
-      sessionId: sessionIdentity.sessionId
+      groupId: body?.groupId
     });
-    if (!ready.ok) return routeError(deps, ready, headers);
-    let result;
-    try {
-      result = await listWorkerGroupMembers({
-        env,
-        slug,
-        sessionId: sessionIdentity.sessionId,
-        groupId: body?.groupId,
-        cursor: body?.cursor,
-        limit: body?.limit
-      });
-    } catch {
-      result = {
-        ok: false,
-        status: 503,
-        reason: "worker_group_projection_unavailable"
-      };
-    }
     if (!result.ok) return routeError(deps, result, headers);
-    return jsonResponse(
-      deps,
-      {
-        ok: true,
-        ...sessionIdentity,
-        store: result.store,
-        group: result.group,
-        members: result.members,
-        nextCursor: result.nextCursor
-      },
-      200,
-      headers
-    );
+    return jsonResponse(deps, { ok: true, store: result.store, group: result.group, members: result.members }, 200, headers);
   }
   return null;
 };
@@ -62723,7 +56543,6 @@ var workerGroupsRoute = async ({
   path,
   method,
   request,
-  config,
   env,
   slug,
   requesterAddress,
@@ -62731,239 +56550,54 @@ var workerGroupsRoute = async ({
   baseHeaders,
   deps
 } = {}) => {
-  const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
-  if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
-  let routeBody = null;
-  let requestedSessionId = "";
-  if (method === "POST") {
-    const parsed = await parseRouteBody(request);
-    if (!parsed.ok) return jsonResponse(deps, { error: parsed.error }, 400, baseHeaders);
-    routeBody = parsed.body;
-    requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: routeBody.sessionId });
-  } else if (method === "GET") {
-    try {
-      requestedSessionId = resolveCanonicalWorkerSessionIdHex({
-        sessionId: new URL(request?.url || "").searchParams.get("sessionId")
-      });
-    } catch {
-      requestedSessionId = "";
-    }
-  }
-  if (requestedSessionId !== sessionIdentity.sessionId) {
-    return routeError(
-      deps,
-      {
-        status: 409,
-        reason: "worker_group_session_identity_mismatch"
-      },
-      baseHeaders
-    );
-  }
   const actor = resolveWorkerGroupPrincipal({ requesterAddress, authScopes, deps });
   if (!actor.ok) {
     return jsonResponse(deps, { error: "Missing worker group principal.", reason: actor.reason }, 401, baseHeaders);
   }
   if (path === "/groups/my-memberships" && (method === "GET" || method === "POST")) {
-    const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
-      env,
-      slug,
-      sessionId: sessionIdentity.sessionId
-    });
-    if (!ready.ok) return routeError(deps, ready, baseHeaders);
-    let result;
-    try {
-      result = await listWorkerGroupMemberships({
-        env,
-        slug,
-        sessionId: sessionIdentity.sessionId,
-        principal: actor.principal,
-        deps
-      });
-    } catch {
-      result = {
-        ok: false,
-        status: 503,
-        reason: "worker_group_projection_unavailable"
-      };
-    }
+    const result = await listWorkerGroupMemberships({ env, slug, principal: actor.principal, deps });
     if (!result.ok) return routeError(deps, result, baseHeaders);
-    return jsonResponse(
-      deps,
-      {
-        ok: true,
-        ...sessionIdentity,
-        store: result.store,
-        principal: result.principal,
-        memberships: result.memberships
-      },
-      200,
-      baseHeaders
-    );
-  }
-  if (path === "/groups/members" && (method === "GET" || method === "POST")) {
-    const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
-      env,
-      slug,
-      sessionId: sessionIdentity.sessionId
-    });
-    if (!ready.ok) return routeError(deps, ready, baseHeaders);
-    let result;
-    try {
-      const requestUrl = method === "GET" ? new URL(request?.url || "") : null;
-      result = await (deps?.listWorkerGroupMembersForPrincipal || listWorkerGroupMembersForPrincipal)({
-        env,
-        slug,
-        sessionId: sessionIdentity.sessionId,
-        groupId: method === "GET" ? requestUrl?.searchParams.get("groupId") : routeBody?.groupId,
-        principal: actor.principal,
-        cursor: method === "GET" ? requestUrl?.searchParams.get("cursor") : routeBody?.cursor,
-        limit: method === "GET" ? requestUrl?.searchParams.get("limit") : routeBody?.limit,
-        deps
-      });
-    } catch {
-      result = {
-        ok: false,
-        status: 503,
-        reason: "worker_group_projection_unavailable"
-      };
-    }
-    if (!result.ok) return routeError(deps, result, baseHeaders);
-    return jsonResponse(
-      deps,
-      {
-        ok: true,
-        ...sessionIdentity,
-        store: result.store,
-        group: result.group,
-        members: result.members,
-        memberCount: result.memberCount,
-        nextCursor: result.nextCursor
-      },
-      200,
-      baseHeaders
-    );
+    return jsonResponse(deps, {
+      ok: true,
+      store: result.store,
+      principal: result.principal,
+      memberships: result.memberships
+    }, 200, baseHeaders);
   }
   if (path === "/groups/list" && (method === "GET" || method === "POST")) {
-    const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
-      env,
-      slug,
-      sessionId: sessionIdentity.sessionId
-    });
-    if (!ready.ok) return routeError(deps, ready, baseHeaders);
-    let result;
-    try {
-      result = await listWorkerGroups({
-        env,
-        slug,
-        sessionId: sessionIdentity.sessionId,
-        actorPrincipalResult: actor,
-        admin: false,
-        expectedGroupCount: ready.meta?.groupCount
-      });
-    } catch {
-      result = {
-        ok: false,
-        status: 503,
-        reason: "worker_group_projection_unavailable"
-      };
-    }
+    const result = await listWorkerGroups({ env, slug, actorPrincipalResult: actor, admin: false });
     if (!result.ok) return routeError(deps, result, baseHeaders);
-    return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
-  }
-  if (path === "/groups/create" && method === "POST") {
-    if (!participantGroupCreationAllowed(config)) {
-      return routeError(
-        deps,
-        {
-          status: 403,
-          reason: "worker_group_creation_admin_only"
-        },
-        baseHeaders
-      );
-    }
-    const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
-    const result = await mutate({
-      env,
-      slug,
-      sessionId: sessionIdentity.sessionId,
-      operation: "create",
-      input: {
-        label: routeBody?.group?.label,
-        description: routeBody?.group?.description,
-        imageUrl: routeBody?.group?.imageUrl,
-        tags: routeBody?.group?.tags,
-        documentURLs: routeBody?.group?.documentURLs,
-        memberLimit: routeBody?.group?.memberLimit,
-        joinEndsAt: routeBody?.group?.joinEndsAt,
-        adminAddress: actor.principal?.address,
-        joinMode: WORKER_GROUP_JOIN_MODES.OPEN,
-        memberVisibility: WORKER_GROUP_MEMBER_VISIBILITY.SESSION
-      },
-      actorPrincipal: actor.principal
-    });
-    if (!result.ok) return routeError(deps, result, baseHeaders);
-    return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, group: result.group }, 200, baseHeaders);
+    return jsonResponse(deps, { ok: true, store: result.store, groups: result.groups }, 200, baseHeaders);
   }
   if (path === "/groups/join" && method === "POST") {
-    const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
-    const result = await mutate({
+    const parsed = await parseRouteBody(request);
+    if (!parsed.ok) return jsonResponse(deps, { error: parsed.error }, 400, baseHeaders);
+    const store = resolveWorkerGroupStore(env);
+    if (!store) return routeError(deps, { status: 501, reason: "worker_group_store_not_configured" }, baseHeaders);
+    const group = await readGroupRecord({ store, slug, groupId: parsed.body.groupId });
+    if (!group || group.deletedAt) return routeError(deps, { status: 404, reason: "worker_group_not_found" }, baseHeaders);
+    if (group.joinMode !== WORKER_GROUP_JOIN_MODES.OPEN) {
+      return routeError(deps, { status: 403, reason: "worker_group_join_denied" }, baseHeaders);
+    }
+    const result = await addWorkerGroupMember({
       env,
       slug,
-      sessionId: sessionIdentity.sessionId,
-      operation: "join",
-      groupId: routeBody.groupId,
+      groupId: group.groupId,
       principal: actor.principal,
-      actorPrincipal: actor.principal
+      actorPrincipal: actor.principal,
+      deps
     });
     if (!result.ok) return routeError(deps, result, baseHeaders);
-    return jsonResponse(
-      deps,
-      {
-        ok: true,
-        ...sessionIdentity,
-        store: result.store,
-        group: result.group,
-        member: result.member
-      },
-      200,
-      baseHeaders
-    );
-  }
-  if (path === "/groups/leave" && method === "POST") {
-    const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
-    const result = await mutate({
-      env,
-      slug,
-      sessionId: sessionIdentity.sessionId,
-      operation: "remove-member",
-      groupId: routeBody.groupId,
-      // A participant may only remove the principal authenticated by this
-      // request. Never accept a caller-supplied principal on this route.
-      principal: actor.principal,
-      actorPrincipal: actor.principal
-    });
-    if (!result.ok) return routeError(deps, result, baseHeaders);
-    return jsonResponse(
-      deps,
-      {
-        ok: true,
-        ...sessionIdentity,
-        store: result.store,
-        groupId: result.groupId,
-        principal: result.principal
-      },
-      200,
-      baseHeaders
-    );
+    return jsonResponse(deps, { ok: true, store: result.store, group: result.group, member: result.member }, 200, baseHeaders);
   }
   return jsonResponse(deps, { error: "Not found." }, 404, baseHeaders);
 };
 
 // workers/sessionCorsWorker/workerCanonicalAuthority.js
-var toStr16 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
-var trim3 = (value) => toStr16(value).trim();
-var lower = (value) => trim3(value).toLowerCase();
-var isObj7 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var toStr9 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
+var trim2 = (value) => toStr9(value).trim();
+var lower = (value) => trim2(value).toLowerCase();
+var isObj2 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var ALLOWED_WORKER_SCOPE_KEYS = /* @__PURE__ */ new Set([
   "ai",
   "transcribe",
@@ -62977,7 +56611,7 @@ var ALLOWED_WORKER_SCOPE_KEYS = /* @__PURE__ */ new Set([
 var normalizeScopeList = (value) => Array.isArray(value) ? [...new Set(value.map(lower).filter((scope) => ALLOWED_WORKER_SCOPE_KEYS.has(scope)))] : [];
 var listAddresses = (value) => {
   if (Array.isArray(value)) return value.flatMap(listAddresses);
-  if (isObj7(value)) return listAddresses(value.addresses || value.members || []);
+  if (isObj2(value)) return listAddresses(value.addresses || value.members || []);
   const address = lower(value);
   return /^0x[0-9a-f]{40}$/.test(address) ? [address] : [];
 };
@@ -62989,19 +56623,19 @@ var resolveRoleAddressSet = ({ config, role }) => {
     listAddresses(config?.adminAddresses).forEach((address) => addresses.add(address));
     listAddresses(config?.admin?.addresses).forEach((address) => addresses.add(address));
   }
-  [config?.workerRoles, config?.roles, config?.authorization?.roles].filter(isObj7).forEach((roles) => listAddresses(roles[normalizedRole]).forEach((address) => addresses.add(address)));
+  [config?.workerRoles, config?.roles, config?.authorization?.roles].filter(isObj2).forEach((roles) => listAddresses(roles[normalizedRole]).forEach((address) => addresses.add(address)));
   return addresses;
 };
 var resolveAuthorityPolicy = (config) => {
-  const policy = isObj7(config?.workerAuthority) ? config.workerAuthority : null;
+  const policy = isObj2(config?.workerAuthority) ? config.workerAuthority : null;
   if (!policy || Number(policy.version) !== 1) return null;
   return policy;
 };
 var resolveLoginConditions = (policy) => {
-  const gate = isObj7(policy?.loginGate) ? policy.loginGate : {};
+  const gate = isObj2(policy?.loginGate) ? policy.loginGate : {};
   return {
     match: lower(gate.match) === "all" ? "all" : "any",
-    conditions: Array.isArray(gate.conditions) ? gate.conditions.filter(isObj7) : []
+    conditions: Array.isArray(gate.conditions) ? gate.conditions.filter(isObj2) : []
   };
 };
 var evaluateLoginCondition = async ({ condition, address, config, env, slug, deps }) => {
@@ -63011,13 +56645,12 @@ var evaluateLoginCondition = async ({ condition, address, config, env, slug, dep
     return resolveRoleAddressSet({ config, role }).has(lower(address));
   }
   if (kind === "worker_group") {
-    const groupId = trim3(condition?.groupId);
+    const groupId = trim2(condition?.groupId);
     if (!groupId) return false;
     const checkMembership = typeof deps?.isWorkerGroupMember === "function" ? deps.isWorkerGroupMember : isWorkerGroupMember;
     const result = await checkMembership({
       env,
       slug,
-      sessionId: resolveCanonicalWorkerSessionIdHex(config),
       groupId,
       requesterAddress: address,
       authScopes: {}
@@ -63444,9 +57077,6 @@ var verifyToken = async (token, secret, deps) => {
   if (typeof payload?.slug !== "undefined" && typeof payload.slug !== "string") {
     return { ok: false, error: "Token slug must be a string." };
   }
-  if (typeof payload?.sessionId !== "undefined" && typeof payload.sessionId !== "string") {
-    return { ok: false, error: "Token sessionId must be a string." };
-  }
   if (typeof payload?.jti === "undefined" || typeof payload.jti === "string" && !payload.jti.trim()) {
     return { ok: false, error: "Token missing jti." };
   }
@@ -63797,7 +57427,7 @@ var ADMIN_ACTION_AUTH_FIELDS = Object.freeze([
   "audience",
   "expiration"
 ]);
-var toTrimmedString7 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString3 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var buildAdminActionMessage = ({
   action,
   slug,
@@ -63806,11 +57436,11 @@ var buildAdminActionMessage = ({
   audience,
   expiration
 } = {}) => ({
-  action: toTrimmedString7(action),
-  slug: toTrimmedString7(slug),
-  bodyHash: toTrimmedString7(bodyHash),
-  nonce: toTrimmedString7(nonce),
-  audience: toTrimmedString7(audience),
+  action: toTrimmedString3(action),
+  slug: toTrimmedString3(slug),
+  bodyHash: toTrimmedString3(bodyHash),
+  nonce: toTrimmedString3(nonce),
+  audience: toTrimmedString3(audience),
   expiration: Number.isFinite(Number(expiration)) ? Number(expiration) : 0
 });
 var buildAdminActionTypedData = (params = {}) => ({
@@ -63854,7 +57484,7 @@ var TRUSTED_ORIGINS = Object.freeze([
   "http://127.0.0.1:7391"
 ]);
 var getSiweFieldValue = (line, prefix) => line.startsWith(prefix) ? line.slice(prefix.length).trim() : null;
-var normalizeOrigin2 = (value) => {
+var normalizeOrigin = (value) => {
   const raw = toStr7(value).trim();
   if (!raw) return "";
   try {
@@ -63878,7 +57508,7 @@ var resolveConfiguredAdminOrigins = (...configs) => {
   const seen = /* @__PURE__ */ new Set();
   const out = [];
   configs.forEach((config) => {
-    coerceOriginListInput(config?.allowOrigins).map((entry) => normalizeOrigin2(entry)).filter(Boolean).forEach((entry) => {
+    coerceOriginListInput(config?.allowOrigins).map((entry) => normalizeOrigin(entry)).filter(Boolean).forEach((entry) => {
       if (seen.has(entry)) return;
       seen.add(entry);
       out.push(entry);
@@ -63889,7 +57519,7 @@ var resolveConfiguredAdminOrigins = (...configs) => {
 var resolveTrustedAdminOrigins = (env) => {
   const raw = toStr7(env?.ADMIN_TRUSTED_ORIGINS).trim();
   if (!raw) return [...TRUSTED_ORIGINS];
-  const parsed = raw.split(/[\s,]+/).map((entry) => normalizeOrigin2(entry)).filter(Boolean);
+  const parsed = raw.split(/[\s,]+/).map((entry) => normalizeOrigin(entry)).filter(Boolean);
   return parsed.length ? parsed : [...TRUSTED_ORIGINS];
 };
 var resolveTrustedLoginOrigins = ({
@@ -63900,7 +57530,7 @@ var resolveTrustedLoginOrigins = ({
   const seen = /* @__PURE__ */ new Set();
   const out = [];
   const append = (value) => {
-    const normalized = normalizeOrigin2(value);
+    const normalized = normalizeOrigin(value);
     if (!normalized || seen.has(normalized)) return;
     seen.add(normalized);
     out.push(normalized);
@@ -63925,7 +57555,7 @@ var validateTrustedLoginRequestOrigin = ({
   config,
   allowTrustedAdminOrigins = false
 } = {}, deps) => {
-  const requestOrigin = normalizeOrigin2(
+  const requestOrigin = normalizeOrigin(
     request?.headers?.get?.("Origin") || request?.headers?.get?.("origin") || ""
   );
   if (!requestOrigin) {
@@ -63959,7 +57589,7 @@ var validateBrowserLoginOrigin = ({
   const requestOrigin = requestOriginCheck.origin;
   let siweOrigin = "";
   try {
-    siweOrigin = normalizeOrigin2(siwe?.uri);
+    siweOrigin = normalizeOrigin(siwe?.uri);
   } catch {
     siweOrigin = "";
   }
@@ -63981,22 +57611,22 @@ var validateAdminActionAudience = ({
   config,
   initializingConfig
 } = {}, deps) => {
-  const normalizedAudience = normalizeOrigin2(audience);
+  const normalizedAudience = normalizeOrigin(audience);
   if (!normalizedAudience) {
     return { ok: false, error: "Invalid admin audience." };
   }
-  const requestOrigin = normalizeOrigin2(
+  const requestOrigin = normalizeOrigin(
     request?.headers?.get?.("Origin") || request?.headers?.get?.("origin") || ""
   );
   if (requestOrigin && requestOrigin !== normalizedAudience) {
     return { ok: false, error: "Admin audience does not match request origin." };
   }
-  const trustedOrigins = (typeof deps?.resolveTrustedAdminOrigins === "function" ? deps.resolveTrustedAdminOrigins(env) : resolveTrustedAdminOrigins(env)).map((entry) => normalizeOrigin2(entry)).filter(Boolean);
+  const trustedOrigins = (typeof deps?.resolveTrustedAdminOrigins === "function" ? deps.resolveTrustedAdminOrigins(env) : resolveTrustedAdminOrigins(env)).map((entry) => normalizeOrigin(entry)).filter(Boolean);
   const configuredOrigins = resolveConfiguredAdminOrigins(
     config,
     initializingConfig
   );
-  const workerOrigin = normalizeOrigin2(request?.url || env?.WORKER_URL || "");
+  const workerOrigin = normalizeOrigin(request?.url || env?.WORKER_URL || "");
   if (!trustedOrigins.includes(normalizedAudience) && !configuredOrigins.includes(normalizedAudience) && (!workerOrigin || workerOrigin !== normalizedAudience)) {
     return { ok: false, error: "Untrusted admin audience." };
   }
@@ -64075,7 +57705,7 @@ var validateSiwe = (siwe, deps) => {
 };
 
 // workers/sessionCorsWorker/existingSessionCorsResolution.js
-var normalizeOrigin3 = (value) => {
+var normalizeOrigin2 = (value) => {
   const raw = typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
   if (!raw) return "";
   try {
@@ -64100,11 +57730,11 @@ var buildTrustedAdminCorsHeaders = ({
   const path = getRequestPath(request);
   const allowTrustedRoute = path.startsWith("/admin/") || allowTrustedAdminAuthOrigin && path === "/auth/nonce";
   if (!allowTrustedRoute) return null;
-  const origin = normalizeOrigin3(
+  const origin = normalizeOrigin2(
     request?.headers?.get?.("Origin") || request?.headers?.get?.("origin") || ""
   );
   if (!origin) return null;
-  const trustedOrigins = (typeof deps?.resolveTrustedAdminOrigins === "function" ? deps.resolveTrustedAdminOrigins(env) : resolveTrustedAdminOrigins(env)).map((entry) => normalizeOrigin3(entry)).filter(Boolean);
+  const trustedOrigins = (typeof deps?.resolveTrustedAdminOrigins === "function" ? deps.resolveTrustedAdminOrigins(env) : resolveTrustedAdminOrigins(env)).map((entry) => normalizeOrigin2(entry)).filter(Boolean);
   if (!trustedOrigins.includes(origin)) return null;
   return typeof deps?.corsHeaders === "function" ? deps.corsHeaders(origin, [origin]) : null;
 };
@@ -64490,6 +58120,3719 @@ var createFaucetGateAuthorityWithDeps = ({
   };
 };
 
+// workers/shared/deployHelperCore.mjs
+var import_rpcDefaults3 = __toESM(require_rpcDefaults(), 1);
+
+// workers/sessionCorsWorker/storageRefNormalization.js
+var STORAGE_BACKENDS = Object.freeze({
+  ARWEAVE: "arweave",
+  LIT_ARWEAVE: "lit-arweave",
+  CLOUDFLARE: "cloudflare"
+});
+var CLOUDFLARE_REF_ID_RE = /^[a-z0-9][a-z0-9._:-]{5,160}$/i;
+var CLOUDFLARE_REF_FORBIDDEN_RE = /(r2:\/\/|d1:\/\/|kv:\/\/|\/|\\|https?:\/\/)/i;
+var toStr10 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
+var isObj3 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var trim3 = (value) => toStr10(value).trim();
+var normalizeStorageBackend = (value, fallback = STORAGE_BACKENDS.ARWEAVE) => {
+  const raw = trim3(value).toLowerCase();
+  if (raw === STORAGE_BACKENDS.CLOUDFLARE || raw === "cf" || raw === "r2") return STORAGE_BACKENDS.CLOUDFLARE;
+  if (raw === STORAGE_BACKENDS.LIT_ARWEAVE || raw === "lit" || raw === "lit_arweave" || raw === "encrypted-arweave") {
+    return STORAGE_BACKENDS.LIT_ARWEAVE;
+  }
+  if (raw === STORAGE_BACKENDS.ARWEAVE || raw === "ar") return STORAGE_BACKENDS.ARWEAVE;
+  return normalizeStorageBackend(fallback, STORAGE_BACKENDS.ARWEAVE);
+};
+var isArweaveStorageBackend = (value) => {
+  const backend = normalizeStorageBackend(value);
+  return backend === STORAGE_BACKENDS.ARWEAVE || backend === STORAGE_BACKENDS.LIT_ARWEAVE;
+};
+var isSafeCloudflareStorageRefId = (value) => {
+  const id2 = trim3(value);
+  return !!id2 && CLOUDFLARE_REF_ID_RE.test(id2) && !CLOUDFLARE_REF_FORBIDDEN_RE.test(id2);
+};
+var assertNoCloudflarePrivateMaterial = (value) => {
+  const text = typeof value === "string" ? value : JSON.stringify(value || {});
+  if (/(r2:\/\/|d1:\/\/|kv:\/\/|bucket[-_\s]?name|account[-_\s]?id|api[-_\s]?token|worker[-_\s]?token|secret|private[-_\s]?key)/i.test(text)) {
+    throw new Error("Cloudflare storage references must not expose private storage identifiers or credentials.");
+  }
+  return true;
+};
+var normalizeCloudflareStorageUri = (id2) => `/storage/read?id=${encodeURIComponent(id2)}`;
+var normalizeStorageRef = (input = {}, opts = {}) => {
+  const raw = isObj3(input) ? input : trim3(input) ? { id: trim3(input) } : {};
+  const backend = normalizeStorageBackend(raw.backend || raw.storage, opts.fallbackBackend);
+  const legacyTxId = trim3(raw.arweaveTxId || raw.txId || opts.legacyArweaveTxId);
+  const id2 = trim3(raw.id || raw.key || legacyTxId);
+  if (!id2) return null;
+  if (backend === STORAGE_BACKENDS.CLOUDFLARE && !isSafeCloudflareStorageRefId(id2)) return null;
+  const ref = { backend, id: id2 };
+  if (backend === STORAGE_BACKENDS.CLOUDFLARE) {
+    ref.uri = normalizeCloudflareStorageUri(id2);
+  } else {
+    ref.uri = backend === STORAGE_BACKENDS.LIT_ARWEAVE ? `lit-arweave://${id2}` : `ar://${id2}`;
+  }
+  const contentType = trim3(raw.contentType || raw.mime || raw.type);
+  if (contentType) ref.contentType = contentType;
+  if (backend === STORAGE_BACKENDS.LIT_ARWEAVE || raw.encrypted === true || raw.payloadEncrypted === true) ref.encrypted = true;
+  const gate = trim3(raw.gate || raw.gateResource || raw.resourceGate);
+  if (gate) ref.gate = gate;
+  const resource = trim3(raw.resource || opts.resource);
+  if (resource) ref.resource = resource;
+  const createdAt = trim3(raw.createdAt);
+  if (createdAt) ref.createdAt = createdAt;
+  if (backend === STORAGE_BACKENDS.CLOUDFLARE) assertNoCloudflarePrivateMaterial(ref);
+  return ref;
+};
+var deriveStorageRefFromLegacyArweaveTxId = (arweaveTxId, opts = {}) => {
+  const txId = trim3(arweaveTxId);
+  if (!txId) return null;
+  return normalizeStorageRef({
+    backend: opts.backend || (opts.encrypted ? STORAGE_BACKENDS.LIT_ARWEAVE : STORAGE_BACKENDS.ARWEAVE),
+    id: txId,
+    contentType: opts.contentType,
+    gate: opts.gate,
+    resource: opts.resource
+  }, opts);
+};
+var resolvePayloadStorageRef = (record, opts = {}) => {
+  const raw = isObj3(record) ? record : {};
+  const ref = raw.storageRef ? normalizeStorageRef(raw.storageRef, {
+    ...opts,
+    legacyArweaveTxId: raw.arweaveTxId || raw.txId || opts.legacyArweaveTxId
+  }) : null;
+  if (ref) return ref;
+  return deriveStorageRefFromLegacyArweaveTxId(raw.arweaveTxId || raw.txId || opts.legacyArweaveTxId, {
+    ...opts,
+    contentType: raw.contentType || raw.mime || opts.contentType,
+    encrypted: opts.encrypted ?? raw.encrypted ?? raw.payloadEncrypted,
+    backend: raw.backend || raw.storage || raw.profile || opts.backend,
+    gate: raw.gate || raw.gateResource || raw.resourceGate || opts.gate,
+    resource: raw.resource || opts.resource
+  });
+};
+var getLegacyArweaveTxId = (record, opts = {}) => {
+  if (!isObj3(record)) return trim3(record);
+  const storageRef = record.storageRef ? normalizeStorageRef(record.storageRef, {
+    ...opts,
+    legacyArweaveTxId: record.arweaveTxId || record.txId || opts.legacyArweaveTxId
+  }) : null;
+  if (storageRef) return isArweaveStorageBackend(storageRef.backend) ? storageRef.id : "";
+  return trim3(record.arweaveTxId || record.txId || opts.legacyArweaveTxId);
+};
+var attachStorageRefCompatibilityFields = (record, opts = {}) => {
+  const source = isObj3(record) ? { ...record } : {};
+  const storageRef = resolvePayloadStorageRef(source, opts);
+  if (!storageRef) return source;
+  source.storageRef = storageRef;
+  const arweaveTxId = getLegacyArweaveTxId(source, opts);
+  if (arweaveTxId && isArweaveStorageBackend(storageRef.backend)) {
+    source.arweaveTxId = arweaveTxId;
+  }
+  return source;
+};
+
+// workers/shared/sessionSecretsEnvelope.mjs
+var SESSION_SECRETS_ENVELOPE_VERSION = 1;
+var SESSION_SECRETS_ENVELOPE_KIND = "session-secrets";
+var SESSION_SECRETS_ENVELOPE_CIPHER = "AES-256-GCM";
+var SESSION_SECRETS_ENVELOPE_KEY_REF = "worker_secret:CE_STORAGE_ENVELOPE_KEK";
+var SESSION_SECRETS_CURRENT_KEK_NAME = "CE_STORAGE_ENVELOPE_KEK";
+var SESSION_SECRETS_PREVIOUS_KEK_NAME = "CE_STORAGE_ENVELOPE_PREVIOUS_KEK";
+var textEncoder = new TextEncoder();
+var textDecoder = new TextDecoder();
+var AES_GCM = "AES-GCM";
+var KEY_DERIVATION_DOMAIN = "ce-session-secrets-kek:v1";
+var isRecord = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+var normalizeTimestampMs = (value) => {
+  const raw = Number(value || 0);
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  return raw > 1e12 ? Math.trunc(raw) : Math.trunc(raw * 1e3);
+};
+var cloneRecord = (value) => isRecord(value) ? { ...value } : {};
+var toTrimmedString4 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var normalizeSlug = (value) => toTrimmedString4(value).toLowerCase() || "general";
+var getCryptoImpl = (deps = {}) => {
+  const cryptoImpl = deps.crypto || globalThis.crypto;
+  if (!cryptoImpl?.subtle) {
+    throw new Error("WebCrypto subtle crypto is required for session secret encryption.");
+  }
+  return cryptoImpl;
+};
+var randomBytes4 = (length, deps = {}) => {
+  const supplied = typeof deps.randomBytes === "function" ? deps.randomBytes(length) : null;
+  if (supplied && supplied.length >= length) {
+    return new Uint8Array(supplied).slice(0, length);
+  }
+  const bytes2 = new Uint8Array(length);
+  const cryptoImpl = getCryptoImpl(deps);
+  const getRandomValues = typeof deps.getRandomValues === "function" ? deps.getRandomValues : cryptoImpl.getRandomValues?.bind(cryptoImpl);
+  if (typeof getRandomValues !== "function") {
+    throw new Error("Secure randomness is required for session secret encryption.");
+  }
+  getRandomValues(bytes2);
+  return bytes2;
+};
+var bytesToBase64url = (value) => {
+  const bytes2 = value instanceof Uint8Array ? value : new Uint8Array(value || []);
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(bytes2).toString("base64url");
+  }
+  let binary = "";
+  bytes2.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+};
+var base64urlToBytes = (value) => {
+  const text = toTrimmedString4(value);
+  if (!/^[A-Za-z0-9_-]+$/.test(text)) {
+    throw new Error("Invalid encrypted session secrets encoding.");
+  }
+  const base64 = text.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(text.length / 4) * 4, "=");
+  if (typeof Buffer !== "undefined") return new Uint8Array(Buffer.from(base64, "base64"));
+  const binary = atob(base64);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+};
+var buildAad = (slug) => [
+  "ce-session-secrets",
+  `v${SESSION_SECRETS_ENVELOPE_VERSION}`,
+  normalizeSlug(slug),
+  SESSION_SECRETS_ENVELOPE_KEY_REF
+].join(":");
+var resolveKek = (env = {}, previous = false, deps = {}) => {
+  if (typeof deps.getSessionSecretsKek === "function") {
+    return deps.getSessionSecretsKek({
+      name: previous ? SESSION_SECRETS_PREVIOUS_KEK_NAME : SESSION_SECRETS_CURRENT_KEK_NAME,
+      previous
+    });
+  }
+  return previous ? env?.[SESSION_SECRETS_PREVIOUS_KEK_NAME] : env?.[SESSION_SECRETS_CURRENT_KEK_NAME];
+};
+var importKek = async (secret, usages, deps = {}) => {
+  const material = toTrimmedString4(secret);
+  if (!material) throw new Error(`${SESSION_SECRETS_CURRENT_KEK_NAME} is missing.`);
+  const cryptoImpl = getCryptoImpl(deps);
+  const digest = await cryptoImpl.subtle.digest(
+    "SHA-256",
+    textEncoder.encode(`${KEY_DERIVATION_DOMAIN}\0${material}`)
+  );
+  return cryptoImpl.subtle.importKey("raw", digest, { name: AES_GCM }, false, usages);
+};
+var isSessionSecretsEnvelope = (value) => isRecord(value) && Number(value.v || 0) === SESSION_SECRETS_ENVELOPE_VERSION && value.kind === SESSION_SECRETS_ENVELOPE_KIND;
+var isEncryptedSessionSecretsEnvelope = (value) => isSessionSecretsEnvelope(value) && value.cipher === SESSION_SECRETS_ENVELOPE_CIPHER && value.keyRef === SESSION_SECRETS_ENVELOPE_KEY_REF && typeof value.aad === "string" && typeof value.iv === "string" && typeof value.encryptedSecrets === "string";
+var hasEncryptedSessionSecretsFields = (value) => isRecord(value) && ["cipher", "keyRef", "aad", "iv", "encryptedSecrets"].some((field) => Object.prototype.hasOwnProperty.call(value, field));
+var unwrapSessionSecretsEnvelope = (value) => {
+  if (!isRecord(value)) return null;
+  if (hasEncryptedSessionSecretsFields(value) && (value.kind === SESSION_SECRETS_ENVELOPE_KIND || Object.prototype.hasOwnProperty.call(value, "v") || Object.prototype.hasOwnProperty.call(value, "version"))) {
+    throw new Error("Invalid or encrypted session secrets require authenticated decryption.");
+  }
+  if (isSessionSecretsEnvelope(value)) {
+    return cloneRecord(value.secrets);
+  }
+  if (Number(value.version || 0) === SESSION_SECRETS_ENVELOPE_VERSION && isRecord(value.secrets)) {
+    return cloneRecord(value.secrets);
+  }
+  return cloneRecord(value);
+};
+var buildEncryptedSessionSecretsEnvelope = async (secrets, {
+  env = {},
+  slug = "",
+  now,
+  previousEnvelope,
+  ...deps
+} = {}) => {
+  const nowMs = normalizeTimestampMs(typeof now === "function" ? now() : Date.now()) || Date.now();
+  const previousCreatedAt = isSessionSecretsEnvelope(previousEnvelope) ? normalizeTimestampMs(previousEnvelope.createdAt) : 0;
+  const aad = buildAad(slug);
+  const iv = randomBytes4(12, deps);
+  const key = await importKek(resolveKek(env, false, deps), ["encrypt"], deps);
+  const ciphertext = await getCryptoImpl(deps).subtle.encrypt(
+    {
+      name: AES_GCM,
+      iv,
+      additionalData: textEncoder.encode(aad)
+    },
+    key,
+    textEncoder.encode(JSON.stringify(cloneRecord(secrets)))
+  );
+  return {
+    v: SESSION_SECRETS_ENVELOPE_VERSION,
+    kind: SESSION_SECRETS_ENVELOPE_KIND,
+    createdAt: previousCreatedAt || nowMs,
+    updatedAt: nowMs,
+    cipher: SESSION_SECRETS_ENVELOPE_CIPHER,
+    keyRef: SESSION_SECRETS_ENVELOPE_KEY_REF,
+    aad,
+    iv: bytesToBase64url(iv),
+    encryptedSecrets: bytesToBase64url(new Uint8Array(ciphertext))
+  };
+};
+var decryptSessionSecretsEnvelope = async (value, { env = {}, slug = "", ...deps } = {}) => {
+  if (!isEncryptedSessionSecretsEnvelope(value)) {
+    throw new Error("Invalid encrypted session secrets envelope.");
+  }
+  const aad = buildAad(slug);
+  if (value.aad !== aad) {
+    throw new Error("Encrypted session secrets identity mismatch.");
+  }
+  const iv = base64urlToBytes(value.iv);
+  if (iv.length !== 12) throw new Error("Invalid encrypted session secrets IV.");
+  const ciphertext = base64urlToBytes(value.encryptedSecrets);
+  const attempts = [false, true];
+  let attempted = false;
+  for (const previous of attempts) {
+    const secret = resolveKek(env, previous, deps);
+    if (!toTrimmedString4(secret)) continue;
+    attempted = true;
+    try {
+      const key = await importKek(secret, ["decrypt"], deps);
+      const plaintext = await getCryptoImpl(deps).subtle.decrypt(
+        {
+          name: AES_GCM,
+          iv,
+          additionalData: textEncoder.encode(aad)
+        },
+        key,
+        ciphertext
+      );
+      const parsed = JSON.parse(textDecoder.decode(plaintext));
+      if (!isRecord(parsed)) throw new Error("Decrypted session secrets are invalid.");
+      return cloneRecord(parsed);
+    } catch {
+    }
+  }
+  if (!attempted) throw new Error(`${SESSION_SECRETS_CURRENT_KEK_NAME} is missing.`);
+  throw new Error("Session secrets decryption failed.");
+};
+
+// workers/shared/workerReleaseManifest.mjs
+var SHA_PATTERN = /^[a-f0-9]{40}$/;
+var SHA256_PATTERN = /^[a-f0-9]{64}$/;
+var RELEASE_MANIFEST_FILE = "worker-release-manifest.json";
+var ARTIFACT_SET = "context-engine-worker-bundles";
+var toStr11 = (value) => String(value ?? "").trim();
+var normalizeWorkerBundleSha256 = (value) => {
+  const normalized = toStr11(value).toLowerCase();
+  return SHA256_PATTERN.test(normalized) ? normalized : "";
+};
+var deriveWorkerReleaseManifestUrl = (bundleUrl) => {
+  try {
+    const parsed = new URL(toStr11(bundleUrl));
+    if (parsed.protocol !== "https:" || !parsed.pathname.includes("/")) return "";
+    parsed.pathname = `${parsed.pathname.slice(0, parsed.pathname.lastIndexOf("/") + 1)}${RELEASE_MANIFEST_FILE}`;
+    parsed.search = "";
+    parsed.hash = "";
+    return parsed.toString();
+  } catch (_) {
+    return "";
+  }
+};
+var readWorkerBundleDigestFromManifest = (manifest, { artifactFile, artifactKind }) => {
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) {
+    return { ok: false, error: "Worker release manifest must be an object." };
+  }
+  if (manifest.schemaVersion !== 1 || manifest.artifactSet !== ARTIFACT_SET) {
+    return { ok: false, error: "Worker release manifest schema or artifact set is unsupported." };
+  }
+  if (!SHA_PATTERN.test(toStr11(manifest.source?.commit)) || !SHA_PATTERN.test(toStr11(manifest.source?.tree)) || !toStr11(manifest.source?.ref).startsWith("refs/heads/") || !SHA_PATTERN.test(toStr11(manifest.replay?.privateSourceCommit)) || !SHA_PATTERN.test(toStr11(manifest.replay?.publicReplayCommit)) || toStr11(manifest.replay?.publicCommit) !== toStr11(manifest.source?.commit) || toStr11(manifest.replay?.publicTree) !== toStr11(manifest.source?.tree) || toStr11(manifest.builder?.workflow) !== "CI" || !/^[1-9][0-9]*$/.test(toStr11(manifest.builder?.runId))) {
+    return { ok: false, error: "Worker release manifest provenance is incomplete or inconsistent." };
+  }
+  const matches = (Array.isArray(manifest.artifacts) ? manifest.artifacts : []).filter((entry) => toStr11(entry?.file) === artifactFile && toStr11(entry?.kind) === artifactKind);
+  if (matches.length !== 1) {
+    return { ok: false, error: `Worker release manifest must contain exactly one ${artifactKind} artifact.` };
+  }
+  const digest = normalizeWorkerBundleSha256(matches[0]?.sha256);
+  if (!digest || !Number.isSafeInteger(matches[0]?.bytes) || matches[0].bytes <= 0) {
+    return { ok: false, error: `Worker release manifest has invalid ${artifactKind} digest metadata.` };
+  }
+  return { ok: true, digest };
+};
+var fetchExpectedWorkerBundleDigest = async ({
+  manifestUrl,
+  artifactFile,
+  artifactKind,
+  fetchImpl = globalThis.fetch
+}) => {
+  const normalizedUrl = deriveWorkerReleaseManifestUrl(manifestUrl);
+  if (!normalizedUrl || normalizedUrl !== toStr11(manifestUrl)) {
+    return { ok: false, error: "Worker release manifest URL must be an explicit HTTPS manifest asset URL." };
+  }
+  try {
+    const response2 = await fetchImpl(normalizedUrl, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store"
+    });
+    if (!response2.ok) {
+      return { ok: false, error: `Failed to fetch Worker release manifest (${response2.status}).` };
+    }
+    const manifest = await response2.json();
+    return readWorkerBundleDigestFromManifest(manifest, { artifactFile, artifactKind });
+  } catch (error) {
+    return { ok: false, error: `Failed to read Worker release manifest: ${toStr11(error?.message || error)}` };
+  }
+};
+
+// workers/shared/agentSessionWrappedDeployment.mjs
+var AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND = "agent_session_wrapped";
+var AGENT_SESSION_WRAPPED_PROTOCOL_VERSION = "agent-session-wrapped-v1";
+var COMPATIBILITY_DATE = "2024-09-02";
+var REQUIRED_SECRET_NAMES = Object.freeze([
+  "DEMO_SIGNER_ROOT_SECRET",
+  "AGENT_BRIDGE_AGENT_API_TOKEN"
+]);
+var toStr12 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var safeSlug = (value) => {
+  const slug = toStr12(value).toLowerCase();
+  return /^[a-z0-9_-]{1,128}$/.test(slug) ? slug : "";
+};
+var safeDeploymentIdentity = (value) => {
+  const identity = toStr12(value);
+  return /^[A-Za-z0-9._:-]{8,180}$/.test(identity) ? identity : "";
+};
+var normalizeHttpsOrigin = (value) => {
+  try {
+    const parsed = new URL(toStr12(value));
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return "";
+    if (parsed.pathname !== "/" || parsed.search || parsed.hash) return "";
+    return parsed.origin;
+  } catch {
+    return "";
+  }
+};
+var normalizeHttpsUrl = (value) => {
+  try {
+    const parsed = new URL(toStr12(value));
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.hash) return "";
+    return parsed.toString();
+  } catch {
+    return "";
+  }
+};
+var normalizeAuthorityMode = (value) => {
+  const mode = toStr12(value).toLowerCase();
+  return ["worker_canonical", "evm_registry_canonical", "registry_canonical"].includes(mode) ? mode : "";
+};
+var encode = (value) => new TextEncoder().encode(String(value || ""));
+var bytesToHex2 = (bytes2) => Array.from(bytes2, (byte) => byte.toString(16).padStart(2, "0")).join("");
+var sha256Hex = async (value) => bytesToHex2(new Uint8Array(await crypto.subtle.digest("SHA-256", encode(value))));
+var randomSecret = () => {
+  const bytes2 = new Uint8Array(32);
+  crypto.getRandomValues(bytes2);
+  return bytesToHex2(bytes2);
+};
+var response = (ok, status, body) => ({ ok, status, body });
+var failure = (status, step, error) => response(false, status, { ok: false, step, error: toStr12(error) });
+var isAmbiguousMutationFailure = (result = {}) => {
+  const status = Number(result?.status || 0);
+  return !status || status >= 500 || [408, 409, 412, 425, 429, 499].includes(status);
+};
+var policyFor = ({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled = true }) => ({
+  version: 1,
+  defaultSessionSlug: sessionSlug,
+  sessions: [{
+    sessionSlug,
+    sessionWorkerUrl: sessionWorkerOrigin,
+    telegramBridgeEnabled: false,
+    sessionModeProfile: {
+      surfaces: { agentHttp: agentHttpEnabled, telegram: false },
+      authority: { mode: authorityMode }
+    }
+  }]
+});
+var workerNameFor = ({ sessionSlug, deploymentId }) => {
+  const prefix = `ce-wrapped-${sessionSlug}`.replace(/_/g, "-").replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+  return `${prefix || "ce-wrapped-session"}-${deploymentId.slice(0, 12)}`;
+};
+var bindingMap = (bindings = []) => new Map(
+  (Array.isArray(bindings) ? bindings : []).map((binding) => [toStr12(binding?.name), binding])
+);
+var settingsOwnDeployment = ({ settings, expectedBindings, kvNamespaceId, verifyBundle = true }) => {
+  if (!settings?.ok) return false;
+  const result = settings.data?.result || {};
+  if (toStr12(result.main_module) && toStr12(result.main_module) !== "worker.mjs") return false;
+  const actual = bindingMap(result.bindings);
+  const kv = actual.get("AGENT_ACTION_KV");
+  if (toStr12(kv?.type) !== "kv_namespace" || toStr12(kv?.namespace_id) !== kvNamespaceId) return false;
+  return expectedBindings.filter((binding) => binding.type === "plain_text").filter((binding) => verifyBundle || binding.name !== "AGENT_BRIDGE_BUNDLE_SHA256").every((binding) => {
+    const observed = actual.get(binding.name);
+    return toStr12(observed?.type) === "plain_text" && toStr12(observed?.text) === binding.text;
+  });
+};
+var buildUploadForm = ({ bundleSource, bindings }) => {
+  const metadata = {
+    main_module: "worker.mjs",
+    compatibility_date: COMPATIBILITY_DATE,
+    compatibility_flags: ["nodejs_compat", "global_fetch_strictly_public"],
+    bindings
+  };
+  const form = new FormData();
+  form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }), "metadata.json");
+  form.append("worker.mjs", new Blob([bundleSource], { type: "application/javascript+module" }), "worker.mjs");
+  return { form, metadata };
+};
+var readBundle = async ({ body, env, fetchImpl }) => {
+  const inline = typeof body?.bundleText === "string" ? body.bundleText : "";
+  if (inline.trim()) return { ok: true, source: inline };
+  const url = normalizeHttpsUrl(body?.bundleUrl || env?.AGENT_BRIDGE_BUNDLE_URL);
+  if (!url) return { ok: false, error: "Missing a trusted Agent Bridge bundle." };
+  try {
+    const result = await fetchImpl(url, { method: "GET", cache: "no-store" });
+    if (!result.ok) return { ok: false, error: `Failed to fetch Agent Bridge bundle (${result.status}).` };
+    const source = await result.text();
+    return source.trim() ? { ok: true, source } : { ok: false, error: "Agent Bridge bundle is empty." };
+  } catch (error) {
+    return { ok: false, error: `Failed to fetch Agent Bridge bundle: ${toStr12(error?.message || error)}` };
+  }
+};
+var listMatchingKvNamespaces = async ({ apiToken, accountId, title, cfFetchImpl }) => {
+  const listed = await cfFetchImpl(
+    apiToken,
+    `/accounts/${accountId}/storage/kv/namespaces?per_page=100&page=1`,
+    { method: "GET" }
+  );
+  if (!listed.ok) return { ok: false, error: listed.error || "Failed to list KV namespaces." };
+  const matches = (Array.isArray(listed.data?.result) ? listed.data.result : []).filter((entry) => toStr12(entry?.title) === title && toStr12(entry?.id));
+  if (matches.length > 1) return { ok: false, status: 409, error: "Multiple KV namespaces match this Wrapped deployment identity." };
+  return { ok: true, match: matches[0] || null };
+};
+var normalizeCapability = (value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const origin = normalizeHttpsOrigin(value.origin);
+  const protocolVersion = toStr12(value.protocolVersion);
+  const revision = toStr12(value.revision);
+  const verifiedAt = toStr12(value.verifiedAt);
+  if (Number(value.version) !== 1 || typeof value.enabled !== "boolean" || !origin || protocolVersion !== AGENT_SESSION_WRAPPED_PROTOCOL_VERSION || !/^wrapped-[0-9a-f]{16}$/.test(revision) || !Number.isFinite(Date.parse(verifiedAt))) return null;
+  return { version: 1, enabled: value.enabled, origin, protocolVersion, revision, verifiedAt };
+};
+async function persistAgentSessionWrappedCapability({
+  apiToken = "",
+  accountId = "",
+  kvNamespaceId = "",
+  sessionConfigKey = "",
+  sessionSlug = "",
+  sessionWorkerOrigin = "",
+  capability = null,
+  cfFetchImpl
+} = {}) {
+  const token = toStr12(apiToken);
+  const account = toStr12(accountId);
+  const kvId = toStr12(kvNamespaceId);
+  const configKey = toStr12(sessionConfigKey);
+  const slug = safeSlug(sessionSlug);
+  const workerOrigin = normalizeHttpsOrigin(sessionWorkerOrigin);
+  const normalizedCapability = normalizeCapability(capability);
+  if (!token || !account || !kvId || !configKey || !slug || !workerOrigin || !normalizedCapability) {
+    return failure(400, "capability_config_validate", "Wrapped capability publication inputs are invalid.");
+  }
+  if (typeof cfFetchImpl !== "function") {
+    return failure(500, "capability_config_validate", "Cloudflare deployment client is unavailable.");
+  }
+  const path = `/accounts/${account}/storage/kv/namespaces/${kvId}/values/${configKey}`;
+  const current = await cfFetchImpl(token, path, { method: "GET" });
+  const currentConfig = current?.data?.result || current?.data || {};
+  if (!current.ok) {
+    return failure(502, "capability_config_read", current.error || "Session Worker config is unavailable.");
+  }
+  if (safeSlug(currentConfig.slug) !== slug || normalizeHttpsOrigin(currentConfig.corsWorkerUrl) !== workerOrigin) {
+    return failure(409, "capability_config_identity", "Live session config does not match the paired session Worker.");
+  }
+  const nextConfig = { ...currentConfig, agentSessionWrapped: normalizedCapability };
+  const written = await cfFetchImpl(token, path, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(nextConfig)
+  });
+  if (!written.ok) {
+    return failure(502, "capability_config_write", written.error || "Wrapped capability config write failed.");
+  }
+  const verified = await cfFetchImpl(token, path, { method: "GET" });
+  const verifiedConfig = verified?.data?.result || verified?.data || {};
+  if (!verified.ok || safeSlug(verifiedConfig.slug) !== slug || normalizeHttpsOrigin(verifiedConfig.corsWorkerUrl) !== workerOrigin || JSON.stringify(normalizeCapability(verifiedConfig.agentSessionWrapped)) !== JSON.stringify(normalizedCapability)) {
+    return failure(502, "capability_config_verify", "Wrapped capability did not verify in session Worker config.");
+  }
+  return response(true, 200, { ok: true, agentSessionWrapped: normalizedCapability });
+}
+async function executeAgentSessionWrappedDeployment({
+  body = {},
+  env = {},
+  accountId = "",
+  cfFetchImpl,
+  fetchImpl = globalThis.fetch,
+  now = () => /* @__PURE__ */ new Date(),
+  markMutationStarted = null,
+  randomSecretImpl = randomSecret
+} = {}) {
+  let mutationMarked = false;
+  const beforeMutation = async () => {
+    if (mutationMarked) return;
+    if (typeof markMutationStarted === "function") await markMutationStarted();
+    mutationMarked = true;
+  };
+  const fail = (status, step, error) => {
+    const result = failure(status, step, error);
+    if (mutationMarked) result.body.deploymentRequestPending = true;
+    return result;
+  };
+  const apiToken = toStr12(body.apiToken || body.token);
+  const resolvedAccountId = toStr12(accountId);
+  const sessionSlug = safeSlug(body.sessionSlug);
+  const sessionWorkerOrigin = normalizeHttpsOrigin(body.sessionWorkerOrigin || body.sessionWorkerUrl);
+  const sessionDeploymentIdentity = safeDeploymentIdentity(body.sessionDeploymentIdentity);
+  const authorityMode = normalizeAuthorityMode(body.authorityMode);
+  const agentHttpEnabled = body.agentHttpEnabled === void 0 ? true : body.agentHttpEnabled;
+  if (body.deploymentKind !== AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
+    return fail(400, "validate", "Invalid deployment kind.");
+  }
+  if (!apiToken || !resolvedAccountId || !sessionSlug || !sessionWorkerOrigin || !sessionDeploymentIdentity || !authorityMode || typeof agentHttpEnabled !== "boolean") {
+    return fail(400, "validate", "Dedicated Wrapped deployment requires token, account, session identity, authority mode, and HTTPS session Worker origin.");
+  }
+  if (typeof cfFetchImpl !== "function") return fail(500, "validate", "Cloudflare deployment client is unavailable.");
+  if (body.telegramEnabled === true || toStr12(body.telegramBotToken || body.telegramWebhookSecret)) {
+    return fail(400, "validate", "Telegram configuration is not part of the default dedicated Wrapped deployment.");
+  }
+  const suppliedBundleSha256 = toStr12(body.bundleSha256);
+  let expectedBundleSha256 = normalizeWorkerBundleSha256(suppliedBundleSha256);
+  if (suppliedBundleSha256 && !expectedBundleSha256) {
+    return fail(400, "bundle_provenance", "bundleSha256 must be a complete SHA-256 hex digest.");
+  }
+  if (!toStr12(body.bundleText) && toStr12(body.bundleManifestUrl)) {
+    const manifestDigest = await fetchExpectedWorkerBundleDigest({
+      manifestUrl: body.bundleManifestUrl,
+      artifactFile: "agentBridgeWorker.bundle.js",
+      artifactKind: "agent-bridge-worker",
+      fetchImpl
+    });
+    if (!manifestDigest.ok) return fail(502, "bundle_provenance", manifestDigest.error);
+    if (expectedBundleSha256 && expectedBundleSha256 !== manifestDigest.digest) {
+      return fail(409, "bundle_provenance", "Worker release manifest digest conflicts with bundleSha256.");
+    }
+    expectedBundleSha256 = manifestDigest.digest;
+  }
+  const bundle = await readBundle({ body, env, fetchImpl });
+  if (!bundle.ok) return fail(400, "bundle", bundle.error);
+  const [deploymentId, bundleSha256] = await Promise.all([
+    sha256Hex(`context-engine:agent-session-wrapped:deployment:v1:${sessionDeploymentIdentity}`),
+    sha256Hex(bundle.source)
+  ]);
+  if (expectedBundleSha256 && bundleSha256 !== expectedBundleSha256) {
+    return fail(409, "bundle_provenance", "Agent Bridge bundle SHA-256 does not match the verified release manifest.");
+  }
+  const workerName = workerNameFor({ sessionSlug, deploymentId });
+  const accountSubdomain = await cfFetchImpl(
+    apiToken,
+    `/accounts/${resolvedAccountId}/workers/subdomain`,
+    { method: "GET" }
+  );
+  const subdomain = toStr12(accountSubdomain.data?.result?.subdomain);
+  if (!accountSubdomain.ok || !subdomain) {
+    return fail(502, "workers_dev_subdomain", accountSubdomain.error || "Cloudflare workers.dev subdomain is unavailable.");
+  }
+  const workerUrl = `https://${workerName}.${subdomain}.workers.dev`;
+  const policyJson = JSON.stringify(policyFor({ sessionSlug, sessionWorkerOrigin, authorityMode, agentHttpEnabled }));
+  const plainBindings = [
+    { name: "AGENT_BRIDGE_DEPLOYMENT_ID", type: "plain_text", text: deploymentId },
+    { name: "AGENT_BRIDGE_BUNDLE_SHA256", type: "plain_text", text: bundleSha256 },
+    { name: "AGENT_BRIDGE_PUBLIC_URL", type: "plain_text", text: workerUrl },
+    { name: "CE_SESSION_WORKER_BASE_URL", type: "plain_text", text: sessionWorkerOrigin },
+    { name: "AGENT_BRIDGE_SESSION_POLICY_JSON", type: "plain_text", text: policyJson },
+    { name: "AGENT_BRIDGE_DIRECT_SUBMIT_ENABLED", type: "plain_text", text: "false" },
+    { name: "BROADCAST_ENABLED", type: "plain_text", text: "false" }
+  ];
+  const kvTitle = `ContextEngineAgentSessionWrapped:${sessionSlug}:${deploymentId.slice(0, 12)}`;
+  const inventory = await listMatchingKvNamespaces({
+    apiToken,
+    accountId: resolvedAccountId,
+    title: kvTitle,
+    cfFetchImpl
+  });
+  if (!inventory.ok) return fail(inventory.status || 502, "kv_inventory", inventory.error);
+  let kvId = toStr12(inventory.match?.id);
+  let kvReused = !!kvId;
+  if (!kvId) {
+    await beforeMutation();
+    const created = await cfFetchImpl(
+      apiToken,
+      `/accounts/${resolvedAccountId}/storage/kv/namespaces`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title: kvTitle }) }
+    );
+    kvId = toStr12(created.data?.result?.id);
+    if (!created.ok || !kvId) return fail(502, "kv_create", created.error || "Cloudflare did not create Wrapped KV.");
+    kvReused = false;
+  }
+  const bindings = [
+    { name: "AGENT_ACTION_KV", type: "kv_namespace", namespace_id: kvId },
+    ...plainBindings
+  ];
+  const settingsPath = `/accounts/${resolvedAccountId}/workers/scripts/${workerName}/settings`;
+  const beforeSettings = await cfFetchImpl(apiToken, settingsPath, { method: "GET" });
+  const exists2 = beforeSettings.ok;
+  if (!exists2 && Number(beforeSettings.status || 0) !== 404) {
+    return fail(502, "worker_preflight", beforeSettings.error || "Unable to verify Wrapped Worker identity.");
+  }
+  if (exists2 && !settingsOwnDeployment({
+    settings: beforeSettings,
+    expectedBindings: plainBindings,
+    kvNamespaceId: kvId,
+    verifyBundle: false
+  })) {
+    return fail(409, "worker_preflight", "Existing Worker does not match this Wrapped deployment identity.");
+  }
+  const beforeBindingMap = bindingMap(beforeSettings.data?.result?.bindings);
+  const bundleAlreadyUploaded = exists2 && toStr12(beforeBindingMap.get("AGENT_BRIDGE_BUNDLE_SHA256")?.text) === bundleSha256;
+  let uploadMetadata = null;
+  if (!bundleAlreadyUploaded) {
+    await beforeMutation();
+    const upload = buildUploadForm({ bundleSource: bundle.source, bindings });
+    uploadMetadata = upload.metadata;
+    const uploaded = await cfFetchImpl(
+      apiToken,
+      `/accounts/${resolvedAccountId}/workers/scripts/${workerName}`,
+      { method: "PUT", body: upload.form }
+    );
+    if (!uploaded.ok) return fail(502, "worker_upload", uploaded.error || "Wrapped Worker upload failed.");
+  }
+  const verifiedSettings = await cfFetchImpl(apiToken, settingsPath, { method: "GET" });
+  if (!settingsOwnDeployment({ settings: verifiedSettings, expectedBindings: plainBindings, kvNamespaceId: kvId })) {
+    return fail(502, "worker_binding_verification", "Wrapped Worker bindings did not verify after upload.");
+  }
+  let existingSecrets = /* @__PURE__ */ new Set();
+  if (exists2) {
+    const listedSecrets = await cfFetchImpl(
+      apiToken,
+      `/accounts/${resolvedAccountId}/workers/scripts/${workerName}/secrets`,
+      { method: "GET" }
+    );
+    if (!listedSecrets.ok || !Array.isArray(listedSecrets.data?.result)) {
+      return fail(502, "worker_secret_inventory", listedSecrets.error || "Unable to verify existing Wrapped secrets.");
+    }
+    existingSecrets = new Set(listedSecrets.data.result.filter((entry) => toStr12(entry?.type) === "secret_text").map((entry) => toStr12(entry?.name)));
+  }
+  const generated = [];
+  const preserved = [];
+  const secretsPath = `/accounts/${resolvedAccountId}/workers/scripts/${workerName}/secrets`;
+  for (const name of REQUIRED_SECRET_NAMES) {
+    if (existingSecrets.has(name)) {
+      preserved.push(name);
+      continue;
+    }
+    await beforeMutation();
+    const text = randomSecretImpl();
+    const written = await cfFetchImpl(
+      apiToken,
+      secretsPath,
+      { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, type: "secret_text", text }) }
+    );
+    if (!written.ok) {
+      let reconciled = false;
+      if (isAmbiguousMutationFailure(written)) {
+        const inventory2 = await cfFetchImpl(apiToken, secretsPath, { method: "GET" });
+        reconciled = inventory2.ok && Array.isArray(inventory2.data?.result) && inventory2.data.result.some((entry) => toStr12(entry?.type) === "secret_text" && toStr12(entry?.name) === name);
+      }
+      if (!reconciled) return fail(502, `worker_secret_${name}`, written.error || `Failed to write ${name}.`);
+    }
+    generated.push(name);
+  }
+  await beforeMutation();
+  const activation = await cfFetchImpl(
+    apiToken,
+    `/accounts/${resolvedAccountId}/workers/scripts/${workerName}/subdomain`,
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled: true }) }
+  );
+  if (!activation.ok || activation.data?.result?.enabled !== true) {
+    return fail(502, "worker_activation", activation.error || "Wrapped Worker workers.dev activation failed.");
+  }
+  let healthResponse;
+  let health;
+  try {
+    healthResponse = await fetchImpl(`${workerUrl}/health`, { method: "GET", headers: { Accept: "application/json" }, cache: "no-store" });
+    health = await healthResponse.json();
+  } catch (error) {
+    return fail(503, "authority_health_probe", toStr12(error?.message || error) || "Wrapped health request failed.");
+  }
+  const authorityReady = healthResponse.ok && health?.ok === true && health?.worker === "agentBridgeWorker" && health?.protocolVersion === AGENT_SESSION_WRAPPED_PROTOCOL_VERSION && health?.agentSessionWrappedConfigured === true && health?.agentSessionWrappedReady === agentHttpEnabled && safeSlug(health?.dedicatedSession?.sessionSlug) === sessionSlug && normalizeHttpsOrigin(health?.dedicatedSession?.sessionWorkerOrigin) === sessionWorkerOrigin && health?.dedicatedSession?.accessEnabled === agentHttpEnabled;
+  if (!authorityReady) {
+    return fail(503, "authority_health_probe", "Wrapped Worker health, protocol, or pinned authority did not verify.");
+  }
+  const revisionDigest = agentHttpEnabled ? bundleSha256 : await sha256Hex(`${bundleSha256}:agent-http-disabled`);
+  const verifiedAt = now().toISOString();
+  return response(true, 200, {
+    ok: true,
+    deploymentKind: AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
+    accountId: resolvedAccountId,
+    workerName,
+    workerUrl,
+    sessionSlug,
+    sessionWorkerOrigin,
+    telegramConfigured: false,
+    resources: { kvNamespaceId: kvId, kvReused },
+    upload: { reused: bundleAlreadyUploaded, bundleSha256, metadata: uploadMetadata ? { main_module: uploadMetadata.main_module } : null },
+    secrets: { generated, preserved },
+    health: {
+      ok: true,
+      protocolVersion: health.protocolVersion,
+      authorityPinned: true,
+      accessEnabled: agentHttpEnabled
+    },
+    agentSessionWrapped: {
+      version: 1,
+      enabled: agentHttpEnabled,
+      origin: workerUrl,
+      protocolVersion: AGENT_SESSION_WRAPPED_PROTOCOL_VERSION,
+      revision: `wrapped-${revisionDigest.slice(0, 16)}`,
+      verifiedAt
+    }
+  });
+}
+
+// workers/shared/deployHelperEndpointConfig.mjs
+var DEFAULT_CLOUDFLARE_API_BASE_URL = "https://api.cloudflare.com/client/v4";
+var CLOUDFLARE_API_BASE_URL_ENV = "CE_CLOUDFLARE_API_BASE_URL";
+var toTrimmedString5 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var stripTrailingSlashes = (value) => value.replace(/\/+$/u, "");
+var resolveCloudflareApiBaseUrl = ({
+  apiBaseUrl = "",
+  env = null
+} = {}) => stripTrailingSlashes(toTrimmedString5(apiBaseUrl)) || stripTrailingSlashes(toTrimmedString5(env?.[CLOUDFLARE_API_BASE_URL_ENV])) || DEFAULT_CLOUDFLARE_API_BASE_URL;
+
+// workers/shared/workerSessionConfig.mjs
+var isObj4 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var toStr13 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
+var PUBLIC_CONFIG_KEYS = Object.freeze([
+  "slug",
+  "authzEpoch",
+  "sessionId",
+  "sessionIdHex",
+  "configRevision",
+  "sessionName",
+  "sessionInfo",
+  "sessionHeaderImg",
+  "defaultTags",
+  "defaultSbtTags",
+  "questionsGenPrompt",
+  "defaultFilterState",
+  "defaultFeaturedSBTs",
+  "autoFeatureSBTsBySessionSlug",
+  "HIGHLIGHTED_QUESTION_IDS",
+  "BLOCKED_QUESTION_IDS",
+  "HIGHLIGHTED_SURVEY_IDS",
+  "BLOCKED_SURVEY_IDS",
+  "ignored_SBTs_LIST",
+  "featured_SBTs_LIST",
+  "adminAddress",
+  "adminAddresses",
+  "corsWorkerUrl",
+  "allowOrigins",
+  "sessionModeProfile",
+  "agentSessionWrapped",
+  "workerAuthority",
+  "storageProfile",
+  "ai",
+  "limits",
+  "scopes",
+  "blockLimits",
+  "contracts",
+  "registryChainId",
+  "networkChainId",
+  "embeddedDeployHelperEnabled"
+]);
+var DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
+  "sessionId",
+  "sessionIdHex",
+  "configRevision",
+  "sessionName",
+  "sessionInfo",
+  "sessionHeaderImg",
+  "sessionModeProfile",
+  "workerAuthority",
+  "ai",
+  "contracts"
+]);
+var OPEN_CONFIG_SUBTREE_KEYS = Object.freeze([
+  "ai",
+  "contracts",
+  "limits",
+  "scopes",
+  "sessionModeProfile",
+  "storageProfile",
+  "workerAuthority"
+]);
+var normalizeKey = (value) => toStr13(value).replace(/[^a-z0-9]/gi, "").toLowerCase();
+var OMIT_PUBLIC_VALUE = Symbol("omit-public-worker-config-value");
+var SAFE_PUBLIC_KEY_FIELD_NAMES = /* @__PURE__ */ new Set(["keyprovider", "publickey", "resourcekey"]);
+var SAFE_STRUCTURAL_AUTHORIZATION_PATHS = /* @__PURE__ */ new Set([
+  "config.authorization",
+  "config.sessionModeProfile.authorization"
+]);
+var SAFE_WRAPPED_STORAGE_KEY_PATHS = /* @__PURE__ */ new Set([
+  "config.storageEnvelope.sessionKey",
+  "config.storageEnvelope.sessionKey.wrappedKey"
+]);
+var SAFE_BOOLEAN_SCOPE_PATH = "config.scopes";
+var SAFE_LEGACY_FAUCET_CONFIG_PATH = "config.faucet";
+var WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS = Object.freeze([
+  "litApiBase",
+  "litGroupId",
+  "litPkpId",
+  "litActionCid"
+]);
+var WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET = new Set(WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELDS);
+var TOP_LEVEL_PROVIDER_KEY_NAMES = /* @__PURE__ */ new Set([
+  "aikey",
+  "anthropickey",
+  "geminikey",
+  "googleaikey",
+  "groqkey",
+  "mistralkey",
+  "openaikey",
+  "openrouterkey"
+]);
+var hasSensitiveTokenValue = (value) => {
+  if (value == null || value === false) return false;
+  if (typeof value === "string") return value.trim() !== "";
+  return true;
+};
+var isRecursiveSecretAlias = ({ key, path, value }) => {
+  const normalized = normalizeKey(key);
+  const fieldPath = `${path}.${key}`;
+  if (SAFE_WRAPPED_STORAGE_KEY_PATHS.has(fieldPath)) return false;
+  if (SAFE_PUBLIC_KEY_FIELD_NAMES.has(normalized)) return false;
+  if (path === SAFE_BOOLEAN_SCOPE_PATH && typeof value === "boolean") return false;
+  if (fieldPath === SAFE_LEGACY_FAUCET_CONFIG_PATH && isObj4(value)) return false;
+  if (normalized.startsWith("exposes") && typeof value === "boolean") return false;
+  if (normalized === "authorization" && SAFE_STRUCTURAL_AUTHORIZATION_PATHS.has(fieldPath) && isObj4(value)) {
+    return false;
+  }
+  return normalized === "authorization" || normalized === "authorizationheader" || normalized.endsWith("apikeys") || normalized.endsWith("providerkeys") || normalized.endsWith("credential") || normalized.endsWith("credentials") || normalized.endsWith("key") || normalized.startsWith("faucet") || normalized.endsWith("secret") || normalized.endsWith("token") || normalized.endsWith("password") || normalized.endsWith("jwk");
+};
+var isSecretAdjacentKey = (key, value, path) => {
+  const normalized = normalizeKey(key);
+  const fieldPath = `${path}.${key}`;
+  if (SAFE_WRAPPED_STORAGE_KEY_PATHS.has(fieldPath)) return false;
+  if (SAFE_PUBLIC_KEY_FIELD_NAMES.has(normalized)) return false;
+  if (path === SAFE_BOOLEAN_SCOPE_PATH && typeof value === "boolean") return false;
+  if (normalized.startsWith("exposes") && typeof value === "boolean") return false;
+  if (normalized === "authorization" && SAFE_STRUCTURAL_AUTHORIZATION_PATHS.has(fieldPath) && isObj4(value)) {
+    return false;
+  }
+  if (isRecursiveSecretAlias({ key, path, value })) return true;
+  if (normalized.startsWith("faucet")) return true;
+  if (normalized === "litcredentials") return true;
+  if (normalized === "rpc" || normalized.includes("rpcurl") || normalized.includes("rpcendpoint")) return true;
+  return normalized === "auth" || normalized === "credential" || normalized === "headers" || normalized === "key" || normalized === "secrets" || normalized === "credentials" || normalized.endsWith("apikey") || normalized.endsWith("key") || normalized.endsWith("privatekey") || normalized.endsWith("secret") || normalized.endsWith("token") || normalized.endsWith("password") || normalized.endsWith("jwk");
+};
+var hasUrlCredentials = (value) => {
+  if (typeof value !== "string" || !/^https?:\/\//i.test(value.trim())) return false;
+  try {
+    const parsed = new URL(value);
+    return !!parsed.username || !!parsed.password;
+  } catch {
+    return false;
+  }
+};
+var sanitizePublicValue = (value, path = "config") => {
+  if (hasUrlCredentials(value)) return OMIT_PUBLIC_VALUE;
+  if (Array.isArray(value)) {
+    return value.map((entry, index) => sanitizePublicValue(entry, `${path}.${index}`)).filter((entry) => entry !== OMIT_PUBLIC_VALUE);
+  }
+  if (!isObj4(value)) return value;
+  return Object.keys(value).reduce((acc, key) => {
+    if (isSecretAdjacentKey(key, value[key], path)) return acc;
+    const sanitized = sanitizePublicValue(value[key], `${path}.${key}`);
+    if (sanitized !== OMIT_PUBLIC_VALUE) acc[key] = sanitized;
+    return acc;
+  }, {});
+};
+var projectPublicAiConfig = (value, path) => {
+  const ai = isObj4(value) ? value : {};
+  return selectFields(ai, ["models"], path);
+};
+var selectFields = (source, keys, path = "config") => keys.reduce((acc, key) => {
+  if (!Object.prototype.hasOwnProperty.call(source || {}, key)) return acc;
+  const fieldPath = `${path}.${key}`;
+  const sanitized = key === "ai" ? projectPublicAiConfig(source[key], fieldPath) : sanitizePublicValue(source[key], fieldPath);
+  if (sanitized !== OMIT_PUBLIC_VALUE) acc[key] = sanitized;
+  return acc;
+}, {});
+var findForbiddenCloudflareDeploymentTokenPath = (value, path = "config") => {
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const nested = findForbiddenCloudflareDeploymentTokenPath(value[index], `${path}.${index}`);
+      if (nested) return nested;
+    }
+    return "";
+  }
+  if (!isObj4(value)) return "";
+  for (const key of Object.keys(value)) {
+    const normalized = normalizeKey(key);
+    const normalizedPath = normalizeKey(path);
+    const isCloudflareContext = normalizedPath.includes("cloudflare") || normalized.startsWith("cloudflare");
+    const isCloudflareTokenAlias = [
+      "apitoken",
+      "cfapitoken",
+      "cloudflareapitoken",
+      "cloudflaretoken",
+      "cloudflareaccesstoken",
+      "cloudflareworkertoken"
+    ].includes(normalized) || isCloudflareContext && normalized.endsWith("token");
+    if (isCloudflareTokenAlias && hasSensitiveTokenValue(value[key])) {
+      return `${path}.${key}`;
+    }
+    const nested = findForbiddenCloudflareDeploymentTokenPath(value[key], `${path}.${key}`);
+    if (nested) return nested;
+  }
+  return "";
+};
+var findForbiddenOpenConfigSecretPath = (value, path) => {
+  if (hasUrlCredentials(value)) return path;
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const nested = findForbiddenOpenConfigSecretPath(value[index], `${path}.${index}`);
+      if (nested) return nested;
+    }
+    return "";
+  }
+  if (!isObj4(value)) return "";
+  for (const key of Object.keys(value)) {
+    if (isSecretAdjacentKey(key, value[key], path)) return `${path}.${key}`;
+    const nested = findForbiddenOpenConfigSecretPath(value[key], `${path}.${key}`);
+    if (nested) return nested;
+  }
+  return "";
+};
+var findForbiddenRecursiveSecretAliasPath = (value, path) => {
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const nested = findForbiddenRecursiveSecretAliasPath(value[index], `${path}.${index}`);
+      if (nested) return nested;
+    }
+    return "";
+  }
+  if (!isObj4(value)) return "";
+  for (const key of Object.keys(value)) {
+    if (isRecursiveSecretAlias({ key, path, value: value[key] })) return `${path}.${key}`;
+    const nested = findForbiddenRecursiveSecretAliasPath(value[key], `${path}.${key}`);
+    if (nested) return nested;
+  }
+  return "";
+};
+var findInvalidLitCredentialsDescriptorPath = (value, path = "config.litCredentials") => {
+  if (!isObj4(value)) return path;
+  for (const key of Object.keys(value)) {
+    const fieldPath = `${path}.${key}`;
+    if (!WORKER_LIT_CREDENTIAL_DESCRIPTOR_FIELD_SET.has(key)) return fieldPath;
+    if (typeof value[key] !== "string" || hasUrlCredentials(value[key])) return fieldPath;
+  }
+  return "";
+};
+var findForbiddenWorkerConfigSecretPath = (config, path = "config") => {
+  const source = isObj4(config) ? config : {};
+  if (Object.prototype.hasOwnProperty.call(source, "litCredentials")) {
+    const invalidLitCredentialsPath = findInvalidLitCredentialsDescriptorPath(
+      source.litCredentials,
+      `${path}.litCredentials`
+    );
+    if (invalidLitCredentialsPath) return invalidLitCredentialsPath;
+  }
+  for (const key of Object.keys(source)) {
+    const normalized = normalizeKey(key);
+    if (TOP_LEVEL_PROVIDER_KEY_NAMES.has(normalized) || !SAFE_PUBLIC_KEY_FIELD_NAMES.has(normalized) && normalized.endsWith("key")) {
+      return `${path}.${key}`;
+    }
+  }
+  for (const key of OPEN_CONFIG_SUBTREE_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
+    const nested = findForbiddenOpenConfigSecretPath(source[key], `${path}.${key}`);
+    if (nested) return nested;
+  }
+  const recursiveSource = { ...source };
+  delete recursiveSource.litCredentials;
+  return findForbiddenRecursiveSecretAliasPath(recursiveSource, path);
+};
+var projectPublicWorkerSessionConfig = (config) => selectFields(isObj4(config) ? config : {}, PUBLIC_CONFIG_KEYS);
+var selectDeployWorkerSessionConfigFields = (body) => selectFields(isObj4(body) ? body : {}, DEPLOY_CANONICAL_CONFIG_KEYS);
+var sanitizeWorkerConfigOpenSubtree = (value) => {
+  const sanitized = sanitizePublicValue(value, "config.open");
+  return sanitized === OMIT_PUBLIC_VALUE ? {} : sanitized;
+};
+
+// workers/shared/workerConfigModeValidation.mjs
+var isObj5 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+var AUTHORITY_MODES = /* @__PURE__ */ new Set([
+  "worker_canonical",
+  "worker_with_public_anchor",
+  "evm_registry_canonical"
+]);
+var SESSION_PRESETS = /* @__PURE__ */ new Set([
+  "fast_cheap_cloudflare",
+  "trustless_public_decentralized",
+  "custom"
+]);
+var SESSION_STORAGE_BACKENDS = /* @__PURE__ */ new Set(["cloudflare", "arweave"]);
+var DEPLOY_STORAGE_BACKENDS = /* @__PURE__ */ new Set(["cloudflare", "arweave", "lit-arweave"]);
+var PAYLOAD_ACCESS_MODES = /* @__PURE__ */ new Set(["public_read", "worker_sbt_gate", "lit_encrypted"]);
+var PAYLOAD_ACCESS_GATES = /* @__PURE__ */ new Set(["none", "sbt_gate", "group_gate", "role_gate"]);
+var PAYLOAD_ENCRYPTION_MODES = /* @__PURE__ */ new Set(["none", "worker_envelope", "lit"]);
+var SESSION_KEY_PROVIDERS = /* @__PURE__ */ new Set(["worker_secret"]);
+var valid = () => ({ ok: true });
+var invalid = (path) => ({ ok: false, path });
+var validateEnumField = (record, key, path, allowed) => {
+  if (!hasOwn(record, key)) return valid();
+  const value = record[key];
+  return typeof value === "string" && allowed.has(value) ? valid() : invalid(path);
+};
+var validateRequiredEnumField = (record, key, path, allowed) => hasOwn(record, key) ? validateEnumField(record, key, path, allowed) : invalid(path);
+var validateObjectField = (record, key, path) => {
+  if (!hasOwn(record, key)) return { ok: true, value: null };
+  return isObj5(record[key]) ? { ok: true, value: record[key] } : { ok: false, path };
+};
+var validatePayloadAccessControl = (record, path) => {
+  if (!isObj5(record)) return invalid(path);
+  for (const [key, allowed] of [
+    ["mode", PAYLOAD_ACCESS_MODES],
+    ["gate", PAYLOAD_ACCESS_GATES],
+    ["encryption", PAYLOAD_ENCRYPTION_MODES]
+  ]) {
+    const result = validateEnumField(record, key, `${path}.${key}`, allowed);
+    if (!result.ok) return result;
+  }
+  return valid();
+};
+var validateStorageProfile = (profile, path, { allowString = false } = {}) => {
+  if (allowString && typeof profile === "string") {
+    return DEPLOY_STORAGE_BACKENDS.has(profile) ? valid() : invalid(`${path}.backend`);
+  }
+  if (!isObj5(profile)) return invalid(path);
+  const backendKeys = ["backend", "profile", "storageProfile"].filter((key) => hasOwn(profile, key));
+  if (!backendKeys.length) return invalid(`${path}.backend`);
+  for (const key of backendKeys) {
+    const result = validateEnumField(profile, key, `${path}.${key}`, DEPLOY_STORAGE_BACKENDS);
+    if (!result.ok) return result;
+  }
+  for (const key of ["payloadAccessMode", "accessControlMode"]) {
+    const result = validateEnumField(profile, key, `${path}.${key}`, PAYLOAD_ACCESS_MODES);
+    if (!result.ok) return result;
+  }
+  for (const [key, allowed] of [
+    ["gate", PAYLOAD_ACCESS_GATES],
+    ["encryption", PAYLOAD_ENCRYPTION_MODES]
+  ]) {
+    const result = validateEnumField(profile, key, `${path}.${key}`, allowed);
+    if (!result.ok) return result;
+  }
+  const payloadAccess = validateObjectField(profile, "payloadAccessControl", `${path}.payloadAccessControl`);
+  if (!payloadAccess.ok) return payloadAccess;
+  if (payloadAccess.value) {
+    const result = validatePayloadAccessControl(payloadAccess.value, `${path}.payloadAccessControl`);
+    if (!result.ok) return result;
+  }
+  const cloudflare = validateObjectField(profile, "cloudflare", `${path}.cloudflare`);
+  if (!cloudflare.ok) return cloudflare;
+  if (cloudflare.value) {
+    const result = validateEnumField(
+      cloudflare.value,
+      "payloadAccessMode",
+      `${path}.cloudflare.payloadAccessMode`,
+      PAYLOAD_ACCESS_MODES
+    );
+    if (!result.ok) return result;
+  }
+  return valid();
+};
+var validateSessionModeProfile = (profile, path) => {
+  if (!isObj5(profile)) return invalid(path);
+  let result = validateEnumField(profile, "preset", `${path}.preset`, SESSION_PRESETS);
+  if (!result.ok) return result;
+  const authority = validateObjectField(profile, "authority", `${path}.authority`);
+  if (!authority.ok) return authority;
+  if (authority.value) {
+    result = validateRequiredEnumField(authority.value, "mode", `${path}.authority.mode`, AUTHORITY_MODES);
+    if (!result.ok) return result;
+  }
+  const storage = validateObjectField(profile, "storage", `${path}.storage`);
+  if (!storage.ok) return storage;
+  if (storage.value) {
+    result = validateRequiredEnumField(
+      storage.value,
+      "backend",
+      `${path}.storage.backend`,
+      SESSION_STORAGE_BACKENDS
+    );
+    if (!result.ok) return result;
+    const payloadAccess = validateObjectField(
+      storage.value,
+      "payloadAccessControl",
+      `${path}.storage.payloadAccessControl`
+    );
+    if (!payloadAccess.ok) return payloadAccess;
+    if (payloadAccess.value) {
+      result = validatePayloadAccessControl(payloadAccess.value, `${path}.storage.payloadAccessControl`);
+      if (!result.ok) return result;
+    }
+  }
+  const encryption = validateObjectField(profile, "encryption", `${path}.encryption`);
+  if (!encryption.ok) return encryption;
+  if (encryption.value) {
+    result = validateRequiredEnumField(
+      encryption.value,
+      "mode",
+      `${path}.encryption.mode`,
+      PAYLOAD_ENCRYPTION_MODES
+    );
+    if (!result.ok) return result;
+    result = validateEnumField(
+      encryption.value,
+      "keyProvider",
+      `${path}.encryption.keyProvider`,
+      SESSION_KEY_PROVIDERS
+    );
+    if (!result.ok) return result;
+  }
+  return valid();
+};
+var validateWorkerConfigModeValues = (config) => {
+  if (!isObj5(config)) return invalid("config");
+  if (hasOwn(config, "sessionModeProfile")) {
+    const result = validateSessionModeProfile(config.sessionModeProfile, "sessionModeProfile");
+    if (!result.ok) return result;
+  }
+  if (hasOwn(config, "storageProfile")) {
+    const result = validateStorageProfile(config.storageProfile, "storageProfile");
+    if (!result.ok) return result;
+  }
+  return valid();
+};
+var validateDeploymentModeValues = (body) => {
+  if (!isObj5(body)) return invalid("request");
+  if (hasOwn(body, "sessionModeProfile")) {
+    const result = validateSessionModeProfile(body.sessionModeProfile, "sessionModeProfile");
+    if (!result.ok) return result;
+  }
+  if (hasOwn(body, "storageProfile")) {
+    const result = validateStorageProfile(body.storageProfile, "storageProfile", { allowString: true });
+    if (!result.ok) return result;
+  } else if (hasOwn(body, "storageBackend")) {
+    const result = validateStorageProfile(body.storageBackend, "storageProfile", { allowString: true });
+    if (!result.ok) return result;
+  }
+  return valid();
+};
+
+// workers/shared/deployHelperCore.mjs
+var { getPathRpcUrl } = import_rpcDefaults3.default;
+var DEFAULT_COMPAT_DATE = "2024-09-02";
+var DEFAULT_FAUCET_RPC_URL = getPathRpcUrl(11155420) || "";
+var DEFAULT_FAUCET_AMOUNT_ETH = "0.0002";
+var DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH = "0.001";
+var DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = true;
+var DEFAULT_ALLOWED_ORIGINS = [
+  "http://localhost:3000"
+];
+var DEPLOYMENT_JOURNAL_PREFIX = "deploy-helper:deployment:";
+var DEPLOYMENT_JOURNAL_VERSION = 1;
+var DEPLOYMENT_JOURNAL_TTL_SECONDS = 7 * 24 * 60 * 60;
+var DEPLOYMENT_REQUEST_ID_RE = /^[a-z0-9._:-]{8,128}$/i;
+var KV_NAMESPACE_TITLE_MAX_LENGTH = 512;
+var SESSION_SLUG_MAX_LENGTH = 128;
+var TRUE_STRINGS = /* @__PURE__ */ new Set(["1", "true", "yes", "on"]);
+var FALSE_STRINGS = /* @__PURE__ */ new Set(["0", "false", "no", "off"]);
+var STORAGE_RESOURCE_STAGES = Object.freeze({
+  ACTIVE: "active",
+  STAGED: "staged"
+});
+var DEFAULT_STORAGE_RESOURCES = Object.freeze({
+  docsContext: STORAGE_RESOURCE_STAGES.ACTIVE,
+  questions: STORAGE_RESOURCE_STAGES.STAGED,
+  surveys: STORAGE_RESOURCE_STAGES.STAGED,
+  responses: STORAGE_RESOURCE_STAGES.STAGED,
+  generatedArtifacts: STORAGE_RESOURCE_STAGES.STAGED,
+  media: STORAGE_RESOURCE_STAGES.STAGED,
+  images: STORAGE_RESOURCE_STAGES.STAGED
+});
+var DEFAULT_PAYLOAD_ACCESS_RESOURCES = Object.freeze({
+  docsContext: "docUploads",
+  questions: "questionResponses",
+  surveys: "surveyResponses",
+  responses: "questionResponses",
+  generatedArtifacts: "surveyResponses",
+  media: "docUploads",
+  images: "docUploads"
+});
+var DEFAULT_CLOUDFLARE_PRIMITIVES = Object.freeze({
+  r2: ["session_context_payloads", "question_payloads", "survey_payloads", "response_payloads", "media_blob_payloads"],
+  kv: ["metadata_indexes", "audit_events", "short_lived_action_ids", "webhook_replay_cache", "ephemeral_start_params"],
+  durableObjects: ["signer_runtime_coordination_only", "coordination_locks"]
+});
+var PAYLOAD_ACCESS_MODES2 = Object.freeze({
+  PUBLIC_READ: "public_read",
+  WORKER_SBT_GATE: "worker_sbt_gate",
+  LIT_ENCRYPTED: "lit_encrypted"
+});
+var PAYLOAD_ACCESS_GATES2 = Object.freeze({
+  NONE: "none",
+  SBT_GATE: "sbt_gate",
+  GROUP_GATE: "group_gate",
+  ROLE_GATE: "role_gate"
+});
+var PAYLOAD_ENCRYPTION_MODES2 = Object.freeze({
+  NONE: "none",
+  WORKER_ENVELOPE: "worker_envelope",
+  LIT: "lit"
+});
+var STORAGE_ENVELOPE_KEK_SECRET_NAME = "CE_STORAGE_ENVELOPE_KEK";
+var DEPLOYMENT_ID_BINDING_NAME = "CE_DEPLOYMENT_ID";
+var DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME = "CE_DEPLOYMENT_REQUEST_DIGEST";
+var BUNDLE_SHA256_BINDING_NAME = "CE_BUNDLE_SHA256";
+var SESSION_COORDINATOR_BINDING_NAME = "CE_SESSION_COORDINATOR";
+var SESSION_COORDINATOR_CLASS_NAME = "SessionWriteCoordinator";
+var SESSION_COORDINATOR_MIGRATION_TAG = "ce-session-write-coordinator-v1";
+var R2_BUCKET_NAME_RE = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
+var ALLOWED_WORKER_AUTHORITY_SCOPES = /* @__PURE__ */ new Set([
+  "ai",
+  "transcribe",
+  "storage",
+  "groups",
+  "arweave",
+  "faucet",
+  "fetch",
+  "lit"
+]);
+var DEFAULT_WORKER_CANONICAL_AUTHORITY = Object.freeze({
+  version: 1,
+  participantScopes: Object.freeze(["ai", "transcribe", "storage", "groups", "fetch"]),
+  anonymousScopes: Object.freeze([])
+});
+var toStr14 = (val) => typeof val === "string" ? val : val == null ? "" : String(val);
+var isObj6 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var hasScheme = (value) => /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value);
+var ensureHttpUrl = (raw) => {
+  const trimmed = toStr14(raw).trim();
+  if (!trimmed) return "";
+  if (hasScheme(trimmed)) return trimmed;
+  if (trimmed.startsWith("//")) return `https:${trimmed}`;
+  if (trimmed.startsWith("/")) return trimmed;
+  if (/^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|\/|$)/i.test(trimmed)) {
+    return `http://${trimmed}`;
+  }
+  return `https://${trimmed}`;
+};
+var normalizeOrigin3 = (raw) => {
+  const trimmed = toStr14(raw).trim();
+  if (!trimmed) return "";
+  const withScheme = ensureHttpUrl(trimmed);
+  if (withScheme.startsWith("/")) return "";
+  try {
+    return new URL(withScheme).origin;
+  } catch {
+    return "";
+  }
+};
+var normalizeOriginList = (list) => {
+  const entries = Array.isArray(list) ? list : [list];
+  const cleaned = entries.map((entry) => normalizeOrigin3(entry)).filter(Boolean);
+  return Array.from(new Set(cleaned));
+};
+var normalizeAllowList = (list, fallback = DEFAULT_ALLOWED_ORIGINS) => {
+  const normalized = normalizeOriginList(list);
+  if (normalized.length) return normalized;
+  return normalizeOriginList(fallback);
+};
+var validateInboundSlug = (raw) => {
+  if (raw == null) return { ok: true, slug: "", error: "" };
+  const rawStr = toStr14(raw).trim();
+  if (!rawStr) return { ok: true, slug: "", error: "" };
+  if (rawStr.toLowerCase() === "general") return { ok: true, slug: "", error: "" };
+  const canonicalSlug = rawStr.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  if (rawStr !== canonicalSlug || canonicalSlug.length > SESSION_SLUG_MAX_LENGTH) {
+    return {
+      ok: false,
+      slug: "",
+      error: `Invalid session slug. Use at most ${SESSION_SLUG_MAX_LENGTH} lowercase letters, numbers, "_" or "-".`
+    };
+  }
+  return { ok: true, slug: canonicalSlug, error: "" };
+};
+var readJsonOrText = async (resp) => {
+  let text = "";
+  try {
+    text = await resp.text();
+  } catch {
+    return {};
+  }
+  const trimmed = toStr14(text).trim();
+  if (!trimmed) return {};
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return { message: trimmed };
+  }
+};
+var cfFetch = async (token, path, options = {}, {
+  fetchImpl = globalThis.fetch,
+  apiBaseUrl = "",
+  env = null
+} = {}) => {
+  const cloudflareApiBaseUrl = resolveCloudflareApiBaseUrl({ apiBaseUrl, env });
+  let resp;
+  try {
+    resp = await fetchImpl(`${cloudflareApiBaseUrl}${path}`, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...options.headers || {}
+      }
+    });
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Cloudflare API request failed: ${toStr14(err?.message || err).trim() || "Unknown error."}`,
+      detail: void 0,
+      status: 502,
+      data: null
+    };
+  }
+  const data = await readJsonOrText(resp);
+  if (!resp.ok || data?.success === false) {
+    const err = data?.errors?.[0]?.message || data?.message || `Cloudflare API error (${resp.status})`;
+    const detail = data?.errors?.length ? data.errors : void 0;
+    return { ok: false, error: err, detail, status: resp.status, data };
+  }
+  return { ok: true, data };
+};
+var NEW_KV_NAMESPACE_RETRY_DELAYS_MS = Object.freeze([250, 500, 1e3]);
+var FINAL_CONFIG_READBACK_RETRY_DELAYS_MS = Object.freeze([250, 500, 1e3]);
+var isNewKvNamespacePropagationFailure = (result) => {
+  if (!result || result.ok || Number(result.status || 0) !== 404) return false;
+  const detail = Array.isArray(result.detail) ? result.detail : [];
+  if (detail.some((entry) => Number(entry?.code || 0) === 10013)) return true;
+  const message = [result.error, ...detail.map((entry) => entry?.message)].map((value) => toStr14(value).trim().toLowerCase()).filter(Boolean).join(" ");
+  return message.includes("get namespace") && message.includes("namespace not found");
+};
+var putFreshKvNamespaceValue = async ({ apiToken, path, options, cfFetchOptions }) => {
+  let result = await cfFetch(apiToken, path, options, cfFetchOptions);
+  for (const delayMs of NEW_KV_NAMESPACE_RETRY_DELAYS_MS) {
+    if (!isNewKvNamespacePropagationFailure(result)) return result;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    result = await cfFetch(apiToken, path, options, cfFetchOptions);
+  }
+  return result;
+};
+var lookupCloudflareAccount = async ({
+  apiToken,
+  fetchImpl = globalThis.fetch,
+  apiBaseUrl = "",
+  env = null
+} = {}) => {
+  const accountsResp = await cfFetch(apiToken, "/accounts?per_page=5", {}, {
+    fetchImpl,
+    apiBaseUrl,
+    env
+  });
+  if (!accountsResp.ok) {
+    const status = Number(accountsResp.status || 0) || 502;
+    return {
+      ok: false,
+      error: accountsResp.error,
+      detail: accountsResp.detail,
+      status,
+      fallbackEligible: status >= 500 || status === 429
+    };
+  }
+  const accounts = Array.isArray(accountsResp.data?.result) ? accountsResp.data.result : [];
+  const totalCount = Number(accountsResp.data?.result_info?.total_count || accounts.length);
+  if (accounts.length > 1 || totalCount > 1) {
+    return {
+      ok: false,
+      error: "Multiple accounts are available for this token. Restrict the token to exactly one account and retry.",
+      detail: void 0,
+      status: 409,
+      fallbackEligible: false
+    };
+  }
+  const account = accounts[0] || null;
+  if (!account || !account.id) {
+    return {
+      ok: false,
+      error: "No accounts found for token.",
+      detail: void 0,
+      status: 404,
+      fallbackEligible: false
+    };
+  }
+  return {
+    ok: true,
+    accountId: account.id,
+    accountName: account.name || ""
+  };
+};
+var randomSecret2 = () => {
+  const bytes2 = new Uint8Array(32);
+  crypto.getRandomValues(bytes2);
+  return Array.from(bytes2).map((b2) => b2.toString(16).padStart(2, "0")).join("");
+};
+var sha256Hex2 = async (value) => {
+  const input = new TextEncoder().encode(toStr14(value));
+  const digest = await crypto.subtle.digest("SHA-256", input);
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+var canonicalizeJsonValue = (value, arrayEntry = false) => {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (Array.isArray(value)) {
+    return value.map((entry) => canonicalizeJsonValue(entry, true));
+  }
+  if (value && typeof value === "object") {
+    return Object.keys(value).sort().reduce((out, key) => {
+      const entry = value[key];
+      if (entry === void 0 || typeof entry === "function" || typeof entry === "symbol") return out;
+      out[key] = canonicalizeJsonValue(entry);
+      return out;
+    }, /* @__PURE__ */ Object.create(null));
+  }
+  return arrayEntry ? null : void 0;
+};
+var stableCanonicalSerialize = (value) => JSON.stringify(canonicalizeJsonValue(value));
+var buildBundleDiagnostics = async (bundleSource, sourceKind) => {
+  const normalized = toStr14(bundleSource);
+  return {
+    source: toStr14(sourceKind).trim() || "unknown",
+    length: normalized.length,
+    sha256: await sha256Hex2(normalized),
+    hasAnyExport: normalized.includes("export "),
+    hasExportDefault: normalized.includes("export default"),
+    hasNamedDefaultExport: normalized.includes(" as default") || normalized.includes("worker_default"),
+    hasStringExportWrapper: /^export\s+default\s+["'`]/.test(normalized) || /^module\.exports\s*=\s*["'`]/.test(normalized),
+    hasFetchHandler: normalized.includes("fetch("),
+    hasServiceWorkerFetch: normalized.includes(`addEventListener('fetch'`) || normalized.includes('addEventListener("fetch"'),
+    prefix: normalized.slice(0, 120),
+    suffix: normalized.slice(-120)
+  };
+};
+var formatBundleDiagnostics = (diagnostics = {}) => {
+  const sha2563 = toStr14(diagnostics?.sha256).trim();
+  return [
+    `source=${toStr14(diagnostics?.source).trim() || "unknown"}`,
+    `len=${Number(diagnostics?.length || 0) || 0}`,
+    `sha256=${sha2563 ? sha2563.slice(0, 16) : "n/a"}`,
+    `export=${diagnostics?.hasAnyExport === true ? "1" : "0"}`,
+    `default=${diagnostics?.hasExportDefault === true ? "1" : "0"}`,
+    `namedDefault=${diagnostics?.hasNamedDefaultExport === true ? "1" : "0"}`,
+    `stringWrap=${diagnostics?.hasStringExportWrapper === true ? "1" : "0"}`,
+    `fetch=${diagnostics?.hasFetchHandler === true ? "1" : "0"}`,
+    `swFetch=${diagnostics?.hasServiceWorkerFetch === true ? "1" : "0"}`
+  ].join(" ");
+};
+var normalizeSecretValue = (value) => {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return "";
+    }
+  }
+  return toStr14(value).trim();
+};
+var sanitizeSecrets = (incoming) => {
+  const allowed = [
+    "openaiKey",
+    "anthropicKey",
+    "openrouterKey",
+    "customRpcUrl",
+    "customRpcKey",
+    "arweaveJwk",
+    "faucetPrivateKey",
+    "litAccountApiKey",
+    "litUsageApiKey"
+  ];
+  const out = {};
+  allowed.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(incoming || {}, key)) {
+      out[key] = normalizeSecretValue(incoming[key]);
+    }
+  });
+  return out;
+};
+var sanitizeBlockLimits = (incoming) => {
+  if (!incoming || typeof incoming !== "object") return null;
+  const start = Number(incoming.start);
+  if (!Number.isFinite(start) || start <= 0) return null;
+  const normalizedStart = Math.floor(start);
+  const endRaw = incoming.end;
+  const parsedEnd = endRaw == null || endRaw === "" ? null : Number(endRaw);
+  const normalizedEnd = Number.isFinite(parsedEnd) && parsedEnd > 0 && parsedEnd >= normalizedStart ? Math.floor(parsedEnd) : null;
+  return {
+    start: normalizedStart,
+    end: normalizedEnd
+  };
+};
+var normalizeWorkerAuthorityScopes = (value, field) => {
+  if (!Array.isArray(value)) {
+    return { ok: false, error: `Worker-canonical authority ${field} must be an array.` };
+  }
+  const normalized = value.map((scope) => toStr14(scope).trim().toLowerCase());
+  if (normalized.some((scope) => !ALLOWED_WORKER_AUTHORITY_SCOPES.has(scope))) {
+    return { ok: false, error: `Worker-canonical authority ${field} contains an unsupported scope.` };
+  }
+  return { ok: true, value: [...new Set(normalized)] };
+};
+var normalizeWorkerAuthorityLoginGate = (value) => {
+  if (value == null) return { ok: true, value: null };
+  if (!isObj6(value) || !Array.isArray(value.conditions)) {
+    return { ok: false, error: "Worker-canonical authority loginGate must contain a conditions array." };
+  }
+  const match = toStr14(value.match).trim().toLowerCase();
+  if (match && match !== "any" && match !== "all") {
+    return { ok: false, error: 'Worker-canonical authority loginGate.match must be "any" or "all".' };
+  }
+  const conditions = [];
+  for (const condition of value.conditions) {
+    if (!isObj6(condition)) {
+      return { ok: false, error: "Worker-canonical authority loginGate contains an invalid condition." };
+    }
+    const kind = toStr14(condition.kind).trim().toLowerCase();
+    if (kind === "worker_role") {
+      const role = toStr14(condition.role || "admin").trim().toLowerCase() || "admin";
+      conditions.push({ kind, role });
+      continue;
+    }
+    if (kind === "worker_group") {
+      const groupId = toStr14(condition.groupId).trim();
+      if (!groupId) {
+        return { ok: false, error: "Worker-canonical worker_group conditions require groupId." };
+      }
+      conditions.push({ kind, groupId });
+      continue;
+    }
+    return { ok: false, error: "Worker-canonical authority loginGate contains an unsupported condition." };
+  }
+  return {
+    ok: true,
+    value: {
+      match: match || "any",
+      conditions
+    }
+  };
+};
+var resolveWorkerCanonicalAuthorityForDeploy = (incoming) => {
+  if (incoming == null) {
+    return {
+      ok: true,
+      value: {
+        version: DEFAULT_WORKER_CANONICAL_AUTHORITY.version,
+        participantScopes: [...DEFAULT_WORKER_CANONICAL_AUTHORITY.participantScopes],
+        anonymousScopes: [...DEFAULT_WORKER_CANONICAL_AUTHORITY.anonymousScopes]
+      }
+    };
+  }
+  if (!isObj6(incoming) || Number(incoming.version) !== 1) {
+    return { ok: false, error: "Worker-canonical authority policy must use version 1." };
+  }
+  const participantScopes = normalizeWorkerAuthorityScopes(incoming.participantScopes, "participantScopes");
+  if (!participantScopes.ok) return participantScopes;
+  const anonymousScopes = normalizeWorkerAuthorityScopes(incoming.anonymousScopes, "anonymousScopes");
+  if (!anonymousScopes.ok) return anonymousScopes;
+  const loginGate = normalizeWorkerAuthorityLoginGate(incoming.loginGate);
+  if (!loginGate.ok) return loginGate;
+  return {
+    ok: true,
+    value: {
+      version: 1,
+      participantScopes: participantScopes.value,
+      anonymousScopes: anonymousScopes.value,
+      ...loginGate.value ? { loginGate: loginGate.value } : {}
+    }
+  };
+};
+var workerAuthorityPoliciesMatch = (expected, actual) => JSON.stringify(expected || null) === JSON.stringify(actual || null);
+var buildFreshDeploymentName = (requestedName, deploymentId) => {
+  const base = toStr14(requestedName).trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 50) || "ce-session-worker";
+  return `${base}-${toStr14(deploymentId).slice(0, 12)}`;
+};
+var normalizeDeploymentRequestId = (value) => {
+  const normalized = toStr14(value).trim();
+  return DEPLOYMENT_REQUEST_ID_RE.test(normalized) ? normalized : "";
+};
+var collectKnownRequestCredentials = (body) => {
+  const credentials = /* @__PURE__ */ new Set();
+  const visit = (value, sensitive = false) => {
+    if (typeof value === "string") {
+      const normalized = value.trim();
+      if (sensitive && normalized.length >= 4) credentials.add(normalized);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach((entry) => visit(entry, sensitive));
+      return;
+    }
+    if (!isObj6(value)) return;
+    Object.entries(value).forEach(([key, entry]) => {
+      const credentialField = sensitive || /(?:token|secret|password|api[_-]?key|private[_-]?key)/i.test(key);
+      visit(entry, credentialField);
+    });
+  };
+  visit(body);
+  return [...credentials].sort((a, b2) => b2.length - a.length);
+};
+var redactKnownCredentials = (value, credentials) => {
+  let redacted = toStr14(value);
+  credentials.forEach((credential) => {
+    redacted = redacted.split(credential).join("[REDACTED]");
+  });
+  return redacted;
+};
+var buildSafeDeployJournalResult = (result = {}, credentials = []) => {
+  const incomingBody = isObj6(result?.body) ? result.body : {};
+  const body = {};
+  [
+    "ok",
+    "error",
+    "step",
+    "deploymentKind",
+    "accountId",
+    "workerName",
+    "workerUrl",
+    "sessionSlug",
+    "sessionWorkerOrigin",
+    "telegramConfigured",
+    "resolvedSlug",
+    "kvNamespaceId",
+    "deploymentId",
+    "sessionConfigKey",
+    "sessionSecretsKey",
+    "sessionKvPrefix",
+    "partial",
+    "writesSessionConfig",
+    "writesSessionSecrets",
+    "tokenSecretSet",
+    "tokenSecretPreserved",
+    "envelopeKekSecretSet",
+    "envelopeKekSecretPreserved",
+    "subdomain",
+    "subdomainStatus",
+    "subdomainEnabled",
+    "subdomainError",
+    "scriptSubdomainEnabled",
+    "scriptSubdomainError",
+    "configVerified",
+    "deploymentRequestPending",
+    "deploymentRequestConflict"
+  ].forEach((key) => {
+    const value = incomingBody[key];
+    if (typeof value === "string") {
+      body[key] = redactKnownCredentials(value, credentials);
+    } else if (typeof value === "boolean" || Number.isFinite(value)) {
+      body[key] = value;
+    }
+  });
+  if (isObj6(incomingBody.orphanResources)) {
+    body.orphanResources = {};
+    ["kvNamespaceId", "kvCleanupStatus", "workerName", "workerCleanupStatus"].forEach((key) => {
+      const value = incomingBody.orphanResources[key];
+      if (typeof value === "string") body.orphanResources[key] = value;
+    });
+  }
+  if (isObj6(incomingBody.bundleDiagnostics)) {
+    body.bundleDiagnostics = {};
+    [
+      "source",
+      "length",
+      "sha256",
+      "hasAnyExport",
+      "hasExportDefault",
+      "hasNamedDefaultExport",
+      "hasStringExportWrapper",
+      "hasFetchHandler",
+      "hasServiceWorkerFetch"
+    ].forEach((key) => {
+      const value = incomingBody.bundleDiagnostics[key];
+      if (typeof value === "string" || typeof value === "boolean" || Number.isFinite(value)) {
+        body.bundleDiagnostics[key] = value;
+      }
+    });
+  }
+  if (isObj6(incomingBody.resources)) {
+    body.resources = {};
+    ["kvNamespaceId", "kvReused"].forEach((key) => {
+      const value = incomingBody.resources[key];
+      if (typeof value === "string") body.resources[key] = redactKnownCredentials(value, credentials);
+      else if (typeof value === "boolean" || Number.isFinite(value)) body.resources[key] = value;
+    });
+  }
+  if (isObj6(incomingBody.upload)) {
+    body.upload = {};
+    ["reused", "bundleSha256"].forEach((key) => {
+      const value = incomingBody.upload[key];
+      if (typeof value === "string") body.upload[key] = redactKnownCredentials(value, credentials);
+      else if (typeof value === "boolean" || Number.isFinite(value)) body.upload[key] = value;
+    });
+    if (isObj6(incomingBody.upload.metadata) && typeof incomingBody.upload.metadata.main_module === "string") {
+      body.upload.metadata = { main_module: incomingBody.upload.metadata.main_module };
+    } else if (incomingBody.upload.metadata === null) {
+      body.upload.metadata = null;
+    }
+  }
+  if (isObj6(incomingBody.secrets)) {
+    body.secrets = {};
+    ["generated", "preserved"].forEach((key) => {
+      if (Array.isArray(incomingBody.secrets[key])) {
+        body.secrets[key] = incomingBody.secrets[key].filter((value) => typeof value === "string").map((value) => redactKnownCredentials(value, credentials));
+      }
+    });
+  }
+  if (isObj6(incomingBody.health)) {
+    body.health = {};
+    ["ok", "protocolVersion", "authorityPinned"].forEach((key) => {
+      const value = incomingBody.health[key];
+      if (typeof value === "string") body.health[key] = redactKnownCredentials(value, credentials);
+      else if (typeof value === "boolean" || Number.isFinite(value)) body.health[key] = value;
+    });
+  }
+  if (isObj6(incomingBody.agentSessionWrapped)) {
+    body.agentSessionWrapped = {};
+    ["version", "enabled", "origin", "protocolVersion", "revision", "verifiedAt"].forEach((key) => {
+      const value = incomingBody.agentSessionWrapped[key];
+      if (typeof value === "string") body.agentSessionWrapped[key] = redactKnownCredentials(value, credentials);
+      else if (typeof value === "boolean" || Number.isFinite(value)) body.agentSessionWrapped[key] = value;
+    });
+  }
+  if (result?.ok !== true) body.deploymentRequestTerminal = true;
+  return {
+    ok: result?.ok === true,
+    status: Number(result?.status || 0) || 500,
+    body,
+    fallbackEligible: result?.fallbackEligible === true
+  };
+};
+var resolveDeployJournalBinding = (env) => {
+  for (const binding of [env?.DEPLOY_HELPER_KV, env?.GROUP_KV]) {
+    if (typeof binding?.get === "function" && typeof binding?.put === "function") return binding;
+  }
+  return null;
+};
+var buildDeploymentRequestContext = async ({ body, requestOrigin = "" } = {}) => {
+  const deploymentRequestId = normalizeDeploymentRequestId(body?.deploymentRequestId);
+  if (!deploymentRequestId) return null;
+  const digestBody = { ...isObj6(body) ? body : {} };
+  delete digestBody.deploymentRequestId;
+  delete digestBody.accountId;
+  digestBody.apiToken = toStr14(digestBody.apiToken || digestBody.token).trim();
+  delete digestBody.token;
+  const requestDigest = await sha256Hex2(stableCanonicalSerialize({
+    body: digestBody,
+    requestOrigin: normalizeOrigin3(requestOrigin) || toStr14(requestOrigin).trim()
+  }));
+  const immutableIdentityDigest = await sha256Hex2(stableCanonicalSerialize({
+    requestOrigin: normalizeOrigin3(requestOrigin) || toStr14(requestOrigin).trim(),
+    deploymentKind: toStr14(body?.deploymentKind).trim(),
+    sessionDeploymentIdentity: toStr14(body?.sessionDeploymentIdentity).trim(),
+    requestedWorkerName: toStr14(body?.workerName).trim(),
+    sessionSlug: toStr14(body?.sessionSlug).trim(),
+    sessionWorkerOrigin: toStr14(body?.sessionWorkerOrigin || body?.sessionWorkerUrl).trim(),
+    authorityMode: toStr14(body?.authorityMode).trim(),
+    sessionId: toStr14(body?.sessionId).trim().toLowerCase(),
+    sessionIdHex: toStr14(body?.sessionIdHex).trim().toLowerCase(),
+    adminAddress: toStr14(body?.adminAddress).trim().toLowerCase()
+  }));
+  const bundleCorrectionBody = { ...isObj6(body) ? body : {} };
+  delete bundleCorrectionBody.deploymentRequestId;
+  delete bundleCorrectionBody.accountId;
+  delete bundleCorrectionBody.apiToken;
+  delete bundleCorrectionBody.token;
+  delete bundleCorrectionBody.bundleText;
+  delete bundleCorrectionBody.bundleUrl;
+  const bundleCorrectionDigest = await sha256Hex2(stableCanonicalSerialize({
+    body: bundleCorrectionBody,
+    requestOrigin: normalizeOrigin3(requestOrigin) || toStr14(requestOrigin).trim()
+  }));
+  const deploymentId = await sha256Hex2(`context-engine-deployment:${deploymentRequestId}`);
+  return {
+    deploymentRequestId,
+    requestDigest,
+    // Keep the payload-specific digest even when coordinated recovery swaps
+    // requestDigest for a stable infrastructure identity below.
+    fullRequestDigest: requestDigest,
+    immutableIdentityDigest,
+    bundleCorrectionDigest,
+    deploymentId,
+    requestMarker: deploymentId.slice(0, 16),
+    workerName: buildFreshDeploymentName(body?.workerName, deploymentId),
+    journalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}`,
+    uploadJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:upload`,
+    uploadRejectedJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:upload-rejected`,
+    terminalJournalKey: `${DEPLOYMENT_JOURNAL_PREFIX}${deploymentId}:terminal`,
+    isReplay: false
+  };
+};
+var readDeployJournalRecord = async (binding, key) => {
+  const raw = await binding.get(key);
+  if (!raw) return null;
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return isObj6(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+var writeDeployJournalRecord = async (binding, key, record) => binding.put(
+  key,
+  JSON.stringify(record),
+  { expirationTtl: DEPLOYMENT_JOURNAL_TTL_SECONDS }
+);
+var writeDurableDeployJournalRecord = async (binding, key, record) => binding.put(
+  key,
+  JSON.stringify(record)
+);
+var normalizeResourceStage = (value, fallback) => {
+  const normalized = toStr14(value).trim().toLowerCase();
+  if (normalized === STORAGE_RESOURCE_STAGES.ACTIVE) return STORAGE_RESOURCE_STAGES.ACTIVE;
+  if (normalized === STORAGE_RESOURCE_STAGES.STAGED) return STORAGE_RESOURCE_STAGES.STAGED;
+  return fallback;
+};
+var normalizePayloadAccessMode = (value) => {
+  const normalized = toStr14(value).trim().toLowerCase();
+  if (normalized === PAYLOAD_ACCESS_MODES2.PUBLIC_READ || normalized === "public" || normalized === "public-read") {
+    return PAYLOAD_ACCESS_MODES2.PUBLIC_READ;
+  }
+  if (normalized === PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED) return PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED;
+  return PAYLOAD_ACCESS_MODES2.WORKER_SBT_GATE;
+};
+var normalizePayloadAccessGate = (value, fallback = PAYLOAD_ACCESS_GATES2.SBT_GATE) => {
+  const normalized = toStr14(value).trim().toLowerCase().replace(/-/g, "_");
+  if (!normalized) return fallback;
+  if (normalized === "none" || normalized === "public" || normalized === PAYLOAD_ACCESS_MODES2.PUBLIC_READ) {
+    return PAYLOAD_ACCESS_GATES2.NONE;
+  }
+  if (normalized === "sbt" || normalized === "sbt_gate" || normalized === "worker_sbt" || normalized === PAYLOAD_ACCESS_MODES2.WORKER_SBT_GATE) {
+    return PAYLOAD_ACCESS_GATES2.SBT_GATE;
+  }
+  if (normalized === "group" || normalized === "group_gate" || normalized === "worker_group") {
+    return PAYLOAD_ACCESS_GATES2.GROUP_GATE;
+  }
+  if (normalized === "role" || normalized === "role_gate" || normalized === "worker_role") {
+    return PAYLOAD_ACCESS_GATES2.ROLE_GATE;
+  }
+  return fallback;
+};
+var normalizePayloadEncryptionMode = (value, fallback = PAYLOAD_ENCRYPTION_MODES2.NONE) => {
+  const raw = isObj6(value) ? value.mode : value;
+  const normalized = toStr14(raw).trim().toLowerCase().replace(/-/g, "_");
+  if (!normalized) return fallback;
+  if (normalized === "none" || normalized === "plain" || normalized === "plaintext") {
+    return PAYLOAD_ENCRYPTION_MODES2.NONE;
+  }
+  if (normalized === "worker_envelope" || normalized === "cloudflare_envelope") {
+    return PAYLOAD_ENCRYPTION_MODES2.WORKER_ENVELOPE;
+  }
+  if (normalized === "lit" || normalized === PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED) {
+    return PAYLOAD_ENCRYPTION_MODES2.LIT;
+  }
+  return fallback;
+};
+var deriveLegacyPayloadAccessMode = ({ gate, encryption }) => {
+  if (encryption === PAYLOAD_ENCRYPTION_MODES2.LIT) return PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED;
+  if (gate === PAYLOAD_ACCESS_GATES2.NONE) return PAYLOAD_ACCESS_MODES2.PUBLIC_READ;
+  return PAYLOAD_ACCESS_MODES2.WORKER_SBT_GATE;
+};
+var cloneAccessConditions = (source) => {
+  const conditions = isObj6(source?.accessConditions) ? source.accessConditions : isObj6(source?.conditions) ? source.conditions : null;
+  return conditions ? JSON.parse(JSON.stringify(conditions)) : null;
+};
+var normalizePayloadAccessControl = (raw) => {
+  const rawRecord = isObj6(raw) ? raw : {};
+  const rawAccess = isObj6(rawRecord.payloadAccessControl) ? rawRecord.payloadAccessControl : {};
+  const rawCloudflare = isObj6(rawRecord.cloudflare) ? rawRecord.cloudflare : {};
+  const legacyMode = normalizePayloadAccessMode(
+    rawAccess.mode || rawCloudflare.payloadAccessMode || rawRecord.payloadAccessMode || rawRecord.accessControlMode
+  );
+  const fallbackGate = legacyMode === PAYLOAD_ACCESS_MODES2.PUBLIC_READ || legacyMode === PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED ? PAYLOAD_ACCESS_GATES2.NONE : PAYLOAD_ACCESS_GATES2.SBT_GATE;
+  const fallbackEncryption = legacyMode === PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED ? PAYLOAD_ENCRYPTION_MODES2.LIT : PAYLOAD_ENCRYPTION_MODES2.NONE;
+  const directV2 = Object.prototype.hasOwnProperty.call(rawRecord, "gate") || Object.prototype.hasOwnProperty.call(rawRecord, "encryption");
+  const source = directV2 ? rawRecord : rawAccess;
+  const gate = normalizePayloadAccessGate(isObj6(source) ? source.gate : void 0, fallbackGate);
+  const encryption = normalizePayloadEncryptionMode(isObj6(source) ? source.encryption : void 0, fallbackEncryption);
+  const accessConditions = cloneAccessConditions(source);
+  return {
+    gate,
+    encryption,
+    mode: deriveLegacyPayloadAccessMode({ gate, encryption }),
+    ...accessConditions ? { accessConditions } : {}
+  };
+};
+var normalizeStorageProfileInput = (incoming) => {
+  if (incoming == null) return null;
+  if (isObj6(incoming)) return incoming;
+  const trimmed = toStr14(incoming).trim();
+  return trimmed ? { backend: trimmed } : null;
+};
+var normalizeDeployStorageProfile = (incoming) => {
+  const raw = normalizeStorageProfileInput(incoming);
+  if (!raw) return null;
+  const backend = normalizeStorageBackend(raw.backend || raw.profile || raw.storageProfile);
+  const rawResources = isObj6(raw.resources) ? raw.resources : {};
+  const defaultCanonicalStage = backend === STORAGE_BACKENDS.CLOUDFLARE ? STORAGE_RESOURCE_STAGES.ACTIVE : STORAGE_RESOURCE_STAGES.STAGED;
+  const docsContext = normalizeResourceStage(rawResources.docsContext || raw.docsContext, STORAGE_RESOURCE_STAGES.ACTIVE);
+  const profile = {
+    type: "session_storage_profile",
+    version: "session-storage-profile-v1",
+    backend,
+    sessionOwned: true,
+    telegramOwned: false,
+    resources: {
+      ...DEFAULT_STORAGE_RESOURCES,
+      docsContext,
+      questions: normalizeResourceStage(rawResources.questions || raw.questions, defaultCanonicalStage),
+      surveys: normalizeResourceStage(rawResources.surveys || raw.surveys, defaultCanonicalStage),
+      responses: normalizeResourceStage(rawResources.responses || raw.responses, defaultCanonicalStage),
+      generatedArtifacts: normalizeResourceStage(
+        rawResources.generatedArtifacts || raw.generatedArtifacts,
+        defaultCanonicalStage
+      ),
+      media: normalizeResourceStage(rawResources.media || raw.media, defaultCanonicalStage),
+      images: normalizeResourceStage(rawResources.images || raw.images, defaultCanonicalStage)
+    },
+    sbtGatedAccess: {
+      uploads: "session_worker_gate",
+      snippets: "session_worker_gate",
+      shortLivedReads: "session_worker_gate",
+      downloads: "session_worker_gate",
+      litRequired: "payload_encrypted_only"
+    },
+    cloudflare: null
+  };
+  if (backend !== STORAGE_BACKENDS.CLOUDFLARE) return profile;
+  const accessControl = normalizePayloadAccessControl(raw);
+  const accessMode = accessControl.mode;
+  const litEncrypted = accessMode === PAYLOAD_ACCESS_MODES2.LIT_ENCRYPTED;
+  const workerEnvelope = accessControl.encryption === PAYLOAD_ENCRYPTION_MODES2.WORKER_ENVELOPE;
+  const publicRead = accessMode === PAYLOAD_ACCESS_MODES2.PUBLIC_READ;
+  profile.payloadAccessControl = {
+    gate: accessControl.gate,
+    encryption: accessControl.encryption,
+    mode: accessMode,
+    enforcement: litEncrypted ? "lit_access_control_conditions" : workerEnvelope ? "session_worker_envelope_conditions" : publicRead ? "session_worker_public_read" : "session_worker_sbt_gate",
+    litRequired: litEncrypted,
+    label: litEncrypted ? "Lit-encrypted Cloudflare payloads" : workerEnvelope ? "Worker-envelope encrypted Cloudflare payloads" : publicRead ? "Public-read Cloudflare payloads" : "Worker-enforced SBT access control",
+    resources: {
+      ...DEFAULT_PAYLOAD_ACCESS_RESOURCES,
+      ...isObj6(raw.payloadAccessControl?.resources) ? raw.payloadAccessControl.resources : {}
+    },
+    ...accessControl.accessConditions ? { accessConditions: accessControl.accessConditions } : {}
+  };
+  profile.sbtGatedAccess = {
+    ...profile.sbtGatedAccess,
+    litRequired: litEncrypted ? "required_for_cloudflare_payload_encryption" : publicRead ? "not_required_public_read" : "not_required_worker_enforced"
+  };
+  profile.cloudflare = {
+    primitives: DEFAULT_CLOUDFLARE_PRIMITIVES,
+    payloadAccessMode: accessMode,
+    credentialSource: "worker_secret_or_cloudflare_binding",
+    exposesAccountId: false,
+    exposesBucketName: false,
+    exposesWorkerToken: false,
+    exposesRawStoragePath: false,
+    exposesLongLivedUrl: false
+  };
+  return profile;
+};
+var firstTrimmed = (...values) => {
+  for (const value of values) {
+    const trimmed = toStr14(value).trim();
+    if (trimmed) return trimmed;
+  }
+  return "";
+};
+var resolveRequestedR2BucketName = (incoming) => {
+  const raw = normalizeStorageProfileInput(incoming);
+  if (!raw) return "";
+  const cloudflare = isObj6(raw.cloudflare) ? raw.cloudflare : {};
+  const r2 = isObj6(cloudflare.r2) ? cloudflare.r2 : {};
+  return firstTrimmed(
+    raw.r2BucketName,
+    raw.r2Bucket,
+    raw.bucketName,
+    raw.bucket,
+    cloudflare.r2BucketName,
+    cloudflare.r2Bucket,
+    cloudflare.bucketName,
+    cloudflare.bucket,
+    r2.bucketName,
+    r2.bucket
+  );
+};
+var truthyR2Marker = (value) => {
+  if (value === true) return true;
+  const normalized = toStr14(value).trim().toLowerCase();
+  return normalized === "r2" || TRUE_STRINGS.has(normalized);
+};
+var hasExplicitR2Request = (incoming, bucketName = "") => {
+  if (bucketName) return true;
+  const raw = normalizeStorageProfileInput(incoming);
+  if (!raw) return false;
+  const cloudflare = isObj6(raw.cloudflare) ? raw.cloudflare : {};
+  return truthyR2Marker(raw.useR2) || truthyR2Marker(raw.payloadStorage) || truthyR2Marker(raw.storageLayer) || truthyR2Marker(cloudflare.useR2) || truthyR2Marker(cloudflare.payloadStorage) || truthyR2Marker(cloudflare.storageLayer) || truthyR2Marker(cloudflare.r2);
+};
+var resolveDeployStorageBindingPlan = (incoming, storageProfile) => {
+  if (!storageProfile || storageProfile.backend !== STORAGE_BACKENDS.CLOUDFLARE) {
+    return { ok: true, r2BucketName: "", requiresStorageIndexKv: false };
+  }
+  const r2BucketName = resolveRequestedR2BucketName(incoming);
+  if (r2BucketName && (!R2_BUCKET_NAME_RE.test(r2BucketName) || r2BucketName.includes("..") || r2BucketName.includes("-.") || r2BucketName.includes(".-"))) {
+    return {
+      ok: false,
+      error: "Invalid Cloudflare R2 bucket name. Use the existing bucket name without URLs, paths, or credentials."
+    };
+  }
+  if (hasExplicitR2Request(incoming, r2BucketName) && !r2BucketName) {
+    return {
+      ok: false,
+      error: "Cloudflare R2 storage requires r2BucketName when R2 is explicitly requested."
+    };
+  }
+  return {
+    ok: true,
+    r2BucketName,
+    requiresStorageIndexKv: true
+  };
+};
+var normalizeEmbeddedDeployHelperEnabled = (value, fallback = DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED) => {
+  if (typeof value === "boolean") return value;
+  const trimmed = toStr14(value).trim().toLowerCase();
+  if (!trimmed) return fallback;
+  if (TRUE_STRINGS.has(trimmed)) return true;
+  if (FALSE_STRINGS.has(trimmed)) return false;
+  return fallback;
+};
+var buildFailure = (status, body, { fallbackEligible = false } = {}) => ({
+  ok: false,
+  status,
+  body,
+  fallbackEligible
+});
+var buildSuccess = (status, body) => ({
+  ok: true,
+  status,
+  body,
+  fallbackEligible: false
+});
+var shouldAllowFallbackForCloudflareFailure = (result = {}) => {
+  const status = Number(result?.status || 0);
+  if (!status) return true;
+  return status >= 500 || status === 429;
+};
+var isAmbiguousCloudflareMutationFailure = (result = {}) => {
+  const status = Number(result?.status || 0);
+  return !status || status >= 500 || [408, 409, 412, 425, 429, 499].includes(status);
+};
+var isDefinitiveWorkerUploadRejection = (result = {}) => {
+  const status = Number(result?.status || 0);
+  if (status < 400 || status >= 500) return false;
+  return !(/* @__PURE__ */ new Set([408, 409, 412, 425, 429, 499])).has(status);
+};
+var ensureWorkersDevAccountSubdomain = async ({
+  apiToken,
+  accountId,
+  requestedSubdomain = "",
+  fetchImpl = globalThis.fetch,
+  apiBaseUrl = "",
+  env = null
+} = {}) => {
+  let subdomain = null;
+  let subdomainStatus = "";
+  let subdomainEnabled = false;
+  let subdomainError = "";
+  const activationFailures = [];
+  const fallbackSubdomain = accountId ? `ce-${toStr14(accountId).replace(/[^a-z0-9-]/gi, "").slice(0, 10)}` : "";
+  const cfFetchOptions = { fetchImpl, apiBaseUrl, env };
+  const subdomainResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/subdomain`, {}, cfFetchOptions);
+  if (subdomainResp.ok) {
+    subdomain = subdomainResp.data?.result?.subdomain || null;
+    subdomainStatus = subdomainResp.data?.result?.status || "";
+  } else {
+    activationFailures.push(subdomainResp);
+    subdomainError = subdomainResp.error || subdomainError;
+  }
+  const ensureAccountSubdomain = async (candidate) => {
+    if (!candidate) return;
+    const enableResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/subdomain`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subdomain: candidate })
+    }, cfFetchOptions);
+    if (enableResp.ok) {
+      subdomain = enableResp.data?.result?.subdomain || candidate;
+      subdomainStatus = enableResp.data?.result?.status || subdomainStatus || "active";
+      subdomainEnabled = true;
+      subdomainError = "";
+    } else {
+      activationFailures.push(enableResp);
+      subdomainError = enableResp.error || "Failed to enable workers.dev subdomain.";
+    }
+  };
+  if (!subdomain) {
+    await ensureAccountSubdomain(toStr14(requestedSubdomain).trim() || fallbackSubdomain);
+  } else if (subdomainStatus && subdomainStatus !== "active") {
+    await ensureAccountSubdomain(subdomain);
+  }
+  const fallbackEligible = !subdomain && activationFailures.length > 0 && activationFailures.every((failure2) => shouldAllowFallbackForCloudflareFailure(failure2));
+  return {
+    subdomain,
+    subdomainStatus,
+    subdomainEnabled,
+    subdomainError,
+    fallbackEligible
+  };
+};
+var ensureWorkersDevSubdomain = async ({
+  apiToken,
+  accountId,
+  workerName,
+  requestedSubdomain = "",
+  knownAccountSubdomain = null,
+  fetchImpl = globalThis.fetch,
+  apiBaseUrl = "",
+  env = null
+} = {}) => {
+  const cfFetchOptions = { fetchImpl, apiBaseUrl, env };
+  const accountSubdomain = knownAccountSubdomain || await ensureWorkersDevAccountSubdomain({
+    apiToken,
+    accountId,
+    requestedSubdomain,
+    fetchImpl,
+    apiBaseUrl,
+    env
+  });
+  const {
+    subdomain = null,
+    subdomainStatus = "",
+    subdomainEnabled = false,
+    subdomainError = ""
+  } = accountSubdomain;
+  let scriptSubdomainEnabled = false;
+  let scriptSubdomainError = "";
+  const activationFailures = [];
+  if (!subdomain && accountSubdomain?.fallbackEligible) activationFailures.push({ status: 503 });
+  if (subdomain) {
+    const scriptSubdomainResp = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}/subdomain`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: true })
+    }, cfFetchOptions);
+    if (scriptSubdomainResp.ok) {
+      scriptSubdomainEnabled = scriptSubdomainResp.data?.result?.enabled === true;
+      if (!scriptSubdomainEnabled) {
+        activationFailures.push({ status: 503 });
+        scriptSubdomainError = "Cloudflare did not enable workers.dev for this Worker.";
+      }
+    } else {
+      activationFailures.push(scriptSubdomainResp);
+      scriptSubdomainError = scriptSubdomainResp.error || "Failed to enable workers.dev for script.";
+    }
+  }
+  const workerUrl = subdomain && scriptSubdomainEnabled ? `https://${workerName}.${subdomain}.workers.dev/` : "";
+  const fallbackEligible = !workerUrl && activationFailures.length > 0 && activationFailures.every((failure2) => shouldAllowFallbackForCloudflareFailure(failure2));
+  return {
+    subdomain,
+    subdomainStatus,
+    subdomainEnabled,
+    subdomainError,
+    scriptSubdomainEnabled,
+    scriptSubdomainError,
+    workerUrl,
+    fallbackEligible
+  };
+};
+var resolveDeploymentAccountId = async ({
+  body,
+  fetchImpl,
+  apiBaseUrl = "",
+  env = null
+} = {}) => {
+  const lookup = await lookupCloudflareAccount({
+    apiToken: toStr14(body?.apiToken || body?.token).trim(),
+    fetchImpl,
+    apiBaseUrl,
+    env
+  });
+  if (!lookup.ok) {
+    return lookup;
+  }
+  return lookup;
+};
+var executeDeployHelperRequestCore = async ({
+  body,
+  env,
+  requestOrigin = "",
+  fetchImpl = globalThis.fetch,
+  consoleImpl = console,
+  idempotencyContext = null,
+  resolvedAccountId = ""
+} = {}) => {
+  const sessionSlugCheck = validateInboundSlug(body?.sessionSlug);
+  if (!sessionSlugCheck.ok) {
+    return buildFailure(400, { error: sessionSlugCheck.error });
+  }
+  if (body?.groupSlug != null && body?.sessionSlug == null) {
+    return buildFailure(400, {
+      error: "Legacy groupSlug is no longer accepted. Use sessionSlug instead."
+    });
+  }
+  const apiToken = toStr14(body?.apiToken || body?.token).trim();
+  const apiBaseUrl = resolveCloudflareApiBaseUrl({ env });
+  const cfFetchOptions = { fetchImpl, apiBaseUrl };
+  if (body?.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
+    if (!apiToken) return buildFailure(400, { error: "Missing apiToken." });
+    const accountLookup2 = toStr14(resolvedAccountId).trim() ? { ok: true, accountId: toStr14(resolvedAccountId).trim() } : await resolveDeploymentAccountId({ body, fetchImpl, apiBaseUrl, env });
+    if (!accountLookup2.ok) {
+      const lookupStatus = Number(accountLookup2.status || 0);
+      return buildFailure(lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502, {
+        error: accountLookup2.error || "Failed to resolve Cloudflare account.",
+        detail: accountLookup2.detail
+      }, { fallbackEligible: accountLookup2.fallbackEligible === true });
+    }
+    return executeAgentSessionWrappedDeployment({
+      body,
+      env,
+      accountId: toStr14(accountLookup2.accountId).trim(),
+      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
+      fetchImpl,
+      markMutationStarted: idempotencyContext?.markMutationStarted
+    });
+  }
+  const requestedWorkerName = toStr14(body?.workerName).trim();
+  const defaultSlugInput = env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG ?? "";
+  const defaultSlugCheck = validateInboundSlug(defaultSlugInput);
+  if (body?.sessionSlug == null && !defaultSlugCheck.ok) {
+    return buildFailure(400, { error: defaultSlugCheck.error });
+  }
+  const defaultSlug = defaultSlugCheck.slug;
+  const sessionSlug = body?.sessionSlug != null ? sessionSlugCheck.slug : defaultSlug;
+  const displaySlug = sessionSlug || "general";
+  const bundleText = typeof body?.bundleText === "string" ? body.bundleText : toStr14(body?.bundleText);
+  const hasBundleText = bundleText.trim() !== "";
+  const bundleUrl = toStr14(body?.bundleUrl || env?.WORKER_BUNDLE_URL).trim();
+  const expectedInlineBundleSha256 = hasBundleText ? await sha256Hex2(bundleText) : "";
+  const suppliedBundleSha256 = toStr14(body?.bundleSha256).trim();
+  let expectedBundleSha256 = normalizeWorkerBundleSha256(suppliedBundleSha256);
+  let bundleSource = hasBundleText ? bundleText : "";
+  const bundleSourceKind = hasBundleText ? "bundleText" : "bundleUrl";
+  let bundleDiagnostics = null;
+  if (!apiToken) return buildFailure(400, { error: "Missing apiToken." });
+  if (!requestedWorkerName) return buildFailure(400, { error: "Missing workerName." });
+  if (suppliedBundleSha256 && !expectedBundleSha256) {
+    return buildFailure(400, { error: "bundleSha256 must be a complete SHA-256 hex digest." });
+  }
+  if (!hasBundleText && !bundleUrl) {
+    return buildFailure(400, {
+      error: "Missing bundleText or bundleUrl (set WORKER_BUNDLE_URL or pass bundleUrl)."
+    });
+  }
+  const rawStorageProfile = body?.storageProfile ?? body?.storageBackend ?? null;
+  const modeValidation = validateDeploymentModeValues(body);
+  if (!modeValidation.ok) {
+    return buildFailure(400, { error: `Invalid deployment mode at ${modeValidation.path}.` });
+  }
+  const storageProfile = normalizeDeployStorageProfile(rawStorageProfile);
+  const storageBindingPlan = resolveDeployStorageBindingPlan(rawStorageProfile, storageProfile);
+  if (!storageBindingPlan.ok) {
+    return buildFailure(400, { error: storageBindingPlan.error });
+  }
+  if (!hasBundleText && toStr14(body?.bundleManifestUrl).trim()) {
+    const manifestDigest = await fetchExpectedWorkerBundleDigest({
+      manifestUrl: toStr14(body.bundleManifestUrl).trim(),
+      artifactFile: "sessionCorsWorker.bundle.js",
+      artifactKind: "session-cors-worker",
+      fetchImpl
+    });
+    if (!manifestDigest.ok) {
+      return buildFailure(502, { error: manifestDigest.error });
+    }
+    if (expectedBundleSha256 && expectedBundleSha256 !== manifestDigest.digest) {
+      return buildFailure(409, { error: "Worker release manifest digest conflicts with bundleSha256." });
+    }
+    expectedBundleSha256 = manifestDigest.digest;
+  }
+  if (expectedBundleSha256 && !bundleSource) {
+    let bundleResponse;
+    try {
+      bundleResponse = await fetchImpl(bundleUrl);
+    } catch (error) {
+      return buildFailure(502, {
+        error: `Failed to fetch bundle: ${toStr14(error?.message || error).trim() || "Unknown error."}`
+      }, { fallbackEligible: true });
+    }
+    if (!bundleResponse.ok) {
+      return buildFailure(502, { error: `Failed to fetch bundle (${bundleResponse.status}).` }, {
+        fallbackEligible: bundleResponse.status >= 500 || bundleResponse.status === 429
+      });
+    }
+    bundleSource = await bundleResponse.text();
+    bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
+  }
+  if (expectedBundleSha256 && (bundleDiagnostics?.sha256 || expectedInlineBundleSha256) !== expectedBundleSha256) {
+    return buildFailure(409, {
+      error: "Worker bundle SHA-256 does not match the verified release manifest."
+    });
+  }
+  const accountLookup = toStr14(resolvedAccountId).trim() ? { ok: true, accountId: toStr14(resolvedAccountId).trim() } : await resolveDeploymentAccountId({
+    body: {
+      ...body,
+      apiToken
+    },
+    fetchImpl,
+    apiBaseUrl,
+    env
+  });
+  if (!accountLookup.ok) {
+    const lookupStatus = Number(accountLookup.status || 0);
+    const responseStatus = lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502;
+    return buildFailure(responseStatus, {
+      error: accountLookup.error || "Failed to resolve Cloudflare account.",
+      detail: accountLookup.detail
+    }, {
+      fallbackEligible: accountLookup.fallbackEligible === true
+    });
+  }
+  const accountId = toStr14(accountLookup.accountId).trim();
+  if (!accountId) {
+    return buildFailure(404, { error: "No accounts found for token." });
+  }
+  const registryAddress = toStr14(body?.registryAddress).trim();
+  const registryChainId = Number(body?.registryChainId || 0) || 0;
+  const hatsAddress = toStr14(body?.hatsAddress).trim();
+  const adminHatId = toStr14(body?.adminHatId).trim();
+  const adminAddress = toStr14(body?.adminAddress).trim();
+  const workerCanonicalRequested = toStr14(body?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === "worker_canonical";
+  if (workerCanonicalRequested && !/^0x[0-9a-f]{40}$/i.test(adminAddress)) {
+    return buildFailure(400, { error: "A valid adminAddress is required for worker-canonical deploys." });
+  }
+  const workerCanonicalAuthority = workerCanonicalRequested ? resolveWorkerCanonicalAuthorityForDeploy(body?.workerAuthority) : { ok: true, value: null };
+  if (!workerCanonicalAuthority.ok) {
+    return buildFailure(400, { error: workerCanonicalAuthority.error });
+  }
+  const deploymentId = toStr14(idempotencyContext?.deploymentId).trim() || randomSecret2();
+  const workerName = toStr14(idempotencyContext?.workerName).trim() || buildFreshDeploymentName(requestedWorkerName, deploymentId);
+  const buildDeploymentFailure = (status, payload, options) => buildFailure(status, {
+    ...payload,
+    // This is the non-secret marker embedded in CE_DEPLOYMENT_ID. Preserve it
+    // on partial-deploy failures so a caller can verify ownership before
+    // retrying cleanup of any reported orphan resources.
+    ...Object.hasOwn(payload || {}, "orphanResources") ? { accountId, deploymentId } : {}
+  }, options);
+  const workerNamePreflight = await cfFetch(
+    apiToken,
+    `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
+    { method: "GET" },
+    cfFetchOptions
+  );
+  const workerNameConfirmedAbsent = !workerNamePreflight.ok && Number(workerNamePreflight.status || 0) === 404;
+  const mayResumeExistingWorker = workerNamePreflight.ok && !!toStr14(idempotencyContext?.requestMarker).trim();
+  if (!workerNamePreflight.ok && !workerNameConfirmedAbsent) {
+    return buildFailure(502, {
+      error: workerNamePreflight.error || "Failed to determine whether the worker already exists.",
+      detail: workerNamePreflight.detail
+    }, {
+      fallbackEligible: shouldAllowFallbackForCloudflareFailure(workerNamePreflight)
+    });
+  }
+  if (workerNamePreflight.ok && !mayResumeExistingWorker) {
+    return buildFailure(409, {
+      error: `Generated worker name "${workerName}" already exists. In-place redeploy is disabled to protect existing worker state. Retry to allocate a new physical worker name.`
+    });
+  }
+  const accountSubdomain = await ensureWorkersDevAccountSubdomain({
+    apiToken,
+    accountId,
+    requestedSubdomain: toStr14(body?.subdomain || body?.workersSubdomain).trim(),
+    fetchImpl,
+    apiBaseUrl,
+    env
+  });
+  if (!accountSubdomain.subdomain) {
+    return buildFailure(502, {
+      error: accountSubdomain.subdomainError || "Cloudflare did not return a workers.dev account subdomain."
+    }, {
+      fallbackEligible: accountSubdomain.fallbackEligible
+    });
+  }
+  const anticipatedWorkerUrl = `https://${workerName}.${accountSubdomain.subdomain}.workers.dev/`;
+  const rpcUrl = toStr14(body?.rpcUrl).trim();
+  const rpcUrlsByChainId = body?.rpcUrlsByChainId && typeof body.rpcUrlsByChainId === "object" ? body.rpcUrlsByChainId : {};
+  const allowOriginsInput = Array.isArray(body?.allowOrigins) ? body.allowOrigins : [];
+  const allowOrigins = normalizeAllowList(
+    allowOriginsInput.length ? allowOriginsInput : [requestOrigin]
+  );
+  const limits = sanitizeWorkerConfigOpenSubtree(body?.limits || {});
+  const scopes = sanitizeWorkerConfigOpenSubtree(body?.scopes || {});
+  const faucetInput = body?.faucet && typeof body.faucet === "object" ? body.faucet : {};
+  const faucet2 = {
+    rpcUrl: toStr14(faucetInput.rpcUrl).trim() || DEFAULT_FAUCET_RPC_URL,
+    amountEth: toStr14(faucetInput.amountEth).trim() || DEFAULT_FAUCET_AMOUNT_ETH,
+    balanceThresholdEth: toStr14(faucetInput.balanceThresholdEth).trim() || DEFAULT_FAUCET_BALANCE_THRESHOLD_ETH
+  };
+  const embeddedDeployHelperEnabled = normalizeEmbeddedDeployHelperEnabled(
+    body?.embeddedDeployHelperEnabled ?? body?.deployHelperEnabled,
+    true
+  );
+  const prepareBundleDiagnostics = async () => {
+    if (bundleDiagnostics) return { ok: true };
+    if (!bundleSource) {
+      let bundleResp;
+      try {
+        bundleResp = await fetchImpl(bundleUrl);
+      } catch (err) {
+        return {
+          ok: false,
+          result: buildFailure(502, {
+            error: `Failed to fetch bundle: ${toStr14(err?.message || err).trim() || "Unknown error."}`
+          }, { fallbackEligible: true })
+        };
+      }
+      if (!bundleResp.ok) {
+        return {
+          ok: false,
+          result: buildFailure(502, {
+            error: `Failed to fetch bundle (${bundleResp.status}).`
+          }, {
+            fallbackEligible: bundleResp.status >= 500 || bundleResp.status === 429
+          })
+        };
+      }
+      bundleSource = await bundleResp.text();
+    }
+    bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
+    if (expectedBundleSha256 && bundleDiagnostics.sha256 !== expectedBundleSha256) {
+      return {
+        ok: false,
+        result: buildFailure(409, {
+          error: "Worker bundle SHA-256 does not match the verified release manifest."
+        })
+      };
+    }
+    consoleImpl?.log?.("[deploy-helper] bundle diagnostics", JSON.stringify({
+      workerName,
+      sessionSlug: displaySlug,
+      diagnostics: {
+        ...bundleDiagnostics,
+        prefix: bundleDiagnostics.prefix,
+        suffix: bundleDiagnostics.suffix
+      }
+    }));
+    return { ok: true };
+  };
+  const config = {
+    slug: sessionSlug,
+    authzEpoch: 1,
+    adminAddress,
+    allowOrigins,
+    limits,
+    scopes,
+    corsWorkerUrl: anticipatedWorkerUrl,
+    embeddedDeployHelperEnabled,
+    ...!workerCanonicalRequested ? {
+      registryAddress,
+      registryChainId,
+      hatsAddress,
+      adminHatId,
+      rpcUrl,
+      rpcUrlsByChainId,
+      faucet: faucet2
+    } : {},
+    ...selectDeployWorkerSessionConfigFields(body)
+  };
+  if (workerCanonicalRequested) {
+    config.workerAuthority = workerCanonicalAuthority.value;
+  }
+  if (storageProfile) {
+    config.storageProfile = storageProfile;
+  }
+  const blockLimits = sanitizeBlockLimits(body?.blockLimits);
+  if (blockLimits && !workerCanonicalRequested) {
+    config.blockLimits = blockLimits;
+  }
+  if (findForbiddenCloudflareDeploymentTokenPath(config)) {
+    return buildFailure(400, { error: "Cloudflare deployment tokens are not allowed in session config." });
+  }
+  if (findForbiddenWorkerConfigSecretPath(config)) {
+    return buildFailure(400, { error: "Secret-like values are not allowed in public session config fields." });
+  }
+  const sessionConfigKey = `session:${sessionSlug}:config`;
+  const sessionSecretsKey = `session:${sessionSlug}:secrets`;
+  const secrets = sanitizeSecrets(body?.secrets || {});
+  const envelopeKekSecretRequired = true;
+  const candidateEnvelopeKekSecret = randomSecret2();
+  const secretsEnvelope = await buildEncryptedSessionSecretsEnvelope(secrets, {
+    env: { [STORAGE_ENVELOPE_KEK_SECRET_NAME]: candidateEnvelopeKekSecret },
+    slug: sessionSlug || displaySlug
+  });
+  const requestMarker = toStr14(idempotencyContext?.requestMarker).trim();
+  const kvTitleSuffix = requestMarker ? `:req-${requestMarker}` : "";
+  const kvTitlePrefix = `ContextEngineSessionCorsWorker:${displaySlug}`.slice(0, KV_NAMESPACE_TITLE_MAX_LENGTH - kvTitleSuffix.length);
+  const kvNamespaceTitle = `${kvTitlePrefix}${kvTitleSuffix}`;
+  const findRequestMarkedKvNamespaces = async () => {
+    const matches = [];
+    let page = 1;
+    let totalPages = 1;
+    do {
+      const listResult = await cfFetch(
+        apiToken,
+        `/accounts/${accountId}/storage/kv/namespaces?per_page=100&page=${page}`,
+        { method: "GET" },
+        cfFetchOptions
+      );
+      if (!listResult.ok) return { ok: false, result: listResult, matches: [] };
+      const namespaces = Array.isArray(listResult.data?.result) ? listResult.data.result : [];
+      matches.push(...namespaces.filter((namespace) => toStr14(namespace?.title).trim() === kvNamespaceTitle && toStr14(namespace?.id).trim()));
+      const reportedTotalPages = Number(listResult.data?.result_info?.total_pages || 1) || 1;
+      if (reportedTotalPages > 1e3) {
+        return {
+          ok: false,
+          result: { error: "KV namespace inventory is too large to reconcile safely.", status: 409 },
+          matches: []
+        };
+      }
+      totalPages = Math.max(1, reportedTotalPages);
+      page += 1;
+    } while (page <= totalPages);
+    return { ok: true, matches };
+  };
+  const workerSettingsMatchDeployment = (settingsResult, namespaceId, { ignoreBundleIdentity = false } = {}) => {
+    if (!settingsResult?.ok || !namespaceId) return false;
+    const settings = settingsResult.data?.result || {};
+    const bindings = Array.isArray(settings?.bindings) ? settings.bindings : [];
+    const named = (name) => bindings.filter((binding) => toStr14(binding?.name).trim() === name);
+    const hasExactPlainText = (name, expected, { caseInsensitive = false } = {}) => {
+      const matches = named(name);
+      if (matches.length !== 1 || toStr14(matches[0]?.type).trim() !== "plain_text") return false;
+      const actual = toStr14(matches[0]?.text).trim();
+      return caseInsensitive ? actual.toLowerCase() === expected.toLowerCase() : actual === expected;
+    };
+    const hasExactKv = (name, expectedNamespaceId) => {
+      const matches = named(name);
+      return matches.length === 1 && toStr14(matches[0]?.type).trim() === "kv_namespace" && toStr14(matches[0]?.namespace_id).trim() === expectedNamespaceId;
+    };
+    const hasExactR2 = (name, expectedBucketName) => {
+      const matches = named(name);
+      return matches.length === 1 && toStr14(matches[0]?.type).trim() === "r2_bucket" && toStr14(matches[0]?.bucket_name).trim() === expectedBucketName;
+    };
+    const hasExactDurableObject = (name, expectedClassName) => {
+      const matches = named(name);
+      return matches.length === 1 && toStr14(matches[0]?.type).trim() === "durable_object_namespace" && toStr14(matches[0]?.class_name).trim() === expectedClassName;
+    };
+    const observedMainModule = toStr14(settings?.main_module).trim();
+    const moduleIdentityMatches = !observedMainModule || observedMainModule === "worker.mjs";
+    const storageIndexMatches = storageBindingPlan.requiresStorageIndexKv ? hasExactKv("CE_STORAGE_INDEX_KV", namespaceId) : named("CE_STORAGE_INDEX_KV").length === 0;
+    const r2Matches = storageBindingPlan.r2BucketName ? hasExactR2("CE_STORAGE_R2", storageBindingPlan.r2BucketName) : named("CE_STORAGE_R2").length === 0;
+    const adminMatches = adminAddress ? hasExactPlainText("BOOTSTRAP_ADMIN_ADDRESS", adminAddress, { caseInsensitive: true }) : named("BOOTSTRAP_ADMIN_ADDRESS").length === 0;
+    const bundleIdentityBindings = named(BUNDLE_SHA256_BINDING_NAME);
+    const observedBundleSha256 = bundleIdentityBindings.length === 1 && toStr14(bundleIdentityBindings[0]?.type).trim() === "plain_text" ? toStr14(bundleIdentityBindings[0]?.text).trim().toLowerCase() : "";
+    const expectedBundleSha2562 = bundleDiagnostics?.sha256 || expectedInlineBundleSha256 || toStr14(idempotencyContext?.bundleSha256).trim().toLowerCase();
+    const bundleIdentityMatches = /^[0-9a-f]{64}$/.test(observedBundleSha256) && (ignoreBundleIdentity || !expectedBundleSha2562 || observedBundleSha256 === expectedBundleSha2562);
+    const requestDigestMatches = requestMarker ? hasExactPlainText(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, toStr14(idempotencyContext?.requestDigest).trim()) : named(DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME).length === 0;
+    return moduleIdentityMatches && hasExactPlainText(DEPLOYMENT_ID_BINDING_NAME, deploymentId) && requestDigestMatches && bundleIdentityMatches && hasExactDurableObject(SESSION_COORDINATOR_BINDING_NAME, SESSION_COORDINATOR_CLASS_NAME) && hasExactKv("GROUP_KV", namespaceId) && storageIndexMatches && r2Matches && adminMatches && hasExactPlainText("DEFAULT_SESSION_SLUG", sessionSlug) && hasExactPlainText("DEPLOY_HELPER_ENABLED", embeddedDeployHelperEnabled ? "1" : "0");
+  };
+  const readWorkerBundleSha256 = (settingsResult) => {
+    const bindings = Array.isArray(settingsResult?.data?.result?.bindings) ? settingsResult.data.result.bindings : [];
+    const matches = bindings.filter((binding) => toStr14(binding?.name).trim() === BUNDLE_SHA256_BINDING_NAME && toStr14(binding?.type).trim() === "plain_text");
+    const value = matches.length === 1 ? toStr14(matches[0]?.text).trim().toLowerCase() : "";
+    return /^[0-9a-f]{64}$/.test(value) ? value : "";
+  };
+  let kvId = "";
+  let resumeUploadedWorker = false;
+  let resumeWorkerSettings = mayResumeExistingWorker ? workerNamePreflight : null;
+  let replaceRejectedWorker = idempotencyContext?.definitiveUploadRejected === true;
+  let createdKvThisInvocation = false;
+  let uploadedWorkerThisInvocation = false;
+  if (requestMarker) {
+    const existingMarkedNamespaces = await findRequestMarkedKvNamespaces();
+    if (!existingMarkedNamespaces.ok) {
+      const reconciliationRetryable = Number(existingMarkedNamespaces.result?.status || 0) === 404 || shouldAllowFallbackForCloudflareFailure(existingMarkedNamespaces.result);
+      return buildFailure(502, {
+        error: existingMarkedNamespaces.result?.error || "Failed to reconcile deployment KV namespace.",
+        detail: existingMarkedNamespaces.result?.detail,
+        ...reconciliationRetryable ? { deploymentRequestPending: true } : {}
+      }, {
+        fallbackEligible: reconciliationRetryable
+      });
+    }
+    if (existingMarkedNamespaces.matches.length > 1) {
+      return buildFailure(409, {
+        error: "Multiple KV namespaces share this deployment request marker; deployment stopped."
+      });
+    }
+    if (mayResumeExistingWorker && existingMarkedNamespaces.matches.length === 0) {
+      return buildFailure(503, {
+        error: "Existing worker is visible before its request-marked KV namespace. Retry the same deployment request.",
+        deploymentRequestPending: true
+      }, {
+        fallbackEligible: true
+      });
+    }
+    if (existingMarkedNamespaces.matches.length === 1) {
+      if (idempotencyContext?.isReplay !== true && !mayResumeExistingWorker) {
+        return buildFailure(409, {
+          error: "A KV namespace already uses this new deployment request marker; deployment stopped.",
+          deploymentRequestPending: true
+        });
+      }
+      kvId = toStr14(existingMarkedNamespaces.matches[0]?.id).trim();
+    }
+  }
+  if (!resumeWorkerSettings && workerNameConfirmedAbsent && idempotencyContext?.isReplay === true && idempotencyContext?.uploadStarted === true && kvId) {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const retrySettings = await cfFetch(
+        apiToken,
+        `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
+        { method: "GET" },
+        cfFetchOptions
+      );
+      if (retrySettings.ok) {
+        resumeWorkerSettings = retrySettings;
+        break;
+      }
+      if (Number(retrySettings.status || 0) !== 404) {
+        return buildFailure(502, {
+          error: retrySettings.error || "Failed to recheck deployment Worker during resume.",
+          detail: retrySettings.detail,
+          deploymentRequestPending: true
+        }, { fallbackEligible: true });
+      }
+    }
+  }
+  if (resumeWorkerSettings) {
+    if (idempotencyContext?.definitiveUploadRejected === true) {
+      const preparedBundle = await prepareBundleDiagnostics();
+      if (!preparedBundle.ok) return preparedBundle.result;
+      if (!workerSettingsMatchDeployment(resumeWorkerSettings, kvId, { ignoreBundleIdentity: true })) {
+        return buildFailure(409, {
+          error: "Existing worker does not match this deployment request; required bindings differ and resume stopped.",
+          deploymentRequestPending: true
+        });
+      }
+      if (readWorkerBundleSha256(resumeWorkerSettings) === bundleDiagnostics.sha256) {
+        resumeUploadedWorker = true;
+      } else {
+        replaceRejectedWorker = true;
+      }
+      idempotencyContext.mutationStarted = true;
+    } else if (!workerSettingsMatchDeployment(resumeWorkerSettings, kvId)) {
+      return buildFailure(409, {
+        error: "Existing worker does not match this deployment request; required bindings differ and resume stopped.",
+        deploymentRequestPending: true
+      });
+    } else {
+      resumeUploadedWorker = true;
+      idempotencyContext.mutationStarted = true;
+    }
+  }
+  if (!resumeUploadedWorker) {
+    const preparedBundle = await prepareBundleDiagnostics();
+    if (!preparedBundle.ok) return preparedBundle.result;
+    if (idempotencyContext?.bundleSha256 && toStr14(idempotencyContext.bundleSha256).trim().toLowerCase() !== bundleDiagnostics.sha256 && idempotencyContext?.definitiveUploadRejected !== true) {
+      return buildFailure(409, {
+        error: "Deployment bundle content changed after this request started; upload was stopped.",
+        deploymentRequestPending: true
+      });
+    }
+  }
+  let kvCreate = null;
+  if (!kvId) {
+    try {
+      await idempotencyContext?.markMutationStarted?.();
+    } catch (error) {
+      return buildFailure(503, {
+        error: `Failed to advance deployment request journal: ${toStr14(error?.message || error).trim() || "Unknown error."}`
+      }, { fallbackEligible: true });
+    }
+    kvCreate = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: kvNamespaceTitle })
+    }, cfFetchOptions);
+    kvId = toStr14(kvCreate.data?.result?.id).trim();
+    createdKvThisInvocation = kvCreate.ok && !!kvId;
+    if (!kvId && requestMarker) {
+      for (let attempt = 0; attempt <= NEW_KV_NAMESPACE_RETRY_DELAYS_MS.length; attempt += 1) {
+        const reconciled = await findRequestMarkedKvNamespaces();
+        if (!reconciled.ok) break;
+        if (reconciled.matches.length > 1) {
+          return buildFailure(409, {
+            error: "Multiple KV namespaces share this deployment request marker; deployment stopped."
+          });
+        }
+        if (reconciled.matches.length === 1) {
+          kvId = toStr14(reconciled.matches[0]?.id).trim();
+          break;
+        }
+        const delayMs = NEW_KV_NAMESPACE_RETRY_DELAYS_MS[attempt];
+        if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    if (!kvId) {
+      const createStatus = Number(kvCreate?.status || 0);
+      const createMayHaveCommitted = requestMarker && (kvCreate?.ok === true || createStatus === 400 || createStatus === 409 || shouldAllowFallbackForCloudflareFailure(kvCreate));
+      return buildFailure(createMayHaveCommitted ? 503 : 502, {
+        error: kvCreate?.error || "Failed to create or reconcile KV namespace.",
+        detail: kvCreate?.detail,
+        ...createMayHaveCommitted ? { deploymentRequestPending: true } : {}
+      }, {
+        fallbackEligible: kvCreate ? shouldAllowFallbackForCloudflareFailure(kvCreate) : true
+      });
+    }
+  }
+  const cleanupStagedKv = async () => {
+    if (!createdKvThisInvocation) {
+      return { kvNamespaceId: kvId, kvCleanupStatus: "retained-pre-existing" };
+    }
+    const kvCleanup = await cfFetch(
+      apiToken,
+      `/accounts/${accountId}/storage/kv/namespaces/${kvId}`,
+      { method: "DELETE" },
+      cfFetchOptions
+    );
+    return kvCleanup.ok ? { kvNamespaceId: "" } : { kvNamespaceId: kvId, kvCleanupStatus: "delete-failed" };
+  };
+  if (!resumeUploadedWorker && idempotencyContext?.definitiveUploadRejected !== true) {
+    const configPut = await putFreshKvNamespaceValue({
+      apiToken,
+      path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`,
+      options: {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config)
+      },
+      cfFetchOptions
+    });
+    if (!configPut.ok) {
+      const orphanKv = await cleanupStagedKv();
+      return buildDeploymentFailure(502, {
+        error: configPut.error,
+        detail: configPut.detail,
+        orphanResources: { ...orphanKv, workerName: "" }
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(configPut)
+      });
+    }
+    const secretsEnvelopeBody = JSON.stringify(secretsEnvelope);
+    const secretsPut = await putFreshKvNamespaceValue({
+      apiToken,
+      path: `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`,
+      options: {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: secretsEnvelopeBody
+      },
+      cfFetchOptions
+    });
+    if (!secretsPut.ok) {
+      const orphanKv = await cleanupStagedKv();
+      return buildDeploymentFailure(502, {
+        error: secretsPut.error,
+        detail: secretsPut.detail,
+        orphanResources: { ...orphanKv, workerName: "" }
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretsPut)
+      });
+    }
+  }
+  const metadata = {
+    main_module: "worker.mjs",
+    bindings: [
+      { name: "GROUP_KV", type: "kv_namespace", namespace_id: kvId },
+      ...storageBindingPlan.requiresStorageIndexKv ? [{ name: "CE_STORAGE_INDEX_KV", type: "kv_namespace", namespace_id: kvId }] : [],
+      ...storageBindingPlan.r2BucketName ? [{ name: "CE_STORAGE_R2", type: "r2_bucket", bucket_name: storageBindingPlan.r2BucketName }] : [],
+      { name: "DEFAULT_SESSION_SLUG", type: "plain_text", text: sessionSlug },
+      ...adminAddress ? [{ name: "BOOTSTRAP_ADMIN_ADDRESS", type: "plain_text", text: adminAddress }] : [],
+      { name: DEPLOYMENT_ID_BINDING_NAME, type: "plain_text", text: deploymentId },
+      ...requestMarker ? [{ name: DEPLOYMENT_REQUEST_DIGEST_BINDING_NAME, type: "plain_text", text: idempotencyContext.requestDigest }] : [],
+      { name: BUNDLE_SHA256_BINDING_NAME, type: "plain_text", text: bundleDiagnostics?.sha256 || expectedInlineBundleSha256 },
+      {
+        name: SESSION_COORDINATOR_BINDING_NAME,
+        type: "durable_object_namespace",
+        class_name: SESSION_COORDINATOR_CLASS_NAME
+      },
+      { name: "DEPLOY_HELPER_ENABLED", type: "plain_text", text: embeddedDeployHelperEnabled ? "1" : "0" }
+    ],
+    migrations: {
+      old_tag: "",
+      new_tag: SESSION_COORDINATOR_MIGRATION_TAG,
+      new_sqlite_classes: [SESSION_COORDINATOR_CLASS_NAME]
+    },
+    compatibility_date: toStr14(env?.WORKER_COMPATIBILITY_DATE || DEFAULT_COMPAT_DATE),
+    compatibility_flags: ["nodejs_compat"]
+  };
+  const readWorkerSettingsAfterUpload = async () => {
+    let settingsResp = null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      settingsResp = await cfFetch(
+        apiToken,
+        `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
+        { method: "GET" },
+        cfFetchOptions
+      );
+      if (settingsResp.ok) break;
+    }
+    return settingsResp;
+  };
+  const cleanupDeploymentResources = async () => {
+    let removableWorkerName = workerName;
+    let workerCleanupStatus = "";
+    const cleanupWorkerIfOwned = async () => {
+      if (!uploadedWorkerThisInvocation) {
+        workerCleanupStatus = "retained-pre-existing";
+        return false;
+      }
+      const settingsResp = await readWorkerSettingsAfterUpload();
+      if (!settingsResp.ok) {
+        workerCleanupStatus = "ownership-unverified";
+        return false;
+      }
+      const deploymentStillOwned = workerSettingsMatchDeployment(settingsResp, kvId);
+      if (!deploymentStillOwned) {
+        workerCleanupStatus = "ownership-changed";
+        return false;
+      }
+      const scriptCleanup = await cfFetch(
+        apiToken,
+        `/accounts/${accountId}/workers/scripts/${workerName}?force=true`,
+        { method: "DELETE" },
+        cfFetchOptions
+      );
+      if (!scriptCleanup.ok) {
+        workerCleanupStatus = isAmbiguousCloudflareMutationFailure(scriptCleanup) ? "owned-delete-failed" : "owned-delete-rejected";
+        return false;
+      }
+      removableWorkerName = "";
+      return true;
+    };
+    const workerConfirmedAbsent = await cleanupWorkerIfOwned();
+    if (!workerConfirmedAbsent) {
+      return {
+        kvNamespaceId: kvId,
+        kvCleanupStatus: "retained-live-worker",
+        workerName: removableWorkerName,
+        ...workerCleanupStatus ? { workerCleanupStatus } : {}
+      };
+    }
+    if (!createdKvThisInvocation) {
+      return {
+        kvNamespaceId: kvId,
+        kvCleanupStatus: "retained-pre-existing",
+        workerName: removableWorkerName,
+        ...workerCleanupStatus ? { workerCleanupStatus } : {}
+      };
+    }
+    const kvCleanup = await cfFetch(
+      apiToken,
+      `/accounts/${accountId}/storage/kv/namespaces/${kvId}`,
+      { method: "DELETE" },
+      cfFetchOptions
+    );
+    return {
+      kvNamespaceId: kvCleanup.ok ? "" : kvId,
+      ...!kvCleanup.ok ? { kvCleanupStatus: "delete-failed" } : {},
+      workerName: removableWorkerName,
+      ...workerCleanupStatus ? { workerCleanupStatus } : {}
+    };
+  };
+  const buildScriptUploadForm = ({ omitMigrations = false } = {}) => {
+    const uploadMetadata = {
+      ...metadata,
+      ...replaceRejectedWorker ? { keep_bindings: ["secret_text"] } : {}
+    };
+    if (omitMigrations) delete uploadMetadata.migrations;
+    const uploadForm = new FormData();
+    uploadForm.append(
+      "metadata",
+      new Blob([JSON.stringify(uploadMetadata)], { type: "application/json" }),
+      "metadata.json"
+    );
+    uploadForm.append(
+      "worker.mjs",
+      new Blob([bundleSource], { type: "application/javascript+module" }),
+      "worker.mjs"
+    );
+    return uploadForm;
+  };
+  const scriptUploadPath = `/accounts/${accountId}/workers/scripts/${workerName}`;
+  if (!resumeUploadedWorker) {
+    const finalWorkerNamePreflight = await cfFetch(
+      apiToken,
+      `/accounts/${accountId}/workers/scripts/${workerName}/settings`,
+      { method: "GET" },
+      cfFetchOptions
+    );
+    if (finalWorkerNamePreflight.ok) {
+      if (requestMarker && idempotencyContext?.definitiveUploadRejected === true) {
+        if (!workerSettingsMatchDeployment(finalWorkerNamePreflight, kvId, { ignoreBundleIdentity: true })) {
+          return buildDeploymentFailure(409, {
+            error: "Existing worker does not match this deployment request; required bindings differ and resume stopped.",
+            deploymentRequestPending: true,
+            orphanResources: {
+              kvNamespaceId: kvId,
+              kvCleanupStatus: "retained-upload-pending",
+              workerName,
+              workerCleanupStatus: "ownership-changed"
+            }
+          });
+        }
+        if (readWorkerBundleSha256(finalWorkerNamePreflight) === bundleDiagnostics.sha256) {
+          resumeUploadedWorker = true;
+        } else {
+          replaceRejectedWorker = true;
+        }
+      } else if (requestMarker) {
+        return buildDeploymentFailure(503, {
+          error: "This deployment request is already advancing in another invocation. Retry the same request ID.",
+          deploymentRequestPending: true,
+          orphanResources: {
+            kvNamespaceId: kvId,
+            kvCleanupStatus: "retained-live-worker",
+            workerName
+          }
+        });
+      } else {
+        const orphanKv = await cleanupStagedKv();
+        return buildDeploymentFailure(409, {
+          error: `Generated worker name "${workerName}" became unavailable during deployment. No script was uploaded; retry to allocate a new physical worker name.`,
+          orphanResources: { ...orphanKv, workerName: "" }
+        });
+      }
+    }
+    if (!finalWorkerNamePreflight.ok && Number(finalWorkerNamePreflight.status || 0) !== 404) {
+      const orphanKv = await cleanupStagedKv();
+      return buildDeploymentFailure(502, {
+        error: finalWorkerNamePreflight.error || "Failed to re-verify worker-name availability.",
+        detail: finalWorkerNamePreflight.detail,
+        orphanResources: { ...orphanKv, workerName: "" }
+      }, {
+        fallbackEligible: shouldAllowFallbackForCloudflareFailure(finalWorkerNamePreflight)
+      });
+    }
+    if (!resumeUploadedWorker) {
+      try {
+        await idempotencyContext?.markUploadStarted?.(bundleDiagnostics?.sha256);
+      } catch (error) {
+        return buildDeploymentFailure(503, {
+          error: `Failed to journal deployment upload identity: ${toStr14(error?.message || error).trim() || "Unknown error."}`,
+          deploymentRequestPending: true,
+          orphanResources: {
+            kvNamespaceId: kvId,
+            kvCleanupStatus: "retained-upload-pending",
+            workerName
+          }
+        }, { fallbackEligible: true });
+      }
+      uploadedWorkerThisInvocation = true;
+      let scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
+        method: "PUT",
+        body: buildScriptUploadForm()
+      }, cfFetchOptions);
+      const migrationPreconditionFailure = Number(scriptUpload.status || 0) === 412 && /migration tag precondition failed/i.test([
+        scriptUpload.error,
+        ...Array.isArray(scriptUpload.detail) ? scriptUpload.detail.map((entry) => toStr14(entry?.message || entry)) : [scriptUpload.detail]
+      ].filter(Boolean).join("\n"));
+      if (migrationPreconditionFailure) {
+        scriptUpload = await cfFetch(apiToken, scriptUploadPath, {
+          method: "PUT",
+          body: buildScriptUploadForm({ omitMigrations: true })
+        }, cfFetchOptions);
+      }
+      if (!scriptUpload.ok) {
+        consoleImpl?.error?.("[deploy-helper] script upload failed", JSON.stringify({
+          workerName,
+          sessionSlug: displaySlug,
+          error: scriptUpload.error,
+          detail: scriptUpload.detail,
+          diagnostics: bundleDiagnostics
+        }));
+        const bundleSummary = formatBundleDiagnostics(bundleDiagnostics);
+        const uploadWasDefinitivelyRejected = isDefinitiveWorkerUploadRejection(scriptUpload);
+        const stableUploadWasDefinitivelyRejected = uploadWasDefinitivelyRejected && !!requestMarker && !!kvId;
+        const stableUploadMayHaveCommitted = !uploadWasDefinitivelyRejected && !!requestMarker && !!kvId;
+        let rejectionJournalError = "";
+        if (stableUploadWasDefinitivelyRejected) {
+          try {
+            await idempotencyContext?.markDefinitiveUploadRejected?.(bundleDiagnostics?.sha256);
+          } catch (error) {
+            rejectionJournalError = toStr14(error?.message || error).trim() || "Unknown error.";
+          }
+        }
+        const orphanResources = stableUploadWasDefinitivelyRejected || stableUploadMayHaveCommitted ? {
+          kvNamespaceId: kvId,
+          kvCleanupStatus: "retained-upload-pending",
+          workerName
+        } : uploadWasDefinitivelyRejected ? { ...await cleanupStagedKv(), workerName: "" } : await cleanupDeploymentResources();
+        return buildDeploymentFailure(rejectionJournalError ? 503 : 502, {
+          error: rejectionJournalError ? `Failed to persist definitive upload rejection: ${rejectionJournalError}` : `${scriptUpload.error} Bundle diagnostics: ${bundleSummary}`,
+          detail: scriptUpload.detail,
+          bundleDiagnostics,
+          orphanResources,
+          ...stableUploadWasDefinitivelyRejected || stableUploadMayHaveCommitted ? { deploymentRequestPending: true } : {}
+        }, {
+          fallbackEligible: rejectionJournalError ? true : shouldAllowFallbackForCloudflareFailure(scriptUpload)
+        });
+      }
+      if (idempotencyContext?.definitiveUploadRejected === true) {
+        resumeUploadedWorker = true;
+      }
+    }
+  }
+  const uploadedWorkerSettings = await readWorkerSettingsAfterUpload();
+  const uploadedWorkerStillOwned = workerSettingsMatchDeployment(uploadedWorkerSettings, kvId);
+  if (!uploadedWorkerStillOwned) {
+    const settingsVisibilityPending = !uploadedWorkerSettings.ok && Number(uploadedWorkerSettings.status || 0) === 404;
+    const orphanResources = await cleanupDeploymentResources();
+    return buildDeploymentFailure(uploadedWorkerSettings.ok ? 409 : 502, {
+      error: uploadedWorkerSettings.ok ? "Worker ownership changed during deployment; runtime activation was stopped." : uploadedWorkerSettings.error || "Failed to verify worker ownership after upload.",
+      detail: uploadedWorkerSettings.detail,
+      orphanResources
+    }, {
+      fallbackEligible: settingsVisibilityPending || !uploadedWorkerSettings.ok && shouldAllowFallbackForCloudflareFailure(uploadedWorkerSettings)
+    });
+  }
+  let resumedSecretBindings = /* @__PURE__ */ new Set();
+  if (resumeUploadedWorker) {
+    const secretList = await cfFetch(
+      apiToken,
+      `/accounts/${accountId}/workers/scripts/${workerName}/secrets`,
+      { method: "GET" },
+      cfFetchOptions
+    );
+    const listedSecrets = secretList?.data?.result;
+    if (!secretList.ok || !Array.isArray(listedSecrets)) {
+      return buildDeploymentFailure(502, {
+        error: secretList.error || "Failed to verify existing Worker secret bindings during recovery.",
+        detail: secretList.detail,
+        deploymentRequestPending: true,
+        orphanResources: {
+          kvNamespaceId: kvId,
+          kvCleanupStatus: "retained-pre-existing",
+          workerName,
+          workerCleanupStatus: "retained-pre-existing"
+        }
+      }, { fallbackEligible: true });
+    }
+    resumedSecretBindings = new Set(listedSecrets.filter((binding) => toStr14(binding?.type).trim() === "secret_text").map((binding) => toStr14(binding?.name).trim()).filter(Boolean));
+  }
+  let envelopeKekSecretSet = false;
+  const tokenSecretPreserved = resumedSecretBindings.has("TOKEN_HMAC_SECRET");
+  const envelopeKekSecretPreserved = envelopeKekSecretRequired && resumedSecretBindings.has(STORAGE_ENVELOPE_KEK_SECRET_NAME);
+  const tokenSecret = tokenSecretPreserved ? "" : randomSecret2();
+  const envelopeKekSecret = envelopeKekSecretRequired && !envelopeKekSecretPreserved ? candidateEnvelopeKekSecret : "";
+  const {
+    subdomain,
+    subdomainStatus,
+    subdomainEnabled,
+    subdomainError,
+    scriptSubdomainEnabled,
+    scriptSubdomainError,
+    workerUrl,
+    fallbackEligible: activationFallbackEligible
+  } = await ensureWorkersDevSubdomain({
+    apiToken,
+    accountId,
+    workerName,
+    requestedSubdomain: toStr14(body?.subdomain || body?.workersSubdomain).trim(),
+    knownAccountSubdomain: accountSubdomain,
+    fetchImpl,
+    apiBaseUrl,
+    env
+  });
+  const deploymentPayload = {
+    ok: true,
+    accountId,
+    workerName,
+    workerUrl,
+    resolvedSlug: displaySlug,
+    kvNamespaceId: kvId,
+    deploymentId,
+    sessionConfigKey,
+    sessionSecretsKey,
+    sessionKvPrefix: "session",
+    writesSessionConfig: true,
+    // A resumed upload preserves the namespace's existing secret envelope.
+    // Mutable retry secrets must be applied by the signed post-deploy sync.
+    writesSessionSecrets: !resumeUploadedWorker,
+    tokenSecretSet: false,
+    tokenSecretPreserved,
+    envelopeKekSecretSet,
+    envelopeKekSecretPreserved,
+    subdomain,
+    subdomainStatus,
+    subdomainEnabled,
+    subdomainError,
+    scriptSubdomainEnabled,
+    scriptSubdomainError
+  };
+  if (!workerUrl) {
+    const orphanResources = await cleanupDeploymentResources();
+    return buildDeploymentFailure(502, {
+      error: subdomainError || scriptSubdomainError || "Cloudflare did not return a shareable worker URL.",
+      orphanResources
+    }, {
+      fallbackEligible: activationFallbackEligible
+    });
+  }
+  if (workerUrl) {
+    const configWithWorkerUrl = {
+      ...config,
+      corsWorkerUrl: workerUrl
+    };
+    const readbackMatches = (result) => {
+      const readbackConfig = result?.data?.result || result?.data || {};
+      return result?.ok && stableCanonicalSerialize(readbackConfig) === stableCanonicalSerialize(configWithWorkerUrl);
+    };
+    const configReadbackPath = `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionConfigKey}`;
+    const resumedReadbackHasCompatibleIdentity = (result) => {
+      if (!resumeUploadedWorker || !result?.ok) return false;
+      const readbackConfig = result.data?.result || result.data || {};
+      if (Object.keys(readbackConfig).length === 0) return false;
+      return toStr14(readbackConfig.slug).trim() === toStr14(configWithWorkerUrl.slug).trim() && (!configWithWorkerUrl.sessionId || toStr14(readbackConfig.sessionId).trim() === toStr14(configWithWorkerUrl.sessionId).trim()) && (!configWithWorkerUrl.adminAddress || toStr14(readbackConfig.adminAddress).trim().toLowerCase() === toStr14(configWithWorkerUrl.adminAddress).trim().toLowerCase()) && (!workerCanonicalRequested || workerAuthorityPoliciesMatch(configWithWorkerUrl.workerAuthority, readbackConfig.workerAuthority));
+    };
+    const readbackIsRetryable = (result) => {
+      if (!result?.ok) {
+        return isNewKvNamespacePropagationFailure(result) || shouldAllowFallbackForCloudflareFailure(result);
+      }
+      const readbackConfig = result.data?.result || result.data || {};
+      if (Object.keys(readbackConfig).length === 0) return true;
+      return false;
+    };
+    const readConfigWithRetry = async () => {
+      let result = await cfFetch(apiToken, configReadbackPath, { method: "GET" }, cfFetchOptions);
+      for (const delayMs of FINAL_CONFIG_READBACK_RETRY_DELAYS_MS) {
+        if (readbackMatches(result)) break;
+        if (!readbackIsRetryable(result)) break;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        result = await cfFetch(apiToken, configReadbackPath, { method: "GET" }, cfFetchOptions);
+      }
+      return result;
+    };
+    const configReadback = await readConfigWithRetry();
+    const configExactlyVerified = readbackMatches(configReadback);
+    const resumedCompatibleConfig = !configExactlyVerified && resumedReadbackHasCompatibleIdentity(configReadback);
+    if (resumedCompatibleConfig) {
+      deploymentPayload.partial = true;
+      deploymentPayload.writesSessionConfig = false;
+    }
+    const verified = configExactlyVerified || resumedCompatibleConfig;
+    if (!verified) {
+      const propagationPending = readbackIsRetryable(configReadback);
+      const orphanResources = propagationPending ? {
+        kvNamespaceId: kvId,
+        kvCleanupStatus: "retained-config-propagation-pending",
+        workerName,
+        workerCleanupStatus: "retained-config-propagation-pending"
+      } : await cleanupDeploymentResources();
+      return buildDeploymentFailure(502, {
+        error: "Worker config verification failed after deployment.",
+        orphanResources,
+        ...propagationPending ? { deploymentRequestPending: true } : {}
+      }, {
+        fallbackEligible: propagationPending
+      });
+    }
+    deploymentPayload.configVerified = configExactlyVerified;
+  }
+  if (resumeUploadedWorker && !envelopeKekSecretPreserved && !tokenSecretPreserved) {
+    const recoveryEnvelope = await buildEncryptedSessionSecretsEnvelope({}, {
+      env: { [STORAGE_ENVELOPE_KEK_SECRET_NAME]: candidateEnvelopeKekSecret },
+      slug: sessionSlug || displaySlug
+    });
+    const recoverySecretsPut = await cfFetch(
+      apiToken,
+      `/accounts/${accountId}/storage/kv/namespaces/${kvId}/values/${sessionSecretsKey}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(recoveryEnvelope)
+      },
+      cfFetchOptions
+    );
+    if (!recoverySecretsPut.ok) {
+      return buildDeploymentFailure(503, {
+        error: recoverySecretsPut.error || "Failed to recover encrypted session secrets staging.",
+        detail: recoverySecretsPut.detail,
+        deploymentRequestPending: true,
+        orphanResources: {
+          kvNamespaceId: kvId,
+          kvCleanupStatus: "retained-runtime-secret-pending",
+          workerName,
+          workerCleanupStatus: "retained-runtime-secret-pending"
+        }
+      }, { fallbackEligible: true });
+    }
+  }
+  const runtimeSecretsPath = `/accounts/${accountId}/workers/scripts/${workerName}/secrets`;
+  const reconcileRuntimeSecretWrite = async (name, result) => {
+    const pending = !!idempotencyContext && isAmbiguousCloudflareMutationFailure(result);
+    if (!pending) return { ok: false, pending: false };
+    const inventory = await cfFetch(apiToken, runtimeSecretsPath, { method: "GET" }, cfFetchOptions);
+    const committed = inventory.ok && Array.isArray(inventory?.data?.result) && inventory.data.result.some((entry) => toStr14(entry?.type).trim() === "secret_text" && toStr14(entry?.name).trim() === name);
+    return { ok: committed, pending: !committed };
+  };
+  const retainedRuntimeSecretResources = () => ({
+    kvNamespaceId: kvId,
+    kvCleanupStatus: "retained-runtime-secret-pending",
+    workerName,
+    workerCleanupStatus: "retained-runtime-secret-pending"
+  });
+  if (envelopeKekSecretRequired) {
+    if (!deploymentPayload.envelopeKekSecretPreserved) {
+      const envelopeKekResp = await cfFetch(apiToken, runtimeSecretsPath, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: STORAGE_ENVELOPE_KEK_SECRET_NAME,
+          type: "secret_text",
+          text: envelopeKekSecret
+        })
+      }, cfFetchOptions);
+      if (!envelopeKekResp.ok) {
+        const reconciled = await reconcileRuntimeSecretWrite(
+          STORAGE_ENVELOPE_KEK_SECRET_NAME,
+          envelopeKekResp
+        );
+        if (!reconciled.ok) {
+          const orphanResources = reconciled.pending ? retainedRuntimeSecretResources() : await cleanupDeploymentResources();
+          return buildDeploymentFailure(502, {
+            error: envelopeKekResp.error,
+            detail: envelopeKekResp.detail,
+            orphanResources,
+            ...reconciled.pending ? { deploymentRequestPending: true } : {}
+          }, {
+            fallbackEligible: shouldAllowFallbackForCloudflareFailure(envelopeKekResp)
+          });
+        }
+      }
+      envelopeKekSecretSet = true;
+      deploymentPayload.envelopeKekSecretSet = true;
+    }
+  }
+  if (!deploymentPayload.tokenSecretSet && !deploymentPayload.tokenSecretPreserved) {
+    const secretResp = await cfFetch(apiToken, runtimeSecretsPath, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "TOKEN_HMAC_SECRET", type: "secret_text", text: tokenSecret })
+    }, cfFetchOptions);
+    if (!secretResp.ok) {
+      const reconciled = await reconcileRuntimeSecretWrite("TOKEN_HMAC_SECRET", secretResp);
+      if (!reconciled.ok) {
+        const orphanResources = reconciled.pending ? retainedRuntimeSecretResources() : await cleanupDeploymentResources();
+        return buildDeploymentFailure(502, {
+          error: secretResp.error,
+          detail: secretResp.detail,
+          orphanResources,
+          ...reconciled.pending ? { deploymentRequestPending: true } : {}
+        }, {
+          fallbackEligible: shouldAllowFallbackForCloudflareFailure(secretResp)
+        });
+      }
+    }
+    deploymentPayload.tokenSecretSet = true;
+  }
+  if (body?.sessionModeProfile?.surfaces?.agentHttp === true) {
+    const wrappedDeploy = await executeAgentSessionWrappedDeployment({
+      body: {
+        deploymentKind: AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND,
+        apiToken,
+        sessionSlug: displaySlug,
+        sessionWorkerOrigin: workerUrl,
+        sessionDeploymentIdentity: body?.agentSessionWrappedDeploymentIdentity,
+        authorityMode: body?.sessionModeProfile?.authority?.mode,
+        bundleUrl: body?.agentBridgeBundleUrl,
+        bundleManifestUrl: body?.agentBridgeBundleManifestUrl,
+        bundleSha256: body?.agentBridgeBundleSha256
+      },
+      env,
+      accountId,
+      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions),
+      fetchImpl,
+      markMutationStarted: idempotencyContext?.markMutationStarted
+    });
+    if (!wrappedDeploy.ok) {
+      return buildDeploymentFailure(wrappedDeploy.status, {
+        ...wrappedDeploy.body || {},
+        partial: true,
+        deploymentRequestPending: true
+      }, { fallbackEligible: wrappedDeploy.status >= 500 });
+    }
+    const capabilityWrite = await persistAgentSessionWrappedCapability({
+      apiToken,
+      accountId,
+      kvNamespaceId: kvId,
+      sessionConfigKey,
+      sessionSlug: displaySlug,
+      sessionWorkerOrigin: workerUrl,
+      capability: wrappedDeploy.body.agentSessionWrapped,
+      cfFetchImpl: (token, path, options) => cfFetch(token, path, options, cfFetchOptions)
+    });
+    if (!capabilityWrite.ok) {
+      return buildDeploymentFailure(capabilityWrite.status, {
+        ...capabilityWrite.body || {},
+        partial: true,
+        deploymentRequestPending: true
+      }, { fallbackEligible: capabilityWrite.status >= 500 });
+    }
+    deploymentPayload.agentSessionWrapped = capabilityWrite.body.agentSessionWrapped;
+  }
+  return buildSuccess(200, deploymentPayload);
+};
+var resolveDeploymentBundleProvenance = async ({ body = {}, env = {}, fetchImpl = globalThis.fetch } = {}) => {
+  const resolvedBody = { ...isObj6(body) ? body : {} };
+  if (!toStr14(resolvedBody.bundleManifestUrl)) {
+    const defaultBundleManifestUrl = toStr14(
+      resolvedBody.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND ? env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL : env?.WORKER_BUNDLE_MANIFEST_URL
+    );
+    if (defaultBundleManifestUrl) resolvedBody.bundleManifestUrl = defaultBundleManifestUrl;
+  }
+  if (!toStr14(resolvedBody.agentBridgeBundleManifestUrl)) {
+    const defaultAgentManifestUrl = toStr14(env?.AGENT_BRIDGE_BUNDLE_MANIFEST_URL);
+    if (defaultAgentManifestUrl) resolvedBody.agentBridgeBundleManifestUrl = defaultAgentManifestUrl;
+  }
+  const resolveOne = async ({ manifestField, digestField, artifactFile, artifactKind }) => {
+    const manifestUrl = toStr14(resolvedBody[manifestField]).trim();
+    if (!manifestUrl) return null;
+    const manifestDigest = await fetchExpectedWorkerBundleDigest({
+      manifestUrl,
+      artifactFile,
+      artifactKind,
+      fetchImpl
+    });
+    if (!manifestDigest.ok) return buildFailure(502, { error: manifestDigest.error });
+    const supplied = toStr14(resolvedBody[digestField]).trim();
+    const suppliedDigest = normalizeWorkerBundleSha256(supplied);
+    if (supplied && !suppliedDigest) {
+      return buildFailure(400, { error: `${digestField} must be a complete SHA-256 hex digest.` });
+    }
+    if (suppliedDigest && suppliedDigest !== manifestDigest.digest) {
+      return buildFailure(409, { error: `Worker release manifest digest conflicts with ${digestField}.` });
+    }
+    resolvedBody[digestField] = manifestDigest.digest;
+    return null;
+  };
+  if (resolvedBody.deploymentKind === AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND) {
+    const failure2 = await resolveOne({
+      manifestField: "bundleManifestUrl",
+      digestField: "bundleSha256",
+      artifactFile: "agentBridgeWorker.bundle.js",
+      artifactKind: "agent-bridge-worker"
+    });
+    if (failure2) return { ok: false, failure: failure2 };
+  } else {
+    const sessionFailure = await resolveOne({
+      manifestField: "bundleManifestUrl",
+      digestField: "bundleSha256",
+      artifactFile: "sessionCorsWorker.bundle.js",
+      artifactKind: "session-cors-worker"
+    });
+    if (sessionFailure) return { ok: false, failure: sessionFailure };
+    const bridgeFailure = await resolveOne({
+      manifestField: "agentBridgeBundleManifestUrl",
+      digestField: "agentBridgeBundleSha256",
+      artifactFile: "agentBridgeWorker.bundle.js",
+      artifactKind: "agent-bridge-worker"
+    });
+    if (bridgeFailure) return { ok: false, failure: bridgeFailure };
+  }
+  return { ok: true, body: resolvedBody };
+};
+var executeDeployHelperRequest = async (options = {}) => {
+  const provenance = await resolveDeploymentBundleProvenance({
+    body: options?.body,
+    env: options?.env,
+    fetchImpl: options?.fetchImpl
+  });
+  if (!provenance.ok) return provenance.failure;
+  options = { ...options, body: provenance.body };
+  const rawRequestId = toStr14(options?.body?.deploymentRequestId).trim();
+  if (!rawRequestId) return executeDeployHelperRequestCore(options);
+  const context = await buildDeploymentRequestContext({
+    body: options?.body,
+    requestOrigin: options?.requestOrigin
+  });
+  if (!context) {
+    return buildFailure(400, {
+      error: "deploymentRequestId must contain 8-128 safe identifier characters."
+    });
+  }
+  const coordinatedRequestDigest = toStr14(options?.coordinatedRequestDigest).trim().toLowerCase();
+  if (options?.coordinationBypass === true && /^[0-9a-f]{64}$/.test(coordinatedRequestDigest)) {
+    context.requestDigest = coordinatedRequestDigest;
+  }
+  if (options?.coordinationBypass !== true) {
+    const coordinator = options?.env?.CE_SESSION_COORDINATOR;
+    if (!coordinator?.idFromName || !coordinator?.get) {
+      return buildFailure(503, {
+        error: "CE_SESSION_COORDINATOR is required for stable deployment requests; no Cloudflare mutation was attempted.",
+        deploymentRequestPending: true
+      }, { fallbackEligible: true });
+    }
+    const coordinatorName = await sha256Hex2(`direct-deploy:${context.deploymentId}`);
+    const stub = coordinator.get(coordinator.idFromName(coordinatorName));
+    let response2;
+    try {
+      response2 = await stub.fetch("https://session-coordinator.internal/deploy-helper", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requestDigest: context.requestDigest,
+          immutableIdentityDigest: context.immutableIdentityDigest,
+          deployBody: options.body,
+          requestOrigin: options.requestOrigin || "",
+          sensitiveValues: collectKnownRequestCredentials(options.body)
+        })
+      });
+    } catch {
+      return buildFailure(503, {
+        error: "Deployment coordination was interrupted; retry the same request.",
+        deploymentRequestPending: true
+      }, { fallbackEligible: true });
+    }
+    const result2 = await response2.json().catch(() => ({}));
+    if (isObj6(result2?.body) && Number(result2?.status || 0)) {
+      return {
+        ok: result2.ok === true,
+        status: Number(result2.status),
+        body: result2.body,
+        fallbackEligible: result2.fallbackEligible === true
+      };
+    }
+    return buildFailure(Number(response2.status || 0) || 502, isObj6(result2) ? result2 : {
+      error: "Deployment coordinator returned an invalid response."
+    });
+  }
+  const journalBinding = resolveDeployJournalBinding(options?.env);
+  if (!journalBinding) {
+    return buildFailure(503, {
+      error: "DEPLOY_HELPER_KV or GROUP_KV is required for idempotent deployment requests."
+    }, { fallbackEligible: true });
+  }
+  const buildRequestDigestConflict = () => buildFailure(409, {
+    error: "deploymentRequestId was already used with a different request payload.",
+    deploymentRequestConflict: true
+  });
+  const clearRejectedBundleAuthority = async (required) => {
+    if (!required) return null;
+    if (typeof journalBinding.delete !== "function") {
+      return buildFailure(503, {
+        error: "Failed to clear rejected-bundle correction authority; retry the same deployment request.",
+        deploymentRequestPending: true
+      }, { fallbackEligible: true });
+    }
+    try {
+      await journalBinding.delete(context.uploadRejectedJournalKey);
+      return null;
+    } catch {
+      return buildFailure(503, {
+        error: "Failed to clear rejected-bundle correction authority; retry the same deployment request.",
+        deploymentRequestPending: true
+      }, { fallbackEligible: true });
+    }
+  };
+  const buildTerminalJournalReplay = (record) => {
+    const result2 = record?.result;
+    if (result2?.ok !== true) return result2;
+    const recordedFullRequestDigest = toStr14(record?.fullRequestDigest).trim().toLowerCase();
+    const fullRequestDigestMatches = recordedFullRequestDigest ? recordedFullRequestDigest === context.fullRequestDigest : context.requestDigest === context.fullRequestDigest;
+    if (fullRequestDigestMatches) return result2;
+    return {
+      ...result2,
+      body: {
+        ...isObj6(result2?.body) ? result2.body : {},
+        partial: true,
+        configVerified: false,
+        writesSessionConfig: false,
+        writesSessionSecrets: false
+      }
+    };
+  };
+  let existingRecord;
+  let terminalRecord;
+  let uploadRecord;
+  let uploadRejectedRecord;
+  try {
+    [terminalRecord, uploadRecord, uploadRejectedRecord, existingRecord] = await Promise.all([
+      readDeployJournalRecord(journalBinding, context.terminalJournalKey),
+      readDeployJournalRecord(journalBinding, context.uploadJournalKey),
+      readDeployJournalRecord(journalBinding, context.uploadRejectedJournalKey),
+      readDeployJournalRecord(journalBinding, context.journalKey)
+    ]);
+  } catch (error) {
+    return buildFailure(503, {
+      error: `Failed to read deployment request journal: ${toStr14(error?.message || error).trim() || "Unknown error."}`
+    }, { fallbackEligible: true });
+  }
+  if (terminalRecord) {
+    if (Number(terminalRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || toStr14(terminalRecord.requestDigest).trim() !== context.requestDigest) {
+      return buildRequestDigestConflict();
+    }
+    if (terminalRecord.state === "terminal" && isObj6(terminalRecord.result)) {
+      const authorityCleanupFailure2 = await clearRejectedBundleAuthority(true);
+      if (authorityCleanupFailure2) return authorityCleanupFailure2;
+      return buildTerminalJournalReplay(terminalRecord);
+    }
+    return buildFailure(409, { error: "Deployment request terminal journal state is invalid." });
+  }
+  if (uploadRejectedRecord) {
+    const rejectedBundleSha256 = toStr14(uploadRejectedRecord.bundleSha256).trim().toLowerCase();
+    if (toStr14(uploadRejectedRecord.requestDigest).trim() !== context.requestDigest) {
+      return buildRequestDigestConflict();
+    }
+    if (Number(uploadRejectedRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || uploadRejectedRecord.state !== "definitive_upload_rejected" || !/^[0-9a-f]{64}$/.test(toStr14(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase()) || toStr14(uploadRejectedRecord.deploymentId).trim() !== context.deploymentId || toStr14(uploadRejectedRecord.workerName).trim() !== context.workerName || toStr14(uploadRejectedRecord.requestMarker).trim() !== context.requestMarker || !/^[0-9a-f]{64}$/.test(rejectedBundleSha256)) {
+      return buildFailure(409, { error: "Deployment request upload-rejection journal state is invalid." });
+    }
+    if (toStr14(uploadRejectedRecord.bundleCorrectionDigest).trim().toLowerCase() !== context.bundleCorrectionDigest) {
+      return buildFailure(409, {
+        error: "A rejected deployment bundle may be corrected only when every non-bundle deployment field is unchanged.",
+        deploymentRequestConflict: true,
+        deploymentRequestPending: true
+      });
+    }
+    context.definitiveUploadRejected = true;
+    context.rejectedBundleSha256 = rejectedBundleSha256;
+  }
+  if (uploadRecord) {
+    if (toStr14(uploadRecord.requestDigest).trim() !== context.requestDigest) {
+      return buildRequestDigestConflict();
+    }
+    if (Number(uploadRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || uploadRecord.state !== "upload_started" || !/^[0-9a-f]{64}$/.test(toStr14(uploadRecord.bundleSha256).trim().toLowerCase())) {
+      return buildFailure(409, { error: "Deployment request upload journal state is invalid." });
+    }
+    context.uploadStarted = true;
+    context.bundleSha256 = toStr14(uploadRecord.bundleSha256).trim().toLowerCase();
+  }
+  if (context.definitiveUploadRejected === true && context.bundleSha256 && context.bundleSha256 !== context.rejectedBundleSha256) {
+    return buildFailure(409, { error: "Deployment request upload journal conflicts with its rejection state." });
+  }
+  if (context.definitiveUploadRejected === true && !context.bundleSha256) {
+    context.uploadStarted = true;
+    context.bundleSha256 = context.rejectedBundleSha256;
+  }
+  if (existingRecord) {
+    if (Number(existingRecord.version || 0) !== DEPLOYMENT_JOURNAL_VERSION || toStr14(existingRecord.requestDigest).trim() !== context.requestDigest) {
+      return buildRequestDigestConflict();
+    }
+    if (existingRecord.state === "terminal" && isObj6(existingRecord.result)) {
+      return buildTerminalJournalReplay(existingRecord);
+    }
+    if (existingRecord.state !== "reserved" && existingRecord.state !== "mutation_started") {
+      return buildFailure(409, { error: "Deployment request journal state is invalid." });
+    }
+    context.isReplay = true;
+    context.mutationStarted = existingRecord.state === "mutation_started";
+  } else {
+    try {
+      await writeDeployJournalRecord(journalBinding, context.journalKey, {
+        version: DEPLOYMENT_JOURNAL_VERSION,
+        state: "reserved",
+        requestDigest: context.requestDigest,
+        deploymentId: context.deploymentId,
+        workerName: context.workerName,
+        requestMarker: context.requestMarker
+      });
+    } catch (error) {
+      return buildFailure(503, {
+        error: `Failed to initialize deployment request journal: ${toStr14(error?.message || error).trim() || "Unknown error."}`
+      }, { fallbackEligible: true });
+    }
+  }
+  if (context.definitiveUploadRejected === true) context.isReplay = true;
+  context.markMutationStarted = async () => {
+    if (context.mutationStarted) return;
+    context.mutationStarted = true;
+  };
+  context.markUploadStarted = async (bundleSha256) => {
+    const normalizedBundleSha256 = toStr14(bundleSha256).trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(normalizedBundleSha256)) {
+      throw new TypeError("Cannot journal an invalid deployment bundle identity.");
+    }
+    if (context.bundleSha256 && context.bundleSha256 !== normalizedBundleSha256 && context.definitiveUploadRejected !== true) {
+      throw new TypeError("Deployment bundle content changed after this request started.");
+    }
+    if (!context.uploadStarted) {
+      await writeDeployJournalRecord(journalBinding, context.uploadJournalKey, {
+        version: DEPLOYMENT_JOURNAL_VERSION,
+        state: "upload_started",
+        requestDigest: context.requestDigest,
+        deploymentId: context.deploymentId,
+        workerName: context.workerName,
+        requestMarker: context.requestMarker,
+        bundleSha256: normalizedBundleSha256
+      });
+      context.uploadStarted = true;
+      context.bundleSha256 = normalizedBundleSha256;
+    }
+  };
+  context.markDefinitiveUploadRejected = async (bundleSha256) => {
+    const normalizedBundleSha256 = toStr14(bundleSha256).trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(normalizedBundleSha256)) {
+      throw new TypeError("Cannot journal an invalid rejected bundle identity.");
+    }
+    if (context.definitiveUploadRejected === true) return;
+    await writeDurableDeployJournalRecord(journalBinding, context.uploadRejectedJournalKey, {
+      version: DEPLOYMENT_JOURNAL_VERSION,
+      state: "definitive_upload_rejected",
+      requestDigest: context.requestDigest,
+      deploymentId: context.deploymentId,
+      workerName: context.workerName,
+      requestMarker: context.requestMarker,
+      bundleSha256: normalizedBundleSha256,
+      bundleCorrectionDigest: context.bundleCorrectionDigest
+    });
+    context.definitiveUploadRejected = true;
+    context.rejectedBundleSha256 = normalizedBundleSha256;
+  };
+  const result = await executeDeployHelperRequestCore({
+    ...options,
+    idempotencyContext: context
+  });
+  if (context.definitiveUploadRejected === true && result?.ok !== true) {
+    return {
+      ...result,
+      body: {
+        ...isObj6(result?.body) ? result.body : {},
+        deploymentRequestPending: true
+      }
+    };
+  }
+  if (result?.body?.deploymentRequestPending === true) return result;
+  if (result?.ok !== true && result?.fallbackEligible === true) {
+    if (context.mutationStarted === true) {
+      return {
+        ...result,
+        body: {
+          ...isObj6(result?.body) ? result.body : {},
+          deploymentRequestPending: true
+        }
+      };
+    }
+    return result;
+  }
+  const safeResult = buildSafeDeployJournalResult(
+    result,
+    collectKnownRequestCredentials(options?.body)
+  );
+  await writeDeployJournalRecord(journalBinding, context.terminalJournalKey, {
+    version: DEPLOYMENT_JOURNAL_VERSION,
+    state: "terminal",
+    requestDigest: context.requestDigest,
+    fullRequestDigest: context.fullRequestDigest,
+    deploymentId: context.deploymentId,
+    workerName: context.workerName,
+    requestMarker: context.requestMarker,
+    result: safeResult
+  });
+  const authorityCleanupFailure = await clearRejectedBundleAuthority(
+    context.definitiveUploadRejected === true
+  );
+  if (authorityCleanupFailure) return authorityCleanupFailure;
+  return safeResult;
+};
+
 // workers/sessionCorsWorker/responseKvHelpers.js
 var json = (data, status, baseHeaders) => {
   const headers = new Headers(baseHeaders);
@@ -64512,12 +61855,12 @@ var putKvJson = async (env, key, value, ttlSeconds) => {
 
 // workers/sessionCorsWorker/sponsoredBootstrapGrantStore.js
 var DEFAULT_TOKEN_BYTE_LENGTH = 24;
-var toTrimmedString8 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString6 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var SPONSORED_GRANT_TYPES = Object.freeze({
   deploy: "deploy-worker",
   faucet: "faucet-tx"
 });
-var buildSponsoredGrantKvKey = (token = "") => `sponsoredGrant:${toTrimmedString8(token)}`;
+var buildSponsoredGrantKvKey = (token = "") => `sponsoredGrant:${toTrimmedString6(token)}`;
 var buildSponsoredGrantToken = ({
   byteLength = DEFAULT_TOKEN_BYTE_LENGTH,
   cryptoImpl = globalThis.crypto
@@ -64530,7 +61873,7 @@ var buildSponsoredGrantToken = ({
   return Array.from(bytes2).map((value) => value.toString(16).padStart(2, "0")).join("");
 };
 var computeSponsoredGrantExpirationTtl = (expiresAt = "", nowMs = Date.now()) => {
-  const normalized = toTrimmedString8(expiresAt);
+  const normalized = toTrimmedString6(expiresAt);
   if (!normalized) return null;
   const expirationMs = Date.parse(normalized);
   if (!Number.isFinite(expirationMs)) {
@@ -64552,10 +61895,10 @@ var writeSponsoredGrantRecord = async (env, token, record, ttlSeconds = null, de
 };
 var deleteSponsoredGrantRecord = async (env, token) => env?.GROUP_KV?.delete?.(buildSponsoredGrantKvKey(token));
 var normalizeSensitiveValues = (values = []) => Array.from(new Set(
-  (Array.isArray(values) ? values : []).map((value) => toTrimmedString8(value)).filter((value) => value.length >= 4)
+  (Array.isArray(values) ? values : []).map((value) => toTrimmedString6(value)).filter((value) => value.length >= 4)
 )).sort((left, right) => right.length - left.length);
 var redactSponsoredSensitiveText = (value, sensitiveValues = []) => {
-  let redacted = toTrimmedString8(value);
+  let redacted = toTrimmedString6(value);
   normalizeSensitiveValues(sensitiveValues).forEach((secret) => {
     redacted = redacted.split(secret).join("[REDACTED]");
   });
@@ -64643,15 +61986,15 @@ var buildSponsoredGrantContinuationRecord = ({
   requestDigest,
   state
 } = {}) => {
-  const expiresAt = toTrimmedString8(grantRecord?.expiresAt);
-  const sourceAllowOrigins = Array.isArray(grantRecord?.sourceConfig?.allowOrigins) ? grantRecord.sourceConfig.allowOrigins.map((value) => toTrimmedString8(value)).filter(Boolean) : [];
+  const expiresAt = toTrimmedString6(grantRecord?.expiresAt);
+  const sourceAllowOrigins = Array.isArray(grantRecord?.sourceConfig?.allowOrigins) ? grantRecord.sourceConfig.allowOrigins.map((value) => toTrimmedString6(value)).filter(Boolean) : [];
   return {
-    type: toTrimmedString8(grantRecord?.type),
-    sourceSessionSlug: toTrimmedString8(grantRecord?.sourceSessionSlug),
+    type: toTrimmedString6(grantRecord?.type),
+    sourceSessionSlug: toTrimmedString6(grantRecord?.sourceSessionSlug),
     sourceConfig: sourceAllowOrigins.length ? { allowOrigins: sourceAllowOrigins } : {},
     ...expiresAt ? { expiresAt } : {},
     state,
-    requestDigest: toTrimmedString8(requestDigest)
+    requestDigest: toTrimmedString6(requestDigest)
   };
 };
 var writeSponsoredGrantReceipt = async ({
@@ -64663,7 +62006,7 @@ var writeSponsoredGrantReceipt = async ({
   sensitiveValues = [],
   nowMs = Date.now()
 } = {}) => {
-  const expiresAt = toTrimmedString8(grantRecord?.expiresAt);
+  const expiresAt = toTrimmedString6(grantRecord?.expiresAt);
   const ttlSeconds = expiresAt ? computeSponsoredGrantExpirationTtl(expiresAt, nowMs) : null;
   const safeRecord = {
     ...buildSponsoredGrantContinuationRecord({
@@ -64678,6 +62021,483 @@ var writeSponsoredGrantReceipt = async ({
   };
   await writeSponsoredGrantRecord(env, token, safeRecord, ttlSeconds);
   return safeRecord.receipt;
+};
+
+// workers/sessionCorsWorker/sessionSlugResolution.js
+var toStr15 = (val) => typeof val === "string" ? val : val == null ? "" : String(val);
+var INVALID_SESSION_SLUG_ERROR = 'Invalid session slug. Use lowercase letters, numbers, "_" or "-".';
+var SLUG_MISMATCH_ERROR = "sessionSlug does not match worker session.";
+var SLUG_ALIAS_MISMATCH_ERROR = "sessionSlug aliases do not match.";
+var MISSING_SLUG_ERROR = "Missing sessionSlug.";
+var EMPTY_VALIDATION_RESULT = Object.freeze({
+  ok: true,
+  slug: "",
+  error: ""
+});
+var hasExplicitWorkerSlugInput = (raw) => raw != null && toStr15(raw).trim().length > 0;
+var canonicalizeReservedWorkerAlias = (slug = "") => {
+  if (!slug) return "";
+  if (slug === "general") return "";
+  if (slug === "debate") return "rxc";
+  return slug;
+};
+var normalizeWorkerSessionSlug = (raw) => {
+  const slug = toStr15(raw).trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  if (!slug) return "";
+  return canonicalizeReservedWorkerAlias(slug);
+};
+var validateInboundWorkerSessionSlug = (raw) => {
+  if (raw == null) return EMPTY_VALIDATION_RESULT;
+  const rawStr = toStr15(raw).trim();
+  if (!rawStr) return EMPTY_VALIDATION_RESULT;
+  if (rawStr.toLowerCase() === "general") return EMPTY_VALIDATION_RESULT;
+  const canonicalSlug = rawStr.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  if (rawStr !== canonicalSlug) {
+    return {
+      ok: false,
+      slug: "",
+      error: INVALID_SESSION_SLUG_ERROR
+    };
+  }
+  return { ok: true, slug: canonicalizeReservedWorkerAlias(canonicalSlug), error: "" };
+};
+var getDefaultWorkerSessionSlug = (env = {}) => normalizeWorkerSessionSlug(env.DEFAULT_SESSION_SLUG ?? env.DEFAULT_GROUP_SLUG);
+var hasExplicitDefaultWorkerSessionSlug = (env = {}) => hasExplicitWorkerSlugInput(env?.DEFAULT_SESSION_SLUG ?? env?.DEFAULT_GROUP_SLUG);
+var resolveWorkerTenantSlug = ({ envSlug, headerSlug, tokenSlug } = {}) => {
+  if (envSlug) return envSlug;
+  if (headerSlug) return headerSlug;
+  if (tokenSlug) return tokenSlug;
+  return "";
+};
+var resolveRequestedWorkerSlugPayload = (body = {}) => {
+  const source = body && typeof body === "object" ? body : {};
+  const hasSessionSlug = Object.prototype.hasOwnProperty.call(source, "sessionSlug") && source?.sessionSlug != null;
+  const hasGroupSlug = Object.prototype.hasOwnProperty.call(source, "groupSlug") && source?.groupSlug != null;
+  const sessionSlugResult = hasSessionSlug ? validateInboundWorkerSessionSlug(source?.sessionSlug) : EMPTY_VALIDATION_RESULT;
+  const groupSlugResult = hasGroupSlug ? validateInboundWorkerSessionSlug(source?.groupSlug) : EMPTY_VALIDATION_RESULT;
+  const sessionSlug = hasSessionSlug ? sessionSlugResult.slug : "";
+  const groupSlug = hasGroupSlug ? groupSlugResult.slug : "";
+  const invalidResult = !sessionSlugResult.ok ? sessionSlugResult : null;
+  return {
+    ok: !invalidResult,
+    error: invalidResult?.error || "",
+    hasSessionSlug,
+    hasGroupSlug,
+    hasAnySlug: hasSessionSlug,
+    sessionSlug,
+    groupSlug,
+    requestedSlug: sessionSlug,
+    aliasMismatch: hasSessionSlug && hasGroupSlug && groupSlugResult.ok && sessionSlug !== groupSlug
+  };
+};
+var resolveWorkerBodySlugContext = ({ body, env, slugHint } = {}) => {
+  const envSlug = getDefaultWorkerSessionSlug(env);
+  const slugPayload = resolveRequestedWorkerSlugPayload(body);
+  const normalizedHint = normalizeWorkerSessionSlug(slugHint);
+  const explicitSlugProvided = hasExplicitDefaultWorkerSessionSlug(env) || slugPayload.hasAnySlug || hasExplicitWorkerSlugInput(slugHint);
+  const targetSlug = envSlug || (slugPayload.hasAnySlug ? slugPayload.requestedSlug : normalizedHint);
+  if (!slugPayload.ok) {
+    return {
+      ok: false,
+      error: slugPayload.error,
+      envSlug,
+      slugPayload,
+      targetSlug,
+      explicitSlugProvided
+    };
+  }
+  if (slugPayload.aliasMismatch) {
+    return {
+      ok: false,
+      error: SLUG_ALIAS_MISMATCH_ERROR,
+      envSlug,
+      slugPayload,
+      targetSlug,
+      explicitSlugProvided
+    };
+  }
+  if (envSlug && slugPayload.requestedSlug && slugPayload.requestedSlug !== envSlug) {
+    return {
+      ok: false,
+      error: SLUG_MISMATCH_ERROR,
+      envSlug,
+      slugPayload,
+      targetSlug,
+      explicitSlugProvided
+    };
+  }
+  return {
+    ok: true,
+    error: "",
+    envSlug,
+    slugPayload,
+    targetSlug,
+    explicitSlugProvided
+  };
+};
+var resolveWorkerRequestSlugContext = ({
+  tokenSlug,
+  tokenHasSlug = false,
+  headerSlug,
+  env,
+  slugHint,
+  countEmptyHeaderAsExplicit = false
+} = {}) => {
+  const headerPresent = headerSlug != null;
+  const headerHasValue = headerPresent && toStr15(headerSlug).trim().length > 0;
+  const tokenSlugResult = validateInboundWorkerSessionSlug(tokenSlug);
+  if (tokenHasSlug && !tokenSlugResult.ok) {
+    return { ok: false, error: tokenSlugResult.error };
+  }
+  const headerSlugResult = validateInboundWorkerSessionSlug(headerSlug);
+  if (headerPresent && !headerSlugResult.ok) {
+    return { ok: false, error: headerSlugResult.error };
+  }
+  const envSlug = getDefaultWorkerSessionSlug(env);
+  const normalizedHint = normalizeWorkerSessionSlug(slugHint);
+  const resolvedTokenSlug = tokenHasSlug ? tokenSlugResult.slug : "";
+  const resolvedHeaderSlug = headerSlugResult.slug;
+  const slug = resolveWorkerTenantSlug({
+    envSlug,
+    headerSlug: resolvedHeaderSlug,
+    tokenSlug: resolvedTokenSlug
+  }) || normalizedHint;
+  const explicitHeaderProvided = countEmptyHeaderAsExplicit ? headerPresent : headerHasValue;
+  return {
+    ok: true,
+    error: "",
+    slug,
+    explicitSlugProvided: hasExplicitDefaultWorkerSessionSlug(env) || !!tokenHasSlug || hasExplicitWorkerSlugInput(slugHint) || explicitHeaderProvided,
+    envSlug,
+    tokenSlug: resolvedTokenSlug,
+    headerSlug: resolvedHeaderSlug,
+    headerPresent,
+    headerHasValue
+  };
+};
+
+// workers/sessionCorsWorker/sessionConfigNormalization.js
+var toStr16 = (value) => typeof value === "string" ? value : value == null ? "" : String(value);
+var isObj7 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
+var hasOwn2 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+var normalizeEmbeddedDeployHelperEnabled2 = (raw) => {
+  if (raw == null) return true;
+  if (typeof raw === "boolean") return raw;
+  return null;
+};
+var cloneValue = (value) => {
+  if (Array.isArray(value)) return value.map((entry) => cloneValue(entry));
+  if (isObj7(value)) {
+    return Object.keys(value).reduce((acc, key) => {
+      acc[key] = cloneValue(value[key]);
+      return acc;
+    }, {});
+  }
+  return trimIfString(value);
+};
+var appendListEntries = (target, raw) => {
+  if (Array.isArray(raw)) {
+    raw.forEach((entry) => appendListEntries(target, entry));
+    return;
+  }
+  const value = toStr16(raw).trim();
+  if (!value) return;
+  value.split(/[\n,]+/).map((entry) => entry.trim()).filter(Boolean).forEach((entry) => target.push(entry));
+};
+var normalizeWorkerAllowOrigins = (raw) => {
+  const entries = [];
+  appendListEntries(entries, raw);
+  const seen = /* @__PURE__ */ new Set();
+  return entries.filter((entry) => {
+    if (seen.has(entry)) return false;
+    seen.add(entry);
+    return true;
+  });
+};
+var normalizeWorkerRpcUrlsByChainId = (raw) => {
+  if (!isObj7(raw)) return {};
+  return Object.keys(raw).reduce((acc, key) => {
+    const urls = normalizeWorkerAllowOrigins(raw[key]);
+    if (urls.length) acc[key] = urls;
+    return acc;
+  }, {});
+};
+var normalizeWorkerConfigRecord = (raw, { slug } = {}) => {
+  if (!isObj7(raw)) return null;
+  const normalized = cloneValue(raw);
+  const normalizedSlug = normalizeWorkerSessionSlug(slug);
+  if (hasOwn2(normalized, "slug")) {
+    normalized.slug = normalizedSlug || normalizeWorkerSessionSlug(normalized.slug);
+  }
+  if (hasOwn2(normalized, "allowOrigins")) {
+    normalized.allowOrigins = normalizeWorkerAllowOrigins(normalized.allowOrigins);
+  }
+  if (hasOwn2(normalized, "limits")) {
+    normalized.limits = isObj7(normalized.limits) ? cloneValue(normalized.limits) : {};
+  }
+  if (hasOwn2(normalized, "scopes")) {
+    normalized.scopes = isObj7(normalized.scopes) ? cloneValue(normalized.scopes) : {};
+  }
+  if (hasOwn2(normalized, "faucet")) {
+    normalized.faucet = isObj7(normalized.faucet) ? cloneValue(normalized.faucet) : {};
+  }
+  if (hasOwn2(normalized, "rpcUrlsByChainId")) {
+    normalized.rpcUrlsByChainId = normalizeWorkerRpcUrlsByChainId(normalized.rpcUrlsByChainId);
+  }
+  const embeddedDeployHelperEnabledRaw = hasOwn2(normalized, "embeddedDeployHelperEnabled") ? normalized.embeddedDeployHelperEnabled : hasOwn2(normalized, "deployHelperEnabled") ? normalized.deployHelperEnabled : void 0;
+  if (embeddedDeployHelperEnabledRaw !== void 0) {
+    const embeddedDeployHelperEnabled = normalizeEmbeddedDeployHelperEnabled2(embeddedDeployHelperEnabledRaw);
+    if (embeddedDeployHelperEnabled === null) {
+      delete normalized.embeddedDeployHelperEnabled;
+    } else {
+      normalized.embeddedDeployHelperEnabled = embeddedDeployHelperEnabled;
+    }
+  }
+  delete normalized.deployHelperEnabled;
+  return normalized;
+};
+var mergeWorkerConfigRecords = ({
+  existingConfig,
+  incomingConfig,
+  slug
+} = {}) => {
+  const existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
+  const incoming = isObj7(incomingConfig) ? cloneValue(incomingConfig) : {};
+  const merged = {
+    ...existing,
+    ...incoming
+  };
+  merged.limits = {
+    ...isObj7(existing.limits) ? existing.limits : {},
+    ...isObj7(incoming.limits) ? cloneValue(incoming.limits) : {}
+  };
+  merged.scopes = {
+    ...isObj7(existing.scopes) ? existing.scopes : {},
+    ...isObj7(incoming.scopes) ? cloneValue(incoming.scopes) : {}
+  };
+  return normalizeWorkerConfigRecord(merged, { slug }) || {};
+};
+var mergeWorkerLimitRecords = ({
+  existingConfig,
+  incomingLimits,
+  slug
+} = {}) => {
+  const existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
+  return normalizeWorkerConfigRecord({
+    ...existing,
+    limits: {
+      ...isObj7(existing.limits) ? existing.limits : {},
+      ...isObj7(incomingLimits) ? cloneValue(incomingLimits) : {}
+    }
+  }, { slug }) || {};
+};
+
+// workers/sessionCorsWorker/authorizationScopeFreshness.js
+var AUTHORIZATION_EPOCH_KEY = "authzEpoch";
+var RESOURCE_GATE_BY_SCOPE = Object.freeze({
+  ai: "ai",
+  arweave: "arweave",
+  faucet: "txGas",
+  fetch: "rpc",
+  groups: "default",
+  lit: "lit",
+  storage: "arweave",
+  transcribe: "ai"
+});
+var normalizeAuthorizationEpoch = (value) => {
+  if (value == null) return 0;
+  return Number.isSafeInteger(value) && value >= 0 ? value : null;
+};
+var readAuthorizationEpoch = (config) => normalizeAuthorizationEpoch(config?.[AUTHORIZATION_EPOCH_KEY]);
+var incrementAuthorizationEpoch = (config) => {
+  const current = readAuthorizationEpoch(config);
+  if (current === null || current >= Number.MAX_SAFE_INTEGER) return null;
+  return current + 1;
+};
+var selectResourceGateKeysForScopes = (resourceKeys, requestedScopes) => {
+  const keys = Array.isArray(resourceKeys) ? resourceKeys : [];
+  if (!Array.isArray(requestedScopes) || requestedScopes.length === 0) return keys;
+  const required = /* @__PURE__ */ new Set(["default"]);
+  requestedScopes.forEach((scope) => {
+    const resourceKey = RESOURCE_GATE_BY_SCOPE[String(scope || "").trim().toLowerCase()];
+    if (resourceKey) required.add(resourceKey);
+  });
+  return keys.filter((key) => required.has(key));
+};
+
+// workers/sessionCorsWorker/sessionConfigMutation.js
+var WORKER_CANONICAL_PUBLICATION_REVISION_KEY = "workerCanonicalPublicationRevision";
+var toTrimmedString7 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var hasOwn3 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+var getWorkerAuthorityMode = (config) => toTrimmedString7(
+  config?.sessionModeProfile?.authority?.mode
+).toLowerCase();
+var normalizeCanonicalSessionId = (value) => {
+  const raw = toTrimmedString7(value).toLowerCase();
+  if (!raw) return "";
+  const normalized = raw.replace(/^0x/, "").replace(/-/g, "");
+  return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? normalized : "";
+};
+var resolveCanonicalSessionIdentity = (config) => {
+  const rawValues = ["sessionId", "sessionIdHex"].filter((key) => hasOwn3(config, key) && toTrimmedString7(config?.[key])).map((key) => config[key]);
+  const normalizedValues = rawValues.map(normalizeCanonicalSessionId);
+  const uniqueValues = new Set(normalizedValues.filter(Boolean));
+  return {
+    invalid: normalizedValues.some((value) => !value) || uniqueValues.size > 1,
+    value: uniqueValues.size === 1 ? [...uniqueValues][0] : ""
+  };
+};
+var normalizeConfigRevision = (value) => {
+  if (typeof value !== "string" || value !== value.trim()) return "";
+  return /^[a-z0-9._:-]{1,128}$/i.test(value) ? value : "";
+};
+var changesInitializedWorkerCanonicalIdentity = ({ existingConfig, mergedConfig } = {}) => {
+  if (getWorkerAuthorityMode(existingConfig) !== "worker_canonical") return false;
+  if (getWorkerAuthorityMode(mergedConfig) !== "worker_canonical") return true;
+  const existingSessionIdentity = resolveCanonicalSessionIdentity(existingConfig);
+  const mergedSessionIdentity = resolveCanonicalSessionIdentity(mergedConfig);
+  if (existingSessionIdentity.invalid || mergedSessionIdentity.invalid) return true;
+  if (existingSessionIdentity.value && mergedSessionIdentity.value !== existingSessionIdentity.value) return true;
+  return ["slug", "corsWorkerUrl"].some((key) => {
+    const existingValue = toTrimmedString7(existingConfig?.[key]);
+    return !!existingValue && toTrimmedString7(mergedConfig?.[key]) !== existingValue;
+  });
+};
+var resolveWorkerCanonicalPublicationWrite = ({
+  existingConfig,
+  incomingConfig,
+  mergedConfig
+} = {}) => {
+  if (hasOwn3(incomingConfig, WORKER_CANONICAL_PUBLICATION_REVISION_KEY)) {
+    return { ok: false, status: 400, error: "Worker-canonical publication state is server-managed." };
+  }
+  if (getWorkerAuthorityMode(mergedConfig) !== "worker_canonical") {
+    return { ok: true, config: mergedConfig };
+  }
+  const existingPublicationRevision = normalizeConfigRevision(
+    existingConfig?.[WORKER_CANONICAL_PUBLICATION_REVISION_KEY]
+  );
+  const incomingHasRevision = hasOwn3(incomingConfig, "configRevision");
+  const incomingRevision = incomingHasRevision ? normalizeConfigRevision(incomingConfig?.configRevision) : "";
+  if (incomingHasRevision && !incomingRevision) {
+    return { ok: false, status: 400, error: "Worker config revision is invalid." };
+  }
+  if (existingPublicationRevision && incomingHasRevision && incomingRevision !== existingPublicationRevision) {
+    return { ok: false, status: 409, error: "Worker-canonical publication is already finalized." };
+  }
+  if (existingPublicationRevision && incomingRevision === existingPublicationRevision) {
+    if (stableCanonicalSerialize(mergedConfig) !== stableCanonicalSerialize(existingConfig)) {
+      return {
+        ok: false,
+        status: 409,
+        error: "Worker-canonical publication revision was reused with different config."
+      };
+    }
+    return { ok: true, skipPersistence: true, config: existingConfig };
+  }
+  const publicationRevision = existingPublicationRevision || incomingRevision;
+  if (!publicationRevision) return { ok: true, config: mergedConfig };
+  return {
+    ok: true,
+    config: {
+      ...mergedConfig,
+      [WORKER_CANONICAL_PUBLICATION_REVISION_KEY]: publicationRevision
+    }
+  };
+};
+var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
+  const authorityExisting = normalizeWorkerConfigRecord(existingConfig) || {};
+  const existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
+  const kind = toTrimmedString7(mutation?.kind);
+  let incomingConfig;
+  let mergedConfig;
+  if (kind === "set-config") {
+    incomingConfig = mutation?.incomingConfig && typeof mutation.incomingConfig === "object" ? mutation.incomingConfig : null;
+    if (!incomingConfig) return { ok: false, status: 400, error: "Missing config." };
+    if (hasOwn3(incomingConfig, AUTHORIZATION_EPOCH_KEY)) {
+      return { ok: false, status: 400, error: "Authorization epoch is server-managed." };
+    }
+    if (findForbiddenCloudflareDeploymentTokenPath(incomingConfig)) {
+      return { ok: false, status: 400, error: "Cloudflare deployment tokens are not allowed in session config." };
+    }
+    if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
+      return { ok: false, status: 400, error: "Secret-like values are not allowed in public session config fields." };
+    }
+    const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig);
+    if (!incomingModeValidation.ok) {
+      return {
+        ok: false,
+        status: 400,
+        error: `Invalid session config mode at ${incomingModeValidation.path}.`
+      };
+    }
+    mergedConfig = mergeWorkerConfigRecords({ existingConfig: existing, incomingConfig, slug });
+  } else if (kind === "set-limits") {
+    const incomingLimits = mutation?.incomingLimits && typeof mutation.incomingLimits === "object" ? mutation.incomingLimits : null;
+    if (!incomingLimits) return { ok: false, status: 400, error: "Missing limits." };
+    incomingConfig = { limits: incomingLimits };
+    mergedConfig = mergeWorkerLimitRecords({ existingConfig: existing, incomingLimits, slug });
+  } else if (kind === "merge-lit-credentials") {
+    const litCredentials = mutation?.litCredentials && typeof mutation.litCredentials === "object" ? mutation.litCredentials : null;
+    if (!litCredentials) return { ok: false, status: 400, error: "Missing Lit credentials." };
+    incomingConfig = {
+      litCredentials: {
+        ...existing.litCredentials && typeof existing.litCredentials === "object" ? existing.litCredentials : {},
+        ...litCredentials
+      }
+    };
+    mergedConfig = mergeWorkerConfigRecords({ existingConfig: existing, incomingConfig, slug });
+  } else {
+    return { ok: false, status: 400, error: "Unsupported session config mutation." };
+  }
+  if (findForbiddenCloudflareDeploymentTokenPath(mergedConfig)) {
+    return { ok: false, status: 400, error: "Cloudflare deployment tokens are not allowed in session config." };
+  }
+  if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
+    return { ok: false, status: 400, error: "Secret-like values are not allowed in public session config fields." };
+  }
+  const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
+  if (!mergedModeValidation.ok) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Invalid session config mode at ${mergedModeValidation.path}.`
+    };
+  }
+  if (changesInitializedWorkerCanonicalIdentity({ existingConfig: authorityExisting, mergedConfig })) {
+    return {
+      ok: false,
+      status: 409,
+      error: "Worker-canonical session identity cannot be changed after initialization."
+    };
+  }
+  const publicationWrite = resolveWorkerCanonicalPublicationWrite({
+    existingConfig: authorityExisting,
+    incomingConfig,
+    mergedConfig
+  });
+  if (!publicationWrite?.ok || publicationWrite.skipPersistence || kind !== "set-config") {
+    return publicationWrite;
+  }
+  const comparisonExisting = mergeWorkerConfigRecords({
+    existingConfig: authorityExisting,
+    incomingConfig: {},
+    slug
+  });
+  if (stableCanonicalSerialize(publicationWrite.config) === stableCanonicalSerialize(comparisonExisting)) {
+    return publicationWrite;
+  }
+  const nextEpoch = incrementAuthorizationEpoch(authorityExisting);
+  if (nextEpoch === null) {
+    return { ok: false, status: 409, error: "Authorization epoch is invalid." };
+  }
+  return {
+    ...publicationWrite,
+    config: {
+      ...publicationWrite.config,
+      [AUTHORIZATION_EPOCH_KEY]: nextEpoch
+    }
+  };
 };
 
 // workers/sessionCorsWorker/sessionConfigSecretsStore.js
@@ -64734,9 +62554,6 @@ var SESSION_CONFIG_AUTHORITY_KEY = "session-config-authority";
 var AUTH_NONCE_ACTIVE_KEY = "auth-nonce-active";
 var AUTH_NONCE_USED_KEY = "auth-nonce-used";
 var AUTH_RATE_RECORD_KEY = "auth-rate-record";
-var WORKER_GROUP_CAPACITY_META_KEY = "worker-group-capacity-meta-v3";
-var WORKER_GROUP_CAPACITY_GROUP_PREFIX = "worker-group-capacity-group-v3:";
-var WORKER_GROUP_CAPACITY_MEMBER_PREFIX = "worker-group-capacity-member-v3:";
 var RUNNING_LEASE_MS = 65e3;
 var MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1e3;
 var MAX_AUTH_RATE_WINDOW_MS = 8 * 24 * 60 * 60 * 1e3;
@@ -64750,7 +62567,7 @@ var WRAPPED_SESSION_KEY_FIELDS = [
   "wrapAlg",
   "wrappedKey"
 ];
-var toTrimmedString9 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString8 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var isObjectRecord = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var normalizePositiveSafeInteger = (value) => {
   const numeric = Number(value);
@@ -64772,9 +62589,9 @@ var normalizeWrappedSessionKeyRecord = (value, slug) => {
   if (!isObjectRecord(value)) return null;
   const fields = Object.keys(value).sort();
   if (fields.join(",") !== [...WRAPPED_SESSION_KEY_FIELDS].sort().join(",")) return null;
-  const createdAt = toTrimmedString9(value.createdAt);
+  const createdAt = toTrimmedString8(value.createdAt);
   const createdAtMs = Date.parse(createdAt);
-  if (value.version !== 1 || value.keyProvider !== "worker_secret" || value.alg !== "AES-256-GCM" || value.wrapAlg !== "AES-GCM-KW-v1" || toTrimmedString9(value.keyId) !== `session:${slug}:${createdAt}` || !Number.isFinite(createdAtMs) || new Date(createdAtMs).toISOString() !== createdAt || !isBase64url(value.iv, 16) || !isBase64url(value.wrappedKey, 64)) return null;
+  if (value.version !== 1 || value.keyProvider !== "worker_secret" || value.alg !== "AES-256-GCM" || value.wrapAlg !== "AES-GCM-KW-v1" || toTrimmedString8(value.keyId) !== `session:${slug}:${createdAt}` || !Number.isFinite(createdAtMs) || new Date(createdAtMs).toISOString() !== createdAt || !isBase64url(value.iv, 16) || !isBase64url(value.wrappedKey, 64)) return null;
   return Object.fromEntries(WRAPPED_SESSION_KEY_FIELDS.map((field) => [field, value[field]]));
 };
 var normalizePublicSessionConfig = (value, slug) => {
@@ -64833,76 +62650,6 @@ var createAttemptId = (cryptoImpl = globalThis.crypto) => {
   cryptoImpl?.getRandomValues?.(bytes2);
   return Array.from(bytes2).map((value) => value.toString(16).padStart(2, "0")).join("");
 };
-var workerGroupCapacityGroupKey = (groupId) => `${WORKER_GROUP_CAPACITY_GROUP_PREFIX}${encodeURIComponent(normalizeWorkerGroupId(groupId))}`;
-var workerGroupCapacityMemberKey = ({ groupId, generation, principalDigest }) => `${WORKER_GROUP_CAPACITY_MEMBER_PREFIX}${encodeURIComponent(normalizeWorkerGroupId(groupId))}:${generation}:${principalDigest}`;
-var WORKER_GROUP_MUTATIONS = /* @__PURE__ */ new Set([
-  "create",
-  "update",
-  "delete",
-  "add-member",
-  "remove-member",
-  "join"
-]);
-var normalizeWorkerGroupMutation = (payload) => {
-  const slug = normalizeSessionSlug(payload?.slug);
-  const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
-  const operation = toTrimmedString9(payload?.operation).toLowerCase();
-  const actor = normalizeWorkerGroupPrincipal(payload?.actorPrincipal);
-  if (!slug || !sessionId || !WORKER_GROUP_MUTATIONS.has(operation) || !actor.ok) return null;
-  if (operation === "create") {
-    if (!isObjectRecord(payload?.input)) return null;
-    const requestedGroupId = toTrimmedString9(payload.input.groupId);
-    const groupId = requestedGroupId ? normalizeWorkerGroupId(requestedGroupId) : createWorkerGroupId();
-    if (!groupId) return null;
-    return {
-      slug,
-      sessionId,
-      operation,
-      input: {
-        ...payload.input,
-        groupId
-      },
-      groupId,
-      actorPrincipal: actor.principal
-    };
-  }
-  const rawGroupId = toTrimmedString9(payload?.groupId);
-  if (!rawGroupId) return null;
-  const normalized = {
-    slug,
-    sessionId,
-    operation,
-    groupId: normalizeWorkerGroupId(rawGroupId),
-    input: isObjectRecord(payload?.input) ? payload.input : {},
-    actorPrincipal: actor.principal
-  };
-  if (!normalized.groupId) return null;
-  if (operation === "add-member" || operation === "remove-member" || operation === "join") {
-    const principal = normalizeWorkerGroupPrincipal(payload?.principal);
-    if (!principal.ok) return null;
-    normalized.principal = principal.principal;
-    normalized.principalKey = principal.key;
-  }
-  return normalized;
-};
-var resolveInitializedWorkerGroupCapacity = (existing, slug, sessionId) => {
-  if (!existing) return null;
-  if (existing.version !== 3 || existing.slug !== slug || existing.sessionId !== sessionId) {
-    return {
-      ok: false,
-      status: 409,
-      reason: "worker_group_capacity_identity_conflict"
-    };
-  }
-  if (existing.phase === "ready" && Number.isSafeInteger(existing.groupCount) && existing.groupCount >= 0) {
-    return { ok: true, meta: existing };
-  }
-  return {
-    ok: false,
-    status: 503,
-    reason: "worker_group_capacity_reconciliation_required"
-  };
-};
 var SessionWriteCoordinator = class {
   constructor(state, env, deps = {}) {
     this.state = state;
@@ -64916,660 +62663,11 @@ var SessionWriteCoordinator = class {
     this.activeAttemptId = "";
     this.activeDirectAttemptId = "";
     this.sessionConfigTail = Promise.resolve();
-    this.workerGroupTail = Promise.resolve();
   }
   serializeSessionConfigOperation(operation) {
     const run = this.sessionConfigTail.then(operation);
     this.sessionConfigTail = run.catch(() => void 0);
     return run;
-  }
-  serializeWorkerGroupOperation(operation) {
-    const run = this.workerGroupTail.then(operation);
-    this.workerGroupTail = run.catch(() => void 0);
-    return run;
-  }
-  async initializeWorkerGroupCapacity(slug, sessionId) {
-    const existing = await this.state.storage.get(WORKER_GROUP_CAPACITY_META_KEY);
-    const initialized = resolveInitializedWorkerGroupCapacity(existing, slug, sessionId);
-    if (initialized) return initialized;
-    const bootstrap = await resolveWorkerGroupBootstrap({ env: this.env, slug, sessionId });
-    return this.state.storage.transaction(async (transaction) => {
-      const concurrent = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
-      const concurrentlyInitialized = resolveInitializedWorkerGroupCapacity(concurrent, slug, sessionId);
-      if (concurrentlyInitialized) return concurrentlyInitialized;
-      if (!bootstrap.ok) {
-        if (bootstrap.reason === "worker_group_capacity_reconciliation_required") {
-          await transaction.put(WORKER_GROUP_CAPACITY_META_KEY, {
-            version: 3,
-            slug,
-            sessionId,
-            phase: "legacy_locked",
-            bootstrapId: "",
-            groupCount: resolveWorkerGroupCaps(this.env).maxGroupsPerSession
-          });
-        }
-        return bootstrap;
-      }
-      const meta = {
-        version: 3,
-        slug,
-        sessionId,
-        phase: "ready",
-        bootstrapId: bootstrap.bootstrapId,
-        groupCount: 0
-      };
-      await transaction.put(WORKER_GROUP_CAPACITY_META_KEY, meta);
-      return { ok: true, meta };
-    });
-  }
-  async reconcileEmptyWorkerGroupCapacity(slug, sessionId) {
-    const existing = await this.state.storage.get(WORKER_GROUP_CAPACITY_META_KEY);
-    const initialized = resolveInitializedWorkerGroupCapacity(existing, slug, sessionId);
-    if (initialized?.ok) {
-      return { ...initialized, repaired: false };
-    }
-    if (initialized?.reason === "worker_group_capacity_identity_conflict") return initialized;
-    if (existing?.version !== 3 || existing.slug !== slug || existing.sessionId !== sessionId || existing.phase !== "legacy_locked") {
-      return {
-        ok: false,
-        status: 409,
-        reason: "worker_group_capacity_repair_not_applicable"
-      };
-    }
-    const bootstrap = await resolveWorkerGroupBootstrap({
-      env: this.env,
-      slug,
-      sessionId,
-      requireExhaustiveEmptyScan: true
-    });
-    if (!bootstrap.ok) return bootstrap;
-    return this.state.storage.transaction(async (transaction) => {
-      const concurrent = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
-      const concurrentlyInitialized = resolveInitializedWorkerGroupCapacity(concurrent, slug, sessionId);
-      if (concurrentlyInitialized?.ok) {
-        return { ...concurrentlyInitialized, repaired: false };
-      }
-      if (concurrentlyInitialized?.reason === "worker_group_capacity_identity_conflict") {
-        return concurrentlyInitialized;
-      }
-      if (concurrent?.version !== 3 || concurrent.slug !== slug || concurrent.sessionId !== sessionId || concurrent.phase !== "legacy_locked") {
-        return {
-          ok: false,
-          status: 409,
-          reason: "worker_group_capacity_repair_not_applicable"
-        };
-      }
-      const meta = {
-        version: 3,
-        slug,
-        sessionId,
-        phase: "ready",
-        bootstrapId: bootstrap.bootstrapId,
-        groupCount: 0
-      };
-      await transaction.put(WORKER_GROUP_CAPACITY_META_KEY, meta);
-      return { ok: true, repaired: true, meta };
-    });
-  }
-  async reserveWorkerGroupSlot({ slug, sessionId, groupId, maxGroupsPerSession }) {
-    return this.state.storage.transaction(async (transaction) => {
-      const meta = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
-      if (meta?.version !== 3 || meta.slug !== slug || meta.sessionId !== sessionId || meta.phase !== "ready") {
-        return { ok: false, status: 503, reason: "worker_group_capacity_state_unavailable" };
-      }
-      const groupKey2 = workerGroupCapacityGroupKey(groupId);
-      const prior = await transaction.get(groupKey2);
-      if (prior) {
-        return {
-          ok: false,
-          status: 409,
-          reason: prior.active === true ? "worker_group_exists" : "worker_group_id_retired"
-        };
-      }
-      if (Number(meta.groupCount || 0) >= maxGroupsPerSession) {
-        return { ok: false, status: 409, reason: "worker_group_session_cap_exceeded" };
-      }
-      await transaction.put(WORKER_GROUP_CAPACITY_META_KEY, {
-        ...meta,
-        groupCount: Number(meta.groupCount || 0) + 1
-      });
-      await transaction.put(groupKey2, {
-        version: 2,
-        phase: "creating",
-        active: false,
-        generation: 1,
-        memberCount: 0,
-        joinMode: "admin_add"
-      });
-      return { ok: true, reserved: true, generation: 1 };
-    });
-  }
-  async rollbackWorkerGroupSlot({ slug, sessionId, groupId }) {
-    await this.state.storage.transaction(async (transaction) => {
-      const meta = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
-      const key = workerGroupCapacityGroupKey(groupId);
-      const groupState = await transaction.get(key);
-      if (meta?.version !== 3 || meta.slug !== slug || meta.sessionId !== sessionId || meta.phase !== "ready" || groupState?.phase !== "creating") return;
-      await transaction.put(WORKER_GROUP_CAPACITY_META_KEY, {
-        ...meta,
-        groupCount: Math.max(0, Number(meta.groupCount || 0) - 1)
-      });
-      await transaction.delete(key);
-    });
-  }
-  async activateWorkerGroupCapacity(group) {
-    await this.state.storage.transaction(async (transaction) => {
-      const groupId = normalizeWorkerGroupId(group?.groupId);
-      const key = workerGroupCapacityGroupKey(groupId);
-      const prior = await transaction.get(key);
-      if (prior?.phase !== "creating") {
-        throw new Error("Worker group creation reservation is unavailable.");
-      }
-      await transaction.put(key, {
-        ...prior,
-        version: 2,
-        phase: "active",
-        active: true,
-        joinMode: toTrimmedString9(group?.joinMode).toLowerCase() || "admin_add",
-        memberVisibility: toTrimmedString9(group?.memberVisibility).toLowerCase() || "admin_only",
-        memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
-        joinEndsAt: toTrimmedString9(group?.joinEndsAt)
-      });
-    });
-  }
-  async getActiveWorkerGroupCapacity(groupId) {
-    const state = await this.state.storage.get(workerGroupCapacityGroupKey(groupId));
-    if (state?.version !== 2 || state.phase !== "active" || state.active !== true) {
-      return { ok: false, status: 404, reason: "worker_group_not_found" };
-    }
-    return { ok: true, state };
-  }
-  async beginWorkerGroupUpdate(groupId) {
-    return this.state.storage.transaction(async (transaction) => {
-      const key = workerGroupCapacityGroupKey(groupId);
-      const state = await transaction.get(key);
-      if (state?.phase !== "active" || state.active !== true) {
-        return { ok: false, status: 404, reason: "worker_group_not_found" };
-      }
-      await transaction.put(key, {
-        ...state,
-        phase: "updating",
-        // Closed is the conservative join posture while the KV projection is
-        // ambiguous or a restrictive update is propagating.
-        joinMode: "admin_add"
-      });
-      return { ok: true, prior: state };
-    });
-  }
-  async finalizeWorkerGroupUpdate({ groupId, group }) {
-    await this.state.storage.transaction(async (transaction) => {
-      const key = workerGroupCapacityGroupKey(groupId);
-      const state = await transaction.get(key);
-      if (state?.phase !== "updating") return;
-      await transaction.put(key, {
-        ...state,
-        phase: "active",
-        active: true,
-        joinMode: toTrimmedString9(group?.joinMode).toLowerCase() || "admin_add",
-        memberVisibility: toTrimmedString9(group?.memberVisibility).toLowerCase() || "admin_only",
-        memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
-        joinEndsAt: toTrimmedString9(group?.joinEndsAt)
-      });
-    });
-  }
-  async rollbackWorkerGroupUpdate({ groupId, prior }) {
-    await this.state.storage.transaction(async (transaction) => {
-      const key = workerGroupCapacityGroupKey(groupId);
-      const state = await transaction.get(key);
-      if (state?.phase === "updating") await transaction.put(key, prior);
-    });
-  }
-  async beginWorkerGroupDelete(groupId) {
-    return this.state.storage.transaction(async (transaction) => {
-      const key = workerGroupCapacityGroupKey(groupId);
-      const state = await transaction.get(key);
-      if (state?.phase !== "active" || state.active !== true) {
-        return { ok: false, status: 404, reason: "worker_group_not_found" };
-      }
-      await transaction.put(key, {
-        ...state,
-        phase: "deleting",
-        active: false,
-        joinMode: "admin_add"
-      });
-      return { ok: true };
-    });
-  }
-  async reserveWorkerGroupMemberSlot({
-    groupId,
-    principalDigest,
-    maxMembersPerGroup
-  }) {
-    return this.state.storage.transaction(async (transaction) => {
-      const groupKey2 = workerGroupCapacityGroupKey(groupId);
-      const groupState = await transaction.get(groupKey2);
-      if (groupState?.phase !== "active" || groupState.active !== true) {
-        return { ok: false, status: 404, reason: "worker_group_not_found" };
-      }
-      const generation = Math.max(1, Number(groupState.generation || 0));
-      const memberKey2 = workerGroupCapacityMemberKey({
-        groupId,
-        generation,
-        principalDigest
-      });
-      const memberState = await transaction.get(memberKey2);
-      if (memberState?.state === "active") {
-        return { ok: true, reserved: false, generation, memberKey: memberKey2 };
-      }
-      if (memberState?.state === "reserved" || memberState?.state === "removing") {
-        return {
-          ok: false,
-          status: 503,
-          reason: "worker_group_membership_state_pending"
-        };
-      }
-      const configuredMemberLimit = normalizePositiveSafeInteger(groupState.memberLimit);
-      const effectiveMemberLimit = configuredMemberLimit ? Math.min(configuredMemberLimit, maxMembersPerGroup) : maxMembersPerGroup;
-      if (Number(groupState.memberCount || 0) >= effectiveMemberLimit) {
-        return { ok: false, status: 409, reason: "worker_group_member_cap_exceeded" };
-      }
-      await transaction.put(groupKey2, {
-        ...groupState,
-        memberCount: Number(groupState.memberCount || 0) + 1
-      });
-      await transaction.put(memberKey2, {
-        version: 2,
-        state: "reserved"
-      });
-      return { ok: true, reserved: true, generation, memberKey: memberKey2 };
-    });
-  }
-  async finalizeWorkerGroupMemberSlot(memberKey2) {
-    await this.state.storage.transaction(async (transaction) => {
-      const memberState = await transaction.get(memberKey2);
-      if (memberState?.state !== "reserved") return;
-      await transaction.put(memberKey2, {
-        version: 2,
-        state: "active"
-      });
-    });
-  }
-  async rollbackWorkerGroupMemberSlot({ groupId, memberKey: memberKey2 }) {
-    await this.state.storage.transaction(async (transaction) => {
-      const groupKey2 = workerGroupCapacityGroupKey(groupId);
-      const groupState = await transaction.get(groupKey2);
-      const memberState = await transaction.get(memberKey2);
-      if (groupState?.active && memberState?.state === "reserved") {
-        await transaction.put(groupKey2, {
-          ...groupState,
-          memberCount: Math.max(0, Number(groupState.memberCount || 0) - 1)
-        });
-        await transaction.put(memberKey2, {
-          version: 2,
-          state: "removed"
-        });
-      }
-    });
-  }
-  async beginWorkerGroupMemberRemoval({ groupId, principalDigest }) {
-    return this.state.storage.transaction(async (transaction) => {
-      const groupKey2 = workerGroupCapacityGroupKey(groupId);
-      const groupState = await transaction.get(groupKey2);
-      if (groupState?.phase !== "active" || groupState.active !== true) {
-        return { ok: false, status: 404, reason: "worker_group_not_found" };
-      }
-      const generation = Math.max(1, Number(groupState.generation || 0));
-      const memberKey2 = workerGroupCapacityMemberKey({
-        groupId,
-        generation,
-        principalDigest
-      });
-      const memberState = await transaction.get(memberKey2);
-      if (memberState?.state !== "active") {
-        return {
-          ok: false,
-          status: memberState?.state === "reserved" || memberState?.state === "removing" ? 503 : 404,
-          reason: memberState?.state === "reserved" || memberState?.state === "removing" ? "worker_group_membership_state_pending" : "worker_group_member_not_found"
-        };
-      }
-      await transaction.put(memberKey2, {
-        version: 2,
-        state: "removing"
-      });
-      return { ok: true, memberKey: memberKey2 };
-    });
-  }
-  async releaseWorkerGroupMemberSlot({ groupId, memberKey: memberKey2 }) {
-    await this.state.storage.transaction(async (transaction) => {
-      const groupKey2 = workerGroupCapacityGroupKey(groupId);
-      const groupState = await transaction.get(groupKey2);
-      const memberState = await transaction.get(memberKey2);
-      if (!groupState || memberState?.state !== "removing") return;
-      await transaction.put(groupKey2, {
-        ...groupState,
-        memberCount: Math.max(0, Number(groupState.memberCount || 0) - 1)
-      });
-      await transaction.put(memberKey2, {
-        version: 2,
-        state: "removed"
-      });
-    });
-  }
-  async releaseWorkerGroupCapacity({ slug, sessionId, groupId }) {
-    await this.state.storage.transaction(async (transaction) => {
-      const meta = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
-      const key = workerGroupCapacityGroupKey(groupId);
-      const groupState = await transaction.get(key);
-      if (meta?.version !== 3 || meta.slug !== slug || meta.sessionId !== sessionId || meta.phase !== "ready" || groupState?.phase !== "deleting") return;
-      await transaction.put(WORKER_GROUP_CAPACITY_META_KEY, {
-        ...meta,
-        groupCount: Math.max(0, Number(meta.groupCount || 0) - 1)
-      });
-      await transaction.put(key, {
-        ...groupState,
-        phase: "deleted",
-        active: false,
-        memberCount: 0
-      });
-    });
-  }
-  async executeWorkerGroupReady(payload) {
-    const slug = normalizeSessionSlug(payload?.slug);
-    const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
-    if (!slug || !sessionId) {
-      return jsonResponse2({
-        ok: false,
-        status: 400,
-        reason: "worker_group_session_identity_invalid"
-      }, 400);
-    }
-    const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
-    return jsonResponse2(initialized, initialized.ok ? 200 : initialized.status || 503);
-  }
-  executeWorkerGroupReconcileEmpty(payload) {
-    return this.serializeWorkerGroupOperation(async () => {
-      const slug = normalizeSessionSlug(payload?.slug);
-      const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
-      if (!slug || !sessionId) {
-        return jsonResponse2({
-          ok: false,
-          status: 400,
-          reason: "worker_group_session_identity_invalid"
-        }, 400);
-      }
-      const reconciled = await this.reconcileEmptyWorkerGroupCapacity(slug, sessionId);
-      return jsonResponse2(reconciled, reconciled.ok ? 200 : reconciled.status || 503);
-    });
-  }
-  executeWorkerGroupAuthorization(payload) {
-    return this.serializeWorkerGroupOperation(async () => {
-      const slug = normalizeSessionSlug(payload?.slug);
-      const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
-      const groupId = normalizeWorkerGroupId(payload?.groupId);
-      const principal = normalizeWorkerGroupPrincipal(payload?.principal);
-      if (!slug || !sessionId || !groupId || !principal.ok) {
-        return jsonResponse2({
-          ok: false,
-          status: 400,
-          reason: "worker_group_authorization_invalid"
-        }, 400);
-      }
-      const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
-      if (!initialized.ok) {
-        return jsonResponse2(initialized, initialized.status || 503);
-      }
-      const group = await this.getActiveWorkerGroupCapacity(groupId);
-      if (!group.ok) return jsonResponse2(group, group.status || 404);
-      const principalDigest = await sha256Hex2(`worker-group-member:${principal.key}`);
-      const memberKey2 = workerGroupCapacityMemberKey({
-        groupId,
-        generation: Math.max(1, Number(group.state.generation || 0)),
-        principalDigest
-      });
-      const member = await this.state.storage.get(memberKey2);
-      if (member?.state !== "active") {
-        return jsonResponse2({
-          ok: false,
-          status: 403,
-          reason: "worker_group_membership_denied",
-          principal: principal.principal
-        }, 403);
-      }
-      return jsonResponse2({
-        ok: true,
-        status: 200,
-        store: "durable_object",
-        principal: principal.principal,
-        groupId,
-        group: {
-          groupId,
-          joinMode: group.state.joinMode,
-          memberVisibility: group.state.memberVisibility,
-          memberCount: Number(group.state.memberCount || 0)
-        }
-      }, 200);
-    });
-  }
-  executeWorkerGroupCatalog(payload) {
-    return this.serializeWorkerGroupOperation(async () => {
-      const slug = normalizeSessionSlug(payload?.slug);
-      const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
-      const requestedGroupIds = Array.isArray(payload?.groupIds) ? payload.groupIds.map((groupId) => normalizeWorkerGroupId(groupId)) : [];
-      const maxGroups = resolveWorkerGroupCaps(this.env).maxGroupsPerSession;
-      const uniqueGroupIds = [...new Set(requestedGroupIds)];
-      const principal = payload?.principal == null ? null : normalizeWorkerGroupPrincipal(payload.principal);
-      if (!slug || !sessionId || !requestedGroupIds.length || requestedGroupIds.some((groupId) => !groupId) || uniqueGroupIds.length !== requestedGroupIds.length || uniqueGroupIds.length > maxGroups || principal && !principal.ok) {
-        return jsonResponse2({
-          ok: false,
-          status: 400,
-          reason: "worker_group_catalog_invalid"
-        }, 400);
-      }
-      const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
-      if (!initialized.ok) {
-        return jsonResponse2(initialized, initialized.status || 503);
-      }
-      const principalDigest = principal ? await sha256Hex2(`worker-group-member:${principal.key}`) : "";
-      const groups = [];
-      for (const groupId of uniqueGroupIds) {
-        const group = await this.getActiveWorkerGroupCapacity(groupId);
-        if (!group.ok) continue;
-        let isMember = false;
-        if (principalDigest) {
-          const memberKey2 = workerGroupCapacityMemberKey({
-            groupId,
-            generation: Math.max(1, Number(group.state.generation || 0)),
-            principalDigest
-          });
-          const member = await this.state.storage.get(memberKey2);
-          isMember = member?.state === "active";
-        }
-        groups.push({
-          groupId,
-          joinMode: group.state.joinMode,
-          memberVisibility: group.state.memberVisibility,
-          memberCount: Number(group.state.memberCount || 0),
-          isMember
-        });
-      }
-      return jsonResponse2({
-        ok: true,
-        status: 200,
-        store: "durable_object",
-        groups
-      }, 200);
-    });
-  }
-  async executeWorkerGroupMutation(payload) {
-    return this.serializeWorkerGroupOperation(async () => {
-      const mutation = normalizeWorkerGroupMutation(payload);
-      if (!mutation) {
-        return jsonResponse2({
-          ok: false,
-          status: 400,
-          reason: "worker_group_mutation_invalid"
-        }, 400);
-      }
-      const initialized = await this.initializeWorkerGroupCapacity(mutation.slug, mutation.sessionId);
-      if (!initialized.ok) {
-        return jsonResponse2(initialized, initialized.status || 503);
-      }
-      const caps = resolveWorkerGroupCaps(this.env);
-      let groupReservation = null;
-      let memberReservation = null;
-      let updateReservation = null;
-      let removalReservation = null;
-      let principalDigest = "";
-      let activeGroup = null;
-      if (mutation.operation === "create") {
-        groupReservation = await this.reserveWorkerGroupSlot({
-          slug: mutation.slug,
-          sessionId: mutation.sessionId,
-          groupId: mutation.groupId,
-          maxGroupsPerSession: caps.maxGroupsPerSession
-        });
-        if (!groupReservation.ok) {
-          return jsonResponse2(groupReservation, groupReservation.status || 409);
-        }
-      } else {
-        activeGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
-        if (!activeGroup.ok) {
-          return jsonResponse2(activeGroup, activeGroup.status || 404);
-        }
-        if (mutation.operation === "join" && activeGroup.state.joinMode !== "open") {
-          return jsonResponse2({
-            ok: false,
-            status: 403,
-            reason: "worker_group_join_denied"
-          }, 403);
-        }
-        if (mutation.operation === "join") {
-          const joinEndsAt = Date.parse(toTrimmedString9(activeGroup.state.joinEndsAt));
-          if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(this.now())) {
-            return jsonResponse2({
-              ok: false,
-              status: 403,
-              reason: "worker_group_join_ended"
-            }, 403);
-          }
-        }
-        if (mutation.operation === "update") {
-          if (Object.prototype.hasOwnProperty.call(mutation.input, "memberLimit")) {
-            const requestedMemberLimit = Number(mutation.input.memberLimit);
-            if (Number.isSafeInteger(requestedMemberLimit) && requestedMemberLimit > 0 && requestedMemberLimit < Number(activeGroup.state.memberCount || 0)) {
-              return jsonResponse2({
-                ok: false,
-                status: 409,
-                reason: "worker_group_member_limit_below_current"
-              }, 409);
-            }
-          }
-          updateReservation = await this.beginWorkerGroupUpdate(mutation.groupId);
-          if (!updateReservation.ok) {
-            return jsonResponse2(updateReservation, updateReservation.status || 404);
-          }
-        } else if (mutation.operation === "delete") {
-          const deleting = await this.beginWorkerGroupDelete(mutation.groupId);
-          if (!deleting.ok) return jsonResponse2(deleting, deleting.status || 404);
-        }
-      }
-      if (mutation.operation === "add-member" || mutation.operation === "join") {
-        principalDigest = await sha256Hex2(`worker-group-member:${mutation.principalKey}`);
-        memberReservation = await this.reserveWorkerGroupMemberSlot({
-          groupId: mutation.groupId,
-          principalDigest,
-          maxMembersPerGroup: caps.maxMembersPerGroup
-        });
-        if (!memberReservation.ok) {
-          return jsonResponse2(memberReservation, memberReservation.status || 409);
-        }
-      } else if (mutation.operation === "remove-member") {
-        principalDigest = await sha256Hex2(`worker-group-member:${mutation.principalKey}`);
-        removalReservation = await this.beginWorkerGroupMemberRemoval({
-          groupId: mutation.groupId,
-          principalDigest
-        });
-        if (!removalReservation.ok) {
-          return jsonResponse2(removalReservation, removalReservation.status || 404);
-        }
-      }
-      let result;
-      try {
-        result = await executeWorkerGroupMutation({
-          env: this.env,
-          ...mutation,
-          capacityAuthorized: true
-        });
-      } catch {
-        return jsonResponse2({
-          ok: false,
-          status: 503,
-          reason: "worker_group_mutation_ambiguous"
-        }, 503);
-      }
-      if (!result.ok) {
-        if (groupReservation?.reserved) {
-          const definitelyPrewrite = /* @__PURE__ */ new Set([
-            "invalid_join_mode",
-            "join_mode_not_implemented",
-            "invalid_member_visibility",
-            "invalid_group_label",
-            "invalid_group_description",
-            "invalid_group_image_url",
-            "invalid_group_tags",
-            "invalid_group_document_urls",
-            "invalid_group_member_limit",
-            "invalid_group_join_end",
-            "invalid_group_admin_address",
-            "invalid_worker_group_id"
-          ]);
-          if (definitelyPrewrite.has(result.reason)) {
-            await this.rollbackWorkerGroupSlot({
-              slug: mutation.slug,
-              sessionId: mutation.sessionId,
-              groupId: mutation.groupId
-            });
-          }
-        }
-        if (updateReservation?.ok) {
-          await this.rollbackWorkerGroupUpdate({
-            groupId: mutation.groupId,
-            prior: updateReservation.prior
-          });
-        }
-        if (memberReservation?.reserved) {
-          await this.rollbackWorkerGroupMemberSlot({
-            groupId: mutation.groupId,
-            memberKey: memberReservation.memberKey
-          });
-        }
-        return jsonResponse2(result, result.status || 400);
-      }
-      if (mutation.operation === "create") {
-        await this.activateWorkerGroupCapacity(result.group);
-      } else if (mutation.operation === "update") {
-        await this.finalizeWorkerGroupUpdate({
-          groupId: mutation.groupId,
-          group: result.group
-        });
-      } else if (mutation.operation === "add-member" || mutation.operation === "join") {
-        if (memberReservation?.reserved) {
-          await this.finalizeWorkerGroupMemberSlot(memberReservation.memberKey);
-        }
-      } else if (mutation.operation === "remove-member") {
-        await this.releaseWorkerGroupMemberSlot({
-          groupId: mutation.groupId,
-          memberKey: removalReservation.memberKey
-        });
-      } else if (mutation.operation === "delete") {
-        await this.releaseWorkerGroupCapacity({
-          slug: mutation.slug,
-          sessionId: mutation.sessionId,
-          groupId: mutation.groupId
-        });
-      }
-      return jsonResponse2(result, 200);
-    });
   }
   async finalizeSessionConfigProjection(revision) {
     await this.state.storage.transaction(async (transaction) => {
@@ -65735,8 +62833,8 @@ var SessionWriteCoordinator = class {
   async executeAuthNonceIssue(payload) {
     const nowMs = Number(this.now()) || Date.now();
     const slug = normalizeSessionSlug(payload?.slug);
-    const address = toTrimmedString9(payload?.address).toLowerCase();
-    const nonce = toTrimmedString9(payload?.nonce);
+    const address = toTrimmedString8(payload?.address).toLowerCase();
+    const nonce = toTrimmedString8(payload?.nonce);
     const expiresAtMs = normalizeBoundedFutureTimestamp(
       payload?.expiresAtMs,
       nowMs,
@@ -65765,8 +62863,8 @@ var SessionWriteCoordinator = class {
   async executeAuthNonceConsume(payload) {
     const nowMs = Number(this.now()) || Date.now();
     const slug = normalizeSessionSlug(payload?.slug);
-    const address = toTrimmedString9(payload?.address).toLowerCase();
-    const nonce = toTrimmedString9(payload?.nonce);
+    const address = toTrimmedString8(payload?.address).toLowerCase();
+    const nonce = toTrimmedString8(payload?.nonce);
     const usedExpiresAtMs = normalizeBoundedFutureTimestamp(
       payload?.usedExpiresAtMs,
       nowMs,
@@ -65778,7 +62876,7 @@ var SessionWriteCoordinator = class {
     const result = await this.state.storage.transaction(async (transaction) => {
       const used = await transaction.get(AUTH_NONCE_USED_KEY);
       const entries = Array.isArray(used?.entries) ? used.entries.filter((entry) => Number(entry?.expiresAtMs || 0) > nowMs) : [];
-      if (entries.some((entry) => toTrimmedString9(entry?.nonce) === nonce)) {
+      if (entries.some((entry) => toTrimmedString8(entry?.nonce) === nonce)) {
         await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
         return { ok: false, error: "Nonce already used." };
       }
@@ -65801,8 +62899,8 @@ var SessionWriteCoordinator = class {
   async executeAuthRateCheck(payload) {
     const nowMs = Number(this.now()) || Date.now();
     const slug = normalizeSessionSlug(payload?.slug);
-    const route = toTrimmedString9(payload?.route).toLowerCase();
-    const identity = toTrimmedString9(payload?.identity).toLowerCase();
+    const route = toTrimmedString8(payload?.route).toLowerCase();
+    const identity = toTrimmedString8(payload?.identity).toLowerCase();
     const limit = normalizePositiveSafeInteger(payload?.limit);
     const resetAtMs = normalizeBoundedFutureTimestamp(
       payload?.resetAtMs,
@@ -65830,13 +62928,13 @@ var SessionWriteCoordinator = class {
     const nowMs = Number(this.now()) || Date.now();
     return this.state.storage.transaction(async (transaction) => {
       const existing = await transaction.get(SPONSORED_DEPLOY_RECORD_KEY);
-      if (existing && toTrimmedString9(existing.requestDigest) !== requestDigest) {
+      if (existing && toTrimmedString8(existing.requestDigest) !== requestDigest) {
         return { kind: "conflict" };
       }
       if (existing?.state === "terminal" && existing.result) {
         return { kind: "terminal", result: existing.result };
       }
-      if (existing?.state === "running" && (this.activeAttemptId === toTrimmedString9(existing.attemptId) || nowMs - Number(existing.startedAtMs || 0) < RUNNING_LEASE_MS)) {
+      if (existing?.state === "running" && (this.activeAttemptId === toTrimmedString8(existing.attemptId) || nowMs - Number(existing.startedAtMs || 0) < RUNNING_LEASE_MS)) {
         return { kind: "pending" };
       }
       const attemptId = createAttemptId(this.crypto);
@@ -65853,7 +62951,7 @@ var SessionWriteCoordinator = class {
   async finalizeSponsoredDeploy({ requestDigest, attemptId, result, terminal }) {
     await this.state.storage.transaction(async (transaction) => {
       const existing = await transaction.get(SPONSORED_DEPLOY_RECORD_KEY);
-      if (toTrimmedString9(existing?.requestDigest) !== requestDigest || toTrimmedString9(existing?.attemptId) !== attemptId || existing?.state !== "running") {
+      if (toTrimmedString8(existing?.requestDigest) !== requestDigest || toTrimmedString8(existing?.attemptId) !== attemptId || existing?.state !== "running") {
         return;
       }
       await transaction.put(SPONSORED_DEPLOY_RECORD_KEY, terminal ? {
@@ -65874,20 +62972,20 @@ var SessionWriteCoordinator = class {
     const nowMs = Number(this.now()) || Date.now();
     return this.state.storage.transaction(async (transaction) => {
       const existing = await transaction.get(DIRECT_DEPLOY_RECORD_KEY);
-      if (existing && toTrimmedString9(existing.immutableIdentityDigest) !== immutableIdentityDigest) {
+      if (existing && toTrimmedString8(existing.immutableIdentityDigest) !== immutableIdentityDigest) {
         return { kind: "identity-conflict" };
       }
-      if (existing && toTrimmedString9(existing.accountId) !== accountId) {
+      if (existing && toTrimmedString8(existing.accountId) !== accountId) {
         return { kind: "account-conflict" };
       }
       if (existing?.state === "terminal" && existing.result) {
         return {
           kind: "terminal",
           result: existing.result,
-          requestDigestMatches: toTrimmedString9(existing.requestDigest) === requestDigest
+          requestDigestMatches: toTrimmedString8(existing.requestDigest) === requestDigest
         };
       }
-      if (existing?.state === "running" && (this.activeDirectAttemptId === toTrimmedString9(existing.attemptId) || nowMs - Number(existing.startedAtMs || 0) < RUNNING_LEASE_MS)) {
+      if (existing?.state === "running" && (this.activeDirectAttemptId === toTrimmedString8(existing.attemptId) || nowMs - Number(existing.startedAtMs || 0) < RUNNING_LEASE_MS)) {
         return { kind: "pending" };
       }
       const attemptId = createAttemptId(this.crypto);
@@ -65913,7 +63011,7 @@ var SessionWriteCoordinator = class {
   }) {
     await this.state.storage.transaction(async (transaction) => {
       const existing = await transaction.get(DIRECT_DEPLOY_RECORD_KEY);
-      if (existing?.state !== "running" || toTrimmedString9(existing.requestDigest) !== requestDigest || toTrimmedString9(existing.immutableIdentityDigest) !== immutableIdentityDigest || toTrimmedString9(existing.accountId) !== accountId || toTrimmedString9(existing.attemptId) !== attemptId) return;
+      if (existing?.state !== "running" || toTrimmedString8(existing.requestDigest) !== requestDigest || toTrimmedString8(existing.immutableIdentityDigest) !== immutableIdentityDigest || toTrimmedString8(existing.accountId) !== accountId || toTrimmedString8(existing.attemptId) !== attemptId) return;
       await transaction.put(DIRECT_DEPLOY_RECORD_KEY, terminal ? {
         version: 1,
         state: "terminal",
@@ -65933,17 +63031,17 @@ var SessionWriteCoordinator = class {
     });
   }
   async executeDirectDeploy(payload) {
-    const requestDigest = toTrimmedString9(payload?.requestDigest);
-    const immutableIdentityDigest = toTrimmedString9(payload?.immutableIdentityDigest);
+    const requestDigest = toTrimmedString8(payload?.requestDigest);
+    const immutableIdentityDigest = toTrimmedString8(payload?.immutableIdentityDigest);
     const deployBody = payload?.deployBody && typeof payload.deployBody === "object" ? payload.deployBody : null;
     if (!requestDigest || !immutableIdentityDigest || !deployBody) {
       return jsonResponse2({ error: "Invalid direct deploy coordination request." }, 400);
     }
     const account = await this.lookupCloudflareAccount({
-      apiToken: toTrimmedString9(deployBody.apiToken || deployBody.token),
+      apiToken: toTrimmedString8(deployBody.apiToken || deployBody.token),
       env: this.env
     });
-    if (!account?.ok || !toTrimmedString9(account.accountId)) {
+    if (!account?.ok || !toTrimmedString8(account.accountId)) {
       const lookupStatus = Number(account?.status || 0);
       const responseStatus = lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502;
       const safeError = buildSafeSponsoredReceiptBody({
@@ -65956,7 +63054,7 @@ var SessionWriteCoordinator = class {
         body: safeError
       }, responseStatus);
     }
-    const accountId = toTrimmedString9(account.accountId);
+    const accountId = toTrimmedString8(account.accountId);
     const reservation = await this.reserveDirectDeploy({ requestDigest, immutableIdentityDigest, accountId });
     if (reservation.kind === "terminal") {
       const replayResult = buildDirectDeployTerminalReplay(reservation);
@@ -66005,7 +63103,7 @@ var SessionWriteCoordinator = class {
       rawResult = await this.executeDeployHelperRequest({
         body: deployBody,
         env: this.env,
-        requestOrigin: toTrimmedString9(payload?.requestOrigin),
+        requestOrigin: toTrimmedString8(payload?.requestOrigin),
         consoleImpl: console,
         coordinationBypass: true,
         coordinatedRequestDigest,
@@ -66043,7 +63141,7 @@ var SessionWriteCoordinator = class {
   async reserveSponsoredFaucet(requestDigest) {
     return this.state.storage.transaction(async (transaction) => {
       const existing = await transaction.get(SPONSORED_FAUCET_RECORD_KEY);
-      if (existing && toTrimmedString9(existing.requestDigest) !== requestDigest) {
+      if (existing && toTrimmedString8(existing.requestDigest) !== requestDigest) {
         return { kind: "conflict" };
       }
       if (existing?.state === "terminal" && existing.receipt) {
@@ -66068,7 +63166,7 @@ var SessionWriteCoordinator = class {
     };
     return this.state.storage.transaction(async (transaction) => {
       const existing = await transaction.get(SPONSORED_FAUCET_RECORD_KEY);
-      if (toTrimmedString9(existing?.requestDigest) !== requestDigest) return null;
+      if (toTrimmedString8(existing?.requestDigest) !== requestDigest) return null;
       if (existing?.state === "terminal" && existing.receipt) return existing.receipt;
       if (existing?.state !== "running") return null;
       await transaction.put(SPONSORED_FAUCET_RECORD_KEY, {
@@ -66102,37 +63200,22 @@ var SessionWriteCoordinator = class {
     if (url.pathname === "/auth-state/rate/check") {
       return this.executeAuthRateCheck(payload);
     }
-    if (url.pathname === "/worker-groups/ready") {
-      return this.executeWorkerGroupReady(payload);
-    }
-    if (url.pathname === "/worker-groups/reconcile-empty") {
-      return this.executeWorkerGroupReconcileEmpty(payload);
-    }
-    if (url.pathname === "/worker-groups/authorize") {
-      return this.executeWorkerGroupAuthorization(payload);
-    }
-    if (url.pathname === "/worker-groups/catalog") {
-      return this.executeWorkerGroupCatalog(payload);
-    }
-    if (url.pathname === "/worker-groups/mutate") {
-      return this.executeWorkerGroupMutation(payload);
-    }
     if (url.pathname === "/deploy-helper") return this.executeDirectDeploy(payload);
     if (url.pathname === "/sponsored-faucet/reserve") {
-      const requestDigest2 = toTrimmedString9(payload?.requestDigest);
+      const requestDigest2 = toTrimmedString8(payload?.requestDigest);
       if (!requestDigest2) return jsonResponse2({ error: "Invalid sponsored faucet reservation." }, 400);
       const reservation2 = await this.reserveSponsoredFaucet(requestDigest2);
       return jsonResponse2(reservation2, reservation2.kind === "conflict" ? 409 : reservation2.kind === "pending" ? 503 : 200);
     }
     if (url.pathname === "/sponsored-faucet/finalize") {
-      const requestDigest2 = toTrimmedString9(payload?.requestDigest);
+      const requestDigest2 = toTrimmedString8(payload?.requestDigest);
       const receipt = payload?.receipt && typeof payload.receipt === "object" ? payload.receipt : null;
       if (!requestDigest2 || !receipt) return jsonResponse2({ error: "Invalid sponsored faucet receipt." }, 400);
       const storedReceipt = await this.finalizeSponsoredFaucet({ requestDigest: requestDigest2, receipt });
       return storedReceipt ? jsonResponse2({ kind: "terminal", receipt: storedReceipt }, 200) : jsonResponse2({ error: "Sponsored faucet reservation does not match." }, 409);
     }
     if (url.pathname !== "/sponsored-deploy") return jsonResponse2({ error: "Not found." }, 404);
-    const requestDigest = toTrimmedString9(payload?.requestDigest);
+    const requestDigest = toTrimmedString8(payload?.requestDigest);
     const deployBody = payload?.deployBody && typeof payload.deployBody === "object" ? payload.deployBody : null;
     const sensitiveValues = Array.isArray(payload?.sensitiveValues) ? payload.sensitiveValues : [];
     if (!requestDigest || !deployBody) {
@@ -66168,7 +63251,7 @@ var SessionWriteCoordinator = class {
       rawResult = await this.executeDeployHelperRequest({
         body: deployBody,
         env: this.env,
-        requestOrigin: toTrimmedString9(payload?.requestOrigin),
+        requestOrigin: toTrimmedString8(payload?.requestOrigin),
         consoleImpl: console,
         coordinationBypass: true
       });
@@ -66177,7 +63260,7 @@ var SessionWriteCoordinator = class {
         ok: false,
         status: 502,
         body: {
-          error: toTrimmedString9(error?.message || error) || "Failed to run embedded sponsored deploy.",
+          error: toTrimmedString8(error?.message || error) || "Failed to run embedded sponsored deploy.",
           deploymentRequestPending: true
         }
       };
@@ -66196,8 +63279,6 @@ var SessionWriteCoordinator = class {
       if (this.activeAttemptId === reservation.attemptId) this.activeAttemptId = "";
     }
   }
-};
-var WorkerGroupWriteCoordinator = class extends SessionWriteCoordinator {
 };
 var executeCoordinatedSponsoredDeploy = async ({
   env,
@@ -66218,7 +63299,7 @@ var executeCoordinatedSponsoredDeploy = async ({
       }
     };
   }
-  const normalizedGrantToken = toTrimmedString9(grantToken);
+  const normalizedGrantToken = toTrimmedString8(grantToken);
   if (!normalizedGrantToken) {
     return { ok: false, status: 400, body: { error: "Missing sponsored deploy grant identity." } };
   }
@@ -66291,7 +63372,7 @@ var issueCoordinatedAuthNonce = async ({
   const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
   return callAuthStateCoordinator({
     env,
-    identity: `auth-nonce:${toTrimmedString9(slug)}:${toTrimmedString9(address).toLowerCase()}`,
+    identity: `auth-nonce:${toTrimmedString8(slug)}:${toTrimmedString8(address).toLowerCase()}`,
     path: "/auth-state/nonce/issue",
     payload: {
       slug,
@@ -66313,7 +63394,7 @@ var consumeCoordinatedAuthNonce = async ({
   const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
   return callAuthStateCoordinator({
     env,
-    identity: `auth-nonce:${toTrimmedString9(slug)}:${toTrimmedString9(address).toLowerCase()}`,
+    identity: `auth-nonce:${toTrimmedString8(slug)}:${toTrimmedString8(address).toLowerCase()}`,
     path: "/auth-state/nonce/consume",
     payload: {
       slug,
@@ -66333,11 +63414,11 @@ var checkCoordinatedAuthRateLimit = async ({
   now = Date.now
 } = {}) => {
   const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
-  const normalizedRoute = toTrimmedString9(route).toLowerCase();
-  const normalizedIdentity = toTrimmedString9(identity).toLowerCase();
+  const normalizedRoute = toTrimmedString8(route).toLowerCase();
+  const normalizedIdentity = toTrimmedString8(identity).toLowerCase();
   return callAuthStateCoordinator({
     env,
-    identity: `auth-rate:${toTrimmedString9(slug)}:${normalizedRoute}:${normalizedIdentity}`,
+    identity: `auth-rate:${toTrimmedString8(slug)}:${normalizedRoute}:${normalizedIdentity}`,
     path: "/auth-state/rate/check",
     payload: {
       slug,
@@ -66421,8 +63502,8 @@ var executeCoordinatedSessionConfigMutation = async ({
   };
 };
 var reserveCoordinatedSponsoredFaucet = async ({ env, grantToken, requestDigest } = {}) => {
-  const token = toTrimmedString9(grantToken);
-  const digest = toTrimmedString9(requestDigest);
+  const token = toTrimmedString8(grantToken);
+  const digest = toTrimmedString8(requestDigest);
   const stub = token ? await resolveCoordinatorStub(env, `sponsored-faucet:${token}`) : null;
   if (!stub) return { kind: "unavailable" };
   try {
@@ -66442,7 +63523,7 @@ var finalizeCoordinatedSponsoredFaucet = async ({
   requestDigest,
   receipt
 } = {}) => {
-  const token = toTrimmedString9(grantToken);
+  const token = toTrimmedString8(grantToken);
   const stub = token ? await resolveCoordinatorStub(env, `sponsored-faucet:${token}`) : null;
   if (!stub) return null;
   try {
@@ -68228,7 +65309,7 @@ var getDefaultArweaveCtorCandidates = () => [
   { name: "arweave", loader: async () => await Promise.resolve().then(() => __toESM(require_web(), 1)) }
 ];
 var resolveCtorFromModule = (moduleValue) => (moduleValue && typeof moduleValue.init === "function" ? moduleValue : null) || (moduleValue?.default && typeof moduleValue.default.init === "function" ? moduleValue.default : null) || (moduleValue?.Arweave && typeof moduleValue.Arweave.init === "function" ? moduleValue.Arweave : null) || (moduleValue?.default?.Arweave && typeof moduleValue.default.Arweave.init === "function" ? moduleValue.default.Arweave : null) || (moduleValue?.default?.default && typeof moduleValue.default.default.init === "function" ? moduleValue.default.default : null);
-var toTrimmedString10 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
+var toTrimmedString9 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
 var noop = () => {
 };
 var resolveLog = (deps) => typeof deps?.log === "function" ? deps.log : noop;
@@ -68247,11 +65328,11 @@ var uploadTransactionWithFallback = async ({ arweave, tx, deps }) => {
       return;
     }
     const status = res?.status || "unknown";
-    const statusText = toTrimmedString10(res?.statusText || "", deps);
+    const statusText = toTrimmedString9(res?.statusText || "", deps);
     let responseBody = "";
     if (typeof res?.text === "function") {
       try {
-        responseBody = toTrimmedString10(await res.text(), deps);
+        responseBody = toTrimmedString9(await res.text(), deps);
       } catch {
         responseBody = "";
       }
@@ -68879,7 +65960,7 @@ var normalizeFaucetRequest = ({
 // workers/sessionCorsWorker/faucetExecution.js
 var DEFAULT_GAS_PRICE_HEX = "0x3b9aca00";
 var DEFAULT_ACCESS_DENIED_ERROR = "Access denied.";
-var toTrimmedString11 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
+var toTrimmedString10 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
 var resolveJson2 = (deps) => deps?.json || json;
 var resolveLog2 = (deps) => typeof deps?.log === "function" ? deps.log : () => {
 };
@@ -68937,11 +66018,11 @@ var faucet = async ({
       logContext.rpcUrl = maskRpcUrl(normalizedRpcUrls[0]);
       logContext.rpcUrls = normalizedRpcUrls.map((rpcUrl) => maskRpcUrl(rpcUrl));
     } else {
-      if (/^https?:\/\//i.test(toTrimmedString11(logContext.rpcUrl, deps))) {
+      if (/^https?:\/\//i.test(toTrimmedString10(logContext.rpcUrl, deps))) {
         logContext.rpcUrl = maskRpcUrl(logContext.rpcUrl);
       }
       if (Array.isArray(logContext.rpcUrls)) {
-        logContext.rpcUrls = logContext.rpcUrls.map((rpcUrl) => /^https?:\/\//i.test(toTrimmedString11(rpcUrl, deps)) ? maskRpcUrl(rpcUrl) : rpcUrl);
+        logContext.rpcUrls = logContext.rpcUrls.map((rpcUrl) => /^https?:\/\//i.test(toTrimmedString10(rpcUrl, deps)) ? maskRpcUrl(rpcUrl) : rpcUrl);
       }
     }
     log2("[faucet] request", logContext);
@@ -69798,14 +66879,14 @@ var readTranscribeRequestPayload = async ({ request } = {}) => {
 // workers/sessionCorsWorker/endpointConfig.js
 var DEFAULT_OPENAI_TRANSCRIBE_URL = "https://api.openai.com/v1/audio/transcriptions";
 var OPENAI_TRANSCRIBE_URL_ENV = "CE_OPENAI_TRANSCRIBE_URL";
-var toTrimmedString12 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString11 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var resolveOpenAiTranscribeUrl = ({
   constants = null,
   env = null
-} = {}) => toTrimmedString12(constants?.openAiTranscribeUrl) || toTrimmedString12(constants?.OPENAI_TRANSCRIBE_URL) || toTrimmedString12(env?.[OPENAI_TRANSCRIBE_URL_ENV]) || DEFAULT_OPENAI_TRANSCRIBE_URL;
+} = {}) => toTrimmedString11(constants?.openAiTranscribeUrl) || toTrimmedString11(constants?.OPENAI_TRANSCRIBE_URL) || toTrimmedString11(env?.[OPENAI_TRANSCRIBE_URL_ENV]) || DEFAULT_OPENAI_TRANSCRIBE_URL;
 
 // workers/sessionCorsWorker/transcribeExecution.js
-var toTrimmedString13 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
+var toTrimmedString12 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
 var transcribe = async ({
   request,
   secrets,
@@ -69826,7 +66907,7 @@ var transcribe = async ({
     upstreamFormData
   } = normalizedRequest.payload || {};
   let targetUrl = resolveOpenAiTranscribeUrl({ constants });
-  let key = requestApiKey || toTrimmedString13(secrets?.openaiKey, deps);
+  let key = requestApiKey || toTrimmedString12(secrets?.openaiKey, deps);
   if (provider === "custom") {
     targetUrl = requestRpcUrl;
     if (deps?.isBlockedOutboundUrl?.(targetUrl)) {
@@ -70699,48 +67780,16 @@ var evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress, 
   }
   return { ok: false, reason: "sbt_onchain_denied", condition: { kind: "sbt_onchain", chainId, anyOrAll: mode } };
 };
-var checkWorkerGroupMembership = async ({
-  env,
-  slug,
-  config,
-  groupId,
-  requesterAddress,
-  authScopes,
-  deps
-}) => {
+var checkWorkerGroupMembership = async ({ env, slug, groupId, requesterAddress, authScopes, deps }) => {
   const check = typeof deps?.isWorkerGroupMember === "function" ? deps.isWorkerGroupMember : isWorkerGroupMember;
-  return check({
-    env,
-    slug,
-    sessionId: resolveCanonicalWorkerSessionIdHex(config),
-    groupId,
-    requesterAddress,
-    authScopes,
-    deps
-  });
+  return check({ env, slug, groupId, requesterAddress, authScopes, deps });
 };
-var evaluateWorkerGroupCondition = async ({
-  condition,
-  env,
-  slug,
-  config,
-  requesterAddress,
-  authScopes,
-  deps
-}) => {
+var evaluateWorkerGroupCondition = async ({ condition, env, slug, requesterAddress, authScopes, deps }) => {
   const groupIds = normalizeGroupIdList(condition.groupIds || condition.groups || condition.groupId);
   if (!groupIds.length) return { ok: false, reason: "missing_worker_group", condition: { kind: "worker_group" } };
   let firstFailure = null;
   for (const groupId of groupIds) {
-    const result = await checkWorkerGroupMembership({
-      env,
-      slug,
-      config,
-      groupId,
-      requesterAddress,
-      authScopes,
-      deps
-    });
+    const result = await checkWorkerGroupMembership({ env, slug, groupId, requesterAddress, authScopes, deps });
     if (result?.ok) {
       return {
         ok: true,
@@ -70765,15 +67814,7 @@ var evaluateAccessCondition = async ({ condition, env, slug, config, requesterAd
   if (kind === "agent_grant_scope") return evaluateAgentGrantScopeCondition({ condition, authScopes });
   if (kind === "sbt_onchain") return evaluateSbtOnchainCondition({ condition, config, requesterAddress, deps });
   if (kind === "worker_group") {
-    return evaluateWorkerGroupCondition({
-      condition,
-      env,
-      slug,
-      config,
-      requesterAddress,
-      authScopes,
-      deps
-    });
+    return evaluateWorkerGroupCondition({ condition, env, slug, requesterAddress, authScopes, deps });
   }
   return { ok: false, reason: "unknown_condition_kind", condition: { kind: kind || "unknown" } };
 };
@@ -70841,16 +67882,7 @@ var resolveGroupGateIds = ({ metadata, access }) => normalizeGroupIdList([
   ...normalizeGroupIdList(metadata?.payloadAccessControl?.groupId),
   ...normalizeGroupIdList(access.groupIds)
 ]);
-var authorizeWorkerGroupAccess = async ({
-  env,
-  slug,
-  config,
-  groupIds,
-  requesterAddress,
-  authScopes,
-  baseHeaders,
-  deps
-}) => {
+var authorizeWorkerGroupAccess = async ({ env, slug, groupIds, requesterAddress, authScopes, baseHeaders, deps }) => {
   if (!groupIds.length) {
     return {
       ok: false,
@@ -70859,15 +67891,7 @@ var authorizeWorkerGroupAccess = async ({
   }
   let firstFailure = null;
   for (const groupId of groupIds) {
-    const result = await checkWorkerGroupMembership({
-      env,
-      slug,
-      config,
-      groupId,
-      requesterAddress,
-      authScopes,
-      deps
-    });
+    const result = await checkWorkerGroupMembership({ env, slug, groupId, requesterAddress, authScopes, deps });
     if (result?.ok) {
       return {
         ok: true,
@@ -70973,7 +67997,6 @@ var authorizeCloudflareStorageAccess = async ({
     const groupAccess = await authorizeWorkerGroupAccess({
       env,
       slug,
-      config,
       groupIds: resolveGroupGateIds({ metadata, access }),
       requesterAddress,
       authScopes,
@@ -71098,7 +68121,6 @@ var enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, request
     const groupAccess = await authorizeWorkerGroupAccess({
       env,
       slug,
-      config,
       groupIds,
       requesterAddress,
       authScopes,
@@ -71346,7 +68368,6 @@ var handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authSc
     uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : void 0,
     size: bytesToStore?.length || 0,
     createdAt,
-    ...resource === "responses" && trim6(uploaderAddress) ? { responder: trim6(uploaderAddress).toLowerCase() } : {},
     payloadAccessMode: payloadAccess.mode,
     payloadAccessControl: {
       gate: payloadAccess.gate,
@@ -71665,7 +68686,6 @@ var handleCloudflareList = async ({ request, env, config, slug, uploaderAddress,
         tags: normalizeTagsForMetadata(metadata?.tags),
         size: Number(metadata?.size || 0) || 0,
         createdAt: trim6(metadata?.createdAt),
-        ...storageRef.resource === "responses" && trim6(metadata?.responder) ? { responder: trim6(metadata.responder).toLowerCase() } : {},
         payloadAccessControl: {
           gate: metadataAccess.gate,
           encryption: metadataAccess.encryption
@@ -72126,7 +69146,6 @@ var dispatchAnonymousRouteWithWorkerDeps = async ({
   deps: {
     readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
     storageRoute: deps?.storageRoute,
-    dispatchPublicWorkerGroupListRequest: deps?.dispatchPublicWorkerGroupListRequest,
     evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
     getSessionSecrets: (sessionSlug) => deps?.getSessionSecrets?.(env, sessionSlug),
     transcribe: deps?.transcribe,
@@ -72137,7 +69156,6 @@ var dispatchAnonymousRouteWithWorkerDeps = async ({
     proxyOpenRouter: deps?.proxyOpenRouter,
     proxyCustomRPC: deps?.proxyCustomRPC,
     json: deps?.json,
-    now: deps?.now,
     ANONYMOUS_ROUTE_DENIED_ERROR: constants?.anonymousRouteDeniedError
   }
 });
@@ -72184,8 +69202,7 @@ var dispatchAnonymousRouteEntryWithWorkerDeps = async ({
         proxyOpenAI: deps?.proxyOpenAI,
         proxyOpenRouter: deps?.proxyOpenRouter,
         proxyCustomRPC: deps?.proxyCustomRPC,
-        json: deps?.json,
-        now: deps?.now
+        json: deps?.json
       },
       constants: {
         anonymousRouteDeniedError: constants?.anonymousRouteDeniedError
@@ -72251,8 +69268,7 @@ var dispatchAuthenticatedRouteWithWorkerDeps = async ({
         getAddress: deps?.getAddress,
         transcribe: deps?.transcribe,
         arweaveUpload: deps?.arweaveUpload,
-        storageRoute: deps?.storageRoute,
-        now: deps?.now
+        storageRoute: deps?.storageRoute
       }
     }),
     readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
@@ -72265,8 +69281,7 @@ var dispatchAuthenticatedRouteWithWorkerDeps = async ({
         fetchImage: deps?.fetchImage,
         fetchUrl: deps?.fetchUrl,
         checkRateLimit: deps?.checkRateLimit,
-        json: deps?.json,
-        now: deps?.now
+        json: deps?.json
       }
     }),
     dispatchAuthenticatedSecretActionRoute: (value) => deps?.dispatchAuthenticatedSecretActionRoute?.({
@@ -72285,8 +69300,7 @@ var dispatchAuthenticatedRouteWithWorkerDeps = async ({
         checkRateLimit: deps?.checkRateLimit,
         getSessionSecrets: deps?.getSessionSecrets,
         json: deps?.json,
-        toStr: deps?.toStr,
-        now: deps?.now
+        toStr: deps?.toStr
       }
     }),
     json: deps?.json
@@ -72294,13 +69308,6 @@ var dispatchAuthenticatedRouteWithWorkerDeps = async ({
 });
 
 // workers/sessionCorsWorker/authenticatedRouteContextResolution.js
-var isWorkerGroupsRequest = (request) => {
-  try {
-    return new URL(request?.url || "").pathname.startsWith("/groups/");
-  } catch {
-    return false;
-  }
-};
 var resolveAuthenticatedRouteContext = async ({
   request,
   env,
@@ -72325,15 +69332,6 @@ var resolveAuthenticatedRouteContext = async ({
     };
   }
   const payload = auth?.payload || {};
-  const currentSessionId = resolveCanonicalWorkerSessionIdHex(config);
-  const tokenSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload.sessionId });
-  const workerCanonical = String(config?.sessionModeProfile?.authority?.mode || "").trim().toLowerCase() === "worker_canonical";
-  if ((workerCanonical || isWorkerGroupsRequest(request)) && (!currentSessionId || tokenSessionId !== currentSessionId)) {
-    return {
-      ok: false,
-      response: deps?.json?.({ error: "Token session identity is stale." }, 401, corsContext.headers)
-    };
-  }
   const tokenEpoch = normalizeAuthorizationEpoch(payload.authzEpoch);
   const currentEpoch = readAuthorizationEpoch(config);
   if (tokenEpoch === null || currentEpoch === null || tokenEpoch !== currentEpoch) {
@@ -72417,7 +69415,7 @@ var dispatchAuthenticatedRouteEntryWithWorkerDeps = async ({
 });
 
 // workers/sessionCorsWorker/adminRequestAuthority.js
-var toTrimmedString14 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString13 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var resolveEthersCompat2 = (loadedModule) => loadedModule?.ethers || loadedModule?.default?.ethers || loadedModule?.default || loadedModule || null;
 var ethers2 = resolveEthersCompat2(lib_exports);
 var getEthersFn3 = (...candidates) => candidates.find((fn) => typeof fn === "function") || null;
@@ -72458,7 +69456,7 @@ var verifyTypedDataCompat = (...args) => {
   }
   return verifyFn(...args);
 };
-var normalizeAddressLower2 = (value) => toTrimmedString14(value).toLowerCase();
+var normalizeAddressLower2 = (value) => toTrimmedString13(value).toLowerCase();
 var normalizeUnixSeconds = (value, deps) => {
   const raw = Number(
     value != null ? value : typeof deps?.now === "function" ? deps.now() : Date.now()
@@ -72540,12 +69538,12 @@ var resolveAdminRequestAuthority = async ({
     address,
     signature
   } = deps?.normalizeSignedWorkerRequest?.(body) || {};
-  const signedAction = toTrimmedString14(body?.action);
+  const signedAction = toTrimmedString13(body?.action);
   const signedSlugProvided = body && typeof body === "object" && Object.prototype.hasOwnProperty.call(body, "slug") && body?.slug != null;
-  const signedSlug = signedSlugProvided ? toTrimmedString14(body?.slug) : null;
-  const signedBodyHash = toTrimmedString14(body?.bodyHash).toLowerCase();
-  const nonce = toTrimmedString14(body?.nonce);
-  const audience = toTrimmedString14(body?.audience);
+  const signedSlug = signedSlugProvided ? toTrimmedString13(body?.slug) : null;
+  const signedBodyHash = toTrimmedString13(body?.bodyHash).toLowerCase();
+  const nonce = toTrimmedString13(body?.nonce);
+  const audience = toTrimmedString13(body?.audience);
   const expiration = body?.expiration;
   const slugContext = deps?.resolveWorkerBodySlugContext?.({ body, env, slugHint }) || {
     ok: false,
@@ -72603,7 +69601,7 @@ var resolveAdminRequestAuthority = async ({
     };
   }
   const buildAdminActionBodyHash2 = typeof deps?.buildAdminActionBodyHash === "function" ? deps.buildAdminActionBodyHash : buildAdminActionBodyHash;
-  const actualBodyHash = toTrimmedString14(buildAdminActionBodyHash2(body)).toLowerCase();
+  const actualBodyHash = toTrimmedString13(buildAdminActionBodyHash2(body)).toLowerCase();
   if (!actualBodyHash || actualBodyHash !== signedBodyHash) {
     return {
       ok: false,
@@ -72812,13 +69810,13 @@ var DEFAULT_PAGE_NUMBER = 0;
 var DEFAULT_PAGE_SIZE = 100;
 var { getPathRpcUrl: getPathRpcUrl2, getPublicRpcUrls: getPublicRpcUrls2 } = import_rpcDefaults4.default;
 var ethersUtils2 = ethers_exports?.utils || ethers_exports;
-var toTrimmedString15 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString14 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var isObj11 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var normalizeChipotleRpcCandidateList = (value = []) => {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   (Array.isArray(value) ? value : [value]).forEach((entry) => {
-    const trimmed = toTrimmedString15(entry);
+    const trimmed = toTrimmedString14(entry);
     if (!trimmed) return;
     const key = trimmed.toLowerCase();
     if (seen.has(key)) return;
@@ -72828,12 +69826,12 @@ var normalizeChipotleRpcCandidateList = (value = []) => {
   return out;
 };
 var normalizeValidChipotlePkpId = (value = "") => {
-  const trimmed = toTrimmedString15(value);
+  const trimmed = toTrimmedString14(value);
   if (!trimmed || trimmed === "0") return "";
   return trimmed;
 };
-var normalizeChipotleMembershipValue = (value = "") => toTrimmedString15(value).toLowerCase();
-var normalizeHostname = (value = "") => toTrimmedString15(value).toLowerCase().replace(/^\[(.*)\]$/, "$1");
+var normalizeChipotleMembershipValue = (value = "") => toTrimmedString14(value).toLowerCase();
+var normalizeHostname = (value = "") => toTrimmedString14(value).toLowerCase().replace(/^\[(.*)\]$/, "$1");
 var parseIpv4Octets2 = (hostname = "") => {
   const normalized = normalizeHostname(hostname);
   const parts = normalized.split(".");
@@ -72876,13 +69874,13 @@ var isApprovedLocalChipotleApiHost = (hostname = "") => {
   return normalized === "localhost" || normalized.endsWith(".localhost") || normalized === "::1" || normalized === "0:0:0:0:0:0:0:1" || ipv4Octets && ipv4Octets[0] === 127;
 };
 var isTruthyFlag = (value) => ["1", "true", "yes", "on"].includes(
-  toTrimmedString15(value).toLowerCase()
+  toTrimmedString14(value).toLowerCase()
 );
 var isLitChipotleLocalApiBaseAllowed = (env = {}) => isTruthyFlag(env?.[LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG]) || isTruthyFlag(env?.[LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG]);
 var normalizeLitChipotleApiBase = (value, {
   allowLocalApiBase = false
 } = {}) => {
-  const raw = toTrimmedString15(value);
+  const raw = toTrimmedString14(value);
   const candidate = raw || DEFAULT_LIT_API_BASE;
   let parsed;
   try {
@@ -72893,7 +69891,7 @@ var normalizeLitChipotleApiBase = (value, {
   const hostname = normalizeHostname(parsed.hostname);
   const isApprovedLocalHost = isApprovedLocalChipotleApiHost(hostname);
   const localOverrideAllowed = allowLocalApiBase === true && isApprovedLocalHost;
-  const protocol = toTrimmedString15(parsed.protocol).toLowerCase();
+  const protocol = toTrimmedString14(parsed.protocol).toLowerCase();
   if (parsed.username || parsed.password) {
     throw new Error("Lit Chipotle API base URL must not include credentials.");
   }
@@ -72922,7 +69920,7 @@ var normalizeLitChipotleApiBase = (value, {
   return parsed.origin.replace(/\/+$/, "");
 };
 var normalizeChipotleRequestPath = (path) => {
-  const raw = toTrimmedString15(path);
+  const raw = toTrimmedString14(path);
   if (!raw) return "/";
   if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith("//") || raw.includes("\\")) {
     throw new Error("Lit Chipotle request path must be relative.");
@@ -72942,7 +69940,7 @@ var buildChipotleUrl = (apiBase, path, { allowLocalApiBase = false } = {}) => {
   return `${normalizedBase}${CHIPOTLE_API_PREFIX}${normalizedPath}`;
 };
 var parseJsonIfPossible = (value) => {
-  const trimmed = toTrimmedString15(value);
+  const trimmed = toTrimmedString14(value);
   if (!trimmed) return {};
   try {
     return JSON.parse(trimmed);
@@ -72953,7 +69951,7 @@ var parseJsonIfPossible = (value) => {
 var extractChipotleErrorMessage = (status, body, fallback) => {
   if (typeof body === "string" && body.trim()) return body.trim();
   if (isObj11(body)) {
-    const nestedError = toTrimmedString15(body.error || body.message || body.detail);
+    const nestedError = toTrimmedString14(body.error || body.message || body.detail);
     if (nestedError) return nestedError;
   }
   return `${fallback} (${Number(status || 0) || 500})`;
@@ -72971,7 +69969,7 @@ var fetchChipotleJson = async ({
   if (typeof fetchImpl !== "function") {
     throw new Error("Fetch unavailable for Chipotle request.");
   }
-  const normalizedApiKey = toTrimmedString15(apiKey);
+  const normalizedApiKey = toTrimmedString14(apiKey);
   const headers = {};
   if (body !== void 0) {
     headers["Content-Type"] = "application/json";
@@ -72989,14 +69987,14 @@ var fetchChipotleJson = async ({
       ...body !== void 0 ? { body: JSON.stringify(body) } : {}
     });
   } catch (error) {
-    throw new Error(toTrimmedString15(error?.message || error) || "Chipotle request failed.");
+    throw new Error(toTrimmedString14(error?.message || error) || "Chipotle request failed.");
   }
   const text = await response2.text().catch(() => "");
   const parsed = parseJsonIfPossible(text);
   if (!response2.ok) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
-  if (isObj11(parsed) && toTrimmedString15(parsed.error || "").trim()) {
+  if (isObj11(parsed) && toTrimmedString14(parsed.error || "").trim()) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
   return parsed;
@@ -73010,9 +70008,9 @@ var resolveLitChipotleRuntime = ({
   const litCredentials = isObj11(config?.litCredentials) ? config.litCredentials : {};
   const requestBody = isObj11(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
-  const envApiKey = toTrimmedString15(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
-  const requestApiKey = toTrimmedString15(requestBody.litUsageApiKey || requestBody.apiKey);
-  const secretApiKey = toTrimmedString15(secrets?.litUsageApiKey);
+  const envApiKey = toTrimmedString14(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
+  const requestApiKey = toTrimmedString14(requestBody.litUsageApiKey || requestBody.apiKey);
+  const secretApiKey = toTrimmedString14(secrets?.litUsageApiKey);
   const litUsageApiKey = requestApiKey || secretApiKey || envApiKey;
   let apiKeySource = "missing";
   if (requestApiKey) apiKeySource = "request";
@@ -73026,11 +70024,11 @@ var resolveLitChipotleRuntime = ({
     allowLocalApiBase,
     litUsageApiKey,
     apiKeySource,
-    litGroupId: toTrimmedString15(requestBody.litGroupId || litCredentials.litGroupId),
-    litPkpId: toTrimmedString15(requestBody.litPkpId || litCredentials.litPkpId),
-    litActionCid: toTrimmedString15(requestBody.litActionCid || litCredentials.litActionCid),
-    customRpcUrl: toTrimmedString15(requestBody.customRpcUrl || secrets?.customRpcUrl),
-    customRpcKey: toTrimmedString15(requestBody.customRpcKey || secrets?.customRpcKey)
+    litGroupId: toTrimmedString14(requestBody.litGroupId || litCredentials.litGroupId),
+    litPkpId: toTrimmedString14(requestBody.litPkpId || litCredentials.litPkpId),
+    litActionCid: toTrimmedString14(requestBody.litActionCid || litCredentials.litActionCid),
+    customRpcUrl: toTrimmedString14(requestBody.customRpcUrl || secrets?.customRpcUrl),
+    customRpcKey: toTrimmedString14(requestBody.customRpcKey || secrets?.customRpcKey)
   };
 };
 var resolveLitChipotleProvisioningRuntime = ({
@@ -73042,11 +70040,11 @@ var resolveLitChipotleProvisioningRuntime = ({
   const litCredentials = isObj11(config?.litCredentials) ? config.litCredentials : {};
   const requestBody = isObj11(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
-  const secretManagementApiKey = toTrimmedString15(secrets?.litAccountApiKey);
-  const envManagementApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
+  const secretManagementApiKey = toTrimmedString14(secrets?.litAccountApiKey);
+  const envManagementApiKey = toTrimmedString14(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
   const litManagementApiKey = secretManagementApiKey || envManagementApiKey;
-  const litGroupId = toTrimmedString15(requestBody.litGroupId || requestBody.groupId || litCredentials.litGroupId);
-  const litGroupName = toTrimmedString15(requestBody.litGroupName || requestBody.groupName);
+  const litGroupId = toTrimmedString14(requestBody.litGroupId || requestBody.groupId || litCredentials.litGroupId);
+  const litGroupName = toTrimmedString14(requestBody.litGroupName || requestBody.groupName);
   const resolvedGroupSelector = litGroupId || litGroupName;
   let apiKeySource = "missing";
   if (secretManagementApiKey) apiKeySource = "session-secret";
@@ -73060,24 +70058,24 @@ var resolveLitChipotleProvisioningRuntime = ({
     litManagementApiKey,
     apiKeySource,
     litGroupId: resolvedGroupSelector,
-    litPkpId: toTrimmedString15(requestBody.litPkpId || requestBody.pkpId || litCredentials.litPkpId),
-    litActionCid: toTrimmedString15(requestBody.litActionCid || litCredentials.litActionCid)
+    litPkpId: toTrimmedString14(requestBody.litPkpId || requestBody.pkpId || litCredentials.litPkpId),
+    litActionCid: toTrimmedString14(requestBody.litActionCid || litCredentials.litActionCid)
   };
 };
 var ensureChipotleApiKey = (runtime = {}) => {
-  if (!toTrimmedString15(runtime?.litUsageApiKey)) {
+  if (!toTrimmedString14(runtime?.litUsageApiKey)) {
     throw new Error("Lit API key not configured.");
   }
 };
 var ensureChipotleManagementApiKey = (runtime = {}) => {
-  if (!toTrimmedString15(runtime?.litManagementApiKey)) {
+  if (!toTrimmedString14(runtime?.litManagementApiKey)) {
     throw new Error("Lit account API key not configured.");
   }
 };
 var buildPagedPath = (path, params = {}) => {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    const trimmed = toTrimmedString15(value);
+    const trimmed = toTrimmedString14(value);
     if (!trimmed) return;
     query.set(key, trimmed);
   });
@@ -73086,7 +70084,7 @@ var buildPagedPath = (path, params = {}) => {
 };
 var runtimeAllowsLocalApiBase = (runtime = {}) => runtime?.allowLocalApiBase === true;
 var listGroupWallets = async ({ runtime, fetchImpl } = {}) => {
-  if (!toTrimmedString15(runtime?.litGroupId)) return [];
+  if (!toTrimmedString14(runtime?.litGroupId)) return [];
   const response2 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litUsageApiKey,
@@ -73102,7 +70100,7 @@ var listGroupWallets = async ({ runtime, fetchImpl } = {}) => {
 };
 var listActions = async ({ runtime, fetchImpl, groupId } = {}) => {
   const rawGroupId = groupId === null ? "" : groupId === void 0 ? runtime?.litGroupId : groupId;
-  const resolvedGroupId = toTrimmedString15(rawGroupId);
+  const resolvedGroupId = toTrimmedString14(rawGroupId);
   if (groupId !== void 0 && groupId !== null && !resolvedGroupId && groupId !== "") return [];
   const response2 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
@@ -73118,7 +70116,7 @@ var listActions = async ({ runtime, fetchImpl, groupId } = {}) => {
   return Array.isArray(response2) ? response2 : [];
 };
 var listGroupActions = async ({ runtime, fetchImpl } = {}) => {
-  if (!toTrimmedString15(runtime?.litGroupId)) return [];
+  if (!toTrimmedString14(runtime?.litGroupId)) return [];
   return listActions({ runtime, fetchImpl, groupId: runtime.litGroupId });
 };
 var listGroups = async ({ runtime, fetchImpl } = {}) => {
@@ -73148,7 +70146,7 @@ var listWallets = async ({ runtime, fetchImpl } = {}) => {
   return Array.isArray(response2) ? response2 : [];
 };
 var resolveActionCidMembership = async ({ runtime, actions = [], fetchImpl } = {}) => {
-  const configuredCid = toTrimmedString15(runtime?.litActionCid);
+  const configuredCid = toTrimmedString14(runtime?.litActionCid);
   if (!configuredCid) return null;
   if (!Array.isArray(actions)) return null;
   const configuredCidLower = configuredCid.toLowerCase();
@@ -73164,8 +70162,8 @@ var resolveActionCidMembership = async ({ runtime, actions = [], fetchImpl } = {
   });
 };
 var createStatusWarning = (step, error) => ({
-  step: toTrimmedString15(step),
-  message: toTrimmedString15(error?.message || error) || "Unknown Chipotle status error."
+  step: toTrimmedString14(step),
+  message: toTrimmedString14(error?.message || error) || "Unknown Chipotle status error."
 });
 var readLitChipotleStatus = async ({
   runtime = {},
@@ -73231,13 +70229,13 @@ var readLitChipotleStatus = async ({
       hasConfiguredPkp: groupHasConfiguredPkp,
       hasConfiguredAction: groupHasConfiguredAction
     },
-    ready: !!toTrimmedString15(runtime.litUsageApiKey) && groupHasConfiguredPkp !== false && groupHasConfiguredAction !== false
+    ready: !!toTrimmedString14(runtime.litUsageApiKey) && groupHasConfiguredPkp !== false && groupHasConfiguredAction !== false
   };
 };
 var deriveLitActionCid = async ({ runtime = {}, actionCode = "", fetchImpl = globalThis.fetch } = {}) => {
-  const normalizedCode = toTrimmedString15(actionCode);
+  const normalizedCode = toTrimmedString14(actionCode);
   if (!normalizedCode) throw new Error("Lit Action code is required.");
-  return toTrimmedString15(await fetchChipotleJson({
+  return toTrimmedString14(await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: "/get_lit_action_ipfs_id",
@@ -73247,13 +70245,13 @@ var deriveLitActionCid = async ({ runtime = {}, actionCode = "", fetchImpl = glo
   }));
 };
 var normalizeSessionScopedNameSegment = (value, fallback = "session") => {
-  const normalized = toTrimmedString15(value).toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
+  const normalized = toTrimmedString14(value).toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
   return normalized || fallback;
 };
-var normalizeGateMode2 = (value) => toTrimmedString15(value).toLowerCase() === "all" ? "all" : "any";
+var normalizeGateMode2 = (value) => toTrimmedString14(value).toLowerCase() === "all" ? "all" : "any";
 var isPrivateHostname = isPrivateOrLocalHostname;
 var validateChipotleRpcUrl = (value = "") => {
-  const raw = toTrimmedString15(value);
+  const raw = toTrimmedString14(value);
   if (!raw) throw new Error("Lit Chipotle RPC URL is required.");
   let parsed;
   try {
@@ -73300,7 +70298,7 @@ var resolveSessionChipotleRpcUrl = ({
 } = {}) => {
   const requestBody = isObj11(request) ? request : {};
   const normalizedChainId = toChainId(chainId);
-  const requestRpcUrl = toTrimmedString15(requestBody.rpcUrl || requestBody.customRpcUrl);
+  const requestRpcUrl = toTrimmedString14(requestBody.rpcUrl || requestBody.customRpcUrl);
   const candidates = normalizeChipotleRpcCandidateList([
     secrets?.customRpcUrl,
     ...resolveConfigMappedChipotleRpcUrls({ config, chainId: normalizedChainId }),
@@ -73344,18 +70342,18 @@ var buildSessionBootstrapMetadata = ({
     requestBody.sessionSlug || requestBody.slug || sessionSlug,
     "session"
   );
-  const sessionName = toTrimmedString15(requestBody.sessionName) || slugSegment;
-  const accountName = toTrimmedString15(requestBody.accountName) || `ce-session-${slugSegment}`;
-  const groupName = toTrimmedString15(requestBody.groupName) || `${accountName}-default`;
-  const usageKeyName = toTrimmedString15(requestBody.usageKeyName) || `${groupName}-runtime`;
+  const sessionName = toTrimmedString14(requestBody.sessionName) || slugSegment;
+  const accountName = toTrimmedString14(requestBody.accountName) || `ce-session-${slugSegment}`;
+  const groupName = toTrimmedString14(requestBody.groupName) || `${accountName}-default`;
+  const usageKeyName = toTrimmedString14(requestBody.usageKeyName) || `${groupName}-runtime`;
   return {
     sessionName,
     accountName,
-    accountDescription: toTrimmedString15(requestBody.accountDescription) || `Context Engine Lit account for session ${sessionName}`,
+    accountDescription: toTrimmedString14(requestBody.accountDescription) || `Context Engine Lit account for session ${sessionName}`,
     groupName,
-    groupDescription: toTrimmedString15(requestBody.groupDescription) || `Default Lit group for session ${sessionName}`,
+    groupDescription: toTrimmedString14(requestBody.groupDescription) || `Default Lit group for session ${sessionName}`,
     usageKeyName,
-    usageKeyDescription: toTrimmedString15(requestBody.usageKeyDescription) || `Scoped runtime key for session ${sessionName}`
+    usageKeyDescription: toTrimmedString14(requestBody.usageKeyDescription) || `Scoped runtime key for session ${sessionName}`
   };
 };
 var createLitChipotleAccount = async ({
@@ -73375,13 +70373,13 @@ var createLitChipotleAccount = async ({
     body: {
       account_name: metadata.accountName,
       account_description: metadata.accountDescription,
-      ...toTrimmedString15(requestBody.accountEmail) ? { email: toTrimmedString15(requestBody.accountEmail) } : {}
+      ...toTrimmedString14(requestBody.accountEmail) ? { email: toTrimmedString14(requestBody.accountEmail) } : {}
     },
     fetchImpl
   });
   return {
-    accountApiKey: toTrimmedString15(response2?.api_key),
-    accountWalletAddress: toTrimmedString15(response2?.wallet_address),
+    accountApiKey: toTrimmedString14(response2?.api_key),
+    accountWalletAddress: toTrimmedString14(response2?.wallet_address),
     metadata
   };
 };
@@ -73407,7 +70405,7 @@ var createLitChipotleGroup = async ({
     fetchImpl
   });
   return {
-    groupId: toTrimmedString15(response2?.group_id),
+    groupId: toTrimmedString14(response2?.group_id),
     metadata
   };
 };
@@ -73422,10 +70420,10 @@ var createLitChipotleWallet = async ({
     path: "/create_wallet",
     fetchImpl
   });
-  const walletAddress = toTrimmedString15(response2?.wallet_address);
+  const walletAddress = toTrimmedString14(response2?.wallet_address);
   const wallets = await listWallets({ runtime, fetchImpl }).catch(() => []);
   const matchedWallet = wallets.find((entry) => {
-    const entryWalletAddress = toTrimmedString15(entry?.wallet_address).toLowerCase();
+    const entryWalletAddress = toTrimmedString14(entry?.wallet_address).toLowerCase();
     return !!walletAddress && entryWalletAddress === walletAddress.toLowerCase();
   });
   return {
@@ -73465,7 +70463,7 @@ var createLitChipotleUsageKey = async ({
     fetchImpl
   });
   return {
-    usageApiKey: toTrimmedString15(response2?.usage_api_key),
+    usageApiKey: toTrimmedString14(response2?.usage_api_key),
     metadata
   };
 };
@@ -73482,16 +70480,16 @@ var readChipotleBillingBalance = async ({
   fetchImpl
 }).catch(() => null);
 var resolveProvisioningGroupId = async ({ runtime = {}, fetchImpl = globalThis.fetch } = {}) => {
-  const rawGroupId = toTrimmedString15(runtime?.litGroupId);
+  const rawGroupId = toTrimmedString14(runtime?.litGroupId);
   if (!rawGroupId) throw new Error("Lit group ID not configured.");
   if (/^\d+$/.test(rawGroupId)) return rawGroupId;
   const groups = await listGroups({ runtime, fetchImpl });
   const match = groups.find((group) => {
-    const candidateId = toTrimmedString15(group?.id);
-    const candidateName = toTrimmedString15(group?.name);
+    const candidateId = toTrimmedString14(group?.id);
+    const candidateName = toTrimmedString14(group?.name);
     return candidateId === rawGroupId || candidateName === rawGroupId;
   });
-  const resolvedId = toTrimmedString15(match?.id);
+  const resolvedId = toTrimmedString14(match?.id);
   if (!resolvedId) throw new Error(`Lit group not found: ${rawGroupId}`);
   return resolvedId;
 };
@@ -73513,8 +70511,8 @@ var ensureActionMetadata = async ({ runtime = {}, litActionCid = "", actionName 
     method: "POST",
     body: {
       action_ipfs_cid: litActionCid,
-      name: toTrimmedString15(actionName) || "Context Engine Lit Action",
-      description: toTrimmedString15(actionDescription) || "Provisioned by Context Engine"
+      name: toTrimmedString14(actionName) || "Context Engine Lit Action",
+      description: toTrimmedString14(actionDescription) || "Provisioned by Context Engine"
     },
     fetchImpl
   });
@@ -73579,7 +70577,7 @@ var ensurePkpInGroup = async ({ runtime = {}, groupId = "", fetchImpl = globalTh
     method: "POST",
     body: {
       group_id: Number(groupId),
-      pkp_id: toTrimmedString15(runtime?.litPkpId)
+      pkp_id: toTrimmedString14(runtime?.litPkpId)
     },
     fetchImpl
   });
@@ -73594,11 +70592,11 @@ var provisionLitChipotleAction = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   ensureChipotleManagementApiKey(runtime);
-  if (!toTrimmedString15(runtime?.litPkpId)) {
+  if (!toTrimmedString14(runtime?.litPkpId)) {
     throw new Error("Lit PKP ID not configured.");
   }
   const actionRequest = isObj11(request) ? request : {};
-  const actionCode = toTrimmedString15(actionRequest.actionCode || actionRequest.code);
+  const actionCode = toTrimmedString14(actionRequest.actionCode || actionRequest.code);
   if (!actionCode) {
     throw new Error("Lit Action code is required.");
   }
@@ -73628,7 +70626,7 @@ var provisionLitChipotleAction = async ({
     apiKeySource: runtime.apiKeySource,
     litActionCid,
     litGroupId: resolvedGroupId,
-    litPkpId: toTrimmedString15(runtime.litPkpId),
+    litPkpId: toTrimmedString14(runtime.litPkpId),
     steps: {
       derivedCid: true,
       registeredAction: metadata.created,
@@ -73646,16 +70644,16 @@ var bootstrapLitChipotleSession = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   const litCredentials = isObj11(config?.litCredentials) ? config.litCredentials : {};
-  const secretAccountApiKey = toTrimmedString15(secrets?.litAccountApiKey);
+  const secretAccountApiKey = toTrimmedString14(secrets?.litAccountApiKey);
   const requestBody = isObj11(request) ? request : {};
-  const requestAccountApiKey = toTrimmedString15(requestBody.litAccountApiKey);
-  const envAccountApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY);
+  const requestAccountApiKey = toTrimmedString14(requestBody.litAccountApiKey);
+  const envAccountApiKey = toTrimmedString14(env?.LIT_ACCOUNT_API_KEY);
   const existingAccountApiKey = secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
   const existingAccountApiKeySource = secretAccountApiKey ? "session-secret" : requestAccountApiKey ? "admin-request" : envAccountApiKey ? "worker-env" : "missing";
-  const existingUsageApiKey = toTrimmedString15(secrets?.litUsageApiKey);
-  const existingGroupId = toTrimmedString15(litCredentials?.litGroupId);
-  const existingPkpId = toTrimmedString15(litCredentials?.litPkpId);
-  const existingActionCid = toTrimmedString15(litCredentials?.litActionCid);
+  const existingUsageApiKey = toTrimmedString14(secrets?.litUsageApiKey);
+  const existingGroupId = toTrimmedString14(litCredentials?.litGroupId);
+  const existingPkpId = toTrimmedString14(litCredentials?.litPkpId);
+  const existingActionCid = toTrimmedString14(litCredentials?.litActionCid);
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const litApiBase = normalizeLitChipotleApiBase(
     requestBody.litApiBase || litCredentials.litApiBase || env?.LIT_API_BASE || DEFAULT_LIT_API_BASE,
@@ -73692,7 +70690,7 @@ var bootstrapLitChipotleSession = async ({
       }
     };
   }
-  const actionCode = toTrimmedString15(requestBody.actionCode || requestBody.code);
+  const actionCode = toTrimmedString14(requestBody.actionCode || requestBody.code);
   if (!actionCode && !existingActionCid) {
     throw new Error("Lit Action code is required.");
   }
@@ -73712,7 +70710,7 @@ var bootstrapLitChipotleSession = async ({
         sessionSlug,
         fetchImpl
       });
-      groupId2 = toTrimmedString15(group2.groupId);
+      groupId2 = toTrimmedString14(group2.groupId);
       if (!groupId2) {
         throw new Error("Lit session bootstrap did not return a group ID.");
       }
@@ -73725,7 +70723,7 @@ var bootstrapLitChipotleSession = async ({
         runtime: runtime2,
         fetchImpl
       });
-      litPkpId2 = toTrimmedString15(wallet2.litPkpId);
+      litPkpId2 = toTrimmedString14(wallet2.litPkpId);
       if (!litPkpId2) {
         throw new Error("Lit session bootstrap did not return a PKP ID.");
       }
@@ -73769,7 +70767,7 @@ var bootstrapLitChipotleSession = async ({
         sessionSlug,
         fetchImpl
       });
-      usageApiKey = toTrimmedString15(usageKey2.usageApiKey);
+      usageApiKey = toTrimmedString14(usageKey2.usageApiKey);
       if (!usageApiKey) {
         throw new Error("Lit session bootstrap did not return a usage API key.");
       }
@@ -73834,7 +70832,7 @@ var bootstrapLitChipotleSession = async ({
     sessionSlug,
     fetchImpl
   });
-  const groupId = toTrimmedString15(group.groupId);
+  const groupId = toTrimmedString14(group.groupId);
   if (!groupId) {
     throw new Error("Lit session bootstrap did not return a group ID.");
   }
@@ -73842,7 +70840,7 @@ var bootstrapLitChipotleSession = async ({
     runtime,
     fetchImpl
   });
-  const litPkpId = toTrimmedString15(wallet.litPkpId);
+  const litPkpId = toTrimmedString14(wallet.litPkpId);
   if (!litPkpId) {
     throw new Error("Lit session bootstrap did not return a PKP ID.");
   }
@@ -73905,7 +70903,7 @@ var bootstrapLitChipotleSession = async ({
     },
     secretOutputs: {
       litAccountApiKey: account.accountApiKey,
-      litUsageApiKey: toTrimmedString15(usageKey.usageApiKey)
+      litUsageApiKey: toTrimmedString14(usageKey.usageApiKey)
     },
     steps: {
       createdAccount: true,
@@ -73926,8 +70924,8 @@ var executeLitChipotleAction = async ({
 } = {}) => {
   ensureChipotleApiKey(runtime);
   const actionRequest = isObj11(request) ? request : {};
-  const code = toTrimmedString15(actionRequest.code);
-  const ipfsId = toTrimmedString15(
+  const code = toTrimmedString14(actionRequest.code);
+  const ipfsId = toTrimmedString14(
     actionRequest.ipfsId || actionRequest.ipfs_id || runtime.litActionCid
   );
   if (!code && !ipfsId) {
@@ -73953,7 +70951,7 @@ var executeLitChipotleAction = async ({
       fetchImpl
     });
   } catch (error) {
-    const message = toTrimmedString15(error?.message || error);
+    const message = toTrimmedString14(error?.message || error);
     if (/not found/i.test(message)) {
       throw new Error("Lit Chipotle action was not found or is not permitted for this session usage key. Re-run Lit Chipotle provisioning for this session worker.");
     }
@@ -73984,15 +70982,15 @@ var executeSessionLitChipotleAction = async ({
     body: {}
   });
   ensureChipotleApiKey(runtime);
-  const litPkpId = toTrimmedString15(litCredentials?.litPkpId || runtime.litPkpId);
+  const litPkpId = toTrimmedString14(litCredentials?.litPkpId || runtime.litPkpId);
   if (!litPkpId) {
     throw new Error("Lit PKP ID not configured.");
   }
-  const litActionCid = toTrimmedString15(litCredentials?.litActionCid || runtime.litActionCid);
+  const litActionCid = toTrimmedString14(litCredentials?.litActionCid || runtime.litActionCid);
   if (!litActionCid) {
     throw new Error("Lit Action CID not configured.");
   }
-  const actionCode = toTrimmedString15(requestBody.actionCode || requestBody.code);
+  const actionCode = toTrimmedString14(requestBody.actionCode || requestBody.code);
   if (!actionCode) {
     throw new Error("Lit Action code is required.");
   }
@@ -74000,7 +70998,7 @@ var executeSessionLitChipotleAction = async ({
   if (derivedActionCid !== litActionCid) {
     throw new Error("Lit Action code does not match the configured Lit Action CID.");
   }
-  const op = toTrimmedString15(requestBody.op).toLowerCase();
+  const op = toTrimmedString14(requestBody.op).toLowerCase();
   if (!["check", "encrypt", "decrypt"].includes(op)) {
     throw new Error("Lit Chipotle op must be check, encrypt, or decrypt.");
   }
@@ -74037,7 +71035,7 @@ var executeSessionLitChipotleAction = async ({
     chainId: gateChainId,
     op
   });
-  const normalizedRequesterAddress = toTrimmedString15(requesterAddress);
+  const normalizedRequesterAddress = toTrimmedString14(requesterAddress);
   if (!normalizedRequesterAddress) {
     throw new Error("Requester address unavailable for Lit Chipotle action.");
   }
@@ -74071,7 +71069,7 @@ var executeSessionLitChipotleAction = async ({
     if (metadataVersion && metadataVersion !== 2) {
       throw new Error("Lit Chipotle legacy wrapped keys are not supported.");
     }
-    jsParams.ciphertext = toTrimmedString15(requestBody.ciphertext);
+    jsParams.ciphertext = toTrimmedString14(requestBody.ciphertext);
     if (!jsParams.ciphertext) {
       throw new Error("Lit Chipotle decrypt requires ciphertext.");
     }
@@ -74093,7 +71091,7 @@ var executeSessionLitChipotleAction = async ({
       fetchImpl
     });
   } catch (error) {
-    const message = toTrimmedString15(error?.message || error).toLowerCase();
+    const message = toTrimmedString14(error?.message || error).toLowerCase();
     if (!message.includes("no cached code found") && !message.includes("cache miss for ipfs id")) {
       throw error;
     }
@@ -74120,7 +71118,7 @@ var ALLOWED_SECRET_KEYS = [
   "litAccountApiKey",
   "litUsageApiKey"
 ];
-var toTrimmedString16 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString15 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var recordAuthFailure2 = async ({ env, deps } = {}) => {
   try {
     await (deps?.recordAbuseEvent || recordAbuseEvent)({
@@ -74134,7 +71132,7 @@ var recordAuthFailure2 = async ({ env, deps } = {}) => {
 var buildSecretPresenceManifest = (secrets) => {
   const source = secrets && typeof secrets === "object" ? secrets : {};
   return ALLOWED_SECRET_KEYS.reduce((acc, key) => {
-    acc[key] = !!toTrimmedString16(source[key]);
+    acc[key] = !!toTrimmedString15(source[key]);
     return acc;
   }, {});
 };
@@ -74146,9 +71144,9 @@ var buildSetConfigIncomingConfig = ({
   const incoming = body?.config && typeof body.config === "object" ? body.config : null;
   if (!incoming) return null;
   const nextIncoming = { ...incoming };
-  const hasIncomingAdminAddress = !!toTrimmedString16(nextIncoming.adminAddress);
+  const hasIncomingAdminAddress = !!toTrimmedString15(nextIncoming.adminAddress);
   if (!existingConfig && !hasIncomingAdminAddress) {
-    const requestedAdminAddress = toTrimmedString16(body?.adminAddress);
+    const requestedAdminAddress = toTrimmedString15(body?.adminAddress);
     if (requestedAdminAddress && deps?.isAddress?.(requestedAdminAddress)) {
       nextIncoming.adminAddress = requestedAdminAddress;
     }
@@ -74230,7 +71228,6 @@ var dispatchAdminRequest = async ({
     const response2 = await (deps?.dispatchAdminWorkerGroupRequest || dispatchAdminWorkerGroupRequest)({
       action,
       body,
-      config: existingConfig,
       env,
       slug: targetSlug,
       adminAddress: authorityResult.address || body?.address,
@@ -74241,9 +71238,7 @@ var dispatchAdminRequest = async ({
         getAddress: deps?.getAddress,
         now: deps?.now,
         randomUUID: deps?.randomUUID,
-        getRandomValues: deps?.getRandomValues,
-        executeCoordinatedWorkerGroupMutation: deps?.executeCoordinatedWorkerGroupMutation,
-        reconcileCoordinatedWorkerGroupCapacity: deps?.reconcileCoordinatedWorkerGroupCapacity
+        getRandomValues: deps?.getRandomValues
       }
     });
     if (response2) return response2;
@@ -74423,7 +71418,7 @@ var dispatchAdminRequest = async ({
         env,
         slug: targetSlug,
         config: existingConfig,
-        resource: toTrimmedString16(body?.resource),
+        resource: toTrimmedString15(body?.resource),
         includeSessionEnvelope: true,
         deps: {
           now: deps?.now
@@ -74445,17 +71440,17 @@ var dispatchAdminRequest = async ({
     }
     const deployRequest = grantRequest?.deploy && typeof grantRequest.deploy === "object" ? grantRequest.deploy : {};
     const faucetRequest = grantRequest?.faucet && typeof grantRequest.faucet === "object" ? grantRequest.faucet : {};
-    const cloudflareApiToken = toTrimmedString16(deployRequest.cloudflareApiToken);
-    const faucetPrivateKey = typeof deps?.normalizeSecretValue === "function" ? deps.normalizeSecretValue(faucetRequest.faucetPrivateKey) : toTrimmedString16(faucetRequest.faucetPrivateKey);
-    const bootstrapWorkerUrl = toTrimmedString16(
+    const cloudflareApiToken = toTrimmedString15(deployRequest.cloudflareApiToken);
+    const faucetPrivateKey = typeof deps?.normalizeSecretValue === "function" ? deps.normalizeSecretValue(faucetRequest.faucetPrivateKey) : toTrimmedString15(faucetRequest.faucetPrivateKey);
+    const bootstrapWorkerUrl = toTrimmedString15(
       grantRequest.bootstrapWorkerUrl || existingConfig?.corsWorkerUrl || ""
     );
-    const expiresAt = toTrimmedString16(grantRequest.expiresAt);
+    const expiresAt = toTrimmedString15(grantRequest.expiresAt);
     const embeddedDeployHelperEnabled = normalizeEmbeddedDeployHelperEnabled(
       env?.DEPLOY_HELPER_ENABLED,
       true
     );
-    if (!cloudflareApiToken && !toTrimmedString16(faucetPrivateKey)) {
+    if (!cloudflareApiToken && !toTrimmedString15(faucetPrivateKey)) {
       return deps?.json?.(
         { error: "At least one sponsored deploy or faucet credential is required." },
         400,
@@ -74498,7 +71493,7 @@ var dispatchAdminRequest = async ({
         );
       }
       let faucetGrantToken = "";
-      if (toTrimmedString16(faucetPrivateKey)) {
+      if (toTrimmedString15(faucetPrivateKey)) {
         faucetGrantToken = buildSponsoredGrantToken();
         await writeSponsoredGrantRecord(
           env,
@@ -74507,7 +71502,7 @@ var dispatchAdminRequest = async ({
             type: SPONSORED_GRANT_TYPES.faucet,
             sourceSessionSlug: targetSlug,
             sourceConfig,
-            faucetPrivateKey: toTrimmedString16(faucetPrivateKey),
+            faucetPrivateKey: toTrimmedString15(faucetPrivateKey),
             issuedAt,
             expiresAt
           },
@@ -74583,7 +71578,7 @@ var dispatchAdminRequestWithWorkerDeps = async ({
 });
 
 // workers/sessionCorsWorker/adminAbuseSummaryDispatch.js
-var toTrimmedString17 = (value, deps) => {
+var toTrimmedString16 = (value, deps) => {
   if (typeof deps?.toStr === "function") return deps.toStr(value).trim();
   return value == null ? "" : String(value).trim();
 };
@@ -74633,7 +71628,7 @@ var dispatchAdminAbuseSummaryRequest = async ({
   });
   if (corsContext && !corsContext.ok) return corsContext.response;
   const headers = corsContext?.headers || baseHeaders;
-  const address = toTrimmedString17(auth.payload?.sub, deps).toLowerCase();
+  const address = toTrimmedString16(auth.payload?.sub, deps).toLowerCase();
   const isAdmin = await deps?.validateAdmin?.({
     env,
     slug: targetSlug,
@@ -74708,17 +71703,6 @@ var dispatchAuthNonceRequest = async ({
   if (!originCheck?.ok) {
     return deps?.json?.({ error: originCheck?.error }, 403, headers);
   }
-  const workerCanonical = String(
-    corsState.config?.sessionModeProfile?.authority?.mode || ""
-  ).trim().toLowerCase() === "worker_canonical";
-  const sessionId = resolveCanonicalWorkerSessionIdHex(corsState.config);
-  const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
-  if (workerCanonical && !sessionId) {
-    return deps?.json?.({ error: "Worker session identity is invalid." }, 500, headers);
-  }
-  if (workerCanonical && requestedSessionId !== sessionId) {
-    return deps?.json?.({ error: "Session identity does not match worker session." }, 409, headers);
-  }
   const rateLimitIdentity = typeof deps?.resolveAnonymousRateIdentity === "function" ? deps.resolveAnonymousRateIdentity(request) : resolveAnonymousRateIdentity({
     request,
     deps: {
@@ -74754,10 +71738,7 @@ var dispatchAuthNonceRequest = async ({
       headers
     );
   }
-  return deps?.json?.({
-    nonce,
-    ...workerCanonical ? { sessionSlug: targetSlug, sessionId } : {}
-  }, 200, headers);
+  return deps?.json?.({ nonce }, 200, headers);
 };
 
 // workers/sessionCorsWorker/authLoginRequestAuthority.js
@@ -74851,23 +71832,6 @@ var resolveAuthLoginRequestAuthority = async ({
     return {
       ok: false,
       response: deps?.json?.({ error: deps?.SESSION_CONFIG_NOT_FOUND_ERROR }, 404, headers)
-    };
-  }
-  const workerCanonical = String(
-    config?.sessionModeProfile?.authority?.mode || ""
-  ).trim().toLowerCase() === "worker_canonical";
-  const sessionId = resolveCanonicalWorkerSessionIdHex(config);
-  const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
-  if (workerCanonical && !sessionId) {
-    return {
-      ok: false,
-      response: deps?.json?.({ error: "Worker session identity is invalid." }, 500, headers)
-    };
-  }
-  if (workerCanonical && requestedSessionId !== sessionId) {
-    return {
-      ok: false,
-      response: deps?.json?.({ error: "Session identity does not match worker session." }, 409, headers)
     };
   }
   const loginOriginCheck = (typeof deps?.validateBrowserLoginOrigin === "function" ? deps.validateBrowserLoginOrigin : validateBrowserLoginOrigin)({
@@ -74995,15 +71959,6 @@ var dispatchAuthLoginRequest = async ({
   if (authzEpoch === null) {
     return deps?.json?.({ error: "Session authorization epoch is invalid." }, 500, headers);
   }
-  const sessionId = resolveCanonicalWorkerSessionIdHex(config);
-  const workerCanonical = String(config?.sessionModeProfile?.authority?.mode || "").trim().toLowerCase() === "worker_canonical";
-  const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
-  if (workerCanonical && !sessionId) {
-    return deps?.json?.({ error: "Worker session identity is invalid." }, 500, headers);
-  }
-  if (workerCanonical && requestedSessionId !== sessionId) {
-    return deps?.json?.({ error: "Session identity does not match worker session." }, 409, headers);
-  }
   const buildJti = typeof deps?.buildAuthTokenJti === "function" ? deps.buildAuthTokenJti : buildAuthTokenJti;
   const jti = buildJti({
     randomUUID: deps?.randomUUID,
@@ -75013,7 +71968,6 @@ var dispatchAuthLoginRequest = async ({
   const payload = {
     sub,
     slug: targetSlug,
-    ...sessionId ? { sessionId } : {},
     authzEpoch,
     scopes,
     exp,
@@ -75037,12 +71991,7 @@ var dispatchAuthLoginRequest = async ({
   } catch (err) {
     return deps?.json?.({ error: err?.message || "Token persistence failed." }, 500, headers);
   }
-  return deps?.json?.({
-    token,
-    exp,
-    sessionSlug: targetSlug,
-    ...sessionId ? { sessionId } : {}
-  }, 200, headers);
+  return deps?.json?.({ token, exp }, 200, headers);
 };
 
 // workers/sessionCorsWorker/nonceLifecycle.js
@@ -75449,9 +72398,9 @@ var dispatchBootstrapArweaveUploadWithWorkerDeps = async ({
 
 // workers/sessionCorsWorker/sponsoredBootstrapRedeemDispatch.js
 var INVALID_GRANT_ERROR = "Invalid, expired, or already used sponsored bootstrap grant.";
-var toTrimmedString18 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString17 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var isExpiredGrant = (record = {}, nowMs = Date.now()) => {
-  const expiresAt = toTrimmedString18(record?.expiresAt);
+  const expiresAt = toTrimmedString17(record?.expiresAt);
   if (!expiresAt) return false;
   const expirationMs = Date.parse(expiresAt);
   if (!Number.isFinite(expirationMs)) return false;
@@ -75482,11 +72431,11 @@ var buildDeployExecutionFailure = (error) => ({
   ok: false,
   status: 502,
   body: {
-    error: toTrimmedString18(error?.message || error) || "Failed to run embedded sponsored deploy."
+    error: toTrimmedString17(error?.message || error) || "Failed to run embedded sponsored deploy."
   }
 });
 var buildSponsoredRequestDigest = async (action, payload, requestOrigin = "") => sha256Hex2(
-  stableCanonicalSerialize({ action, payload, requestOrigin: normalizeOrigin(requestOrigin) })
+  stableCanonicalSerialize({ action, payload, requestOrigin: normalizeOrigin3(requestOrigin) })
 );
 var buildSponsoredDeploymentRequestId = async (grantToken) => `sponsored-${(await sha256Hex2(`sponsored-deploy:${grantToken}`)).slice(0, 32)}`;
 var buildSponsoredConfigRevision = async (grantToken) => `sponsored-revision-${(await sha256Hex2(`sponsored-config:${grantToken}`)).slice(0, 32)}`;
@@ -75522,7 +72471,7 @@ var redactSponsoredDeployFailure = (result, sensitiveValues = []) => ({
 });
 var resolveSponsoredRedemptionReplay = ({ grantRecord, requestDigest, deps, headers } = {}) => {
   if (grantRecord?.state !== "redeemed" && grantRecord?.state !== "redeeming") return null;
-  if (toTrimmedString18(grantRecord?.requestDigest) !== requestDigest) {
+  if (toTrimmedString17(grantRecord?.requestDigest) !== requestDigest) {
     return buildGrantErrorResponse(
       deps,
       headers,
@@ -75558,7 +72507,7 @@ var dispatchSponsoredBootstrapRedeem = async ({
   }
   const tokenField = action === "deploy" ? "deployGrantToken" : "faucetGrantToken";
   const expectedGrantType = action === "deploy" ? SPONSORED_GRANT_TYPES.deploy : SPONSORED_GRANT_TYPES.faucet;
-  const grantToken = toTrimmedString18(body?.[tokenField]);
+  const grantToken = toTrimmedString17(body?.[tokenField]);
   if (!grantToken) {
     return buildGrantErrorResponse(deps, baseHeaders, 400, `Missing ${tokenField}.`);
   }
@@ -75611,7 +72560,7 @@ var dispatchSponsoredBootstrapRedeem = async ({
       grantRecord,
       effectiveDeployPayload
     });
-    const requestOrigin = normalizeOrigin(request?.headers?.get?.("Origin") || "");
+    const requestOrigin = normalizeOrigin3(request?.headers?.get?.("Origin") || "");
     const requestDigest2 = await buildSponsoredRequestDigest(
       "deploy",
       effectiveDeployPayload,
@@ -75632,7 +72581,7 @@ var dispatchSponsoredBootstrapRedeem = async ({
         requestDigest: requestDigest2,
         deployBody: {
           ...effectiveDeployPayload,
-          apiToken: toTrimmedString18(grantRecord?.cloudflareApiToken)
+          apiToken: toTrimmedString17(grantRecord?.cloudflareApiToken)
         },
         requestOrigin,
         sensitiveValues
@@ -75662,7 +72611,7 @@ var dispatchSponsoredBootstrapRedeem = async ({
       headers
     );
   }
-  const recipientAddress = toTrimmedString18(body?.to || body?.recipient || body?.address);
+  const recipientAddress = toTrimmedString17(body?.to || body?.recipient || body?.address);
   if (!recipientAddress) {
     return buildGrantErrorResponse(deps, headers, 400, "Missing address.");
   }
@@ -75733,11 +72682,11 @@ var dispatchSponsoredBootstrapRedeem = async ({
         to: recipientAddress
       },
       secrets: {
-        faucetPrivateKey: toTrimmedString18(grantRecord?.faucetPrivateKey)
+        faucetPrivateKey: toTrimmedString17(grantRecord?.faucetPrivateKey)
       },
       config: sourceConfig,
       baseHeaders: headers,
-      slug: toTrimmedString18(grantRecord?.sourceSessionSlug),
+      slug: toTrimmedString17(grantRecord?.sourceSessionSlug),
       requesterAddress: recipientAddress,
       tokenHasFaucetScope: true
     });
@@ -75900,10 +72849,6 @@ var dispatchSessionConfigBootstrapRequest = async ({
   if (!config || !isWorkerCanonicalSessionConfig(config)) {
     return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
   }
-  const modeValidation = validateWorkerConfigModeValues(config);
-  if (!modeValidation.ok) {
-    return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
-  }
   const corsContext = await deps?.getCorsContext?.({ request, config });
   if (!corsContext?.ok) return protectBootstrapResponse(corsContext?.response, protectedBaseHeaders);
   return deps?.json?.({
@@ -75975,12 +72920,6 @@ var resolveTopLevelRouteSelection = ({
     return {
       kind: "anonymous",
       anonymousRoute: "storage"
-    };
-  }
-  if (!hasTrimmedAuthorization && path === "/groups/list" && method === "GET") {
-    return {
-      kind: "anonymous",
-      anonymousRoute: "groups"
     };
   }
   return { kind: "authenticated" };
@@ -76258,8 +73197,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
             proxyAnthropic: deps?.proxyAnthropic,
             proxyOpenAI: deps?.proxyOpenAI,
             proxyOpenRouter: deps?.proxyOpenRouter,
-            proxyCustomRPC: deps?.proxyCustomRPC,
-            now: deps?.now
+            proxyCustomRPC: deps?.proxyCustomRPC
           },
           constants: {
             missingSlugError: constants?.missingSlugError,
@@ -76297,7 +73235,6 @@ var createWorkerRouteShellWithWorkerDeps = ({
           storageRoute: deps?.storageRoute,
           fetchImage: deps?.fetchImage,
           fetchUrl: deps?.fetchUrl,
-          now: deps?.now,
           normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
           proxyAnthropic: deps?.proxyAnthropic,
           proxyOpenAI: deps?.proxyOpenAI,
@@ -76960,17 +73897,9 @@ var dispatchAuthenticatedSecretPathRoute = async ({
   const isTranscribeRoute = path === "/transcribe" && method === "POST";
   const isArweaveUploadRoute = path === "/arweave/upload" && method === "POST";
   const isStorageRoute = path === "/storage/upload" && method === "POST" || path === "/storage/read" && (method === "GET" || method === "POST") || path === "/storage/list" && (method === "GET" || method === "POST") || path === "/storage/export-envelopes" && (method === "GET" || method === "POST");
-  const isWorkerGroupsRoute = path === "/groups/my-memberships" && (method === "GET" || method === "POST") || path === "/groups/members" && (method === "GET" || method === "POST") || path === "/groups/list" && (method === "GET" || method === "POST") || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
+  const isWorkerGroupsRoute = path === "/groups/my-memberships" && (method === "GET" || method === "POST") || path === "/groups/list" && (method === "GET" || method === "POST") || path === "/groups/join" && method === "POST";
   if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute) {
     return { handled: false };
-  }
-  const isParticipantWrite = isTranscribeRoute || isArweaveUploadRoute || path === "/storage/upload" && method === "POST" || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
-  const endedResponse = isParticipantWrite ? buildSessionEndedResponse({ config, headers, json: deps?.json, now: deps?.now }) : null;
-  if (endedResponse) {
-    return {
-      handled: true,
-      response: endedResponse
-    };
   }
   const route = isTranscribeRoute ? "transcribe" : isStorageRoute ? "storage" : isWorkerGroupsRoute ? "groups" : "arweave";
   const scope = route === "storage" && scopes?.storage !== true ? "arweave" : route;
@@ -77129,20 +74058,6 @@ var dispatchAuthenticatedSecretActionRoute = async ({
   const isLitChipotleAction = path === "/lit/chipotle-action" || action === "lit_chipotle_execute";
   if (!isFaucetAction && !isAiAction && !isLitChipotleAction) {
     return { handled: false };
-  }
-  if (isAiAction) {
-    const endedResponse = buildSessionEndedResponse({
-      config,
-      headers,
-      json: deps?.json,
-      now: deps?.now
-    });
-    if (endedResponse) {
-      return {
-        handled: true,
-        response: endedResponse
-      };
-    }
   }
   if (isFaucetAction) {
     const toStr21 = typeof deps?.toStr === "function" ? deps.toStr : (value) => typeof value === "string" ? value : value == null ? "" : String(value);
@@ -77376,18 +74291,6 @@ var dispatchAuthenticatedNonSecretActionRoute = async ({
   if (!isFetchImageAction && !isFetchUrlAction) {
     return { handled: false };
   }
-  const endedResponse = buildSessionEndedResponse({
-    config,
-    headers,
-    json: deps?.json,
-    now: deps?.now
-  });
-  if (endedResponse) {
-    return {
-      handled: true,
-      response: endedResponse
-    };
-  }
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
     scope: "fetch",
@@ -77514,19 +74417,6 @@ var dispatchAnonymousRoute = async ({
     headers,
     env
   } = anonymousContext || {};
-  if (path === "/groups/list") {
-    const dispatchPublicWorkerGroupListRequest2 = deps?.dispatchPublicWorkerGroupListRequest || dispatchPublicWorkerGroupListRequest;
-    return dispatchPublicWorkerGroupListRequest2({
-      request,
-      config,
-      env,
-      slug,
-      baseHeaders: headers,
-      deps: {
-        json: deps?.json
-      }
-    });
-  }
   if ((path === "/storage/read" || path === "/storage/list") && typeof deps?.storageRoute === "function") {
     return deps.storageRoute({
       path,
@@ -77539,13 +74429,6 @@ var dispatchAnonymousRoute = async ({
       baseHeaders: headers
     });
   }
-  const endedResponse = buildSessionEndedResponse({
-    config,
-    headers,
-    json: deps?.json,
-    now: deps?.now
-  });
-  if (endedResponse) return endedResponse;
   if (path === "/transcribe") {
     const transcribeRequest = await deps?.readTranscribeRequestPayload?.({ request });
     if (!transcribeRequest?.ok) {
@@ -78070,7 +74953,6 @@ var worker_default = {
 };
 export {
   SessionWriteCoordinator,
-  WorkerGroupWriteCoordinator,
   worker_default as default,
   workerAuthGateUtils
 };
