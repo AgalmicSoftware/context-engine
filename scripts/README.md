@@ -15,6 +15,17 @@ Common contents here include:
 - worker build, bundle verification, and deploy-helper publish scripts
 - release, audit, and maintenance helpers
 
+Contract ABI parity:
+
+```bash
+npm run verify:abi-sync
+```
+
+This builds the Foundry contracts and compares deterministic ABI extraction
+with `client/src/contractsABI/` without rewriting tracked files. If reviewed
+contract changes intentionally alter an ABI, run `npm run abi:sync` and inspect
+the resulting tracked diff before rerunning the parity command.
+
 Type-debt ratchet:
 
 ```bash

@@ -130,6 +130,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/resolve-baseline-growth-approval.mjs');
   expectFile('scripts/resolve-baseline-growth-approval.test.mjs');
   expectFile('.github/CODEOWNERS');
+  expectFile('scripts/verify-abi-sync.mjs');
+  expectFile('scripts/verify-abi-sync.test.mjs');
   expectFile('scripts/testInventoryConfig.js');
   expectFile('scripts/verify-test-inventory.js');
   expectFile('scripts/verify-test-inventory.test.js');
@@ -190,6 +192,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('ai:test-nav:smoke', 'node scripts/vite-navigation-smoke.js');
   expectScriptContains('test:ci', 'npm run test:wiring');
   expectScriptContains('test:ci', 'npm run verify:release');
+  expectScriptContains('test:ci', 'npm run verify:abi-sync');
   expectScriptContains('test:ci', 'npm run coverage-floor:check');
   expectScriptContains('test:ci', 'npm run test:root:jest');
   expectScriptContains('test:ci', 'npm run test:worker:session-cors');
@@ -335,6 +338,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('run: npm run verify:worker-bundle', '"npm run verify:worker-bundle"');
   expectWorkflowContains('run: npm --prefix client run build', '"npm --prefix client run build"');
   expectWorkflowContains('run: npm run test:contracts', '"npm run test:contracts"');
+  expectWorkflowContains('run: npm run verify:abi-sync', '"npm run verify:abi-sync"');
   expectWorkflowContains('run: npm run test:client', '"npm run test:client"');
   expectWorkflowContains('run: npm run coverage-floor:check', '"npm run coverage-floor:check"');
   expectWorkflowContains('run: npm run test:root:jest', '"npm run test:root:jest"');
@@ -362,6 +366,9 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     '/scripts/client-boundaries-baseline.json @AgalmicSoftware',
     '/scripts/type-debt-baseline.json @AgalmicSoftware',
     '/scripts/dead-exports-baseline.json @AgalmicSoftware',
+    '/scripts/verify-abi-sync.mjs @AgalmicSoftware',
+    '/client/src/contractsABI/ @AgalmicSoftware',
+    '/contracts/ @AgalmicSoftware',
   ].forEach((rule) => {
     if (!codeowners.includes(rule)) {
       failures.push(`CODEOWNERS must include "${rule}"`);

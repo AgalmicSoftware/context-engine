@@ -54,6 +54,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
         scripts: {
           'test:contracts':
             'forge test --match-contract "^(SurveysTest|CustomSBTTest|SessionRegistryTest|SurveysFuzzTest|CustomSBTFuzzTest|SessionRegistryFuzzTest|CustomSBTInvariantTest)$"',
+          'abi:check': 'node scripts/verify-abi-sync.mjs',
+          'verify:abi-sync': 'forge build && npm run -s abi:check',
           'test:root:jest':
             "cd client && npm test -- --watchAll=false --runInBand --testMatch '<rootDir>/../tests/root/deployHelper.worker.test.js' '<rootDir>/../tests/root/sessionCorsWorker.auth.test.js'",
           'test:worker:session-cors': 'npm --prefix workers/sessionCorsWorker test',
@@ -68,7 +70,7 @@ test('public-release style copies without .git still pass wiring checks', () => 
           'test:e2e:smoke': 'npm run -s ai:test-nav:smoke',
           'ai:test-nav:smoke': 'node scripts/vite-navigation-smoke.js',
           'test:ci':
-            'npm run test:wiring && npm run type-debt:check && npm run verify:release && npm run test:client && npm run coverage-floor:check && npm run test:root:jest && npm run test:worker:session-cors && npm run test:worker:agent-bridge && npm run test:node',
+            'npm run test:wiring && npm run type-debt:check && npm run verify:release && npm run verify:abi-sync && npm run test:client && npm run coverage-floor:check && npm run test:root:jest && npm run test:worker:session-cors && npm run test:worker:agent-bridge && npm run test:node',
           'test:wiring':
             'node scripts/verify-test-wiring.js && node scripts/verify-test-inventory.js && npm run -s client-boundaries:check && npm run -s dead-exports:check',
           tests: 'npm run test:ci && npm run test:surveys-sbt',
@@ -113,7 +115,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '      - run: npm --prefix client run build',
         '  contracts:',
         '    steps:',
-        '      - run: npm run ci:gate -- contracts',
+        '      - run: npm run test:contracts',
+        '      - run: npm run verify:abi-sync',
         '  client:',
         '    steps:',
         '      - run: npm run ci:gate -- client',
@@ -163,6 +166,9 @@ test('public-release style copies without .git still pass wiring checks', () => 
         '/scripts/client-boundaries-baseline.json @AgalmicSoftware',
         '/scripts/type-debt-baseline.json @AgalmicSoftware',
         '/scripts/dead-exports-baseline.json @AgalmicSoftware',
+        '/scripts/verify-abi-sync.mjs @AgalmicSoftware',
+        '/client/src/contractsABI/ @AgalmicSoftware',
+        '/contracts/ @AgalmicSoftware',
       ].join('\n'),
     );
     writeFile(
@@ -222,6 +228,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/check-baseline-monotonicity.test.mjs',
       'scripts/resolve-baseline-growth-approval.mjs',
       'scripts/resolve-baseline-growth-approval.test.mjs',
+      'scripts/verify-abi-sync.mjs',
+      'scripts/verify-abi-sync.test.mjs',
       'scripts/testInventoryConfig.js',
       'scripts/verify-test-inventory.js',
       'scripts/verify-test-inventory.test.js',

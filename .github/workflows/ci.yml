@@ -144,6 +144,9 @@ jobs:
       - name: Run contracts gate
         run: npm run ci:gate -- contracts
 
+      - name: Verify tracked contract ABIs
+        run: npm run verify:abi-sync
+
   client:
     runs-on: ubuntu-latest
     timeout-minutes: 25
