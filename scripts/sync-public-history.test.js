@@ -362,7 +362,6 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.deepEqual(commitBodies, [
       `Public commit title\n\nPublic commit body line.\n\nCE-Private-Source: ${sourceShasBySubject.get('Public commit title')}\n\n`,
       `Mixed commit\n\nCE-Private-Source: ${sourceShasBySubject.get('Mixed commit')}\n\n`,
-      `chore: bump public version to 0.1.1\n\nCE-Private-Source: ${sourceShasBySubject.get('Mixed commit')}\n\n`,
     ]);
     assert.equal(JSON.parse(git(sourceDir, ['show', 'release-staging:package.json'])).version, '0.1.1');
     assert.equal(JSON.parse(git(sourceDir, ['show', 'release-staging:client/package.json'])).version, '0.1.1');

@@ -128,6 +128,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile(gateManifestPath);
   expectFile('scripts/run-ci-gates.mjs');
   expectFile('scripts/run-ci-gates.test.mjs');
+  expectFile('scripts/worker-release-artifacts.mjs');
+  expectFile('scripts/worker-release-artifacts.test.mjs');
   expectFile('.github/CODEOWNERS');
   expectFile('scripts/verify-abi-sync.mjs');
   expectFile('scripts/verify-abi-sync.test.mjs');
@@ -282,6 +284,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectSyncPublicHistoryContains('npm run type-debt:check', '"npm run type-debt:check"');
   expectSyncPublicHistoryContains('verify_public_assets', '"verify_public_assets"');
   expectSyncPublicHistoryContains('verify_public_text', '"verify_public_text"');
+  expectSyncPublicHistoryContains('CE-Private-Source:', 'private-to-public source mapping trailer');
 
   expectWorkflowContains('wiring-and-release:', 'the wiring-and-release job');
   expectWorkflowContains('contracts:', 'the contracts job');
@@ -316,14 +319,24 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('if: ${{ always() }}', 'always-running aggregate test job');
   expectWorkflowContains('CI_GATE_RESULTS_JSON:', 'manifest-backed aggregate result map');
   expectWorkflowContains('run: npm run ci:gates:check-hosted', 'manifest-backed aggregate checker');
+  expectWorkflowContains('worker-bundle-candidate-${{ github.sha }}', 'SHA-keyed tested Worker candidate');
+  expectWorkflowContains('node scripts/worker-release-artifacts.mjs resolve-source', 'private-to-public provenance resolver');
+  expectWorkflowContains('node scripts/worker-release-artifacts.mjs create', 'immutable Worker manifest creation');
+  expectWorkflowContains('name: worker-bundles-${{ github.sha }}', 'SHA-keyed immutable Worker artifact');
   expectWorkflowOmits('      - dev\n', 'private dev branch triggers');
   [
     '/.github/workflows/ci.yml @AgalmicSoftware',
+    '/.github/workflows/publish-worker-bundles.yml @AgalmicSoftware',
+    '/.github/workflows/promote-worker-bundles.yml @AgalmicSoftware',
+    '/.github/workflows/public-drift.yml @AgalmicSoftware',
     '/scripts/check-baseline-monotonicity.mjs @AgalmicSoftware',
     '/scripts/resolve-baseline-growth-approval.mjs @AgalmicSoftware',
     '/scripts/ci-gates.json @AgalmicSoftware',
     '/scripts/run-ci-gates.mjs @AgalmicSoftware',
     '/scripts/run-ci-gates.test.mjs @AgalmicSoftware',
+    '/scripts/worker-release-artifacts.mjs @AgalmicSoftware',
+    '/scripts/worker-release-artifacts.test.mjs @AgalmicSoftware',
+    '/scripts/sync-public-history.sh @AgalmicSoftware',
     '/scripts/client-boundaries-baseline.json @AgalmicSoftware',
     '/scripts/type-debt-baseline.json @AgalmicSoftware',
     '/scripts/dead-exports-baseline.json @AgalmicSoftware',
@@ -335,17 +348,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
       failures.push(`CODEOWNERS must include "${rule}"`);
     }
   });
-  if (!publishWorkflow.includes('run: npm run worker:bundle')) {
-    failures.push('publish-worker-bundles workflow must execute "npm run worker:bundle"');
-  }
-  if (
-    !publishWorkflow.includes('app_version="$(node -p')
-    || !publishWorkflow.includes('require("./package.json").version')
-  ) {
-    failures.push('publish-worker-bundles workflow must read the canonical application version');
-  }
-  if (!publishWorkflow.includes('Context Engine ${app_version} Worker bundles')) {
-    failures.push('publish-worker-bundles workflow must include the application version in release metadata');
+  if (/npm run (?:worker:bundle|verify:worker-bundle)/.test(publishWorkflow)) {
+    failures.push('publish-worker-bundles workflow must consume tested CI bytes without rebuilding');
   }
   [
     'workflow_run:',
@@ -389,9 +393,6 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     if (unpinned.length > 0) {
       failures.push(`${workflowPath} has non-immutable action references: ${unpinned.join(', ')}`);
     }
-  }
-  if (!publishWorkflow.includes('dist/agentBridgeWorker.bundle.js')) {
-    failures.push('publish-worker-bundles workflow must upload dist/agentBridgeWorker.bundle.js');
   }
   if (trackedDistFiles.includes('dist/sessionCorsWorker.bundle.js')) {
     failures.push('dist/sessionCorsWorker.bundle.js must not be tracked by git');

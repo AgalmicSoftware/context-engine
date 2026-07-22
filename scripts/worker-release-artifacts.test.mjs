@@ -10,7 +10,6 @@ import {
   WORKER_ARTIFACTS,
   createWorkerReleaseManifest,
   planStablePromotion,
-  resolvePrivateSourceReference,
   resolveSourceProvenance,
   stageWorkerArtifacts,
   validateSuccessfulCiRun,
@@ -211,30 +210,6 @@ test('source provenance resolves the replay trailer from a fast-forward or merge
   assert.equal(resolved.publicReplayCommit, replayCommit);
   assert.equal(resolved.privateSourceCommit, SHA_C);
   assert.match(resolved.sourceTree, /^[a-f0-9]{40}$/);
-});
-
-test('source provenance recognizes only the audited PR 30 trailerless release mapping', () => {
-  assert.equal(
-    resolvePrivateSourceReference({
-      publicCommit: '974dc394a19c420dd6cfcfb5f88499330408a92d',
-      trailer: '',
-    }),
-    '48f5182922c87505c963edc9d0e3fd2c7e1ca8c7',
-  );
-  assert.equal(
-    resolvePrivateSourceReference({
-      publicCommit: SHA_A,
-      trailer: SHA_C,
-    }),
-    SHA_C,
-  );
-  assert.equal(
-    resolvePrivateSourceReference({
-      publicCommit: SHA_A,
-      trailer: '',
-    }),
-    '',
-  );
 });
 
 test('source provenance rejects commits without an explicit replay mapping', () => {

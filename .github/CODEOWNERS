@@ -1,5 +1,8 @@
 /.github/CODEOWNERS @AgalmicSoftware
 /.github/workflows/ci.yml @AgalmicSoftware
+/.github/workflows/publish-worker-bundles.yml @AgalmicSoftware
+/.github/workflows/promote-worker-bundles.yml @AgalmicSoftware
+/.github/workflows/public-drift.yml @AgalmicSoftware
 /scripts/check-baseline-monotonicity.mjs @AgalmicSoftware
 /scripts/check-baseline-monotonicity.test.mjs @AgalmicSoftware
 /scripts/resolve-baseline-growth-approval.mjs @AgalmicSoftware
@@ -7,6 +10,9 @@
 /scripts/ci-gates.json @AgalmicSoftware
 /scripts/run-ci-gates.mjs @AgalmicSoftware
 /scripts/run-ci-gates.test.mjs @AgalmicSoftware
+/scripts/worker-release-artifacts.mjs @AgalmicSoftware
+/scripts/worker-release-artifacts.test.mjs @AgalmicSoftware
+/scripts/sync-public-history.sh @AgalmicSoftware
 /scripts/client-boundaries-baseline.json @AgalmicSoftware
 /scripts/type-debt-baseline.json @AgalmicSoftware
 /scripts/dead-exports-baseline.json @AgalmicSoftware

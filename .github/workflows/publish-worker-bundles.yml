@@ -60,15 +60,85 @@ jobs:
           ref: ${{ steps.run.outputs.sourceCommit }}
           fetch-depth: 2
 
-            Published assets:
-            - `sessionCorsWorker.bundle.js`
-            - `deployHelper.bundle.js`
-            - `agentBridgeWorker.bundle.js`
+      - name: Download exact immutable CI artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: worker-bundles-${{ steps.run.outputs.sourceCommit }}
+          path: ${{ runner.temp }}/worker-release
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.run.outputs.runId }}
+          github-token: ${{ github.token }}
 
-            Generated at: `${{ steps.meta.outputs.release_stamp }}`
-          files: |
-            dist/sessionCorsWorker.bundle.js
-            dist/deployHelper.bundle.js
-            dist/agentBridgeWorker.bundle.js
-          fail_on_unmatched_files: true
-          overwrite_files: true
+      - name: Resolve checked-out replay provenance
+        id: source
+        run: >-
+          node scripts/worker-release-artifacts.mjs resolve-source
+          --root .
+          --commit "${{ steps.run.outputs.sourceCommit }}"
+          --github-output "$GITHUB_OUTPUT"
+
+      - name: Verify archive, provenance, source, and checksums
+        run: >-
+          node scripts/worker-release-artifacts.mjs verify
+          --root .
+          --artifact-dir "${{ runner.temp }}/worker-release"
+          --source-commit "${{ steps.run.outputs.sourceCommit }}"
+          --source-ref "${{ steps.run.outputs.sourceRef }}"
+          --source-tree "${{ steps.source.outputs.sourceTree }}"
+          --repository "${{ github.repository }}"
+          --workflow CI
+          --run-id "${{ steps.run.outputs.runId }}"
+          --run-attempt "${{ steps.run.outputs.runAttempt }}"
+
+      - name: Publish or verify immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_COMMIT: ${{ steps.run.outputs.sourceCommit }}
+          SOURCE_REF: ${{ steps.run.outputs.sourceRef }}
+          RUN_ID: ${{ steps.run.outputs.runId }}
+          RUN_ATTEMPT: ${{ steps.run.outputs.runAttempt }}
+          SOURCE_TREE: ${{ steps.source.outputs.sourceTree }}
+        run: |
+          set -euo pipefail
+          tag="worker-bundles-${SOURCE_COMMIT}"
+          artifact_dir="${RUNNER_TEMP}/worker-release"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            existing_dir="${RUNNER_TEMP}/existing-worker-release"
+            mkdir -p "$existing_dir"
+            gh release download "$tag" --dir "$existing_dir"
+            node scripts/worker-release-artifacts.mjs verify \
+              --root . \
+              --artifact-dir "$existing_dir" \
+              --source-commit "$SOURCE_COMMIT" \
+              --source-ref "$SOURCE_REF" \
+              --source-tree "$SOURCE_TREE" \
+              --repository "$GITHUB_REPOSITORY" \
+              --workflow CI \
+              --run-id "$RUN_ID" \
+              --run-attempt "$RUN_ATTEMPT"
+            for file in "$artifact_dir"/*; do
+              cmp --silent "$file" "$existing_dir/$(basename "$file")"
+            done
+            echo "Immutable release already exists with identical verified assets: $tag"
+            exit 0
+          fi
+
+          notes="${RUNNER_TEMP}/worker-release-notes.md"
+          {
+            echo "Immutable Worker bundles produced and verified by canonical CI run ${RUN_ID}."
+            echo
+            echo "Source commit: \`${SOURCE_COMMIT}\`"
+            echo "Source ref: \`${SOURCE_REF}\`"
+            echo "Provenance and SHA-256 checksums: \`worker-release-manifest.json\`"
+            echo
+            echo "This release does not move the protected latest channel."
+          } > "$notes"
+          gh release create "$tag" \
+            "$artifact_dir/sessionCorsWorker.bundle.js" \
+            "$artifact_dir/deployHelper.bundle.js" \
+            "$artifact_dir/agentBridgeWorker.bundle.js" \
+            "$artifact_dir/worker-release-manifest.json" \
+            --target "$SOURCE_COMMIT" \
+            --title "Worker bundles ${SOURCE_COMMIT}" \
+            --notes-file "$notes" \
+            --latest=false

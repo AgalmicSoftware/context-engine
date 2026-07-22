@@ -31,12 +31,6 @@ export const WORKER_ARTIFACTS = Object.freeze([
 const SHA_PATTERN = /^[a-f0-9]{40}$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const SAFE_REF_PATTERN = /^refs\/heads\/[A-Za-z0-9._/-]+$/;
-const LEGACY_PUBLIC_SOURCE_MAPPINGS = Object.freeze({
-  // PR #30 was prepared from this audited private source immediately before
-  // CE-Private-Source trailers became mandatory for Worker artifact CI. A
-  // fresh stripped artifact differs only by an untracked empty directory.
-  '974dc394a19c420dd6cfcfb5f88499330408a92d': '48f5182922c87505c963edc9d0e3fd2c7e1ca8c7',
-});
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -245,12 +239,6 @@ function privateSourceTrailer(rootDir, commit) {
   return git(rootDir, ['show', '-s', '--format=%(trailers:key=CE-Private-Source,valueonly)', commit]);
 }
 
-export function resolvePrivateSourceReference({ publicCommit, trailer }) {
-  const explicitTrailer = String(trailer || '').trim();
-  if (explicitTrailer) return explicitTrailer;
-  return LEGACY_PUBLIC_SOURCE_MAPPINGS[publicCommit] || '';
-}
-
 export function resolveSourceProvenance({ rootDir, commit }) {
   assertSha(commit, 'source commit');
   const resolvedCommit = git(rootDir, ['rev-parse', commit]);
@@ -259,20 +247,14 @@ export function resolveSourceProvenance({ rootDir, commit }) {
   const parentLine = git(rootDir, ['rev-list', '--parents', '-n', '1', commit]).split(/\s+/);
 
   let publicReplayCommit = commit;
-  let privateSourceCommit = resolvePrivateSourceReference({
-    publicCommit: commit,
-    trailer: privateSourceTrailer(rootDir, commit),
-  });
+  let privateSourceCommit = privateSourceTrailer(rootDir, commit);
   if (!privateSourceCommit && parentLine.length > 2) {
     const mergeParents = parentLine.slice(1).reverse();
     for (const parent of mergeParents) {
-      const parentPrivateSource = resolvePrivateSourceReference({
-        publicCommit: parent,
-        trailer: privateSourceTrailer(rootDir, parent),
-      });
-      if (parentPrivateSource) {
+      const trailer = privateSourceTrailer(rootDir, parent);
+      if (trailer) {
         publicReplayCommit = parent;
-        privateSourceCommit = parentPrivateSource;
+        privateSourceCommit = trailer;
         break;
       }
     }

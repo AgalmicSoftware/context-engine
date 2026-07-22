@@ -277,6 +277,18 @@ ensure_public_replay_message() {
   fi
 }
 
+bind_public_replay_to_source() {
+  local commit_sha="$1"
+  local message_file="$2"
+
+  git interpret-trailers \
+    --in-place \
+    --if-exists replace \
+    --if-missing add \
+    --trailer "CE-Private-Source: $commit_sha" \
+    "$message_file"
+}
+
 sync_agent_bridge_public_package_wiring() {
   local commit_sha="$1"
   local target_package="$TEMP_CLONE/package.json"
