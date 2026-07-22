@@ -141,6 +141,23 @@ const deepClone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
+const hasOwn = (value: unknown, key: string): boolean =>
+  isRecord(value) && Object.prototype.hasOwnProperty.call(value, key);
+
+const SESSION_MODE_AUTHORITY_MODES = new Set<string>([
+  'worker_canonical',
+  'worker_with_public_anchor',
+  'evm_registry_canonical',
+  'org_private_chain',
+]);
+const SESSION_MODE_STORAGE_BACKENDS = new Set<string>(['cloudflare', 'arweave']);
+const SESSION_MODE_ENCRYPTION_MODES = new Set<string>(['none', 'lit', 'worker_envelope']);
+const SESSION_MODE_KEY_PROVIDERS = new Set<string>(['worker_secret', 'cloudflare_secrets_store', 'external_kms']);
+const SESSION_MODE_LEGACY_PAYLOAD_MODES = new Set<string>(['public_read', 'worker_sbt_gate', 'lit_encrypted']);
+const SESSION_MODE_PRESET_VALUES = new Set<string>(Object.values(SESSION_MODE_PRESET_IDS));
+const SESSION_MODE_GATE_VALUES = new Set<string>(Object.values(SESSION_STORAGE_PAYLOAD_ACCESS_GATES));
+const SESSION_MODE_PAYLOAD_ENCRYPTION_VALUES = new Set<string>(Object.values(SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES));
+
 const trim = (value: unknown): string => String(value ?? '').trim();
 const lower = (value: unknown): string => trim(value).toLowerCase();
 
@@ -382,9 +399,53 @@ export const validateSessionModeProfile = (
   const addIssue = (path: string, code: string, message: string) => {
     issues.push({ path, code, message });
   };
+  const validateEnum = (
+    path: string,
+    value: unknown,
+    allowed: ReadonlySet<string>,
+    { optional = false }: { optional?: boolean } = {},
+  ) => {
+    if (optional && typeof value === 'undefined') return;
+    if (typeof value !== 'string' || !allowed.has(value)) {
+      addIssue(path, 'invalid_enum', `${path} must use an exact supported value.`);
+    }
+  };
 
   if (!profile || profile.profileVersion !== SESSION_MODE_PROFILE_VERSION) {
     addIssue('profileVersion', 'invalid_profile_version', 'Session mode profile must use profileVersion 1.');
+  }
+  if (!profile) return { valid: false, issues };
+  if (profile) {
+    validateEnum('preset', profile.preset, SESSION_MODE_PRESET_VALUES);
+    validateEnum('authority.mode', profile.authority?.mode, SESSION_MODE_AUTHORITY_MODES);
+    validateEnum('storage.backend', profile.storage?.backend, SESSION_MODE_STORAGE_BACKENDS);
+    validateEnum('encryption.mode', profile.encryption?.mode, SESSION_MODE_ENCRYPTION_MODES);
+    if (hasOwn(profile.encryption, 'keyProvider')) {
+      validateEnum('encryption.keyProvider', profile.encryption?.keyProvider, SESSION_MODE_KEY_PROVIDERS);
+    }
+    if (isRecord(profile.storage?.payloadAccessControl)) {
+      if (hasOwn(profile.storage.payloadAccessControl, 'mode')) {
+        validateEnum(
+          'storage.payloadAccessControl.mode',
+          profile.storage.payloadAccessControl.mode,
+          SESSION_MODE_LEGACY_PAYLOAD_MODES,
+        );
+      }
+      if (hasOwn(profile.storage.payloadAccessControl, 'gate')) {
+        validateEnum(
+          'storage.payloadAccessControl.gate',
+          profile.storage.payloadAccessControl.gate,
+          SESSION_MODE_GATE_VALUES,
+        );
+      }
+      if (hasOwn(profile.storage.payloadAccessControl, 'encryption')) {
+        validateEnum(
+          'storage.payloadAccessControl.encryption',
+          profile.storage.payloadAccessControl.encryption,
+          SESSION_MODE_PAYLOAD_ENCRYPTION_VALUES,
+        );
+      }
+    }
   }
   if (profile.authority?.mode === 'org_private_chain') {
     addIssue('authority.mode', 'reserved', 'Private-chain authority is reserved for a later implementation.');
@@ -399,6 +460,7 @@ export const validateSessionModeProfile = (
   if (
     profile.encryption?.mode === 'worker_envelope' &&
     profile.encryption?.keyProvider &&
+    SESSION_MODE_KEY_PROVIDERS.has(profile.encryption.keyProvider) &&
     profile.encryption.keyProvider !== 'worker_secret'
   ) {
     addIssue(
@@ -458,6 +520,20 @@ export const validateSessionModeProfile = (
   if (profile.export?.scope === 'encrypted_envelopes_only' && profile.encryption?.mode === 'none') {
     addIssue('export.scope', 'encrypted_export_requires_encryption', 'Encrypted-envelope export requires encryption.');
   }
+  if (profile.export?.scope === 'selected_surfaces') {
+    addIssue(
+      'export.scope',
+      'selected_surface_export_not_implemented',
+      'Selected-channel export is not available yet. Choose another export policy.',
+    );
+  }
+  if (['private_admin', 'public_redacted_snapshot'].includes(profile.results?.visibility)) {
+    addIssue(
+      'results.visibility',
+      'results_visibility_not_implemented',
+      'That results visibility option is not available yet. Choose an enforced results policy.',
+    );
+  }
   const mechanisms = Array.isArray(profile.authorization?.mechanisms) ? profile.authorization.mechanisms : [];
   if (
     mechanisms.length === 1 &&
@@ -472,6 +548,9 @@ export const validateSessionModeProfile = (
   }
   if (profile.surfaces?.web !== true) {
     addIssue('surfaces.web', 'web_surface_fixed_on', 'The web surface is fixed on in v1.');
+  }
+  if (profile.surfaces?.miniApp === true && profile.surfaces?.telegram !== true) {
+    addIssue('surfaces.miniApp', 'mini_app_requires_telegram', 'Telegram Mini App requires the Telegram channel.');
   }
 
   return { valid: issues.length === 0, issues };

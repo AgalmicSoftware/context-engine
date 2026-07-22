@@ -112,7 +112,7 @@ test('resolveAuthenticatedRequest records invalid bearer tokens as auth failures
 
 test('resolveAuthenticatedRequest passes token and header slug data through with countEmptyHeaderAsExplicit enabled', async () => {
   let received = null;
-  const payload = { sub: '0xabc' };
+  const payload = { sub: '0xabc', jti: 'jti-1' };
 
   const result = await resolveAuthenticatedRequest({
     request: {
@@ -133,6 +133,7 @@ test('resolveAuthenticatedRequest passes token and header slug data through with
         received = value;
         return { ok: true, slug: 'resolved-slug', tokenSlug: '', explicitSlugProvided: true };
       },
+      validateAuthTokenRecord: async () => ({ ok: true, legacy: false }),
       json: createJsonStub(),
       MISSING_SLUG_ERROR: 'Missing sessionSlug.',
     },
@@ -230,7 +231,7 @@ test('resolveAuthenticatedRequest preserves token/request slug mismatch failure'
 });
 
 test('resolveAuthenticatedRequest preserves success payload and resolved slug shape', async () => {
-  const payload = { sub: '0xabc', scopes: { ai: true } };
+  const payload = { sub: '0xabc', scopes: { ai: true }, jti: 'jti-1' };
   let validateCalled = false;
 
   const result = await resolveAuthenticatedRequest({
@@ -254,19 +255,66 @@ test('resolveAuthenticatedRequest preserves success payload and resolved slug sh
       }),
       validateAuthTokenRecord: async () => {
         validateCalled = true;
-        return { ok: false, error: 'Invalid token.' };
+        return { ok: true, legacy: false };
       },
       json: createJsonStub(),
       MISSING_SLUG_ERROR: 'Missing sessionSlug.',
     },
   });
 
-  assert.equal(validateCalled, false);
+  assert.equal(validateCalled, true);
   assert.deepEqual(result, {
     ok: true,
     payload,
     slug: 'session-a',
   });
+});
+
+test('resolveAuthenticatedRequest rejects tokens without a live non-empty jti record', async () => {
+  const baseHeaders = { 'Access-Control-Allow-Origin': '*' };
+  const validationPayloads = [];
+
+  for (const payload of [
+    { sub: '0xabc', slug: 'session-a', scopes: { ai: true } },
+    { sub: '0xabc', slug: 'session-a', scopes: { ai: true }, jti: '   ' },
+  ]) {
+    const result = await resolveAuthenticatedRequest({
+      request: {
+        headers: new Headers({
+          Authorization: 'Bearer test-token',
+          'X-Session-Slug': 'session-a',
+        }),
+      },
+      env: { TOKEN_HMAC_SECRET: 'secret', GROUP_KV: { id: 'kv' } },
+      baseHeaders,
+      deps: {
+        verifyToken: async () => ({ ok: true, payload }),
+        resolveWorkerRequestSlugContext: () => ({
+          ok: true,
+          slug: 'session-a',
+          tokenSlug: 'session-a',
+          explicitSlugProvided: true,
+        }),
+        validateAuthTokenRecord: async (value) => {
+          validationPayloads.push(value.payload);
+          return { ok: false, error: 'Invalid token.' };
+        },
+        json: createJsonStub(),
+        MISSING_SLUG_ERROR: 'Missing sessionSlug.',
+      },
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      response: {
+        body: { error: 'Invalid token.' },
+        status: 401,
+        headers: baseHeaders,
+      },
+    });
+  }
+
+  assert.deepEqual(validationPayloads.map((payload) => payload.jti), [undefined, '   ']);
 });
 
 test('resolveAuthenticatedRequest requires live KV marker for jti tokens', async () => {

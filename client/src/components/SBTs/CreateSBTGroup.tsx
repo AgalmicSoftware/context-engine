@@ -43,6 +43,7 @@ import CompactImageChooser from '../Shared/CompactImageChooser';
 import { readCompactImageClipboard } from '../Shared/compactImageClipboard.js';
 import { resolveSessionContractRef } from '../../utilities/session/sessionNaming.js';
 import CreateSbtShareableBlock from './CreateSbtShareableBlock';
+import { SbtEncryptedRecoveryControl, selectCreateEncryptedRecovery } from './SbtEncryptedRecoveryControl';
 
 import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { getGlobalLitHooks, uploadEncryptedArweaveData } from '../../utilities/crypto/litProtocol.js';
@@ -65,7 +66,6 @@ import {
   hasMeaningfulCreateSbtFormPayload,
   LEGACY_CREATE_SBT_FORM_CACHE_KEY,
 } from '../../utilities/sbt/sbtCreateFormCache.js';
-import { upsertSbtPasswordRecoveryCodes } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 import { isCryptoMode, t } from '../../utilities/ui/terminology.js';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerAuth.js';
 import { renderCreateSbtDistributionOptionsSection, renderCreateSbtMintOptionsSection } from './CreateSBTGroupSections';
@@ -238,35 +238,22 @@ type CreateSbtContractScripts = {
   createSBT: (...args: unknown[]) => Promise<unknown>;
   predictSBTAddress: (...args: unknown[]) => Promise<string>;
 };
-type SbtPasswordRecoveryUpsertArgs = {
-  chainId?: unknown;
-  sbtAddress?: unknown;
-  passwords?: unknown;
-  mode?: 'replace' | 'append' | string;
-};
-type SbtPasswordRecoveryUpsertResult = Record<string, unknown> & {
-  ok: boolean;
-  status: string;
-  key?: string;
-  passwords?: string[];
-  expiresAt?: number;
-  write?: unknown;
-};
 type CreateSbtRecoveryPersistArgs = {
   sbtAddress?: unknown;
   hasPasswordMintOnChain?: unknown;
   codesToStore?: unknown;
 };
 type CreateSbtRecoveryPersistResult =
-  | SbtPasswordRecoveryUpsertResult
+  | {
+      ok: true;
+      status: 'export-only';
+      passwords: string[];
+    }
   | {
       ok: false;
       status: 'empty-recovery-payload';
     };
 const createSbtContractScripts = contractScripts as unknown as CreateSbtContractScripts;
-const upsertSbtPasswordRecoveryCodesTyped = upsertSbtPasswordRecoveryCodes as unknown as (
-  args?: SbtPasswordRecoveryUpsertArgs,
-) => SbtPasswordRecoveryUpsertResult;
 
 const DEFAULT_SBT_IMAGE_ARWEAVE_TX = 'h8Z3ZLldhuZafwvUODixAeGZKg8ZBAuwH86UvNzRCuw';
 const DEFERRED_DRAFT_CREATE2_SALT_PREFIX = 'draft/';
@@ -2862,12 +2849,21 @@ class CreateSBTGroup extends Component<any, any> {
         status: 'empty-recovery-payload',
       };
     }
-    return upsertSbtPasswordRecoveryCodesTyped({
-      chainId: this.getSelectedAuthoringChainId(),
-      sbtAddress,
-      passwords: codesToStore,
-      mode: 'replace',
+    return {
+      ok: true,
+      status: 'export-only',
+      passwords: [...codesToStore],
+    };
+  };
+
+  handleEncryptedRecoveryChange = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    this.setState({ encryptedRecoveryStatus: 'saving' });
+    const { patch, warning } = await selectCreateEncryptedRecovery({
+      chainId: this.getSelectedAuthoringChainId(), enabled: event.target.checked === true,
+      passwords: this.state.passwordList, sbtAddress: this.state.sbtAddress,
     });
+    this.setState(patch);
+    if (warning) notify.warn(warning);
   };
 
   handleDeferredSave = async (): Promise<CreateSbtDeferredDraftPayload> => {
@@ -3428,10 +3424,7 @@ class CreateSBTGroup extends Component<any, any> {
       }
 
       const codesToStore = usesInviteCodes ? [groupPassword] : finalPasswordList;
-      const recoveryWrite = this.persistCreatedSbtCodes({ sbtAddress, hasPasswordMintOnChain, codesToStore });
-      if (!recoveryWrite?.ok) {
-        sbtLog.warn('Failed to persist SBT password recovery codes:', recoveryWrite?.status);
-      }
+      this.persistCreatedSbtCodes({ sbtAddress, hasPasswordMintOnChain, codesToStore });
       this.suppressFormCachePersistenceAfterSuccess();
 
       this.setState(
@@ -4564,7 +4557,7 @@ class CreateSBTGroup extends Component<any, any> {
         {successDisplayState.shouldRenderPasswordRecovery && (
           <div className={styles.sbtInviteLinks}>
             <h3>Password Recovery</h3>
-            <p>Saved to the local recovery cache on this device and available to export.</p>
+            <SbtEncryptedRecoveryControl checked={this.state.encryptedRecoveryEnabled === true} mode="create" onChange={this.handleEncryptedRecoveryChange} status={String(this.state.encryptedRecoveryStatus || 'idle')} />
             <div className={styles.exportOptions}>
               <select
                 value={exportFormat}
@@ -4600,7 +4593,7 @@ class CreateSBTGroup extends Component<any, any> {
                 );
               })}
             </ul>
-            <p>Saved to the local recovery cache on this device and available to export.</p>
+            <SbtEncryptedRecoveryControl checked={this.state.encryptedRecoveryEnabled === true} mode="create" onChange={this.handleEncryptedRecoveryChange} status={String(this.state.encryptedRecoveryStatus || 'idle')} />
             <div className={styles.exportOptions}>
               <select
                 value={exportFormat}

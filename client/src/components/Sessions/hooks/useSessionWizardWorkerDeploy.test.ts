@@ -269,6 +269,61 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(true);
   });
 
+  it('requests and adopts the dedicated Wrapped capability when surfaces.agentHttp is enabled', async () => {
+    const capability = {
+      version: 1,
+      enabled: true,
+      origin: 'https://ce-wrapped-deploy-storage-session.example.workers.dev',
+      protocolVersion: 'agent-session-wrapped-v1',
+      revision: 'wrapped-0123456789abcdef',
+      verifiedAt: '2026-07-20T18:00:00.000Z',
+    };
+    const deployBodies: Record<string, unknown>[] = [];
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      if (String(url).endsWith('/deploy')) {
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            configVerified: true,
+            writesSessionConfig: true,
+            writesSessionSecrets: false,
+            agentSessionWrapped: capability,
+          }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const options = buildDeployHookOptions();
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = 'custom';
+    profile.surfaces.agentHttp = true;
+    options.refs.runtimeRef.current.draft = {
+      ...options.refs.runtimeRef.current.draft,
+      sessionModeProfile: profile,
+    };
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let deployResult: Record<string, unknown> = {};
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker();
+    });
+
+    expect(deployResult).toEqual(expect.objectContaining({ ok: true, agentSessionWrapped: capability }));
+    expect(deployBodies).toHaveLength(1);
+    expect(deployBodies[0]).toEqual(
+      expect.objectContaining({
+        agentBridgeBundleUrl: expect.stringContaining('agentBridgeWorker.bundle.js'),
+        agentSessionWrappedDeploymentIdentity: expect.stringContaining('deploy-storage-session'),
+      }),
+    );
+    expect(options.updateDraftValue).toHaveBeenCalledWith(['agentSessionWrapped'], capability);
+    expect(JSON.stringify(deployBodies[0])).not.toContain('TELEGRAM_');
+  });
+
   it('skips a concurrent worker deploy while the first deploy is still resolving', async () => {
     let resolveAccounts: ((accounts: string[]) => void) | undefined;
     const providerRequest = jest.fn(

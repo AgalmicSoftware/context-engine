@@ -7,6 +7,7 @@ import {
   makeJsonRequest,
   decodeTokenPayload,
   buildSiweMessage,
+  installSessionCoordinatorBinding,
 } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 
 describe('sessionCorsWorker auth routes', () => {
@@ -18,8 +19,8 @@ describe('sessionCorsWorker auth routes', () => {
   const sessionSlug = 'test-auth';
   const protectedSbt = '0x0000000000000000000000000000000000000101';
   const wallet = new ethers.Wallet('0x59c6995e998f97a5a0044976f84ce7de5d9d7f17b2f6a6a5f76f8864c8ad88f5');
-  const loginOrigin = 'https://contextengine.xyz';
-  const loginDomain = 'contextengine.xyz';
+  const loginOrigin = 'https://contextengine.sh';
+  const loginDomain = 'contextengine.sh';
 
   const makeAuthJsonRequest = (path, body, origin = loginOrigin) => makeJsonRequest(path, body, {
     headers: { Origin: origin },
@@ -73,7 +74,7 @@ describe('sessionCorsWorker auth routes', () => {
 
   it('issues auth nonces and stores them under slug + address', async () => {
     const kv = createMemoryKv();
-    const env = { GROUP_KV: kv };
+    const env = installSessionCoordinatorBinding({ GROUP_KV: kv });
 
     const response = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {
@@ -97,7 +98,7 @@ describe('sessionCorsWorker auth routes', () => {
 
   it('rejects auth nonce requests with non-canonical session slugs', async () => {
     const kv = createMemoryKv();
-    const env = { GROUP_KV: kv };
+    const env = installSessionCoordinatorBinding({ GROUP_KV: kv });
 
     const response = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {
@@ -116,7 +117,7 @@ describe('sessionCorsWorker auth routes', () => {
 
   it('rejects auth nonce requests when sessionSlug aliases disagree', async () => {
     const kv = createMemoryKv();
-    const env = { GROUP_KV: kv };
+    const env = installSessionCoordinatorBinding({ GROUP_KV: kv });
 
     const response = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {
@@ -136,7 +137,7 @@ describe('sessionCorsWorker auth routes', () => {
 
   it('rejects auth nonce requests with invalid json bodies', async () => {
     const kv = createMemoryKv();
-    const env = { GROUP_KV: kv };
+    const env = installSessionCoordinatorBinding({ GROUP_KV: kv });
 
     const response = await sessionCorsWorker.fetch(
       new Request('https://worker.example/auth/nonce', {
@@ -164,7 +165,7 @@ describe('sessionCorsWorker auth routes', () => {
         allowOrigins: ['https://allowed.example'],
       }),
     });
-    const env = { GROUP_KV: kv };
+    const env = installSessionCoordinatorBinding({ GROUP_KV: kv });
 
     const response = await sessionCorsWorker.fetch(
       makeJsonRequest('/auth/nonce', {
@@ -190,7 +191,7 @@ describe('sessionCorsWorker auth routes', () => {
         allowOrigins: 'https://allowed.example\nhttps://other.example',
       }),
     });
-    const env = { GROUP_KV: kv };
+    const env = installSessionCoordinatorBinding({ GROUP_KV: kv });
 
     const response = await sessionCorsWorker.fetch(
       makeJsonRequest('/auth/nonce', {
@@ -231,10 +232,10 @@ describe('sessionCorsWorker auth routes', () => {
         rpcUrl,
       }),
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const nonceResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {
@@ -302,10 +303,10 @@ describe('sessionCorsWorker auth routes', () => {
         },
       }),
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const nonceResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {
@@ -370,10 +371,10 @@ describe('sessionCorsWorker auth routes', () => {
         rpcUrl,
       }),
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const nonceResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {
@@ -435,10 +436,10 @@ describe('sessionCorsWorker auth routes', () => {
         rpcUrl,
       }),
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const nonceResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {
@@ -483,7 +484,7 @@ describe('sessionCorsWorker auth routes', () => {
     expect(secondPayload?.error).toBe('Nonce already used.');
   });
 
-  it('rejects login when the nonce has already been marked as used', async () => {
+  it('does not treat eventually consistent KV nonce markers as the consume authority', async () => {
     const nonce = 'reused-auth-nonce';
     const fetchMock = buildRpcFetchMock({
       rpcUrl,
@@ -504,10 +505,10 @@ describe('sessionCorsWorker auth routes', () => {
       [`nonce:${sessionSlug}:${wallet.address.toLowerCase()}`]: nonce,
       [`usedNonce:${sessionSlug}:${nonce}`]: '1',
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const message = buildLoginSiweMessage({
       address: wallet.address,
@@ -528,7 +529,7 @@ describe('sessionCorsWorker auth routes', () => {
     const payload = await response.json();
 
     expect(response.status).toBe(400);
-    expect(payload?.error).toBe('Nonce already used.');
+    expect(payload?.error).toBe('Nonce mismatch or expired.');
     expect(kv.delete).not.toHaveBeenCalled();
   });
 
@@ -540,10 +541,10 @@ describe('sessionCorsWorker auth routes', () => {
         rpcUrl,
       }),
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const nonceResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {
@@ -586,10 +587,10 @@ describe('sessionCorsWorker auth routes', () => {
         rpcUrl,
       }),
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
     const otherAddress = '0x00000000000000000000000000000000000000bb';
 
     const nonceResponse = await sessionCorsWorker.fetch(
@@ -627,10 +628,10 @@ describe('sessionCorsWorker auth routes', () => {
 
   it('rejects login when the siwe message is expired and preserves the nonce', async () => {
     const kv = createMemoryKv();
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const nonceResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {
@@ -668,10 +669,10 @@ describe('sessionCorsWorker auth routes', () => {
 
   it('rejects login when session config is missing without consuming the nonce', async () => {
     const kv = createMemoryKv();
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const nonceResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {
@@ -727,10 +728,10 @@ describe('sessionCorsWorker auth routes', () => {
         rpcUrl,
       }),
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const nonceResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {
@@ -774,10 +775,10 @@ describe('sessionCorsWorker auth routes', () => {
         allowOrigins: ['https://allowed.example'],
       }),
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const nonceResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {

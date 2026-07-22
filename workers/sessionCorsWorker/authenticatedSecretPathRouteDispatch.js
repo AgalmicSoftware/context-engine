@@ -40,6 +40,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     scopes,
     scope,
     route,
+    config,
     env,
     slug,
     address,
@@ -47,6 +48,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     headers,
     deps: {
       checkRateLimit: deps?.checkRateLimit,
+      computeScopesForLogin: deps?.computeScopesForLogin,
       json: deps?.json,
     },
   });

@@ -16,8 +16,8 @@ describe('sessionWizardModeRequirements', () => {
       expect.objectContaining({
         authorityMode: 'worker_canonical',
         isWorkerCanonical: true,
-        presetKeyChips: ['Cloudflare API token', 'AI provider key'],
-        requiredRequirementIds: ['cloudflareApiToken', 'aiProviderKey'],
+        presetKeyChips: ['Cloudflare account', 'AI provider key'],
+        requiredRequirementIds: ['cloudflareAccount', 'aiProviderKey'],
         requiredWorkerSecretFields: ['openaiKey'],
         visibleWorkerResourceKeys: ['ai'],
         requiresRpc: false,
@@ -47,7 +47,7 @@ describe('sessionWizardModeRequirements', () => {
     const requirements = resolveSessionWizardModeRequirements(profile);
 
     expect(requirements.presetKeyChips).toEqual([
-      'Cloudflare API token',
+      'Cloudflare account',
       'AI provider key',
       'RPC URL/key',
       'Lit API key',
@@ -91,7 +91,7 @@ describe('sessionWizardModeRequirements', () => {
     expect(requirements.requiresArweave).toBe(false);
     expect(requirements.requiresWallet).toBe(false);
     expect(requirements.requiresFunding).toBe(false);
-    expect(requirements.requiredRequirementIds).toEqual(['cloudflareApiToken', 'aiProviderKey', 'rpc']);
+    expect(requirements.requiredRequirementIds).toEqual(['cloudflareAccount', 'aiProviderKey', 'rpc']);
     expect(requirements.visibleWorkerResourceKeys).toEqual(['ai', 'rpc']);
     expect(requirements.publish.deployPendingSbts).toBe(true);
     expect(requirements.publishSettings.showGasOverrideControls).toBe(false);
@@ -100,7 +100,7 @@ describe('sessionWizardModeRequirements', () => {
     expect(pendingRequirements.requiresWallet).toBe(true);
     expect(pendingRequirements.requiresFunding).toBe(true);
     expect(pendingRequirements.requiredRequirementIds).toEqual([
-      'cloudflareApiToken',
+      'cloudflareAccount',
       'aiProviderKey',
       'rpc',
       'wallet',
@@ -149,6 +149,17 @@ describe('sessionWizardModeRequirements', () => {
       showArweaveMetadataControls: true,
       showGasOverrideControls: true,
     });
+  });
+
+  it('adds the request-only Cloudflare token requirement when registry-canonical Wrapped is enabled', () => {
+    const profile = decentralizedProfile();
+    profile.preset = 'custom';
+    profile.surfaces.agentHttp = true;
+
+    const requirements = resolveSessionWizardModeRequirements(profile);
+
+    expect(requirements.requiredRequirementIds).toContain('cloudflareApiToken');
+    expect(requirements.presetKeyChips[0]).toBe('Request-only Cloudflare API token');
   });
 
   it('returns an unselected descriptor instead of inventing legacy requirements', () => {

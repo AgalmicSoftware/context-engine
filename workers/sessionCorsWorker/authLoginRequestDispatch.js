@@ -9,6 +9,7 @@ import {
   ABUSE_COUNTER_TYPES,
   recordAbuseEvent as recordAbuseEventBoundary,
 } from './abuseObservability.js';
+import { readAuthorizationEpoch } from './authorizationScopeFreshness.js';
 
 const recordAuthFailure = async ({ env, deps } = {}) => {
   try {
@@ -73,6 +74,7 @@ export const dispatchAuthLoginRequest = async ({
 
   const {
     address,
+    config,
     headers,
     scopes,
     targetSlug,
@@ -80,6 +82,10 @@ export const dispatchAuthLoginRequest = async ({
 
   const exp = Math.floor((deps?.now?.() ?? Date.now()) / 1000) + deps?.TOKEN_TTL_SECONDS;
   const sub = deps?.getAddress?.(address);
+  const authzEpoch = readAuthorizationEpoch(config);
+  if (authzEpoch === null) {
+    return deps?.json?.({ error: 'Session authorization epoch is invalid.' }, 500, headers);
+  }
   const buildJti = typeof deps?.buildAuthTokenJti === 'function'
     ? deps.buildAuthTokenJti
     : buildAuthTokenJti;
@@ -91,6 +97,7 @@ export const dispatchAuthLoginRequest = async ({
   const payload = {
     sub,
     slug: targetSlug,
+    authzEpoch,
     scopes,
     exp,
     jti,

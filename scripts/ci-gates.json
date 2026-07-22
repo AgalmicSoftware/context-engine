@@ -1,0 +1,366 @@
+{
+  "schemaVersion": 1,
+  "profiles": {
+    "ci": [
+      "wiring-and-release",
+      "contracts",
+      "client",
+      "root-jest",
+      "workers",
+      "cecc-and-node"
+    ],
+    "hosted": [
+      "wiring-and-release",
+      "public-text",
+      "contracts",
+      "client",
+      "root-jest",
+      "workers",
+      "e2e-smoke",
+      "cecc-and-node"
+    ],
+    "release": [
+      "release"
+    ]
+  },
+  "gates": {
+    "wiring-and-release": {
+      "commands": [
+        {
+          "label": "Check test and release wiring",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:wiring"
+          ]
+        },
+        {
+          "label": "Check type debt ratchet",
+          "command": "npm",
+          "args": [
+            "run",
+            "type-debt:check"
+          ]
+        },
+        {
+          "label": "Lint client",
+          "command": "npm",
+          "args": [
+            "run",
+            "lint"
+          ]
+        },
+        {
+          "label": "Check client formatting",
+          "command": "npm",
+          "args": [
+            "--prefix",
+            "client",
+            "run",
+            "format:check"
+          ]
+        },
+        {
+          "label": "Lint workers",
+          "command": "npm",
+          "args": [
+            "run",
+            "lint:workers"
+          ]
+        },
+        {
+          "label": "Typecheck client",
+          "command": "npm",
+          "args": [
+            "run",
+            "typecheck:client"
+          ]
+        },
+        {
+          "label": "Verify typed client tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "typecheck:client-tests"
+          ]
+        },
+        {
+          "label": "Verify public release surface",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:public-release-surface"
+          ]
+        },
+        {
+          "label": "Verify public asset ownership",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:public-assets"
+          ]
+        },
+        {
+          "label": "Build worker bundles",
+          "command": "npm",
+          "args": [
+            "run",
+            "worker:bundle"
+          ]
+        },
+        {
+          "label": "Verify worker bundle sync",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:worker-bundle"
+          ]
+        },
+        {
+          "label": "Verify Cloudflare-native Session Worker package",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:cloudflare-template"
+          ]
+        },
+        {
+          "label": "Build client",
+          "command": "npm",
+          "args": [
+            "--prefix",
+            "client",
+            "run",
+            "build"
+          ]
+        },
+        {
+          "label": "Check client bundle budget",
+          "command": "npm",
+          "args": [
+            "run",
+            "client:bundle-budget:check"
+          ]
+        }
+      ]
+    },
+    "public-text": {
+      "commands": [
+        {
+          "label": "Verify public text exposure",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:public-text"
+          ]
+        }
+      ]
+    },
+    "contracts": {
+      "commands": [
+        {
+          "label": "Run contract tests and build artifacts",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:contracts"
+          ]
+        },
+        {
+          "label": "Verify tracked contract ABIs",
+          "command": "npm",
+          "args": [
+            "run",
+            "abi:check"
+          ]
+        }
+      ]
+    },
+    "client": {
+      "commands": [
+        {
+          "label": "Run client coverage tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:client"
+          ]
+        },
+        {
+          "label": "Check client coverage floor",
+          "command": "npm",
+          "args": [
+            "run",
+            "coverage-floor:check"
+          ]
+        }
+      ]
+    },
+    "root-jest": {
+      "commands": [
+        {
+          "label": "Run root Jest tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:root:jest"
+          ]
+        }
+      ]
+    },
+    "workers": {
+      "commands": [
+        {
+          "label": "Run session CORS Worker tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:worker:session-cors"
+          ]
+        },
+        {
+          "label": "Run Agent Bridge Worker tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:worker:agent-bridge"
+          ]
+        }
+      ]
+    },
+    "e2e-smoke": {
+      "commands": [
+        {
+          "label": "Run tracked E2E smoke",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:e2e:smoke"
+          ]
+        }
+      ]
+    },
+    "cecc-and-node": {
+      "commands": [
+        {
+          "label": "Run tracked root Node tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:node:tracked"
+          ]
+        },
+        {
+          "label": "Run managed-cache guard",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:cache-guard"
+          ]
+        }
+      ]
+    },
+    "release": {
+      "commands": [
+        {
+          "label": "Lint client",
+          "command": "npm",
+          "args": [
+            "run",
+            "lint"
+          ]
+        },
+        {
+          "label": "Typecheck client",
+          "command": "npm",
+          "args": [
+            "run",
+            "typecheck:client"
+          ]
+        },
+        {
+          "label": "Verify typed client tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "typecheck:client-tests"
+          ]
+        },
+        {
+          "label": "Run tracked Node release tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:node:tracked"
+          ]
+        },
+        {
+          "label": "Run full client release tests",
+          "command": "npm",
+          "args": [
+            "run",
+            "test:release:client"
+          ]
+        },
+        {
+          "label": "Verify public release surface",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:public-release-surface"
+          ]
+        },
+        {
+          "label": "Verify public asset ownership",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:public-assets"
+          ]
+        },
+        {
+          "label": "Build worker bundles",
+          "command": "npm",
+          "args": [
+            "run",
+            "worker:bundle"
+          ]
+        },
+        {
+          "label": "Verify worker bundle sync",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:worker-bundle"
+          ]
+        },
+        {
+          "label": "Verify Cloudflare-native Session Worker package",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:cloudflare-template"
+          ]
+        },
+        {
+          "label": "Build client",
+          "command": "npm",
+          "args": [
+            "--prefix",
+            "client",
+            "run",
+            "build"
+          ]
+        },
+        {
+          "label": "Check client bundle budget",
+          "command": "npm",
+          "args": [
+            "run",
+            "client:bundle-budget:check"
+          ]
+        }
+      ]
+    }
+  }
+}

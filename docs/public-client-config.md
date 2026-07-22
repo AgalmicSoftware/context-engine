@@ -12,10 +12,38 @@ stays centralized in `client/src/variables/publicDeploymentConfig.ts`.
 - Runtime reader/re-export surface: `client/src/variables/appConfig.ts`
 - Shared env parsing helpers: `client/src/variables/publicEnv.ts`
 
+## Session Wrapped Capability Record
+
+Agent Session Wrapped discovery is session-scoped public config, not a
+browser environment secret. A successfully verified dedicated deployment may
+publish exactly this versioned record in the canonical session config:
+
+```json
+{
+  "agentSessionWrapped": {
+    "version": 1,
+    "enabled": true,
+    "origin": "https://<dedicated-bridge>.<workers-subdomain>.workers.dev",
+    "protocolVersion": "agent-session-wrapped-v1",
+    "revision": "wrapped-<safe-revision>",
+    "verifiedAt": "<ISO-8601 timestamp>"
+  }
+}
+```
+
+The client accepts an HTTPS origin with no credentials, path, query, or
+fragment and safe bounded protocol/revision identifiers. The record contains
+no Cloudflare token, worker secret, member credential, Telegram credential, or
+provider key. `sessionModeProfile.surfaces.agentHttp` is the only enablement
+bit; it must mirror `agentSessionWrapped.enabled`. `surfaces.telegram` is a
+separate optional adapter bit. Deploy and redeploy code preserves the last
+verified record until the replacement Worker has passed activation, health,
+protocol, pinned-authority, and durable-config checks.
+
 ## How to Configure
 
 1. Copy the example file: `cp client/.env.example client/.env`
-2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows an empty `.env` file is valid; the default `/new` flow now ships with a project deploy-helper URL, while healthcheck and self-host overrides still need explicit URLs when you use them.
+2. Edit `client/.env` - uncomment and change only the values you need to override. For general local browsing/authoring flows an empty `.env` file is valid. A production release enables native Cloudflare deployment with its reviewed public replay commit; helper and healthcheck URLs are legacy/self-host overrides.
 3. Restart the dev server: `cd client && npm run dev` (client env values are bundled when the dev server or production build starts)
 4. For production (Vercel, Netlify, Cloudflare Pages, etc.): set `REACT_APP_*` vars in your hosting platform's environment settings. Do not commit `client/.env` to git.
 
@@ -47,12 +75,19 @@ For a custom-domain self-host, the values to check first are:
   wallet address namespace. Changing it changes derived wallet addresses.
 - `REACT_APP_CE_SHARED_WORKER_URL` when the deployment should use your own
   default/shared `sessionCorsWorker` instead of the demo fallback.
+- `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` to enable the native
+  Cloudflare deploy card. The value must be the exact 40-character commit that
+  publicly contains the reviewed `deploy/cloudflare/session-worker/` package.
+  Branch names, tags, abbreviated hashes, and non-GitHub sources fail closed.
 - `REACT_APP_CE_DEPLOY_HELPER_URL` when `/new` should use your own
-  deploy-helper instead of the project helper.
+  deploy-helper for the explicit legacy fallback.
 - `REACT_APP_CE_HEALTHCHECK_WORKER_URL` when worker diagnostics should target a
   specific worker.
 - `REACT_APP_CE_WORKER_BUNDLE_URL` only when deploy flows should fetch a worker
   bundle from a non-default URL.
+- `REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL` alongside any Worker bundle URL
+  override. The manifest must come from the same immutable release and provides
+  the expected SHA-256 for both Session and Wrapped deploys.
 - `REACT_APP_DEFAULT_CHAIN_ID`, session scan variables, and registry/session
   defaults only when your deployment intentionally targets a different chain,
   registry/session surface, or profile scan scope.
@@ -81,29 +116,55 @@ The output directory is `client/build/`.
 Before building, the build script removes stale legacy `client/build-vite/` and
 `client/vite-build/` directories if they exist locally.
 
-### 3. Upload to Netlify
+### 3. Publish to Netlify
 
-For a manual upload, drag `client/build/` into Netlify's deploy UI. For a
-connected repo deploy, set the publish directory to:
+The repository-root `netlify.toml` is the canonical connected-build contract.
+Connect only the public `AgalmicSoftware/context-engine` repository, select
+`main` as the production branch, and leave the dashboard's build overrides
+blank. Netlify then runs the following contract from the repository:
 
 ```text
-client/build
+base: client
+command: npm ci && REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT=$COMMIT_REF npm run build
+publish: build
+Node: 20
 ```
 
-Do not upload `client/build-vite/` or `client/vite-build/`. Those names are
-legacy ignored artifacts from older local builds and can contain partial or
-stale CSS output. If a Netlify deploy looks unstyled or low-contrast, rebuild
-from `client/` and upload the fresh `client/build/` directory.
+`COMMIT_REF` is supplied by Netlify for Git-backed builds. Passing it through
+to `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` binds the native
+Cloudflare Deploy Button to the exact reviewed public commit that produced the
+client. Manual or local builds without `COMMIT_REF` keep the native button
+disabled rather than guessing a private or mutable source ref.
 
-Because the app uses client-side routing, configure an SPA route fallback. Either
-include a Netlify `_redirects` file in the published build output:
+Enable pull-request Deploy Previews so a candidate can be inspected before it
+reaches `main`. Leave general branch deploys disabled unless a named release
+workflow explicitly needs them. Never connect a private development branch or
+grant Netlify access to private planning repositories.
+
+Deploy Previews prove the static build and browser routes. Worker-backed flows
+also require the exact preview origin in the relevant worker allowlist, so keep
+full production verification on an approved custom domain rather than adding a
+wildcard preview origin.
+
+For a manual fallback, drag `client/build/` into Netlify's deploy UI. Do not
+upload `client/build-vite/` or `client/vite-build/`. Those names are legacy
+ignored artifacts from older local builds and can contain partial or stale CSS
+output. Set `REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT` to the exact
+public source commit before a manual build when the native Deploy Button must
+be available. If a deploy looks unstyled or low-contrast, rebuild from
+`client/` and upload the fresh `client/build/` directory.
+
+Because the app uses client-side routing, the root `netlify.toml` owns the Git
+deploy redirects. The matching `client/public/_redirects` file is retained in
+the published bundle for manual deploys and other Netlify-compatible static
+uploads:
 
 ```text
 /demo/dacc /about 301
 /*    /index.html   200
 ```
 
-Or configure the same rule in `netlify.toml`:
+The connected-build equivalent is:
 
 ```toml
 [[redirects]]
@@ -117,9 +178,11 @@ Or configure the same rule in `netlify.toml`:
   status = 200
 ```
 
-For manual drag-and-drop deploys, the `_redirects` file must be present inside
-the uploaded `client/build/` directory. Keep any specific legacy redirects above
-the SPA fallback rule.
+Keep specific legacy redirects above the SPA fallback rule in both files.
+
+For rollback, use Netlify's deploy history to republish the previous known-good
+production deploy, then correct `main` normally. A frontend rollback does not
+roll back workers, contracts, or externally stored session data.
 
 When hosting the app under a subpath, set `PUBLIC_URL` to that mount path before
 building, for example `PUBLIC_URL=/ce npm run build`. Internal session,
@@ -150,6 +213,11 @@ In Netlify, add the domain under the site domain settings and complete the DNS
 setup Netlify provides. Rebuild/redeploy after the final origin is known if any
 `REACT_APP_*` values depend on that origin or point at origin-specific worker,
 helper, registry, or API endpoints.
+
+The domain does not need to be registered with Netlify or use Netlify DNS.
+Keeping registration and DNS at an external registrar is supported; point only
+the web records at the Netlify project and preserve unrelated MX, TXT, and
+service records.
 
 ### 5. Update worker CORS
 

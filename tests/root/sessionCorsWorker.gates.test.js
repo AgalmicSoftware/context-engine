@@ -3,6 +3,7 @@ import sessionCorsWorker, { workerAuthGateUtils } from '../../workers/sessionCor
 import {
   buildRpcFetchMock,
   createMemoryKv,
+  installSessionCoordinatorBinding,
 } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 
 const REGISTRY_ABI = [
@@ -539,7 +540,7 @@ describe('sessionCorsWorker gate authority', () => {
     expect(identity).toBe('anon:198.51.100.7');
   });
 
-  it('short-circuits anonymous ai over-limit requests before on-chain gate checks', async () => {
+  it('admits exactly one concurrent anonymous ai request at a limit of one', async () => {
     const fetchMock = buildRpcFetchMock({
       rpcUrl,
       registryAddress,
@@ -559,10 +560,10 @@ describe('sessionCorsWorker gate authority', () => {
         limits: { perWalletPerDay: 1 },
       }),
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const makeRequest = () => new Request('https://worker.example/ai', {
       method: 'POST',
@@ -576,15 +577,12 @@ describe('sessionCorsWorker gate authority', () => {
       }),
     });
 
-    const first = await sessionCorsWorker.fetch(makeRequest(), env, {});
-    expect(first.status).toBe(400);
+    const responses = await Promise.all([
+      sessionCorsWorker.fetch(makeRequest(), env, {}),
+      sessionCorsWorker.fetch(makeRequest(), env, {}),
+    ]);
+    expect(responses.map((response) => response.status).sort()).toEqual([400, 429]);
     expect(fetchMock).toHaveBeenCalled();
-
-    fetchMock.mockClear();
-
-    const second = await sessionCorsWorker.fetch(makeRequest(), env, {});
-    expect(second.status).toBe(429);
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('rejects anonymous apiKey custom ai requests that omit rpcUrl', async () => {
@@ -600,10 +598,10 @@ describe('sessionCorsWorker gate authority', () => {
         customRpcKey: 'secret-key',
       }),
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const request = new Request('https://worker.example/ai', {
       method: 'POST',
@@ -641,10 +639,10 @@ describe('sessionCorsWorker gate authority', () => {
         openaiKey: 'sk-worker-openai',
       }),
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const formData = new FormData();
     formData.append('file', new File(['audio'], 'clip.mp3', { type: 'audio/mpeg' }));

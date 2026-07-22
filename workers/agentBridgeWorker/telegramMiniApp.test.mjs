@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import {
   __test__telegramMiniApp,
@@ -21,6 +22,11 @@ import {
   saveAgentOnlyModeConfig,
   submitAgentOnlyAnswersBulk,
 } from './telegramAgentOnlyMode.mjs';
+
+const HISTORICAL_AGENT_ONLY_WINDOWING = Object.freeze({
+  launchOpensAt: '2026-06-12T08:00:00-07:00',
+  launchClosesAt: '2026-06-15T08:00:00-07:00',
+});
 
 class MemoryKv {
   constructor() {
@@ -170,6 +176,18 @@ test('Mini App explains how to recover an expired launch', async () => {
   assert.match(state.message, /send \/start/);
   assert.equal(state.launchRecovery.command, '/start');
   assert.equal(state.launchRecovery.botUrl, 'https://t.me/contextengineer_bot');
+});
+
+test('Mini App browser asset is owned outside the Worker auth and resource handler host', () => {
+  const serverSource = readFileSync(new URL('./telegramMiniApp.mjs', import.meta.url), 'utf8');
+  const browserSource = readFileSync(new URL('./telegramMiniAppBrowserAsset.mjs', import.meta.url), 'utf8');
+  assert.match(serverSource, /from '\.\/telegramMiniAppBrowserAsset\.mjs'/);
+  assert.doesNotMatch(serverSource, /<!doctype html>|<style>|<script>/);
+  assert.match(browserSource, /export function renderTelegramMiniAppBrowserAsset/);
+  assert.match(browserSource, /<!doctype html>/);
+  assert.match(browserSource, /<style>/);
+  assert.match(browserSource, /<script>/);
+  assert.doesNotMatch(browserSource, /AGENT_ACTION_KV|validateTelegramMiniAppInitData|authenticateSessionWorker/);
 });
 
 test('Mini App renders agree-style controls in client order with client colors', () => {
@@ -1096,6 +1114,14 @@ test('Mini App session picker lists sessions and loads multi-selected questions'
         { sessionSlug: 'alpha', sessionName: 'Alpha', telegramBridgeEnabled: true, telegramOnly: true },
         { sessionSlug: 'e2e-spam', sessionName: 'E2E Spam', telegramBridgeEnabled: true, telegramOnly: true },
         { sessionSlug: 'hidden', sessionName: 'Hidden', telegramBridgeEnabled: false },
+        {
+          sessionSlug: 'telegram-without-mini-app',
+          sessionName: 'Telegram Without Mini App',
+          sessionModeProfile: {
+            authority: { mode: 'worker_canonical' },
+            surfaces: { telegram: true, miniApp: false },
+          },
+        },
         { sessionSlug: 'beta', sessionName: 'Beta', telegramBridgeEnabled: true, telegramOnly: true },
       ],
     }),
@@ -2287,6 +2313,200 @@ test('Mini App draft save endpoint returns draft metadata and reloads saved draf
   });
 });
 
+test('Mini App action routes reject a stale question action after the Mini App surface is disabled', async () => {
+  const kv = new MemoryKv();
+  const enabledProfile = {
+    authority: { mode: 'worker_canonical' },
+    surfaces: { telegram: true, miniApp: true },
+  };
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_DEFAULT_SESSION_SLUG: 'alpha',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [{ sessionSlug: 'alpha', sessionName: 'Alpha', sessionModeProfile: enabledProfile }],
+    }),
+    AGENT_BRIDGE_QUESTION_SOURCE: 'fixture',
+    AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([{
+      sessionSlug: 'alpha',
+      questionId: 'q-disabled-mini-app',
+      questionType: 'agree_unsure_disagree',
+      prompt: 'Should stale Mini App actions stop working?',
+    }]),
+  };
+  const state = await __test__telegramMiniApp.buildMiniAppState({
+    request: new Request('https://bridge.example/telegram/mini-app/api/state'),
+    env,
+    createdAt: '2026-07-21T12:00:00.000Z',
+  });
+  const questionKey = state.questions[0].questionKey;
+
+  env.AGENT_BRIDGE_SESSION_POLICY_JSON = JSON.stringify({
+    defaultSessionSlug: 'alpha',
+    sessions: [{
+      sessionSlug: 'alpha',
+      sessionName: 'Alpha',
+      sessionModeProfile: {
+        ...enabledProfile,
+        surfaces: { telegram: true, miniApp: false },
+      },
+    }],
+  });
+  const draftResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/draft', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        questionKey,
+        answer: { value: 'agree' },
+        submit: false,
+      }),
+    }),
+    env,
+    createdAt: '2026-07-21T12:01:00.000Z',
+  });
+  const draftBody = await draftResponse.json();
+
+  assert.equal(draftResponse.status, 403);
+  assert.equal(draftBody.error, 'mini_app_disabled');
+  assert.equal(Array.from(kv.store.keys()).some((key) => key.includes('answer-draft')), false);
+
+  const voteResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/question-vote', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ questionKey, vote: 'up' }),
+    }),
+    env,
+    createdAt: '2026-07-21T12:02:00.000Z',
+  });
+  const voteBody = await voteResponse.json();
+
+  assert.equal(voteResponse.status, 403);
+  assert.equal(voteBody.error, 'mini_app_disabled');
+  assert.equal(Array.from(kv.store.keys()).some((key) => key.includes('question-vote')), false);
+
+  const clearResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/clear-drafts', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ questionKeys: [questionKey] }),
+    }),
+    env,
+  });
+  const clearBody = await clearResponse.json();
+
+  assert.equal(clearResponse.status, 403);
+  assert.equal(clearBody.error, 'mini_app_disabled');
+});
+
+test('Mini App activity fails closed when no requested session remains enabled', async () => {
+  const kv = new MemoryKv();
+  await persistAnswerDraft({
+    env: { AGENT_ACTION_KV: kv },
+    normalized: { user: { telegramUserId: 'preview-user' }, chat: { chatId: 'preview-user' } },
+    sessionSlug: 'disabled-session',
+    selectedQuestionId: 'q-disabled-activity',
+    answerLabel: 'Private draft',
+    answerValue: JSON.stringify({ questionType: 'freeform', value: 'Private draft' }),
+    controlType: 'freeform',
+    submitLane: 'telegram_mini_app',
+    createdAt: '2026-07-21T12:00:00.000Z',
+  });
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'disabled-session',
+      sessions: [{
+        sessionSlug: 'disabled-session',
+        sessionName: 'Disabled session',
+        sessionModeProfile: {
+          authority: { mode: 'worker_canonical' },
+          surfaces: { telegram: true, miniApp: false },
+        },
+      }],
+    }),
+  };
+
+  const response = await handleTelegramMiniAppRequest({
+    request: new Request(
+      'https://bridge.example/telegram/mini-app/api/activity?sessionSlug=disabled-session',
+    ),
+    env,
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 403);
+  assert.equal(body.ok, false);
+  assert.equal(body.error, 'mini_app_disabled');
+  assert.equal(JSON.stringify(body).includes('Private draft'), false);
+});
+
+test('Mini App settings reject disabled sessions and launch-session mismatches before writing', async () => {
+  const kv = new MemoryKv();
+  const enabledProfile = {
+    authority: { mode: 'worker_canonical' },
+    surfaces: { telegram: true, miniApp: true },
+  };
+  const env = {
+    AGENT_ACTION_KV: kv,
+    AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
+      defaultSessionSlug: 'alpha',
+      sessions: [
+        { sessionSlug: 'alpha', sessionName: 'Alpha', sessionModeProfile: enabledProfile },
+        { sessionSlug: 'beta', sessionName: 'Beta', sessionModeProfile: enabledProfile },
+        {
+          sessionSlug: 'disabled-session',
+          sessionName: 'Disabled session',
+          sessionModeProfile: {
+            ...enabledProfile,
+            surfaces: { telegram: true, miniApp: false },
+          },
+        },
+      ],
+    }),
+  };
+
+  const disabledResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/settings', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionSlug: 'disabled-session',
+        settings: { draftStyle: 'concise' },
+      }),
+    }),
+    env,
+  });
+  assert.equal(disabledResponse.status, 403);
+  assert.equal((await disabledResponse.json()).error, 'mini_app_disabled');
+
+  const launch = 'cecb_settingsalphalaunch';
+  await kv.put(`telegram:action:${launch}`, JSON.stringify({
+    type: 'agent_bridge_opaque_action',
+    actionId: launch,
+    action: 'edit_agent_settings',
+    lane: 'telegram_mini_app',
+    miniAppLaunch: true,
+    serverContextRef: { sessionSlug: 'alpha' },
+  }));
+  const mismatchResponse = await handleTelegramMiniAppRequest({
+    request: new Request('https://bridge.example/telegram/mini-app/api/settings', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        launch,
+        sessionSlug: 'beta',
+        settings: { draftStyle: 'concise' },
+      }),
+    }),
+    env,
+  });
+  assert.equal(mismatchResponse.status, 403);
+  assert.equal((await mismatchResponse.json()).error, 'mini_app_launch_mismatch');
+  assert.equal(Array.from(kv.store.keys()).some((key) => key.includes('agent-settings')), false);
+});
+
 test('Mini App exposes agent-only sidecar state, human votes, confirm, and edit-after-agent events', async () => {
   const kv = new MemoryKv();
   const env = {
@@ -2319,7 +2539,7 @@ test('Mini App exposes agent-only sidecar state, human votes, confirm, and edit-
   await saveAgentOnlyModeConfig({
     env,
     sessionSlug: 'alpha',
-    patch: { enabledQuestionIds: [proposed.questionId] },
+    patch: { enabledQuestionIds: [proposed.questionId], windowing: HISTORICAL_AGENT_ONLY_WINDOWING },
     createdAt: '2026-06-12T15:01:00.000Z',
   });
   await materializeAgentOnlyWindow({
@@ -2489,7 +2709,10 @@ test('Mini App classifies agent-only confirm/edit by answer semantics, not displ
   await saveAgentOnlyModeConfig({
     env,
     sessionSlug: 'alpha',
-    patch: { enabledQuestionIds: [freeform.questionId, multichoice.questionId] },
+    patch: {
+      enabledQuestionIds: [freeform.questionId, multichoice.questionId],
+      windowing: HISTORICAL_AGENT_ONLY_WINDOWING,
+    },
     createdAt: '2026-06-12T15:01:00.000Z',
   });
   await materializeAgentOnlyWindow({
@@ -2695,7 +2918,7 @@ test('Mini App submit contains agent-only review failures after persisting the h
   await saveAgentOnlyModeConfig({
     env,
     sessionSlug: 'alpha',
-    patch: { enabledQuestionIds: [proposed.questionId] },
+    patch: { enabledQuestionIds: [proposed.questionId], windowing: HISTORICAL_AGENT_ONLY_WINDOWING },
     createdAt: '2026-06-12T15:01:00.000Z',
   });
   await materializeAgentOnlyWindow({

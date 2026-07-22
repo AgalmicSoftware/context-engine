@@ -5,19 +5,14 @@ type CloudflareTokenPermission = {
   type: string;
 };
 
+export const CLOUDFLARE_API_TOKENS_URL = 'https://dash.cloudflare.com/profile/api-tokens';
+
 export const CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS = Object.freeze([
   { key: 'workers_scripts', type: 'edit' },
   { key: 'workers_kv_storage', type: 'edit' },
 ]);
 
 export const CLOUDFLARE_TOKEN_TEMPLATE_R2_PERMISSIONS = Object.freeze([{ key: 'workers_r2', type: 'edit' }]);
-
-export const CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS = CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS;
-
-export const CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS = Object.freeze({
-  kv: 'canonical config, encrypted payload envelopes and indexes, groups, audit rows, and deploy state',
-  r2: 'optional existing R2 bucket for advanced deployments that explicitly enable R2 payload storage',
-});
 
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'] as const;
 const CLOUDFLARE_TOKEN_NAME_PREFIX = 'contextEngine-corsSessionWorker-';
@@ -92,5 +87,5 @@ export const buildCloudflareTokenTemplateUrl = ({
   params.set('accountId', '*');
   params.set('zoneId', 'all');
   params.set('name', buildTokenName(slug));
-  return `https://dash.cloudflare.com/profile/api-tokens?${params.toString()}`;
+  return `${CLOUDFLARE_API_TOKENS_URL}?${params.toString()}`;
 };

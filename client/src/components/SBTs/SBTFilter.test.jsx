@@ -53,7 +53,6 @@ const createSubject = (props = {}, stateOverrides = {}) => {
 
 const flushMicrotasks = async (cycles = 3) => {
   for (let i = 0; i < cycles; i += 1) {
-    // eslint-disable-next-line no-await-in-loop
     await Promise.resolve();
   }
 };

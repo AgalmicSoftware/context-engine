@@ -73,6 +73,9 @@ Recommended env vars / secrets:
   - bearer token required for `GET /admin/origins` and `POST /admin/origins`
 - `WORKER_BUNDLE_URL`
   - optional default `sessionCorsWorker` bundle URL when callers omit `bundleUrl`
+- `WORKER_BUNDLE_MANIFEST_URL`
+  - adjacent immutable-release manifest used to bind the expected bundle
+    SHA-256 before any Cloudflare mutation
 - `WORKER_COMPATIBILITY_DATE`
   - optional compatibility date for the worker the helper deploys
 - `DEFAULT_SESSION_SLUG`
@@ -86,8 +89,9 @@ Wrangler is the preferred deploy path. The checked-in `worker.js` imports `../sh
   - input: `{ apiToken }`
   - output: `{ accountId, accountName }`
 - `POST /deploy`
-  - input: Cloudflare token, worker name, worker bundle (`bundleUrl` or
-    `bundleText`), initial session config/secrets, and optional
+  - input: Cloudflare token, worker name, worker bundle (`bundleUrl` plus
+    `bundleManifestUrl`, or `bundleText` plus its locally computed digest),
+    initial session config/secrets, and optional
     `deploymentRequestId` (the first-party wizard always supplies one)
   - output: absolute `workerUrl`, the non-secret `deploymentId` ownership marker,
     and `subdomainStatus`, `subdomainEnabled`, `subdomainError`,
@@ -101,6 +105,10 @@ Wrangler is the preferred deploy path. The checked-in `worker.js` imports `../sh
     response-loss retries, and rejects reuse of the ID with a conflicting
     immutable identity. Coordinator and journal state contain no raw tokens,
     secrets, or bundle bytes
+  - release-manifest provenance is resolved before request coordination, so
+    the expected digest is part of the stable request identity. The manifest
+    and downloaded bytes are rechecked before account lookup or resource
+    mutation; a moved `latest` pointer cannot silently change retry bytes
   - if Cloudflare definitively rejects an uploaded bundle after the stable KV
     namespace is staged, the helper retains a separate non-secret recovery
     marker. The same request may retry corrected bundle bytes while every

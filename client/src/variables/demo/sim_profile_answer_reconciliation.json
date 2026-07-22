@@ -1,0 +1,85 @@
+{
+  "description": "Curated evidence mapping used by scripts/reconcile-sim-profile-answers.mjs to keep historical_figure_users.json binary answers consistent with the canonical demo vote fixtures. Profile questions reference the all_300_questions.json policy list via commentIndex; this config links those policy indexes to demo_polis_data.json comments (via verbatim key_tension matches) and, where no POLIS vote exists, to manually validated atlas tree nodes with explicit polarity. Tree-node mappings are only allowed on nodes whose tree votes empirically agree with the node's anchor POLIS statements (anchorCommentIndexes) for at least 80% of figures that have both signals; sim_profile_answer_consistency.test.js enforces this.",
+  "treeScoreThresholds": {
+    "agreeMin": 2,
+    "disagreeMax": -2
+  },
+  "treeAnchorMinDirectionalAgreement": 0.8,
+  "polisLinkPolarityByPolicyIndex": {
+    "0": 1,
+    "2": 1,
+    "4": 1,
+    "7": 1,
+    "9": 1,
+    "11": 1,
+    "18": 1,
+    "23": 1,
+    "25": 1,
+    "28": 1,
+    "36": 1,
+    "41": 1,
+    "50": 1,
+    "51": 1,
+    "55": 1,
+    "58": 1,
+    "60": 1,
+    "66": 1,
+    "72": 1,
+    "73": 1,
+    "77": 1,
+    "80": 1,
+    "84": 1,
+    "96": 1,
+    "99": 1
+  },
+  "bankQuestionTreeNodeIds": {
+    "8": {
+      "nodeId": "0x3100000000000000000000000000000000000000000000000000000000000000",
+      "polarity": 1,
+      "anchorCommentIndexes": [4, 5],
+      "rationale": "An IAEA-style international regulatory body is a binding-regulation instrument; positive Regulation Approaches tree votes are anchored pro-binding-regulation by the validated POLIS[4]/POLIS[5] mappings (95% directional agreement)."
+    },
+    "10": {
+      "nodeId": "0x3100000000000000000000000000000000000000000000000000000000000000",
+      "polarity": 1,
+      "anchorCommentIndexes": [4, 5],
+      "rationale": "Mandatory pre-deployment safety testing and certification is binding regulation; same 0x3100 anchor."
+    },
+    "15": {
+      "nodeId": "0x3100000000000000000000000000000000000000000000000000000000000000",
+      "polarity": 1,
+      "anchorCommentIndexes": [4, 5],
+      "rationale": "Mandatory safety-incident and near-miss disclosure is binding regulation; same 0x3100 anchor."
+    },
+    "16": {
+      "nodeId": "0x3100000000000000000000000000000000000000000000000000000000000000",
+      "polarity": -1,
+      "anchorCommentIndexes": [4, 5],
+      "rationale": "Adversarial auditing by competing labs as an effective regulator is the voluntary/market-sufficiency inverse of the pro-binding-regulation 0x3100 anchor."
+    },
+    "17": {
+      "nodeId": "0x3100000000000000000000000000000000000000000000000000000000000000",
+      "polarity": 1,
+      "anchorCommentIndexes": [4, 5],
+      "rationale": "Real-time regulator monitoring and override authority is binding regulation; same 0x3100 anchor."
+    },
+    "62": {
+      "nodeId": "0x3100000000000000000000000000000000000000000000000000000000000000",
+      "polarity": 1,
+      "anchorCommentIndexes": [4, 5],
+      "rationale": "Mandatory interpretability requirements for high-stakes AI decisions are binding regulation; same 0x3100 anchor."
+    },
+    "65": {
+      "nodeId": "0x4230000000000000000000000000000000000000000000000000000000000000",
+      "polarity": 1,
+      "anchorCommentIndexes": [19, 20],
+      "rationale": "Requiring AI agents to disclose their AI nature follows the pro-synthetic-labeling direction anchored by the validated POLIS[19] watermarking and POLIS[20] deepfake-labeling mappings (83% directional agreement)."
+    },
+    "78": {
+      "nodeId": "0x4230000000000000000000000000000000000000000000000000000000000000",
+      "polarity": 1,
+      "anchorCommentIndexes": [19, 20],
+      "rationale": "Platform liability for AI-generated misinformation follows the pro-intervention direction of the same 0x4230 anchor."
+    }
+  }
+}

@@ -11,7 +11,7 @@
   "bugs": {
     "url": "https://github.com/AgalmicSoftware/context-engine/issues"
   },
-  "homepage": "https://contextengine.xyz/",
+  "homepage": "https://contextengine.sh/",
   "engines": {
     "npm": "^10.0.0",
     "node": "^20.19.0 || >=22.12.0"
@@ -67,10 +67,13 @@
     "verify:passkey-only-bundle": "node scripts/verify-passkey-only-bundle.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "jest",
+    "test:coverage": "npm run test:coverage:full-universe",
+    "test:coverage:full-universe": "jest --config jest.full-universe.config.cjs --watchAll=false --runInBand --coverage --coverageReporters=json --coverageReporters=json-summary --coverageReporters=lcov --coverageReporters=text-summary",
     "parity:fixtures": "GENERATE_PARITY_FIXTURES=1 jest --runTestsByPath src/utilities/survey/parityFixtures.test.js --watchAll=false",
     "commonground:export": "GENERATE_COMMONGROUND_EXPORT=1 jest --runTestsByPath src/utilities/survey/commongroundExport.test.js --watchAll=false",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --no-error-on-unmatched-pattern src/ \"src/**/*.{js,jsx,mjs,cjs}\" \"src/domains/**/*.{ts,tsx}\" \"src/utilities/session/**/*.{ts,tsx}\" \"src/utilities/worker/**/*.{ts,tsx}\" \"src/utilities/arweave/**/*.{ts,tsx}\" \"src/utilities/web3/**/*.{ts,tsx}\" \"src/utilities/cache/**/*.{ts,tsx}\" \"src/utilities/survey/**/*.{ts,tsx}\" \"src/utilities/sbt/**/*.{ts,tsx}\" \"src/utilities/user/**/*.{ts,tsx}\" \"src/utilities/sponsor/**/*.{ts,tsx}\" \"src/utilities/tags/**/*.{ts,tsx}\" \"src/utilities/contracts/**/*.{ts,tsx}\" \"src/utilities/shared/**/*.{ts,tsx}\" \"src/utilities/ui/**/*.{ts,tsx}\" \"src/utilities/storage/**/*.{ts,tsx}\" \"src/components/Shared/**/*.{ts,tsx}\" \"src/components/About/**/*.{ts,tsx}\" \"src/components/Footer/**/*.{ts,tsx}\" \"src/components/InformationModals/**/*.{ts,tsx}\" \"src/components/Onboarding/**/*.{ts,tsx}\" \"src/components/MainContent/**/*.{ts,tsx}\" \"src/components/Agent/**/*.{ts,tsx}\" \"src/components/Bookmarks/**/*.{ts,tsx}\" \"src/components/Sponsor/**/*.{ts,tsx}\" \"src/components/ErrorBoundary/**/*.{ts,tsx}\" \"src/components/RightSidebar/**/*.{ts,tsx}\" \"src/components/E2E/**/*.{ts,tsx}\" \"src/components/Gates/**/*.{ts,tsx}\" \"src/components/CommunityTab/**/*.{ts,tsx}\" \"src/components/PolisReport/**/*.{ts,tsx}\" \"src/components/DebateMap/**/*.{ts,tsx}\" \"src/components/Navbar/**/*.{ts,tsx}\" \"src/components/ContractPage/**/*.{ts,tsx}\" \"src/components/OnePageSession/**/*.{ts,tsx}\" \"src/components/TagPage/**/*.{ts,tsx}\" \"src/components/DocumentLibrary/**/*.{ts,tsx}\" \"src/components/DemoViews/**/*.{ts,tsx}\" \"src/components/Account/**/*.{ts,tsx}\" \"src/components/Admin/**/*.{ts,tsx}\" \"src/components/MainSite/**/*.{ts,tsx}\" \"src/components/UserPage/**/*.{ts,tsx}\" \"src/components/Sessions/**/*.{ts,tsx}\" \"src/components/SBTs/**/*.{ts,tsx}\" \"src/components/SurveyTool/**/*.{ts,tsx}\"",
+    "typecheck:tests": "tsc --project tsconfig.tests.json --noEmit",
+    "lint": "eslint --no-error-on-unmatched-pattern \"src/**/*.{js,jsx,mjs,cjs,ts,tsx}\"",
     "format:check": "prettier --config .prettierrc.js --ignore-path ../.prettierignore --check \"src/**/*.{js,jsx,mjs,cjs,ts,tsx,css,scss}\""
   },
   "devDependencies": {

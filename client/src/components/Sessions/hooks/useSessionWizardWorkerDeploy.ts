@@ -11,10 +11,7 @@ import {
   withSecretsSyncStatus,
   withWorkerConfigSyncWarning,
 } from '../sessionWizardSecrets.js';
-import {
-  buildSessionWizardWorkerConfigPayload,
-  resolveSessionWizardWorkerStorageProfilePayload,
-} from '../sessionWizardWriteNormalization.js';
+import { buildSessionWizardWorkerConfigPayload } from '../sessionWizardWriteNormalization.js';
 import {
   buildSessionWizardLitBootstrapRequest,
   buildSessionWizardLitProvisionRequest,
@@ -60,6 +57,11 @@ import {
 } from '../sessionWizardWorkerDeployLitRuntime';
 import { getSessionWizardWorkerDeployValidationError } from '../sessionWizardWorkerRpc';
 import { resolveSessionWizardModeRequirements } from '../sessionWizardModeRequirements';
+import {
+  requireSessionWizardAgentSessionWrappedCapability,
+  resolveSessionWizardAgentSessionWrappedDeployment,
+} from '../sessionWizardAgentSessionWrappedDeploy';
+import { buildSessionWizardDeployStorageProfilePayload } from '../sessionWizardWorkerDeployStorage';
 import {
   advanceSessionWizardDeployAttemptGeneration,
   isStructuredSessionWizardDeployAttemptConflict,
@@ -116,55 +118,6 @@ export type SessionWizardWorkerDeployRuntime = {
   workerRequirementProof?: SessionWizardWorkerRequirementProof | null;
   draft?: DraftLike | null;
   deployForm?: DeployFormLike | null;
-};
-
-const isRecord = (value: unknown): value is AnyRecord => !!value && typeof value === 'object' && !Array.isArray(value);
-
-const firstTrimmed = (...values: unknown[]): string => {
-  for (const value of values) {
-    const trimmed = toStr(value).trim();
-    if (trimmed) return trimmed;
-  }
-  return '';
-};
-
-const resolveDeployOnlyR2BucketName = (draft: AnyRecord, deployPayload: AnyRecord): string => {
-  const rawStorageProfile = isRecord(draft.storageProfile)
-    ? draft.storageProfile
-    : isRecord(deployPayload.storageProfile)
-      ? deployPayload.storageProfile
-      : {};
-  const cloudflare = isRecord(rawStorageProfile.cloudflare) ? rawStorageProfile.cloudflare : {};
-  const r2 = isRecord(cloudflare.r2) ? cloudflare.r2 : {};
-  return firstTrimmed(
-    rawStorageProfile.r2BucketName,
-    rawStorageProfile.r2Bucket,
-    rawStorageProfile.bucketName,
-    rawStorageProfile.bucket,
-    cloudflare.r2BucketName,
-    cloudflare.r2Bucket,
-    cloudflare.bucketName,
-    cloudflare.bucket,
-    r2.bucketName,
-    r2.bucket,
-  );
-};
-
-const buildDeployStorageProfilePayload = (draft: AnyRecord, deployPayload: AnyRecord): AnyRecord | null => {
-  const { storageProfile } = resolveSessionWizardWorkerStorageProfilePayload({
-    draft,
-    deployPayload,
-  });
-  if (toStr(storageProfile.backend).trim().toLowerCase() !== 'cloudflare') return null;
-  const r2BucketName = resolveDeployOnlyR2BucketName(draft, deployPayload);
-  if (!r2BucketName) return storageProfile;
-  return {
-    ...storageProfile,
-    cloudflare: {
-      ...(isRecord(storageProfile.cloudflare) ? storageProfile.cloudflare : {}),
-      r2BucketName,
-    },
-  };
 };
 
 type SessionWizardWorkerDeployStateUpdate = {
@@ -380,7 +333,7 @@ const useSessionWizardWorkerDeploy = ({
           bundleUrl: currentDeployForm.bundleUrl,
           normalModeBundleUrlOverride: runtime.normalModeBundleUrlOverride,
         });
-        const { bundleText, bundleUrl } = await resolveSessionWizardDeployBundlePayload({
+        const { bundleText, bundleUrl, bundleManifestUrl, bundleSha256 } = await resolveSessionWizardDeployBundlePayload({
           effectiveBundleMode,
           bundleFile: runtime.bundleFile,
           bundleUrl: requestedBundleUrl,
@@ -393,7 +346,7 @@ const useSessionWizardWorkerDeploy = ({
             workerSecrets: allDeploySecrets,
           });
         const deployBlockLimits = normalizeBlockLimitsForConfig(currentDraft?.blockLimits, runtime.latestChainBlock);
-        const deployStorageProfile = buildDeployStorageProfilePayload(currentDraft, {});
+        const deployStorageProfile = buildSessionWizardDeployStorageProfilePayload(currentDraft, {});
         const normalizedSponsoredBundle = normalizeSparseSponsoredBundlePayload(
           sponsoredBundleAppliedBundleRef?.current,
         );
@@ -425,6 +378,8 @@ const useSessionWizardWorkerDeploy = ({
           sessionSlug: slug,
           bundleUrl,
           bundleText: bundleText || undefined,
+          bundleManifestUrl,
+          bundleSha256,
           registryAddress: toStr(runtime.registryAddress).trim(),
           registryChainId: Number(runtime.registryChainId || currentDraft.networkChainId || 0) || 0,
           adminAddress: resolvedAdmin,
@@ -438,6 +393,15 @@ const useSessionWizardWorkerDeploy = ({
           faucet: resolveWorkerFaucetConfig(),
           embeddedDeployHelperEnabled: runtime.embeddedDeployHelperEnabled,
         };
+        const agentSessionWrappedDeployment = resolveSessionWizardAgentSessionWrappedDeployment({
+          draft: currentDraft,
+          registryChainId: runtime.registryChainId,
+          networkChainId: currentDraft.networkChainId,
+          sessionId: runtime.sessionId,
+          sessionIdHex: runtime.sessionIdHex,
+          slug,
+        });
+        Object.assign(payload, agentSessionWrappedDeployment.payload);
         const canonicalSeedConfig = buildSessionWizardWorkerConfigPayload({
           slug,
           draft: currentDraft,
@@ -565,6 +529,13 @@ const useSessionWizardWorkerDeploy = ({
         let deployStatusCode = 0;
         let data: AnyRecord = {};
         ({ deployStatusCode, data } = await submitDeployPayload(payload));
+        const agentSessionWrapped = requireSessionWizardAgentSessionWrappedCapability({
+          requested: agentSessionWrappedDeployment.requested,
+          value: data?.agentSessionWrapped,
+        });
+        if (agentSessionWrapped) {
+          updateDraftValue(['agentSessionWrapped'], agentSessionWrapped);
+        }
         // The helper's successful response makes this scope terminal. Persist that
         // fact before any later config/secret synchronization can yield or fail.
         if (!markSessionWizardDeployAttemptCompleted(deployAttemptIdentity)) {
@@ -601,6 +572,7 @@ const useSessionWizardWorkerDeploy = ({
             resolveWorkerFaucetConfig,
           }),
           corsWorkerUrl: resolvedDeployWorkerUrl,
+          ...(agentSessionWrapped ? { agentSessionWrapped } : {}),
         };
         const ensureWorkerSessionConfig = createSessionWizardEnsureWorkerSessionConfig({
           getWorkerConfig: () => workerConfigPayload,
@@ -938,6 +910,7 @@ const useSessionWizardWorkerDeploy = ({
           requiredWorkerSecretsReady,
           requiredWorkerSecretFields,
           workerRequirementProof,
+          agentSessionWrapped,
         };
       } catch (err) {
         const runtime = readRuntime(runtimeRef);

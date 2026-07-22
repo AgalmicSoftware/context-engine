@@ -3,11 +3,16 @@ import {
   findForbiddenCloudflareDeploymentTokenPath,
   findForbiddenWorkerConfigSecretPath,
 } from '../shared/workerSessionConfig.mjs';
+import { validateWorkerConfigModeValues } from '../shared/workerConfigModeValidation.mjs';
 import {
   mergeWorkerConfigRecords,
   mergeWorkerLimitRecords,
   normalizeWorkerConfigRecord,
 } from './sessionConfigNormalization.js';
+import {
+  AUTHORIZATION_EPOCH_KEY,
+  incrementAuthorizationEpoch,
+} from './authorizationScopeFreshness.js';
 
 const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
 
@@ -121,11 +126,22 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
       ? mutation.incomingConfig
       : null;
     if (!incomingConfig) return { ok: false, status: 400, error: 'Missing config.' };
+    if (hasOwn(incomingConfig, AUTHORIZATION_EPOCH_KEY)) {
+      return { ok: false, status: 400, error: 'Authorization epoch is server-managed.' };
+    }
     if (findForbiddenCloudflareDeploymentTokenPath(incomingConfig)) {
       return { ok: false, status: 400, error: 'Cloudflare deployment tokens are not allowed in session config.' };
     }
     if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
       return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
+    }
+    const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig);
+    if (!incomingModeValidation.ok) {
+      return {
+        ok: false,
+        status: 400,
+        error: `Invalid session config mode at ${incomingModeValidation.path}.`,
+      };
     }
     mergedConfig = mergeWorkerConfigRecords({ existingConfig: existing, incomingConfig, slug });
   } else if (kind === 'set-limits') {
@@ -162,6 +178,14 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
     return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
   }
+  const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
+  if (!mergedModeValidation.ok) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Invalid session config mode at ${mergedModeValidation.path}.`,
+    };
+  }
 
   if (changesInitializedWorkerCanonicalIdentity({ existingConfig: authorityExisting, mergedConfig })) {
     return {
@@ -170,9 +194,35 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
       error: 'Worker-canonical session identity cannot be changed after initialization.',
     };
   }
-  return resolveWorkerCanonicalPublicationWrite({
+  const publicationWrite = resolveWorkerCanonicalPublicationWrite({
     existingConfig: authorityExisting,
     incomingConfig,
     mergedConfig,
   });
+  if (!publicationWrite?.ok || publicationWrite.skipPersistence || kind !== 'set-config') {
+    return publicationWrite;
+  }
+
+  const comparisonExisting = mergeWorkerConfigRecords({
+    existingConfig: authorityExisting,
+    incomingConfig: {},
+    slug,
+  });
+  if (
+    stableCanonicalSerialize(publicationWrite.config) ===
+    stableCanonicalSerialize(comparisonExisting)
+  ) {
+    return publicationWrite;
+  }
+  const nextEpoch = incrementAuthorizationEpoch(authorityExisting);
+  if (nextEpoch === null) {
+    return { ok: false, status: 409, error: 'Authorization epoch is invalid.' };
+  }
+  return {
+    ...publicationWrite,
+    config: {
+      ...publicationWrite.config,
+      [AUTHORIZATION_EPOCH_KEY]: nextEpoch,
+    },
+  };
 };

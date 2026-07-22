@@ -20,6 +20,14 @@ function arweaveId(byte = 7) {
   return Buffer.from(Uint8Array.from({ length: 32 }, () => byte)).toString('base64url');
 }
 
+test('worker-login fallback candidates include the canonical .sh site before the legacy redirect origin', () => {
+  const candidates = __test__onChainResponses.resolveLoginOriginCandidates({}, {});
+
+  assert.ok(candidates.indexOf('https://contextengine.sh') >= 0);
+  assert.ok(candidates.indexOf('https://contextengine.xyz') >= 0);
+  assert.ok(candidates.indexOf('https://contextengine.sh') < candidates.indexOf('https://contextengine.xyz'));
+});
+
 async function makeAccount() {
   const principal = normalizeTelegramPrincipal({ telegramUserId: '42', username: 'participant' });
   const account = await deriveManagedDemoAccount({

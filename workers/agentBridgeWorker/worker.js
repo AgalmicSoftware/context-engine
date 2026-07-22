@@ -1,11 +1,14 @@
-import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
-export { ManagedDemoSignerDurableObject } from './durableObjectSigner.mjs';
+import {
+  AGENT_BRIDGE_WORKER_VERSION,
+  AGENT_SESSION_WRAPPED_PROTOCOL_VERSION,
+} from './constants.mjs';
 import { directSubmitFeatureEnabled } from './onChainResponses.mjs';
 import { runMockTelegramDemoFlow } from './transportMock.mjs';
 import { handleTelegramAgentHandoffRequest } from './telegramAgentHandoff.mjs';
 import { buildTelegramCommandResponse, handleTelegramWebhookUpdate, readTelegramResultPhoto } from './telegramCommands.mjs';
 import { handleTelegramMiniAppRequest } from './telegramMiniApp.mjs';
 import { processTelegramSubmitQueueBatch } from './telegramSubmitQueue.mjs';
+import { resolvePinnedSessionWorkerAuthority } from './sessionWorkerAuthority.mjs';
 
 function json(data, init = {}) {
   return new Response(JSON.stringify(data, null, 2), {
@@ -204,12 +207,24 @@ export default {
   async fetch(request, env = {}, ctx = {}) {
     const url = new URL(request.url);
     if (url.pathname === '/health') {
+      const authority = resolvePinnedSessionWorkerAuthority({
+        policyJson: env.AGENT_BRIDGE_SESSION_POLICY_JSON,
+        sessionWorkerOrigin: env.CE_SESSION_WORKER_BASE_URL,
+      });
       return json({
         ok: true,
         worker: 'agentBridgeWorker',
         version: AGENT_BRIDGE_WORKER_VERSION,
         privateRelease: true,
         broadcastEnabled: directSubmitFeatureEnabled(env),
+        protocolVersion: AGENT_SESSION_WRAPPED_PROTOCOL_VERSION,
+        agentSessionWrappedConfigured: authority.ok,
+        agentSessionWrappedReady: authority.ok && authority.accessEnabled,
+        dedicatedSession: authority.ok ? {
+          accessEnabled: authority.accessEnabled,
+          sessionSlug: authority.sessionSlug,
+          sessionWorkerOrigin: authority.sessionWorkerOrigin,
+        } : null,
       });
     }
     if (url.pathname === '/session-wrapped' && (request.method === 'GET' || request.method === 'HEAD')) {

@@ -51,12 +51,12 @@ Although Context Engine is an Ethereum application, users do not need to know an
 
 Context Engine is a web application, a set of smart contracts (EVM), and supporting infrastructure for AI inference, storage, access gating, and encryption. It is meant to be easily redeployable by various groups with no programming experience.
 
-- **Sessions** include questions, responses, documents, access gates, and configuration, and new Sessions  can be created from the web application (at [/new](https://contextengine.xyz/new)).
+- **Sessions** include questions, responses, documents, access gates, and configuration, and new Sessions  can be created from the web application (at [/new](https://contextengine.sh/new)).
 - **Surveys and Questions** supports binary, rating, multiple-choice, and freeform questions (with the ability to add new question types as needed), with optional conviction weighting and comments.
 - **Access control** uses soulbound tokens (non-transferrable NFTs), with support for gated participation, encrypted fields, and sponsored resources (RPC, AI, EVM tx Costs, Arweave Storage, Lit Encryption).
 - **Storage**: responses and documents stored on Arweave
 - **AI** is already used for question generation, transcription, cluster summaries, result analysis, and comparison of user positions across wallets.
-- **Demonstration datasets** are shipped in the repo as well, including one built around simulated historical figures. The results of this can be seen at [/demo](https://contextengine.xyz/session/demo)
+- **Demonstration datasets** are shipped in the repo as well, including one built around simulated historical figures. The current public demo can be seen at [/demo-1](https://contextengine.sh/session/demo-1)
 
 The same product can also be deployed more privately and scalably (as circumstances demand), with local storage, POA blockchain, local encryption backends, and self-hosted workers when data cannot leave an organization.
 
@@ -212,4 +212,4 @@ sensemaking, deliberation, collective intelligence, discourse, debate, ethereum,
 
 ---
 
-*Context Engine is open-source software. Code, documentation, and participation: [contextengine.xyz](https://contextengine.xyz)*
+*Context Engine is open-source software. Code, documentation, and participation: [contextengine.sh](https://contextengine.sh)*

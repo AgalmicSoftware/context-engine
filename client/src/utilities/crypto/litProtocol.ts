@@ -152,7 +152,6 @@ declare global {
     __litTools?: LitDevToolsApi | null;
   }
 
-  // eslint-disable-next-line no-var
   var CE_E2E_LIT_MOCK: boolean | undefined;
 }
 
@@ -1375,7 +1374,6 @@ const e2eLitMockCheckAccessControlConditions = async ({
       continue;
     }
     if (check?.type === 'erc721-balance' && ethers.utils.isAddress(check.address)) {
-      // eslint-disable-next-line no-await-in-loop
       const balance = await new ethers.Contract(check.address, abi, ethersProvider).balanceOf(req);
       checks.push(ethers.BigNumber.isBigNumber(balance) ? balance.gt(0) : Number(balance || 0) > 0);
     }

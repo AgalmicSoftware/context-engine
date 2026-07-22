@@ -1,5 +1,6 @@
 import {
   ADMIN_SECRET_CARDS,
+  buildAdminSecretPresenceTargetKey,
   buildAdminSecretRemoveTestId,
   getAdminSecretCardStatus,
   getAdminSecretFieldInputType,
@@ -11,6 +12,16 @@ import {
 } from './adminPageSecretCardHelpers';
 
 describe('adminPageSecretCardHelpers', () => {
+  it('scopes secret-presence state to the normalized session and Worker identity', () => {
+    expect(
+      buildAdminSecretPresenceTargetKey({
+        slug: ' Alpha Session! ',
+        workerUrl: 'https://worker.example.test/admin/set-config',
+      }),
+    ).toBe('alphasession\nhttps://worker.example.test');
+    expect(buildAdminSecretPresenceTargetKey({ slug: 'alpha', workerUrl: '' })).toBe('');
+  });
+
   it('keeps worker secret cards and fields in their existing order', () => {
     expect(ADMIN_SECRET_CARDS).toEqual([
       { key: 'ai', label: 'AI', fields: ['openaiKey', 'anthropicKey', 'openrouterKey'] },

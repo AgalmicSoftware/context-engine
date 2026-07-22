@@ -1,11 +1,16 @@
 // NOTE: The demo session uses a project-hosted worker hard-coded by default as https://demo-worker-030226.agalmic.workers.dev.
 // All other OSS sessions are bring-your-own-worker.
 // DEFAULT_SHARED_WORKER_URL still remains env-overridable; the hard-coded value is only the default.
-// The deploy-helper has a verified project-operated default endpoint for `/new`.
+// Native Cloudflare deployment is the default `/new` path. The deploy-helper
+// endpoint remains available only for the explicitly labeled legacy fallback.
 // All public deployment URLs below remain env-overridable via REACT_APP_CE_* variables.
 
 import { readPublicBoolEnv, readPublicEnv } from './publicEnv.js';
 import { buildPublicRepoLatestReleaseAssetUrl } from './publicRepoMetadata.js';
+import {
+  buildCloudflareNativeDeployUrl,
+  normalizeCloudflareNativeDeployCommit,
+} from '../utilities/worker/cloudflareNativeDeploy.js';
 
 const EMPTY_PUBLIC_DEPLOYMENT_ENDPOINT = '';
 const DEFAULT_PROJECT_DEPLOY_HELPER_URL = 'https://ce-deploy-helper.agalmic.workers.dev/';
@@ -22,7 +27,25 @@ export const WORKER_BUNDLE_URL = readPublicEnv(
   buildPublicRepoLatestReleaseAssetUrl('sessionCorsWorker.bundle.js'),
 );
 
+export const AGENT_BRIDGE_WORKER_BUNDLE_URL = readPublicEnv(
+  'REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL',
+  buildPublicRepoLatestReleaseAssetUrl('agentBridgeWorker.bundle.js'),
+);
+
+export const WORKER_RELEASE_MANIFEST_URL = readPublicEnv(
+  'REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL',
+  buildPublicRepoLatestReleaseAssetUrl('worker-release-manifest.json'),
+);
+
 export const DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = readPublicBoolEnv(
   'REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED',
   true,
 );
+
+export const CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = normalizeCloudflareNativeDeployCommit(
+  readPublicEnv('REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT', ''),
+);
+
+export const CLOUDFLARE_NATIVE_DEPLOY_URL = buildCloudflareNativeDeployUrl({
+  commit: CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT,
+});

@@ -33,11 +33,11 @@ export const validateBootstrapAdmin = async ({
   const registryRpcUrls = deps?.normalizeRpcUrlList?.(env?.RPC_URL) || [];
   const registrySlug = deps?.toRegistrySessionSlug?.(slug);
 
-  // Preserve legacy first-write bootstrap when the worker is not wired to the registry
-  // or when the slug does not exist on-chain yet. Once the registry proves ownership,
-  // the on-chain admin must authorize the bootstrap.
+  // Registry-less deployments must bind BOOTSTRAP_ADMIN_ADDRESS during the
+  // trusted deployment step. Never let an arbitrary first signer claim a
+  // reachable worker whose bootstrap binding or registry wiring is absent.
   if (!deps?.isAddress?.(registryAddress) || !registryRpcUrls.length) {
-    return requestedAdminMatches;
+    return false;
   }
 
   const incomingConfig = body?.config && typeof body.config === 'object' ? body.config : {};
@@ -57,7 +57,7 @@ export const validateBootstrapAdmin = async ({
     chainAttestationCache,
   });
   if (sessionCheck?.exists === false) {
-    return requestedAdminMatches;
+    return false;
   }
   if (sessionCheck?.exists !== true) {
     return false;

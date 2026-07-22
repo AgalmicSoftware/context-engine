@@ -1,0 +1,37 @@
+{
+  "name": "context-engine-session",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-07-21",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "kv_namespaces": [
+    {
+      "binding": "GROUP_KV"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CE_SESSION_COORDINATOR",
+        "class_name": "SessionWriteCoordinator"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "ce-session-write-coordinator-v1",
+      "new_sqlite_classes": [
+        "SessionWriteCoordinator"
+      ]
+    }
+  ],
+  "vars": {
+    "DEFAULT_SESSION_SLUG": "replace-with-session-slug",
+    "BOOTSTRAP_ADMIN_ADDRESS": "replace-with-context-engine-admin-address",
+    "DEPLOY_HELPER_ENABLED": "0",
+    "WORKER_DEBUG_LOGS": "0",
+    "CE_BUNDLE_SHA256": "a59d4ad306a9cdb0c76f73cf698ade3824955045938e5e4b2f36ef62c9b37643"
+  }
+}

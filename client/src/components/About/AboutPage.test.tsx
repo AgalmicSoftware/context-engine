@@ -365,7 +365,7 @@ describe('AboutPage', () => {
         selectedSessionScope: 'list',
         selectedSessionSlugs: ['general'],
       } as any),
-    ).toBe('/session/demo-1');
+    ).toBe('/session/demo-sh');
   });
 
   it.each([

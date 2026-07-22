@@ -127,7 +127,10 @@ export const verifyToken = async (token, secret, deps) => {
   if (typeof payload?.slug !== 'undefined' && typeof payload.slug !== 'string') {
     return { ok: false, error: 'Token slug must be a string.' };
   }
-  if (typeof payload?.jti !== 'undefined' && typeof payload.jti !== 'string') {
+  if (typeof payload?.jti === 'undefined' || (typeof payload.jti === 'string' && !payload.jti.trim())) {
+    return { ok: false, error: 'Token missing jti.' };
+  }
+  if (typeof payload.jti !== 'string') {
     return { ok: false, error: 'Token jti must be a string.' };
   }
 

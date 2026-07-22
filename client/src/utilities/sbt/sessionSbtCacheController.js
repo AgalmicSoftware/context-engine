@@ -777,7 +777,7 @@ export const createSessionSbtCacheController = (host = {}) => {
       const priorityProcessedSbts = {};
       for (let i = 0; i < featuredGlobalLower.length; i += BATCH_SIZE) {
         const batch = featuredGlobalLower.slice(i, i + BATCH_SIZE);
-        // eslint-disable-next-line no-loop-func
+
         const batchPromises = batch.map(async (sbtAddressLower) => {
           try {
             const cachedSBT = currentSbtListForNetwork[sbtAddressLower];
@@ -1146,7 +1146,7 @@ export const createSessionSbtCacheController = (host = {}) => {
           }
         });
         const batchResults = await Promise.all(batchPromises);
-        // eslint-disable-next-line no-loop-func
+
         batchResults.forEach((result) => {
           if (result && result.sbtAddress) {
             finalProcessedSbtsMap[result.sbtAddress.toLowerCase()] = result;

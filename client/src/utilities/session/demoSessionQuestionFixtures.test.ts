@@ -93,4 +93,29 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
       questionCount: 42,
     });
   });
+
+  it('maps the same 42 questions to the Cloudflare-canonical demo-sh session', () => {
+    const config = (demoSessions as Record<string, any>)['demo-sh'];
+    const questions = getTemporaryDemoSessionQuestionFixtures('demo-sh', config);
+
+    expect(questions).toHaveLength(42);
+    expect(questions.map((question) => question.id)).toEqual(demo1OnchainQuestionIds);
+    expect(questions[0]).toMatchObject({
+      sessionSlug: 'demo-sh',
+      temporaryDemoSeed: false,
+      cloudflareDemoSeed: true,
+      demoFixture: { workerCanonical: true },
+    });
+    expect(config).toMatchObject({
+      slug: 'demo-sh',
+      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+      configRevision: 'demo-sh-v1',
+      corsWorkerUrl: 'https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/',
+      demoCompatibilitySeed: {
+        temporary: false,
+        workerCanonical: true,
+        questionCount: 42,
+      },
+    });
+  });
 });

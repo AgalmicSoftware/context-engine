@@ -12,24 +12,18 @@ test('createRateLimitFaucetSupportWithWorkerDeps returns the expected helper fun
   assert.equal(typeof helpers.validateSbtPasswordForFaucet, 'function');
 });
 
-test('createRateLimitFaucetSupportWithWorkerDeps preserves rate-limit keying, reset, and ttl writes', async () => {
-  const kvCalls = [];
-  const env = {
-    GROUP_KV: {
-      get: async (key) => {
-        kvCalls.push(['get', key]);
-        return JSON.stringify({ count: 2, resetAt: 1000 });
-      },
-      put: async (key, value, opts) => {
-        kvCalls.push(['put', key, JSON.parse(value), opts]);
-      },
-    },
-  };
+test('createRateLimitFaucetSupportWithWorkerDeps delegates normalized route limits to durable coordination', async () => {
+  const calls = [];
+  const env = { GROUP_KV: {} };
 
   const { checkRateLimit } = createRateLimitFaucetSupportWithWorkerDeps({
     deps: {
       toStr: (value) => (typeof value === 'string' ? value : value == null ? '' : String(value)),
       now: () => 1000,
+      checkCoordinatedAuthRateLimit: async (value) => {
+        calls.push(value);
+        return { ok: true, allowed: true, count: 1 };
+      },
     },
   });
 
@@ -42,20 +36,21 @@ test('createRateLimitFaucetSupportWithWorkerDeps preserves rate-limit keying, re
   });
 
   assert.equal(allowed, true);
-  assert.deepEqual(kvCalls, [
-    ['get', 'rate:session-a:ai:anon:user'],
-    ['put', 'rate:session-a:ai:anon:user', { count: 1, resetAt: 86401000 }, { expirationTtl: 86400 }],
-  ]);
+  assert.deepEqual(calls, [{
+    env,
+    slug: 'session-a',
+    route: 'ai',
+    identity: 'anon:user',
+    limit: 2,
+    windowMs: 86_400_000,
+    now: calls[0].now,
+  }]);
+  assert.equal(calls[0].now(), 1000);
 });
 
 test('createRateLimitFaucetSupportWithWorkerDeps records rate-limit denials', async () => {
   const events = [];
-  const env = {
-    GROUP_KV: {
-      get: async () => JSON.stringify({ count: 2, resetAt: 2_000 }),
-      put: async () => {},
-    },
-  };
+  const env = { GROUP_KV: {} };
 
   const { checkRateLimit } = createRateLimitFaucetSupportWithWorkerDeps({
     deps: {
@@ -65,6 +60,7 @@ test('createRateLimitFaucetSupportWithWorkerDeps records rate-limit denials', as
         events.push(event);
         return { ok: true };
       },
+      checkCoordinatedAuthRateLimit: async () => ({ ok: true, allowed: false, count: 3 }),
     },
   });
 

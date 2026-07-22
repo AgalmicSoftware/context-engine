@@ -4,6 +4,7 @@ import {
   buildRpcFetchMock,
   createMemoryKv,
   createSignedSiweBody,
+  installSessionCoordinatorBinding,
   issueWorkerLoginToken,
 } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 
@@ -73,10 +74,10 @@ const createWorkerEnv = ({ sessionSlug, config, secrets, tokenSecret = 'test-sec
   if (secrets !== undefined) {
     seed[SESSION_SECRETS_KEY(sessionSlug)] = JSON.stringify(secrets);
   }
-  return {
+  return installSessionCoordinatorBinding({
     GROUP_KV: createMemoryKv(seed),
     TOKEN_HMAC_SECRET: tokenSecret,
-  };
+  });
 };
 
 const createUploadJsonRequest = ({ headers = {}, body }) => new Request('https://worker.example/arweave/upload', {

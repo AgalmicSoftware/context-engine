@@ -263,6 +263,18 @@ ensure_public_replay_message() {
   fi
 }
 
+bind_public_replay_to_source() {
+  local commit_sha="$1"
+  local message_file="$2"
+
+  git interpret-trailers \
+    --in-place \
+    --if-exists replace \
+    --if-missing add \
+    --trailer "CE-Private-Source: $commit_sha" \
+    "$message_file"
+}
+
 sync_agent_bridge_public_package_wiring() {
   local commit_sha="$1"
   local target_package="$TEMP_CLONE/package.json"
@@ -866,6 +878,8 @@ fi
 
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/sync-public-history.XXXXXX")
 TEMP_CLONE="$TMP_ROOT/replay"
+REPLAY_HOOKS_DIR="$TMP_ROOT/replay-hooks"
+mkdir -p "$REPLAY_HOOKS_DIR"
 
 log_info "Cloning source repo into temporary workspace: $TEMP_CLONE"
 git clone --quiet "$REPO_ROOT" "$TEMP_CLONE"
@@ -954,6 +968,7 @@ for commit_sha in "${COMMITS[@]}"; do
   fi
 
   ensure_public_replay_message "$commit_sha" "$subject" "$message_file"
+  bind_public_replay_to_source "$commit_sha" "$message_file"
 
   GIT_AUTHOR_NAME="$PUBLIC_GIT_NAME" \
   GIT_AUTHOR_EMAIL="$PUBLIC_GIT_EMAIL" \
@@ -961,7 +976,9 @@ for commit_sha in "${COMMITS[@]}"; do
   GIT_COMMITTER_NAME="$PUBLIC_GIT_NAME" \
   GIT_COMMITTER_EMAIL="$PUBLIC_GIT_EMAIL" \
   GIT_COMMITTER_DATE="$committer_date" \
-    git -C "$TEMP_CLONE" commit --quiet --file "$message_file"
+    git -C "$TEMP_CLONE" \
+      -c "core.hooksPath=$REPLAY_HOOKS_DIR" \
+      commit --quiet --no-gpg-sign --file "$message_file"
 
   REPLAYED_COUNT=$((REPLAYED_COUNT + 1))
   replayed_head=$(git -C "$TEMP_CLONE" rev-parse HEAD)

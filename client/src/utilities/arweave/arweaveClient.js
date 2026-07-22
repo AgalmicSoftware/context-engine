@@ -591,7 +591,6 @@ const uploadDirectToArweave = async ({ data, contentType, tags, arweaveJwk, requ
   try {
     const uploader = await arweave.transactions.getUploader(tx);
     while (!uploader.isComplete) {
-      // eslint-disable-next-line no-await-in-loop
       await withTimeout(uploader.uploadChunk(), ARWEAVE_CHUNK_UPLOAD_TIMEOUT_MS, 'Arweave chunk upload');
     }
   } catch (err) {
@@ -1007,7 +1006,7 @@ async function uploadDataToArweave(data, format, opts = {}) {
         ) {
           // Keep retrying the same worker briefly for transient upstream pricing/routing failures.
           // These happen in live no-mock runs and usually settle within a couple of quick retries.
-          // eslint-disable-next-line no-await-in-loop
+
           await sleep(750 * transientAttempt);
           continue;
         }

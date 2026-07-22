@@ -224,6 +224,69 @@ test('dispatchAdminRequest merges config and persists the result after authority
   });
 });
 
+test('dispatchAdminRequest rejects explicit invalid security modes before config persistence', async () => {
+  const invalidConfigs = [
+    {
+      path: 'sessionModeProfile.authority.mode',
+      config: { sessionModeProfile: { authority: { mode: 'registry' } } },
+    },
+    {
+      path: 'sessionModeProfile.encryption.mode',
+      config: { sessionModeProfile: { encryption: { mode: 'mystery' } } },
+    },
+    {
+      path: 'sessionModeProfile.encryption.keyProvider',
+      config: {
+        sessionModeProfile: {
+          encryption: { mode: 'worker_envelope', keyProvider: 'cloudflare_secrets_store' },
+        },
+      },
+    },
+    {
+      path: 'storageProfile.payloadAccessControl.gate',
+      config: { storageProfile: { backend: 'cloudflare', payloadAccessControl: { gate: '   ' } } },
+    },
+    {
+      path: 'storageProfile.payloadAccessControl.encryption',
+      config: {
+        storageProfile: { backend: 'cloudflare', payloadAccessControl: { encryption: 'plaintext' } },
+      },
+    },
+    {
+      path: 'storageProfile.payloadAccessControl.mode',
+      config: { storageProfile: { backend: 'cloudflare', payloadAccessControl: { mode: 'public-read' } } },
+    },
+  ];
+
+  for (const { path, config } of invalidConfigs) {
+    let writes = 0;
+    const result = await dispatchAdminRequest({
+      request: { json: async () => createSignedBody({ config }) },
+      env: { GROUP_KV: {} },
+      baseHeaders: {},
+      slug: 'session-a',
+      action: 'set-config',
+      deps: createAdminDeps({
+        resolveAdminRequestAuthority: async () => ({
+          ok: true,
+          existingConfig: null,
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+          targetSlug: 'session-a',
+        }),
+        mergeWorkerConfigRecords,
+        putSessionConfig: async () => { writes += 1; },
+      }),
+    });
+
+    assert.equal(writes, 0, path);
+    assert.deepEqual(result, {
+      body: { error: `Invalid session config mode at ${path}.` },
+      status: 400,
+      headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+    }, path);
+  }
+});
+
 test('dispatchAdminRequest preserves a freshly stored storage envelope during the next config mutation', async () => {
   const env = { GROUP_KV: createMemoryKv() };
   const storageEnvelope = {
@@ -296,7 +359,7 @@ test('dispatchAdminRequest rejects changes to an initialized worker-canonical id
     },
     {
       label: 'authority mode',
-      config: { sessionModeProfile: { authority: { mode: 'registry' } } },
+      config: { sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } } },
     },
     {
       label: 'worker URL',
@@ -1705,6 +1768,7 @@ test('dispatchAdminRequest persists a signed Lit descriptor through the real con
   assert.equal(result.status, 200);
   assert.deepEqual(await getSessionConfig(env, 'session-a'), {
     slug: 'session-a',
+    authzEpoch: 1,
     adminAddress: '0xabc',
     sessionName: 'Worker Lit Session',
     litCredentials,
@@ -1802,6 +1866,7 @@ test('dispatchAdminRequest persists boolean scope permissions through the real c
   assert.equal(result.status, 200);
   assert.deepEqual(await getSessionConfig(env, 'session-a'), {
     slug: 'session-a',
+    authzEpoch: 1,
     adminAddress: '0xabc',
     sessionName: 'Worker Session',
     scopes,
@@ -1810,7 +1875,11 @@ test('dispatchAdminRequest persists boolean scope permissions through the real c
 });
 
 test('dispatchAdminRequest provisions Lit descriptors through the real worker config store', async () => {
-  const env = { GROUP_KV: createMemoryKv(), LIT_ACCOUNT_API_KEY: 'account-key' };
+  const env = {
+    GROUP_KV: createMemoryKv(),
+    LIT_ACCOUNT_API_KEY: 'account-key',
+    CE_STORAGE_ENVELOPE_KEK: 'session-secrets-test-kek',
+  };
   const existingConfig = {
     slug: 'session-a',
     adminAddress: '0xabc',
@@ -1870,7 +1939,10 @@ test('dispatchAdminRequest provisions Lit descriptors through the real worker co
 });
 
 test('dispatchAdminRequest bootstraps Lit config and secrets through the real worker stores', async () => {
-  const env = { GROUP_KV: createMemoryKv() };
+  const env = {
+    GROUP_KV: createMemoryKv(),
+    CE_STORAGE_ENVELOPE_KEK: 'session-secrets-test-kek',
+  };
   const existingConfig = {
     slug: 'session-a',
     adminAddress: '0xabc',

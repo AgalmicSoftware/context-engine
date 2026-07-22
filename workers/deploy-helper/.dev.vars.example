@@ -4,5 +4,6 @@
 ALLOWED_ORIGINS=http://localhost:3000
 ADMIN_SECRET=replace-with-a-long-random-secret
 WORKER_BUNDLE_URL=https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js
+WORKER_BUNDLE_MANIFEST_URL=https://github.com/AgalmicSoftware/context-engine/releases/latest/download/worker-release-manifest.json
 WORKER_COMPATIBILITY_DATE=2024-09-02
 DEFAULT_SESSION_SLUG=

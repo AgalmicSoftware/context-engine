@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "warningRatio": 0.95,
+  "entry": {
+    "sources": [
+      "index.html"
+    ],
+    "includeDirectDynamicImports": true,
+    "maxGzipBytes": 250000
+  },
+  "nonVendorChunk": {
+    "maxMinifiedBytes": 500000,
+    "vendorFilePrefixes": [
+      "assets/vendor-"
+    ]
+  },
+  "exceptions": [
+    {
+      "id": "app-shell-temporary",
+      "filePrefix": "assets/AppShell-",
+      "maxMinifiedBytes": 625000,
+      "owner": "docs/bundle-budget.md#temporary-appshell-exception"
+    }
+  ],
+  "duplicateAssets": {
+    "allowedPairs": []
+  }
+}

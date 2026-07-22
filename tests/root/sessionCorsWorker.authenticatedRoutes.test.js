@@ -4,6 +4,8 @@ import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
 import {
   createMemoryKv,
   issueWorkerLoginToken,
+  installSessionCoordinatorBinding,
+  installRpcAwareUpstreamFetchMock,
 } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 
 const REGISTRY_ADDRESS = '0x0000000000000000000000000000000000000001';
@@ -56,10 +58,10 @@ const createWorkerEnv = ({ sessionSlug, config, secrets, tokenSecret = 'test-sec
   if (secrets !== undefined) {
     seed[SESSION_SECRETS_KEY(sessionSlug)] = JSON.stringify(secrets);
   }
-  return {
+  return installSessionCoordinatorBinding({
     GROUP_KV: createMemoryKv(seed),
     TOKEN_HMAC_SECRET: tokenSecret,
-  };
+  });
 };
 
 const createAuthOnlyWorkerEnv = (sourceEnv, tokenSecret = 'test-secret') => {
@@ -67,10 +69,10 @@ const createAuthOnlyWorkerEnv = (sourceEnv, tokenSecret = 'test-secret') => {
     [...sourceEnv.GROUP_KV._dump()]
       .filter(([key]) => String(key || '').startsWith('authToken:'))
   );
-  return {
+  return installSessionCoordinatorBinding({
     GROUP_KV: createMemoryKv(authTokenRecords),
     TOKEN_HMAC_SECRET: tokenSecret,
-  };
+  });
 };
 
 describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
@@ -157,6 +159,42 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
     expect(payload?.error).toBe('Token missing transcribe scope.');
   });
 
+  it('removes a signed ai scope when current session config disables it', async () => {
+    const sessionSlug = 'ai-current-scope-revoked';
+    const config = buildSessionConfig({ scopes: { ai: true } });
+    const env = createWorkerEnv({
+      sessionSlug,
+      config,
+      secrets: { openaiKey: 'sk-openai' },
+    });
+    const token = await issueWorkerLoginToken({
+      worker: sessionCorsWorker,
+      env,
+      wallet,
+      sessionSlug,
+      rpcUrl: RPC_URL,
+      registryAddress: REGISTRY_ADDRESS,
+    });
+    await env.GROUP_KV.put(
+      SESSION_CONFIG_KEY(sessionSlug),
+      JSON.stringify({ ...config, scopes: { ai: false } }),
+    );
+
+    const response = await sessionCorsWorker.fetch(
+      createJsonRequest({
+        token,
+        sessionSlug,
+        body: JSON.stringify({ provider: 'openai', prompt: 'must not run' }),
+      }),
+      env,
+      {},
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(payload?.error).toBe('Token missing ai scope.');
+  });
+
   it('rate limits authenticated /ai requests before a second upstream proxy call', async () => {
     const sessionSlug = 'ai-rate-limit';
     const env = createWorkerEnv({
@@ -173,11 +211,14 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
       registryAddress: REGISTRY_ADDRESS,
     });
 
-    global.fetch = jest.fn().mockResolvedValue({
+    const upstreamFetch = installRpcAwareUpstreamFetchMock({
+      rpcUrl: RPC_URL,
+      implementation: async () => ({
       ok: true,
       status: 200,
       json: async () => ({
         choices: [{ message: { content: 'pong' } }],
+      }),
       }),
     });
 
@@ -204,7 +245,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
     expect(firstResponse.status).toBe(200);
     expect(secondResponse.status).toBe(429);
     expect(secondPayload?.error).toBe('Rate limit exceeded.');
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(upstreamFetch).toHaveBeenCalledTimes(1);
   });
 
   it('rejects authenticated /ai when session secrets are missing', async () => {
@@ -421,11 +462,14 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
       rpcUrl: RPC_URL,
       registryAddress: REGISTRY_ADDRESS,
     });
-    global.fetch = jest.fn().mockResolvedValue({
+    const upstreamFetch = installRpcAwareUpstreamFetchMock({
+      rpcUrl: RPC_URL,
+      implementation: async () => ({
       ok: true,
       status: 200,
       json: async () => ({
         content: [{ text: 'pong' }],
+      }),
       }),
     });
 
@@ -453,7 +497,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
         content: [{ text: 'pong' }],
       },
     });
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(upstreamFetch).toHaveBeenCalledWith(
       'https://api.anthropic.com/v1/messages',
       {
         method: 'POST',
@@ -488,11 +532,14 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
       rpcUrl: RPC_URL,
       registryAddress: REGISTRY_ADDRESS,
     });
-    global.fetch = jest.fn().mockResolvedValue({
+    const upstreamFetch = installRpcAwareUpstreamFetchMock({
+      rpcUrl: RPC_URL,
+      implementation: async () => ({
       ok: true,
       status: 200,
       json: async () => ({
         choices: [{ message: { content: 'pong' } }],
+      }),
       }),
     });
 
@@ -523,7 +570,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
         choices: [{ message: { content: 'pong' } }],
       },
     });
-    expect(global.fetch).toHaveBeenCalledWith(
+    expect(upstreamFetch).toHaveBeenCalledWith(
       'https://openrouter.ai/api/v1/chat/completions',
       {
         method: 'POST',
@@ -561,7 +608,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
       rpcUrl: RPC_URL,
       registryAddress: REGISTRY_ADDRESS,
     });
-    global.fetch = jest.fn();
+    const upstreamFetch = installRpcAwareUpstreamFetchMock({ rpcUrl: RPC_URL });
 
     const response = await sessionCorsWorker.fetch(
       createJsonRequest({
@@ -582,7 +629,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
 
     expect(response.status).toBe(400);
     expect(payload?.error).toBe('Custom provider rpcUrl override requires a request apiKey/rpcKey.');
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(upstreamFetch).not.toHaveBeenCalled();
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://allowed.example');
   });
 
@@ -601,7 +648,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
       rpcUrl: RPC_URL,
       registryAddress: REGISTRY_ADDRESS,
     });
-    global.fetch = jest.fn();
+    const upstreamFetch = installRpcAwareUpstreamFetchMock({ rpcUrl: RPC_URL });
 
     const response = await sessionCorsWorker.fetch(
       createJsonRequest({
@@ -623,7 +670,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
 
     expect(response.status).toBe(403);
     expect(payload?.error).toBe('Custom RPC must use HTTPS');
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(upstreamFetch).not.toHaveBeenCalled();
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://allowed.example');
   });
 
@@ -643,10 +690,13 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
       registryAddress: REGISTRY_ADDRESS,
     });
 
-    global.fetch = jest.fn().mockResolvedValue({
+    const upstreamFetch = installRpcAwareUpstreamFetchMock({
+      rpcUrl: RPC_URL,
+      implementation: async () => ({
       ok: true,
       status: 200,
       json: async () => ({ text: 'pong' }),
+      }),
     });
 
     const buildForm = () => {
@@ -670,7 +720,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
     expect(firstResponse.status).toBe(200);
     expect(secondResponse.status).toBe(429);
     expect(secondPayload?.error).toBe('Rate limit exceeded.');
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(upstreamFetch).toHaveBeenCalledTimes(1);
   });
 
   it('rejects authenticated /transcribe when session secrets are missing', async () => {
@@ -719,7 +769,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
     const form = new FormData();
     form.append('file', new File(['audio'], 'clip.mp3', { type: 'audio/mpeg' }));
     form.append('provider', 'anthropic');
-    global.fetch = jest.fn();
+    const upstreamFetch = installRpcAwareUpstreamFetchMock({ rpcUrl: RPC_URL });
 
     const response = await sessionCorsWorker.fetch(
       createTranscribeRequest({
@@ -735,7 +785,7 @@ describe('sessionCorsWorker authenticated ai/transcribe routes', () => {
 
     expect(response.status).toBe(400);
     expect(payload?.error).toBe('Unsupported transcription provider: anthropic');
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(upstreamFetch).not.toHaveBeenCalled();
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://allowed.example');
   });
 

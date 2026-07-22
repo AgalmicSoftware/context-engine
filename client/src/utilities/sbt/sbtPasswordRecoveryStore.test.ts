@@ -4,6 +4,7 @@ import {
   SBT_PASSWORD_RECOVERY_STORAGE_KEY,
   getSbtPasswordRecoveryCodes,
   getSbtPasswordRecoveryKey,
+  clearSbtPasswordRecoveryCodes,
   readSbtPasswordRecoveryStore,
   upsertSbtPasswordRecoveryCodes,
 } from './sbtPasswordRecoveryStore.js';
@@ -171,5 +172,20 @@ describe('sbtPasswordRecoveryStore', () => {
         passwords: ['migrated-code'],
       }),
     );
+  });
+
+  it('clears only the selected legacy plaintext recovery entry', () => {
+    const storage = createMemoryStorage();
+    const first = '0xabc0000000000000000000000000000000000010';
+    const second = '0xabc0000000000000000000000000000000000011';
+    for (const sbtAddress of [first, second]) {
+      upsertSbtPasswordRecoveryCodes({ chainId: 84532, sbtAddress, passwords: [sbtAddress], storage, now: 1000 });
+    }
+
+    expect(clearSbtPasswordRecoveryCodes({ chainId: 84532, sbtAddress: first, storage, now: 2000 })).toEqual(
+      expect.objectContaining({ ok: true, status: 'cleared' }),
+    );
+    expect(getSbtPasswordRecoveryCodes({ chainId: 84532, sbtAddress: first, storage, now: 2000 })).toEqual([]);
+    expect(getSbtPasswordRecoveryCodes({ chainId: 84532, sbtAddress: second, storage, now: 2000 })).toEqual([second]);
   });
 });

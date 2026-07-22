@@ -3,6 +3,7 @@ const toStr = (value) => (typeof value === 'string' ? value : value == null ? ''
 
 const PUBLIC_CONFIG_KEYS = Object.freeze([
   'slug',
+  'authzEpoch',
   'sessionId',
   'sessionIdHex',
   'configRevision',
@@ -26,6 +27,7 @@ const PUBLIC_CONFIG_KEYS = Object.freeze([
   'corsWorkerUrl',
   'allowOrigins',
   'sessionModeProfile',
+  'agentSessionWrapped',
   'workerAuthority',
   'storageProfile',
   'ai',

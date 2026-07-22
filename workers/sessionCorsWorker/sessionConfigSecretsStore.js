@@ -1,7 +1,9 @@
 import { getKvJson, putKvJson } from './responseKvHelpers.js';
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
 import {
-  buildSessionSecretsEnvelope,
+  buildEncryptedSessionSecretsEnvelope,
+  decryptSessionSecretsEnvelope,
+  isEncryptedSessionSecretsEnvelope,
   unwrapSessionSecretsEnvelope,
 } from '../shared/sessionSecretsEnvelope.mjs';
 import {
@@ -26,6 +28,9 @@ export const getSessionConfig = async (env, slug, deps) => {
 export const getSessionSecrets = async (env, slug, deps) => {
   const getKvJsonFn = typeof deps?.getKvJson === 'function' ? deps.getKvJson : getKvJson;
   const raw = await getKvJsonFn(env, buildSessionSecretsKvKey(slug));
+  if (isEncryptedSessionSecretsEnvelope(raw)) {
+    return decryptSessionSecretsEnvelope(raw, { env, slug, ...deps });
+  }
   return unwrapSessionSecretsEnvelope(raw);
 };
 
@@ -47,10 +52,17 @@ export const putSessionConfig = async (env, slug, value, deps) => {
 
 export const putSessionSecrets = async (env, slug, value, deps) => {
   const putKvJsonFn = typeof deps?.putKvJson === 'function' ? deps.putKvJson : putKvJson;
-  const buildEnvelope = typeof deps?.buildSessionSecretsEnvelope === 'function'
-    ? deps.buildSessionSecretsEnvelope
-    : buildSessionSecretsEnvelope;
-  await putKvJsonFn(env, buildSessionSecretsKvKey(slug), buildEnvelope(value, {
+  const buildEnvelope = typeof deps?.buildEncryptedSessionSecretsEnvelope === 'function'
+    ? deps.buildEncryptedSessionSecretsEnvelope
+    : buildEncryptedSessionSecretsEnvelope;
+  const envelope = await buildEnvelope(value, {
+    env,
+    slug,
     now: deps?.now,
-  }));
+    crypto: deps?.crypto,
+    randomBytes: deps?.randomBytes,
+    getRandomValues: deps?.getRandomValues,
+    getSessionSecretsKek: deps?.getSessionSecretsKek,
+  });
+  await putKvJsonFn(env, buildSessionSecretsKvKey(slug), envelope);
 };

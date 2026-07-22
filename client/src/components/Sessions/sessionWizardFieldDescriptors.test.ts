@@ -19,6 +19,15 @@ describe('sessionWizardFieldDescriptors', () => {
     expect(orderedEntries.map(([key]) => key)).toEqual(['slug', 'sessionInfo', 'defaultTags', 'extraField']);
   });
 
+  it('omits the legacy storage editor when the integrated session profile is present', () => {
+    const orderedEntries = getSessionWizardOrderedDraftEntries({
+      sessionModeProfile: { storage: { backend: 'cloudflare' } },
+      storageProfile: { provider: 'cloudflare' },
+    });
+
+    expect(orderedEntries.map(([key]) => key)).toEqual(['sessionModeProfile']);
+  });
+
   it('splits primary and more-options entries by mode', () => {
     const { primaryEntries, moreOptionsEntries } = splitSessionWizardDraftEntries(
       [

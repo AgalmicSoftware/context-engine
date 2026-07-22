@@ -84,7 +84,6 @@ export const CategoryDotsViz = ({ spec, hideHeader = false }: VizProps) => {
               {Array.from({ length: Math.max(1, Math.min(160, Math.round(category.value / dotUnit))) }).map(
                 (_, index) => (
                   <span
-                    // eslint-disable-next-line react/no-array-index-key
                     key={`${category.label}-${index}`}
                     className={styles.dot}
                     style={{ backgroundColor: category.color }}

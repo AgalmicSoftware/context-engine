@@ -18,54 +18,7 @@ const readClientFile = (relativePath) => {
 
 const readClientJestConfig = () => require(path.resolve(__dirname, '../../../jest.config.cjs'));
 
-const expectedLintCommand = [
-  'eslint --no-error-on-unmatched-pattern src/',
-  '"src/**/*.{js,jsx,mjs,cjs}"',
-  '"src/domains/**/*.{ts,tsx}"',
-  '"src/utilities/session/**/*.{ts,tsx}"',
-  '"src/utilities/worker/**/*.{ts,tsx}"',
-  '"src/utilities/arweave/**/*.{ts,tsx}"',
-  '"src/utilities/web3/**/*.{ts,tsx}"',
-  '"src/utilities/cache/**/*.{ts,tsx}"',
-  '"src/utilities/survey/**/*.{ts,tsx}"',
-  '"src/utilities/sbt/**/*.{ts,tsx}"',
-  '"src/utilities/user/**/*.{ts,tsx}"',
-  '"src/utilities/sponsor/**/*.{ts,tsx}"',
-  '"src/utilities/tags/**/*.{ts,tsx}"',
-  '"src/utilities/contracts/**/*.{ts,tsx}"',
-  '"src/utilities/shared/**/*.{ts,tsx}"',
-  '"src/utilities/ui/**/*.{ts,tsx}"',
-  '"src/utilities/storage/**/*.{ts,tsx}"',
-  '"src/components/Shared/**/*.{ts,tsx}"',
-  '"src/components/About/**/*.{ts,tsx}"',
-  '"src/components/Footer/**/*.{ts,tsx}"',
-  '"src/components/InformationModals/**/*.{ts,tsx}"',
-  '"src/components/Onboarding/**/*.{ts,tsx}"',
-  '"src/components/MainContent/**/*.{ts,tsx}"',
-  '"src/components/Agent/**/*.{ts,tsx}"',
-  '"src/components/Bookmarks/**/*.{ts,tsx}"',
-  '"src/components/Sponsor/**/*.{ts,tsx}"',
-  '"src/components/ErrorBoundary/**/*.{ts,tsx}"',
-  '"src/components/RightSidebar/**/*.{ts,tsx}"',
-  '"src/components/E2E/**/*.{ts,tsx}"',
-  '"src/components/Gates/**/*.{ts,tsx}"',
-  '"src/components/CommunityTab/**/*.{ts,tsx}"',
-  '"src/components/PolisReport/**/*.{ts,tsx}"',
-  '"src/components/DebateMap/**/*.{ts,tsx}"',
-  '"src/components/Navbar/**/*.{ts,tsx}"',
-  '"src/components/ContractPage/**/*.{ts,tsx}"',
-  '"src/components/OnePageSession/**/*.{ts,tsx}"',
-  '"src/components/TagPage/**/*.{ts,tsx}"',
-  '"src/components/DocumentLibrary/**/*.{ts,tsx}"',
-  '"src/components/DemoViews/**/*.{ts,tsx}"',
-  '"src/components/Account/**/*.{ts,tsx}"',
-  '"src/components/Admin/**/*.{ts,tsx}"',
-  '"src/components/MainSite/**/*.{ts,tsx}"',
-  '"src/components/UserPage/**/*.{ts,tsx}"',
-  '"src/components/Sessions/**/*.{ts,tsx}"',
-  '"src/components/SBTs/**/*.{ts,tsx}"',
-  '"src/components/SurveyTool/**/*.{ts,tsx}"',
-].join(' ');
+const expectedLintCommand = 'eslint --no-error-on-unmatched-pattern "src/**/*.{js,jsx,mjs,cjs,ts,tsx}"';
 
 describe('client package modernization contract', () => {
   it('keeps canonical commands on the Vite and standalone Jest paths', () => {
@@ -192,12 +145,15 @@ describe('client package modernization contract', () => {
     const contractSourceLoader = readClientFile('src/components/ContractPage/contractSourceLoader.ts');
 
     expect(viteConfig).toContain("outDir: path.resolve(__dirname, 'build')");
+    expect(viteConfig).toContain("manifest: 'vite-bundle-manifest.json'");
     expect(viteConfig).not.toContain("outDir: path.resolve(__dirname, 'build-vite')");
+    expect(viteConfig).not.toContain('copyStaticImageAssetsPlugin');
+    expect(viteConfig).not.toContain('ce-copy-static-image-assets');
     expect(viteConfig).not.toContain('ce-raw-loader-compatibility');
     expect(viteConfig).not.toContain('!!raw-loader!');
     expect(viteIndex).toContain('__PUBLIC_URL__');
     expect(viteIndex).toContain('/src/viteEntry.ts');
-    expect(viteIndex).toContain('https://contextengine.xyz/assets/img/context-engine-social-preview-square.png');
+    expect(viteIndex).toContain('https://contextengine.sh/assets/img/context-engine-social-preview-square.png');
     expect(
       fs.existsSync(path.resolve(__dirname, '../../../public/assets/img/context-engine-social-preview-square.png')),
     ).toBe(true);
@@ -253,6 +209,7 @@ describe('client package modernization contract', () => {
     expect(viteConfig).toContain("'walletConnectorProfile.metamask.ts'");
     expect(viteConfig).toContain("fileName: 'ce-wallet-profile.json'");
     expect(viteConfig).toContain('findPasskeyOnlyForbiddenModules(moduleIds)');
+    expect(viteConfig).not.toContain('metamask_icon_white.png');
   });
 
   it('keeps Vite browser polyfill dependencies limited to imported runtime shims', () => {
@@ -362,6 +319,11 @@ describe('client package modernization contract', () => {
     expect(eslintConfig).toContain("import tsParser from '@typescript-eslint/parser'");
     expect(eslintConfig).toContain("import reactHooksPlugin from 'eslint-plugin-react-hooks'");
     expect(eslintConfig).toContain("const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}']");
+    expect(eslintConfig).toContain("const typedFiles = ['src/**/*.{ts,tsx}']");
+    expect(eslintConfig).toContain("const typedReactFiles = ['src/**/*.tsx']");
+    expect(eslintConfig).toContain('files: typedFiles');
+    expect(eslintConfig).toContain('files: typedReactFiles');
+    expect(eslintConfig).toContain("reportUnusedDisableDirectives: 'error'");
     expect(eslintConfig).toContain("const typedUiUtilityFiles = ['src/utilities/ui/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedSharedComponentFiles = ['src/components/Shared/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain('const typedInformationalComponentFiles = [');

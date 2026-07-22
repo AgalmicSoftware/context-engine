@@ -3,8 +3,8 @@
 This Worker can be the canonical identity, content/config, auth, AI, and payload
 storage authority for a `worker_canonical` session. It also keeps the existing
 AI proxy, transcription, Arweave, fetch-helper, and testnet-faucet capabilities
-for profiles that enable them. Session secrets use the separate versioned
-Worker KV secrets envelope; public config never contains API keys, private
+for profiles that enable them. Session secrets use a separate AES-GCM-encrypted,
+versioned Worker KV envelope; public config never contains API keys, private
 keys, JWKs, bearer tokens, credentials, RPC/faucet settings, or URL-embedded
 credentials.
 
@@ -40,18 +40,20 @@ canonical `/api/agent/*` routes:
 Hosted origin allowlists for the bridge live in deploy environment variables,
 not repo source: `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS` for browser token
 exchange/result cache reads and `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS` for Mini
-App origins. The current first-party set should include
-`https://contextengine.xyz`, `https://www.contextengine.xyz`, and the planned
-`https://contextengine.sh`, `https://www.contextengine.sh` origins before DNS
-cutover.
+App origins. The current first-party set should include the canonical
+`https://contextengine.sh`, `https://www.contextengine.sh` origins and the
+redirect-compatible `https://contextengine.xyz`, `https://www.contextengine.xyz`
+origins.
 
 ## OSS worker model
 
-- The project hosts one worker for the demo session; it can sponsor new sessions and includes the embedded deploy-helper path.
-- New sessions created via `/new` are bring-your-own-worker: deploy your own `sessionCorsWorker` on a free Cloudflare Workers account.
+- The project hosts a worker for the `demo-sh` session with embedded deploy-helper capability disabled.
+- New sessions created via `/new` are bring-your-own-worker: Cloudflare's native deploy button installs a full `sessionCorsWorker` on a free Cloudflare Workers account.
+- Native deploy does not use a Context Engine deploy helper, Cloudflare API token, OAuth token, or local agent. The legacy helper path remains an explicit fallback.
 - A full shared multi-session worker product is planned but not yet shipped.
 
 Preferred worker sources:
+- Native Cloudflare package: `deploy/cloudflare/session-worker/`
 - `sessionCorsWorker` source tree: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
 - `sessionCorsWorker` release bundle asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
 - Deploy-helper source tree: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/deploy-helper`
@@ -74,7 +76,28 @@ The Worker source keeps runtime wiring explicit so route logic can be tested wit
 
 The route-shell bundle is intentionally still a large boundary object because it is where authenticated, anonymous, admin, AI, Arweave, storage, fetch, and faucet routes meet. Keep behavior changes inside the smaller route/execution modules when possible, and update the binding tests when the boundary adds or removes a dependency.
 
-## Wizard flow (/new + deploy-helper)
+## Native wizard flow (/new + Cloudflare deploy button)
+
+For the default `Fast & Cheap (Cloudflare)` preset:
+
+1. Context Engine shows the exact session slug, public passkey-derived admin
+   address, and two independently generated Worker runtime secrets.
+2. The deploy link opens Cloudflare with an immutable 40-character Git commit
+   and the isolated `deploy/cloudflare/session-worker/` package. Cloudflare
+   provisions the Worker, KV namespace, and Durable Object in the user's own
+   account.
+3. The user pastes the two runtime secrets into Cloudflare's encrypted secret
+   fields, deploys, and returns the resulting `workers.dev` URL to the wizard.
+4. The wizard verifies the Worker and performs the signed initial session
+   configuration write. No Cloudflare credential crosses a Context
+   Engine-operated origin.
+
+The generated runtime secrets are `TOKEN_HMAC_SECRET` and
+`CE_STORAGE_ENVELOPE_KEK`. They secure the deployed app runtime; they do not
+grant Cloudflare account access. The Worker is deployed with
+`DEPLOY_HELPER_ENABLED=0`.
+
+## Legacy wizard flow (/new + deploy-helper fallback)
 
 For the default `Fast & Cheap (Cloudflare)` preset:
 
@@ -91,6 +114,9 @@ For the default `Fast & Cheap (Cloudflare)` preset:
      the flag does not create the bucket.
    - When the template preselects `All accounts`, restrict Account Resources to the one account
      where the session worker will run before creating the token.
+   - Set the earliest expiration Cloudflare permits that still covers setup and an immediate
+     retry. Revoke the token from the Cloudflare API Tokens page as soon as deployment succeeds
+     or the attempt is abandoned.
    - The template auto-names the token as `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMAM` or `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMPM` (local time).
    - The first-party wizard derives the worker name and does not ask for a
      Cloudflare account ID. The deploy-helper resolves exactly one visible
@@ -99,8 +125,10 @@ For the default `Fast & Cheap (Cloudflare)` preset:
    - On the direct default `/new` path, the token is deploy-helper request input
      only. It is rejected from canonical session config and must not appear in
      worker config/secrets, URLs, metadata, logs, analytics, or browser/durable
-     storage. The separate legacy sponsored deploy-grant path below retains its
-     existing short-lived server-side grant record.
+     storage. The Worker step displays the exact deploy-helper URL that receives
+     the one-attempt HTTPS request; that helper is the component that presents
+     the token to Cloudflare. The separate legacy sponsored deploy-grant path
+     below retains its existing short-lived server-side grant record.
 2) Click "Deploy worker". The default preset does not ask for an Arweave JWK,
    Lit key, user RPC URL/key, faucet key, wallet connector, funding, or gas.
    Those inputs remain available only when an explicit Lit, decentralized, or
@@ -184,7 +212,7 @@ deleted speculatively.
   bodies, and worker bundle bytes are not written to either coordinator state or
   the journal. KV journal records expire after seven days.
 - Deploy-helper origin configuration:
-  - CE-hosted mode should set `ALLOWED_ORIGINS` explicitly to the public app origins it serves. Current hosted example: `https://contextengine.xyz,https://www.contextengine.xyz,http://localhost:3000`.
+  - CE-hosted mode should set `ALLOWED_ORIGINS` explicitly to the public app origins it serves. Current hosted example: `https://contextengine.sh,https://www.contextengine.sh,https://contextengine.xyz,https://www.contextengine.xyz,http://localhost:3000`.
   - Self-hosted mode should replace that list with the origins for your own app/admin hosts. Leaving `ALLOWED_ORIGINS` unset is intentionally restrictive and only allows `http://localhost:3000` until you configure it.
   - `CE_CLOUDFLARE_API_BASE_URL` is optional and defaults to `https://api.cloudflare.com/client/v4`. Override it only for Cloudflare-compatible test or proxy endpoints.
   - This is where self-hosting can still trip over the CLI default: `npm run deploy-helper:deploy` can seed the stable CE/local defaults, but unlike the `/new` browser flow it cannot discover your current custom app origin. If your UI runs on `https://your-app.example`, pass that origin explicitly with `--allowed-origins`.
@@ -403,6 +431,13 @@ The worker still read-normalizes legacy `payloadAccessControl.mode`, `cloudflare
 - `worker_sbt_gate` -> `{ "gate": "sbt_gate", "encryption": "none" }`
 - `lit_encrypted` -> `{ "gate": "none", "encryption": "lit" }`
 
+That compatibility is read-only. Deploy requests and signed config mutations
+must use the exact canonical values shown above. Explicit blanks, aliases such
+as `public` / `public-read` / `plaintext`, unknown values, reserved key
+providers, or malformed mode containers return `400` before account lookup,
+Cloudflare mutation, coordinator persistence, or KV write. Omit an optional
+field to select its documented default; do not send an empty value.
+
 Where older clients still need one string, the worker and client derive the legacy `payloadAccessMode` from the v2 object.
 
 - `gate: "sbt_gate"` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain before upload, list, or read bytes are exposed. Worker-canonical same-network checks prefer the private `customRpcUrl` session secret; Cloudflare storage loads that secret lazily only when an SBT condition or policy is evaluated. Public/group/role reads do not read it, and an unavailable secret store fails closed only for the affected SBT check. Before a contract read, the Worker calls `eth_chainId` and rejects an endpoint that cannot prove the expected chain.
@@ -418,6 +453,13 @@ Lit credentials are required only for `lit-arweave` storage or Cloudflare `encry
 `worker_envelope` uses WebCrypto AES-256-GCM and the existing session config/index stores:
 
 - Deployment KEK: read from the Worker secret `CE_STORAGE_ENVELOPE_KEK` through the `worker_secret` key provider. The plaintext KEK is never stored in KV or R2. Keep this secret stable for the lifetime of the encrypted session. Automatically provisioned Workers do not return this secret to the client. `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` is a temporary break-glass unwrap fallback after a mistaken replacement, not a rotation mechanism: restore the original value as `CE_STORAGE_ENVELOPE_KEK`, verify reads, and then remove the fallback.
+- Session-secret record: every Session Worker derives a domain-separated
+  AES-256-GCM key from the deployment KEK and writes only `cipher`, `keyRef`,
+  session-bound authenticated data, IV, and ciphertext to
+  `session:<slug>:secrets`. Legacy plaintext records remain read-only compatible
+  and migrate on the next signed secret mutation. Missing keys, wrong-session
+  copies, tampering, and decrypt failure fail closed; writes never use the
+  previous KEK.
 - Session KEK: generated locally on the first envelope write for a session and wrapped by the deployment KEK before coordination. The per-session `SessionWriteCoordinator` adopts one wrapped candidate, keeps that wrapped record authoritative, and projects it to `session:{slug}:config` under `storageEnvelope.sessionKey`. Raw session keys and the deployment KEK never pass through coordinator state. A missing coordinator binding fails closed instead of falling back to a racing KV write.
 - Payload DEK: generated per payload, used to encrypt the stored bytes, wrapped by the session KEK, and stored in payload metadata with the envelope algorithm, IVs, key id, and condition reference.
 
@@ -458,7 +500,25 @@ accept a replacement deployment secret in an Admin request.
 
 ### Worker-Native Groups
 
-Groups are canonical in `sessionCorsWorker`; the Agent Bridge's demographic research buckets are separate profile data and never grant worker access, and the Bridge does not mirror worker group definitions or memberships. Agent-enabled sessions use the session-worker JWT returned by client login to call `/groups/list`, `/groups/my-memberships`, and `/groups/join` directly. The Admin page uses the existing signed worker-admin request path for group and member management. These routes require the explicit `groups` scope; successful registry-backed participant login grants that scope after the default session gate passes, and session configuration may still disable it explicitly. The legacy `arweave` compatibility scope applies only to storage routes. Group membership is visible to the worker/operator by design. This is the same trust domain as worker-enforced gates.
+Groups are canonical in `sessionCorsWorker`; the Agent Bridge's demographic research buckets are separate profile data and never grant worker access, and the Bridge does not mirror worker group definitions or memberships. Agent-enabled sessions use the session-worker JWT returned by client login to call `/groups/list`, `/groups/my-memberships`, and `/groups/join` directly. A dedicated Agent Session Wrapped Bridge may also validate that same JWT at its deployment-pinned `/groups/my-memberships` endpoint before issuing a shorter, session-bound Bridge credential; the Bridge does not evaluate the login's SIWE, registry, RPC, SBT, or gate logic. The Admin page uses the existing signed worker-admin request path for group and member management. These routes require the explicit `groups` scope; successful registry-backed participant login grants that scope after the default session gate passes, and session configuration may still disable it explicitly. The legacy `arweave` compatibility scope applies only to storage routes. Group membership is visible to the worker/operator by design. This is the same trust domain as worker-enforced gates.
+
+That single-verifier model is identical for worker-canonical and
+registry-canonical sessions: the latter's session-Worker login evaluates the
+configured registry/on-chain gates before `/groups/my-memberships` can attest
+the principal. A registry session may use Wrapped only with an already usable
+or newly attached compatible Worker. A permanently locked workerless session
+fails closed because it cannot attach a new `corsWorkerUrl`. After exchange,
+Wrapped answer submission is HTTPS/KV and requires no agent-originated EVM
+transaction. The Bridge member credential expires at the earlier of 24 hours
+or the remaining Worker-JWT lifetime, which is also the maximum propagation
+delay after either authority revokes access.
+
+The non-secret version-1 `agentSessionWrapped` session-config record contains
+only `enabled`, the verified dedicated origin, protocol/revision identifiers,
+and `verifiedAt`. `sessionModeProfile.surfaces.agentHttp` is its sole product
+enablement bit; Telegram remains independently optional. The record is written
+only after the dedicated Bridge proves its exact session slug and pinned Worker
+origin. Failed deploy/redeploy attempts preserve the last verified record.
 
 Group records and membership rows are stored separately in KV. The worker uses `CE_WORKER_GROUPS_KV` when present, otherwise the storage index KV aliases. D1 and envelope-audit bindings are never group stores, so adding an unrelated database cannot switch group authority away from existing KV state. Membership rows are keyed by normalized principals and are not embedded in group objects.
 
@@ -490,11 +550,16 @@ R2 / Durable Objects:
 - `CE_SESSION_COORDINATOR` binds the SQLite-backed `SessionWriteCoordinator`
   class for direct/sponsored deploy idempotency, one-shot sponsored faucet
   receipts, atomic wrapped session-key selection, and versioned public session
-  config mutation. One-click deploy metadata installs migration tag
+  config mutation. It is also the required cross-isolate authority for auth
+  nonce issue/consume and nonce, authenticated, anonymous, and faucet route
+  counters. One-click deploy metadata installs migration tag
   `ce-session-write-coordinator-v1`; a repeated upload retries without
   reapplying an already-installed migration. Coordinator state contains only
   credential-redacted deploy/faucet records, normalized public session config,
-  revisions, and wrapped session-key records. It never stores deployment
+  revisions, wrapped session-key records, short-lived random nonces, and numeric
+  counter windows. Auth object names are derived from SHA-256 identity digests;
+  their stored records omit slugs, wallet/anonymous identifiers, and route
+  names. It never stores deployment
   credentials, raw session keys, deployment KEKs, raw DEKs, request bodies,
   worker bundle bytes, or ordinary session payload blobs. The binding serializes
   first-use key selection with signed Admin config mutations. Once its authority
@@ -509,9 +574,17 @@ R2 / Durable Objects:
   duplicate. There is no upload receipt journal or key-rotation state machine.
 
 Vars:
-- `TOKEN_HMAC_SECRET` (HMAC secret for session tokens)
-- `CE_STORAGE_ENVELOPE_KEK` (Worker secret for `worker_envelope`; required only when sessions use `encryption: "worker_envelope"`. `/new` custom-worker deploys that select worker-envelope storage ask the deploy helper to generate and set this secret during Worker provisioning; manual deployments must set it themselves.)
-- `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` (temporary break-glass unwrap fallback after a mistaken deployment-secret replacement; restore the original current KEK, verify access, then remove the fallback)
+- `TOKEN_HMAC_SECRET` (HMAC secret for session tokens; automated deployment
+  generates an independent 256-bit Web Crypto value and never derives it from
+  the Cloudflare credential or another runtime secret.)
+- `CE_STORAGE_ENVELOPE_KEK` (required Worker secret for every Session Worker.
+  It protects the canonical session-secret KV record and, when selected, the
+  worker-envelope payload key hierarchy. Automated deployment generates a
+  separate 256-bit Web Crypto value; manual deployments must set one.)
+- `CE_STORAGE_ENVELOPE_PREVIOUS_KEK` (temporary break-glass decrypt fallback
+  for both session-secret records and worker-envelope payloads after a mistaken
+  deployment-secret replacement; restore the original current KEK, verify
+  access, then remove the fallback)
 - `CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION` (optional; defaults to `100`)
 - `CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP` (optional; defaults to `1000`)
 - `DEFAULT_SESSION_SLUG` (optional; canonical)
@@ -534,6 +607,7 @@ Runtime:
   ```json
   {
     "slug": "test-72",
+    "authzEpoch": 1,
     "sessionId": "0x0123456789abcdef0123456789abcdef",
     "configRevision": "6f0c2c84-f28b-4fa7-baba-d035f9767967",
     "sessionName": "Example session",
@@ -579,6 +653,9 @@ Runtime:
     fields remain supported for legacy/decentralized or explicitly chain-backed
     profiles, but the default worker-canonical config omits them.
   - Worker KV config is normalized on read/write:
+    - `authzEpoch` is server-managed. New deployments start at `1`; effective
+      signed `set-config` writes increment it, while rejected and idempotent
+      writes do not. Callers cannot set it directly.
     - `allowOrigins` accepts legacy comma/newline-delimited strings but is stored/read as a trimmed array.
     - saving an empty `allowOrigins` list is intentional and means "open CORS" for that session (no allowlist).
     - if a `slug` field is present in the config payload, the authenticated request slug / KV key remains authoritative and overwrites mismatched values.
@@ -917,10 +994,10 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
   preserving the worker-specific secret-path, non-secret action, and
   secret-action helper bundles plus the existing fetch/AI/faucet helper
   wiring into the extracted authenticated dispatcher.
-- `nonce:{slug}:{address}` → nonce string (TTL 5m)
-- `usedNonce:{slug}:{nonce}` → "1" (TTL 10m)
+- `nonce:{slug}:{address}` → diagnostic nonce mirror (TTL 5m; the Durable Object is authoritative)
+- `usedNonce:{slug}:{nonce}` → diagnostic used mirror (TTL 10m; the Durable Object is authoritative)
 - `authToken:{slug}:{sub}:{jti}` → "1" for minted login tokens (TTL 4h)
-- `rate:{slug}:{address}` → JSON counter (stubbed)
+- route and auth-nonce counters are authoritative only in `CE_SESSION_COORDINATOR`; no KV counter fallback is accepted
 
 ## Registry fields (on-chain)
 
@@ -1016,6 +1093,13 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
 
 ## Auth flow (SIWE-style)
 
+Bootstrap configuration fails closed unless deployment has bound
+`BOOTSTRAP_ADMIN_ADDRESS` to the signer or an existing registry session proves
+the signer is its on-chain admin. An unconfigured worker and an unregistered
+registry slug have no first-signer claim path. Worker-canonical deployment
+therefore stages the admin binding and canonical config before making the
+Worker reachable.
+
 1) `POST /auth/nonce` body: `{ address, sessionSlug }`
    - Nonce request dispatch now also routes through a shared helper:
      it preserves nonce JSON parse failures, address validation, body/env slug resolution,
@@ -1043,12 +1127,13 @@ modules under `workers/sessionCorsWorker/`. Key boundary files:
    - Signed login request dispatch remains the thinner shared helper shell:
      it preserves login JSON parse failures, token signing, and the final
      `{ token, exp }` response contract after the extracted authority helper
-     resolves the signed request. New tokens include a crypto-random `jti`
-     and are returned only after the matching KV token marker is persisted.
+     resolves the signed request. New tokens include the current server-managed
+     `authzEpoch` plus a crypto-random `jti`, and are returned only after the
+     matching KV token marker is persisted.
    - Token signing / verification now also route through a shared helper:
      it preserves `JSON.stringify(payload)` signing, `base64url(payloadJson) + "." + base64url(hmac(payloadJson))`,
-     cached HMAC key reuse, the exact token verification error strings, `jti`
-     type validation, and `exp` comparison in epoch seconds.
+     cached HMAC key reuse, the exact token verification error strings,
+     non-empty `jti` validation, and `exp` comparison in epoch seconds.
    - SIWE message parsing/validation now also routes through a shared helper:
      it preserves trimmed `URI` / `Chain ID` / `Nonce` / `Issued At` / `Expiration Time` extraction,
      required field checks, URI host vs domain matching, and invalid/expired expiration rejection
@@ -1060,14 +1145,13 @@ Token format:
 ```
 base64url(payloadJson) + "." + base64url(hmac(payloadJson))
 ```
-New payloads: `{ sub, slug, scopes, exp, jti }`.
+New payloads: `{ sub, slug, authzEpoch, scopes, exp, jti }`.
 
 The worker stores `authToken:{slug}:{sub}:{jti}` in `GROUP_KV` with a TTL aligned
-to the token lifetime. Authenticated routes reject `jti` tokens when that marker
-is missing or expired, using the existing `401 { error: "Invalid token." }`
-contract. Legacy signed tokens without `jti` continue to verify by signature,
-shape, slug binding, and `exp` only until their natural 24h expiration window
-has passed; the worker no longer mints no-`jti` tokens.
+to the token lifetime. Token verification rejects missing or blank `jti` claims,
+and authenticated routes reject tokens when that marker is missing or expired,
+using the existing `401 { error: "Invalid token." }` contract. The worker neither
+mints nor accepts legacy no-`jti` tokens.
 
 ## Required headers
 
@@ -1076,12 +1160,12 @@ Authenticated requests must include:
 - `X-Session-Slug: <slug>` when `DEFAULT_SESSION_SLUG`/`DEFAULT_GROUP_SLUG` are empty and the token has no slug claim (`X-Group-Slug` remains accepted as a legacy alias).
 - Authenticated auth-header + token/request slug binding now routes through a shared helper:
   it preserves the existing `401 Missing Authorization header.`, `verifyToken(...)` error passthrough, `X-Session-Slug` before legacy `X-Group-Slug`, `400 Missing sessionSlug.`, and `403 Token does not match requested session slug.` behavior.
-  For new `jti` tokens, the same helper also requires the live
+  For every token, the same helper also requires the live
   `authToken:{slug}:{sub}:{jti}` KV marker before route context resolution.
 - Authenticated post-auth route context now also routes through a shared helper:
-  it preserves the existing `404 Session config not found.`, fail-closed authenticated CORS rejection, and common authenticated context derivation (`slug`, `headers`, token `scopes`, lowercased `sub` address, and `limits.perWalletPerDay`) before route-specific scope/rate-limit handling runs.
+  it preserves the existing `404 Session config not found.`, fail-closed authenticated CORS rejection, and common authenticated context derivation (`slug`, `headers`, token `scopes`, lowercased `sub` address, and `limits.perWalletPerDay`) before route-specific scope/rate-limit handling runs. It also rejects malformed or stale token authorization epochs with `401` before dispatch. Legacy config/token pairs with no epoch are interpreted as epoch zero until the first effective config update.
 - Authenticated route scope/rate-limit preflight now also routes through a shared helper:
-  it preserves per-scope `403 Token missing ... scope.` failures, `429 Rate limit exceeded.` selection, shared `checkRateLimit(...)` inputs, and the faucet bypasses that now allow `request_test_eth` to continue without token faucet scope when either an SBT proof payload is present or the request is funding the authenticated wallet and current `txGas` gate access is re-checked downstream.
+  it preserves per-scope `403 Token missing ... scope.` failures, `429 Rate limit exceeded.` selection, shared `checkRateLimit(...)` inputs, and the faucet bypasses that now allow `request_test_eth` to continue without token faucet scope when either an SBT proof payload is present or the request is funding the authenticated wallet. Every protected route now re-evaluates the current default gate and only its route-specific resource gate; signed and current scope must both allow ordinary access, and policy-read failures return `403` before side effects.
 - Authenticated secret-backed route secrets resolution now also routes through a shared helper:
   it preserves the shared `getSessionSecrets(env, slug)` lookup plus `401 Session secrets not configured.` failure before authenticated `ai`, `transcribe`, `arweave/upload`, and `request_test_eth` dispatch continue.
 - Authenticated secret-backed path-route dispatch now also routes through a shared helper:
@@ -1128,6 +1212,9 @@ Admin requests require a fresh signed SIWE message (no session token):
 Never return secrets in responses.
 
 `/admin/set-config` notes:
+- Security-sensitive `sessionModeProfile` and `storageProfile` enum values are
+  validated before merge and again on the complete record before persistence.
+  Read compatibility for legacy values is not a write-time fallback.
 - The session slug is taken from the signed request context, not trusted from `config.slug`.
 - After a worker-canonical session is initialized, its slug, worker URL, authority
   mode, and normalized `sessionId`/`sessionIdHex` identity are immutable. Attempts
@@ -1481,8 +1568,9 @@ Manual:
 - Bind a SQLite-backed Durable Object namespace named `CE_SESSION_COORDINATOR`
   to the bundle's exported `SessionWriteCoordinator` class and install migration
   tag `ce-session-write-coordinator-v1` with that class in
-  `new_sqlite_classes`. Without this binding, signed config mutations and the
-  first worker-envelope write fail closed with `503`; use a Wrangler/module
+  `new_sqlite_classes`. Without this binding, nonce issue/consume, rate-limited
+  routes, signed config mutations, and the first worker-envelope write fail
+  closed; use a Wrangler/module
   upload when the dashboard cannot install the binding and migration together.
 
 Deploy-helper (trusted, self-host via CLI or Wrangler):
@@ -1518,6 +1606,20 @@ Deploy-helper (trusted, self-host via CLI or Wrangler):
     or an explicit new attempt rotates them.
   - Provide either `bundleUrl` (release asset) or `bundleText` (raw bundle contents) from the `/new` UI.
 - The helper fetches the latest bundled worker asset and configures KV + bindings.
+- The helper generates `TOKEN_HMAC_SECRET` and
+  `CE_STORAGE_ENVELOPE_KEK` independently with 256 bits from Web Crypto for
+  every Session Worker. These
+  values are never derived from the Cloudflare API token, account, Worker name,
+  deployment ID, provider keys, or each other, and are never returned to the
+  browser. Stable-request recovery inventories existing secret binding names
+  before writing; an ambiguous secret-write response is inventoried again and
+  accepted only when the exact binding is present. Otherwise the owned Worker
+  and KV namespace remain pending for a later safe replay.
+- The fresh KV secret record is encrypted before upload with the same in-memory
+  KEK that is installed as the Worker binding. If an exact owned upload is
+  recovered before either runtime binding exists, retry replaces only the
+  unreachable ciphertext with encrypted empty state, installs a new KEK, and
+  requires signed post-deploy secret sync. Existing KEK bindings are preserved.
 - Every fresh deploy treats the requested worker name as a readable prefix. An
   idempotent request derives a stable physical suffix and KV title marker from
   `deploymentRequestId`; a legacy request without that ID receives a random

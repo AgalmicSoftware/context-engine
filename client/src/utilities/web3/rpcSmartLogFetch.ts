@@ -485,7 +485,7 @@ export function createFetchLogsSmartWithProvider({
 
     while (queue.length) {
       const batch = queue.splice(0, maxConcurrency);
-      // eslint-disable-next-line no-await-in-loop
+
       const batchResults = await Promise.all(batch.map((segment) => processSegment(segment)));
       batchResults.forEach((result) => {
         if (Array.isArray(result?.logs) && result.logs.length) {

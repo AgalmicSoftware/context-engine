@@ -1,3 +1,8 @@
+import {
+  normalizeAuthorizationEpoch,
+  readAuthorizationEpoch,
+} from './authorizationScopeFreshness.js';
+
 export const resolveAuthenticatedRouteContext = async ({
   request,
   env,
@@ -24,13 +29,24 @@ export const resolveAuthenticatedRouteContext = async ({
   }
 
   const payload = auth?.payload || {};
+  const tokenEpoch = normalizeAuthorizationEpoch(payload.authzEpoch);
+  const currentEpoch = readAuthorizationEpoch(config);
+  if (tokenEpoch === null || currentEpoch === null || tokenEpoch !== currentEpoch) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: 'Token authorization is stale.' }, 401, corsContext.headers),
+    };
+  }
+
+  const address = deps?.toStr?.(payload.sub || '').toLowerCase();
+
   return {
     ok: true,
     slug,
     config,
     headers: corsContext.headers,
     scopes: payload.scopes || {},
-    address: deps?.toStr?.(payload.sub || '').toLowerCase(),
+    address,
     limit: config?.limits?.perWalletPerDay || 0,
   };
 };

@@ -460,7 +460,7 @@ const sendWithNonceRetry = async ({
     try {
       const tx = await sendWithGasFallback({
         estimate,
-        // eslint-disable-next-line no-loop-func
+
         send: (overrides: TxFeeOverrides) =>
           send({
             ...overrides,
@@ -1251,6 +1251,7 @@ const buildSessionConfigFromRegistry = ({
     metadataURI: session.metadataURI || '',
     encryptedMetadataURI: session.encryptedMetadataURI || '',
     adminAddress: session.adminAddress || null,
+    createdAt: session.createdAt || null,
     updatedAt: session.updatedAt || null,
     sessionId: sessionId || null,
     sessionIdHex: sessionIdHex || null,
@@ -1326,6 +1327,7 @@ const mergeSessionFieldsIntoCachedConfig = ({
     metadataURI: session?.metadataURI || registryMeta.metadataURI || '',
     encryptedMetadataURI: session?.encryptedMetadataURI || registryMeta.encryptedMetadataURI || '',
     adminAddress: session?.adminAddress || registryMeta.adminAddress || null,
+    createdAt: session?.createdAt || registryMeta.createdAt || null,
     updatedAt: session?.updatedAt || registryMeta.updatedAt || null,
     sessionId: sessionId || registryMeta.sessionId || null,
     sessionIdHex: sessionIdHex || registryMeta.sessionIdHex || null,

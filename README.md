@@ -6,7 +6,7 @@
   <img src="client/src/assets/img/readme-header.png" alt="Context Engine interface showing a survey card asking whether humans and agents need better tools for debate, negotiation, and sensemaking, with Agree selected." />
 </p>
 
-**Live demo:** [contextengine.xyz](https://contextengine.xyz)
+**Live demo:** [contextengine.sh](https://contextengine.sh)
 
 Context Engine is a toolkit for AI-enhanced deliberation, decision-making, and negotiation in large groups. It supports public and private questions and responses, AI-assisted input and analysis, permanent records, and cryptographic access control. It allows for no-code deployment of [Soulbound Tokens](https://www.radicalxchange.org/wiki/social-identity/) for Groups. Designed for use cases such as public discourse, organizational decision-making, and preference-related dataset creation.
 
@@ -26,7 +26,7 @@ Context Engine separates how the web app is hosted from how each session establi
 | **Trustless & Slower** | Available; opt-in | Public or private sessions use Arweave plus an EVM registry and contracts. Setup requires an Arweave wallet/JWK, an EVM RPC URL and gas, and one AI-provider key; add Lit credentials only when Lit encryption is selected. |
 | **Company-Operated** | Planned; not yet generally available | Existing hardware, private clouds, or internal networks connect through adapters for company identity and key management, storage, AI gateways, and observability. Public EVM and Arweave are not architectural requirements, so this mode can be entirely off-chain. |
 
-[contextengine.xyz](https://contextengine.xyz) is the hosted public web interface, and the static client can also be self-hosted. App hosting, public/private session access, and the session infrastructure profile are separate choices. Participants never need deployer API keys.
+[contextengine.sh](https://contextengine.sh) is the hosted public web interface, and the static client can also be self-hosted. The former `.xyz` address redirects to this canonical site. App hosting, public/private session access, and the session infrastructure profile are separate choices. Participants never need deployer API keys.
 
 ## Quick Start
 

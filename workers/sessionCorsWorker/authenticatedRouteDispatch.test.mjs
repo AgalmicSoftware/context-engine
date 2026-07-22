@@ -114,6 +114,7 @@ test('dispatchAuthenticatedRoute short-circuits non-secret action routes before 
         assert.deepEqual(value, {
           action: 'fetch_url',
           body: { action: 'fetch_url', url: 'https://example.com' },
+          config: { registryAddress: '0x0000000000000000000000000000000000000001' },
           slug: 'session-a',
           address: '0xabc',
           limit: 7,

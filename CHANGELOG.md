@@ -6,6 +6,104 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Git-backed Netlify builds now bind the native Cloudflare Deploy Button to
+  Netlify's exact public `COMMIT_REF`; builds without a public commit remain
+  fail-closed with the native deployment card disabled.
+- Public-release scrubbing now preserves the byte-stable generated Cloudflare
+  Worker package while continuing to scan its bundled dependency contacts,
+  preventing email-shaped wordlist data from being rewritten after hashing.
+- SBT claim and invite codes now default to explicit export without silent
+  browser persistence; existing scoped recovery entries remain readable for
+  compatibility.
+- Added explicit opt-in encrypted SBT recovery using AES-GCM, authenticated
+  chain/address metadata, and a non-extractable IndexedDB key. Unsupported,
+  missing-key, and tampered records fail closed to export-only behavior, and
+  group-scoped local recovery can be cleared from the admin UI.
+- Made Worker authorization current at request time. Login tokens now bind a
+  server-managed session authorization epoch, effective config changes
+  invalidate prior tokens, and protected routes fail closed unless both the
+  signed scope and the current default/route-specific policy allow access.
+  Nonce redemption and route limits now use the mandatory Session Durable
+  Object, closing cross-isolate replay and concurrent-limit overshoot without
+  persisting principal identifiers in coordinator records.
+- Encrypted every canonical Session Worker secret record at rest with
+  session-bound AES-256-GCM before deploy-helper or signed-admin KV writes.
+  Current/previous KEK recovery is bounded, legacy plaintext records are
+  read-only compatible and migrate on signed update, all new deployments
+  receive an independent KEK, and interrupted activation cannot silently bind
+  ciphertext to a lost replacement key.
+- Closed the legacy first-signer Worker bootstrap path. Initial session config
+  now requires either the deployment-bound bootstrap admin or an existing
+  registry session whose on-chain admin matches; missing registry wiring and
+  unregistered slugs fail closed.
+- Enforced client entry, non-vendor chunk, and temporary AppShell byte budgets
+  from Vite's build manifest, with protected no-growth policy and generated-doc
+  drift checks. Removed an unconsumed static-image compatibility copy that
+  duplicated 21 emitted assets (16,618,799 bytes); future cross-tree image
+  duplicates now fail the post-build gate.
+- Made client test-universe claims complete and monotonic. One instrumented
+  Jest run now accounts for every tracked production source while preserving a
+  fixed legacy comparison metric; recursive Node discovery closes nested test
+  omissions; and every tracked typed test/helper is classified under a
+  real-framework-type diagnostic ratchet. Coverage exclusions, floors, legacy
+  membership, and typed-test debt now fail closed against protected baselines.
+- Bound Worker releases to the exact bytes produced by successful aggregate
+  CI. SHA-keyed artifacts now carry source/replay/tree, builder-run, recipe,
+  lockfile, and bundle-digest provenance; publication refuses failed or
+  mismatched runs and never rebuilds. Immutable releases no longer move
+  `latest` automatically, while a serialized, protected manual promotion keeps
+  stable and previous rollback refs. GitHub Actions are pinned immutably.
+  Session Setup and Admin Wrapped deploys now bind the corresponding manifest
+  digest before request coordination and reject changed bytes before any
+  Cloudflare mutation, including retry and repair paths.
+- Unified local and hosted CI behind `scripts/ci-gates.json`. The local
+  aggregate now runs the full client coverage and tracked root Node universes once,
+  hosted jobs execute the same named gates, aggregate results fail closed
+  against the hosted profile, and `verify:release` remains a separate
+  non-coverage release rehearsal. Public-package scrubbing keeps retained gate
+  commands aligned with retained scripts.
+- Hardened new-session profile continuity and enforcement: explicit saved
+  profiles now survive `/new` reloads behind a clear continue action, invalid
+  profiles fail before publish side effects and are rechecked against the live
+  draft after asynchronous preflight, stage-local errors identify the
+  setting to fix, storage backend changes preserve an explicit Cloudflare role
+  gate without carrying Cloudflare fields into Arweave, and unsupported
+  result/export promises remain visible but unavailable. The compact selectors
+  now support arrow keys and editable multi-digit group thresholds.
+- Made Telegram Mini App an independently enforced session surface that still
+  requires Telegram, while keeping Agent Session Wrapped independent. The
+  Bridge now consumes canonical nested result-exposure settings before legacy
+  aliases and excludes Mini-App-disabled sessions from every Mini App picker
+  and route; onboarding cannot mint a credential for a disabled Mini App,
+  activity and settings requests fail closed when no enabled session remains,
+  and launch-bound settings cannot target a different session.
+- Made direct Agent HTTP authorization independent of Telegram for user invite,
+  service bootstrap, and ordinary authenticated API requests. Explicit session
+  profiles now enforce `surfaces.agentHttp`; pre-profile Bridge records retain
+  their historical direct API behavior unless they explicitly disable it.
+- Integrated hosting customization into the existing session setup stages:
+  storage, encryption, decryption access, and result visibility now live in
+  Privacy; optional participation channels live in Worker; and export policy
+  lives in Deploy. The compact header no longer opens a large technical
+  popover, profile-based drafts no longer show a duplicate legacy storage
+  editor, and custom decryption rules stay hidden until the creator overrides
+  the explicit Cloudflare defaults.
+- Moved session hosting selection into a compact header control, kept the
+  selected Cloudflare, decentralized, or custom profile visible in the title,
+  and previewed Corporate hosting as unavailable without changing publishing
+  semantics. Cloudflare token guidance now explains that the linked form
+  prefills permissions for users already signed in.
+- Made `contextengine.sh` the canonical public URL across site metadata,
+  discovery assets, documentation, and Agent Bridge links. Worker and Bridge
+  bootstrap allowlists now prefer `.sh` while retaining `.xyz` as redirect
+  compatibility.
+- Replaced the placeholder emoji favicon family with an optically centered
+  white Context Engine circuit C on transparent browser, Apple touch, and
+  Android icon backgrounds, using the high-resolution circuit artwork for the
+  larger touch and installed-app assets.
+- Added a repository-owned Netlify build contract for strict, Node 20 client
+  builds from public `main`, with pull-request preview guidance and the existing
+  manual-deploy redirect fallback retained.
 - Refreshed the AI discourse corpus with verified 2026 policy, safety,
   evaluation, and practitioner sources; consolidated duplicate records,
   repaired primary-source provenance and tweet metadata, synchronized the
@@ -19,6 +117,20 @@ All notable changes to this project will be documented in this file.
   one-time invites can onboard an opaque non-Telegram user, the root token is
   limited to bootstrap/break-glass semantics, and browser exchange returns
   separate Bridge and session-worker credentials.
+- Added the hybrid Agent Session Wrapped path for worker-canonical and
+  registry-canonical sessions through one deployment-pinned session-Worker
+  membership verifier. Dedicated Bridges now require explicit one-session
+  policy, use the sole `surfaces.agentHttp` capability bit, deploy without the
+  unused Durable Object or Telegram resources by default, exchange Worker
+  credentials for at-most-24-hour session-bound `ceagt_` member credentials,
+  and accept Wrapped answers over HTTPS/KV without an agent-originated EVM
+  transaction. Session Setup and Admin support request-only enable, retained-
+  resource disable-access, health, and idempotent redeploy controls with
+  capability publication only after durable verification. Ordinary Wrapped
+  uses canonical session questions, explicit historical/agent-only configs
+  retain proposal windows and storage prefixes, and posters default to the
+  deterministic local renderer with separately configured optional OpenAI
+  generation.
 - Added direct session-worker access-group views and open self-join controls to
   agent-enabled sessions, plus signed group and member administration in the
   existing Admin surface. The Agent Bridge does not proxy or mirror this state.
@@ -56,6 +168,9 @@ All notable changes to this project will be documented in this file.
 - Replaced the About-page Google Drive video embed and thumbnail dependency
   with the repository-owned `about-demo.mp4` on desktop and mobile, so public
   playback no longer depends on third-party cookies or Drive playback limits.
+- Kept registry-backed session scans bounded when Arweave metadata is temporarily
+  unavailable by deriving the creation block from the registry tuple timestamp
+  before attempting legacy event-log recovery.
 - Kept history-preserving public releases self-testing when the Agent Bridge
   cutover follows a source-only baseline by restoring its narrow root test
   command alongside the audited worker and runner snapshot, while using the

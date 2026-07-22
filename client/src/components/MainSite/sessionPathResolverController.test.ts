@@ -344,7 +344,6 @@ describe('createSessionPathResolverController', () => {
     await flushMicrotasks();
 
     for (const delay of [3200, 3200, 6000, 12000, 24000, 30000]) {
-      // eslint-disable-next-line no-await-in-loop
       await advanceTimersAndFlush(delay);
     }
 

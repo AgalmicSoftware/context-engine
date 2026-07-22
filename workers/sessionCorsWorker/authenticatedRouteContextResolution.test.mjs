@@ -94,6 +94,7 @@ test('resolveAuthenticatedRouteContext preserves blocked-origin passthrough resp
 
 test('resolveAuthenticatedRouteContext returns common authenticated route context on success', async () => {
   const config = {
+    authzEpoch: 3,
     limits: {
       perWalletPerDay: 7,
     },
@@ -109,7 +110,8 @@ test('resolveAuthenticatedRouteContext returns common authenticated route contex
       slug: 'session-a',
       payload: {
         sub: '0xAbC123',
-        scopes: { ai: true, fetch: false },
+        authzEpoch: 3,
+        scopes: { ai: true, fetch: false, groups: true },
       },
     },
     baseHeaders: { 'Access-Control-Allow-Origin': '*' },
@@ -127,8 +129,44 @@ test('resolveAuthenticatedRouteContext returns common authenticated route contex
     slug: 'session-a',
     config,
     headers,
-    scopes: { ai: true, fetch: false },
+    scopes: { ai: true, fetch: false, groups: true },
     address: '0xabc123',
     limit: 7,
+  });
+});
+
+test('resolveAuthenticatedRouteContext rejects a token from an older authorization epoch', async () => {
+  let scopeCheckCalled = false;
+  const headers = { 'Access-Control-Allow-Origin': 'https://allowed.example' };
+
+  const result = await resolveAuthenticatedRouteContext({
+    request: { headers: new Headers({ Origin: 'https://allowed.example' }) },
+    env: { GROUP_KV: {} },
+    auth: {
+      slug: 'session-a',
+      payload: { sub: '0xabc', authzEpoch: 4, scopes: { ai: true } },
+    },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    deps: {
+      getSessionConfig: async () => ({ authzEpoch: 5 }),
+      getCorsContext: async () => ({ ok: true, headers }),
+      computeScopesForLogin: async () => {
+        scopeCheckCalled = true;
+        return { ai: true };
+      },
+      json: createJsonStub(),
+      toStr: String,
+      SESSION_CONFIG_NOT_FOUND_ERROR: 'Session config not found.',
+    },
+  });
+
+  assert.equal(scopeCheckCalled, false);
+  assert.deepEqual(result, {
+    ok: false,
+    response: {
+      body: { error: 'Token authorization is stale.' },
+      status: 401,
+      headers,
+    },
   });
 });

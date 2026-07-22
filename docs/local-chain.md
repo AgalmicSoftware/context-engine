@@ -37,8 +37,8 @@ To run the full integration suite (Node start -> Deploy -> Client Tests):
 npm run test:local
 ```
 
-To run the canonical PR gate locally (wiring guard, release-sanity gate,
-contracts, client, CE-CC, root node suites, and cache guard):
+To run the canonical PR gate locally (wiring/ratchets, builds, contracts and ABI
+parity, client coverage, Workers, CE-CC, root Node, and cache guard):
 
 ```bash
 npm run test:ci
@@ -46,8 +46,9 @@ npm run test:ci
 
 `npm test` is an alias for the same canonical PR gate.
 
-To run only the release-sanity gate (lint, client typecheck, full client Jest
-without coverage, worker bundle verification, and production build):
+To run only the standalone release profile (lint, client typecheck, tracked
+Node, full client Jest without coverage, worker bundle verification, and
+production build):
 
 ```bash
 npm run verify:release

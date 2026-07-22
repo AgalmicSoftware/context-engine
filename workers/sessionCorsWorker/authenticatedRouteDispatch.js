@@ -45,6 +45,7 @@ export const dispatchAuthenticatedRoute = async ({
   const nonSecretActionRoute = await deps?.dispatchAuthenticatedNonSecretActionRoute?.({
     action,
     body,
+    config,
     slug,
     address,
     limit,

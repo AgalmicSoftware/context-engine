@@ -1,6 +1,7 @@
 export const dispatchAuthenticatedNonSecretActionRoute = async ({
   action,
   body,
+  config,
   slug,
   address,
   env,
@@ -19,6 +20,7 @@ export const dispatchAuthenticatedNonSecretActionRoute = async ({
     scopes,
     scope: 'fetch',
     route: 'fetch',
+    config,
     env,
     slug,
     address,
@@ -26,6 +28,7 @@ export const dispatchAuthenticatedNonSecretActionRoute = async ({
     headers,
     deps: {
       checkRateLimit: deps?.checkRateLimit,
+      computeScopesForLogin: deps?.computeScopesForLogin,
       json: deps?.json,
     },
   });

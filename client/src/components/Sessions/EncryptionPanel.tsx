@@ -61,6 +61,7 @@ export type EncryptionPanelProps = {
   addEncryptionGate: () => void;
   pendingSbtDrafts?: PendingSbtDraft[];
   removePendingSbtDraft: (address?: string) => void;
+  sessionModeProfilePrivacyControl?: React.ReactNode;
 };
 
 const EncryptionPanel = ({
@@ -89,6 +90,7 @@ const EncryptionPanel = ({
   addEncryptionGate,
   pendingSbtDrafts,
   removePendingSbtDraft,
+  sessionModeProfilePrivacyControl = null,
 }: EncryptionPanelProps) => {
   const translate = typeof t === 'function' ? t : (key: string) => key;
   const gates = Array.isArray(encryptionGates) ? encryptionGates : [];
@@ -131,6 +133,7 @@ const EncryptionPanel = ({
       </div>
       {!isCollapsed && (
         <div className={styles.panelBody}>
+          {sessionModeProfilePrivacyControl}
           <div className={styles.encryptionGateList}>
             {gates.map((gate, idx) => (
               <div

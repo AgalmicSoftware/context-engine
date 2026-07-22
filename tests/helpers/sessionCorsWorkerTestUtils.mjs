@@ -1,4 +1,5 @@
 import { ethers } from 'ethers';
+import { SessionWriteCoordinator } from '../../workers/sessionCorsWorker/sessionWriteCoordinator.js';
 import {
   ADMIN_ACTION_TYPES,
   buildAdminActionBodyHash,
@@ -16,8 +17,8 @@ const SBT_ADMIN_ABI = ['function admin() view returns (address)', 'function owne
 const registryIface = new ethers.utils.Interface(REGISTRY_ABI);
 const erc721Iface = new ethers.utils.Interface(ERC721_ABI);
 const sbtAdminIface = new ethers.utils.Interface(SBT_ADMIN_ABI);
-const LOGIN_ORIGIN = 'https://contextengine.xyz';
-const LOGIN_DOMAIN = 'contextengine.xyz';
+const LOGIN_ORIGIN = 'https://contextengine.sh';
+const LOGIN_DOMAIN = 'contextengine.sh';
 
 const normalizeOrigin = (value) => {
   const raw = String(value ?? '').trim();
@@ -212,6 +213,21 @@ export const buildRpcFetchMock = ({
   return jsonRpcResponse({ jsonrpc: '2.0', id: 1, result });
 });
 
+export const installRpcAwareUpstreamFetchMock = ({
+  rpcUrl,
+  implementation,
+} = {}) => {
+  const rpcFetch = global.fetch;
+  const upstreamFetch = jest.fn(implementation);
+  global.fetch = jest.fn((input, init) => {
+    const url = typeof input === 'string' ? input : String(input?.url || input || '');
+    return url === rpcUrl
+      ? rpcFetch(input, init)
+      : upstreamFetch(input, init);
+  });
+  return upstreamFetch;
+};
+
 export const createMemoryKv = (seed = {}) => {
   const storage = new Map(Object.entries(seed));
   return {
@@ -224,6 +240,59 @@ export const createMemoryKv = (seed = {}) => {
     }),
     _dump: () => new Map(storage),
   };
+};
+
+const cloneCoordinatorTestValue = (value) => (
+  typeof globalThis.structuredClone === 'function'
+    ? globalThis.structuredClone(value)
+    : JSON.parse(JSON.stringify(value))
+);
+
+export const installSessionCoordinatorBinding = (env = {}) => {
+  if (env.CE_SESSION_COORDINATOR) return env;
+  const instances = new Map();
+  env.CE_SESSION_COORDINATOR = {
+    idFromName: (name) => `coordinator:${name}`,
+    get: (id) => {
+      if (!instances.has(id)) {
+        const values = new Map();
+        let tail = Promise.resolve();
+        const transaction = (callback) => {
+          const run = tail.then(async () => {
+            const staged = new Map([...values].map(([key, value]) => [key, cloneCoordinatorTestValue(value)]));
+            const result = await callback({
+              get: async (key) => staged.get(key),
+              put: async (key, value) => staged.set(key, cloneCoordinatorTestValue(value)),
+              delete: async (key) => staged.delete(key),
+            });
+            values.clear();
+            for (const [key, value] of staged) values.set(key, value);
+            return result;
+          });
+          tail = run.catch(() => undefined);
+          return run;
+        };
+        const state = {
+          storage: {
+            get: async (key) => values.get(key),
+            put: async (key, value) => values.set(key, cloneCoordinatorTestValue(value)),
+            delete: async (key) => values.delete(key),
+            transaction,
+          },
+        };
+        const coordinator = new SessionWriteCoordinator(state, env);
+        instances.set(id, {
+          fetch: (input, init) => coordinator.fetch(
+            input instanceof Request ? input : new Request(input, init),
+          ),
+          store: values,
+        });
+      }
+      return instances.get(id);
+    },
+  };
+  env.__coordinatorInstances = instances;
+  return env;
 };
 
 export const makeJsonRequest = (path, body, init = {}) => new Request(`https://worker.example${path}`, {
@@ -277,6 +346,7 @@ export const createSignedSiweBody = async ({
   loginOrigin,
   adminOrigin,
 }) => {
+  installSessionCoordinatorBinding(env);
   const resolvedAdminAction = (() => {
     const explicit = String(adminAction || '').trim().toLowerCase();
     if (explicit) return explicit;
@@ -434,6 +504,7 @@ export const issueWorkerLoginToken = async ({
 
 export const workerTestUtils = {
   buildRpcFetchMock,
+  installRpcAwareUpstreamFetchMock,
   createMemoryKv,
   makeJsonRequest,
   decodeTokenPayload,

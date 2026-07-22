@@ -253,25 +253,160 @@ test('putSessionConfig fails closed before KV persistence for secret-like config
   assert.equal(writes, 0);
 });
 
-test('putSessionSecrets wraps the secrets payload in a v1 envelope', async () => {
+test('putSessionSecrets encrypts the secrets payload before writing a v1 envelope', async () => {
   const calls = [];
-  const env = { GROUP_KV: {} };
+  const env = {
+    GROUP_KV: {},
+    CE_STORAGE_ENVELOPE_KEK: 'current-session-secrets-kek',
+  };
   const secrets = { openaiKey: 'sk-test', customRpcUrl: 'https://rpc.example' };
 
   await putSessionSecrets(env, 'session-a', secrets, {
     now: () => 1234567890000,
+    randomBytes: (length) => new Uint8Array(length).fill(7),
     putKvJson: async (passedEnv, key, value) => {
       calls.push(['putKvJson', passedEnv, key, value]);
     },
   });
 
-  assert.deepEqual(calls, [
-    ['putKvJson', env, 'session:session-a:secrets', {
+  assert.equal(calls.length, 1);
+  const [operation, passedEnv, key, envelope] = calls[0];
+  assert.equal(operation, 'putKvJson');
+  assert.equal(passedEnv, env);
+  assert.equal(key, 'session:session-a:secrets');
+  assert.equal(envelope.v, 1);
+  assert.equal(envelope.kind, 'session-secrets');
+  assert.equal(envelope.createdAt, 1234567890000);
+  assert.equal(envelope.updatedAt, 1234567890000);
+  assert.equal(envelope.cipher, 'AES-256-GCM');
+  assert.equal(envelope.keyRef, 'worker_secret:CE_STORAGE_ENVELOPE_KEK');
+  assert.equal(envelope.aad, 'ce-session-secrets:v1:session-a:worker_secret:CE_STORAGE_ENVELOPE_KEK');
+  assert.equal(typeof envelope.iv, 'string');
+  assert.equal(typeof envelope.encryptedSecrets, 'string');
+  assert.equal('secrets' in envelope, false);
+  assert.equal(JSON.stringify(envelope).includes('sk-test'), false);
+  assert.equal(JSON.stringify(envelope).includes('https://rpc.example'), false);
+});
+
+test('getSessionSecrets decrypts the current encrypted envelope only for its bound slug', async () => {
+  const env = { CE_STORAGE_ENVELOPE_KEK: 'current-session-secrets-kek' };
+  const secrets = {
+    faucetPrivateKey: '0xprivate',
+    nested: { providerKey: 'provider-secret' },
+  };
+  let storedEnvelope;
+
+  await putSessionSecrets(env, 'session-a', secrets, {
+    randomBytes: (length) => new Uint8Array(length).fill(11),
+    putKvJson: async (_passedEnv, _key, value) => { storedEnvelope = value; },
+  });
+
+  const roundTrip = await getSessionSecrets(env, 'session-a', {
+    getKvJson: async () => storedEnvelope,
+  });
+  assert.deepEqual(roundTrip, secrets);
+
+  await assert.rejects(
+    () => getSessionSecrets(env, 'session-b', {
+      getKvJson: async () => storedEnvelope,
+    }),
+    /Encrypted session secrets identity mismatch\./,
+  );
+});
+
+test('getSessionSecrets uses only the bounded previous KEK fallback window', async () => {
+  let storedEnvelope;
+  await putSessionSecrets(
+    { CE_STORAGE_ENVELOPE_KEK: 'previous-session-secrets-kek' },
+    'session-a',
+    { openaiKey: 'previous-key-secret' },
+    {
+      randomBytes: (length) => new Uint8Array(length).fill(13),
+      putKvJson: async (_passedEnv, _key, value) => { storedEnvelope = value; },
+    },
+  );
+
+  const recovered = await getSessionSecrets({
+    CE_STORAGE_ENVELOPE_KEK: 'replacement-session-secrets-kek',
+    CE_STORAGE_ENVELOPE_PREVIOUS_KEK: 'previous-session-secrets-kek',
+  }, 'session-a', {
+    getKvJson: async () => storedEnvelope,
+  });
+  assert.deepEqual(recovered, { openaiKey: 'previous-key-secret' });
+
+  await assert.rejects(
+    () => getSessionSecrets({
+      CE_STORAGE_ENVELOPE_KEK: 'replacement-session-secrets-kek',
+      CE_STORAGE_ENVELOPE_PREVIOUS_KEK: 'unrelated-old-kek',
+    }, 'session-a', {
+      getKvJson: async () => storedEnvelope,
+    }),
+    /Session secrets decryption failed\./,
+  );
+});
+
+test('session secrets encryption fails before persistence without the current KEK', async () => {
+  let writes = 0;
+  await assert.rejects(
+    () => putSessionSecrets({}, 'session-a', { openaiKey: 'must-not-persist' }, {
+      putKvJson: async () => { writes += 1; },
+    }),
+    /CE_STORAGE_ENVELOPE_KEK is missing\./,
+  );
+  assert.equal(writes, 0);
+});
+
+test('getSessionSecrets rejects authenticated-ciphertext tampering', async () => {
+  const env = { CE_STORAGE_ENVELOPE_KEK: 'current-session-secrets-kek' };
+  let storedEnvelope;
+  await putSessionSecrets(env, 'session-a', { openaiKey: 'must-stay-secret' }, {
+    randomBytes: (length) => new Uint8Array(length).fill(17),
+    putKvJson: async (_passedEnv, _key, value) => { storedEnvelope = value; },
+  });
+  const last = storedEnvelope.encryptedSecrets.slice(-1);
+  const tampered = {
+    ...storedEnvelope,
+    encryptedSecrets: `${storedEnvelope.encryptedSecrets.slice(0, -1)}${last === 'A' ? 'B' : 'A'}`,
+  };
+
+  await assert.rejects(
+    () => getSessionSecrets(env, 'session-a', { getKvJson: async () => tampered }),
+    /Session secrets decryption failed\./,
+  );
+});
+
+test('getSessionSecrets fails closed on partial or unknown encrypted envelope formats', async () => {
+  for (const malformed of [
+    {
       v: 1,
       kind: 'session-secrets',
-      createdAt: 1234567890000,
-      updatedAt: 1234567890000,
-      secrets,
-    }],
-  ]);
+      cipher: 'AES-256-GCM',
+      encryptedSecrets: 'opaque',
+    },
+    {
+      v: 1,
+      kind: 'session-secrets',
+      cipher: 'future-cipher',
+      keyRef: 'future-key',
+      aad: 'future-aad',
+      iv: 'opaque',
+      encryptedSecrets: 'opaque',
+    },
+    {
+      v: 2,
+      kind: 'session-secrets',
+      cipher: 'future-cipher',
+      keyRef: 'future-key',
+      aad: 'future-aad',
+      iv: 'opaque',
+      encryptedSecrets: 'opaque',
+    },
+  ]) {
+    await assert.rejects(
+      () => getSessionSecrets({ CE_STORAGE_ENVELOPE_KEK: 'test-kek' }, 'session-a', {
+        getKvJson: async () => malformed,
+      }),
+      /authenticated decryption\./,
+    );
+  }
 });

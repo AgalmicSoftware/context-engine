@@ -4,6 +4,7 @@ import {
 import {
   dispatchAuthLoginRequest as dispatchAuthLoginRequestBoundary,
 } from './authLoginRequestDispatch.js';
+import { issueNonce as issueNonceBoundary } from './nonceLifecycle.js';
 
 export const dispatchAuthNonceRequestWithWorkerDeps = async ({
   request,
@@ -32,10 +33,18 @@ export const dispatchAuthNonceRequestWithWorkerDeps = async ({
       buildNonce: () => deps?.buildNonce?.({
         base64UrlEncode: deps?.base64UrlEncode,
       }),
-      putNonce: async (currentEnv, key, value, ttl) => currentEnv?.GROUP_KV?.put?.(
-        key,
-        value,
-        { expirationTtl: ttl },
+      issueNonce: (currentEnv, slugArg, addressArg, nonceArg, ttl) => (
+        deps?.issueNonce || issueNonceBoundary
+      )(
+        currentEnv,
+        slugArg,
+        addressArg,
+        nonceArg,
+        ttl,
+        {
+          usedNonceTtlSeconds: constants?.usedNonceTtlSeconds,
+          now: deps?.now,
+        },
       ),
       MISSING_SLUG_ERROR: constants?.missingSlugError,
       NONCE_TTL_SECONDS: constants?.nonceTtlSeconds,

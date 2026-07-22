@@ -21,7 +21,12 @@ const SPONSORED_DEPLOY_RECORD_KEY = 'sponsored-deploy';
 const DIRECT_DEPLOY_RECORD_KEY = 'direct-deploy';
 const SPONSORED_FAUCET_RECORD_KEY = 'sponsored-faucet';
 const SESSION_CONFIG_AUTHORITY_KEY = 'session-config-authority';
+const AUTH_NONCE_ACTIVE_KEY = 'auth-nonce-active';
+const AUTH_NONCE_USED_KEY = 'auth-nonce-used';
+const AUTH_RATE_RECORD_KEY = 'auth-rate-record';
 const RUNNING_LEASE_MS = 65_000;
+const MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1000;
+const MAX_AUTH_RATE_WINDOW_MS = 8 * 24 * 60 * 60 * 1000;
 const WRAPPED_SESSION_KEY_FIELDS = [
   'alg',
   'createdAt',
@@ -44,6 +49,17 @@ const toTrimmedString = (value) => (
 const isObjectRecord = (value) => (
   !!value && typeof value === 'object' && !Array.isArray(value)
 );
+
+const normalizePositiveSafeInteger = (value) => {
+  const numeric = Number(value);
+  return Number.isSafeInteger(numeric) && numeric > 0 ? numeric : 0;
+};
+
+const normalizeBoundedFutureTimestamp = (value, nowMs, maxAheadMs) => {
+  const numeric = normalizePositiveSafeInteger(value);
+  if (!numeric || numeric <= nowMs || numeric > nowMs + maxAheadMs) return 0;
+  return numeric;
+};
 
 const normalizeSessionSlug = (value) => {
   if (value == null) return '';
@@ -349,6 +365,118 @@ export class SessionWriteCoordinator {
       }
       return jsonResponse({ ok: true, skipPersistence: reserved.skipPersistence === true });
     });
+  }
+
+  async executeAuthNonceIssue(payload) {
+    const nowMs = Number(this.now()) || Date.now();
+    const slug = normalizeSessionSlug(payload?.slug);
+    const address = toTrimmedString(payload?.address).toLowerCase();
+    const nonce = toTrimmedString(payload?.nonce);
+    const expiresAtMs = normalizeBoundedFutureTimestamp(
+      payload?.expiresAtMs,
+      nowMs,
+      MAX_AUTH_NONCE_LIFETIME_MS,
+    );
+    const usedExpiresAtMs = normalizeBoundedFutureTimestamp(
+      payload?.usedExpiresAtMs,
+      nowMs,
+      MAX_AUTH_NONCE_LIFETIME_MS,
+    );
+    if (!slug || !address || !nonce || nonce.length > 256 || !expiresAtMs || !usedExpiresAtMs) {
+      return jsonResponse({ error: 'Invalid auth nonce issuance request.' }, 400);
+    }
+
+    await this.state.storage.transaction(async (transaction) => {
+      const used = await transaction.get(AUTH_NONCE_USED_KEY);
+      const entries = Array.isArray(used?.entries)
+        ? used.entries.filter((entry) => Number(entry?.expiresAtMs || 0) > nowMs)
+        : [];
+      await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
+      await transaction.put(AUTH_NONCE_ACTIVE_KEY, {
+        version: 1,
+        nonce,
+        expiresAtMs,
+      });
+    });
+    return jsonResponse({ ok: true });
+  }
+
+  async executeAuthNonceConsume(payload) {
+    const nowMs = Number(this.now()) || Date.now();
+    const slug = normalizeSessionSlug(payload?.slug);
+    const address = toTrimmedString(payload?.address).toLowerCase();
+    const nonce = toTrimmedString(payload?.nonce);
+    const usedExpiresAtMs = normalizeBoundedFutureTimestamp(
+      payload?.usedExpiresAtMs,
+      nowMs,
+      MAX_AUTH_NONCE_LIFETIME_MS,
+    );
+    if (!slug || !address || !nonce || nonce.length > 256 || !usedExpiresAtMs) {
+      return jsonResponse({ error: 'Invalid auth nonce consumption request.' }, 400);
+    }
+
+    const result = await this.state.storage.transaction(async (transaction) => {
+      const used = await transaction.get(AUTH_NONCE_USED_KEY);
+      const entries = Array.isArray(used?.entries)
+        ? used.entries.filter((entry) => Number(entry?.expiresAtMs || 0) > nowMs)
+        : [];
+      if (entries.some((entry) => toTrimmedString(entry?.nonce) === nonce)) {
+        await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
+        return { ok: false, error: 'Nonce already used.' };
+      }
+
+      const active = await transaction.get(AUTH_NONCE_ACTIVE_KEY);
+      const activeMatches = (
+        active?.nonce === nonce &&
+        Number(active?.expiresAtMs || 0) > nowMs
+      );
+      if (!activeMatches) {
+        if (Number(active?.expiresAtMs || 0) <= nowMs) {
+          await transaction.delete(AUTH_NONCE_ACTIVE_KEY);
+        }
+        await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
+        return { ok: false, error: 'Nonce mismatch or expired.' };
+      }
+
+      entries.push({ nonce, expiresAtMs: usedExpiresAtMs });
+      await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
+      await transaction.delete(AUTH_NONCE_ACTIVE_KEY);
+      return { ok: true };
+    });
+    return jsonResponse(result, result.ok ? 200 : 409);
+  }
+
+  async executeAuthRateCheck(payload) {
+    const nowMs = Number(this.now()) || Date.now();
+    const slug = normalizeSessionSlug(payload?.slug);
+    const route = toTrimmedString(payload?.route).toLowerCase();
+    const identity = toTrimmedString(payload?.identity).toLowerCase();
+    const limit = normalizePositiveSafeInteger(payload?.limit);
+    const resetAtMs = normalizeBoundedFutureTimestamp(
+      payload?.resetAtMs,
+      nowMs,
+      MAX_AUTH_RATE_WINDOW_MS,
+    );
+    if (!slug || !route || !identity || !limit || !resetAtMs) {
+      return jsonResponse({ error: 'Invalid auth rate-limit request.' }, 400);
+    }
+    const result = await this.state.storage.transaction(async (transaction) => {
+      const existing = await transaction.get(AUTH_RATE_RECORD_KEY);
+      const current = Number(existing?.resetAtMs || 0) > nowMs
+        ? normalizePositiveSafeInteger(existing?.count)
+        : 0;
+      const count = current + 1;
+      const effectiveResetAtMs = Number(existing?.resetAtMs || 0) > nowMs
+        ? existing.resetAtMs
+        : resetAtMs;
+      await transaction.put(AUTH_RATE_RECORD_KEY, {
+        version: 1,
+        count,
+        resetAtMs: effectiveResetAtMs,
+      });
+      return { ok: true, allowed: count <= limit, count, resetAtMs: effectiveResetAtMs };
+    });
+    return jsonResponse(result);
   }
 
   async reserveSponsoredDeploy(requestDigest) {
@@ -663,6 +791,15 @@ export class SessionWriteCoordinator {
     if (url.pathname === '/session-config/mutate') {
       return this.executeSessionConfigMutation(payload);
     }
+    if (url.pathname === '/auth-state/nonce/issue') {
+      return this.executeAuthNonceIssue(payload);
+    }
+    if (url.pathname === '/auth-state/nonce/consume') {
+      return this.executeAuthNonceConsume(payload);
+    }
+    if (url.pathname === '/auth-state/rate/check') {
+      return this.executeAuthRateCheck(payload);
+    }
     if (url.pathname === '/deploy-helper') return this.executeDirectDeploy(payload);
     if (url.pathname === '/sponsored-faucet/reserve') {
       const requestDigest = toTrimmedString(payload?.requestDigest);
@@ -798,6 +935,114 @@ const resolveCoordinatorStub = async (env, identity) => {
   if (!coordinator?.idFromName || !coordinator?.get) return null;
   const name = await sha256Hex(identity);
   return coordinator.get(coordinator.idFromName(name));
+};
+
+const AUTH_STATE_UNAVAILABLE = Object.freeze({
+  ok: false,
+  status: 503,
+  error: 'Authorization state coordination is unavailable.',
+});
+
+const callAuthStateCoordinator = async ({
+  env,
+  identity,
+  path,
+  payload,
+} = {}) => {
+  let stub;
+  try {
+    stub = await resolveCoordinatorStub(env, identity);
+  } catch {
+    return { ...AUTH_STATE_UNAVAILABLE };
+  }
+  if (!stub?.fetch) return { ...AUTH_STATE_UNAVAILABLE };
+  try {
+    const response = await stub.fetch(`https://session-coordinator.internal${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const body = await response.json().catch(() => null);
+    if (!body || typeof body !== 'object') return { ...AUTH_STATE_UNAVAILABLE };
+    return {
+      ...body,
+      status: response.status,
+    };
+  } catch {
+    return { ...AUTH_STATE_UNAVAILABLE };
+  }
+};
+
+export const issueCoordinatedAuthNonce = async ({
+  env,
+  slug,
+  address,
+  nonce,
+  ttlSeconds,
+  usedNonceTtlSeconds = 600,
+  now = Date.now,
+} = {}) => {
+  const nowMs = Number(typeof now === 'function' ? now() : now) || Date.now();
+  return callAuthStateCoordinator({
+    env,
+    identity: `auth-nonce:${toTrimmedString(slug)}:${toTrimmedString(address).toLowerCase()}`,
+    path: '/auth-state/nonce/issue',
+    payload: {
+      slug,
+      address,
+      nonce,
+      expiresAtMs: nowMs + normalizePositiveSafeInteger(ttlSeconds) * 1000,
+      usedExpiresAtMs: nowMs + normalizePositiveSafeInteger(usedNonceTtlSeconds) * 1000,
+    },
+  });
+};
+
+export const consumeCoordinatedAuthNonce = async ({
+  env,
+  slug,
+  address,
+  nonce,
+  usedNonceTtlSeconds,
+  now = Date.now,
+} = {}) => {
+  const nowMs = Number(typeof now === 'function' ? now() : now) || Date.now();
+  return callAuthStateCoordinator({
+    env,
+    identity: `auth-nonce:${toTrimmedString(slug)}:${toTrimmedString(address).toLowerCase()}`,
+    path: '/auth-state/nonce/consume',
+    payload: {
+      slug,
+      address,
+      nonce,
+      usedExpiresAtMs: nowMs + normalizePositiveSafeInteger(usedNonceTtlSeconds) * 1000,
+    },
+  });
+};
+
+export const checkCoordinatedAuthRateLimit = async ({
+  env,
+  slug,
+  route,
+  identity,
+  limit,
+  windowMs,
+  now = Date.now,
+} = {}) => {
+  const nowMs = Number(typeof now === 'function' ? now() : now) || Date.now();
+  const normalizedRoute = toTrimmedString(route).toLowerCase();
+  const normalizedIdentity = toTrimmedString(identity).toLowerCase();
+  return callAuthStateCoordinator({
+    env,
+    identity: `auth-rate:${toTrimmedString(slug)}:${normalizedRoute}:${normalizedIdentity}`,
+    path: '/auth-state/rate/check',
+    payload: {
+      slug,
+      route: normalizedRoute,
+      identity: normalizedIdentity,
+      limit,
+      resetAtMs: nowMs + normalizePositiveSafeInteger(windowMs),
+    },
+  });
 };
 
 export const getOrCreateCoordinatedStorageEnvelopeSessionKey = async ({

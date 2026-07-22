@@ -108,6 +108,9 @@ Scope modes exposed in the modal:
 - Session configs are expected to provide a positive `blockLimits.start`.
 - Missing/invalid `blockLimits.start` is treated as a configuration error; there is no implicit
   scan-from-zero fallback in current code.
+- If public session metadata is temporarily unavailable, the client can recover a bounded start
+  from the registry tuple's creation timestamp. It uses block-by-timestamp lookup first and the
+  `SessionCreated` event only as a legacy fallback, avoiding provider-wide log queries.
 - When a slug is out of scope, `getRelevantBlockWindowForFilter()` returns an empty window
   (`fromBlock > toBlock`) and callers short-circuit.
 

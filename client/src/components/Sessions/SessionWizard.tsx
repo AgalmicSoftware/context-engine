@@ -14,7 +14,7 @@ import {
 } from '../../variables/appConfig.js';
 import { getChainById, getDefaultHttpRpc, getSessionRegistryChains } from '../../variables/chains.js';
 import type { SessionConfig, UnknownRecord } from '../../utilities/session/sessionTypes.js';
-import type { SessionModeProfile } from '../../utilities/session/sessionModeProfile';
+import { validateSessionModeProfile, type SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import { normalizeBaseUrl } from '../../utilities/urlUtils.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { createLogger } from '../../utilities/logging';
@@ -79,8 +79,7 @@ import {
 import SessionWizardInfoTooltip, { type SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 import SessionWizardShell from './SessionWizardShell';
 import SessionWizardSessionIdBadge from './SessionWizardSessionIdBadge';
-import SessionWizardSessionModeProfileControl from './SessionWizardSessionModeProfileControl';
-import { applySessionModeProfileSelectionToDraft } from './sessionWizardModeProfileDraftController';
+import useSessionWizardModeProfileControls from './hooks/useSessionWizardModeProfileControls';
 import { buildNormalModeCards, buildNormalModePublishSummary } from './sessionWizardNormalModeCards';
 import {
   LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
@@ -461,7 +460,7 @@ const SessionWizard = ({
         ? null
         : sourceEmbeddedDeployHelperDefault,
     });
-    if (!isNewSessionWizardRoute) return draftFromCache;
+    if (!isNewSessionWizardRoute || cachedWizard?.draft?.sessionModeProfile) return draftFromCache;
     const freshNewSessionDraft = { ...draftFromCache };
     delete freshNewSessionDraft.sessionModeProfile;
     return freshNewSessionDraft;
@@ -1929,6 +1928,13 @@ const SessionWizard = ({
       setStatus('Choose a session mode before publishing.');
       return;
     }
+    const sessionModeValidation = validateSessionModeProfile(draft.sessionModeProfile as SessionModeProfile);
+    if (!sessionModeValidation.valid) {
+      setStatus(
+        `Fix the session hosting settings before publishing: ${sessionModeValidation.issues[0]?.message || 'Invalid session mode profile.'}`,
+      );
+      return;
+    }
     if (publishRequestInFlightRef.current) {
       setStatus('Publish already in progress.');
       return;
@@ -1996,6 +2002,16 @@ const SessionWizard = ({
         const currentWorkerSecrets = getCurrentWorkerSecrets();
         const liveRuntime = workerDeployRuntimeRef.current;
         const liveDraft = liveRuntime?.draft || draftRef.current;
+        const liveSessionModeProfile = liveDraft?.sessionModeProfile as SessionModeProfile | undefined;
+        const liveSessionModeValidation = liveSessionModeProfile
+          ? validateSessionModeProfile(liveSessionModeProfile)
+          : { valid: false, issues: [] };
+        if (!liveSessionModeValidation.valid) {
+          setStatus(
+            `Fix the session hosting settings before publishing: ${liveSessionModeValidation.issues[0]?.message || 'Invalid session mode profile.'}`,
+          );
+          return;
+        }
         const sponsoredAutoDeployState = resolveSessionWizardSponsoredAutoDeployReadiness({
           wizardMode,
           sponsoredBundle: sponsoredBundleAppliedBundleRef.current,
@@ -2762,26 +2778,18 @@ const SessionWizard = ({
         sessionIdDisplay={sessionIdDisplay}
       />
     ) : null;
-  const handleSessionModeProfileContinue = useCallback(() => {
-    setSessionModeProfileStepComplete(true);
-  }, []);
   const showSessionModeProfileEntryStep = isNewSessionWizardRoute && !effectiveSessionModeProfileStepComplete;
-  const sessionModeProfileControl = (
-    <SessionWizardSessionModeProfileControl
-      registryChainId={registryChainId}
-      value={draft.sessionModeProfile}
-      onChange={(profile, compiled) => {
-        setDraft((prev) => {
-          const next = applySessionModeProfileSelectionToDraft(prev, profile, compiled);
-          draftRef.current = next;
-          return next;
-        });
-      }}
-      onContinue={handleSessionModeProfileContinue}
-      entryOnly={showSessionModeProfileEntryStep}
-      showContinue={showSessionModeProfileEntryStep || !isNewSessionWizardRoute}
-    />
-  );
+  const sessionModeProfileControls = useSessionWizardModeProfileControls({
+    draft,
+    draftRef,
+    entryOnly: showSessionModeProfileEntryStep,
+    onContinue: () => setSessionModeProfileStepComplete(true),
+    onEnterAdvancedMode: handleEnterAdvancedMode,
+    registryChainId,
+    setCollapsedSections,
+    setDraft,
+    showContinue: showSessionModeProfileEntryStep || !isNewSessionWizardRoute,
+  });
 
   return (
     <SessionWizardShell
@@ -2903,8 +2911,10 @@ const SessionWizard = ({
       sessionHeaderPreviewModalOpen={sessionHeaderPreviewModalOpen}
       sessionHeaderPreviewSrc={sessionHeaderPreviewSrc}
       sessionMetadataHeaderAccessory={sessionMetadataHeaderAccessory}
-      sessionModeProfileControl={sessionModeProfileControl}
-      showSessionModeProfileControlInSetup={effectiveSessionModeProfileStepComplete}
+      sessionModeProfileControl={sessionModeProfileControls.header}
+      sessionModeProfilePrivacyControl={sessionModeProfileControls.privacy}
+      sessionModeProfileWorkerControl={sessionModeProfileControls.worker}
+      sessionModeProfilePublishControl={sessionModeProfileControls.publish}
       sessionModeProfileStepComplete={effectiveSessionModeProfileStepComplete}
       sessionUrl={sessionUrl}
       setBundleFile={setBundleFile}

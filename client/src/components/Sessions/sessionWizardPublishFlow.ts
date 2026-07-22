@@ -1,5 +1,9 @@
 import { toStr } from '../../utilities/shared/primitives.js';
-import { CLOUDFLARE_WORKER_BUNDLE_URL } from '../../variables/appConfig.js';
+import sha256 from 'crypto-js/sha256';
+import {
+  CLOUDFLARE_WORKER_BUNDLE_URL,
+  CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL,
+} from '../../variables/appConfig.js';
 import {
   hasSponsoredBundleFields,
   normalizeSparseSponsoredBundlePayload,
@@ -442,10 +446,14 @@ export const resolveSessionWizardDeployBundlePayload = async ({
   effectiveBundleMode = 'upload',
   bundleFile = null,
   bundleUrl = '',
+  normalModeDefaultBundleUrl = CLOUDFLARE_WORKER_BUNDLE_URL,
+  normalModeDefaultBundleManifestUrl = CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL,
 }: {
   effectiveBundleMode?: string;
   bundleFile?: File | null;
   bundleUrl?: unknown;
+  normalModeDefaultBundleUrl?: unknown;
+  normalModeDefaultBundleManifestUrl?: unknown;
 } = {}) => {
   if (effectiveBundleMode === 'upload') {
     const bundleText = bundleFile
@@ -454,14 +462,39 @@ export const resolveSessionWizardDeployBundlePayload = async ({
     return {
       bundleText,
       bundleUrl: undefined,
+      bundleManifestUrl: undefined,
+      bundleSha256: bundleText ? sha256(bundleText).toString() : undefined,
       bundleSource: bundleText ? 'upload' : 'upload-missing',
     };
   }
 
   const normalizedBundleUrl = toStr(bundleUrl).trim() || undefined;
+  let bundleManifestUrl: string | undefined;
+  if (normalizedBundleUrl) {
+    try {
+      const parsed = new URL(normalizedBundleUrl);
+      if (parsed.protocol === 'https:') {
+        if (normalizedBundleUrl === toStr(normalModeDefaultBundleUrl).trim()) {
+          bundleManifestUrl = toStr(normalModeDefaultBundleManifestUrl).trim() || undefined;
+        } else {
+          parsed.pathname = `${parsed.pathname.slice(0, parsed.pathname.lastIndexOf('/') + 1)}worker-release-manifest.json`;
+          parsed.search = '';
+          parsed.hash = '';
+          bundleManifestUrl = parsed.toString();
+        }
+      }
+    } catch (_) {
+      bundleManifestUrl = undefined;
+    }
+    if (!bundleManifestUrl) {
+      throw new Error('Worker bundle URL must use HTTPS and provide a release manifest binding.');
+    }
+  }
   return {
     bundleText: '',
     bundleUrl: normalizedBundleUrl,
+    bundleManifestUrl,
+    bundleSha256: undefined,
     bundleSource: normalizedBundleUrl ? 'url' : 'url-missing',
   };
 };

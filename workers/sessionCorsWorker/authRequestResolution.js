@@ -82,18 +82,16 @@ export const resolveAuthenticatedRequest = async ({
     };
   }
 
-  if (Object.prototype.hasOwnProperty.call(payload, 'jti')) {
-    const validateRecord = typeof deps?.validateAuthTokenRecord === 'function'
-      ? deps.validateAuthTokenRecord
-      : validateAuthTokenRecord;
-    const tokenRecord = await validateRecord({ env, payload, slug });
-    if (!tokenRecord?.ok) {
-      await recordAuthFailure({ env, deps });
-      return {
-        ok: false,
-        response: deps?.json?.({ error: tokenRecord?.error || 'Invalid token.' }, 401, baseHeaders),
-      };
-    }
+  const validateRecord = typeof deps?.validateAuthTokenRecord === 'function'
+    ? deps.validateAuthTokenRecord
+    : validateAuthTokenRecord;
+  const tokenRecord = await validateRecord({ env, payload, slug });
+  if (!tokenRecord?.ok) {
+    await recordAuthFailure({ env, deps });
+    return {
+      ok: false,
+      response: deps?.json?.({ error: tokenRecord?.error || 'Invalid token.' }, 401, baseHeaders),
+    };
   }
 
   return { ok: true, payload, slug };

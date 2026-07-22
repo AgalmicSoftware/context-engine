@@ -63,6 +63,7 @@ export type SessionPublishSummaryProps = {
   onCopyAdminUrl: () => void;
   adminUrlStatus: string;
   status: string;
+  sessionModeProfilePublishControl?: React.ReactNode;
 };
 
 const SessionPublishSummary = ({
@@ -106,6 +107,7 @@ const SessionPublishSummary = ({
   onCopyAdminUrl,
   adminUrlStatus,
   status,
+  sessionModeProfilePublishControl = null,
 }: SessionPublishSummaryProps) => {
   const { publishActionDisplayState, publishMetadataDisplayState, publishProgressDisplayState, publishReadiness } =
     publishUiPlan;
@@ -125,6 +127,7 @@ const SessionPublishSummary = ({
       ) : null}
       {isNormalDisplayMode || !isCollapsed ? (
         <div className={styles.panelBody}>
+          {sessionModeProfilePublishControl}
           {isNormalDisplayMode ? (
             <div className={styles.publishHero}>
               <div className={styles.publishSummaryGrid}>

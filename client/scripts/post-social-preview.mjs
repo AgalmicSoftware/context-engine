@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const DEFAULT_PUBLIC_SITE_URL = 'https://contextengine.xyz/';
+const DEFAULT_PUBLIC_SITE_URL = 'https://contextengine.sh/';
 const SAFE_POST_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/i;
 
 const toTrimmedString = (value) => String(value ?? '').trim();

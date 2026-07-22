@@ -67,9 +67,6 @@ export const validateAuthTokenRecord = async ({
   payload,
   slug,
 } = {}) => {
-  const hasJti = Object.prototype.hasOwnProperty.call(payload || {}, 'jti');
-  if (!hasJti) return { ok: true, legacy: true };
-
   const key = buildAuthTokenKey({
     slug: slug || payload?.slug,
     sub: payload?.sub,

@@ -606,10 +606,11 @@ test('storageRoute can use KV-only Cloudflare payload storage when R2 is unavail
     config: CLOUDFLARE_WORKER_GATE_CONFIG,
     slug: 'session-a',
     uploaderAddress: '0xabc',
-    baseHeaders: {},
+    baseHeaders: new Headers({ 'Access-Control-Allow-Origin': 'https://contextengine.sh' }),
     deps: { json },
   });
   assert.equal(readResponse.status, 200);
+  assert.equal(readResponse.headers.get('Access-Control-Allow-Origin'), 'https://contextengine.sh');
   assert.equal(readResponse.headers.get('X-CE-Storage-Backend'), 'cloudflare');
   assert.deepEqual(JSON.parse(await readResponse.text()), { prompt: 'Question from KV storage?', ok: true });
 

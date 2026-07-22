@@ -2021,14 +2021,12 @@ export const executePriorResponseFetchPlan = async ({
 
     slug = resolvedSlug;
     if (typeof refreshQuestionResponses === 'function') {
-      // eslint-disable-next-line no-await-in-loop
       await refreshQuestionResponses(idsToFetch, {
         slug: resolvedSlug,
         responder: normalizedResponder,
       });
     }
     if (typeof readQuestionsCacheAsync === 'function') {
-      // eslint-disable-next-line no-await-in-loop
       await readQuestionsCacheAsync(resolvedSlug);
     }
     fetched = true;

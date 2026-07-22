@@ -3,9 +3,7 @@ import { existsSync, readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { resolve } from 'path';
 import { getWorkerDependencyVersionReport } from './worker-dependency-guard.mjs';
-import { resolveWorkerBundleTargets } from './worker-bundle.mjs';
-
-const normalizeText = (value) => String(value || '').replace(/\r\n/g, '\n');
+import { normalizeWorkerBundleText, resolveWorkerBundleTargets } from './worker-bundle.mjs';
 
 const getPaths = (rootDir) => {
   const targets = resolveWorkerBundleTargets({ rootDir });
@@ -49,15 +47,18 @@ export const compareWorkerBundleSync = async ({ rootDir = process.cwd() } = {}) 
       bundle: true,
       format: 'esm',
       platform: 'browser',
-      target: ['es2020'],
+      preserveSymlinks: true,
+      target: [target.target || 'es2020'],
+      ...(target.legalComments ? { legalComments: target.legalComments } : {}),
+      ...(target.mainFields ? { mainFields: target.mainFields } : {}),
       write: false,
     });
 
-    const generatedBundled = normalizeText(
+    const generatedBundled = normalizeWorkerBundleText(
       buildResult.outputFiles?.find((file) => file?.path?.endsWith('.js'))?.text
         || buildResult.outputFiles?.[0]?.text
     );
-    const expectedBundled = normalizeText(readFileSync(target.outputFile, 'utf8'));
+    const expectedBundled = normalizeWorkerBundleText(readFileSync(target.outputFile, 'utf8'));
 
     if (generatedBundled !== expectedBundled) {
       mismatches.push({

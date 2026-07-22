@@ -35,10 +35,7 @@ import {
   getCachedSessionWorkerConfig,
   upsertCachedSessionWorkerConfig,
 } from '../../utilities/session/sessionWorkerConfigCache.js';
-import {
-  getUsableSessionWorkerUrl,
-  hasUsableSessionWorkerConfig,
-} from '../../utilities/session/sessionWorkerAvailability.js';
+import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability.js';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../utilities/session/sponsoredFlags.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import SBTSelector from '../SBTs/SBTSelector';
@@ -47,6 +44,8 @@ import CETooltip from '../Shared/CETooltip';
 import AdminPageMetadataEditor from './AdminPageMetadataEditor';
 import AdminPageTestsPanel from './AdminPageTestsPanel';
 import AdminPageWorkerSecretsPanel from './AdminPageWorkerSecretsPanel';
+import AdminAgentSessionWrappedPanel from './AdminAgentSessionWrappedPanel';
+import { resolveAdminAgentSessionWrappedWorkerOrigin } from './adminAgentSessionWrapped';
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
 import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
@@ -83,7 +82,12 @@ import {
   getAdminSessionDisplayUrl,
   shortAddress,
 } from './adminPageSessionDisplayHelpers';
-import { normalizeAdminSecretPresence, normalizeAdminSecretPresencePatch } from './adminPageSecretCardHelpers';
+import {
+  buildAdminSecretPresenceTargetKey,
+  normalizeAdminSecretPresence,
+  normalizeAdminSecretPresencePatch,
+} from './adminPageSecretCardHelpers';
+import { useAdminAgentSessionWrappedConfigUpdate } from './useAdminAgentSessionWrappedConfigUpdate';
 import type { AdminTestResults } from './adminPageTestResultHelpers';
 import { renderAdminTestResult } from './adminPageTestResultHelpers';
 import {
@@ -174,12 +178,6 @@ export const __adminPageTestUtils = {
   buildHealthAuthMismatchState,
   getAdminSessionDisplayUrl,
   getSessionReadRpcConfig,
-};
-
-const buildSecretPresenceTargetKey = ({ slug, workerUrl }: { slug?: unknown; workerUrl?: unknown } = {}) => {
-  const normalizedSlug = normalizeSlug(slug);
-  const normalizedWorkerUrl = normalizeWorkerUrl(workerUrl);
-  return normalizedWorkerUrl ? `${normalizedSlug}\n${normalizedWorkerUrl}` : '';
 };
 
 const asAdminSessionConfig = (value: unknown): AdminSessionConfigLike =>
@@ -861,18 +859,19 @@ const AdminPageRuntime = ({
       ),
     [selectedConfig, selectedSlug],
   );
-  const selectedSessionHasUsableWorker = useMemo(
+  const agentSessionWrappedWorkerUrl = useMemo(
     () =>
-      hasUsableSessionWorkerConfig({
-        slug: selectedSlug,
+      resolveAdminAgentSessionWrappedWorkerOrigin({
+        editedWorkerUrl: workerUrl,
         sessionConfig: selectedConfig,
-        allowSharedFallback: true,
+        sessionSlug: selectedSlug,
+        workerUrlEditable,
       }),
-    [selectedConfig, selectedSlug],
+    [selectedConfig, selectedSlug, workerUrl, workerUrlEditable],
   );
   const secretPresenceTargetKey = useMemo(
     () =>
-      buildSecretPresenceTargetKey({
+      buildAdminSecretPresenceTargetKey({
         slug: selectedSlug,
         workerUrl: workerUrl || selectedConfigWorkerUrl,
       }),
@@ -1142,7 +1141,7 @@ const AdminPageRuntime = ({
       const slug = normalizeSlug(selectedSlug);
       baseUrl = normalizeWorkerUrl(workerUrl || selectedConfigWorkerUrl);
       if (!baseUrl) throw new Error('Worker URL is missing.');
-      targetKey = buildSecretPresenceTargetKey({ slug, workerUrl: baseUrl });
+      targetKey = buildAdminSecretPresenceTargetKey({ slug, workerUrl: baseUrl });
       requestId = secretPresenceRequestRef.current + 1;
       secretPresenceRequestRef.current = requestId;
       setSecretPresenceStatus('loading');
@@ -1407,7 +1406,7 @@ const AdminPageRuntime = ({
       if (!canAdminWorker) throw new Error('Connect the admin wallet to update worker secrets.');
       const baseUrl = normalizeWorkerUrl(workerUrl);
       if (!baseUrl) throw new Error('Worker URL is missing.');
-      const savedPresenceTargetKey = buildSecretPresenceTargetKey({ slug, workerUrl: baseUrl });
+      const savedPresenceTargetKey = buildAdminSecretPresenceTargetKey({ slug, workerUrl: baseUrl });
       // Only send non-empty fields — blank fields are skipped to avoid overwriting existing secrets.
       const secretsPayload = Object.entries(secrets).reduce((acc: any, [key, value]: any) => {
         const trimmed = toStr(value).trim();
@@ -1599,6 +1598,15 @@ const AdminPageRuntime = ({
   const testSessionConfig = selectedConfig
     ? { ...selectedConfig, corsWorkerUrl: baseWorkerUrl || selectedConfigWorkerUrl || '' }
     : null;
+  const {
+    ensureSessionWorkerAttached: ensureAgentSessionWrappedWorkerAttached,
+    handleConfigUpdated: handleAgentSessionWrappedConfigUpdated,
+  } = useAdminAgentSessionWrappedConfigUpdate({
+    selectedConfig,
+    selectedSlug: normalizeSlug(selectedSlug),
+    setSessions,
+    providerLike: provider,
+  });
   const ensureWorkerSessionConfig = useCallback(
     async ({
       sessionConfigOverride,
@@ -2818,6 +2826,16 @@ const AdminPageRuntime = ({
             </>
           )}
         </section>
+
+        <AdminAgentSessionWrappedPanel
+          canAdminWorker={canAdminWorker}
+          sessionConfig={selectedConfig}
+          sessionSlug={normalizeSlug(selectedSlug)}
+          sessionWorkerUrl={agentSessionWrappedWorkerUrl}
+          postSignedRequest={postSignedAdminRequest}
+          ensureSessionWorkerAttached={ensureAgentSessionWrappedWorkerAttached}
+          onConfigUpdated={handleAgentSessionWrappedConfigUpdated}
+        />
 
         <AdminWorkerGroupsPanel
           canAdminWorker={canAdminWorker}

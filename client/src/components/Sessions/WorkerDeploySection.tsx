@@ -3,7 +3,9 @@ import React from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { buildCloudflareTokenTemplateUrl } from './cloudflareTokenTemplate.js';
+import { CLOUDFLARE_NATIVE_DEPLOY_URL } from '../../variables/publicDeploymentConfig.js';
+import { createCloudflareNativeSetupSecrets } from '../../utilities/worker/cloudflareNativeDeploy.js';
+import { buildCloudflareTokenTemplateUrl, CLOUDFLARE_API_TOKENS_URL } from './cloudflareTokenTemplate.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
@@ -51,6 +53,7 @@ export type WorkerDeploySectionProps = {
   showSponsoredDeployAccessNotice: boolean;
   account?: string;
   cloudflareTokenSlug?: string;
+  cloudflareNativeDeployUrl?: string;
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
   handleDeployWorker: () => void;
   deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
@@ -85,10 +88,16 @@ const WorkerDeploySection = ({
   showSponsoredDeployAccessNotice,
   account,
   cloudflareTokenSlug = '',
+  cloudflareNativeDeployUrl = CLOUDFLARE_NATIVE_DEPLOY_URL,
   setDeployForm,
   handleDeployWorker,
   deployStatusDisplayState,
 }: WorkerDeploySectionProps) => {
+  const [nativeSetupSecrets, setNativeSetupSecrets] = React.useState<{
+    tokenHmacSecret: string;
+    storageEnvelopeKek: string;
+  } | null>(null);
+  const [nativeSetupError, setNativeSetupError] = React.useState('');
   const renderTooltip = typeof renderInfoTooltip === 'function' ? renderInfoTooltip : () => null;
   const {
     deployButtonDisabled,
@@ -102,6 +111,25 @@ const WorkerDeploySection = ({
   const cloudflareTokenTemplateHref = buildCloudflareTokenTemplateUrl({
     slug: cloudflareTokenSlug,
   });
+  const cloudflareTokenReceiver = String(deployHelperUrl || '').trim();
+  const nativeDeployUrl = String(cloudflareNativeDeployUrl || '').trim();
+  const nativeSessionSlug = String(cloudflareTokenSlug || '').trim();
+  const nativeAdminAddress = String(deployForm.adminAddress || account || '').trim();
+  const nativeDeployReady = !!(
+    nativeDeployUrl &&
+    nativeSetupSecrets &&
+    nativeSessionSlug &&
+    nativeAdminAddress
+  );
+  const generateNativeSetupSecrets = () => {
+    try {
+      setNativeSetupSecrets(createCloudflareNativeSetupSecrets());
+      setNativeSetupError('');
+    } catch (error) {
+      setNativeSetupSecrets(null);
+      setNativeSetupError(error instanceof Error ? error.message : 'Secure setup-secret generation failed.');
+    }
+  };
   const updateApiToken = (nextApiToken: string) => {
     setDeployForm((prev) => {
       const { accountId: _discardedAccountId, ...accountIndependentForm } = (prev || {}) as DeployForm & {
@@ -120,6 +148,88 @@ const WorkerDeploySection = ({
 
   return (
     <>
+      {nativeDeployUrl && (
+        <section className={styles.cloudflareNativeDeployCard} aria-labelledby="ce-cloudflare-native-deploy-title">
+          <div>
+            <h3 id="ce-cloudflare-native-deploy-title" className={styles.cloudflareNativeDeployTitle}>
+              Deploy the full Session Worker in your Cloudflare account
+            </h3>
+            <p className={styles.helperText}>
+              This is the default self-hosted path. Cloudflare creates and owns the Worker, KV namespace, and Durable
+              Object. No Cloudflare API token, Context Engine deploy helper, OAuth grant, or installed agent is used.
+            </p>
+          </div>
+          <Button
+            type="button"
+            className={styles.secondaryButton}
+            data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE}
+            onClick={generateNativeSetupSecrets}
+          >
+            {nativeSetupSecrets ? 'Replace setup values' : 'Generate setup values'}
+          </Button>
+          {nativeSetupSecrets && (
+            <div className={styles.cloudflareNativeDeployGrid}>
+              <FormGroup>
+                <Label>DEFAULT_SESSION_SLUG</Label>
+                <Input
+                  value={nativeSessionSlug}
+                  readOnly
+                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_SESSION_SLUG}
+                />
+              </FormGroup>
+              <FormGroup>
+                <Label>BOOTSTRAP_ADMIN_ADDRESS</Label>
+                <Input
+                  value={nativeAdminAddress}
+                  readOnly
+                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_ADMIN_ADDRESS}
+                />
+              </FormGroup>
+              <FormGroup>
+                <Label>TOKEN_HMAC_SECRET</Label>
+                <Input
+                  value={nativeSetupSecrets.tokenHmacSecret}
+                  readOnly
+                  autoComplete="off"
+                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC}
+                />
+              </FormGroup>
+              <FormGroup>
+                <Label>CE_STORAGE_ENVELOPE_KEK</Label>
+                <Input
+                  value={nativeSetupSecrets.storageEnvelopeKek}
+                  readOnly
+                  autoComplete="off"
+                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK}
+                />
+              </FormGroup>
+            </div>
+          )}
+          {nativeSetupError && <div className={styles.errorText}>{nativeSetupError}</div>}
+          {nativeSetupSecrets && !nativeSessionSlug && (
+            <div className={styles.errorText}>Enter the session slug before opening Cloudflare.</div>
+          )}
+          {nativeSetupSecrets && !nativeAdminAddress && (
+            <div className={styles.errorText}>Log in with the session admin passkey before opening Cloudflare.</div>
+          )}
+          {nativeDeployReady && (
+            <a
+              href={nativeDeployUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`${styles.secondaryButton} btn btn-secondary`}
+              data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY}
+            >
+              Open Cloudflare deployment
+            </a>
+          )}
+          <div className={styles.helperText}>
+            Paste the four values above into Cloudflare. The two 64-character values are independent Session Worker
+            runtime secrets, not Cloudflare credentials; they stay only in this tab and Cloudflare&apos;s encrypted
+            Worker-secret store. After deployment, paste the resulting workers.dev URL into the Worker URL field.
+          </div>
+        </section>
+      )}
       {shouldUseSponsoredAutoDeployFlow && (
         <div className={styles.statusNote}>
           Sponsored deploy bundle is ready. Normal mode will use the GitHub-hosted worker bundle automatically. If a
@@ -129,7 +239,9 @@ const WorkerDeploySection = ({
         </div>
       )}
       {(!shouldUseSponsoredAutoDeployFlow || !isNormalMode) && (
-        <div className={styles.workerDeployPanel}>
+        <details className={styles.legacyWorkerDeployDetails} open={!nativeDeployUrl}>
+          <summary>{nativeDeployUrl ? 'Legacy deploy-helper fallback' : 'Worker deployment'}</summary>
+          <div className={styles.workerDeployPanel}>
           <div className={styles.workerDeployHeader}>
             {deployForm.workerName ? (
               <div className={styles.workerDeployName} data-testid={E2E_TESTIDS.WIZARD_WORKER_NAME}>
@@ -316,6 +428,27 @@ const WorkerDeploySection = ({
               <div className={styles.helperText}>
                 Account is inferred during deploy only when the token can see exactly one account.
               </div>
+              <div className={styles.helperText}>
+                This browser sends this token only for this deployment attempt to the deploy helper
+                {cloudflareTokenReceiver ? (
+                  <>
+                    {' '}
+                    at <code>{cloudflareTokenReceiver}</code>
+                  </>
+                ) : (
+                  ' at the deploy-helper URL shown above'
+                )}
+                . The helper uses it to call Cloudflare; it is not saved to the session draft or browser storage and is
+                not installed in the deployed Session Worker.
+              </div>
+              <div className={styles.helperText}>
+                Set the earliest expiration Cloudflare permits that still covers setup and an immediate retry. Revoke
+                the token as soon as deployment succeeds or you abandon the attempt from{' '}
+                <a href={CLOUDFLARE_API_TOKENS_URL} target="_blank" rel="noopener noreferrer">
+                  Cloudflare API Tokens
+                </a>
+                .
+              </div>
             </FormGroup>
             <FormGroup>
               <Label>Admin address</Label>
@@ -345,7 +478,8 @@ const WorkerDeploySection = ({
               {deployStatusText}
             </div>
           )}
-        </div>
+          </div>
+        </details>
       )}
     </>
   );

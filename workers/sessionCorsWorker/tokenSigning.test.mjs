@@ -41,6 +41,7 @@ test('signToken preserves JSON.stringify payload format and verifyToken round-tr
     sub: '0xABC',
     slug: 'session-a',
     scopes: { ai: true, arweave: false },
+    jti: 'jti-1',
     exp: 1_700_000_000,
   };
 
@@ -144,6 +145,23 @@ test('verifyToken rejects invalid token payload field types after expiration val
     await verifyToken(badJtiToken, 'test-secret', { ...deps, now }),
     { ok: false, error: 'Token jti must be a string.' },
   );
+});
+
+test('verifyToken rejects tokens without a non-empty jti', async () => {
+  const deps = createBase64Deps();
+  const now = () => 1_699_999_000 * 1000;
+
+  for (const payload of [
+    { sub: '0xabc', exp: 1_700_000_000 },
+    { sub: '0xabc', jti: '', exp: 1_700_000_000 },
+    { sub: '0xabc', jti: '   ', exp: 1_700_000_000 },
+  ]) {
+    const token = await signToken(payload, 'test-secret', deps);
+    assert.deepEqual(
+      await verifyToken(token, 'test-secret', { ...deps, now }),
+      { ok: false, error: 'Token missing jti.' },
+    );
+  }
 });
 
 test('verifyToken accepts valid token payload field types', async () => {

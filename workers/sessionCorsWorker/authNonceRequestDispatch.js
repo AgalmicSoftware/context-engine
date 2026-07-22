@@ -93,8 +93,20 @@ export const dispatchAuthNonceRequest = async ({
   }
 
   const nonce = deps?.buildNonce?.();
-  const key = `nonce:${targetSlug}:${address.toLowerCase()}`;
-  await deps?.putNonce?.(env, key, nonce, deps?.NONCE_TTL_SECONDS);
+  const issueResult = await deps?.issueNonce?.(
+    env,
+    targetSlug,
+    address.toLowerCase(),
+    nonce,
+    deps?.NONCE_TTL_SECONDS,
+  );
+  if (!issueResult?.ok) {
+    return deps?.json?.(
+      { error: issueResult?.error || 'Authorization state coordination is unavailable.' },
+      Number(issueResult?.status || 0) || 503,
+      headers,
+    );
+  }
 
   return deps?.json?.({ nonce }, 200, headers);
 };

@@ -21,11 +21,22 @@ describe('SessionWizardHeader', () => {
   });
 
   it('renders the default mode controls and forwards mode clicks', () => {
-    render(<SessionWizardHeader {...baseProps} wizardMode="normal" />);
+    render(
+      <SessionWizardHeader
+        {...baseProps}
+        sessionModeProfileControl={<div data-testid="hosting-profile-control">hosting selector</div>}
+        sessionModeProfileLabel="Cloudflare"
+        wizardMode="normal"
+      />,
+    );
 
-    expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Session Setup (Cloudflare)' })).toBeInTheDocument();
+    const hostingControl = screen.getByTestId('hosting-profile-control');
+    const normalMode = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL);
+    expect(hostingControl).toBeInTheDocument();
+    expect(hostingControl.compareDocumentPosition(normalMode) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByText('Advanced mode shows the full session configuration.')).not.toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL)).toHaveAttribute('aria-pressed', 'true');
+    expect(normalMode).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toHaveAttribute('aria-pressed', 'false');
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));

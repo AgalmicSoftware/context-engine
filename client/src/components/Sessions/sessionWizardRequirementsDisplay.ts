@@ -78,7 +78,9 @@ export const resolveSessionWizardNewSessionRequirementsDisplayState = ({
       toRequirementString(currentWorkerSecrets?.faucetPrivateKey).trim() ||
       toRequirementString(normalizedAppliedSponsoredBundle?.faucetGrantToken).trim()
     );
-  const requiresCloudflareDeploy = modeRequirements.requiredRequirementIds.includes('cloudflareApiToken');
+  const requiresCloudflareDeploy = modeRequirements.requiredRequirementIds.some(
+    (requirementId) => requirementId === 'cloudflareAccount' || requirementId === 'cloudflareApiToken',
+  );
   const hasNewSessionDeployRequirementCovered =
     (modeRequirements.selected && !requiresCloudflareDeploy) ||
     !!toRequirementString(normalizedAppliedSponsoredBundle?.deployGrantToken).trim();

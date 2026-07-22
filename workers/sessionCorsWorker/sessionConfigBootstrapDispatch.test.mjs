@@ -60,11 +60,15 @@ const buildWorkerCanonicalConfig = () => ({
 });
 
 test('projectPublicWorkerSessionConfig returns canonical fields and recursively redacts secret-adjacent data', () => {
-  const projected = projectPublicWorkerSessionConfig(buildWorkerCanonicalConfig());
+  const projected = projectPublicWorkerSessionConfig({
+    ...buildWorkerCanonicalConfig(),
+    authzEpoch: 7,
+  });
   const serialized = JSON.stringify(projected);
 
   assert.deepEqual(projected, {
     slug: 'session-a',
+    authzEpoch: 7,
     sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     configRevision: 'revision-a',
     sessionName: 'Session A',
@@ -175,6 +179,35 @@ test('projectPublicWorkerSessionConfig keeps worker-canonical editable text meta
     ignored_SBTs_LIST: ['0x0000000000000000000000000000000000000002'],
     featured_SBTs_LIST: ['0x0000000000000000000000000000000000000003'],
   });
+});
+
+test('projectPublicWorkerSessionConfig publishes only the versioned Agent Session Wrapped capability record', () => {
+  const projected = projectPublicWorkerSessionConfig({
+    slug: 'session-a',
+    agentSessionWrapped: {
+      version: 1,
+      enabled: true,
+      origin: 'https://wrapped-session-a.example.workers.dev',
+      protocolVersion: 'agent-session-wrapped-v1',
+      revision: 'wrapped-revision-1',
+      verifiedAt: '2026-07-20T18:00:00.000Z',
+      cloudflareApiToken: 'must-not-publish',
+      generatedSecret: 'must-not-publish',
+    },
+  });
+
+  assert.deepEqual(projected, {
+    slug: 'session-a',
+    agentSessionWrapped: {
+      version: 1,
+      enabled: true,
+      origin: 'https://wrapped-session-a.example.workers.dev',
+      protocolVersion: 'agent-session-wrapped-v1',
+      revision: 'wrapped-revision-1',
+      verifiedAt: '2026-07-20T18:00:00.000Z',
+    },
+  });
+  assert.equal(JSON.stringify(projected).includes('must-not-publish'), false);
 });
 
 test('Cloudflare deployment-token detection covers aliases and nested Cloudflare token fields', () => {

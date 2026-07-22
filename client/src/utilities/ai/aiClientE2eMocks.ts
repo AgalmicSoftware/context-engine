@@ -56,10 +56,10 @@ const hashStr32 = (value: unknown): number => {
   let h = 2166136261;
   for (let i = 0; i < s.length; i += 1) {
     h ^= s.charCodeAt(i);
-    // eslint-disable-next-line no-bitwise
+
     h = Math.imul(h, 16777619);
   }
-  // eslint-disable-next-line no-bitwise
+
   return h >>> 0;
 };
 

@@ -19,6 +19,7 @@ import {
 import {
   resolveLoginAuthorityContext as resolveLoginAuthorityContextBoundary,
 } from './loginAuthorityPreflight.js';
+import { selectResourceGateKeysForScopes } from './authorizationScopeFreshness.js';
 
 export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
   deps,
@@ -80,6 +81,7 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
     slug,
     address,
     config,
+    requestedScopes,
   } = {}) => {
     // Endpoint identity is memoized only for this login request. A shared cache
     // would let a later request trust an endpoint that has since changed chain.
@@ -115,7 +117,7 @@ export const createRegistryLoginBootstrapAdaptersWithWorkerDeps = ({
       registryRpcUrls,
       registrySlug,
       sessionCheck,
-      resourceKeys: constants?.resourceGateKeys,
+      resourceKeys: selectResourceGateKeysForScopes(constants?.resourceGateKeys, requestedScopes),
       deps: {
         readResourceGateOnChain,
         resolveRpcUrlListForGate: deps?.resolveRpcUrlListForGate,

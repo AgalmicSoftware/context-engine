@@ -178,6 +178,7 @@ Notes:
   - Arweave gateway (`<preferred-gateway>/<txId>`): the txId is missing/unavailable (bad pointer or propagation).
 - `blockLimits.start` should be set for any real session.
   - Missing/invalid `blockLimits.start` is treated as a configuration error in current code; there is no implicit scan-from-zero fallback.
+  - When registry metadata cannot be loaded, the cached registry tuple retains `createdAt` so the client can derive a bounded creation block before falling back to the `SessionCreated` event. This is recovery for unavailable metadata, not a second block-window authority.
   - Do not hardcode chain-specific "start blocks" in code; keep them in session config / registry metadata.
 - `autoFeatureSBTsBySessionSlug` controls session-slug auto-feature behavior:
   when `true`, Groups featured strips auto-feature SBTs whose metadata authoritatively declares a matching `sessionSlug` for that session slug.

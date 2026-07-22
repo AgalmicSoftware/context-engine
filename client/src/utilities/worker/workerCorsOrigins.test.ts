@@ -1,6 +1,15 @@
 import { buildWorkerAllowOrigins, DEFAULT_WORKER_ALLOWED_ORIGINS } from './workerCorsOrigins';
 
 describe('workerCorsOrigins helpers', () => {
+  it('keeps the canonical .sh site and the redirecting .xyz site in the hosted defaults', () => {
+    expect(DEFAULT_WORKER_ALLOWED_ORIGINS.slice(0, 4)).toEqual([
+      'https://contextengine.sh',
+      'https://www.contextengine.sh',
+      'https://contextengine.xyz',
+      'https://www.contextengine.xyz',
+    ]);
+  });
+
   it('includes common dev origins (localhost/127.0.0.1 ports 3000, 3001, and 7391)', () => {
     expect(DEFAULT_WORKER_ALLOWED_ORIGINS).toEqual(
       expect.arrayContaining([

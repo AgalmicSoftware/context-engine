@@ -163,7 +163,6 @@ const fetchSessionFromRegistryAcrossChains = async (
 
   for (const chainId of chainIds) {
     try {
-      // eslint-disable-next-line no-await-in-loop
       const config = await fetchSessionFromRegistry({
         chainId,
         ...request,

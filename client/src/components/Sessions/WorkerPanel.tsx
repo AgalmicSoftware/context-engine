@@ -96,6 +96,7 @@ export type WorkerPanelProps = {
   displayedWorkerUrl: string;
   renderField: SessionWizardRenderField;
   workerUrlAutoFilled: boolean;
+  sessionModeProfileWorkerControl?: React.ReactNode;
 };
 
 const WorkerPanel = ({
@@ -157,6 +158,7 @@ const WorkerPanel = ({
   displayedWorkerUrl,
   renderField,
   workerUrlAutoFilled,
+  sessionModeProfileWorkerControl = null,
 }: WorkerPanelProps) => {
   const translate = typeof t === 'function' ? t : (key: string) => key;
   const renderInfoTooltip =
@@ -197,6 +199,7 @@ const WorkerPanel = ({
       </button>
       {!isCollapsed && (
         <div className={styles.panelBody}>
+          {sessionModeProfileWorkerControl}
           <div className={styles.workerModeRow}>
             {!showSharedWorkerChoice ? (
               <div className={styles.workerModeCopy}>

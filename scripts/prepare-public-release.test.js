@@ -88,6 +88,12 @@ test('prepare-public-release strips private surfaces without publishing an inven
       'public.txt',
       `keep [redacted-email] and /redacted-home and contextengine${'@'}protonmail.com and ContextEngine${'@'}Protonmail.COM and contextengine+tag${'@'}protonmail.com\n`,
     );
+    const generatedWorkerBytes = `const wordlist = "Rfe${'@'}Rm.Rs"; // me${'@'}ricmoo.com\n`;
+    writeFile(
+      sourceDir,
+      path.join('deploy', 'cloudflare', 'session-worker', 'worker.mjs'),
+      generatedWorkerBytes,
+    );
     writeFile(sourceDir, '.DS_Store', 'mac metadata\n');
     writeFile(sourceDir, '.secrets.baseline', '{"results":{".codex/secret.txt":[]}}\n');
     writeFile(sourceDir, '.env.local', 'SECRET=value\n');
@@ -198,6 +204,10 @@ test('prepare-public-release strips private surfaces without publishing an inven
     assert.match(
       fs.readFileSync(path.join(outputDir, 'client/src/variables/publicRepoMetadata.ts'), 'utf8'),
       /PUBLIC_SECURITY_EMAIL = 'contextengine@protonmail\.com'/,
+    );
+    assert.equal(
+      fs.readFileSync(path.join(outputDir, 'deploy', 'cloudflare', 'session-worker', 'worker.mjs'), 'utf8'),
+      generatedWorkerBytes,
     );
     const publicChipotleTest = fs.readFileSync(
       path.join(outputDir, 'workers/sessionCorsWorker/chipotleClient.test.mjs'),

@@ -114,7 +114,7 @@ describe('CreateSBTGroup cache helpers', () => {
     expect(sessionStorage.getItem(getScopedCreateSbtFormCacheKey('test'))).toContain('"Scoped Draft"');
   });
 
-  it('saves generated password codes to the scoped recovery store without legacy createdSBTs writes', () => {
+  it('keeps generated password codes export-only without writing browser recovery storage', () => {
     localStorage.clear();
     const sbtAddress = '0xABC0000000000000000000000000000000000000';
     const instance = makeInstance({
@@ -128,14 +128,8 @@ describe('CreateSBTGroup cache helpers', () => {
       codesToStore: ['code-one', 'code-two'],
     });
 
-    const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
-    expect(recoveryStore.entries[`84532:${sbtAddress.toLowerCase()}`]).toEqual(
-      expect.objectContaining({
-        chainId: 84532,
-        sbtAddress: sbtAddress.toLowerCase(),
-        passwords: ['code-one', 'code-two'],
-      }),
-    );
+    expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem('createdSBTs')).toBeNull();
   });
 
   it('skips recovery-code persistence when the SBT has no password mint path', () => {

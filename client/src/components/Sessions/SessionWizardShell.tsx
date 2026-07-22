@@ -12,6 +12,7 @@ import WorkerDeployHelperToggle from './WorkerDeployHelperToggle';
 import WorkerPanel, { type WorkerPanelProps } from './WorkerPanel';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 import type { SessionWizardRenderField } from './sessionWizardFieldDescriptors';
+import { SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 type HeaderProps = React.ComponentProps<typeof SessionWizardHeader>;
 type IntroStatusRailProps = React.ComponentProps<typeof SessionWizardIntroStatusRail>;
@@ -29,6 +30,7 @@ type SessionWizardShellDraft = Record<string, unknown> & {
   contracts?: Record<string, unknown>;
   corsWorkerUrl?: string;
   defaultSbtTags?: string;
+  sessionModeProfile?: { preset?: unknown };
   slug?: string;
 };
 
@@ -162,7 +164,9 @@ export type SessionWizardShellProps = {
   sessionHeaderPreviewSrc: WizardModalsProps['sessionHeaderPreviewSrc'];
   sessionMetadataHeaderAccessory: MetadataEditorProps['headerAccessory'];
   sessionModeProfileControl?: React.ReactNode;
-  showSessionModeProfileControlInSetup?: boolean;
+  sessionModeProfilePrivacyControl?: EncryptionPanelBoundaryProps['sessionModeProfilePrivacyControl'];
+  sessionModeProfileWorkerControl?: WorkerPanelProps['sessionModeProfileWorkerControl'];
+  sessionModeProfilePublishControl?: PublishSectionProps['sessionModeProfilePublishControl'];
   sessionModeProfileStepComplete?: boolean;
   sessionUrl: PublishSectionProps['sessionUrl'];
   setBundleFile: WorkerPanelProps['setBundleFile'];
@@ -326,7 +330,9 @@ const SessionWizardShell = ({
   sessionHeaderPreviewSrc,
   sessionMetadataHeaderAccessory,
   sessionModeProfileControl = null,
-  showSessionModeProfileControlInSetup = true,
+  sessionModeProfilePrivacyControl = null,
+  sessionModeProfileWorkerControl = null,
+  sessionModeProfilePublishControl = null,
   sessionModeProfileStepComplete = true,
   sessionUrl,
   setBundleFile,
@@ -369,29 +375,47 @@ const SessionWizardShell = ({
   wizardMode,
 }: SessionWizardShellProps) => {
   const showSessionModeProfileGate = !!sessionModeProfileControl && !sessionModeProfileStepComplete;
+  const sessionModeProfileLabel = (() => {
+    switch (draft.sessionModeProfile?.preset) {
+      case SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE:
+        return 'Cloudflare';
+      case SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED:
+        return 'Decentralized';
+      case SESSION_MODE_PRESET_IDS.CUSTOM:
+        return 'Custom';
+      default:
+        return '';
+    }
+  })();
+
+  const header = (
+    <SessionWizardHeader
+      hasSponsoredBundleLink={hasSponsoredBundleLink}
+      isNormalMode={isNormalMode}
+      onCloseDisplaySettings={onCloseDisplaySettings}
+      onEnterAdvancedMode={onEnterAdvancedMode}
+      onEnterNormalMode={onEnterNormalMode}
+      onRegistryChainIdChange={onRegistryChainIdChange}
+      onToggleDisplaySettings={onToggleDisplaySettings}
+      registryAddress={registryAddress}
+      registryChainId={registryChainId}
+      registryChainName={registryChainName}
+      registryChainOptions={registryChainOptions}
+      renderInfoTooltip={renderSessionWizardInfoTooltip}
+      sessionModeProfileControl={sessionModeProfileControl}
+      sessionModeProfileLabel={sessionModeProfileLabel}
+      wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
+      wizardMode={wizardMode}
+    />
+  );
 
   if (showSessionModeProfileGate) {
-    return <div className={styles.groupWizard}>{sessionModeProfileControl}</div>;
+    return <div className={styles.groupWizard}>{header}</div>;
   }
 
   return (
     <div className={styles.groupWizard}>
-      <SessionWizardHeader
-        hasSponsoredBundleLink={hasSponsoredBundleLink}
-        isNormalMode={isNormalMode}
-        onCloseDisplaySettings={onCloseDisplaySettings}
-        onEnterAdvancedMode={onEnterAdvancedMode}
-        onEnterNormalMode={onEnterNormalMode}
-        onRegistryChainIdChange={onRegistryChainIdChange}
-        onToggleDisplaySettings={onToggleDisplaySettings}
-        registryAddress={registryAddress}
-        registryChainId={registryChainId}
-        registryChainName={registryChainName}
-        registryChainOptions={registryChainOptions}
-        renderInfoTooltip={renderSessionWizardInfoTooltip}
-        wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
-        wizardMode={wizardMode}
-      />
+      {header}
 
       <SessionWizardIntroStatusRail
         activeNormalModeIndex={activeNormalModeIndex}
@@ -412,8 +436,6 @@ const SessionWizardShell = ({
       />
 
       <>
-        {showSessionModeProfileControlInSetup ? sessionModeProfileControl : null}
-
         {(!isNormalMode || !collapsedSections.encryption) && (
           <EncryptionPanel
             isNormalMode={isNormalMode}
@@ -441,6 +463,7 @@ const SessionWizardShell = ({
             addEncryptionGate={addEncryptionGate}
             pendingSbtDrafts={pendingSbtDrafts}
             removePendingSbtDraft={removePendingSbtDraft}
+            sessionModeProfilePrivacyControl={isNormalMode ? null : sessionModeProfilePrivacyControl}
           />
         )}
 
@@ -530,6 +553,7 @@ const SessionWizardShell = ({
             displayedWorkerUrl={displayedWorkerUrl}
             renderField={renderField}
             workerUrlAutoFilled={workerUrlAutoFilled}
+            sessionModeProfileWorkerControl={isNormalMode ? null : sessionModeProfileWorkerControl}
           />
         )}
 
@@ -575,6 +599,7 @@ const SessionWizardShell = ({
           onCopyAdminUrl={handleCopyAdminUrl}
           adminUrlStatus={adminUrlStatus}
           status={status}
+          sessionModeProfilePublishControl={isNormalMode ? null : sessionModeProfilePublishControl}
         />
 
         <SessionWizardModals

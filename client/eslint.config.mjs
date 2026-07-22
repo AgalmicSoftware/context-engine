@@ -5,6 +5,8 @@ import reactPlugin from 'eslint-plugin-react';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 
 const javascriptFiles = ['src/**/*.{js,jsx,mjs,cjs}'];
+const typedFiles = ['src/**/*.{ts,tsx}'];
+const typedReactFiles = ['src/**/*.tsx'];
 const typedDomainFiles = ['src/domains/**/*.{ts,tsx}'];
 const typedSessionUtilityFiles = ['src/utilities/session/**/*.{ts,tsx}'];
 const typedWorkerUtilityFiles = ['src/utilities/worker/**/*.{ts,tsx}'];
@@ -97,7 +99,7 @@ const reactSettings = {
 const reactRules = {
   ...reactPlugin.configs.flat.recommended.rules,
   'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'error',
+  'react-hooks/exhaustive-deps': 'error',
   'react/display-name': 'off',
   'react/prop-types': 'off',
   'react/react-in-jsx-scope': 'off',
@@ -108,7 +110,7 @@ export default [
   {
     ignores: ['build/**', 'coverage/**', 'node_modules/**'],
     linterOptions: {
-      reportUnusedDisableDirectives: false,
+      reportUnusedDisableDirectives: 'error',
     },
   },
   {
@@ -119,6 +121,25 @@ export default [
     rules: {
       ...sharedRules,
       ...reactRules,
+    },
+  },
+  {
+    files: typedFiles,
+    languageOptions: sharedLanguageOptions,
+    rules: {
+      ...sharedRules,
+      'no-undef': 'off',
+    },
+  },
+  {
+    files: typedReactFiles,
+    languageOptions: sharedLanguageOptions,
+    plugins: reactPlugins,
+    settings: reactSettings,
+    rules: {
+      ...sharedRules,
+      ...reactRules,
+      'no-undef': 'off',
     },
   },
   {

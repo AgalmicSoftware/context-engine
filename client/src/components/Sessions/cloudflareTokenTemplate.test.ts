@@ -2,8 +2,6 @@ import {
   buildTokenName,
   buildCloudflareTokenTemplateUrl,
   buildCloudflareTokenTemplatePermissions,
-  CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS,
-  CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS,
 } from './cloudflareTokenTemplate.js';
 
 describe('cloudflareTokenTemplate', () => {
@@ -25,8 +23,10 @@ describe('cloudflareTokenTemplate', () => {
       { key: 'workers_scripts', type: 'edit' },
       { key: 'workers_kv_storage', type: 'edit' },
     ]);
-    expect(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS).toHaveLength(2);
-    expect(buildCloudflareTokenTemplatePermissions()).toEqual(CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS);
+    expect(buildCloudflareTokenTemplatePermissions()).toEqual([
+      { key: 'workers_scripts', type: 'edit' },
+      { key: 'workers_kv_storage', type: 'edit' },
+    ]);
   });
 
   test('adds only R2 when an advanced deployment explicitly opts into R2 storage', () => {
@@ -48,7 +48,7 @@ describe('cloudflareTokenTemplate', () => {
   });
 
   test('does not request unrelated Cloudflare product scopes by default', () => {
-    const permissionKeys = CLOUDFLARE_TOKEN_TEMPLATE_PERMISSIONS.map((permission) => permission.key);
+    const permissionKeys = buildCloudflareTokenTemplatePermissions().map((permission) => permission.key);
 
     expect(permissionKeys).not.toEqual(
       expect.arrayContaining([
@@ -64,11 +64,6 @@ describe('cloudflareTokenTemplate', () => {
         'tail',
       ]),
     );
-  });
-
-  test('documents least-privilege storage resource responsibilities', () => {
-    expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.kv).toMatch(/canonical config/);
-    expect(CLOUDFLARE_TOKEN_TEMPLATE_RESOURCE_HINTS.r2).toMatch(/optional existing R2 bucket/);
   });
 
   test('buildCloudflareTokenTemplateUrl falls back to the general slug when none is provided', () => {

@@ -65,6 +65,8 @@ const createProps = (overrides: Partial<React.ComponentProps<typeof SbtPageAdmin
   onExportFormatChange: jest.fn(),
   onExportPasswords: jest.fn(),
   onGenerateAdminInvites: jest.fn(),
+  onEncryptedRecoveryChange: jest.fn(),
+  onClearLocalRecovery: jest.fn(),
   onIncludePreviousPasswordsChange: jest.fn(),
   onPasswordGenerationCountChange: jest.fn(),
   openMintAutoJoinUrl: 'https://session.example.test/open',
@@ -81,6 +83,9 @@ const createProps = (overrides: Partial<React.ComponentProps<typeof SbtPageAdmin
     sbtBasePathValue: '/join',
   },
   passwordGenerationCount: '3',
+  encryptedRecoveryEnabled: false,
+  encryptedRecoveryStatus: 'idle',
+  hasLocalRecovery: true,
   sbtLabel: 'SBT',
   ...overrides,
 });
@@ -155,6 +160,26 @@ describe('SbtPageAdminActions', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Export Passwords' }));
     expect(onExportPasswords).toHaveBeenCalledTimes(1);
+  });
+
+  it('exposes encrypted local recovery as an explicit browser-only opt-in', () => {
+    const onEncryptedRecoveryChange = jest.fn();
+    render(<SbtPageAdminActions {...createProps({ onEncryptedRecoveryChange })} />);
+
+    const toggle = screen.getByRole('checkbox', { name: 'Keep encrypted recovery on this browser' });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    expect(onEncryptedRecoveryChange).toHaveBeenCalledTimes(1);
+    expect(screen.getByText(/does not protect against a compromised browser profile/i)).toBeInTheDocument();
+  });
+
+  it('offers a scoped clear action for legacy or encrypted local recovery', () => {
+    const onClearLocalRecovery = jest.fn();
+    render(<SbtPageAdminActions {...createProps({ onClearLocalRecovery })} />);
+
+    expect(screen.getByText(/legacy recovery may contain plaintext/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear local recovery' }));
+    expect(onClearLocalRecovery).toHaveBeenCalledTimes(1);
   });
 
   it('keeps disabled admin burn and invite generation actions inert', () => {

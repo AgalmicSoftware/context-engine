@@ -66,9 +66,13 @@ type SessionRegistryStoreLike = {
 type RegistryLog = {
   blockNumber?: unknown;
 };
+type RegistryBlock = {
+  timestamp?: unknown;
+};
 type RegistryContractLike = {
   address?: string;
   provider?: {
+    getBlock?: (blockNumber: number) => Promise<RegistryBlock | null>;
     getBlockNumber?: () => Promise<unknown>;
     getLogs?: (filter: UnknownRecord) => Promise<RegistryLog[]>;
   };
@@ -489,6 +493,42 @@ export const createContractScriptsCache = ({
     return minBlock;
   };
 
+  const readSessionCreatedBlockViaTimestamp = async (
+    contract: RegistryContractLike | null,
+    cfg: SessionConfigRecord | null,
+  ) => {
+    const registryMetadata =
+      cfg?.__registry && typeof cfg.__registry === 'object' ? (cfg.__registry as UnknownRecord) : null;
+    const createdAt = parsePositiveBlockNumber(registryMetadata?.createdAt);
+    const provider = contract?.provider;
+    if (!createdAt || !provider?.getBlockNumber || !provider?.getBlock) return null;
+
+    try {
+      const latestBlock = parsePositiveBlockNumber(await provider.getBlockNumber());
+      if (!latestBlock) return null;
+
+      let low = 1;
+      let high = latestBlock;
+      while (low < high) {
+        const mid = Math.floor((low + high) / 2);
+        const block = await provider.getBlock(mid);
+        const timestamp = parsePositiveBlockNumber(block?.timestamp);
+        if (!timestamp) return null;
+        if (timestamp < createdAt) {
+          low = mid + 1;
+        } else {
+          high = mid;
+        }
+      }
+
+      const candidate = await provider.getBlock(low);
+      const candidateTimestamp = parsePositiveBlockNumber(candidate?.timestamp);
+      return candidateTimestamp && candidateTimestamp >= createdAt ? low : null;
+    } catch (_) {
+      return null;
+    }
+  };
+
   const readSessionCreatedBlockViaChunkedLogs = async (contract: RegistryContractLike | null, slugHash: string) => {
     const provider = contract?.provider;
     if (!provider || typeof provider.getLogs !== 'function') return null;
@@ -545,16 +585,18 @@ export const createContractScriptsCache = ({
     if (!contract) return null;
 
     const slugHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(registrySlug));
-    let resolved = null;
+    let resolved = await readSessionCreatedBlockViaTimestamp(contract, cfg);
 
-    try {
-      resolved = await readSessionCreatedBlockViaQueryFilter(contract, slugHash);
-    } catch (err) {
-      contractsLog.warn('[blockLimits] SessionCreated queryFilter fallback failed; trying chunked logs.', {
-        slug: slug || 'general',
-        chainId,
-        error: errorMessage(err),
-      });
+    if (resolved == null) {
+      try {
+        resolved = await readSessionCreatedBlockViaQueryFilter(contract, slugHash);
+      } catch (err) {
+        contractsLog.warn('[blockLimits] SessionCreated queryFilter fallback failed; trying chunked logs.', {
+          slug: slug || 'general',
+          chainId,
+          error: errorMessage(err),
+        });
+      }
     }
 
     if (resolved == null) {

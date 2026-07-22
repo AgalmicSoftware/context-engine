@@ -280,11 +280,12 @@ const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; asse
 
     const track = trackRef.current;
     if (!track) return undefined;
+    const intersectionRatios = slideIntersectionRatiosRef.current;
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          slideIntersectionRatiosRef.current.set(entry.target, entry.intersectionRatio);
+          intersectionRatios.set(entry.target, entry.intersectionRatio);
         });
 
         let maxRatio = 0;
@@ -293,7 +294,7 @@ const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; asse
         slideRefs.current.forEach((slide, index) => {
           if (!slide) return;
 
-          const ratio = slideIntersectionRatiosRef.current.get(slide) ?? 0;
+          const ratio = intersectionRatios.get(slide) ?? 0;
           if (ratio > maxRatio) {
             maxRatio = ratio;
             visibleIndex = index;
@@ -325,7 +326,7 @@ const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; asse
 
     return () => {
       observer.disconnect();
-      slideIntersectionRatiosRef.current.clear();
+      intersectionRatios.clear();
     };
   }, [clearPendingNavigation, slideCount]);
 
@@ -421,7 +422,6 @@ const VizGroupCarousel = ({ block, assetBasePath }: { block: VizGroupBlock; asse
         <div className={styles.vizCarouselDots} role="group" aria-label="Choose visualization slide">
           {slideTitles.map((slideTitle, slideIndex) => (
             <button
-              // eslint-disable-next-line react/no-array-index-key
               key={`${slideTitle}-${slideIndex}`}
               type="button"
               className={styles.vizCarouselDot}

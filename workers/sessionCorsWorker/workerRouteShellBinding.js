@@ -362,6 +362,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           requireAuth: deps?.requireAuth,
           getSessionConfig: deps?.getSessionConfig,
           getCorsContext: deps?.getCorsContext,
+          computeScopesForLogin: deps?.computeScopesForLogin,
           toStr: deps?.toStr,
           dispatchAuthenticatedRoute: deps?.dispatchAuthenticatedRoute,
           dispatchAuthenticatedSecretPathRoute: deps?.dispatchAuthenticatedSecretPathRoute,
