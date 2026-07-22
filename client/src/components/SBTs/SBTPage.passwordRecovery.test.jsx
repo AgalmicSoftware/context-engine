@@ -116,9 +116,8 @@ describe('SBTPage scoped password recovery store', () => {
     expect(subject.state.cachedPasswords).toEqual(['base-only-code']);
   });
 
-  it('persists admin-generated invite codes to the scoped recovery store', async () => {
+  it('keeps admin-generated invite codes export-only by default', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000202';
-    const sbtLower = sbtAddress.toLowerCase();
     const subject = createSubject({
       SBTAddress: sbtAddress,
       network: { id: 84532, name: 'Base Sepolia' },
@@ -135,15 +134,8 @@ describe('SBTPage scoped password recovery store', () => {
 
     await subject.handleGenerateAdminInvites();
 
-    const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
-    expect(recoveryStore.entries[`84532:${sbtLower}`]).toEqual(
-      expect.objectContaining({
-        chainId: 84532,
-        sbtAddress: sbtLower,
-        passwords: ['admin-one', 'admin-two'],
-      }),
-    );
+    expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
     expect(subject.state.adminGeneratedPasswords).toEqual(['admin-one', 'admin-two']);
-    expect(subject.state.cachedPasswords).toEqual(['admin-one', 'admin-two']);
+    expect(subject.state.cachedPasswords).toEqual([]);
   });
 });

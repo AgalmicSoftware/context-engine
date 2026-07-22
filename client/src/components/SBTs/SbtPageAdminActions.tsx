@@ -246,15 +246,12 @@ const SbtPageAdminActions = ({
         </div>
         {passwordInventoryDisplayState.shouldRenderGeneratedPasswordList ? (
           <div className={styles.generatedPasswordsList}>
-            <h5>Generated Passwords (including codes kept in this tab):</h5>
+            <h5>Generated Passwords (including legacy cached passwords):</h5>
             {SbtPagePasswordInviteRows({
               combinedPasswords,
               passwordInviteLinkContext,
             })}
-            <p>
-              Export is the only durable recovery path. Optional recovery keeps new passwords in this tab&apos;s memory
-              only.
-            </p>
+            <p>New passwords are export-only and are not stored by this browser. Save them before leaving this page.</p>
             {SbtPagePasswordExportControls({
               exportFormat,
               onExportFormatChange,

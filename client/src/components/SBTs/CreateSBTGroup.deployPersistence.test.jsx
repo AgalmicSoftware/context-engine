@@ -139,7 +139,7 @@ describe('CreateSBTGroup deploy and persistence flows', () => {
     expect(sessionStorage.getItem(scopedKey)).toBeNull();
   });
 
-  it('persists password recovery codes during mint to the scoped recovery store', async () => {
+  it('keeps password recovery codes export-only after mint', async () => {
     localStorage.clear();
     const sbtAddress = '0x00000000000000000000000000000000000000b3';
     const instance = makeInstance({
@@ -174,14 +174,8 @@ describe('CreateSBTGroup deploy and persistence flows', () => {
     await instance.mintSBT();
 
     expect(instance.generateSBTInviteLinks).toHaveBeenCalledWith(sbtAddress, ['shared-secret']);
-    const recoveryStore = JSON.parse(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY));
-    expect(recoveryStore.entries[`84532:${sbtAddress.toLowerCase()}`]).toEqual(
-      expect.objectContaining({
-        chainId: 84532,
-        sbtAddress: sbtAddress.toLowerCase(),
-        passwords: ['shared-secret'],
-      }),
-    );
+    expect(instance.state.passwordList).toEqual(['shared-secret']);
+    expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
   });
 
   it('reads bookmark cache with clone:false before mutating sbt bookmarks', async () => {

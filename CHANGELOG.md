@@ -6,6 +6,9 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- SBT claim and invite codes now default to explicit export without silent
+  browser persistence; existing scoped recovery entries remain readable for
+  compatibility.
 - Made Worker authorization current at request time. Login tokens now bind a
   server-managed session authorization epoch, effective config changes
   invalidate prior tokens, and protected routes fail closed unless both the
