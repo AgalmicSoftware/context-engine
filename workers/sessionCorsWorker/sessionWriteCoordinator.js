@@ -35,9 +35,6 @@ const SESSION_CONFIG_AUTHORITY_KEY = 'session-config-authority';
 const AUTH_NONCE_ACTIVE_KEY = 'auth-nonce-active';
 const AUTH_NONCE_USED_KEY = 'auth-nonce-used';
 const AUTH_RATE_RECORD_KEY = 'auth-rate-record';
-const WORKER_GROUP_CAPACITY_META_KEY = 'worker-group-capacity-meta-v3';
-const WORKER_GROUP_CAPACITY_GROUP_PREFIX = 'worker-group-capacity-group-v3:';
-const WORKER_GROUP_CAPACITY_MEMBER_PREFIX = 'worker-group-capacity-member-v3:';
 const RUNNING_LEASE_MS = 65_000;
 const MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1000;
 const MAX_AUTH_RATE_WINDOW_MS = 8 * 24 * 60 * 60 * 1000;
@@ -1639,21 +1636,6 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname === '/auth-state/rate/check') {
       return this.executeAuthRateCheck(payload);
-    }
-    if (url.pathname === '/worker-groups/ready') {
-      return this.executeWorkerGroupReady(payload);
-    }
-    if (url.pathname === '/worker-groups/reconcile-empty') {
-      return this.executeWorkerGroupReconcileEmpty(payload);
-    }
-    if (url.pathname === '/worker-groups/authorize') {
-      return this.executeWorkerGroupAuthorization(payload);
-    }
-    if (url.pathname === '/worker-groups/catalog') {
-      return this.executeWorkerGroupCatalog(payload);
-    }
-    if (url.pathname === '/worker-groups/mutate') {
-      return this.executeWorkerGroupMutation(payload);
     }
     if (url.pathname === '/deploy-helper') return this.executeDirectDeploy(payload);
     if (url.pathname === '/sponsored-faucet/reserve') {

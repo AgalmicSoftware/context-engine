@@ -530,11 +530,16 @@ R2 / Durable Objects:
 - `CE_SESSION_COORDINATOR` binds the SQLite-backed `SessionWriteCoordinator`
   class for direct/sponsored deploy idempotency, one-shot sponsored faucet
   receipts, atomic wrapped session-key selection, and versioned public session
-  config mutation. One-click deploy metadata installs migration tag
+  config mutation. It is also the required cross-isolate authority for auth
+  nonce issue/consume and nonce, authenticated, anonymous, and faucet route
+  counters. One-click deploy metadata installs migration tag
   `ce-session-write-coordinator-v1`; a repeated upload retries without
   reapplying an already-installed migration. Coordinator state contains only
   credential-redacted deploy/faucet records, normalized public session config,
-  revisions, and wrapped session-key records. It never stores deployment
+  revisions, wrapped session-key records, short-lived random nonces, and numeric
+  counter windows. Auth object names are derived from SHA-256 identity digests;
+  their stored records omit slugs, wallet/anonymous identifiers, and route
+  names. It never stores deployment
   credentials, raw session keys, deployment KEKs, raw DEKs, request bodies,
   worker bundle bytes, or ordinary session payload blobs. The binding serializes
   first-use key selection with signed Admin config mutations. Once its authority
@@ -1558,8 +1563,9 @@ Manual:
 - Bind a SQLite-backed Durable Object namespace named `CE_SESSION_COORDINATOR`
   to the bundle's exported `SessionWriteCoordinator` class and install migration
   tag `ce-session-write-coordinator-v1` with that class in
-  `new_sqlite_classes`. Without this binding, signed config mutations and the
-  first worker-envelope write fail closed with `503`; use a Wrangler/module
+  `new_sqlite_classes`. Without this binding, nonce issue/consume, rate-limited
+  routes, signed config mutations, and the first worker-envelope write fail
+  closed; use a Wrangler/module
   upload when the dashboard cannot install the binding and migration together.
 
 Deploy-helper (trusted, self-host via CLI or Wrangler):

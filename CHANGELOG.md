@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
   server-managed session authorization epoch, effective config changes
   invalidate prior tokens, and protected routes fail closed unless both the
   signed scope and the current default/route-specific policy allow access.
+  Nonce redemption and route limits now use the mandatory Session Durable
+  Object, closing cross-isolate replay and concurrent-limit overshoot without
+  persisting principal identifiers in coordinator records.
 - Encrypted every canonical Session Worker secret record at rest with
   session-bound AES-256-GCM before deploy-helper or signed-admin KV writes.
   Current/previous KEK recovery is bounded, legacy plaintext records are

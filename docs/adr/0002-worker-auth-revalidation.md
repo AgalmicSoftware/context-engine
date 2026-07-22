@@ -43,6 +43,11 @@ Use KV claim tokens plus shorter login tokens and current-policy route checks:
 - A legacy config and token with no epoch are interpreted as epoch zero. The
   first effective config change advances the config to epoch one and
   invalidates those tokens.
+- Nonce issuance and consumption are serialized in one Durable Object per
+  session/address boundary. Nonce, authenticated, anonymous, and faucet route
+  limits are serialized per session/route/identity boundary.
+- Missing or unreachable Durable Object coordination fails closed; there is no
+  KV or isolate-local authorization fallback.
 
 The existing nonce, used-nonce, rate-window, and token TTLs remain unchanged.
 SIWE origin/freshness validation and current-policy scope computation keep their

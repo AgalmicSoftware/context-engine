@@ -7,6 +7,7 @@ import {
   makeJsonRequest,
   decodeTokenPayload,
   buildSiweMessage,
+  installSessionCoordinatorBinding,
 } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 
 describe('sessionCorsWorker auth routes', () => {
@@ -451,10 +452,10 @@ describe('sessionCorsWorker auth routes', () => {
         },
       }),
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const nonceResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {
@@ -519,10 +520,10 @@ describe('sessionCorsWorker auth routes', () => {
         rpcUrl,
       }),
     });
-    const env = {
+    const env = installSessionCoordinatorBinding({
       GROUP_KV: kv,
       TOKEN_HMAC_SECRET: 'test-secret',
-    };
+    });
 
     const nonceResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/nonce', {

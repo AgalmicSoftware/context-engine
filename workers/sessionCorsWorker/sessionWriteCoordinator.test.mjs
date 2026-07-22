@@ -2,44 +2,46 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-	checkCoordinatedAuthRateLimit,
-	consumeCoordinatedAuthNonce,
-	issueCoordinatedAuthNonce,
-	SessionWriteCoordinator,
-	executeCoordinatedSponsoredDeploy,
+  checkCoordinatedAuthRateLimit,
+  consumeCoordinatedAuthNonce,
+  issueCoordinatedAuthNonce,
+  SessionWriteCoordinator,
+  executeCoordinatedSponsoredDeploy,
 } from './sessionWriteCoordinator.js';
 import { getSessionConfig } from './sessionConfigSecretsStore.js';
 import { normalizeWorkerSessionSlug } from './sessionSlugResolution.js';
 
 const createTransactionalState = () => {
-	const store = new Map();
-	let tail = Promise.resolve();
-	const transaction = (callback) => {
-		const run = tail.then(async () => {
-			const staged = new Map([...store].map(([key, value]) => [key, structuredClone(value)]));
-			const result = await callback({
-				get: async (key) => staged.get(key),
-				put: async (key, value) => staged.set(key, structuredClone(value)),
-				delete: async (key) => staged.delete(key),
-			});
-			store.clear();
-			for (const [key, value] of staged) store.set(key, value);
-			return result;
-		});
-		tail = run.catch(() => undefined);
-		return run;
-	};
-	return {
-		state: {
-			storage: {
-				transaction,
-				get: async (key) => store.get(key),
-				put: async (key, value) => store.set(key, structuredClone(value)),
-				delete: async (key) => store.delete(key),
-			},
-		},
-		store,
-	};
+  const store = new Map();
+  let tail = Promise.resolve();
+  const transaction = (callback) => {
+    const run = tail.then(async () => {
+      const staged = new Map([...store].map(([key, value]) => (
+        [key, structuredClone(value)]
+      )));
+      const result = await callback({
+        get: async (key) => staged.get(key),
+        put: async (key, value) => staged.set(key, structuredClone(value)),
+        delete: async (key) => staged.delete(key),
+      });
+      store.clear();
+      for (const [key, value] of staged) store.set(key, value);
+      return result;
+    });
+    tail = run.catch(() => undefined);
+    return run;
+  };
+  return {
+    state: {
+      storage: {
+        transaction,
+        get: async (key) => store.get(key),
+        put: async (key, value) => store.set(key, structuredClone(value)),
+        delete: async (key) => store.delete(key),
+      },
+    },
+    store,
+  };
 };
 
 const createRequest = ({ requestDigest, deployBody = {}, sensitiveValues = [] } = {}) =>
@@ -81,6 +83,78 @@ const createWrappedCandidate = (suffix, {
   wrapAlg: 'AES-GCM-KW-v1',
   iv: suffix.repeat(16).slice(0, 16),
   wrappedKey: suffix.repeat(64).slice(0, 64),
+});
+
+test('SessionWriteCoordinator consumes one issued auth nonce exactly once under concurrency', async () => {
+  const { state, store } = createTransactionalState();
+  const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+  const issue = await coordinator.fetch(createCoordinatorRequest('/auth-state/nonce/issue', {
+    slug: 'session-a',
+    address: '0xabc',
+    nonce: 'nonce-1',
+    expiresAtMs: 301_000,
+    usedExpiresAtMs: 601_000,
+  }));
+  assert.equal(issue.status, 200);
+
+  const consume = () => coordinator.fetch(createCoordinatorRequest('/auth-state/nonce/consume', {
+    slug: 'session-a',
+    address: '0xabc',
+    nonce: 'nonce-1',
+    usedExpiresAtMs: 601_000,
+  }));
+  const responses = await Promise.all([consume(), consume()]);
+  const bodies = await Promise.all(responses.map((response) => response.json()));
+
+  assert.deepEqual(bodies.map((body) => body.ok).sort(), [false, true]);
+  assert.deepEqual(
+    bodies.map((body) => body.error || '').sort(),
+    ['', 'Nonce already used.'],
+  );
+  assert.doesNotMatch(JSON.stringify([...store.values()]), /session-a|0xabc/i);
+});
+
+test('SessionWriteCoordinator admits exactly the configured number of concurrent rate checks', async () => {
+  const { state, store } = createTransactionalState();
+  const coordinator = new SessionWriteCoordinator(state, {}, { now: () => 1_000 });
+  const check = () => coordinator.fetch(createCoordinatorRequest('/auth-state/rate/check', {
+    slug: 'session-a',
+    route: 'ai',
+    identity: '0xabc',
+    limit: 5,
+    resetAtMs: 86_401_000,
+  }));
+  const responses = await Promise.all(Array.from({ length: 10 }, check));
+  const bodies = await Promise.all(responses.map((response) => response.json()));
+
+  assert.equal(bodies.filter((body) => body.allowed === true).length, 5);
+  assert.equal(bodies.filter((body) => body.allowed === false).length, 5);
+  assert.deepEqual(bodies.map((body) => body.count).sort((a, b) => a - b), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+  assert.doesNotMatch(JSON.stringify([...store.values()]), /session-a|0xabc|ai/i);
+});
+
+test('auth-state coordination clients fail closed without the Durable Object binding', async () => {
+  assert.deepEqual(await issueCoordinatedAuthNonce({
+    env: {}, slug: 'session-a', address: '0xabc', nonce: 'nonce-1', ttlSeconds: 300,
+  }), {
+    ok: false,
+    status: 503,
+    error: 'Authorization state coordination is unavailable.',
+  });
+  assert.deepEqual(await consumeCoordinatedAuthNonce({
+    env: {}, slug: 'session-a', address: '0xabc', nonce: 'nonce-1', usedNonceTtlSeconds: 600,
+  }), {
+    ok: false,
+    status: 503,
+    error: 'Authorization state coordination is unavailable.',
+  });
+  assert.deepEqual(await checkCoordinatedAuthRateLimit({
+    env: {}, slug: 'session-a', route: 'ai', identity: '0xabc', limit: 1, windowMs: 60_000,
+  }), {
+    ok: false,
+    status: 503,
+    error: 'Authorization state coordination is unavailable.',
+  });
 });
 
 const createSessionConfigRequest = ({

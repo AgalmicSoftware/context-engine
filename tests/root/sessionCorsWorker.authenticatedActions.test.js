@@ -4,6 +4,7 @@ import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
 import {
   createMemoryKv,
   issueWorkerLoginToken,
+  installSessionCoordinatorBinding,
   installRpcAwareUpstreamFetchMock,
 } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 

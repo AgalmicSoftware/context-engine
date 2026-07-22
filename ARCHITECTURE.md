@@ -282,7 +282,9 @@ base64url payload plus HMAC, expire after four hours, and have a same-TTL
 the Worker also requires the token's server-managed authorization epoch to
 match current config and re-evaluates the current default plus route-specific
 gate. Registry gate changes therefore take effect on the next request; config
-changes invalidate previously issued tokens.
+changes invalidate previously issued tokens. The mandatory Session coordinator
+Durable Object serializes nonce issue/consume and per-route counters across
+isolates; KV nonce markers are diagnostic mirrors only.
 
 ## Session Config Data Shape
 
