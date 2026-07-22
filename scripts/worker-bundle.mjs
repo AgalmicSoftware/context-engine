@@ -81,6 +81,7 @@ export const buildWorkerBundles = async ({
       bundle: true,
       platform: 'browser',
       format: 'esm',
+      preserveSymlinks: true,
       target: [target.target || 'es2020'],
       ...(target.legalComments ? { legalComments: target.legalComments } : {}),
       ...(target.mainFields ? { mainFields: target.mainFields } : {}),

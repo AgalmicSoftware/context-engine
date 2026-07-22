@@ -47,6 +47,7 @@ export const compareWorkerBundleSync = async ({ rootDir = process.cwd() } = {}) 
       bundle: true,
       format: 'esm',
       platform: 'browser',
+      preserveSymlinks: true,
       target: [target.target || 'es2020'],
       ...(target.legalComments ? { legalComments: target.legalComments } : {}),
       ...(target.mainFields ? { mainFields: target.mainFields } : {}),
