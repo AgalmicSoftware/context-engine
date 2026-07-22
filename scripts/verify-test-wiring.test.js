@@ -230,6 +230,8 @@ test('public-release style copies without .git still pass wiring checks', () => 
       'scripts/resolve-baseline-growth-approval.test.mjs',
       'scripts/verify-abi-sync.mjs',
       'scripts/verify-abi-sync.test.mjs',
+      'scripts/lib/audit-verdict.sh',
+      'scripts/audit-verdict.test.js',
       'scripts/testInventoryConfig.js',
       'scripts/verify-test-inventory.js',
       'scripts/verify-test-inventory.test.js',

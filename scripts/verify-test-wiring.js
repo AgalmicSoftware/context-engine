@@ -132,6 +132,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('.github/CODEOWNERS');
   expectFile('scripts/verify-abi-sync.mjs');
   expectFile('scripts/verify-abi-sync.test.mjs');
+  expectFile('scripts/lib/audit-verdict.sh');
+  expectFile('scripts/audit-verdict.test.js');
   expectFile('scripts/testInventoryConfig.js');
   expectFile('scripts/verify-test-inventory.js');
   expectFile('scripts/verify-test-inventory.test.js');

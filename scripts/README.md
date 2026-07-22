@@ -26,6 +26,11 @@ with `client/src/contractsABI/` without rewriting tracked files. If reviewed
 contract changes intentionally alter an ABI, run `npm run abi:sync` and inspect
 the resulting tracked diff before rerunning the parity command.
 
+Audit entrypoints write their complete report and then resolve the final
+non-empty line through `scripts/lib/audit-verdict.sh`. A terminal `PASS` exits
+zero; `FAIL`, an unreadable report, or a missing/malformed verdict exits
+nonzero. Successful report plumbing alone is never treated as an audit pass.
+
 Type-debt ratchet:
 
 ```bash
