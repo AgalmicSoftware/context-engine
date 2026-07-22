@@ -1,3 +1,8 @@
+import {
+  fetchExpectedWorkerBundleDigest,
+  normalizeWorkerBundleSha256,
+} from './workerReleaseManifest.mjs';
+
 export const AGENT_SESSION_WRAPPED_DEPLOYMENT_KIND = 'agent_session_wrapped';
 export const AGENT_SESSION_WRAPPED_PROTOCOL_VERSION = 'agent-session-wrapped-v1';
 
@@ -252,12 +257,34 @@ export async function executeAgentSessionWrappedDeployment({
     return fail(400, 'validate', 'Telegram configuration is not part of the default dedicated Wrapped deployment.');
   }
 
+  const suppliedBundleSha256 = toStr(body.bundleSha256);
+  let expectedBundleSha256 = normalizeWorkerBundleSha256(suppliedBundleSha256);
+  if (suppliedBundleSha256 && !expectedBundleSha256) {
+    return fail(400, 'bundle_provenance', 'bundleSha256 must be a complete SHA-256 hex digest.');
+  }
+  if (!toStr(body.bundleText) && toStr(body.bundleManifestUrl)) {
+    const manifestDigest = await fetchExpectedWorkerBundleDigest({
+      manifestUrl: body.bundleManifestUrl,
+      artifactFile: 'agentBridgeWorker.bundle.js',
+      artifactKind: 'agent-bridge-worker',
+      fetchImpl,
+    });
+    if (!manifestDigest.ok) return fail(502, 'bundle_provenance', manifestDigest.error);
+    if (expectedBundleSha256 && expectedBundleSha256 !== manifestDigest.digest) {
+      return fail(409, 'bundle_provenance', 'Worker release manifest digest conflicts with bundleSha256.');
+    }
+    expectedBundleSha256 = manifestDigest.digest;
+  }
+
   const bundle = await readBundle({ body, env, fetchImpl });
   if (!bundle.ok) return fail(400, 'bundle', bundle.error);
   const [deploymentId, bundleSha256] = await Promise.all([
     sha256Hex(`context-engine:agent-session-wrapped:deployment:v1:${sessionDeploymentIdentity}`),
     sha256Hex(bundle.source),
   ]);
+  if (expectedBundleSha256 && bundleSha256 !== expectedBundleSha256) {
+    return fail(409, 'bundle_provenance', 'Agent Bridge bundle SHA-256 does not match the verified release manifest.');
+  }
   const workerName = workerNameFor({ sessionSlug, deploymentId });
 
   const accountSubdomain = await cfFetchImpl(

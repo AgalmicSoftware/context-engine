@@ -333,6 +333,49 @@ test('dedicated Wrapped deployment accepts an HTTPS release bundle URL with a pa
   assert.equal(harness.calls.some((call) => call.url === 'https://downloads.example/release/agent-bridge.bundle.js'), true);
 });
 
+test('dedicated Wrapped deployment rejects manifest drift before any Cloudflare mutation', async () => {
+  const cloudflareCalls = [];
+  const manifestUrl = 'https://downloads.example/release/worker-release-manifest.json';
+  const bundleUrl = 'https://downloads.example/release/agentBridgeWorker.bundle.js';
+  const result = await executeAgentSessionWrappedDeployment({
+    body: body({ bundleText: '', bundleUrl, bundleManifestUrl: manifestUrl }),
+    accountId: 'account-123',
+    cfFetchImpl: async (...args) => {
+      cloudflareCalls.push(args);
+      throw new Error('Cloudflare must not be reached');
+    },
+    fetchImpl: async (url) => {
+      if (url === manifestUrl) {
+        return jsonResponse({
+          schemaVersion: 1,
+          artifactSet: 'context-engine-worker-bundles',
+          source: { commit: 'a'.repeat(40), ref: 'refs/heads/main', tree: 'b'.repeat(40) },
+          replay: {
+            privateSourceCommit: 'c'.repeat(40),
+            publicReplayCommit: 'a'.repeat(40),
+            publicCommit: 'a'.repeat(40),
+            publicTree: 'b'.repeat(40),
+          },
+          builder: { workflow: 'CI', runId: '123' },
+          artifacts: [{
+            kind: 'agent-bridge-worker',
+            file: 'agentBridgeWorker.bundle.js',
+            bytes: 42,
+            sha256: 'd'.repeat(64),
+          }],
+        });
+      }
+      if (url === bundleUrl) return new Response('export default { fetch() {} };', { status: 200 });
+      throw new Error(`unexpected URL: ${url}`);
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 409);
+  assert.equal(result.body.step, 'bundle_provenance');
+  assert.equal(cloudflareCalls.length, 0);
+});
+
 test('dedicated Wrapped deployment withholds capability when health or authority proof fails', async () => {
   const harness = successfulHarness({ healthOk: false });
   const result = await executeAgentSessionWrappedDeployment({

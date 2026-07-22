@@ -32,6 +32,11 @@ export const AGENT_BRIDGE_WORKER_BUNDLE_URL = readPublicEnv(
   buildPublicRepoLatestReleaseAssetUrl('agentBridgeWorker.bundle.js'),
 );
 
+export const WORKER_RELEASE_MANIFEST_URL = readPublicEnv(
+  'REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL',
+  buildPublicRepoLatestReleaseAssetUrl('worker-release-manifest.json'),
+);
+
 export const DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = readPublicBoolEnv(
   'REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED',
   true,

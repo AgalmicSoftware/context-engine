@@ -477,6 +477,28 @@ describe('sessionWizardPublishFlow', () => {
 
     await expect(
       resolveSessionWizardDeployBundlePayload({
+        effectiveBundleMode: 'url',
+        bundleUrl: 'https://configured.example.test/sessionCorsWorker.bundle.js',
+        normalModeDefaultBundleUrl: 'https://configured.example.test/sessionCorsWorker.bundle.js',
+        normalModeDefaultBundleManifestUrl: 'https://proof.example.test/worker-release-manifest.json',
+      }),
+    ).resolves.toEqual({
+      bundleText: '',
+      bundleUrl: 'https://configured.example.test/sessionCorsWorker.bundle.js',
+      bundleManifestUrl: 'https://proof.example.test/worker-release-manifest.json',
+      bundleSha256: undefined,
+      bundleSource: 'url',
+    });
+
+    await expect(
+      resolveSessionWizardDeployBundlePayload({
+        effectiveBundleMode: 'url',
+        bundleUrl: 'http://bundles.example.test/sessionCorsWorker.bundle.js',
+      }),
+    ).rejects.toThrow(/HTTPS.*release manifest/i);
+
+    await expect(
+      resolveSessionWizardDeployBundlePayload({
         effectiveBundleMode: 'upload',
         bundleFile: {
           text: async () => 'export default { fetch() { return new Response("ok"); } };',
@@ -498,6 +520,8 @@ describe('sessionWizardPublishFlow', () => {
     ).resolves.toEqual({
       bundleText: '',
       bundleUrl: undefined,
+      bundleManifestUrl: undefined,
+      bundleSha256: undefined,
       bundleSource: 'url-missing',
     });
   });
@@ -534,6 +558,8 @@ describe('sessionWizardPublishFlow', () => {
     ).resolves.toEqual({
       bundleText: '',
       bundleUrl: undefined,
+      bundleManifestUrl: undefined,
+      bundleSha256: undefined,
       bundleSource: 'url-missing',
     });
 

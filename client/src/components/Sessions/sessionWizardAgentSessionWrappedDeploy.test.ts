@@ -27,6 +27,7 @@ describe('sessionWizardAgentSessionWrappedDeploy', () => {
       requested: true,
       payload: {
         agentBridgeBundleUrl: expect.stringContaining('agentBridgeWorker.bundle.js'),
+        agentBridgeBundleManifestUrl: expect.stringContaining('worker-release-manifest.json'),
         agentSessionWrappedDeploymentIdentity: 'session:11155420:0x07:sample-session',
       },
     });

@@ -306,7 +306,7 @@ const useSessionWizardWorkerDeploy = ({
           bundleUrl: currentDeployForm.bundleUrl,
           normalModeBundleUrlOverride: runtime.normalModeBundleUrlOverride,
         });
-        const { bundleText, bundleUrl } = await resolveSessionWizardDeployBundlePayload({
+        const { bundleText, bundleUrl, bundleManifestUrl, bundleSha256 } = await resolveSessionWizardDeployBundlePayload({
           effectiveBundleMode,
           bundleFile: runtime.bundleFile,
           bundleUrl: requestedBundleUrl,
@@ -354,6 +354,8 @@ const useSessionWizardWorkerDeploy = ({
           sessionSlug: slug,
           bundleUrl,
           bundleText: bundleText || undefined,
+          bundleManifestUrl,
+          bundleSha256,
           registryAddress: toStr(runtime.registryAddress).trim(),
           registryChainId: Number(runtime.registryChainId || currentDraft.networkChainId || 0) || 0,
           adminAddress: resolvedAdmin,

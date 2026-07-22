@@ -1,6 +1,9 @@
 import { toStr } from '../../utilities/shared/primitives.js';
 import sha256 from 'crypto-js/sha256';
-import { CLOUDFLARE_WORKER_BUNDLE_URL, CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL } from '../../variables/appConfig.js';
+import {
+  CLOUDFLARE_WORKER_BUNDLE_URL,
+  CLOUDFLARE_WORKER_RELEASE_MANIFEST_URL,
+} from '../../variables/appConfig.js';
 import {
   hasSponsoredBundleFields,
   normalizeSparseSponsoredBundlePayload,

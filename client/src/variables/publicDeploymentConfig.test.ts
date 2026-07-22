@@ -8,6 +8,7 @@ const ENV_KEYS = [
   'REACT_APP_CE_HEALTHCHECK_WORKER_URL',
   'REACT_APP_CE_WORKER_BUNDLE_URL',
   'REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL',
+  'REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL',
   'REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED',
   'REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT',
 ];
@@ -58,6 +59,7 @@ describe('publicDeploymentConfig', () => {
       expect(typeof config.HEALTHCHECK_WORKER_URL).toBe('string');
       expect(typeof config.WORKER_BUNDLE_URL).toBe('string');
       expect(typeof config.AGENT_BRIDGE_WORKER_BUNDLE_URL).toBe('string');
+      expect(typeof config.WORKER_RELEASE_MANIFEST_URL).toBe('string');
       expect(typeof config.DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED).toBe('boolean');
       expect(typeof config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT).toBe('string');
       expect(typeof config.CLOUDFLARE_NATIVE_DEPLOY_URL).toBe('string');
@@ -86,6 +88,9 @@ describe('publicDeploymentConfig', () => {
       expect(config.AGENT_BRIDGE_WORKER_BUNDLE_URL).toBe(
         buildPublicRepoLatestReleaseAssetUrl('agentBridgeWorker.bundle.js'),
       );
+      expect(config.WORKER_RELEASE_MANIFEST_URL).toBe(
+        buildPublicRepoLatestReleaseAssetUrl('worker-release-manifest.json'),
+      );
     });
   });
 
@@ -95,6 +100,7 @@ describe('publicDeploymentConfig', () => {
     process.env.REACT_APP_CE_HEALTHCHECK_WORKER_URL = 'https://healthcheck.example.test/';
     process.env.REACT_APP_CE_WORKER_BUNDLE_URL = 'https://assets.example.test/sessionCorsWorker.bundle.js';
     process.env.REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL = 'https://assets.example.test/agentBridgeWorker.bundle.js';
+    process.env.REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL = 'https://assets.example.test/worker-release-manifest.json';
     process.env.REACT_APP_CE_DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED = 'false';
     process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT = 'abcdef0123456789abcdef0123456789abcdef01';
 
@@ -106,6 +112,7 @@ describe('publicDeploymentConfig', () => {
       expect(config.HEALTHCHECK_WORKER_URL).toBe(process.env.REACT_APP_CE_HEALTHCHECK_WORKER_URL);
       expect(config.WORKER_BUNDLE_URL).toBe(process.env.REACT_APP_CE_WORKER_BUNDLE_URL);
       expect(config.AGENT_BRIDGE_WORKER_BUNDLE_URL).toBe(process.env.REACT_APP_CE_AGENT_BRIDGE_WORKER_BUNDLE_URL);
+      expect(config.WORKER_RELEASE_MANIFEST_URL).toBe(process.env.REACT_APP_CE_WORKER_RELEASE_MANIFEST_URL);
       expect(config.DEFAULT_EMBEDDED_DEPLOY_HELPER_ENABLED).toBe(false);
       expect(config.CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT).toBe(
         process.env.REACT_APP_CE_CLOUDFLARE_NATIVE_DEPLOY_REPLAY_COMMIT,

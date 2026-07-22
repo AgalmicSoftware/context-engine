@@ -17,6 +17,10 @@ import {
   selectDeployWorkerSessionConfigFields,
 } from './workerSessionConfig.mjs';
 import { validateDeploymentModeValues } from './workerConfigModeValidation.mjs';
+import {
+  fetchExpectedWorkerBundleDigest,
+  normalizeWorkerBundleSha256,
+} from './workerReleaseManifest.mjs';
 
 const { getPathRpcUrl } = rpcDefaults;
 
@@ -1199,13 +1203,59 @@ const executeDeployHelperRequestCore = async ({
     return buildFailure(400, { error: storageBindingPlan.error });
   }
 
-  const accountLookup = await resolveDeploymentAccountId({
-    body: {
-      ...body,
-      apiToken,
-    },
-    fetchImpl,
-  });
+  if (!hasBundleText && toStr(body?.bundleManifestUrl).trim()) {
+    const manifestDigest = await fetchExpectedWorkerBundleDigest({
+      manifestUrl: toStr(body.bundleManifestUrl).trim(),
+      artifactFile: 'sessionCorsWorker.bundle.js',
+      artifactKind: 'session-cors-worker',
+      fetchImpl,
+    });
+    if (!manifestDigest.ok) {
+      return buildFailure(502, { error: manifestDigest.error });
+    }
+    if (expectedBundleSha256 && expectedBundleSha256 !== manifestDigest.digest) {
+      return buildFailure(409, { error: 'Worker release manifest digest conflicts with bundleSha256.' });
+    }
+    expectedBundleSha256 = manifestDigest.digest;
+  }
+
+  if (expectedBundleSha256 && !bundleSource) {
+    let bundleResponse;
+    try {
+      bundleResponse = await fetchImpl(bundleUrl);
+    } catch (error) {
+      return buildFailure(502, {
+        error: `Failed to fetch bundle: ${toStr(error?.message || error).trim() || 'Unknown error.'}`,
+      }, { fallbackEligible: true });
+    }
+    if (!bundleResponse.ok) {
+      return buildFailure(502, { error: `Failed to fetch bundle (${bundleResponse.status}).` }, {
+        fallbackEligible: bundleResponse.status >= 500 || bundleResponse.status === 429,
+      });
+    }
+    bundleSource = await bundleResponse.text();
+    bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
+  }
+  if (
+    expectedBundleSha256 &&
+    (bundleDiagnostics?.sha256 || expectedInlineBundleSha256) !== expectedBundleSha256
+  ) {
+    return buildFailure(409, {
+      error: 'Worker bundle SHA-256 does not match the verified release manifest.',
+    });
+  }
+
+  const accountLookup = toStr(resolvedAccountId).trim()
+    ? { ok: true, accountId: toStr(resolvedAccountId).trim() }
+    : await resolveDeploymentAccountId({
+        body: {
+          ...body,
+          apiToken,
+        },
+        fetchImpl,
+        apiBaseUrl,
+        env,
+      });
   if (!accountLookup.ok) {
     const lookupStatus = Number(accountLookup.status || 0);
     const responseStatus = lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502;
@@ -1341,65 +1391,7 @@ const executeDeployHelperRequestCore = async ({
         }),
       };
     }
-    bundleSource = await bundleResp.text();
-  }
-  const bundleDiagnostics = await buildBundleDiagnostics(bundleSource, bundleSourceKind);
-  consoleImpl?.log?.('[deploy-helper] bundle diagnostics', JSON.stringify({
-    workerName,
-    sessionSlug: displaySlug,
-    diagnostics: {
-      ...bundleDiagnostics,
-      prefix: bundleDiagnostics.prefix,
-      suffix: bundleDiagnostics.suffix,
-    },
-  }));
-
-  const kvCreate = await cfFetch(apiToken, `/accounts/${accountId}/storage/kv/namespaces`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: `ContextEngineSessionCorsWorker:${displaySlug}` }),
-  }, { fetchImpl });
-  if (!kvCreate.ok) {
-    return buildFailure(502, {
-      error: kvCreate.error,
-      detail: kvCreate.detail,
-    }, {
-      fallbackEligible: shouldAllowFallbackForCloudflareFailure(kvCreate),
-    });
-  }
-  const kvId = kvCreate.data?.result?.id;
-  if (!kvId) {
-    return buildFailure(502, { error: 'Failed to create KV namespace.' }, { fallbackEligible: true });
-  }
-
-  const tokenSecret = randomSecret();
-  const metadata = {
-    main_module: 'worker.mjs',
-    bindings: [
-      { name: 'GROUP_KV', type: 'kv_namespace', namespace_id: kvId },
-      ...(storageBindingPlan.requiresStorageIndexKv
-        ? [{ name: 'CE_STORAGE_INDEX_KV', type: 'kv_namespace', namespace_id: kvId }]
-        : []),
-      ...(storageBindingPlan.r2BucketName
-        ? [{ name: 'CE_STORAGE_R2', type: 'r2_bucket', bucket_name: storageBindingPlan.r2BucketName }]
-        : []),
-      { name: 'DEFAULT_SESSION_SLUG', type: 'plain_text', text: sessionSlug },
-      { name: 'DEPLOY_HELPER_ENABLED', type: 'plain_text', text: embeddedDeployHelperEnabled ? '1' : '0' },
-    ],
-    compatibility_date: toStr(env?.WORKER_COMPATIBILITY_DATE || DEFAULT_COMPAT_DATE),
-    compatibility_flags: ['nodejs_compat'],
-  };
-
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }), 'metadata.json');
-  form.append('worker.mjs', new Blob([bundleSource], { type: 'application/javascript+module' }), 'worker.mjs');
-
-  const scriptUpload = await cfFetch(apiToken, `/accounts/${accountId}/workers/scripts/${workerName}`, {
-    method: 'PUT',
-    body: form,
-  }, { fetchImpl });
-  if (!scriptUpload.ok) {
-    consoleImpl?.error?.('[deploy-helper] script upload failed', JSON.stringify({
+    consoleImpl?.log?.('[deploy-helper] bundle diagnostics', JSON.stringify({
       workerName,
       sessionSlug: displaySlug,
       diagnostics: {
@@ -2230,6 +2222,8 @@ const executeDeployHelperRequestCore = async ({
         sessionDeploymentIdentity: body?.agentSessionWrappedDeploymentIdentity,
         authorityMode: body?.sessionModeProfile?.authority?.mode,
         bundleUrl: body?.agentBridgeBundleUrl,
+        bundleManifestUrl: body?.agentBridgeBundleManifestUrl,
+        bundleSha256: body?.agentBridgeBundleSha256,
       },
       env,
       accountId,
