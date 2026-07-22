@@ -1406,11 +1406,6 @@ const executeDeployHelperRequestCore = async ({
   const config = {
     slug: sessionSlug,
     authzEpoch: 1,
-    workerGroupsBootstrap: {
-      version: 2,
-      state: 'fresh_empty',
-      bootstrapId: deploymentId,
-    },
     adminAddress,
     allowOrigins,
     limits,

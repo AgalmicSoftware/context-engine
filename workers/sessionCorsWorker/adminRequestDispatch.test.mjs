@@ -1707,6 +1707,7 @@ test('dispatchAdminRequest persists a signed Lit descriptor through the real con
   assert.equal(result.status, 200);
   assert.deepEqual(await getSessionConfig(env, 'session-a'), {
     slug: 'session-a',
+    authzEpoch: 1,
     adminAddress: '0xabc',
     sessionName: 'Worker Lit Session',
     litCredentials,
@@ -1804,6 +1805,7 @@ test('dispatchAdminRequest persists boolean scope permissions through the real c
   assert.equal(result.status, 200);
   assert.deepEqual(await getSessionConfig(env, 'session-a'), {
     slug: 'session-a',
+    authzEpoch: 1,
     adminAddress: '0xabc',
     sessionName: 'Worker Session',
     scopes,

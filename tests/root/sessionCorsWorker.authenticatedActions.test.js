@@ -4,6 +4,7 @@ import sessionCorsWorker from '../../workers/sessionCorsWorker/worker.js';
 import {
   createMemoryKv,
   issueWorkerLoginToken,
+  installRpcAwareUpstreamFetchMock,
 } from '../helpers/sessionCorsWorkerTestUtils.mjs';
 
 const REGISTRY_ADDRESS = '0x0000000000000000000000000000000000000001';

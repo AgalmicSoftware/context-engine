@@ -235,16 +235,6 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (hasOwn(incomingConfig, AUTHORIZATION_EPOCH_KEY)) {
       return { ok: false, status: 400, error: 'Authorization epoch is server-managed.' };
     }
-    if (
-      hasOwn(incomingConfig, WORKER_GROUPS_BOOTSTRAP_KEY) &&
-      (
-        !hasOwn(authorityExisting, WORKER_GROUPS_BOOTSTRAP_KEY) ||
-        stableCanonicalSerialize(incomingConfig[WORKER_GROUPS_BOOTSTRAP_KEY]) !==
-          stableCanonicalSerialize(authorityExisting[WORKER_GROUPS_BOOTSTRAP_KEY])
-      )
-    ) {
-      return { ok: false, status: 400, error: 'Worker Group bootstrap state is server-managed.' };
-    }
     if (findForbiddenCloudflareDeploymentTokenPath(incomingConfig)) {
       return { ok: false, status: 400, error: 'Cloudflare deployment tokens are not allowed in session config.' };
     }

@@ -117,6 +117,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
       scopes,
       scope: 'ai',
       route: 'ai',
+      config,
       env,
       slug,
       address,
@@ -124,6 +125,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
       headers,
       deps: {
         checkRateLimit: deps?.checkRateLimit,
+        computeScopesForLogin: deps?.computeScopesForLogin,
         json: deps?.json,
       },
     });
@@ -214,6 +216,7 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
     scopes,
     scope: 'lit',
     route: 'lit',
+    config,
     env,
     slug,
     address,

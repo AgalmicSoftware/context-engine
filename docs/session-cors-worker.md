@@ -583,6 +583,7 @@ Runtime:
   ```json
   {
     "slug": "test-72",
+    "authzEpoch": 1,
     "sessionId": "0x0123456789abcdef0123456789abcdef",
     "configRevision": "6f0c2c84-f28b-4fa7-baba-d035f9767967",
     "sessionName": "Example session",
@@ -1104,11 +1105,10 @@ Worker reachable.
    - Registry-canonical sessions keep their existing on-chain existence, gate,
      and scope evaluation.
    - Signed login request dispatch remains the thinner shared helper shell:
-     it preserves login JSON parse failures and token signing after the
-     extracted authority helper resolves the signed request. The response is
-     `{ token, exp, sessionSlug, sessionId }` when a canonical session ID is
-     available. New tokens include that identity, the current server-managed
-     `authzEpoch`, and a crypto-random `jti`, and are returned only after the
+     it preserves login JSON parse failures, token signing, and the final
+     `{ token, exp }` response contract after the extracted authority helper
+     resolves the signed request. New tokens include the current server-managed
+     `authzEpoch` plus a crypto-random `jti`, and are returned only after the
      matching KV token marker is persisted.
    - Token signing / verification now also route through a shared helper:
      it preserves `JSON.stringify(payload)` signing, `base64url(payloadJson) + "." + base64url(hmac(payloadJson))`,
@@ -1127,11 +1127,7 @@ Token format:
 ```
 base64url(payloadJson) + "." + base64url(hmac(payloadJson))
 ```
-
-New payloads:
-`{ sub, slug, sessionId?, authzEpoch, scopes, exp, jti }`. Every authenticated
-route for a worker-canonical session compares the token's `sessionId` with the
-current canonical config and returns `401` when it is missing or stale.
+New payloads: `{ sub, slug, authzEpoch, scopes, exp, jti }`.
 
 The worker stores `authToken:{slug}:{sub}:{jti}` in `GROUP_KV` with a TTL aligned
 to the token lifetime. Token verification rejects missing or blank `jti` claims,

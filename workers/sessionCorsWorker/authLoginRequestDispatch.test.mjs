@@ -194,13 +194,7 @@ test('dispatchAuthLoginRequest signs tokens with jti and persists the token mark
         return {
           ok: true,
           address: '0xabc',
-          config: {
-            authzEpoch: 7,
-            sessionId: workerSessionId,
-            sessionModeProfile: {
-              authority: { mode: 'worker_canonical' },
-            },
-          },
+          config: { authzEpoch: 7 },
           headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
           scopes,
           targetSlug: 'session-a',
@@ -239,7 +233,6 @@ test('dispatchAuthLoginRequest signs tokens with jti and persists the token mark
     ['signToken', {
       sub: '0xABC',
       slug: 'session-a',
-      sessionId: workerSessionId,
       authzEpoch: 7,
       scopes,
       exp: expectedExp,

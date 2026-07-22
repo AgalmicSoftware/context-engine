@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Made Worker authorization current at request time. Login tokens now bind a
+  server-managed session authorization epoch, effective config changes
+  invalidate prior tokens, and protected routes fail closed unless both the
+  signed scope and the current default/route-specific policy allow access.
 - Encrypted every canonical Session Worker secret record at rest with
   session-bound AES-256-GCM before deploy-helper or signed-admin KV writes.
   Current/previous KEK recovery is bounded, legacy plaintext records are
