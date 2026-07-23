@@ -545,32 +545,32 @@ test('Worker Groups prefer an independently migrated coordinator binding when co
 });
 
 test('worker group CRUD stores memberships separately and enforces caps', async () => {
-	const kv = createMockKv();
-	const env = {
-		CE_WORKER_GROUPS_KV: kv,
-		CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION: '1',
-		CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '1',
-	};
-	const deps = {
-		now: () => Date.parse('2026-02-03T04:05:06.000Z'),
-		randomUUID: () => 'group-alpha',
-	};
-	const created = await createWorkerGroup({
-		env,
-		slug: 'session-a',
-		input: {
-			label: 'Review cohort',
-			description: 'Internal review access',
-			imageUrl: 'https://ar-io.dev/example-group-image',
-			joinMode: 'admin_add',
-			memberVisibility: 'members',
-		},
-		actorPrincipal: actor,
-		deps,
-	});
-	assert.equal(created.ok, true);
-	assert.equal(created.group.groupId, 'group-alpha');
-	assert.equal(created.group.imageUrl, 'https://ar-io.dev/example-group-image');
+  const kv = createMockKv();
+  const env = {
+    CE_WORKER_GROUPS_KV: kv,
+    CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION: '1',
+    CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '1',
+  };
+  const deps = {
+    now: () => Date.parse('2026-02-03T04:05:06.000Z'),
+    randomUUID: () => 'group-alpha',
+  };
+  const created = await createWorkerGroup({
+    env,
+    slug: 'session-a',
+    input: {
+      label: 'Review cohort',
+      description: 'Internal review access',
+      imageUrl: 'https://ar-io.dev/example-group-image',
+      joinMode: 'admin_add',
+      memberVisibility: 'members',
+    },
+    actorPrincipal: actor,
+    deps,
+  });
+  assert.equal(created.ok, true);
+  assert.equal(created.group.groupId, 'group-alpha');
+  assert.equal(created.group.imageUrl, 'https://ar-io.dev/example-group-image');
 
 	const duplicate = await createWorkerGroup({
 		env,
@@ -1059,6 +1059,41 @@ test('worker group image metadata accepts public HTTPS URLs and rejects unsafe v
 		assert.equal(rejected.ok, false, imageUrl);
 		assert.equal(rejected.reason, 'invalid_group_image_url', imageUrl);
 	}
+});
+
+test('worker group image metadata accepts public HTTPS URLs and rejects unsafe values', async () => {
+  const env = { CE_WORKER_GROUPS_KV: createMockKv() };
+  const valid = await createWorkerGroup({
+    env,
+    slug: 'session-a',
+    input: {
+      groupId: 'with-image',
+      label: 'With image',
+      joinMode: 'open',
+      memberVisibility: 'session',
+      imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/example.jpg',
+    },
+    actorPrincipal: actor,
+  });
+  assert.equal(valid.ok, true);
+  assert.equal(valid.group.imageUrl, 'https://upload.wikimedia.org/wikipedia/commons/example.jpg');
+
+  for (const imageUrl of [
+    'http://example.test/group.png',
+    'javascript:alert(1)',
+    'https://user:[redacted-email]/group.png',
+    `https://example.test/${'a'.repeat(2048)}`,
+  ]) {
+    // eslint-disable-next-line no-await-in-loop
+    const rejected = await createWorkerGroup({
+      env,
+      slug: 'session-a',
+      input: { groupId: `invalid-${imageUrl.length}`, label: 'Invalid image', imageUrl },
+      actorPrincipal: actor,
+    });
+    assert.equal(rejected.ok, false, imageUrl);
+    assert.equal(rejected.reason, 'invalid_group_image_url', imageUrl);
+  }
 });
 
 test('worker groups operate on storage index KV without a D1 binding', async () => {

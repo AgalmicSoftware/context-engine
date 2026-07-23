@@ -122,12 +122,6 @@ describe('AdminWorkerGroupsPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(await screen.findByText('Reviewers')).toBeInTheDocument();
-    expect(postSignedRequest).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'groups/list',
-        workerUrl: 'https://session-worker.example',
-      }),
-    );
     expect(screen.getByTestId('ce-admin-worker-group-image')).toHaveAttribute(
       'src',
       'https://ar-io.dev/reviewers-image',
@@ -145,17 +139,8 @@ describe('AdminWorkerGroupsPanel', () => {
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-mode'), {
       target: { value: 'open' },
     });
-    fireEvent.change(screen.getByLabelText('Tag'), { target: { value: 'reviewers' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add tag' }));
-    fireEvent.change(screen.getByLabelText('Reference URL'), {
-      target: { value: 'https://docs.example.test/brief' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Add reference URL' }));
-    fireEvent.change(screen.getByLabelText('Member limit'), { target: { value: '25' } });
-    fireEvent.change(screen.getByLabelText('Join deadline'), { target: { value: '2030-01-01T12:00' } });
-    fireEvent.change(screen.getByLabelText('Group admin address'), { target: { value: ADDRESS } });
     expect(screen.getByTestId('ce-admin-worker-group-create-visibility')).toHaveValue('session');
-    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
     await waitFor(() =>
       expect(postSignedRequest).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -167,11 +152,6 @@ describe('AdminWorkerGroupsPanel', () => {
               label: 'Open participants',
               description: 'Public acceleration discussion group.',
               imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/rocket.jpg',
-              tags: ['reviewers'],
-              documentURLs: ['https://docs.example.test/brief'],
-              memberLimit: 25,
-              joinEndsAt: new Date('2030-01-01T12:00').toISOString(),
-              adminAddress: ADDRESS,
               joinMode: 'open',
               memberVisibility: 'session',
             }),

@@ -22,15 +22,6 @@ export const WORKER_GROUP_MEMBER_VISIBILITY = Object.freeze({
 export const DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION = 100;
 export const DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP = 1000;
 export const MAX_WORKER_GROUP_IMAGE_URL_LENGTH = 2048;
-export const MAX_WORKER_GROUP_DOCUMENT_URLS = 10;
-export const MAX_WORKER_GROUP_TAGS = 20;
-export const MAX_WORKER_GROUP_TAG_LENGTH = 64;
-export const MAX_WORKER_GROUP_MEMBER_LIMIT = 1000;
-export const MAX_WORKER_GROUP_ID_LENGTH = 80;
-export const MAX_WORKER_GROUP_SESSION_SLUG_LENGTH = 128;
-export const DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
-export const MAX_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
-const WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL = 'fresh-template-v2';
 
 const IMPLEMENTED_JOIN_MODES = new Set([WORKER_GROUP_JOIN_MODES.OPEN, WORKER_GROUP_JOIN_MODES.ADMIN_ADD]);
 
@@ -274,6 +265,19 @@ const normalizeGroupJoinEndsAt = (value, deps = {}, { allowPast = false } = {}) 
 	return { ok: true, value: new Date(timestamp).toISOString() };
 };
 
+const normalizeImageUrl = (value) => {
+  const raw = trim(value);
+  if (!raw) return { ok: true, value: '' };
+  if (raw.length > MAX_WORKER_GROUP_IMAGE_URL_LENGTH) return { ok: false };
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return { ok: false };
+    return { ok: true, value: parsed.href };
+  } catch {
+    return { ok: false };
+  }
+};
+
 const normalizeEvmAddress = (value, deps = {}) => {
 	const address = trim(value);
 	if (typeof deps.isAddress === 'function' && !deps.isAddress(address)) return '';
@@ -387,61 +391,35 @@ export const createWorkerGroupId = (deps = {}) => {
 };
 
 const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps = {} } = {}) => {
-	const joinMode = normalizeJoinMode(input.joinMode || existing?.joinMode);
-	if (!joinMode) return { ok: false, status: 400, reason: 'invalid_join_mode' };
-	if (!IMPLEMENTED_JOIN_MODES.has(joinMode)) {
-		return { ok: false, status: 400, reason: 'join_mode_not_implemented' };
-	}
-	const memberVisibility = normalizeMemberVisibility(input.memberVisibility || existing?.memberVisibility);
-	if (!memberVisibility) return { ok: false, status: 400, reason: 'invalid_member_visibility' };
-	const label = trim(input.label || existing?.label);
-	if (!label || label.length > 120) return { ok: false, status: 400, reason: 'invalid_group_label' };
-	const description = trim(input.description ?? existing?.description);
-	if (description.length > 500) return { ok: false, status: 400, reason: 'invalid_group_description' };
-	const imageUrlResult = normalizeImageUrl(input.imageUrl ?? existing?.imageUrl);
-	if (!imageUrlResult.ok) return { ok: false, status: 400, reason: 'invalid_group_image_url' };
-	const tagsResult = normalizeGroupTags(input.tags ?? existing?.tags);
-	if (!tagsResult.ok) return { ok: false, status: 400, reason: 'invalid_group_tags' };
-	const documentUrlsResult = normalizeGroupDocumentUrls(input.documentURLs ?? existing?.documentURLs);
-	if (!documentUrlsResult.ok) return { ok: false, status: 400, reason: 'invalid_group_document_urls' };
-	const memberLimitResult = normalizeGroupMemberLimit(
-		Object.prototype.hasOwnProperty.call(input, 'memberLimit') ? input.memberLimit : existing?.memberLimit,
-	);
-	if (!memberLimitResult.ok) return { ok: false, status: 400, reason: 'invalid_group_member_limit' };
-	const joinEndsAtResult = Object.prototype.hasOwnProperty.call(input, 'joinEndsAt')
-		? normalizeGroupJoinEndsAt(input.joinEndsAt, deps, { allowPast: !!existing })
-		: { ok: true, value: trim(existing?.joinEndsAt) };
-	if (!joinEndsAtResult.ok) return { ok: false, status: 400, reason: 'invalid_group_join_end' };
-	const requestedAdminAddress = Object.prototype.hasOwnProperty.call(input, 'adminAddress')
-		? trim(input.adminAddress)
-		: trim(existing?.adminAddress || actorPrincipal?.address);
-	const adminAddress = requestedAdminAddress ? normalizeEvmAddress(requestedAdminAddress, deps) : '';
-	if (requestedAdminAddress && !adminAddress) {
-		return { ok: false, status: 400, reason: 'invalid_group_admin_address' };
-	}
-	const updatedAt = nowIso(deps);
-	return {
-		ok: true,
-		patch: {
-			label,
-			description: description || undefined,
-			imageUrl: imageUrlResult.value || undefined,
-			tags: tagsResult.value.length ? tagsResult.value : undefined,
-			documentURLs: documentUrlsResult.value.length ? documentUrlsResult.value : undefined,
-			memberLimit: memberLimitResult.value || undefined,
-			joinEndsAt: joinEndsAtResult.value || undefined,
-			adminAddress: adminAddress || undefined,
-			joinMode,
-			memberVisibility,
-			updatedAt,
-			...(existing
-				? {}
-				: {
-						createdBy: actorPrincipal,
-						createdAt: updatedAt,
-					}),
-		},
-	};
+  const joinMode = normalizeJoinMode(input.joinMode || existing?.joinMode);
+  if (!joinMode) return { ok: false, status: 400, reason: 'invalid_join_mode' };
+  if (!IMPLEMENTED_JOIN_MODES.has(joinMode)) {
+    return { ok: false, status: 400, reason: 'join_mode_not_implemented' };
+  }
+  const memberVisibility = normalizeMemberVisibility(input.memberVisibility || existing?.memberVisibility);
+  if (!memberVisibility) return { ok: false, status: 400, reason: 'invalid_member_visibility' };
+  const label = trim(input.label || existing?.label);
+  if (!label || label.length > 120) return { ok: false, status: 400, reason: 'invalid_group_label' };
+  const description = trim(input.description ?? existing?.description);
+  if (description.length > 500) return { ok: false, status: 400, reason: 'invalid_group_description' };
+  const imageUrlResult = normalizeImageUrl(input.imageUrl ?? existing?.imageUrl);
+  if (!imageUrlResult.ok) return { ok: false, status: 400, reason: 'invalid_group_image_url' };
+  const updatedAt = nowIso(deps);
+  return {
+    ok: true,
+    patch: {
+      label,
+      description: description || undefined,
+      imageUrl: imageUrlResult.value || undefined,
+      joinMode,
+      memberVisibility,
+      updatedAt,
+      ...(existing ? {} : {
+        createdBy: actorPrincipal,
+        createdAt: updatedAt,
+      }),
+    },
+  };
 };
 
 const kvGetJsonStrict = async (kv, key) => {
@@ -1132,20 +1110,15 @@ const listMembershipRecordPage = async ({ store, slug, sessionId, groupId, curso
 };
 
 const redactGroupForMember = (group) => ({
-	groupId: group.groupId,
-	sessionSlug: group.sessionSlug,
-	label: group.label,
-	...(group.description ? { description: group.description } : {}),
-	...(group.imageUrl ? { imageUrl: group.imageUrl } : {}),
-	...(Array.isArray(group.tags) && group.tags.length ? { tags: group.tags } : {}),
-	...(Array.isArray(group.documentURLs) && group.documentURLs.length ? { documentURLs: group.documentURLs } : {}),
-	...(Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? { memberLimit: group.memberLimit } : {}),
-	...(group.joinEndsAt ? { joinEndsAt: group.joinEndsAt } : {}),
-	...(group.adminAddress ? { adminAddress: group.adminAddress } : {}),
-	joinMode: group.joinMode,
-	memberVisibility: group.memberVisibility,
-	createdAt: group.createdAt,
-	updatedAt: group.updatedAt,
+  groupId: group.groupId,
+  sessionSlug: group.sessionSlug,
+  label: group.label,
+  ...(group.description ? { description: group.description } : {}),
+  ...(group.imageUrl ? { imageUrl: group.imageUrl } : {}),
+  joinMode: group.joinMode,
+  memberVisibility: group.memberVisibility,
+  createdAt: group.createdAt,
+  updatedAt: group.updatedAt,
 });
 
 const isDefinitiveWorkerGroupMembershipMiss = (result) =>

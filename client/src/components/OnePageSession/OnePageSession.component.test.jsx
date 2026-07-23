@@ -24,6 +24,7 @@ const mockDebateMap = jest.fn();
 const mockRiskMatrix = jest.fn();
 const mockDebateSelector = jest.fn();
 const mockDemoAnalysisWorkspace = jest.fn();
+const mockWorkerSessionGroupsPanel = jest.fn();
 const originalFetch = global.fetch;
 const fullCrossCorpusPayload = JSON.parse(
   fs.readFileSync(path.join(__dirname, '../../../../ai-discourse-corpus/corpuses/cross-corpus-debates.json'), 'utf8'),
@@ -79,6 +80,10 @@ jest.mock('../SurveyTool/SurveyPage.jsx', () => (props) => {
 jest.mock('../SBTs/SBTsPage', () => (props) => {
   mockSBTsPage(props);
   return <div data-testid="sbts-page">{props.showCreateGroupExternal ? 'Create Open' : 'Create Closed'}</div>;
+});
+jest.mock('./WorkerSessionGroupsPanel', () => (props) => {
+  mockWorkerSessionGroupsPanel(props);
+  return <div data-testid="worker-session-groups-panel">Worker-native groups</div>;
 });
 jest.mock('../PolisReport/PolisReport', () => (props) => {
   mockPolisReport(props);
@@ -1283,6 +1288,38 @@ describe('OnePageSession view gating', () => {
     const sbtPropsAfterToggle = mockSBTsPage.mock.calls.map((args) => args[0]).filter(Boolean);
     expect(sbtPropsAfterToggle[sbtPropsAfterToggle.length - 1]?.showCreateGroupAboveFeatured).toBe(true);
     expect(sbtPropsAfterToggle[sbtPropsAfterToggle.length - 1]?.showCreateGroupExternal).toBe(true);
+  });
+
+  it('uses worker-native groups without contract controls for Cloudflare-canonical sessions', async () => {
+    const workerSessionConfig = {
+      ...buildProps().sessionConfig,
+      slug: 'demo-sh',
+      corsWorkerUrl: 'https://demo-sh-worker.example',
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    render(
+      <OnePageSession
+        {...buildProps()}
+        slug="demo-sh"
+        account="0x00000000000000000000000000000000000000aa"
+        sessionConfig={workerSessionConfig}
+      />,
+    );
+
+    fireEvent.click(screen.getByText(t('sbts')));
+    expect(await screen.findByTestId('worker-session-groups-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('sbts-page')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^View All$/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/without deploying a contract/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
+    await waitFor(() =>
+      expect(mockWorkerSessionGroupsPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({ sessionSlug: 'demo-sh', showCreate: true }),
+      ),
+    );
+    expect(mockSBTsPage).not.toHaveBeenCalled();
   });
 
   it('passes the canonical Polis demo questions to both /session/demo question surfaces', async () => {

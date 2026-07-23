@@ -675,23 +675,11 @@ describe('WorkerGroupMembershipPanel', () => {
     render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
 
     expect(await screen.findByText('Members')).toBeInTheDocument();
-    const groupImage = screen.getByTestId('ce-session-worker-group-image');
-    expect(groupImage).toHaveAttribute('src', 'https://ar-io.dev/open-reviewers-image');
-    expect(groupImage).toHaveClass('sbtImage');
-    expect(groupImage.parentElement).toHaveClass('miniImageContainer');
-    expect(screen.getByText('Invited reviewers')).toBeInTheDocument();
-    expect(screen.queryByText('Details')).not.toBeInTheDocument();
-    expect(screen.queryByText(/contract|network|rpc|gas|mint/i)).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Copy Invited reviewers group link' }));
-    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1));
-    const copiedGroupLink = new URL(String((navigator.clipboard.writeText as jest.Mock).mock.calls[0][0]));
-    expect(copiedGroupLink.pathname).toBe('/group/invited-reviewers');
-    expect(copiedGroupLink.hash).toBe('');
-    expect(copiedGroupLink.searchParams.get('sessionName')).toBe('alpha');
-    expect([...copiedGroupLink.searchParams.keys()]).toEqual(['sessionName']);
-    expect(copiedGroupLink.searchParams.has('inv')).toBe(false);
-    expect(copiedGroupLink.searchParams.has('agentToken')).toBe(false);
-    expect(screen.getByText(/contains no invitation token or credential/i)).toBeInTheDocument();
+    expect(screen.getByTestId('ce-session-worker-group-image')).toHaveAttribute(
+      'src',
+      'https://ar-io.dev/open-reviewers-image',
+    );
+    expect(screen.getByText('3 members')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Join Open reviewers' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent('Joined Open reviewers.');

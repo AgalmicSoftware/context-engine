@@ -222,11 +222,41 @@
 }
 
 .telegramPileFrame {
+  display: grid;
+  gap: 8px;
+
   :global(.card) {
     background: rgba(2, 6, 23, 0.72);
     color: #f8fafc;
     border-color: rgba(148, 163, 184, 0.28);
   }
+}
+
+.workerGroupsPanel {
+  display: grid;
+  gap: 14px;
+}
+
+.workerGroupNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: var(--ce-radius-6);
+  background: rgba(15, 23, 42, 0.58);
+  color: #cbd5e1;
+  font-size: 0.95rem;
+}
+
+.workerGroupImage {
+  width: min(100%, 240px);
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--ce-radius-6);
+  border: 1px solid rgba(148, 163, 184, 0.28);
 }
 
 .telegramPileFooter {

@@ -56,16 +56,21 @@ type WorkerGroupViewState = {
   error: string;
 };
 
-type WorkerGroupMemberListState = {
-  targetKey: string;
-  groupId: string;
-  isOpen: boolean;
-  status: 'idle' | 'loading' | 'ready' | 'error';
-  error: string;
-  members: WorkerGroupMember[];
-  memberCount?: number;
-  nextCursor: string;
-};
+const WorkerGroupMembershipPanel = ({
+  envelope,
+  workerUrl: workerUrlProp,
+  workerToken: workerTokenProp,
+  canReadGroups: canReadGroupsProp,
+  refreshNonce = 0,
+  fetchImpl = fetch,
+}: WorkerGroupMembershipPanelProps) => {
+  const [overview, setOverview] = useState<WorkerGroupOverview>(emptyOverview);
+  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [error, setError] = useState('');
+  const [joiningGroupId, setJoiningGroupId] = useState('');
+  const canReadGroups = canReadGroupsProp ?? envelope?.capabilities?.readGroups === true;
+  const workerUrl = workerUrlProp || envelope?.workerUrl || '';
+  const workerToken = workerTokenProp || envelope?.workerCredential?.token || '';
 
 const emptyViewState = (targetKey: string): WorkerGroupViewState => ({
   targetKey,
@@ -555,12 +560,7 @@ const WorkerGroupMembershipPanel = ({
     setShareState({ targetKey, status: '' });
     setMemberListState(emptyMemberListState(targetKey, selectedGroupId));
     void reload();
-    return () => {
-      requestIdRef.current += 1;
-      mutationIdRef.current += 1;
-      memberListRequestIdRef.current += 1;
-    };
-  }, [refreshNonce, reload, selectedGroupId, targetKey]);
+  }, [refreshNonce, reload]);
 
   const membershipIds = useMemo(
     () => new Set(overview.memberships.map((membership) => membership.group.groupId)),
@@ -915,27 +915,41 @@ const WorkerGroupMembershipPanel = ({
       ) : null}
       {status === 'loading' ? <div className={styles.telegramListEmpty}>Loading access groups…</div> : null}
       {error ? <div className={styles.telegramListEmpty}>{error}</div> : null}
-      {membershipStatus ? (
-        <div className={styles.telegramReportApprox} role="status">
-          {membershipStatus}
-        </div>
-      ) : null}
-      {shareStatus ? <div className={styles.telegramReportApprox}>{shareStatus}</div> : null}
-      {overview.memberships.length || displayedAvailableGroups.length ? (
-        <div className={`${sbtsPageStyles.sbtGrid} ${styles.workerGroupCardGrid}`}>
-          {overview.memberships.map((membership) => (
-            <WorkerGroupCard
-              key={membership.group.groupId}
-              copyGroupLink={copyGroupLink}
-              fetchImpl={fetchImpl}
-              group={membership.group}
-              isActive={membership.group.joinMode === 'open' && !groupJoinHasEnded(membership.group)}
-              onOpenDetails={openGroupDetails}
-              showDescription={showDescriptions}
-              sessionConfig={sessionConfig}
-              sessionSlug={sessionSlug}
-              workerToken={workerToken}
-              workerUrl={workerUrl}
+      {overview.memberships.map((membership) => (
+        <article key={membership.group.groupId} className={styles.telegramPileFrame}>
+          {membership.group.imageUrl ? (
+            <img
+              src={membership.group.imageUrl}
+              alt=""
+              className={styles.workerGroupImage}
+              data-testid="ce-session-worker-group-image"
+            />
+          ) : null}
+          <strong>{membership.group.label}</strong>
+          {membership.group.description ? <span>{membership.group.description}</span> : null}
+          <span>Member</span>
+          {typeof membership.memberCount === 'number' ? <span>{membership.memberCount} members</span> : null}
+        </article>
+      ))}
+      {availableGroups.map((group) => (
+        <article key={group.groupId} className={styles.telegramPileFrame}>
+          {group.imageUrl ? (
+            <img
+              src={group.imageUrl}
+              alt=""
+              className={styles.workerGroupImage}
+              data-testid="ce-session-worker-group-image"
+            />
+          ) : null}
+          <strong>{group.label}</strong>
+          {group.description ? <span>{group.description}</span> : null}
+          {group.joinMode === 'open' ? (
+            <button
+              type="button"
+              className={styles.telegramPrimaryButton}
+              disabled={joiningGroupId === group.groupId}
+              aria-label={`Join ${group.label}`}
+              onClick={() => void handleJoin(group.groupId)}
             >
               {renderMembershipAction(membership.group, true)}
             </WorkerGroupCard>

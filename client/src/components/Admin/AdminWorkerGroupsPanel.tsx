@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
 import {
   addWorkerGroupMember,
@@ -30,11 +30,6 @@ type WorkerGroupDraft = {
   label: string;
   description: string;
   imageUrl: string;
-  tags: string[];
-  documentURLs: string[];
-  memberLimit: string;
-  joinEndsAt: string;
-  adminAddress: string;
   joinMode: WorkerGroupJoinMode;
   memberVisibility: WorkerGroupMemberVisibility;
 };
@@ -49,44 +44,15 @@ export type AdminWorkerGroupsPanelProps = {
   workerAuthContext?: unknown;
   postSignedRequest: PostSignedWorkerGroupRequest;
   autoLoad?: boolean;
-  createOnly?: boolean;
   onGroupsChanged?: () => void;
-  title?: string;
-  description?: string;
-  sessionName?: string;
 };
 
 const emptyDraft = (adminAddress = '', tags: string[] = []): WorkerGroupDraft => ({
   label: '',
   description: '',
   imageUrl: '',
-  tags: [...tags],
-  documentURLs: [],
-  memberLimit: '',
-  joinEndsAt: '',
-  adminAddress,
   joinMode: 'admin_add',
   memberVisibility: 'admin_only',
-});
-
-const toLocalDateTimeInput = (value: unknown): string => {
-  const date = new Date(String(value || ''));
-  if (!Number.isFinite(date.getTime())) return '';
-  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return offsetDate.toISOString().slice(0, 19);
-};
-
-const buildGroupInput = (draft: WorkerGroupDraft, label: string) => ({
-  label,
-  description: draft.description.trim(),
-  imageUrl: draft.imageUrl.trim(),
-  tags: draft.tags,
-  documentURLs: draft.documentURLs,
-  memberLimit: draft.memberLimit.trim() ? Number(draft.memberLimit) : 0,
-  joinEndsAt: draft.joinEndsAt ? new Date(draft.joinEndsAt).toISOString() : '',
-  adminAddress: draft.adminAddress.trim(),
-  joinMode: draft.joinMode,
-  memberVisibility: draft.memberVisibility,
 });
 
 const withJoinMode = (draft: WorkerGroupDraft, joinMode: WorkerGroupJoinMode): WorkerGroupDraft => ({
@@ -95,14 +61,7 @@ const withJoinMode = (draft: WorkerGroupDraft, joinMode: WorkerGroupJoinMode): W
   memberVisibility: joinMode === 'open' && draft.memberVisibility === 'admin_only' ? 'session' : draft.memberVisibility,
 });
 
-const memberAddress = (member: WorkerGroupMember): string => {
-  const principal = member.principal;
-  return principal?.kind === 'evm_address' || principal?.kind === 'passkey_account'
-    ? String(principal.address || '').trim()
-    : '';
-};
-const memberIdentity = (member: WorkerGroupMember): string =>
-  String(member.principalKey || memberAddress(member) || `${member.groupId || ''}\n${member.addedAt || ''}`);
+const memberAddress = (member: WorkerGroupMember): string => String(member.principal?.address || '').trim();
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
@@ -118,11 +77,7 @@ const AdminWorkerGroupsPanel = ({
   workerAuthContext = null,
   postSignedRequest,
   autoLoad = false,
-  createOnly = false,
   onGroupsChanged,
-  title = 'Worker access groups',
-  description = 'Manage the supported open and admin-added authorization groups.',
-  sessionName,
 }: AdminWorkerGroupsPanelProps) => {
   const defaultGroupTags = useMemo(() => normalizeWorkerGroupDefaultTags(sessionConfig), [sessionConfig]);
   const defaultGroupTagsKey = defaultGroupTags.join('\u0000');
@@ -204,34 +159,20 @@ const AdminWorkerGroupsPanel = ({
   ]);
 
   useEffect(() => {
-    setGroups([]);
-    setCreateDraft(emptyDraft(signedAccount, defaultGroupTags));
-    setEditingGroupId('');
-    setEditDraft(emptyDraft());
-    setMemberGroupId('');
-    setMembers([]);
-    setMemberNextCursor('');
-    setMemberAddressDraft('');
-    setBusy(false);
-    setStatus('');
-    if (autoLoad && !createOnly) void loadGroups();
-  }, [autoLoad, createOnly, defaultGroupTags, loadGroups, signedAccount, targetKey]); // targetKey includes normalized defaults.
+    if (autoLoad) void loadGroups();
+  }, [autoLoad, loadGroups]);
 
   const runMutation = async (
     operation: () => Promise<unknown>,
     success: string,
     updateLocalGroups?: LocalGroupUpdater,
   ): Promise<boolean> => {
-    const requestTargetKey = targetKey;
-    const requestGeneration = targetGeneration;
     setBusy(true);
     setStatus('');
     try {
       const result = await operation();
-      if (!isCurrentTarget(requestTargetKey, requestGeneration)) return false;
       if (updateLocalGroups) setGroups((current) => updateLocalGroups(current, result));
       else await loadGroups();
-      if (!isCurrentTarget(requestTargetKey, requestGeneration)) return false;
       setStatus(success);
       onGroupsChanged?.();
       return true;
@@ -260,10 +201,7 @@ const AdminWorkerGroupsPanel = ({
         }),
       'Group created.',
       (current, result) => {
-        const created = normalizeWorkerGroupsAdminPayload(
-          { groups: [asRecord(result).group] },
-          normalizedSessionSlug,
-        )[0];
+        const created = normalizeWorkerGroupsAdminPayload({ groups: [asRecord(result).group] })[0];
         return created ? [...current.filter((group) => group.groupId !== created.groupId), created] : current;
       },
     ).then((created) => {
@@ -277,11 +215,6 @@ const AdminWorkerGroupsPanel = ({
       label: group.label,
       description: group.description || '',
       imageUrl: group.imageUrl || '',
-      tags: group.tags || [],
-      documentURLs: group.documentURLs || [],
-      memberLimit: group.memberLimit ? String(group.memberLimit) : '',
-      joinEndsAt: toLocalDateTimeInput(group.joinEndsAt),
-      adminAddress: group.adminAddress || '',
       joinMode: group.joinMode,
       memberVisibility: group.memberVisibility,
     });
@@ -304,10 +237,7 @@ const AdminWorkerGroupsPanel = ({
         }),
       'Group updated.',
       (current, result) => {
-        const updated = normalizeWorkerGroupsAdminPayload(
-          { groups: [asRecord(result).group] },
-          normalizedSessionSlug,
-        )[0];
+        const updated = normalizeWorkerGroupsAdminPayload({ groups: [asRecord(result).group] })[0];
         return updated ? current.map((group) => (group.groupId === updated.groupId ? updated : group)) : current;
       },
     ).then((updated) => {
@@ -471,22 +401,85 @@ const AdminWorkerGroupsPanel = ({
         </Button>
       </div>
 
-      {createForm}
+      <div className={styles.formRow}>
+        <FormGroup>
+          <Label for="worker-group-create-label">Group label</Label>
+          <Input
+            id="worker-group-create-label"
+            data-testid="ce-admin-worker-group-create-label"
+            value={createDraft.label}
+            onChange={(event) => setCreateDraft((draft) => ({ ...draft, label: event.target.value }))}
+          />
+        </FormGroup>
+        <FormGroup>
+          <Label for="worker-group-create-description">Description</Label>
+          <Input
+            id="worker-group-create-description"
+            type="textarea"
+            data-testid="ce-admin-worker-group-create-description"
+            value={createDraft.description}
+            onChange={(event) => setCreateDraft((draft) => ({ ...draft, description: event.target.value }))}
+          />
+        </FormGroup>
+        <FormGroup>
+          <Label for="worker-group-create-image">Image URL</Label>
+          <Input
+            id="worker-group-create-image"
+            type="url"
+            data-testid="ce-admin-worker-group-create-image"
+            placeholder="https://…"
+            value={createDraft.imageUrl}
+            onChange={(event) => setCreateDraft((draft) => ({ ...draft, imageUrl: event.target.value }))}
+          />
+        </FormGroup>
+        <FormGroup>
+          <Label for="worker-group-create-mode">Join mode</Label>
+          <Input
+            id="worker-group-create-mode"
+            type="select"
+            data-testid="ce-admin-worker-group-create-mode"
+            value={createDraft.joinMode}
+            onChange={(event) =>
+              setCreateDraft((draft) => withJoinMode(draft, event.target.value as WorkerGroupJoinMode))
+            }
+          >
+            <option value="admin_add">Admin adds members</option>
+            <option value="open">Open self-join</option>
+          </Input>
+        </FormGroup>
+        <FormGroup>
+          <Label for="worker-group-create-visibility">Group visibility</Label>
+          <Input
+            id="worker-group-create-visibility"
+            type="select"
+            data-testid="ce-admin-worker-group-create-visibility"
+            value={createDraft.memberVisibility}
+            onChange={(event) =>
+              setCreateDraft((draft) => ({
+                ...draft,
+                memberVisibility: event.target.value as WorkerGroupMemberVisibility,
+              }))
+            }
+          >
+            <option value="admin_only">Admins only</option>
+            <option value="members">Group members</option>
+            <option value="session">All session members</option>
+          </Input>
+        </FormGroup>
+        <Button color="primary" disabled={busy} onClick={handleCreate}>
+          Create group
+        </Button>
+      </div>
 
       <div className={styles.grid}>
         {groups.map((group) => (
           <div key={group.groupId} className={styles.statusItem}>
             {group.imageUrl ? (
-              <WorkerGroupImage
+              <img
                 src={group.imageUrl}
                 alt=""
                 className={styles.workerGroupImage}
-                context={workerAuthContext}
-                sessionConfig={sessionConfig}
-                sessionSlug={normalizedSessionSlug}
-                testId="ce-admin-worker-group-image"
-                workerToken={workerToken}
-                workerUrl={normalizedWorkerUrl}
+                data-testid="ce-admin-worker-group-image"
               />
             ) : null}
             <strong>{group.label}</strong>
@@ -582,43 +575,6 @@ const AdminWorkerGroupsPanel = ({
               data-testid="ce-admin-worker-group-edit-image"
               value={editDraft.imageUrl}
               onChange={(event) => setEditDraft((draft) => ({ ...draft, imageUrl: event.target.value }))}
-            />
-          </FormGroup>
-          <FormGroup>
-            <Label for="worker-group-edit-tags">Tags</Label>
-            <Input
-              id="worker-group-edit-tags"
-              value={editDraft.tags.join(', ')}
-              placeholder="research, reviewers"
-              onChange={(event) =>
-                setEditDraft((draft) => ({
-                  ...draft,
-                  tags: event.target.value
-                    .split(',')
-                    .map((tag) => tag.trim())
-                    .filter(Boolean)
-                    .slice(0, 20),
-                }))
-              }
-            />
-          </FormGroup>
-          <FormGroup>
-            <Label for="worker-group-edit-document-urls">Reference URLs</Label>
-            <Input
-              id="worker-group-edit-document-urls"
-              type="textarea"
-              value={editDraft.documentURLs.join('\n')}
-              placeholder="One HTTPS URL per line"
-              onChange={(event) =>
-                setEditDraft((draft) => ({
-                  ...draft,
-                  documentURLs: event.target.value
-                    .split(/\r?\n/)
-                    .map((url) => url.trim())
-                    .filter(Boolean)
-                    .slice(0, 10),
-                }))
-              }
             />
           </FormGroup>
           <FormGroup>

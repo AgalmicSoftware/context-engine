@@ -13,11 +13,6 @@ export type WorkerGroup = {
   label: string;
   description?: string;
   imageUrl?: string;
-  tags?: string[];
-  documentURLs?: string[];
-  memberLimit?: number;
-  joinEndsAt?: string;
-  adminAddress?: string;
   joinMode: WorkerGroupJoinMode;
   memberVisibility: WorkerGroupMemberVisibility;
   createdAt?: string;
@@ -105,6 +100,17 @@ const isSafeHttpsUrl = (value: string): boolean => {
   } catch {
     return false;
   }
+  return {
+    groupId,
+    sessionSlug: toStringValue(source.sessionSlug) || undefined,
+    label,
+    description: toStringValue(source.description) || undefined,
+    imageUrl: toStringValue(source.imageUrl) || undefined,
+    joinMode: joinMode as WorkerGroupJoinMode,
+    memberVisibility: memberVisibility as WorkerGroupMemberVisibility,
+    createdAt: toStringValue(source.createdAt) || undefined,
+    updatedAt: toStringValue(source.updatedAt) || undefined,
+  };
 };
 
 const SAFE_REMOTE_WORKER_GROUP_REASONS = new Set([

@@ -56054,6 +56054,7 @@ var WORKER_GROUP_MEMBER_VISIBILITY = Object.freeze({
 });
 var DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION = 100;
 var DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP = 1e3;
+var MAX_WORKER_GROUP_IMAGE_URL_LENGTH = 2048;
 var IMPLEMENTED_JOIN_MODES = /* @__PURE__ */ new Set([
   WORKER_GROUP_JOIN_MODES.OPEN,
   WORKER_GROUP_JOIN_MODES.ADMIN_ADD
@@ -56098,6 +56099,18 @@ var normalizeMemberVisibility = (value) => {
   const visibility = trim(value || WORKER_GROUP_MEMBER_VISIBILITY.ADMIN_ONLY).toLowerCase();
   if (Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(visibility)) return visibility;
   return "";
+};
+var normalizeImageUrl = (value) => {
+  const raw = trim(value);
+  if (!raw) return { ok: true, value: "" };
+  if (raw.length > MAX_WORKER_GROUP_IMAGE_URL_LENGTH) return { ok: false };
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return { ok: false };
+    return { ok: true, value: parsed.href };
+  } catch {
+    return { ok: false };
+  }
 };
 var normalizeEvmAddress = (value, deps = {}) => {
   const address = trim(value);
@@ -56202,12 +56215,15 @@ var normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps =
   if (!label || label.length > 120) return { ok: false, status: 400, reason: "invalid_group_label" };
   const description = trim(input.description ?? existing?.description);
   if (description.length > 500) return { ok: false, status: 400, reason: "invalid_group_description" };
+  const imageUrlResult = normalizeImageUrl(input.imageUrl ?? existing?.imageUrl);
+  if (!imageUrlResult.ok) return { ok: false, status: 400, reason: "invalid_group_image_url" };
   const updatedAt = nowIso(deps);
   return {
     ok: true,
     patch: {
       label,
-      ...description ? { description } : {},
+      description: description || void 0,
+      imageUrl: imageUrlResult.value || void 0,
       joinMode,
       memberVisibility,
       updatedAt,
@@ -56270,6 +56286,7 @@ var redactGroupForMember = (group) => ({
   sessionSlug: group.sessionSlug,
   label: group.label,
   ...group.description ? { description: group.description } : {},
+  ...group.imageUrl ? { imageUrl: group.imageUrl } : {},
   joinMode: group.joinMode,
   memberVisibility: group.memberVisibility,
   createdAt: group.createdAt,
