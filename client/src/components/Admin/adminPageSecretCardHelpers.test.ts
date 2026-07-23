@@ -7,6 +7,7 @@ import {
   getAdminSecretFieldLabel,
   getAdminSecretFieldRows,
   getAdminSecretFieldStatusLabel,
+  filterAdminSecretCards,
   normalizeAdminSecretPresence,
   normalizeAdminSecretPresencePatch,
 } from './adminPageSecretCardHelpers';
@@ -30,6 +31,12 @@ describe('adminPageSecretCardHelpers', () => {
       { key: 'faucet', label: 'Faucet', fields: ['faucetPrivateKey'] },
       { key: 'lit', label: 'Lit', fields: ['litAccountApiKey', 'litUsageApiKey'] },
     ]);
+  });
+
+  it('projects only enabled secret cards while preserving canonical order', () => {
+    expect(filterAdminSecretCards(['ai']).map((card) => card.key)).toEqual(['ai']);
+    expect(filterAdminSecretCards(['lit', 'rpc', 'ai']).map((card) => card.key)).toEqual(['ai', 'rpc', 'lit']);
+    expect(filterAdminSecretCards([])).toEqual([]);
   });
 
   it('preserves secret field labels, input types, rows, and remove test IDs', () => {

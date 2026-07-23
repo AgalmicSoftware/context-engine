@@ -58,6 +58,8 @@ type AdminPageTestsPanelProps = {
   deniedStatus: string;
   deniedResults: AdminTestResults;
   runDeniedAccessTest: (kind: keyof AdminTestResults) => void;
+  visibleTestKeys?: readonly string[];
+  gateKind?: 'sbt' | 'session';
 };
 
 const renderInfoTooltip = (id: string, content: React.ReactNode, placement: 'right' | 'top' = 'right') => {
@@ -139,6 +141,8 @@ const AdminPageTestsPanel = ({
   deniedStatus,
   deniedResults,
   runDeniedAccessTest,
+  visibleTestKeys = ['health', 'ai'],
+  gateKind = 'session',
 }: AdminPageTestsPanelProps) => (
   <section className={`${styles.panel} ${styles.testsPanel}`}>
     <div className={styles.panelHeader}>
@@ -150,7 +154,8 @@ const AdminPageTestsPanel = ({
             <div className={styles.tooltipTextStack}>
               <div>Run quick checks against the selected worker and the session&apos;s gate rules.</div>
               <div>
-                Run these as a user who holds the sponsored SBT. Tests use the configured worker URL and auth flow.
+                Run these as an identity that satisfies the configured session gate. Tests use the configured Worker URL
+                and auth flow.
               </div>
             </div>,
           )}
@@ -169,95 +174,103 @@ const AdminPageTestsPanel = ({
     </div>
     {testsOpen && (
       <>
-        <div className={styles.panelTitleRow}>
-          <div className={styles.panelSubtitle}>Lit quick test (no worker)</div>
-          {renderInfoTooltip(
-            'admin-lit-test-tip',
-            'Uses the selected session’s default gate + Lit hooks. Does not call the worker.',
-          )}
-        </div>
-        <FormGroup>
-          <Label>Lit test value</Label>
-          <Input
-            type="textarea"
-            rows="2"
-            value={litTestValue}
-            onChange={(event: AdminTestInputChangeEvent) => setLitTestValue(event.target.value)}
-            placeholder="Type a short test string"
-          />
-        </FormGroup>
-        <div className={`${styles.formRow} ${styles.litActionRow}`}>
-          <Button
-            color="primary"
-            outline
-            className={styles.actionButton}
-            onClick={runLitEncryptTest}
-            disabled={litTestBusy}
-          >
-            Encrypt
-          </Button>
-          <Button
-            color="primary"
-            outline
-            className={styles.actionButton}
-            onClick={runLitDecryptTest}
-            disabled={litTestBusy || !litTestEnvelope}
-          >
-            Decrypt
-          </Button>
-        </div>
-        {litTestStatus && <div className={styles.statusNote}>{litTestStatus}</div>}
-        {litTestEnvelope && (
-          <div className={styles.resultBox}>
-            <div>Envelope</div>
-            <pre>{litTestEnvelope}</pre>
-          </div>
-        )}
-        {litTestDecrypted && <div className={styles.statusNote}>Decrypted: {litTestDecrypted}</div>}
-        <div className={styles.inlineRow}>
-          <Label>
-            Transcription test (AudioInput)
-            {!canRunTests &&
-              renderInfoTooltip(
-                'admin-transcription-tip',
-                'Connect a wallet and set a worker URL to test transcription.',
+        {visibleTestKeys.includes('lit') ? (
+          <>
+            <div className={styles.panelTitleRow}>
+              <div className={styles.panelSubtitle}>Lit quick test (no worker)</div>
+              {renderInfoTooltip(
+                'admin-lit-test-tip',
+                'Uses the selected session’s default gate + Lit hooks. Does not call the worker.',
               )}
-          </Label>
-          {canRunTests ? (
-            <AudioInput
-              placeholder="Record a short clip to test /transcribe…"
-              updateFunction={handleTranscribeTestTextChange}
-              toggleEncryption={() => {}}
-              value={transcribeText}
-              encrypted={false}
-              hideEncryption
-              disableEncryption
-              enableAiRewrite={false}
-              sessionSlug={normalizeSlug(selectedSlug)}
-              sessionConfig={testSessionConfig}
-              context={testContext}
-              workerUrl={baseWorkerUrl}
-            />
-          ) : null}
-        </div>
+            </div>
+            <FormGroup>
+              <Label>Lit test value</Label>
+              <Input
+                type="textarea"
+                rows="2"
+                value={litTestValue}
+                onChange={(event: AdminTestInputChangeEvent) => setLitTestValue(event.target.value)}
+                placeholder="Type a short test string"
+              />
+            </FormGroup>
+            <div className={`${styles.formRow} ${styles.litActionRow}`}>
+              <Button
+                color="primary"
+                outline
+                className={styles.actionButton}
+                onClick={runLitEncryptTest}
+                disabled={litTestBusy}
+              >
+                Encrypt
+              </Button>
+              <Button
+                color="primary"
+                outline
+                className={styles.actionButton}
+                onClick={runLitDecryptTest}
+                disabled={litTestBusy || !litTestEnvelope}
+              >
+                Decrypt
+              </Button>
+            </div>
+            {litTestStatus && <div className={styles.statusNote}>{litTestStatus}</div>}
+            {litTestEnvelope && (
+              <div className={styles.resultBox}>
+                <div>Envelope</div>
+                <pre>{litTestEnvelope}</pre>
+              </div>
+            )}
+            {litTestDecrypted && <div className={styles.statusNote}>Decrypted: {litTestDecrypted}</div>}
+          </>
+        ) : null}
+        {visibleTestKeys.includes('transcribe') ? (
+          <div className={styles.inlineRow}>
+            <Label>
+              Transcription test (AudioInput)
+              {!canRunTests &&
+                renderInfoTooltip(
+                  'admin-transcription-tip',
+                  'Connect a wallet and set a worker URL to test transcription.',
+                )}
+            </Label>
+            {canRunTests ? (
+              <AudioInput
+                placeholder="Record a short clip to test /transcribe…"
+                updateFunction={handleTranscribeTestTextChange}
+                toggleEncryption={() => {}}
+                value={transcribeText}
+                encrypted={false}
+                hideEncryption
+                disableEncryption
+                enableAiRewrite={false}
+                sessionSlug={normalizeSlug(selectedSlug)}
+                sessionConfig={testSessionConfig}
+                context={testContext}
+                workerUrl={baseWorkerUrl}
+              />
+            ) : null}
+          </div>
+        ) : null}
         {testStatus && <div className={styles.statusNote}>{testStatus}</div>}
         <div className={styles.grid}>
-          <AdminTestChip
-            label="Health"
-            result={testResults.health}
-            clickable={canRunHealthTest}
-            disabled={testBusy || !canRunHealthTest}
-            busy={testBusy}
-            onRun={runWorkerHealthTest}
-            title={
-              !baseWorkerUrl
-                ? 'Set a worker URL to test /health'
-                : !defaultGateIsEmpty && !walletReady
-                  ? 'Connect a wallet to run the gated access test.'
-                  : 'Click to test /health'
-            }
-            id={!defaultGateIsEmpty && !walletReady ? 'admin-health-test-chip' : undefined}
-          />
+          {visibleTestKeys.includes('health') ? (
+            <AdminTestChip
+              label="Health"
+              result={testResults.health}
+              clickable={canRunHealthTest}
+              disabled={testBusy || !canRunHealthTest}
+              busy={testBusy}
+              onRun={runWorkerHealthTest}
+              title={
+                !baseWorkerUrl
+                  ? 'Set a worker URL to test /health'
+                  : !defaultGateIsEmpty && !walletReady
+                    ? 'Connect a wallet to run the gated access test.'
+                    : 'Click to test /health'
+              }
+              id={!defaultGateIsEmpty && !walletReady ? 'admin-health-test-chip' : undefined}
+            />
+          ) : null}
           {!defaultGateIsEmpty && !walletReady && (
             <CETooltip
               placement="top"
@@ -268,89 +281,109 @@ const AdminPageTestsPanel = ({
               Connect a wallet to run the gated access test.
             </CETooltip>
           )}
-          <AdminTestChip
-            label="AI"
-            result={testResults.ai}
-            clickable={!!account}
-            disabled={testBusy || !account}
-            busy={testBusy}
-            onRun={runWorkerAiTest}
-            title="Click to test AI"
-          />
-          <AdminTestChip
-            label="Arweave"
-            result={testResults.arweave}
-            clickable={!!account}
-            disabled={testBusy || !account}
-            busy={testBusy}
-            onRun={runWorkerArweaveTest}
-            title="Click to test Arweave upload"
-          />
-          <AdminTestChip
-            label="Faucet"
-            result={testResults.faucet}
-            clickable={!!account}
-            disabled={testBusy || !account}
-            busy={testBusy}
-            onRun={runWorkerFaucetTest}
-            title="Click to test faucet (0.0000001)"
-          />
-          <AdminTestChip label="Transcribe" result={testResults.transcribe} />
+          {visibleTestKeys.includes('ai') ? (
+            <AdminTestChip
+              label="AI"
+              result={testResults.ai}
+              clickable={!!account}
+              disabled={testBusy || !account}
+              busy={testBusy}
+              onRun={runWorkerAiTest}
+              title="Click to test AI"
+            />
+          ) : null}
+          {visibleTestKeys.includes('arweave') ? (
+            <AdminTestChip
+              label="Arweave"
+              result={testResults.arweave}
+              clickable={!!account}
+              disabled={testBusy || !account}
+              busy={testBusy}
+              onRun={runWorkerArweaveTest}
+              title="Click to test Arweave upload"
+            />
+          ) : null}
+          {visibleTestKeys.includes('faucet') ? (
+            <AdminTestChip
+              label="Faucet"
+              result={testResults.faucet}
+              clickable={!!account}
+              disabled={testBusy || !account}
+              busy={testBusy}
+              onRun={runWorkerFaucetTest}
+              title="Click to test faucet (0.0000001)"
+            />
+          ) : null}
+          {visibleTestKeys.includes('transcribe') ? (
+            <AdminTestChip label="Transcribe" result={testResults.transcribe} />
+          ) : null}
         </div>
         <div className={styles.panelTitleRow} style={{ marginTop: 16 }}>
           <div className={styles.panelTitle}>Negative tests (denied access)</div>
           {renderInfoTooltip(
             'admin-negative-tests-tip',
-            'Connect a wallet that does NOT hold the sponsored SBT. Each test expects a 403 during login.',
+            gateKind === 'sbt'
+              ? 'Connect a wallet that does NOT hold the configured SBT. Each test expects a 403 during login.'
+              : 'Use a wallet or identity that fails the configured session gate. Each test expects a 403 during login.',
           )}
         </div>
         {deniedStatus && <div className={styles.statusNote}>{deniedStatus}</div>}
         <div className={styles.grid}>
-          <AdminTestChip
-            label="Login"
-            result={deniedResults.login}
-            clickable={!deniedBusy}
-            disabled={deniedBusy}
-            onRun={() => runDeniedAccessTest('login')}
-            title="Click to test login denied"
-            testId="ce-admin-denied-chip-login"
-          />
-          <AdminTestChip
-            label="AI"
-            result={deniedResults.ai}
-            clickable={!deniedBusy}
-            disabled={deniedBusy}
-            onRun={() => runDeniedAccessTest('ai')}
-            title="Click to test AI denied"
-            testId="ce-admin-denied-chip-ai"
-          />
-          <AdminTestChip
-            label="Arweave"
-            result={deniedResults.arweave}
-            clickable={!deniedBusy}
-            disabled={deniedBusy}
-            onRun={() => runDeniedAccessTest('arweave')}
-            title="Click to test Arweave denied"
-            testId="ce-admin-denied-chip-arweave"
-          />
-          <AdminTestChip
-            label="Transcribe"
-            result={deniedResults.transcribe}
-            clickable={!deniedBusy}
-            disabled={deniedBusy}
-            onRun={() => runDeniedAccessTest('transcribe')}
-            title="Click to test transcription denied"
-            testId="ce-admin-denied-chip-transcribe"
-          />
-          <AdminTestChip
-            label="Faucet"
-            result={deniedResults.faucet}
-            clickable={!deniedBusy}
-            disabled={deniedBusy}
-            onRun={() => runDeniedAccessTest('faucet')}
-            title="Click to test faucet denied"
-            testId="ce-admin-denied-chip-faucet"
-          />
+          {visibleTestKeys.includes('health') ? (
+            <AdminTestChip
+              label="Login"
+              result={deniedResults.login}
+              clickable={!deniedBusy}
+              disabled={deniedBusy}
+              onRun={() => runDeniedAccessTest('login')}
+              title="Click to test login denied"
+              testId="ce-admin-denied-chip-login"
+            />
+          ) : null}
+          {visibleTestKeys.includes('ai') ? (
+            <AdminTestChip
+              label="AI"
+              result={deniedResults.ai}
+              clickable={!deniedBusy}
+              disabled={deniedBusy}
+              onRun={() => runDeniedAccessTest('ai')}
+              title="Click to test AI denied"
+              testId="ce-admin-denied-chip-ai"
+            />
+          ) : null}
+          {visibleTestKeys.includes('arweave') ? (
+            <AdminTestChip
+              label="Arweave"
+              result={deniedResults.arweave}
+              clickable={!deniedBusy}
+              disabled={deniedBusy}
+              onRun={() => runDeniedAccessTest('arweave')}
+              title="Click to test Arweave denied"
+              testId="ce-admin-denied-chip-arweave"
+            />
+          ) : null}
+          {visibleTestKeys.includes('transcribe') ? (
+            <AdminTestChip
+              label="Transcribe"
+              result={deniedResults.transcribe}
+              clickable={!deniedBusy}
+              disabled={deniedBusy}
+              onRun={() => runDeniedAccessTest('transcribe')}
+              title="Click to test transcription denied"
+              testId="ce-admin-denied-chip-transcribe"
+            />
+          ) : null}
+          {visibleTestKeys.includes('faucet') ? (
+            <AdminTestChip
+              label="Faucet"
+              result={deniedResults.faucet}
+              clickable={!deniedBusy}
+              disabled={deniedBusy}
+              onRun={() => runDeniedAccessTest('faucet')}
+              title="Click to test faucet denied"
+              testId="ce-admin-denied-chip-faucet"
+            />
+          ) : null}
         </div>
       </>
     )}

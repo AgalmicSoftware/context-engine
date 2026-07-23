@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { ethers } from 'ethers';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import styles from './AdminPage.module.scss';
 
 const ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
@@ -263,7 +264,8 @@ describe('AdminPage rendered interactions', () => {
       sessionName: 'Worker Admin Session',
       corsWorkerUrl: 'https://worker-admin.example.test',
       adminAddress: ADMIN_ADDRESS,
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      configRevision: 'worker-admin-revision',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     };
     mockResolveCorsProxyUrl.mockResolvedValue({
       url: initialSessionConfig.corsWorkerUrl,
@@ -277,6 +279,20 @@ describe('AdminPage rendered interactions', () => {
     expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
     expect(mockLoadSessionRegistryCache).not.toHaveBeenCalled();
     expect(mockFetchSessionFromRegistry).not.toHaveBeenCalled();
+    const metadataPanel = screen.getByText('Session metadata').closest('section');
+    fireEvent.click(within(metadataPanel).getByRole('button', { name: 'Toggle Session metadata section' }));
+    expect(screen.getByText('Cloudflare Session Worker')).toBeInTheDocument();
+    expect(screen.getByText('worker-admin-revision')).toBeInTheDocument();
+    expect(screen.getByText('Not reported')).toBeInTheDocument();
+    expect(screen.queryByText('Chain / Registry')).not.toBeInTheDocument();
+    expect(screen.queryByText('Metadata URI')).not.toBeInTheDocument();
+    expect(screen.queryByText('On-chain default gate')).not.toBeInTheDocument();
+    expect(within(metadataPanel).getByText('AI defaults')).toBeInTheDocument();
+    expect(within(metadataPanel).getByText('Highlighted question IDs')).toBeInTheDocument();
+    expect(within(metadataPanel).queryByText('Contracts')).not.toBeInTheDocument();
+    expect(within(metadataPanel).queryByText('Ignored SBT list')).not.toBeInTheDocument();
+    expect(within(metadataPanel).queryByText('Start block')).not.toBeInTheDocument();
+    expect(within(metadataPanel).queryByText('Faucet amount (ETH)')).not.toBeInTheDocument();
   });
 
   it('rebinds worker actions across route-only worker session navigation A to B to A', async () => {

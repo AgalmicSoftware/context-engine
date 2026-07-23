@@ -14,6 +14,7 @@ import CETooltip from '../Shared/CETooltip';
 import { normalizeWorkerUrl } from './adminPageHelpers';
 import {
   ADMIN_SECRET_CARDS,
+  filterAdminSecretCards,
   buildAdminSecretRemoveTestId,
   getAdminSecretCardStatus,
   getAdminSecretFieldInputType,
@@ -66,6 +67,7 @@ type AdminPageWorkerSecretsPanelProps = {
   handleSaveWorkerSecrets: () => void;
   saveStatus: string;
   chainStatus: string;
+  visibleCardKeys?: readonly string[];
 };
 
 const renderInfoTooltip = (id: string, content: React.ReactNode) => {
@@ -130,6 +132,7 @@ const AdminPageWorkerSecretsPanel = ({
   handleSaveWorkerSecrets,
   saveStatus,
   chainStatus,
+  visibleCardKeys = ['ai'],
 }: AdminPageWorkerSecretsPanelProps) => (
   <section className={`${styles.panel} ${styles.secretsPanel}`}>
     <div className={styles.panelHeader}>
@@ -177,7 +180,7 @@ const AdminPageWorkerSecretsPanel = ({
           </Button>
         </div>
         <div className={styles.secretOptionsGrid}>
-          {ADMIN_SECRET_CARDS.map((card) => {
+          {filterAdminSecretCards(visibleCardKeys).map((card) => {
             const isOpen = openSecretCards[card.key];
             const cardStatus = getAdminSecretCardStatus({
               fields: card.fields,
@@ -293,6 +296,11 @@ const AdminPageWorkerSecretsPanel = ({
             );
           })}
         </div>
+        {visibleCardKeys.length < ADMIN_SECRET_CARDS.length ? (
+          <div className={styles.statusNote}>
+            Chain, Arweave, faucet, and Lit secrets appear only when an enabled Advanced hybrid capability needs them.
+          </div>
+        ) : null}
         {canAdminWorker && workerSecretsDirty && (
           <Button
             color="primary"
