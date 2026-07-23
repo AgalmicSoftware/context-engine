@@ -25,6 +25,7 @@ describe('worker group ports', () => {
               {
                 groupId: 'reviewers',
                 label: 'Reviewers',
+                imageUrl: 'https://ar-io.dev/reviewers-image',
                 joinMode: 'open',
                 memberVisibility: 'session',
               },
@@ -57,7 +58,13 @@ describe('worker group ports', () => {
     await expect(
       loadWorkerGroupOverview({ workerUrl: `${WORKER_URL}/`, credentialToken: WORKER_TOKEN, fetchImpl }),
     ).resolves.toMatchObject({
-      groups: [{ groupId: 'reviewers', label: 'Reviewers' }],
+      groups: [
+        {
+          groupId: 'reviewers',
+          label: 'Reviewers',
+          imageUrl: 'https://ar-io.dev/reviewers-image',
+        },
+      ],
       memberships: [{ group: { groupId: 'members', memberVisibility: 'admin_only' }, memberCount: 3 }],
     });
 

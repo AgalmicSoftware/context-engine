@@ -8,20 +8,31 @@ import {
 import styles from './OnePageSession.module.scss';
 
 export type WorkerGroupMembershipPanelProps = {
-  envelope: AgentClientLoginEnvelope;
+  envelope?: AgentClientLoginEnvelope;
+  workerUrl?: string;
+  workerToken?: string;
+  canReadGroups?: boolean;
+  refreshNonce?: number;
   fetchImpl?: typeof fetch;
 };
 
 const emptyOverview: WorkerGroupOverview = { groups: [], memberships: [] };
 
-const WorkerGroupMembershipPanel = ({ envelope, fetchImpl = fetch }: WorkerGroupMembershipPanelProps) => {
+const WorkerGroupMembershipPanel = ({
+  envelope,
+  workerUrl: workerUrlProp,
+  workerToken: workerTokenProp,
+  canReadGroups: canReadGroupsProp,
+  refreshNonce = 0,
+  fetchImpl = fetch,
+}: WorkerGroupMembershipPanelProps) => {
   const [overview, setOverview] = useState<WorkerGroupOverview>(emptyOverview);
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [error, setError] = useState('');
   const [joiningGroupId, setJoiningGroupId] = useState('');
-  const canReadGroups = envelope.capabilities?.readGroups === true;
-  const workerUrl = envelope.workerUrl || '';
-  const workerToken = envelope.workerCredential?.token || '';
+  const canReadGroups = canReadGroupsProp ?? envelope?.capabilities?.readGroups === true;
+  const workerUrl = workerUrlProp || envelope?.workerUrl || '';
+  const workerToken = workerTokenProp || envelope?.workerCredential?.token || '';
 
   const reload = useCallback(async () => {
     if (!canReadGroups || !workerUrl || !workerToken) return;
@@ -43,7 +54,7 @@ const WorkerGroupMembershipPanel = ({ envelope, fetchImpl = fetch }: WorkerGroup
 
   useEffect(() => {
     void reload();
-  }, [reload]);
+  }, [refreshNonce, reload]);
 
   const membershipIds = useMemo(
     () => new Set(overview.memberships.map((membership) => membership.group.groupId)),
@@ -90,6 +101,14 @@ const WorkerGroupMembershipPanel = ({ envelope, fetchImpl = fetch }: WorkerGroup
       {error ? <div className={styles.telegramListEmpty}>{error}</div> : null}
       {overview.memberships.map((membership) => (
         <article key={membership.group.groupId} className={styles.telegramPileFrame}>
+          {membership.group.imageUrl ? (
+            <img
+              src={membership.group.imageUrl}
+              alt=""
+              className={styles.workerGroupImage}
+              data-testid="ce-session-worker-group-image"
+            />
+          ) : null}
           <strong>{membership.group.label}</strong>
           {membership.group.description ? <span>{membership.group.description}</span> : null}
           <span>Member</span>
@@ -98,6 +117,14 @@ const WorkerGroupMembershipPanel = ({ envelope, fetchImpl = fetch }: WorkerGroup
       ))}
       {availableGroups.map((group) => (
         <article key={group.groupId} className={styles.telegramPileFrame}>
+          {group.imageUrl ? (
+            <img
+              src={group.imageUrl}
+              alt=""
+              className={styles.workerGroupImage}
+              data-testid="ce-session-worker-group-image"
+            />
+          ) : null}
           <strong>{group.label}</strong>
           {group.description ? <span>{group.description}</span> : null}
           {group.joinMode === 'open' ? (

@@ -786,6 +786,13 @@ $card-shadow: tokens.$ce-card-shadow;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
+.workerGroupImage {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: var(--ce-radius-6);
+}
+
 .metadataItem {
   display: flex;
   flex-direction: column;

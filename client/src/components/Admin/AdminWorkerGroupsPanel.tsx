@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
 import {
   addWorkerGroupMember,
@@ -21,6 +21,7 @@ import styles from './AdminPage.module.scss';
 type WorkerGroupDraft = {
   label: string;
   description: string;
+  imageUrl: string;
   joinMode: WorkerGroupJoinMode;
   memberVisibility: WorkerGroupMemberVisibility;
 };
@@ -30,22 +31,37 @@ export type AdminWorkerGroupsPanelProps = {
   sessionSlug: string;
   workerUrl: string;
   postSignedRequest: PostSignedWorkerGroupRequest;
+  autoLoad?: boolean;
+  onGroupsChanged?: () => void;
 };
 
 const emptyDraft = (): WorkerGroupDraft => ({
   label: '',
   description: '',
+  imageUrl: '',
   joinMode: 'admin_add',
   memberVisibility: 'admin_only',
 });
 
+const withJoinMode = (draft: WorkerGroupDraft, joinMode: WorkerGroupJoinMode): WorkerGroupDraft => ({
+  ...draft,
+  joinMode,
+  memberVisibility: joinMode === 'open' && draft.memberVisibility === 'admin_only' ? 'session' : draft.memberVisibility,
+});
+
 const memberAddress = (member: WorkerGroupMember): string => String(member.principal?.address || '').trim();
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+
+type LocalGroupUpdater = (groups: WorkerGroup[], result: unknown) => WorkerGroup[];
 
 const AdminWorkerGroupsPanel = ({
   canAdminWorker,
   sessionSlug,
   workerUrl,
   postSignedRequest,
+  autoLoad = false,
+  onGroupsChanged,
 }: AdminWorkerGroupsPanelProps) => {
   const [groups, setGroups] = useState<WorkerGroup[]>([]);
   const [createDraft, setCreateDraft] = useState<WorkerGroupDraft>(emptyDraft);
@@ -75,13 +91,23 @@ const AdminWorkerGroupsPanel = ({
     }
   }, [postSignedRequest, ready]);
 
-  const runMutation = async (operation: () => Promise<unknown>, success: string): Promise<boolean> => {
+  useEffect(() => {
+    if (autoLoad) void loadGroups();
+  }, [autoLoad, loadGroups]);
+
+  const runMutation = async (
+    operation: () => Promise<unknown>,
+    success: string,
+    updateLocalGroups?: LocalGroupUpdater,
+  ): Promise<boolean> => {
     setBusy(true);
     setStatus('');
     try {
-      await operation();
-      const refreshed = await loadGroups();
-      if (refreshed) setStatus(success);
+      const result = await operation();
+      if (updateLocalGroups) setGroups((current) => updateLocalGroups(current, result));
+      else await loadGroups();
+      setStatus(success);
+      onGroupsChanged?.();
       return true;
     } catch (error) {
       setStatus(error instanceof Error ? error.message : 'Worker group request failed.');
@@ -100,6 +126,10 @@ const AdminWorkerGroupsPanel = ({
     void runMutation(
       () => createWorkerGroup({ group: { ...createDraft, label }, postSignedRequest }),
       'Group created.',
+      (current, result) => {
+        const created = normalizeWorkerGroupsAdminPayload({ groups: [asRecord(result).group] })[0];
+        return created ? [...current.filter((group) => group.groupId !== created.groupId), created] : current;
+      },
     ).then((created) => {
       if (created) setCreateDraft(emptyDraft());
     });
@@ -110,6 +140,7 @@ const AdminWorkerGroupsPanel = ({
     setEditDraft({
       label: group.label,
       description: group.description || '',
+      imageUrl: group.imageUrl || '',
       joinMode: group.joinMode,
       memberVisibility: group.memberVisibility,
     });
@@ -124,6 +155,10 @@ const AdminWorkerGroupsPanel = ({
     void runMutation(
       () => updateWorkerGroup({ groupId: editingGroupId, group: { ...editDraft, label }, postSignedRequest }),
       'Group updated.',
+      (current, result) => {
+        const updated = normalizeWorkerGroupsAdminPayload({ groups: [asRecord(result).group] })[0];
+        return updated ? current.map((group) => (group.groupId === updated.groupId ? updated : group)) : current;
+      },
     ).then((updated) => {
       if (updated) setEditingGroupId('');
     });
@@ -203,6 +238,27 @@ const AdminWorkerGroupsPanel = ({
           />
         </FormGroup>
         <FormGroup>
+          <Label for="worker-group-create-description">Description</Label>
+          <Input
+            id="worker-group-create-description"
+            type="textarea"
+            data-testid="ce-admin-worker-group-create-description"
+            value={createDraft.description}
+            onChange={(event) => setCreateDraft((draft) => ({ ...draft, description: event.target.value }))}
+          />
+        </FormGroup>
+        <FormGroup>
+          <Label for="worker-group-create-image">Image URL</Label>
+          <Input
+            id="worker-group-create-image"
+            type="url"
+            data-testid="ce-admin-worker-group-create-image"
+            placeholder="https://…"
+            value={createDraft.imageUrl}
+            onChange={(event) => setCreateDraft((draft) => ({ ...draft, imageUrl: event.target.value }))}
+          />
+        </FormGroup>
+        <FormGroup>
           <Label for="worker-group-create-mode">Join mode</Label>
           <Input
             id="worker-group-create-mode"
@@ -210,7 +266,7 @@ const AdminWorkerGroupsPanel = ({
             data-testid="ce-admin-worker-group-create-mode"
             value={createDraft.joinMode}
             onChange={(event) =>
-              setCreateDraft((draft) => ({ ...draft, joinMode: event.target.value as WorkerGroupJoinMode }))
+              setCreateDraft((draft) => withJoinMode(draft, event.target.value as WorkerGroupJoinMode))
             }
           >
             <option value="admin_add">Admin adds members</option>
@@ -244,6 +300,14 @@ const AdminWorkerGroupsPanel = ({
       <div className={styles.grid}>
         {groups.map((group) => (
           <div key={group.groupId} className={styles.statusItem}>
+            {group.imageUrl ? (
+              <img
+                src={group.imageUrl}
+                alt=""
+                className={styles.workerGroupImage}
+                data-testid="ce-admin-worker-group-image"
+              />
+            ) : null}
             <strong>{group.label}</strong>
             <span>{group.description || group.groupId}</span>
             <span>{group.joinMode === 'open' ? 'Open self-join' : 'Admin adds members'}</span>
@@ -277,6 +341,7 @@ const AdminWorkerGroupsPanel = ({
                     void runMutation(
                       () => deleteWorkerGroup({ groupId: group.groupId, postSignedRequest }),
                       'Group deleted.',
+                      (current) => current.filter((candidate) => candidate.groupId !== group.groupId),
                     );
                   }
                 }}
@@ -300,13 +365,33 @@ const AdminWorkerGroupsPanel = ({
             />
           </FormGroup>
           <FormGroup>
+            <Label for="worker-group-edit-description">Edit description</Label>
+            <Input
+              id="worker-group-edit-description"
+              type="textarea"
+              data-testid="ce-admin-worker-group-edit-description"
+              value={editDraft.description}
+              onChange={(event) => setEditDraft((draft) => ({ ...draft, description: event.target.value }))}
+            />
+          </FormGroup>
+          <FormGroup>
+            <Label for="worker-group-edit-image">Edit image URL</Label>
+            <Input
+              id="worker-group-edit-image"
+              type="url"
+              data-testid="ce-admin-worker-group-edit-image"
+              value={editDraft.imageUrl}
+              onChange={(event) => setEditDraft((draft) => ({ ...draft, imageUrl: event.target.value }))}
+            />
+          </FormGroup>
+          <FormGroup>
             <Label for="worker-group-edit-mode">Join mode</Label>
             <Input
               id="worker-group-edit-mode"
               type="select"
               value={editDraft.joinMode}
               onChange={(event) =>
-                setEditDraft((draft) => ({ ...draft, joinMode: event.target.value as WorkerGroupJoinMode }))
+                setEditDraft((draft) => withJoinMode(draft, event.target.value as WorkerGroupJoinMode))
               }
             >
               <option value="admin_add">Admin adds members</option>

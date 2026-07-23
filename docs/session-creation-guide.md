@@ -323,6 +323,13 @@ version-1 `workerAuthority` policy. It does not require an SBT, registry, RPC,
 or Lit key. Participant and anonymous scopes, plus any login gate, are evaluated
 by the session worker.
 
+After publishing a worker-canonical session, its Groups section manages native
+Cloudflare records. The worker admin supplies the group name, optional
+description and HTTPS image, join mode, and visibility. No SBT contract is
+deployed, so there is no contract address, network transaction, gas payment,
+RPC setting, or burn authorization. Advanced chain-backed profiles continue to
+use the on-chain SBT group flow below.
+
 Advanced chain-backed profiles retain the existing controls:
 
 - One or more SBT gates

@@ -20,6 +20,7 @@ describe('AdminWorkerGroupsPanel', () => {
                 groupId: 'reviewers',
                 label: 'Reviewers',
                 description: 'Can review session material.',
+                imageUrl: 'https://ar-io.dev/reviewers-image',
                 joinMode: 'admin_add',
                 memberVisibility: 'members',
               },
@@ -50,16 +51,24 @@ describe('AdminWorkerGroupsPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(await screen.findByText('Reviewers')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-admin-worker-group-image')).toHaveAttribute(
+      'src',
+      'https://ar-io.dev/reviewers-image',
+    );
 
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), {
       target: { value: 'Open participants' },
     });
+    fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-description'), {
+      target: { value: 'Public acceleration discussion group.' },
+    });
+    fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-image'), {
+      target: { value: 'https://upload.wikimedia.org/wikipedia/commons/rocket.jpg' },
+    });
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-mode'), {
       target: { value: 'open' },
     });
-    fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-visibility'), {
-      target: { value: 'session' },
-    });
+    expect(screen.getByTestId('ce-admin-worker-group-create-visibility')).toHaveValue('session');
     fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
     await waitFor(() =>
       expect(postSignedRequest).toHaveBeenCalledWith(
@@ -68,6 +77,8 @@ describe('AdminWorkerGroupsPanel', () => {
           body: expect.objectContaining({
             group: expect.objectContaining({
               label: 'Open participants',
+              description: 'Public acceleration discussion group.',
+              imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/rocket.jpg',
               joinMode: 'open',
               memberVisibility: 'session',
             }),
@@ -76,6 +87,8 @@ describe('AdminWorkerGroupsPanel', () => {
       ),
     );
     expect(await screen.findByText('Group created.')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/network/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/contract address/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Reviewers' }));
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-edit-label'), {

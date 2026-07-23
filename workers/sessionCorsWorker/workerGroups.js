@@ -17,6 +17,7 @@ export const WORKER_GROUP_MEMBER_VISIBILITY = Object.freeze({
 
 export const DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION = 100;
 export const DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP = 1000;
+export const MAX_WORKER_GROUP_IMAGE_URL_LENGTH = 2048;
 
 const IMPLEMENTED_JOIN_MODES = new Set([
   WORKER_GROUP_JOIN_MODES.OPEN,
@@ -96,6 +97,19 @@ const normalizeMemberVisibility = (value) => {
   const visibility = trim(value || WORKER_GROUP_MEMBER_VISIBILITY.ADMIN_ONLY).toLowerCase();
   if (Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(visibility)) return visibility;
   return '';
+};
+
+const normalizeImageUrl = (value) => {
+  const raw = trim(value);
+  if (!raw) return { ok: true, value: '' };
+  if (raw.length > MAX_WORKER_GROUP_IMAGE_URL_LENGTH) return { ok: false };
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return { ok: false };
+    return { ok: true, value: parsed.href };
+  } catch {
+    return { ok: false };
+  }
 };
 
 const normalizeEvmAddress = (value, deps = {}) => {
@@ -222,12 +236,15 @@ const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps
   if (!label || label.length > 120) return { ok: false, status: 400, reason: 'invalid_group_label' };
   const description = trim(input.description ?? existing?.description);
   if (description.length > 500) return { ok: false, status: 400, reason: 'invalid_group_description' };
+  const imageUrlResult = normalizeImageUrl(input.imageUrl ?? existing?.imageUrl);
+  if (!imageUrlResult.ok) return { ok: false, status: 400, reason: 'invalid_group_image_url' };
   const updatedAt = nowIso(deps);
   return {
     ok: true,
     patch: {
       label,
-      ...(description ? { description } : {}),
+      description: description || undefined,
+      imageUrl: imageUrlResult.value || undefined,
       joinMode,
       memberVisibility,
       updatedAt,
@@ -308,6 +325,7 @@ const redactGroupForMember = (group) => ({
   sessionSlug: group.sessionSlug,
   label: group.label,
   ...(group.description ? { description: group.description } : {}),
+  ...(group.imageUrl ? { imageUrl: group.imageUrl } : {}),
   joinMode: group.joinMode,
   memberVisibility: group.memberVisibility,
   createdAt: group.createdAt,

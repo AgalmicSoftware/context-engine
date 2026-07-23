@@ -7,14 +7,12 @@ import {
   faDownload,
   faExpand,
   faExternalLinkAlt,
-  faPlus,
   faQuestionCircle,
 } from '@fortawesome/free-solid-svg-icons';
 
 import LazyFallback from '../Shared/LazyFallback';
 import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
-import { isCryptoMode, t } from '../../utilities/ui/terminology.js';
 import { PUBLIC_AI_DISCOURSE_CORPUS_URL } from '../../variables/publicRepoMetadata.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import type { RiskMatrixRestoreState } from '../MainContent/RiskMatrix';
@@ -23,7 +21,7 @@ import OnePageSessionAutoMintAlerts, { type OnePageSessionAutoMintAlertsProps } 
 
 const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
 const MemoSurveyPage = React.memo((props: Record<string, unknown>) => <SurveyPage {...props} />);
-const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage'));
+const OnePageSessionGroupsSection = React.lazy(() => import('./GroupsSection'));
 const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
 const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
 const CorpusViewer = lazyWithRetry(() => import('../DemoViews/CorpusViewer'));
@@ -31,7 +29,6 @@ const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
 const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
 
 const DebateMapAny = DebateMap as React.ComponentType<Record<string, unknown>>;
-const SBT_TOOLTIP_LABEL = isCryptoMode() ? 'Soulbound tokens (SBTs)' : `${t('sbtFull')}s`;
 const DEMO_CORPUS_GITHUB_URL = PUBLIC_AI_DISCOURSE_CORPUS_URL;
 
 export const DEFAULT_CORPUS_VIEWER_LOAD_STATE = Object.freeze({
@@ -443,88 +440,37 @@ export default function OnePageSessionStandardShell({
       )}
 
       <div className={sectionsGridClassName}>
-        <div className={`${styles.sectionContainer} ${showGroups ? styles.sectionExpanded : ''}`}>
-          <div className={styles.sectionHeaderRow}>
-            <h2 onClick={onToggleGroups} className={styles.sectionHeader}>
-              {showGroups ? (
-                <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
-              ) : (
-                <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
-              )}
-              {renderSectionHeading(t('sbts'), 'Join or Create')}
-              {showGroups && (
-                <div
-                  className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                  onClick={(event: React.MouseEvent<HTMLElement>) => event.stopPropagation()}
-                >
-                  <FontAwesomeIcon icon={faQuestionCircle} />
-                  <span className={styles.tooltiptext}>
-                    {`${SBT_TOOLTIP_LABEL} enable groups to organize membership, roles, and permissions on-chain.`}
-                    They unlock private coordination, community-governed tools, and shared AI training.
-                  </span>
-                </div>
-              )}
-            </h2>
-
-            {showGroups && (
-              <div className={styles.sectionHeaderActionsScroller}>
-                <div className={styles.sectionHeaderActions}>
-                  <button type="button" onClick={onGroupsViewAll} className={styles.sectionHeaderActionButton}>
-                    <FontAwesomeIcon icon={faExpand} />
-                    View All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onToggleEmbeddedCreateGroup}
-                    className={styles.sectionHeaderActionButton}
-                    data-testid={E2E_TESTIDS.SBTS_CREATE_TOGGLE}
-                  >
-                    <FontAwesomeIcon icon={faPlus} />
-                    {showEmbeddedCreateGroup ? 'Exit' : 'Create'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {showGroups && (
-            <div className={styles.miniSectionContent}>
-              <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
-                <SBTsPage
-                  key={`sbtspage:${embeddedGroupsSessionSlug || 'general'}`}
-                  provider={provider}
-                  network={network}
-                  account={account}
-                  loginComplete={loginComplete}
-                  toggleLoginModal={toggleLoginModal}
-                  miniaturized={true}
-                  hideMiniActionRow={true}
-                  sessionName={sessionName}
-                  sessionInfo={sessionInfo}
-                  defaultFeaturedSBTs={defaultFeaturedSBTs}
-                  defaultSbtTags={defaultSbtTags}
-                  isSBTCacheReady={isSBTCacheReady}
-                  autoMintingMode={autoMintingMode}
-                  showCreateGroupAboveFeatured={true}
-                  showCreateGroupExternal={showEmbeddedCreateGroup}
-                  onCreateGroupToggleExternal={onToggleEmbeddedCreateGroup}
-                  preferCacheBackedFeaturedCards={true}
-                  requireExplicitAutoFeatureSessionSlug={true}
-                  refreshSbtData={refreshSbtData}
-                  sessionSlug={embeddedGroupsSessionSlug}
-                  contracts={contracts}
-                  blockLimits={blockLimits}
-                  networkChainId={networkChainId}
-                  sessionConfig={embeddedGroupsSessionConfig}
-                  sbtScanProgressBySlug={sbtScanProgressBySlug}
-                  sbtRealtimeCoverageBySlug={sbtRealtimeCoverageBySlug}
-                  ensureLightSbtDiscovery={ensureLightSbtDiscovery}
-                  ensureLightSbtUniverse={ensureLightSbtUniverse}
-                />
-              </Suspense>
-            </div>
-          )}
-        </div>
+        <Suspense fallback={<LazyFallback label="Loading Groups..." minHeight="8vh" />}>
+          <OnePageSessionGroupsSection
+            account={account}
+            autoMintingMode={autoMintingMode}
+            blockLimits={blockLimits}
+            contracts={contracts}
+            defaultFeaturedSBTs={defaultFeaturedSBTs}
+            defaultSbtTags={defaultSbtTags}
+            embeddedGroupsSessionConfig={embeddedGroupsSessionConfig}
+            embeddedGroupsSessionSlug={embeddedGroupsSessionSlug}
+            ensureLightSbtDiscovery={ensureLightSbtDiscovery}
+            ensureLightSbtUniverse={ensureLightSbtUniverse}
+            isSBTCacheReady={isSBTCacheReady}
+            loginComplete={loginComplete}
+            network={network}
+            networkChainId={networkChainId}
+            provider={provider}
+            refreshSbtData={refreshSbtData}
+            resolvedSessionConfig={resolvedSessionConfig}
+            sbtRealtimeCoverageBySlug={sbtRealtimeCoverageBySlug}
+            sbtScanProgressBySlug={sbtScanProgressBySlug}
+            sessionInfo={sessionInfo}
+            sessionName={sessionName}
+            showEmbeddedCreateGroup={showEmbeddedCreateGroup}
+            showGroups={showGroups}
+            toggleLoginModal={toggleLoginModal}
+            onGroupsViewAll={onGroupsViewAll}
+            onToggleEmbeddedCreateGroup={onToggleEmbeddedCreateGroup}
+            onToggleGroups={onToggleGroups}
+          />
+        </Suspense>
 
         {isDemoSlug && (
           <div

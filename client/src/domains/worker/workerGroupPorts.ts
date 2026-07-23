@@ -10,6 +10,7 @@ export type WorkerGroup = {
   sessionSlug?: string;
   label: string;
   description?: string;
+  imageUrl?: string;
   joinMode: WorkerGroupJoinMode;
   memberVisibility: WorkerGroupMemberVisibility;
   createdAt?: string;
@@ -71,6 +72,7 @@ const normalizeGroup = (value: unknown): WorkerGroup | null => {
     sessionSlug: toStringValue(source.sessionSlug) || undefined,
     label,
     description: toStringValue(source.description) || undefined,
+    imageUrl: toStringValue(source.imageUrl) || undefined,
     joinMode: joinMode as WorkerGroupJoinMode,
     memberVisibility: memberVisibility as WorkerGroupMemberVisibility,
     createdAt: toStringValue(source.createdAt) || undefined,

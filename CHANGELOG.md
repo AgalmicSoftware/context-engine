@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Worker-canonical web sessions now use native Cloudflare Groups instead of
+  opening the on-chain SBT deployment form. Group records support names,
+  descriptions, HTTPS images, open or admin-added membership, and visibility
+  without contract addresses, chain transactions, gas, RPC, or burn settings;
+  chain-backed sessions retain the legacy SBT flow.
 - Git-backed Netlify builds now bind the native Cloudflare Deploy Button to
   Netlify's exact public `COMMIT_REF`; builds without a public commit remain
   fail-closed with the native deployment card disabled.

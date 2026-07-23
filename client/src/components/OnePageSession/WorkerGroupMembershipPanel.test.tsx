@@ -56,6 +56,7 @@ describe('WorkerGroupMembershipPanel', () => {
               groupId: 'open-reviewers',
               label: 'Open reviewers',
               description: 'Join this access group.',
+              imageUrl: 'https://ar-io.dev/open-reviewers-image',
               joinMode: 'open',
               memberVisibility: 'session',
             },
@@ -68,6 +69,10 @@ describe('WorkerGroupMembershipPanel', () => {
     render(<WorkerGroupMembershipPanel envelope={envelope} fetchImpl={fetchImpl as typeof fetch} />);
 
     expect(await screen.findByText('Members')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-session-worker-group-image')).toHaveAttribute(
+      'src',
+      'https://ar-io.dev/open-reviewers-image',
+    );
     expect(screen.getByText('3 members')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Join Open reviewers' }));
 
