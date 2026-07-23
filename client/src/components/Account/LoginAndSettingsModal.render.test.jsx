@@ -1,5 +1,7 @@
 import React, { act } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import styles from './Account.module.scss';
 
 jest.mock('@rainbow-me/rainbowkit', () => ({
@@ -8,6 +10,16 @@ jest.mock('@rainbow-me/rainbowkit', () => ({
 
 jest.mock('../HooksHOC/withWagmiBridge', () => ({
   WagmiHooksHOC: (Comp) => Comp,
+}));
+
+jest.mock('./LoginSettingsAiConfigContent', () => ({
+  __esModule: true,
+  default: () => require('react').createElement('input', { placeholder: 'Sponsored key configured' }),
+}));
+
+jest.mock('./LoginSettingsResourceKeysContent', () => ({
+  __esModule: true,
+  default: () => null,
 }));
 
 jest.mock('components/UserPage/UserPage', () => (props) => (
@@ -205,7 +217,12 @@ const loadIsolatedSettingsModal = () => {
   return loaded;
 };
 
-const buildWrongNetworkSubject = ({ mode = undefined, aiSettingsOpen = false, activeSessionSlug = 'edge' } = {}) => {
+const buildWrongNetworkSubject = ({
+  mode = undefined,
+  aiSettingsOpen = false,
+  activeSessionSlug = 'edge',
+  sessionConfig = null,
+} = {}) => {
   if (typeof mode === 'undefined') {
     delete process.env.REACT_APP_TERMINOLOGY_MODE;
   } else {
@@ -224,7 +241,7 @@ const buildWrongNetworkSubject = ({ mode = undefined, aiSettingsOpen = false, ac
     String(slug || '')
       .trim()
       .toLowerCase() === 'edge'
-      ? { slug: 'edge', sessionName: 'Edge Session' }
+      ? sessionConfig || { slug: 'edge', sessionName: 'Edge Session', sponsoredKeys: { rpc: 'edge-rpc' } }
       : {},
   );
   isolatedCheckSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
@@ -243,6 +260,7 @@ const buildWrongNetworkSubject = ({ mode = undefined, aiSettingsOpen = false, ac
       },
     }),
   );
+  subject._sessionCapabilityProjectionResolver = resolveSessionCapabilityProjection;
 
   if (aiSettingsOpen) {
     subject.state = {
@@ -378,6 +396,36 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     const sessionLink = screen.getByRole('link', { name: 'Open session Edge Session' });
     expect(sessionLink).toHaveAttribute('href', '/session/edge');
     expect(sessionLink).not.toHaveAttribute('href', '/session/Edge%20Session');
+  });
+
+  it('shows worker session access and AI state without chain resource controls', () => {
+    const subject = buildWrongNetworkSubject({
+      aiSettingsOpen: true,
+      sessionConfig: {
+        slug: 'edge',
+        sessionName: 'Edge Session',
+        corsWorkerUrl: 'https://edge-worker.example.test',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+    });
+    subject.state = {
+      ...subject.state,
+      aiSettingsSectionsOpen: {
+        ...subject.state.aiSettingsSectionsOpen,
+        session: true,
+      },
+    };
+
+    render(subject.getSettingsDisplay());
+
+    expect(screen.getByTestId('ce-settings-worker-session-access')).toHaveTextContent(
+      /Passkey session access: signed in.*Session Worker: configured.*AI: session default/i,
+    );
+    expect(screen.queryByText('Network')).not.toBeInTheDocument();
+    expect(screen.queryByText('RPC')).not.toBeInTheDocument();
+    expect(screen.queryByText('Arweave')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tx gas')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Resource keys/i })).not.toBeInTheDocument();
   });
 
   it('preserves PUBLIC_URL when building the active-session link', () => {
@@ -582,6 +630,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
 
     const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'demo' }));
+    subject._sessionCapabilityProjectionResolver = resolveSessionCapabilityProjection;
     subject.state = {
       ...subject.state,
       preLoginSettingsOpen: true,
@@ -614,7 +663,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
   });
 
-  it('keeps pre-login session and local AI controls behind Config while leaving the shared overview visible', async () => {
+  it('keeps pre-login session and local AI controls behind Config with a capability-driven overview', async () => {
     getAllSessionSlugs.mockReturnValue(['demo']);
     getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
       String(slug || '')
@@ -635,14 +684,15 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
     await openPreLoginSettingsDrawer();
 
-    expect(await screen.findByText('Network')).toBeInTheDocument();
+    expect(await screen.findByText('AI')).toBeInTheDocument();
+    expect(screen.queryByText('Network')).not.toBeInTheDocument();
     expect(screen.queryByTestId('ce-prelogin-session-select')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('OpenAI API key')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('AI endpoint')).not.toBeInTheDocument();
 
     await openPreLoginConfigPanel();
 
-    expect(screen.getByText('Network')).toBeInTheDocument();
+    expect(screen.queryByText('Network')).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-prelogin-session-select')).toBeInTheDocument();
     expect(screen.getByLabelText('OpenAI API key')).toBeInTheDocument();
     expect(screen.getByLabelText('AI endpoint')).toBeInTheDocument();
@@ -857,6 +907,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
         selectedSessionSlugs: ['edge', 'rxc'],
       }),
     );
+    subject._sessionCapabilityProjectionResolver = resolveSessionCapabilityProjection;
     subject.state = {
       ...subject.state,
       preLoginSettingsOpen: true,
@@ -1075,6 +1126,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
         provider: 'wagmi',
       }),
     );
+    subject._sessionCapabilityProjectionResolver = resolveSessionCapabilityProjection;
     subject.state = {
       ...subject.state,
       aiSettingsOpen: true,
@@ -1114,7 +1166,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     expect((await screen.findAllByText('Edge Session')).length).toBeGreaterThan(0);
   });
 
-  it('separates active-session sponsorship from other sponsor sessions', async () => {
+  it('does not expose another session’s RPC capability in the active session settings', async () => {
     getAllSessionSlugs.mockReturnValue(['op-session-test']);
     getSessionConfigBySlugOrDefault.mockImplementation((slug) => {
       const normalized = String(slug || '')
@@ -1166,27 +1218,9 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       });
     });
 
-    const rpcCard = (await screen.findByText('RPC')).closest(`.${styles.supportedResourceCard}`);
-    expect(rpcCard).toBeTruthy();
-    expect(within(rpcCard).getByText('Not sponsored')).toBeInTheDocument();
-    expect(within(rpcCard).queryByText('Gate locked')).not.toBeInTheDocument();
-    expect(within(rpcCard).getByText('General')).toBeInTheDocument();
-    expect(within(rpcCard).getByText('not configured here')).toBeInTheDocument();
-    expect(within(rpcCard).queryByText('OP Session Test')).not.toBeInTheDocument();
-
-    fireEvent.click(within(rpcCard).getByRole('button', { name: 'Show other RPC sponsor sessions' }));
-
-    await waitFor(() => {
-      expect(within(rpcCard).getByText('OP Session Test')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByRole('button', { name: /Resource keys/i }));
-
-    expect(
-      await screen.findByText(
-        'No active-session RPC sponsor. Other sessions with RPC: OP Session Test. Switch sessions to use one.',
-      ),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('AI')).toBeInTheDocument();
+    expect(screen.queryByText('RPC')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Resource keys/i })).not.toBeInTheDocument();
   });
 
   it('does not render the legacy send-testnet-funds control in settings', () => {
@@ -1249,6 +1283,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       activeSessionSlug: 'edge',
     });
     const subject = new LoginAndSettingsModal(props);
+    subject._sessionCapabilityProjectionResolver = resolveSessionCapabilityProjection;
     subject.state = {
       ...subject.state,
       aiSettingsOpen: true,
@@ -1267,6 +1302,11 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       },
     };
     subject.getSessionDescriptor = jest.fn(() => ({ label: 'Edge Session' }));
+    subject.getDisplaySessionConfig = jest.fn(() => ({
+      slug: 'edge',
+      sessionName: 'Edge Session',
+      sponsoredKeys: { rpc: 'edge-rpc' },
+    }));
     subject.getSettingsSessionOptions = jest.fn(() => [{ slug: 'edge', label: 'Edge Session' }]);
     subject.getSponsoredSessionSources = jest.fn(() => ({
       byResource: {

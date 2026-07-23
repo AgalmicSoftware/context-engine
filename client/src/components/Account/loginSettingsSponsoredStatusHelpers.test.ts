@@ -38,7 +38,7 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
       tone: 'ok',
       detail: 'Sponsored key is available for the active session.',
     });
-    expect(formatSponsoredStatusMeta({ status: 'denied' }, true)).toEqual({
+    expect(formatSponsoredStatusMeta({ status: 'denied' }, true, 'sbt')).toEqual({
       label: 'Gate locked',
       tone: 'warn',
       detail: 'Sponsored key exists, but this wallet does not satisfy the SBT gate.',
@@ -58,10 +58,15 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
       tone: 'muted',
       detail: 'We could not confirm gate access for the active-session sponsor.',
     });
-    expect(formatSponsoredStatusMeta(null, true)).toEqual({
+    expect(formatSponsoredStatusMeta(null, true, 'sbt')).toEqual({
       label: 'Sponsored',
       tone: 'ok',
       detail: 'A sponsor key is configured and does not require an SBT gate.',
+    });
+    expect(formatSponsoredStatusMeta({ status: 'denied' }, true)).toEqual({
+      label: 'Gate locked',
+      tone: 'warn',
+      detail: 'Sponsored key exists, but this identity does not satisfy the configured session gate.',
     });
   });
 
@@ -151,6 +156,15 @@ describe('loginSettingsSponsoredStatusHelpers', () => {
     expect(cards[0].status.label).toBe('Gate unlocked');
     expect(cards[3].status.label).toBe('Not sponsored');
     expect(cards[3].otherSponsorSessions.map((entry: any) => entry.label)).toEqual(['Funding']);
+  });
+
+  it('projects only resources enabled by a minimal Worker session', () => {
+    const cards = buildLoginSettingsSponsorshipCards({
+      resourceKeys: ['ai'],
+      gateKind: 'session',
+    });
+
+    expect(cards.map((card) => card.key)).toEqual(['ai']);
   });
 
   it('formats resource sponsor hints without changing active and other-session fallbacks', () => {

@@ -1,5 +1,5 @@
 /** @file LoginAndSettingsModal.tsx */
-import React, { Component } from 'react';
+import React, { Component, Suspense } from 'react';
 import { connect } from 'react-redux';
 import { ethers } from 'ethers';
 import { changeAccount } from '../../actions/accountActions.js';
@@ -34,8 +34,6 @@ import { LoginSettingsSupportedResourceCard } from './LoginSettingsResourceSumma
 import { LoginSettingsInlineNetworkSummary, LoginSettingsPanelNetworkSummary } from './LoginSettingsNetworkSummary';
 import { LoginSettingsConfigToggleControl, LoginSettingsControlRow } from './LoginSettingsControlRow';
 import LoginSettingsSectionCard from './LoginSettingsSectionCard';
-import LoginSettingsAiConfigContent from './LoginSettingsAiConfigContent';
-import LoginSettingsResourceKeysContent from './LoginSettingsResourceKeysContent';
 import { assignLoginAndSettingsModalLegacyStatics } from './loginAndSettingsModalLegacyStatics';
 import LoginModalDisplayBody from './LoginModalDisplayBody';
 import LoginTooltipsToggleControl from './LoginTooltipsToggleControl';
@@ -84,8 +82,8 @@ import {
 import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../utilities/cache/cacheScripts.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
-import { isCryptoMode } from '../../utilities/ui/terminology.js';
 import { isTelegramFirstSessionConfig } from '../../utilities/session/sessionBackendKind';
+import type { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
   exchangeAgentClientLogin,
   extractAgentClientToken,
@@ -102,11 +100,15 @@ import {
   normalizeSettingsSessionSlug,
 } from './loginSettingsRouteHelpers';
 import {
-  buildLoginSettingsSponsorshipCards,
   formatResourceSponsorHint as formatLoginSettingsResourceSponsorHint,
   getSponsoredKeyAliases,
   mergeWorkerResourcePresenceIntoSponsoredKeys,
 } from './loginSettingsSponsoredStatusHelpers';
+import {
+  getLoginSettingsOverviewContext,
+  type LoginSettingsOverviewContext,
+  type SponsoredSessionSources,
+} from './loginSettingsOverviewContext';
 import {
   LOGIN_SETTINGS_AI_REASONING_LEVELS as AI_REASONING_LEVELS,
   LOGIN_SETTINGS_AI_TASK_REASONING_ROWS as AI_TASK_REASONING_ROWS,
@@ -116,6 +118,9 @@ import LoginAgentTokenPanel from './LoginAgentTokenPanel';
 import { createLoginAgentActions } from './loginAndSettingsAgentTokenActions';
 import { createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
 import type { PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
+
+const LoginSettingsAiConfigContent = React.lazy(() => import('./LoginSettingsAiConfigContent'));
+const LoginSettingsResourceKeysContent = React.lazy(() => import('./LoginSettingsResourceKeysContent'));
 
 const accountLog = createLogger('account');
 const normalizeAccountForComparison = (value: unknown): string =>
@@ -237,27 +242,6 @@ type WagmiBalanceLike =
 
 type TestFundsRequestOptions = {
   source?: 'manual' | 'auto';
-};
-
-type SettingsSessionDescriptor = Record<string, unknown> & {
-  label: string;
-};
-
-type SponsoredSessionSources = {
-  byResource: Record<string, SponsoredSessionEntry[]>;
-  rpcScope: SponsoredSessionEntry[];
-};
-
-type SettingsOverviewContext = {
-  activeSession: SettingsSessionDescriptor;
-  cryptoTerminology: boolean;
-  needsNetworkSwitch: boolean;
-  showWalletNetwork: boolean;
-  sponsorshipCards: ReturnType<typeof buildLoginSettingsSponsorshipCards>;
-  sponsorSessions: SponsoredSessionSources;
-  targetNetworkName: string;
-  targetNetwork: unknown;
-  walletNetworkName: string;
 };
 
 export { buildBookmarksRoutePath };
@@ -389,7 +373,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   _passkeyWalletRestoreReqId: number = 0;
   _passkeyWalletActionId: number = 0;
   _sponsoredSessionSourcesMemo: { key: string; value: SponsoredSessionSources } | null = null;
-  _settingsOverviewMemo: { key: string; value: SettingsOverviewContext } | null = null;
+  _settingsOverviewMemo: { key: string; value: LoginSettingsOverviewContext } | null = null;
+  _sessionCapabilityProjectionResolver: typeof resolveSessionCapabilityProjection | null = null;
   _passkeyActions = createLoginPasskeyActions({
     accountLogError: (message, error) => accountLog.error(message, error),
     changeAccount: (payload) => this.props.changeAccount(payload),
@@ -518,6 +503,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   async componentDidMount() {
     this._isMounted = true;
+    void this.loadSessionCapabilityProjection();
     this.checkAndSendTestFundsIfNeeded();
 
     // Passkey wallet session rehydration
@@ -578,6 +564,19 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       }
     }
     this.setState(nextState, cb);
+  };
+
+  loadSessionCapabilityProjection = async () => {
+    if (this._sessionCapabilityProjectionResolver) return;
+    try {
+      const capabilityModule = await import('../../utilities/session/sessionCapabilityProjection');
+      if (!this._isMounted) return;
+      this._sessionCapabilityProjectionResolver = capabilityModule.resolveSessionCapabilityProjection;
+      this._settingsOverviewMemo = null;
+      this.forceUpdate();
+    } catch (error) {
+      accountLog.error('Failed to load session capability projection:', error);
+    }
   };
 
   getWalletChainId = (props: LoginAndSettingsModalProps = this.props) =>
@@ -1678,6 +1677,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   toggleAiSettingsPanel = () => {
+    void this.loadSessionCapabilityProjection();
     this.setState((prevState: Readonly<LoginAndSettingsModal['state']>) => ({
       aiSettingsOpen: !prevState.aiSettingsOpen,
     }));
@@ -1897,59 +1897,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     );
   };
 
-  getSettingsOverviewContext = () => {
-    const walletNet = this.props.provider === 'wagmi' ? this.props.wagmiNetwork : this.props.network;
-    const tn = this.getTargetNetwork();
-    const targetNetworkName = tn?.name || 'not configured';
-    const walletNetworkName = walletNet?.name || 'not connected';
-    const corrId = Number(tn.id);
-    const isCorrectNetwork = walletNet?.id === corrId;
-    const needsNetworkSwitch = this.props.provider === 'wagmi' && !isCorrectNetwork && this.props.loginComplete;
-    const showWalletNetwork = this.props.provider === 'wagmi' && !!walletNet && walletNet?.id !== corrId;
-    const sessionSlug = this.getActiveSessionSlug();
-    const sessionConfig = this.getDisplaySessionConfig(sessionSlug);
-    const activeSession = this.getSessionDescriptor(sessionSlug, sessionConfig);
-    const sponsoredAccess = this.state.sponsoredAccess || {};
-    const sponsorSessions = this.getSponsoredSessionSources({ activeSlug: sessionSlug });
-    const memoKey = JSON.stringify({
-      activeSession,
-      loginComplete: this.props.loginComplete,
-      provider: this.props.provider,
-      selectedSessionScope: this.props.selectedSessionScope,
-      selectedSessionSlugs: this.props.selectedSessionSlugs || [],
-      sessionScanScope: this.getSessionScanScopeValue(),
-      sessionScanSlugs: this.state.sessionScanSlugs,
-      sessionScanSlugsInput: this.state.sessionScanSlugsInput,
-      sponsoredAccess,
-      sponsorSessions,
-      targetNetworkId: tn?.id,
-      targetNetworkName,
-      walletNetworkId: walletNet?.id,
-      walletNetworkName,
-    });
-    if (this._settingsOverviewMemo?.key === memoKey) {
-      return this._settingsOverviewMemo.value;
-    }
-    const sponsorshipCards = buildLoginSettingsSponsorshipCards({
-      activeSession,
-      sponsoredAccess,
-      sponsorSessions,
-    });
-
-    const value = {
-      activeSession,
-      cryptoTerminology: isCryptoMode(),
-      needsNetworkSwitch,
-      showWalletNetwork,
-      sponsorshipCards,
-      sponsorSessions,
-      targetNetworkName,
-      targetNetwork: tn,
-      walletNetworkName,
-    };
-    this._settingsOverviewMemo = { key: memoKey, value };
-    return value;
-  };
+  getSettingsOverviewContext = () => getLoginSettingsOverviewContext(this);
 
   renderInlineNetworkSummary = ({
     targetNetworkName = 'not configured',
@@ -2036,7 +1984,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     overview = this.getSettingsOverviewContext(),
     extraContent = null,
     networkTooltipId = 'networkInfoTooltipPanel',
-    showPanelNetwork = !overview.cryptoTerminology,
+    showPanelNetwork = !overview.cryptoTerminology && overview.capabilities.showNetworkControls,
   }: any = {}) => (
     <div className={styles.aiSettingsPanel}>
       {showPanelNetwork
@@ -2100,7 +2048,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         ? aiAccessStatus === 'granted'
           ? 'Sponsored key configured (unlocked)'
           : aiAccessIsConfirmedLocked
-            ? 'Sponsored key configured (SBT required)'
+            ? overview.capabilities.gateKind === 'sbt'
+              ? 'Sponsored key configured (SBT required)'
+              : 'Sponsored key configured (session access required)'
             : 'Sponsored key configured'
         : 'No sponsored key set';
 
@@ -2120,7 +2070,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
         ? aiAccessStatus === 'granted'
           ? 'Encrypted session key is ready and the current wallet satisfies the sponsor gate.'
           : aiAccessStatus === 'denied'
-            ? 'Encrypted session key exists, but this wallet still needs the sponsor SBT gate.'
+            ? overview.capabilities.gateKind === 'sbt'
+              ? 'Encrypted session key exists, but this wallet still needs the sponsor SBT gate.'
+              : 'Encrypted session key exists, but this identity does not satisfy the configured session gate.'
             : 'Encrypted session key is available for this session.'
         : '';
 
@@ -2144,16 +2096,17 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
           activeSession,
           configOpen: this.state.aiSettingsOpen,
           onToggleConfig: this.toggleAiSettingsPanel,
-          betweenSessionAndTooltips: cryptoTerminology
-            ? this.renderInlineNetworkSummary({
-                targetNetworkName: overview.targetNetworkName,
-                walletNetworkName: overview.walletNetworkName,
-                showWalletNetwork: overview.showWalletNetwork,
-                tooltipId: 'networkInfoTooltipInline',
-              })
-            : null,
+          betweenSessionAndTooltips:
+            cryptoTerminology && overview.capabilities.showNetworkControls
+              ? this.renderInlineNetworkSummary({
+                  targetNetworkName: overview.targetNetworkName,
+                  walletNetworkName: overview.walletNetworkName,
+                  showWalletNetwork: overview.showWalletNetwork,
+                  tooltipId: 'networkInfoTooltipInline',
+                })
+              : null,
           afterDemo:
-            cryptoTerminology && needsNetworkSwitch ? (
+            cryptoTerminology && overview.capabilities.showNetworkControls && needsNetworkSwitch ? (
               <Button onClick={this.switchToCorrectNetwork} className={`${styles.networkSwitchButton} ${styles.glow}`}>
                 Switch to {overview.targetNetworkName}
               </Button>
@@ -2181,6 +2134,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                           scopePrefix: 'ce-web3modal-session-scope',
                         })}
                       </div>
+                      {overview.capabilities.isWorkerCanonical ? (
+                        <div className={styles.aiSettingsHint} data-testid="ce-settings-worker-session-access">
+                          Passkey session access: {this.props.loginComplete ? 'signed in' : 'sign-in required'} ·
+                          Session Worker: {toStr(sessionConfig?.corsWorkerUrl).trim() ? 'configured' : 'URL missing'} ·
+                          AI: {useLocalAi ? 'local override' : 'session default'}
+                        </div>
+                      ) : null}
                     </>
                   ),
                 })}
@@ -2190,68 +2150,75 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                   title: 'AI config',
                   summary: (useLocalAi ? 'Local override on' : 'Using session defaults') + ' · ' + aiPresetLabel,
                   children: (
-                    <LoginSettingsAiConfigContent
-                      aiDisplay={aiDisplay}
-                      aiPresetKey={aiPresetKey}
-                      aiPresetOptions={AI_PRESET_OPTIONS}
-                      aiProviderLabel={aiProviderLabel}
-                      aiSettingsDirty={this.state.aiSettingsDirty}
-                      aiSettingsStatus={this.state.aiSettingsStatus}
-                      handleAiModeChange={this.handleAiModeChange}
-                      handleAiPresetChange={this.handleAiPresetChange}
-                      handleAiToggleLocal={this.handleAiToggleLocal}
-                      handleClearAiSettings={this.handleClearAiSettings}
-                      handleSaveAiSettings={this.handleSaveAiSettings}
-                      isAdvancedOpen={isAdvancedOpen}
-                      isPerTaskOpen={isPerTaskOpen}
-                      keyPlaceholder={keyPlaceholder}
-                      localProvider={localProvider}
-                      providerKeyHint={providerKeyHint}
-                      providerLocalEntry={providerLocalEntry}
-                      reasoningEffort={reasoningEffort}
-                      sessionDefaultBadgeText={sessionDefaultBadgeText}
-                      showCustomFields={showCustomFields}
-                      showCustomTranscription={showCustomTranscription}
-                      showReasoningControls={showReasoningControls}
-                      taskReasoningEffort={taskReasoningEffort}
-                      taskReasoningRows={AI_TASK_REASONING_ROWS}
-                      reasoningLevels={AI_REASONING_LEVELS}
-                      toggleAiSettingsSection={this.toggleAiSettingsSection}
-                      updateAiModelField={this.updateAiModelField}
-                      updateAiProviderField={this.updateAiProviderField}
-                      updateAiSettings={this.updateAiSettings}
-                      updateAiTaskReasoningField={this.updateAiTaskReasoningField}
-                      updateAiTranscriptionField={this.updateAiTranscriptionField}
-                      useLocalAi={useLocalAi}
-                      usingSessionDefaultsLabel={usingSessionDefaultsLabel}
-                    />
+                    <Suspense fallback={<div className={styles.aiSettingsHint}>Loading AI settings…</div>}>
+                      <LoginSettingsAiConfigContent
+                        aiDisplay={aiDisplay}
+                        aiPresetKey={aiPresetKey}
+                        aiPresetOptions={AI_PRESET_OPTIONS}
+                        aiProviderLabel={aiProviderLabel}
+                        aiSettingsDirty={this.state.aiSettingsDirty}
+                        aiSettingsStatus={this.state.aiSettingsStatus}
+                        handleAiModeChange={this.handleAiModeChange}
+                        handleAiPresetChange={this.handleAiPresetChange}
+                        handleAiToggleLocal={this.handleAiToggleLocal}
+                        handleClearAiSettings={this.handleClearAiSettings}
+                        handleSaveAiSettings={this.handleSaveAiSettings}
+                        isAdvancedOpen={isAdvancedOpen}
+                        isPerTaskOpen={isPerTaskOpen}
+                        keyPlaceholder={keyPlaceholder}
+                        localProvider={localProvider}
+                        providerKeyHint={providerKeyHint}
+                        providerLocalEntry={providerLocalEntry}
+                        reasoningEffort={reasoningEffort}
+                        sessionDefaultBadgeText={sessionDefaultBadgeText}
+                        showCustomFields={showCustomFields}
+                        showCustomTranscription={showCustomTranscription}
+                        showReasoningControls={showReasoningControls}
+                        taskReasoningEffort={taskReasoningEffort}
+                        taskReasoningRows={AI_TASK_REASONING_ROWS}
+                        reasoningLevels={AI_REASONING_LEVELS}
+                        toggleAiSettingsSection={this.toggleAiSettingsSection}
+                        updateAiModelField={this.updateAiModelField}
+                        updateAiProviderField={this.updateAiProviderField}
+                        updateAiSettings={this.updateAiSettings}
+                        updateAiTaskReasoningField={this.updateAiTaskReasoningField}
+                        updateAiTranscriptionField={this.updateAiTranscriptionField}
+                        useLocalAi={useLocalAi}
+                        usingSessionDefaultsLabel={usingSessionDefaultsLabel}
+                      />
+                    </Suspense>
                   ),
                 })}
 
-                {renderSection({
-                  key: 'resourceKeys',
-                  title: 'Resource keys',
-                  summary:
-                    useLocalRpc || useLocalArweave
-                      ? 'Local key overrides enabled'
-                      : 'Using session-sponsored fallbacks',
-                  children: (
-                    <LoginSettingsResourceKeysContent
-                      formatResourceSponsorHint={this.formatResourceSponsorHint}
-                      handleClearResourceKeys={this.handleClearResourceKeys}
-                      handleResourceToggleLocal={this.handleResourceToggleLocal}
-                      handleSaveResourceKeys={this.handleSaveResourceKeys}
-                      resourceKeys={resourceKeys}
-                      resourceKeysDirty={this.state.resourceKeysDirty}
-                      resourceKeysStatus={this.state.resourceKeysStatus}
-                      sponsorSessions={sponsorSessions}
-                      sponsoredKeys={sponsoredKeys}
-                      updateResourceKeyField={this.updateResourceKeyField}
-                      useLocalArweave={useLocalArweave}
-                      useLocalRpc={useLocalRpc}
-                    />
-                  ),
-                })}
+                {overview.capabilities.settingsResourceKeys.some((key) => key === 'rpc' || key === 'arweave')
+                  ? renderSection({
+                      key: 'resourceKeys',
+                      title: 'Resource keys',
+                      summary:
+                        useLocalRpc || useLocalArweave
+                          ? 'Local key overrides enabled'
+                          : 'Using session-sponsored fallbacks',
+                      children: (
+                        <Suspense fallback={<div className={styles.aiSettingsHint}>Loading resource settings…</div>}>
+                          <LoginSettingsResourceKeysContent
+                            formatResourceSponsorHint={this.formatResourceSponsorHint}
+                            handleClearResourceKeys={this.handleClearResourceKeys}
+                            handleResourceToggleLocal={this.handleResourceToggleLocal}
+                            handleSaveResourceKeys={this.handleSaveResourceKeys}
+                            resourceKeys={resourceKeys}
+                            resourceKeysDirty={this.state.resourceKeysDirty}
+                            resourceKeysStatus={this.state.resourceKeysStatus}
+                            sponsorSessions={sponsorSessions}
+                            sponsoredKeys={sponsoredKeys}
+                            updateResourceKeyField={this.updateResourceKeyField}
+                            useLocalArweave={useLocalArweave}
+                            useLocalRpc={useLocalRpc}
+                            visibleResources={overview.capabilities.settingsResourceKeys}
+                          />
+                        </Suspense>
+                      ),
+                    })
+                  : null}
               </>
             ),
           })}

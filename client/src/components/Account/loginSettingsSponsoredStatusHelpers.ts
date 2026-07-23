@@ -7,7 +7,7 @@ type SponsorSessionDisplayEntry = Record<string, unknown> & {
   label?: string;
 };
 
-type SponsoredAccessRecord = Record<string, SponsoredStatusEntry | null | undefined>;
+export type SponsoredAccessRecord = Record<string, SponsoredStatusEntry | null | undefined>;
 type SponsoredKeysRecord = Record<string, unknown>;
 type WorkerResourcePresenceRecord = Partial<Record<'ai' | 'arweave' | 'rpc' | 'txGas', boolean>>;
 type SponsorSessionsRecord = Record<string, unknown> & {
@@ -20,6 +20,7 @@ type SponsorshipCardArgs = {
   sponsoredAccess?: SponsoredAccessRecord;
   sponsorSessions?: SponsorSessionsRecord;
   title: string;
+  gateKind?: 'sbt' | 'session';
 };
 
 type ResourceSponsorHintArgs = {
@@ -60,6 +61,7 @@ export const mergeWorkerResourcePresenceIntoSponsoredKeys = (
 export const formatSponsoredStatusMeta = (
   entry: SponsoredStatusEntry | null = null,
   hasActiveSponsor: boolean = false,
+  gateKind: 'sbt' | 'session' = 'session',
 ) => {
   const status = entry?.status === 'unresolved' ? 'error' : entry?.status || 'no-gate';
   if (!hasActiveSponsor) {
@@ -72,7 +74,10 @@ export const formatSponsoredStatusMeta = (
     return {
       label: 'Gate locked',
       tone: 'warn',
-      detail: 'Sponsored key exists, but this wallet does not satisfy the SBT gate.',
+      detail:
+        gateKind === 'sbt'
+          ? 'Sponsored key exists, but this wallet does not satisfy the SBT gate.'
+          : 'Sponsored key exists, but this identity does not satisfy the configured session gate.',
     };
   }
   if (status === 'needs-wallet') {
@@ -93,7 +98,14 @@ export const formatSponsoredStatusMeta = (
     };
   }
   if (status === 'no-gate' && hasActiveSponsor) {
-    return { label: 'Sponsored', tone: 'ok', detail: 'A sponsor key is configured and does not require an SBT gate.' };
+    return {
+      label: 'Sponsored',
+      tone: 'ok',
+      detail:
+        gateKind === 'sbt'
+          ? 'A sponsor key is configured and does not require an SBT gate.'
+          : 'A sponsor key is configured and does not require an additional session gate.',
+    };
   }
   return { label: 'Not sponsored', tone: 'muted', detail: 'No sponsor key is configured for the active session.' };
 };
@@ -104,6 +116,7 @@ export const buildLoginSettingsSponsorshipCard = ({
   sponsoredAccess = {},
   sponsorSessions = {},
   title,
+  gateKind = 'session',
 }: SponsorshipCardArgs) => {
   const sessions = sponsorSessions.byResource?.[key] || [];
   const activeSponsorSession = sessions.find((entry) => entry?.isActive) || null;
@@ -112,7 +125,7 @@ export const buildLoginSettingsSponsorshipCard = ({
   return {
     key,
     title,
-    status: formatSponsoredStatusMeta(access, !!activeSponsorSession),
+    status: formatSponsoredStatusMeta(access, !!activeSponsorSession, gateKind),
     access,
     activeSession,
     activeSponsorSession,
@@ -125,18 +138,23 @@ export const buildLoginSettingsSponsorshipCards = ({
   activeSession = null,
   sponsoredAccess = {},
   sponsorSessions = {},
+  resourceKeys = SETTINGS_SPONSORSHIP_RESOURCES.map(({ key }) => key),
+  gateKind = 'session',
 }: {
   activeSession?: unknown;
   sponsoredAccess?: SponsoredAccessRecord;
   sponsorSessions?: SponsorSessionsRecord;
+  resourceKeys?: readonly string[];
+  gateKind?: 'sbt' | 'session';
 } = {}) =>
-  SETTINGS_SPONSORSHIP_RESOURCES.map(({ key, title }) =>
+  SETTINGS_SPONSORSHIP_RESOURCES.filter(({ key }) => resourceKeys.includes(key)).map(({ key, title }) =>
     buildLoginSettingsSponsorshipCard({
       activeSession,
       key,
       sponsoredAccess,
       sponsorSessions,
       title,
+      gateKind,
     }),
   );
 

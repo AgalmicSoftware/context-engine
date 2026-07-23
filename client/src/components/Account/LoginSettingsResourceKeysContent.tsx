@@ -25,6 +25,7 @@ type LoginSettingsResourceKeysContentProps = {
   updateResourceKeyField: (resource: string, field: string, value: string) => void;
   useLocalArweave: boolean;
   useLocalRpc: boolean;
+  visibleResources?: readonly string[];
 };
 
 const inputValue = (value: unknown): string => (value == null ? '' : String(value));
@@ -42,67 +43,80 @@ const LoginSettingsResourceKeysContent = ({
   updateResourceKeyField,
   useLocalArweave,
   useLocalRpc,
+  visibleResources = [],
 }: LoginSettingsResourceKeysContentProps) => (
   <>
     <div className={styles.aiSettingsGrid}>
-      <div className={styles.aiSettingsRow}>
-        <label className={styles.aiSettingsLabel}>RPC API key</label>
-        <input
-          className={styles.aiSettingsInput}
-          type="password"
-          value={useLocalRpc ? inputValue(resourceKeys.rpc?.apiKey) : ''}
-          onChange={(event) => updateResourceKeyField('rpc', 'apiKey', event.target.value)}
-          disabled={!useLocalRpc}
-          placeholder={
-            useLocalRpc ? 'Enter RPC API key' : sponsoredKeys.rpc ? 'Sponsored key configured' : 'No sponsored key set'
-          }
-        />
-        <label className={styles.aiSettingsInlineToggle}>
-          <input type="checkbox" checked={useLocalRpc} onChange={(event) => handleResourceToggleLocal('rpc', event)} />
-          <span>Use local override</span>
-        </label>
-        <div className={styles.aiSettingsHint}>
-          {formatResourceSponsorHint({
-            resourceKey: 'rpc',
-            resourceLabel: 'RPC',
-            sponsoredKeys,
-            sponsorSessions,
-          })}
-        </div>
-      </div>
-
-      <div className={`${styles.aiSettingsRow} ${styles.aiSettingsRowFull}`}>
-        <label className={styles.aiSettingsLabel}>Arweave JWK (JSON)</label>
-        <textarea
-          className={styles.aiSettingsTextarea}
-          value={useLocalArweave ? inputValue(resourceKeys.arweave?.jwk) : ''}
-          onChange={(event) => updateResourceKeyField('arweave', 'jwk', event.target.value)}
-          disabled={!useLocalArweave}
-          placeholder={
-            useLocalArweave
-              ? '{ "kty": "...", ... }'
-              : sponsoredKeys.arweave
-                ? 'Sponsored key configured'
-                : 'No sponsored key set'
-          }
-        />
-        <label className={styles.aiSettingsInlineToggle}>
+      {visibleResources.includes('rpc') ? (
+        <div className={styles.aiSettingsRow}>
+          <label className={styles.aiSettingsLabel}>RPC API key</label>
           <input
-            type="checkbox"
-            checked={useLocalArweave}
-            onChange={(event) => handleResourceToggleLocal('arweave', event)}
+            className={styles.aiSettingsInput}
+            type="password"
+            value={useLocalRpc ? inputValue(resourceKeys.rpc?.apiKey) : ''}
+            onChange={(event) => updateResourceKeyField('rpc', 'apiKey', event.target.value)}
+            disabled={!useLocalRpc}
+            placeholder={
+              useLocalRpc
+                ? 'Enter RPC API key'
+                : sponsoredKeys.rpc
+                  ? 'Sponsored key configured'
+                  : 'No sponsored key set'
+            }
           />
-          <span>Use local override</span>
-        </label>
-        <div className={styles.aiSettingsHint}>
-          {formatResourceSponsorHint({
-            resourceKey: 'arweave',
-            resourceLabel: 'Arweave',
-            sponsoredKeys,
-            sponsorSessions,
-          })}
+          <label className={styles.aiSettingsInlineToggle}>
+            <input
+              type="checkbox"
+              checked={useLocalRpc}
+              onChange={(event) => handleResourceToggleLocal('rpc', event)}
+            />
+            <span>Use local override</span>
+          </label>
+          <div className={styles.aiSettingsHint}>
+            {formatResourceSponsorHint({
+              resourceKey: 'rpc',
+              resourceLabel: 'RPC',
+              sponsoredKeys,
+              sponsorSessions,
+            })}
+          </div>
         </div>
-      </div>
+      ) : null}
+
+      {visibleResources.includes('arweave') ? (
+        <div className={`${styles.aiSettingsRow} ${styles.aiSettingsRowFull}`}>
+          <label className={styles.aiSettingsLabel}>Arweave JWK (JSON)</label>
+          <textarea
+            className={styles.aiSettingsTextarea}
+            value={useLocalArweave ? inputValue(resourceKeys.arweave?.jwk) : ''}
+            onChange={(event) => updateResourceKeyField('arweave', 'jwk', event.target.value)}
+            disabled={!useLocalArweave}
+            placeholder={
+              useLocalArweave
+                ? '{ "kty": "...", ... }'
+                : sponsoredKeys.arweave
+                  ? 'Sponsored key configured'
+                  : 'No sponsored key set'
+            }
+          />
+          <label className={styles.aiSettingsInlineToggle}>
+            <input
+              type="checkbox"
+              checked={useLocalArweave}
+              onChange={(event) => handleResourceToggleLocal('arweave', event)}
+            />
+            <span>Use local override</span>
+          </label>
+          <div className={styles.aiSettingsHint}>
+            {formatResourceSponsorHint({
+              resourceKey: 'arweave',
+              resourceLabel: 'Arweave',
+              sponsoredKeys,
+              sponsorSessions,
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
     <div className={styles.aiSettingsFooterRow}>
       <div className={styles.aiSettingsStatus}>
