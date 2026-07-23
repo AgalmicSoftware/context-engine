@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-const { ethers } = require('ethers');
-const { nowHumanTag } = require('./lib/common');
-const { normalizeRequiredMetadataUri } = require('./lib/arweave-metadata');
-const { resolveChainDefaults } = require('./lib/network-defaults');
-const { derivePrivateKeyFromPasskeyRawId } = require('./lib/porto-wallet-derivation.js');
+const { ethers } = require("ethers");
+const { nowHumanTag } = require("./lib/common");
+const { normalizeRequiredMetadataUri } = require("./lib/arweave-metadata");
+const { resolveChainDefaults } = require("./lib/network-defaults");
+const { buildPasskeyDerivedWallet } = require("./lib/passkey-derived-wallet");
 
 const DEFAULT_PASSKEY_RAW_ID_B64URL = "AQIDBAUGBwgJCgsMDQ4PEA";
 const DEFAULT_GROUP_PASSWORD = "browserUse";
@@ -91,8 +91,11 @@ async function main() {
   const chain = resolveChainDefaults({ env: process.env });
   const rpcUrl = chain.rpcUrl;
   const expectedChainId = chain.chainId;
-  const rawIdB64Url = process.env.PASSKEY_RAW_ID_B64URL || DEFAULT_PASSKEY_RAW_ID_B64URL;
-  const privateKey = process.env.AI_TEST_PRIVATE_KEY || buildPasskeyDerivedWallet(rawIdB64Url).privateKey;
+  const rawIdB64Url =
+    process.env.PASSKEY_RAW_ID_B64URL || DEFAULT_PASSKEY_RAW_ID_B64URL;
+  const privateKey =
+    process.env.AI_TEST_PRIVATE_KEY ||
+    buildPasskeyDerivedWallet(rawIdB64Url).privateKey;
 
   const factoryAddress = chain.sbtFactory;
   const groupPassword = normalizeGroupPasswordInput(

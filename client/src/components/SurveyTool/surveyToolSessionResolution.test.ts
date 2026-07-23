@@ -279,7 +279,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved draft-storage slugs on pending network scope unless props provide the chain id', () => {
+  it('keeps unresolved draft-storage slugs fail-closed even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolDraftStorageContext({
@@ -310,7 +310,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved response-hydration slugs off cache scope unless props provide the chain id', () => {
+  it('keeps unresolved response-hydration slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolResponseHydrationContext({
@@ -346,7 +346,7 @@ describe('surveyToolSessionResolution', () => {
       slug === 'demo-sh'
         ? {
             slug,
-            sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+            sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
           }
         : null,
     );
@@ -375,7 +375,7 @@ describe('surveyToolSessionResolution', () => {
     });
   });
 
-  it('keeps unresolved question-bootstrap slugs off bootstrap network scope unless props provide the chain id', () => {
+  it('keeps unresolved question-bootstrap slugs off bootstrap scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolQuestionBootstrapContext({
@@ -406,7 +406,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved question-read-cache slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved question-read-cache slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolQuestionReadCacheContext({
@@ -469,7 +469,7 @@ describe('surveyToolSessionResolution', () => {
     });
   });
 
-  it('keeps unresolved questions-dashboard-load slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved dashboard-load slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolQuestionsDashboardLoadContext({
@@ -501,9 +501,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('recovers questions-dashboard network scope from fallback list slugs when bare /questions has no base session config', () => {
-    const resolveBySlug = makeResolveBySlug((slug) =>
-      slug === 'alpha' ? { slug: 'alpha', networkChainId: 84532 } : null,
-    );
+    const resolveBySlug = makeResolveBySlug((slug) => (slug === 'alpha' ? makeLegacyRegistryConfig('alpha') : null));
 
     const resolved = resolveSurveyToolQuestionsDashboardLoadContext({
       sessionSlug: '',
@@ -523,7 +521,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).toHaveBeenCalledWith('alpha');
   });
 
-  it('keeps unresolved question-payload-cache-write slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved question-payload writes off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolQuestionPayloadCacheWriteContext({
@@ -554,7 +552,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved ensure-question-cached slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved ensure-question-cached calls fail-closed when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolEnsureQuestionCachedContext({
@@ -585,7 +583,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved question-count slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved question-count slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolQuestionCountContext({
@@ -617,9 +615,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('recovers question-count network scope from fallback list slugs when bare /questions has no base session config', () => {
-    const resolveBySlug = makeResolveBySlug((slug) =>
-      slug === 'alpha' ? { slug: 'alpha', networkChainId: 84532 } : null,
-    );
+    const resolveBySlug = makeResolveBySlug((slug) => (slug === 'alpha' ? makeLegacyRegistryConfig('alpha') : null));
 
     const resolved = resolveSurveyToolQuestionCountContext({
       sessionSlug: '',
@@ -639,7 +635,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).toHaveBeenCalledWith('alpha');
   });
 
-  it('keeps unresolved id-lookup slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved id-lookup slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolIdLookupContext({
@@ -670,7 +666,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved survey-read slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved survey-read slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolSurveyReadContext({
@@ -701,7 +697,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved update-cache slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved update-cache slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolUpdateCacheContext({
@@ -732,7 +728,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved submitted-cache-write slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved submitted-cache writes off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolSubmittedCacheWriteContext({
@@ -763,7 +759,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved pile-warm-seed slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved pile warm seeds off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolPileWarmSeedContext({
@@ -794,7 +790,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved pile-load slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved pile loads off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolPileLoadContext({
@@ -825,7 +821,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved pile-response-read slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved pile-response reads off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolPileResponseReadContext({
@@ -863,7 +859,7 @@ describe('surveyToolSessionResolution', () => {
             contracts: {
               surveys: { chainId: 84532 },
             },
-          }
+          })
         : null,
     );
 
@@ -892,7 +888,7 @@ describe('surveyToolSessionResolution', () => {
     });
   });
 
-  it('keeps unresolved pile-filter slugs off cache/config scope unless props provide the chain id', () => {
+  it('keeps unresolved pile filters off cache/config scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) =>
       slug === ''
         ? {
@@ -936,7 +932,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved decrypt-hydration slugs off cache scope unless props provide the chain id', () => {
+  it('keeps unresolved decrypt hydration off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolDecryptHydrationContext({
@@ -967,7 +963,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved response-json slugs off metadata scope unless props provide the chain id', () => {
+  it('keeps unresolved response JSON off metadata scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) =>
       slug === '' ? { slug: '', networkChainId: 84532, sessionName: 'General Session' } : null,
     );

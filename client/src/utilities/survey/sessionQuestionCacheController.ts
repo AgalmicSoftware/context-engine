@@ -26,7 +26,17 @@ import {
 } from '../session/mainSiteProgressHelpers.js';
 import { MASKED_Q_DECRYPT_BACKOFF_MAX, MASKED_Q_DECRYPT_BACKOFF_TTL_MS } from '../cache/sessionCacheConstants.js';
 import { isMaskedQuestionPayload, pickBetterQuestionPayload } from './questionRouting.js';
-import { compareResponseRecency, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency';
+import { isResponseRecencyAtLeast, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency';
+import {
+  shouldHydrateWorkerCanonicalMetadata,
+  type WorkerMetadataHydrationHost,
+} from './workerCanonicalCacheHydration';
+import {
+  hydrateSessionWorkerQuestionCache,
+  isWorkerMetadataHydrationInFlight,
+  resolveWorkerMetadataHydrationTarget,
+} from './sessionWorkerMetadataCacheRuntime';
+import { createSessionCacheRevisionUpdater } from './sessionCacheRevisionRuntime';
 
 type CacheRecord = Record<string, unknown>;
 type StateRecord = {
@@ -417,28 +427,17 @@ export const createSessionQuestionCacheController = (
       : { metadata: args?.[0] || {}, targetSlug: normalizeSessionSlug(args?.[1] || '') };
   const writeQuestionMetadataToCache = (
     ...args: [string, string, CacheRecord, string, CacheRecord?]
-  ): boolean | void =>
-    typeof host.writeQuestionMetadataToCache === 'function' ? host.writeQuestionMetadataToCache(...args) : false;
-  const queueLocalRevisionUpdate = (opts: QueueLocalRevisionUpdateOptions = {}): void => {
-    if (typeof host.queueLocalRevisionUpdate === 'function') {
-      host.queueLocalRevisionUpdate(opts);
-      return;
+  ): Promise<boolean> => {
+    try {
+      return typeof host.writeQuestionMetadataToCache === 'function'
+        ? await host.writeQuestionMetadataToCache(...args)
+        : false;
+    } catch (error: unknown) {
+      if (error instanceof QuestionCachePersistenceError) throw error;
+      throw new QuestionCachePersistenceError(
+        `Failed to persist questions cache for ${args[0]}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-    const shouldBumpQuestionResponsesNonce = !!opts?.needsQuestionResponsesNonce;
-    const shouldCheckAllCachesReady = !!opts?.checkAllCachesReady;
-    if (!shouldBumpQuestionResponsesNonce && !shouldCheckAllCachesReady) return;
-    setState(
-      (prev) => {
-        const next: StateRecord = {};
-        if (shouldBumpQuestionResponsesNonce) {
-          next.questionResponsesNonce = Number(prev?.questionResponsesNonce || 0) + 1;
-        }
-        return Object.keys(next).length ? next : null;
-      },
-      () => {
-        if (shouldCheckAllCachesReady) checkAllCachesReady();
-      },
-    );
   };
   const queueLocalRevisionUpdate = createSessionCacheRevisionUpdater<StateRecord, QueueLocalRevisionUpdateOptions>({
     host,
@@ -528,6 +527,7 @@ export const createSessionQuestionCacheController = (
       checkAllCachesReady();
     };
     if (
+      !workerTarget.isWorkerCanonical &&
       scanScopeNoop(slug, 'initializeQuestionCacheForGroup', () => {
         setQuestionState({ isQuestionCacheReady: true }, checkAllCachesReady);
       })
@@ -2243,9 +2243,11 @@ export const createSessionQuestionCacheController = (
 
   async function refreshQuestionMetadataForGroup(slug: string, opts: QuestionInitOptions = {}): Promise<void> {
     mainSiteLog.log('refreshQuestionMetadataForGroup() - invoked', { slug });
-    if (!getSessionChainId(slug)) {
-      mainSiteLog.warn('No group chainId for refreshQuestionMetadataForGroup');
-      return;
+    if (!shouldHydrateWorkerCanonicalMetadata(getSessionCfg(slug))) {
+      if (!getSessionChainId(slug)) {
+        mainSiteLog.warn('No group chainId for refreshQuestionMetadataForGroup');
+        return;
+      }
     }
     // Re-running initializeQuestionCacheForGroup will handle fetching new QIDs and their metadata
     // from the last known block.

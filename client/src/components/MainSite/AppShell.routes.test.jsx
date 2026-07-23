@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppShell, appShellDispatchActions } from './AppShell';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -823,10 +823,7 @@ describe('AppShell route render smoke', () => {
       'data-initial-sponsored-bundle-id',
       'sponsor-tx-id',
     );
-    expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute(
-      'data-initial-sponsored-bundle-key',
-      'sponsor-secret',
-    );
+    expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute('data-initial-sponsored-bundle-key', '');
     expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute('data-network-id', '84532');
     expect(mockSessionWizard.mock.calls[mockSessionWizard.mock.calls.length - 1][0]?.ensureLightSbtUniverse).toBe(
       subject.ensureLightSbtUniverse,
@@ -834,7 +831,7 @@ describe('AppShell route render smoke', () => {
     expect(replaceStateSpy).toHaveBeenCalledWith(
       {},
       '',
-      '/session/new?sessionId=edge-session-id&chainId=chain-84532&sponsored=sponsor-tx-id#k=sponsor-secret',
+      '/session/new?sessionId=edge-session-id&chainId=chain-84532&sponsored=sponsor-tx-id',
     );
     expect(window.location.hash).toBe('');
   });
@@ -877,7 +874,7 @@ describe('AppShell route render smoke', () => {
       sessionId,
       configRevision: 'admin-revision-1',
       corsWorkerUrl: workerOrigin,
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     };
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
@@ -962,11 +959,8 @@ describe('AppShell route render smoke', () => {
       configRevision: 'revision-1',
       corsWorkerUrl: workerOrigin,
       sessionName: 'Worker Session',
-      sessionModeProfile: {
-        authority: { mode: 'worker_canonical' },
-        storage: { mode: 'worker_kv' },
-        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
-      },
+      networkChainId: 11155420,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
       workerAuthority: { participantScopes: ['ai', 'storage'] },
     };
     const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -986,22 +980,78 @@ describe('AppShell route render smoke', () => {
       sessionConfig: null,
     });
     subject.resolveSessionPathSlug = jest.fn();
+    subject._mounted = true;
+    subject.getSessionSlugFromState = jest.fn(() => 'worker-session');
+    subject.handleNetworkChange = jest.fn();
+    subject.syncSessionFallbackRedirectConsumption = jest.fn();
+    subject.initializeQuestionCacheForGroup = jest.fn(async () => {
+      subject.state = { ...subject.state, isQuestionCacheReady: true };
+    });
+    subject.initializeSurveyCacheForGroup = jest.fn(async () => {
+      subject.state = { ...subject.state, isSurveyCacheReady: true };
+    });
+    subject.fetchQuestionResponsesChunkedForGroup = jest.fn(async () => {
+      subject.state = { ...subject.state, isResponsesCacheReady: true };
+    });
+    subject.initializeSbtCacheForGroup = jest.fn(async () => undefined);
+    subject.startSbtEventListenerForGroup = jest.fn();
+    subject.startSurveyAndQuestionEventListenerForGroup = jest.fn();
+    subject.setReadinessStateIfChanged = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+    });
+    subject.checkAllCachesReady = jest.fn(() => {
+      subject.state = {
+        ...subject.state,
+        isAllCachesReady:
+          subject.state.isSBTCacheReady && subject.state.isSurveyCacheReady && subject.state.isQuestionCacheReady,
+      };
+    });
 
     const view = render(subject.render());
 
     expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent(
       'Loading worker session',
     );
+    expect(mockNavbar.mock.calls.at(-1)?.[0]?.sessionConfig).toBeNull();
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+
+    const previousState = {
+      ...subject.state,
+      sessionPathResolutionNonce: 0,
+    };
+    subject.getSessionCfg.mockClear();
+    subject.componentDidUpdate(subject.props, previousState);
+    await waitFor(() => expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('worker-session'));
+
+    expect(subject.getCacheSessionCfg('worker-session')).toEqual(workerConfig);
+    expect(subject.getSessionCfg).not.toHaveBeenCalled();
+    expect(subject.initializeQuestionCacheForGroup).toHaveBeenCalledWith('worker-session');
+    expect(subject.fetchQuestionResponsesChunkedForGroup).toHaveBeenCalledWith('worker-session');
+    expect(subject.initializeSbtCacheForGroup).not.toHaveBeenCalled();
+    expect(subject.startSbtEventListenerForGroup).not.toHaveBeenCalled();
+    expect(subject.startSurveyAndQuestionEventListenerForGroup).not.toHaveBeenCalled();
+    expect(subject.state).toMatchObject({
+      isSBTCacheReady: true,
+      isSurveyCacheReady: true,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isAllCachesReady: true,
+    });
 
     view.rerender(subject.render());
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(mockNavbar.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual(workerConfig);
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'worker-session');
-    expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual(workerConfig);
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-network-id', '');
+    expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual({
+      ...workerConfig,
+      networkChainId: null,
+    });
     expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
     expect(fetchSpy.mock.calls[0][0]).toBe('https://worker-session.example.com/session-config?slug=worker-session');
+    subject._mounted = false;
   });
 
   it('installs verified explicit-Lit worker hooks through the boundary and route controller', async () => {
@@ -1010,6 +1060,7 @@ describe('AppShell route render smoke', () => {
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     sessionModeProfile.encryption = { mode: 'lit' };
     sessionModeProfile.evm.registryChainId = 11155420;
+    sessionModeProfile.storage.payloadAccessControl.encryption = 'lit';
     const workerConfig = {
       slug: 'worker-lit',
       sessionId: '0x11223344556677889900aabbccddeeff',
@@ -1444,7 +1495,7 @@ describe('AppShell route render smoke', () => {
     render(subject.render());
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_WIZARD_ROOT)).toBeInTheDocument();
-    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/ce/session/new?sessionId=edge-session-id#k=sponsor-secret');
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/ce/session/new?sessionId=edge-session-id#preview=1');
   });
 
   it('renders the sponsor root and forwards session query params to SponsorPage', async () => {
@@ -1768,11 +1819,7 @@ describe('AppShell route render smoke', () => {
       configRevision: 'worker-docs-revision-1',
       corsWorkerUrl: workerOrigin,
       sessionName: 'Worker Docs',
-      sessionModeProfile: {
-        authority: { mode: 'worker_canonical' },
-        storage: { backend: 'cloudflare' },
-        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
-      },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     };
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
@@ -2172,16 +2219,30 @@ describe('AppShell route render smoke', () => {
       await subject.componentDidMount();
     });
 
-    expect(subject.getDisplaySessionNetwork).toHaveBeenCalledWith('demo-sh');
+    expect(subject.getDisplaySessionNetwork).not.toHaveBeenCalledWith('demo-sh');
     expect(subject.initializeQuestionCacheForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
     expect(subject.fetchQuestionResponsesChunkedForGroup).not.toHaveBeenCalled();
     expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
-    expect(subject.initializeSbtCacheForGroup).toHaveBeenCalledWith('demo-sh', {
-      mode: 'partial',
-      background: true,
-    });
+    expect(subject.initializeSbtCacheForGroup).not.toHaveBeenCalled();
 
     subject.componentWillUnmount();
+  });
+
+  it('skips about-page Worker preloads when the browser origin is not allowed', () => {
+    const demoConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      allowOrigins: ['https://contextengine.sh'],
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = createSubject({ path: '/about', activeSessionSlug: '', sessionConfig: null });
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (slug === 'demo-sh' ? demoConfig : null));
+    subject.initializeQuestionCacheForGroup = jest.fn(async () => undefined);
+    subject.initializeSurveyCacheForGroup = jest.fn(async () => undefined);
+
+    expect(subject.preloadAboutDemoSessionData('/about')).toBeNull();
+    expect(subject.initializeQuestionCacheForGroup).not.toHaveBeenCalled();
+    expect(subject.initializeSurveyCacheForGroup).not.toHaveBeenCalled();
   });
 
   it('preserves session question-results subroutes and forwards route-open flags to OnePageSession', async () => {
@@ -2321,6 +2382,21 @@ describe('AppShell route render smoke', () => {
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-all-sessions-mode', 'false');
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-slug', 'edge');
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-config-slug', 'edge');
+  });
+
+  it.each(['/sbts/new', '/groups/new/'])('renders the standalone SBT create route for %s', async (path) => {
+    const sessionConfig = buildSessionConfig();
+    const subject = createSubject({
+      path,
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SBTS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-sbt-create-page')).toHaveAttribute('data-network-id', '84532');
+    expect(screen.getByTestId('mock-sbt-create-page')).toHaveAttribute('data-session-slug', 'edge');
   });
 
   it.each(['/sbts/new', '/groups/new/'])('renders the standalone SBT create route for %s', async (path) => {
@@ -2496,34 +2572,6 @@ describe('AppShell route render smoke', () => {
       await subject.componentDidMount();
     });
 
-    expect(loadGroupRegistryCache).not.toHaveBeenCalled();
-    expect(subject._registryBootstrapPromise).toBeNull();
-    expect(subject._registryBootstrapScopeKey).toBe('');
-  });
-
-  it('does not bootstrap an on-chain registry RPC for a canonical pure Worker Group detail route', async () => {
-    const workerConfig = buildSessionConfig({
-      slug: 'demo-sh',
-      networkChainId: DEFAULT_NETWORK.id,
-      __registry: undefined,
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-    });
-    const subject = stubMainSiteMountSideEffects(
-      createSubject({
-        path: '/group/public-reviewers',
-        search: '?sessionName=demo-sh',
-        activeSessionSlug: 'stale-session',
-        sessionConfig: workerConfig,
-      }),
-    );
-    subject.getDisplaySessionChainId = jest.fn(() => null);
-
-    await act(async () => {
-      await subject.componentDidMount();
-    });
-
-    expect(subject.getBootstrapActiveSessionSlug('/group/public-reviewers', '?sessionName=demo-sh')).toBe('demo-sh');
-    expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
     expect(loadGroupRegistryCache).not.toHaveBeenCalled();
     expect(subject._registryBootstrapPromise).toBeNull();
     expect(subject._registryBootstrapScopeKey).toBe('');

@@ -1,4 +1,5 @@
 import {
+  buildLegacySbtRouteCredentialCleanPath,
   buildSbtPageAutoMintStorageKey,
   buildSbtPageAutoMintCleanPath,
   clearLegacySbtRouteCredential,
@@ -80,6 +81,9 @@ describe('sbtPageAutoMintHelpers', () => {
     ).toBe('/sbt/0xA?keep=yes');
     expect(buildSbtPageAutoMintCleanPath('https://example.test/sbt/0xA?auto1=1&sbt1=0xA&gp1=secret&keep=yes')).toBe(
       '/sbt/0xA?keep=yes',
+    );
+    expect(buildSbtPageAutoMintCleanPath('https://example.test/sbt/0xA?sbt=0xA&gp=secret&inv=invite&keep=yes')).toBe(
+      '/sbt/0xA?sbt=0xA&keep=yes',
     );
     expect(buildSbtPageAutoMintCleanPath('https://example.test/sbt/0xA?keep=yes')).toBeNull();
   });

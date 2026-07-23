@@ -145,7 +145,7 @@ describe('sessionWizardLocalStateSupport', () => {
     expect(clearDraftCache).toHaveBeenCalledWith(expect.objectContaining({ expectedPublicationIdentity }));
   });
 
-  it('poisons the published draft while atomically retaining undeployed pending SBT drafts', () => {
+  it('poisons the published draft while retaining undeployed pending SBT drafts in memory', () => {
     sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({

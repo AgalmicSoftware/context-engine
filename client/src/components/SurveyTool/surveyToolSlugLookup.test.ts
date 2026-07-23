@@ -77,7 +77,14 @@ describe('surveyToolSlugLookup', () => {
       String(slug || '')
         .trim()
         .toLowerCase() === 'edge'
-        ? { slug: 'edge', networkChainId: 84532 }
+        ? {
+            slug: 'edge',
+            networkChainId: 84532,
+            __registry: {
+              registryChainId: 84532,
+              sessionIdHex: '0x00112233445566778899aabbccddeeff',
+            },
+          }
         : null;
 
     mockedGetAllSessionSlugs.mockReturnValue(['ghost', 'edge']);

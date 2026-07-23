@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
 import {
   addWorkerGroupMember,
@@ -18,12 +18,9 @@ import {
   type WorkerGroupMember,
   type WorkerGroupMemberVisibility,
 } from '../../domains/worker/workerGroupPorts';
-import { uploadWorkerGroupImage } from '../../domains/worker/workerGroupImageUpload';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
-import WorkerGroupCreateForm from '../Shared/WorkerGroupCreateForm';
-import WorkerGroupImage from '../Shared/WorkerGroupImage';
 import styles from './AdminPage.module.scss';
 
 type WorkerGroupDraft = {
@@ -37,7 +34,6 @@ type WorkerGroupDraft = {
 export type AdminWorkerGroupsPanelProps = {
   canAdminWorker: boolean;
   sessionId: string;
-  sessionConfig?: unknown;
   sessionSlug: string;
   workerUrl: string;
   workerToken?: string;
@@ -45,6 +41,8 @@ export type AdminWorkerGroupsPanelProps = {
   postSignedRequest: PostSignedWorkerGroupRequest;
   autoLoad?: boolean;
   onGroupsChanged?: () => void;
+  title?: string;
+  description?: string;
 };
 
 const emptyDraft = (adminAddress = '', tags: string[] = []): WorkerGroupDraft => ({
@@ -62,6 +60,8 @@ const withJoinMode = (draft: WorkerGroupDraft, joinMode: WorkerGroupJoinMode): W
 });
 
 const memberAddress = (member: WorkerGroupMember): string => String(member.principal?.address || '').trim();
+const memberIdentity = (member: WorkerGroupMember): string =>
+  String(member.principalKey || memberAddress(member) || `${member.groupId || ''}\n${member.addedAt || ''}`);
 const asRecord = (value: unknown): Record<string, unknown> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 
@@ -70,7 +70,6 @@ type LocalGroupUpdater = (groups: WorkerGroup[], result: unknown) => WorkerGroup
 const AdminWorkerGroupsPanel = ({
   canAdminWorker,
   sessionId,
-  sessionConfig,
   sessionSlug,
   workerUrl,
   workerToken = '',
@@ -78,6 +77,8 @@ const AdminWorkerGroupsPanel = ({
   postSignedRequest,
   autoLoad = false,
   onGroupsChanged,
+  title = 'Worker access groups',
+  description = 'Manage the supported open and admin-added authorization groups.',
 }: AdminWorkerGroupsPanelProps) => {
   const defaultGroupTags = useMemo(() => normalizeWorkerGroupDefaultTags(sessionConfig), [sessionConfig]);
   const defaultGroupTagsKey = defaultGroupTags.join('\u0000');
@@ -109,7 +110,7 @@ const AdminWorkerGroupsPanel = ({
     },
     [normalizedWorkerUrl, postSignedRequest],
   );
-  const targetKey = `${normalizedSessionId}\n${normalizedSessionSlug}\n${normalizedWorkerUrl}\n${defaultGroupTagsKey}`;
+  const targetKey = `${normalizedSessionId}\n${normalizedSessionSlug}\n${normalizedWorkerUrl}`;
   const targetGenerationRef = useRef({ key: targetKey, generation: 0 });
   if (targetGenerationRef.current.key !== targetKey) {
     targetGenerationRef.current = {
@@ -142,8 +143,7 @@ const AdminWorkerGroupsPanel = ({
       return true;
     } catch (error) {
       if (!isCurrentTarget(requestTargetKey, requestGeneration)) return false;
-      const message = error instanceof Error ? error.message : 'Could not load worker groups.';
-      setStatus(message);
+      setStatus(error instanceof Error ? error.message : 'Could not load worker groups.');
       return false;
     } finally {
       if (isCurrentTarget(requestTargetKey, requestGeneration)) setBusy(false);
@@ -159,20 +159,34 @@ const AdminWorkerGroupsPanel = ({
   ]);
 
   useEffect(() => {
+    setGroups([]);
+    setCreateDraft(emptyDraft());
+    setEditingGroupId('');
+    setEditDraft(emptyDraft());
+    setMemberGroupId('');
+    setMembers([]);
+    setMemberNextCursor('');
+    setMemberAddressDraft('');
+    setBusy(false);
+    setStatus('');
     if (autoLoad) void loadGroups();
-  }, [autoLoad, loadGroups]);
+  }, [autoLoad, loadGroups, targetKey]);
 
   const runMutation = async (
     operation: () => Promise<unknown>,
     success: string,
     updateLocalGroups?: LocalGroupUpdater,
   ): Promise<boolean> => {
+    const requestTargetKey = targetKey;
+    const requestGeneration = targetGeneration;
     setBusy(true);
     setStatus('');
     try {
       const result = await operation();
+      if (!isCurrentTarget(requestTargetKey, requestGeneration)) return false;
       if (updateLocalGroups) setGroups((current) => updateLocalGroups(current, result));
       else await loadGroups();
+      if (!isCurrentTarget(requestTargetKey, requestGeneration)) return false;
       setStatus(success);
       onGroupsChanged?.();
       return true;
@@ -194,14 +208,17 @@ const AdminWorkerGroupsPanel = ({
     void runMutation(
       () =>
         createWorkerGroup({
-          group: buildGroupInput(createDraft, label),
+          group: { ...createDraft, label },
           sessionId: normalizedSessionId,
           sessionSlug: normalizedSessionSlug,
           postSignedRequest: postExactSignedRequest,
         }),
       'Group created.',
       (current, result) => {
-        const created = normalizeWorkerGroupsAdminPayload({ groups: [asRecord(result).group] })[0];
+        const created = normalizeWorkerGroupsAdminPayload(
+          { groups: [asRecord(result).group] },
+          normalizedSessionSlug,
+        )[0];
         return created ? [...current.filter((group) => group.groupId !== created.groupId), created] : current;
       },
     ).then((created) => {
@@ -230,14 +247,17 @@ const AdminWorkerGroupsPanel = ({
       () =>
         updateWorkerGroup({
           groupId: editingGroupId,
-          group: buildGroupInput(editDraft, label),
+          group: { ...editDraft, label },
           sessionId: normalizedSessionId,
           sessionSlug: normalizedSessionSlug,
           postSignedRequest: postExactSignedRequest,
         }),
       'Group updated.',
       (current, result) => {
-        const updated = normalizeWorkerGroupsAdminPayload({ groups: [asRecord(result).group] })[0];
+        const updated = normalizeWorkerGroupsAdminPayload(
+          { groups: [asRecord(result).group] },
+          normalizedSessionSlug,
+        )[0];
         return updated ? current.map((group) => (group.groupId === updated.groupId ? updated : group)) : current;
       },
     ).then((updated) => {

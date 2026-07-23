@@ -83,4 +83,20 @@ describe('SessionWizard deploy cache authority', () => {
       }).deployComplete,
     ).toBe(false);
   });
+
+  it('does not equate a helper-returned URL with public config verification', () => {
+    expect(
+      resolveDeployWorkerState({
+        responseWorkerUrl: 'https://deployed.example',
+        configuredWorkerUrl: '',
+      }).deployComplete,
+    ).toBe(false);
+    expect(
+      resolveDeployWorkerState({
+        responseWorkerUrl: 'https://deployed.example',
+        configuredWorkerUrl: '',
+        publicConfigVerified: true,
+      }).deployComplete,
+    ).toBe(true);
+  });
 });

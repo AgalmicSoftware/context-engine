@@ -231,7 +231,11 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
   const getScopedSessionSlugs = (scopeIn?: string): string[] => {
     const scope = typeof scopeIn === 'string' ? scopeIn : getSessionScanScope();
     const scopeContext = getSessionScanScopeContext(scope);
-    const scoped = getAllowedSessionSlugs(scopeContext.scope, scopeContext.list, scopeContext.activeSlug);
+    const candidates =
+      scope === 'all'
+        ? getAllSessionSlugs()
+        : getAllowedSessionSlugs(scopeContext.scope, scopeContext.list, scopeContext.activeSlug);
+    const scoped = filterScanEligibleSlugs(candidates, scopeContext, 'getScopedSessionSlugs');
     if (!scoped.length && scopeContext.scope === 'list') {
       logScopeSkipOnce('getScopedSessionSlugs:list-empty', '', scopeContext);
     }

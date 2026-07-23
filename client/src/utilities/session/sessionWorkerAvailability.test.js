@@ -254,4 +254,69 @@ describe('sessionWorkerAvailability', () => {
       }),
     ).toBe(false);
   });
+
+  it('resolves an exact Worker target only for a matching slug and validated Worker profile', () => {
+    const exactConfig = {
+      ...demoSessions['demo-sh'],
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: 'demo-sh',
+        sessionConfig: exactConfig,
+        requireExactWorkerSession: true,
+      }),
+    ).toBe(exactConfig.corsWorkerUrl.replace(/\/+$/, ''));
+
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: 'other-session',
+        sessionConfig: exactConfig,
+        requireExactWorkerSession: true,
+      }),
+    ).toBe('');
+
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: 'demo-sh',
+        sessionConfig: {
+          ...exactConfig,
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        },
+        requireExactWorkerSession: true,
+      }),
+    ).toBe('');
+  });
+
+  it('pins exact Worker targets to the validated origin and identity instead of a newer slug cache', () => {
+    const exactConfig = {
+      ...demoSessions['demo-sh'],
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    upsertCachedSessionWorkerConfig({
+      slug: exactConfig.slug,
+      config: {
+        corsWorkerUrl: 'https://cross-session-cache.example',
+      },
+    });
+
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: exactConfig.slug,
+        sessionConfig: exactConfig,
+        requireExactWorkerSession: true,
+      }),
+    ).toBe(exactConfig.corsWorkerUrl.replace(/\/+$/, ''));
+
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: exactConfig.slug,
+        sessionConfig: {
+          ...exactConfig,
+          sessionId: '',
+        },
+        requireExactWorkerSession: true,
+      }),
+    ).toBe('');
+  });
 });

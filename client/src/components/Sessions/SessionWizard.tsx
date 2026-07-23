@@ -315,7 +315,7 @@ export {
   RESERVED_SESSION_SLUGS,
 } from './sessionWizardSlugValidation';
 export { getSessionWizardSecretFieldTestId } from './sessionWizardUiSupport';
-export { __test__getSessionWizardDefaultAiSettings, __test__isSessionWizardDevMode } from './sessionWizardConfig';
+export { __test__getSessionWizardDefaultAiSettings } from './sessionWizardConfig';
 export {
   deploySessionWizardPendingSbtDraft,
   finalizeSessionWizardPendingSbtDraft,
@@ -506,8 +506,8 @@ const SessionWizard = ({
     sessionExists: checkSessionSlugExists,
   });
   const [encryptionGates, setEncryptionGates] = useState<EncryptionGateState[]>(() => cachedInitialState.initialGates);
-  // Pending SBT drafts carry deploy secrets and claim codes, so keep them out
-  // of localStorage while still surviving same-tab refreshes via sessionStorage.
+  // Pending SBT drafts carry deploy secrets and claim codes, so keep them only
+  // in this mounted tab. Reloading or leaving the wizard intentionally clears them.
   const { pendingSbtDrafts, setPendingSbtDrafts, normalizedPendingSbtDrafts, hasUndeployedPendingSbtDrafts } =
     usePendingSbtDrafts();
   const pendingSbtDraftsRef = useRef(pendingSbtDrafts);
@@ -607,27 +607,52 @@ const SessionWizard = ({
     sessionIdStatusTimerRef,
     jsonCopiedTimerRef,
   });
-  const [bundleMode, setBundleMode] = useState(() => (toStr(CLOUDFLARE_WORKER_BUNDLE_URL) ? 'url' : 'upload'));
-  const [bundleFile, setBundleFile] = useState<File | null>(null);
-  const [forceManualBundleFile, setForceManualBundleFile] = useState(false);
-  const [normalModeBundleUrlOverride, setNormalModeBundleUrlOverride] = useState('');
-  const [deployStatus, setDeployStatus] = useState('');
-  const [deployInFlight, setDeployInFlight] = useState(false);
-  const [deployComplete, setDeployComplete] = useState(() => !!cachedWizard?.deployComplete);
-  const [deployWorkerUrl, setDeployWorkerUrl] = useState(() => normalizeBaseUrl(toStr(cachedWizard?.deployWorkerUrl).trim()));
-  const [provisionedSponsoredContext, setProvisionedSponsoredContext] = useState<UnknownRecord>(() => ({
-    ...buildEmptyProvisionedSponsoredContext(),
-    sessionSlug: sessionRegistryUtils.normalizeSlug(cachedWizard?.provisionedSponsoredContext?.sessionSlug),
-    workerUrl: normalizeWorkerAuthUrl(toStr(cachedWizard?.provisionedSponsoredContext?.workerUrl).trim()),
-    fields: sanitizeSessionWizardSponsoredFieldSnapshotForLitMode(cachedWizard?.provisionedSponsoredContext?.fields),
-  }));
-  const [persistedNewSessionBannerDismissed, setPersistedNewSessionBannerDismissed] = useState(() => (
-    readSessionWizardNewSessionBannerDismissed()
-  ));
-  const [newSessionBannerDismissedContext, setNewSessionBannerDismissedContext] = useState('');
-  const [workerSecrets, setWorkerSecrets] = useState<WorkerSecretsLike>(() => {
-    const cached = cachedWizard?.workerSecrets;
-    return sanitizeSessionWizardWorkerSecretsForLitMode(cached);
+  const DEFAULT_ALLOWED_ORIGINS = buildSessionWizardDefaultAllowedOrigins().join('\n');
+  const {
+    workerMode,
+    setWorkerMode,
+    workerSecretsEnabled,
+    setWorkerSecretsEnabled,
+    persistWorkerSecrets,
+    setPersistWorkerSecrets,
+    deployHelperUrl,
+    setDeployHelperUrl,
+    deployForm,
+    setDeployForm,
+    bundleMode,
+    setBundleMode,
+    bundleFile,
+    setBundleFile,
+    forceManualBundleFile,
+    setForceManualBundleFile,
+    normalModeBundleUrlOverride,
+    setNormalModeBundleUrlOverride,
+    deployStatus,
+    setDeployStatus,
+    deployInFlight,
+    setDeployInFlight,
+    deployComplete,
+    setDeployComplete,
+    deployWorkerUrl,
+    setDeployWorkerUrl,
+    workerRequirementProof,
+    setWorkerRequirementProof,
+    provisionedSponsoredContext,
+    setProvisionedSponsoredContext,
+    workerSecrets,
+    setWorkerSecrets,
+    workerUrlAutoFilled,
+    setWorkerUrlAutoFilled,
+    workerAllowOrigins,
+    setWorkerAllowOrigins,
+    workerLimitPerWallet,
+    setWorkerLimitPerWallet,
+  } = useSessionWizardWorkerState<ProvisionedSponsoredContextState>({
+    cachedWizard,
+    deployHelperUrlDefault: CLOUDFLARE_DEPLOY_HELPER_URL,
+    workerBundleUrlDefault: CLOUDFLARE_WORKER_BUNDLE_URL,
+    defaultAllowedOrigins: DEFAULT_ALLOWED_ORIGINS,
+    buildProvisionedSponsoredContextState,
   });
   const deployFormRef = useRef<DeployFormState>(deployForm);
   const resolvedWalletAccountRef = useRef(toStr(account).trim());
@@ -877,30 +902,7 @@ const SessionWizard = ({
     () => workerResourceKeys.filter((key) => !cloudflareWorkerSbtGateMode || key !== 'lit'),
     [cloudflareWorkerSbtGateMode, workerResourceKeys],
   );
-  const setSessionHeaderStatus = useCallback((text = '', tone = 'default') => {
-    setSessionHeaderUploadStatus(text);
-    setSessionHeaderUploadStatusTone(text ? tone : 'default');
-  }, []);
-  useEffect(() => {
-    if (wizardMode === 'advanced') return;
-    setCollapsedSections((prev) => {
-      const firstOpenSection = ['metadata', 'encryption', 'worker', 'publish']
-        .find((key) => prev[key] === false) || 'metadata';
-      return {
-        metadata: firstOpenSection !== 'metadata',
-        encryption: firstOpenSection !== 'encryption',
-        worker: firstOpenSection !== 'worker',
-        publish: firstOpenSection !== 'publish',
-      };
-    });
-  }, [wizardMode]);
-  useEffect(() => {
-    if (!hasSponsoredBundleLink) {
-      setWizardDisplaySettingsOpen(false);
-    }
-  }, [hasSponsoredBundleLink]);
-
-  const effectivePersistWorkerSecrets = DEV_PERSIST_WORKER_SECRETS && persistWorkerSecrets;
+  const effectivePersistWorkerSecrets = false;
 
   const registryAddress = useMemo(() => {
     return resolveSessionWizardRegistryAddress(registryChainId, draft?.contracts);
@@ -4649,10 +4651,8 @@ const SessionWizard = ({
       deployHelperUrl={deployHelperUrl}
       deployStatusDisplayState={deployStatusDisplayState}
       deployWorkerUrl={deployWorkerUrl}
-      devPersistWorkerSecrets={DEV_PERSIST_WORKER_SECRETS}
       displayedWorkerUrl={displayedWorkerUrl}
       draft={draft}
-      effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
       embeddedDeployHelperEnabled={embeddedDeployHelperEnabled}
       encryptionGates={encryptionGates}
       ensureLightSbtUniverse={ensureLightSbtUniverse}
@@ -4706,13 +4706,14 @@ const SessionWizard = ({
       onPublish={handlePublish}
       onRegistryChainIdChange={handleRegistryChainIdChange}
       onRetrySponsoredBundle={() => setSponsoredBundleRetryNonce((prev) => prev + 1)}
+      onSponsoredBundleKeyChange={setSponsoredBundleKeyInput}
+      onSubmitSponsoredBundleKey={submitSponsoredBundleKey}
       onToggleDisplaySettings={() => setWizardDisplaySettingsOpen((prev) => !prev)}
       onToggleJsonPreview={() => setShowJsonPreview((prev) => !prev)}
       onToggleMoreOptions={() => setMoreOptionsOpen((prev) => !prev)}
       onTogglePublishAdvanced={() => setPublishAdvancedOpen((prev) => !prev)}
       pendingSbtDrafts={pendingSbtDrafts}
       pendingSbtSelectorOptions={pendingSbtSelectorOptions}
-      persistWorkerSecrets={persistWorkerSecrets}
       primaryDraftEntries={primaryDraftEntries}
       provider={provider}
       publishUiPlan={publishUiPlan}
@@ -4749,7 +4750,6 @@ const SessionWizard = ({
       setDeployForm={setDeployForm}
       setDeployHelperUrl={setDeployHelperUrl}
       setNormalModeBundleUrlOverride={setNormalModeBundleUrlOverride}
-      setPersistWorkerSecrets={setPersistWorkerSecrets}
       setWorkerAllowOrigins={setWorkerAllowOrigins}
       setWorkerMode={setWorkerMode}
       setWorkerSecretsEnabled={setWorkerSecretsEnabled}
@@ -4769,6 +4769,7 @@ const SessionWizard = ({
         sessionModeRequirements.publish.deployPendingSbts || sessionModeRequirements.publish.registerSession
       }
       signBootstrapAdminAction={signBootstrapAdminAction}
+      sponsoredBundleKey={sponsoredBundleKeyInput}
       sponsoredBundleStatus={sponsoredBundleStatus}
       sponsoredManualBundleRetryMessage={SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE}
       sponsoredPublishBundleFileInputRef={sponsoredPublishBundleFileInputRef}

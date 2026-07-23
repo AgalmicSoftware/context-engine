@@ -85,38 +85,51 @@ describe('sbtSelectorSessionRuntimeHelpers', () => {
     expect(
       resolveSbtSelectorSessionNetworkId({
         ...baseArgs,
-        propsSessionConfig: { networkChainId: '999' },
+        propsSessionConfig: {
+          networkChainId: '999',
+          sessionModeProfile: pureWorker,
+        },
         shouldUsePropsSessionConfig: true,
       }),
-    ).toBe(999);
+    ).toBeNull();
     expect(
       resolveSbtSelectorSessionNetworkId({
         ...baseArgs,
-        displayLookupSessionConfig: { networkChainId: 777 },
-        getSessionChainId: () => null,
+        propsSessionConfig: {
+          networkChainId: '999',
+          sessionModeProfile: workerSbt,
+        },
+        shouldUsePropsSessionConfig: true,
       }),
-    ).toBe(777);
+    ).toBe(11155420);
     expect(
       resolveSbtSelectorSessionNetworkId({
         ...baseArgs,
-        displayLookupSessionConfig: { __registry: { chainId: 778 } },
+        displayLookupSessionConfig: {
+          sessionModeProfile: registry,
+        },
+      }),
+    ).toBe(11155420);
+    expect(
+      resolveSbtSelectorSessionNetworkId({
+        ...baseArgs,
+        displayLookupSessionConfig: {
+          __registry: {
+            chainId: 778,
+            sessionIdHex: '0x00112233445566778899aabbccddeeff',
+          },
+        },
         getSessionChainId: () => null,
       }),
     ).toBe(778);
     expect(
       resolveSbtSelectorSessionNetworkId({
         ...baseArgs,
-        displayLookupSessionConfig: { contracts: { sbtFactory: { chainId: 779 } } },
-        getSessionChainId: () => null,
-      }),
-    ).toBe(779);
-    expect(
-      resolveSbtSelectorSessionNetworkId({
-        ...baseArgs,
+        displayLookupSessionConfig: {},
         getSessionChainId: () => null,
         directChainId: '',
       }),
-    ).toBe(10);
+    ).toBeNull();
     expect(
       resolveSbtSelectorSessionNetworkId({
         defaultFallbackChainId: 11155420,
@@ -124,6 +137,18 @@ describe('sbtSelectorSessionRuntimeHelpers', () => {
         getSessionChainId: () => null,
       }),
     ).toBe(11155420);
+    expect(
+      shouldDiscoverSbtForSessionConfig({
+        sessionConfig: { networkChainId: 11155420, sessionModeProfile: pureWorker },
+        sessionSlug: 'demo-sh',
+      }),
+    ).toBe(false);
+    expect(
+      shouldDiscoverSbtForSessionConfig({
+        sessionConfig: { sessionModeProfile: workerSbt },
+        sessionSlug: 'worker-hybrid',
+      }),
+    ).toBe(true);
   });
 
   it('builds selector metadata lookup config and display labels', () => {

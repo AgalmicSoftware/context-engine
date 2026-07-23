@@ -178,4 +178,38 @@ describe('ContractPage contract deep links', () => {
       expect(window.location.hash).toBe('#source');
     });
   });
+
+  it('keeps a Worker session legacy chain and contracts out of the global Advanced viewer', async () => {
+    const workerSessionConfig = {
+      slug: 'demo-sh',
+      sessionName: 'Worker Demo',
+      networkChainId: 11155420,
+      contracts: {
+        sessionRegistry: {
+          address: '0x5555555555555555555555555555555555555555',
+          chainId: 11155420,
+        },
+      },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    window.history.pushState({}, '', '/contracts?session=demo-sh');
+    mockGetSessionConfigBySlug.mockImplementation((slug = '') => (slug === 'demo-sh' ? workerSessionConfig : null));
+
+    render(<ContractPage activeSessionSlug="demo-sh" reduxActiveSessionSlug="" />);
+
+    expect(await screen.findByTestId('ce-contracts-advanced-external-notice')).toHaveTextContent(
+      /Advanced\/external on-chain tools/i,
+    );
+    expect(screen.getByTestId('ce-contracts-advanced-external-notice')).toHaveTextContent(
+      /not part of this session's Worker-native Groups or authority/i,
+    );
+    expect(mockBuildContractViewerContracts).toHaveBeenLastCalledWith({
+      sessionContracts: {},
+      chainId: undefined,
+      includeSessionRegistry: false,
+      includeCustomSBT: true,
+    });
+    expect(screen.queryByText('Session Registry')).not.toBeInTheDocument();
+    expect(screen.getByText('Custom SBT (Template)')).toBeInTheDocument();
+  });
 });

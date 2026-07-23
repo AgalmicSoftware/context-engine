@@ -108,7 +108,6 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
     normalizeSessionSlug,
     normalizeStorageRef,
     notify,
-    notifyUserFacingTransactionError,
     parseArweaveTxId,
     questionHashRevertLogged,
     readPayloadPointerTextForGroup,
@@ -280,7 +279,7 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
           burnAuth,
           hashedPasswordsCount: hashedPasswords.length,
           tokenURI,
-          groupPasswordHash,
+          groupPasswordConfigured: hasNonZeroHashValue(groupPasswordHash),
           ...(useConfiguredDeterministic ? { initializeGroupPasswordHash } : {}),
         },
       });
@@ -370,18 +369,33 @@ export const createContractScriptsSbtRegistryMethods = (deps: ContractScriptsRun
           txOverrides,
           rpcFunction: 'createSBT',
           revertMessage: 'createSBT transaction reverted on-chain.',
+          sensitiveArgs: true,
+          resolveSensitiveErrorMessage: useConfiguredDeterministic
+            ? (error: unknown) => {
+                const wrapped = maybeWrapUnsupportedConfiguredDeterministicFactoryError(error, addr);
+                return wrapped !== error && wrapped instanceof Error ? wrapped.message : null;
+              }
+            : null,
         });
         return receipt;
       } catch (error: any) {
         const normalizedError = useConfiguredDeterministic
           ? maybeWrapUnsupportedConfiguredDeterministicFactoryError(error, addr)
           : error;
-        if (normalizedError !== error) {
-          notify.error(normalizedError.message);
-        } else {
-          notifyUserFacingTransactionError(error);
-        }
-        throw normalizedError;
+        const safeConfiguredMessage =
+          useConfiguredDeterministic &&
+          error instanceof Error &&
+          error.message.startsWith("This session's SBT factory") &&
+          error.message.includes('does not support predictable-address deployment yet.')
+            ? error.message
+            : '';
+        const safeMessage =
+          safeConfiguredMessage ||
+          (normalizedError !== error && normalizedError instanceof Error
+            ? normalizedError.message
+            : 'SBT creation transaction failed. Verify the network and deployment settings, then retry.');
+        notify.error(safeMessage);
+        throw new Error(safeMessage);
       }
     },
 

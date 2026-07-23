@@ -14,7 +14,7 @@ describe('sponsoredBootstrapFunding helpers', () => {
     clearSponsoredBootstrapFundingContext();
   });
 
-  it('normalizes compatibility fields into the persisted funding context shape', () => {
+  it('normalizes compatibility fields into the in-memory funding context shape', () => {
     expect(
       normalizeSponsoredBootstrapFundingContext({
         sourceSessionSlug: ' General ',
@@ -30,7 +30,7 @@ describe('sponsoredBootstrapFunding helpers', () => {
     });
   });
 
-  it('persists, reads, clears tokens, and removes the session storage context', () => {
+  it('keeps funding context in memory, clears tokens, and never serializes auth material', () => {
     expect(
       writeSponsoredBootstrapFundingContext({
         sessionSlug: 'source',

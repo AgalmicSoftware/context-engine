@@ -145,12 +145,29 @@ export const shouldRouteSurveyToolMountToQuestions = ({
   !props.preventUrlChange &&
   !props.miniMode;
 
+export const shouldFetchSurveyToolSurveyIndex = (props: SurveyToolPropsLike = {}): boolean => {
+  const renderMode = resolveSurveyToolRenderMode({
+    minifiedMode: props.minifiedMode,
+    singleQuestionMode: props.singleQuestionMode,
+  });
+  if (!renderMode.shouldRenderSurveySelectorMode) return false;
+
+  const projection = resolveSessionCapabilityProjection(props.sessionConfig);
+  if (projection.source === 'invalid_profile' || projection.source === 'missing') return false;
+  return !projection.isWorkerCanonical;
+};
+
 export const shouldFetchSurveyToolSurveysOnPropsChange = ({
   prevProps = {},
   props = {},
-}: SurveyToolPropsChangeArgs = {}): boolean =>
-  getNetworkIdFromPropsLike(prevProps) !== getNetworkIdFromPropsLike(props) ||
-  (prevProps.isSurveyCacheReady !== props.isSurveyCacheReady && !!props.isSurveyCacheReady);
+}: SurveyToolPropsChangeArgs = {}): boolean => {
+  if (!shouldFetchSurveyToolSurveyIndex(props)) return false;
+  if (!shouldFetchSurveyToolSurveyIndex(prevProps)) return true;
+  return (
+    getNetworkIdFromPropsLike(prevProps) !== getNetworkIdFromPropsLike(props) ||
+    (prevProps.isSurveyCacheReady !== props.isSurveyCacheReady && !!props.isSurveyCacheReady)
+  );
+};
 
 export const shouldOpenSurveyToolResultsOnPropsChange = ({
   prevProps = {},

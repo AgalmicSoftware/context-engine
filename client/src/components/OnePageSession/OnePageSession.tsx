@@ -47,20 +47,12 @@ import contractScripts, { getAllSessionSlugs } from '../../utilities/web3/contra
 
 import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils.js';
 import { resolvePolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool.js';
-import {
-  isQuestionAllowedByAuthoritativePool,
-  normalizeAuthoritativeQuestionPoolId,
-  resolveAuthoritativeQuestionPoolScope,
-} from '../SurveyTool/surveyAuthoritativeQuestionPool';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
-import { lazyWithRetry } from '../../utilities/ui/lazyImportRetry.js';
-import { hasCachedCreateSbtForm as hasCachedCreateSbtFormCache } from '../../utilities/sbt/sbtCreateFormCache.js';
-import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
@@ -91,8 +83,10 @@ import OnePageSessionAutoMintAlerts from './OnePageSessionAutoMintAlerts';
 import OnePageSessionTelegramShell from './OnePageSessionTelegramShell';
 import {
   buildCurrentSessionConfigRequest,
+  getAgentClientLoginEnvelopeMemoryKey,
   isOnePageTelegramBackendMode,
   normalizeOnePageSessionSlug,
+  resolveAgentClientLoginIdentityTarget,
   resolveCurrentSessionSlugForProps,
   resolveTelegramAgentBridgeUrl as resolveTelegramAgentBridgeUrlForSession,
   type OnePageSessionPropsLike,
@@ -102,18 +96,41 @@ import {
   createOnePageSessionTelegramActions,
   type OnePageSessionTelegramState,
 } from './onePageSessionTelegramActions';
-
-const SurveyPage = React.lazy(() => import('../SurveyTool/SurveyPage'));
-const MemoSurveyPage = React.memo((props: any) => <SurveyPage {...props} />);
-const SBTsPage = React.lazy(() => import('../SBTs/SBTsPage'));
-const PolisReport = React.lazy(() => import('../PolisReport/PolisReport'));
-const DebateMap = React.lazy(() => import('../DebateMap/DebateMap'));
-const CorpusViewer = lazyWithRetry(() => import('../DemoViews/CorpusViewer'));
-const RiskMatrix = React.lazy(() => import('../MainContent/RiskMatrix'));
-const DemoAnalysisWorkspace = React.lazy(() => import('../DemoViews/DemoAnalysis/DemoAnalysisWorkspace'));
-const TelegramQuestionPile = React.lazy(() => import('./telegram/TelegramQuestionPile'));
-const TelegramBucketCards = React.lazy(() => import('./telegram/TelegramBucketCards'));
-const TelegramDebateMapPanel = React.lazy(() => import('./telegram/TelegramDebateMapPanel'));
+import OnePageSessionStandardShell, { DEFAULT_CORPUS_VIEWER_LOAD_STATE } from './OnePageSessionStandardShell';
+import {
+  buildOnePageSessionCanonicalBaseUrl,
+  buildOnePageSessionRawResultsRoute,
+  resolveOnePageSessionAggregatorCacheScope,
+  resolveOnePageSessionRouteUiState,
+} from './onePageSessionRouteRuntime';
+import {
+  closeStaleSbtGroupEditor,
+  hasCachedCreateSbtForm,
+  hasCachedOnChainSbtGroup,
+  sessionSupportsOnChainSbt,
+  shouldKickoffSbtUniverseScan,
+} from './onePageSessionSbtGroupRuntime';
+import {
+  buildSbtAutoMintCredentialCleanPath,
+  clearUnsupportedSbtAutoMintState,
+  hasSbtAutoMintCredential,
+  initializeSbtAutoMintRuntime,
+  sanitizeSbtAutoMintQueryForStorage,
+} from './onePageSessionAutoMintRuntime';
+import { resolveOnePageSessionNetworkRuntime, sessionAllowsLitRuntime } from './onePageSessionCapabilityRuntime';
+import {
+  workerCanonicalCacheIdentityMatches,
+  withWorkerCanonicalCacheIdentity,
+} from '../../utilities/survey/workerCanonicalCacheIdentity';
+import {
+  buildAggregatorFallbackQuestions,
+  getUniqueAggregatorCandidateSlugs,
+  mergeAggregatorResultRows,
+  resolveOnePageSessionSurveySlug,
+  resolveOnePageSessionWorkerCacheIdentity,
+  scopeAggregatorNetworkNodeToQuestionPool,
+  shouldUseBuiltInDemoAggregatorFallback,
+} from './onePageSessionAggregatorCacheRuntime';
 
 const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
@@ -192,180 +209,6 @@ const normalizeOnePageSessionFilterState = (value: unknown = {}) => {
 const serializeOnePageSessionFilterState = (value: unknown = {}) =>
   serializeFilterState(normalizeOnePageSessionFilterState(value));
 
-const hasOwn = (value: unknown, key: string) =>
-  !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key);
-
-const resolveOnePageSessionSurveySlug = (props: Record<string, unknown> | string = '') => {
-  const propsRecord = props && typeof props === 'object' ? props : {};
-  const sessionConfig =
-    propsRecord.sessionConfig && typeof propsRecord.sessionConfig === 'object'
-      ? (propsRecord.sessionConfig as Record<string, unknown>)
-      : {};
-  if (hasOwn(propsRecord, 'questionSessionSlug')) {
-    return normalizeOnePageSessionSlug(propsRecord.questionSessionSlug);
-  }
-  if (hasOwn(props.sessionConfig, 'slug')) {
-    return normalizeOnePageSessionSlug(props.sessionConfig.slug);
-  }
-  return normalizeOnePageSessionSlug(props.slug || '');
-};
-
-const getUniqueAggregatorCandidateSlugs = (...slugs: any[]) => {
-  const seen = new Set<string>();
-  return slugs
-    .map((value) => normalizeOnePageSessionSlug(value))
-    .filter((value) => {
-      const key = value || '__general__';
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-};
-
-const shouldUseBuiltInDemoAggregatorFallback = (displaySlug: any = '', questionSourceSlug: any = '') => {
-  const normalizedDisplaySlug = normalizeOnePageSessionSlug(displaySlug);
-  const normalizedQuestionSourceSlug = normalizeOnePageSessionSlug(questionSourceSlug);
-  return (
-    normalizedDisplaySlug === 'demo' && (normalizedQuestionSourceSlug === '' || normalizedQuestionSourceSlug === 'demo')
-  );
-};
-
-const buildAggregatorFallbackQuestions = (
-  questionPool: Array<Record<string, unknown>> = [],
-  sessionSlug: unknown = '',
-) => {
-  const out: Record<string, Record<string, unknown>> = {};
-  const normalizedSessionSlug = normalizeOnePageSessionSlug(sessionSlug);
-  (Array.isArray(questionPool) ? questionPool : []).forEach((entry: any) => {
-    const questionId = String(entry?.id || '').trim();
-    if (!questionId) return;
-    out[questionId.toLowerCase()] = {
-      creator: '',
-      tags: [],
-      ...entry,
-      id: questionId,
-      sessionSlug: normalizedSessionSlug,
-      sessionSlugExplicit: true,
-    };
-  });
-  return out;
-};
-
-const scopeAggregatorNetworkNodeToQuestionPool = (
-  networkNode: any = {},
-  fallbackQuestions: Record<string, any> = {},
-  sessionSlug: any = '',
-) => {
-  const fallbackQuestionPool = Object.values(fallbackQuestions || {});
-  const scope = resolveAuthoritativeQuestionPoolScope(fallbackQuestionPool, sessionSlug);
-  if (!scope) return networkNode;
-
-  const nextQuestions: Record<string, any> = {};
-  const sourceQuestions = networkNode?.questions || {};
-  Object.keys(sourceQuestions).forEach((qid) => {
-    const question = sourceQuestions[qid];
-    if (!isQuestionAllowedByAuthoritativePool(question, qid, scope)) return;
-    const questionId = String(question?.id || qid || '').trim();
-    if (!questionId) return;
-    nextQuestions[questionId.toLowerCase()] = {
-      ...question,
-      id: questionId,
-    };
-  });
-  Object.keys(fallbackQuestions || {}).forEach((qid) => {
-    const questionId = normalizeAuthoritativeQuestionPoolId(qid);
-    if (!questionId || nextQuestions[questionId]) return;
-    nextQuestions[questionId] = fallbackQuestions[qid];
-  });
-
-  const nextQuestionResponses: Record<string, any> = {};
-  const sourceQuestionResponses = networkNode?.questionResponses || {};
-  Object.keys(sourceQuestionResponses).forEach((qid) => {
-    const questionId = normalizeAuthoritativeQuestionPoolId(qid);
-    if (!questionId || !nextQuestions[questionId]) return;
-    nextQuestionResponses[qid] = sourceQuestionResponses[qid];
-  });
-
-  return {
-    ...networkNode,
-    questions: nextQuestions,
-    questionResponses: nextQuestionResponses,
-  };
-};
-
-const mergeAggregatorResultRows = (target: Record<string, any[]> = {}, source: any = {}) => {
-  const nextTarget = target && typeof target === 'object' ? target : {};
-  if (!source || typeof source !== 'object') return nextTarget;
-
-  Object.keys(source).forEach((qid) => {
-    const rows = Array.isArray(source[qid]) ? source[qid] : [];
-    if (rows.length === 0) {
-      if (!nextTarget[qid]) nextTarget[qid] = [];
-      return;
-    }
-    nextTarget[qid] = Array.isArray(nextTarget[qid]) ? nextTarget[qid] : [];
-    const seenRows = new Set(nextTarget[qid].map((row: any) => `${row?.responder || ''}|${row?.response || ''}`));
-    rows.forEach((row: any) => {
-      const key = `${row?.responder || ''}|${row?.response || ''}`;
-      if (seenRows.has(key)) return;
-      seenRows.add(key);
-      nextTarget[qid].push(row);
-    });
-  });
-
-  return nextTarget;
-};
-
-const resolveOnePageSessionRouteUiState = (props: any = {}) => {
-  const autoOpenResults = props.routeAutoOpenResults === true;
-  const showQuestions = autoOpenResults || props.routeQuestionsOpen === true;
-  return {
-    showQuestions,
-    autoOpenResults,
-  };
-};
-const buildOnePageSessionPublicRoute = (pathname: any = '') => {
-  const normalizedPath = String(pathname || '').trim();
-  const basePath = readPublicUrlBasePath();
-  if (!normalizedPath) return basePath || '/';
-  return `${basePath}${normalizedPath}` || normalizedPath;
-};
-
-const buildOnePageSessionCanonicalBaseUrl = (props: any = {}) => {
-  try {
-    const slug = resolveEffectiveSlug(props);
-    const nextUrl = new URL(window.location.href);
-    nextUrl.pathname = buildOnePageSessionPublicRoute(`/session${slug ? `/${slug}` : ''}`);
-    nextUrl.searchParams.delete('sessionSlug');
-    nextUrl.searchParams.delete('s');
-    if (slug) {
-      nextUrl.searchParams.set('session', slug);
-    } else {
-      nextUrl.searchParams.delete('session');
-    }
-    return `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
-  } catch (_) {
-    const slug = resolveEffectiveSlug(props);
-    return `${buildOnePageSessionPublicRoute(`/session${slug ? `/${slug}` : ''}`)}${slug ? `?session=${encodeURIComponent(slug)}` : ''}`;
-  }
-};
-
-const buildOnePageSessionRawResultsRoute = (props: any = {}) => {
-  const slug = resolveEffectiveSlug(props);
-  const path = slug ? `/session/${slug}/questions/results` : '/questions/results';
-  return buildOnePageSessionPublicRoute(path);
-};
-
-// Group helpers (for cross-group cache lookups)
-
-function hasCachedCreateSbtForm(slug: any = '') {
-  return hasCachedCreateSbtFormCache({
-    sessionSlug: slug,
-    migrateLegacyToSessionKey: true,
-    clearInvalid: true,
-  } as any);
-}
-
 export { buildAggregatorFromLocalCache, computeAggregatorSourceSnapshotSignature, hasCachedCreateSbtForm };
 
 class OnePageSession extends Component<any, any> {
@@ -439,19 +282,7 @@ class OnePageSession extends Component<any, any> {
       autoMintCountdown: null, // null = not counting, number = seconds remaining
       dismissedStatusItems: {},
 
-      telegramClientEnvelope: readAgentClientLoginEnvelope(initialSlug),
-      telegramSessionMeta: null,
-      telegramSessionMetaStatus: 'idle',
-      telegramAgentQuestionsStatus: 'idle',
-      telegramAgentQuestions: [],
-      telegramAgentAnswerState: null,
-      telegramQuestionPileIndex: 0,
-      telegramSubmittingQuestionId: '',
-      telegramSubmittedQuestionIds: [],
-      telegramQuestionSubmitError: '',
-      telegramAgentResultsStatus: 'idle',
-      telegramAgentResults: null,
-      telegramPolisDataset: null,
+      ...buildInitialTelegramState(initialAgentLoginTarget, readAgentClientLoginEnvelope),
     };
 
     // Ensure idempotent auto-open of Groups on mount (do not fight user toggles)
@@ -553,6 +384,10 @@ class OnePageSession extends Component<any, any> {
     }
   }
 
+  clearUnsupportedAutoMintState(updateState = true) {
+    clearUnsupportedSbtAutoMintState(this, updateState, (error) => demoLog.warn('OnePageSession: fallback', error));
+  }
+
   componentDidMount() {
     const routeUiState = resolveOnePageSessionRouteUiState(this.props);
     this.recordOriginalURL(routeUiState.showQuestions ? buildOnePageSessionCanonicalBaseUrl(this.props) : null);
@@ -566,34 +401,7 @@ class OnePageSession extends Component<any, any> {
       demoLog.warn('OnePageSession: fallback', e);
     }
 
-    // Persist any incoming auto-mint params so they survive Web3Auth redirect cycles
-    try {
-      const currentSearch = typeof window !== 'undefined' ? window.location.search || '' : '';
-      const hasAutoFlag = () => {
-        try {
-          const raw = currentSearch.replace(/^\?/, '');
-          const params = new URLSearchParams(raw);
-          if (params.get('auto') === '1') return true;
-          for (const key of params.keys()) {
-            if (/^auto\d+$/.test(key) && params.get(key) === '1') return true;
-          }
-        } catch (e) {
-          demoLog.warn('OnePageSession: fallback', e);
-        }
-        return false;
-      };
-      if (currentSearch && hasAutoFlag()) {
-        sessionStorage.setItem(this.getAutoHashStorageKey(), currentSearch.replace(/^\?/, ''));
-      }
-    } catch (e) {
-      demoLog.warn('OnePageSession: fallback', e);
-    }
-
-    // Fragment-driven auto mint (both limited/unlimited)
-    const targets = this.parseAutoMintFragment();
-    if (targets.length > 0) {
-      this.primeAutoMintTargets(targets);
-    }
+    initializeSbtAutoMintRuntime(this, (error) => demoLog.warn('OnePageSession: fallback', error));
 
     initializeSbtAutoMintRuntime(this, (error) => demoLog.warn('OnePageSession: fallback', error));
 
@@ -624,6 +432,7 @@ class OnePageSession extends Component<any, any> {
   }
 
   componentWillUnmount() {
+    this._autoMintLegacyCredentialQuery = '';
     window.removeEventListener('ce-agent-client-login', this.handleAgentClientLoginEvent as EventListener);
     if (this._autoOpenResultsTimer) {
       clearTimeout(this._autoOpenResultsTimer);
@@ -648,11 +457,13 @@ class OnePageSession extends Component<any, any> {
     const state = stateIn || {};
     const displaySlug = resolveEffectiveSlug(props);
     const questionCacheSlug = resolveOnePageSessionSurveySlug(props);
-    const netId = props.network?.id ?? props.networkChainId ?? '';
+    const cacheScope = resolveOnePageSessionAggregatorCacheScope(props);
+    const workerCacheIdentity = resolveOnePageSessionWorkerCacheIdentity(props, cacheScope);
     return [
       String(displaySlug || ''),
       String(questionCacheSlug || ''),
-      String(netId || ''),
+      cacheScope,
+      cacheScope === 'worker' ? workerCacheIdentity?.key || 'invalid-worker-identity' : '',
       state.showResults ? 1 : 0,
       props.isQuestionCacheReady ? 1 : 0,
       props.isResponsesCacheReady ? 1 : 0,
@@ -716,6 +527,7 @@ class OnePageSession extends Component<any, any> {
   }
 
   resolveScopedLitHooks(sessionConfig: any = {}) {
+    if (!sessionAllowsLitRuntime(sessionConfig)) return null;
     if (this.props.litHooks && typeof this.props.litHooks === 'object') {
       return this.props.litHooks;
     }
@@ -1057,7 +869,9 @@ class OnePageSession extends Component<any, any> {
     const aggregatorInvalidated =
       slugChanged ||
       (this.props.isQuestionCacheReady && !prevProps.isQuestionCacheReady) ||
-      (this.props.network?.id ?? null) !== (prevProps.network?.id ?? null) ||
+      resolveOnePageSessionAggregatorCacheScope(this.props) !== resolveOnePageSessionAggregatorCacheScope(prevProps) ||
+      this.buildAggregatorInputSignature(this.props, this.state) !==
+        this.buildAggregatorInputSignature(prevProps, prevState) ||
       prevProps.questionResponsesNonce !== this.props.questionResponsesNonce ||
       (prevProps.isResponsesCacheReady !== this.props.isResponsesCacheReady && this.props.isResponsesCacheReady);
 
@@ -1106,30 +920,10 @@ class OnePageSession extends Component<any, any> {
       }
     }
 
-    const telegramMode = this.isTelegramBackendMode(this.resolveCurrentSessionConfig());
-    if (slugChanged && telegramMode) {
-      const envelope = this.restoreTelegramEnvelopeFromStorage();
-      this.setState({
-        telegramAgentQuestionsStatus: 'idle',
-        telegramAgentQuestions: [],
-        telegramAgentAnswerState: null,
-        telegramQuestionPileIndex: 0,
-        telegramSubmittingQuestionId: '',
-        telegramSubmittedQuestionIds: [],
-        telegramQuestionSubmitError: '',
-        telegramAgentResultsStatus: 'idle',
-        telegramAgentResults: null,
-        telegramPolisDataset: null,
-      }, () => {
-        if (envelope) this.loadTelegramAgentData(true);
-        else this.loadTelegramSessionMeta();
-      });
-    } else if (telegramMode && !prevProps.loginComplete && this.props.loginComplete) {
-      const envelope = this.restoreTelegramEnvelopeFromStorage();
-      if (envelope) this.loadTelegramAgentData(true);
-    } else if (telegramMode && this.state.telegramSessionMetaStatus === 'idle') {
-      this.loadTelegramSessionMeta();
-    }
+    this.handleTelegramComponentDidUpdate({
+      slugChanged: slugChanged || telegramTargetChanged,
+      loginJustCompleted: !prevProps.loginComplete && this.props.loginComplete,
+    });
   }
 
   scheduleBuildAggregator(
@@ -1175,6 +969,15 @@ class OnePageSession extends Component<any, any> {
         const safeLegacyValue = sanitizeSbtAutoMintQueryForStorage(legacyVal);
         if (safeLegacyValue) sessionStorage.setItem(newKey, safeLegacyValue);
         sessionStorage.removeItem(legacy);
+      }
+      const currentValue = sessionStorage.getItem(newKey);
+      if (currentValue) {
+        const safeCurrentValue = sanitizeSbtAutoMintQueryForStorage(currentValue);
+        if (safeCurrentValue) {
+          if (safeCurrentValue !== currentValue) sessionStorage.setItem(newKey, safeCurrentValue);
+        } else {
+          sessionStorage.removeItem(newKey);
+        }
       }
     } catch (e) {
       demoLog.warn('OnePageSession: fallback', e);
@@ -1246,12 +1049,17 @@ class OnePageSession extends Component<any, any> {
 
       const displaySlug = resolveEffectiveSlug(this.props);
       const questionSourceSlug = resolveOnePageSessionSurveySlug(this.props);
-      const netIdVal = this.props.network?.id ?? this.props.networkChainId ?? 0;
+      const cacheScope = resolveOnePageSessionAggregatorCacheScope(this.props);
+      const workerCacheIdentity = resolveOnePageSessionWorkerCacheIdentity(this.props, cacheScope);
       const useBuiltInDemoFallback = shouldUseBuiltInDemoAggregatorFallback(displaySlug, questionSourceSlug);
-      const canBuildFromLocalCache = netIdVal != null && (this.props.isQuestionCacheReady || useBuiltInDemoFallback);
+      const canBuildFromLocalCache = !!cacheScope && (this.props.isQuestionCacheReady || useBuiltInDemoFallback);
 
       if (canBuildFromLocalCache) {
-        const netIdStr = String(netIdVal);
+        const netIdStr = cacheScope;
+        if (netIdStr === 'worker' && !workerCacheIdentity) {
+          applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|invalid-worker-identity`);
+          return;
+        }
         try {
           const candidateSlugs = useBuiltInDemoFallback
             ? getUniqueAggregatorCandidateSlugs(displaySlug)
@@ -1276,14 +1084,18 @@ class OnePageSession extends Component<any, any> {
             }
             sawCandidateCache = true;
 
-            if (!qCache[netIdStr]) {
+            const networkNode = qCache[netIdStr];
+            if (!networkNode) {
               sourceSigParts.push(`${slug || '__general__'}:missing-net`);
+              continue;
+            }
+            if (workerCacheIdentity && !workerCanonicalCacheIdentityMatches(networkNode, workerCacheIdentity)) {
+              sourceSigParts.push(`${slug || '__general__'}:worker-identity-mismatch`);
               continue;
             }
             sawNetworkCache = true;
 
             const fallbackQuestions = buildAggregatorFallbackQuestions(demoQuestionPool, slug);
-            const networkNode = qCache[netIdStr] || {};
             const networkNodeForAggregation = useBuiltInDemoFallback
               ? scopeAggregatorNetworkNodeToQuestionPool(networkNode, fallbackQuestions, slug)
               : networkNode;
@@ -1302,21 +1114,39 @@ class OnePageSession extends Component<any, any> {
             });
             mergeAggregatorResultRows(aggregateMap, map);
             if (dirty) {
+              if (workerCacheIdentity) {
+                qCache[netIdStr] = withWorkerCanonicalCacheIdentity(
+                  networkNode,
+                  workerCacheIdentity,
+                ) as typeof networkNode;
+              }
               void writeCache('questionsCache', slug, qCache);
             }
           }
 
           if (!sawCandidateCache) {
-            applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|empty-cache`);
+            applyAggregatorData(
+              {},
+              '0:0:0',
+              `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|empty-cache`,
+            );
             return;
           }
 
           if (!sawNetworkCache) {
-            applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|missing-net`);
+            applyAggregatorData(
+              {},
+              '0:0:0',
+              `${displaySlug}|${questionSourceSlug}|${netIdStr}|${
+                workerCacheIdentity?.key || ''
+              }|${sourceSigParts.join('|') || 'missing-net'}`,
+            );
             return;
           }
 
-          const sourceSigKey = `${displaySlug}|${questionSourceSlug}|${netIdStr}|${sourceSigParts.join('|')}`;
+          const sourceSigKey = `${displaySlug}|${questionSourceSlug}|${netIdStr}|${
+            workerCacheIdentity?.key || ''
+          }|${sourceSigParts.join('|')}`;
           if (sourceSigKey === this._aggregatorSourceSigKey) {
             bumpPerfCounter('aggregatorSourceSkips');
             return;
@@ -1324,11 +1154,19 @@ class OnePageSession extends Component<any, any> {
           applyAggregatorData(aggregateMap, computeAggregatorDataSignature(aggregateMap), sourceSigKey);
         } catch (err) {
           demoLog.error('Error building aggregator in OnePageSession:', err);
-          applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|error`);
+          applyAggregatorData(
+            {},
+            '0:0:0',
+            `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|error`,
+          );
         }
       } else {
-        const netIdStr = String(netIdVal || '');
-        applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|not-ready`);
+        const netIdStr = cacheScope;
+        applyAggregatorData(
+          {},
+          '0:0:0',
+          `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|not-ready`,
+        );
       }
     });
 
@@ -1374,6 +1212,7 @@ class OnePageSession extends Component<any, any> {
         } catch (e) {
           demoLog.warn('OnePageSession: fallback', e);
         }
+        this._autoMintLegacyCredentialQuery = '';
 
         // --- NEW: Clear URL hash to remove the 'intent' from the browser address bar ---
         try {
@@ -1406,19 +1245,25 @@ class OnePageSession extends Component<any, any> {
   recordOriginalURL(urlIn: any = null) {
     if (this.originalURL || typeof window === 'undefined') return;
     const nextUrl =
-      typeof urlIn === 'string' && urlIn ? urlIn : `${window.location.pathname || ''}${window.location.search || ''}`;
-    this.originalURL = nextUrl || '';
+      typeof urlIn === 'string' && urlIn
+        ? urlIn
+        : `${window.location.pathname || ''}${window.location.search || ''}${window.location.hash || ''}`;
+    const cleanCredentialPath = buildSbtAutoMintCredentialCleanPath(
+      new URL(nextUrl || '/', window.location.origin).href,
+    );
+    this.originalURL = cleanCredentialPath || nextUrl || '';
   }
 
   /* =======================
    * Helpers: prefetch names for banner
    * ======================= */
   async prefetchTargetNames(targets: any) {
+    if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) return;
     const slug = resolveEffectiveSlug(this.props);
 
     // 1. Try to read from cache first to save RPC calls
-    let cachedNames: Record<string, any> = {};
-    let cachedImages: Record<string, any> = {};
+    let cachedNames: Record<string, string> = {};
+    let cachedImages: Record<string, unknown> = {};
     try {
       const parsed = peekCacheSync('sbtCache', slug, { clone: false });
       if (parsed && typeof parsed === 'object') {
@@ -1544,13 +1389,19 @@ class OnePageSession extends Component<any, any> {
     let sourceQuery = '';
     try {
       const currentSearch = typeof window !== 'undefined' && window.location.search ? window.location.search : '';
-      sourceQuery = currentSearch || '';
-      if (
-        !sourceQuery ||
-        (!sourceQuery.includes('gp') && !sourceQuery.includes('inv') && !sourceQuery.includes('sbt'))
+      const saved = sessionStorage.getItem(this.getAutoHashStorageKey()) || '';
+      const identityQuery = currentSearch || saved;
+      const legacyCredentialQuery = String(this._autoMintLegacyCredentialQuery || '');
+      if (hasSbtAutoMintCredential(currentSearch)) {
+        this._autoMintLegacyCredentialQuery = currentSearch;
+        sourceQuery = currentSearch;
+      } else if (
+        legacyCredentialQuery &&
+        sanitizeSbtAutoMintQueryForStorage(legacyCredentialQuery) === sanitizeSbtAutoMintQueryForStorage(identityQuery)
       ) {
-        const saved = sessionStorage.getItem(this.getAutoHashStorageKey()) || '';
-        if (saved) sourceQuery = saved;
+        sourceQuery = legacyCredentialQuery;
+      } else {
+        sourceQuery = identityQuery;
       }
     } catch (e) {
       demoLog.warn('OnePageSession: fallback', e);
@@ -2129,8 +1980,6 @@ class OnePageSession extends Component<any, any> {
                       password,
                       sbtAddress: walletScopeSbtAddress,
                     });
-              demoLog.log('[INVITE_DEBUG v4] auto-mint local groupPasswordHash:', localHash);
-              demoLog.log('[INVITE_DEBUG v4] auto-mint on-chain groupPasswordHash:', onchainHash);
               if (!localHash || String(localHash).toLowerCase() !== String(onchainHash).toLowerCase()) {
                 throw new Error('Group password mismatch');
               }
@@ -2252,7 +2101,11 @@ class OnePageSession extends Component<any, any> {
         } else if (msg.includes('max tokens') || msg.includes('limit reached')) {
           updateStatus(sbtKey, { status: 'failed', name: `Join Failed`, error: 'Group limit reached' });
         } else {
-          updateStatus(sbtKey, { status: 'failed', name: `Join Failed`, error: getErrorMessage(e, 'Mint failed') });
+          updateStatus(sbtKey, {
+            status: 'failed',
+            name: `Join Failed`,
+            error: 'Join failed. Verify the credential and network, then retry.',
+          });
         }
       }
 
@@ -2858,6 +2711,10 @@ class OnePageSession extends Component<any, any> {
       incomingSessionConfig?.polisDemoDataBySlug ||
       resolvedSessionConfig?.polisDemoDataBySlug ||
       null;
+    const { network: routedNetwork, networkChainId: routedNetworkChainId } = resolveOnePageSessionNetworkRuntime(
+      resolvedSessionConfig,
+      this.props.network,
+    );
     const scopedLitHooks = this.resolveScopedLitHooks(resolvedSessionConfig);
     const effectiveSlug = resolveEffectiveSlug(this.props) || slug;
     const surveySessionSlug = resolveOnePageSessionSurveySlug({
@@ -2939,6 +2796,10 @@ class OnePageSession extends Component<any, any> {
       sessionConfig: resolvedSessionConfig,
       probeResult: this.state.telegramSessionMeta,
     });
+    const telegramLoginTarget = resolveAgentClientLoginIdentityTarget({
+      sessionConfig: resolvedSessionConfig,
+      sessionSlug: displaySessionSlug,
+    });
 
     if (isTelegramSession) {
       return (
@@ -2951,8 +2812,8 @@ class OnePageSession extends Component<any, any> {
           displaySessionSlug={displaySessionSlug}
           filterState={this.state.filterState}
           loginComplete={this.props.loginComplete}
-          network={this.props.network}
-          networkChainId={networkChainId}
+          network={routedNetwork}
+          networkChainId={routedNetworkChainId}
           provider={this.props.provider}
           questionResponsesNonce={this.props.questionResponsesNonce}
           questionScanProgress={this.props.questionScanProgress}
@@ -2971,6 +2832,8 @@ class OnePageSession extends Component<any, any> {
           telegramSessionMeta={this.state.telegramSessionMeta}
           telegramSubmittedQuestionIds={this.state.telegramSubmittedQuestionIds}
           telegramSubmittingQuestionId={this.state.telegramSubmittingQuestionId}
+          workerGroupSessionId={String(telegramLoginTarget.sessionId || '')}
+          workerGroupWorkerUrl={String(telegramLoginTarget.workerUrl || '')}
           titleText={titleText}
           onLogout={this.handleTelegramLogout}
           onOpenLoginModal={() => this.props.toggleLoginModal?.(true)}
@@ -2985,619 +2848,101 @@ class OnePageSession extends Component<any, any> {
     }
 
     return (
-      <div className={styles.onePageDemoContainer}>
-        {/* Sticky banners */}
-        {this.state.needsLoginForAutoMint && (
-          <Alert
-            color="warning"
-            className={styles.sbtMintStatusItem}
-            data-testid={E2E_TESTIDS.SESSION_AUTO_MINT_LOGIN_BANNER}
-            style={{
-              position: 'sticky',
-              top: 0,
-              marginBottom: '12px',
-              fontWeight: '600',
-              fontSize: '1.5em'
-            }}
-            isOpen={!this.state.dismissedLoginBanner}
-            fade={false}
-            toggle={this.dismissLoginBanner}
-            closeClassName={alertCloseClass}
-          >
-            {`Login to Join ${t('sbt')}:`}&nbsp;
-            {firstTargetName
-              ? firstTargetName
-              : <FontAwesomeIcon icon={faSpinner} spin aria-label="loading group name" />}
-          </Alert>
-        )}
-
-        {this.state.autoMintCountdown !== null && (
-          <Alert
-            color='info'
-            className={styles.sbtMintStatusItem}
-            isOpen={true}
-            fade={false}
-            data-testid={E2E_TESTIDS.SESSION_AUTO_MINT_COUNTDOWN}
-            style={{ fontSize: '1.15rem', fontWeight: 600 }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>
-                <FontAwesomeIcon icon={faSpinner} spin style={{ marginRight: '8px' }} />
-                Joining group in {this.state.autoMintCountdown}...
-              </span>
-              <button
-                className='btn btn-outline-light'
-                style={{ padding: '4px 16px', cursor: 'pointer', marginLeft: '12px', fontSize: '1rem' }}
-                onClick={this.cancelAutoMintCountdown}
-              >
-                Cancel
-              </button>
-            </div>
-          </Alert>
-        )}
-
-        {/* Per-SBT status sub-banners */}
-        {this.state.autoMintStatuses && Object.keys(this.state.autoMintStatuses).length > 0 && (
-          <div className={styles.sbtMintBannerContainer}>
-            {Object.entries(this.state.autoMintStatuses).map(([addrKey, v]: any) => {
-              const color =
-                v.status === 'success'
-                  ? 'success'
-                  : v.status === 'failed'
-                  ? 'danger'
-                  : v.status === 'skipped'
-                  ? 'secondary'
-                  : 'info';
-              const isOpen = !this.state.dismissedStatusItems[(addrKey || '').toLowerCase()];
-              const isExpanded = !!this.state.expandedImages[(addrKey || '').toLowerCase()];
-              const sbtImage = this.state.sbtImages[(addrKey || '').toLowerCase()];
-              const isTerminalError = !!(
-                v.error &&
-                /max(imum)?\s*(tokens?\s*)?mint|supply\s*exhaust|mint.*expir|period.*end|group\s*limit/i.test(v.error)
-              );
-
-              // Map status to icon
-              let statusIcon: any = null;
-              if (v.status === 'pending') statusIcon = <FontAwesomeIcon icon={faSpinner} spin />;
-              else if (v.status === 'success') statusIcon = <FontAwesomeIcon icon={faCheck} />;
-              else if (v.status === 'failed') statusIcon = <FontAwesomeIcon icon={faTimes} />;
-              else statusIcon = <FontAwesomeIcon icon={faQuestionCircle} />; // skipped/info
-
-              return (
-                <Alert
-                  key={addrKey}
-                  color={color}
-                  className={styles.sbtMintStatusItem}
-                  isOpen={isOpen}
-                  fade={false}
-                  data-testid={E2E_TESTIDS.SESSION_AUTO_MINT_STATUS}
-                  data-ce-sbt-address={(addrKey || '').toLowerCase() || undefined}
-                  data-ce-status={String(v.status || '').trim().toLowerCase() || undefined}
-                  toggle={() => this.dismissStatusItem(addrKey)}
-                  closeClassName={alertCloseClass}
-                  style={{ fontSize: '1.15rem', fontWeight: 600 }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      {statusIcon}
-                      <span>
-                        <a
-                          href={`${basePath}${buildSbtDetailPath(addrKey, effectiveSlug)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ textDecoration: 'underline', color: 'inherit' }}
-                        >
-                          {v.name || addrKey}
-                        </a>
-                      </span>
-                      {sbtImage && (
-                        <button
-                          onClick={() => this.toggleStatusImagePreview(addrKey)}
-                          style={{
-                             background: 'none',
-                             border: 'none',
-                             cursor: 'pointer',
-                             opacity: 0.7,
-                             marginLeft: '5px',
-                             padding: '0 5px'
-                          }}
-                          title={isExpanded ? "Hide Preview" : "Show Preview"}
-                        >
-                          {sbtImage ? (
-                            <img
-                              src={sbtImage}
-                              alt={t('sbt')}
-                              loading="lazy"
-                              referrerPolicy="no-referrer"
-                              style={{
-                                height: '24px',
-                                width: '24px',
-                                borderRadius: '4px',
-                                objectFit: 'cover',
-                                verticalAlign: 'middle'
-                              }}
-                            />
-                          ) : (
-                            <FontAwesomeIcon icon={faImage} />
-                          )}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {v.error && <div style={{ fontSize: '0.9em', marginTop: '4px', marginLeft: '26px', fontWeight: 400 }}>{v.error}</div>}
-
-                  {v.status === 'failed' && !isTerminalError && (
-                    <div style={{ marginTop: '6px', marginLeft: '26px' }}>
-                      <button
-                        className="btn btn-sm btn-outline-dark"
-                        style={{ padding: '2px 10px', border: '1px solid rgba(0,0,0,0.2)', cursor: 'pointer' }}
-                        onClick={() => this.kickoffAutoMintIfNeeded()}
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  )}
-
-                  {isExpanded && sbtImage && (
-                    <div style={{ marginTop: '10px', marginLeft: '26px' }}>
-                      <img
-                        src={sbtImage}
-                        alt={`${t('sbt')} Preview`}
-                        style={{ maxHeight: '100px', borderRadius: '4px', border: '1px solid rgba(0,0,0,0.1)' }}
-                      />
-                    </div>
-                  )}
-                </Alert>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Branding/header */}
-        <div className={brandingSectionClassName}>
-          <div className={titleContainerClassName}>
-            <h2 id={styles.brandingSectionTitle}>{titleText}</h2>
-            <div className={styles.tooltip} tabIndex={0} aria-label="Session info">
-              <FontAwesomeIcon icon={faQuestionCircle} />
-              <span className={styles.tooltiptext}>
-                {sessionInfo ? (
-                  <p>
-                    <em>{sessionInfo}</em>
-                  </p>
-                ) : (
-                  <p>Share input; your responses help generate a collective intelligence map.</p>
-                )}
-              </span>
-            </div>
-          </div>
-
-          {this.state.showQuestions ? (
-            <div className={styles.pileHeaderRow} data-testid={E2E_TESTIDS.SESSION_QUESTIONS_FULL_HEADER}>
-              <div className={styles.pileBackContainer}>
-                <button
-                  type="button"
-                  onClick={this.toggleQuestions}
-                  className={styles.pileBackButton}
-                  data-testid={E2E_TESTIDS.SESSION_PILE_BACK}
-                  aria-label="Back to pile view"
-                >
-                  <FontAwesomeIcon icon={faArrowLeft} />
-                  <span>Back</span>
-                </button>
-              </div>
-              <div className={styles.pileHeaderTitleWrap}>
-                <h2 className={styles.pileHeaderTitle}>{questionsSectionTitle}</h2>
-                <div
-                  className={`${styles.tooltip} ${styles.pileHeaderTooltip}`}
-                  tabIndex={0}
-                  aria-label="Questions info"
-                >
-                  <FontAwesomeIcon icon={faQuestionCircle} />
-                  <span className={styles.tooltiptext}>{questionsSectionTooltip}</span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
-              <MemoSurveyPage
-                minifiedMode="pile"
-                account={this.props.account}
-                provider={this.props.provider}
-                network={this.props.network}
-                toggleLoginModal={this.props.toggleLoginModal}
-                loginComplete={this.props.loginComplete}
-                isSBTCacheReady={this.props.isSBTCacheReady}
-                isSurveyCacheReady={this.props.isSurveyCacheReady}
-                isQuestionCacheReady={this.props.isQuestionCacheReady}
-                isResponsesCacheReady={this.props.isResponsesCacheReady}
-                cacheHasLoaded={this.props.cacheHasLoaded}
-                sbtCacheRevision={this.props.sbtCacheRevision}
-                questionResponsesNonce={this.props.questionResponsesNonce}
-                questionScanProgress={this.props.questionScanProgress}
-                refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-                refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-                refreshQuestionResponses={this.props.refreshQuestionResponses}
-                sessionInfo={sessionInfo}
-                sessionName={sessionName}
-                sessionHeader={sessionHeader}
-                defaultTags={defaultTags}
-                defaultFilterState={defaultFilterState}
-                defaultFeaturedSBTs={defaultFeaturedSBTs}
-                onFilterChange={this.handleFilterChange}
-                onPileSubmitRailVisibilityChange={this.handlePileSubmitRailVisibilityChange}
-                filterState={this.state.filterState}
-                onViewAllClick={this.handleViewAllQuestionsClick}
-                hideSessionSelector={true}
-                // Keep "Raw Results" session-local when launched from a
-                // specific OnePageSession; SurveyResults has its own scope selector.
-                sessionSlugPinned={true}
-                preventUrlChange={true}
-                /* per-demo passthroughs */
-                sessionSlug={embeddedQuestionSessionSlug}
-                questionPool={sharedQuestionPool}
-                sessionConfig={resolvedSessionConfig}
-                contracts={contracts}
-                blockLimits={blockLimits}
-                networkChainId={networkChainId}
-                litHooks={scopedLitHooks}
-              />
-            </Suspense>
-          )}
-        </div>
-
-        {/* Questions section */}
-        {this.state.showQuestions && (
-          <div className={styles.sectionContainer} ref={this.questionsSectionRef}>
-            <div className={`${styles.miniSectionContent} ${styles.miniSectionContentNoHeader}`}>
-              <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
-                <MemoSurveyPage
-                  miniMode={true}
-                  hideEmbeddedDebugUi={true}
-                  account={this.props.account}
-                  provider={this.props.provider}
-                  network={this.props.network}
-                  toggleLoginModal={this.props.toggleLoginModal}
-                  loginComplete={this.props.loginComplete}
-                  sessionInfo={sessionInfo}
-                  sessionName={sessionName}
-                  sessionHeader={sessionHeader}
-                  defaultTags={defaultTags}
-                  defaultFilterState={defaultFilterState}
-                  defaultFeaturedSBTs={defaultFeaturedSBTs}
-                  autoOpenResults={this.state.autoOpenResults}
-                  questionResponsesNonce={this.props.questionResponsesNonce}
-                  questionScanProgress={this.props.questionScanProgress}
-                  refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
-                  refreshQuestionMetadata={this.props.refreshQuestionMetadata}
-                  refreshQuestionResponses={this.props.refreshQuestionResponses}
-                  isQuestionCacheReady={this.props.isQuestionCacheReady}
-                  isSBTCacheReady={this.props.isSBTCacheReady}
-                  isSurveyCacheReady={this.props.isSurveyCacheReady}
-                  isResponsesCacheReady={this.props.isResponsesCacheReady}
-                  cacheHasLoaded={this.props.cacheHasLoaded}
-                  onFilterChange={this.handleFilterChange}
-                  filterState={this.state.filterState}
-                  hideSessionSelector={true}
-                  // Same invariant in embedded full mode: start scoped to this session,
-                  // then let SurveyResults widen scope explicitly if the user wants to.
-                  sessionSlugPinned={true}
-                  preventUrlChange={true}
-                  onResultsModalClose={this.handleResultsModalClose}
-                  /* per-demo passthroughs */
-                  sessionSlug={embeddedQuestionSessionSlug}
-                  questionPool={sharedQuestionPool}
-                  sessionConfig={resolvedSessionConfig}
-                  contracts={contracts}
-                  blockLimits={blockLimits}
-                  networkChainId={networkChainId}
-                  litHooks={scopedLitHooks}
-                />
-              </Suspense>
-            </div>
-          </div>
-        )}
-
-        <div className={sectionsGridClassName}>
-          {/* Groups section */}
-          <div className={`${styles.sectionContainer} ${this.state.showGroups ? styles.sectionExpanded : ''}`}>
-            <div className={styles.sectionHeaderRow}>
-              <h2 onClick={this.toggleGroups} className={styles.sectionHeader}>
-                {this.state.showGroups ? (
-                  <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
-                ) : (
-                  <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
-                )}
-                {renderSectionHeading(t('sbts'), 'Join or Create')}
-                {this.state.showGroups && (
-                  <div
-                    className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                    onClick={(e: any) => e.stopPropagation()}
-                  >
-                    <FontAwesomeIcon icon={faQuestionCircle} />
-                    <span className={styles.tooltiptext}>
-                      {`${SBT_TOOLTIP_LABEL} enable groups to organize membership, roles, and permissions on-chain.`}
-                      They unlock private coordination, community-governed tools, and shared AI training.
-                    </span>
-                  </div>
-                )}
-              </h2>
-
-              {this.state.showGroups && (
-                <div className={styles.sectionHeaderActionsScroller}>
-                  <div className={styles.sectionHeaderActions}>
-                    <button
-                      type="button"
-                      onClick={this.handleGroupsViewAll}
-                      className={styles.sectionHeaderActionButton}
-                    >
-                      <FontAwesomeIcon icon={faExpand} />
-                      View All
-                    </button>
-                    <button
-                      type="button"
-                      onClick={this.toggleEmbeddedCreateGroup}
-                      className={styles.sectionHeaderActionButton}
-                      data-testid={E2E_TESTIDS.SBTS_CREATE_TOGGLE}
-                    >
-                      <FontAwesomeIcon icon={faPlus} />
-                      {this.state.showEmbeddedCreateGroup ? 'Exit' : 'Create'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {this.state.showGroups && (
-              <div className={styles.miniSectionContent}>
-                <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
-                  <SBTsPage
-                    key={`sbtspage:${embeddedGroupsSessionSlug || 'general'}`}
-                    provider={this.props.provider}
-                    network={this.props.network}
-                    account={this.props.account}
-                    loginComplete={this.props.loginComplete}
-                    toggleLoginModal={this.props.toggleLoginModal}
-                    miniaturized={true}
-                    hideMiniActionRow={true}
-                    sessionName={sessionName}
-                    sessionInfo={sessionInfo}
-                    defaultFeaturedSBTs={defaultFeaturedSBTs}
-                    defaultSbtTags={defaultSbtTags}
-                    isSBTCacheReady={this.props.isSBTCacheReady}
-                    autoMintingMode={this.state.autoMintingMode}
-                    showCreateGroupAboveFeatured={true}
-                    showCreateGroupExternal={this.state.showEmbeddedCreateGroup}
-                    onCreateGroupToggleExternal={this.toggleEmbeddedCreateGroup}
-                    preferCacheBackedFeaturedCards={true}
-                    requireExplicitAutoFeatureSessionSlug={true}
-                    refreshSbtData={this.props.refreshSbtData}
-                    /* per-demo passthroughs */
-                    sessionSlug={embeddedGroupsSessionSlug}
-                    contracts={contracts}
-                    blockLimits={blockLimits}
-                    networkChainId={networkChainId}
-                    /* Pass sessionConfig including the autoFeature flag so SBTsPage can read it */
-                    sessionConfig={embeddedGroupsSessionConfig}
-                    sbtScanProgressBySlug={this.props.sbtScanProgressBySlug}
-                    sbtRealtimeCoverageBySlug={this.props.sbtRealtimeCoverageBySlug}
-                    ensureLightSbtDiscovery={this.props.ensureLightSbtDiscovery}
-                    ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
-                  />
-                </Suspense>
-              </div>
-            )}
-          </div>
-
-          {/* Documents Section */}
-          {isDemoSlug && (
-            <div
-              className={`${styles.sectionContainer} ${this.state.showDocuments ? styles.sectionExpanded : ''}`}
-              data-testid="ce-demo-documents-section"
-            >
-              <div className={styles.sectionHeaderRow}>
-                <h2
-                  onClick={this.toggleDocuments}
-                  className={`${styles.sectionHeader} ${styles.documentsSectionHeader}`.trim()}
-                  data-testid="ce-demo-documents-toggle"
-                >
-                  {this.state.showDocuments ? (
-                    <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
-                  ) : (
-                    <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
-                  )}
-                  {renderSectionHeading('Context', 'View')}
-                  {this.state.showDocuments && (
-                    <div
-                      className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                      onClick={(e: any) => e.stopPropagation()}
-                    >
-                      <FontAwesomeIcon icon={faQuestionCircle} />
-                      <span className={styles.tooltiptext}>{documentsSectionTooltip}</span>
-                    </div>
-                  )}
-                </h2>
-                {this.state.showDocuments && (
-                  <div className={styles.sectionHeaderActionsScroller}>
-                    <div className={styles.sectionHeaderActions}>
-                      <a
-                        href={DEMO_CORPUS_GITHUB_URL}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={styles.sectionHeaderActionButton}
-                        onClick={(e: any) => e.stopPropagation()}
-                      >
-                        <FontAwesomeIcon icon={faExternalLinkAlt} />
-                        <span>GitHub</span>
-                      </a>
-                      <button
-                        type="button"
-                        className={styles.sectionHeaderActionButton}
-                        onClick={this.handleLoadFullCorpusClick}
-                        disabled={disableLoadFullCorpusButton}
-                        data-testid="ce-demo-documents-load-full-corpus"
-                      >
-                        <FontAwesomeIcon icon={faDownload} />
-                        <span>{loadFullCorpusButtonLabel}</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              {this.state.showDocuments && (
-                <div className={styles.miniSectionContent}>
-                  <Suspense fallback={<LazyFallback label="Loading Corpus..." minHeight="20vh" />}>
-                    <CorpusViewer
-                      onAtlasIssueOpen={this.handleCorpusAtlasIssueOpen}
-                      showGithubLink={false}
-                      externalLoadRequestNonce={this.state.corpusViewerLoadRequestNonce}
-                      onExternalLoadStateChange={this.handleCorpusViewerLoadStateChange}
-                    />
-                  </Suspense>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Results section */}
-          <div className={`${styles.sectionContainer} ${this.state.showResults ? styles.sectionExpanded : ''}`}>
-            <div className={styles.sectionHeaderRow}>
-              <h2
-                onClick={this.toggleResults}
-                className={styles.sectionHeader}
-                data-testid={E2E_TESTIDS.SESSION_RESULTS_TOGGLE}
-              >
-                {this.state.showResults ? (
-                  <FontAwesomeIcon icon={faCaretUp} className={styles.sectionToggleIcon} />
-                ) : (
-                  <FontAwesomeIcon icon={faCaretDown} className={styles.sectionToggleIcon} />
-                )}
-                {renderSectionHeading('Results', 'View')}
-                {this.state.showResults && (
-                  <div
-                    className={`${styles.tooltip} ${styles.sectionHeaderTooltip}`}
-                    onClick={(e: any) => e.stopPropagation()}
-                  >
-                    <FontAwesomeIcon icon={faQuestionCircle} />
-                    <span className={styles.tooltiptext}>
-                      Click “Raw Results” to explore detailed breakdowns, filter by group membership, and export a
-                      pol.is report.
-                    </span>
-                  </div>
-                )}
-              </h2>
-
-              {this.state.showResults && (
-                <div className={`${styles.sectionHeaderActionsScroller} ${styles.resultsModeActionsScroller}`}>
-                  <div
-                    className={`${styles.sectionHeaderActions} ${styles.resultsModeActions}`}
-                    data-testid="ce-session-results-view-nav"
-                  >
-                    {resultsViewOptions.map(({ key, label, icon }: any) => {
-                      const isSelected = resultsViewMode === key;
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => this.setState({ resultsViewMode: key })}
-                          className={`${styles.sectionHeaderViewModeButton} ${isSelected ? styles.sectionHeaderViewModeButtonActive : ''}`}
-                          title={label}
-                          aria-pressed={isSelected}
-                        >
-                          <span className={styles.sectionHeaderViewModeIcon} aria-hidden="true">
-                            {icon}
-                          </span>
-                          <span className={styles.sectionHeaderViewModeLabel}>{label}</span>
-                        </button>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      onClick={(e: any) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this.handleOpenResults();
-                      }}
-                      className={styles.sectionHeaderViewModeButton}
-                    >
-                      <FontAwesomeIcon icon={faExpand} />
-                      Raw Results
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-            {this.state.showResults && (
-              <div className={styles.miniSectionContent}>
-                <div>
-                  {resultsViewMode === 'polis' && (
-                    <Suspense fallback={<LazyFallback label="Loading..." minHeight="20vh" />}>
-                      <PolisReport
-                        onePageDemo={true}
-                        miniMode={true}
-                        account={this.props.account}
-                        provider={this.props.provider}
-                        network={this.props.network}
-                        loginComplete={this.props.loginComplete}
-                        questionResponses={this.state.aggregatorData}
-                        disclaimersActive={this.state.disclaimersActive}
-                        filterState={this.state.filterState}
-                        sessionName={sessionName}
-                        sessionHeader={sessionHeader}
-                        sessionInfo={sessionInfo}
-                        defaultTags={defaultTags}
-                        isQuestionCacheReady={this.props.isQuestionCacheReady}
-                        isResponsesCacheReady={this.props.isResponsesCacheReady}
-                        questionScanProgress={this.props.questionScanProgress}
-                        questionResponsesNonce={this.props.questionResponsesNonce}
-                        /* per-demo passthroughs */
-                        sessionSlug={displaySessionSlug}
-                        demoDataFirstLoad={isDemoSlug}
-                        demoDataBySlug={resolvedPolisDemoDataBySlug}
-                        contracts={contracts}
-                        blockLimits={blockLimits}
-                        networkChainId={networkChainId}
-                      />
-                    </Suspense>
-                  )}
-                  {isDemoSlug && resultsViewMode === 'analysis' && (
-                    <Suspense fallback={<LazyFallback label="Loading Analysis..." minHeight="30vh" />}>
-                      <DemoAnalysisWorkspace />
-                    </Suspense>
-                  )}
-                  {isDemoSlug && resultsViewMode === 'debateAtlas' && (
-                    <Suspense fallback={<LazyFallback label="Loading Debate Atlas..." minHeight="30vh" />}>
-                      <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
-                        <DebateMapAny
-                          account={this.props.account}
-                          provider={this.props.provider}
-                          network={this.props.network}
-                          activeSessionSlug={slug}
-                          toggleLoginModal={this.props.toggleLoginModal}
-                          demoMode={true}
-                          embedded={true}
-                          requestedModalNodeId={this.state.embeddedAtlasNodeId}
-                          onModalClose={this.state.embeddedAtlasReturnState ? this.handleEmbeddedAtlasModalClose : null}
-                        />
-                      </div>
-                    </Suspense>
-                  )}
-                  {isDemoSlug && resultsViewMode === 'riskMatrix' && (
-                    <Suspense fallback={<LazyFallback label="Loading Risk Matrix..." minHeight="30vh" />}>
-                      <RiskMatrix
-                        embedded={true}
-                        onOpenAtlasNode={this.handleCorpusAtlasIssueOpen}
-                        restoreState={this.state.riskMatrixRestoreState}
-                        onRestoreApplied={this.handleRiskMatrixRestoreApplied}
-                      />
-                    </Suspense>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <OnePageSessionStandardShell
+        account={this.props.account}
+        aggregatorData={this.state.aggregatorData}
+        autoMintCountdown={this.state.autoMintCountdown}
+        autoMintingMode={this.state.autoMintingMode}
+        autoMintStatuses={this.state.autoMintStatuses || {}}
+        autoMintTargets={this.state.autoMintTargets || []}
+        autoOpenResults={this.state.autoOpenResults}
+        blockLimits={blockLimits}
+        cacheHasLoaded={this.props.cacheHasLoaded}
+        contracts={contracts}
+        corpusViewerLoadRequestNonce={this.state.corpusViewerLoadRequestNonce}
+        corpusViewerLoadState={corpusViewerLoadState}
+        defaultFeaturedSBTs={defaultFeaturedSBTs}
+        defaultFilterState={defaultFilterState}
+        defaultSbtTags={defaultSbtTags}
+        defaultTags={defaultTags}
+        disclaimersActive={this.state.disclaimersActive}
+        displaySessionSlug={displaySessionSlug}
+        dismissedLoginBanner={this.state.dismissedLoginBanner}
+        dismissedStatusItems={this.state.dismissedStatusItems || {}}
+        effectiveSlug={effectiveSlug}
+        embeddedAtlasNodeId={this.state.embeddedAtlasNodeId}
+        embeddedAtlasReturnState={this.state.embeddedAtlasReturnState}
+        embeddedGroupsSessionConfig={embeddedGroupsSessionConfig}
+        embeddedGroupsSessionSlug={embeddedGroupsSessionSlug}
+        embeddedQuestionSessionSlug={embeddedQuestionSessionSlug}
+        expandedImages={this.state.expandedImages || {}}
+        filterState={this.state.filterState}
+        isDemoSlug={isDemoSlug}
+        isQuestionCacheReady={this.props.isQuestionCacheReady}
+        isResponsesCacheReady={this.props.isResponsesCacheReady}
+        isSBTCacheReady={this.props.isSBTCacheReady}
+        isSurveyCacheReady={this.props.isSurveyCacheReady}
+        litHooks={scopedLitHooks}
+        loginComplete={this.props.loginComplete}
+        needsLoginForAutoMint={this.state.needsLoginForAutoMint}
+        network={routedNetwork}
+        networkChainId={routedNetworkChainId}
+        pileSubmitRailVisible={this.state.pileSubmitRailVisible}
+        provider={this.props.provider}
+        questionPool={sharedQuestionPool}
+        questionResponsesNonce={this.props.questionResponsesNonce}
+        questionScanProgress={this.props.questionScanProgress}
+        questionsSectionRef={this.questionsSectionRef}
+        refreshQuestionMetadata={this.props.refreshQuestionMetadata}
+        refreshQuestionResponses={this.props.refreshQuestionResponses}
+        refreshSbtData={this.props.refreshSbtData}
+        refreshSurveyResponsesByID={this.props.refreshSurveyResponsesByID}
+        resolvedPolisDemoDataBySlug={resolvedPolisDemoDataBySlug}
+        resolvedSessionConfig={resolvedSessionConfig}
+        resultsViewMode={this.state.resultsViewMode}
+        riskMatrixRestoreState={this.state.riskMatrixRestoreState}
+        sbtCacheRevision={this.props.sbtCacheRevision}
+        sbtImages={this.state.sbtImages || {}}
+        sbtNames={this.state.sbtNames || {}}
+        sbtRealtimeCoverageBySlug={this.props.sbtRealtimeCoverageBySlug}
+        sbtScanProgressBySlug={this.props.sbtScanProgressBySlug}
+        sessionHeader={sessionHeader}
+        sessionInfo={sessionInfo}
+        sessionName={sessionName}
+        sharedQuestionPool={sharedQuestionPool}
+        showDocuments={this.state.showDocuments}
+        showEmbeddedCreateGroup={this.state.showEmbeddedCreateGroup}
+        showGroups={this.state.showGroups}
+        showQuestions={this.state.showQuestions}
+        showResults={this.state.showResults}
+        slug={slug}
+        titleText={titleText}
+        toggleLoginModal={this.props.toggleLoginModal}
+        ensureLightSbtDiscovery={this.props.ensureLightSbtDiscovery}
+        ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
+        onCancelAutoMintCountdown={this.cancelAutoMintCountdown}
+        onCorpusAtlasIssueOpen={this.handleCorpusAtlasIssueOpen}
+        onCorpusViewerLoadStateChange={this.handleCorpusViewerLoadStateChange}
+        onDismissLoginBanner={this.dismissLoginBanner}
+        onDismissStatusItem={this.dismissStatusItem}
+        onEmbeddedAtlasModalClose={this.handleEmbeddedAtlasModalClose}
+        onFilterChange={this.handleFilterChange}
+        onGroupsViewAll={this.handleGroupsViewAll}
+        onKickoffAutoMintIfNeeded={this.kickoffAutoMintIfNeeded}
+        onLoadFullCorpusClick={this.handleLoadFullCorpusClick}
+        onOpenResults={this.handleOpenResults}
+        onPileSubmitRailVisibilityChange={this.handlePileSubmitRailVisibilityChange}
+        onResultsModalClose={this.handleResultsModalClose}
+        onResultsModeChange={(resultsViewMode) => this.setState({ resultsViewMode })}
+        onRiskMatrixRestoreApplied={this.handleRiskMatrixRestoreApplied}
+        onToggleDocuments={this.toggleDocuments}
+        onToggleEmbeddedCreateGroup={this.toggleEmbeddedCreateGroup}
+        onToggleGroups={this.toggleGroups}
+        onToggleQuestions={this.toggleQuestions}
+        onToggleResults={this.toggleResults}
+        onToggleStatusImagePreview={this.toggleStatusImagePreview}
+        onViewAllQuestionsClick={this.handleViewAllQuestionsClick}
+      />
     );
   }
 }

@@ -35,6 +35,9 @@ const SESSION_CONFIG_AUTHORITY_KEY = 'session-config-authority';
 const AUTH_NONCE_ACTIVE_KEY = 'auth-nonce-active';
 const AUTH_NONCE_USED_KEY = 'auth-nonce-used';
 const AUTH_RATE_RECORD_KEY = 'auth-rate-record';
+const WORKER_GROUP_CAPACITY_META_KEY = 'worker-group-capacity-meta-v3';
+const WORKER_GROUP_CAPACITY_GROUP_PREFIX = 'worker-group-capacity-group-v3:';
+const WORKER_GROUP_CAPACITY_MEMBER_PREFIX = 'worker-group-capacity-member-v3:';
 const RUNNING_LEASE_MS = 65_000;
 const MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1000;
 const MAX_AUTH_RATE_WINDOW_MS = 8 * 24 * 60 * 60 * 1000;
@@ -328,70 +331,6 @@ export class SessionWriteCoordinator {
     });
   }
 
-  async reconcileEmptyWorkerGroupCapacity(slug, sessionId) {
-    const existing = await this.state.storage.get(WORKER_GROUP_CAPACITY_META_KEY);
-    const initialized = resolveInitializedWorkerGroupCapacity(existing, slug, sessionId);
-    if (initialized?.ok) {
-      return { ...initialized, repaired: false };
-    }
-    if (initialized?.reason === 'worker_group_capacity_identity_conflict') return initialized;
-    if (
-      existing?.version !== 3 ||
-      existing.slug !== slug ||
-      existing.sessionId !== sessionId ||
-      existing.phase !== 'legacy_locked'
-    ) {
-      return {
-        ok: false,
-        status: 409,
-        reason: 'worker_group_capacity_repair_not_applicable',
-      };
-    }
-
-    // This proof scans both canonical and legacy KV rows, including deleted
-    // groups. It only succeeds for a server-declared fresh deployment.
-    const bootstrap = await resolveWorkerGroupBootstrap({
-      env: this.env,
-      slug,
-      sessionId,
-      requireExhaustiveEmptyScan: true,
-    });
-    if (!bootstrap.ok) return bootstrap;
-
-    return this.state.storage.transaction(async (transaction) => {
-      const concurrent = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
-      const concurrentlyInitialized = resolveInitializedWorkerGroupCapacity(concurrent, slug, sessionId);
-      if (concurrentlyInitialized?.ok) {
-        return { ...concurrentlyInitialized, repaired: false };
-      }
-      if (concurrentlyInitialized?.reason === 'worker_group_capacity_identity_conflict') {
-        return concurrentlyInitialized;
-      }
-      if (
-        concurrent?.version !== 3 ||
-        concurrent.slug !== slug ||
-        concurrent.sessionId !== sessionId ||
-        concurrent.phase !== 'legacy_locked'
-      ) {
-        return {
-          ok: false,
-          status: 409,
-          reason: 'worker_group_capacity_repair_not_applicable',
-        };
-      }
-      const meta = {
-        version: 3,
-        slug,
-        sessionId,
-        phase: 'ready',
-        bootstrapId: bootstrap.bootstrapId,
-        groupCount: 0,
-      };
-      await transaction.put(WORKER_GROUP_CAPACITY_META_KEY, meta);
-      return { ok: true, repaired: true, meta };
-    });
-  }
-
   async reserveWorkerGroupSlot({ slug, sessionId, groupId, maxGroupsPerSession }) {
     return this.state.storage.transaction(async (transaction) => {
       const meta = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
@@ -466,8 +405,6 @@ export class SessionWriteCoordinator {
         active: true,
         joinMode: toTrimmedString(group?.joinMode).toLowerCase() || 'admin_add',
         memberVisibility: toTrimmedString(group?.memberVisibility).toLowerCase() || 'admin_only',
-        memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
-        joinEndsAt: toTrimmedString(group?.joinEndsAt),
       });
     });
   }
@@ -509,8 +446,6 @@ export class SessionWriteCoordinator {
         active: true,
         joinMode: toTrimmedString(group?.joinMode).toLowerCase() || 'admin_add',
         memberVisibility: toTrimmedString(group?.memberVisibility).toLowerCase() || 'admin_only',
-        memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
-        joinEndsAt: toTrimmedString(group?.joinEndsAt),
       });
     });
   }
@@ -568,11 +503,7 @@ export class SessionWriteCoordinator {
           reason: 'worker_group_membership_state_pending',
         };
       }
-      const configuredMemberLimit = normalizePositiveSafeInteger(groupState.memberLimit);
-      const effectiveMemberLimit = configuredMemberLimit
-        ? Math.min(configuredMemberLimit, maxMembersPerGroup)
-        : maxMembersPerGroup;
-      if (Number(groupState.memberCount || 0) >= effectiveMemberLimit) {
+      if (Number(groupState.memberCount || 0) >= maxMembersPerGroup) {
         return { ok: false, status: 409, reason: 'worker_group_member_cap_exceeded' };
       }
       await transaction.put(groupKey, {
@@ -703,22 +634,6 @@ export class SessionWriteCoordinator {
     }
     const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
     return jsonResponse(initialized, initialized.ok ? 200 : (initialized.status || 503));
-  }
-
-  executeWorkerGroupReconcileEmpty(payload) {
-    return this.serializeWorkerGroupOperation(async () => {
-      const slug = normalizeSessionSlug(payload?.slug);
-      const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
-      if (!slug || !sessionId) {
-        return jsonResponse({
-          ok: false,
-          status: 400,
-          reason: 'worker_group_session_identity_invalid',
-        }, 400);
-      }
-      const reconciled = await this.reconcileEmptyWorkerGroupCapacity(slug, sessionId);
-      return jsonResponse(reconciled, reconciled.ok ? 200 : (reconciled.status || 503));
-    });
   }
 
   executeWorkerGroupAuthorization(payload) {
@@ -856,7 +771,6 @@ export class SessionWriteCoordinator {
       let updateReservation = null;
       let removalReservation = null;
       let principalDigest = '';
-      let activeGroup = null;
       if (mutation.operation === 'create') {
         groupReservation = await this.reserveWorkerGroupSlot({
           slug: mutation.slug,
@@ -868,7 +782,7 @@ export class SessionWriteCoordinator {
           return jsonResponse(groupReservation, groupReservation.status || 409);
         }
       } else {
-        activeGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
+        const activeGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
         if (!activeGroup.ok) {
           return jsonResponse(activeGroup, activeGroup.status || 404);
         }
@@ -882,31 +796,7 @@ export class SessionWriteCoordinator {
             reason: 'worker_group_join_denied',
           }, 403);
         }
-        if (mutation.operation === 'join') {
-          const joinEndsAt = Date.parse(toTrimmedString(activeGroup.state.joinEndsAt));
-          if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(this.now())) {
-            return jsonResponse({
-              ok: false,
-              status: 403,
-              reason: 'worker_group_join_ended',
-            }, 403);
-          }
-        }
         if (mutation.operation === 'update') {
-          if (Object.prototype.hasOwnProperty.call(mutation.input, 'memberLimit')) {
-            const requestedMemberLimit = Number(mutation.input.memberLimit);
-            if (
-              Number.isSafeInteger(requestedMemberLimit) &&
-              requestedMemberLimit > 0 &&
-              requestedMemberLimit < Number(activeGroup.state.memberCount || 0)
-            ) {
-              return jsonResponse({
-                ok: false,
-                status: 409,
-                reason: 'worker_group_member_limit_below_current',
-              }, 409);
-            }
-          }
           updateReservation = await this.beginWorkerGroupUpdate(mutation.groupId);
           if (!updateReservation.ok) {
             return jsonResponse(updateReservation, updateReservation.status || 404);
@@ -963,11 +853,6 @@ export class SessionWriteCoordinator {
             'invalid_group_label',
             'invalid_group_description',
             'invalid_group_image_url',
-            'invalid_group_tags',
-            'invalid_group_document_urls',
-            'invalid_group_member_limit',
-            'invalid_group_join_end',
-            'invalid_group_admin_address',
             'invalid_worker_group_id',
           ]);
           if (definitelyPrewrite.has(result.reason)) {
@@ -1636,6 +1521,18 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname === '/auth-state/rate/check') {
       return this.executeAuthRateCheck(payload);
+    }
+    if (url.pathname === '/worker-groups/ready') {
+      return this.executeWorkerGroupReady(payload);
+    }
+    if (url.pathname === '/worker-groups/authorize') {
+      return this.executeWorkerGroupAuthorization(payload);
+    }
+    if (url.pathname === '/worker-groups/catalog') {
+      return this.executeWorkerGroupCatalog(payload);
+    }
+    if (url.pathname === '/worker-groups/mutate') {
+      return this.executeWorkerGroupMutation(payload);
     }
     if (url.pathname === '/deploy-helper') return this.executeDirectDeploy(payload);
     if (url.pathname === '/sponsored-faucet/reserve') {

@@ -41,8 +41,10 @@ export const buildCreateSbtPasswordExportFile = ({
   const codeLabel = isInvite ? 'groupPassword' : 'password';
   const fileLabel = isInvite ? 'group-passwords' : 'passwords';
   const codes = Array.isArray(passwordList) ? passwordList.map((code: unknown) => String(code || '')) : [];
-  const links = Array.isArray(sbtInviteLinks) ? sbtInviteLinks.map((link: unknown) => String(link || '')) : [];
-  const fallbackLink = String(autoJoinUrl || '');
+  const links = Array.isArray(sbtInviteLinks)
+    ? sbtInviteLinks.map((link: unknown) => sanitizeSbtClaimIdentityUrl(link))
+    : [];
+  const fallbackLink = sanitizeSbtClaimIdentityUrl(autoJoinUrl);
   const symbolText = String(sbtSymbol || '');
   const nameText = String(sbtName || '');
   const dateText = String(date || '');
@@ -96,12 +98,10 @@ export const buildCreateSbtInviteLinks = ({
   const sbtAddressText = String(sbtAddress || '');
   const [detailPathname, detailQuery = ''] = String(detailPath || '').split('?');
   const detailQuerySuffix = detailQuery ? `?${detailQuery}` : '';
-  const encoder = typeof encodeGroupPassword === 'function' ? encodeGroupPassword : (code: unknown) => code;
-
-  return codes.map((code) =>
+  return codes.map(() =>
     isInvite
-      ? `${origin}${routePath}?auto=1&sbt=${encodeURIComponent(sbtAddressText)}&gp=${encodeURIComponent(String(encoder(code)))}`
-      : `${origin}${detailPathname}/${encodeURIComponent(code)}${detailQuerySuffix}`,
+      ? `${origin}${routePath}?auto=1&sbt=${encodeURIComponent(sbtAddressText)}`
+      : `${origin}${detailPathname}${detailQuerySuffix}`,
   );
 };
 

@@ -2,8 +2,9 @@ import SBTPage from './SBTPage';
 import contractScripts from '../../utilities/web3/chainGateway.js';
 import * as sbtEncryptedRecoveryUi from './SbtEncryptedRecoveryControl';
 import {
-  SBT_PASSWORD_RECOVERY_KIND,
   SBT_PASSWORD_RECOVERY_STORAGE_KEY,
+  clearAllSbtPasswordRecoveryMemory,
+  upsertSbtPasswordRecoveryCodes,
 } from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 
 const mockIsCryptoMode = jest.fn(() => true);
@@ -41,48 +42,30 @@ describe('SBTPage scoped password recovery store', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
+    clearAllSbtPasswordRecoveryMemory();
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  it('loads cached passwords from the scoped recovery store', async () => {
+  it('loads codes from the scoped tab-memory recovery store', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000201';
-    const sbtLower = sbtAddress.toLowerCase();
     const subject = createSubject({
       SBTAddress: sbtAddress,
       network: { id: 84532, name: 'Base Sepolia' },
     });
-    const now = Date.now();
-    localStorage.setItem(
-      SBT_PASSWORD_RECOVERY_STORAGE_KEY,
-      JSON.stringify({
-        v: 1,
-        kind: SBT_PASSWORD_RECOVERY_KIND,
-        updatedAt: now,
-        entries: {
-          [`84532:${sbtLower}`]: {
-            chainId: 84532,
-            sbtAddress: sbtLower,
-            passwords: ['scoped-code'],
-            createdAt: now,
-            updatedAt: now,
-            expiresAt: now + 60_000,
-          },
-        },
-      }),
-    );
+    upsertSbtPasswordRecoveryCodes({ chainId: 84532, sbtAddress, passwords: ['scoped-code'] });
 
     await subject.loadCachedPasswords();
 
     expect(subject.state.cachedPasswords).toEqual(['scoped-code']);
+    expect(localStorage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
   });
 
-  it('prefers the viewed SBT chain over the connected network when loading cached passwords', async () => {
+  it('prefers the viewed SBT chain over the connected network when loading tab-memory codes', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000203';
-    const sbtLower = sbtAddress.toLowerCase();
-    const now = Date.now();
     const subject = createSubject({
       SBTAddress: sbtAddress,
       network: { id: 11155420, name: 'OP Sepolia' },
@@ -93,24 +76,7 @@ describe('SBTPage scoped password recovery store', () => {
         chainID: 84532,
       },
     };
-    localStorage.setItem(
-      SBT_PASSWORD_RECOVERY_STORAGE_KEY,
-      JSON.stringify({
-        v: 1,
-        kind: SBT_PASSWORD_RECOVERY_KIND,
-        updatedAt: now,
-        entries: {
-          [`84532:${sbtLower}`]: {
-            chainId: 84532,
-            sbtAddress: sbtLower,
-            passwords: ['base-only-code'],
-            createdAt: now,
-            updatedAt: now,
-            expiresAt: now + 60_000,
-          },
-        },
-      }),
-    );
+    upsertSbtPasswordRecoveryCodes({ chainId: 84532, sbtAddress, passwords: ['base-only-code'] });
 
     await subject.loadCachedPasswords();
 
@@ -140,7 +106,7 @@ describe('SBTPage scoped password recovery store', () => {
     expect(subject.state.cachedPasswords).toEqual([]);
   });
 
-  it('persists admin-generated invite codes when encrypted recovery is opted in', async () => {
+  it('keeps admin-generated invite codes in tab memory when recovery is opted in', async () => {
     const subject = createSubject({
       SBTAddress: '0x0000000000000000000000000000000000000204',
       network: { id: 84532, name: 'Base Sepolia' },
@@ -163,37 +129,18 @@ describe('SBTPage scoped password recovery store', () => {
     expect(subject.state.encryptedRecoveryStatus).toBe('saved');
   });
 
-  it('applies the combined legacy and encrypted recovery snapshot', async () => {
+  it('applies the tab-memory recovery snapshot', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000205';
     const subject = createSubject({ SBTAddress: sbtAddress, network: { id: 84532 } });
-    const now = Date.now();
-    localStorage.setItem(
-      SBT_PASSWORD_RECOVERY_STORAGE_KEY,
-      JSON.stringify({
-        v: 1,
-        kind: SBT_PASSWORD_RECOVERY_KIND,
-        updatedAt: now,
-        entries: {
-          [`84532:${sbtAddress}`]: {
-            chainId: 84532,
-            sbtAddress,
-            passwords: ['legacy-code'],
-            createdAt: now,
-            updatedAt: now,
-            expiresAt: now + 60_000,
-          },
-        },
-      }),
-    );
     jest.spyOn(sbtEncryptedRecoveryUi, 'loadSbtRecoverySnapshot').mockResolvedValue({
-      cachedPasswords: ['legacy-code', 'encrypted-code'],
+      cachedPasswords: ['memory-code'],
       encryptedRecoveryEnabled: true,
       encryptedRecoveryStatus: 'saved',
     });
 
     await subject.loadCachedPasswords();
 
-    expect(subject.state.cachedPasswords).toEqual(['legacy-code', 'encrypted-code']);
+    expect(subject.state.cachedPasswords).toEqual(['memory-code']);
     expect(subject.state.encryptedRecoveryEnabled).toBe(true);
     expect(subject.state.encryptedRecoveryStatus).toBe('saved');
   });

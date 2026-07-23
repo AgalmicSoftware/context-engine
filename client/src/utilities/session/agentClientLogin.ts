@@ -1,11 +1,13 @@
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
+import { normalizeWorkerCanonicalSessionIdHex } from './sessionWorkerDiscovery.js';
 
 type UnknownRecord = Record<string, unknown>;
 
 export type AgentClientCapabilities = Record<string, boolean>;
 
 export type AgentClientLoginEnvelope = {
-  v: 1;
+  v: 2;
+  sessionId?: string;
   sessionSlug: string;
   expiresAt: string;
   address: string;
@@ -28,14 +30,23 @@ export type AgentClientTokenValidation = {
 
 export type ExchangeAgentClientLoginArgs = {
   agentBridgeUrl: string;
+  sessionId?: unknown;
   sessionSlug: string;
   tokenOrLink: string;
-  requestedCapabilities?: string[];
+  workerUrl?: unknown;
   fetchImpl?: typeof fetch;
 };
 
-const STORAGE_PREFIX = 'ce:agentClientLogin:v1';
-const RAW_AGENT_TOKEN_RE = /ceagt_[A-Za-z0-9_-]{16,}/;
+export type AgentClientLoginIdentityTarget = {
+  agentBridgeUrl?: unknown;
+  sessionId?: unknown;
+  sessionSlug: unknown;
+  workerUrl?: unknown;
+};
+
+const STORAGE_PREFIX = 'ce:agentClientLogin:v2';
+const RAW_AGENT_TOKEN_RE = /^ceagt_[A-Za-z0-9_-]{16,}$/;
+const agentClientLoginMemoryCache = new Map<string, string>();
 
 const toRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
@@ -47,8 +58,68 @@ const normalizeSessionSlug = (value: unknown): string => {
   return slug === 'general' ? '' : slug;
 };
 
-const storageKey = (sessionSlug: unknown): string =>
-  `${STORAGE_PREFIX}:${encodeURIComponent(normalizeSessionSlug(sessionSlug) || 'general')}`;
+const normalizeIdentityTarget = (
+  target: unknown | AgentClientLoginIdentityTarget,
+): {
+  agentBridgeUrl: string;
+  sessionId: string;
+  sessionSlug: string;
+  workerUrl: string;
+} => {
+  const source =
+    target && typeof target === 'object' && !Array.isArray(target)
+      ? (target as AgentClientLoginIdentityTarget)
+      : ({ sessionSlug: target } as AgentClientLoginIdentityTarget);
+  return {
+    sessionSlug: normalizeSessionSlug(source.sessionSlug),
+    sessionId: normalizeWorkerCanonicalSessionIdHex(source.sessionId),
+    workerUrl: normalizeWorkerUrl(toStr(source.workerUrl)),
+    agentBridgeUrl: normalizeWorkerUrl(toStr(source.agentBridgeUrl)),
+  };
+};
+
+const storageSlugPart = (sessionSlug: unknown): string =>
+  encodeURIComponent(normalizeSessionSlug(sessionSlug) || 'general');
+
+const storageKey = (target: unknown | AgentClientLoginIdentityTarget): string => {
+  const identity = normalizeIdentityTarget(target);
+  return [
+    STORAGE_PREFIX,
+    storageSlugPart(identity.sessionSlug),
+    encodeURIComponent(identity.sessionId || 'no-session-id'),
+    encodeURIComponent(identity.workerUrl || 'no-worker-origin'),
+    encodeURIComponent(identity.agentBridgeUrl || 'no-bridge-origin'),
+  ].join(':');
+};
+
+const identityTargetForEnvelope = (envelope: AgentClientLoginEnvelope): AgentClientLoginIdentityTarget => ({
+  sessionSlug: envelope.sessionSlug,
+  sessionId: envelope.sessionId,
+  workerUrl: envelope.workerUrl,
+  agentBridgeUrl: envelope.agentBridgeUrl,
+});
+
+export const agentClientLoginEnvelopeMatchesIdentity = (
+  envelope: AgentClientLoginEnvelope | null,
+  target: unknown | AgentClientLoginIdentityTarget,
+): boolean => {
+  if (!envelope) return false;
+  const expected = normalizeIdentityTarget(target);
+  const actual = normalizeIdentityTarget(identityTargetForEnvelope(envelope));
+  if (actual.sessionSlug !== expected.sessionSlug) return false;
+  if (expected.sessionId && actual.sessionId !== expected.sessionId) return false;
+  if (expected.workerUrl && actual.workerUrl !== expected.workerUrl) return false;
+  if (expected.agentBridgeUrl && actual.agentBridgeUrl !== expected.agentBridgeUrl) return false;
+  if (envelope.capabilities?.readGroups === true) {
+    return (
+      !!expected.sessionId &&
+      !!expected.workerUrl &&
+      actual.sessionId === expected.sessionId &&
+      actual.workerUrl === expected.workerUrl
+    );
+  }
+  return true;
+};
 
 const sessionStorageSafe = (): Storage | null => {
   if (typeof window === 'undefined') return null;
@@ -59,33 +130,31 @@ const sessionStorageSafe = (): Storage | null => {
   }
 };
 
-const extractTokenFromUrl = (input: string): string => {
+const purgePersistedAgentClientLoginEnvelopes = (): void => {
+  const storage = sessionStorageSafe();
+  if (!storage) return;
   try {
-    const parsed = new URL(input);
-    const fromParams = [
-      parsed.searchParams.get('token'),
-      parsed.searchParams.get('agentToken'),
-      parsed.searchParams.get('telegramToken'),
-      parsed.searchParams.get('ceagt'),
-    ]
-      .map(toStr)
-      .find((candidate) => RAW_AGENT_TOKEN_RE.test(candidate));
-    if (fromParams) return fromParams.match(RAW_AGENT_TOKEN_RE)?.[0] || '';
-    return input.match(RAW_AGENT_TOKEN_RE)?.[0] || '';
-  } catch (_) {
-    return input.match(RAW_AGENT_TOKEN_RE)?.[0] || '';
-  }
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index);
+      if (key && (key === STORAGE_PREFIX || key.startsWith(`${STORAGE_PREFIX}:`))) {
+        storage.removeItem(key);
+      }
+    }
+  } catch (_) {}
 };
+
+// Exchanged Bridge and Worker bearer credentials used to be tab-persistent.
+// Remove those records at startup; current credentials live only in page memory.
+purgePersistedAgentClientLoginEnvelopes();
 
 export const extractAgentClientToken = (input: unknown): AgentClientTokenValidation => {
   const text = toStr(input);
   if (!text) return { ok: false, token: '', reason: 'empty' };
   if (/[\r\n]/.test(text)) return { ok: false, token: '', reason: 'multiline' };
-  const token = text.startsWith('ceagt_') ? text : extractTokenFromUrl(text);
-  if (!RAW_AGENT_TOKEN_RE.test(token) || token !== text.match(RAW_AGENT_TOKEN_RE)?.[0]) {
+  if (!RAW_AGENT_TOKEN_RE.test(text)) {
     return { ok: false, token: '', reason: 'unsupported_format' };
   }
-  return { ok: true, token };
+  return { ok: true, token: text };
 };
 
 const normalizeCapabilities = (input: unknown): AgentClientCapabilities => {
@@ -97,16 +166,20 @@ const normalizeCapabilities = (input: unknown): AgentClientCapabilities => {
   return out;
 };
 
-const defaultCapabilitiesForWorkerToken = (body: UnknownRecord): AgentClientCapabilities => ({
-  readQuestions: !!(body.workerToken || toRecord(body.credential).token),
-  draftAnswers: false,
-  submitAnswers: false,
-  voteQuestions: false,
-  poseQuestions: false,
-  readResults: !!(body.workerToken || toRecord(body.credential).token),
-  admin: false,
-  export: false,
-});
+const normalizeClientLoginFailureReason = (value: unknown, status: number): string => {
+  const reason = toStr(value).toLowerCase();
+  const knownReason = [
+    'expired',
+    'session_mismatch',
+    'session_identity',
+    'scope_denied',
+    'origin_not_allowed',
+    'origin_denied',
+    'not_enabled',
+    'disabled',
+  ].find((candidate) => reason.includes(candidate));
+  return knownReason ? `telegram_client_login_${knownReason}` : `telegram_client_login_failed_${status}`;
+};
 
 const normalizeExchangeEnvelope = ({
   body,
@@ -129,20 +202,30 @@ const normalizeExchangeEnvelope = ({
   if (normalizedSlug !== normalizeSessionSlug(sessionSlug)) {
     throw new Error('telegram_client_login_session_mismatch');
   }
+  const capabilities = normalizeCapabilities(body.capabilities);
+  const sessionId = normalizeWorkerCanonicalSessionIdHex(body.sessionId);
+  if (capabilities.readGroups && !sessionId) {
+    throw new Error('telegram_client_login_session_identity_missing');
+  }
   const expiresAt =
     toStr(body.expiresAt) || (Number(body.exp || 0) > 0 ? new Date(Number(body.exp) * 1000).toISOString() : '');
   const address = toStr(toRecord(body.account).address || body.accountAddress || body.address);
   const envelope: AgentClientLoginEnvelope = {
-    v: 1,
+    v: 2,
+    ...(sessionId ? { sessionId } : {}),
     sessionSlug: normalizedSlug,
     expiresAt,
     address,
-    capabilities: Object.keys(toRecord(body.capabilities)).length
-      ? normalizeCapabilities(body.capabilities)
-      : defaultCapabilitiesForWorkerToken(body),
-    credential: {
-      kind: toStr(credentialRecord.kind || body.tokenType) || 'session_worker_jwt',
-      token: credentialToken,
+    capabilities,
+    bridgeCredential: {
+      kind: toStr(bridgeCredential.kind) || 'agent_bridge_browser_token',
+      token: toStr(bridgeCredential.token),
+      expiresAt: toStr(bridgeCredential.expiresAt),
+    },
+    workerCredential: {
+      kind: toStr(workerCredential.kind) || 'session_worker_jwt',
+      token: toStr(workerCredential.token),
+      expiresAt: toStr(workerCredential.expiresAt),
     },
     workerUrl: normalizeWorkerUrl(toStr(body.workerUrl)),
     agentBridgeUrl: normalizeWorkerUrl(agentBridgeUrl),
@@ -153,7 +236,10 @@ const normalizeExchangeEnvelope = ({
 };
 
 const persistedEnvelope = (envelope: AgentClientLoginEnvelope): AgentClientLoginEnvelope => ({
-  v: 1,
+  v: 2,
+  ...(normalizeWorkerCanonicalSessionIdHex(envelope.sessionId)
+    ? { sessionId: normalizeWorkerCanonicalSessionIdHex(envelope.sessionId) }
+    : {}),
   sessionSlug: envelope.sessionSlug,
   expiresAt: envelope.expiresAt,
   address: envelope.address,
@@ -178,25 +264,28 @@ export const isAgentClientLoginEnvelopeExpired = (
 };
 
 export const writeAgentClientLoginEnvelope = (envelope: AgentClientLoginEnvelope): AgentClientLoginEnvelope => {
-  const storage = sessionStorageSafe();
   const persisted = persistedEnvelope(envelope);
-  if (storage) {
-    storage.setItem(storageKey(persisted.sessionSlug), JSON.stringify(persisted));
-  }
+  purgePersistedAgentClientLoginEnvelopes();
+  agentClientLoginMemoryCache.set(storageKey(identityTargetForEnvelope(persisted)), JSON.stringify(persisted));
   return persisted;
 };
 
-export const readAgentClientLoginEnvelope = (sessionSlug: unknown): AgentClientLoginEnvelope | null => {
-  const storage = sessionStorageSafe();
-  if (!storage) return null;
-  const key = storageKey(sessionSlug);
+export const readAgentClientLoginEnvelope = (
+  target: unknown | AgentClientLoginIdentityTarget,
+): AgentClientLoginEnvelope | null => {
+  purgePersistedAgentClientLoginEnvelopes();
+  const expected = normalizeIdentityTarget(target);
+  const key = storageKey(expected);
   try {
-    const raw = storage.getItem(key);
+    const raw = agentClientLoginMemoryCache.get(key);
     if (!raw) return null;
     const parsed = toRecord(JSON.parse(raw));
     const credential = toRecord(parsed.credential);
     const envelope: AgentClientLoginEnvelope = {
-      v: 1,
+      v: 2,
+      ...(normalizeWorkerCanonicalSessionIdHex(parsed.sessionId)
+        ? { sessionId: normalizeWorkerCanonicalSessionIdHex(parsed.sessionId) }
+        : {}),
       sessionSlug: normalizeSessionSlug(parsed.sessionSlug),
       expiresAt: toStr(parsed.expiresAt),
       address: toStr(parsed.address),
@@ -210,24 +299,35 @@ export const readAgentClientLoginEnvelope = (sessionSlug: unknown): AgentClientL
       tokenType: toStr(parsed.tokenType),
       buckets: null,
     };
-    if (!envelope.credential.token || envelope.sessionSlug !== normalizeSessionSlug(sessionSlug)) {
-      storage.removeItem(key);
+    if (
+      !envelope.bridgeCredential.token ||
+      !envelope.workerCredential.token ||
+      (envelope.capabilities.readGroups && !envelope.sessionId) ||
+      !agentClientLoginEnvelopeMatchesIdentity(envelope, expected)
+    ) {
+      agentClientLoginMemoryCache.delete(key);
       return null;
     }
     if (isAgentClientLoginEnvelopeExpired(envelope)) {
-      storage.removeItem(key);
+      agentClientLoginMemoryCache.delete(key);
       return null;
     }
     return envelope;
   } catch (_) {
-    storage.removeItem(key);
+    agentClientLoginMemoryCache.delete(key);
     return null;
   }
 };
 
-export const clearAgentClientLoginEnvelope = (sessionSlug: unknown): void => {
-  const storage = sessionStorageSafe();
-  if (storage) storage.removeItem(storageKey(sessionSlug));
+export const clearAgentClientLoginEnvelope = (target: unknown | AgentClientLoginIdentityTarget): void => {
+  purgePersistedAgentClientLoginEnvelopes();
+  const expected = normalizeIdentityTarget(target);
+  const slugPrefix = `${STORAGE_PREFIX}:${storageSlugPart(expected.sessionSlug)}`;
+  Array.from(agentClientLoginMemoryCache.keys()).forEach((key) => {
+    if (key === slugPrefix || key.startsWith(`${slugPrefix}:`)) {
+      agentClientLoginMemoryCache.delete(key);
+    }
+  });
 };
 
 export const buildAgentClientAuthHeaders = (envelope: AgentClientLoginEnvelope | null): Record<string, string> =>
@@ -235,9 +335,10 @@ export const buildAgentClientAuthHeaders = (envelope: AgentClientLoginEnvelope |
 
 export const exchangeAgentClientLogin = async ({
   agentBridgeUrl,
+  sessionId: expectedSessionIdRaw,
   sessionSlug,
   tokenOrLink,
-  requestedCapabilities = ['client_session_read', 'client_results_read', 'client_answer_submit'],
+  workerUrl: expectedWorkerUrlRaw,
   fetchImpl = fetch,
 }: ExchangeAgentClientLoginArgs): Promise<AgentClientLoginEnvelope> => {
   const bridge = normalizeWorkerUrl(agentBridgeUrl);
@@ -259,7 +360,7 @@ export const exchangeAgentClientLogin = async ({
   });
   const body = toRecord(await response.json().catch(() => ({})));
   if (!response.ok || body.ok === false) {
-    throw new Error(toStr(body.reason) || `telegram_client_login_failed_${response.status}`);
+    throw new Error(normalizeClientLoginFailureReason(body.reason, response.status));
   }
   const envelope = normalizeExchangeEnvelope({
     body,
@@ -267,6 +368,24 @@ export const exchangeAgentClientLogin = async ({
     sourceToken: validation.token,
     agentBridgeUrl: bridge,
   });
+  const expectedSessionId = normalizeWorkerCanonicalSessionIdHex(expectedSessionIdRaw);
+  const expectedWorkerUrl = normalizeWorkerUrl(toStr(expectedWorkerUrlRaw));
+  if ((toStr(expectedSessionIdRaw) && !expectedSessionId) || (toStr(expectedWorkerUrlRaw) && !expectedWorkerUrl)) {
+    throw new Error('telegram_client_login_expected_identity_invalid');
+  }
+  if (envelope.capabilities.readGroups && (!expectedSessionId || !expectedWorkerUrl)) {
+    throw new Error('telegram_client_login_expected_identity_missing');
+  }
+  if (
+    !agentClientLoginEnvelopeMatchesIdentity(envelope, {
+      sessionSlug: slug,
+      sessionId: expectedSessionId,
+      workerUrl: expectedWorkerUrl,
+      agentBridgeUrl: bridge,
+    })
+  ) {
+    throw new Error('telegram_client_login_session_identity_mismatch');
+  }
   writeAgentClientLoginEnvelope(envelope);
   return envelope;
 };

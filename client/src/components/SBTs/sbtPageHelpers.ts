@@ -32,6 +32,11 @@ export {
   resolveSbtPageSessionSlugFromInfo,
 } from './sbtPageSessionDisplayHelpers';
 export type { SbtPageSessionDisplayConfig } from './sbtPageSessionDisplayHelpers';
+export {
+  SBT_ADMIN_INVITE_FAILURE_MESSAGE,
+  SBT_CLAIM_FAILURE_MESSAGE,
+  resolveSbtPageMintFailure,
+} from './sbtClaimUrlSafety';
 export { applySbtPageHistorySummaryFallback, normalizeSbtPageHistorySummary } from './sbtPageHistorySummaryHelpers';
 export type { SbtPageHistorySummary, SbtPageHistorySummaryInput } from './sbtPageHistorySummaryHelpers';
 export {

@@ -148,11 +148,7 @@ export const clearSessionWizardCache = ({
       ok: writeResult.ok,
       removed: writeResult.ok ? 1 : 0,
       failed: writeResult.ok ? 0 : 1,
-      status: writeResult.ok
-        ? ('ok' as const)
-        : writeResult.status === 'missing-storage'
-          ? ('missing-storage' as const)
-          : ('partial-failure' as const),
+      status: writeResult.ok ? ('ok' as const) : ('partial-failure' as const),
     };
   };
   const result = clearDraftCache({

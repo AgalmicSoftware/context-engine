@@ -106,6 +106,8 @@ describe('SBTPage auto-mint routing', () => {
 
       await expect(subject.handleUrlAutoMintIntent()).rejects.toThrow('wallet rejected');
       expect(window.sessionStorage.getItem(successKey)).toBeNull();
+      expect(window.location.search).not.toContain('auto=');
+      expect(window.location.search).not.toContain('sbt=');
 
       await subject.handleUrlAutoMintIntent();
 
@@ -459,6 +461,35 @@ describe('SBTPage auto-mint routing', () => {
     expect(subject.state.mintingStatus).toBe('idle');
   });
 
+  it('does not expose nested provider claim data through return or UI error text', async () => {
+    const sbtAddress = '0x0000000000000000000000000000000000000112';
+    const rawCredential = 'claim-secret-sentinel';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account: '0x0000000000000000000000000000000000000abc',
+      loginComplete: true,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      userHasSBT: false,
+      mintingStatus: 'idle',
+    };
+    jest
+      .spyOn(contractScripts, 'claimWithInvite')
+      .mockRejectedValue(new Error(`RPC request failed with calldata containing ${rawCredential}`));
+
+    const result = await subject.claimWithInvitePayload({ nonce: '1', signature: rawCredential }, sbtAddress, {
+      sessionSlugOverride: 'edge',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error.message).toBe('Claim failed. Verify the credential and network, then retry.');
+    expect(subject.state.error).toBe('Claim failed. Verify the credential and network, then retry.');
+    expect(JSON.stringify(result)).not.toContain(rawCredential);
+    expect(JSON.stringify(subject.state)).not.toContain(rawCredential);
+  });
+
   it('defers prop-driven auto-mint on mount until sbtInfo is loaded', async () => {
     const sbtAddress = '0x0000000000000000000000000000000000000105';
     const subject = createSubject({
@@ -649,6 +680,45 @@ describe('SBTPage auto-mint routing', () => {
     expect(subject.state.error).toBeNull();
     expect(subject.state.mintingStatus).toBe('idle');
     expect(startClaimSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not expose provider-returned password claim data in logs or UI state', async () => {
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const sbtAddress = '0x0000000000000000000000000000000000000128';
+    const account = '0x0000000000000000000000000000000000000abc';
+    const secretSentinel = 'password-claim-secret-sentinel';
+    const subject = createSubject({
+      SBTAddress: sbtAddress,
+      account,
+      loginComplete: true,
+      sessionSlug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      error: null,
+      manualPasswordInput: secretSentinel,
+      mintStep: 0,
+      mintingStatus: 'idle',
+      sbtInfo: { hasPasswordMint: true },
+    };
+    jest.spyOn(contractScripts, 'isPasswordValid').mockResolvedValue(true);
+    jest.spyOn(contractScripts, 'startClaim').mockRejectedValue(new Error(`provider echoed ${secretSentinel}`));
+
+    try {
+      const result = await subject.handleMint(true, {
+        accountLowerOverride: account,
+        sbtAddressOverride: sbtAddress,
+        sessionSlugOverride: 'edge',
+        sbtInfoOverride: { hasPasswordMint: true },
+      });
+
+      expect(result).toBe(false);
+      expect(subject.state.error).toBe('Claim failed. Verify the credential and network, then retry.');
+      expect(JSON.stringify(subject.state)).not.toContain(`provider echoed ${secretSentinel}`);
+      expect(JSON.stringify(consoleErrorSpy.mock.calls)).not.toContain(secretSentinel);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('does not continue password mints after the network changes during prevalidation', async () => {
@@ -867,6 +937,7 @@ describe('SBTPage auto-mint routing', () => {
       await flushPromises();
 
       expect(subject.state.groupPasswordInput).toBe('invite-token');
+      expect(window.location.href).not.toContain('invite-token');
       expect(inviteSpy).toHaveBeenCalledWith(
         'invite-token',
         sbtAddress,
@@ -905,6 +976,7 @@ describe('SBTPage auto-mint routing', () => {
       await flushPromises();
 
       expect(subject.state.groupPasswordInput).toBe('claim-code');
+      expect(window.location.href).not.toContain('claim-code');
       expect(claimSpy).toHaveBeenCalledWith(
         'claim-code',
         sbtAddress,

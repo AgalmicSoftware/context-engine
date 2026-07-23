@@ -1319,6 +1319,7 @@ export default function PolisReport({
   const resolvedSessionInfo = sessionInfo;
   const activeReportSlug = normalizeSessionSlug(slug || sessionSlug || '');
   const resolvedSessionSlug = activeReportSlug;
+  const hasBlockchainContext = Number(networkChainId || network?.id || network?.chainId || 0) > 0;
   const reportProgressSlug = useMemo(() => normalizeQuestionProgressSlug(resolvedSessionSlug), [resolvedSessionSlug]);
   const resolvedDemoDataBySlug = useMemo(() => buildPolisDemoDatasetsBySlug(demoDataBySlug), [demoDataBySlug]);
   const autoUseDemoData = useMemo(
@@ -3602,12 +3603,14 @@ export default function PolisReport({
 
                     {/* Added row for network and block info */}
                     <div className={styles.statsRow}>
-                      <div className={styles.statsItem}>
-                        <span className={styles.statLabel}>Blockchain:</span>
-                        <span className={styles.statValue}>
-                          {formatBlockchainNetworkLabel(network, networkChainId)}
-                        </span>
-                      </div>
+                      {hasBlockchainContext ? (
+                        <div className={styles.statsItem}>
+                          <span className={styles.statLabel}>Blockchain:</span>
+                          <span className={styles.statValue}>
+                            {formatBlockchainNetworkLabel(network, networkChainId)}
+                          </span>
+                        </div>
+                      ) : null}
                       {/* <div className={styles.statsItem}>
                         <span className={styles.statLabel}>Last Block:</span>
                         <span className={styles.statValue}>{getLastBlock()}</span>

@@ -84,6 +84,39 @@ describe('CreateSBTGroup authoring chain selection', () => {
     );
   });
 
+  it('prefers the connected network over a pure Worker session legacy chain for standalone authoring', () => {
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      preferConnectedNetworkForAuthoring: true,
+      sessionConfigOverride: {
+        slug: 'demo-sh',
+        networkChainId: 11155420,
+      },
+    });
+    instance.getAuthoringChainOptions = jest.fn(() => [
+      { id: 84532, name: 'Base Sepolia' },
+      { id: 11155420, name: 'OP Sepolia' },
+    ]);
+
+    expect(instance.resolveAuthoringChainId()).toBe(84532);
+  });
+
+  it('retains the session authoring chain for registry and hybrid contexts', () => {
+    const instance = makeInstance({
+      network: { id: 84532, name: 'Base Sepolia' },
+      sessionConfigOverride: {
+        slug: 'registry-session',
+        networkChainId: 11155420,
+      },
+    });
+    instance.getAuthoringChainOptions = jest.fn(() => [
+      { id: 84532, name: 'Base Sepolia' },
+      { id: 11155420, name: 'OP Sepolia' },
+    ]);
+
+    expect(instance.resolveAuthoringChainId()).toBe(11155420);
+  });
+
   it('oss demo fallback sessions omit shipped SBT factory addresses', () => {
     const generalCfg = getDemoSessionConfigBySlug('', { allowDemoFallback: true });
     const testCfg = getDemoSessionConfigBySlug('test', { allowDemoFallback: true });

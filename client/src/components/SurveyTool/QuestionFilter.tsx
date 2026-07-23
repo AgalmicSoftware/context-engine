@@ -109,32 +109,6 @@ import {
   suppressQuestionFilterSbtState,
 } from './questionFilterSbtCapability';
 import {
-  QUESTION_FILTER_ACTIONS_STYLE,
-  QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
-  QUESTION_FILTER_DISABLED_TEXT_SPACING_STYLE,
-  QUESTION_FILTER_ENCRYPTED_COUNT_LOCK_STYLE,
-  QUESTION_FILTER_MODAL_HEADER_ROW_STYLE,
-  QUESTION_FILTER_MODAL_TITLE_ROW_STYLE,
-  QUESTION_FILTER_SBT_SPINNER_STYLE,
-  buildQuestionFilterAiCombineRowClassName,
-  buildQuestionFilterDisabledSectionClassName,
-  buildQuestionFilterSectionIconClassName,
-  buildQuestionFilterTagBubbleClassName,
-  buildQuestionFilterTypeButtonClassName,
-  buildQuestionFilterTypePillClassName,
-  resolveQuestionFilterBookmarkIconStyle,
-  resolveQuestionFilterClearIconStyle,
-  resolveQuestionFilterCopyIconStyle,
-  resolveQuestionFilterEncryptedCountBadgeStyle,
-  resolveQuestionFilterInlineVisibilityStyle,
-  resolveQuestionFilterSectionBodyStyle,
-  resolveQuestionFilterSectionHeaderStyle,
-} from './questionFilterDisplayHelpers';
-import {
-  areQuestionListsEquivalentById,
-  buildAiCandidateSignature,
-  buildFilterPayloadSignature,
-  buildFilteredResponsesByQuestionSignature,
   buildQuestionFilterAiApplyBasePatch,
   buildQuestionFilterAiApplyFailurePatch,
   buildQuestionFilterAiApplyErrorPatch,
@@ -605,6 +579,9 @@ class QuestionFilter extends React.Component<any, any> {
     return (resolveEffectiveSessionContext(propsIn).sessionConfig || {}) as UnknownRecord;
   };
 
+  canUseSbtFilter = (propsIn: QuestionFilterSessionProps = this.props): boolean =>
+    shouldEnableQuestionFilterSbt(resolveQuestionFilterSbtSessionConfig(propsIn));
+
   buildAiRequestOptions = (propsIn: QuestionFilterSessionProps = this.props): QuestionFilterAiRequestOptions => {
     const resolvedSession = resolveEffectiveSessionContext(propsIn);
     const slug = resolvedSession.sessionSlug || '';
@@ -706,9 +683,11 @@ class QuestionFilter extends React.Component<any, any> {
       : [];
     let subset: QuestionFilterQuestionRecord[] = mergedQuestions;
     const selectedTypes = usePendingState ? this.state.pendingSelectedTypes : this.state.selectedTypes;
-    const sbtFilteredQuestions = usePendingState
-      ? this.state.pendingSbtFilteredQuestions
-      : this.state.sbtFilteredQuestions;
+    const sbtFilteredQuestions = this.canUseSbtFilter()
+      ? usePendingState
+        ? this.state.pendingSbtFilteredQuestions
+        : this.state.sbtFilteredQuestions
+      : null;
     const selectedTags = this.state.selectedTags || [];
 
     if (sbtFilteredQuestions !== null) {
@@ -1432,9 +1411,11 @@ class QuestionFilter extends React.Component<any, any> {
               aiRankedQuestionIds: [],
               aiCombineWithOtherFilters: parsed.aiSearchQuery ? parsed.aiCombineWithOtherFilters === true : false,
               aiApplyError: '',
-              sbtFilterLocalState: Object.prototype.hasOwnProperty.call(parsed, 'sbtFilterLocalState')
-                ? parsed.sbtFilterLocalState || null
-                : prevState.sbtFilterLocalState,
+              sbtFilterLocalState: this.canUseSbtFilter()
+                ? Object.prototype.hasOwnProperty.call(parsed, 'sbtFilterLocalState')
+                  ? parsed.sbtFilterLocalState || null
+                  : prevState.sbtFilterLocalState
+                : null,
               selectedTags: Array.isArray(parsed.selectedTags) ? parsed.selectedTags : prevState.selectedTags,
               filterByResponded: responseStatusState.filterByResponded,
               filterByNotResponded: responseStatusState.filterByNotResponded,
@@ -1863,9 +1844,11 @@ class QuestionFilter extends React.Component<any, any> {
       : [];
     const selectedTypes = usePendingState ? this.state.pendingSelectedTypes : this.state.selectedTypes;
     const sortByImportance = usePendingState ? this.state.pendingSortByImportance : this.state.sortByImportance;
-    const sbtFilteredQuestions = usePendingState
-      ? this.state.pendingSbtFilteredQuestions
-      : this.state.sbtFilteredQuestions;
+    const sbtFilteredQuestions = this.canUseSbtFilter()
+      ? usePendingState
+        ? this.state.pendingSbtFilteredQuestions
+        : this.state.sbtFilteredQuestions
+      : null;
     const showTopQuestions = usePendingState ? this.state.pendingShowTopQuestions : this.state.showTopQuestions;
     const topQuestionsCount = usePendingState ? this.state.pendingTopQuestionsCount : this.state.topQuestionsCount;
     const showTopQuestionsByResponses = usePendingState
@@ -2065,6 +2048,8 @@ class QuestionFilter extends React.Component<any, any> {
   }
 
   handleFilteredQuestions = (filtered: unknown, newSbtFilterLocalState: unknown): void => {
+    if (!this.canUseSbtFilter()) return;
+
     // "filtered" can be an array or an object { filteredQuestions, filteredResponsesByQuestion }
     let realFilteredQuestions: QuestionFilterQuestionRecord[] = [];
     let filteredResponsesByQuestion: QuestionFilterResponsesByQuestion = {};
@@ -2398,7 +2383,10 @@ class QuestionFilter extends React.Component<any, any> {
   }
 
   buildFilterState(): QuestionFilterSerializableState {
-    return buildQuestionFilterStateFromComponentState(this.state, DEFAULT_AI_TOP_N) as QuestionFilterSerializableState;
+    return suppressQuestionFilterSbtState(
+      buildQuestionFilterStateFromComponentState(this.state, DEFAULT_AI_TOP_N) as QuestionFilterSerializableState,
+      this.canUseSbtFilter(),
+    );
   }
 
   isFilterStateDefault = (filterStateToTest: unknown): boolean => {
@@ -2654,7 +2642,17 @@ class QuestionFilter extends React.Component<any, any> {
         throw new Error('Invalid filter string.');
       }
 
-      const newState = {};
+      const selectedTypes = normalizeFilterSelectionList(deserializedState.questionTypes);
+      const selectedTags = normalizeFilterSelectionList(deserializedState.selectedTags);
+      const sbtFilterLocalState = this.canUseSbtFilter()
+        ? normalizeSbtFilterLocalState(deserializedState.sbtFilter)
+        : null;
+      const newState: QuestionFilterMutableStatePatch = {
+        selectedTypes,
+        pendingSelectedTypes: selectedTypes,
+        selectedTags,
+        sbtFilterLocalState,
+      };
       // Map deserialized state to component's state structure
       if (deserializedState.responseStatus) {
         const responseStatus = toUnknownRecord(deserializedState.responseStatus);
@@ -3099,9 +3097,6 @@ class QuestionFilter extends React.Component<any, any> {
       ? 'Disabled by “Top X questions” selection.'
       : 'Disabled by AI Top-N override. Enable “Combine with other filters” to intersect.';
     const aiAccessState = this.getAiAccessState();
-    const sbtSessionContext = resolveEffectiveSessionContext(this.props);
-    const sbtFilterSessionSlug = sbtSessionContext.sessionSlug || resolveEffectiveSlug(this.props);
-    const sbtFilterSessionConfig = this.props.sessionConfig || sbtSessionContext.sessionConfig || {};
     const aiSectionDisabled = isTopQuestionsModeActive;
     const aiControlsDisabled = isTopQuestionsModeActive || !aiAccessState.enabled || aiApplying;
     const aiApplyButtonLabel = aiApplying ? `Applying... ${Math.max(0, Number(aiApplyingElapsedSec || 0))}s` : 'Apply';
@@ -3312,21 +3307,12 @@ class QuestionFilter extends React.Component<any, any> {
                 </div>
               </button>
 
-              <button
-                type="button"
-                className={`${styles.typeButton} ${
-                  pendingSelectedTypes.includes('rating') ? styles.typeButtonActive : ''
-                }`}
-                onClick={() => this.handleTypeSelection('rating')}
-                disabled={isOtherFiltersDisabled}
-                aria-pressed={pendingSelectedTypes.includes('rating')}
-              >
-                <div className={styles.typeTitle}>Rating</div>
-                <div className={styles.ratingPreviewWrap}>
-                  <div className={styles.ratingPreviewFill} />
-                  <div className={styles.ratingPreviewHandle} />
-                </div>
-              </button>
+          <QuestionFilterCapabilitySbtSection
+            disabled={isOtherFiltersDisabled}
+            disabledReason={otherFiltersDisabledReason}
+            expandedSections={expandedSections}
+            host={this}
+          />
 
               <button
                 type="button"

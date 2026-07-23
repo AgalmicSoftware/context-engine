@@ -28,20 +28,39 @@ import {
 import {
   ExperimentalStub as ExperimentalStubRaw,
   NotFoundRoute as NotFoundRouteRaw,
-  readHashQueryParam,
+  removeHashQueryParam,
 } from './routeStatusViews';
 import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE } from './routeConfig.js';
 import { resolveMainSiteRouteMatch } from './routeTable.js';
 import { renderMainSiteRouteView } from './mainSiteRouteViewMap.js';
+import { renderMainSiteSbtCreateRoute } from './mainSiteSbtCreateRoute';
 import { renderPostsRoute } from './postsRouteRenderer.js';
+import {
+  hasRouteCacheInitializationError,
+  hasRouteSessionRegistryIdentity,
+  readRouteLocationSearch,
+  resolveRequestedRouteChainId,
+  resolveRouteNetwork,
+  resolveRoutePathParts,
+} from './mainSiteRouteSessionNetwork';
 import { buildPublicRoute, buildPublicUrl, replaceRouteResponderQueryParam } from './urlUtils.js';
 import { hasAutoFlag as hasAutoFlagFn } from './autoHashPersistence';
+import {
+  buildLegacySbtRouteCredentialCleanPath,
+  resolveLegacySbtRouteCredential,
+} from '../SBTs/sbtPageAutoMintHelpers';
 import {
   resolveMainSiteQuestionRouteSessionContext,
   resolveMainSiteSessionRouteSourceSlug,
 } from './routeSessionResolution.js';
 import { getWorkerCanonicalRouteController } from './workerCanonicalRouteController.js';
 import { resolveValidatedWorkerCanonicalLitProfile } from './litSessionConfig';
+import {
+  renderMainSiteSurveyResolutionStatus,
+  resolveMainSiteRouteCapabilityContext,
+  resolveMainSiteSurveyRouteCapabilityState,
+} from './mainSiteRouteCapabilityRuntime';
+import { MainSiteRouteStatusView } from './mainSiteRouteStatusView';
 import {
   renderWorkerCanonicalRouteBootstrap,
   renderWorkerCanonicalRouteError,
@@ -129,53 +148,6 @@ const SurveyPage = asMainSiteRouteComponent(SurveyPageRaw);
 const SurveyTool = asMainSiteRouteComponent(SurveyToolRaw);
 const TagPage = asMainSiteRouteComponent(TagPageRaw);
 const UserPage = asMainSiteRouteComponent(UserPageRaw);
-
-const hasMainSiteRegistryIdentity = (sessionConfig: unknown): boolean => {
-  if (!sessionConfig || typeof sessionConfig !== 'object') return false;
-  const cfg = sessionConfig as Record<string, unknown>;
-  const registry =
-    cfg.__registry && typeof cfg.__registry === 'object' ? (cfg.__registry as Record<string, unknown>) : {};
-  return !!(
-    cfg.sessionId ||
-    cfg.sessionIdHex ||
-    cfg.metadataURI ||
-    registry.sessionId ||
-    registry.sessionIdHex ||
-    registry.metadataURI
-  );
-};
-
-const resolveExplicitWorkerSessionConfig = ({
-  workerOrigin,
-  sessionConfig,
-}: {
-  workerOrigin: string;
-  sessionConfig: SessionConfigLike;
-}): SessionConfigLike => {
-  if (!workerOrigin) return sessionConfig;
-  const validatedLitProfile = resolveValidatedWorkerCanonicalLitProfile(sessionConfig.sessionModeProfile);
-  const chainId = Number(validatedLitProfile?.evm.registryChainId || 0);
-  if (!Number.isSafeInteger(chainId) || chainId <= 0) return sessionConfig;
-  if (Number(sessionConfig.networkChainId || 0) === chainId) return sessionConfig;
-  // The validated Lit profile drives both hook construction and downstream
-  // response-gate/mint consumers; never leave a stale top-level chain override.
-  return { ...sessionConfig, networkChainId: chainId };
-};
-
-const resolveExplicitWorkerSessionNetwork = ({
-  workerOrigin,
-  sessionConfig,
-  fallbackNetwork,
-}: {
-  workerOrigin: string;
-  sessionConfig: SessionConfigLike;
-  fallbackNetwork: MainSiteRouteNetwork;
-}): MainSiteRouteNetwork => {
-  if (!workerOrigin) return fallbackNetwork;
-  const chainId = Number(sessionConfig.networkChainId || 0);
-  if (!Number.isSafeInteger(chainId) || chainId <= 0) return null;
-  return getChainById(chainId) || { id: chainId, chainId };
-};
 
 export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) => ({
   workerCanonicalRoutes: getWorkerCanonicalRouteController(host),
@@ -561,123 +533,42 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     // 0. LOADING GATE: If caches haven't loaded yet, don't attempt to resolve or scan.
     // This prevents "Survey Not Found" from flashing during initial hydration.
     if (!host.state.cacheHasLoaded && !host.state.isAllCachesReady) {
-      return (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '50vh',
-            color: 'white',
-          }}
-        >
-          <h3>Loading...</h3>
-          <div style={{ marginTop: '1rem' }} className="spinner-border text-light" role="status" />
-        </div>
-      );
+      return <MainSiteRouteStatusView heading="Loading..." showSpinner={true} />;
     }
 
     // 1. Determine the "Best Guess" Slug
     const effectiveSlug = host.findGroupSlugForSurvey(sidLower);
 
-    // 2. Check if the data actually exists in this resolved context
-    const cfg = host.getSessionCfg(effectiveSlug);
-    const cache = host.readDgRecord('surveysCache', effectiveSlug, {
-      clone: false,
-    }) as MainSiteSurveyMetadataCache | null;
-    const netKey = String(host.getSessionChainId(effectiveSlug));
+    const {
+      sessionConfig: cfg,
+      capabilities: surveyCapabilities,
+      allowChainContext: allowSurveyChainContext,
+      allowSbtContext: allowSurveySbtContext,
+      allowLitContext: allowSurveyLitContext,
+      allowRegistryScan: allowSurveyRegistryScan,
+      surveyMissing: surveyMissingFromResolvedSession,
+      isScanning,
+      hasFailed,
+      hasError,
+      workerMetadataStatus,
+    } = resolveMainSiteSurveyRouteCapabilityState({
+      host,
+      sessionSlug: effectiveSlug,
+      surveyId: sidLower,
+    });
+    if (workerMetadataStatus) return workerMetadataStatus;
 
-    const inCache = !!cache?.[netKey]?.surveys?.[sidLower];
-    const inConfig =
-      Array.isArray(cfg?.HIGHLIGHTED_SURVEY_IDS) &&
-      cfg.HIGHLIGHTED_SURVEY_IDS.some((id: string) => id.toLowerCase() === sidLower);
-
-    // 3. Check Scan State
-    const isScanning = host.state.isScanningForGroup === sidLower;
-    const hasFailed = host.state.scanFailedFor === sidLower;
-    const hasError = host.state.scanErrorFor === sidLower;
-
-    // 4. BLOCKING LOGIC: If missing, not scanning, and not failed -> Start Scan
-    if (!inCache && !inConfig && !hasFailed && !hasError && !isScanning) {
-      host.queueSurveyGroupScan(sidLower, { hintedSlug: host.getSurveyRouteSessionSlugHint() });
-    }
-
-    // 5. RENDER SPINNER (Block SurveyPage from mounting if scanning or missing)
-    if ((!inCache && !inConfig && !hasFailed && !hasError) || isScanning) {
-      const routeHintSlug = host.getSurveyRouteSessionSlugHint();
-      const scanTargetLabel = routeHintSlug ? `session "${routeHintSlug}" first, then other sessions` : 'demo sessions';
-      return (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '50vh',
-            color: 'white',
-          }}
-        >
-          <h3>Resolving Survey Context...</h3>
-          <p>
-            Scanning {scanTargetLabel} for ID: {sidLower.substring(0, 6)}...
-          </p>
-          <div style={{ marginTop: '1rem' }} className="spinner-border text-light" role="status" />
-        </div>
-      );
-    }
-
-    if (hasError) {
-      const loadErrorMessage =
-        String(host.state.scanErrorMessage || '').trim() || 'Survey metadata was found but could not be loaded.';
-      return (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '50vh',
-            color: 'white',
-          }}
-        >
-          <h3>Survey Load Error</h3>
-          <p>{loadErrorMessage}</p>
-          <button
-            className="btn btn-outline-light"
-            onClick={() =>
-              host.setState({ scanErrorFor: null, scanErrorMessage: '', scanFailedFor: null }, () =>
-                host.queueSurveyGroupScan(sidLower, { hintedSlug: host.getSurveyRouteSessionSlugHint() }),
-              )
-            }
-          >
-            Retry
-          </button>
-        </div>
-      );
-    }
-
-    // 6. If Scan Failed (Survey truly doesn't exist in any known group)
-    if (hasFailed) {
-      return (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: '50vh',
-            color: 'white',
-          }}
-        >
-          <h3>Survey Not Found</h3>
-          <p>This survey ID does not exist in any known session.</p>
-          <button className="btn btn-outline-light" onClick={() => window.history.back()}>
-            Go Back
-          </button>
-        </div>
-      );
-    }
+    const resolutionStatus = renderMainSiteSurveyResolutionStatus({
+      host,
+      sessionSlug: effectiveSlug,
+      surveyId: sidLower,
+      surveyMissing: surveyMissingFromResolvedSession,
+      allowRegistryScan: allowSurveyRegistryScan,
+      isScanning,
+      hasFailed,
+      hasError,
+    });
+    if (resolutionStatus) return resolutionStatus;
 
     // 7. Success: We have the data (or config) and the correct slug. Render the Page immediately.
     const effectiveNetwork = allowSurveyChainContext ? host.getSessionNetwork(effectiveSlug) : null;
@@ -1001,14 +892,25 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
         window.history.replaceState({}, '', withHash);
       }
     }
+    const questionSessionCfg = host.getDisplaySessionCfg(effectiveQuestionSlug);
+    const {
+      capabilities: questionCapabilities,
+      allowChainContext: allowQuestionChainContext,
+      allowSbtContext: allowQuestionSbtContext,
+      allowLitContext: allowQuestionLitContext,
+      allowRegistryScan: allowQuestionRegistryScan,
+    } = resolveMainSiteRouteCapabilityContext({
+      slug: effectiveQuestionSlug,
+      sessionConfig: questionSessionCfg,
+    });
     const walletNetwork = host.props.network && typeof host.props.network === 'object' ? host.props.network : null;
-    const effectiveQuestionNetwork =
-      host.getSessionNetwork(effectiveQuestionSlug) ||
-      defaultSessionNetwork ||
-      walletNetwork ||
-      host.getSessionNetwork('') ||
-      null;
-    const questionSessionCfg = host.getSessionCfg(effectiveQuestionSlug);
+    const effectiveQuestionNetwork = allowQuestionChainContext
+      ? host.getSessionNetwork(effectiveQuestionSlug) ||
+        defaultSessionNetwork ||
+        walletNetwork ||
+        host.getSessionNetwork('') ||
+        null
+      : null;
     const authViewProps = composeMainSiteAuthViewProps(host.props);
     const questionCacheViewProps = composeMainSiteQuestionCacheViewProps(host.state);
     return (
@@ -1305,21 +1207,18 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const requestedSessionId = searchParams.get('sessionId') || searchParams.get('sessionID') || '';
     const requestedChainIdRaw = searchParams.get('chainId') || searchParams.get('chainID') || '';
     const requestedSponsoredBundleId = searchParams.get('sponsored') || '';
-    const requestedSponsoredBundleKey = readHashQueryParam(hashStr, 'k');
-    const requestedChainIdTokens = requestedChainIdRaw ? requestedChainIdRaw.match(/\d+/g) : null;
-    const requestedChainId =
-      requestedChainIdTokens && requestedChainIdTokens.length
-        ? Number(requestedChainIdTokens[requestedChainIdTokens.length - 1])
-        : null;
+    const requestedSponsoredBundleKey = null;
+    const sanitizedHash = removeHashQueryParam(hashStr, 'k');
+    if (sanitizedHash !== hashStr && typeof window !== 'undefined' && window.location && window.history?.replaceState) {
+      window.history.replaceState({}, '', `${window.location.pathname || ''}${searchStr}${sanitizedHash}`);
+      hashStr = sanitizedHash;
+    }
+    const requestedChainId = resolveRequestedRouteChainId(requestedChainIdRaw);
     const sessionFallbackTarget = host.applySessionFallbackRedirect({ pathIn: fullPath });
     if (sessionFallbackTarget) {
       fullPath = sessionFallbackTarget.path;
     }
-    const pathWithoutQuery = String(fullPath || '').split('?')[0] || '';
-    const pathSegments = pathWithoutQuery.split('/').filter(Boolean);
-    const firstPathSegment = String(pathSegments[0] || '')
-      .trim()
-      .toLowerCase();
+    const [pathWithoutQuery, pathSegments, firstPathSegment] = resolveRoutePathParts(fullPath);
 
     // Robust results routing (/survey/:id/results or /questions/results)
     const surveyMatch = fullPath.match(SURVEY_RESULTS_RE);

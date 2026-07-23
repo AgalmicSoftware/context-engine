@@ -264,7 +264,93 @@ describe('sessionWizardDraftState', () => {
     expect(next.faucet).toEqual({ rpcUrl: 'https://existing-faucet.example' });
   });
 
-  it('builds cache write payloads with redacted worker secrets and durable pending draft isolation', () => {
+  it('synchronizes chain-relevant profiles without adding chain capability to pure Worker profiles', () => {
+    const pureWorker = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const workerNext = applySessionWizardRegistryChainDraftDefaults({
+      draft: {
+        networkChainId: 11155420,
+        sessionModeProfile: pureWorker,
+      },
+      chainId: 84532,
+    });
+
+    expect(workerNext.networkChainId).toBe(84532);
+    expect(workerNext.sessionModeProfile).toEqual(pureWorker);
+    expect(workerNext.sessionModeProfile.evm.registryChainId).toBeNull();
+
+    const registry = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const registryNext = applySessionWizardRegistryChainDraftDefaults({
+      draft: { sessionModeProfile: registry },
+      chainId: 84532,
+    });
+
+    expect(registryNext.sessionModeProfile).toEqual(
+      expect.objectContaining({
+        preset: 'custom',
+        evm: { registryChainId: 84532 },
+      }),
+    );
+  });
+
+  it('keeps explicit Worker SBT access rules on the selected wizard network', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.evm.registryChainId = 11155420;
+    profile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        {
+          kind: 'sbt_onchain',
+          chainId: 11155420,
+          contract: '0x00000000000000000000000000000000000000aa',
+          anyOrAll: 'any',
+        },
+      ],
+    };
+
+    const next = applySessionWizardRegistryChainDraftDefaults({
+      draft: { sessionModeProfile: profile },
+      chainId: 84532,
+    });
+
+    expect(next.sessionModeProfile.evm.registryChainId).toBe(84532);
+    expect(next.sessionModeProfile.encryption.accessConditions.conditions[0].chainId).toBe(84532);
+  });
+
+  it('limits Worker hybrid chain defaults to RPC without adding registry or faucet capabilities', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.evm.registryChainId = 11155420;
+    profile.encryption = { mode: 'lit' };
+    profile.storage.payloadAccessControl = {
+      ...profile.storage.payloadAccessControl,
+      encryption: 'lit',
+    };
+    const next = applySessionWizardRegistryChainDraftDefaults({
+      draft: {
+        sessionModeProfile: profile,
+      },
+      chainId: 84532,
+      contractDefaults: {
+        sessionRegistry: '0xRegistry',
+      },
+      pathRpc: 'https://rpc.example',
+      includeContracts: false,
+      includeFaucet: false,
+    });
+
+    expect(next.sessionModeProfile.evm.registryChainId).toBe(84532);
+    expect(next.rpc).toEqual({
+      provider: 'path',
+      providers: {
+        path: { rpcUrl: 'https://rpc.example' },
+      },
+    });
+    expect(next.contracts).toBeUndefined();
+    expect(next.faucet).toBeUndefined();
+  });
+
+  it('builds cache write payloads with public Worker config only and durable pending draft isolation', () => {
     const payload = buildSessionWizardCacheWritePayload({
       sessionId: 'session-1',
       draft: { sessionName: 'Draft' },
@@ -290,8 +376,10 @@ describe('sessionWizardDraftState', () => {
         pendingSbtDrafts: [],
         persistWorkerSecrets: false,
         workerSecrets: {
-          apiToken: '[redacted]',
-          optional: '',
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litGroupId: 'group-1',
+          litPkpId: 'pkp-1',
+          litActionCid: 'bafy-action-1',
         },
         deployForm: {
           workerName: 'worker',
@@ -302,9 +390,26 @@ describe('sessionWizardDraftState', () => {
       }),
     );
     expect(payload.deployForm.apiToken).toBeUndefined();
+    expect(payload.deployForm.accountId).toBeUndefined();
+    expect(payload.workerRequirementProof).toBeUndefined();
+    expect(JSON.stringify(payload)).not.toContain('cf-secret');
+    expect(JSON.stringify(payload)).not.toContain('"apiToken":"secret"');
   });
 
-  it('keeps worker secrets only when local secret persistence is explicitly enabled', () => {
+  it('keeps multi-gate resource selections in the cache write payload', () => {
+    const resourceGateMap = {
+      ai: ['gate-1', 'gate-2'],
+      rpc: 'gate-2',
+    };
+
+    const payload = buildSessionWizardCacheWritePayload({
+      resourceGateMap,
+    });
+
+    expect(payload.resourceGateMap).toBe(resourceGateMap);
+  });
+
+  it('never serializes worker credentials even when legacy persistence input is enabled', () => {
     const workerSecrets = {
       apiToken: 'secret',
       accountId: 'account',
@@ -315,7 +420,9 @@ describe('sessionWizardDraftState', () => {
       workerSecrets,
     });
 
-    expect(payload.persistWorkerSecrets).toBe(true);
-    expect(payload.workerSecrets).toBe(workerSecrets);
+    expect(payload.persistWorkerSecrets).toBe(false);
+    expect(payload.workerSecrets).toEqual({});
+    expect(JSON.stringify(payload)).not.toContain('secret');
+    expect(JSON.stringify(payload)).not.toContain('account');
   });
 });

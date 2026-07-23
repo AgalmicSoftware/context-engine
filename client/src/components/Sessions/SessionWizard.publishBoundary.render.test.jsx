@@ -449,19 +449,21 @@ describe('SessionWizard publish boundary rendering', () => {
       expect(mockFetchSessionFromRegistry).toHaveBeenCalledTimes(1);
     });
     expect(mockCreateSBT).not.toHaveBeenCalled();
-    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toContain(mockPendingSbtAddress);
-
-    await act(async () => {
-      resolveRegistryRefresh(null);
-      await registryRefreshPromise;
-    });
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+    expect(mockFetchSessionFromRegistry).not.toHaveBeenCalled();
+    expect(readSessionWizardPendingSbtDraftsCache()).toEqual([
+      expect.objectContaining({ predictedAddress: mockPendingSbtAddress }),
+    ]);
+    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
   });
 
   it('blocks the actual worker-canonical publish action after secret, provider, or profile requirement edits', async () => {
     const originalFetch = global.fetch;
     const workerUrl = 'https://requirement-proof-worker.example.test';
-    global.fetch = jest.fn(async (url) => {
-      if (String(url).endsWith('/deploy')) {
+    let persistedConfig = null;
+    global.fetch = jest.fn(async (url, init = {}) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
         return {
           ok: true,
           status: 200,
@@ -474,6 +476,15 @@ describe('SessionWizard publish boundary rendering', () => {
           }),
         };
       }
+      if (normalizedUrl.endsWith('/admin/set-config')) {
+        persistedConfig = JSON.parse(String(init.body || '{}')).config;
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      if (normalizedUrl.endsWith('/session-config')) {
+        const { litCredentials: _privateLitDescriptor, ...publicConfig } = persistedConfig || {};
+        if (publicConfig.ai) publicConfig.ai = { models: publicConfig.ai.models };
+        return { ok: true, status: 200, json: async () => ({ config: publicConfig }) };
+      }
       return { ok: true, status: 200, json: async () => ({ ok: true, nonce: 'wizard-admin-nonce' }) };
     });
 
@@ -485,13 +496,18 @@ describe('SessionWizard publish boundary rendering', () => {
         sessionInfo: 'Verified custom worker requirement snapshot.',
         openaiKey: 'sk-remotely-verified',
       });
+      const configWritesAfterDeploy = global.fetch.mock.calls.filter(([url]) =>
+        String(url).endsWith('/admin/set-config'),
+      ).length;
       const publishButton = await openPublishSection();
       await waitFor(() => expect(publishButton).not.toBeDisabled());
 
       fireEvent.change(openAiKeyInput, { target: { value: 'sk-locally-edited' } });
       await waitFor(() => expect(publishButton).toBeDisabled());
       fireEvent.click(publishButton);
-      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(0);
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
+        configWritesAfterDeploy,
+      );
 
       fireEvent.change(openAiKeyInput, { target: { value: 'sk-remotely-verified' } });
       await waitFor(() => expect(publishButton).not.toBeDisabled());
@@ -512,7 +528,9 @@ describe('SessionWizard publish boundary rendering', () => {
       await waitFor(() => expect(publishButton).toBeDisabled());
       fireEvent.click(publishButton);
 
-      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(0);
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
+        configWritesAfterDeploy,
+      );
       expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
     } finally {
       global.fetch = originalFetch;

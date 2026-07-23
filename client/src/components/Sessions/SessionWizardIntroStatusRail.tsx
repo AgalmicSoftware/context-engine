@@ -61,7 +61,13 @@ const SessionWizardIntroStatusRail = ({
       />
     ) : null}
 
-    <SessionWizardSponsoredStatus onRetry={onRetrySponsoredBundle} status={sponsoredBundleStatus} />
+    <SessionWizardSponsoredStatus
+      decryptionKey={sponsoredBundleKey}
+      onDecryptionKeyChange={onSponsoredBundleKeyChange}
+      onRetry={onRetrySponsoredBundle}
+      onSubmitDecryptionKey={onSubmitSponsoredBundleKey}
+      status={sponsoredBundleStatus}
+    />
 
     {isNormalMode && showNormalModeRail ? (
       <SessionWizardNormalModeRail

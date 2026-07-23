@@ -6,7 +6,7 @@ import {
   clearSbtPasswordRecoveryCodes,
   getSbtPasswordRecoveryCodes,
   getSbtPasswordRecoveryKey,
-  clearSbtPasswordRecoveryCodes,
+  purgeLegacySbtPasswordRecoveryArtifacts,
   readSbtPasswordRecoveryStore,
   upsertSbtPasswordRecoveryCodes,
   writeSbtPasswordRecoveryStore,
@@ -41,28 +41,15 @@ describe('sbtPasswordRecoveryStore tab-memory policy', () => {
     expect(result).toEqual(
       expect.objectContaining({
         ok: true,
+        status: 'memory-only',
         key: getSbtPasswordRecoveryKey({ chainId: 84532, sbtAddress }),
         passwords: ['one', 'two'],
-        expiresAt: now + SBT_PASSWORD_RECOVERY_DEFAULT_TTL_MS,
       }),
     );
-
-    const stored = JSON.parse(storage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY) || '{}');
-    expect(stored).toEqual(
-      expect.objectContaining({
-        v: 1,
-        kind: SBT_PASSWORD_RECOVERY_KIND,
-        updatedAt: now,
-      }),
-    );
-    expect(stored.entries[result.key]).toEqual(
-      expect.objectContaining({
-        chainId: 84532,
-        sbtAddress: sbtAddress.toLowerCase(),
-        passwords: ['one', 'two'],
-        expiresAt: now + SBT_PASSWORD_RECOVERY_DEFAULT_TTL_MS,
-      }),
-    );
+    expect(storage.setItem).not.toHaveBeenCalled();
+    expect(storage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(SBT_ENCRYPTED_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
+    expect(getSbtPasswordRecoveryCodes({ chainId: 84532, sbtAddress, storage, now: 1_000 })).toEqual(['one', 'two']);
   });
 
   it('appends and clears only the selected tab-memory scope', () => {
@@ -95,105 +82,39 @@ describe('sbtPasswordRecoveryStore tab-memory policy', () => {
       [SBT_ENCRYPTED_PASSWORD_RECOVERY_STORAGE_KEY]: JSON.stringify({ ciphertext: legacySecret }),
     });
 
-    expect(result.passwords).toEqual(['alpha', 'beta', 'gamma']);
-    expect(
-      getSbtPasswordRecoveryCodes({
-        chainId: 84532,
-        sbtAddress,
-        storage,
-        now: 2000,
-      }),
-    ).toEqual(['alpha', 'beta', 'gamma']);
+    expect(readSbtPasswordRecoveryStore({ storage }).entries).toEqual({});
+    expect(storage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
+    expect(storage.getItem(SBT_ENCRYPTED_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
+    expect(JSON.stringify(readSbtPasswordRecoveryStore({ storage }))).not.toContain(legacySecret);
   });
 
-  it('ignores expired entries instead of falling back to legacy storage', () => {
-    const storage = createMemoryStorage();
-    const sbtAddress = '0xabc0000000000000000000000000000000000000';
-    const key = getSbtPasswordRecoveryKey({ chainId: 84532, sbtAddress });
-    storage.setItem(
-      SBT_PASSWORD_RECOVERY_STORAGE_KEY,
-      JSON.stringify({
-        v: 1,
-        kind: SBT_PASSWORD_RECOVERY_KIND,
-        updatedAt: 1000,
-        entries: {
-          [key]: {
-            chainId: 84532,
-            sbtAddress,
-            passwords: ['expired'],
-            createdAt: 1000,
-            updatedAt: 1000,
-            expiresAt: 1500,
-          },
-        },
-      }),
-    );
+  it('purges both browser-storage surfaces and the old IndexedDB key database', () => {
+    const localStorageRef = createMemoryStorage({
+      [SBT_PASSWORD_RECOVERY_STORAGE_KEY]: 'plaintext',
+      [SBT_ENCRYPTED_PASSWORD_RECOVERY_STORAGE_KEY]: 'ciphertext',
+    });
+    const sessionStorageRef = createMemoryStorage({
+      [SBT_PASSWORD_RECOVERY_STORAGE_KEY]: 'plaintext-session',
+      [SBT_ENCRYPTED_PASSWORD_RECOVERY_STORAGE_KEY]: 'ciphertext-session',
+    });
+    const indexedDbRef = { deleteDatabase: jest.fn() };
 
-    expect(readSbtPasswordRecoveryStore({ storage, now: 2000 }).entries).toEqual({});
-    expect(
-      getSbtPasswordRecoveryCodes({
-        chainId: 84532,
-        sbtAddress,
-        storage,
-        now: 2000,
-      }),
-    ).toEqual([]);
+    purgeLegacySbtPasswordRecoveryArtifacts({ indexedDbRef, localStorageRef, sessionStorageRef });
+
+    for (const storage of [localStorageRef, sessionStorageRef]) {
+      expect(storage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
+      expect(storage.getItem(SBT_ENCRYPTED_PASSWORD_RECOVERY_STORAGE_KEY)).toBeNull();
+    }
+    expect(indexedDbRef.deleteDatabase).toHaveBeenCalledWith(SBT_PASSWORD_RECOVERY_INDEXED_DB_NAME);
   });
 
   it('fails closed when a legacy caller asks to write a persisted envelope', () => {
     const storage = createMemoryStorage();
 
-    storage.setItem(
-      SBT_PASSWORD_RECOVERY_STORAGE_KEY,
-      JSON.stringify({
-        v: 1,
-        kind: SBT_PASSWORD_RECOVERY_KIND,
-        updatedAt: 1000,
-        entries: {
-          [unknownKey]: {
-            chainId: null,
-            sbtAddress,
-            passwords: ['migrated-code'],
-            createdAt: 1000,
-            updatedAt: 1000,
-            expiresAt: now + 60_000,
-          },
-        },
-      }),
-    );
-
-    expect(
-      getSbtPasswordRecoveryCodes({
-        chainId: 84532,
-        sbtAddress,
-        storage,
-        now,
-      }),
-    ).toEqual(['migrated-code']);
-
-    const stored = JSON.parse(storage.getItem(SBT_PASSWORD_RECOVERY_STORAGE_KEY) || '{}');
-    expect(stored.entries[unknownKey]).toBeUndefined();
-    expect(stored.entries[scopedKey]).toEqual(
-      expect.objectContaining({
-        chainId: 84532,
-        sbtAddress,
-        passwords: ['migrated-code'],
-      }),
-    );
-  });
-
-  it('clears only the selected legacy plaintext recovery entry', () => {
-    const storage = createMemoryStorage();
-    const first = '0xabc0000000000000000000000000000000000010';
-    const second = '0xabc0000000000000000000000000000000000011';
-    for (const sbtAddress of [first, second]) {
-      upsertSbtPasswordRecoveryCodes({ chainId: 84532, sbtAddress, passwords: [sbtAddress], storage, now: 1000 });
-    }
-
-    expect(clearSbtPasswordRecoveryCodes({ chainId: 84532, sbtAddress: first, storage, now: 2000 })).toEqual(
-      expect.objectContaining({ ok: true, status: 'cleared' }),
-    );
-    expect(getSbtPasswordRecoveryCodes({ chainId: 84532, sbtAddress: first, storage, now: 2000 })).toEqual([]);
-    expect(getSbtPasswordRecoveryCodes({ chainId: 84532, sbtAddress: second, storage, now: 2000 })).toEqual([second]);
+    expect(writeSbtPasswordRecoveryStore({ passwords: ['secret'] }, { storage })).toEqual({
+      ok: false,
+      status: 'browser-persistence-disabled',
+    });
+    expect(storage.setItem).not.toHaveBeenCalled();
   });
 });

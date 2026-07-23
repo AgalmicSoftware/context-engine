@@ -3707,6 +3707,24 @@ body.w3a-silent iframe[class^='walletIframe-'] {
   color: #ffe8ec;
 }
 
+.advancedWalletAccessNotice {
+  width: min(520px, 100%);
+  margin: 16px auto 0;
+  padding: 10px 12px;
+  border-radius: var(--ce-radius-8);
+  border: 1px solid rgba(140, 170, 220, 0.28);
+  background: rgba(18, 22, 48, 0.62);
+  color: #f2f4ff;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  text-align: center;
+
+  strong,
+  span {
+    display: block;
+  }
+}
+
 .agentTokenLoginPanel {
   width: min(520px, 100%);
   margin: 16px auto 0;

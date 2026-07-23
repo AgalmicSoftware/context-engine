@@ -560,6 +560,18 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     expect(sbtSection.props.sbtEntries[0].sbtInfo.name).toBe('[encrypted]');
   });
 
+  it('omits the on-chain SBT section when the active session disables on-chain profile data', () => {
+    const instance = makeInstance({
+      onChainProfileEnabled: false,
+      viewAddress: '0x00000000000000000000000000000000000000aa',
+    });
+
+    const tree = instance.render();
+    const sbtSections = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSbtSection');
+
+    expect(sbtSections).toHaveLength(0);
+  });
+
   it('uses clone:false when reading survey and question creation caches for analysis payloads', async () => {
     const instance = makeInstance({
       activeSessionSlug: 'edge',

@@ -195,9 +195,12 @@ const AdminPage = ({
   const initialWorkerCanonicalConfigRef = useRef<AdminSessionConfigLike | null>(null);
   if (!initialWorkerCanonicalConfigRef.current) {
     const candidate = asAdminSessionConfig(initialSessionConfig);
-    const candidateProfile = asAdminSessionConfig(candidate.sessionModeProfile);
-    const candidateAuthority = asAdminSessionConfig(candidateProfile.authority);
-    if (candidateAuthority.mode === 'worker_canonical' && normalizeSlug(candidate.slug)) {
+    const candidateCapabilities = resolveAdminCapabilityRoute(candidate).sessionCapabilities;
+    if (
+      candidateCapabilities.profileValid &&
+      candidateCapabilities.isWorkerCanonical &&
+      normalizeSlug(candidate.slug)
+    ) {
       initialWorkerCanonicalConfigRef.current = candidate;
     }
   }
@@ -598,8 +601,10 @@ const AdminPage = ({
     const match = availableSessions.find(([slug]) => slug === selectedSlug);
     return match ? asAdminSessionConfig(match[1]) : null;
   }, [availableSessions, selectedSlug]);
-  const effectiveWorkerAllowOrigins = useMemo(() => {
-    if (!selectedConfig) return [];
+  const adminCapabilityRoute = useMemo(() => resolveAdminCapabilityRoute(selectedConfig), [selectedConfig]);
+  const { sessionCapabilities, selectedWorkerSessionId } = adminCapabilityRoute;
+  const effectiveWorkerCorsState = useMemo(() => {
+    if (!selectedConfig) return { origins: [], reported: false };
     const cachedWorkerConfig: any =
       getCachedSessionWorkerConfig({
         slug: selectedSlug,
@@ -865,6 +870,17 @@ const AdminPage = ({
       ),
     [selectedConfig, selectedSlug],
   );
+  const exactSelectedConfigWorkerUrl = useMemo(
+    () =>
+      normalizeWorkerUrl(
+        getUsableSessionWorkerUrl({
+          slug: selectedSlug,
+          sessionConfig: selectedConfig,
+          requireExactWorkerSession: true,
+        }),
+      ),
+    [selectedConfig, selectedSlug],
+  );
   const agentSessionWrappedWorkerUrl = useMemo(
     () =>
       resolveAdminAgentSessionWrappedWorkerOrigin({
@@ -1093,6 +1109,7 @@ const AdminPage = ({
       return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
         action,
         slug,
+        sessionId: selectedWorkerSessionId || undefined,
         body,
         workerUrl: baseUrl,
         context: {
@@ -1109,6 +1126,7 @@ const AdminPage = ({
       selectedConfig,
       selectedConfigWorkerUrl,
       selectedSlug,
+      selectedWorkerSessionId,
       toggleLoginModal,
       workerUrl,
     ],
@@ -1520,7 +1538,7 @@ const AdminPage = ({
         status: loginResp.status,
       });
       if (loginResp.status === 403) {
-        const detail = toStr(loginData?.error || 'Forbidden').trim();
+        const detail = loginError?.reason || 'worker_auth_worker_login_failed';
         setDeniedResults((prev) => ({ ...prev, [key]: `OK (403 ${detail})` }));
         setDeniedStatus(`Expected 403 for ${key}.`);
         return;
@@ -1530,11 +1548,11 @@ const AdminPage = ({
         setDeniedStatus('Unexpectedly allowed login; gating may be misconfigured.');
         return;
       }
-      const detail = toStr(loginData?.error || `Login failed (${loginResp.status})`).trim();
+      const detail = loginError?.message || `Worker login failed (${loginResp.status}).`;
       setDeniedResults((prev) => ({ ...prev, [key]: `FAILED (${detail})` }));
       setDeniedStatus(detail);
     } catch (err: any) {
-      const msg = getErrorMessage(err, 'Denied test failed.');
+      const msg = adminWorkerPorts.siweLogin.getRemoteErrorMessage(err) || 'Denied access test failed.';
       setDeniedResults((prev) => ({ ...prev, [key]: `FAILED (${msg})` }));
       setDeniedStatus(msg);
     } finally {
@@ -1599,6 +1617,8 @@ const AdminPage = ({
 
   const { isWorkerCanonicalSession, workerAdminAddress, hasRegistryEntry, canAdminWorker, canAdminRegistry } =
     resolveAdminCapabilities({ account, sessionConfig: selectedConfig });
+  const { showAdminWorkerGroups, workerGroupsPanelTitle, workerGroupsPanelDescription } = adminCapabilityRoute;
+  const sessionRecoveryMessage = resolveAdminSessionRecoveryMessage({ sessionCapabilities, hasRegistryEntry });
   const baseWorkerUrl = normalizeWorkerUrl(workerUrl);
   const canRunTests = !!baseWorkerUrl && !!account;
   const canRunHealthTest = !!baseWorkerUrl && (defaultGateIsEmpty || walletReady);
@@ -2536,10 +2556,8 @@ const AdminPage = ({
               </div>
             )}
             {corsPatchStatus && <div className={styles.statusNote}>{corsPatchStatus}</div>}
-            {selectedConfig && !hasRegistryEntry && !isWorkerCanonicalSession && (
-              <div className={styles.warningNote}>
-                Session is not registered on-chain yet. Register in /new before using worker actions.
-              </div>
+            {selectedConfig && sessionRecoveryMessage && (
+              <div className={styles.warningNote}>{sessionRecoveryMessage}</div>
             )}
           </div>
         </div>
@@ -2739,82 +2757,17 @@ const AdminPage = ({
           )}
         </section>
 
-        <section className={`${styles.panel} ${styles.gatePanel}`}>
-          <div className={styles.panelHeader}>
-            <div className={styles.panelTitleGroup}>
-              <div className={styles.panelTitleRow}>
-                <div className={styles.panelTitle}>On-chain default gate</div>
-                {renderInfoTooltip(
-                  'admin-default-gate-tip',
-                  'Match the default worker-auth gate to the session’s intended access model.',
-                )}
-              </div>
-            </div>
-            <Button
-              size="sm"
-              color="secondary"
-              outline
-              className={styles.collapseToggle}
-              onClick={() => toggleSection('defaultGate')}
-              aria-label="Toggle On-chain default gate section"
-            >
-              <FontAwesomeIcon icon={defaultGateOpen ? faCaretUp : faCaretDown} />
-            </Button>
-          </div>
-          {defaultGateOpen && (
-            <>
-              <div className={styles.formRow}>
-                <FormGroup>
-                  <Label className={styles.gateLabelRow}>
-                    <span>Default gate SBTs</span>
-                    <Input
-                      type="select"
-                      value={defaultGateDraft.mode}
-                      data-testid={E2E_TESTIDS.ADMIN_GATE_MODE_SELECT}
-                      onChange={(e: any) => {
-                        setDefaultGateTouched(true);
-                        setGateConfigDirty(true);
-                        setDefaultGateDraft((prev: any) => ({ ...prev, mode: e.target.value }));
-                      }}
-                      className={styles.gateModeSelect}
-                    >
-                      <option value="any">ANY</option>
-                      <option value="all">ALL</option>
-                    </Input>
-                  </Label>
-                  <SBTSelector
-                    id="admin-default-gate-sbts"
-                    label=""
-                    selectedSBTs={dedupeSbtSelections(defaultGateDraft.sbts || [])}
-                    onAddSBT={(sbt: any) => {
-                      setDefaultGateTouched(true);
-                      setGateConfigDirty(true);
-                      setDefaultGateDraft((prev: any) => ({
-                        ...prev,
-                        sbts: dedupeSbtSelections([...(prev.sbts || []), sbt]),
-                      }));
-                    }}
-                    onRemoveSBT={(address: any) => {
-                      setDefaultGateTouched(true);
-                      setGateConfigDirty(true);
-                      setDefaultGateDraft((prev: any) => ({
-                        ...prev,
-                        sbts: dedupeSbtSelections(prev.sbts || []).filter(
-                          (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase(),
-                        ),
-                      }));
-                    }}
-                    network={network}
-                    chainId={
-                      Number(
-                        selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0,
-                      ) || null
-                    }
-                    sessionSlug={normalizeSlug(selectedSlug)}
-                    variant="admin"
-                    ensureLightSbtUniverse={ensureLightSbtUniverse}
-                  />
-                </FormGroup>
+        {sessionCapabilities.isRegistryCanonical ? (
+          <section className={`${styles.panel} ${styles.gatePanel}`}>
+            <div className={styles.panelHeader}>
+              <div className={styles.panelTitleGroup}>
+                <div className={styles.panelTitleRow}>
+                  <div className={styles.panelTitle}>On-chain default gate</div>
+                  {renderInfoTooltip(
+                    'admin-default-gate-tip',
+                    'Match the default worker-auth gate to the session’s intended access model.',
+                  )}
+                </div>
               </div>
               <Button
                 color="primary"
@@ -2836,6 +2789,16 @@ const AdminPage = ({
           )}
         </section>
 
+        {sessionCapabilities.usesOnChainSbt && !sessionCapabilities.isRegistryCanonical ? (
+          <section className={`${styles.panel} ${styles.gatePanel}`} data-testid="ce-admin-worker-sbt-gates">
+            <div className={styles.panelTitle}>Advanced on-chain access gates</div>
+            <div className={styles.statusNote}>
+              This Worker-owned session checks the SBT conditions in its validated profile. Gate editing is read-only
+              here; update and republish the profile through the session wizard. No registry transaction is available.
+            </div>
+          </section>
+        ) : null}
+
         <AdminAgentSessionWrappedPanel
           canAdminWorker={canAdminWorker}
           sessionConfig={selectedConfig}
@@ -2846,12 +2809,17 @@ const AdminPage = ({
           onConfigUpdated={handleAgentSessionWrappedConfigUpdated}
         />
 
-        <AdminWorkerGroupsPanel
-          canAdminWorker={canAdminWorker}
-          sessionSlug={normalizeSlug(selectedSlug)}
-          workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
-          postSignedRequest={postSignedAdminRequest}
-        />
+        {showAdminWorkerGroups ? (
+          <AdminWorkerGroupsPanel
+            canAdminWorker={canAdminWorker}
+            sessionId={selectedWorkerSessionId}
+            sessionSlug={normalizeSlug(selectedSlug)}
+            workerUrl={sessionCapabilities.usesWorkerGroups ? exactSelectedConfigWorkerUrl : selectedConfigWorkerUrl}
+            postSignedRequest={postSignedAdminRequest}
+            title={workerGroupsPanelTitle}
+            description={workerGroupsPanelDescription}
+          />
+        ) : null}
 
         <AdminPageWorkerSecretsPanel
           workerSecretsOpen={workerSecretsOpen}

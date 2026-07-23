@@ -5,6 +5,8 @@ import {
   resolveSponsoredGateForResource,
 } from '../../utilities/web3/sponsoredAccess.js';
 import { buildSbtAccessControlConditions, resolveLitChain } from '../../utilities/crypto/litProtocol.js';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
+import { validateSessionModeProfile, type SessionModeProfile } from '../../utilities/session/sessionModeProfile.js';
 import { toStr } from '../../utilities/shared/primitives';
 
 type LitCredentialsLike = Record<string, unknown> & {
@@ -111,6 +113,23 @@ export const resolveMainSiteLitSessionConfig = ({
   networkChainIdFallback?: number | null;
 } = {}) => {
   const cfg: MainSiteLitSessionConfigLike = sessionConfig || {};
+  const capabilityProjection = resolveSessionCapabilityProjection(cfg);
+  if (
+    capabilityProjection.source === 'invalid_profile' ||
+    capabilityProjection.source === 'missing' ||
+    (capabilityProjection.source === 'profile' && !capabilityProjection.usesLit)
+  ) {
+    return {
+      gate: null,
+      chainId: null,
+      litNetwork: '',
+      userMaxPrice: '',
+      litChain: '',
+      gateAddresses: [],
+      accessControlConditions: null,
+      chipotle: null,
+    };
+  }
   const litCredentials =
     cfg?.litCredentials && typeof cfg.litCredentials === 'object' && !Array.isArray(cfg.litCredentials)
       ? (cfg.litCredentials as LitCredentialsLike)

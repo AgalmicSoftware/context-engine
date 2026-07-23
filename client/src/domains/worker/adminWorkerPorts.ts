@@ -101,6 +101,12 @@ export type WorkerAdminAuthPort = {
 };
 
 export type WorkerSiweLoginPort = {
+  createRemoteError: (input: {
+    kind: 'admin_nonce' | 'worker_nonce' | 'worker_login';
+    payload: unknown;
+    status: unknown;
+  }) => Error & { reason: string; status: number };
+  getRemoteErrorMessage: (error: unknown) => string;
   prepareSiweLogin: (input: AdminPrepareSiweLoginInput) => Promise<AdminPrepareSiweLoginResult>;
 };
 

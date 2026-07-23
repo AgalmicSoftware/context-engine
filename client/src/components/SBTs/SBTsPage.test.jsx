@@ -6,33 +6,18 @@ import { getDemoSessionConfigBySlug, getSessionLists } from '../../utilities/web
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
-import * as terminology from '../../utilities/ui/terminology.js';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const mockSBTPage = jest.fn();
-const mockSBTsList = jest.fn();
 const mockCreateGroup = jest.fn();
-const mockWorkerGroupCreate = jest.fn();
 const mockIsCryptoMode = jest.fn(() => true);
 
-jest.mock('./SBTsList', () => (props) => {
-  mockSBTsList(props);
-  return null;
-});
+jest.mock('./SBTsList', () => () => null);
 jest.mock('./CreateSBTGroup', () => (props) => {
   mockCreateGroup(props);
   return (
     <div data-testid="create-group-panel" data-network-name={props.network?.name || ''}>
       Create Group Panel
-    </div>
-  );
-});
-jest.mock('../OnePageSession/WorkerSessionGroupsPanel', () => (props) => {
-  mockWorkerGroupCreate(props);
-  return (
-    <div data-testid="worker-group-create-panel">
-      <span>Active session</span>
-      <span>{props.sessionName}</span>
-      <span>/{props.sessionSlug}</span>
     </div>
   );
 });
@@ -235,6 +220,183 @@ describe('SBTsPage auto-feature flag', () => {
     );
     expect(replaceStateSpy).toHaveBeenCalledWith(null, '', '/ce/groups/rxc');
     replaceStateSpy.mockRestore();
+  });
+
+  it('uses an explicitly supplied unregistered Worker session for standalone Advanced/external authoring', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const workerSessionConfig = {
+      slug: 'demo-sh',
+      networkChainId: 11155420,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === '' ? { slug: '' } : null,
+    );
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    getDemoSessionConfigBySlug.mockReturnValue(null);
+    window.history.replaceState({}, '', '/groups/new');
+
+    render(
+      <SBTsPage
+        sessionSlug="demo-sh"
+        sessionConfig={workerSessionConfig}
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        provider="wagmi"
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toHaveTextContent(
+      /Advanced\/external on-chain SBT/i,
+    );
+    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toHaveTextContent(
+      /does not replace or modify this session's Worker-native Groups/i,
+    );
+    expect(screen.getByTestId('create-group-panel')).toHaveAttribute('data-network-name', 'Base Sepolia');
+    expect(mockCreateGroup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        network: expect.objectContaining({ id: 84532, name: 'Base Sepolia' }),
+        preferConnectedNetworkForAuthoring: true,
+        sessionConfigOverride: workerSessionConfig,
+        sessionSlug: 'demo-sh',
+      }),
+    );
+    expect(contractScripts.getSessionConfigBySlug).not.toHaveBeenCalledWith('demo-sh');
+    expect(getDemoSessionConfigBySlug).not.toHaveBeenCalledWith('demo-sh', { allowDemoFallback: true });
+  });
+
+  it('fails closed instead of re-resolving a mismatched explicit standalone session config', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const workerSessionConfig = {
+      slug: 'other-session',
+      networkChainId: 11155420,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === 'demo-sh'
+        ? {
+            slug: 'demo-sh',
+            networkChainId: 84532,
+            __registry: {
+              sessionIdHex: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            },
+          }
+        : String(slug || '') === ''
+          ? { slug: '' }
+          : null,
+    );
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    window.history.replaceState({}, '', '/sbts/new');
+
+    render(
+      <SBTsPage
+        sessionSlug="demo-sh"
+        sessionConfig={workerSessionConfig}
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        provider="wagmi"
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/session context could not be verified/i);
+    expect(mockCreateGroup).not.toHaveBeenCalled();
+    expect(contractScripts.getSessionConfigBySlug).not.toHaveBeenCalledWith('demo-sh');
+  });
+
+  it.each([
+    ['missing', { slug: 'broken-session', networkChainId: 84532 }],
+    ['invalid', { slug: 'broken-session', sessionModeProfile: { authority: { mode: 'worker_canonical' } } }],
+  ])('fails closed for an explicit concrete %s-profile standalone context', (_label, sessionConfig) => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === '' ? { slug: '' } : null,
+    );
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    window.history.replaceState({}, '', '/sbts/new');
+
+    render(
+      <SBTsPage
+        sessionSlug="broken-session"
+        sessionConfig={sessionConfig}
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        provider="wagmi"
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/session context could not be verified/i);
+    expect(mockCreateGroup).not.toHaveBeenCalled();
+    expect(contractScripts.getSessionConfigBySlug).not.toHaveBeenCalledWith('broken-session');
+  });
+
+  it('keeps the unscoped global standalone SBT tool available without a session profile', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === '' ? { slug: '' } : null,
+    );
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    window.history.replaceState({}, '', '/sbts/new');
+
+    render(
+      <SBTsPage
+        sessionConfig={{}}
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        provider="wagmi"
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(mockCreateGroup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        network: expect.objectContaining({ id: 84532 }),
+        sessionSlug: '',
+      }),
+    );
+  });
+
+  it('accepts an explicitly supplied legacy registry config for standalone authoring', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const registrySessionConfig = {
+      slug: 'legacy-session',
+      networkChainId: 84532,
+      __registry: {
+        sessionIdHex: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      },
+    };
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === '' ? { slug: '' } : null,
+    );
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    window.history.replaceState({}, '', '/sbts/new');
+
+    render(
+      <SBTsPage
+        sessionSlug="legacy-session"
+        sessionConfig={registrySessionConfig}
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        provider="wagmi"
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+      />,
+    );
+
+    expect(mockCreateGroup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preferConnectedNetworkForAuthoring: false,
+        sessionConfigOverride: registrySessionConfig,
+        sessionSlug: 'legacy-session',
+      }),
+    );
   });
 
   it('auto-features SBTs whose metadata sessionSlug matches the active session', () => {

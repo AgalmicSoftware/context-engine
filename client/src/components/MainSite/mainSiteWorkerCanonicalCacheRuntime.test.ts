@@ -22,7 +22,6 @@ const makeHost = () => {
         if (patch.isSBTCacheReady) calls.push('sbt-ready');
         if (patch.isSurveyCacheReady) calls.push('surveys-ready');
       }),
-      checkAllCachesReady: jest.fn(),
       startSbtEventListenerForGroup: jest.fn((_slug: string) => {
         calls.push('sbt-listener');
       }),
@@ -52,56 +51,6 @@ describe('mainSiteWorkerCanonicalCacheRuntime', () => {
     expect(calls).toEqual(['questions', 'sbt-ready', 'responses', 'surveys', 'surveys-ready']);
     expect(host.initializeSbtCacheForGroup).not.toHaveBeenCalled();
     expect(host.startSbtEventListenerForGroup).not.toHaveBeenCalled();
-  });
-
-  it('checks aggregate readiness after React commits the final cache-ready state', async () => {
-    const { host } = makeHost();
-    const committedReadiness: Record<string, unknown> = {};
-    const queuedCommits: Array<() => void> = [];
-    host.setReadinessStateIfChanged.mockImplementation((patch: Record<string, unknown>, callback?: () => void) => {
-      queuedCommits.push(() => {
-        Object.assign(committedReadiness, patch);
-        callback?.();
-      });
-    });
-    host.checkAllCachesReady.mockImplementation(() => {
-      expect(committedReadiness).toMatchObject({
-        isSBTCacheReady: true,
-        isSurveyCacheReady: true,
-      });
-    });
-
-    await expect(
-      initializeMainSiteWorkerCanonicalCaches({
-        host,
-        sessionConfig: makeWorkerConfig(),
-        sessionSlug: 'worker-session',
-      }),
-    ).resolves.toBe(true);
-
-    expect(host.checkAllCachesReady).not.toHaveBeenCalled();
-    queuedCommits.forEach((commit) => commit());
-    expect(host.checkAllCachesReady).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not check aggregate readiness from a stale final-state callback', async () => {
-    const { host } = makeHost();
-    let current = true;
-    let finalCallback: (() => void) | undefined;
-    host.setReadinessStateIfChanged.mockImplementation((patch: Record<string, unknown>, callback?: () => void) => {
-      if (patch.isSurveyCacheReady) finalCallback = callback;
-    });
-
-    await initializeMainSiteWorkerCanonicalCaches({
-      host,
-      sessionConfig: makeWorkerConfig(),
-      sessionSlug: 'worker-session',
-      isCurrent: () => current,
-    });
-    current = false;
-    finalCallback?.();
-
-    expect(host.checkAllCachesReady).not.toHaveBeenCalled();
   });
 
   it('hydrates Worker metadata while keeping hybrid SBT work explicitly separate', async () => {

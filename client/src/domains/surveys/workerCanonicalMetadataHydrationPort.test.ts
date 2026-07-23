@@ -204,62 +204,6 @@ describe('workerCanonicalMetadataHydrationPort', () => {
     );
   });
 
-  it('accepts legacy payloads without a session ID while preserving the verified Worker identity', async () => {
-    const sessionConfig = buildWorkerSessionConfig();
-    const listSessionStorageRefsPage = jest.fn().mockResolvedValue({
-      items: [
-        buildListedItem('legacy-question', 'questions', '2026-07-23T00:00:00.000Z'),
-        buildListedItem('malformed-session-question', 'questions', '2026-07-23T00:00:01.000Z'),
-      ],
-      cursor: null,
-      listComplete: true,
-    });
-    const readSessionStorageBlob = jest.fn(
-      async ({ storageRef }: any) =>
-        ({
-          json: async () =>
-            storageRef.id === 'legacy-question'
-              ? {
-                  id: '0xlegacyquestion',
-                  prompt: 'Legacy Worker question',
-                  sessionSlug: 'worker-session',
-                }
-              : {
-                  id: '0xmalformedsessionquestion',
-                  prompt: 'Malformed session question',
-                  sessionId: 'not-a-session-id',
-                  sessionSlug: 'worker-session',
-                },
-        }) as Response,
-    );
-
-    const rows = await loadWorkerCanonicalQuestions(
-      {
-        sessionConfig,
-        sessionSlug: 'worker-session',
-      },
-      {
-        listSessionStorageRefsPage,
-        readSessionStorageBlob,
-      },
-    );
-
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toEqual(
-      expect.objectContaining({
-        id: '0xlegacyquestion',
-        payload: expect.objectContaining({
-          id: '0xlegacyquestion',
-          prompt: 'Legacy Worker question',
-          sessionId: SESSION_ID,
-          sessionSlug: 'worker-session',
-          sessionSlugExplicit: true,
-          source: 'worker-session-storage',
-        }),
-      }),
-    );
-  });
-
   it('hydrates Worker/SBT hybrid survey metadata into the Worker cache scope without chain discovery', async () => {
     const sessionConfig: any = buildWorkerSessionConfig();
     sessionConfig.sessionModeProfile.evm.registryChainId = 11155420;
@@ -277,7 +221,6 @@ describe('workerCanonicalMetadataHydrationPort', () => {
         },
       ],
     };
-    sessionConfig.sessionModeProfile.results.visibility = 'participant_aggregate';
     sessionConfig.storageProfile.payloadAccessControl = {
       gate: 'role_gate',
       encryption: 'worker_envelope',

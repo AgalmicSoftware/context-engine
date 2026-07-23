@@ -578,6 +578,24 @@ const WorkerEnvelopeOptions = ({
     commitConditions(next);
   };
 
+  const updateSbtConditionChain = (chainId: number) => {
+    if (!Number.isSafeInteger(chainId) || chainId <= 0) return;
+    const next = cloneAccessConditions(profile.encryption.accessConditions);
+    next.conditions = next.conditions.map((condition) =>
+      condition.kind === 'sbt_onchain' ? { ...condition, chainId } : condition,
+    );
+    updateProfile((draft) => {
+      draft.evm.registryChainId = chainId;
+      const storedConditions = draft.storage.payloadAccessControl?.accessConditions;
+      if (storedConditions) {
+        storedConditions.conditions = storedConditions.conditions.map((condition) =>
+          condition.kind === 'sbt_onchain' ? { ...condition, chainId } : condition,
+        );
+      }
+      setWorkerEnvelopeCondition(draft, next);
+    });
+  };
+
   return (
     <div className={styles.modeRuleBuilder}>
       <Label className={styles.modeFieldLabel} htmlFor="ce-new-envelope-condition-match">
@@ -666,9 +684,7 @@ const WorkerEnvelopeOptions = ({
                   aria-label="SBT network"
                   value={condition.chainId || ''}
                   data-testid={`ce-new-envelope-sbt-chain-${index}`}
-                  onChange={(event) =>
-                    updateCondition(index, () => ({ ...condition, chainId: Number(event.target.value || 0) || 0 }))
-                  }
+                  onChange={(event) => updateSbtConditionChain(Number(event.target.value || 0) || 0)}
                 >
                   {Array.from(new Set([condition.chainId, 11155420, 84532]))
                     .filter((chainId) => Number(chainId) > 0)

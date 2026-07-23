@@ -108,7 +108,7 @@ describe('SessionWizard new-session requirements banner', () => {
   });
 
   it('does not show the new-session requirements banner when a sponsored bundle covers setup requirements', async () => {
-    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
 
     renderSessionWizard({
       initialSponsoredBundleId: 'sponsor-tx-id',
@@ -122,8 +122,8 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
   });
 
-  it('keeps the new-session requirements banner visible when sponsored setup is missing deploy access', async () => {
-    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+  it('keeps Cloudflare requirements visible when sponsored setup is missing deploy access', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
     const sponsoredBundleWithoutDeployAccess = buildMockSponsoredBundle();
     delete sponsoredBundleWithoutDeployAccess.deployGrantToken;
     mockDecryptWithPassword.mockResolvedValueOnce(sponsoredBundleWithoutDeployAccess);
@@ -141,7 +141,7 @@ describe('SessionWizard new-session requirements banner', () => {
   });
 
   it('keeps the new-session requirements banner visible for partial sponsored bundles', async () => {
-    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
     mockDecryptWithPassword.mockResolvedValueOnce({
       openaiKey: 'sponsored-openai',
       meta: {
@@ -164,7 +164,7 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
   });
 
-  it('shows the new-session requirements banner again when a sponsored link falls back to manual setup', async () => {
+  it('keeps the new-session requirements hidden while waiting for the separate sponsored key', async () => {
     window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
 
     renderSessionWizard({
@@ -173,8 +173,8 @@ describe('SessionWizard new-session requirements banner', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
-    await expectSponsoredStatusText('Malformed sponsored link.');
-    expect(screen.getByRole('heading', { name: /to create a session you'll need:/i })).toBeInTheDocument();
+    await expectSponsoredStatusText('Enter the sponsored bundle decryption key to continue.');
+    expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
   });
 
   it('dismisses the new-session requirements banner and keeps it hidden after remount', async () => {
@@ -212,7 +212,7 @@ describe('SessionWizard new-session requirements banner', () => {
     expect(localStorage.getItem(NEW_SESSION_BANNER_DISMISSED_KEY)).toBe('true');
 
     firstRender.unmount();
-    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
     mockDecryptWithPassword.mockResolvedValueOnce({
       openaiKey: 'sponsored-openai',
       meta: {

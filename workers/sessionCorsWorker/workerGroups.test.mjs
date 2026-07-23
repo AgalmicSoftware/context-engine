@@ -6,12 +6,9 @@ import {
 	createWorkerGroup as createWorkerGroupBoundary,
 	deleteWorkerGroup as deleteWorkerGroupBoundary,
 	dispatchAdminWorkerGroupRequest as dispatchAdminWorkerGroupRequestBoundary,
-	dispatchPublicWorkerGroupListRequest,
 	executeCoordinatedWorkerGroupMutation as executeCoordinatedWorkerGroupMutationBoundary,
-	executeWorkerGroupMutation as executeWorkerGroupMutationBoundary,
 	isWorkerGroupMember,
 	listWorkerGroupMembers as listWorkerGroupMembersBoundary,
-	listWorkerGroupMembersForPrincipal as listWorkerGroupMembersForPrincipalBoundary,
 	listWorkerGroupMemberships as listWorkerGroupMembershipsBoundary,
 	normalizeWorkerGroupId,
 	normalizeWorkerGroupPrincipal,
@@ -30,63 +27,16 @@ const json = (body, status = 200, headers = {}) => ({ body, status, headers });
 const sessionId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const replacementSessionId = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const workerCanonicalConfig = { sessionId };
-const publicWorkerModeProfile = {
-	profileVersion: 1,
-	preset: 'custom',
-	authority: { mode: 'worker_canonical' },
-	evm: { registryChainId: null },
-	storage: {
-		backend: 'cloudflare',
-		payloadAccessControl: { gate: 'none', encryption: 'none' },
-	},
-	identity: { default: 'passkey', enabled: ['passkey'] },
-	authorization: { mechanisms: ['worker_roles'] },
-	encryption: { mode: 'none' },
-	surfaces: {
-		web: true,
-		telegram: false,
-		miniApp: false,
-		agentHttp: false,
-		mcp: false,
-		ceCc: false,
-	},
-	results: {
-		visibility: 'public_full_if_storage_public',
-		exposure: {
-			aggregateResultsEnabled: true,
-			anonymizedGroupsEnabled: false,
-			minGroupSize: 2,
-		},
-	},
-	export: { scope: 'all_session' },
-};
-const publicWorkerGroupConfig = (groupCreationPolicy = 'admin_only') => ({
-	sessionId,
-	groupCreationPolicy,
-	sessionModeProfile: JSON.parse(JSON.stringify(publicWorkerModeProfile)),
-	storageProfile: {
-		backend: 'cloudflare',
-		payloadAccessControl: { gate: 'none', encryption: 'none' },
-	},
-});
-const privateWorkerGroupConfig = () => {
-	const config = publicWorkerGroupConfig('participants');
-	config.sessionModeProfile.results.visibility = 'session_member_aggregate';
-	return config;
-};
 const addWorkerGroupMember = (args = {}) => addWorkerGroupMemberBoundary({ sessionId, ...args });
 const createWorkerGroup = (args = {}) => createWorkerGroupBoundary({ sessionId, ...args });
 const deleteWorkerGroup = (args = {}) => deleteWorkerGroupBoundary({ sessionId, ...args });
 const listWorkerGroupMembers = (args = {}) => listWorkerGroupMembersBoundary({ sessionId, ...args });
-const listWorkerGroupMembersForPrincipal = (args = {}) =>
-	listWorkerGroupMembersForPrincipalBoundary({ sessionId, ...args });
 const listWorkerGroupMemberships = (args = {}) => listWorkerGroupMembershipsBoundary({ sessionId, ...args });
 const readWorkerGroupMembershipProjection = (args = {}) => readWorkerGroupMembershipProjectionBoundary({ sessionId, ...args });
 const removeWorkerGroupMember = (args = {}) => removeWorkerGroupMemberBoundary({ sessionId, ...args });
 const snapshotWorkerGroupCapacity = (args = {}) => snapshotWorkerGroupCapacityBoundary({ sessionId, ...args });
 const updateWorkerGroup = (args = {}) => updateWorkerGroupBoundary({ sessionId, ...args });
 const executeCoordinatedWorkerGroupMutation = (args = {}) => executeCoordinatedWorkerGroupMutationBoundary({ sessionId, ...args });
-const executeWorkerGroupMutation = (args = {}) => executeWorkerGroupMutationBoundary({ sessionId, ...args });
 const requestWithSessionId = async (request, requestedSessionId = sessionId) => {
 	if (!(request instanceof Request)) return request;
 	const url = new URL(request.url);
@@ -118,133 +68,6 @@ const dispatchAdminWorkerGroupRequest = (args = {}) =>
 			...(args.body || {}),
 		},
 	});
-
-test('admin empty-state reconciliation preserves exact session identity and returns no capacity internals', async () => {
-	let reconciliationArgs = null;
-	const result = await dispatchAdminWorkerGroupRequest({
-		action: 'groups/reconcile-empty',
-		env: {},
-		slug: 'session-a',
-		adminAddress: '0x0000000000000000000000000000000000000abc',
-		headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
-		deps: {
-			json,
-			reconcileCoordinatedWorkerGroupCapacity: async (args) => {
-				reconciliationArgs = args;
-				return {
-					ok: true,
-					repaired: true,
-					meta: {
-						groupCount: 0,
-						bootstrapId: 'must-not-leak',
-						phase: 'ready',
-					},
-				};
-			},
-		},
-	});
-
-	assert.deepEqual(reconciliationArgs, {
-		env: {},
-		slug: 'session-a',
-		sessionId,
-	});
-	assert.deepEqual(result, {
-		body: {
-			ok: true,
-			sessionSlug: 'session-a',
-			sessionId,
-			store: 'durable_object',
-			repaired: true,
-			groupCount: 0,
-		},
-		status: 200,
-		headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
-	});
-	assert.doesNotMatch(JSON.stringify(result), /must-not-leak|bootstrapId/);
-});
-
-test('public Worker Group discovery follows the public ungated mode independently of creation policy', async () => {
-	const headers = { 'Access-Control-Allow-Origin': 'https://allowed.example' };
-	let listCalls = 0;
-	const deps = {
-		json,
-		checkCoordinatedWorkerGroupReady: async () => ({
-			ok: true,
-			meta: { groupCount: 1 },
-		}),
-		listWorkerGroups: async (value) => {
-			listCalls += 1;
-			assert.equal(value.sessionId, sessionId);
-			assert.equal(value.slug, 'session-a');
-			assert.equal(value.admin, false);
-			assert.equal(value.actorPrincipalResult, undefined);
-			assert.equal(value.expectedGroupCount, 1);
-			return {
-				ok: true,
-				store: 'kv',
-				groups: [
-					{
-						groupId: 'open-reviewers',
-						sessionSlug: 'session-a',
-						label: 'Open reviewers',
-						joinMode: 'open',
-						memberVisibility: 'session',
-					},
-				],
-			};
-		},
-	};
-
-	const openResult = await dispatchPublicWorkerGroupListRequest({
-		request: new Request(`https://worker.example/groups/list?sessionId=${sessionId}`),
-		config: publicWorkerGroupConfig('admin_only'),
-		env: {},
-		slug: 'session-a',
-		baseHeaders: headers,
-		deps,
-	});
-	assert.equal(openResult.status, 200);
-	assert.equal(openResult.body.sessionId, sessionId);
-	assert.equal(openResult.body.sessionSlug, 'session-a');
-	assert.equal(openResult.body.groups[0].groupId, 'open-reviewers');
-	assert.equal(listCalls, 1);
-
-	const participantPolicyResult = await dispatchPublicWorkerGroupListRequest({
-		request: new Request(`https://worker.example/groups/list?sessionId=${sessionId}`),
-		config: publicWorkerGroupConfig('participants'),
-		env: {},
-		slug: 'session-a',
-		baseHeaders: headers,
-		deps,
-	});
-	assert.equal(participantPolicyResult.status, 200);
-
-	for (const config of [privateWorkerGroupConfig(), { sessionId, groupCreationPolicy: 'participants' }]) {
-		const denied = await dispatchPublicWorkerGroupListRequest({
-			request: new Request(`https://worker.example/groups/list?sessionId=${sessionId}`),
-			config,
-			env: {},
-			slug: 'session-a',
-			baseHeaders: headers,
-			deps,
-		});
-		assert.equal(denied.status, 403);
-		assert.equal(denied.body.reason, 'worker_group_discovery_not_public');
-	}
-
-	const mismatched = await dispatchPublicWorkerGroupListRequest({
-		request: new Request(`https://worker.example/groups/list?sessionId=${replacementSessionId}`),
-		config: publicWorkerGroupConfig('participants'),
-		env: {},
-		slug: 'session-a',
-		baseHeaders: headers,
-		deps,
-	});
-	assert.equal(mismatched.status, 409);
-	assert.equal(mismatched.body.reason, 'worker_group_session_identity_mismatch');
-	assert.equal(listCalls, 2);
-});
 
 const createMockKv = () => {
 	const store = new Map();
@@ -345,19 +168,6 @@ test('Worker Group bootstrap accepts only the exact fresh sentinel or a deployme
 		ok: true,
 		bootstrapId: 'fresh-template-v2',
 	});
-	assert.deepEqual(
-		await resolveWorkerGroupBootstrap({
-			env: { CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2' },
-			slug: 'session-a',
-			sessionId,
-			requireExhaustiveEmptyScan: true,
-		}),
-		{
-			ok: false,
-			status: 503,
-			reason: 'worker_group_capacity_state_unavailable',
-		},
-	);
 
 	for (const marker of ['fresh-v2', 'false', 'legacy', '0']) {
 		const rejected = await resolveWorkerGroupBootstrap({
@@ -494,83 +304,33 @@ test('externally coordinated Worker Group mutations fail closed without the coor
 	assert.equal(kv.store.size, 0);
 });
 
-test('Worker Groups prefer an independently migrated coordinator binding when configured', async () => {
+test('worker group CRUD stores memberships separately and enforces caps', async () => {
 	const kv = createMockKv();
-	let groupCoordinatorCalls = 0;
-	let sessionCoordinatorCalls = 0;
-	const result = await executeCoordinatedWorkerGroupMutation({
-		env: {
-			CE_WORKER_GROUPS_KV: kv,
-			CE_WORKER_GROUP_COORDINATOR: {
-				idFromName: (name) => {
-					groupCoordinatorCalls += 1;
-					return `groups:${name}`;
-				},
-				get: () => ({
-					fetch: async () =>
-						new Response(JSON.stringify({ ok: false, status: 409, reason: 'preferred_group_coordinator' }), {
-							status: 409,
-							headers: { 'Content-Type': 'application/json' },
-						}),
-				}),
-			},
-			CE_SESSION_COORDINATOR: {
-				idFromName: (name) => {
-					sessionCoordinatorCalls += 1;
-					return `session:${name}`;
-				},
-				get: () => ({
-					fetch: async () => new Response(JSON.stringify({ ok: true }), { status: 200 }),
-				}),
-			},
-		},
+	const env = {
+		CE_WORKER_GROUPS_KV: kv,
+		CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION: '1',
+		CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '1',
+	};
+	const deps = {
+		now: () => Date.parse('2026-02-03T04:05:06.000Z'),
+		randomUUID: () => 'group-alpha',
+	};
+	const created = await createWorkerGroup({
+		env,
 		slug: 'session-a',
-		sessionId: '0x11111111111111111111111111111111',
-		operation: 'create',
 		input: {
-			groupId: 'preferred-binding',
-			label: 'Preferred binding',
-			joinMode: 'open',
-			memberVisibility: 'session',
+			label: 'Review cohort',
+			description: 'Internal review access',
+			imageUrl: 'https://ar-io.dev/example-group-image',
+			joinMode: 'admin_add',
+			memberVisibility: 'members',
 		},
 		actorPrincipal: actor,
+		deps,
 	});
-
-	assert.equal(result.ok, false);
-	assert.equal(result.status, 409);
-	assert.equal(result.reason, 'preferred_group_coordinator');
-	assert.equal(groupCoordinatorCalls, 1);
-	assert.equal(sessionCoordinatorCalls, 0);
-	assert.equal(kv.store.size, 0);
-});
-
-test('worker group CRUD stores memberships separately and enforces caps', async () => {
-  const kv = createMockKv();
-  const env = {
-    CE_WORKER_GROUPS_KV: kv,
-    CE_WORKER_GROUP_MAX_GROUPS_PER_SESSION: '1',
-    CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '1',
-  };
-  const deps = {
-    now: () => Date.parse('2026-02-03T04:05:06.000Z'),
-    randomUUID: () => 'group-alpha',
-  };
-  const created = await createWorkerGroup({
-    env,
-    slug: 'session-a',
-    input: {
-      label: 'Review cohort',
-      description: 'Internal review access',
-      imageUrl: 'https://ar-io.dev/example-group-image',
-      joinMode: 'admin_add',
-      memberVisibility: 'members',
-    },
-    actorPrincipal: actor,
-    deps,
-  });
-  assert.equal(created.ok, true);
-  assert.equal(created.group.groupId, 'group-alpha');
-  assert.equal(created.group.imageUrl, 'https://ar-io.dev/example-group-image');
+	assert.equal(created.ok, true);
+	assert.equal(created.group.groupId, 'group-alpha');
+	assert.equal(created.group.imageUrl, 'https://ar-io.dev/example-group-image');
 
 	const duplicate = await createWorkerGroup({
 		env,
@@ -624,103 +384,6 @@ test('worker group CRUD stores memberships separately and enforces caps', async 
 	});
 	assert.equal(denied.ok, false);
 	assert.equal(denied.reason, 'worker_group_membership_denied');
-});
-
-test('worker group metadata is validated, persisted, projected, and enforces its own member limit', async () => {
-	const kv = createMockKv();
-	const env = {
-		CE_WORKER_GROUPS_KV: kv,
-		CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '5',
-	};
-	const deps = {
-		now: () => Date.parse('2026-02-03T04:05:06.000Z'),
-	};
-	const created = await createWorkerGroup({
-		env,
-		slug: 'session-a',
-		input: {
-			groupId: 'metadata-group',
-			label: 'Metadata group',
-			tags: ['Research', 'research', 'reviewers'],
-			documentURLs: ['https://docs.example.test/brief'],
-			memberLimit: 1,
-			joinEndsAt: '2026-03-03T04:05:06.000Z',
-			adminAddress: actor.address,
-			joinMode: 'open',
-			memberVisibility: 'session',
-		},
-		actorPrincipal: actor,
-		deps,
-	});
-	assert.equal(created.ok, true);
-	assert.deepEqual(created.group.tags, ['Research', 'reviewers']);
-	assert.deepEqual(created.group.documentURLs, ['https://docs.example.test/brief']);
-	assert.equal(created.group.memberLimit, 1);
-	assert.equal(created.group.joinEndsAt, '2026-03-03T04:05:06.000Z');
-	assert.equal(created.group.adminAddress, actor.address.toLowerCase());
-
-	const first = await addWorkerGroupMember({
-		env,
-		slug: 'session-a',
-		groupId: 'metadata-group',
-		principal: member,
-		actorPrincipal: actor,
-		deps,
-	});
-	assert.equal(first.ok, true);
-	const overflow = await addWorkerGroupMember({
-		env,
-		slug: 'session-a',
-		groupId: 'metadata-group',
-		principal: { kind: 'telegram', principalId: 'telegram:overflow' },
-		actorPrincipal: actor,
-		deps,
-	});
-	assert.equal(overflow.ok, false);
-	assert.equal(overflow.reason, 'worker_group_member_cap_exceeded');
-
-	const unsafeUrl = await createWorkerGroup({
-		env,
-		slug: 'session-a',
-		input: {
-			groupId: 'unsafe-url',
-			label: 'Unsafe URL',
-			documentURLs: ['javascript:alert(1)'],
-			joinMode: 'open',
-		},
-		actorPrincipal: actor,
-		deps,
-	});
-	assert.equal(unsafeUrl.ok, false);
-	assert.equal(unsafeUrl.reason, 'invalid_group_document_urls');
-});
-
-test('direct open join rejects an expired group deadline', async () => {
-	const env = { CE_WORKER_GROUPS_KV: createMockKv() };
-	await createWorkerGroup({
-		env,
-		slug: 'session-a',
-		input: {
-			groupId: 'deadline-group',
-			label: 'Deadline group',
-			joinMode: 'open',
-			memberVisibility: 'session',
-			joinEndsAt: '2026-02-04T04:05:06.000Z',
-		},
-		actorPrincipal: actor,
-		deps: { now: () => Date.parse('2026-02-03T04:05:06.000Z') },
-	});
-	const joined = await executeWorkerGroupMutation({
-		env,
-		slug: 'session-a',
-		operation: 'join',
-		groupId: 'deadline-group',
-		principal: member,
-		actorPrincipal: member,
-		deps: { now: () => Date.parse('2026-02-05T04:05:06.000Z') },
-	});
-	assert.equal(joined.ok, false);
-	assert.equal(joined.reason, 'worker_group_join_ended');
 });
 
 test('worker group membership keys cannot collide across distinct principal ids', async () => {
@@ -1061,41 +724,6 @@ test('worker group image metadata accepts public HTTPS URLs and rejects unsafe v
 	}
 });
 
-test('worker group image metadata accepts public HTTPS URLs and rejects unsafe values', async () => {
-  const env = { CE_WORKER_GROUPS_KV: createMockKv() };
-  const valid = await createWorkerGroup({
-    env,
-    slug: 'session-a',
-    input: {
-      groupId: 'with-image',
-      label: 'With image',
-      joinMode: 'open',
-      memberVisibility: 'session',
-      imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/example.jpg',
-    },
-    actorPrincipal: actor,
-  });
-  assert.equal(valid.ok, true);
-  assert.equal(valid.group.imageUrl, 'https://upload.wikimedia.org/wikipedia/commons/example.jpg');
-
-  for (const imageUrl of [
-    'http://example.test/group.png',
-    'javascript:alert(1)',
-    'https://user:[redacted-email]/group.png',
-    `https://example.test/${'a'.repeat(2048)}`,
-  ]) {
-    // eslint-disable-next-line no-await-in-loop
-    const rejected = await createWorkerGroup({
-      env,
-      slug: 'session-a',
-      input: { groupId: `invalid-${imageUrl.length}`, label: 'Invalid image', imageUrl },
-      actorPrincipal: actor,
-    });
-    assert.equal(rejected.ok, false, imageUrl);
-    assert.equal(rejected.reason, 'invalid_group_image_url', imageUrl);
-  }
-});
-
 test('worker groups operate on storage index KV without a D1 binding', async () => {
 	const kv = createMockKv();
 	const env = installCoordinatorBinding({ CE_STORAGE_INDEX_KV: kv });
@@ -1385,278 +1013,6 @@ test('member routes respect visibility and open join mode', async () => {
 		['open-review'],
 	);
 	assert.equal(memberships.memberships[0].memberCount, 1);
-
-	const leaveResponse = await workerGroupsRoute({
-		path: '/groups/leave',
-		method: 'POST',
-		request: new Request('https://worker.example/groups/leave', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({
-				groupId: 'open-review',
-				principal: actor,
-			}),
-		}),
-		env,
-		slug: 'session-a',
-		requesterAddress: member.address,
-		authScopes: {},
-		baseHeaders: {},
-		deps: { json, now: () => Date.parse('2026-02-03T04:06:06.000Z') },
-	});
-	assert.equal(leaveResponse.status, 200);
-	assert.equal(leaveResponse.body.sessionSlug, 'session-a');
-	assert.equal(leaveResponse.body.sessionId, sessionId);
-	assert.equal(leaveResponse.body.groupId, 'open-review');
-	assert.equal(leaveResponse.body.principal.address, member.address);
-
-	const membershipsAfterLeave = await listWorkerGroupMemberships({
-		env,
-		slug: 'session-a',
-		sessionId,
-		principal: member,
-	});
-	assert.equal(membershipsAfterLeave.ok, true);
-	assert.deepEqual(membershipsAfterLeave.memberships, []);
-
-	const actorMemberships = await listWorkerGroupMemberships({
-		env,
-		slug: 'session-a',
-		sessionId,
-		principal: actor,
-	});
-	assert.equal(actorMemberships.ok, true);
-	assert.deepEqual(actorMemberships.memberships, []);
-});
-
-test('participant member lists enforce the configured identity visibility and redact storage internals', async () => {
-	let listCalls = 0;
-	const listPage = async () => {
-		listCalls += 1;
-		return {
-			ok: true,
-			store: 'kv',
-			group: {
-				groupId: 'visible',
-				sessionSlug: 'session-a',
-				label: 'Visible',
-				joinMode: 'admin_add',
-				memberVisibility: 'admin_only',
-			},
-			members: [
-				{
-					groupId: 'visible',
-					sessionSlug: 'session-a',
-					principal: member,
-					principalKey: 'must-not-leak',
-					addedAt: '2026-07-28T12:00:00.000Z',
-					addedBy: 'must-not-leak',
-				},
-			],
-			nextCursor: 'next-page',
-		};
-	};
-	const run = ({ memberVisibility, isMember }) =>
-		listWorkerGroupMembersForPrincipal({
-			env: {},
-			slug: 'session-a',
-			groupId: 'visible',
-			principal: actor,
-			deps: {
-				readCoordinatedWorkerGroupCatalog: async () => ({
-					ok: true,
-					groups: [
-						{
-							groupId: 'visible',
-							joinMode: 'open',
-							memberVisibility,
-							memberCount: 2,
-							isMember,
-						},
-					],
-				}),
-				listWorkerGroupMembers: listPage,
-			},
-		});
-
-	const sessionVisible = await run({ memberVisibility: 'session', isMember: false });
-	assert.equal(sessionVisible.ok, true);
-	assert.equal(sessionVisible.memberCount, 2);
-	assert.equal(sessionVisible.group.memberVisibility, 'session');
-	assert.equal(sessionVisible.group.joinMode, 'open');
-	assert.deepEqual(sessionVisible.members, [
-		{
-			groupId: 'visible',
-			sessionSlug: 'session-a',
-			principal: member,
-			addedAt: '2026-07-28T12:00:00.000Z',
-		},
-	]);
-	assert.doesNotMatch(JSON.stringify(sessionVisible), /principalKey|addedBy|must-not-leak/);
-
-	const memberVisible = await run({ memberVisibility: 'members', isMember: true });
-	assert.equal(memberVisible.ok, true);
-	assert.equal(memberVisible.group.memberVisibility, 'members');
-
-	for (const denied of [
-		{ memberVisibility: 'members', isMember: false },
-		{ memberVisibility: 'admin_only', isMember: true },
-	]) {
-		const response = await run(denied);
-		assert.equal(response.ok, false);
-		assert.equal(response.status, 403);
-		assert.equal(response.reason, 'worker_group_member_list_forbidden');
-	}
-	assert.equal(listCalls, 2);
-});
-
-test('participant member-list route binds the authenticated principal and exact session identity', async () => {
-	let memberListArgs = null;
-	const response = await workerGroupsRoute({
-		path: '/groups/members',
-		method: 'POST',
-		request: new Request('https://worker.example/groups/members', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({ groupId: 'visible', cursor: 'current-page', limit: 25 }),
-		}),
-		env: {},
-		slug: 'session-a',
-		requesterAddress: member.address,
-		authScopes: {},
-		baseHeaders: {},
-		deps: {
-			json,
-			checkCoordinatedWorkerGroupReady: async () => ({ ok: true }),
-			listWorkerGroupMembersForPrincipal: async (args) => {
-				memberListArgs = args;
-				return {
-					ok: true,
-					store: 'kv',
-					group: {
-						groupId: 'visible',
-						sessionSlug: 'session-a',
-						label: 'Visible',
-						joinMode: 'open',
-						memberVisibility: 'session',
-					},
-					members: [],
-					memberCount: 0,
-					nextCursor: '',
-				};
-			},
-		},
-	});
-
-	assert.equal(response.status, 200);
-	assert.equal(response.body.sessionId, sessionId);
-	assert.equal(response.body.sessionSlug, 'session-a');
-	assert.equal(response.body.memberCount, 0);
-	assert.equal(memberListArgs.slug, 'session-a');
-	assert.equal(memberListArgs.sessionId, sessionId);
-	assert.equal(memberListArgs.groupId, 'visible');
-	assert.equal(memberListArgs.cursor, 'current-page');
-	assert.equal(memberListArgs.limit, 25);
-	assert.deepEqual(memberListArgs.principal, member);
-});
-
-test('participant group creation requires the explicit policy and forces an open session-visible group', async () => {
-	let mutation = null;
-	const deps = {
-		json,
-		executeCoordinatedWorkerGroupMutation: async (args) => {
-			mutation = args;
-			return {
-				ok: true,
-				store: 'kv',
-				group: {
-					groupId: 'generated-group',
-					sessionSlug: 'session-a',
-					label: args.input.label,
-					description: args.input.description,
-					joinMode: args.input.joinMode,
-					memberVisibility: args.input.memberVisibility,
-				},
-			};
-		},
-	};
-	const request = () =>
-		new Request('https://worker.example/groups/create', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json' },
-			body: JSON.stringify({
-				group: {
-					groupId: 'participant-chosen-id',
-					label: 'Participant review',
-					description: 'Open working group.',
-					tags: ['reviewers'],
-					documentURLs: ['https://docs.example.test/review'],
-					memberLimit: 12,
-					joinEndsAt: '2030-02-03T04:05:06.000Z',
-					adminAddress: actor.address,
-					joinMode: 'admin_add',
-					memberVisibility: 'admin_only',
-				},
-			}),
-		});
-
-	const denied = await workerGroupsRoute({
-		path: '/groups/create',
-		method: 'POST',
-		request: request(),
-		env: {},
-		slug: 'session-a',
-		requesterAddress: member.address,
-		authScopes: { groups: true },
-		baseHeaders: {},
-		deps,
-	});
-	assert.equal(denied.status, 403);
-	assert.equal(denied.body.reason, 'worker_group_creation_admin_only');
-	assert.equal(mutation, null);
-	for (const groupCreationPolicy of ['Participants', ' participants ', true]) {
-		const noncanonical = await workerGroupsRoute({
-			path: '/groups/create',
-			method: 'POST',
-			request: request(),
-			config: { sessionId, groupCreationPolicy },
-			env: {},
-			slug: 'session-a',
-			requesterAddress: member.address,
-			authScopes: { groups: true },
-			baseHeaders: {},
-			deps,
-		});
-		assert.equal(noncanonical.status, 403);
-		assert.equal(noncanonical.body.reason, 'worker_group_creation_admin_only');
-		assert.equal(mutation, null);
-	}
-
-	const created = await workerGroupsRoute({
-		path: '/groups/create',
-		method: 'POST',
-		request: request(),
-		config: { sessionId, groupCreationPolicy: 'participants' },
-		env: {},
-		slug: 'session-a',
-		requesterAddress: member.address,
-		authScopes: { groups: true },
-		baseHeaders: {},
-		deps,
-	});
-	assert.equal(created.status, 200);
-	assert.equal(created.body.sessionId, sessionId);
-	assert.equal(created.body.sessionSlug, 'session-a');
-	assert.equal(mutation.operation, 'create');
-	assert.equal(mutation.input.groupId, undefined);
-	assert.equal(mutation.input.joinMode, 'open');
-	assert.equal(mutation.input.memberVisibility, 'session');
-	assert.deepEqual(mutation.input.tags, ['reviewers']);
-	assert.deepEqual(mutation.input.documentURLs, ['https://docs.example.test/review']);
-	assert.equal(mutation.input.memberLimit, 12);
-	assert.equal(mutation.input.joinEndsAt, '2030-02-03T04:05:06.000Z');
-	assert.equal(mutation.input.adminAddress, member.address);
-	assert.deepEqual(mutation.actorPrincipal, member);
 });
 
 test('same slug with a replacement session id cannot expose prior groups or members', async () => {
@@ -1968,13 +1324,11 @@ test('member list routes propagate coordinator failures after readiness succeeds
 		}),
 	};
 
-	for (const path of ['/groups/list', '/groups/my-memberships', '/groups/members']) {
+	for (const path of ['/groups/list', '/groups/my-memberships']) {
 		const response = await workerGroupsRoute({
 			path,
 			method: 'GET',
-			request: new Request(
-				`https://worker.example${path}${path === '/groups/members' ? '?groupId=members-only' : ''}`,
-			),
+			request: new Request(`https://worker.example${path}`),
 			env,
 			slug: 'session-a',
 			requesterAddress: member.address,

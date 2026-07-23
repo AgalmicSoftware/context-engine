@@ -46,7 +46,7 @@ const buildSessionConfigWithGate = ({
 });
 
 describe('litSessionConfig', () => {
-  it('resolves chainId from gate first, then config, then fallback', () => {
+  it('resolves chainId from a strong legacy gate or config without trusting a missing-profile fallback', () => {
     expect(
       resolveConfig({
         sessionConfig: {
@@ -59,7 +59,7 @@ describe('litSessionConfig', () => {
 
     expect(
       resolveConfig({
-        sessionConfig: { networkChainId: 2 },
+        sessionConfig: buildLegacyRegistryIdentity(2),
         networkChainIdFallback: 3,
       }).chainId,
     ).toBe(2);
@@ -69,7 +69,7 @@ describe('litSessionConfig', () => {
         sessionConfig: {},
         networkChainIdFallback: 3,
       }).chainId,
-    ).toBe(3);
+    ).toBeNull();
 
     expect(
       resolveConfig({
@@ -89,13 +89,13 @@ describe('litSessionConfig', () => {
   it('reads optional lit.userMaxPrice deployment defaults without requiring new UI fields', () => {
     expect(
       resolveConfig({
-        sessionConfig: { lit: { userMaxPrice: '123' } },
+        sessionConfig: { ...buildLegacyRegistryIdentity(), lit: { userMaxPrice: '123' } },
       }).userMaxPrice,
     ).toBe('123');
 
     expect(
       resolveConfig({
-        sessionConfig: { litUserMaxPrice: '456' },
+        sessionConfig: { ...buildLegacyRegistryIdentity(), litUserMaxPrice: '456' },
       }).userMaxPrice,
     ).toBe('456');
   });
@@ -130,17 +130,17 @@ describe('litSessionConfig', () => {
   });
 
   it('surfaces Chipotle runtime config when the session has worker credentials', () => {
-    const result = resolveConfig({
-      sessionConfig: {
-        corsWorkerUrl: 'https://worker.example.test',
-        litCredentials: {
-          litApiBase: 'https://api.chipotle.litprotocol.com',
-          litActionCid: 'QmAction123',
-          litGroupId: '7',
-          litPkpId: '0xpkp123',
-        },
+    const sessionConfig = {
+      ...buildLegacyRegistryIdentity(),
+      corsWorkerUrl: 'https://worker.example.test',
+      litCredentials: {
+        litApiBase: 'https://api.chipotle.litprotocol.com',
+        litActionCid: 'QmAction123',
+        litGroupId: '7',
+        litPkpId: '0xpkp123',
       },
-    });
+    };
+    const result = resolveConfig({ sessionConfig });
 
     expect(result.chipotle).toEqual({
       enabled: true,
@@ -151,15 +151,7 @@ describe('litSessionConfig', () => {
         litGroupId: '7',
         litPkpId: '0xpkp123',
       },
-      sessionConfig: {
-        corsWorkerUrl: 'https://worker.example.test',
-        litCredentials: {
-          litApiBase: 'https://api.chipotle.litprotocol.com',
-          litActionCid: 'QmAction123',
-          litGroupId: '7',
-          litPkpId: '0xpkp123',
-        },
-      },
+      sessionConfig,
     });
     expect(result.litNetwork).toBe('chipotle');
   });
@@ -183,6 +175,113 @@ describe('litSessionConfig', () => {
     expect(result.accessControlConditions).toEqual(expect.any(Array));
   });
 
+  it('derives a descriptor-free Chipotle runtime from a validated worker-canonical Lit profile', () => {
+    const sessionModeProfile = buildWorkerCanonicalLitProfile();
+    const sessionConfig = {
+      slug: 'worker-lit-session',
+      corsWorkerUrl: 'https://worker.example.test',
+      sessionModeProfile,
+    };
+
+    const result = resolveConfig({ sessionConfig });
+
+    expect(result.chipotle).toEqual({
+      enabled: true,
+      workerUrl: 'https://worker.example.test',
+      litCredentials: {},
+      sessionConfig,
+    });
+    expect(result.chainId).toBe(11155420);
+    expect(result.litNetwork).toBe('chipotle');
+    expect(result.accessControlConditions).toBeNull();
+    expect(sessionConfig).not.toHaveProperty('lit');
+    expect(sessionConfig).not.toHaveProperty('litCredentials');
+    expect(sessionConfig).not.toHaveProperty('rpcUrl');
+    expect(sessionConfig).not.toHaveProperty('rpcUrlsByChainId');
+  });
+
+  it('does not infer Chipotle from non-Lit or untrusted worker profiles', () => {
+    const workerEnvelopeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const wrongAuthorityProfile = buildWorkerCanonicalLitProfile();
+    wrongAuthorityProfile.authority.mode = 'evm_registry_canonical';
+    const malformedProfile = {
+      authority: { mode: 'worker_canonical' },
+      storage: { backend: 'cloudflare' },
+      encryption: { mode: 'lit' },
+      evm: { registryChainId: 11155420 },
+    };
+
+    [workerEnvelopeProfile, wrongAuthorityProfile, malformedProfile].forEach((sessionModeProfile) => {
+      expect(
+        resolveConfig({
+          sessionConfig: {
+            corsWorkerUrl: 'https://worker.example.test',
+            sessionModeProfile,
+          },
+        }).chipotle,
+      ).toBeNull();
+    });
+  });
+
+  it('does not let stale legacy Lit hints escalate a valid pure Worker profile', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const result = resolveConfig({
+      sessionConfig: {
+        ...buildSessionConfigWithGate({ chainId: 84532 }),
+        corsWorkerUrl: 'https://worker.example.test',
+        lit: { network: 'chipotle', userMaxPrice: '999' },
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litActionCid: 'QmStaleAction',
+          litPkpId: '0xstale',
+        },
+        litNetwork: 'chipotle',
+        networkChainId: 84532,
+        sessionModeProfile,
+      },
+      networkChainIdFallback: 11155420,
+    });
+
+    expect(result).toEqual({
+      gate: null,
+      chainId: null,
+      litNetwork: '',
+      userMaxPrice: '',
+      litChain: '',
+      gateAddresses: [],
+      accessControlConditions: null,
+      chipotle: null,
+    });
+  });
+
+  it('does not let stale Lit hints or a fallback chain escalate a missing session profile', () => {
+    const result = resolveConfig({
+      sessionConfig: {
+        corsWorkerUrl: 'https://worker.example.test',
+        lit: { network: 'chipotle', userMaxPrice: '999' },
+        litCredentials: {
+          litApiBase: 'https://api.chipotle.litprotocol.com',
+          litActionCid: 'QmStaleAction',
+          litPkpId: '0xstale',
+        },
+        litNetwork: 'chipotle',
+        networkChainId: 84532,
+      },
+      networkChainIdFallback: 11155420,
+    });
+
+    expect(result).toEqual({
+      gate: null,
+      chainId: null,
+      litNetwork: '',
+      userMaxPrice: '',
+      litChain: '',
+      gateAddresses: [],
+      accessControlConditions: null,
+      chipotle: null,
+    });
+  });
+
   it('uses the primary encryption gate when the default resource is open', () => {
     const sessionConfig = {
       corsWorkerUrl: 'https://worker.example.test',
@@ -190,6 +289,7 @@ describe('litSessionConfig', () => {
         primaryGateId: 'questionResponses',
       },
       __registry: {
+        chainId: 84532,
         gateAuthority: 'onchain',
         gatesByResource: {
           default: {
@@ -205,6 +305,7 @@ describe('litSessionConfig', () => {
             mode: 'any',
           },
         },
+        sessionIdHex: LEGACY_SESSION_ID,
       },
     };
 
@@ -232,6 +333,7 @@ describe('litSessionConfig', () => {
         primaryGateId: 'questionResponses',
       },
       __registry: {
+        chainId: 84532,
         gateAuthority: 'onchain',
         gatesByResource: {
           default: {
@@ -247,6 +349,7 @@ describe('litSessionConfig', () => {
             mode: 'any',
           },
         },
+        sessionIdHex: LEGACY_SESSION_ID,
       },
     };
 

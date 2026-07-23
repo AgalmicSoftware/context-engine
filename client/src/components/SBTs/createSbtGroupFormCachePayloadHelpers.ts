@@ -25,7 +25,6 @@ export const buildCreateSbtFormCachePayload = ({
     documentIDHashes,
     documentURLs,
     documentUrl,
-    groupPassword,
     numInviteLinks,
     exportFormat,
     metadataLockGateIds,

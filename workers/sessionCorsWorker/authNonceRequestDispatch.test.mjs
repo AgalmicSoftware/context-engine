@@ -450,6 +450,17 @@ test('dispatchAuthNonceRequest lowercases the nonce storage key, preserves ttl, 
         ok: true,
         targetSlug: 'session-b',
       }),
+      resolveExistingSessionCors: async () => ({
+        ok: true,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        config: {
+          allowOrigins: ['https://allowed.example'],
+          sessionId: workerSessionId,
+          sessionModeProfile: {
+            authority: { mode: 'worker_canonical' },
+          },
+        },
+      }),
       issueNonce: async (...args) => {
         writes.push(args);
         return { ok: true };

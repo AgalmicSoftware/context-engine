@@ -135,9 +135,64 @@ const useSponsoredBundleLifecycle = ({
   const sponsoredBundleAppliedBundleRef = useRef<SponsoredBundleLike | null>(null);
   const sponsoredBundleTerminalTxIdRef = useRef('');
   const hasSponsoredBundleLink = useMemo(
-    () => !!toStr(initialSponsoredBundleId || '').trim() || !!toStr(initialSponsoredBundleKey || '').trim(),
-    [initialSponsoredBundleId, initialSponsoredBundleKey],
+    () => !!bundleId || !!activeSponsoredBundleKeyState.submitted,
+    [activeSponsoredBundleKeyState.submitted, bundleId],
   );
+
+  useEffect(() => {
+    setSponsoredBundleKeyState((current) => {
+      if (current.bundleId !== bundleId) {
+        return {
+          bundleId,
+          input: providedBundleKey,
+          submitted: providedBundleKey,
+        };
+      }
+      if (providedBundleKey && current.submitted !== providedBundleKey) {
+        return {
+          bundleId,
+          input: providedBundleKey,
+          submitted: providedBundleKey,
+        };
+      }
+      return current;
+    });
+  }, [bundleId, providedBundleKey]);
+
+  const setSponsoredBundleKeyInput = useCallback(
+    (value = '') => {
+      const nextInput = toStr(value);
+      setSponsoredBundleKeyState((current) => ({
+        bundleId,
+        input: nextInput,
+        submitted: current.bundleId === bundleId ? current.submitted : '',
+      }));
+    },
+    [bundleId],
+  );
+
+  const submitSponsoredBundleKey = useCallback(() => {
+    const nextKey = toStr(activeSponsoredBundleKeyState.input).trim();
+    if (!bundleId) {
+      setSponsoredBundleStatus({ tone: 'error', message: 'Malformed sponsored link.', retryable: false });
+      return;
+    }
+    if (!nextKey) {
+      setSponsoredBundleStatus({
+        tone: 'error',
+        message: 'Enter the sponsored bundle decryption key to continue.',
+        retryable: false,
+        requiresKey: true,
+      });
+      return;
+    }
+    setSponsoredBundleKeyState({
+      bundleId,
+      input: nextKey,
+      submitted: nextKey,
+    });
+    setSponsoredBundleStatus({ tone: 'info', message: 'Loading sponsored bundle…', retryable: false });
+  }, [activeSponsoredBundleKeyState.input, bundleId]);
 
   const buildRestoredSponsoredWorkerSecrets = useCallback(
     ({
@@ -403,7 +458,7 @@ const useSponsoredBundleLifecycle = ({
       setSponsoredBundleStatus(null);
       return;
     }
-    const applyKey = bundleKey ? `${bundleId}::${bundleKey}` : `${bundleId}::__session_cache__`;
+    const applyKey = bundleKey ? `${bundleId}::${bundleKey}` : `${bundleId}::__memory_cache__`;
     const activeApplyKey = sponsoredBundleRetryNonce > 0 ? `${applyKey}::retry:${sponsoredBundleRetryNonce}` : applyKey;
     if (sponsoredBundleApplyRef.current === activeApplyKey) return;
     let cancelled = false;

@@ -14,6 +14,11 @@ import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+import {
+  resolveWorkerCanonicalCacheIdentity,
+  withWorkerCanonicalCacheIdentity,
+} from '../../utilities/survey/workerCanonicalCacheIdentity';
 
 const mockSurveyPage = jest.fn();
 const mockPolisReport = jest.fn();
@@ -862,6 +867,7 @@ describe('OnePageSession results routing', () => {
   it('kicks off a slug-scoped light SBT universe scan on mount and session switches', async () => {
     const ensureLightSbtUniverse = jest.fn().mockResolvedValue(undefined);
     const props = buildProps();
+    const registryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     const priorUrl = window.location.href;
 
     try {
@@ -870,7 +876,7 @@ describe('OnePageSession results routing', () => {
         <OnePageSession
           {...props}
           slug="demo"
-          sessionConfig={{ ...props.sessionConfig, slug: 'demo' }}
+          sessionConfig={{ ...props.sessionConfig, slug: 'demo', sessionModeProfile: registryProfile }}
           ensureLightSbtUniverse={ensureLightSbtUniverse}
         />,
       );
@@ -886,7 +892,7 @@ describe('OnePageSession results routing', () => {
         <OnePageSession
           {...props}
           slug="edge"
-          sessionConfig={{ ...props.sessionConfig, slug: 'edge' }}
+          sessionConfig={{ ...props.sessionConfig, slug: 'edge', sessionModeProfile: registryProfile }}
           ensureLightSbtUniverse={ensureLightSbtUniverse}
         />,
       );
@@ -899,6 +905,29 @@ describe('OnePageSession results routing', () => {
     } finally {
       window.history.replaceState({}, '', priorUrl);
     }
+  });
+
+  it('never starts SBT discovery for a pure Worker session with a legacy chain id', async () => {
+    const ensureLightSbtUniverse = jest.fn().mockResolvedValue(undefined);
+    const props = buildProps();
+    const workerProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+
+    render(
+      <OnePageSession
+        {...props}
+        slug="demo-sh"
+        sessionConfig={{
+          ...props.sessionConfig,
+          slug: 'demo-sh',
+          networkChainId: 11155420,
+          sessionModeProfile: workerProfile,
+        }}
+        ensureLightSbtUniverse={ensureLightSbtUniverse}
+      />,
+    );
+
+    await act(async () => Promise.resolve());
+    expect(ensureLightSbtUniverse).not.toHaveBeenCalled();
   });
 
   it('clears pending auto-open results timer on unmount before it fires', async () => {
@@ -961,6 +990,9 @@ describe('OnePageSession results routing', () => {
       .spyOn(cacheScripts, 'peekCacheSync')
       .mockImplementation((namespace) => (namespace === 'questionsCache' ? { 84532: { questionResponses: {} } } : {}));
     const props = buildProps();
+    props.sessionConfig.sessionModeProfile = cloneSessionModePreset(
+      SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
+    );
     const { rerender } = render(<OnePageSession {...props} isQuestionCacheReady={true} />);
     const getQuestionsPeekCalls = () => peekSpy.mock.calls.filter((args) => args[0] === 'questionsCache').length;
 
@@ -979,6 +1011,115 @@ describe('OnePageSession results routing', () => {
     expect(getQuestionsPeekCalls()).toBe(2);
   });
 
+  it('rejects results cached for a different Worker identity under the same slug', () => {
+    const buildWorkerConfig = (sessionId, corsWorkerUrl) => ({
+      ...buildProps().sessionConfig,
+      slug: 'edge',
+      sessionId,
+      corsWorkerUrl,
+      networkChainId: null,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      storageProfile: {
+        backend: 'cloudflare',
+        resources: {
+          questions: 'active',
+          surveys: 'active',
+        },
+      },
+    });
+    const workerAConfig = buildWorkerConfig(`0x${'1'.repeat(32)}`, 'https://worker-a-results.example.test');
+    const workerBConfig = buildWorkerConfig(`0x${'2'.repeat(32)}`, 'https://worker-b-results.example.test');
+    const workerAIdentity = resolveWorkerCanonicalCacheIdentity({
+      sessionConfig: workerAConfig,
+      sessionSlug: 'edge',
+    });
+    const workerBIdentity = resolveWorkerCanonicalCacheIdentity({
+      sessionConfig: workerBConfig,
+      sessionSlug: 'edge',
+    });
+    const peekSpy = jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({
+      worker: withWorkerCanonicalCacheIdentity(
+        {
+          questions: {
+            'question-a': {
+              id: 'question-a',
+              prompt: 'Worker A only',
+              sessionSlug: 'edge',
+            },
+          },
+          questionResponses: {
+            'question-a': {
+              '0xresponder': {
+                type: 'binary',
+                answer: { value: 'yes' },
+                sessionSlug: 'edge',
+              },
+            },
+          },
+        },
+        workerAIdentity,
+      ),
+    });
+    const subject = createSubject({
+      slug: 'edge',
+      sessionConfig: workerBConfig,
+      isQuestionCacheReady: true,
+    });
+    subject.state = {
+      ...subject.state,
+      showResults: true,
+      aggregatorData: {
+        'question-a': [{ questionId: 'question-a', responder: '0xresponder', response: 'Worker A only' }],
+      },
+    };
+    subject._aggregatorDataSig = '1:1:worker-a';
+
+    const workerASignature = subject.buildAggregatorInputSignature(
+      { ...subject.props, sessionConfig: workerAConfig },
+      subject.state,
+    );
+    const workerBSignature = subject.buildAggregatorInputSignature(subject.props, subject.state);
+    subject.buildAggregator();
+
+    expect(workerBSignature).not.toBe(workerASignature);
+    expect(subject.state.aggregatorData).toEqual({});
+    expect(subject._aggregatorSourceSigKey).toContain('worker-identity-mismatch');
+
+    peekSpy.mockReturnValue({
+      worker: withWorkerCanonicalCacheIdentity(
+        {
+          questions: {
+            'question-b': {
+              id: 'question-b',
+              prompt: 'Worker B only',
+              sessionSlug: 'edge',
+            },
+          },
+          questionResponses: {
+            'question-b': {
+              '0xresponder': {
+                type: 'binary',
+                answer: { value: 'yes' },
+                sessionSlug: 'edge',
+              },
+            },
+          },
+        },
+        workerBIdentity,
+      ),
+    });
+    subject.buildAggregator();
+
+    expect(subject.state.aggregatorData).toEqual({
+      'question-b': [
+        expect.objectContaining({
+          questionId: 'question-b',
+          responder: '0xresponder',
+        }),
+      ],
+    });
+  });
+
   it('does not amplify results cache reads across repeated results toggles', () => {
     jest.useFakeTimers();
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('active');
@@ -986,6 +1127,9 @@ describe('OnePageSession results routing', () => {
       .spyOn(cacheScripts, 'peekCacheSync')
       .mockImplementation((namespace) => (namespace === 'questionsCache' ? { 84532: { questionResponses: {} } } : {}));
     const props = buildProps();
+    props.sessionConfig.sessionModeProfile = cloneSessionModePreset(
+      SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
+    );
     render(<OnePageSession {...props} isQuestionCacheReady={true} />);
     const getQuestionsPeekCalls = () => peekSpy.mock.calls.filter((args) => args[0] === 'questionsCache').length;
 
@@ -1157,6 +1301,9 @@ describe('OnePageSession results routing', () => {
     const initialDefault = { selectedTags: ['alpha'] };
     const nextDefault = { selectedTags: ['beta'] };
     const props = buildProps();
+    props.sessionConfig.sessionModeProfile = cloneSessionModePreset(
+      SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
+    );
     const { rerender } = render(
       <OnePageSession
         {...props}

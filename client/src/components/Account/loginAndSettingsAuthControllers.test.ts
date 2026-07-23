@@ -1,4 +1,5 @@
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { buildPasskeyWalletNetwork, createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
 import { createLoginAgentActions, formatAgentTokenError } from './loginAndSettingsAgentTokenActions';
 
@@ -106,7 +107,7 @@ describe('loginAndSettings auth controllers', () => {
     expect(formatAgentTokenError(new Error('expired'))).toBe(
       'This token is expired. Create a fresh agent token in Telegram and paste it again.',
     );
-    expect(formatAgentTokenError('unsupported_format')).toBe('Paste a ceagt_ token or a Context Engine token link.');
+    expect(formatAgentTokenError('unsupported_format')).toBe('Paste the raw ceagt_ token, not a link.');
     expect(formatAgentTokenError('unknown')).toBe(
       'Agent token login failed. Create a fresh token in Telegram and try again.',
     );
@@ -136,9 +137,67 @@ describe('loginAndSettings auth controllers', () => {
 
     expect(actions.getAgentTokenLoginSessionContext()).toEqual({
       sessionSlug: 'alpha',
-      sessionConfig: { slug: 'alpha', agentBridgeUrl: 'https://bridge.example/' },
-      agentBridgeUrl: 'https://bridge.example',
+      sessionConfig: {
+        slug: 'alpha',
+        agentBridgeUrl: 'https://registry-bridge.example/',
+        sponsoredKeys: { ai: true },
+        contracts: {},
+      },
+      agentBridgeUrl: 'https://registry-bridge.example',
+      sessionId: '',
+      workerCanonical: false,
+      workerUrl: '',
     });
     expect(actions.shouldShowAgentTokenLogin()).toBe(true);
+  });
+
+  it('keeps an exact worker-canonical prop authoritative during a same-slug registry collision', () => {
+    const workerConfig = {
+      slug: 'alpha',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      configRevision: 'route-revision-1',
+      corsWorkerUrl: 'https://route-worker.example',
+      agentBridgeUrl: 'https://route-bridge.example',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    const actions = createLoginAgentActions({
+      changeAccount: jest.fn(),
+      exchangeAgentClientLogin: async () => envelope,
+      extractAgentClientToken: () => ({ ok: true }),
+      getActiveSessionSlug: () => 'alpha',
+      getAgentTokenInput: () => '',
+      getDemoSessionConfigBySlug: () => ({
+        slug: 'alpha',
+        corsWorkerUrl: 'https://demo-worker.example',
+      }),
+      getPropSessionConfig: () => workerConfig,
+      getSessionConfigBySlugOrDefault: () => ({
+        slug: 'alpha',
+        sessionId: '0xffeeddccbbaa99887766554433221100',
+        corsWorkerUrl: 'https://registry-worker.example',
+        agentBridgeUrl: 'https://registry-bridge.example',
+      }),
+      getTargetNetwork: () => ({ id: 11155420 }),
+      isTelegramFirstSessionConfig: () => true,
+      normalizeSettingsSessionSlug: (slug) =>
+        String(slug || '')
+          .trim()
+          .toLowerCase(),
+      setState: jest.fn(),
+      setStateIfMounted: jest.fn(),
+      updateLoginInfo: jest.fn(),
+      windowTarget: null,
+    });
+
+    const context = actions.getAgentTokenLoginSessionContext();
+
+    expect(context.sessionConfig).toBe(workerConfig);
+    expect(context).toMatchObject({
+      sessionSlug: 'alpha',
+      agentBridgeUrl: 'https://route-bridge.example',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      workerCanonical: true,
+      workerUrl: 'https://route-worker.example',
+    });
   });
 });

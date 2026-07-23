@@ -16,6 +16,7 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
 import { writeAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 const mockSurveyPage = jest.fn();
 const mockPolisReport = jest.fn();
@@ -280,8 +281,10 @@ describe('OnePageSession view gating', () => {
   });
 
   it('renders telegram parity surfaces from an exchanged envelope', async () => {
+    const sessionId = '0x1234567890abcdef1234567890abcdef';
     writeAgentClientLoginEnvelope({
-      v: 1,
+      v: 2,
+      sessionId,
       sessionSlug: 'edge',
       expiresAt: '2027-07-05T00:00:00.000Z',
       address: '0x3333333333333333333333333333333333333333',
@@ -293,6 +296,53 @@ describe('OnePageSession view gating', () => {
       writable: true,
       value: jest.fn(async (url) => {
         const parsed = new URL(String(url));
+        if (parsed.pathname.endsWith('/groups/list')) {
+          expect(new Headers(options?.headers).get('Authorization')).toBe('Bearer jwt-session-token');
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              sessionId,
+              sessionSlug: 'edge',
+              groups: [
+                {
+                  groupId: 'open-reviewers',
+                  sessionSlug: 'edge',
+                  label: 'Open reviewers',
+                  joinMode: 'open',
+                  memberVisibility: 'session',
+                },
+              ],
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
+        }
+        if (parsed.pathname.endsWith('/groups/my-memberships')) {
+          expect(new Headers(options?.headers).get('Authorization')).toBe('Bearer jwt-session-token');
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              sessionId,
+              sessionSlug: 'edge',
+              memberships: [
+                {
+                  group: {
+                    groupId: 'members',
+                    sessionSlug: 'edge',
+                    label: 'Worker members',
+                    joinMode: 'admin_add',
+                    memberVisibility: 'members',
+                  },
+                  member: {
+                    sessionSlug: 'edge',
+                    principalKey: 'evm:0x3333333333333333333333333333333333333333',
+                  },
+                  memberCount: 4,
+                },
+              ],
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
+        }
         if (parsed.pathname.endsWith('/api/agent/session-meta')) {
           return new Response(
             JSON.stringify({
@@ -364,6 +414,10 @@ describe('OnePageSession view gating', () => {
         loginComplete={true}
         sessionConfig={{
           ...buildProps().sessionConfig,
+          sessionId,
+          corsWorkerUrl: 'https://worker.example',
+          agentBridgeUrl: 'https://bridge.example',
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
           telegramOnly: true,
           sessionMode: 'telegram_only',
         }}
@@ -379,6 +433,12 @@ describe('OnePageSession view gating', () => {
   });
 
   it('derives scoped Chipotle Lit hooks for embedded survey pages from session config', async () => {
+    const litProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    litProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    litProfile.evm.registryChainId = 11155420;
+    litProfile.encryption = { mode: 'lit' };
+    litProfile.storage.payloadAccessControl.encryption = 'lit';
+
     render(
       <OnePageSession
         {...buildProps()}
@@ -388,6 +448,7 @@ describe('OnePageSession view gating', () => {
           ...buildProps().sessionConfig,
           slug: 'chipotle-session',
           corsWorkerUrl: 'https://worker.example.test',
+          sessionModeProfile: litProfile,
           __registry: {
             gateAuthority: 'onchain',
             gatesByResource: {
@@ -413,6 +474,74 @@ describe('OnePageSession view gating', () => {
         litNetwork: 'chipotle',
       }),
     );
+  });
+
+  it('does not reuse injected Lit hooks after switching to a pure Worker profile', () => {
+    const workerConfig = {
+      ...buildProps().sessionConfig,
+      slug: 'demo-sh',
+      networkChainId: 11155420,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    const subject = createSubject({
+      slug: 'demo-sh',
+      sessionConfig: workerConfig,
+      litHooks: {
+        saveKey: jest.fn(),
+        getKey: jest.fn(),
+      },
+    });
+
+    expect(subject.resolveScopedLitHooks(subject.resolveCurrentSessionConfig())).toBeNull();
+  });
+
+  it('clears auto-mint state without parsing, prefetching, or minting after a registry-to-Worker switch', () => {
+    jest.useFakeTimers();
+    const priorUrl = window.location.href;
+    const sbtAddress = '0x00000000000000000000000000000000000000bb';
+    const registryProps = buildProps();
+    const subject = createSubject(registryProps);
+    const prefetchTargetNames = jest.spyOn(subject, 'prefetchTargetNames');
+    const runAutoMintQueue = jest.spyOn(subject, 'runAutoMintQueue');
+    subject.state = {
+      ...subject.state,
+      autoMintTargets: [{ sbt: sbtAddress, gp: 'group-password', inv: '' }],
+      autoMintStatuses: { [sbtAddress.toLowerCase()]: { status: 'pending' } },
+      autoMintCountdown: 4,
+      autoMintingMode: true,
+      needsLoginForAutoMint: true,
+    };
+    subject._autoMintCountdownTimer = setInterval(() => {}, 1000);
+    const prevState = { ...subject.state };
+    const prevProps = subject.props;
+    const workerConfig = {
+      ...registryProps.sessionConfig,
+      slug: 'demo-sh',
+      networkChainId: 11155420,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    subject.props = {
+      ...prevProps,
+      slug: 'demo-sh',
+      sessionConfig: workerConfig,
+    };
+    window.history.replaceState({}, '', `/session/demo-sh?sbt=${sbtAddress}&gp=group-password&auto=1`);
+    window.sessionStorage.setItem('dg:autoHash:demo-sh', `sbt=${sbtAddress}&gp=group-password&auto=1`);
+
+    subject.componentDidUpdate(prevProps, prevState);
+
+    expect(subject.state.autoMintTargets).toEqual([]);
+    expect(subject.state.autoMintStatuses).toEqual({});
+    expect(subject.state.autoMintCountdown).toBeNull();
+    expect(subject.state.autoMintingMode).toBe(false);
+    expect(subject.state.needsLoginForAutoMint).toBe(false);
+    expect(window.sessionStorage.getItem('dg:autoHash:demo-sh')).toBeNull();
+    expect(window.location.href).not.toContain('group-password');
+    expect(subject.parseAutoMintFragment()).toEqual([]);
+    expect(subject.hasAutoMintIntent()).toBe(false);
+    expect(prefetchTargetNames).not.toHaveBeenCalled();
+    expect(runAutoMintQueue).not.toHaveBeenCalled();
+    window.history.replaceState({}, '', priorUrl || '/');
   });
 
   it('uses the title container slot to keep the pile submit rail off the header title', async () => {
@@ -1296,7 +1425,7 @@ describe('OnePageSession view gating', () => {
       slug: 'demo-sh',
       corsWorkerUrl: 'https://demo-sh-worker.example',
       adminAddress: '0x00000000000000000000000000000000000000aa',
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     };
     render(
       <OnePageSession
@@ -1320,6 +1449,37 @@ describe('OnePageSession view gating', () => {
       ),
     );
     expect(mockSBTsPage).not.toHaveBeenCalled();
+  });
+
+  it('projects a normal /session/demo-sh route without legacy blockchain context', async () => {
+    const priorUrl = window.location.href;
+    const workerSessionConfig = {
+      ...buildProps().sessionConfig,
+      slug: 'demo-sh',
+      networkChainId: 11155420,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    try {
+      window.history.replaceState({}, '', '/session/demo-sh');
+      render(
+        <OnePageSession
+          {...buildProps()}
+          slug="demo-sh"
+          network={{ id: 11155420, name: 'OP Sepolia' }}
+          sessionConfig={workerSessionConfig}
+        />,
+      );
+
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.SESSION_RESULTS_TOGGLE));
+      await waitFor(() => expect(mockPolisReport).toHaveBeenCalled());
+      const latestReportProps = mockPolisReport.mock.calls[mockPolisReport.mock.calls.length - 1]?.[0];
+      expect(latestReportProps.networkChainId).toBeNull();
+      expect(latestReportProps.network).toEqual(expect.objectContaining({ id: null, chainId: null }));
+      expect(window.location.pathname).toBe('/session/demo-sh');
+      expect(window.location.search).not.toContain('worker=');
+    } finally {
+      window.history.replaceState({}, '', priorUrl || '/');
+    }
   });
 
   it('passes the canonical Polis demo questions to both /session/demo question surfaces', async () => {

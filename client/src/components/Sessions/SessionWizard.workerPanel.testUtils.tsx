@@ -486,6 +486,8 @@ const createPendingFeaturedDraft = async () => {
 
 const resetSessionWizardWorkerPanelTestState = () => {
   jest.clearAllMocks();
+  clearSessionWizardPendingSbtDraftsCache();
+  __test__resetSessionWizardSponsoredBundleCacheKey();
   if (!ethers.providers.JsonRpcProvider.prototype.getBlockNumber._isMockFunction) {
     jest.spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBlockNumber');
   }

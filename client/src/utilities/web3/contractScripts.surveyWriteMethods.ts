@@ -1,4 +1,6 @@
 import type { ContractScriptsMethodMap, ContractScriptsRuntimeDeps } from './contractScripts.runtimeDeps.js';
+import { resolveSessionCapabilityProjection } from '../session/sessionCapabilityProjection';
+import { resolveWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
 
 type SbtReadProviderRef = string | Record<string, unknown>;
 type SbtReadGroupKeyOrConfig = string | Record<string, unknown> | null | undefined;
@@ -533,6 +535,11 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       surveyResponse: any,
       groupKeyOrCfg: any = null,
     ) {
+      let cfg = resolveSession(groupKeyOrCfg || '');
+      let sessionProjection = resolveSessionCapabilityProjection(cfg);
+      if (sessionProjection.source === 'invalid_profile' || sessionProjection.source === 'missing') {
+        throw new Error('submitResponses: session mode profile is missing, invalid, or unsupported.');
+      }
       if (providerName === 'none') {
         throw new Error('submitResponses: read-only provider is not allowed here. Connect a wallet first.');
       }
@@ -584,14 +591,47 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
       let surveyResponseUpload: PayloadPointerUpload | null = null;
       let surveyResponseHashBytes = ethers.constants.HashZero;
 
-      const cfg = resolveSession(groupKeyOrCfg || '');
+      const resolvedArweaveOpts = await resolveArweaveUploadOpts(groupKeyOrCfg, {
+        providerLike: ethersProvider,
+        signer,
+        refreshSessionConfig:
+          typeof refreshSessionRegistryFieldsCache === 'function' &&
+          (sessionProjection.isRegistryCanonical || sessionProjection.source === 'legacy_registry')
+            ? async ({ slug, sessionConfig }: any) =>
+                refreshSessionRegistryFieldsCache({
+                  chainId:
+                    resolveSessionCapabilityProjection(sessionConfig).chainId || sessionProjection.chainId || null,
+                  slug,
+                  sessionId:
+                    sessionConfig?.sessionId || sessionConfig?.__registry?.sessionIdHex || cfg?.sessionId || null,
+                  providerLike: signingProvider,
+                })
+            : null,
+      });
+      if (resolvedArweaveOpts?.sessionConfig) {
+        cfg = resolvedArweaveOpts.sessionConfig;
+        sessionProjection = resolveSessionCapabilityProjection(cfg);
+        if (sessionProjection.source === 'invalid_profile' || sessionProjection.source === 'missing') {
+          throw new Error('submitResponses: refreshed session mode profile is missing, invalid, or unsupported.');
+        }
+      }
+      const workerResponseIdentity =
+        sessionProjection.profileValid && sessionProjection.isWorkerCanonical
+          ? {
+              sessionId: resolveWorkerCanonicalSessionIdHex(cfg),
+              sessionSlug: normalizeSessionSlug(resolveStorageSessionSlug(groupKeyOrCfg, cfg)),
+            }
+          : null;
+      if (workerResponseIdentity && (!workerResponseIdentity.sessionId || !workerResponseIdentity.sessionSlug)) {
+        throw new Error('submitResponses: exact Worker session identity is required.');
+      }
       const canUseSessionStorage = isCloudflareStorageResource(cfg, STORAGE_RESOURCE_KEYS.RESPONSES);
       if (ARWEAVE_ACTIVE || canUseSessionStorage) {
         const uploadContext = {
           account: userAddress,
           providerLike: ethersProvider,
           signer,
-          chainId: cfg?.networkChainId || null,
+          chainId: sessionProjection.chainId,
         };
         const arweaveOpts = {
           ...(await resolveArweaveUploadOpts(groupKeyOrCfg, {
@@ -601,12 +641,15 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
           context: uploadContext,
         };
         if (surveyResponse) {
-          validateNoLockedPlaintextInPayload(surveyResponse, {
+          const surveyResponsePayload = workerResponseIdentity
+            ? { ...surveyResponse, ...workerResponseIdentity }
+            : surveyResponse;
+          validateNoLockedPlaintextInPayload(surveyResponsePayload, {
             family: 'survey_response_payload',
             path: 'survey response',
           });
           surveyResponseUpload = await uploadJsonPayloadForContractPointer({
-            payload: surveyResponse,
+            payload: surveyResponsePayload,
             resource: STORAGE_RESOURCE_KEYS.RESPONSES,
             groupKeyOrCfg,
             cfg,
@@ -620,13 +663,14 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         // that can appear when multiple uploads are posted in parallel for one wallet.
         questionResponseUploads = [];
         for (const response of questionResponses) {
-          validateNoLockedPlaintextInPayload(response, {
+          const responsePayload = workerResponseIdentity ? { ...response, ...workerResponseIdentity } : response;
+          validateNoLockedPlaintextInPayload(responsePayload, {
             family: 'question_response_payload',
             path: 'question response',
           });
 
           const responseUpload = await uploadJsonPayloadForContractPointer({
-            payload: response,
+            payload: responsePayload,
             resource: STORAGE_RESOURCE_KEYS.RESPONSES,
             groupKeyOrCfg,
             cfg,
@@ -642,10 +686,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
 
       const questionResponseHashesBytes = questionResponseUploads.map((upload: any) => upload.pointerBytes);
 
-      const authorityMode = String(cfg?.sessionModeProfile?.authority?.mode || '')
-        .trim()
-        .toLowerCase();
-      if (authorityMode === 'worker_canonical' && canUseSessionStorage) {
+      if (sessionProjection.profileValid && sessionProjection.isWorkerCanonical && canUseSessionStorage) {
         const storageRefs = [
           surveyResponseUpload?.storageRef,
           ...questionResponseUploads.map((upload) => upload.storageRef),
@@ -655,7 +696,7 @@ export const createContractScriptsSurveyWriteMethods = (deps: ContractScriptsRun
         }
         return {
           workerCanonicalSubmission: true,
-          sessionSlug: resolveStorageSessionSlug(groupKeyOrCfg, cfg),
+          sessionSlug: workerResponseIdentity?.sessionSlug || resolveStorageSessionSlug(groupKeyOrCfg, cfg),
           storageRefs,
         };
       }

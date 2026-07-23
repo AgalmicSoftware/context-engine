@@ -13,13 +13,9 @@ const renderWorkerSecretsSection = (props = {}) =>
         return key;
       }}
       renderInfoTooltip={({ testId }) => <button type="button" data-testid={testId} />}
-      devPersistWorkerSecrets
-      persistWorkerSecrets={false}
-      setPersistWorkerSecrets={() => {}}
       workerSecretsEnabled
       setWorkerSecretsEnabled={() => {}}
       clearWorkerSecretFields={() => {}}
-      effectivePersistWorkerSecrets={false}
       workerResourceKeys={['ai', 'rpc']}
       renderResource={(resourceKey) => <div key={resourceKey}>card {resourceKey}</div>}
       workerAllowOrigins="https://app.example"
@@ -40,7 +36,7 @@ describe('WorkerSecretsSection', () => {
     expect(screen.getByText('Worker secrets')).toBeInTheDocument();
     expect(screen.getByText('Resource gates (on-chain)')).toBeInTheDocument();
     expect(
-      screen.getByText('Secrets are not saved locally — re-enter them if you refresh the page.'),
+      screen.getByText("Secrets stay in this tab's memory only — re-enter them if you refresh the page."),
     ).toBeInTheDocument();
     expect(screen.getByText('card ai')).toBeInTheDocument();
     expect(screen.getByText('card rpc')).toBeInTheDocument();

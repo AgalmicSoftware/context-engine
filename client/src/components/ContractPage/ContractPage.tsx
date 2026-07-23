@@ -196,7 +196,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
   const sessionNetworkChainId = contributesSessionContracts ? activeSession?.networkChainId : undefined;
   const contracts = useMemo(() => {
     const sessionContracts =
-      activeSession?.contracts && typeof activeSession.contracts === 'object'
+      contributesSessionContracts && activeSession?.contracts && typeof activeSession.contracts === 'object'
         ? (activeSession.contracts as SessionContractsMap)
         : {};
     const firstContract = Object.values(sessionContracts)[0] || null;
@@ -221,7 +221,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
           }
         : contract,
     );
-  }, [activeSession?.contracts, sessionNetworkChainId]);
+  }, [activeSession?.contracts, contributesSessionContracts, sessionNetworkChainId]);
 
   const [bytes32Input, setBytes32Input] = useState('');
   const [base64urlInput, setBase64urlInput] = useState('');

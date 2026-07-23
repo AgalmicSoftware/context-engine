@@ -356,6 +356,10 @@ private per-tapper Telegram Mini App page. That page must send Telegram's raw
 POST /api/agent/miniapp/onboard
 ```
 
+Send `initData` in the POST JSON body or the canonical
+`X-Telegram-Init-Data` request header. Never put it in a URL query string; GET
+onboarding and query-carried credentials are rejected.
+
 The worker validates the Telegram initData server-side and returns that user's
 own `ceagt_...` token, worker URL, session slug, expiry, and skill name. The
 endpoint may be called again for the same Telegram user to mint a fresh token
@@ -452,7 +456,7 @@ Default token scope does not permit:
 
 - response export
 - broad admin actions such as response export allowlist management
-- Telegram group approval link management
+- remote Telegram group approval (approval must be confirmed in the target group)
 - wallet/private-key export
 - raw response access
 - final answer submission unless a separate CE user-approved submit path is enabled
@@ -598,7 +602,7 @@ use.
 Use this path when the user should become a CE participant by answering one CE question in a Telegram group that already has the CE bot enabled.
 
 1. Direct the user to the Telegram group/thread where the CE bot is present.
-2. Ensure the group has selected a CE session. If not, ask a group participant to run `/sessions` and join the intended session. If the session uses an approved Telegram group allowlist or `telegramGroupApprovalRequired`, the group must be approved first. A participant can run `/group_id` in that group and send the numeric chat id to a session admin, or a configured session admin can generate a one-use Add Bot To Group link with `/group_link <session>` and send that link to the group owner.
+2. Ensure the group has selected a CE session. If not, ask a group participant to run `/sessions` and join the intended session. If the session uses an approved Telegram group allowlist or `telegramGroupApprovalRequired`, add the CE bot to the target group and have a configured session admin run `/join <session>` inside that group. CE verifies the admin and group together before approving it. Operators can instead run `/group_id` there and add the numeric chat id to session policy. `/group_link <session>` is guidance-only and never returns an authorization-bearing URL.
 3. Ask the user to answer any visible CE bot question by tapping a CE inline response button.
 4. After the tap, CE can bind `telegramUserId` to the group/session, derive or recover the CE-managed Telegram EVM account, and mark the user as an approved participant for worker calls.
 5. From then on, in this Telegram-group button flow only, use this skill's API calls with the same `telegramUserId`, `groupChatId`, and `sessionSlug` captured by Telegram. Do not ask for these identifiers during copied-token Claude Code onboarding. For `telegram_only` sessions, a private user who has already joined the session can also use participant-bound question authoring paths.
@@ -1182,8 +1186,7 @@ participant credentials cannot mutate the queue.
 Question refs may be exact IDs or 1-based candidate numbers from the `GET`
 response.
 
-Session admins can also ask the worker to mint a one-use Telegram group approval
-link:
+The historical group-approval-link endpoint no longer mints Telegram links:
 
 ```http
 POST /api/agent/group-approval-link
@@ -1196,13 +1199,12 @@ Authorization: Bearer <root break-glass token>
 }
 ```
 
-The caller must pass CE's session-admin gate. A normal user credential does not
-include the `manage_group_approvals` scope by default; use root break-glass only
-for explicit operator recovery or mint a service credential with that scope.
-The response contains a `url` to send to the
-Telegram group owner. The first group that opens it becomes approved for that
-session. User-scoped admin tokens should use the normal in-group admin approval
-flow instead of minting group approval links directly.
+The caller must still pass CE's session-admin gate. The compatibility endpoint
+returns `409 group_approval_link_disabled` with fixed guidance and no token or
+URL. To approve dynamically, add the bot to the target Telegram group and have
+a configured session admin run `/join <session>` inside that group. CE verifies
+the admin and target chat together before persisting approval. Operators can
+instead add the `/group_id` value to the session's approved-group policy.
 
 For a user-scoped `ceagt_` token, first check whether the user is an admin for
 the current or explicitly selected session:
@@ -1801,7 +1803,8 @@ onboarding message.
   Telegram WebView while the DM `Onboard Agent` path remains available.
 - Agent onboarding deep links can go straight to the private copy screen, and
   `/api/agent/onboarding` stores first-run consent answers.
-- Admin agents can request group approval links and revoke group approvals.
+- Admin agents can revoke group approvals; group approval now requires verified
+  admin action inside the target group.
 - Telegram group access is closed by default unless a group is statically or
   dynamically approved, or the session explicitly enables open group access.
 - The confusing `/actions` Telegram command was removed; use `/agent` for the

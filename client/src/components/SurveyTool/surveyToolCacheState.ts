@@ -1,4 +1,10 @@
 import { peekCacheSync, readCache, writeCacheOptimistic } from '../../utilities/cache/cacheScripts.js';
+import {
+  workerCanonicalCacheIdentityMatches,
+  withWorkerCanonicalCacheIdentity,
+  WORKER_CANONICAL_CACHE_SCOPE_KEY,
+  type WorkerCanonicalCacheIdentity,
+} from '../../utilities/survey/workerCanonicalCacheIdentity.js';
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import type { UnknownRecord } from './surveyToolTypes.js';
 
@@ -192,9 +198,19 @@ export function mergeSurveyToolCachePatchIntoSurveysCache(
   cache: UnknownRecord = {},
   netIdStr: string,
   patch: UnknownRecord = {},
+  { workerIdentity = null }: { workerIdentity?: WorkerCanonicalCacheIdentity | null } = {},
 ): Record<string, SurveyNetworkCache> {
   if (!netIdStr) return cache && typeof cache === 'object' ? (cache as Record<string, SurveyNetworkCache>) : {};
-  const global = ensureSurveysNet(cache, netIdStr);
+  let cacheSeed = cache && typeof cache === 'object' ? cache : {};
+  if (netIdStr === WORKER_CANONICAL_CACHE_SCOPE_KEY) {
+    if (!workerIdentity) return cacheSeed as Record<string, SurveyNetworkCache>;
+    if (!workerCanonicalCacheIdentityMatches(cacheSeed[netIdStr], workerIdentity)) {
+      cacheSeed = { ...cacheSeed };
+      delete cacheSeed[netIdStr];
+    }
+  }
+
+  const global = ensureSurveysNet(cacheSeed, netIdStr);
   const net = global[netIdStr];
   if (!net) return global;
 

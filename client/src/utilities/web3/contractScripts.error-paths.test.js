@@ -127,10 +127,38 @@ const CLOUDFLARE_GROUP_CFG = {
 };
 const WORKER_CANONICAL_GROUP_CFG = {
   slug: 'demo-sh',
+  sessionId: '0x00112233445566778899aabbccddeeff',
   corsWorkerUrl: 'https://worker.example',
   contracts: {},
   sessionModeProfile: {
+    profileVersion: 1,
+    preset: 'custom',
     authority: { mode: 'worker_canonical' },
+    evm: { registryChainId: null },
+    storage: {
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'none', encryption: 'none' },
+    },
+    identity: { default: 'passkey', enabled: ['passkey'] },
+    authorization: { mechanisms: ['worker_roles'] },
+    encryption: { mode: 'none' },
+    surfaces: {
+      web: true,
+      telegram: false,
+      miniApp: false,
+      agentHttp: false,
+      mcp: false,
+      ceCc: false,
+    },
+    results: {
+      visibility: 'participant_aggregate',
+      exposure: {
+        aggregateResultsEnabled: true,
+        anonymizedGroupsEnabled: false,
+        minGroupSize: 2,
+      },
+    },
+    export: { scope: 'all_session' },
   },
   storageProfile: {
     backend: 'cloudflare',
@@ -439,6 +467,33 @@ describe('error paths', () => {
         resource: 'responses',
       }),
     );
+    expect(JSON.parse(uploadDataToSessionStorage.mock.calls[0][0])).toEqual(
+      expect.objectContaining({
+        questionID: QUESTION_ID,
+        answer: 'yes',
+        sessionId: WORKER_CANONICAL_GROUP_CFG.sessionId,
+        sessionSlug: 'demo-sh',
+      }),
+    );
+    expect(rpcProvider.request).not.toHaveBeenCalledWith(expect.objectContaining({ method: 'eth_sendTransaction' }));
+  });
+
+  it('rejects worker-canonical response writes without an exact session ID', async () => {
+    const rpcProvider = makeRpcProvider();
+    window.ethereum = rpcProvider;
+
+    await expect(
+      submitResponses(
+        'wagmi',
+        [QUESTION_ID],
+        [{ questionID: QUESTION_ID, answer: 'yes' }],
+        ethers.constants.HashZero,
+        null,
+        { ...WORKER_CANONICAL_GROUP_CFG, sessionId: '' },
+      ),
+    ).rejects.toThrow('submitResponses: exact Worker session identity is required.');
+
+    expect(uploadDataToSessionStorage).not.toHaveBeenCalled();
     expect(rpcProvider.request).not.toHaveBeenCalledWith(expect.objectContaining({ method: 'eth_sendTransaction' }));
   });
 
@@ -630,7 +685,7 @@ describe('error paths', () => {
         ethers.constants.HashZero,
         GROUP_CFG,
       ),
-    ).rejects.toMatchObject({ code: 4001, message: 'User denied transaction signature.' });
+    ).rejects.toThrow('SBT creation transaction failed. Verify the network and deployment settings, then retry.');
 
     expect(createSpy).toHaveBeenCalledTimes(1);
     expect(mockFactory.estimateGas.createSBT).not.toHaveBeenCalled();
@@ -688,7 +743,7 @@ describe('error paths', () => {
         ethers.constants.HashZero,
         GROUP_CFG,
       ),
-    ).rejects.toMatchObject({ code: 4001, message: 'User denied transaction signature.' });
+    ).rejects.toThrow('SBT creation transaction failed. Verify the network and deployment settings, then retry.');
 
     expect(mockFactory.estimateGas.createSBT).not.toHaveBeenCalled();
     expect(mockFactory.createSBT).not.toHaveBeenCalled();

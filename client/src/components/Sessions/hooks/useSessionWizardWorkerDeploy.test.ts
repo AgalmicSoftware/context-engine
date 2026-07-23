@@ -367,6 +367,30 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(true);
   });
 
+  it('reports infrastructure-only completion when public config readback is not verified', async () => {
+    const options = buildDeployHookOptions();
+    mockSuccessfulWorkerDeployFetch();
+    options.verifyPublicWorkerDeployment.mockRejectedValue(new TypeError('Failed to fetch'));
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    let deployResult;
+
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker();
+    });
+
+    expect(deployResult).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: expect.stringMatching(/public config readback.*browser-origin verification.*pending/i),
+      }),
+    );
+    expect(options.updateDeploymentState).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        deployComplete: true,
+      }),
+    );
+  });
+
   it('requests and adopts the dedicated Wrapped capability when surfaces.agentHttp is enabled', async () => {
     const capability = {
       version: 1,
@@ -627,6 +651,197 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(JSON.parse(String(secretsSyncCall?.[1]?.body || '{}')).secrets).toEqual({
       openaiKey: 'sk-current-retry-secret',
     });
+  });
+
+  it('syncs current config and secrets after a terminal mutable-drift recovery response', async () => {
+    global.fetch = jest.fn(async (url: RequestInfo | URL) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            partial: true,
+            writesSessionConfig: false,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true }),
+      } as Response;
+    });
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current.draft = {
+      ...options.refs.runtimeRef.current.draft,
+      sessionName: 'Current mutable recovery config',
+    };
+    options.refs.runtimeRef.current.workerSecretsEnabled = true;
+    options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'sk-current-mutable-recovery' });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let deployResult: Record<string, unknown> = {};
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker();
+    });
+
+    expect(deployResult.ok).toBe(true);
+    const fetchCalls = (global.fetch as jest.Mock).mock.calls;
+    const configSyncCalls = fetchCalls.filter(([url]) => String(url).endsWith('/admin/set-config'));
+    const secretsSyncCalls = fetchCalls.filter(([url]) => String(url).endsWith('/admin/set-secrets'));
+    expect(configSyncCalls).toHaveLength(1);
+    expect(secretsSyncCalls).toHaveLength(1);
+    expect(JSON.parse(String(configSyncCalls[0][1]?.body || '{}')).config).toEqual(
+      expect.objectContaining({ sessionName: 'Current mutable recovery config' }),
+    );
+    expect(JSON.parse(String(secretsSyncCalls[0][1]?.body || '{}')).secrets).toEqual({
+      openaiKey: 'sk-current-mutable-recovery',
+    });
+  });
+
+  it('keeps manual deploy incomplete so publish retries required secrets on the same deployment identity', async () => {
+    const deployBodies: Record<string, unknown>[] = [];
+    let secretsSyncCalls = 0;
+    global.fetch = jest.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        deployBodies.push(JSON.parse(String(init?.body || '{}')));
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            partial: true,
+            writesSessionConfig: false,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      if (normalizedUrl.endsWith('/admin/set-config')) {
+        return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+      }
+      if (normalizedUrl.endsWith('/admin/set-secrets')) {
+        secretsSyncCalls += 1;
+        if (secretsSyncCalls === 1) {
+          return {
+            ok: false,
+            status: 503,
+            json: async () => ({ error: 'Required session secret sync was rejected.' }),
+          } as Response;
+        }
+        return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const options = buildDeployHookOptions();
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      registryAddress: '',
+      registryChainId: 0,
+      draft: {
+        slug: 'required-secret-recovery',
+        sessionModeProfile,
+      },
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'sk-required-recovery' });
+    options.resolveWorkerRpcUrl.mockReturnValue('');
+    options.resolveWorkerRpcUrlMap.mockReturnValue({});
+    options.resolveWorkerFaucetConfig.mockReturnValue({});
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let firstResult: Record<string, unknown> = {};
+    let retryResult: Record<string, unknown> = {};
+    await act(async () => {
+      firstResult = await result.current.handleDeployWorker();
+    });
+    const failedDeployReadiness = resolveSessionWizardPublishReadiness({
+      resolvedWorkerBaseUrl: 'https://deployed.example.test',
+      workerMode: 'custom',
+      usesDefaultWorkerUrl: false,
+      deployVerifiedInUi: firstResult.deployComplete === true,
+      deployWorkerMatchesConfiguredUrl: true,
+      canUseSponsoredAutoDeployNow: false,
+      manualMetadataUrl: '',
+      metadataUrl: '',
+      sessionModeProfile,
+    });
+    const retryPublishPlan = buildSessionWizardPublishExecutionPlan({
+      workerMode: 'custom',
+      sponsoredAutoDeployReady: false,
+      deployComplete: firstResult.deployComplete === true,
+      sessionModeProfile,
+    });
+    await act(async () => {
+      retryResult = await result.current.handleDeployWorker();
+    });
+
+    expect(firstResult).toEqual(
+      expect.objectContaining({
+        ok: true,
+        deployComplete: false,
+        requiredWorkerSecretsReady: false,
+        requiredWorkerSecretFields: ['openaiKey'],
+      }),
+    );
+    expect(retryResult).toEqual(
+      expect.objectContaining({
+        ok: true,
+        deployComplete: true,
+        requiredWorkerSecretsReady: true,
+        requiredWorkerSecretFields: ['openaiKey'],
+      }),
+    );
+    expect(failedDeployReadiness).toEqual(expect.objectContaining({ canPublishNow: false, readinessKind: 'blocked' }));
+    expect(retryPublishPlan.shouldAutoDeployWorker).toBe(false);
+    expect(deployBodies).toHaveLength(2);
+    expect(deployBodies[1].deploymentRequestId).toBe(deployBodies[0].deploymentRequestId);
+    expect(deployBodies[1].configRevision).toBe(deployBodies[0].configRevision);
+    expect(secretsSyncCalls).toBe(2);
+    expect(options.updateDeploymentState).toHaveBeenCalledWith(expect.objectContaining({ deployComplete: false }));
+    expect(options.updateDeploymentState).toHaveBeenCalledWith(expect.objectContaining({ deployComplete: true }));
+  });
+
+  it('does not cache a 200 partial deploy when signed config recovery fails', async () => {
+    global.fetch = jest.fn(async (url: RequestInfo | URL) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            ok: true,
+            workerUrl: 'https://deployed.example.test',
+            partial: true,
+            writesSessionConfig: false,
+            writesSessionSecrets: false,
+          }),
+        } as Response;
+      }
+      if (normalizedUrl.endsWith('/admin/set-config')) {
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({ error: 'Config recovery unavailable.' }),
+        } as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
+    });
+    const options = buildDeployHookOptions();
+    options.verifyPublicWorkerDeployment.mockRejectedValue(new Error('Config recovery unavailable.'));
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    await act(async () => {
+      await result.current.handleDeployWorker();
+    });
+
+    expect(readSessionWorkerConfigCache().bySession).toEqual({});
   });
 
   it('reuses the deploy identity after the hook is unmounted and remounted', async () => {

@@ -5,10 +5,6 @@ import {
   readEncryptedSbtPasswordRecoveryCodes,
   upsertEncryptedSbtPasswordRecoveryCodes,
 } from '../../utilities/sbt/sbtEncryptedPasswordRecoveryStore.js';
-import {
-  clearSbtPasswordRecoveryCodes,
-  getSbtPasswordRecoveryCodes,
-} from '../../utilities/sbt/sbtPasswordRecoveryStore.js';
 
 type RecoveryResult = { ok: boolean; status: string; passwords?: string[] };
 type RecoveryPatch = {
@@ -38,25 +34,24 @@ export const SbtEncryptedRecoveryControl = ({
   status,
 }: SbtEncryptedRecoveryControlProps): React.ReactElement => (
   <div>
-    {mode === 'create' && <p>Export-only is the default; codes are stored only after this explicit opt-in.</p>}
+    {mode === 'create' && <p>Export is the only durable recovery path. Browser storage is never used for codes.</p>}
     <label>
       <input type="checkbox" checked={checked} disabled={status === 'saving'} onChange={onChange} />
-      Keep encrypted recovery on this browser
+      Keep recovery codes in this tab
     </label>
     <p>
-      Optional AES-GCM browser-local recovery does not sync across devices and does not protect against a compromised
-      browser profile.{mode === 'admin' ? ' Uncheck it to clear encrypted recovery for this group.' : ''}
+      This optional convenience keeps codes in memory only. Reloading or closing the tab clears them.
+      {mode === 'admin' ? ' Uncheck it to clear tab-memory recovery for this group.' : ''}
     </p>
-    {status === 'saved' && <p>Encrypted local recovery saved.</p>}
-    {status === 'ready' && <p>New passwords will be kept encrypted on this browser.</p>}
-    {status === 'unavailable' && <p>Encrypted recovery unavailable; export-only remains active.</p>}
-    {status === 'unreadable' && <p>Encrypted recovery cannot be decrypted by this browser.</p>}
-    {status === 'cleared' && <p>Encrypted local recovery cleared.</p>}
+    {status === 'saved' && <p>Recovery codes are available in this tab only.</p>}
+    {status === 'ready' && <p>New passwords will be kept in this tab only.</p>}
+    {status === 'unavailable' && <p>Tab-memory recovery unavailable; export-only remains active.</p>}
+    {status === 'unreadable' && <p>Tab-memory recovery is unavailable.</p>}
+    {status === 'cleared' && <p>Tab-memory recovery cleared.</p>}
     {mode === 'admin' && hasLocalRecovery && onClear && (
       <>
-        <p>Legacy recovery may contain plaintext. Clear local recovery after exporting anything you still need.</p>
         <button type="button" onClick={onClear} className={clearButtonClassName}>
-          Clear local recovery
+          Clear tab recovery
         </button>
       </>
     )}
@@ -85,36 +80,29 @@ export const selectCreateEncryptedRecovery = async ({
     ? { patch: { encryptedRecoveryEnabled: true, encryptedRecoveryStatus: 'saved' }, warning: '' }
     : {
         patch: { encryptedRecoveryEnabled: false, encryptedRecoveryStatus: 'unavailable' },
-        warning: 'Encrypted local recovery is unavailable. Export these passwords before leaving this page.',
+        warning: 'Tab-memory recovery is unavailable. Export these passwords before leaving this page.',
       };
 };
 
 export const loadSbtRecoverySnapshot = async ({
   chainId,
   sbtAddress,
-  readEncrypted = readEncryptedSbtPasswordRecoveryCodes,
-  readLegacy = getSbtPasswordRecoveryCodes,
+  readMemory = readEncryptedSbtPasswordRecoveryCodes,
 }: RecoveryScope & {
-  readEncrypted?: (scope: RecoveryScope) => Promise<RecoveryResult>;
-  readLegacy?: (scope: RecoveryScope) => string[];
+  readMemory?: (scope: RecoveryScope) => Promise<RecoveryResult>;
 }): Promise<RecoveryPatch> => {
-  const legacy = readLegacy({ chainId, sbtAddress });
-  const encrypted = await readEncrypted({ chainId, sbtAddress });
-  if (encrypted.ok && encrypted.status === 'ok') {
+  const memory = await readMemory({ chainId, sbtAddress });
+  if (memory.ok && memory.status === 'ok') {
     return {
-      cachedPasswords: [...new Set([...legacy, ...(encrypted.passwords || [])])],
+      cachedPasswords: [...new Set(memory.passwords || [])],
       encryptedRecoveryEnabled: true,
       encryptedRecoveryStatus: 'saved',
     };
   }
   return {
-    cachedPasswords: legacy,
+    cachedPasswords: [],
     encryptedRecoveryEnabled: false,
-    encryptedRecoveryStatus: encrypted.ok
-      ? 'idle'
-      : encrypted.status === 'unavailable'
-        ? 'unavailable'
-        : 'unreadable',
+    encryptedRecoveryStatus: memory.ok ? 'idle' : memory.status === 'unavailable' ? 'unavailable' : 'unreadable',
   };
 };
 
@@ -129,7 +117,7 @@ export const selectAdminEncryptedRecovery = async ({
   if (enabled) return { encryptedRecoveryEnabled: true, encryptedRecoveryStatus: 'ready' };
   await clearEncryptedSbtPasswordRecoveryCodes({ chainId, sbtAddress });
   return {
-    cachedPasswords: getSbtPasswordRecoveryCodes({ chainId, sbtAddress }),
+    cachedPasswords: [],
     encryptedRecoveryEnabled: false,
     encryptedRecoveryStatus: 'cleared',
   };
@@ -137,7 +125,6 @@ export const selectAdminEncryptedRecovery = async ({
 
 export const clearAllSbtRecovery = async (scope: RecoveryScope): Promise<RecoveryPatch> => {
   await clearEncryptedSbtPasswordRecoveryCodes(scope);
-  clearSbtPasswordRecoveryCodes(scope);
   return { cachedPasswords: [], encryptedRecoveryEnabled: false, encryptedRecoveryStatus: 'cleared' };
 };
 

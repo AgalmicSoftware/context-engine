@@ -102,6 +102,7 @@ import { toStr } from '../../utilities/shared/primitives.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import { isCryptoMode } from '../../utilities/ui/terminology.js';
 import { isTelegramFirstSessionConfig } from '../../utilities/session/sessionBackendKind';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
   exchangeAgentClientLogin,
   extractAgentClientToken,
@@ -128,31 +129,21 @@ import {
   formatLoginSettingsAiProviderLabel,
 } from './loginSettingsAiDisplayHelpers';
 import LoginAgentTokenPanel from './LoginAgentTokenPanel';
-import { createLoginAgentActions } from './loginAndSettingsAgentTokenActions';
+import {
+  createLoginAgentActions,
+  resolveValidatedWorkerCanonicalLoginConfig,
+} from './loginAndSettingsAgentTokenActions';
 import { createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
-import type { PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
+import type { LoginPasskeyNetwork, PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
 const accountLog = createLogger('account');
 const normalizeAccountForComparison = (value: unknown): string =>
   String(value || '')
     .trim()
     .toLowerCase();
-type AccountUserPageProps = {
-  viewAddress?: string;
-  account?: string;
-  provider?: string;
-  minimized?: boolean;
-  network?: unknown;
-  activeSessionSlug?: string;
-  sessionConfig?: unknown;
-  networkChainId?: unknown;
+type LoginTargetNetwork = LoginPasskeyNetwork & {
+  blockExplorers?: { default?: { name?: unknown; url?: unknown } };
 };
-const AccountUserPage = React.lazy(() => import('components/UserPage/UserPage')) as React.LazyExoticComponent<
-  React.ComponentType<AccountUserPageProps>
->;
-
-type LoginAndSettingsRecord = Record<string, any>;
-
 interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'network'>> {
   provider: string;
   network: WagmiInjectedProps['network'] | null;
@@ -420,7 +411,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   _passkeyWalletRestoreReqId: number = 0;
   _passkeyWalletActionId: number = 0;
   _sponsoredSessionSourcesMemo: { key: string; value: SponsoredSessionSources } | null = null;
-  _settingsOverviewMemo: { key: string; value: SettingsOverviewContext } | null = null;
+  _settingsOverviewMemo: { key: string; value: LoginSettingsOverviewContext } | null = null;
+  _sessionCapabilityProjectionResolver: typeof resolveSessionCapabilityProjection = resolveSessionCapabilityProjection;
   _passkeyActions = createLoginPasskeyActions({
     accountLogError: (message, error) => accountLog.error(message, error),
     changeAccount: (payload) => this.props.changeAccount(payload),
@@ -512,7 +504,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       ? normalizedPropList[0]
       : String(normalizedPropList || '')
           .split(',')
-          .map((slug: any) => slug.trim())
+          .map((slug) => slug.trim())
           .filter(Boolean)[0];
     const effectiveListPrimary = listModePrimary || normalizeSettingsSessionSlug(propListPrimary);
     const listIncludesGeneral =
@@ -533,7 +525,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return this.getActiveSessionSlug();
   };
 
-  getTargetNetwork = () => {
+  getActiveSessionCapabilities = () => {
     const slug = this.getActiveSessionSlug();
     return this._sessionCapabilityProjectionResolver(this.getDisplaySessionConfig(slug));
   };
@@ -559,16 +551,20 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     const fallback = getChainById(DEFAULT_CHAIN_ID);
     if (fallback) return fallback;
 
-    return {
-      id: DEFAULT_CHAIN_ID,
-      chainId: DEFAULT_CHAIN_ID,
-      name: `Chain ${DEFAULT_CHAIN_ID}`,
-      network: String(DEFAULT_CHAIN_ID),
-      nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-      rpcUrls: { default: { http: [] }, public: { http: [] } },
-      blockExplorers: { default: { name: '', url: '' } },
-      unsupported: false,
-    };
+    return this.buildTargetNetworkDescriptor(DEFAULT_CHAIN_ID);
+  };
+
+  getTargetNetwork = (): LoginTargetNetwork => {
+    const slug = this.getActiveSessionSlug();
+    const capabilities = this.getActiveSessionCapabilities();
+    const projectedChainId =
+      capabilities.showNetworkControls && Number(capabilities.chainId) > 0 ? Number(capabilities.chainId) : null;
+    if (!projectedChainId) return this.getGlobalTargetNetwork();
+
+    const configuredNetwork = getSessionNetwork(slug);
+    if (Number(readChainIdLike(configuredNetwork)) === projectedChainId) return configuredNetwork as LoginTargetNetwork;
+
+    return getChainById(projectedChainId) || this.buildTargetNetworkDescriptor(projectedChainId);
   };
 
   async componentDidMount() {
@@ -931,8 +927,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     if (activeSessionChanged) {
       this.loadAiSettings();
       this.loadResourceKeys();
-      this.loadSponsoredAccess();
-      this.syncPasskeyWalletChain();
+      const capabilities = this.getActiveSessionCapabilities();
+      if (capabilities.showNetworkControls && capabilities.chainId) {
+        this.syncPasskeyWalletChain(this.getTargetNetwork());
+      }
     }
     if (needsSponsoredAccessRefresh) this.loadSponsoredAccess();
 
@@ -1223,10 +1221,9 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       const { loadLoginSettingsSponsoredAccess } = await import('./loginSettingsSponsoredAccessRuntime');
       const { accessMap, workerResourcePresence } = await loadLoginSettingsSponsoredAccess({
         slug,
-        sessionConfig: getSessionConfigBySlugOrDefault(slug) || {},
+        sessionConfig: verifiedWorkerConfig || getSessionConfigBySlugOrDefault(slug) || {},
         account: this.props.account || '',
         providerLike: this.props.provider || null,
-        fallbackChainId: this.getTargetNetwork()?.id,
         // Regression guard: old workers may reject resource-presence. Only probe
         // when the settings UI that consumes the result is actually visible.
         includeWorkerResourcePresence: !!this.props.loginModalToggled,
@@ -1434,8 +1431,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   renderAgentTokenLoginPanel = () => {
     if (!this.shouldShowAgentTokenLogin()) return null;
-    const { sessionSlug } = this.getAgentTokenLoginSessionContext();
-    const cachedEnvelope = readAgentClientLoginEnvelope(sessionSlug);
+    const { agentBridgeUrl, sessionId, sessionSlug, workerUrl } = this.getAgentTokenLoginSessionContext();
+    const cachedEnvelope = readAgentClientLoginEnvelope({
+      sessionSlug,
+      sessionId,
+      workerUrl,
+      agentBridgeUrl,
+    });
     return (
       <LoginAgentTokenPanel
         agentTokenError={this.state.agentTokenError}
@@ -2532,28 +2534,30 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                   ),
                 })}
 
-                {renderSection({
-                  key: 'resourceKeys',
-                  title: 'Resource keys',
-                  summary: `${useLocalRpc || useLocalArweave ? 'Local key overrides enabled' : 'Using session-sponsored fallbacks'}`,
-                  children: (
-                    <>
-                      <div className={styles.aiSettingsGrid}>
-                        <div className={styles.aiSettingsRow}>
-                          <label className={styles.aiSettingsLabel}>RPC API key</label>
-                          <input
-                            className={styles.aiSettingsInput}
-                            type="password"
-                            value={useLocalRpc ? resourceKeys?.rpc?.apiKey || '' : ''}
-                            onChange={(e: any) => this.updateResourceKeyField('rpc', 'apiKey', e.target.value)}
-                            disabled={!useLocalRpc}
-                            placeholder={
-                              useLocalRpc
-                                ? 'Enter RPC API key'
-                                : sponsoredKeys.rpc
-                                  ? 'Sponsored key configured'
-                                  : 'No sponsored key set'
-                            }
+                {overview.capabilities.settingsResourceKeys.some((key) => key === 'rpc' || key === 'arweave')
+                  ? renderSection({
+                      key: 'resourceKeys',
+                      title: 'Resource keys',
+                      summary:
+                        useLocalRpc || useLocalArweave
+                          ? 'In-memory key overrides enabled'
+                          : 'Using session-sponsored fallbacks',
+                      children: (
+                        <Suspense fallback={<div className={styles.aiSettingsHint}>Loading resource settings…</div>}>
+                          <LoginSettingsResourceKeysContent
+                            formatResourceSponsorHint={this.formatResourceSponsorHint}
+                            handleClearResourceKeys={this.handleClearResourceKeys}
+                            handleResourceToggleLocal={this.handleResourceToggleLocal}
+                            handleSaveResourceKeys={this.handleSaveResourceKeys}
+                            resourceKeys={resourceKeys}
+                            resourceKeysDirty={this.state.resourceKeysDirty}
+                            resourceKeysStatus={this.state.resourceKeysStatus}
+                            sponsorSessions={sponsorSessions}
+                            sponsoredKeys={sponsoredKeys}
+                            updateResourceKeyField={this.updateResourceKeyField}
+                            useLocalArweave={useLocalArweave}
+                            useLocalRpc={useLocalRpc}
+                            visibleResources={overview.capabilities.settingsResourceKeys}
                           />
                           <label className={styles.aiSettingsInlineToggle}>
                             <input
@@ -2836,6 +2840,25 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   getModalDisplay = () => {
+    const activeSessionSlug = this.getActiveSessionSlug();
+    const activeSessionConfig = this.getDisplaySessionConfig(activeSessionSlug);
+    const activeSessionCapabilities = this._sessionCapabilityProjectionResolver(activeSessionConfig);
+    const hasConcreteActiveSession = !!normalizeSettingsSessionSlug(activeSessionSlug);
+    const sessionIdentityUnavailable =
+      hasConcreteActiveSession &&
+      (activeSessionCapabilities.source === 'missing' || activeSessionCapabilities.source === 'invalid_profile');
+    const isValidatedPasskeyOnlyWorkerSession =
+      activeSessionCapabilities.profileValid &&
+      activeSessionCapabilities.isWorkerCanonical &&
+      activeSessionCapabilities.usesPasskeyIdentity &&
+      !activeSessionCapabilities.usesWalletIdentity;
+    const showAdvancedWalletAccess =
+      isValidatedPasskeyOnlyWorkerSession && !activeSessionCapabilities.isPureWorkerCanonical;
+    const showWalletIdentity =
+      !sessionIdentityUnavailable &&
+      (activeSessionCapabilities.isRegistryCanonical ||
+        (activeSessionCapabilities.profileValid && activeSessionCapabilities.usesWalletIdentity) ||
+        !hasConcreteActiveSession);
     const activeChain = this.props.wagmiNetwork || this.props.network || this.getTargetNetwork();
     const showTestnetOnly = (showWalletIdentity || showAdvancedWalletAccess) && !!activeChain?.testnet;
     const activeSessionNetworkChainId =
@@ -2846,6 +2869,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return LoginModalDisplayBody({
       account: this.props.account,
       activeSessionConfig,
+      activeSessionNetworkChainId,
       activeSessionSlug,
       handleLogout: this.handleLogout,
       handlePasskeyWalletCreate: this.handlePasskeyWalletCreate,
@@ -2865,7 +2889,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       passkeyMode: this.state.passkeyMode,
       provider: this.props.provider,
       renderAgentTokenLoginPanel: this.renderAgentTokenLoginPanel,
+      sessionIdentityUnavailable,
+      showAdvancedWalletAccess,
       showTestnetOnly,
+      showWalletIdentity,
     });
   };
 

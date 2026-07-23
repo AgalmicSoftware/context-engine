@@ -52,11 +52,6 @@ const createWorkerSessionModeProfile = () => ({
   export: { scope: 'all_session' },
 });
 
-const createWorkerStorageProfile = () => ({
-  backend: 'cloudflare',
-  payloadAccessControl: { gate: 'none', encryption: 'none' },
-});
-
 const createRegistrySessionModeProfile = () => ({
   profileVersion: 1,
   preset: 'custom',
@@ -290,22 +285,27 @@ test('dispatchAdminRequest merges config and persists the result after authority
 });
 
 test('dispatchAdminRequest rejects explicit invalid security modes before config persistence', async () => {
+  const invalidAuthority = createWorkerSessionModeProfile();
+  invalidAuthority.authority.mode = 'registry';
+  const invalidEncryption = createWorkerSessionModeProfile();
+  invalidEncryption.encryption.mode = 'mystery';
+  const invalidKeyProvider = createWorkerSessionModeProfile();
+  invalidKeyProvider.encryption = {
+    mode: 'worker_envelope',
+    keyProvider: 'cloudflare_secrets_store',
+  };
   const invalidConfigs = [
     {
       path: 'sessionModeProfile.authority.mode',
-      config: { sessionModeProfile: { authority: { mode: 'registry' } } },
+      config: { sessionModeProfile: invalidAuthority },
     },
     {
       path: 'sessionModeProfile.encryption.mode',
-      config: { sessionModeProfile: { encryption: { mode: 'mystery' } } },
+      config: { sessionModeProfile: invalidEncryption },
     },
     {
       path: 'sessionModeProfile.encryption.keyProvider',
-      config: {
-        sessionModeProfile: {
-          encryption: { mode: 'worker_envelope', keyProvider: 'cloudflare_secrets_store' },
-        },
-      },
+      config: { sessionModeProfile: invalidKeyProvider },
     },
     {
       path: 'storageProfile.payloadAccessControl.gate',
@@ -410,7 +410,6 @@ test('dispatchAdminRequest rejects changes to an initialized worker-canonical id
     sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     corsWorkerUrl: 'https://session-a.workers.dev',
     sessionModeProfile: createWorkerSessionModeProfile(),
-    storageProfile: createWorkerStorageProfile(),
     sessionName: 'Canonical Session',
   };
   const unsafePatches = [
@@ -425,7 +424,7 @@ test('dispatchAdminRequest rejects changes to an initialized worker-canonical id
     },
     {
       label: 'authority mode',
-      config: { sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } } },
+      config: { sessionModeProfile: createRegistrySessionModeProfile() },
     },
     {
       label: 'worker URL',
@@ -470,7 +469,6 @@ test('dispatchAdminRequest treats sessionId and sessionIdHex as one immutable ca
     sessionIdHex: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     corsWorkerUrl: 'https://session-a.workers.dev',
     sessionModeProfile: createWorkerSessionModeProfile(),
-    storageProfile: createWorkerStorageProfile(),
   };
 
   for (const config of [
@@ -534,7 +532,6 @@ test('dispatchAdminRequest finalizes the first canonical publication revision an
     configRevision: 'deployment-seed',
     corsWorkerUrl: 'https://session-a.workers.dev',
     sessionModeProfile: createWorkerSessionModeProfile(),
-    storageProfile: createWorkerStorageProfile(),
     sessionName: 'Deployment seed',
   };
   let persistedConfig = deploymentConfig;
@@ -608,7 +605,6 @@ test('dispatchAdminRequest permits non-identity updates to an initialized worker
     sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     corsWorkerUrl: 'https://session-a.workers.dev',
     sessionModeProfile: createWorkerSessionModeProfile(),
-    storageProfile: createWorkerStorageProfile(),
     sessionName: 'Canonical Session',
   };
   const writes = [];
@@ -857,7 +853,6 @@ test('dispatchAdminRequest preserves allowlisted structural authorization', asyn
   const config = {
     authorization: { roles: { moderator: ['0x00000000000000000000000000000000000000aa'] } },
     sessionModeProfile: createWorkerSessionModeProfile(),
-    storageProfile: createWorkerStorageProfile(),
   };
 
   const result = await dispatchAdminRequest({
@@ -931,6 +926,141 @@ test('dispatchAdminRequest filters and normalizes allowed secrets before persist
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
   });
+});
+
+test('dispatchAdminRequest returns allowed-key secret presence without exposing values', async () => {
+  let putCalled = false;
+
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({}),
+    },
+    env: { GROUP_KV: {} },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'secret-presence',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        existingConfig: { adminAddress: '0xabc' },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      getSessionSecrets: async () => ({
+        openaiKey: 'sk-existing',
+        anthropicKey: '   ',
+        customRpcUrl: 'https://rpc.example.test',
+        arweaveJwk: { kty: 'RSA' },
+        ignoredSecret: 'do-not-report',
+      }),
+      putSessionSecrets: async () => {
+        putCalled = true;
+      },
+    }),
+  });
+
+  assert.equal(putCalled, false);
+  assert.deepEqual(result, {
+    body: {
+      ok: true,
+      sessionSlug: 'session-a',
+      secrets: {
+        openaiKey: true,
+        anthropicKey: false,
+        openrouterKey: false,
+        customRpcUrl: true,
+        customRpcKey: false,
+        arweaveJwk: true,
+        faucetPrivateKey: false,
+        litAccountApiKey: false,
+        litUsageApiKey: false,
+      },
+    },
+    status: 200,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+  });
+  assert.doesNotMatch(JSON.stringify(result.body), /sk-existing|rpc\.example|do-not-report|RSA/);
+});
+
+test('dispatchAdminRequest routes signed worker group CRUD through admin auth', async () => {
+  let authorityCalled = false;
+  const sessionId = '0x00112233445566778899aabbccddeeff';
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        sessionId,
+        group: {
+          groupId: 'reviewers',
+          label: 'Reviewers',
+          joinMode: 'admin_add',
+          memberVisibility: 'members',
+        },
+      }),
+    },
+    env: { CE_WORKER_GROUPS_KV: {
+      store: new Map(),
+      async put(key, value) { this.store.set(key, value); },
+      async get(key) { return this.store.get(key) || null; },
+      async list({ prefix = '' } = {}) {
+        return { keys: [...this.store.keys()].filter((name) => name.startsWith(prefix)).map((name) => ({ name })) };
+      },
+    } },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'groups/create',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => {
+        authorityCalled = true;
+        return {
+          ok: true,
+          address: '0x0000000000000000000000000000000000000abc',
+          existingConfig: {
+            adminAddress: '0x0000000000000000000000000000000000000abc',
+            sessionId,
+          },
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+          targetSlug: 'session-a',
+        };
+      },
+      now: () => Date.parse('2026-02-03T04:05:06.000Z'),
+      executeCoordinatedWorkerGroupMutation: (args) => executeWorkerGroupMutation({
+        ...args,
+        deps: { now: () => Date.parse('2026-02-03T04:05:06.000Z') },
+      }),
+    }),
+  });
+
+  assert.equal(authorityCalled, true);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.ok, true);
+  assert.equal(result.body.group.groupId, 'reviewers');
+  assert.equal(result.body.group.createdBy.kind, 'evm_address');
+});
+
+test('dispatchAdminRequest does not touch groups when admin auth fails', async () => {
+  const response = { body: { error: 'Admin denied.' }, status: 403, headers: {} };
+  let groupDispatchCalled = false;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({
+        group: { groupId: 'blocked', label: 'Blocked', joinMode: 'admin_add' },
+      }),
+    },
+    env: {},
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'groups/create',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({ ok: false, response }),
+      dispatchAdminWorkerGroupRequest: async () => {
+        groupDispatchCalled = true;
+        return null;
+      },
+    }),
+  });
+
+  assert.equal(result, response);
+  assert.equal(groupDispatchCalled, false);
 });
 
 test('dispatchAdminRequest reads Lit Chipotle status from worker config plus session secrets', async () => {

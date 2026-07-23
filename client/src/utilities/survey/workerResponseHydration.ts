@@ -1,5 +1,15 @@
 import { listSessionStorageRefsPage, readSessionStorageBlob } from '../storage/storageClient.js';
+import { resolveSessionCapabilityProjection } from '../session/sessionCapabilityProjection';
+import { canonicalizeSessionSlug } from '../session/canonicalSessionContext';
+import { normalizeWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery';
+import { resolveWorkerCanonicalStorageTarget } from '../../domains/surveys/workerCanonicalAuthoringPort';
 import { isResponseRecencyNewer, toResponseRecencyPair } from './responseRecency.js';
+import {
+  WORKER_CANONICAL_CACHE_SCOPE_KEY,
+  type WorkerCanonicalCacheIdentity,
+  withWorkerCanonicalCacheIdentity,
+  workerCanonicalCacheIdentityMatches,
+} from './workerCanonicalCacheIdentity';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -22,8 +32,6 @@ export type WorkerCanonicalResponseRow = {
   timestamp: number;
 };
 
-const WORKER_CANONICAL_RESPONSE_CACHE_SCOPE_KEY = 'worker';
-
 const MAX_RESPONSE_LIST_PAGES = 100;
 const RESPONSE_READ_CONCURRENCY = 8;
 
@@ -33,33 +41,42 @@ const isRecord = (value: unknown): value is UnknownRecord =>
 const readString = (value: unknown): string => String(value || '').trim();
 
 export const isWorkerCanonicalSessionConfig = (value: unknown): boolean => {
-  const config = isRecord(value) ? value : {};
-  const profile = isRecord(config.sessionModeProfile) ? config.sessionModeProfile : {};
-  const authority = isRecord(profile.authority) ? profile.authority : {};
-  return authority.mode === 'worker_canonical';
+  const projection = resolveSessionCapabilityProjection(value);
+  return projection.profileValid && projection.isWorkerCanonical;
 };
 
 export const loadWorkerResponses = async (
   {
+    account,
+    providerLike,
     sessionSlug,
     sessionConfig,
   }: {
+    account?: unknown;
+    providerLike?: unknown;
     sessionSlug: string;
     sessionConfig: UnknownRecord;
   },
   deps: WorkerCanonicalResponseHydrationDeps = {},
 ): Promise<WorkerCanonicalResponseRow[]> => {
   if (!isWorkerCanonicalSessionConfig(sessionConfig)) return [];
+  const target = resolveWorkerCanonicalStorageTarget({
+    sessionSlug,
+    sessionConfig,
+  });
   const listPage = deps.listSessionStorageRefsPage || listSessionStorageRefsPage;
   const readBlob = deps.readSessionStorageBlob || readSessionStorageBlob;
+  const context = { account, providerLike };
   const items: UnknownRecord[] = [];
   const seenCursors = new Set<string>();
   let cursor: string | null = null;
 
   for (let pageIndex = 0; pageIndex < MAX_RESPONSE_LIST_PAGES; pageIndex += 1) {
     const page = await listPage({
-      sessionSlug,
-      sessionConfig,
+      sessionSlug: target.sessionSlug,
+      sessionConfig: target.sessionConfig,
+      context,
+      workerUrl: target.workerUrl,
       resource: 'responses',
       cursor,
       limit: 100,
@@ -88,11 +105,22 @@ export const loadWorkerResponses = async (
         if (!storageRefId) return null;
         const response = await readBlob({
           storageRef,
-          sessionSlug,
-          sessionConfig,
+          sessionSlug: target.sessionSlug,
+          sessionConfig: target.sessionConfig,
+          context,
+          workerUrl: target.workerUrl,
         });
         const payload = await response.json().catch(() => null);
         if (!isRecord(payload)) return null;
+        const payloadSlug = readString(payload.sessionSlug);
+        const payloadSessionId = normalizeWorkerCanonicalSessionIdHex(payload.sessionId);
+        if (
+          payloadSlug !== target.sessionSlug ||
+          canonicalizeSessionSlug(payloadSlug) !== target.sessionSlug ||
+          payloadSessionId !== target.sessionId
+        ) {
+          return null;
+        }
         const questionId = readString(payload.questionID || payload.questionId).toLowerCase();
         if (!questionId) return null;
         // The Worker derives this value from the authenticated uploader. Payload claims
@@ -133,19 +161,19 @@ export const mergeWorkerQuestionResponses = (
   current: unknown,
   rows: WorkerCanonicalResponseRow[],
   slug: string,
+  identity: WorkerCanonicalCacheIdentity,
 ): UnknownRecord => {
-  const next = isRecord(current) ? current : {};
-  const scope = WORKER_CANONICAL_RESPONSE_CACHE_SCOPE_KEY;
-  if (!isRecord(next[scope])) next[scope] = createWorkerQuestionCacheNode();
-  const network = next[scope] as UnknownRecord;
-  if (!isRecord(network.questions)) network.questions = {};
-  if (!isRecord(network.questionResponses)) network.questionResponses = {};
-  if (!isRecord(network.questionResponsesMeta)) network.questionResponsesMeta = {};
-  if (!isRecord(network.workerResponseStorageRefs)) network.workerResponseStorageRefs = {};
-  const questions = network.questions as UnknownRecord;
-  const responses = network.questionResponses as UnknownRecord;
-  const responseMeta = network.questionResponsesMeta as UnknownRecord;
-  const seenRefs = network.workerResponseStorageRefs as UnknownRecord;
+  const next = isRecord(current) ? { ...current } : {};
+  const cachedNetwork = isRecord(next[WORKER_CANONICAL_CACHE_SCOPE_KEY])
+    ? (next[WORKER_CANONICAL_CACHE_SCOPE_KEY] as UnknownRecord)
+    : createWorkerQuestionCacheNode();
+  const network = workerCanonicalCacheIdentityMatches(cachedNetwork, identity)
+    ? { ...cachedNetwork }
+    : createWorkerQuestionCacheNode();
+  const questions = isRecord(network.questions) ? { ...network.questions } : {};
+  const responses = isRecord(network.questionResponses) ? { ...network.questionResponses } : {};
+  const responseMeta = isRecord(network.questionResponsesMeta) ? { ...network.questionResponsesMeta } : {};
+  const seenRefs = isRecord(network.workerResponseStorageRefs) ? { ...network.workerResponseStorageRefs } : {};
 
   rows.forEach((row) => {
     const storageRefId = readString(row.storageRefId);
@@ -154,14 +182,16 @@ export const mergeWorkerQuestionResponses = (
     const questionId = readString(row.questionId).toLowerCase();
     const responder = readString(row.responder).toLowerCase();
     if (!questionId || !responder) return;
-    if (!isRecord(responses[questionId])) responses[questionId] = {};
-    if (!isRecord(responseMeta[questionId])) responseMeta[questionId] = {};
-    const byResponder = responses[questionId] as UnknownRecord;
-    const metaByResponder = responseMeta[questionId] as UnknownRecord;
+    const byResponder = isRecord(responses[questionId]) ? { ...(responses[questionId] as UnknownRecord) } : {};
+    const metaByResponder = isRecord(responseMeta[questionId])
+      ? { ...(responseMeta[questionId] as UnknownRecord) }
+      : {};
     const incoming = toResponseRecencyPair({ timestamp: row.timestamp }, row.response);
     if (!isResponseRecencyNewer(incoming, toResponseRecencyPair(metaByResponder[responder]))) return;
     byResponder[responder] = row.response;
     metaByResponder[responder] = incoming;
+    responses[questionId] = byResponder;
+    responseMeta[questionId] = metaByResponder;
     if (!isRecord(questions[questionId])) {
       const prompt = readString(row.response.prompt || row.response.questionPrompt || row.response.questionText);
       if (prompt) {
@@ -180,6 +210,17 @@ export const mergeWorkerQuestionResponses = (
       }
     }
   });
+  next[WORKER_CANONICAL_CACHE_SCOPE_KEY] = withWorkerCanonicalCacheIdentity(
+    {
+      ...createWorkerQuestionCacheNode(),
+      ...network,
+      questions,
+      questionResponses: responses,
+      questionResponsesMeta: responseMeta,
+      workerResponseStorageRefs: seenRefs,
+    },
+    identity,
+  );
   return next;
 };
 
@@ -191,24 +232,45 @@ const createWorkerUserData = (): UnknownRecord => ({
   questionResponses: [],
 });
 
-export const mergeWorkerUserResponses = (current: unknown, rows: WorkerCanonicalResponseRow[]): UnknownRecord => {
-  const next = isRecord(current) ? current : {};
-  const scope = WORKER_CANONICAL_RESPONSE_CACHE_SCOPE_KEY;
+export const mergeWorkerUserResponses = (
+  current: unknown,
+  rows: WorkerCanonicalResponseRow[],
+  identity: WorkerCanonicalCacheIdentity,
+): UnknownRecord => {
+  const source = isRecord(current) ? current : {};
+  const next: UnknownRecord = {};
+  Object.entries(source).forEach(([key, value]) => {
+    if (!isRecord(value)) {
+      next[key] = value;
+      return;
+    }
+    const byScope = { ...value };
+    if (
+      Object.prototype.hasOwnProperty.call(byScope, WORKER_CANONICAL_CACHE_SCOPE_KEY) &&
+      !workerCanonicalCacheIdentityMatches(byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY], identity)
+    ) {
+      delete byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY];
+    }
+    next[key] = byScope;
+  });
   rows.forEach((row) => {
     const questionId = readString(row.questionId).toLowerCase();
     const responder = readString(row.responder).toLowerCase();
     if (!questionId || !responder) return;
     if (!isRecord(next[responder])) next[responder] = {};
-    const byScope = next[responder] as UnknownRecord;
-    if (!isRecord(byScope[scope])) {
-      byScope[scope] = { lastBlockScanned: 0, lastScanTimestamp: 0, data: createWorkerUserData() };
-    }
-    const network = byScope[scope] as UnknownRecord;
-    if (!isRecord(network.data)) network.data = createWorkerUserData();
-    const data = network.data as UnknownRecord;
-    if (!Array.isArray(data.questionResponses)) data.questionResponses = [];
+    const byScope = { ...(next[responder] as UnknownRecord) };
+    const cachedNetwork = isRecord(byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY])
+      ? (byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY] as UnknownRecord)
+      : {};
+    const network = workerCanonicalCacheIdentityMatches(cachedNetwork, identity)
+      ? { ...cachedNetwork }
+      : { lastBlockScanned: 0, lastScanTimestamp: 0, data: createWorkerUserData() };
+    const data = isRecord(network.data) ? { ...network.data } : createWorkerUserData();
+    const entries = Array.isArray(data.questionResponses)
+      ? (data.questionResponses as UnknownRecord[]).map((entry) => ({ ...entry }))
+      : [];
+    data.questionResponses = entries;
     network.lastScanTimestamp = Math.max(Number(network.lastScanTimestamp || 0), Number(row.timestamp || 0));
-    const entries = data.questionResponses as UnknownRecord[];
     const existingIndex = entries.findIndex((entry) => readString(entry?.questionId).toLowerCase() === questionId);
     const incoming = { questionId, responder, response: row.response, timestamp: Number(row.timestamp || 0) };
     if (existingIndex < 0) {
@@ -216,6 +278,9 @@ export const mergeWorkerUserResponses = (current: unknown, rows: WorkerCanonical
     } else if (isResponseRecencyNewer(incoming, entries[existingIndex])) {
       entries[existingIndex] = incoming;
     }
+    network.data = data;
+    byScope[WORKER_CANONICAL_CACHE_SCOPE_KEY] = withWorkerCanonicalCacheIdentity(network, identity);
+    next[responder] = byScope;
   });
   return next;
 };

@@ -394,6 +394,7 @@ const createPendingFeaturedDraft = async () => {
 describe('SessionWizard rendered validation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    clearSessionWizardPendingSbtDraftsCache();
     mockCreateSbtDraftQueue = [];
     mockCreateSBT.mockReset();
     mockFinalizeDeferredCreateSbtDraftUpload.mockReset();

@@ -102,12 +102,78 @@ const {
   shouldFlushCoalescedRun,
 } = require('../session/mainSiteProgressHelpers.js');
 const { isMaskedQuestionPayload, pickBetterQuestionPayload } = require('./questionRouting.js');
+const { resolveWorkerCanonicalCacheIdentity } = require('./workerCanonicalCacheIdentity.js');
 
 const NETWORK_ID = '11155420';
 const SESSION_SLUG = 'alpha';
 const ACCOUNT = '0xUser';
 const PROVIDER_LIKE = 'provider-like';
 const WORKER_SESSION_ID = `0x${'3'.repeat(32)}`;
+
+const createWorkerCanonicalSessionConfig = ({
+  hybrid = false,
+  sessionId = WORKER_SESSION_ID,
+  workerUrl = 'https://alpha-worker.example.test',
+} = {}) => ({
+  slug: SESSION_SLUG,
+  sessionId,
+  corsWorkerUrl: workerUrl,
+  sessionModeProfile: {
+    profileVersion: 1,
+    preset: 'custom',
+    authority: { mode: 'worker_canonical' },
+    evm: { registryChainId: hybrid ? 11155420 : null },
+    storage: {
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'none', encryption: hybrid ? 'worker_envelope' : 'none' },
+    },
+    identity: { default: 'passkey', enabled: ['passkey'] },
+    authorization: { mechanisms: ['worker_roles'] },
+    encryption: hybrid
+      ? {
+          mode: 'worker_envelope',
+          keyProvider: 'worker_secret',
+          accessConditions: {
+            match: 'any',
+            conditions: [
+              {
+                kind: 'sbt_onchain',
+                chainId: 11155420,
+                contract: '0x1111111111111111111111111111111111111111',
+                anyOrAll: 'any',
+              },
+            ],
+          },
+        }
+      : { mode: 'none' },
+    surfaces: {
+      web: true,
+      telegram: false,
+      miniApp: false,
+      agentHttp: false,
+      mcp: false,
+      ceCc: false,
+    },
+    results: {
+      visibility: 'public_full_if_storage_public',
+      exposure: {
+        aggregateResultsEnabled: true,
+        anonymizedGroupsEnabled: false,
+        minGroupSize: 2,
+      },
+    },
+    export: { scope: 'all_session' },
+  },
+  storageProfile: {
+    backend: 'cloudflare',
+    resources: { questions: 'active', surveys: 'active' },
+    payloadAccessControl: {
+      gate: 'none',
+      encryption: 'none',
+      mode: 'public_read',
+    },
+  },
+});
 
 const deepClone = (value) => (value == null ? value : JSON.parse(JSON.stringify(value)));
 

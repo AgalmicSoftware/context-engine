@@ -70,8 +70,19 @@ import { generateQuestionId as generateSharedQuestionId } from '../../utilities/
 import { notify } from '../../utilities/ui/notify.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { canonicalizeLegacySessionAlias } from '../../utilities/session/sessionDemoCompat.js';
-import { chainHttpRpc, chainHttpRpcNoPath, getChainById } from '../../variables/chains.js';
+import { chainHttpRpc, chainHttpRpcNoPath } from '../../variables/chains.js';
 import { resolveMainSiteLitSessionConfig } from '../MainSite/litSessionConfig.js';
+import { workerCanonicalAuthoringPort } from '../../domains/surveys/workerCanonicalAuthoringPort';
+import {
+  workerCanonicalCacheIdentityMatches,
+  withWorkerCanonicalCacheIdentity,
+} from '../../utilities/survey/workerCanonicalCacheIdentity';
+import {
+  resolveCreateSurveyGateOptions,
+  resolveCreateSurveySessionChainId,
+  resolveCreateSurveySessionConfig,
+  resolveCreateSurveyTargetNetwork,
+} from './createSurveySessionCapabilityHelpers';
 import {
   buildAuthoringEncryptionPayload,
   buildCreateSurveyAiPromptModelLabelPatch,
@@ -92,7 +103,6 @@ import {
   buildCreateSurveyHashPatch,
   buildCreateSurveyMountSubmitResetPatch,
   buildCreateSurveyNetworkSwitchPatch,
-  buildCreateSurveyGateOptions,
   buildCreateSurveyGateObjectsAndRecipients,
   buildCreateSurveyNewQuestionDraft,
   buildCreateSurveyOpenLockKeyPatch,
@@ -135,6 +145,8 @@ import {
 } from './createQuestionsAndSurveysHelpers.js';
 import { sanitizeDocumentUrls } from './createQuestionsAndSurveysDocumentUrlHelpers';
 import {
+  resolveCreateQuestionsManagedCacheSeedTargets,
+  resolveCreateQuestionsManagedWorkerCacheIdentity,
   hasSubmittedResourcesInManagedCache,
   readManagedCacheSnapshot,
   selectManagedNetBucketSnapshot,
@@ -863,49 +875,11 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       ? (props.sessionConfig as CreateSurveySessionConfigLike)
       : EMPTY_SESSION_CONFIG;
 
-  getResolvedSessionConfig = (
-    props: CreateQuestionsAndSurveysProps = this.props,
-  ): CreateSurveyResolvedSessionConfig => {
-    const propConfig = this.getSessionConfig(props);
-    const propsSlug = resolveActiveSessionSlug({
-      activeSessionSlug: props.activeSessionSlug,
-      sessionSlug: props.sessionSlug,
-    });
-    const slug = normalizeSessionSlug(propConfig.slug || propsSlug || '');
-    const canonicalConfig = getSessionConfigBySlug(slug) || {};
-    const contractsFromProps = props.contracts && typeof props.contracts === 'object' ? props.contracts : {};
-
-    const mergedContracts = mergeSessionContractMaps(
-      canonicalConfig.contracts,
-      contractsFromProps,
-      propConfig.contracts,
-    );
-    const resolvedNetworkChainId =
-      Number(
-        propConfig.networkChainId ||
-          propConfig?.contracts?.surveys?.chainId ||
-          propConfig?.contracts?.sbtFactory?.chainId ||
-          propConfig?.__registry?.chainId ||
-          propConfig?.__registry?.registryChainId ||
-          canonicalConfig.networkChainId ||
-          canonicalConfig?.contracts?.surveys?.chainId ||
-          canonicalConfig?.contracts?.sbtFactory?.chainId ||
-          canonicalConfig?.__registry?.chainId ||
-          canonicalConfig?.__registry?.registryChainId ||
-          props.networkChainId ||
-          props.network?.id ||
-          props.network?.chainId ||
-          0,
-      ) || null;
-
-    return {
-      ...canonicalConfig,
-      ...propConfig,
-      slug,
-      contracts: mergedContracts,
-      networkChainId: resolvedNetworkChainId,
-    };
-  };
+  getResolvedSessionConfig = (props: CreateQuestionsAndSurveysProps = this.props): CreateSurveyResolvedSessionConfig =>
+    resolveCreateSurveySessionConfig({
+      propConfig: this.getSessionConfig(props),
+      props,
+    }) as CreateSurveyResolvedSessionConfig;
 
   getSessionConfig = (props: CreateQuestionsAndSurveysProps = this.props): CreateSurveySessionConfigLike =>
     props.sessionConfig && typeof props.sessionConfig === 'object'
@@ -926,19 +900,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       sessionConfigIn && typeof sessionConfigIn === 'object'
         ? (sessionConfigIn as CreateSurveySessionConfigLike)
         : this.getResolvedSessionConfig(props);
-    return (
-      Number(
-        sessionConfig?.networkChainId ||
-          sessionConfig?.contracts?.surveys?.chainId ||
-          sessionConfig?.contracts?.sbtFactory?.chainId ||
-          sessionConfig?.__registry?.chainId ||
-          sessionConfig?.__registry?.registryChainId ||
-          props.networkChainId ||
-          props.network?.id ||
-          props.network?.chainId ||
-          0,
-      ) || null
-    );
+    return resolveCreateSurveySessionChainId(sessionConfig, props);
   };
 
   resolveTargetNetwork = (
@@ -963,13 +925,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   resolveGateOptions = (
     cfgIn: unknown = this.getResolvedSessionConfig(),
     { isStandaloneQuestion = this.state?.isStandaloneQuestion }: CreateSurveyGateOptionsArgs = {},
-  ): CreateSurveyGateOptionsResult => {
-    return buildCreateSurveyGateOptions({
-      cfg: cfgIn,
+  ): CreateSurveyGateOptionsResult =>
+    resolveCreateSurveyGateOptions({
       isStandaloneQuestion,
+      sessionConfig: cfgIn,
       sessionLabel: this.resolveLockAudienceSessionName(cfgIn),
     }) as CreateSurveyGateOptionsResult;
-  };
 
   ensureResolvedSessionConfigForSubmit = async (
     sessionConfigIn: unknown = this.getResolvedSessionConfig(),
@@ -1043,25 +1004,32 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
   };
 
   resolveLitHooksForSubmit = (sessionConfig: unknown, chainIdFallback: unknown): CreateSurveyLitHooks | null => {
+    const inputSessionConfig = asPlainRecord(sessionConfig);
+    const projection = resolveSessionCapabilityProjection(inputSessionConfig);
+    const workerCanonicalBoundary = claimsWorkerCanonicalAuthority(inputSessionConfig);
+    if (workerCanonicalBoundary && (!projection.profileValid || !projection.isWorkerCanonical)) return null;
+
     const scopedLitHooks =
       this.props.litHooks && typeof this.props.litHooks === 'object'
         ? (this.props.litHooks as CreateSurveyLitHooks)
         : null;
     if (scopedLitHooks && typeof scopedLitHooks.saveKey === 'function') return scopedLitHooks;
 
-    const globalLitHooks = getGlobalLitHooks() as CreateSurveyLitHooks | null;
-    if (globalLitHooks && typeof globalLitHooks.saveKey === 'function') return globalLitHooks;
-
+    if (!workerCanonicalBoundary) {
+      const globalLitHooks = getGlobalLitHooks() as CreateSurveyLitHooks | null;
+      if (globalLitHooks && typeof globalLitHooks.saveKey === 'function') return globalLitHooks;
+    }
     const sessionSlug = normalizeSessionSlug(this.getActiveSessionSlug() || '');
-    const registrySessionConfig = sessionSlug ? sessionRegistryStore.getSessionConfig(sessionSlug) : null;
-    const mergedSessionConfig = mergeCreateSurveySessionConfigWithRegistry({
-      sessionConfig,
-      registryConfig: registrySessionConfig,
-      slug: sessionSlug,
-    });
+    const resolvedLitSessionConfig = workerCanonicalBoundary
+      ? inputSessionConfig
+      : mergeCreateSurveySessionConfigWithRegistry({
+          sessionConfig: inputSessionConfig,
+          registryConfig: sessionSlug ? sessionRegistryStore.getSessionConfig(sessionSlug) : null,
+          slug: sessionSlug,
+        });
     const { chainId, litNetwork, litChain, accessControlConditions, userMaxPrice, chipotle } =
       resolveMainSiteLitSessionConfig({
-        sessionConfig: mergedSessionConfig,
+        sessionConfig: resolvedLitSessionConfig,
         networkChainIdFallback: Number(chainIdFallback || 0) || null,
       });
     if (!chipotle) return null;
@@ -1662,75 +1630,20 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
     return removeDuplicateCreateSurveyQuestions(questions);
   };
 
-  resolveManagedCacheSeedTargets = (): CreateQuestionsManagedCacheSeedTargets => {
-    const resolveRouteSlug = (): string => {
-      try {
-        const pathname =
-          typeof window !== 'undefined' && window.location && window.location.pathname ? window.location.pathname : '';
-        if (!pathname.startsWith('/session/')) return '';
-        const routeSlug = (pathname.split('/').filter(Boolean)[1] || '').trim();
-        return normalizeSessionSlug(routeSlug);
-      } catch (_) {
-        return '';
-      }
-    };
+  resolveManagedCacheSeedTargets = (): CreateQuestionsManagedCacheSeedTargets =>
+    resolveCreateQuestionsManagedCacheSeedTargets({
+      activeSessionSlug: this.props.activeSessionSlug,
+      currentSessionSlug: this.getActiveSessionSlug(),
+      network: this.props.network,
+      networkChainId: this.props.networkChainId,
+      resolveSessionChainId: (cfg) => this.resolveSessionChainId(cfg),
+      routePathname: typeof window !== 'undefined' ? window.location?.pathname : '',
+      sessionConfig: this.getSessionConfig(),
+      sessionSlug: this.props.sessionSlug,
+    });
 
-    const sessionConfig = this.getSessionConfig();
-    const rawSlugCandidates = Array.from(
-      new Set(
-        [
-          sessionConfig?.slug,
-          this.props.activeSessionSlug,
-          this.props.sessionSlug,
-          this.getActiveSessionSlug(),
-          resolveRouteSlug(),
-        ].map((slug: unknown) => normalizeSessionSlug(slug || '')),
-      ),
-    );
-    const slugCandidates = rawSlugCandidates.filter((slug: string) => slug !== '');
-    const primarySlug = slugCandidates[0] || '';
-    const cfgForNet = getSessionConfigBySlug(primarySlug) || sessionConfig || {};
-
-    const netIdCandidates = Array.from(
-      new Set(
-        [
-          this.resolveSessionChainId(sessionConfig),
-          cfgForNet?.networkChainId,
-          cfgForNet?.contracts?.surveys?.chainId,
-          cfgForNet?.contracts?.sbtFactory?.chainId,
-          this.props.networkChainId,
-          this.props.network?.id,
-          this.props.network?.chainId,
-        ]
-          .map((value: unknown) => String(value ?? '').trim())
-          .filter(Boolean),
-      ),
-    );
-
-    if (!netIdCandidates.length) {
-      ['questionsCache', 'surveysCache'].forEach((namespace: string) => {
-        const existing = readManagedCacheSnapshot(namespace, primarySlug);
-        if (!existing || typeof existing !== 'object') return;
-        Object.keys(existing).forEach((key: string) => {
-          const normalized = String(key || '').trim();
-          if (normalized) netIdCandidates.push(normalized);
-        });
-      });
-    }
-
-    const normalizedNetIds = Array.from(
-      new Set(
-        netIdCandidates
-          .map((value: unknown) => String(value || '').trim())
-          .filter((value: string) => value && value !== 'undefined' && value !== 'null'),
-      ),
-    );
-
-    return {
-      primarySlug,
-      primaryNetId: normalizedNetIds[0] || '',
-    };
-  };
+  resolveManagedWorkerCacheIdentity = (target: CreateQuestionsManagedCacheSeedTargets) =>
+    resolveCreateQuestionsManagedWorkerCacheIdentity({ sessionConfig: this.getSessionConfig(), target });
 
   seedUploadedQuestionsCache: SeedUploadedQuestionsCache = async ({
     questionDataArray = [],
@@ -1852,9 +1765,11 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
       const existing = readManagedCacheSnapshot('questionsCache', primarySlug);
       const next: ManagedCacheSnapshot = isObjectLikeRecord(existing) ? { ...existing } : {};
-      const netBucket: ManagedCacheBucket = isObjectLikeRecord(next[primaryNetId])
-        ? { ...(next[primaryNetId] as UnknownRecord) }
-        : {};
+      const existingNetBucket = next[primaryNetId];
+      const canReuseNetBucket =
+        !workerCacheIdentity || workerCanonicalCacheIdentityMatches(existingNetBucket, workerCacheIdentity);
+      const netBucket: ManagedCacheBucket =
+        canReuseNetBucket && isObjectLikeRecord(existingNetBucket) ? { ...(existingNetBucket as UnknownRecord) } : {};
       const questions: ManagedResourceMap = isObjectLikeRecord(netBucket.questions) ? { ...netBucket.questions } : {};
 
       normalizedRows.forEach((row) => {
@@ -1881,6 +1796,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
       // Best-effort write-through: failures here must not fail successful on-chain submits.
       try {
+        if (workerCacheIdentity) {
+          const currentIdentity = this.resolveManagedWorkerCacheIdentity(cacheTarget);
+          if (!currentIdentity || currentIdentity.key !== workerCacheIdentity.key) return false;
+        }
         await writeCreateSurveyCacheOptimistic('questionsCache', primarySlug, next);
       } catch (error: unknown) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed questions cache write-through', {
@@ -1943,6 +1862,9 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
       const existing = readManagedCacheSnapshot('surveysCache', primarySlug);
       let next: ManagedCacheSnapshot = isObjectLikeRecord(existing) ? { ...existing } : {};
+      if (workerCacheIdentity && !workerCanonicalCacheIdentityMatches(next[primaryNetId], workerCacheIdentity)) {
+        next[primaryNetId] = {};
+      }
       next = ensureManagedSurveysNet(next, primaryNetId);
       const netBucket = next[primaryNetId] as ManagedCacheBucket;
       const surveys = netBucket.surveys as ManagedResourceMap;
@@ -1960,6 +1882,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
       }
 
       try {
+        if (workerCacheIdentity) {
+          const currentIdentity = this.resolveManagedWorkerCacheIdentity(cacheTarget);
+          if (!currentIdentity || currentIdentity.key !== workerCacheIdentity.key) return false;
+        }
         await writeCreateSurveyCacheOptimistic('surveysCache', primarySlug, next);
       } catch (error: unknown) {
         surveyLog.warn('[CreateQuestionsAndSurveys] Failed to seed surveys cache write-through', {
@@ -2252,7 +2178,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         surveyLockGateIds,
       });
 
-    const chainIdFallback = this.resolveSessionChainId(sessionConfig);
+    const chainIdFallback = isPureWorkerCanonicalAuthoring ? null : this.resolveSessionChainId(sessionConfig);
 
     const litHooks = needsLit ? this.resolveLitHooksForSubmit(sessionConfig, chainIdFallback) : null;
     if (needsLit) {
@@ -2438,21 +2364,35 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
             path: `question metadata[${index}]`,
           });
         });
-        const surveyIdsForContract = uniqueQuestions.map((q) => q.associatedSurveyId || ethers.constants.HashZero);
-
-        // Step 2: contracts submit
+        // Step 2: publish the durable index entry for this session.
         this.setState(buildCreateSurveySubmitProgressPatch({ progress: 50, submitStep: 2 }));
 
         const questionIdsForContract = uniqueQuestions.map((q) => q.id);
-        const addQuestionsResult = await contractScriptsForSubmit.addQuestions(
-          this.props.provider,
-          questionIdsForContract,
-          questionDataArray,
-          surveyIdsForContract,
-          sessionKeyOrCfg,
-        );
-        if (!addQuestionsResult || !addQuestionsResult.receipt) {
-          throw new Error('addQuestions did not return a transaction receipt.');
+        let submittedQuestions: unknown[] = [];
+        if (isWorkerCanonicalAuthoring) {
+          const workerResult = await workerCanonicalAuthoringPort.publishQuestions({
+            account: this.props.account,
+            providerLike: this.props.provider,
+            questions: questionDataArray,
+            sessionConfig,
+            sessionSlug,
+          });
+          submittedQuestions = workerResult.uploadedQuestions;
+        } else {
+          const surveyIdsForContract = uniqueQuestions.map((q) => q.associatedSurveyId || ethers.constants.HashZero);
+          const addQuestionsResult = await contractScriptsForSubmit.addQuestions(
+            this.props.provider,
+            questionIdsForContract,
+            questionDataArray,
+            surveyIdsForContract,
+            sessionKeyOrCfg,
+          );
+          if (!addQuestionsResult || !addQuestionsResult.receipt) {
+            throw new Error('addQuestions did not return a transaction receipt.');
+          }
+          submittedQuestions = Array.isArray(addQuestionsResult.uploadedQuestions)
+            ? addQuestionsResult.uploadedQuestions
+            : [];
         }
 
         if (!this.props.preformedQuestions) {
@@ -2467,7 +2407,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           this.setState(
             buildCreateSurveyQuestionsSubmitSuccessPatch({
               resetDraft: true,
-              uploadedQuestions: contractUploadedQuestions || [],
+              uploadedQuestions: submittedQuestions,
             }),
             this.startCacheWatch,
           );
@@ -2479,7 +2419,7 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
           });
           this.setState(
             buildCreateSurveyQuestionsSubmitSuccessPatch({
-              uploadedQuestions: contractUploadedQuestions || [],
+              uploadedQuestions: submittedQuestions,
             }),
             () => {
               this.startCacheWatch();
@@ -2598,10 +2538,12 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
 
         // Fetch current block number for creationBlock optimization
         let creationBlock = 0;
-        try {
-          creationBlock = await contractScriptsForSubmit.getLatestBlockNumber(this.props.provider, sessionKeyOrCfg);
-        } catch (e) {
-          surveyLog.warn('Could not fetch creationBlock, defaulting to 0', e);
+        if (!isWorkerCanonicalAuthoring) {
+          try {
+            creationBlock = await contractScriptsForSubmit.getLatestBlockNumber(this.props.provider, sessionKeyOrCfg);
+          } catch (e) {
+            surveyLog.warn('Could not fetch creationBlock, defaulting to 0', e);
+          }
         }
 
         let surveyTitleValue: unknown = title;
@@ -2670,45 +2612,69 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
         // Step 1: Upload to Arweave (survey.json)
         this.setState(buildCreateSurveySubmitProgressPatch({ progress: 30, submitStep: 1 }));
         let surveyArweaveTxId = '';
-        const cloudflareSurveyStorage = usesCloudflareSessionStorageForCreateSurvey(sessionConfig, {
-          resource: 'surveys',
-        });
-        if (!cloudflareSurveyStorage) {
-          try {
-            surveyArweaveTxId = String(
-              (await arweaveScripts.uploadDataToArweave(surveyDataString, 'json', {
-                arweaveJwk: arweaveKey?.arweaveJwk || '',
-                forceDirectArweaveUpload: arweaveKey?.source === 'local' && !!arweaveKey?.arweaveJwk,
-                sessionSlug,
-                sessionConfig,
-                context: {
-                  account: this.props.account,
-                  providerLike: this.props.provider,
-                  chainId: chainIdFallback,
-                },
-              })) || '',
-            );
-          } catch (error: unknown) {
-            const resettableError = error as { resetSubmitProgress?: boolean };
-            if (error && typeof error === 'object') {
-              resettableError.resetSubmitProgress = true;
+        if (!isWorkerCanonicalAuthoring) {
+          const arweaveKey = await getEffectiveArweaveKey({
+            sessionSlug,
+            sessionConfig: sessionConfig as CreateSurveyEffectiveArweaveSessionConfig,
+            context: {
+              account: this.props.account,
+              providerLike: this.props.provider as CreateSurveyResourceKeyProviderLike,
+              chainId: chainIdFallback,
+            },
+          });
+          const surveyDataString = JSON.stringify(completeSurveyData);
+          const cloudflareSurveyStorage = usesCloudflareSessionStorageForCreateSurvey(sessionConfig, {
+            resource: 'surveys',
+          });
+          if (!cloudflareSurveyStorage) {
+            try {
+              surveyArweaveTxId = String(
+                (await arweaveClient.uploadDataToArweave(surveyDataString, 'json', {
+                  arweaveJwk: arweaveKey?.arweaveJwk || '',
+                  forceDirectArweaveUpload: arweaveKey?.source === 'local' && !!arweaveKey?.arweaveJwk,
+                  sessionSlug,
+                  sessionConfig,
+                  context: {
+                    account: this.props.account,
+                    providerLike: this.props.provider,
+                    chainId: chainIdFallback,
+                  },
+                })) || '',
+              );
+            } catch (error: unknown) {
+              const resettableError = error as { resetSubmitProgress?: boolean };
+              if (error && typeof error === 'object') {
+                resettableError.resetSubmitProgress = true;
+              }
+              throw error;
             }
-            throw error;
           }
         }
 
         // Step 2: publish the durable session index or the configured contract.
         this.setState(buildCreateSurveySubmitProgressPatch({ progress: 60, submitStep: 2 }));
-        const addSurveyResult = await contractScriptsForSubmit.addSurveyWithQuestions(
-          this.props.provider,
-          surveyIDForUpload,
-          completeSurveyData,
-          questionIdsForContract,
-          questionDataArray,
-          sessionKeyOrCfg,
-        );
-        if (!addSurveyResult || !addSurveyResult.receipt) {
-          throw new Error('addSurveyWithQuestions did not return a transaction receipt.');
+        let addSurveyResult: UnknownRecord;
+        if (isWorkerCanonicalAuthoring) {
+          addSurveyResult = await workerCanonicalAuthoringPort.publishSurvey({
+            account: this.props.account,
+            providerLike: this.props.provider,
+            questions: questionDataArray,
+            sessionConfig,
+            sessionSlug,
+            survey: completeSurveyData,
+          });
+        } else {
+          addSurveyResult = await contractScriptsForSubmit.addSurveyWithQuestions(
+            this.props.provider,
+            surveyIDForUpload,
+            completeSurveyData,
+            questionIdsForContract,
+            questionDataArray,
+            sessionKeyOrCfg,
+          );
+          if (!addSurveyResult || !addSurveyResult.receipt) {
+            throw new Error('addSurveyWithQuestions did not return a transaction receipt.');
+          }
         }
         const submittedSurveyStorageRef = resolvePayloadStorageRef({
           storageRef: addSurveyResult.surveyStorageRef,
@@ -3683,13 +3649,19 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
               className={buildCreateSurveySubmitButtonClassName(styles, isSubmitting, submissionError)}
               data-testid={E2E_TESTIDS.CREATE_SUBMIT}
               onClick={
-                this.state.needsNetworkSwitch && this.props.provider === 'wagmi' && this.props.loginComplete
+                !isPureWorkerCanonicalAuthoring &&
+                this.state.needsNetworkSwitch &&
+                this.props.provider === 'wagmi' &&
+                this.props.loginComplete
                   ? this.switchToCorrectNetwork
                   : this.handleSubmitButtonClick
               }
               disabled={
                 isSubmitting ||
-                (this.state.needsNetworkSwitch && this.props.provider === 'wagmi' && this.props.loginComplete
+                (!isPureWorkerCanonicalAuthoring &&
+                this.state.needsNetworkSwitch &&
+                this.props.provider === 'wagmi' &&
+                this.props.loginComplete
                   ? false
                   : submissionError
                     ? false
@@ -3717,7 +3689,10 @@ class CreateQuestionsAndSurveys extends Component<CreateQuestionsAndSurveysProps
                     {submissionError}
                     <span className={styles.copyHint}>&nbsp;— click to copy</span>
                   </>
-                ) : this.state.needsNetworkSwitch && this.props.provider === 'wagmi' && this.props.loginComplete ? (
+                ) : !isPureWorkerCanonicalAuthoring &&
+                  this.state.needsNetworkSwitch &&
+                  this.props.provider === 'wagmi' &&
+                  this.props.loginComplete ? (
                   'Switch to correct network → Submit'
                 ) : isStandaloneQuestion ? (
                   'Create Questions'

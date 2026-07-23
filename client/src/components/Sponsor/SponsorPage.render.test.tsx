@@ -385,7 +385,7 @@ describe('SponsorPage', () => {
     }
   });
 
-  it('uploads an encrypted sponsored bundle and renders a share URL with tx query plus hash key', async () => {
+  it('uploads an encrypted sponsored bundle and renders an id-only URL with a separate memory-only key', async () => {
     getFetchMock().mockImplementation((url: any) =>
       Promise.resolve(
         String(url).endsWith('/auth/nonce')

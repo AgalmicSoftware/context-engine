@@ -296,7 +296,7 @@ describe('SessionWizard blank bundle render regression', () => {
       resolveSponsoredBundle = resolve;
     });
 
-    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
     sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
@@ -380,7 +380,7 @@ describe('SessionWizard blank bundle render regression', () => {
       resolveSponsoredBundle = resolve;
     });
 
-    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
     sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({

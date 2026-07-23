@@ -81,6 +81,7 @@ class AccountSection extends Component<AccountSectionProps> {
           sendTestETH={(amountToSend: unknown) => this.props.sendTestETH?.(amountToSend)}
           demoMode={this.props.demoMode}
           toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
+          sessionConfig={this.props.sessionConfig}
         />
         {topRight}
       </>

@@ -16,7 +16,6 @@ import {
   buildOpaqueActionId,
   createTelegramCallbackAction,
   createRandomTelegramCallbackAction,
-  createRandomTelegramStartAction,
   createTelegramStartAction,
   parseOpaqueActionId,
 } from './opaqueActions.mjs';
@@ -140,7 +139,6 @@ const DM_VOICE_TRANSCRIBE_RATE_KV_PREFIX = 'telegram:dm-voice-transcribe-rate:v1
 const DEFAULT_ACTION_TTL_SECONDS = 30 * 60;
 const DEFAULT_GROUP_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 const GROUP_MINI_APP_LAUNCH_TTL_SECONDS = DEFAULT_GROUP_SESSION_TTL_SECONDS;
-const DEFAULT_GROUP_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
 const QUESTION_GENERATION_BATCH_TTL_SECONDS = 24 * 60 * 60;
 const RESULT_PHOTO_TTL_SECONDS = 15 * 60;
 const SUBMIT_REQUEST_TTL_SECONDS = 30 * 24 * 60 * 60;
@@ -325,12 +323,6 @@ function normalizeBotUsername(value = '') {
 
 function sanitizeSessionSlug(value = '') {
   return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
-}
-
-function normalizePositiveInteger(value, fallback) {
-  const number = Number(value);
-  if (!Number.isFinite(number) || number <= 0) return fallback;
-  return Math.floor(number);
 }
 
 function sessionLabel(session = {}) {
@@ -4449,7 +4441,7 @@ function telegramGroupAccessDeniedText(session = {}, access = {}) {
     `This Telegram group is not approved for ${sessionLabel(session)}.`,
     chatId ? `Group ID: ${chatId}` : '',
     '',
-    `Ask a session admin to add this group to ${sessionSlug}'s approved Telegram groups or send an admin group invite link, then run /join ${sessionSlug} again.`,
+    `Ask a session admin to run /join ${sessionSlug} in this group, or add this group to ${sessionSlug}'s approved Telegram groups, then try again.`,
   ].filter((line) => line !== '').join('\n');
 }
 
@@ -4832,7 +4824,7 @@ async function buildGroupIdResponse({
       normalized.chat.title ? `Group: ${normalized.chat.title}` : '',
       resolved.ok ? `Selected session: ${resolved.session.sessionSlug}` : 'Selected session: none',
       '',
-      'Add this ID to the session approved Telegram groups list, then run /join <session> here.',
+      'Add this ID to the session approved Telegram groups list, or have a configured session admin run /join <session> here.',
     ].filter(Boolean).join('\n'),
     screen: 'telegram_group_id',
     command,
@@ -7661,81 +7653,20 @@ async function makeResultsExposureToggleButton({
   });
 }
 
-async function makeTelegramGroupApprovalLinkButton({
-  env,
-  normalized,
-  sessionSlug = '',
-  seed = '',
-  createdAt,
-} = {}) {
-  return makeCallbackButton({
-    env,
-    label: 'Add Bot To Group Link',
-    action: TELEGRAM_BRIDGE_ACTIONS.CREATE_TELEGRAM_GROUP_APPROVAL_LINK,
-    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
-    serverContextRef: { sessionSlug },
-    seed: seed || `telegram_group_link|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
-    createdAt,
-  });
-}
-
-function telegramGroupApprovalLinkTtlSeconds(env = {}) {
-  return Math.max(60, Math.min(
-    30 * 24 * 60 * 60,
-    normalizePositiveInteger(
-      env.AGENT_BRIDGE_TELEGRAM_GROUP_APPROVAL_LINK_TTL_SECONDS ||
-        env.TELEGRAM_GROUP_APPROVAL_LINK_TTL_SECONDS,
-      DEFAULT_GROUP_APPROVAL_LINK_TTL_SECONDS
-    )
-  ));
-}
-
-function actionRecordExpired(record = {}, createdAt = null) {
-  const expiresMs = Date.parse(safeString(record.expiresAt));
-  if (!Number.isFinite(expiresMs)) return false;
-  const nowMs = Date.parse(createdAt || nowIso());
-  return Number.isFinite(nowMs) && nowMs > expiresMs;
-}
-
-function telegramAddBotToGroupUrl(env = {}, payload = '') {
-  const username = normalizeBotUsername(env.TELEGRAM_BOT_USERNAME);
-  const token = safeString(payload);
-  return username && token
-    ? `https://t.me/${username}?startgroup=${encodeURIComponent(token)}`
-    : '';
-}
-
-export async function mintTelegramGroupApprovalLink({
-  env = {},
-  session = {},
-  approvedByTelegramUserId = '',
-  approvedByAccountAddress = '',
-  createdAt,
-} = {}) {
-  const ttlSeconds = telegramGroupApprovalLinkTtlSeconds(env);
-  const expiresAt = new Date(Date.parse(createdAt || nowIso()) + ttlSeconds * 1000).toISOString();
-  const start = createRandomTelegramStartAction({
-    action: TELEGRAM_BRIDGE_ACTIONS.APPROVE_TELEGRAM_GROUP,
-    lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
-    serverContextRef: {
-      sessionSlug: session.sessionSlug,
-      approvedByTelegramUserId: safeString(approvedByTelegramUserId),
-      approvedByAccountAddress: safeString(approvedByAccountAddress),
-    },
-    createdAt,
-    expiresAt,
-  });
-  await persistActionRecord(env, start.deepLinkPayload, {
-    ...start.record,
-    deepLinkPayload: start.deepLinkPayload,
-    oneUse: true,
-  }, {
-    ttlSeconds,
-  });
+export function telegramGroupApprovalGuidance(sessionSlug = '') {
+  const slug = sanitizeSessionSlug(sessionSlug);
+  const joinCommand = `/join ${slug || '<session>'}`;
   return {
-    url: telegramAddBotToGroupUrl(env, start.deepLinkPayload),
-    expiresAt,
-    startPayload: start.deepLinkPayload,
+    manualApprovalRequired: true,
+    reason: 'explicit_group_admin_confirmation_required',
+    joinCommand,
+    groupIdCommand: '/group_id',
+    guidance: [
+      'For security, Context Engine does not create authorization-bearing group links.',
+      `Add the bot to the target Telegram group, then have a configured session admin run ${joinCommand} inside that group.`,
+      'The worker verifies the admin and target group together before approving the attachment.',
+      'Operators can instead run /group_id in the target group and add that ID to the session approved Telegram groups list.',
+    ].join(' '),
   };
 }
 
@@ -7761,61 +7692,26 @@ async function buildTelegramGroupApprovalLinkResponse({
       extra: { reason: context.reason, accountAddress: context.accountAddress || '' },
     });
   }
-  const minted = await mintTelegramGroupApprovalLink({
-    env,
-    session: context.session,
-    approvedByTelegramUserId: normalized.user.telegramUserId,
-    approvedByAccountAddress: context.manager.accountAddress,
-    createdAt,
-  });
-  if (!minted.url) {
-    return reply({
-      method,
-      chatId: normalized.chat.chatId,
-      messageId,
-      text: 'Could not create a Telegram group invite link because TELEGRAM_BOT_USERNAME is not configured.',
-      screen: 'telegram_group_approval_link_unavailable',
-      command,
-      normalized,
-      extra: { sessionSlug: context.session.sessionSlug, reason: 'telegram_bot_username_missing' },
-    });
-  }
-  const backButton = await makeCallbackButton({
-    env,
-    label: 'Back to Admin Actions',
-    action: TELEGRAM_BRIDGE_ACTIONS.VIEW_ADMIN_ACTIONS,
-    lane: TELEGRAM_CHAT_LANES.PRIVATE_ACCOUNT,
-    serverContextRef: { sessionSlug: context.session.sessionSlug },
-    seed: `telegram_group_link|back|${context.session.sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
-    createdAt,
-  });
+  const approval = telegramGroupApprovalGuidance(context.session.sessionSlug);
   return reply({
     method,
     chatId: normalized.chat.chatId,
     messageId,
     text: [
-      `Telegram group invite for ${sessionLabel(context.session)}`,
+      `Secure Telegram group approval for ${sessionLabel(context.session)}`,
       `Session: ${context.session.sessionSlug}`,
-      `Expires: ${minted.expiresAt}`,
       '',
-      'Send this one-use link to add the bot to a Telegram group. The first group that opens it is approved and selected for this session.',
+      approval.guidance,
       '',
-      minted.url,
+      `In-group command: ${approval.joinCommand}`,
     ].join('\n'),
-    replyMarkup: {
-      inline_keyboard: [
-        [{ text: 'Add Bot To Group', url: minted.url }],
-        [backButton],
-      ],
-    },
-    screen: 'telegram_group_approval_link',
+    screen: 'telegram_group_approval_guidance',
     command,
     normalized,
     extra: {
       sessionSlug: context.session.sessionSlug,
-      expiresAt: minted.expiresAt,
-      startPayload: minted.startPayload,
-      url: minted.url,
+      manualApprovalRequired: true,
+      reason: approval.reason,
     },
   });
 }
@@ -8224,13 +8120,6 @@ async function buildAdminActionsResponse({
     seed: `admin_actions|question_queue|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
     createdAt,
   })]);
-  rows.push([await makeTelegramGroupApprovalLinkButton({
-    env,
-    normalized,
-    sessionSlug,
-    seed: `admin_actions|group_link|${sessionSlug}|${normalized.user.telegramUserId}|${normalized.updateId}`,
-    createdAt,
-  })]);
   return reply({
     method,
     chatId: normalized.chat.chatId,
@@ -8242,6 +8131,7 @@ async function buildAdminActionsResponse({
       'Choose an admin action.',
       '',
       'Default session: /set_default <slug>',
+      `Approve a Telegram group: add the bot there, then run /join ${sessionSlug} in that group as a configured session admin.`,
       `Revoke group access: /group_revoke ${sessionSlug} <telegram_group_id>`,
     ].join('\n'),
     replyMarkup: { inline_keyboard: rows },
@@ -10158,120 +10048,28 @@ async function buildMiniAppVoiceDraftFallbackResponse({
 async function buildApproveTelegramGroupResponse({
   normalized,
   command,
-  env,
   record = {},
-  payload = '',
-  createdAt,
-  waitUntil = null,
 } = {}) {
-  if (normalized.chat?.isPrivate) {
-    return reply({
-      chatId: normalized.chat.chatId,
-      text: [
-        'This link approves a Telegram group.',
-        '',
-        'Open the Add Bot To Group link and choose a group instead of this private chat.',
-      ].join('\n'),
-      screen: 'telegram_group_approval_private_required',
-      command,
-      normalized,
-      extra: { startPayload: payload },
-    });
-  }
   const sessionSlug = sanitizeSessionSlug(record.serverContextRef?.sessionSlug);
-  const consumedGroupChatId = safeString(record.consumedGroupChatId);
-  if (record.consumedAt && consumedGroupChatId && consumedGroupChatId !== safeString(normalized.chat.chatId)) {
-    return reply({
-      chatId: normalized.chat.chatId,
-      text: [
-        'This group approval link has already been used.',
-        '',
-        'Ask a session admin to generate a fresh Add Bot To Group link.',
-      ].join('\n'),
-      screen: 'telegram_group_approval_token_used',
-      command,
-      normalized,
-      extra: {
-        startPayload: payload,
-        sessionSlug,
-        consumedGroupChatId,
-      },
-    });
-  }
-  if (!record.consumedAt && actionRecordExpired(record, createdAt)) {
-    return reply({
-      chatId: normalized.chat.chatId,
-      text: [
-        'This group approval link has expired.',
-        '',
-        'Ask a session admin to generate a fresh Add Bot To Group link.',
-      ].join('\n'),
-      screen: 'telegram_group_approval_token_expired',
-      command,
-      normalized,
-      extra: { startPayload: payload, sessionSlug },
-    });
-  }
-  const policy = await loadSessionPolicy(env);
-  const resolved = resolveSessionInvocation(policy, sessionSlug);
-  if (!resolved.ok) {
-    return errorReply({
-      normalized,
-      command,
-      reason: resolved.reason,
-      text: `Session "${sessionSlug}" is not available. Ask a session admin for a fresh group invite link.`,
-    });
-  }
-  const approval = await persistTelegramGroupApproval({
-    env,
-    session: resolved.session,
-    normalized,
-    approvedByTelegramUserId: record.serverContextRef?.approvedByTelegramUserId || '',
-    approvedByAccountAddress: record.serverContextRef?.approvedByAccountAddress || '',
-    approvalTokenId: payload,
-    createdAt,
-  });
-  if (!approval.ok) {
-    return errorReply({
-      normalized,
-      command,
-      reason: approval.reason || 'telegram_group_approval_failed',
-      text: `Could not approve this Telegram group: ${approval.reason || 'telegram_group_approval_failed'}.`,
-    });
-  }
-  if (!record.consumedAt) {
-    await persistActionRecord(env, payload, {
-      ...record,
-      consumedAt: createdAt,
-      consumedGroupChatId: safeString(normalized.chat.chatId),
-      consumedGroupTitle: safeString(normalized.chat.title),
-    }, {
-      ttlSeconds: DEFAULT_GROUP_APPROVAL_LINK_TTL_SECONDS,
-    });
-  }
-  const joined = await buildJoinResponse({
-    normalized,
-    command,
-    env,
-    sessionSlugOverride: resolved.session.sessionSlug,
-    createdAt,
-    waitUntil,
-  });
-  if (joined?.response?.text) {
-    joined.response.text = [
-      `Group approved for ${sessionLabel(resolved.session)}.`,
+  const approval = telegramGroupApprovalGuidance(sessionSlug);
+  return reply({
+    chatId: normalized.chat.chatId,
+    text: [
+      'This legacy group-approval link is disabled and cannot authorize a Telegram group.',
       '',
-      joined.response.text,
-    ].join('\n');
-  }
-  joined.screen = 'telegram_group_approved';
-  joined.extra = {
-    ...(joined.extra || {}),
-    sessionSlug: resolved.session.sessionSlug,
-    groupChatId: normalized.chat.chatId,
-    approvalKey: approval.key,
-  };
-  return joined;
+      approval.guidance,
+      '',
+      `In-group command: ${approval.joinCommand}`,
+    ].join('\n'),
+    screen: 'telegram_group_approval_link_disabled',
+    command,
+    normalized,
+    extra: {
+      sessionSlug,
+      manualApprovalRequired: true,
+      reason: 'group_approval_link_disabled',
+    },
+  });
 }
 
 async function buildStartPayloadResponse({
@@ -10346,11 +10144,7 @@ async function buildStartPayloadResponse({
     return buildApproveTelegramGroupResponse({
       normalized,
       command,
-      env,
       record,
-      payload: parsed.actionId,
-      createdAt,
-      waitUntil,
     });
   }
   if (record.action === TELEGRAM_BRIDGE_ACTIONS.AGENT_ACTION_MENU) {

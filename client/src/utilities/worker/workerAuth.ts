@@ -23,7 +23,42 @@ import {
   resolveWorkerAllowDemoFallback,
   resolveWorkerSessionContext,
 } from './workerSessionResolution.js';
+import {
+  buildTokenCacheEnvelope,
+  buildTokenCacheKey,
+  clearAllTokenCaches,
+  clearTokenCache,
+  normalizeTokenCacheEntry,
+  readScopedTokenCache,
+  writeTokenCache,
+} from './workerAuthTokenCache.js';
+import {
+  buildAnonymousHeaders,
+  buildWorkerAuthNonceHeaders,
+  isStreamBody,
+  mergeHeaders,
+  shouldRetryAnonymousWithoutRateId,
+  stripAnonymousRateIdHeader,
+} from './workerAuthAnonymousHeaders.js';
+import {
+  readRequestApiKey,
+  shouldFallbackToAuthenticatedFlow,
+  shouldRetryAuthenticatedResponse,
+} from './workerAuthFallbackPolicy.js';
+import { fetchWorkerAuthEndpoint, resolveAdminActionAudience } from './workerAuthReachability.js';
 import { ADMIN_ACTION_TYPES, buildAdminActionBodyHash, buildAdminActionTypedData } from './adminTypedData.mjs';
+import {
+  assertWorkerAuthResponseIdentity,
+  bindWorkerAuthRequestIdentity,
+  resolveAdminActionSessionId,
+  resolveWorkerAuthSessionId,
+  type WorkerLoginResponse,
+} from './workerAuthSessionIdentity.js';
+import {
+  createWorkerAuthRemoteError,
+  NONCE_MISMATCH_ERROR,
+  ONCHAIN_GATE_UNAVAILABLE_ERROR,
+} from './workerAuthRemoteError.js';
 
 const accountLog = createLogger('account');
 
@@ -32,7 +67,94 @@ const LOGIN_GATE_UNAVAILABLE_RETRY_BASE_MS = 700;
 const ADMIN_ACTION_EXPIRATION_WINDOW_SECONDS = 5 * 60;
 export { normalizeWorkerUrl };
 
-const shouldAllowDemoSessionFallback = (allowDemoFallback) =>
+type UnknownRecord = Record<string, unknown>;
+type CryptoProviderLike = Parameters<typeof cryptoUtils._getProvider>[0];
+type WorkerAuthContext = {
+  account?: unknown;
+  chainId?: unknown;
+  provider?: unknown;
+  providerLike?: unknown;
+};
+type WorkerProvider = ethers.providers.ExternalProvider & {
+  address?: unknown;
+  request?: (request: { method: string; params?: unknown[] }) => Promise<unknown>;
+  selectedAddress?: unknown;
+};
+type WorkerAuthStoreState = {
+  profile?: {
+    account?: unknown;
+    network?: {
+      chainId?: unknown;
+      id?: unknown;
+    };
+    provider?: unknown;
+  };
+};
+type SleepOptions = {
+  requestAddress?: unknown;
+  requestAuthEpoch?: number;
+  signal?: AbortSignal | null;
+};
+type ResolveWorkerTokenRequestContextOptions = {
+  allowDemoFallback?: boolean;
+  context?: unknown;
+  resolvedAddress?: unknown;
+  resolveWorkerUrl?: boolean;
+  sessionConfig?: unknown;
+  sessionSlug?: unknown;
+  workerUrl?: unknown;
+};
+type BuildSiweMessageOptions = {
+  address?: unknown;
+  chainId?: unknown;
+  domain?: unknown;
+  expirationTime?: string;
+  issuedAt?: string;
+  nonce?: unknown;
+  statement?: unknown;
+  uri?: unknown;
+};
+type AdminActionAuthOptions = {
+  action?: unknown;
+  body?: unknown;
+  context?: unknown;
+  nonce?: unknown;
+  sessionId?: unknown;
+  slug?: unknown;
+  workerUrl?: unknown;
+};
+type BootstrapAdminAuthOptions = {
+  context?: unknown;
+  nonce?: unknown;
+  slug?: unknown;
+  statement?: string;
+  workerUrl?: unknown;
+};
+type WorkerSessionTokenOptions = ResolveWorkerTokenRequestContextOptions & {
+  requestContext?: WorkerTokenRequestContext;
+};
+type WorkerFetchAuthOptions = ResolveWorkerTokenRequestContextOptions & {
+  fallbackOnGateUnavailable?: boolean;
+  preferAnonymous?: boolean;
+  retry?: boolean;
+};
+type InFlightTokenRequest = {
+  abortController: {
+    abort: () => void;
+    signal: AbortSignal | null;
+  };
+  promise: Promise<string> | null;
+};
+const asStoreState = (value: unknown): WorkerAuthStoreState =>
+  value && typeof value === 'object' ? (value as WorkerAuthStoreState) : {};
+const asWorkerAuthContext = (value: unknown): WorkerAuthContext =>
+  value && typeof value === 'object' ? (value as WorkerAuthContext) : {};
+const getWorkerProvider = (providerLike: unknown): WorkerProvider =>
+  cryptoUtils._getProvider((providerLike || resolveDefaultProviderLike()) as CryptoProviderLike) as WorkerProvider;
+const getErrorMessage = (error: unknown): string =>
+  toStr(error && typeof error === 'object' ? (error as { message?: unknown }).message : '');
+
+const shouldAllowDemoSessionFallback = (allowDemoFallback?: boolean): boolean =>
   resolveWorkerAllowDemoFallback({
     allowDemoFallback,
     getDefaultAllowDemoFallback: defaultWorkerAuthAllowDemoFallback,
@@ -374,7 +496,8 @@ const resolveWorkerTokenRequestContext = async ({
     resolvedSigner,
     address,
     resolvedWorkerUrl,
-    storageKey: resolvedWorkerUrl ? buildTokenCacheKey({ workerUrl: resolvedWorkerUrl, slug, address }) : '',
+    sessionId,
+    storageKey: resolvedWorkerUrl ? buildTokenCacheKey({ workerUrl: resolvedWorkerUrl, slug, sessionId, address }) : '',
     authEpoch,
   };
 };
@@ -837,6 +960,7 @@ export const getWorkerSessionToken = async ({
         token: loginData.token,
         exp: Number(loginData.exp || 0),
         workerUrl: resolvedWorkerUrl,
+        sessionId,
         sessionSlug: slug,
         address,
       }),

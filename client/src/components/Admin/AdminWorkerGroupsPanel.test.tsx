@@ -28,20 +28,14 @@ describe('AdminWorkerGroupsPanel', () => {
   });
 
   it('manages the supported group and membership operations through signed worker requests', async () => {
-    const buildGroup = (group: Record<string, unknown> = {}) => {
-      const built: Record<string, unknown> = {
-        groupId: 'reviewers',
-        sessionSlug: 'alpha',
-        label: 'Reviewers',
-        joinMode: 'admin_add',
-        memberVisibility: 'members',
-        ...group,
-      };
-      if (built.memberLimit === 0) delete built.memberLimit;
-      if (!built.joinEndsAt) delete built.joinEndsAt;
-      if (!built.adminAddress) delete built.adminAddress;
-      return built;
-    };
+    const buildGroup = (group = {}) => ({
+      groupId: 'reviewers',
+      sessionSlug: 'alpha',
+      label: 'Reviewers',
+      joinMode: 'admin_add',
+      memberVisibility: 'members',
+      ...group,
+    });
     const postSignedRequest = jest.fn(async ({ action, body }) => {
       if (action === 'groups/list') {
         return {
@@ -122,6 +116,12 @@ describe('AdminWorkerGroupsPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(await screen.findByText('Reviewers')).toBeInTheDocument();
+    expect(postSignedRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'groups/list',
+        workerUrl: 'https://session-worker.example',
+      }),
+    );
     expect(screen.getByTestId('ce-admin-worker-group-image')).toHaveAttribute(
       'src',
       'https://ar-io.dev/reviewers-image',
@@ -241,11 +241,6 @@ describe('AdminWorkerGroupsPanel', () => {
               principal: { kind: 'evm_address', address: ADDRESS },
               principalKey: `evm:${ADDRESS}`,
             },
-            {
-              sessionSlug: 'alpha',
-              principal: { kind: 'telegram', principalId: 'telegram:12345' },
-              principalKey: 'telegram:12345',
-            },
           ],
           nextCursor: 'page-2',
         },
@@ -265,8 +260,6 @@ describe('AdminWorkerGroupsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Manage Reviewers members' }));
     expect(await screen.findByText(ADDRESS)).toBeInTheDocument();
-    expect(screen.getByText('telegram:12345')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Remove telegram:12345' })).not.toBeInTheDocument();
     const loadMore = screen.getByRole('button', { name: 'Load more members' });
     fireEvent.click(loadMore);
 

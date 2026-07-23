@@ -8,6 +8,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { Navbar } from './Navbar';
 
 const navbarStylesheet = fs.readFileSync(path.join(__dirname, 'Navbar.module.scss'), 'utf8');
+const mockLoginAndSettingsModal = jest.fn((_props: unknown) => <div data-testid="web3-modal" />);
 
 jest.mock('./AccountDisplay', () => ({
   AccountDisplayTorus: ({ account }: any) => <div data-testid="account-display">{account}</div>,

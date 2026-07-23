@@ -39,7 +39,7 @@ the decryption key in the fixture, a URL fragment, or another URL field.
   "links": [
     {
       "label": "Sponsored setup 1",
-      "url": "https://contextengine.sh/new?sponsored=<txId>#k=<secret>",
+      "url": "https://contextengine.sh/new?sponsored=<txId>",
       "active": true
     }
   ]

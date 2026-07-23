@@ -15,18 +15,6 @@ export const SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE = `Sponsored publish still de
 
 export const NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED = false;
 
-type SessionWizardProcessLike = {
-  env?: {
-    NODE_ENV?: unknown;
-  };
-};
-
-export const __test__isSessionWizardDevMode = (
-  proc: SessionWizardProcessLike | undefined = typeof process !== 'undefined' ? process : undefined,
-): boolean => toStr(proc?.env?.NODE_ENV).trim().toLowerCase() !== 'production';
-
-export const DEV_PERSIST_WORKER_SECRETS = __test__isSessionWizardDevMode();
-
 export const METADATA_FIELD_ORDER = [
   'networkChainId',
   'sessionId',

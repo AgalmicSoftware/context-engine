@@ -40,14 +40,20 @@ import {
   treeHasText,
 } from './surveyToolTreeTestHelpers.js';
 
-const createDeferred = () => {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => {
-    resolve = res;
-    reject = rej;
-  });
-  return { promise, resolve, reject };
+const clone = (value) => JSON.parse(JSON.stringify(value));
+const makeLegacySessionConfig = (slug) => ({
+  slug,
+  networkChainId: 84532,
+  __registry: {
+    registryChainId: 84532,
+    sessionIdHex: '0x00112233445566778899aabbccddeeff',
+  },
+});
+
+const applyStateUpdate = (stateRef, update) => {
+  const patch = typeof update === 'function' ? update(stateRef.current) : update;
+  stateRef.current = { ...stateRef.current, ...(patch || {}) };
+  return patch;
 };
 
 const buildViewedSliceFromPayload = (payload) => ({
@@ -1036,6 +1042,9 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
 
   it('persists fetched surveys through optimistic survey cache writes', async () => {
     jest
+      .spyOn(contractScriptsModule, 'getSessionConfigBySlug')
+      .mockImplementation((slug) => (slug === 'edge' ? makeLegacySessionConfig(slug) : null));
+    jest
       .spyOn(cacheScripts, 'readCache')
       .mockImplementation(async (namespace) => (namespace === 'surveysCache' ? {} : null));
     const writeSpy = jest.spyOn(cacheScripts, 'writeCacheOptimistic').mockResolvedValue(true);
@@ -1081,6 +1090,9 @@ describe('SurveyTool single-question cache writes and decrypts', () => {
   });
 
   it('uses an explicit SurveyTool session prop for fetched survey reads and cache writes', async () => {
+    jest
+      .spyOn(contractScriptsModule, 'getSessionConfigBySlug')
+      .mockImplementation((slug) => (slug === 'rxc' ? makeLegacySessionConfig(slug) : null));
     jest
       .spyOn(cacheScripts, 'readCache')
       .mockImplementation(async (namespace) => (namespace === 'surveysCache' ? {} : null));

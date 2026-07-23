@@ -55,6 +55,35 @@ describe('createSbtFormCache helpers', () => {
     expect(sessionStorage.getItem(getScopedCreateSbtFormCacheKey('edge'))).toBe(JSON.stringify(legacyPayload));
   });
 
+  it('purges claim credentials from legacy and scoped draft storage', () => {
+    const scopedKey = getScopedCreateSbtFormCacheKey('edge');
+    sessionStorage.setItem(
+      scopedKey,
+      JSON.stringify({
+        sbtName: 'Alpha',
+        sbtDescription: 'Cached draft details',
+        groupPassword: 'group-secret',
+        passwordList: ['claim-secret'],
+        sbtInviteLinks: ['https://example.test/session?gp=group-secret'],
+        sbtDistribution: {
+          distributionOption: 'groupPassword',
+          invitePayload: 'nested-invite-secret',
+          nested: {
+            claimCodes: ['nested-claim-secret'],
+          },
+        },
+      }),
+    );
+
+    expect(hasCachedCreateSbtForm({ sessionSlug: 'edge' })).toBe(true);
+    const stored = sessionStorage.getItem(scopedKey) || '';
+    expect(stored).not.toContain('group-secret');
+    expect(stored).not.toContain('claim-secret');
+    expect(stored).not.toContain('nested-invite-secret');
+    expect(stored).not.toContain('nested-claim-secret');
+    expect(JSON.parse(stored)).not.toHaveProperty('groupPassword');
+  });
+
   it('leaves a legacy cache entry untouched when its stored session slug targets another session', () => {
     const legacyPayload = {
       sbtName: 'Alpha',

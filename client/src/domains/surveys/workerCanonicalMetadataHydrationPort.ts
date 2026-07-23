@@ -118,12 +118,11 @@ const payloadMatchesTarget = (
   },
 ): boolean => {
   const payloadSlug = readString(payload.sessionSlug);
-  const rawPayloadSessionId = readString(payload.sessionId);
-  const payloadSessionId = normalizeWorkerCanonicalSessionIdHex(rawPayloadSessionId);
+  const payloadSessionId = normalizeWorkerCanonicalSessionIdHex(payload.sessionId);
   return (
     payloadSlug === sessionSlug &&
     canonicalizeSessionSlug(payloadSlug) === sessionSlug &&
-    (!rawPayloadSessionId || payloadSessionId === sessionId)
+    payloadSessionId === sessionId
   );
 };
 

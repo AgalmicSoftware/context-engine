@@ -493,60 +493,6 @@ describe('sbtSelectorHelpers', () => {
     expect(getSbtSelectorLoadingStatusText({ compact: true, count: 0 })).toBe('Loading');
   });
 
-  it('resolves selector session network id by source precedence', () => {
-    const baseArgs = {
-      defaultFallbackChainId: 11155420,
-      directChainId: 84532,
-      getNormalizedNetworkChainValue: () => 10,
-      getSessionChainId: () => 420,
-      network: { id: 5 },
-      slug: 'Alpha',
-    };
-
-    expect(
-      resolveSbtSelectorSessionNetworkId({
-        ...baseArgs,
-        propsSessionConfig: { networkChainId: '999' },
-        shouldUsePropsSessionConfig: true,
-      }),
-    ).toBe(999);
-    expect(
-      resolveSbtSelectorSessionNetworkId({
-        ...baseArgs,
-        displayLookupSessionConfig: { networkChainId: 777 },
-        getSessionChainId: () => null,
-      }),
-    ).toBe(777);
-    expect(
-      resolveSbtSelectorSessionNetworkId({
-        ...baseArgs,
-        displayLookupSessionConfig: { __registry: { chainId: 778 } },
-        getSessionChainId: () => null,
-      }),
-    ).toBe(778);
-    expect(
-      resolveSbtSelectorSessionNetworkId({
-        ...baseArgs,
-        displayLookupSessionConfig: { contracts: { sbtFactory: { chainId: 779 } } },
-        getSessionChainId: () => null,
-      }),
-    ).toBe(779);
-    expect(
-      resolveSbtSelectorSessionNetworkId({
-        ...baseArgs,
-        getSessionChainId: () => null,
-        directChainId: '',
-      }),
-    ).toBe(10);
-    expect(
-      resolveSbtSelectorSessionNetworkId({
-        defaultFallbackChainId: 11155420,
-        getNormalizedNetworkChainValue: () => null,
-        getSessionChainId: () => null,
-      }),
-    ).toBe(11155420);
-  });
-
   it('builds selector metadata lookup config with merged contracts and chain context', () => {
     expect(
       buildSbtSelectorMetadataLookupConfig({

@@ -405,6 +405,8 @@ type DocumentLibraryUploadControlsProps = {
   onUploadUrlRecord: () => void;
   urlUploadPending: boolean;
   isUploadableDocProvider: boolean;
+  showEncryptionControls: boolean;
+  showSbtAudienceControls: boolean;
   requiresLitDocumentStorage: boolean;
   locked: boolean;
   onToggleLocked: () => void;
@@ -444,6 +446,8 @@ export const DocumentLibraryUploadControls = ({
   onUploadUrlRecord,
   urlUploadPending,
   isUploadableDocProvider,
+  showEncryptionControls,
+  showSbtAudienceControls,
   requiresLitDocumentStorage,
   locked,
   onToggleLocked,
@@ -532,121 +536,127 @@ export const DocumentLibraryUploadControls = ({
       />
     </div>
 
-    <div className={styles.encryptBox}>
-      <div className={styles.encryptHeader}>
-        <button
-          type="button"
-          className={styles.lockToggle}
-          onClick={onToggleLocked}
-          disabled={requiresLitDocumentStorage}
-          title={
-            requiresLitDocumentStorage
-              ? 'Lit-Arweave session storage requires encrypted uploads'
-              : locked
-                ? 'Upload plaintext'
-                : 'Encrypt with Lit'
-          }
-          data-testid={E2E_TESTIDS.DOC_LOCK_TOGGLE}
-          data-ce-locked={locked ? 'true' : 'false'}
-        >
-          <FontAwesomeIcon icon={locked ? faLock : faLockOpen} />
-          <span className={styles.lockLabel}>{locked ? 'Locked (Encrypted)' : 'Unlocked (Plaintext)'}</span>
-        </button>
-      </div>
-
-      {sessionGateUnsupportedMessage ? (
-        <div className={styles.noticeInline}>{sessionGateUnsupportedMessage}</div>
-      ) : null}
-
-      {locked && (
-        <div className={styles.encryptControls}>
-          <div className={styles.audienceRow}>
-            <label className={styles.radioLabel}>
-              <input
-                type="radio"
-                name="audienceMode"
-                checked={audienceMode === 'sessionGate'}
-                onChange={() => onAudienceModeChange('sessionGate')}
-                disabled={!docUploadsGate.hasRecipients}
-                data-testid={E2E_TESTIDS.DOC_AUDIENCE_SESSION_GATE}
-              />
-              Session <code>docUploads</code> gate
-            </label>
-            <label className={styles.radioLabel}>
-              <input
-                type="radio"
-                name="audienceMode"
-                checked={audienceMode === 'custom'}
-                onChange={() => onAudienceModeChange('custom')}
-                data-testid={E2E_TESTIDS.DOC_AUDIENCE_CUSTOM}
-              />
-              Custom SBT(s)
-            </label>
-          </div>
-
-          {audienceMode === 'sessionGate' && (
-            <div className={styles.gateSummary}>
-              {docUploadsGate.hasRecipients ? (
-                <div>
-                  <div>
-                    <strong>Mode:</strong> {docUploadsGate.mode}
-                  </div>
-                  <div>
-                    <strong>SBTs:</strong> {docUploadsGate.sbtAddresses.length}
-                  </div>
-                </div>
-              ) : (
-                <div className={styles.noticeInline}>
-                  Session <code>docUploads</code> gate is unavailable or empty. Uploads will default to plaintext unless
-                  you pick Custom SBT(s).
-                </div>
-              )}
-            </div>
-          )}
-
-          {audienceMode === 'custom' && (
-            <div className={styles.customAudience}>
-              <div className={styles.customSelectorWrap} data-testid={E2E_TESTIDS.DOC_CUSTOM_SBT_SELECTOR}>
-                <SBTSelector
-                  id={`doc-library-custom-${mode || 'session'}`}
-                  label="Select SBT access"
-                  selectedSBTs={customSbtList}
-                  onAddSBT={addCustomSbt}
-                  onRemoveSBT={removeCustomSbt}
-                  network={network}
-                  sessionSlug={sessionSlug || ''}
-                  discoverySessionSlugs={[sessionSlug || '']}
-                  variant="create"
-                />
-              </div>
-
-              <div className={styles.customRow}>
-                <label className={styles.radioLabel}>
-                  <input
-                    type="radio"
-                    name="customGateMode"
-                    checked={customGateMode === 'any'}
-                    onChange={() => onCustomGateModeChange('any')}
-                    data-testid={E2E_TESTIDS.DOC_CUSTOM_MODE_ANY}
-                  />
-                  Any
-                </label>
-                <label className={styles.radioLabel}>
-                  <input
-                    type="radio"
-                    name="customGateMode"
-                    checked={customGateMode === 'all'}
-                    onChange={() => onCustomGateModeChange('all')}
-                    data-testid={E2E_TESTIDS.DOC_CUSTOM_MODE_ALL}
-                  />
-                  All
-                </label>
-              </div>
-            </div>
-          )}
+    {showEncryptionControls ? (
+      <div className={styles.encryptBox}>
+        <div className={styles.encryptHeader}>
+          <button
+            type="button"
+            className={styles.lockToggle}
+            onClick={onToggleLocked}
+            disabled={requiresLitDocumentStorage}
+            title={
+              requiresLitDocumentStorage
+                ? 'Lit-Arweave session storage requires encrypted uploads'
+                : locked
+                  ? 'Upload plaintext'
+                  : 'Encrypt with Lit'
+            }
+            data-testid={E2E_TESTIDS.DOC_LOCK_TOGGLE}
+            data-ce-locked={locked ? 'true' : 'false'}
+          >
+            <FontAwesomeIcon icon={locked ? faLock : faLockOpen} />
+            <span className={styles.lockLabel}>{locked ? 'Locked (Encrypted)' : 'Unlocked (Plaintext)'}</span>
+          </button>
         </div>
-      )}
-    </div>
+
+        {sessionGateUnsupportedMessage ? (
+          <div className={styles.noticeInline}>{sessionGateUnsupportedMessage}</div>
+        ) : null}
+
+        {locked && showSbtAudienceControls ? (
+          <div className={styles.encryptControls}>
+            <div className={styles.audienceRow}>
+              <label className={styles.radioLabel}>
+                <input
+                  type="radio"
+                  name="audienceMode"
+                  checked={audienceMode === 'sessionGate'}
+                  onChange={() => onAudienceModeChange('sessionGate')}
+                  disabled={!docUploadsGate.hasRecipients}
+                  data-testid={E2E_TESTIDS.DOC_AUDIENCE_SESSION_GATE}
+                />
+                Session <code>docUploads</code> gate
+              </label>
+              <label className={styles.radioLabel}>
+                <input
+                  type="radio"
+                  name="audienceMode"
+                  checked={audienceMode === 'custom'}
+                  onChange={() => onAudienceModeChange('custom')}
+                  data-testid={E2E_TESTIDS.DOC_AUDIENCE_CUSTOM}
+                />
+                Custom SBT(s)
+              </label>
+            </div>
+
+            {audienceMode === 'sessionGate' && (
+              <div className={styles.gateSummary}>
+                {docUploadsGate.hasRecipients ? (
+                  <div>
+                    <div>
+                      <strong>Mode:</strong> {docUploadsGate.mode}
+                    </div>
+                    <div>
+                      <strong>SBTs:</strong> {docUploadsGate.sbtAddresses.length}
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.noticeInline}>
+                    Session <code>docUploads</code> gate is unavailable or empty. Uploads will default to plaintext
+                    unless you pick Custom SBT(s).
+                  </div>
+                )}
+              </div>
+            )}
+
+            {audienceMode === 'custom' && (
+              <div className={styles.customAudience}>
+                <div className={styles.customSelectorWrap} data-testid={E2E_TESTIDS.DOC_CUSTOM_SBT_SELECTOR}>
+                  <SBTSelector
+                    id={`doc-library-custom-${mode || 'session'}`}
+                    label="Select SBT access"
+                    selectedSBTs={customSbtList}
+                    onAddSBT={addCustomSbt}
+                    onRemoveSBT={removeCustomSbt}
+                    network={network}
+                    sessionSlug={sessionSlug || ''}
+                    discoverySessionSlugs={[sessionSlug || '']}
+                    variant="create"
+                  />
+                </div>
+
+                <div className={styles.customRow}>
+                  <label className={styles.radioLabel}>
+                    <input
+                      type="radio"
+                      name="customGateMode"
+                      checked={customGateMode === 'any'}
+                      onChange={() => onCustomGateModeChange('any')}
+                      data-testid={E2E_TESTIDS.DOC_CUSTOM_MODE_ANY}
+                    />
+                    Any
+                  </label>
+                  <label className={styles.radioLabel}>
+                    <input
+                      type="radio"
+                      name="customGateMode"
+                      checked={customGateMode === 'all'}
+                      onChange={() => onCustomGateModeChange('all')}
+                      data-testid={E2E_TESTIDS.DOC_CUSTOM_MODE_ALL}
+                    />
+                    All
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : locked ? (
+          <div className={styles.noticeInline}>
+            This session profile does not enable on-chain SBT document audiences.
+          </div>
+        ) : null}
+      </div>
+    ) : null}
 
     {secondaryAssociationType === 'sbt' && mode !== 'session' && (
       <div className={styles.secondaryAssoc}>

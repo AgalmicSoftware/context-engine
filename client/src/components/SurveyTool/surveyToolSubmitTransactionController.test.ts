@@ -40,7 +40,7 @@ describe('surveyToolSubmitTransactionController', () => {
       const sessionConfig = {
         slug: 'demo-sh',
         corsWorkerUrl: 'https://worker.example',
-        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
         storageProfile: { backend: 'cloudflare' },
       };
 
@@ -50,7 +50,20 @@ describe('surveyToolSubmitTransactionController', () => {
           sessionConfig,
         }),
       ).toEqual(sessionConfig);
-      expect(resolveSurveySubmitSessionTarget({ sessionSlug: 'legacy', sessionConfig: {} })).toBe('legacy');
+      expect(() => resolveSurveySubmitSessionTarget({ sessionSlug: 'missing', sessionConfig: {} })).toThrow(
+        /missing, invalid, or unsupported/i,
+      );
+      expect(
+        resolveSurveySubmitSessionTarget({
+          sessionSlug: 'legacy',
+          sessionConfig: {
+            __registry: {
+              registryChainId: 11155420,
+              sessionIdHex: '0x00112233445566778899aabbccddeeff',
+            },
+          },
+        }),
+      ).toBe('legacy');
     });
   });
 
@@ -427,7 +440,7 @@ describe('surveyToolSubmitTransactionController', () => {
         makeSubmitOpts({
           questionResponses,
           surveyResponse,
-          deepClone,
+          deepClone: deepClone as NormalizeSubmitOptions['deepClone'],
         }),
       );
 

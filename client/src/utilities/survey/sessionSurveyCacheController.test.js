@@ -45,6 +45,57 @@ const { normalizeSessionSlug } = contractScriptsModule;
 const { normalizeArweaveFailureMeta, shouldStopPendingMetadataRetry } = require('../arweave/arweaveRetryHelpers.js');
 const { prepareSurveyMetadataCacheEntry } = require('./metadataCacheEntryBuilders.js');
 const { resolveScopedMetadataSessionSlug } = require('../session/metadataSessionBinding.js');
+const { resolveWorkerCanonicalCacheIdentity } = require('./workerCanonicalCacheIdentity.js');
+
+const WORKER_SESSION_ID = `0x${'4'.repeat(32)}`;
+
+const createWorkerCanonicalSessionConfig = ({
+  sessionId = WORKER_SESSION_ID,
+  workerUrl = 'https://alpha-worker.example.test',
+} = {}) => ({
+  slug: 'alpha',
+  sessionId,
+  corsWorkerUrl: workerUrl,
+  sessionModeProfile: {
+    profileVersion: 1,
+    preset: 'custom',
+    authority: { mode: 'worker_canonical' },
+    evm: { registryChainId: null },
+    storage: {
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'none', encryption: 'none' },
+    },
+    identity: { default: 'passkey', enabled: ['passkey'] },
+    authorization: { mechanisms: ['worker_roles'] },
+    encryption: { mode: 'none' },
+    surfaces: {
+      web: true,
+      telegram: false,
+      miniApp: false,
+      agentHttp: false,
+      mcp: false,
+      ceCc: false,
+    },
+    results: {
+      visibility: 'public_full_if_storage_public',
+      exposure: {
+        aggregateResultsEnabled: true,
+        anonymizedGroupsEnabled: false,
+        minGroupSize: 2,
+      },
+    },
+    export: { scope: 'all_session' },
+  },
+  storageProfile: {
+    backend: 'cloudflare',
+    resources: { questions: 'active', surveys: 'active' },
+    payloadAccessControl: {
+      gate: 'none',
+      encryption: 'none',
+      mode: 'public_read',
+    },
+  },
+});
 
 const deepClone = (value) => (value == null ? value : JSON.parse(JSON.stringify(value)));
 

@@ -1,4 +1,5 @@
-import { QuestionFilter as QuestionFilterComponent } from './QuestionFilter';
+import { QuestionFilter as QuestionFilterComponent, shouldEnableQuestionFilterSbt } from './QuestionFilter';
+import { QuestionFilterSbtSection } from './QuestionFilterSections';
 import {
   QUESTION_FILTER_ACTIONS_STYLE,
   QUESTION_FILTER_BOOKMARK_FEEDBACK_STYLE,
@@ -313,7 +314,14 @@ describe('QuestionFilter session resolution', () => {
   });
 
   it('passes resolved session warm-start props into the SBT filter section', () => {
-    const sessionConfig = { slug: 'edge', networkChainId: 84532 };
+    const sessionConfig = {
+      slug: 'edge',
+      networkChainId: 84532,
+      __registry: {
+        chainId: 84532,
+        sessionIdHex: '0x00112233445566778899aabbccddeeff',
+      },
+    };
     const ensureLightSbtUniverse = jest.fn();
     const instance = new QuestionFilter({
       activeSessionSlug: 'edge',
@@ -349,6 +357,55 @@ describe('QuestionFilter session resolution', () => {
     expect(sbtFilterNode?.props.sessionSlug).toBe('edge');
     expect(sbtFilterNode?.props.sessionConfig).toBe(sessionConfig);
     expect(sbtFilterNode?.props.ensureLightSbtUniverse).toBe(ensureLightSbtUniverse);
+  });
+
+  it('enables SBT filtering only for global unscoped or strong registry contexts when profiles are absent', () => {
+    expect(shouldEnableQuestionFilterSbt({})).toBe(true);
+    expect(shouldEnableQuestionFilterSbt({ slug: '' })).toBe(true);
+    expect(shouldEnableQuestionFilterSbt({ slug: 'missing', networkChainId: 84532 })).toBe(false);
+    expect(
+      shouldEnableQuestionFilterSbt({
+        slug: 'legacy',
+        networkChainId: 84532,
+        __registry: {
+          chainId: 84532,
+          sessionIdHex: '0x00112233445566778899aabbccddeeff',
+        },
+      }),
+    ).toBe(true);
+    expect(
+      shouldEnableQuestionFilterSbt({
+        slug: 'invalid',
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      }),
+    ).toBe(false);
+
+    const concreteMissingInstance = new QuestionFilter({
+      sessionSlug: 'missing',
+      sessionConfig: {},
+      questions: [],
+      questionResponses: {},
+      filterModalOpen: true,
+      isQuestionCacheReady: true,
+      isSurveyCacheReady: true,
+      isSBTCacheReady: true,
+    });
+    concreteMissingInstance.buildFilterPipelineResult = jest.fn(() => ({
+      finalQuestions: [],
+      count: 0,
+    }));
+    concreteMissingInstance.getAllTagsWithCounts = jest.fn(() => []);
+    concreteMissingInstance.getAiAccessState = jest.fn(() => ({
+      enabled: false,
+      localKeyAvailable: false,
+    }));
+
+    expect(
+      findElement(
+        concreteMissingInstance.render(),
+        (element) => element?.props?.mode === 'creator' && element?.props?.autoExpand === true,
+      ),
+    ).toBeNull();
   });
 });
 
@@ -514,6 +571,112 @@ describe('QuestionFilter encrypted count gate tooltip integration', () => {
 
     expect(sbtHeader).toBeTruthy();
     expect(getNodeText(sbtHeader)).toContain('Loading groups');
+  });
+
+  it('does not mount or apply the SBT filter for an exact pure-Worker profile', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const questions = [
+      { id: 'q1', prompt: 'Q1', type: 'freeform' },
+      { id: 'q2', prompt: 'Q2', type: 'freeform' },
+    ];
+    const instance = new QuestionFilter({
+      questions,
+      questionResponses: {},
+      network: { id: 11155420 },
+      resultsMode: true,
+      filterModalOpen: true,
+      isQuestionCacheReady: true,
+      isSBTCacheReady: true,
+      sessionConfig: {
+        slug: 'demo-sh',
+        // Compatibility metadata must not grant an undeclared chain capability.
+        networkChainId: 11155420,
+        sessionModeProfile,
+      },
+      filterState: {
+        sbtFilter: {
+          selectedSBTGroups: [{ address: '0x00000000000000000000000000000000000000aa', name: 'Legacy' }],
+        },
+      },
+    });
+
+    expect(validateSessionModeProfile(sessionModeProfile).valid).toBe(true);
+    expect(shouldEnableQuestionFilterSbt(instance.props.sessionConfig)).toBe(false);
+    expect(instance.state.sbtFilterLocalState).toBeNull();
+
+    instance.state = {
+      ...instance.state,
+      sbtFilterLocalState: {
+        selectedSBTGroups: [{ address: '0x00000000000000000000000000000000000000aa', name: 'Stale' }],
+      },
+      sbtFilteredQuestions: [questions[0]],
+      pendingSbtFilteredQuestions: [questions[0]],
+      filteredQuestionsCount: questions.length,
+    };
+    instance.getAllTagsWithCounts = jest.fn(() => []);
+    instance.getAiAccessState = jest.fn(() => ({
+      enabled: false,
+      localKeyAvailable: false,
+    }));
+
+    const tree = instance.render();
+
+    expect(findElement(tree, (element) => element?.type === QuestionFilterSbtSection)).toBeNull();
+    expect(getNodeText(tree)).not.toContain('Group(s) of Question Creator');
+    expect(instance.buildFilterPipelineResult(true).finalQuestions).toEqual(questions);
+    expect(instance.buildFilterState().sbtFilter).toBeNull();
+    expect(instance.getFilterSummaryItems().some((item: any) => item.type === 'sbt')).toBe(false);
+
+    instance.setState = jest.fn();
+    instance.handleFilteredQuestions([questions[0]], {
+      selectedSBTGroups: [{ address: '0x00000000000000000000000000000000000000aa' }],
+    });
+    expect(instance.setState).not.toHaveBeenCalled();
+  });
+
+  it('preserves the SBT filter for reachable registry and Worker-hybrid profiles', () => {
+    const registryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const hybridProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    hybridProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    hybridProfile.evm.registryChainId = 11155420;
+    hybridProfile.encryption.accessConditions = {
+      match: 'all',
+      conditions: [
+        { kind: 'worker_role', role: 'reviewer' },
+        {
+          kind: 'sbt_onchain',
+          chainId: 11155420,
+          contract: '0x00000000000000000000000000000000000000aa',
+          anyOrAll: 'any',
+        },
+      ],
+    };
+
+    expect(validateSessionModeProfile(registryProfile).valid).toBe(true);
+    expect(validateSessionModeProfile(hybridProfile).valid).toBe(true);
+    expect(shouldEnableQuestionFilterSbt({ sessionModeProfile: registryProfile })).toBe(true);
+    expect(shouldEnableQuestionFilterSbt({ sessionModeProfile: hybridProfile })).toBe(true);
+
+    const instance = new QuestionFilter({
+      questions: [{ id: 'q1', prompt: 'Q1', type: 'freeform' }],
+      questionResponses: {},
+      network: { id: 11155420 },
+      resultsMode: true,
+      filterModalOpen: true,
+      isQuestionCacheReady: true,
+      isSBTCacheReady: true,
+      sessionConfig: {
+        slug: 'hybrid',
+        sessionModeProfile: hybridProfile,
+      },
+    });
+    instance.getAllTagsWithCounts = jest.fn(() => []);
+    instance.getAiAccessState = jest.fn(() => ({
+      enabled: false,
+      localKeyAvailable: false,
+    }));
+
+    expect(findElement(instance.render(), (element) => element?.type === QuestionFilterSbtSection)).toBeTruthy();
   });
 
   it('passes session gate details into the encrypted-count badge tooltip when available', () => {

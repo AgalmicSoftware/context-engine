@@ -102,10 +102,6 @@ export const E2E_TESTIDS = Object.freeze({
   SESSION_RESULTS_TOGGLE: 'ce-session-results-toggle',
   SESSION_ADVANCED_ONCHAIN_ACCESS_GATES: 'ce-session-advanced-onchain-access-gates',
   SESSION_GROUPS_UNAVAILABLE: 'ce-session-groups-unavailable',
-  SESSION_GROUP_CREATION_POLICY_DENIED: 'ce-session-group-creation-policy-denied',
-  SESSION_WORKER_PARTICIPANT_GROUP_CREATE: 'ce-session-worker-participant-group-create',
-  SESSION_WORKER_PARTICIPANT_GROUP_LABEL: 'ce-session-worker-participant-group-label',
-  SESSION_WORKER_PARTICIPANT_GROUP_SUBMIT: 'ce-session-worker-participant-group-submit',
   SURVEY_FILTER_TOGGLE: 'ce-survey-filter-toggle',
   CONTRACTS_ADVANCED_EXTERNAL_NOTICE: 'ce-contracts-advanced-external-notice',
 
@@ -323,6 +319,7 @@ export const E2E_TESTIDS = Object.freeze({
 
   // CreateSBTGroup + SBTPage
   SBTS_CREATE_TOGGLE: 'ce-sbts-create-toggle',
+  SBT_CREATE_ADVANCED_EXTERNAL_NOTICE: 'ce-sbt-create-advanced-external-notice',
   SBT_CREATE_NAME_INPUT: 'ce-sbt-create-name-input',
   SBT_CREATE_DESCRIPTION_INPUT: 'ce-sbt-create-description-input',
   SBT_CREATE_NAME_LOCK_ROW: 'ce-sbt-create-name-lock-row',

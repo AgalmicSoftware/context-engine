@@ -97,8 +97,12 @@ describe('contractScripts session resolution helpers', () => {
     );
     expect(getDemoSessionConfigBySlug('demo', { allowDemoFallback: true })).toEqual(
       expect.objectContaining({
-        slug: '',
-        sessionName: 'Context Engine',
+        slug: 'demo-sh',
+        sessionName: 'Demo Session',
+        sessionModeProfile: expect.objectContaining({
+          authority: { mode: 'worker_canonical' },
+          evm: { registryChainId: null },
+        }),
       }),
     );
     expect(getDemoSessionConfigBySlug('DEBATE', { allowDemoFallback: true })).toBeNull();

@@ -287,7 +287,12 @@ const buildWrongNetworkSubject = ({ mode = undefined, aiSettingsOpen = false, ac
     String(slug || '')
       .trim()
       .toLowerCase() === 'edge'
-      ? { slug: 'edge', sessionName: 'Edge Session' }
+      ? sessionConfig ||
+        buildRegistrySessionConfig({
+          slug: 'edge',
+          sessionName: 'Edge Session',
+          sponsoredKeys: { rpc: 'edge-rpc' },
+        })
       : {},
   );
   isolatedCheckSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
@@ -361,6 +366,95 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     getAllSessionSlugs.mockReturnValue([]);
     getSessionConfigBySlugOrDefault.mockImplementation(() => ({}));
     checkSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
+  });
+
+  it('resolves a signed-out pure Worker session and presents passkey as its only identity path', () => {
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
+      slug === 'demo-sh' ? buildPureWorkerSessionConfig() : {},
+    );
+    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'demo-sh' }));
+
+    const tree = subject.getModalDisplay();
+    render(tree);
+
+    expect(getSessionConfigBySlugOrDefault).toHaveBeenCalledWith('demo-sh');
+    expect(screen.getByText('Account uses a passkey:')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ethereum wallet' })).not.toBeInTheDocument();
+    expect(screen.queryByText('test network only')).not.toBeInTheDocument();
+    expect(treeHasElementType(tree, MetaMaskLoginButton)).toBe(false);
+  });
+
+  it('retains the signed-out wallet identity path for registry sessions', () => {
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
+      slug === 'registry' ? buildRegistrySessionConfig({ slug: 'registry' }) : {},
+    );
+    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'registry' }));
+
+    const tree = subject.getModalDisplay();
+    render(tree);
+
+    expect(getSessionConfigBySlugOrDefault).toHaveBeenCalledWith('registry');
+    expect(screen.getByRole('link', { name: 'Ethereum wallet' })).toBeInTheDocument();
+    expect(screen.getByText('test network only')).toBeInTheDocument();
+    expect(treeHasElementType(tree, MetaMaskLoginButton)).toBe(true);
+  });
+
+  it.each([
+    [
+      'missing',
+      {
+        slug: 'unavailable',
+        networkChainId: 11155420,
+      },
+    ],
+    [
+      'invalid',
+      {
+        slug: 'unavailable',
+        networkChainId: 11155420,
+        sessionModeProfile: {
+          profileVersion: 1,
+          authority: { mode: 'worker_canonical' },
+        },
+      },
+    ],
+  ])('fails closed for a concrete %s capability profile instead of inferring wallet auth', (_label, config) => {
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (slug === 'unavailable' ? config : {}));
+    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'unavailable' }));
+
+    const tree = subject.getModalDisplay();
+    render(tree);
+
+    expect(screen.getByTestId('ce-session-identity-unavailable')).toHaveTextContent(
+      /capability profile is unavailable or invalid/i,
+    );
+    expect(screen.queryByRole('link', { name: 'Ethereum wallet' })).not.toBeInTheDocument();
+    expect(screen.queryByText('test network only')).not.toBeInTheDocument();
+    expect(treeHasElementType(tree, MetaMaskLoginButton)).toBe(false);
+  });
+
+  it('retains the signed-out wallet access path for validated Worker hybrids', () => {
+    const hybridConfig = buildHybridWorkerSessionConfig();
+    expect(resolveSessionCapabilityProjection(hybridConfig)).toMatchObject({
+      profileValid: true,
+      isWorkerCanonical: true,
+      isPureWorkerCanonical: false,
+      usesRpc: true,
+    });
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (slug === 'hybrid' ? hybridConfig : {}));
+    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'hybrid' }));
+
+    const tree = subject.getModalDisplay();
+    render(tree);
+
+    expect(screen.getByText('Account uses a passkey:')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ethereum wallet' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-advanced-wallet-access')).toHaveTextContent('Advanced on-chain access');
+    expect(screen.getByTestId('ce-advanced-wallet-access')).toHaveTextContent(
+      "Use an Ethereum wallet only for this session's optional on-chain gates.",
+    );
+    expect(screen.getByText('test network only')).toBeInTheDocument();
+    expect(treeHasElementType(tree, MetaMaskLoginButton)).toBe(true);
   });
 
   it('renders passkey auth without a MetaMask login control by default', () => {
@@ -441,6 +535,37 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     const sessionLink = screen.getByRole('link', { name: 'Open session Edge Session' });
     expect(sessionLink).toHaveAttribute('href', '/session/edge');
     expect(sessionLink).not.toHaveAttribute('href', '/session/Edge%20Session');
+  });
+
+  it('shows worker session access and AI state without chain resource controls', () => {
+    const subject = buildWrongNetworkSubject({
+      mode: 'crypto',
+      aiSettingsOpen: true,
+      sessionConfig: {
+        slug: 'edge',
+        sessionName: 'Edge Session',
+        corsWorkerUrl: 'https://edge-worker.example.test',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+    });
+    subject.state = {
+      ...subject.state,
+      aiSettingsSectionsOpen: {
+        ...subject.state.aiSettingsSectionsOpen,
+        session: true,
+      },
+    };
+
+    render(subject.getSettingsDisplay());
+
+    expect(screen.getByTestId('ce-settings-worker-session-access')).toHaveTextContent(
+      /Passkey session access: signed in.*Session Worker: configured.*AI: session default/i,
+    );
+    expect(screen.queryByText('Network')).not.toBeInTheDocument();
+    expect(screen.queryByText('RPC')).not.toBeInTheDocument();
+    expect(screen.queryByText('Arweave')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tx gas')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Resource keys/i })).not.toBeInTheDocument();
   });
 
   it('preserves PUBLIC_URL when building the active-session link', () => {
@@ -1053,7 +1178,13 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
   it('renders logged-in controls and disconnects wagmi users from the modal', async () => {
     getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
-      slug === 'demo-1' ? { slug: 'demo-1', sessionName: 'Demo Session', networkChainId: 11155420 } : {},
+      slug === 'demo-1'
+        ? buildRegistrySessionConfig({
+            slug: 'demo-1',
+            sessionName: 'Demo Session',
+            networkChainId: 11155420,
+          })
+        : {},
     );
     const props = buildProps({
       account: WAGMI_ADDRESS,
@@ -1551,6 +1682,7 @@ describe('LoginAndSettingsModal agent token login', () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
+    clearAgentClientLoginEnvelope('alpha');
     window.history.replaceState({}, '', '/session/alpha');
     global.fetch = jest.fn(
       async () =>
@@ -1571,6 +1703,7 @@ describe('LoginAndSettingsModal agent token login', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    clearAgentClientLoginEnvelope('alpha');
     window.localStorage.clear();
     window.sessionStorage.clear();
     delete global.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__;
@@ -1606,6 +1739,8 @@ describe('LoginAndSettingsModal agent token login', () => {
     expect(window.location.href).not.toContain(RAW_AGENT_TOKEN);
     expect(JSON.stringify(window.localStorage)).not.toContain(RAW_AGENT_TOKEN);
     expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_AGENT_TOKEN);
+    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('bridge-browser-token');
+    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('jwt-session-token');
     expect(JSON.stringify(props.changeAccount.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
     expect(JSON.stringify(props.updateLoginInfo.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
   });

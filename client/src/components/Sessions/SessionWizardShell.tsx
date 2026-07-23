@@ -192,6 +192,7 @@ export type SessionWizardShellProps = {
   showWorkerUrlField: WorkerPanelProps['showWorkerUrlField'];
   showNetworkSelector?: boolean;
   showOnChainGateControls?: boolean;
+  sponsoredBundleKey?: IntroStatusRailProps['sponsoredBundleKey'];
   sponsoredBundleStatus: IntroStatusRailProps['sponsoredBundleStatus'];
   sponsoredManualBundleRetryMessage: PublishSectionProps['sponsoredManualBundleRetryMessage'];
   sponsoredPublishBundleFileInputRef: PublishSectionProps['bundleFileInputRef'];
@@ -361,6 +362,7 @@ const SessionWizardShell = ({
   showWorkerUrlField,
   showNetworkSelector = true,
   showOnChainGateControls = true,
+  sponsoredBundleKey,
   sponsoredBundleStatus,
   sponsoredManualBundleRetryMessage,
   sponsoredPublishBundleFileInputRef,
@@ -516,13 +518,9 @@ const SessionWizardShell = ({
             draft={draft}
             deployWorkerUrl={deployWorkerUrl}
             deployComplete={deployComplete}
-            devPersistWorkerSecrets={devPersistWorkerSecrets}
-            persistWorkerSecrets={persistWorkerSecrets}
-            setPersistWorkerSecrets={setPersistWorkerSecrets}
             workerSecretsEnabled={workerSecretsEnabled}
             setWorkerSecretsEnabled={setWorkerSecretsEnabled}
             clearWorkerSecretFields={clearWorkerSecretFields}
-            effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
             workerResourceKeys={visibleWorkerResourceKeys}
             renderResourceCard={renderResourceCard}
             workerAllowOrigins={workerAllowOrigins}

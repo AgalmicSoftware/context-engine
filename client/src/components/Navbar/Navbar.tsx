@@ -152,6 +152,7 @@ export class Navbar extends Component<NavbarProps, NavbarState> {
               loginComplete={this.props.loginComplete}
               loginInProgress={this.props.loginInProgress}
               provider={this.props.provider}
+              sessionConfig={this.props.sessionConfig}
             />
           </div>
         </div>
@@ -180,6 +181,7 @@ export class Navbar extends Component<NavbarProps, NavbarState> {
               sendTestETH={(amountToSend: unknown) => this.props.sendTestETH?.(amountToSend)}
               demoMode={this.props.demoMode}
               toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
+              sessionConfig={this.props.sessionConfig}
             />
           </div>
         </div>

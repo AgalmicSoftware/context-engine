@@ -1,6 +1,5 @@
 import { normalizeWorkerSessionSlug, validateInboundWorkerSessionSlug } from './sessionSlugResolution.js';
 import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
-import { workerConfigAllowsAnonymousGroupDiscovery } from '../shared/workerConfigModeValidation.mjs';
 
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const trim = (value) => toStr(value).trim();
@@ -22,6 +21,11 @@ export const WORKER_GROUP_MEMBER_VISIBILITY = Object.freeze({
 export const DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION = 100;
 export const DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP = 1000;
 export const MAX_WORKER_GROUP_IMAGE_URL_LENGTH = 2048;
+export const MAX_WORKER_GROUP_ID_LENGTH = 80;
+export const MAX_WORKER_GROUP_SESSION_SLUG_LENGTH = 128;
+export const DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
+export const MAX_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
+const WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL = 'fresh-template-v2';
 
 const IMPLEMENTED_JOIN_MODES = new Set([WORKER_GROUP_JOIN_MODES.OPEN, WORKER_GROUP_JOIN_MODES.ADMIN_ADD]);
 
@@ -214,70 +218,6 @@ const normalizeImageUrl = (value) => {
 	}
 };
 
-const normalizeGroupTags = (value) => {
-	if (value == null) return { ok: true, value: [] };
-	if (!Array.isArray(value) || value.length > MAX_WORKER_GROUP_TAGS) return { ok: false };
-	const tags = [];
-	const seen = new Set();
-	for (const candidate of value) {
-		if (typeof candidate !== 'string') return { ok: false };
-		const tag = trim(candidate);
-		if (!tag || tag.length > MAX_WORKER_GROUP_TAG_LENGTH) return { ok: false };
-		const key = tag.toLowerCase();
-		if (seen.has(key)) continue;
-		seen.add(key);
-		tags.push(tag);
-	}
-	return { ok: true, value: tags };
-};
-
-const normalizeGroupDocumentUrls = (value) => {
-	if (value == null) return { ok: true, value: [] };
-	if (!Array.isArray(value) || value.length > MAX_WORKER_GROUP_DOCUMENT_URLS) return { ok: false };
-	const documentURLs = [];
-	const seen = new Set();
-	for (const candidate of value) {
-		if (typeof candidate !== 'string') return { ok: false };
-		const normalized = normalizeImageUrl(candidate);
-		if (!normalized.ok || !normalized.value) return { ok: false };
-		if (seen.has(normalized.value)) continue;
-		seen.add(normalized.value);
-		documentURLs.push(normalized.value);
-	}
-	return { ok: true, value: documentURLs };
-};
-
-const normalizeGroupMemberLimit = (value) => {
-	if (value == null || value === '' || Number(value) === 0) return { ok: true, value: 0 };
-	const memberLimit = Number(value);
-	if (!Number.isSafeInteger(memberLimit) || memberLimit < 1 || memberLimit > MAX_WORKER_GROUP_MEMBER_LIMIT) {
-		return { ok: false };
-	}
-	return { ok: true, value: memberLimit };
-};
-
-const normalizeGroupJoinEndsAt = (value, deps = {}, { allowPast = false } = {}) => {
-	const raw = trim(value);
-	if (!raw) return { ok: true, value: '' };
-	const timestamp = Date.parse(raw);
-	const now = Number(deps.now?.() || Date.now());
-	if (!Number.isFinite(timestamp) || (!allowPast && timestamp <= now)) return { ok: false };
-	return { ok: true, value: new Date(timestamp).toISOString() };
-};
-
-const normalizeImageUrl = (value) => {
-  const raw = trim(value);
-  if (!raw) return { ok: true, value: '' };
-  if (raw.length > MAX_WORKER_GROUP_IMAGE_URL_LENGTH) return { ok: false };
-  try {
-    const parsed = new URL(raw);
-    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return { ok: false };
-    return { ok: true, value: parsed.href };
-  } catch {
-    return { ok: false };
-  }
-};
-
 const normalizeEvmAddress = (value, deps = {}) => {
 	const address = trim(value);
 	if (typeof deps.isAddress === 'function' && !deps.isAddress(address)) return '';
@@ -391,35 +331,37 @@ export const createWorkerGroupId = (deps = {}) => {
 };
 
 const normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps = {} } = {}) => {
-  const joinMode = normalizeJoinMode(input.joinMode || existing?.joinMode);
-  if (!joinMode) return { ok: false, status: 400, reason: 'invalid_join_mode' };
-  if (!IMPLEMENTED_JOIN_MODES.has(joinMode)) {
-    return { ok: false, status: 400, reason: 'join_mode_not_implemented' };
-  }
-  const memberVisibility = normalizeMemberVisibility(input.memberVisibility || existing?.memberVisibility);
-  if (!memberVisibility) return { ok: false, status: 400, reason: 'invalid_member_visibility' };
-  const label = trim(input.label || existing?.label);
-  if (!label || label.length > 120) return { ok: false, status: 400, reason: 'invalid_group_label' };
-  const description = trim(input.description ?? existing?.description);
-  if (description.length > 500) return { ok: false, status: 400, reason: 'invalid_group_description' };
-  const imageUrlResult = normalizeImageUrl(input.imageUrl ?? existing?.imageUrl);
-  if (!imageUrlResult.ok) return { ok: false, status: 400, reason: 'invalid_group_image_url' };
-  const updatedAt = nowIso(deps);
-  return {
-    ok: true,
-    patch: {
-      label,
-      description: description || undefined,
-      imageUrl: imageUrlResult.value || undefined,
-      joinMode,
-      memberVisibility,
-      updatedAt,
-      ...(existing ? {} : {
-        createdBy: actorPrincipal,
-        createdAt: updatedAt,
-      }),
-    },
-  };
+	const joinMode = normalizeJoinMode(input.joinMode || existing?.joinMode);
+	if (!joinMode) return { ok: false, status: 400, reason: 'invalid_join_mode' };
+	if (!IMPLEMENTED_JOIN_MODES.has(joinMode)) {
+		return { ok: false, status: 400, reason: 'join_mode_not_implemented' };
+	}
+	const memberVisibility = normalizeMemberVisibility(input.memberVisibility || existing?.memberVisibility);
+	if (!memberVisibility) return { ok: false, status: 400, reason: 'invalid_member_visibility' };
+	const label = trim(input.label || existing?.label);
+	if (!label || label.length > 120) return { ok: false, status: 400, reason: 'invalid_group_label' };
+	const description = trim(input.description ?? existing?.description);
+	if (description.length > 500) return { ok: false, status: 400, reason: 'invalid_group_description' };
+	const imageUrlResult = normalizeImageUrl(input.imageUrl ?? existing?.imageUrl);
+	if (!imageUrlResult.ok) return { ok: false, status: 400, reason: 'invalid_group_image_url' };
+	const updatedAt = nowIso(deps);
+	return {
+		ok: true,
+		patch: {
+			label,
+			description: description || undefined,
+			imageUrl: imageUrlResult.value || undefined,
+			joinMode,
+			memberVisibility,
+			updatedAt,
+			...(existing
+				? {}
+				: {
+						createdBy: actorPrincipal,
+						createdAt: updatedAt,
+					}),
+		},
+	};
 };
 
 const kvGetJsonStrict = async (kv, key) => {
@@ -442,7 +384,7 @@ const kvGetLegacyJson = async (kv, key) => {
 	}
 };
 
-export const resolveWorkerGroupBootstrap = async ({ env, slug, sessionId, requireExhaustiveEmptyScan = false } = {}) => {
+export const resolveWorkerGroupBootstrap = async ({ env, slug, sessionId } = {}) => {
 	const canonicalSlug = canonicalWorkerGroupSessionSlug(slug);
 	const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
 	if (!canonicalSlug || !canonicalSessionId) {
@@ -451,13 +393,6 @@ export const resolveWorkerGroupBootstrap = async ({ env, slug, sessionId, requir
 	const explicitBootstrapId = trim(env?.CE_WORKER_GROUPS_BOOTSTRAP);
 	if (explicitBootstrapId === WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL) {
 		const kv = resolveWorkerGroupsKv(env);
-		if (requireExhaustiveEmptyScan && typeof kv?.list !== 'function') {
-			return {
-				ok: false,
-				status: 503,
-				reason: 'worker_group_capacity_state_unavailable',
-			};
-		}
 		if (typeof kv?.list === 'function') {
 			try {
 				const existingGroups = await scanWorkerGroupRecordsForIdentity({
@@ -493,13 +428,6 @@ export const resolveWorkerGroupBootstrap = async ({ env, slug, sessionId, requir
 	const kv = resolveWorkerGroupsKv(env);
 	if (!kv?.get) {
 		return { ok: false, status: 501, reason: 'worker_group_store_not_configured' };
-	}
-	if (requireExhaustiveEmptyScan && typeof kv.list !== 'function') {
-		return {
-			ok: false,
-			status: 503,
-			reason: 'worker_group_capacity_state_unavailable',
-		};
 	}
 	try {
 		const configSlug = normalizeWorkerSessionSlug(canonicalSlug);
@@ -1110,15 +1038,15 @@ const listMembershipRecordPage = async ({ store, slug, sessionId, groupId, curso
 };
 
 const redactGroupForMember = (group) => ({
-  groupId: group.groupId,
-  sessionSlug: group.sessionSlug,
-  label: group.label,
-  ...(group.description ? { description: group.description } : {}),
-  ...(group.imageUrl ? { imageUrl: group.imageUrl } : {}),
-  joinMode: group.joinMode,
-  memberVisibility: group.memberVisibility,
-  createdAt: group.createdAt,
-  updatedAt: group.updatedAt,
+	groupId: group.groupId,
+	sessionSlug: group.sessionSlug,
+	label: group.label,
+	...(group.description ? { description: group.description } : {}),
+	...(group.imageUrl ? { imageUrl: group.imageUrl } : {}),
+	joinMode: group.joinMode,
+	memberVisibility: group.memberVisibility,
+	createdAt: group.createdAt,
+	updatedAt: group.updatedAt,
 });
 
 const isDefinitiveWorkerGroupMembershipMiss = (result) =>
@@ -1249,12 +1177,9 @@ export const addWorkerGroupMember = async ({
 		existing = existingRecord && !existingRecord.removedAt ? existingRecord : null;
 	} else {
 		const caps = resolveWorkerGroupCaps(env);
-		const configuredMemberLimit =
-			Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? group.memberLimit : caps.maxMembersPerGroup;
-		const effectiveMemberLimit = Math.min(configuredMemberLimit, caps.maxMembersPerGroup);
 		const members = await listMembershipRecords({ store, slug, sessionId, groupId });
 		existing = members.find((member) => member.principalKey === normalized.key);
-		if (!existing && members.length >= effectiveMemberLimit) {
+		if (!existing && members.length >= caps.maxMembersPerGroup) {
 			return { ok: false, status: 409, reason: 'worker_group_member_cap_exceeded' };
 		}
 	}
@@ -1435,81 +1360,6 @@ export const listWorkerGroupMembers = async ({ env, slug, sessionId, groupId, cu
 		group: redactGroupForMember(group),
 		members: page.members,
 		nextCursor: page.nextCursor,
-	};
-};
-
-const redactWorkerGroupMemberForViewer = (member) => ({
-	groupId: normalizeWorkerGroupId(member?.groupId),
-	sessionSlug: normalizeWorkerSessionSlug(member?.sessionSlug),
-	principal: member?.principal,
-	addedAt: trim(member?.addedAt),
-});
-
-export const listWorkerGroupMembersForPrincipal = async ({
-	env,
-	slug,
-	sessionId,
-	groupId,
-	principal,
-	cursor,
-	limit,
-	deps = {},
-} = {}) => {
-	const normalizedGroupId = normalizeWorkerGroupId(groupId);
-	if (!normalizedGroupId) {
-		return { ok: false, status: 400, reason: 'invalid_worker_group_id' };
-	}
-	const catalog = await (deps.readCoordinatedWorkerGroupCatalog || readCoordinatedWorkerGroupCatalog)({
-		env,
-		slug,
-		sessionId,
-		groupIds: [normalizedGroupId],
-		principal,
-	});
-	if (!catalog.ok) return normalizeWorkerGroupMembershipFailure(catalog);
-	if (
-		!Array.isArray(catalog.groups) ||
-		catalog.groups.length !== 1 ||
-		normalizeWorkerGroupId(catalog.groups[0]?.groupId) !== normalizedGroupId
-	) {
-		return { ok: false, status: 404, reason: 'worker_group_not_found' };
-	}
-	const authority = catalog.groups[0];
-	const memberVisibility = trim(authority?.memberVisibility).toLowerCase();
-	const joinMode = trim(authority?.joinMode).toLowerCase();
-	const memberCount = Number(authority?.memberCount);
-	if (
-		!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) ||
-		!IMPLEMENTED_JOIN_MODES.has(joinMode) ||
-		!Number.isSafeInteger(memberCount) ||
-		memberCount < 0
-	) {
-		return normalizeWorkerGroupMembershipFailure();
-	}
-	const canViewMembers =
-		memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION ||
-		(memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS && authority?.isMember === true);
-	if (!canViewMembers) {
-		return { ok: false, status: 403, reason: 'worker_group_member_list_forbidden' };
-	}
-	const page = await (deps.listWorkerGroupMembers || listWorkerGroupMembers)({
-		env,
-		slug,
-		sessionId,
-		groupId: normalizedGroupId,
-		cursor,
-		limit,
-	});
-	if (!page.ok) return page;
-	return {
-		...page,
-		group: redactGroupForMember({
-			...page.group,
-			joinMode,
-			memberVisibility,
-		}),
-		members: (page.members || []).map(redactWorkerGroupMemberForViewer),
-		memberCount,
 	};
 };
 
@@ -1703,10 +1553,6 @@ export const executeWorkerGroupMutation = async ({
 		if (group.joinMode !== WORKER_GROUP_JOIN_MODES.OPEN) {
 			return { ok: false, status: 403, reason: 'worker_group_join_denied' };
 		}
-		const joinEndsAt = Date.parse(trim(group.joinEndsAt));
-		if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(deps.now?.() || Date.now())) {
-			return { ok: false, status: 403, reason: 'worker_group_join_ended' };
-		}
 		return addWorkerGroupMember({
 			env,
 			slug,
@@ -1733,7 +1579,7 @@ const callWorkerGroupCoordinator = async ({ env, slug, sessionId, path, payload 
 	if (!sessionSlug || !canonicalSessionId) {
 		return { ok: false, status: 400, reason: 'worker_group_session_identity_invalid' };
 	}
-	const coordinator = env?.CE_WORKER_GROUP_COORDINATOR || env?.CE_SESSION_COORDINATOR;
+	const coordinator = env?.CE_SESSION_COORDINATOR;
 	if (!coordinator?.idFromName || !coordinator?.get) {
 		return workerGroupCoordinationUnavailable();
 	}
@@ -1768,14 +1614,6 @@ export const checkCoordinatedWorkerGroupReady = async ({ env, slug, sessionId } 
 		slug,
 		sessionId,
 		path: '/worker-groups/ready',
-	});
-
-export const reconcileCoordinatedWorkerGroupCapacity = async ({ env, slug, sessionId } = {}) =>
-	callWorkerGroupCoordinator({
-		env,
-		slug,
-		sessionId,
-		path: '/worker-groups/reconcile-empty',
 	});
 
 export const readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, groupIds, principal } = {}) =>
@@ -1868,65 +1706,6 @@ const resolveWorkerGroupSessionIdentity = ({ config, slug } = {}) => {
 	return { ok: true, sessionSlug, sessionId };
 };
 
-const participantGroupCreationAllowed = (config) => config?.groupCreationPolicy === 'participants';
-
-export const dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
-	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
-	if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
-	if (!workerConfigAllowsAnonymousGroupDiscovery(config)) {
-		return routeError(
-			deps,
-			{
-				status: 403,
-				reason: 'worker_group_discovery_not_public',
-			},
-			baseHeaders,
-		);
-	}
-	let requestedSessionId = '';
-	try {
-		requestedSessionId = resolveCanonicalWorkerSessionIdHex({
-			sessionId: new URL(request?.url || '').searchParams.get('sessionId'),
-		});
-	} catch {
-		requestedSessionId = '';
-	}
-	if (requestedSessionId !== sessionIdentity.sessionId) {
-		return routeError(
-			deps,
-			{
-				status: 409,
-				reason: 'worker_group_session_identity_mismatch',
-			},
-			baseHeaders,
-		);
-	}
-	const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
-		env,
-		slug,
-		sessionId: sessionIdentity.sessionId,
-	});
-	if (!ready.ok) return routeError(deps, ready, baseHeaders);
-	let result;
-	try {
-		result = await (deps?.listWorkerGroups || listWorkerGroups)({
-			env,
-			slug,
-			sessionId: sessionIdentity.sessionId,
-			admin: false,
-			expectedGroupCount: ready.meta?.groupCount,
-		});
-	} catch {
-		result = {
-			ok: false,
-			status: 503,
-			reason: 'worker_group_projection_unavailable',
-		};
-	}
-	if (!result.ok) return routeError(deps, result, baseHeaders);
-	return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
-};
-
 export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, headers, deps } = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
 	if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, headers);
@@ -1947,26 +1726,6 @@ export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, en
 	);
 	if (!actor.ok) {
 		return jsonResponse(deps, { error: 'Invalid admin principal.', reason: actor.reason }, 400, headers);
-	}
-	if (action === 'groups/reconcile-empty') {
-		const result = await (deps?.reconcileCoordinatedWorkerGroupCapacity || reconcileCoordinatedWorkerGroupCapacity)({
-			env,
-			slug,
-			sessionId: sessionIdentity.sessionId,
-		});
-		if (!result.ok) return routeError(deps, result, headers);
-		return jsonResponse(
-			deps,
-			{
-				ok: true,
-				...sessionIdentity,
-				store: 'durable_object',
-				repaired: result.repaired === true,
-				groupCount: Number(result.meta?.groupCount || 0),
-			},
-			200,
-			headers,
-		);
 	}
 	const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
 	if (action === 'groups/create') {
@@ -2215,49 +1974,6 @@ export const workerGroupsRoute = async ({
 			baseHeaders,
 		);
 	}
-	if (path === '/groups/members' && (method === 'GET' || method === 'POST')) {
-		const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
-			env,
-			slug,
-			sessionId: sessionIdentity.sessionId,
-		});
-		if (!ready.ok) return routeError(deps, ready, baseHeaders);
-		let result;
-		try {
-			const requestUrl = method === 'GET' ? new URL(request?.url || '') : null;
-			result = await (deps?.listWorkerGroupMembersForPrincipal || listWorkerGroupMembersForPrincipal)({
-				env,
-				slug,
-				sessionId: sessionIdentity.sessionId,
-				groupId: method === 'GET' ? requestUrl?.searchParams.get('groupId') : routeBody?.groupId,
-				principal: actor.principal,
-				cursor: method === 'GET' ? requestUrl?.searchParams.get('cursor') : routeBody?.cursor,
-				limit: method === 'GET' ? requestUrl?.searchParams.get('limit') : routeBody?.limit,
-				deps,
-			});
-		} catch {
-			result = {
-				ok: false,
-				status: 503,
-				reason: 'worker_group_projection_unavailable',
-			};
-		}
-		if (!result.ok) return routeError(deps, result, baseHeaders);
-		return jsonResponse(
-			deps,
-			{
-				ok: true,
-				...sessionIdentity,
-				store: result.store,
-				group: result.group,
-				members: result.members,
-				memberCount: result.memberCount,
-				nextCursor: result.nextCursor,
-			},
-			200,
-			baseHeaders,
-		);
-	}
 	if (path === '/groups/list' && (method === 'GET' || method === 'POST')) {
 		const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
 			env,
@@ -2285,40 +2001,6 @@ export const workerGroupsRoute = async ({
 		if (!result.ok) return routeError(deps, result, baseHeaders);
 		return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
 	}
-	if (path === '/groups/create' && method === 'POST') {
-		if (!participantGroupCreationAllowed(config)) {
-			return routeError(
-				deps,
-				{
-					status: 403,
-					reason: 'worker_group_creation_admin_only',
-				},
-				baseHeaders,
-			);
-		}
-		const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
-		const result = await mutate({
-			env,
-			slug,
-			sessionId: sessionIdentity.sessionId,
-			operation: 'create',
-			input: {
-				label: routeBody?.group?.label,
-				description: routeBody?.group?.description,
-				imageUrl: routeBody?.group?.imageUrl,
-				tags: routeBody?.group?.tags,
-				documentURLs: routeBody?.group?.documentURLs,
-				memberLimit: routeBody?.group?.memberLimit,
-				joinEndsAt: routeBody?.group?.joinEndsAt,
-				adminAddress: actor.principal?.address,
-				joinMode: WORKER_GROUP_JOIN_MODES.OPEN,
-				memberVisibility: WORKER_GROUP_MEMBER_VISIBILITY.SESSION,
-			},
-			actorPrincipal: actor.principal,
-		});
-		if (!result.ok) return routeError(deps, result, baseHeaders);
-		return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, group: result.group }, 200, baseHeaders);
-	}
 	if (path === '/groups/join' && method === 'POST') {
 		const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
 		const result = await mutate({
@@ -2339,33 +2021,6 @@ export const workerGroupsRoute = async ({
 				store: result.store,
 				group: result.group,
 				member: result.member,
-			},
-			200,
-			baseHeaders,
-		);
-	}
-	if (path === '/groups/leave' && method === 'POST') {
-		const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
-		const result = await mutate({
-			env,
-			slug,
-			sessionId: sessionIdentity.sessionId,
-			operation: 'remove-member',
-			groupId: routeBody.groupId,
-			// A participant may only remove the principal authenticated by this
-			// request. Never accept a caller-supplied principal on this route.
-			principal: actor.principal,
-			actorPrincipal: actor.principal,
-		});
-		if (!result.ok) return routeError(deps, result, baseHeaders);
-		return jsonResponse(
-			deps,
-			{
-				ok: true,
-				...sessionIdentity,
-				store: result.store,
-				groupId: result.groupId,
-				principal: result.principal,
 			},
 			200,
 			baseHeaders,

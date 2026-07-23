@@ -185,7 +185,6 @@ const baseProps = (): SessionWizardShellProps => ({
   deployWorkerUrl: '',
   displayedWorkerUrl: 'https://worker.example.test',
   draft: { sessionModeProfile: { preset: 'fast_cheap_cloudflare' } },
-  effectivePersistWorkerSecrets: false,
   embeddedDeployHelperEnabled: true,
   encryptionGates: [],
   ensureLightSbtUniverse: jest.fn(),

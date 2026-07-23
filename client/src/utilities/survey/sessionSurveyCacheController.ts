@@ -10,6 +10,13 @@ import {
 } from './sessionSurveyResponseHelpers.js';
 import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
+import { readWorkerMetadataSessionConfig, type WorkerMetadataHydrationHost } from './workerCanonicalCacheHydration';
+import {
+  hydrateSessionWorkerSurveyCache,
+  isWorkerMetadataHydrationInFlight,
+  resolveWorkerMetadataHydrationTarget,
+} from './sessionWorkerMetadataCacheRuntime';
+import { createSessionCacheRevisionUpdater } from './sessionCacheRevisionRuntime';
 
 type StateRecord = Record<string, unknown>;
 type CacheRecord = Record<string, unknown>;
@@ -189,6 +196,19 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
     typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null;
   const getActiveSessionSlug = (): string =>
     String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
+  const getSessionBlockWindowRef = (slugIn: string): CacheRecord | string => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const cfg = readWorkerMetadataSessionConfig(host, slug);
+    if (!cfg || typeof cfg !== 'object') return slug;
+    // Regression guard: preserve resolved demo block limits across chain scans.
+    return {
+      ...cfg,
+      slug: normalizeSessionSlug(cfg.slug || slug),
+      ...(cfg.blockLimits && typeof cfg.blockLimits === 'object'
+        ? { blockLimits: { ...(cfg.blockLimits as CacheRecord) } }
+        : {}),
+    };
+  };
   const getSessionChainId = (slug: string): string | number | null | undefined =>
     typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
   const getSessionScanScope = (): string =>
@@ -214,28 +234,83 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
       : false;
   const writeSurveyMetadataToCache = (
     ...args: [string, string, CacheRecord, unknown, string, CacheRecord?]
-  ): boolean | void =>
-    typeof host.writeSurveyMetadataToCache === 'function' ? host.writeSurveyMetadataToCache(...args) : false;
-  const queueLocalRevisionUpdate = (opts: QueueLocalRevisionUpdateOptions = {}): void => {
-    if (typeof host.queueLocalRevisionUpdate === 'function') {
-      host.queueLocalRevisionUpdate(opts);
-      return;
+  ): Promise<boolean> => {
+    try {
+      return typeof host.writeSurveyMetadataToCache === 'function'
+        ? await host.writeSurveyMetadataToCache(...args)
+        : false;
+    } catch (error: unknown) {
+      if (error instanceof SurveyCachePersistenceError) throw error;
+      throw new SurveyCachePersistenceError(
+        `Failed to persist surveys cache for ${args[0]}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-    const shouldBumpQuestionResponsesNonce = !!opts?.needsQuestionResponsesNonce;
-    const shouldCheckAllCachesReady = !!opts?.checkAllCachesReady;
-    if (!shouldBumpQuestionResponsesNonce && !shouldCheckAllCachesReady) return;
-    setState(
-      (prev) => {
-        const next: StateRecord = {};
-        if (shouldBumpQuestionResponsesNonce) {
-          next.questionResponsesNonce = Number(prev?.questionResponsesNonce || 0) + 1;
+  };
+  const queueLocalRevisionUpdate = createSessionCacheRevisionUpdater<StateRecord, QueueLocalRevisionUpdateOptions>({
+    host,
+    setState,
+    checkAllCachesReady,
+  });
+  const isCacheRecord = (value: unknown): value is CacheRecord =>
+    !!value && typeof value === 'object' && !Array.isArray(value);
+  const createSurveyNetworkCache = (initialLastBlock: number): SurveyNetworkCache => ({
+    surveysLatestBlock: initialLastBlock,
+    surveys: {},
+    surveyResponses: {},
+    surveyResponsesLatestBlock: {},
+    pendingSurveyMetadata: {},
+  });
+  const ensureSurveyNetworkCache = (
+    cache: SurveysCache,
+    networkID: string,
+    initialLastBlock: number,
+  ): SurveyNetworkCache => {
+    if (!isCacheRecord(cache[networkID])) cache[networkID] = createSurveyNetworkCache(initialLastBlock);
+    const networkCache = cache[networkID];
+    if (!isCacheRecord(networkCache.surveys)) networkCache.surveys = {};
+    if (!isCacheRecord(networkCache.surveyResponses)) networkCache.surveyResponses = {};
+    if (!isCacheRecord(networkCache.surveyResponsesLatestBlock)) networkCache.surveyResponsesLatestBlock = {};
+    if (!isCacheRecord(networkCache.pendingSurveyMetadata)) networkCache.pendingSurveyMetadata = {};
+    networkCache.surveysLatestBlock = Math.max(Number(networkCache.surveysLatestBlock) || 0, initialLastBlock);
+    return networkCache;
+  };
+  const mergeUserDataArray = (
+    currentValue: unknown,
+    incomingValue: unknown,
+    listKey: keyof UserDataRecord,
+  ): unknown[] => {
+    const current = Array.isArray(currentValue) ? currentValue.slice() : [];
+    const incoming = Array.isArray(incomingValue) ? incomingValue : [];
+    const keyFor = (item: unknown): string => {
+      if (!isCacheRecord(item)) return '';
+      const id = item.id ?? item.surveyId ?? item.questionId ?? item.sbtAddress;
+      const responder = item.responder ? `:${String(item.responder).toLowerCase()}` : '';
+      return id ? `${String(id).toLowerCase()}${responder}` : '';
+    };
+    const indexes = new Map<string, number>();
+    current.forEach((item, index) => {
+      const key = keyFor(item);
+      if (key) indexes.set(key, index);
+    });
+    incoming.forEach((item) => {
+      const key = keyFor(item);
+      if (key && indexes.has(key)) {
+        const index = indexes.get(key)!;
+        if (listKey === 'surveyResponses' || listKey === 'questionResponses') {
+          const existing = isCacheRecord(current[index]) ? current[index] : {};
+          const incomingRow = isCacheRecord(item) ? item : {};
+          const existingRecency = toResponseRecencyPair(existing, existing.response);
+          const incomingRecency = toResponseRecencyPair(incomingRow, incomingRow.response);
+          if (isResponseRecencyNewer(incomingRecency, existingRecency)) current[index] = item;
+          return;
         }
-        return Object.keys(next).length ? next : null;
-      },
-      () => {
-        if (shouldCheckAllCachesReady) checkAllCachesReady();
-      },
-    );
+        current[index] = item;
+      } else {
+        if (key) indexes.set(key, current.length);
+        current.push(item);
+      }
+    });
+    return current;
   };
   const surveyEventStreams = host.surveyEventStreamsPort || sbtEventStreamsPort;
 
@@ -282,8 +357,10 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
         if (suppressUiState || !isMounted()) return;
         setState(nextState, cb);
       };
-
+      const workerTarget = resolveWorkerMetadataHydrationTarget(host, slug);
+      const initRunKey = workerTarget.runKey;
       if (
+        !workerTarget.isWorkerCanonical &&
         scanScopeNoop(slug, 'initializeSurveyCacheForGroup', () => {
           setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
         })
@@ -301,6 +378,27 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost 
         setSurveyState((prev) =>
           prev.surveyCacheInitializationError ? { surveyCacheInitializationError: false } : null,
         );
+
+        if (workerTarget.isWorkerCanonical) {
+          await hydrateSessionWorkerSurveyCache<SurveysCache>({
+            host,
+            target: workerTarget,
+            sessionSlug: slug,
+            createPersistenceError: () =>
+              new SurveyCachePersistenceError(`Failed to persist Worker surveys cache for ${slug}`),
+            onSuccess: (count) => {
+              setSurveyState({ isSurveyCacheReady: true });
+              if (count > 0) queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
+              if (!suppressUiState) checkAllCachesReady();
+            },
+            onError: (error) => {
+              mainSiteLog.error('Error hydrating Worker survey metadata:', error);
+              setSurveyState({ surveyCacheInitializationError: true });
+            },
+          });
+          return;
+        }
+
         const networkID = String(getSessionChainId(slug) || '');
 
         const { fromBlock: baseFrom, toBlock: baseTo } =

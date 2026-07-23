@@ -51,17 +51,30 @@ const renderPile = (props = {}) =>
     ...props,
   });
 
-const treeHasText = (node, text) => {
-  if (node == null) return false;
-  const expandedNode = expandInspectableNode(node);
-  if (expandedNode !== node) return treeHasText(expandedNode, text);
-  if (Array.isArray(node)) return node.some((child) => treeHasText(child, text));
-  if (typeof node === 'string' || typeof node === 'number') {
-    return String(node).includes(text);
-  }
-  if (typeof node !== 'object') return false;
-  return treeHasText(node?.props?.children, text);
-};
+const createLegacyChainSessionConfig = () => ({
+  slug: 'edge',
+  networkChainId: 84532,
+  __registry: {
+    sessionIdHex: '0x00112233445566778899aabbccddeeff',
+    registryChainId: 84532,
+  },
+});
+
+const createDefaultGatedSessionConfig = () => ({
+  ...createLegacyChainSessionConfig(),
+  __registry: {
+    ...createLegacyChainSessionConfig().__registry,
+    gateAuthority: 'onchain',
+    gatesByResource: {
+      default: {
+        lookupStatus: 'ok',
+        sbtAddresses: [SESSION_SBT],
+        chainId: 84532,
+        mode: 'any',
+      },
+    },
+  },
+});
 
 const mockSbtLabels = () =>
   jest
@@ -170,8 +183,6 @@ describe('SurveyPileViewMode gated empty states', () => {
     renderPile({
       sessionConfig,
     });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
 
     const lockedBanner = await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER);
     expect(lockedBanner).toBeInTheDocument();
@@ -214,8 +225,6 @@ describe('SurveyPileViewMode gated empty states', () => {
     renderPile({
       sessionConfig,
     });
-    const pileElement = shell.render();
-    const subject = new PileViewMode(pileElement.props);
 
     expect(await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBeInTheDocument();
     expect(screen.getByText(`This session's questions are ${t('gatedLower')}`)).toBeInTheDocument();

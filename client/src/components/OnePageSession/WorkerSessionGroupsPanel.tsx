@@ -3,6 +3,9 @@ import AdminWorkerGroupsPanel from '../Admin/AdminWorkerGroupsPanel';
 import { resolveAdminCapabilities } from '../Admin/adminPageHelpers';
 import { postSignedAdminWorkerRequest } from '../Admin/adminPageSignedWorkerRequest';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection.js';
+import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
+import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { buildSignedAdminActionAuth, getWorkerSessionToken } from '../../utilities/worker/workerAuth';
 import type { PostSignedWorkerGroupRequest } from '../../domains/worker/workerGroupPorts';
 import WorkerGroupMembershipPanel from './WorkerGroupMembershipPanel';
@@ -24,58 +27,114 @@ const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
 
 const toText = (value: unknown): string => String(value ?? '').trim();
+type WorkerGroupsAuthState = {
+  targetKey: string;
+  token: string;
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  error: string;
+};
+
+const emptyAuthState = (targetKey: string): WorkerGroupsAuthState => ({
+  targetKey,
+  token: '',
+  status: 'idle',
+  error: '',
+});
 
 const WorkerSessionGroupsPanel = ({
   account,
   provider,
-  networkChainId,
   sessionConfig,
   sessionSlug,
   showCreate,
   toggleLoginModal,
 }: WorkerSessionGroupsPanelProps) => {
-  const [workerToken, setWorkerToken] = useState('');
-  const [authStatus, setAuthStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-  const [authError, setAuthError] = useState('');
-  const [groupsRevision, setGroupsRevision] = useState(0);
-  const authRequestIdRef = useRef(0);
   const config = asRecord(sessionConfig);
+  const canonicalSessionSlug = canonicalizeSessionSlug(sessionSlug);
+  const configuredSessionSlug = canonicalizeSessionSlug(config.slug);
+  const canonicalSessionId = resolveWorkerCanonicalSessionIdHex(config);
+  const projection = resolveSessionCapabilityProjection(config);
+  const hasExactWorkerProfile =
+    projection.source === 'profile' &&
+    projection.profileValid &&
+    projection.isWorkerCanonical &&
+    canonicalSessionId.length > 0 &&
+    canonicalSessionSlug.length > 0 &&
+    configuredSessionSlug === canonicalSessionSlug;
   const normalizedAccount = toText(account);
   const workerUrl = useMemo(
-    () => getUsableSessionWorkerUrl({ slug: sessionSlug, sessionConfig }),
-    [sessionConfig, sessionSlug],
+    () =>
+      getUsableSessionWorkerUrl({
+        slug: canonicalSessionSlug,
+        sessionConfig,
+        requireExactWorkerSession: true,
+      }),
+    [canonicalSessionSlug, sessionConfig],
   );
+  const targetKey = `${canonicalSessionId}\n${canonicalSessionSlug}\n${workerUrl}\n${normalizedAccount.toLowerCase()}`;
+  const [authState, setAuthState] = useState<WorkerGroupsAuthState>(() => emptyAuthState(targetKey));
+  const [groupsRevision, setGroupsRevision] = useState(0);
+  const authRequestIdRef = useRef(0);
+  const activeAuthState = authState.targetKey === targetKey ? authState : emptyAuthState(targetKey);
+  const workerToken = activeAuthState.token;
+  const authStatus = activeAuthState.status;
+  const authError = activeAuthState.error;
   const adminCapabilities = resolveAdminCapabilities({ account, sessionConfig: config });
   const canAttemptWorkerAdmin =
     adminCapabilities.canAdminWorker || (!adminCapabilities.workerAdminAddress && !!normalizedAccount);
-  const chainId = Number(networkChainId || config.networkChainId || 1) || 1;
+  const chainId = projection.hasOnChainComponent && projection.chainId ? projection.chainId : 1;
 
   const authenticate = useCallback(async () => {
-    if (!normalizedAccount || !workerUrl) return;
+    const requestTargetKey = targetKey;
+    if (!hasExactWorkerProfile || !normalizedAccount || !workerUrl) {
+      setAuthState(emptyAuthState(requestTargetKey));
+      return;
+    }
     const requestId = authRequestIdRef.current + 1;
     authRequestIdRef.current = requestId;
-    setWorkerToken('');
-    setAuthStatus('loading');
-    setAuthError('');
+    setAuthState({
+      targetKey: requestTargetKey,
+      token: '',
+      status: 'loading',
+      error: '',
+    });
     try {
       const token = await getWorkerSessionToken({
-        sessionSlug,
+        sessionSlug: canonicalSessionSlug,
         sessionConfig,
         workerUrl,
         context: { account, providerLike: provider, chainId },
       });
       if (authRequestIdRef.current !== requestId) return;
-      setWorkerToken(token);
-      setAuthStatus('ready');
+      setAuthState({
+        targetKey: requestTargetKey,
+        token,
+        status: 'ready',
+        error: '',
+      });
     } catch (error) {
       if (authRequestIdRef.current !== requestId) return;
-      setWorkerToken('');
-      setAuthError(error instanceof Error ? error.message : 'Could not authenticate with the session worker.');
-      setAuthStatus('error');
+      setAuthState({
+        targetKey: requestTargetKey,
+        token: '',
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Could not authenticate with the session worker.',
+      });
     }
-  }, [account, chainId, normalizedAccount, provider, sessionConfig, sessionSlug, workerUrl]);
+  }, [
+    account,
+    canonicalSessionSlug,
+    chainId,
+    hasExactWorkerProfile,
+    normalizedAccount,
+    provider,
+    sessionConfig,
+    targetKey,
+    workerUrl,
+  ]);
 
   useEffect(() => {
+    setGroupsRevision(0);
     void authenticate();
     return () => {
       authRequestIdRef.current += 1;
@@ -94,15 +153,24 @@ const WorkerSessionGroupsPanel = ({
         signAdminAction: ({ action: signedAction, body: signedBody, workerUrl: signedWorkerUrl }) =>
           buildSignedAdminActionAuth({
             action: signedAction,
-            slug: sessionSlug,
+            slug: canonicalSessionSlug,
+            sessionId: canonicalSessionId,
             body: signedBody,
             workerUrl: signedWorkerUrl,
             context: { account, providerLike: provider, chainId },
           }),
       });
     },
-    [account, chainId, provider, sessionSlug, workerUrl],
+    [account, canonicalSessionId, canonicalSessionSlug, chainId, provider, workerUrl],
   );
+
+  if (!hasExactWorkerProfile) {
+    return (
+      <div className={styles.workerGroupNotice}>
+        This session does not have an exact, validated Worker Groups profile.
+      </div>
+    );
+  }
 
   if (!workerUrl) {
     return <div className={styles.workerGroupNotice}>This session does not have a configured Cloudflare worker.</div>;
@@ -138,17 +206,22 @@ const WorkerSessionGroupsPanel = ({
       ) : null}
       {workerToken ? (
         <WorkerGroupMembershipPanel
+          key={`worker-memberships:${targetKey}`}
           canReadGroups={true}
           workerUrl={workerUrl}
           workerToken={workerToken}
+          sessionId={canonicalSessionId}
+          sessionSlug={canonicalSessionSlug}
           refreshNonce={groupsRevision}
         />
       ) : null}
       {showCreate ? (
         canAttemptWorkerAdmin ? (
           <AdminWorkerGroupsPanel
+            key={`worker-admin-groups:${targetKey}`}
             canAdminWorker={true}
-            sessionSlug={sessionSlug}
+            sessionId={canonicalSessionId}
+            sessionSlug={canonicalSessionSlug}
             workerUrl={workerUrl}
             postSignedRequest={postSignedRequest}
             autoLoad={true}

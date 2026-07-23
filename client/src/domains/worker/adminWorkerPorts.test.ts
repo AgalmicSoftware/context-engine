@@ -199,14 +199,20 @@ describe('admin worker ports', () => {
       fetchImpl: () => fetchImpl,
     });
 
-    await expect(
-      ports.siweLogin.prepareSiweLogin({
+    const error = await ports.siweLogin
+      .prepareSiweLogin({
         workerUrl: 'https://worker.example.test',
         address: '0x00000000000000000000000000000000000000aa',
         sessionSlug: 'edge',
         chainId: 84532,
-      }),
-    ).rejects.toThrow('nonce unavailable');
+      })
+      .catch((caught) => caught);
+    expect(error).toMatchObject({
+      message: 'Admin Worker nonce request failed (503).',
+      reason: 'worker_auth_admin_nonce_failed',
+      status: 503,
+    });
+    expect(String(error?.message || error)).not.toContain(canaryCredential);
     expect(buildSiweMessage).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,10 @@
 import { act, renderHook } from '@testing-library/react';
-import usePendingSbtDrafts, { SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY } from './usePendingSbtDrafts.js';
+import usePendingSbtDrafts, {
+  SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY,
+  clearSessionWizardPendingSbtDraftsCache,
+  readSessionWizardPendingSbtDraftsCache,
+  writeSessionWizardPendingSbtDraftsCache,
+} from './usePendingSbtDrafts.js';
 
 const PENDING_ADDRESS = '0x00000000000000000000000000000000000000a1';
 const DEPLOYED_ADDRESS = '0x00000000000000000000000000000000000000b2';
@@ -28,7 +33,7 @@ describe('usePendingSbtDrafts', () => {
   it('purges legacy sessionStorage drafts instead of hydrating their secrets', () => {
     sessionStorage.setItem(
       SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY,
-      JSON.stringify([buildDraft({ tokenURI: 'ar://pending' })]),
+      JSON.stringify([buildDraft({ groupPassword: 'legacy-secret', tokenURI: 'ar://pending' })]),
     );
 
     const { result } = renderHook(() => usePendingSbtDrafts());
@@ -45,15 +50,17 @@ describe('usePendingSbtDrafts', () => {
       result.current.setPendingSbtDrafts([buildDraft({ groupPassword: 'memory-secret' })]);
     });
 
-    expect(setItemSpy).toHaveBeenCalledWith(
-      SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY,
-      expect.stringContaining(PENDING_ADDRESS),
-    );
-    expect(JSON.parse(sessionStorage.getItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY) || '[]')).toEqual([
-      expect.objectContaining({
-        predictedAddress: PENDING_ADDRESS,
-        displayName: 'Pending Access',
-        metadataUploadStatus: 'pending-upload',
+    expect(setItemSpy).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY)).toBeNull();
+    expect(readSessionWizardPendingSbtDraftsCache()).toEqual([
+      expect.objectContaining({ groupPassword: 'memory-secret', predictedAddress: PENDING_ADDRESS }),
+    ]);
+  });
+
+  it('retains the memory update while reporting a failed legacy-artifact purge', () => {
+    const storage = {
+      removeItem: jest.fn(() => {
+        throw new Error('sessionStorage denied');
       }),
     };
 

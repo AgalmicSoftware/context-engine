@@ -69,16 +69,16 @@ describe('SBTSelector targeted hydration', () => {
     });
 
     try {
-      expect(instance.getSessionNetworkId('rxc')).toBe(10);
-      expect(instance.getMetadataLookupConfig('rxc')).toEqual(
+      expect(instance.getSessionNetworkId('rxc')).toBeNull();
+      const metadataLookupConfig = instance.getMetadataLookupConfig('rxc');
+      expect(metadataLookupConfig).toEqual(
         expect.objectContaining({
           slug: 'rxc',
-          networkChainId: 10,
-          __registry: expect.objectContaining({
-            chainId: 10,
-          }),
+          contracts: {},
         }),
       );
+      expect(metadataLookupConfig).not.toHaveProperty('networkChainId');
+      expect(metadataLookupConfig).not.toHaveProperty('__registry');
       expect(demoSpy).not.toHaveBeenCalled();
     } finally {
       strictSpy.mockRestore();
@@ -118,7 +118,7 @@ describe('SBTSelector targeted hydration', () => {
           __unresolved: true,
         }),
       );
-      expect(instance.getSessionNetworkId('legacyEdge')).toBe(DEFAULT_CHAIN_ID);
+      expect(instance.getSessionNetworkId('legacyEdge')).toBeNull();
       expect(demoSpy).not.toHaveBeenCalled();
     } finally {
       demoSpy.mockRestore();

@@ -55,7 +55,6 @@ export type WorkerGroupOverview = {
 export type WorkerGroupMemberPage = UnknownRecord & {
   group: WorkerGroup;
   members: WorkerGroupMember[];
-  memberCount?: number;
   nextCursor: string;
 };
 
@@ -73,56 +72,11 @@ const toRecord = (value: unknown): UnknownRecord =>
 
 const toStringValue = (value: unknown): string => String(value ?? '').trim();
 
-export const normalizeWorkerGroupDefaultTags = (sessionConfig: unknown): string[] => {
-  const source = toRecord(sessionConfig);
-  const raw = source.defaultGroupTags ?? source.defaultSbtTags;
-  const entries = Array.isArray(raw)
-    ? raw.map(toStringValue)
-    : toStringValue(raw)
-        .split(/[\n,]+/)
-        .map((entry) => entry.trim());
-  const seen = new Set<string>();
-  return entries
-    .filter((tag) => {
-      if (!tag || tag.length > 64) return false;
-      const key = tag.toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, 20);
-};
-
-const isSafeHttpsUrl = (value: string): boolean => {
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === 'https:' && !parsed.username && !parsed.password && value.length <= 2048;
-  } catch {
-    return false;
-  }
-  return {
-    groupId,
-    sessionSlug: toStringValue(source.sessionSlug) || undefined,
-    label,
-    description: toStringValue(source.description) || undefined,
-    imageUrl: toStringValue(source.imageUrl) || undefined,
-    joinMode: joinMode as WorkerGroupJoinMode,
-    memberVisibility: memberVisibility as WorkerGroupMemberVisibility,
-    createdAt: toStringValue(source.createdAt) || undefined,
-    updatedAt: toStringValue(source.updatedAt) || undefined,
-  };
-};
-
 const SAFE_REMOTE_WORKER_GROUP_REASONS = new Set([
   'invalid_agent_principal',
   'invalid_group_description',
-  'invalid_group_document_urls',
-  'invalid_group_admin_address',
   'invalid_group_image_url',
-  'invalid_group_join_end',
   'invalid_group_label',
-  'invalid_group_member_limit',
-  'invalid_group_tags',
   'invalid_join_mode',
   'invalid_member_visibility',
   'invalid_principal',
@@ -135,18 +89,12 @@ const SAFE_REMOTE_WORKER_GROUP_REASONS = new Set([
   'worker_group_authorization_invalid',
   'worker_group_capacity_identity_conflict',
   'worker_group_capacity_reconciliation_required',
-  'worker_group_capacity_repair_not_applicable',
   'worker_group_capacity_seed_unavailable',
   'worker_group_capacity_state_unavailable',
   'worker_group_catalog_invalid',
   'worker_group_coordination_unavailable',
-  'worker_group_creation_admin_only',
-  'worker_group_discovery_not_public',
   'worker_group_join_denied',
-  'worker_group_join_ended',
   'worker_group_member_cap_exceeded',
-  'worker_group_member_limit_below_current',
-  'worker_group_member_list_forbidden',
   'worker_group_member_not_found',
   'worker_group_member_page_invalid',
   'worker_group_membership_denied',
@@ -171,8 +119,6 @@ const SAFE_LOCAL_WORKER_GROUP_REASONS = new Set([
   'worker_group_request_failed',
   'worker_group_response_cursor_invalid',
   'worker_group_response_group_invalid',
-  'worker_group_response_member_count_invalid',
-  'worker_group_response_member_invalid',
   'worker_group_response_session_identity_mismatch',
   'worker_group_response_session_identity_missing',
   'worker_group_response_session_slug_mismatch',
@@ -212,17 +158,6 @@ export const sanitizeWorkerGroupRequestError = (
   fallbackReason = 'worker_group_request_failed',
 ): WorkerGroupRequestError => {
   if (error instanceof WorkerGroupRequestError && isSafeWorkerGroupReason(error.message)) return error;
-  const remoteReason =
-    error && typeof error === 'object' && 'reason' in error
-      ? toStringValue((error as { reason?: unknown }).reason)
-      : '';
-  if (SAFE_REMOTE_WORKER_GROUP_REASONS.has(remoteReason)) {
-    const remoteStatus =
-      error && typeof error === 'object' && 'status' in error
-        ? normalizeWorkerGroupResponseStatus((error as { status?: unknown }).status)
-        : 0;
-    return new WorkerGroupRequestError(remoteReason, remoteStatus);
-  }
   const safeFallback = isSafeWorkerGroupReason(fallbackReason) ? fallbackReason : 'worker_group_request_failed';
   const status =
     error && typeof error === 'object' && 'status' in error
@@ -273,29 +208,11 @@ const normalizeGroup = (value: unknown, expectedSessionSlug?: unknown): WorkerGr
   const label = toStringValue(source.label);
   const joinMode = toStringValue(source.joinMode);
   const memberVisibility = toStringValue(source.memberVisibility);
-  const tags = Array.isArray(source.tags) ? source.tags.map(toStringValue).filter(Boolean) : [];
-  const documentURLs = Array.isArray(source.documentURLs) ? source.documentURLs.map(toStringValue).filter(Boolean) : [];
-  const memberLimit = Number(source.memberLimit);
-  const joinEndsAt = toStringValue(source.joinEndsAt);
-  const adminAddress = toStringValue(source.adminAddress);
   if (
     !groupId ||
     !label ||
     !['open', 'admin_add'].includes(joinMode) ||
-    !['admin_only', 'members', 'session'].includes(memberVisibility) ||
-    (source.tags != null &&
-      (!Array.isArray(source.tags) ||
-        tags.length !== source.tags.length ||
-        tags.length > 20 ||
-        tags.some((tag) => tag.length > 64))) ||
-    (source.documentURLs != null &&
-      (!Array.isArray(source.documentURLs) ||
-        documentURLs.length !== source.documentURLs.length ||
-        documentURLs.length > 10 ||
-        documentURLs.some((url) => !isSafeHttpsUrl(url)))) ||
-    (source.memberLimit != null && (!Number.isSafeInteger(memberLimit) || memberLimit < 1 || memberLimit > 1000)) ||
-    (source.joinEndsAt != null && (!joinEndsAt || !Number.isFinite(Date.parse(joinEndsAt)))) ||
-    (source.adminAddress != null && !/^0x[0-9a-fA-F]{40}$/.test(adminAddress))
+    !['admin_only', 'members', 'session'].includes(memberVisibility)
   ) {
     return null;
   }
@@ -309,11 +226,6 @@ const normalizeGroup = (value: unknown, expectedSessionSlug?: unknown): WorkerGr
     label,
     description: toStringValue(source.description) || undefined,
     imageUrl: toStringValue(source.imageUrl) || undefined,
-    tags: tags.length ? tags : undefined,
-    documentURLs: documentURLs.length ? documentURLs : undefined,
-    memberLimit: Number.isSafeInteger(memberLimit) && memberLimit > 0 ? memberLimit : undefined,
-    joinEndsAt: joinEndsAt || undefined,
-    adminAddress: adminAddress || undefined,
     joinMode: joinMode as WorkerGroupJoinMode,
     memberVisibility: memberVisibility as WorkerGroupMemberVisibility,
     createdAt: toStringValue(source.createdAt) || undefined,
@@ -346,50 +258,6 @@ const normalizeMemberships = (value: unknown, expectedSessionSlug?: unknown): Wo
   (Array.isArray(value) ? value : [])
     .map((membership) => normalizeMembership(membership, expectedSessionSlug))
     .filter((membership): membership is WorkerGroupMembership => membership !== null);
-
-const normalizeVisibleWorkerGroupPrincipal = (value: unknown): WorkerGroupPrincipal | null => {
-  const source = toRecord(value);
-  const kind = toStringValue(source.kind).toLowerCase();
-  if (kind === 'evm_address' || kind === 'passkey_account') {
-    const address = toStringValue(source.address);
-    return /^0x[0-9a-fA-F]{40}$/.test(address) ? { kind, address: address.toLowerCase() } : null;
-  }
-  if (kind === 'telegram') {
-    const principalId = toStringValue(source.principalId);
-    return principalId && principalId.length <= 180 && /^[A-Za-z0-9:_@./=-]+$/.test(principalId)
-      ? { kind, principalId }
-      : null;
-  }
-  if (kind === 'agent') {
-    const grantId = toStringValue(source.grantId);
-    return grantId && grantId.length <= 180 && /^[A-Za-z0-9:_@./=-]+$/.test(grantId) ? { kind, grantId } : null;
-  }
-  return null;
-};
-
-const normalizeVisibleWorkerGroupMember = (
-  value: unknown,
-  expectedSessionSlug: unknown,
-  expectedGroupId: string,
-): WorkerGroupMember | null => {
-  const source = toRecord(value);
-  const groupId = toStringValue(source.groupId);
-  const principal = normalizeVisibleWorkerGroupPrincipal(source.principal);
-  const addedAt = toStringValue(source.addedAt);
-  if (
-    groupId !== expectedGroupId ||
-    !principal ||
-    (source.addedAt != null && (!addedAt || !Number.isFinite(Date.parse(addedAt))))
-  ) {
-    return null;
-  }
-  return {
-    groupId,
-    sessionSlug: assertExactSessionSlug(source.sessionSlug, expectedSessionSlug),
-    principal,
-    ...(addedAt ? { addedAt } : {}),
-  };
-};
 
 const requestMemberRoute = async ({
   workerUrl,
@@ -503,83 +371,6 @@ export const loadWorkerGroupOverview = async ({
   };
 };
 
-export const loadWorkerGroupMembers = async ({
-  workerUrl,
-  credentialToken,
-  sessionId,
-  sessionSlug,
-  groupId,
-  cursor = '',
-  limit = 100,
-  fetchImpl = fetch,
-}: {
-  workerUrl: unknown;
-  credentialToken: unknown;
-  sessionId: unknown;
-  sessionSlug: unknown;
-  groupId: unknown;
-  cursor?: string;
-  limit?: number;
-  fetchImpl?: typeof fetch;
-}): Promise<WorkerGroupMemberPage> => {
-  const expectedSessionSlug = normalizeExpectedSessionSlug(sessionSlug);
-  const expectedSessionId = normalizeExpectedSessionId(sessionId);
-  const expectedGroupId = toStringValue(groupId);
-  if (
-    !expectedGroupId ||
-    expectedGroupId.length > 80 ||
-    typeof cursor !== 'string' ||
-    cursor.length > 1024 ||
-    !Number.isSafeInteger(limit) ||
-    limit < 1 ||
-    limit > 250
-  ) {
-    throw new WorkerGroupRequestError('worker_group_member_page_invalid', 400);
-  }
-  const payload = await requestMemberRoute({
-    workerUrl,
-    credentialToken,
-    sessionId: expectedSessionId,
-    sessionSlug: expectedSessionSlug,
-    path: '/groups/members',
-    method: 'POST',
-    body: {
-      groupId: expectedGroupId,
-      ...(cursor ? { cursor } : {}),
-      limit,
-    },
-    fetchImpl,
-  });
-  const group = normalizeGroup(payload.group, expectedSessionSlug);
-  if (!group || group.groupId !== expectedGroupId) {
-    throw new WorkerGroupRequestError('worker_group_response_group_invalid');
-  }
-  if (!Array.isArray(payload.members)) {
-    throw new WorkerGroupRequestError('worker_group_response_member_invalid');
-  }
-  const members = payload.members.map((member) =>
-    normalizeVisibleWorkerGroupMember(member, expectedSessionSlug, expectedGroupId),
-  );
-  if (members.some((member) => member === null)) {
-    throw new WorkerGroupRequestError('worker_group_response_member_invalid');
-  }
-  const memberCount = Number(payload.memberCount);
-  if (!Number.isSafeInteger(memberCount) || memberCount < 0) {
-    throw new WorkerGroupRequestError('worker_group_response_member_count_invalid');
-  }
-  const nextCursorValue = payload.nextCursor;
-  if (nextCursorValue != null && (typeof nextCursorValue !== 'string' || nextCursorValue.length > 1024)) {
-    throw new WorkerGroupRequestError('worker_group_response_cursor_invalid');
-  }
-  return {
-    ...payload,
-    group,
-    members: members as WorkerGroupMember[],
-    memberCount,
-    nextCursor: typeof nextCursorValue === 'string' ? nextCursorValue : '',
-  };
-};
-
 export const joinWorkerGroup = async ({
   workerUrl,
   credentialToken,
@@ -610,80 +401,6 @@ export const joinWorkerGroup = async ({
     const group = normalizeGroup(payload.group, expectedSessionSlug);
     if (!group) throw new WorkerGroupRequestError('worker_group_response_group_invalid');
     return { ...payload, group };
-  });
-};
-
-export const leaveWorkerGroup = async ({
-  workerUrl,
-  credentialToken,
-  sessionId,
-  sessionSlug,
-  groupId,
-  fetchImpl = fetch,
-}: {
-  workerUrl: unknown;
-  credentialToken: unknown;
-  sessionId: unknown;
-  sessionSlug: unknown;
-  groupId: unknown;
-  fetchImpl?: typeof fetch;
-}): Promise<UnknownRecord> => {
-  const expectedSessionSlug = normalizeExpectedSessionSlug(sessionSlug);
-  const expectedSessionId = normalizeExpectedSessionId(sessionId);
-  const expectedGroupId = toStringValue(groupId);
-  return requestMemberRoute({
-    workerUrl,
-    credentialToken,
-    sessionId: expectedSessionId,
-    sessionSlug: expectedSessionSlug,
-    path: '/groups/leave',
-    method: 'POST',
-    body: { groupId: expectedGroupId },
-    fetchImpl,
-  }).then((payload) => {
-    if (toStringValue(payload.groupId) !== expectedGroupId) {
-      throw new WorkerGroupRequestError('worker_group_response_group_invalid');
-    }
-    return payload;
-  });
-};
-
-export const createWorkerGroupAsParticipant = async ({
-  workerUrl,
-  credentialToken,
-  sessionId,
-  sessionSlug,
-  group,
-  fetchImpl = fetch,
-}: {
-  workerUrl: unknown;
-  credentialToken: unknown;
-  sessionId: unknown;
-  sessionSlug: unknown;
-  group: Pick<WorkerGroup, 'label'> &
-    Partial<
-      Pick<
-        WorkerGroup,
-        'description' | 'imageUrl' | 'tags' | 'documentURLs' | 'memberLimit' | 'joinEndsAt' | 'adminAddress'
-      >
-    >;
-  fetchImpl?: typeof fetch;
-}): Promise<UnknownRecord> => {
-  const expectedSessionSlug = normalizeExpectedSessionSlug(sessionSlug);
-  const expectedSessionId = normalizeExpectedSessionId(sessionId);
-  return requestMemberRoute({
-    workerUrl,
-    credentialToken,
-    sessionId: expectedSessionId,
-    sessionSlug: expectedSessionSlug,
-    path: '/groups/create',
-    method: 'POST',
-    body: { group },
-    fetchImpl,
-  }).then((payload) => {
-    const created = normalizeGroup(payload.group, expectedSessionSlug);
-    if (!created) throw new WorkerGroupRequestError('worker_group_response_group_invalid');
-    return { ...payload, group: created };
   });
 };
 
@@ -726,21 +443,45 @@ export const listWorkerGroupsAdmin = ({
     groups: normalizeGroups(payload.groups, sessionSlug),
   }));
 
-export const reconcileEmptyWorkerGroupsAdmin = ({
+export const listWorkerGroupMembers = ({
+  groupId,
+  cursor,
+  limit,
   sessionId,
   sessionSlug,
   postSignedRequest,
 }: {
+  groupId: unknown;
+  cursor?: string;
+  limit?: number;
   sessionId: unknown;
   sessionSlug: unknown;
   postSignedRequest: PostSignedWorkerGroupRequest;
-}): Promise<UnknownRecord> =>
+}): Promise<WorkerGroupMemberPage> =>
   runAdminAction({
-    action: 'groups/reconcile-empty',
-    body: {},
+    action: 'groups/list-members',
+    body: {
+      groupId: toStringValue(groupId),
+      ...(cursor ? { cursor } : {}),
+      ...(limit == null ? {} : { limit }),
+    },
     sessionId,
     sessionSlug,
     postSignedRequest,
+  }).then((payload) => {
+    const group = normalizeGroup(payload.group, sessionSlug);
+    if (!group) throw new WorkerGroupRequestError('worker_group_response_group_invalid');
+    const members = normalizeWorkerGroupMembersAdminPayload(payload, sessionSlug);
+    const nextCursorValue = payload.nextCursor;
+    if (nextCursorValue != null && (typeof nextCursorValue !== 'string' || nextCursorValue.length > 1024)) {
+      throw new WorkerGroupRequestError('worker_group_response_cursor_invalid');
+    }
+    return {
+      ...payload,
+      group,
+      members,
+      nextCursor: typeof nextCursorValue === 'string' ? nextCursorValue : '',
+    };
   });
 
 export const listWorkerGroupMembers = ({

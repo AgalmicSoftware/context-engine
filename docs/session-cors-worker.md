@@ -21,15 +21,24 @@ canonical `/api/agent/*` routes:
 - `POST /api/agent/client-login/exchange` accepts a pasted user/install or named
   service `ceagt_` credential once and returns a short-TTL versioned envelope.
   That envelope contains a Bridge browser credential for Bridge reads and a
-  distinct session-worker JWT for canonical worker routes. The web client sends
-  each credential only to its intended authority and stores only the envelope
-  in tab-scoped `sessionStorage`; source credentials must not be put in URLs,
-  localStorage, sessionStorage, Redux, or logs.
+  distinct session-worker JWT for canonical worker routes. The current
+  Telegram-first client sends the Bridge credential only to Bridge routes and
+  retains the worker JWT separately for direct canonical worker consumers; it
+  never sends the worker JWT to the Bridge. The client keeps the exchanged
+  envelope only in page memory and requires a fresh exchange after reload. It
+  also removes legacy Agent-envelope and Session Worker JWT browser-storage
+  entries at startup. Source credentials and exchanged bearer credentials must
+  not be put in URLs, localStorage, sessionStorage, Redux, or logs.
 - Credentials are bound to one principal, session, audience, scope set, expiry,
-  and revocation slot. Telegram can mint a user credential, but Telegram is not
-  required: `POST /api/agent/invite/onboard` also creates an opaque user from a
-  one-time body-only invite. The Bridge root token is bootstrap/break-glass
-  authority and can mint named scoped services through
+  and revocation slot. A `worker_canonical` Bridge browser credential also
+  carries the normalized canonical 16-byte session ID and exact Worker origin.
+  The Bridge re-resolves current policy before authenticated route dispatch and
+  rejects the credential before route reads or writes after a same-slug Worker
+  identity/origin replacement. Registry-compatible browser credentials retain
+  their existing behavior. Telegram can mint a user credential, but Telegram is
+  not required: `POST /api/agent/invite/onboard` also creates an opaque user
+  from a one-time body-only invite. The Bridge root token is
+  bootstrap/break-glass authority and can mint named scoped services through
   `POST /api/agent/credentials/service`.
 - Telegram-first session reads and submits use the shared browser components
   after one page-boundary backend-mode decision. `/session/demo` keeps its
@@ -422,15 +431,26 @@ Authenticated clients can use the worker as the session storage boundary:
     larger payloads.
 - `GET|POST /storage/read`: reads a Cloudflare object by opaque `storageRef.id` after the configured Cloudflare payload access check. For R2 bytes, the matching KV index row is authoritative for per-item authorization metadata, while the session's `storageProfile.payloadAccessControl` remains the coarse fallback policy; R2 custom metadata is only a locator and is never an access-policy fallback. The worker validates the row's id/resource and authorizes it before consuming object body methods. A missing index binding returns `501`, a cleanly absent row returns `404`, and an unreadable, malformed, or mismatched row returns `503` without returning payload bytes. Public-read sessions may be served anonymously only when the resolved per-item conditions or session fallback policy allows it; gated sessions require authenticated route preflight. Successful reads return the payload bytes with `X-CE-Storage-Backend: cloudflare`, `X-CE-Payload-Access-Mode`, and no raw object keys.
 - `GET|POST /storage/list`: returns one bounded Cloudflare metadata/index page for a resource such as `docsContext`, with safe `storageRef` objects, tag metadata, and the configured payload access mode. Inputs are `resource`, opaque `cursor`, and `limit` (default and maximum `100`) as query parameters or POST JSON fields; query values take precedence. The response is `{ "items": [], "cursor": string|null, "listComplete": boolean }`. Authorization filtering is applied independently to every row on every page, so a page may have no visible `items` while still returning a continuation cursor. A client can request the next bounded page with that cursor and must not treat an empty page as completion while the cursor is non-null. If KV marks a page incomplete without supplying its cursor, or a listed row cannot be read because KV is unavailable, the worker returns `503` instead of reporting false completion; cleanly missing or malformed individual rows are omitted. Response rows also include `metadata.responder`, derived from the authenticated upload principal. Worker-canonical clients use that field rather than the response JSON's self-claimed address. Public-read sessions may list anonymously; gated sessions require authenticated route preflight.
+  - Worker-canonical question and survey authoring writes payloads to this
+    session's Cloudflare storage and does not register them in the Surveys
+    contract. Fresh clients paginate the `questions` and `surveys` indexes,
+    read each bounded item with the same exact Worker target, require the
+    canonical slug and session ID inside the payload, and merge only matching
+    rows into the `worker` cache partition. Authenticated storage policies use
+    the active passkey context. List/read/auth failures fail closed without an
+    EVM scan or registry fallback.
 - `GET|POST /storage/export-envelopes`: returns ciphertext plus envelope metadata for encrypted Cloudflare payloads in the requested resource. It does not decrypt payload bytes and does not include session KEK material.
 
 Cloudflare storage bindings are optional until a session selects `storageProfile.backend = "cloudflare"` at creation time in `/new`; legacy doc-library configs with `docLibrary.provider = "cloudflare"` are also accepted by the worker for storage route compatibility. Backend mutation/migration is out of scope for now. This is payload storage for session context, docs, media, questions, surveys, responses, and generated artifacts; it is not user preference/profile storage. Tests use mocked R2/KV contracts; no Cloudflare credentials are needed for local verification. The worker accepts `CE_STORAGE_R2`/`STORAGE_R2`/`R2_BUCKET` for preferred blob storage and `CE_STORAGE_INDEX_KV`/`STORAGE_INDEX_KV`/`STORAGE_KV` for metadata indexes plus the KV-only payload fallback. One-click deploys that receive a Cloudflare storage profile bind the created session KV namespace as both `GROUP_KV` and `CE_STORAGE_INDEX_KV`, then persist a sanitized `storageProfile` in `session:{slug}:config`. If the deploy request explicitly asks for R2 storage, it must provide an existing bucket name so the helper can bind it as `CE_STORAGE_R2`; otherwise the helper fails before provisioning partial Cloudflare resources. Cloudflare refs must not include account IDs, bucket names, raw object keys, worker tokens, long-lived URLs, or secrets.
 
 `storageProfile.payloadAccessControl.mode` controls Cloudflare payload access:
 
-- `worker_sbt_gate` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain using the configured RPC before upload, list, or read bytes are exposed.
-- `public_read` keeps canonical payloads in Cloudflare but serves read/list requests without wallet auth. Uploads still require authenticated session worker requests. Use this for public question prompts or public response summaries that should render identically across Arweave, Cloudflare, Telegram, Mini App, and the CE client.
-- `lit_encrypted` is the stronger scaffolded mode. Cloudflare stores only encrypted payload envelopes and Lit governs decrypt. The worker rejects plaintext Cloudflare uploads in this mode until the client/session path supplies `payloadEncrypted=true` with a Lit-encrypted envelope.
+```json
+{
+  "gate": "none|sbt_gate|group_gate|role_gate",
+  "encryption": "none|worker_envelope|lit"
+}
+```
 
 The worker still read-normalizes legacy `payloadAccessControl.mode`, `cloudflare.payloadAccessMode`, and stored `payloadAccessMode` values forever:
 
@@ -438,22 +458,63 @@ The worker still read-normalizes legacy `payloadAccessControl.mode`, `cloudflare
 - `worker_sbt_gate` -> `{ "gate": "sbt_gate", "encryption": "none" }`
 - `lit_encrypted` -> `{ "gate": "none", "encryption": "lit" }`
 
-That compatibility is read-only. Deploy requests and signed config mutations
-must use the exact canonical values shown above. Explicit blanks, aliases such
-as `public` / `public-read` / `plaintext`, unknown values, reserved key
-providers, or malformed mode containers return `400` before account lookup,
+Those three strings are legacy read aliases, not current `/new` defaults or
+write-time profile values. Deploy requests and signed config mutations must use
+the exact canonical `gate` and `encryption` fields shown above. Explicit blanks,
+aliases such as `public` / `public-read` / `plaintext`, unknown values, reserved
+key providers, or malformed mode containers return `400` before account lookup,
 Cloudflare mutation, coordinator persistence, or KV write. Omit an optional
 field to select its documented default; do not send an empty value.
 
 Where older clients still need one string, the worker and client derive the legacy `payloadAccessMode` from the v2 object.
 
-- `gate: "sbt_gate"` is the default for Cloudflare-backed Telegram/demo sessions. It is worker-enforced access control, not end-to-end encryption. The worker resolves the resource gate (`docsContext` -> `docUploads`, `questions`/`responses` -> `questionResponses`, `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester against the configured SBTs on the gate chain before upload, list, or read bytes are exposed. Worker-canonical same-network checks prefer the private `customRpcUrl` session secret; Cloudflare storage loads that secret lazily only when an SBT condition or policy is evaluated. Public/group/role reads do not read it, and an unavailable secret store fails closed only for the affected SBT check. Before a contract read, the Worker calls `eth_chainId` and rejects an endpoint that cannot prove the expected chain.
-- `gate: "group_gate"` checks worker-native group membership before upload, list, or read bytes are exposed. The gate reads group ids from `storageProfile.payloadAccessControl.groupId`/`groupIds`, or from payload metadata for per-payload group storage refs. Missing, deleted, or unreadable groups fail closed.
+- Current pure Worker profiles use `gate: "role_gate"` with
+  `encryption: "worker_envelope"` by default, or `encryption: "none"` when the
+  creator explicitly disables encryption. They remain passkey/Worker-owned and
+  require `evm.registryChainId: null`.
+- A current Worker/SBT hybrid expresses SBT authorization as an explicit
+  `sbt_onchain` access condition and labels it **Advanced on-chain access**.
+  `gate: "sbt_gate"` and the `worker_sbt_gate` alias remain runtime
+  compatibility for older configs; direct `sbt_gate` is schema-only in the
+  version-1 `/new` profile, and neither form is a current default. An SBT check
+  is worker-enforced access control, not end-to-end encryption. The worker
+  resolves the resource gate (`docsContext` -> `docUploads`,
+  `questions`/`responses` -> `questionResponses`,
+  `surveys`/`generatedArtifacts` -> `surveyResponses`) and checks the requester
+  against the configured SBTs on the gate chain before upload, list, or read
+  bytes are exposed. Worker-canonical same-network checks prefer the private
+  `customRpcUrl` session secret; Cloudflare storage loads that secret lazily
+  only when an SBT condition or policy is evaluated. Public/group/role reads do
+  not read it, and an unavailable secret store fails closed only for the
+  affected SBT check. Before a contract read, the Worker calls `eth_chainId` and
+  rejects an endpoint that cannot prove the expected chain.
+- `gate: "group_gate"` checks worker-native group membership before upload,
+  list, or read bytes are exposed. It remains a lower-level runtime storage
+  policy and is schema-only in the version-1 `/new` profile; Native Worker
+  Groups themselves do not need this gate to replace SBT Groups. The gate reads
+  group IDs from `storageProfile.payloadAccessControl.groupId`/`groupIds`, or
+  from payload metadata for per-payload group storage refs. Missing, deleted, or
+  unreadable groups fail closed.
 - `gate: "none"` keeps canonical payloads in Cloudflare but serves read/list requests without wallet auth. Uploads still require authenticated session worker requests unless the caller is already on an anonymous read/list route. Use this for public question prompts or public response summaries that should render identically across Arweave, Cloudflare, Telegram, Mini App, and the CE client.
 - `encryption: "lit"` keeps the existing Lit scaffold. Cloudflare stores only caller-supplied encrypted payload envelopes and Lit governs decrypt. The worker rejects plaintext Cloudflare uploads in this mode until the client/session path supplies `payloadEncrypted=true` with a Lit-encrypted envelope.
 - `encryption: "worker_envelope"` encrypts payload bytes at rest inside the session worker trust domain, then releases keys only after worker-evaluated conditions pass. The operator and Cloudflare runtime can decrypt. This mode protects against storage-layer dumps of the supported R2/KV payload stores, backups, or bucket/index misconfiguration; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime. Audience removal stops future key release, but cannot un-read plaintext already fetched.
 
-Lit credentials are required only for `lit-arweave` storage or Cloudflare `encryption: "lit"` payload mode. Cloudflare `sbt_gate`, `worker_envelope`, and `none` modes hide the `/new` Lit key input; `sbt_gate` relies on the session worker SBT check while `none` relies on the operator intentionally publishing the payload. In `/new`, `worker_envelope` is selectable only when `storage.backend` is `cloudflare`; Arweave-backed encrypted artifacts remain Lit-managed.
+Lit credentials are required only for `lit-arweave` storage or Cloudflare
+`encryption: "lit"`. Cloudflare `encryption: "worker_envelope"` and
+`encryption: "none"` hide the `/new` Lit key input. An explicit `sbt_onchain`
+condition needs a positive chain ID and RPC, but does not need Lit. In `/new`,
+`worker_envelope` is selectable only when `storage.backend` is `cloudflare`;
+Arweave-backed encrypted artifacts remain Lit-managed.
+
+The client projects only capabilities from a reachable validated profile. For a
+pure Worker profile it suppresses wallet/MetaMask, network, RPC, faucet,
+Arweave, Lit, registry, and SBT controls; does not execute Lit hooks, SBT
+auto-mint, or SBT question filtering; accepts only Cloudflare Document Library
+references; and omits the Polis blockchain row. A transition from a chain-backed
+session clears or ignores stale auto-mint, filter, network, and Arweave/Lit
+document state before another operation can consume it. Explicit Worker/SBT and
+Worker/Lit hybrids restore only the chain-dependent controls their validated
+profile requires, under an **Advanced on-chain access** label.
 
 ### Worker Envelope Encryption
 
@@ -483,7 +544,12 @@ Access conditions may be attached per payload or at session level:
   "match": "any",
   "conditions": [
     { "kind": "worker_role", "role": "admin" },
-    { "kind": "sbt_onchain", "chainId": 11155420, "contract": "0x...", "anyOrAll": "any" },
+    {
+      "kind": "sbt_onchain",
+      "chainId": 11155420,
+      "contract": "0x...",
+      "anyOrAll": "any"
+    },
     { "kind": "agent_grant_scope", "scope": "storage" }
   ]
 }
@@ -507,7 +573,43 @@ accept a replacement deployment secret in an Admin request.
 
 ### Worker-Native Groups
 
-Groups are canonical in `sessionCorsWorker`; the Agent Bridge's demographic research buckets are separate profile data and never grant worker access, and the Bridge does not mirror worker group definitions or memberships. In a `worker_canonical` web session, the expanded Groups section reads and joins these records directly and gives the configured worker admin the signed create/edit/member controls. It never opens the legacy SBT deployment form and does not request a contract address, chain, RPC, gas, or burn policy. Chain-backed sessions retain the existing SBT Groups experience. Agent-enabled sessions use the session-worker JWT returned by client login to call `/groups/list`, `/groups/my-memberships`, and `/groups/join` directly. A dedicated Agent Session Wrapped Bridge may also validate that same JWT at its deployment-pinned `/groups/my-memberships` endpoint before issuing a shorter, session-bound Bridge credential; the Bridge does not evaluate the login's SIWE, registry, RPC, SBT, or gate logic. The Admin page uses the existing signed worker-admin request path for group and member management. These routes require the explicit `groups` scope; successful registry-backed participant login grants that scope after the default session gate passes, and session configuration may still disable it explicitly. The legacy `arweave` compatibility scope applies only to storage routes. Group membership is visible to the worker/operator by design. This is the same trust domain as worker-enforced gates.
+Groups are canonical in `sessionCorsWorker`; the Agent Bridge's demographic
+research buckets are separate profile data and never grant worker access, and
+the Bridge does not mirror worker group definitions or memberships. A
+Worker-native Group belongs to one exact identity tuple: the validated Worker
+origin, normalized canonical slug, and canonical session ID. The client pins
+the Worker origin. Worker-canonical nonce/login requests and responses bind the
+slug and session ID, the login JWT carries that identity, every participant or
+admin Group request supplies the session ID, and every successful Group
+response echoes the canonical slug/session-ID pair. Missing, malformed, stale,
+or mismatched identity fails closed; the client does not retry against a generic
+Worker URL, a slug-only cache, SessionRegistry, SBT discovery, or a global
+session scan.
+
+In a `worker_canonical` web session, the expanded Groups section reads and joins
+these records directly and gives the configured worker admin the signed
+create/edit/member controls. It never opens the legacy SBT deployment form and
+does not request a contract address, chain, RPC, gas, or burn policy. A
+Worker/SBT or Worker/Lit hybrid keeps **Native Worker Groups** as its participant
+Group authority and labels the chain-dependent controls separately as
+**Advanced on-chain access**. Registry-canonical sessions retain the existing
+SBT Groups experience. Agent-enabled sessions use the session-worker JWT
+returned by client login to call `/groups/list`, `/groups/my-memberships`, and
+`/groups/join` directly. A dedicated Agent Session Wrapped Bridge may also
+validate that same JWT at its deployment-pinned `/groups/my-memberships`
+endpoint before issuing a shorter, session-bound Bridge credential; the Bridge
+does not evaluate the login's SIWE, registry, RPC, SBT, or gate logic. The Admin
+page uses the existing signed worker-admin request path for group and member
+management. It labels these controls **Native Worker Groups** for Worker-owned
+participant Groups. A default registry profile does not expose Worker group
+CRUD; when Agent Session Wrapped or its `agentHttp` surface is enabled, Admin
+instead labels the same Worker records **Worker/agent access groups** and states
+that they are separate from registry SBT Groups. These routes require the
+explicit `groups` scope; successful registry-backed participant login grants
+that scope after the default session gate passes, and session configuration may
+still disable it explicitly. The legacy `arweave` compatibility scope applies
+only to storage routes. Group membership is visible to the worker/operator by
+design. This is the same trust domain as worker-enforced gates.
 
 That single-verifier model is identical for worker-canonical and
 registry-canonical sessions: the latter's session-Worker login evaluates the
@@ -527,15 +629,81 @@ enablement bit; Telegram remains independently optional. The record is written
 only after the dedicated Bridge proves its exact session slug and pinned Worker
 origin. Failed deploy/redeploy attempts preserve the last verified record.
 
-Group records and membership rows are stored separately in KV. A group record has a generated `groupId`, label, optional description and HTTPS `imageUrl`, join mode, and member visibility; it has no contract address. Image URLs are limited to 2,048 characters, must use HTTPS, and cannot contain URL credentials. The worker uses `CE_WORKER_GROUPS_KV` when present, otherwise the storage index KV aliases. D1 and envelope-audit bindings are never group stores, so adding an unrelated database cannot switch group authority away from existing KV state. Membership rows are keyed by normalized principals and are not embedded in group objects.
+Group records and membership rows are stored separately in KV and stamped with
+the canonical session ID. A group record has a generated `groupId`, label,
+optional description and HTTPS `imageUrl`, join mode, and member visibility; it
+has no contract address. Image URLs are limited to 2,048 characters, must use
+HTTPS, and cannot contain URL credentials. The worker uses
+`CE_WORKER_GROUPS_KV` when present, otherwise the storage index KV aliases. D1
+and envelope-audit bindings are never group stores, so adding an unrelated
+database cannot switch group authority away from existing KV state. Membership
+rows are keyed by normalized principals and are not embedded in group objects.
+Rows that lack or conflict with the live canonical session ID are not adopted.
+
+Every externally reachable group or membership mutation is serialized by the
+`CE_SESSION_COORDINATOR` object named from the exact normalized session slug and
+canonical session ID. Its version-3 capacity metadata persists both values and
+rejects an identity conflict. On first use, the object becomes ready only from
+an explicit fresh-namespace bootstrap proof: automated deployment writes
+`workerGroupsBootstrap.version = 2` into the new namespace's session config,
+while the standalone Cloudflare template carries the exact operator assertion
+`CE_WORKER_GROUPS_BOOTSTRAP=fresh-template-v2`. The config-backed proof also
+requires the deployment helper's 64-character lowercase SHA-256 deployment ID
+and exact config slug/session ID. Both bootstrap forms scan for pre-existing
+slug-keyed Group rows before declaring the namespace fresh. The bootstrap field
+is server-managed after initial provisioning: signed config updates may
+preserve the identical value but cannot add, change, or remove it. An existing
+namespace without that proof, with legacy rows, or with a conflicting identity
+is durably marked `legacy_locked` and returns
+`503 worker_group_capacity_reconciliation_required`; an eventually consistent
+KV scan is never treated as proof that legacy data is empty.
+
+Once ready, the Durable Object is the strongly consistent authority for active
+groups, member identities, join mode, and group/member capacity. KV is a
+readable projection. The object reserves capacity before KV writes, keeps
+conservative pending state after ambiguous writes, and changes member markers
+from `active` to `removed` exactly once. Membership-gated storage and login
+checks consult that durable state rather than KV, so stale KV reads cannot
+temporarily restore a removed member or deleted group. Group-list reads overlay
+the KV projection with an authoritative coordinator catalog, including current
+visibility, join mode, and member count, so a stale pre-delete or
+pre-restriction row is not disclosed. Deletion invalidates the group in the
+coordinator, tombstones one group row, and removes the bounded group index; it
+does not enumerate and rewrite up to 1,000 membership rows in one invocation.
+Explicit member removal likewise prunes that principal's index. Missing,
+unreachable, non-ready, or identity-conflicting coordination fails closed and
+never falls back to direct KV mutation. Read routes require ready coordination
+and return `503` when an indexed KV record is unavailable or malformed, or when
+coordinator authorization fails mid-read, instead of presenting a false empty
+or partial state.
+
+Legacy or same-slug/recreated-session namespaces need a separate authenticated,
+resumable reconciliation workflow with old writers quiesced before they can be
+marked ready. That migration must stamp and prove the intended canonical
+session ID; it is intentionally not inferred or auto-finalized by this release.
+Ambiguous KV writes intentionally retain conservative coordinator reservations;
+a future authenticated repair workflow should reconcile those reservations.
+Whole-group deletion cannot safely fan out through every member principal index
+in one invocation, so stale per-principal index pointers remain fail-closed
+through the coordinator until a bounded compaction or index-generation
+migration reclaims them.
 
 Implemented routes:
 
+- Worker-canonical authenticated `GET` calls require
+  `?sessionId=<canonical-id>`; participant `POST` and signed Admin calls require
+  the same `sessionId` in their JSON body. Successful responses include
+  `sessionSlug` and `sessionId`. A mismatch returns `409` before principal
+  resolution, coordinator access, or KV mutation.
 - `POST /admin/groups/create`: admin-signed create. `joinMode` supports `admin_add` and `open`; `password` and `invite` are recognized but rejected with `join_mode_not_implemented`.
 - `POST /admin/groups/update`: admin-signed update for label, description, HTTPS image URL, join mode, and member visibility.
 - `POST /admin/groups/delete`: admin-signed tombstone. Deletion revokes future `group_gate` and `worker_group` condition checks.
 - `POST /admin/groups/add-member` / `POST /admin/groups/remove-member`: admin-signed membership mutation.
-- `POST /admin/groups/list` and `POST /admin/groups/list-members`: admin-signed group/member views.
+- `POST /admin/groups/list` and `POST /admin/groups/list-members`: admin-signed
+  group/member views. Member rows are cursor-paginated at no more than 250 per
+  request; the response returns `nextCursor`, and Admin exposes an explicitly
+  signed **Load more** action rather than exceeding the Worker KV operation
+  budget.
 - `GET|POST /groups/list`: authenticated member route. It returns session-visible groups and member-visible groups for the caller.
 - `GET|POST /groups/my-memberships`: authenticated self view. A principal can always see its own memberships. Each row includes the active `memberCount` for that group without exposing the other principals.
 - `POST /groups/join`: authenticated self-join for `joinMode: "open"` groups only.
@@ -558,14 +726,15 @@ R2 / Durable Objects:
 - `CE_SESSION_COORDINATOR` binds the SQLite-backed `SessionWriteCoordinator`
   class for direct/sponsored deploy idempotency, one-shot sponsored faucet
   receipts, atomic wrapped session-key selection, and versioned public session
-  config mutation. It is also the required cross-isolate authority for auth
-  nonce issue/consume and nonce, authenticated, anonymous, and faucet route
-  counters. One-click deploy metadata installs migration tag
+  config mutation. It is also the required cross-isolate authority for Worker
+  Group mutation ordering and capacity, auth nonce issue/consume, and nonce,
+  authenticated, anonymous, and faucet route counters. One-click deploy metadata installs migration tag
   `ce-session-write-coordinator-v1`; a repeated upload retries without
   reapplying an already-installed migration. Coordinator state contains only
   credential-redacted deploy/faucet records, normalized public session config,
   revisions, wrapped session-key records, short-lived random nonces, and numeric
-  counter windows. Auth object names are derived from SHA-256 identity digests;
+  counter windows, plus Worker Group ids, occupancy counts, and hashed member
+  reservation tokens. Auth object names are derived from SHA-256 identity digests;
   their stored records omit slugs, wallet/anonymous identifiers, and route
   names. It never stores deployment
   credentials, raw session keys, deployment KEKs, raw DEKs, request bodies,
@@ -627,14 +796,44 @@ Runtime:
     "sessionModeProfile": {
       "profileVersion": 1,
       "preset": "fast_cheap_cloudflare",
-      "storage": { "backend": "cloudflare" },
+      "storage": {
+        "backend": "cloudflare",
+        "payloadAccessControl": {
+          "gate": "role_gate",
+          "encryption": "worker_envelope",
+          "accessConditions": {
+            "match": "any",
+            "conditions": [
+              { "kind": "worker_role", "role": "admin" },
+              { "kind": "agent_grant_scope", "scope": "storage" }
+            ]
+          }
+        }
+      },
       "authority": { "mode": "worker_canonical" },
       "evm": { "registryChainId": null },
       "identity": { "default": "passkey", "enabled": ["passkey"] },
       "authorization": { "mechanisms": ["worker_roles"] },
-      "encryption": { "mode": "worker_envelope", "keyProvider": "worker_secret" },
-      "surfaces": { "web": true, "telegram": false, "miniApp": false, "agentHttp": false, "mcp": false, "ceCc": false },
-      "results": { "visibility": "participant_aggregate" },
+      "encryption": {
+        "mode": "worker_envelope",
+        "keyProvider": "worker_secret"
+      },
+      "surfaces": {
+        "web": true,
+        "telegram": false,
+        "miniApp": false,
+        "agentHttp": false,
+        "mcp": false,
+        "ceCc": false
+      },
+      "results": {
+        "visibility": "participant_aggregate",
+        "exposure": {
+          "aggregateResultsEnabled": true,
+          "anonymizedGroupsEnabled": false,
+          "minGroupSize": 2
+        }
+      },
       "export": { "scope": "admin_raw" }
     },
     "workerAuthority": {
@@ -644,8 +843,23 @@ Runtime:
     },
     "storageProfile": {
       "backend": "cloudflare",
-      "resources": { "docsContext": "active", "questions": "active", "surveys": "active", "responses": "active" },
-      "payloadAccessControl": { "encryption": "worker_envelope" }
+      "resources": {
+        "docsContext": "active",
+        "questions": "active",
+        "surveys": "active",
+        "responses": "active"
+      },
+      "payloadAccessControl": {
+        "gate": "role_gate",
+        "encryption": "worker_envelope",
+        "accessConditions": {
+          "match": "any",
+          "conditions": [
+            { "kind": "worker_role", "role": "admin" },
+            { "kind": "agent_grant_scope", "scope": "storage" }
+          ]
+        }
+      }
     },
     "ai": { "models": { "fast": { "provider": "openai", "model": "gpt-5" } } },
     "limits": { "perWalletPerDay": 1000 }
@@ -1109,7 +1323,9 @@ registry slug have no first-signer claim path. Worker-canonical deployment
 therefore stages the admin binding and canonical config before making the
 Worker reachable.
 
-1) `POST /auth/nonce` body: `{ address, sessionSlug }`
+1. `POST /auth/nonce` body:
+   `{ address, sessionSlug, sessionId }` for `worker_canonical`; registry
+   compatibility may omit `sessionId`.
    - Nonce request dispatch now also routes through a shared helper:
      it preserves nonce JSON parse failures, address validation, body/env slug resolution,
      missing-slug selection, existing-session CORS passthrough, lowercase nonce KV storage,
@@ -1133,15 +1349,17 @@ Worker reachable.
    - For `worker_canonical`, the persisted KV config is session existence.
      Login does not query SessionRegistry; it derives participant scopes and any
      login gate from the required version-1 `workerAuthority` policy plus
-     worker-native groups. The passkey-derived EOA can therefore log into a
-     session that has never been registered on-chain.
+     worker-native groups. The requested session ID must match that config
+     before the nonce is consumed. The passkey-derived EOA can therefore log
+     into a session that has never been registered on-chain.
    - Registry-canonical sessions keep their existing on-chain existence, gate,
      and scope evaluation.
    - Signed login request dispatch remains the thinner shared helper shell:
-     it preserves login JSON parse failures, token signing, and the final
-     `{ token, exp }` response contract after the extracted authority helper
-     resolves the signed request. New tokens include the current server-managed
-     `authzEpoch` plus a crypto-random `jti`, and are returned only after the
+     it preserves login JSON parse failures and token signing after the
+     extracted authority helper resolves the signed request. The response is
+     `{ token, exp, sessionSlug, sessionId }` when a canonical session ID is
+     available. New tokens include that identity, the current server-managed
+     `authzEpoch`, and a crypto-random `jti`, and are returned only after the
      matching KV token marker is persisted.
    - Token signing / verification now also route through a shared helper:
      it preserves `JSON.stringify(payload)` signing, `base64url(payloadJson) + "." + base64url(hmac(payloadJson))`,
@@ -1160,7 +1378,11 @@ Token format:
 ```
 base64url(payloadJson) + "." + base64url(hmac(payloadJson))
 ```
-New payloads: `{ sub, slug, authzEpoch, scopes, exp, jti }`.
+
+New payloads:
+`{ sub, slug, sessionId?, authzEpoch, scopes, exp, jti }`. Every authenticated
+route for a worker-canonical session compares the token's `sessionId` with the
+current canonical config and returns `401` when it is missing or stale.
 
 The worker stores `authToken:{slug}:{sub}:{jti}` in `GROUP_KV` with a TTL aligned
 to the token lifetime. Token verification rejects missing or blank `jti` claims,

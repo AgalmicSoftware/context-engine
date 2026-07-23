@@ -73,6 +73,48 @@ describe('sessionWizardDraftCache', () => {
     expect(readSessionWizardDraftCache({ storage })).toEqual(payload);
   });
 
+  it('never writes Worker credentials or live deployment proof into browser storage', () => {
+    const storage = createMemoryStorage();
+
+    expect(
+      writeSessionWizardDraftCache(
+        {
+          persistWorkerSecrets: true,
+          workerSecrets: {
+            openaiKey: 'sk-browser-secret',
+            faucetPrivateKey: '0xprivate',
+            litApiBase: 'https://lit.example',
+            litGroupId: 'group-1',
+          },
+          deployForm: {
+            apiToken: 'cloudflare-token',
+            workerName: 'safe-name',
+          },
+          workerRequirementProof: {
+            secretFingerprintSalt: 'secret-salt',
+          },
+          sponsoredBundleKey: 'bundle-secret',
+        },
+        { storage },
+      ),
+    ).toEqual(expect.objectContaining({ ok: true }));
+
+    const stored = JSON.parse(storage.getItem(SESSION_WIZARD_CACHE_KEY) || '{}');
+    expect(stored).toEqual({
+      persistWorkerSecrets: false,
+      workerSecrets: {
+        litApiBase: 'https://lit.example',
+        litGroupId: 'group-1',
+      },
+      deployForm: {
+        workerName: 'safe-name',
+      },
+    });
+    expect(JSON.stringify(stored)).not.toContain('secret');
+    expect(JSON.stringify(stored)).not.toContain('0xprivate');
+    expect(JSON.stringify(stored)).not.toContain('cloudflare-token');
+  });
+
   it('writes ordinary drafts to tab-scoped storage without recreating the shared key', () => {
     const payload = { sessionId: 'tab-id', draft: { slug: 'tab-session' } };
 
@@ -88,6 +130,46 @@ describe('sessionWizardDraftCache', () => {
     expect(readSessionWizardDraftCache()).toEqual(legacyDraft);
     expect(JSON.parse(sessionStorage.getItem(SESSION_WIZARD_CACHE_KEY) || '{}')).toEqual(legacyDraft);
     expect(localStorage.getItem(SESSION_WIZARD_CACHE_KEY)).toBeNull();
+  });
+
+  it('purges credentials while migrating a legacy shared draft', () => {
+    localStorage.setItem(
+      SESSION_WIZARD_CACHE_KEY,
+      JSON.stringify({
+        sessionId: 'legacy-id',
+        draft: {
+          slug: 'legacy-session',
+          ai: { providers: { openai: { apiKey: 'legacy-draft-secret' } } },
+          faucet: { amountEth: '0.001', privateKey: 'legacy-faucet-secret' },
+        },
+        persistWorkerSecrets: true,
+        workerSecrets: {
+          anthropicKey: 'legacy-secret',
+          litActionCid: 'bafy-public-action',
+        },
+        deployForm: {
+          apiToken: 'legacy-cloudflare-token',
+          workerName: 'legacy-worker',
+        },
+      }),
+    );
+
+    expect(readSessionWizardDraftCache()).toEqual({
+      sessionId: 'legacy-id',
+      draft: {
+        slug: 'legacy-session',
+        ai: {},
+        faucet: { amountEth: '0.001' },
+      },
+      persistWorkerSecrets: false,
+      workerSecrets: { litActionCid: 'bafy-public-action' },
+      deployForm: { workerName: 'legacy-worker' },
+    });
+    expect(localStorage.getItem(SESSION_WIZARD_CACHE_KEY)).toBeNull();
+    expect(sessionStorage.getItem(SESSION_WIZARD_CACHE_KEY)).not.toContain('legacy-secret');
+    expect(sessionStorage.getItem(SESSION_WIZARD_CACHE_KEY)).not.toContain('legacy-cloudflare-token');
+    expect(sessionStorage.getItem(SESSION_WIZARD_CACHE_KEY)).not.toContain('legacy-draft-secret');
+    expect(sessionStorage.getItem(SESSION_WIZARD_CACHE_KEY)).not.toContain('legacy-faucet-secret');
   });
 
   it('keeps the tab-scoped copy usable when the legacy draft cannot be removed', () => {

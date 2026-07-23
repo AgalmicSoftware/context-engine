@@ -50,24 +50,6 @@ const WorkerSecretsSection = ({
         <div className={styles.workerSecretsHeader}>
           <div className={styles.workerSecretsTitle}>Worker secrets</div>
           <div className={styles.workerSecretsToggles}>
-            {devPersistWorkerSecrets && (
-              <Label className={styles.workerToggle}>
-                <Input
-                  type="checkbox"
-                  checked={persistWorkerSecrets}
-                  onChange={(e) => setPersistWorkerSecrets(!!e.target.checked)}
-                />
-                <span>Dev: keep secrets on refresh</span>
-                {renderTooltip({
-                  id: 'gw-worker-persist-secrets-tip',
-                  content:
-                    'Stores worker secrets in localStorage so they survive refresh. Do not enable on shared machines.',
-                  placement: 'right',
-                  testId: 'ce-wizard-worker-tooltip-gw-worker-persist-secrets-tip',
-                  ariaLabel: 'Persist worker secrets info',
-                })}
-              </Label>
-            )}
             <Label className={styles.workerToggle}>
               <Input
                 type="checkbox"

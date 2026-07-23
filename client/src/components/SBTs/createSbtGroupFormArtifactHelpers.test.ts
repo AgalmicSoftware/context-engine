@@ -353,7 +353,7 @@ describe('createSbtGroupFormArtifactHelpers', () => {
           {
             index: 0,
             password: 'pw1',
-            inviteLink: 'https://app.example/sbt/0xabc/pw1',
+            inviteLink: 'https://app.example/sbt/0xabc',
           },
           {
             index: 1,
@@ -404,10 +404,7 @@ describe('createSbtGroupFormArtifactHelpers', () => {
         detailPath: '/sbt/0xabc?session=alpha',
         passwordList: ['pw 1', 'pw/2'],
       }),
-    ).toEqual([
-      'https://app.example/sbt/0xabc/pw%201?session=alpha',
-      'https://app.example/sbt/0xabc/pw%2F2?session=alpha',
-    ]);
+    ).toEqual(['https://app.example/sbt/0xabc?session=alpha', 'https://app.example/sbt/0xabc?session=alpha']);
 
     expect(
       buildCreateSbtInviteLinks({
@@ -418,7 +415,7 @@ describe('createSbtGroupFormArtifactHelpers', () => {
         passwordList: ['group code'],
         sbtAddress: '0xABC',
       }),
-    ).toEqual(['https://app.example/session/alpha?auto=1&sbt=0xABC&gp=encoded%3Agroup%20code']);
+    ).toEqual(['https://app.example/session/alpha?auto=1&sbt=0xABC']);
     expect(
       resolveCreateSbtInviteCodeList({
         listOverride: ['override', 0],

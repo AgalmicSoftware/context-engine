@@ -16,15 +16,14 @@ import {
   type ResponseRecencyPair,
 } from './responseRecency';
 import { mergeResponseHydrationInitOptions, type ResponseHydrationInitOptions } from './responseHydrationRunOptions';
+import {
+  hydrateWorkerCanonicalResponses,
+  resolveWorkerResponseHydrationRun,
+  type WorkerResponseHydrationLoader,
+} from './workerResponseHydrationRuntime';
+import { createSessionCacheRevisionUpdater } from './sessionCacheRevisionRuntime';
 
 type CacheRecord = Record<string, unknown>;
-type WorkerCanonicalResponseRow = {
-  questionId: string;
-  responder: string;
-  response: CacheRecord;
-  storageRefId: string;
-  timestamp: number;
-};
 type StateRecord = {
   isQuestionCacheReady?: boolean;
   isResponsesCacheReady?: boolean;
@@ -168,10 +167,7 @@ export interface SessionResponseHydrationHost {
   checkAllCachesReady?: () => void;
   mergeLegacyNumericNetworkKey?: (cache: Record<string, unknown>, networkID: string) => boolean;
   queueLocalRevisionUpdate?: (opts?: QueueLocalRevisionUpdateOptions) => void;
-  loadWorkerResponses?: (options: {
-    sessionSlug: string;
-    sessionConfig: CacheRecord;
-  }) => Promise<WorkerCanonicalResponseRow[]>;
+  loadWorkerResponses?: WorkerResponseHydrationLoader;
 }
 
 export interface SessionResponseHydrationController {
@@ -523,9 +519,28 @@ export const createSessionResponseHydrationController = (
     typeof host.dgWrite === 'function' ? host.dgWrite(...args) : null;
   const getActiveSessionSlug = (): string =>
     String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
+  const getSessionCfg = (slug: string): CacheRecord | null =>
+    typeof host.getSessionCfg === 'function' ? host.getSessionCfg(slug) || null : null;
+  const getSessionBlockWindowRef = (slugIn: string): CacheRecord | string => {
+    const slug = normalizeSessionSlug(slugIn || '');
+    const cfg = getSessionCfg(slug);
+    if (!cfg || typeof cfg !== 'object') return slug;
+    return {
+      ...cfg,
+      slug: normalizeSessionSlug(cfg.slug || slug),
+      ...(cfg.blockLimits && typeof cfg.blockLimits === 'object'
+        ? { blockLimits: { ...(cfg.blockLimits as CacheRecord) } }
+        : {}),
+    };
+  };
   const getSessionChainId = (slug: string): string | number | null | undefined =>
     typeof host.getSessionChainId === 'function' ? host.getSessionChainId(slug) : null;
   const getAccount = (): string | null | undefined => (typeof host.getAccount === 'function' ? host.getAccount() : '');
+  const getProviderLike = (): unknown => {
+    if (typeof host.getProviderLike === 'function') return host.getProviderLike();
+    if (typeof host.getProvider === 'function') return host.getProvider();
+    return host.provider || '';
+  };
   const scanScopeNoop = (slug: string, op: string, onSkipped?: () => void): boolean =>
     typeof host.scanScopeNoop === 'function' ? host.scanScopeNoop(slug, op, onSkipped) : false;
   const setReadinessStateIfChanged = (...args: [StateRecord | null | undefined, (() => void)?]): void => {
@@ -542,27 +557,11 @@ export const createSessionResponseHydrationController = (
     typeof host.mergeLegacyNumericNetworkKey === 'function'
       ? host.mergeLegacyNumericNetworkKey(cache, networkID)
       : false;
-  const queueLocalRevisionUpdate = (opts: QueueLocalRevisionUpdateOptions = {}): void => {
-    if (typeof host.queueLocalRevisionUpdate === 'function') {
-      host.queueLocalRevisionUpdate(opts);
-      return;
-    }
-    const shouldBumpQuestionResponsesNonce = !!opts?.needsQuestionResponsesNonce;
-    const shouldCheckAllCachesReady = !!opts?.checkAllCachesReady;
-    if (!shouldBumpQuestionResponsesNonce && !shouldCheckAllCachesReady) return;
-    setState(
-      (prev) => {
-        const next: StateRecord = {};
-        if (shouldBumpQuestionResponsesNonce) {
-          next.questionResponsesNonce = Number(prev?.questionResponsesNonce || 0) + 1;
-        }
-        return Object.keys(next).length ? next : null;
-      },
-      () => {
-        if (shouldCheckAllCachesReady) checkAllCachesReady();
-      },
-    );
-  };
+  const queueLocalRevisionUpdate = createSessionCacheRevisionUpdater<StateRecord, QueueLocalRevisionUpdateOptions>({
+    host,
+    setState,
+    checkAllCachesReady,
+  });
 
   const isInitInFlight = (slugIn: string = ''): boolean => {
     const slug = normalizeSessionSlug(slugIn || '');
@@ -645,33 +644,32 @@ export const createSessionResponseHydrationController = (
         }
       }
     };
-    const sessionConfig = host.getSessionCfg?.(slug) || null;
-    if (
-      (sessionConfig as { sessionModeProfile?: { authority?: { mode?: unknown } } } | null)?.sessionModeProfile
-        ?.authority?.mode === 'worker_canonical'
-    ) {
-      const workerRun = (async (): Promise<void> => {
-        setResponseState({ isResponsesCacheReady: false });
-        const workerHydration = await import('./workerResponseHydration.js');
-        const loadRows = host.loadWorkerResponses || workerHydration.loadWorkerResponses;
-        const rows = await loadRows({ sessionSlug: slug, sessionConfig: sessionConfig as CacheRecord });
-        if (_destroyed || !isMounted()) return;
-        await host.updateQuestionsCacheAtomic(
-          slug,
-          (current) => workerHydration.mergeWorkerQuestionResponses(current, rows, slug) as QuestionCache,
-        );
-        await host.updateUserCacheAtomic(
-          slug,
-          (current) => workerHydration.mergeWorkerUserResponses(current, rows) as UserCache,
-        );
-        setResponseState((prev) => ({
-          isResponsesCacheReady: true,
-          questionResponsesNonce: Number(prev.questionResponsesNonce || 0) + 1,
-        }));
-        maybeCheckAllCachesReady();
-        notifyBackgroundCompletion();
-      })();
-      return trackResponseInitRun(workerRun);
+    if (workerRun) {
+      const hydrationRun = hydrateWorkerCanonicalResponses({
+        sessionSlug: slug,
+        sessionConfig: sessionConfig as CacheRecord,
+        run: workerRun,
+        loadWorkerResponses: host.loadWorkerResponses,
+        getCurrentSessionConfig: () => getSessionCfg(slug),
+        getAccount,
+        getProviderLike,
+        shouldAbort: () => _destroyed || !isMounted(),
+        markLoading: () => setResponseState({ isResponsesCacheReady: false }),
+        markReady: () => {
+          setResponseState((prev) => ({
+            isResponsesCacheReady: true,
+            questionResponsesNonce: Number(prev.questionResponsesNonce || 0) + 1,
+          }));
+          maybeCheckAllCachesReady();
+          notifyBackgroundCompletion();
+        },
+        updateQuestionsCacheAtomic: (updater) =>
+          host.updateQuestionsCacheAtomic(slug, (current) => updater(current) as QuestionCache),
+        updateUserCacheAtomic: (updater) =>
+          host.updateUserCacheAtomic(slug, (current) => updater(current) as UserCache),
+        createPersistenceError: (message) => new ResponseCachePersistenceError(message),
+      });
+      return trackResponseInitRun(hydrationRun);
     }
     if (
       scanScopeNoop(slug, 'fetchQuestionResponsesChunkedForGroup', () => {

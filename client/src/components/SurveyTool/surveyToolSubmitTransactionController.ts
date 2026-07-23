@@ -30,9 +30,11 @@ export function resolveSurveySubmitSessionTarget({
     .trim()
     .toLowerCase();
   const config = isObjectRecord(sessionConfig) ? sessionConfig : {};
-  const profile = isObjectRecord(config.sessionModeProfile) ? config.sessionModeProfile : {};
-  const authority = isObjectRecord(profile.authority) ? profile.authority : {};
-  if (authority.mode !== 'worker_canonical') return slug;
+  const projection = resolveSessionCapabilityProjection(config);
+  if (projection.source === 'invalid_profile' || projection.source === 'missing') {
+    throw new Error('The session mode profile is missing, invalid, or unsupported.');
+  }
+  if (!projection.isWorkerCanonical) return slug;
   return {
     ...config,
     slug: String(config.slug || slug)

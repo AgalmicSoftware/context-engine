@@ -39,7 +39,9 @@ function decodeBase64UrlJson(value = '') {
 
 function decodeWorkerCredentialClaims(credential = '') {
   const parts = safeString(credential).split('.');
-  return parts.length === 3 ? decodeBase64UrlJson(parts[1]) : null;
+  if (parts.length === 2) return decodeBase64UrlJson(parts[0]);
+  if (parts.length === 3) return decodeBase64UrlJson(parts[1]);
+  return null;
 }
 
 function nowSeconds(now = null) {
@@ -48,10 +50,7 @@ function nowSeconds(now = null) {
 }
 
 async function sha256Hex(input = '') {
-  const digest = await globalThis.crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(String(input || '')),
-  );
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(input || '')));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
@@ -60,48 +59,182 @@ function normalizeAddress(value = '') {
   return /^0x[0-9a-f]{40}$/i.test(address) ? address : '';
 }
 
-export function resolvePinnedSessionWorkerAuthority({
-  policyJson = '',
-  sessionWorkerOrigin = '',
-} = {}) {
+function normalizeSessionId(value = '') {
+  const normalized = safeString(value).toLowerCase().replace(/^0x/, '').replace(/-/g, '');
+  return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? `0x${normalized}` : '';
+}
+
+function resolveSessionId(session = {}) {
+  const rawValues = [session.sessionId, session.sessionIdHex].filter((value) => safeString(value));
+  const normalized = rawValues.map(normalizeSessionId);
+  const unique = new Set(normalized.filter(Boolean));
+  return normalized.some((value) => !value) || unique.size !== 1 ? '' : [...unique][0];
+}
+
+function resolveSessionWorkerOrigin(session = {}) {
+  const rawValues = [
+    session.sessionWorkerOrigin,
+    session.sessionWorkerUrl,
+    session.workerUrl,
+    session.corsWorkerUrl,
+    session.ceSessionWorkerBaseUrl,
+    session.CE_SESSION_WORKER_BASE_URL,
+  ].filter((value) => safeString(value));
+  const normalized = rawValues.map(normalizeHttpsOrigin);
+  const unique = new Set(normalized.filter(Boolean));
+  return normalized.some((value) => !value) || unique.size !== 1 ? '' : [...unique][0];
+}
+
+export function resolvePinnedSessionWorkerAuthority({ policyJson = '', sessionWorkerOrigin = '' } = {}) {
   const policy = parseJsonObject(policyJson);
   if (!policy) {
     return { ok: false, reason: 'dedicated session policy must be valid JSON' };
   }
   const sessions = Array.isArray(policy.sessions)
     ? policy.sessions
-    : (Array.isArray(policy.linkedSessions) ? policy.linkedSessions : []);
+    : Array.isArray(policy.linkedSessions)
+      ? policy.linkedSessions
+      : [];
   if (sessions.length !== 1 || !sessions[0] || typeof sessions[0] !== 'object' || Array.isArray(sessions[0])) {
-    return { ok: false, reason: 'dedicated session policy must contain exactly one session' };
+    return {
+      ok: false,
+      reason: 'dedicated session policy must contain exactly one session',
+    };
   }
   const session = sessions[0];
   const sessionSlug = safeString(session.sessionSlug || session.slug).toLowerCase();
   if (!SESSION_SLUG_RE.test(sessionSlug)) {
-    return { ok: false, reason: 'dedicated session policy requires one valid session slug' };
+    return {
+      ok: false,
+      reason: 'dedicated session policy requires one valid session slug',
+    };
   }
   const defaultSessionSlug = safeString(policy.defaultSessionSlug || policy.defaultSession).toLowerCase();
   if (defaultSessionSlug !== sessionSlug) {
-    return { ok: false, reason: 'dedicated session policy default must match its only session slug' };
+    return {
+      ok: false,
+      reason: 'dedicated session policy default must match its only session slug',
+    };
   }
   const accessEnabled = session.sessionModeProfile?.surfaces?.agentHttp;
   if (typeof accessEnabled !== 'boolean') {
-    return { ok: false, reason: 'dedicated session policy requires an explicit surfaces.agentHttp boolean' };
+    return {
+      ok: false,
+      reason: 'dedicated session policy requires an explicit surfaces.agentHttp boolean',
+    };
   }
   const configuredOrigin = normalizeHttpsOrigin(sessionWorkerOrigin);
   const policyOrigin = normalizeHttpsOrigin(
-    session.sessionWorkerOrigin ||
-    session.sessionWorkerUrl ||
-    session.workerUrl ||
-    session.corsWorkerUrl
+    session.sessionWorkerOrigin || session.sessionWorkerUrl || session.workerUrl || session.corsWorkerUrl,
   );
   if (!configuredOrigin || !policyOrigin || configuredOrigin !== policyOrigin) {
-    return { ok: false, reason: 'dedicated session policy must pin the configured session Worker origin' };
+    return {
+      ok: false,
+      reason: 'dedicated session policy must pin the configured session Worker origin',
+    };
+  }
+  const workerCanonical = safeString(session.sessionModeProfile?.authority?.mode).toLowerCase() === 'worker_canonical';
+  const authorityMode = safeString(session.sessionModeProfile?.authority?.mode).toLowerCase();
+  const sessionId = resolveSessionId(session);
+  if (workerCanonical && !sessionId) {
+    return {
+      ok: false,
+      reason: 'dedicated Worker session policy requires one canonical session id',
+    };
   }
   return {
     ok: true,
     accessEnabled,
+    ...(sessionId ? { sessionId } : {}),
     sessionSlug,
     sessionWorkerOrigin: configuredOrigin,
+    authorityMode,
+  };
+}
+
+export function validateSessionWorkerMemberCredentialBinding({ authority = {}, credentialRecord = {} } = {}) {
+  const authoritySlug = safeString(authority.sessionSlug).toLowerCase();
+  const authorityOrigin = normalizeHttpsOrigin(authority.sessionWorkerOrigin);
+  const authorityMode = safeString(authority.authorityMode).toLowerCase();
+  const authoritySessionId = normalizeSessionId(authority.sessionId);
+  const credentialSlug = safeString(credentialRecord.sessionSlug).toLowerCase();
+  const credentialOrigin = normalizeHttpsOrigin(credentialRecord.sessionWorkerOrigin);
+  const rawCredentialSessionId = safeString(credentialRecord.sessionId);
+  const credentialSessionId = normalizeSessionId(rawCredentialSessionId);
+  if (
+    authority.accessEnabled !== true ||
+    !authoritySlug ||
+    !authorityOrigin ||
+    credentialSlug !== authoritySlug ||
+    credentialOrigin !== authorityOrigin ||
+    (rawCredentialSessionId && !credentialSessionId) ||
+    credentialSessionId !== authoritySessionId
+  ) {
+    return {
+      ok: false,
+      status: 401,
+      reason: 'agent_member_credential_authority_stale',
+    };
+  }
+  return {
+    ok: true,
+    ...(authoritySessionId ? { sessionId: authoritySessionId } : {}),
+    sessionSlug: authoritySlug,
+    sessionWorkerOrigin: authorityOrigin,
+    authorityMode,
+  };
+}
+
+export function validateSessionWorkerBrowserCredentialBinding({ session = {}, credentialRecord = {} } = {}) {
+  const authorityMode = safeString(session.sessionModeProfile?.authority?.mode).toLowerCase();
+  const credentialAuthorityMode = safeString(credentialRecord.sessionAuthorityMode).toLowerCase();
+  const rawCredentialSessionId = safeString(credentialRecord.sessionId);
+  const rawCredentialOrigin = safeString(credentialRecord.sessionWorkerOrigin);
+  const credentialCarriesAuthorityBinding = Boolean(
+    credentialAuthorityMode || rawCredentialSessionId || rawCredentialOrigin,
+  );
+
+  if (authorityMode !== 'worker_canonical') {
+    return credentialCarriesAuthorityBinding
+      ? {
+          ok: false,
+          status: 401,
+          reason: 'agent_browser_credential_authority_stale',
+        }
+      : {
+          ok: true,
+          sessionSlug: safeString(session.sessionSlug || session.slug).toLowerCase(),
+          authorityMode,
+        };
+  }
+
+  const authoritySlug = safeString(session.sessionSlug || session.slug).toLowerCase();
+  const authoritySessionId = resolveSessionId(session);
+  const authorityOrigin = resolveSessionWorkerOrigin(session);
+  const credentialSlug = safeString(credentialRecord.sessionSlug).toLowerCase();
+  const credentialSessionId = normalizeSessionId(rawCredentialSessionId);
+  const credentialOrigin = normalizeHttpsOrigin(rawCredentialOrigin);
+  if (
+    !SESSION_SLUG_RE.test(authoritySlug) ||
+    !authoritySessionId ||
+    !authorityOrigin ||
+    credentialAuthorityMode !== 'worker_canonical' ||
+    credentialSlug !== authoritySlug ||
+    credentialSessionId !== authoritySessionId ||
+    credentialOrigin !== authorityOrigin
+  ) {
+    return {
+      ok: false,
+      status: 401,
+      reason: 'agent_browser_credential_authority_stale',
+    };
+  }
+  return {
+    ok: true,
+    sessionId: authoritySessionId,
+    sessionSlug: authoritySlug,
+    sessionWorkerOrigin: authorityOrigin,
+    authorityMode,
   };
 }
 
@@ -112,48 +245,95 @@ export async function verifySessionWorkerMembership({
   now = null,
 } = {}) {
   const sessionSlug = safeString(authority.sessionSlug).toLowerCase();
+  const sessionId = normalizeSessionId(authority.sessionId);
   const sessionWorkerOrigin = normalizeHttpsOrigin(authority.sessionWorkerOrigin);
   const suppliedCredential = safeString(credential);
   if (!sessionSlug || !sessionWorkerOrigin) {
-    return { ok: false, status: 503, reason: 'session_worker_authority_not_configured' };
+    return {
+      ok: false,
+      status: 503,
+      reason: 'session_worker_authority_not_configured',
+    };
   }
   if (!suppliedCredential) {
-    return { ok: false, status: 401, reason: 'session_worker_credential_missing' };
+    return {
+      ok: false,
+      status: 401,
+      reason: 'session_worker_credential_missing',
+    };
   }
   const claims = decodeWorkerCredentialClaims(suppliedCredential);
   if (!claims || !safeString(claims.jti)) {
-    return { ok: false, status: 401, reason: 'session_worker_credential_invalid' };
+    return {
+      ok: false,
+      status: 401,
+      reason: 'session_worker_credential_invalid',
+    };
   }
   if (safeString(claims.slug).toLowerCase() !== sessionSlug) {
-    return { ok: false, status: 403, reason: 'session_worker_credential_session_mismatch' };
+    return {
+      ok: false,
+      status: 403,
+      reason: 'session_worker_credential_session_mismatch',
+    };
+  }
+  if (sessionId && normalizeSessionId(claims.sessionId) !== sessionId) {
+    return {
+      ok: false,
+      status: 403,
+      reason: 'session_worker_credential_session_identity_mismatch',
+    };
   }
   const audience = safeString(claims.aud);
   if (audience && normalizeHttpsOrigin(audience) !== sessionWorkerOrigin) {
-    return { ok: false, status: 403, reason: 'session_worker_credential_audience_mismatch' };
+    return {
+      ok: false,
+      status: 403,
+      reason: 'session_worker_credential_audience_mismatch',
+    };
   }
   const exp = Math.floor(Number(claims.exp));
   const currentSeconds = nowSeconds(now);
   if (!Number.isFinite(exp) || exp <= currentSeconds) {
-    return { ok: false, status: 401, reason: 'session_worker_credential_expired' };
+    return {
+      ok: false,
+      status: 401,
+      reason: 'session_worker_credential_expired',
+    };
   }
   if (claims.scopes?.groups !== true) {
-    return { ok: false, status: 403, reason: 'session_worker_credential_ineligible' };
+    return {
+      ok: false,
+      status: 403,
+      reason: 'session_worker_credential_ineligible',
+    };
   }
   if (typeof fetchImpl !== 'function') {
-    return { ok: false, status: 503, reason: 'session_worker_authority_unavailable' };
+    return {
+      ok: false,
+      status: 503,
+      reason: 'session_worker_authority_unavailable',
+    };
   }
 
   let response;
   let body;
   try {
-    response = await fetchImpl(`${sessionWorkerOrigin}/groups/my-memberships`, {
+    const membershipUrl = sessionId
+      ? `${sessionWorkerOrigin}/groups/my-memberships?sessionId=${encodeURIComponent(sessionId)}`
+      : `${sessionWorkerOrigin}/groups/my-memberships`;
+    response = await fetchImpl(membershipUrl, {
       method: 'GET',
       headers: { authorization: `Bearer ${suppliedCredential}` },
       cache: 'no-store',
     });
     body = await response.json();
   } catch {
-    return { ok: false, status: 503, reason: 'session_worker_authority_unavailable' };
+    return {
+      ok: false,
+      status: 503,
+      reason: 'session_worker_authority_unavailable',
+    };
   }
   if (!response.ok || body?.ok !== true) {
     if (response.status === 401) {
@@ -167,23 +347,54 @@ export async function verifySessionWorkerMembership({
       return { ok: false, status: 401, reason };
     }
     if (response.status === 403) {
-      return { ok: false, status: 403, reason: 'session_worker_membership_denied' };
+      return {
+        ok: false,
+        status: 403,
+        reason: 'session_worker_membership_denied',
+      };
     }
-    return { ok: false, status: 503, reason: 'session_worker_authority_unavailable' };
+    return {
+      ok: false,
+      status: 503,
+      reason: 'session_worker_authority_unavailable',
+    };
   }
   if (!Array.isArray(body.memberships)) {
-    return { ok: false, status: 503, reason: 'session_worker_authority_invalid_response' };
+    return {
+      ok: false,
+      status: 503,
+      reason: 'session_worker_authority_invalid_response',
+    };
+  }
+  if (
+    sessionId &&
+    (safeString(body.sessionSlug).toLowerCase() !== sessionSlug || normalizeSessionId(body.sessionId) !== sessionId)
+  ) {
+    return {
+      ok: false,
+      status: 503,
+      reason: 'session_worker_authority_invalid_response',
+    };
   }
   const principalKind = safeString(body.principal?.kind).toLowerCase();
   const principalAddress = normalizeAddress(body.principal?.address);
   if (!ELIGIBLE_PRINCIPAL_KINDS.has(principalKind) || !principalAddress) {
-    return { ok: false, status: 403, reason: 'session_worker_principal_ineligible' };
+    return {
+      ok: false,
+      status: 403,
+      reason: 'session_worker_principal_ineligible',
+    };
   }
   if (safeString(claims.sub).toLowerCase() !== principalAddress.toLowerCase()) {
-    return { ok: false, status: 403, reason: 'session_worker_principal_mismatch' };
+    return {
+      ok: false,
+      status: 403,
+      reason: 'session_worker_principal_mismatch',
+    };
   }
   return {
     ok: true,
+    ...(sessionId ? { sessionId } : {}),
     sessionSlug,
     principal: { kind: principalKind, address: principalAddress },
     memberships: body.memberships,

@@ -189,6 +189,10 @@ describe('OnePageSession auto-mint queue', () => {
       contracts: {},
       blockLimits: {},
       networkChainId: 84532,
+      __registry: {
+        registryChainId: 84532,
+        sessionIdHex: '0x00112233445566778899aabbccddeeff',
+      },
     },
   });
 
@@ -660,6 +664,42 @@ describe('OnePageSession auto-mint queue', () => {
       status: 'success',
       name: 'Joined: Invite Badge',
     });
+  });
+
+  it('does not expose provider-returned invite credentials in auto-mint status', async () => {
+    const sbtAddress = '0x00000000000000000000000000000000000000c3';
+    const secretSentinel = '0xinvite-secret-sentinel';
+    const subject = createSubject({
+      account: '0x00000000000000000000000000000000000000c4',
+      loginComplete: true,
+      slug: 'edge',
+    });
+    subject.state = {
+      ...subject.state,
+      autoMintTargets: [{ sbt: sbtAddress, inv: 'invite-token' }],
+    };
+    subject.decodeInviteInput = jest.fn().mockReturnValue({ nonce: '7', signature: secretSentinel });
+    subject.waitForSufficientBalance = jest.fn().mockResolvedValue(true);
+
+    jest.spyOn(contractScriptsModule, 'getAllSessionSlugs').mockReturnValue([]);
+    jest.spyOn(cacheScripts, 'peekCacheSync').mockReturnValue({});
+    jest.spyOn(contractScripts, 'getSbtMetadata').mockResolvedValue({
+      name: 'Invite Badge',
+      tokenURI: 'ar://invite-badge',
+      hasPasswordMint: false,
+      maxTokens: '0',
+    });
+    jest.spyOn(contractScripts, 'claimWithInvite').mockRejectedValue(new Error(`provider echoed ${secretSentinel}`));
+
+    await subject.runAutoMintQueue();
+
+    const status = subject.state.autoMintStatuses[sbtAddress.toLowerCase()];
+    expect(status).toMatchObject({
+      status: 'failed',
+      name: 'Join Failed',
+      error: 'Join failed. Verify the credential and network, then retry.',
+    });
+    expect(JSON.stringify(status)).not.toContain(secretSentinel);
   });
 
   it('auto-mints limited password SBTs through generated invite payloads in the session queue', async () => {

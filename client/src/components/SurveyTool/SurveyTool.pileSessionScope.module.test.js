@@ -40,12 +40,39 @@ import {
   treeHasText,
 } from './surveyToolTreeTestHelpers.js';
 
-const createDeferred = () => {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => {
-    resolve = res;
-    reject = rej;
+const defaultCacheNode = {
+  questions: {},
+  questionResponses: {},
+  pendingQuestionMetadata: {},
+};
+
+const makeLegacySessionConfig = (slug, blockedQuestionIds = []) => ({
+  slug,
+  networkChainId: 84532,
+  BLOCKED_QUESTION_IDS: blockedQuestionIds,
+  __registry: {
+    registryChainId: 84532,
+    sessionIdHex: '0x00112233445566778899aabbccddeeff',
+  },
+});
+
+const setupListScope = (blockedAlpha = []) => {
+  jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
+  jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
+
+  const strictLookup = (slug) => {
+    if (slug === 'alpha') return makeLegacySessionConfig(slug, blockedAlpha);
+    return makeLegacySessionConfig(slug);
+  };
+
+  jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);
+  jest.spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault').mockImplementation(strictLookup);
+};
+
+const mockQuestionCaches = (questionCachesBySlug = {}) => {
+  const readSpy = jest.spyOn(cacheScripts, 'readCache').mockImplementation(async (namespace, slug) => {
+    if (namespace !== 'questionsCache') return {};
+    return questionCachesBySlug[slug] || {};
   });
   return { promise, resolve, reject };
 };

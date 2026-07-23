@@ -42,6 +42,21 @@ export const CREATE_SBT_FORM_CACHE_LEGACY_POLICY = Object.freeze({
 
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
 
+const sanitizeCreateSbtFormCacheValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(sanitizeCreateSbtFormCacheValue);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([field]) => !CREATE_SBT_CREDENTIAL_FIELD_SET.has(field.toLowerCase()))
+      .map(([field, nestedValue]) => [field, sanitizeCreateSbtFormCacheValue(nestedValue)]),
+  );
+};
+
+export const sanitizeCreateSbtFormCachePayload = (value: unknown): CreateSbtDraftPayload | null => {
+  if (!isRecord(value) || Array.isArray(value)) return null;
+  return sanitizeCreateSbtFormCacheValue(value) as CreateSbtDraftPayload;
+};
+
 const getSessionStorage = (storageIn?: StorageLike | null): StorageLike | null => {
   if (storageIn !== undefined) return storageIn;
   try {

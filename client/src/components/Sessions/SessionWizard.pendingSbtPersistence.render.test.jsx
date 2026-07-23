@@ -83,10 +83,7 @@ describe('SessionWizard pending SBT tab-memory rendering', () => {
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     selectNormalModeCard('Privacy');
 
-    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toHaveAttribute(
-      'data-ce-sbt-address',
-      mockPendingSbtAddress.toLowerCase(),
-    );
-    expect(screen.getByText(mockPendingSbtAddress)).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).not.toBeInTheDocument();
+    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
   });
 });

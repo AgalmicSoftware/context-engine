@@ -35,7 +35,9 @@ const LoginAgentTokenPanel = ({
       Log in with agent token
     </button>
     {cachedEnvelope ? (
-      <div className={styles.agentTokenLoginHint}>A Telegram client session is already saved in this tab.</div>
+      <div className={styles.agentTokenLoginHint}>
+        A Telegram client session is active in this page. Reloading requires login again.
+      </div>
     ) : null}
     {agentTokenLoginOpen ? (
       <form onSubmit={onSubmit}>
@@ -43,7 +45,7 @@ const LoginAgentTokenPanel = ({
           Only paste tokens from the Context Engine bot. Tokens grant limited access until they expire.
         </p>
         <label className={styles.agentTokenLoginLabel}>
-          <span>Agent token or link</span>
+          <span>Raw agent token</span>
           <input
             type="password"
             autoComplete="one-time-code"

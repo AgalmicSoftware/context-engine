@@ -90,8 +90,6 @@ type EffectiveFaucetConfigResult = {
   encryptedAvailable: boolean;
 };
 
-const log = createLogger('resourceKeys');
-
 const STORAGE_KEY = 'ce:resourceKeys:v1';
 const RESERVED_KEYS = new Set<string>(['__proto__', 'constructor', 'prototype']);
 const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -174,12 +172,8 @@ const readStore = (): ResourceKeyStore => {
 };
 
 const writeStore = (payload: ResourceKeyStore): void => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  } catch (e) {
-    log.warn('resourceKeys: fallback', e);
-  }
+  purgeLegacyStore();
+  memoryStore = normalizeStore(payload);
 };
 
 export const getLocalResourceKeys = (slugIn = ''): ResourceKeys => {
