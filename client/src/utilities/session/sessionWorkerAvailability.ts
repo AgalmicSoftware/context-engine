@@ -2,6 +2,7 @@ import { CLOUDFLARE_CORS_WORKER_URL, USE_ONCHAIN_SESSION_REGISTRY } from '../../
 import { canonicalizeSessionSlug } from './canonicalSessionContext.js';
 import { overlayCachedSessionWorkerConfig } from './sessionWorkerConfigCache.js';
 import { parseWorkerConfig } from './sessionParsers.js';
+import { resolveSessionCapabilityProjection } from './sessionCapabilityProjection.js';
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 import type { SessionConfigLike } from './sessionTypes.js';
 
@@ -11,6 +12,7 @@ type SessionWorkerAvailabilityOptions = {
   slug?: unknown;
   sessionConfig?: unknown;
   allowSharedFallback?: boolean;
+  requireExactWorkerSession?: boolean;
 };
 
 const isObj = (value: unknown): value is SessionConfigLike =>
@@ -61,13 +63,39 @@ export const getUsableSessionWorkerUrl = ({
   slug,
   sessionConfig,
   allowSharedFallback = false,
+  requireExactWorkerSession = false,
 }: SessionWorkerAvailabilityOptions = {}): string => {
   const sessionConfigSource = isObj(sessionConfig) ? sessionConfig : null;
   const normalizedSlug = canonicalizeSessionSlug(slug ?? sessionConfigSource?.slug ?? '');
+  if (requireExactWorkerSession) {
+    const configuredSlug = canonicalizeSessionSlug(sessionConfigSource?.slug ?? '');
+    const projection = resolveSessionCapabilityProjection(sessionConfigSource);
+    if (
+      !normalizedSlug ||
+      configuredSlug !== normalizedSlug ||
+      projection.source !== 'profile' ||
+      !projection.profileValid ||
+      !projection.isWorkerCanonical
+    ) {
+      return '';
+    }
+  }
   const effectiveSessionConfig = getEffectiveSessionWorkerConfig({
     slug: normalizedSlug,
     sessionConfig,
   });
+  if (requireExactWorkerSession) {
+    const effectiveSlug = canonicalizeSessionSlug(effectiveSessionConfig?.slug ?? '');
+    const effectiveProjection = resolveSessionCapabilityProjection(effectiveSessionConfig);
+    if (
+      effectiveSlug !== normalizedSlug ||
+      effectiveProjection.source !== 'profile' ||
+      !effectiveProjection.profileValid ||
+      !effectiveProjection.isWorkerCanonical
+    ) {
+      return '';
+    }
+  }
   const configuredUrl = shouldUseSharedFallbackWorkerUrl({
     slug: normalizedSlug,
     sessionConfig: effectiveSessionConfig,

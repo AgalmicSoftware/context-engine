@@ -1,5 +1,7 @@
 type UnknownRecord = Record<string, unknown>;
 
+import { classifySessionModeProfileSupport, type SessionModeProfile } from './sessionModeProfile';
+
 export type DiscoveryEnvironment = 'development' | 'production' | 'test' | string;
 
 type WorkerOriginOptions = {
@@ -445,10 +447,17 @@ export const validateWorkerCanonicalSessionBootstrap = (
     throw new Error('Worker bootstrap response slug does not match the requested session.');
   }
 
-  const profile = isRecord(payload.config.sessionModeProfile) ? payload.config.sessionModeProfile : null;
-  const authority = profile && isRecord(profile.authority) ? profile.authority : null;
-  if (authority?.mode !== 'worker_canonical') {
-    throw new Error('Worker bootstrap config is not worker-canonical.');
+  const profileSupport = classifySessionModeProfileSupport(payload.config.sessionModeProfile);
+  if (
+    profileSupport.status !== 'reachable' ||
+    (payload.config.sessionModeProfile as SessionModeProfile | undefined)?.authority?.mode !== 'worker_canonical'
+  ) {
+    const firstIssue = profileSupport.validation.issues[0];
+    throw new Error(
+      `Worker bootstrap config has an unsupported worker-canonical profile${
+        firstIssue ? ` at ${firstIssue.path || 'profile'} (${firstIssue.code})` : ''
+      }.`,
+    );
   }
 
   const forbiddenPath = findSecretLikeSessionWorkerBootstrapPath(payload, 'response');

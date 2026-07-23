@@ -81,6 +81,7 @@ describe('sessionWizardWriteNormalization', () => {
 
   test('sanitizeSessionWizardMetadataPayload writes profile-only mode metadata', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     profile.surfaces.telegram = true;
     profile.surfaces.miniApp = true;
 
@@ -105,6 +106,32 @@ describe('sessionWizardWriteNormalization', () => {
     expect(metadata.sessionMode).toBeUndefined();
     expect(metadata.telegramBridgeEnabled).toBeUndefined();
     expect(metadata.telegram).toBeUndefined();
+  });
+
+  test('publication normalization rejects invalid profiles before compiling storage metadata', () => {
+    const malformedProfile = {
+      profileVersion: 1,
+      preset: 'custom',
+      authority: { mode: 'worker_canonical' },
+    };
+
+    expect(() =>
+      sanitizeSessionWizardMetadataPayload({
+        slug: 'invalid-profile',
+        sessionModeProfile: malformedProfile,
+        storageProfile: { backend: 'cloudflare' },
+      }),
+    ).toThrow(/requires a reachable session mode profile/i);
+
+    expect(() =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'invalid-profile',
+        draft: {
+          sessionModeProfile: malformedProfile,
+          storageProfile: { backend: 'cloudflare' },
+        },
+      }),
+    ).toThrow(/requires a reachable session mode profile/i);
   });
 
   test('sanitizeSessionWizardMetadataPayload upgrades legacy Telegram flags to a profile without dual-write fields', () => {
@@ -420,6 +447,10 @@ describe('sessionWizardWriteNormalization', () => {
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     sessionModeProfile.encryption = { mode: 'lit' };
     sessionModeProfile.evm.registryChainId = DEFAULT_CONFIG_CHAIN_ID;
+    sessionModeProfile.storage.payloadAccessControl = {
+      ...sessionModeProfile.storage.payloadAccessControl!,
+      encryption: 'lit',
+    };
 
     const payload = buildSessionWizardWorkerConfigPayload({
       slug: 'worker-lit-session',
@@ -551,7 +582,7 @@ describe('sessionWizardWriteNormalization', () => {
     expect(workerPayload.storageProfile).toEqual(
       expect.objectContaining({
         backend: 'cloudflare',
-        payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
+        payloadAccessControl: expect.objectContaining({ mode: 'public_read' }),
       }),
     );
     expect(workerPayload.telegramOnly).toBeUndefined();

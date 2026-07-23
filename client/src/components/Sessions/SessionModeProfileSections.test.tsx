@@ -134,15 +134,41 @@ describe('SessionModeProfileSections', () => {
 
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
+        authority: { mode: 'worker_canonical' },
+        evm: { registryChainId: null },
         storage: expect.objectContaining({
           backend: 'cloudflare',
           payloadAccessControl: expect.objectContaining({ gate: 'role_gate' }),
         }),
+        identity: { default: 'passkey', enabled: ['passkey'] },
+        authorization: { mechanisms: ['worker_roles'] },
       }),
       expect.objectContaining({
         storageProfile: expect.objectContaining({
           payloadAccessControl: expect.objectContaining({ gate: 'role_gate' }),
         }),
+      }),
+    );
+  });
+
+  it('switches Cloudflare storage to a coherent registry, wallet, and SBT lineage', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const { onChange } = renderSection('privacy', profile);
+
+    const storage = screen.getByRole('radiogroup', { name: 'Data storage' });
+    fireEvent.click(within(storage).getByRole('radio', { name: 'Arweave' }));
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        authority: { mode: 'evm_registry_canonical' },
+        evm: { registryChainId: 11155420 },
+        storage: { backend: 'arweave' },
+        identity: { default: 'wallet', enabled: ['wallet', 'passkey'] },
+        authorization: { mechanisms: ['sbt_onchain'] },
+        encryption: { mode: 'none' },
+      }),
+      expect.objectContaining({
+        storageProfile: expect.objectContaining({ backend: 'arweave' }),
       }),
     );
   });

@@ -108,6 +108,17 @@
         "agentHttp": false,
         "mcp": false,
         "ceCc": false
+      },
+      "results": {
+        "visibility": "public_full_if_storage_public",
+        "exposure": {
+          "aggregateResultsEnabled": true,
+          "anonymizedGroupsEnabled": false,
+          "minGroupSize": 2
+        }
+      },
+      "export": {
+        "scope": "all_session"
       }
     },
     "storageProfile": {

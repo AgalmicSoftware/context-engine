@@ -9,6 +9,7 @@ import {
   validateWorkerCanonicalSessionBootstrap,
   WorkerSessionBootstrapRequestError,
 } from './sessionWorkerDiscovery';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from './sessionModeProfile';
 
 const SESSION_ID = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
@@ -20,10 +21,7 @@ const buildPayload = (overrides: Record<string, unknown> = {}) => ({
     sessionId: SESSION_ID,
     configRevision: 'revision-a',
     corsWorkerUrl: 'https://session-a.example.workers.dev',
-    sessionModeProfile: {
-      authority: { mode: 'worker_canonical' },
-      encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
-    },
+    sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     workerAuthority: { participantScopes: ['ai', 'storage'] },
     ...overrides,
   },
@@ -141,6 +139,23 @@ describe('sessionWorkerDiscovery bootstrap validation', () => {
         workerOrigin: 'https://session-a.example.workers.dev',
       }),
     );
+  });
+
+  it('rejects a schema-only or malformed profile before accepting canonical readback', () => {
+    const schemaOnly = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    schemaOnly.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    schemaOnly.authority.mode = 'worker_with_public_anchor';
+    schemaOnly.evm.registryChainId = 11155420;
+
+    for (const sessionModeProfile of [schemaOnly, { profileVersion: 1, authority: { mode: 'worker_canonical' } }]) {
+      expect(() =>
+        validateWorkerCanonicalSessionBootstrap(buildPayload({ sessionModeProfile }), {
+          expectedSlug: 'session-a',
+          workerOrigin: 'https://session-a.example.workers.dev',
+          environment: 'production',
+        }),
+      ).toThrow(/unsupported worker-canonical profile/i);
+    }
   });
 
   it('canonicalizes UUID session identity to bytes16 hex and rejects conflicting identity fields', () => {

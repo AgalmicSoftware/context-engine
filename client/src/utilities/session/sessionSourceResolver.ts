@@ -2,6 +2,7 @@ import { normalizeBaseUrl } from '../urlUtils.js';
 import { canonicalizeSessionSlug, resolveSessionSlugAliasFromDemoSessions } from './canonicalSessionContext.js';
 import { normalizeSessionNaming } from './sessionMetadata.js';
 import { getDemoSessionMap } from './sessionDemoCompat.js';
+import { getPrimaryDemoSessionSlug } from './demoSessionSlugs.js';
 import { getUsableSessionWorkerUrl } from './sessionWorkerAvailability.js';
 import type { SessionConfigLike } from './sessionTypes.js';
 
@@ -21,6 +22,9 @@ const findDemoSessionConfigBySlug = (slugIn: unknown = ''): SessionConfigLike | 
       .trim()
       .toLowerCase() === 'demo'
   ) {
+    const primaryDemoSlug = canonicalizeSessionSlug(getPrimaryDemoSessionSlug());
+    const primaryDemoConfig = DEMO_SESSION_MAP[primaryDemoSlug];
+    if (isObj(primaryDemoConfig)) return primaryDemoConfig;
     return isObj(DEMO_SESSION_MAP.general) ? DEMO_SESSION_MAP.general : null;
   }
 

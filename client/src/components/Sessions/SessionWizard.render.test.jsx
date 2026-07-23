@@ -466,6 +466,7 @@ describe('SessionWizard rendered validation', () => {
     renderSessionWizard({ network: null });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    selectDecentralizedPreset();
     enableAdvancedMode();
 
     const defaultChainId = require('../../variables/appConfig.js').DEFAULT_CHAIN_ID;
@@ -706,6 +707,7 @@ describe('SessionWizard rendered validation', () => {
 
   it('switches the gate add affordance from ghost card to full-width rail after adding a second gate', async () => {
     renderSessionWizard();
+    selectDecentralizedPreset();
     selectNormalModeCard('Privacy');
 
     const addGateButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_ADD_GATE);
@@ -782,6 +784,7 @@ describe('SessionWizard rendered validation', () => {
 
   it('pins the slug after a pending SBT draft is queued', async () => {
     renderLoggedInSessionWizard();
+    selectDecentralizedPreset();
 
     const sessionNameInput = await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     fireEvent.change(sessionNameInput, {
@@ -915,6 +918,34 @@ describe('SessionWizard rendered validation', () => {
       expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
     },
   );
+
+  it('keeps the pure Worker /new profile off registry and block-RPC ports', async () => {
+    const blockNumberSpy = jest
+      .spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBlockNumber')
+      .mockResolvedValue(mockSelectorSourceStartBlock);
+    try {
+      window.history.replaceState({}, '', '/new');
+      renderSessionWizard();
+
+      fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
+      expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).toBeInTheDocument();
+      enableAdvancedMode();
+      fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
+        target: { value: 'worker-port-check' },
+      });
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      });
+      const persistedDraft = JSON.parse(sessionStorage.getItem('ce:sessionWizardDraft:v1')).draft;
+      expect(Number(persistedDraft.networkChainId || 0)).not.toBe(84532);
+      expect(persistedDraft.sessionModeProfile.evm.registryChainId).toBeNull();
+      expect(mockSessionExists).not.toHaveBeenCalled();
+      expect(blockNumberSpy).not.toHaveBeenCalled();
+    } finally {
+      blockNumberSpy.mockRestore();
+    }
+  });
 
   it('offers to continue a cached custom profile on /new without silently replacing it', async () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);

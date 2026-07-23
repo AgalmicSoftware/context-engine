@@ -12,6 +12,44 @@ const makeJsonRequest = (path, body, init = {}) => new Request(`https://helper.e
   body: body == null ? undefined : JSON.stringify(body),
 });
 
+const makeWorkerSessionModeProfile = ({
+  encryption = 'worker_envelope',
+  registryChainId = encryption === 'lit' ? 11155420 : null,
+  agentHttp = false,
+} = {}) => ({
+  profileVersion: 1,
+  preset: 'custom',
+  authority: { mode: 'worker_canonical' },
+  evm: { registryChainId },
+  storage: {
+    backend: 'cloudflare',
+    payloadAccessControl: { gate: 'none', encryption },
+  },
+  identity: { default: 'passkey', enabled: ['passkey'] },
+  authorization: { mechanisms: ['worker_roles'] },
+  encryption: {
+    mode: encryption,
+    ...(encryption === 'worker_envelope' ? { keyProvider: 'worker_secret' } : {}),
+  },
+  surfaces: {
+    web: true,
+    telegram: false,
+    miniApp: false,
+    agentHttp,
+    mcp: false,
+    ceCc: false,
+  },
+  results: {
+    visibility: 'participant_aggregate',
+    exposure: {
+      aggregateResultsEnabled: true,
+      anonymizedGroupsEnabled: false,
+      minGroupSize: 2,
+    },
+  },
+  export: { scope: 'admin_raw' },
+});
+
 const cfSuccess = (result = {}) => new Response(JSON.stringify({
   success: true,
   result,
@@ -686,22 +724,24 @@ describe('deploy-helper worker', () => {
   });
 
   it('rejects explicit invalid deployment modes before any Cloudflare request', async () => {
+    const invalidAuthority = makeWorkerSessionModeProfile();
+    invalidAuthority.authority.mode = 'registry';
+    const invalidEncryption = makeWorkerSessionModeProfile();
+    invalidEncryption.encryption.mode = '';
+    const invalidKeyProvider = makeWorkerSessionModeProfile();
+    invalidKeyProvider.encryption.keyProvider = 'external_kms';
     const invalidRequests = [
       {
         path: 'sessionModeProfile.authority.mode',
-        value: { sessionModeProfile: { authority: { mode: 'registry' } } },
+        value: { sessionModeProfile: invalidAuthority },
       },
       {
         path: 'sessionModeProfile.encryption.mode',
-        value: { sessionModeProfile: { encryption: { mode: '' } } },
+        value: { sessionModeProfile: invalidEncryption },
       },
       {
         path: 'sessionModeProfile.encryption.keyProvider',
-        value: {
-          sessionModeProfile: {
-            encryption: { mode: 'worker_envelope', keyProvider: 'external_kms' },
-          },
-        },
+        value: { sessionModeProfile: invalidKeyProvider },
       },
       {
         path: 'storageProfile.payloadAccessControl.gate',
@@ -780,7 +820,7 @@ describe('deploy-helper worker', () => {
           workerName: 'canonical-worker',
           sessionSlug: 'alpha-session',
           adminAddress: '0x00000000000000000000000000000000000000aa',
-          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          sessionModeProfile: makeWorkerSessionModeProfile(),
           storageProfile: {
             backend: 'cloudflare',
             payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' },
@@ -836,7 +876,7 @@ describe('deploy-helper worker', () => {
           workerName: 'canonical-worker',
           sessionSlug: 'alpha-session',
           adminAddress: '0x00000000000000000000000000000000000000aa',
-          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          sessionModeProfile: makeWorkerSessionModeProfile(),
           bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
         }),
         {},
@@ -895,7 +935,7 @@ describe('deploy-helper worker', () => {
           workerName: 'canonical-worker',
           sessionSlug: 'alpha-session',
           adminAddress: '0x00000000000000000000000000000000000000aa',
-          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          sessionModeProfile: makeWorkerSessionModeProfile(),
           bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
         }),
         {},
@@ -1217,10 +1257,7 @@ describe('deploy-helper worker', () => {
         },
         cfApiToken: 'cf-alias-never-store',
         scopes: { cloudflare: { credentials: { token: 'nested-cf-never-store' } } },
-        sessionModeProfile: {
-          authority: { mode: 'worker_canonical' },
-          encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
-        },
+        sessionModeProfile: makeWorkerSessionModeProfile(),
         bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
         storageProfile: {
           backend: 'cloudflare',
@@ -1309,11 +1346,7 @@ describe('deploy-helper worker', () => {
         agentSessionWrappedDeploymentIdentity: 'session:11155420:0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:wrapped-alpha',
         agentBridgeBundleUrl: 'https://bundles.example.test/agentBridgeWorker.bundle.js',
         adminAddress: '0x00000000000000000000000000000000000000aa',
-        sessionModeProfile: {
-          authority: { mode: 'worker_canonical' },
-          encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
-          surfaces: { web: true, telegram: false, miniApp: false, agentHttp: true },
-        },
+        sessionModeProfile: makeWorkerSessionModeProfile({ agentHttp: true }),
         bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
         storageProfile: {
           backend: 'cloudflare',
@@ -1365,10 +1398,7 @@ describe('deploy-helper worker', () => {
         networkChainId: 11155420,
         rpcUrl: 'https://rpc.example.test',
         rpcUrlsByChainId: { 11155420: ['https://rpc.example.test'] },
-        sessionModeProfile: {
-          authority: { mode: 'worker_canonical' },
-          encryption: { mode: 'lit' },
-        },
+        sessionModeProfile: makeWorkerSessionModeProfile({ encryption: 'lit' }),
         bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
         secrets: {
           customRpcUrl: 'https://rpc.example.test',
@@ -1411,9 +1441,7 @@ describe('deploy-helper worker', () => {
       workerName: 'test-worker',
       sessionSlug: 'alpha-session',
       adminAddress: '0x00000000000000000000000000000000000000aa',
-      sessionModeProfile: {
-        authority: { mode: 'worker_canonical' },
-      },
+      sessionModeProfile: makeWorkerSessionModeProfile(),
       workerAuthority: {
         version: 2,
         participantScopes: ['storage'],
@@ -1441,7 +1469,7 @@ describe('deploy-helper worker', () => {
       sessionSlug: 'alpha-session',
       allowOverwrite: true,
       adminAddress: '0x00000000000000000000000000000000000000aa',
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      sessionModeProfile: makeWorkerSessionModeProfile(),
       bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
     }), {}, {});
     const payload = await response.json();
@@ -2064,7 +2092,7 @@ describe('deploy-helper worker', () => {
         workerName: 'test-worker',
         sessionSlug: 'alpha-session',
         adminAddress: '0x00000000000000000000000000000000000000aa',
-        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        sessionModeProfile: makeWorkerSessionModeProfile(),
         bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
       }), {}, {});
       const payload = await response.json();
@@ -2292,7 +2320,7 @@ describe('deploy-helper worker', () => {
         workerName: 'canonical-worker',
         sessionSlug: 'alpha-session',
         adminAddress: '0x00000000000000000000000000000000000000aa',
-        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        sessionModeProfile: makeWorkerSessionModeProfile(),
         bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
       }), {}, {});
       const payload = await response.json();
@@ -3487,7 +3515,7 @@ describe('deploy-helper worker', () => {
       configRevision: 'revision-a',
       sessionName: 'Original session name',
       adminAddress: '0x00000000000000000000000000000000000000aa',
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      sessionModeProfile: makeWorkerSessionModeProfile(),
       bundleText: 'export default { fetch() {} };',
       storageProfile: {
         backend: 'cloudflare',
@@ -3874,7 +3902,7 @@ describe('deploy-helper worker', () => {
       sessionSlug: 'resume-session',
       bundleText: 'export default { fetch() {} };',
       adminAddress: '0x1111111111111111111111111111111111111111',
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      sessionModeProfile: makeWorkerSessionModeProfile({ encryption: 'none' }),
       embeddedDeployHelperEnabled: false,
       storageProfile: {
         backend: 'cloudflare',

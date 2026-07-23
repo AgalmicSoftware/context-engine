@@ -112,6 +112,10 @@ import {
   type SessionWizardRegisterTxEntry,
 } from './sessionWizardPublishController';
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
+import {
+  checkSessionWizardWorkerSlugExists,
+  resolveSessionWizardSlugAvailabilityPort,
+} from './sessionWizardSlugAvailability';
 import { createSessionWizardPublishRuntimeController } from './sessionWizardPublishRuntimeController';
 import { resolveSessionWizardWorkerPublishEvidence } from './sessionWizardWorkerPublishEvidence';
 import {
@@ -464,13 +468,6 @@ const SessionWizard = ({
     },
     [],
   );
-  const { slugAvailability } = useSessionSlugState({
-    slug: draft?.slug,
-    privateSlugMode,
-    registryChainId,
-    isReservedSlug: isReservedSessionSlug,
-    sessionExists: checkSessionSlugExists,
-  });
   const [encryptionGates, setEncryptionGates] = useState<EncryptionGateState[]>(() => cachedInitialState.initialGates);
   // Pending SBT drafts carry deploy secrets and claim codes, so keep them out
   // of localStorage while still surviving same-tab refreshes via sessionStorage.
@@ -771,6 +768,30 @@ const SessionWizard = ({
   const sessionModeRequirements = resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile, {
     hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
   });
+  const workerSlugAvailabilityUrl = normalizeBaseUrl(toStr(draft.corsWorkerUrl).trim());
+  const checkWorkerSessionSlugExists = useCallback(
+    async ({ slug }: SessionSlugExistsArgs): Promise<boolean> =>
+      checkSessionWizardWorkerSlugExists({
+        workerUrl: workerSlugAvailabilityUrl,
+        slug,
+      }),
+    [workerSlugAvailabilityUrl],
+  );
+  const slugAvailabilityPort = resolveSessionWizardSlugAvailabilityPort({
+    isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
+    registerSession: sessionModeRequirements.publish.registerSession,
+    workerUrl: workerSlugAvailabilityUrl,
+    checkRegistrySlug: checkSessionSlugExists,
+    checkWorkerSlug: checkWorkerSessionSlugExists,
+  });
+  const { slugAvailability } = useSessionSlugState({
+    enabled: slugAvailabilityPort.enabled,
+    slug: draft?.slug,
+    privateSlugMode,
+    registryChainId,
+    isReservedSlug: isReservedSessionSlug,
+    sessionExists: slugAvailabilityPort.sessionExists,
+  });
   const workerCanonicalSettlement = useSessionWizardWorkerSettlementLifecycle(cachedWizard, {
     currentIdentity: { workerUrl: deployWorkerUrl || draft.corsWorkerUrl, slug: draft.slug, sessionId },
     isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
@@ -932,6 +953,7 @@ const SessionWizard = ({
   }, [encryptedFieldGates]);
 
   useEffect(() => {
+    if (!sessionModeRequirements.requiresRpc) return;
     const chainId = Number(registryChainId || 0) || 0;
     if (!chainId) return;
     setDraft((prev) => {
@@ -941,8 +963,12 @@ const SessionWizard = ({
       return applySessionWizardRegistryChainDraftDefaults({
         draft: prev,
         chainId,
-        contractDefaults: getSessionWizardContractDefaults(chainId),
+        contractDefaults: sessionModeRequirements.publish.registerSession
+          ? getSessionWizardContractDefaults(chainId)
+          : {},
         pathRpc: getDefaultHttpRpc(chainId),
+        includeContracts: sessionModeRequirements.publish.registerSession,
+        includeFaucet: sessionModeRequirements.requiresFunding,
       }) as DraftState;
     });
     setGateSelections((prev) => {
@@ -957,7 +983,12 @@ const SessionWizard = ({
       });
       return changed ? next : prev;
     });
-  }, [registryChainId]);
+  }, [
+    registryChainId,
+    sessionModeRequirements.publish.registerSession,
+    sessionModeRequirements.requiresFunding,
+    sessionModeRequirements.requiresRpc,
+  ]);
 
   useEffect(() => {
     const gateIds = encryptionGates.map((gate) => gate.id).filter(Boolean);
@@ -1068,6 +1099,7 @@ const SessionWizard = ({
     setBlockLimitUnit,
     markBlockStartManual,
   } = useSessionWizardBlockLimits<DraftState>({
+    enabled: sessionModeRequirements.requiresRpc,
     registryChainId,
     draftBlockLimitStart: draft?.blockLimits?.start,
     setDraft,
@@ -2616,6 +2648,8 @@ const SessionWizard = ({
     publishReadiness: publishUiPlan.publishReadiness,
     isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
     deployPendingSbts: sessionModeRequirements.publish.deployPendingSbts,
+    publishesPendingSbts: sessionModeRequirements.publish.deployPendingSbts && hasUndeployedPendingSbtDrafts,
+    usesLit: sessionModeRequirements.requiresLit,
     t,
   });
   const activeNormalModeIndex = normalModeCards.findIndex((card) => collapsedSections[card.key] === false);
@@ -2632,6 +2666,7 @@ const SessionWizard = ({
     pendingDraftCount,
     isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
     deployPendingSbts: sessionModeRequirements.publish.deployPendingSbts,
+    usesLit: sessionModeRequirements.requiresLit,
     t,
   });
   useSessionWizardNormalModeSectionVisibility({

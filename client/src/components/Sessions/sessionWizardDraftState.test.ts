@@ -5,6 +5,7 @@ import {
   buildSessionWizardDefaultTemplate,
   normalizeSessionWizardDraftShape,
 } from './sessionWizardDraftState';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('sessionWizardDraftState', () => {
   it('normalizes draft naming, ai fields, and fallback worker resources', () => {
@@ -237,6 +238,47 @@ describe('sessionWizardDraftState', () => {
     );
   });
 
+  it('preserves an invalid cached profile as blocked draft state without compiling it', () => {
+    const malformedProfile = {
+      profileVersion: 1,
+      authority: { mode: 'worker_canonical' },
+    };
+
+    expect(() =>
+      normalizeSessionWizardDraftShape({
+        sessionModeProfile: malformedProfile,
+        storageProfile: { backend: 'cloudflare' },
+      }),
+    ).not.toThrow();
+    const normalized = normalizeSessionWizardDraftShape({
+      sessionModeProfile: malformedProfile,
+      storageProfile: { backend: 'cloudflare' },
+    });
+
+    expect(normalized.sessionModeProfile).toEqual(malformedProfile);
+    expect(normalized.storageProfile).toEqual(expect.objectContaining({ backend: 'cloudflare' }));
+  });
+
+  it('preserves a schema-only profile synthesized from stale cached storage without throwing', () => {
+    const cachedWizard = {
+      draft: {
+        sessionName: 'Cached Cloudflare Draft',
+        storageProfile: { backend: 'cloudflare' },
+      },
+    };
+
+    expect(() => buildSessionWizardInitialDraftFromCache({ cachedWizard })).not.toThrow();
+    const normalized = buildSessionWizardInitialDraftFromCache({ cachedWizard });
+
+    expect(normalized.sessionModeProfile).toEqual(
+      expect.objectContaining({
+        authority: { mode: 'worker_canonical' },
+        storage: expect.objectContaining({ backend: 'cloudflare' }),
+      }),
+    );
+    expect(normalized.storageProfile).toEqual(expect.objectContaining({ backend: 'cloudflare' }));
+  });
+
   it('applies registry-chain contract defaults and worker RPC fallbacks without mutating the draft', () => {
     const draft = {
       networkChainId: 84532,
@@ -317,6 +359,92 @@ describe('sessionWizardDraftState', () => {
       },
     });
     expect(next.faucet).toEqual({ rpcUrl: 'https://existing-faucet.example' });
+  });
+
+  it('synchronizes chain-relevant profiles without adding chain capability to pure Worker profiles', () => {
+    const pureWorker = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const workerNext = applySessionWizardRegistryChainDraftDefaults({
+      draft: {
+        networkChainId: 11155420,
+        sessionModeProfile: pureWorker,
+      },
+      chainId: 84532,
+    });
+
+    expect(workerNext.networkChainId).toBe(84532);
+    expect(workerNext.sessionModeProfile).toEqual(pureWorker);
+    expect(workerNext.sessionModeProfile.evm.registryChainId).toBeNull();
+
+    const registry = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const registryNext = applySessionWizardRegistryChainDraftDefaults({
+      draft: { sessionModeProfile: registry },
+      chainId: 84532,
+    });
+
+    expect(registryNext.sessionModeProfile).toEqual(
+      expect.objectContaining({
+        preset: 'custom',
+        evm: { registryChainId: 84532 },
+      }),
+    );
+  });
+
+  it('keeps explicit Worker SBT access rules on the selected wizard network', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.evm.registryChainId = 11155420;
+    profile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        {
+          kind: 'sbt_onchain',
+          chainId: 11155420,
+          contract: '0x00000000000000000000000000000000000000aa',
+          anyOrAll: 'any',
+        },
+      ],
+    };
+
+    const next = applySessionWizardRegistryChainDraftDefaults({
+      draft: { sessionModeProfile: profile },
+      chainId: 84532,
+    });
+
+    expect(next.sessionModeProfile.evm.registryChainId).toBe(84532);
+    expect(next.sessionModeProfile.encryption.accessConditions.conditions[0].chainId).toBe(84532);
+  });
+
+  it('limits Worker hybrid chain defaults to RPC without adding registry or faucet capabilities', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.evm.registryChainId = 11155420;
+    profile.encryption = { mode: 'lit' };
+    profile.storage.payloadAccessControl = {
+      ...profile.storage.payloadAccessControl,
+      encryption: 'lit',
+    };
+    const next = applySessionWizardRegistryChainDraftDefaults({
+      draft: {
+        sessionModeProfile: profile,
+      },
+      chainId: 84532,
+      contractDefaults: {
+        sessionRegistry: '0xRegistry',
+      },
+      pathRpc: 'https://rpc.example',
+      includeContracts: false,
+      includeFaucet: false,
+    });
+
+    expect(next.sessionModeProfile.evm.registryChainId).toBe(84532);
+    expect(next.rpc).toEqual({
+      provider: 'path',
+      providers: {
+        path: { rpcUrl: 'https://rpc.example' },
+      },
+    });
+    expect(next.contracts).toBeUndefined();
+    expect(next.faucet).toBeUndefined();
   });
 
   it('builds cache write payloads with redacted worker secrets and durable pending draft isolation', () => {

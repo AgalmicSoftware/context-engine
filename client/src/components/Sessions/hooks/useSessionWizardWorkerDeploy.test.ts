@@ -90,6 +90,10 @@ const buildWorkerCanonicalLitProfile = () => {
   profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
   profile.encryption = { mode: 'lit' };
   profile.evm.registryChainId = 11155420;
+  profile.storage.payloadAccessControl = {
+    ...profile.storage.payloadAccessControl!,
+    encryption: 'lit',
+  };
   return profile;
 };
 
@@ -1511,6 +1515,10 @@ describe('useSessionWizardWorkerDeploy', () => {
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     sessionModeProfile.encryption = { mode: 'lit' };
     sessionModeProfile.evm.registryChainId = 11155420;
+    sessionModeProfile.storage.payloadAccessControl = {
+      ...sessionModeProfile.storage.payloadAccessControl!,
+      encryption: 'lit',
+    };
     options.refs.runtimeRef.current = {
       ...options.refs.runtimeRef.current,
       sessionId: '123e4567-e89b-12d3-a456-426614174000',

@@ -14,6 +14,8 @@ const renderBlockLimits = (
     draftBlockLimitStart: unknown;
     setDraft: jest.Mock;
     updateDraftValue: jest.Mock;
+    enabled: boolean;
+    readLatestBlockNumber: (args: { chainId: number; rpcUrl: string }) => Promise<number>;
   }> = {},
 ) => {
   const setDraft = overrides.setDraft || jest.fn();
@@ -25,10 +27,12 @@ const renderBlockLimits = (
     updateDraftValue,
     ...renderHook(() =>
       useSessionWizardBlockLimits<DraftState>({
+        enabled: overrides.enabled ?? true,
         registryChainId: overrides.registryChainId ?? 0,
         draftBlockLimitStart: overrides.draftBlockLimitStart,
         setDraft,
         updateDraftValueRef,
+        readLatestBlockNumber: overrides.readLatestBlockNumber,
       }),
     ),
   };
@@ -44,6 +48,41 @@ describe('useSessionWizardBlockLimits', () => {
     expect(result.current.blockLimitUnit).toBe('hours');
   });
 
+  it('does not invoke the block RPC port while chain capabilities are disabled', () => {
+    const readLatestBlockNumber = jest.fn().mockResolvedValue(500);
+
+    const { result } = renderBlockLimits({
+      enabled: false,
+      registryChainId: 11155420,
+      readLatestBlockNumber,
+    });
+
+    expect(readLatestBlockNumber).not.toHaveBeenCalled();
+    expect(result.current.latestChainBlock).toBe(null);
+    expect(result.current.latestBlockStatus).toBe('');
+  });
+
+  it('invokes the block RPC port for a chain-capable mode', async () => {
+    const readLatestBlockNumber = jest.fn().mockResolvedValue(500);
+
+    const { result } = renderBlockLimits({
+      enabled: true,
+      registryChainId: 11155420,
+      readLatestBlockNumber,
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(readLatestBlockNumber).toHaveBeenCalledWith({
+      chainId: 11155420,
+      rpcUrl: expect.any(String),
+    });
+    expect(result.current.latestChainBlock).toBe(500);
+  });
+
   it('auto-fills the start block from the latest chain block', () => {
     const { result, setDraft } = renderBlockLimits();
 
@@ -52,7 +91,7 @@ describe('useSessionWizardBlockLimits', () => {
     });
 
     expect(setDraft).toHaveBeenCalledTimes(1);
-    const updater = setDraft.mock.calls[0][0];
+    const updater = setDraft.mock.calls[0][0] as (draft: DraftState) => DraftState;
     expect(updater({ blockLimits: {} })).toEqual({
       blockLimits: { start: 500 },
     });

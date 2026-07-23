@@ -108,7 +108,7 @@ const readWizardCache = () => JSON.parse(sessionStorage.getItem('ce:sessionWizar
 describe('SessionWizard publish boundary rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
-  it('blocks an invalid session mode profile before publish side effects', async () => {
+  it('keeps an initially invalid session mode profile fail-closed before publish side effects', async () => {
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
@@ -128,15 +128,9 @@ describe('SessionWizard publish boundary rendering', () => {
     renderLoggedInSessionWizard();
     enableAdvancedMode();
     const publishButton = await openPublishSection();
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
-      target: { value: `ar://${'a'.repeat(43)}` },
-    });
-    await waitFor(() => expect(publishButton).not.toBeDisabled());
 
-    fireEvent.click(publishButton);
-
-    expect(await screen.findByText(/Fix the session hosting settings before publishing/i)).toBeInTheDocument();
+    expect(publishButton).toBeDisabled();
+    expect(screen.queryByLabelText('Advanced publish settings')).not.toBeInTheDocument();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
     expect(arweaveClient.uploadDataToArweave).not.toHaveBeenCalled();
   });
@@ -420,8 +414,7 @@ describe('SessionWizard publish boundary rendering', () => {
     });
   });
 
-  it('preserves suppressed pending SBT drafts while post-registration refresh is still pending', async () => {
-    const manualMetadataUri = `ar://${'g'.repeat(43)}`;
+  it('preserves pending SBT drafts when an invalid registry authorization profile blocks publication', async () => {
     const customRegistryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     customRegistryProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     customRegistryProfile.authorization = { mechanisms: [] };
@@ -434,13 +427,6 @@ describe('SessionWizard publish boundary rendering', () => {
         },
       }),
     );
-    let resolveRegistryRefresh = () => {};
-    const registryRefreshPromise = new Promise((resolve) => {
-      resolveRegistryRefresh = resolve;
-    });
-    mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
-    mockFetchSessionFromRegistry.mockImplementation(() => registryRefreshPromise);
-
     renderLoggedInSessionWizard();
     enableAdvancedMode();
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME), {
@@ -450,25 +436,13 @@ describe('SessionWizard publish boundary rendering', () => {
     await createPendingFeaturedDraft();
 
     const publishButton = await openPublishSection();
-    fireEvent.click(screen.getByLabelText('Advanced publish settings'));
-    fireEvent.change(screen.getByPlaceholderText(/ar:\/\/<txId>/i), {
-      target: { value: manualMetadataUri },
-    });
-    await waitFor(() => {
-      expect(publishButton).not.toBeDisabled();
-    });
-    fireEvent.click(publishButton);
 
-    await waitFor(() => {
-      expect(mockFetchSessionFromRegistry).toHaveBeenCalledTimes(1);
-    });
+    expect(publishButton).toBeDisabled();
+    expect(screen.queryByLabelText('Advanced publish settings')).not.toBeInTheDocument();
     expect(mockCreateSBT).not.toHaveBeenCalled();
+    expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
+    expect(mockFetchSessionFromRegistry).not.toHaveBeenCalled();
     expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toContain(mockPendingSbtAddress);
-
-    await act(async () => {
-      resolveRegistryRefresh(null);
-      await registryRefreshPromise;
-    });
   });
 
   it('blocks the actual worker-canonical publish action after secret, provider, or profile requirement edits', async () => {

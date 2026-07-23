@@ -4,6 +4,7 @@ import { Button } from 'reactstrap';
 import styles from './SessionWizard.module.scss';
 import type { AnyRecord } from '../shellTypes';
 import {
+  SESSION_MODE_DEFAULT_REGISTRY_CHAIN_ID,
   SESSION_MODE_PRESET_IDS,
   cloneSessionModePreset,
   compileSessionModeProfile,
@@ -56,6 +57,9 @@ const presetForChain = (
   const profile = cloneSessionModePreset(presetId);
   if (presetId === SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED && registryChainId) {
     profile.evm.registryChainId = registryChainId;
+    if (registryChainId !== SESSION_MODE_DEFAULT_REGISTRY_CHAIN_ID) {
+      profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    }
   }
   return profile;
 };

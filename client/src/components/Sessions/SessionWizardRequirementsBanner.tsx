@@ -43,6 +43,10 @@ const SessionWizardRequirementsBanner = ({
   const walletRequirementLabel = fundingRequirementLabel.includes('SBT publishing')
     ? 'A connected wallet for on-chain SBT publishing'
     : 'A connected wallet for on-chain registration';
+  const rpcRequirementLabel =
+    requires('wallet') || requires('funding')
+      ? 'RPC URL or provider key for on-chain reads and publishing'
+      : 'RPC URL or provider key for read-only access checks or encryption; no on-chain publishing transaction is required';
   const cloudflareTokenTemplateHref = buildCloudflareTokenTemplateUrl({
     slug: cloudflareTokenSlug,
   });
@@ -145,7 +149,7 @@ const SessionWizardRequirementsBanner = ({
               for permanent storage
             </li>
           ) : null}
-          {requires('rpc') ? <li>RPC URL or provider key for on-chain reads and publishing</li> : null}
+          {requires('rpc') ? <li>{rpcRequirementLabel}</li> : null}
           {requires('wallet') ? <li>{walletRequirementLabel}</li> : null}
           {requires('funding') ? (
             <li>

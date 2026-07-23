@@ -44,6 +44,10 @@ describe('sessionWizardModeRequirements', () => {
     profile.preset = 'custom';
     profile.encryption = { mode: 'lit' };
     profile.evm.registryChainId = 11155420;
+    profile.storage.payloadAccessControl = {
+      ...profile.storage.payloadAccessControl!,
+      encryption: 'lit',
+    };
     const requirements = resolveSessionWizardModeRequirements(profile);
 
     expect(requirements.presetKeyChips).toEqual([

@@ -142,4 +142,19 @@ describe('SessionWizardRequirementsBanner', () => {
     expect(screen.getByText('A connected wallet for on-chain SBT publishing')).toBeInTheDocument();
     expect(screen.queryByText('A connected wallet for on-chain registration')).not.toBeInTheDocument();
   });
+
+  it('describes Worker Lit or existing SBT RPC as read-only when no transaction inputs are required', () => {
+    render(
+      <SessionWizardRequirementsBanner
+        fundingRequirementLabel="OP Sepolia ETH for on-chain SBT publishing"
+        onDismiss={jest.fn()}
+        requiredRequirementIds={['aiProviderKey', 'rpc', 'lit']}
+      />,
+    );
+
+    expect(screen.getByText(/RPC URL or provider key for read-only access checks or encryption/i)).toBeInTheDocument();
+    expect(screen.getByText(/no on-chain publishing transaction is required/i)).toBeInTheDocument();
+    expect(screen.queryByText(/on-chain reads and publishing/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/connected wallet/i)).not.toBeInTheDocument();
+  });
 });

@@ -143,6 +143,10 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     sessionModeProfile.encryption = { mode: 'lit' };
     sessionModeProfile.evm.registryChainId = 11155420;
+    sessionModeProfile.storage.payloadAccessControl = {
+      ...sessionModeProfile.storage.payloadAccessControl!,
+      encryption: 'lit',
+    };
     const config = {
       slug: 'worker-session',
       sessionId: SESSION_ID,

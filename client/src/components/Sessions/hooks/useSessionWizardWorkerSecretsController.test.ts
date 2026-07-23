@@ -104,6 +104,11 @@ const buildWorkerCanonicalLitProfile = () => {
   const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
   profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
   profile.encryption = { mode: 'lit' };
+  profile.evm.registryChainId = 11155420;
+  profile.storage.payloadAccessControl = {
+    ...profile.storage.payloadAccessControl!,
+    encryption: 'lit',
+  };
   return profile;
 };
 

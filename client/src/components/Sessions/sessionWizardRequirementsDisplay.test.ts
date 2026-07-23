@@ -101,6 +101,19 @@ describe('sessionWizardRequirementsDisplay', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     profile.preset = 'custom';
     profile.authorization.mechanisms.push('sbt_onchain');
+    profile.evm.registryChainId = 11155420;
+    profile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        { kind: 'worker_role', role: 'admin' },
+        {
+          kind: 'sbt_onchain',
+          chainId: 11155420,
+          contract: '0x00000000000000000000000000000000000000aa',
+          anyOrAll: 'any',
+        },
+      ],
+    };
 
     const settled = resolveSessionWizardNewSessionRequirementsDisplayState({
       sessionModeProfile: profile,

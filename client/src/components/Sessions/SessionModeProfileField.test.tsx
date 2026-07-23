@@ -74,7 +74,7 @@ describe('SessionModeProfileField', () => {
 
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
-        preset: 'trustless_public_decentralized',
+        preset: 'custom',
         evm: { registryChainId: 84532 },
         storage: { backend: 'arweave' },
       }),

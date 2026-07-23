@@ -28,6 +28,8 @@ export type NormalModeCardsInput = {
   publishReadiness: Pick<SessionWizardPublishReadinessDescriptor, 'canPublishNow' | 'uploadBlockedReason'>;
   isWorkerCanonical: boolean;
   deployPendingSbts: boolean;
+  publishesPendingSbts?: boolean;
+  usesLit?: boolean;
   t: NormalModeLabelFn;
 };
 
@@ -44,6 +46,7 @@ export type NormalModePublishSummaryInput = {
   pendingDraftCount: number;
   isWorkerCanonical: boolean;
   deployPendingSbts: boolean;
+  usesLit?: boolean;
   t: NormalModeLabelFn;
 };
 
@@ -55,6 +58,13 @@ export type NormalModePublishSummaryItem = {
 type NormalModeCardWithoutStepNumber = Omit<NormalModeCard, 'stepNumber'>;
 
 const normalizeDisplayString = (value: string): string => value.trim();
+
+const describeWorkerAccess = ({ deployPendingSbts, usesLit }: { deployPendingSbts: boolean; usesLit: boolean }) => {
+  const advancedAccess = [...(usesLit ? ['Lit'] : []), ...(deployPendingSbts ? ['on-chain SBT'] : [])].join(' + ');
+  return advancedAccess
+    ? `Passkey identity · Worker roles and Groups · Advanced/external ${advancedAccess} access`
+    : 'Passkey identity · Worker roles and Groups';
+};
 
 export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard[] {
   const {
@@ -71,6 +81,8 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
     publishReadiness,
     isWorkerCanonical,
     deployPendingSbts,
+    publishesPendingSbts = false,
+    usesLit = false,
     t,
   } = opts;
   const { canPublishNow, uploadBlockedReason } = publishReadiness;
@@ -117,14 +129,13 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
     {
       key: 'encryption',
       title: isWorkerCanonical ? 'Session Access' : 'Privacy',
-      summary:
-        isWorkerCanonical && !deployPendingSbts
-          ? 'Passkey identity · Worker roles and Groups'
-          : configuredPrivateGateCount
-            ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? `${t('sbt')} ${t('gate')}` : `${t('sbt')} ${t('gates')}`} selected`
-            : privateSlugMode
-              ? 'Private URL enabled'
-              : 'Open link by default',
+      summary: isWorkerCanonical
+        ? describeWorkerAccess({ deployPendingSbts, usesLit })
+        : configuredPrivateGateCount
+          ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? `${t('sbt')} ${t('gate')}` : `${t('sbt')} ${t('gates')}`} selected`
+          : privateSlugMode
+            ? 'Private URL enabled'
+            : 'Open link by default',
       tone: privacyTone,
     },
     ...workerCards,
@@ -133,7 +144,9 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
       title: 'Deploy Session',
       summary: canPublishNow
         ? isWorkerCanonical
-          ? 'Deploy saves and verifies canonical config in the Session Worker.'
+          ? publishesPendingSbts
+            ? 'Deploy publishes pending SBTs, then saves and verifies canonical config in the Session Worker.'
+            : 'Deploy saves and verifies canonical config in the Session Worker.'
           : canUseSponsoredAutoDeployNow
             ? 'Publish will deploy the sponsored worker before uploading metadata.'
             : 'Review the setup and deploy when ready.'
@@ -162,6 +175,7 @@ export function buildNormalModePublishSummary(opts: NormalModePublishSummaryInpu
     pendingDraftCount,
     isWorkerCanonical,
     deployPendingSbts,
+    usesLit = false,
     t,
   } = opts;
   const normalizedSessionName = normalizeDisplayString(sessionName);
@@ -204,7 +218,24 @@ export function buildNormalModePublishSummary(opts: NormalModePublishSummaryInpu
                       ? 'Custom worker deployed'
                       : 'Custom worker setup',
     },
-    ...(deployPendingSbts
+    ...(isWorkerCanonical && (usesLit || deployPendingSbts)
+      ? [
+          {
+            label: 'Advanced/external access',
+            value:
+              usesLit && deployPendingSbts
+                ? pendingDraftCount > 0
+                  ? 'Lit encryption · on-chain SBT access · SBT publishing required'
+                  : 'Lit encryption · existing on-chain SBT checks (read-only)'
+                : usesLit
+                  ? 'Lit encryption and on-chain access checks (read-only)'
+                  : pendingDraftCount > 0
+                    ? 'On-chain SBT access · SBT publishing required'
+                    : 'Existing on-chain SBT checks (read-only)',
+          },
+        ]
+      : []),
+    ...(deployPendingSbts && pendingDraftCount > 0
       ? [
           {
             label: `Pending ${t('sbts')}`,

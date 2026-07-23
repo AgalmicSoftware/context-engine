@@ -99,6 +99,12 @@ const setWorkerEnvelopeCondition = (profile: SessionModeProfile, conditions?: Se
   else delete profile.encryption.accessConditions;
 };
 
+const hasSbtOnchainCondition = (profile: SessionModeProfile): boolean =>
+  [profile.encryption.accessConditions, profile.storage.payloadAccessControl?.accessConditions].some(
+    (document) =>
+      Array.isArray(document?.conditions) && document.conditions.some((condition) => condition.kind === 'sbt_onchain'),
+  );
+
 const SessionModeProfileSections = ({
   section,
   registryChainId = null,
@@ -122,7 +128,12 @@ const SessionModeProfileSections = ({
     base.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     mutate(base);
     base.surfaces.web = true;
-    const compiled = compileSessionModeProfile(base);
+    const compileSource = validateSessionModeProfile(base).valid
+      ? base
+      : profile && validateSessionModeProfile(profile).valid
+        ? profile
+        : cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const compiled = compileSessionModeProfile(compileSource);
     onChange(base, { storageProfile: compiled.storageProfile });
   };
 
@@ -238,6 +249,8 @@ const SessionModeProfileSections = ({
               draft.storage.backend = backend as SessionModeProfile['storage']['backend'];
               if (backend === 'cloudflare') {
                 draft.authority.mode = 'worker_canonical';
+                draft.identity = { default: 'passkey', enabled: ['passkey'] };
+                draft.authorization = { mechanisms: ['worker_roles'] };
                 const defaultAccess = defaultCloudflarePayloadAccessControl();
                 draft.storage.payloadAccessControl = {
                   ...defaultAccess,
@@ -251,8 +264,13 @@ const SessionModeProfileSections = ({
                 if (draft.results.visibility === 'public_full_if_storage_public') {
                   draft.results.visibility = 'participant_aggregate';
                 }
+                if (draft.encryption.mode !== 'lit' && !hasSbtOnchainCondition(draft)) {
+                  draft.evm.registryChainId = null;
+                }
               } else {
                 draft.authority.mode = 'evm_registry_canonical';
+                draft.identity = { default: 'wallet', enabled: ['wallet', 'passkey'] };
+                draft.authorization = { mechanisms: ['sbt_onchain'] };
                 draft.evm.registryChainId = draft.evm.registryChainId || registryChainId || 11155420;
                 delete draft.storage.payloadAccessControl;
                 if (draft.encryption.mode === 'worker_envelope') draft.encryption = { mode: 'none' };

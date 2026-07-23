@@ -18,6 +18,7 @@ import {
 import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
 import { WORKER_SECRET_CACHE_SAFE_FIELDS } from './sessionWizardWorkerSecretSupport';
 import {
+  classifySessionModeProfileSupport,
   compileSessionModeProfile,
   hasLegacyTelegramFirstSessionFlags,
   mergeSessionModeProfileStorageAccess,
@@ -187,8 +188,13 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
       draft.sessionModeProfile as SessionModeProfile,
       draft.storageProfile,
     );
-    const compiled = compileSessionModeProfile(draft.sessionModeProfile as SessionModeProfile);
-    draft.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+    const support = classifySessionModeProfileSupport(draft.sessionModeProfile);
+    draft.storageProfile =
+      support.status === 'reachable'
+        ? normalizeSessionStorageProfileConfig(
+            compileSessionModeProfile(draft.sessionModeProfile as SessionModeProfile).storageProfile,
+          )
+        : normalizeSessionStorageProfileConfig(draft.storageProfile);
   } else {
     draft.storageProfile = normalizeSessionStorageProfileConfig(
       draft.storageProfile || draft.sessionStorageProfile || draft.storage,
@@ -296,8 +302,11 @@ export const buildSessionWizardInitialDraftFromCache = ({
   const normalized = normalizeSessionWizardDraftShape(merged);
   if (shouldBuildCachedStorageModeProfile && !normalized.sessionModeProfile) {
     normalized.sessionModeProfile = buildCachedDraftSessionModeProfile(normalized);
-    const compiled = compileSessionModeProfile(normalized.sessionModeProfile as SessionModeProfile);
-    normalized.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+    const support = classifySessionModeProfileSupport(normalized.sessionModeProfile);
+    if (support.status === 'reachable') {
+      const compiled = compileSessionModeProfile(normalized.sessionModeProfile as SessionModeProfile);
+      normalized.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+    }
   }
   if (normalModeSharedHostedWorkerEnabled === false && !cachedWizard?.deployComplete) {
     normalized.corsWorkerUrl = '';
@@ -310,11 +319,15 @@ export const applySessionWizardRegistryChainDraftDefaults = ({
   chainId = 0,
   contractDefaults = {},
   pathRpc = '',
+  includeContracts = true,
+  includeFaucet = true,
 }: {
   draft?: AnyRecord | null;
   chainId?: unknown;
   contractDefaults?: AnyRecord | null;
   pathRpc?: unknown;
+  includeContracts?: boolean;
+  includeFaucet?: boolean;
 } = {}): AnyRecord => {
   const resolvedChainId = Number(chainId || 0) || 0;
   const next = deepClone(draft && typeof draft === 'object' ? draft : {}) as AnyRecord;
@@ -324,19 +337,54 @@ export const applySessionWizardRegistryChainDraftDefaults = ({
     next.networkChainId = resolvedChainId;
   }
 
-  const defaults = contractDefaults && typeof contractDefaults === 'object' ? contractDefaults : {};
-  const contracts = next.contracts && typeof next.contracts === 'object' ? (next.contracts as AnyRecord) : {};
-  next.contracts = contracts;
-  const keys = new Set([...Object.keys(contracts || {}), ...Object.keys(defaults || {})]);
-  keys.forEach((key) => {
-    const entry = contracts[key] && typeof contracts[key] === 'object' ? (contracts[key] as AnyRecord) : {};
-    const fallback = toStr(defaults[key] || '').trim();
-    if (fallback) {
-      entry.address = fallback;
+  if (
+    next.sessionModeProfile &&
+    typeof next.sessionModeProfile === 'object' &&
+    !Array.isArray(next.sessionModeProfile)
+  ) {
+    const support = classifySessionModeProfileSupport(next.sessionModeProfile);
+    if (support.status === 'reachable') {
+      const profile = next.sessionModeProfile as SessionModeProfile;
+      const accessDocuments = [
+        profile.encryption.accessConditions,
+        profile.storage.payloadAccessControl?.accessConditions,
+      ];
+      const hasSbtCondition = accessDocuments.some(
+        (document) =>
+          Array.isArray(document?.conditions) &&
+          document.conditions.some((condition) => condition.kind === 'sbt_onchain'),
+      );
+      const chainRelevant =
+        profile.authority.mode === 'evm_registry_canonical' || profile.encryption.mode === 'lit' || hasSbtCondition;
+      if (chainRelevant) {
+        if (profile.evm.registryChainId !== resolvedChainId) {
+          profile.evm.registryChainId = resolvedChainId;
+          profile.preset = 'custom';
+        }
+        accessDocuments.forEach((document) => {
+          document?.conditions.forEach((condition) => {
+            if (condition.kind === 'sbt_onchain') condition.chainId = resolvedChainId;
+          });
+        });
+      }
     }
-    entry.chainId = resolvedChainId;
-    contracts[key] = entry;
-  });
+  }
+
+  if (includeContracts) {
+    const defaults = contractDefaults && typeof contractDefaults === 'object' ? contractDefaults : {};
+    const contracts = next.contracts && typeof next.contracts === 'object' ? (next.contracts as AnyRecord) : {};
+    next.contracts = contracts;
+    const keys = new Set([...Object.keys(contracts || {}), ...Object.keys(defaults || {})]);
+    keys.forEach((key) => {
+      const entry = contracts[key] && typeof contracts[key] === 'object' ? (contracts[key] as AnyRecord) : {};
+      const fallback = toStr(defaults[key] || '').trim();
+      if (fallback) {
+        entry.address = fallback;
+      }
+      entry.chainId = resolvedChainId;
+      contracts[key] = entry;
+    });
+  }
 
   const resolvedPathRpc = toStr(pathRpc).trim();
   if (resolvedPathRpc) {
@@ -354,10 +402,12 @@ export const applySessionWizardRegistryChainDraftDefaults = ({
       pathProvider.rpcUrl = resolvedPathRpc;
     }
 
-    const faucet = next.faucet && typeof next.faucet === 'object' ? (next.faucet as AnyRecord) : {};
-    next.faucet = faucet;
-    if (!toStr(faucet.rpcUrl).trim()) {
-      faucet.rpcUrl = resolvedPathRpc;
+    if (includeFaucet) {
+      const faucet = next.faucet && typeof next.faucet === 'object' ? (next.faucet as AnyRecord) : {};
+      next.faucet = faucet;
+      if (!toStr(faucet.rpcUrl).trim()) {
+        faucet.rpcUrl = resolvedPathRpc;
+      }
     }
   }
 

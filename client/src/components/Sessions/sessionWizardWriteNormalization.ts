@@ -25,6 +25,7 @@ import {
   normalizeSessionStorageProfileConfig,
 } from './sessionWizardStorageProfile';
 import {
+  classifySessionModeProfileSupport,
   compileSessionModeProfile,
   hasLegacyTelegramFirstSessionFlags,
   mergeSessionModeProfileStorageAccess,
@@ -49,6 +50,17 @@ const WORKER_METADATA_ALIAS_KEYS = Object.freeze([
 ]);
 
 export { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS, buildSessionWizardRegistrySessionFields };
+
+function assertReachableSessionModeProfile(profile: unknown, context: string): asserts profile is SessionModeProfile {
+  const support = classifySessionModeProfileSupport(profile);
+  if (support.status === 'reachable') return;
+  const firstIssue = support.validation.issues[0];
+  throw new Error(
+    `${context} requires a reachable session mode profile${
+      firstIssue ? ` (${firstIssue.path || 'profile'}: ${firstIssue.code})` : ''
+    }.`,
+  );
+}
 
 const orderMetadataFields = (metadata: AnyRecord, fieldOrder: string[] = []): AnyRecord => {
   if (!isObj(metadata)) return metadata;
@@ -188,11 +200,15 @@ export const sanitizeSessionWizardMetadataPayload = (
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(next, 'sessionModeProfile') && !isObj(next.sessionModeProfile)) {
+    throw new Error('Session metadata publication requires a reachable session mode profile.');
+  }
   if (isObj(next.sessionModeProfile)) {
     const sessionModeProfile = mergeSessionModeProfileStorageAccess(
       next.sessionModeProfile as SessionModeProfile,
       next.storageProfile,
     );
+    assertReachableSessionModeProfile(sessionModeProfile, 'Session metadata publication');
     next.sessionModeProfile = sessionModeProfile;
     const compiled = compileSessionModeProfile(sessionModeProfile);
     next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
@@ -239,6 +255,12 @@ export const resolveSessionWizardWorkerStorageProfilePayload = ({
   const resolvedDraft = isObj(draft) ? draft : {};
   const resolvedDeployPayload = isObj(deployPayload) ? deployPayload : {};
   const rawStorageProfile = resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile;
+  if (
+    Object.prototype.hasOwnProperty.call(resolvedDraft, 'sessionModeProfile') &&
+    !isObj(resolvedDraft.sessionModeProfile)
+  ) {
+    throw new Error('Worker config publication requires a reachable session mode profile.');
+  }
   const sessionModeProfile = isObj(resolvedDraft.sessionModeProfile)
     ? (resolvedDraft.sessionModeProfile as SessionModeProfile)
     : hasLegacyTelegramFirstSessionFlags(resolvedDraft)
@@ -247,6 +269,9 @@ export const resolveSessionWizardWorkerStorageProfilePayload = ({
   const effectiveSessionModeProfile = sessionModeProfile
     ? mergeSessionModeProfileStorageAccess(sessionModeProfile, rawStorageProfile)
     : null;
+  if (effectiveSessionModeProfile) {
+    assertReachableSessionModeProfile(effectiveSessionModeProfile, 'Worker config publication');
+  }
   const compiledProfile = effectiveSessionModeProfile ? compileSessionModeProfile(effectiveSessionModeProfile) : null;
   const storageProfile = normalizeSessionStorageProfileConfig(compiledProfile?.storageProfile || rawStorageProfile);
   return {
