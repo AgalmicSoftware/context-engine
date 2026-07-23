@@ -6,6 +6,19 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Worker-canonical sessions now project setup, account settings, Admin metadata,
+  diagnostics, secrets, and route errors from the active capability profile.
+  Pure Cloudflare sessions use passkey access, Worker config, AI, storage, and
+  native Groups without presenting RPC, gas, faucet, Arweave, Lit, registry, or
+  SBT requirements; explicitly enabled hybrid and registry sessions retain
+  their chain controls.
+- The native `/new` deployment path now presents an honest Cloudflare dashboard
+  checklist with copy controls, return guidance, and Worker URL/CORS/canonical
+  config verification before success. The deploy-helper remains a collapsed
+  legacy fallback.
+- Worker route failures now distinguish missing discovery, reachability, CORS,
+  missing canonical config, and identity mismatch, while native Group cards add
+  stable detail/share links and state the current admin-managed leave boundary.
 - Worker-canonical web sessions now use native Cloudflare Groups instead of
   opening the on-chain SBT deployment form. Group records support names,
   descriptions, HTTPS images, open or admin-added membership, and visibility
