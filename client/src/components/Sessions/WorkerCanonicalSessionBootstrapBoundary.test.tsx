@@ -330,7 +330,11 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
       />,
     );
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Worker identity change was not approved.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Worker identity mismatch');
+    expect(screen.getByRole('link', { name: 'Open Admin' })).toHaveAttribute(
+      'href',
+      `/admin?sessionSlug=worker-session&worker=${encodeURIComponent(WORKER_ORIGIN)}`,
+    );
     expect(confirmRepin).toHaveBeenCalledTimes(1);
     expect(mockUpsertBootstrap).toHaveBeenCalledTimes(1);
     expect(mockMarkBootstrapVerified).not.toHaveBeenCalled();
@@ -495,9 +499,14 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
         retryable: false,
         status: 403,
       }),
+      'Worker bootstrap request failed with status 403.',
     ],
-    ['invalid canonical config', new Error('Worker bootstrap response slug does not match the requested session.')],
-  ])('does not retry or offer Retry for %s', async (_label, failure) => {
+    [
+      'invalid canonical config',
+      new Error('Worker bootstrap response slug does not match the requested session.'),
+      'Worker identity mismatch',
+    ],
+  ])('does not retry or offer Retry for %s', async (_label, failure, expectedMessage) => {
     mockFetchBootstrap.mockRejectedValueOnce(failure);
 
     render(
@@ -509,7 +518,7 @@ describe('WorkerCanonicalSessionBootstrapBoundary', () => {
       />,
     );
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(failure.message);
+    expect(await screen.findByRole('alert')).toHaveTextContent(expectedMessage);
     expect(screen.queryByRole('button', { name: 'Retry worker session' })).not.toBeInTheDocument();
     expect(mockFetchBootstrap).toHaveBeenCalledTimes(1);
   });

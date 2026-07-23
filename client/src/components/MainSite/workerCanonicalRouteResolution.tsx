@@ -13,6 +13,7 @@ import {
   validateWorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { DEFAULT_SESSION_SLUG } from '../../variables/appConfig.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 import { resolveMainSiteSessionRouteContext } from './routeSessionResolution.js';
 import { SessionLoadingSkeleton } from './routeStatusViews.js';
 import type { AppShell } from './AppShell';
@@ -147,6 +148,14 @@ const resolveWorkerRouteState = ({
   requireSessionSlug = false,
   getVerifiedConfig = getVerifiedWorkerCanonicalSessionBootstrap,
 }: ResolveWorkerRouteStateOptions): WorkerCanonicalRouteState => {
+  const workerDiscoveryValues = new URLSearchParams(searchStr).getAll('worker');
+  if (workerDiscoveryValues.length === 1 && !workerDiscoveryValues[0].trim()) {
+    return {
+      ...emptyWorkerRouteState(),
+      kind: 'error',
+      error: 'No Session Worker origin is available in this discovery link.',
+    };
+  }
   let workerOrigin = '';
   try {
     workerOrigin = parseSessionWorkerDiscoveryQuery(searchStr);
@@ -157,7 +166,16 @@ const resolveWorkerRouteState = ({
       error: error instanceof Error ? error.message : 'Invalid worker discovery URL.',
     };
   }
-  if (!workerOrigin) return emptyWorkerRouteState();
+  if (!workerOrigin) {
+    if (new URLSearchParams(searchStr).has('worker')) {
+      return {
+        ...emptyWorkerRouteState(),
+        kind: 'error',
+        error: 'No Session Worker origin is available in this discovery link.',
+      };
+    }
+    return emptyWorkerRouteState();
+  }
 
   const normalizedSlug = normalizeSessionSlug(workerSessionSlug);
   const workerOnlySearch = `?worker=${encodeURIComponent(workerOrigin)}`;
@@ -254,7 +272,13 @@ export const resolveMainSiteSessionRouteForRender = ({
 };
 
 export const renderWorkerCanonicalRouteError = (route: WorkerCanonicalRouteState): React.ReactElement | null =>
-  route.kind === 'error' ? <div role="alert">{route.error}</div> : null;
+  route.kind === 'error' ? (
+    <div role="alert" data-testid="ce-worker-canonical-discovery-error">
+      <h3>Worker discovery record missing or invalid</h3>
+      <p>{route.error}</p>
+      <a href={buildPublicRoute('/new')}>Return to session selection</a>
+    </div>
+  ) : null;
 
 export const renderWorkerCanonicalRouteBootstrap = (
   route: WorkerCanonicalRouteState,

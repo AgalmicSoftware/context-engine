@@ -1,5 +1,6 @@
 import {
   buildSessionWorkerBootstrapUrl,
+  describeWorkerSessionBootstrapError,
   fetchWorkerCanonicalSessionBootstrap,
   findSecretLikeSessionWorkerBootstrapPath,
   normalizeWorkerCanonicalSessionIdHex,
@@ -280,7 +281,7 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
     expect(buildSessionWorkerBootstrapUrl(result.workerOrigin, result.sessionSlug)).toBe(
       'https://session-a.example.workers.dev/session-config?slug=session-a',
     );
-    expect(fetchImpl).toHaveBeenCalledWith(
+    expect(fetchImpl as jest.Mock).toHaveBeenCalledWith(
       'https://session-a.example.workers.dev/session-config?slug=session-a',
       expect.objectContaining({
         method: 'GET',
@@ -356,5 +357,58 @@ describe('sessionWorkerDiscovery bootstrap fetch', () => {
         status,
       });
     }
+  });
+
+  it('classifies CORS, reachability, missing config, and identity mismatch without exposing raw responses', async () => {
+    const corsFetch = jest
+      .fn()
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }));
+    const corsError = await fetchWorkerCanonicalSessionBootstrap({
+      fetchImpl: corsFetch,
+      sessionSlug: 'session-a',
+      workerQueryValue: 'https://session-a.example.workers.dev',
+      environment: 'production',
+    }).catch((error) => error);
+    expect(describeWorkerSessionBootstrapError(corsError)).toEqual(
+      expect.objectContaining({ kind: 'cors', title: 'Browser origin not allowed', canRetry: true }),
+    );
+
+    const unreachableFetch = jest.fn().mockRejectedValue(new TypeError('Failed to fetch'));
+    const unreachableError = await fetchWorkerCanonicalSessionBootstrap({
+      fetchImpl: unreachableFetch,
+      sessionSlug: 'session-a',
+      workerQueryValue: 'https://session-a.example.workers.dev',
+      environment: 'production',
+    }).catch((error) => error);
+    expect(describeWorkerSessionBootstrapError(unreachableError)).toEqual(
+      expect.objectContaining({ kind: 'unreachable', title: 'Session Worker unreachable', canRetry: true }),
+    );
+
+    const missingError = await fetchWorkerCanonicalSessionBootstrap({
+      fetchImpl: jest.fn(async () => new Response('missing', { status: 404 })),
+      sessionSlug: 'session-a',
+      workerQueryValue: 'https://session-a.example.workers.dev',
+      environment: 'production',
+    }).catch((error) => error);
+    expect(describeWorkerSessionBootstrapError(missingError)).toEqual(
+      expect.objectContaining({ kind: 'missing_config', title: 'Canonical Worker config missing', canRetry: true }),
+    );
+
+    const identityError = await fetchWorkerCanonicalSessionBootstrap({
+      fetchImpl: jest.fn(
+        async () =>
+          new Response(JSON.stringify({ ...buildPayload(), sessionSlug: 'other-session' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+      ),
+      sessionSlug: 'session-a',
+      workerQueryValue: 'https://session-a.example.workers.dev',
+      environment: 'production',
+    }).catch((error) => error);
+    expect(describeWorkerSessionBootstrapError(identityError)).toEqual(
+      expect.objectContaining({ kind: 'identity_mismatch', title: 'Worker identity mismatch', canRetry: false }),
+    );
   });
 });
