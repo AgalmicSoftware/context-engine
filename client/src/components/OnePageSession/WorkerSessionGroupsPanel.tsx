@@ -142,6 +142,7 @@ const WorkerSessionGroupsPanel = ({
           workerUrl={workerUrl}
           workerToken={workerToken}
           refreshNonce={groupsRevision}
+          participantAddress={normalizedAccount}
         />
       ) : null}
       {showCreate ? (

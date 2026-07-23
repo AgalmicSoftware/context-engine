@@ -14,6 +14,7 @@ export type WorkerGroupMembershipPanelProps = {
   canReadGroups?: boolean;
   refreshNonce?: number;
   fetchImpl?: typeof fetch;
+  participantAddress?: string;
 };
 
 const emptyOverview: WorkerGroupOverview = { groups: [], memberships: [] };
@@ -25,11 +26,13 @@ const WorkerGroupMembershipPanel = ({
   canReadGroups: canReadGroupsProp,
   refreshNonce = 0,
   fetchImpl = fetch,
+  participantAddress = '',
 }: WorkerGroupMembershipPanelProps) => {
   const [overview, setOverview] = useState<WorkerGroupOverview>(emptyOverview);
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [error, setError] = useState('');
   const [joiningGroupId, setJoiningGroupId] = useState('');
+  const [shareStatus, setShareStatus] = useState('');
   const canReadGroups = canReadGroupsProp ?? envelope?.capabilities?.readGroups === true;
   const workerUrl = workerUrlProp || envelope?.workerUrl || '';
   const workerToken = workerTokenProp || envelope?.workerCredential?.token || '';
@@ -75,12 +78,27 @@ const WorkerGroupMembershipPanel = ({
       setJoiningGroupId('');
     }
   };
+  const copyGroupLink = async (groupId: string) => {
+    try {
+      if (typeof window === 'undefined' || !navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      const currentUrl = new URL(window.location.href);
+      const link = new URL(currentUrl.pathname, currentUrl.origin);
+      const canonicalWorkerUrl = new URL(workerUrl);
+      if (!['https:', 'http:'].includes(canonicalWorkerUrl.protocol)) throw new Error('Invalid Worker URL');
+      link.searchParams.set('worker', canonicalWorkerUrl.origin);
+      link.hash = `group-${encodeURIComponent(groupId)}`;
+      await navigator.clipboard.writeText(link.toString());
+      setShareStatus('Group link copied. It contains no invitation token or credential.');
+    } catch {
+      setShareStatus('Could not copy the group link. Copy the current session URL manually.');
+    }
+  };
 
   if (!canReadGroups) {
     return (
       <section className={styles.telegramListPanel} data-testid="ce-session-worker-groups">
-        <div className={styles.telegramListHeader}>Access groups</div>
-        <div className={styles.telegramListEmpty}>Access groups are not included in this credential.</div>
+        <div className={styles.telegramListHeader}>Groups</div>
+        <div className={styles.telegramListEmpty}>Groups are not included in this credential.</div>
       </section>
     );
   }
@@ -88,7 +106,7 @@ const WorkerGroupMembershipPanel = ({
   return (
     <section className={styles.telegramListPanel} data-testid="ce-session-worker-groups">
       <div className={styles.telegramListHeader}>
-        <span>Access groups</span>
+        <span>Groups</span>
         <button type="button" className={styles.telegramSecondaryButton} onClick={() => void reload()}>
           Refresh
         </button>
@@ -99,8 +117,13 @@ const WorkerGroupMembershipPanel = ({
       </p>
       {status === 'loading' ? <div className={styles.telegramListEmpty}>Loading access groups…</div> : null}
       {error ? <div className={styles.telegramListEmpty}>{error}</div> : null}
+      {shareStatus ? <div className={styles.telegramReportApprox}>{shareStatus}</div> : null}
       {overview.memberships.map((membership) => (
-        <article key={membership.group.groupId} className={styles.telegramPileFrame}>
+        <article
+          key={membership.group.groupId}
+          id={`group-${encodeURIComponent(membership.group.groupId)}`}
+          className={styles.telegramPileFrame}
+        >
           {membership.group.imageUrl ? (
             <img
               src={membership.group.imageUrl}
@@ -113,10 +136,25 @@ const WorkerGroupMembershipPanel = ({
           {membership.group.description ? <span>{membership.group.description}</span> : null}
           <span>Member</span>
           {typeof membership.memberCount === 'number' ? <span>{membership.memberCount} members</span> : null}
+          <button
+            type="button"
+            className={styles.telegramSecondaryButton}
+            onClick={() => void copyGroupLink(membership.group.groupId)}
+            aria-label={`Copy ${membership.group.label} group link`}
+          >
+            Copy group link
+          </button>
+          <span>
+            Leaving is not supported by the current Worker authority contract; ask an admin to remove membership.
+          </span>
         </article>
       ))}
       {availableGroups.map((group) => (
-        <article key={group.groupId} className={styles.telegramPileFrame}>
+        <article
+          key={group.groupId}
+          id={`group-${encodeURIComponent(group.groupId)}`}
+          className={styles.telegramPileFrame}
+        >
           {group.imageUrl ? (
             <img
               src={group.imageUrl}
@@ -138,12 +176,27 @@ const WorkerGroupMembershipPanel = ({
               {joiningGroupId === group.groupId ? 'Joining…' : 'Join'}
             </button>
           ) : (
-            <span>Admin invitation required</span>
+            <>
+              <span>Admin add required</span>
+              <span>
+                Share this group link, then ask a session admin to add{' '}
+                {participantAddress ? participantAddress : 'your passkey or wallet address'}. No invitation token is
+                created.
+              </span>
+            </>
           )}
+          <button
+            type="button"
+            className={styles.telegramSecondaryButton}
+            onClick={() => void copyGroupLink(group.groupId)}
+            aria-label={`Copy ${group.label} group link`}
+          >
+            Copy group link
+          </button>
         </article>
       ))}
       {status === 'ready' && !overview.memberships.length && !availableGroups.length ? (
-        <div className={styles.telegramListEmpty}>No visible access groups are configured.</div>
+        <div className={styles.telegramListEmpty}>No visible Groups are configured.</div>
       ) : null}
     </section>
   );

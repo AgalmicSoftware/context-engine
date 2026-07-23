@@ -15,6 +15,18 @@ const envelope: AgentClientLoginEnvelope = {
 };
 
 describe('WorkerGroupMembershipPanel', () => {
+  beforeEach(() => {
+    window.history.replaceState(
+      {},
+      '',
+      '/session/alpha?worker=https%3A%2F%2Fworker.example&inv=must-not-copy&agentToken=must-not-copy',
+    );
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+    });
+  });
+
   it('uses only the worker JWT, shows self-memberships, and joins visible open groups', async () => {
     let joined = false;
     const fetchImpl = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -60,6 +72,13 @@ describe('WorkerGroupMembershipPanel', () => {
               joinMode: 'open',
               memberVisibility: 'session',
             },
+            {
+              groupId: 'invited-reviewers',
+              label: 'Invited reviewers',
+              description: 'Admins add identities to this group.',
+              joinMode: 'admin_add',
+              memberVisibility: 'session',
+            },
           ],
         }),
         { status: 200, headers: { 'content-type': 'application/json' } },
@@ -74,6 +93,16 @@ describe('WorkerGroupMembershipPanel', () => {
       'https://ar-io.dev/open-reviewers-image',
     );
     expect(screen.getByText('3 members')).toBeInTheDocument();
+    expect(screen.getByText('Invited reviewers')).toBeInTheDocument();
+    expect(screen.getByText(/No invitation token is created/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Invited reviewers group link' }));
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1));
+    const copiedGroupLink = new URL(String((navigator.clipboard.writeText as jest.Mock).mock.calls[0][0]));
+    expect(copiedGroupLink.hash).toBe('#group-invited-reviewers');
+    expect(copiedGroupLink.searchParams.get('worker')).toBe('https://session-worker.example');
+    expect(copiedGroupLink.searchParams.has('inv')).toBe(false);
+    expect(copiedGroupLink.searchParams.has('agentToken')).toBe(false);
+    expect(screen.getByText(/contains no invitation token or credential/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Join Open reviewers' }));
 
     await waitFor(() => expect(screen.getByText('4 members')).toBeInTheDocument());
@@ -89,7 +118,7 @@ describe('WorkerGroupMembershipPanel', () => {
       />,
     );
 
-    expect(screen.getByText('Access groups are not included in this credential.')).toBeInTheDocument();
+    expect(screen.getByText('Groups are not included in this credential.')).toBeInTheDocument();
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
