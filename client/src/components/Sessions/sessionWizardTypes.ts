@@ -44,7 +44,6 @@ export type DraftState = UnknownRecord &
     rpc?: UnknownRecord;
     sponsored?: DraftSponsoredState;
     sessionModeProfile?: UnknownRecord;
-    groupCreationPolicy?: string;
     __registry?: UnknownRecord;
   };
 

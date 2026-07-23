@@ -90,10 +90,6 @@ const buildWorkerCanonicalLitProfile = () => {
   profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
   profile.encryption = { mode: 'lit' };
   profile.evm.registryChainId = 11155420;
-  profile.storage.payloadAccessControl = {
-    ...profile.storage.payloadAccessControl!,
-    encryption: 'lit',
-  };
   return profile;
 };
 
@@ -895,6 +891,112 @@ describe('useSessionWizardWorkerDeploy', () => {
     expect(deployPayload.faucet).toBeUndefined();
     expect(deployPayload.blockLimits).toBeUndefined();
     expect(JSON.stringify(deployPayload)).not.toMatch(/must-not-send/);
+    const proofInput = {
+      proof: deployResult.workerRequirementProof,
+      workerUrl: deployResult.workerUrl,
+      sessionSlug: 'two-key-session',
+      sessionId: '0x123e4567e89b12d3a456426614174000',
+      sessionModeProfile: options.refs.runtimeRef.current.draft?.sessionModeProfile,
+      sessionAi: options.refs.runtimeRef.current.draft?.ai,
+      workerSecrets: { openaiKey: 'sk-ai' },
+      workerSecretsEnabled: true,
+    };
+    expect(resolveSessionWizardWorkerRequirementReadiness(proofInput).verified).toBe(true);
+    expect(
+      resolveSessionWizardWorkerRequirementReadiness({
+        ...proofInput,
+        workerSecrets: { openaiKey: 'sk-ai-edited' },
+      }),
+    ).toEqual(expect.objectContaining({ verified: false, reason: 'secret-values-changed' }));
+    expect(
+      resolveSessionWizardWorkerRequirementReadiness({
+        ...proofInput,
+        sessionAi: {
+          models: {
+            fast: { provider: 'anthropic' },
+            thinking: { provider: 'anthropic' },
+            transcription: { provider: 'anthropic' },
+          },
+        },
+        workerSecrets: { anthropicKey: 'sk-ant-edited' },
+      }),
+    ).toEqual(expect.objectContaining({ verified: false, reason: 'requirements-changed' }));
+  });
+
+  it('blocks deployment when an explicit session mode profile is invalid', async () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+    const options = buildDeployHookOptions();
+    const invalidProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    invalidProfile.storage.backend = 'arweave';
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      draft: {
+        ...options.refs.runtimeRef.current.draft,
+        slug: 'invalid-profile-session',
+        sessionModeProfile: invalidProfile,
+      },
+    } as SessionWizardWorkerDeployRuntime;
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let deployResult: Record<string, unknown> = {};
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker();
+    });
+
+    expect(deployResult).toEqual({
+      ok: false,
+      error: 'Session mode configuration is invalid. Review the selected mode before deployment.',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('publishes verified worker state synchronously for the same forced auto-deploy attempt', async () => {
+    mockSuccessfulWorkerDeployFetch();
+    const options = buildDeployHookOptions();
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      registryAddress: '',
+      registryChainId: 0,
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      sessionIdHex: '0x123e4567e89b12d3a456426614174000',
+      draft: {
+        slug: 'same-attempt-session',
+        sessionName: 'Same Attempt Session',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+        ai: {
+          models: {
+            fast: { provider: 'openai', model: 'gpt-5' },
+            thinking: { provider: 'openai', model: 'gpt-5' },
+            transcription: { provider: 'openai', model: 'whisper-1' },
+          },
+        },
+      },
+      workerSecretsEnabled: true,
+    } as SessionWizardWorkerDeployRuntime;
+    options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'sk-ai' });
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let deployResult: Record<string, any> = {};
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker({ forceSponsoredAutoDeploy: true });
+    });
+
+    expect(options.refs.runtimeRef.current).toEqual(
+      expect.objectContaining({
+        workerMode: 'custom',
+        deployComplete: true,
+        deployWorkerUrl: 'https://deployed.example.test',
+        workerRequirementProof: deployResult.workerRequirementProof,
+        draft: expect.objectContaining({ corsWorkerUrl: 'https://deployed.example.test' }),
+      }),
+    );
+    expect(
+      resolveSessionWizardWorkerPublishEvidence({
+        runtime: options.refs.runtimeRef.current,
+        workerSecrets: { openaiKey: 'sk-ai' },
+      }),
+    ).toEqual(expect.objectContaining({ verified: true, workerUrl: 'https://deployed.example.test' }));
   });
 
   it('does not use stale hidden Lit credentials after switching to a selected non-Lit profile', async () => {

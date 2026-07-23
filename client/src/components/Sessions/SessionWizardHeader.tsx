@@ -32,6 +32,8 @@ type SessionWizardHeaderProps = {
   wizardMode?: string;
   sessionModeProfileControl?: React.ReactNode;
   sessionModeProfileLabel?: string;
+  sessionModeProfileSelectionStep?: boolean;
+  showNetworkSelector?: boolean;
 };
 
 const SessionWizardHeader = ({
@@ -46,6 +48,8 @@ const SessionWizardHeader = ({
   wizardMode = 'normal',
   sessionModeProfileControl = null,
   sessionModeProfileLabel = '',
+  sessionModeProfileSelectionStep = false,
+  showNetworkSelector = true,
 }: SessionWizardHeaderProps): React.ReactElement => {
   return (
     <header className={`${styles.header} ${sessionModeProfileSelectionStep ? styles.headerProfileSelectionStep : ''}`}>
@@ -87,23 +91,27 @@ const SessionWizardHeader = ({
                   <div className={styles.wizardSettingsLabel}>Display mode</div>
                   {wizardModeControls}
                 </div>
-              </div>
-            ) : (
-              wizardModeControls
-            )}
-            {wizardMode === 'advanced' && (
-              <div className={styles.headerChainSelector}>
-                <span className={styles.headerChainLabel}>Network:</span>
-                <Input
-                  type="select"
-                  value={registryChainId || ''}
-                  onChange={(event) => onRegistryChainIdChange(event.target.value)}
-                  className={styles.headerChainInput}
-                >
-                  {registryChainOptions.length ? (
-                    registryChainOptions.map((chain) => (
-                      <option key={chain.id} value={chain.id}>
-                        {chain.name} ({chain.id})
+              ) : (
+                wizardModeControls
+              )}
+              {wizardMode === 'advanced' && showNetworkSelector && (
+                <div className={styles.headerChainSelector}>
+                  <span className={styles.headerChainLabel}>Network:</span>
+                  <Input
+                    type="select"
+                    value={registryChainId || ''}
+                    onChange={(event) => onRegistryChainIdChange(event.target.value)}
+                    className={styles.headerChainInput}
+                  >
+                    {registryChainOptions.length ? (
+                      registryChainOptions.map((chain) => (
+                        <option key={chain.id} value={chain.id}>
+                          {chain.name} ({chain.id})
+                        </option>
+                      ))
+                    ) : (
+                      <option value={registryChainId || ''}>
+                        {registryChainName || registryChainId || 'Select a chain'}
                       </option>
                     ))
                   ) : (

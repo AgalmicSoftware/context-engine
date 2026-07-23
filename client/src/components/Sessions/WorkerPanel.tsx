@@ -95,6 +95,8 @@ export type WorkerPanelProps = {
   renderField: SessionWizardRenderField;
   workerUrlAutoFilled: boolean;
   sessionModeProfileWorkerControl?: React.ReactNode;
+  onNativeWorkerVerified?: (bootstrap: WorkerCanonicalSessionBootstrap) => void;
+  verifyNativeWorker?: WorkerDeploySectionProps['verifyNativeWorker'];
 };
 
 const WorkerPanel = ({
@@ -153,6 +155,8 @@ const WorkerPanel = ({
   renderField,
   workerUrlAutoFilled,
   sessionModeProfileWorkerControl = null,
+  onNativeWorkerVerified,
+  verifyNativeWorker,
 }: WorkerPanelProps) => {
   const translate = typeof t === 'function' ? t : (key: string) => key;
   const renderInfoTooltip =

@@ -474,6 +474,30 @@ describe('SessionWizard worker panel rendering', () => {
     expect(screen.queryByRole('button', { name: 'Reset to default' })).not.toBeInTheDocument();
   });
 
+  it('shows the Worker URL return field before a native Cloudflare deploy is verified', async () => {
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    const preset = screen.getByTestId('ce-new-preset-fast_cheap_cloudflare');
+    const originalConfirm = window.confirm;
+    window.confirm = jest.fn(() => true);
+    try {
+      fireEvent.click(preset);
+    } finally {
+      window.confirm = originalConfirm;
+    }
+    await waitFor(() => {
+      expect(preset).toHaveAttribute('aria-checked', 'true');
+    });
+
+    selectNormalModeCard('Worker');
+
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toBeInTheDocument();
+    expect(
+      screen.queryByText('Worker URL appears here after a successful custom worker deploy.'),
+    ).not.toBeInTheDocument();
+  });
+
   it('defaults advanced custom-worker deploys to the configured release bundle URL', async () => {
     const { WORKER_BUNDLE_URL } = require('../../variables/publicDeploymentConfig.js');
 

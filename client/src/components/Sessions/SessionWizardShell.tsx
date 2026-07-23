@@ -192,7 +192,6 @@ export type SessionWizardShellProps = {
   showWorkerUrlField: WorkerPanelProps['showWorkerUrlField'];
   showNetworkSelector?: boolean;
   showOnChainGateControls?: boolean;
-  sponsoredBundleKey?: IntroStatusRailProps['sponsoredBundleKey'];
   sponsoredBundleStatus: IntroStatusRailProps['sponsoredBundleStatus'];
   sponsoredManualBundleRetryMessage: PublishSectionProps['sponsoredManualBundleRetryMessage'];
   sponsoredPublishBundleFileInputRef: PublishSectionProps['bundleFileInputRef'];
@@ -362,7 +361,6 @@ const SessionWizardShell = ({
   showWorkerUrlField,
   showNetworkSelector = true,
   showOnChainGateControls = true,
-  sponsoredBundleKey,
   sponsoredBundleStatus,
   sponsoredManualBundleRetryMessage,
   sponsoredPublishBundleFileInputRef,
@@ -414,6 +412,7 @@ const SessionWizardShell = ({
       sessionModeProfileLabel={sessionModeProfileLabel}
       wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
       wizardMode={wizardMode}
+      showNetworkSelector={showNetworkSelector}
     />
   );
 
@@ -476,6 +475,8 @@ const SessionWizardShell = ({
             pendingSbtDrafts={pendingSbtDrafts}
             removePendingSbtDraft={removePendingSbtDraft}
             sessionModeProfilePrivacyControl={isNormalMode ? null : sessionModeProfilePrivacyControl}
+            isWorkerCanonical={isWorkerCanonical}
+            showOnChainGateControls={showOnChainGateControls}
           />
         )}
 
@@ -566,6 +567,8 @@ const SessionWizardShell = ({
             renderField={renderField}
             workerUrlAutoFilled={workerUrlAutoFilled}
             sessionModeProfileWorkerControl={isNormalMode ? null : sessionModeProfileWorkerControl}
+            onNativeWorkerVerified={onNativeWorkerVerified}
+            verifyNativeWorker={verifyNativeWorker}
           />
         )}
 
