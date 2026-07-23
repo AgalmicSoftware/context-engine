@@ -330,11 +330,18 @@ const SessionModeProfileSections = ({
                 The worker grants storage access to configured admins and agents granted the storage scope.
               </p>
             ) : (
-              <WorkerEnvelopeOptions
-                profile={profile}
-                registryChainId={registryChainId || null}
-                updateProfile={updateProfile}
-              />
+              <>
+                <div className={styles.modeValidationList} data-testid="ce-new-hybrid-requirements">
+                  Advanced hybrid access can add on-chain SBT checks. It requires an RPC URL; creating an SBT also
+                  requires a wallet and testnet gas. Lit encryption additionally requires a Lit credential and the
+                  Advanced manual bootstrap flow.
+                </div>
+                <WorkerEnvelopeOptions
+                  profile={profile}
+                  registryChainId={registryChainId || null}
+                  updateProfile={updateProfile}
+                />
+              </>
             )}
           </div>
         ) : null}
@@ -604,7 +611,7 @@ const WorkerEnvelopeOptions = ({
           onClick={() => addCondition('sbt_onchain')}
           data-testid="ce-new-envelope-add-sbt-onchain"
         >
-          Add SBT holders
+          Add SBT holders (Advanced hybrid)
         </Button>
         <Button
           type="button"

@@ -73,6 +73,7 @@ import {
   normalizeSessionWizardSlug as normalizeSlug,
   normalizeSessionWizardWorkerUrl as normalizeWorkerUrl,
 } from '../sessionWizardUrlSupport';
+import { verifyNativeSessionWorker } from '../sessionWizardNativeWorkerVerification';
 import type { AnyRecord, ChainIdLike, NetworkLike, WorkerSecretSyncResult, WorkerSecretsLike } from '../../shellTypes';
 type DeployFormLike = AnyRecord & {
   apiToken?: string;
@@ -120,7 +121,7 @@ export type SessionWizardWorkerDeployRuntime = {
   deployForm?: DeployFormLike | null;
 };
 
-type SessionWizardWorkerDeployStateUpdate = {
+export type SessionWizardWorkerDeployStateUpdate = {
   deployForm?: DeployFormLike;
   deployStatus?: string;
   deployInFlight?: boolean;
@@ -277,6 +278,9 @@ const useSessionWizardWorkerDeploy = ({
         }
         const configuredWorkerUrlBeforeDeploy = normalizeWorkerUrl(toStr(currentDraft.corsWorkerUrl).trim());
         const modeRequirements = resolveSessionWizardModeRequirements(currentDraft.sessionModeProfile);
+        if (currentDraft.sessionModeProfile != null && !modeRequirements.selected) {
+          throw new Error('Session mode configuration is invalid. Review the selected mode before deployment.');
+        }
         const workerConfigError = getSessionWizardWorkerDeployValidationError({
           registryAddress: runtime.registryAddress,
           registryChainId: runtime.registryChainId,
@@ -955,9 +959,38 @@ const useSessionWizardWorkerDeploy = ({
     ],
   );
 
+  const verifyNativeWorker = useCallback(
+    ({ sessionSlug, workerQueryValue }: { sessionSlug: string; workerQueryValue: unknown }) =>
+      verifyNativeSessionWorker({
+        runtimeRef,
+        sessionSlug,
+        workerQueryValue,
+        getCurrentWorkerSecrets,
+        getMissingWorkerSecretsForDeploy,
+        parseAllowOriginsInput,
+        resolveConnectedAdminAddress,
+        resolveWorkerFaucetConfig,
+        signTypedAdminAction,
+        updateDeploymentState,
+        updateDraftValue,
+      }),
+    [
+      getCurrentWorkerSecrets,
+      getMissingWorkerSecretsForDeploy,
+      parseAllowOriginsInput,
+      resolveConnectedAdminAddress,
+      resolveWorkerFaucetConfig,
+      runtimeRef,
+      signTypedAdminAction,
+      updateDeploymentState,
+      updateDraftValue,
+    ],
+  );
+
   return {
     handleDeployWorker,
     resolveConnectedAdminAddress,
+    verifyNativeWorker,
   };
 };
 

@@ -26,6 +26,8 @@ export type NormalModeCardsInput = {
   deployVerifiedInUi: boolean;
   canUseSponsoredAutoDeployNow: boolean;
   publishReadiness: Pick<SessionWizardPublishReadinessDescriptor, 'canPublishNow' | 'uploadBlockedReason'>;
+  isWorkerCanonical: boolean;
+  deployPendingSbts: boolean;
   t: NormalModeLabelFn;
 };
 
@@ -40,6 +42,8 @@ export type NormalModePublishSummaryInput = {
   workerMode: string;
   deployVerifiedInUi: boolean;
   pendingDraftCount: number;
+  isWorkerCanonical: boolean;
+  deployPendingSbts: boolean;
   t: NormalModeLabelFn;
 };
 
@@ -65,6 +69,8 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
     deployVerifiedInUi,
     canUseSponsoredAutoDeployNow,
     publishReadiness,
+    isWorkerCanonical,
+    deployPendingSbts,
     t,
   } = opts;
   const { canPublishNow, uploadBlockedReason } = publishReadiness;
@@ -82,11 +88,15 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
     ? [
         {
           key: 'worker',
-          title: 'Worker',
+          title: isWorkerCanonical ? 'Session Worker' : 'Worker',
           summary: normalModeRequiresCustomWorker
             ? resolvedWorkerBaseUrl
-              ? 'Your worker URL is configured.'
-              : 'Deploy or paste your own worker URL.'
+              ? isWorkerCanonical
+                ? 'Worker URL configured; verify canonical config and browser access.'
+                : 'Your worker URL is configured.'
+              : isWorkerCanonical
+                ? 'Complete the Cloudflare dashboard handoff, then verify the Worker URL.'
+                : 'Deploy or paste your own worker URL.'
             : workerMode === 'default'
               ? 'Using the shared default worker.'
               : deployVerifiedInUi
@@ -106,12 +116,15 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
     },
     {
       key: 'encryption',
-      title: 'Privacy',
-      summary: configuredPrivateGateCount
-        ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? `${t('sbt')} ${t('gate')}` : `${t('sbt')} ${t('gates')}`} selected`
-        : privateSlugMode
-          ? 'Private URL enabled'
-          : 'Open link by default',
+      title: isWorkerCanonical ? 'Session Access' : 'Privacy',
+      summary:
+        isWorkerCanonical && !deployPendingSbts
+          ? 'Passkey identity · Worker roles and Groups'
+          : configuredPrivateGateCount
+            ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? `${t('sbt')} ${t('gate')}` : `${t('sbt')} ${t('gates')}`} selected`
+            : privateSlugMode
+              ? 'Private URL enabled'
+              : 'Open link by default',
       tone: privacyTone,
     },
     ...workerCards,
@@ -119,9 +132,11 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
       key: 'publish',
       title: 'Deploy Session',
       summary: canPublishNow
-        ? canUseSponsoredAutoDeployNow
-          ? 'Publish will deploy the sponsored worker before uploading metadata.'
-          : 'Review the setup and deploy when ready.'
+        ? isWorkerCanonical
+          ? 'Deploy saves and verifies canonical config in the Session Worker.'
+          : canUseSponsoredAutoDeployNow
+            ? 'Publish will deploy the sponsored worker before uploading metadata.'
+            : 'Review the setup and deploy when ready.'
         : uploadBlockedReason,
       tone: publishTone,
     },
@@ -145,6 +160,8 @@ export function buildNormalModePublishSummary(opts: NormalModePublishSummaryInpu
     workerMode,
     deployVerifiedInUi,
     pendingDraftCount,
+    isWorkerCanonical,
+    deployPendingSbts,
     t,
   } = opts;
   const normalizedSessionName = normalizeDisplayString(sessionName);
@@ -155,32 +172,45 @@ export function buildNormalModePublishSummary(opts: NormalModePublishSummaryInpu
       value: normalizedSessionName || 'Add a session name',
     },
     {
-      label: 'Privacy',
+      label: isWorkerCanonical ? 'Session access' : 'Privacy',
       value: configuredPrivateGateCount
         ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? t('gate') : t('gates')} configured`
-        : privateSlugMode
-          ? 'Private URL mode'
-          : 'Open access',
+        : isWorkerCanonical
+          ? 'Passkey · Worker roles and Groups'
+          : privateSlugMode
+            ? 'Private URL mode'
+            : 'Open access',
     },
     {
       label: 'Worker',
-      value: canUseSponsoredAutoDeployNow
-        ? 'Sponsored auto-deploy on Publish'
-        : shouldUseSponsoredAutoDeployFlow
-          ? 'Sponsored auto-deploy waiting for the hosted bundle URL'
-          : normalModeRequiresCustomWorker
+      value:
+        isWorkerCanonical && deployVerifiedInUi
+          ? 'Canonical Worker config verified'
+          : isWorkerCanonical
             ? resolvedWorkerBaseUrl
-              ? 'Custom worker ready'
-              : 'Bring your own worker'
-            : workerMode === 'default'
-              ? 'Shared hosted worker'
-              : deployVerifiedInUi
-                ? 'Custom worker deployed'
-                : 'Custom worker setup',
+              ? 'Worker URL awaiting verification'
+              : 'Cloudflare dashboard handoff required'
+            : canUseSponsoredAutoDeployNow
+              ? 'Sponsored auto-deploy on Publish'
+              : shouldUseSponsoredAutoDeployFlow
+                ? 'Sponsored auto-deploy waiting for the hosted bundle URL'
+                : normalModeRequiresCustomWorker
+                  ? resolvedWorkerBaseUrl
+                    ? 'Custom worker ready'
+                    : 'Bring your own worker'
+                  : workerMode === 'default'
+                    ? 'Shared hosted worker'
+                    : deployVerifiedInUi
+                      ? 'Custom worker deployed'
+                      : 'Custom worker setup',
     },
-    {
-      label: `Pending ${t('sbts')}`,
-      value: pendingDraftCount ? `${pendingDraftCount} draft${pendingDraftCount === 1 ? '' : 's'} ready` : 'None',
-    },
+    ...(deployPendingSbts
+      ? [
+          {
+            label: `Pending ${t('sbts')}`,
+            value: pendingDraftCount ? `${pendingDraftCount} draft${pendingDraftCount === 1 ? '' : 's'} ready` : 'None',
+          },
+        ]
+      : []),
   ];
 }

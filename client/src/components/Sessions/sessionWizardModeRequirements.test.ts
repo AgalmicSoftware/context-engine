@@ -171,8 +171,30 @@ describe('sessionWizardModeRequirements', () => {
         requiredWorkerSecretFields: [],
         visibleWorkerResourceKeys: [],
         publishSettings: {
-          showArweaveMetadataControls: true,
-          showGasOverrideControls: true,
+          showArweaveMetadataControls: false,
+          showGasOverrideControls: false,
+        },
+      }),
+    );
+  });
+
+  it('fails closed when a malformed profile contains chain-shaped fields', () => {
+    const profile = cloudflareProfile();
+    profile.storage.backend = 'arweave';
+    profile.authorization.mechanisms.push('sbt_onchain');
+
+    expect(resolveSessionWizardModeRequirements(profile)).toEqual(
+      expect.objectContaining({
+        selected: false,
+        requiresArweave: false,
+        requiresRpc: false,
+        requiresFunding: false,
+        publish: {
+          deployPendingSbts: false,
+          persistWorkerConfig: false,
+          uploadMetadata: false,
+          registerSession: false,
+          refreshRegistryCache: false,
         },
       }),
     );

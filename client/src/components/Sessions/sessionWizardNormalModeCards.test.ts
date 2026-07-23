@@ -29,6 +29,8 @@ const baseCardsInput: NormalModeCardsInput = {
     canPublishNow: false,
     uploadBlockedReason: 'Upload is blocked.',
   },
+  isWorkerCanonical: false,
+  deployPendingSbts: true,
   t,
 };
 
@@ -43,6 +45,8 @@ const basePublishSummaryInput: NormalModePublishSummaryInput = {
   workerMode: 'default',
   deployVerifiedInUi: false,
   pendingDraftCount: 0,
+  isWorkerCanonical: false,
+  deployPendingSbts: true,
   t,
 };
 
@@ -102,6 +106,29 @@ describe('sessionWizardNormalModeCards', () => {
 
       expect(singleGateCard?.summary).toBe('1 SBT gate selected');
       expect(multipleGateCard?.summary).toBe('2 SBT gates selected');
+    });
+
+    it('uses Worker-native access and publish copy for a minimal worker-canonical session', () => {
+      const cards = buildNormalModeCards({
+        ...baseCardsInput,
+        isWorkerCanonical: true,
+        deployPendingSbts: false,
+        publishReadiness: {
+          ...baseCardsInput.publishReadiness,
+          canPublishNow: true,
+        },
+      });
+
+      expect(cards.find((card) => card.key === 'encryption')).toEqual(
+        expect.objectContaining({
+          title: 'Session Access',
+          summary: 'Passkey identity · Worker roles and Groups',
+        }),
+      );
+      expect(cards.find((card) => card.key === 'publish')?.summary).toBe(
+        'Deploy saves and verifies canonical config in the Session Worker.',
+      );
+      expect(cards.find((card) => card.key === 'worker')?.title).toBe('Session Worker');
     });
   });
 
@@ -185,6 +212,19 @@ describe('sessionWizardNormalModeCards', () => {
           deployVerifiedInUi: false,
         }).find((item) => item.label === 'Worker')?.value,
       ).toBe('Custom worker setup');
+    });
+
+    it('omits pending SBTs and uses verified Worker language for a minimal worker-canonical session', () => {
+      const summary = buildNormalModePublishSummary({
+        ...basePublishSummaryInput,
+        isWorkerCanonical: true,
+        deployPendingSbts: false,
+        deployVerifiedInUi: true,
+      });
+
+      expect(summary.find((item) => item.label === 'Pending SBTs')).toBeUndefined();
+      expect(summary.find((item) => item.label === 'Session access')?.value).toBe('Passkey · Worker roles and Groups');
+      expect(summary.find((item) => item.label === 'Worker')?.value).toBe('Canonical Worker config verified');
     });
   });
 });

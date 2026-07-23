@@ -1,4 +1,8 @@
-import type { SessionModeProfile, SessionModeResourceKey } from '../../utilities/session/sessionModeProfile';
+import {
+  validateSessionModeProfile,
+  type SessionModeProfile,
+  type SessionModeResourceKey,
+} from '../../utilities/session/sessionModeProfile';
 
 const SESSION_WIZARD_REQUIREMENT_IDS = Object.freeze({
   CLOUDFLARE_ACCOUNT: 'cloudflareAccount',
@@ -65,8 +69,8 @@ const emptyRequirements = (): SessionWizardModeRequirements => ({
     refreshRegistryCache: false,
   },
   publishSettings: {
-    showArweaveMetadataControls: true,
-    showGasOverrideControls: true,
+    showArweaveMetadataControls: false,
+    showGasOverrideControls: false,
   },
 });
 
@@ -87,7 +91,7 @@ export const resolveSessionWizardModeRequirements = (
   profile: SessionModeProfile | null | undefined,
   { hasPendingSbtDrafts = false }: ResolveSessionWizardModeRequirementsOptions = {},
 ): SessionWizardModeRequirements => {
-  if (!profile || typeof profile !== 'object') return emptyRequirements();
+  if (!profile || typeof profile !== 'object' || !validateSessionModeProfile(profile).valid) return emptyRequirements();
 
   const authorityMode = String(profile.authority?.mode || '');
   const isWorkerCanonical = authorityMode === 'worker_canonical';

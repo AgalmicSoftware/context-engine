@@ -36,6 +36,7 @@ type SessionWizardHeaderProps = {
   sessionModeProfileControl?: React.ReactNode;
   sessionModeProfileLabel?: string;
   sessionModeProfileSelectionStep?: boolean;
+  showNetworkSelector?: boolean;
 };
 
 const SessionWizardHeader = ({
@@ -56,6 +57,7 @@ const SessionWizardHeader = ({
   sessionModeProfileControl = null,
   sessionModeProfileLabel = '',
   sessionModeProfileSelectionStep = false,
+  showNetworkSelector = true,
 }: SessionWizardHeaderProps): React.ReactElement => {
   const wizardModeControls = (
     <div className={styles.wizardModeToggle} role="group" aria-label="Session wizard mode">
@@ -125,7 +127,7 @@ const SessionWizardHeader = ({
               ) : (
                 wizardModeControls
               )}
-              {wizardMode === 'advanced' && (
+              {wizardMode === 'advanced' && showNetworkSelector && (
                 <div className={styles.headerChainSelector}>
                   <span className={styles.headerChainLabel}>Network:</span>
                   <Input

@@ -89,6 +89,7 @@ const buildWorkerCanonicalLitProfile = () => {
   const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
   profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
   profile.encryption = { mode: 'lit' };
+  profile.evm.registryChainId = 11155420;
   return profile;
 };
 
@@ -137,6 +138,103 @@ describe('useSessionWizardWorkerDeploy', () => {
     const { result } = renderHook(() => useSessionWizardWorkerDeploy(buildHookOptions()));
 
     expect(typeof result.current.resolveConnectedAdminAddress).toBe('function');
+  });
+
+  it('initializes and verifies a native worker before marking it publish-ready', async () => {
+    const options = buildDeployHookOptions();
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      account: '0x00000000000000000000000000000000000000aa',
+      loginComplete: true,
+      workerMode: 'custom',
+      workerSecretsEnabled: true,
+      sessionId: '00000000-0000-0000-0000-000000000001',
+      sessionIdHex: '0x00000000000000000000000000000001',
+      draft: {
+        slug: 'native-session',
+        sessionName: 'Native Session',
+        sessionModeProfile,
+        ai: {
+          models: {
+            fast: { provider: 'openai', model: 'gpt-5' },
+            thinking: { provider: 'openai', model: 'gpt-5' },
+            transcription: { provider: 'openai', model: 'whisper-1' },
+          },
+        },
+      },
+    } as SessionWizardWorkerDeployRuntime;
+    options.getCurrentWorkerSecrets.mockReturnValue({ openaiKey: 'native-ai-secret' });
+    (options.parseAllowOriginsInput as jest.Mock).mockReturnValue(['https://contextengine.sh']);
+    options.signTypedAdminAction.mockResolvedValue({
+      address: '0x00000000000000000000000000000000000000aa',
+      signature: '0xsigned',
+    });
+    let persistedConfig: Record<string, unknown> | null = null;
+    const fetchMock = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/admin/set-config')) {
+        const body = JSON.parse(String(init?.body || '{}'));
+        persistedConfig = body.config;
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.endsWith('/admin/set-secrets')) {
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (url.includes('/session-config')) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            sessionSlug: 'native-session',
+            config: persistedConfig,
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        );
+      }
+      throw new Error(`Unexpected native verification request: ${url}`);
+    });
+    global.fetch = fetchMock;
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    let bootstrap;
+
+    await act(async () => {
+      bootstrap = await result.current.verifyNativeWorker({
+        sessionSlug: 'native-session',
+        workerQueryValue: 'https://native-session.example.test',
+      });
+    });
+
+    expect(bootstrap).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'native-session',
+        sessionId: '0x00000000000000000000000000000001',
+        workerOrigin: 'https://native-session.example.test',
+      }),
+    );
+    expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(false);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/session-config'))).toHaveLength(2);
+    const secretsCall = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/admin/set-secrets'));
+    expect(JSON.parse(String(secretsCall?.[1]?.body || '{}')).secrets).toEqual({
+      openaiKey: 'native-ai-secret',
+    });
+    expect(options.updateDeploymentState).toHaveBeenCalledWith(
+      expect.objectContaining({
+        deployComplete: true,
+        deployWorkerUrl: 'https://native-session.example.test',
+        workerRequirementProof: expect.objectContaining({ version: 1 }),
+      }),
+    );
+    expect(options.updateDraftValue).toHaveBeenCalledWith(['corsWorkerUrl'], 'https://native-session.example.test');
+    expect(JSON.stringify(fetchMock.mock.calls)).not.toContain('cf-token');
   });
 
   it('returns a cached account without querying the provider', async () => {
@@ -1281,6 +1379,34 @@ describe('useSessionWizardWorkerDeploy', () => {
         workerSecrets: { anthropicKey: 'sk-ant-edited' },
       }),
     ).toEqual(expect.objectContaining({ verified: false, reason: 'requirements-changed' }));
+  });
+
+  it('blocks deployment when an explicit session mode profile is invalid', async () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+    const options = buildDeployHookOptions();
+    const invalidProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    invalidProfile.storage.backend = 'arweave';
+    options.refs.runtimeRef.current = {
+      ...options.refs.runtimeRef.current,
+      draft: {
+        ...options.refs.runtimeRef.current.draft,
+        slug: 'invalid-profile-session',
+        sessionModeProfile: invalidProfile,
+      },
+    } as SessionWizardWorkerDeployRuntime;
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+
+    let deployResult: Record<string, unknown> = {};
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker();
+    });
+
+    expect(deployResult).toEqual({
+      ok: false,
+      error: 'Session mode configuration is invalid. Review the selected mode before deployment.',
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('publishes verified worker state synchronously for the same forced auto-deploy attempt', async () => {

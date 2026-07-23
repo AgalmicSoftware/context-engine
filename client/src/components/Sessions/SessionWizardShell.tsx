@@ -86,9 +86,11 @@ export type SessionWizardShellProps = {
   handleGateAddSbt: EncryptionPanelBoundaryProps['handleGateAddSbt'];
   handleGateRemoveSbt: EncryptionPanelBoundaryProps['handleGateRemoveSbt'];
   handleDeployWorker: WorkerPanelProps['handleDeployWorker'];
+  verifyNativeWorker?: WorkerPanelProps['verifyNativeWorker'];
   handleSavePendingSbtDraft: WizardModalsProps['handleSavePendingSbtDraft'];
   hasSponsoredBundleLink: HeaderProps['hasSponsoredBundleLink'];
   isNormalMode: boolean;
+  isWorkerCanonical?: boolean;
   jsonCopied: MetadataEditorProps['jsonCopied'];
   launchCreateSbtModal: EncryptionPanelBoundaryProps['launchCreateSbtModal'];
   localWorkerBundleFallbackFilePath: PublishSectionProps['localWorkerBundleFallbackFilePath'];
@@ -127,6 +129,7 @@ export type SessionWizardShellProps = {
   onManualMaxPriorityFeePerGasGweiChange: PublishSectionProps['onManualMaxPriorityFeePerGasGweiChange'];
   onManualMetadataUrlChange: PublishSectionProps['onManualMetadataUrlChange'];
   onNormalModeBundleUrlOverrideChange: PublishSectionProps['onNormalModeBundleUrlOverrideChange'];
+  onNativeWorkerVerified?: WorkerPanelProps['onNativeWorkerVerified'];
   onPublish: PublishSectionProps['onPublish'];
   onRegistryChainIdChange: HeaderProps['onRegistryChainIdChange'];
   onRetrySponsoredBundle: IntroStatusRailProps['onRetrySponsoredBundle'];
@@ -189,6 +192,8 @@ export type SessionWizardShellProps = {
   showSponsoredBundleFallbackInput: PublishSectionProps['showSponsoredBundleFallbackInput'];
   showSponsoredDeployAccessNotice: WorkerPanelProps['showSponsoredDeployAccessNotice'];
   showWorkerUrlField: WorkerPanelProps['showWorkerUrlField'];
+  showNetworkSelector?: boolean;
+  showOnChainGateControls?: boolean;
   sponsoredBundleStatus: IntroStatusRailProps['sponsoredBundleStatus'];
   sponsoredManualBundleRetryMessage: PublishSectionProps['sponsoredManualBundleRetryMessage'];
   sponsoredPublishBundleFileInputRef: PublishSectionProps['bundleFileInputRef'];
@@ -252,9 +257,11 @@ const SessionWizardShell = ({
   handleGateAddSbt,
   handleGateRemoveSbt,
   handleDeployWorker,
+  verifyNativeWorker,
   handleSavePendingSbtDraft,
   hasSponsoredBundleLink,
   isNormalMode,
+  isWorkerCanonical = false,
   jsonCopied,
   launchCreateSbtModal,
   localWorkerBundleFallbackFilePath,
@@ -293,6 +300,7 @@ const SessionWizardShell = ({
   onManualMaxPriorityFeePerGasGweiChange,
   onManualMetadataUrlChange,
   onNormalModeBundleUrlOverrideChange,
+  onNativeWorkerVerified,
   onPublish,
   onRegistryChainIdChange,
   onRetrySponsoredBundle,
@@ -355,6 +363,8 @@ const SessionWizardShell = ({
   showSponsoredBundleFallbackInput,
   showSponsoredDeployAccessNotice,
   showWorkerUrlField,
+  showNetworkSelector = true,
+  showOnChainGateControls = true,
   sponsoredBundleStatus,
   sponsoredManualBundleRetryMessage,
   sponsoredPublishBundleFileInputRef,
@@ -407,6 +417,7 @@ const SessionWizardShell = ({
       sessionModeProfileSelectionStep={showSessionModeProfileGate}
       wizardDisplaySettingsOpen={wizardDisplaySettingsOpen}
       wizardMode={wizardMode}
+      showNetworkSelector={showNetworkSelector}
     />
   );
 
@@ -465,6 +476,8 @@ const SessionWizardShell = ({
             pendingSbtDrafts={pendingSbtDrafts}
             removePendingSbtDraft={removePendingSbtDraft}
             sessionModeProfilePrivacyControl={isNormalMode ? null : sessionModeProfilePrivacyControl}
+            isWorkerCanonical={isWorkerCanonical}
+            showOnChainGateControls={showOnChainGateControls}
           />
         )}
 
@@ -555,6 +568,8 @@ const SessionWizardShell = ({
             renderField={renderField}
             workerUrlAutoFilled={workerUrlAutoFilled}
             sessionModeProfileWorkerControl={isNormalMode ? null : sessionModeProfileWorkerControl}
+            onNativeWorkerVerified={onNativeWorkerVerified}
+            verifyNativeWorker={verifyNativeWorker}
           />
         )}
 

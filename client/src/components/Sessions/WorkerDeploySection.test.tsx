@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import WorkerDeploySection, { type WorkerDeploySectionProps } from './WorkerDeploySection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
@@ -93,6 +93,84 @@ describe('WorkerDeploySection', () => {
 
     expect(screen.getByText(/Log in with the session admin passkey/i)).toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY)).not.toBeInTheDocument();
+  });
+
+  it('does not report success until Worker reachability, CORS, and canonical config readback verify', async () => {
+    const onNativeWorkerVerified = jest.fn();
+    const verifyNativeWorker = jest.fn().mockResolvedValue({
+      config: { slug: 'demo-sh' },
+      configRevision: 'revision-7',
+      sessionId: '0x11111111111111111111111111111111',
+      sessionSlug: 'demo-sh',
+      workerOrigin: 'https://demo-sh.example.workers.dev',
+    });
+    renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://demo-sh.example.workers.dev',
+      verifyNativeWorker,
+      onNativeWorkerVerified,
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-checklist')).toHaveTextContent(
+      /Return here and paste the resulting workers\.dev URL/i,
+    );
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).not.toHaveTextContent(/verified at revision/i);
+
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+
+    await waitFor(() =>
+      expect(onNativeWorkerVerified).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configRevision: 'revision-7',
+          workerOrigin: 'https://demo-sh.example.workers.dev',
+        }),
+      ),
+    );
+    expect(verifyNativeWorker).toHaveBeenCalledWith({
+      sessionSlug: 'demo-sh',
+      workerQueryValue: 'https://demo-sh.example.workers.dev',
+    });
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
+      /verified at revision revision-7/i,
+    );
+  });
+
+  it('fails closed when the signed session verification callback is unavailable', () => {
+    renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://demo-sh.example.workers.dev',
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
+      /Session verification is unavailable/i,
+    );
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).not.toHaveTextContent(/verified at revision/i);
+  });
+
+  it('keeps reachability or CORS failures actionable and retryable', async () => {
+    renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://demo-sh.example.workers.dev',
+      verifyNativeWorker: jest.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+
+    expect(await screen.findByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
+      /could not be reached, or its CORS policy rejected this browser origin/i,
+    );
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-verify')).toHaveTextContent('Verify Session Worker');
   });
 
   it('shows the sponsored auto-deploy note without manual controls in normal mode', () => {

@@ -6,12 +6,13 @@ import { faCaretDown, faCaretUp, faExternalLinkAlt } from '@fortawesome/free-sol
 import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import WorkerConnectionSection from './WorkerConnectionSection';
-import WorkerDeploySection from './WorkerDeploySection';
+import WorkerDeploySection, { type WorkerDeploySectionProps } from './WorkerDeploySection';
 import WorkerSecretsSection from './WorkerSecretsSection';
 import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
+import type { WorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 import type { SessionWizardRenderField } from './sessionWizardFieldDescriptors';
 
@@ -97,6 +98,8 @@ export type WorkerPanelProps = {
   renderField: SessionWizardRenderField;
   workerUrlAutoFilled: boolean;
   sessionModeProfileWorkerControl?: React.ReactNode;
+  onNativeWorkerVerified?: (bootstrap: WorkerCanonicalSessionBootstrap) => void;
+  verifyNativeWorker?: WorkerDeploySectionProps['verifyNativeWorker'];
 };
 
 const WorkerPanel = ({
@@ -159,6 +162,8 @@ const WorkerPanel = ({
   renderField,
   workerUrlAutoFilled,
   sessionModeProfileWorkerControl = null,
+  onNativeWorkerVerified,
+  verifyNativeWorker,
 }: WorkerPanelProps) => {
   const translate = typeof t === 'function' ? t : (key: string) => key;
   const renderInfoTooltip =
@@ -301,6 +306,9 @@ const WorkerPanel = ({
             setDeployForm={setDeployForm}
             handleDeployWorker={handleDeployWorker}
             deployStatusDisplayState={deployStatusDisplayState}
+            displayedWorkerUrl={displayedWorkerUrl}
+            onNativeWorkerVerified={onNativeWorkerVerified}
+            verifyNativeWorker={verifyNativeWorker}
           />
 
           <WorkerConnectionSection

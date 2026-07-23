@@ -3,7 +3,6 @@ import { useCallback, useContext, useEffect, useMemo, useReducer, useRef, useSta
 import { ethers } from 'ethers';
 import { ReactReduxContext } from 'react-redux';
 import styles from './SessionWizard.module.scss';
-import type { WorkerPanelProps } from './WorkerPanel';
 import { resolveLitChain, getGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { getEffectiveArweaveKey } from '../../utilities/session/resourceKeys.js';
 import {
@@ -222,7 +221,6 @@ import {
   normalizeSessionWizardGateIds as normalizeGateIds,
   resolveSessionWizardResourceGate as resolveResourceGate,
   resolveSessionWizardResourceGateSelectionUpdate,
-  type SessionWizardResourceGateSelectionState,
 } from './sessionWizardResourceGateSupport';
 import {
   buildSessionWizardCreateSbtModalLaunchState,
@@ -238,7 +236,21 @@ import { resolveSessionWizardFundingRequirement } from './sessionWizardFundingRe
 import { getSessionWizardOrderedDraftEntries, splitSessionWizardDraftEntries } from './sessionWizardFieldDescriptors';
 import { buildSessionWizardDraftFieldRenderer } from './sessionWizardDraftFieldRenderer';
 import { buildSessionWizardMetadataPayloadBuilder } from './sessionWizardMetadataPayloadBuilder';
-import type { ChainIdLike, NetworkLike, SessionContractsLike, WorkerSecretsLike } from '../shellTypes';
+import type { WorkerSecretsLike } from '../shellTypes';
+import type {
+  ContractViewerModalState,
+  CreateSbtModalState,
+  DeployFormState,
+  DraftAiModelsState,
+  DraftAiState,
+  DraftState,
+  GateSelectionsState,
+  ProvisionedSponsoredContextState,
+  ResourceGateMapState,
+  SessionRegistryReadContract,
+  SessionSlugExistsArgs,
+  SessionWizardProps,
+} from './sessionWizardTypes';
 
 export {
   LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH,
@@ -298,101 +310,7 @@ export {
   resolveSessionWizardWorkerRpcUrl,
 } from './sessionWizardWorkerRpc';
 
-type DeployFormState = NonNullable<WorkerPanelProps['deployForm']> & {
-  bundleUrl?: string;
-};
-
-type ResourceGateMapState = Record<string, SessionWizardResourceGateSelectionState>;
-
-type GateSelectionState = UnknownRecord & {
-  sbts?: unknown[];
-  mode?: string;
-  chainId?: ChainIdLike | null;
-  perMemberLimit?: unknown;
-};
-
-type GateSelectionsState = Record<string, GateSelectionState>;
-
-type DraftState = UnknownRecord &
-  NonNullable<WorkerPanelProps['draft']> & {
-    sessionName?: string;
-    sessionInfo?: string;
-    sessionHeader?: string;
-    sessionHeaderImg?: string;
-    slug?: string;
-    corsWorkerUrl?: string;
-    networkChainId?: string | number;
-    blockLimits?: UnknownRecord;
-    contracts?: SessionContractsLike;
-    defaultFeaturedSBTs?: unknown;
-    embeddedDeployHelperEnabled?: boolean;
-    featuredSBTs?: UnknownRecord[];
-    faucet?: UnknownRecord;
-    ai?: UnknownRecord;
-    arweave?: UnknownRecord;
-    lit?: UnknownRecord;
-    rpc?: UnknownRecord;
-    sponsored?: DraftSponsoredState;
-    sessionModeProfile?: UnknownRecord;
-    __registry?: UnknownRecord;
-  };
-
-type DraftAiModelsState = Record<string, UnknownRecord>;
-type DraftAiState = UnknownRecord & {
-  models?: DraftAiModelsState;
-};
-type DraftSponsoredState = UnknownRecord & {
-  defaultGateId?: unknown;
-  gates?: Record<string, UnknownRecord>;
-};
-
-type SessionWizardProps = {
-  account?: string;
-  provider?: UnknownRecord | null;
-  network?: NetworkLike;
-  activeSessionSlug?: string;
-  ensureLightSbtUniverse?: (() => unknown) | null;
-  sbtCacheRevision?: unknown;
-  toggleLoginModal?: ((open?: boolean) => void) | null;
-  loginComplete?: boolean;
-  loginInProgress?: boolean;
-  initialSessionId?: string | number | null;
-  initialRegistryChainId?: ChainIdLike;
-  initialSponsoredBundleId?: string | null;
-  initialSponsoredBundleKey?: string | null;
-  [key: string]: unknown;
-};
-
-type CreateSbtModalState = {
-  open: boolean;
-  targetType: string;
-  gateId: string;
-  sessionSlug: string;
-  arweaveJwkOverride: string;
-};
-
-type ContractViewerModalState = {
-  open: boolean;
-  contractKey: string;
-};
-
-type SessionSlugExistsArgs = {
-  registryChainId?: ChainIdLike;
-  slug: string;
-};
-
-type SessionRegistryReadContract = {
-  sessionExists?: (slug: string) => Promise<boolean> | boolean;
-  sessionIdExists?: (sessionIdHex: string) => Promise<boolean> | boolean;
-};
-
 const ignoreSessionPublishStep = (_publishStep: number): void => {};
-
-type ProvisionedSponsoredContextState = UnknownRecord & {
-  sessionSlug: string;
-  workerUrl: string;
-  fields: UnknownRecord;
-};
 
 const log = createLogger('general');
 const DEFAULT_TEMPLATE: DraftState = SESSION_WIZARD_DEFAULT_TEMPLATE as DraftState;
@@ -2362,7 +2280,7 @@ const SessionWizard = ({
     deployForm,
   };
 
-  const { handleDeployWorker, resolveConnectedAdminAddress } = useSessionWizardWorkerDeploy({
+  const { handleDeployWorker, resolveConnectedAdminAddress, verifyNativeWorker } = useSessionWizardWorkerDeploy({
     refs: {
       runtimeRef: workerDeployRuntimeRef,
       resolvedWalletAccountRef,
@@ -2542,7 +2460,7 @@ const SessionWizard = ({
     ? ''
     : toStr(draft.corsWorkerUrl).trim() || visibleConfiguredWorkerUrl;
   const showSharedWorkerChoice = !normalModeRequiresCustomWorker;
-  const showWorkerUrlField = customWorkerSelected && deployVerifiedInUi;
+  const showWorkerUrlField = customWorkerSelected && (deployVerifiedInUi || sessionModeRequirements.isWorkerCanonical);
   const { deployWorkerMatchesConfiguredUrl, usesDefaultWorkerUrl, workerUrlSource } =
     resolveSessionWizardWorkerUrlSourceState({
       defaultWorkerUrl,
@@ -2696,6 +2614,8 @@ const SessionWizard = ({
     deployVerifiedInUi,
     canUseSponsoredAutoDeployNow,
     publishReadiness: publishUiPlan.publishReadiness,
+    isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
+    deployPendingSbts: sessionModeRequirements.publish.deployPendingSbts,
     t,
   });
   const activeNormalModeIndex = normalModeCards.findIndex((card) => collapsedSections[card.key] === false);
@@ -2710,6 +2630,8 @@ const SessionWizard = ({
     workerMode,
     deployVerifiedInUi,
     pendingDraftCount,
+    isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
+    deployPendingSbts: sessionModeRequirements.publish.deployPendingSbts,
     t,
   });
   useSessionWizardNormalModeSectionVisibility({
@@ -2833,11 +2755,13 @@ const SessionWizard = ({
       getSessionWizardDefaultWorkerUrl={getSessionWizardDefaultWorkerUrl}
       handleCopyAdminUrl={handleCopyAdminUrl}
       handleDeployWorker={handleDeployWorker}
+      verifyNativeWorker={verifyNativeWorker}
       handleGateAddSbt={handleGateAddSbt}
       handleGateRemoveSbt={handleGateRemoveSbt}
       handleSavePendingSbtDraft={handleSavePendingSbtDraft}
       hasSponsoredBundleLink={hasSponsoredBundleLink}
       isNormalMode={isNormalMode}
+      isWorkerCanonical={sessionModeRequirements.isWorkerCanonical}
       jsonCopied={jsonCopied}
       launchCreateSbtModal={launchCreateSbtModal}
       localWorkerBundleFallbackFilePath={LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH}
@@ -2937,6 +2861,10 @@ const SessionWizard = ({
       showSponsoredBundleFallbackInput={showSponsoredBundleFallbackInput}
       showSponsoredDeployAccessNotice={showSponsoredDeployAccessNotice}
       showWorkerUrlField={showWorkerUrlField}
+      showNetworkSelector={sessionModeRequirements.requiresRpc}
+      showOnChainGateControls={
+        sessionModeRequirements.publish.deployPendingSbts || sessionModeRequirements.publish.registerSession
+      }
       signBootstrapAdminAction={signBootstrapAdminAction}
       sponsoredBundleStatus={sponsoredBundleStatus}
       sponsoredManualBundleRetryMessage={SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE}
