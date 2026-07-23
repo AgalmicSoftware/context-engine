@@ -37,6 +37,8 @@ describe('workerCanonicalRouteController', () => {
     expect(controller.hasVerifiedRoute(bootstrap.sessionSlug, bootstrap.workerOrigin)).toBe(true);
     expect(controller.hasVerifiedRoute(bootstrap.sessionSlug, 'https://other.example.com')).toBe(false);
     expect(readState().sessionPathResolutionNonce).toBe(1);
+    expect(controller.isSessionSlug('worker-session')).toBe(true);
+    expect(controller.isSessionSlug('other-session')).toBe(false);
   });
 
   it('returns one stable controller per AppShell host', () => {

@@ -64,6 +64,7 @@ import {
   ensureIdentifierHash,
   filterChangedResponsesForSubmit,
   normalizeSubmitReceipt,
+  resolveSurveySubmitSessionTarget,
 } from './surveyToolSubmitTransactionController';
 import {
   applyQuestionDecryptCompletionStatus as applyQuestionDecryptCompletionStatusHelper,
@@ -1435,6 +1436,7 @@ export const SurveyQuestions = (props: SurveyQuestionsProps): React.ReactElement
     normalizeSingleQuestionMetadataForCache,
     normalizeSingleQuestionViewedResponseHelper,
     normalizeSubmitReceipt,
+    resolveSurveySubmitSessionTarget,
     normalizeSurveyToolFilterState,
     normalizeTransientSubmitFeedbackDurationMs,
     notify,

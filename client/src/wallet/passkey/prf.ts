@@ -24,13 +24,16 @@ export const buildPrfExtension = (salt: ArrayBuffer | Uint8Array): Record<string
   },
 });
 
-export const getCredentialPrfOutput = (credential: PublicKeyCredential): ArrayBuffer => {
+export const getOptionalCredentialPrfOutput = (credential: PublicKeyCredential): ArrayBuffer | null => {
   const results = credential.getClientExtensionResults?.() as PrfResults | undefined;
   const first = results?.prf?.results?.first;
-  if (!isArrayBufferLike(first) || first.byteLength === 0) {
-    throw new Error('WebAuthn PRF is required for the embedded wallet on this browser/authenticator.');
-  }
-  return first;
+  return isArrayBufferLike(first) && first.byteLength > 0 ? first : null;
+};
+
+export const getCredentialPrfOutput = (credential: PublicKeyCredential): ArrayBuffer => {
+  const first = getOptionalCredentialPrfOutput(credential);
+  if (first) return first;
+  throw new Error('WebAuthn PRF is required for the embedded wallet on this browser/authenticator.');
 };
 
 export const getCredentialPrfEnabled = (credential: PublicKeyCredential): boolean => {

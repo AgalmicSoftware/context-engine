@@ -262,6 +262,40 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
+  it('uses a stable worker cache scope for chainless worker-canonical sessions', () => {
+    const resolveBySlug = makeResolveBySlug((slug) =>
+      slug === 'demo-sh'
+        ? {
+            slug,
+            sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          }
+        : null,
+    );
+
+    const hydration = resolveSurveyToolResponseHydrationContext({
+      sessionSlug: 'demo-sh',
+      network: { id: 84532 },
+      resolveBySlug,
+    });
+    const submitted = resolveSurveyToolSubmittedCacheWriteContext({
+      sessionSlug: 'demo-sh',
+      resolveBySlug,
+    });
+
+    expect(hydration).toMatchObject({
+      sessionSlug: 'demo-sh',
+      networkId: null,
+      networkIdStr: 'worker',
+      networkSourceSlug: 'demo-sh',
+    });
+    expect(submitted).toMatchObject({
+      sessionSlug: 'demo-sh',
+      networkId: null,
+      networkIdStr: 'worker',
+      networkSourceSlug: 'demo-sh',
+    });
+  });
+
   it('keeps unresolved question-bootstrap slugs off bootstrap network scope unless props provide the chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 

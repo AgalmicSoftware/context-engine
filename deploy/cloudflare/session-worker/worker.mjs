@@ -68368,6 +68368,7 @@ var handleCloudflareUpload = async ({ env, config, slug, uploaderAddress, authSc
     uploadPolicy: payload.uploadPolicy?.mode ? payload.uploadPolicy : void 0,
     size: bytesToStore?.length || 0,
     createdAt,
+    ...resource === "responses" && trim6(uploaderAddress) ? { responder: trim6(uploaderAddress).toLowerCase() } : {},
     payloadAccessMode: payloadAccess.mode,
     payloadAccessControl: {
       gate: payloadAccess.gate,
@@ -68686,6 +68687,7 @@ var handleCloudflareList = async ({ request, env, config, slug, uploaderAddress,
         tags: normalizeTagsForMetadata(metadata?.tags),
         size: Number(metadata?.size || 0) || 0,
         createdAt: trim6(metadata?.createdAt),
+        ...storageRef.resource === "responses" && trim6(metadata?.responder) ? { responder: trim6(metadata.responder).toLowerCase() } : {},
         payloadAccessControl: {
           gate: metadataAccess.gate,
           encryption: metadataAccess.encryption

@@ -2023,7 +2023,7 @@ describe('AppShell route render smoke', () => {
     subject.componentWillUnmount();
   });
 
-  it('preloads the primary demo session data when the about page mounts', async () => {
+  it('preloads primary demo metadata without fetching responses when the about page mounts', async () => {
     const demoConfig = buildSessionConfig({
       slug: 'demo-sh',
       sessionName: 'Demo Session',
@@ -2071,7 +2071,7 @@ describe('AppShell route render smoke', () => {
 
     expect(subject.getDisplaySessionNetwork).toHaveBeenCalledWith('demo-sh');
     expect(subject.initializeQuestionCacheForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
-    expect(subject.fetchQuestionResponsesChunkedForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
+    expect(subject.fetchQuestionResponsesChunkedForGroup).not.toHaveBeenCalled();
     expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
     expect(subject.initializeSbtCacheForGroup).toHaveBeenCalledWith('demo-sh', {
       mode: 'partial',

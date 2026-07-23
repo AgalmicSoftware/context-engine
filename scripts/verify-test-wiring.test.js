@@ -43,6 +43,15 @@ test('agent bridge tests are reachable through root CI and the workers job', () 
   assert.match(workflow, /run: npm run ci:gate -- workers/);
 });
 
+test('E2E preview readiness retries stay quiet but the final probe remains diagnostic', () => {
+  const rootDir = path.resolve(__dirname, '..');
+  const workflow = fs.readFileSync(path.join(rootDir, '.github/workflows/ci.yml'), 'utf8');
+
+  assert.match(workflow, /if curl -fs "\$BASE_URL" >\/dev\/null; then/);
+  assert.doesNotMatch(workflow, /if curl -fsS "\$BASE_URL" >\/dev\/null; then/);
+  assert.match(workflow, /curl -fsS "\$BASE_URL" >\/dev\/null\s+npm run ci:gate -- e2e-smoke/);
+});
+
 test('agent bridge runner skips cleanly when a public artifact omits the worker', () => {
   const { runAgentBridgeWorkerTests } = require('./run-agent-bridge-worker-tests');
 

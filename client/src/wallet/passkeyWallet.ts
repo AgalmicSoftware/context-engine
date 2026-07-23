@@ -18,7 +18,7 @@ import { getReadProviderForChain } from '../utilities/web3/rpcProviders.js';
 import { createPasskeyCredential } from './passkey/createCredential.js';
 import { authenticatePasskeyCredential } from './passkey/authenticateCredential.js';
 import { bufferToBase64URL, base64URLToBuffer, randomBase64Url } from './passkey/encoding.js';
-import { deriveAesGcmKeyFromPrf } from './passkey/prf.js';
+import { deriveAesGcmKeyFromPrf, getOptionalCredentialPrfOutput } from './passkey/prf.js';
 import { createRandomEoaPrivateKey, getAddressForPrivateKey } from './keystore/createWallet.js';
 import { decryptPrivateKey } from './keystore/decryptPrivateKey.js';
 import {
@@ -144,6 +144,30 @@ const isEncryptedWalletRecord = (record: PasskeyWalletRecord): record is Encrypt
 const isPasskeyDerivedWalletRecord = (record: PasskeyWalletRecord): record is PasskeyDerivedWalletRecord =>
   record.keyMode === 'passkey-derived';
 
+const resolveCreatedCredentialPrfOutput = async ({
+  config,
+  credential,
+  credentialId,
+  credentials,
+  salt,
+}: {
+  config: PasskeyWalletConfig;
+  credential: PublicKeyCredential;
+  credentialId: string;
+  credentials?: PasskeyCredentialClient;
+  salt: Uint8Array;
+}): Promise<ArrayBuffer> => {
+  const registrationOutput = getOptionalCredentialPrfOutput(credential);
+  if (registrationOutput) return registrationOutput;
+  const assertion = await authenticatePasskeyCredential({
+    config,
+    credentialId,
+    salt,
+    credentials,
+  });
+  return assertion.prfOutput;
+};
+
 export class PasskeyEoaWalletClient {
   private readonly config: PasskeyWalletConfig;
   private readonly storage: PasskeyWalletStorage;
@@ -208,8 +232,9 @@ export class PasskeyEoaWalletClient {
           credentials: this.credentials,
         });
         const credentialId = bufferToBase64URL(credential.rawId);
-        const { prfOutput } = await authenticatePasskeyCredential({
+        const prfOutput = await resolveCreatedCredentialPrfOutput({
           config: this.config,
+          credential,
           credentialId,
           salt: saltBytes,
           credentials: this.credentials,
@@ -235,8 +260,9 @@ export class PasskeyEoaWalletClient {
         credentials: this.credentials,
       });
       const credentialId = bufferToBase64URL(credential.rawId);
-      const { prfOutput } = await authenticatePasskeyCredential({
+      const prfOutput = await resolveCreatedCredentialPrfOutput({
         config: this.config,
+        credential,
         credentialId,
         salt: saltBytes,
         credentials: this.credentials,

@@ -416,6 +416,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     normalizeSingleQuestionMetadataForCache,
     normalizeSingleQuestionViewedResponseHelper,
     normalizeSubmitReceipt,
+    resolveSurveySubmitSessionTarget,
     normalizeSurveyToolFilterState,
     normalizeTransientSubmitFeedbackDurationMs,
     notify,
@@ -2627,13 +2628,21 @@ export const createSurveyQuestionsRuntimeMethods = (
     const hashedSurveyId: SurveyQuestionsLegacyValue = ensureIdentifierHash(surveyId, hashDeps);
 
     // Submit tx (must actually send or we throw)
+    const submissionSessionConfig: SurveyQuestionsLegacyValue = resolveEffectiveResponseGateConfig(
+      submissionGroupKey,
+      context.props,
+    );
+    const submissionTarget: SurveyQuestionsLegacyValue = resolveSurveySubmitSessionTarget({
+      sessionSlug: submissionGroupKey,
+      sessionConfig: submissionSessionConfig,
+    });
     const tx: SurveyQuestionsLegacyValue = await surveyResponseSubmitPort.submitResponses(
       context.provider,
       hashedQuestionIds,
       questionResponses,
       hashedSurveyId,
       surveyResponse,
-      submissionGroupKey,
+      submissionTarget,
     );
 
     return normalizeSubmitReceipt(tx, {

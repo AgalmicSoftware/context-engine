@@ -34,15 +34,34 @@ const derivedConfig: PasskeyWalletConfig = {
   walletKeyMode: 'passkey-derived',
 };
 
-const makeCredential = ({ prf = true, prfOutput = PRF_OUTPUT } = {}) =>
+const makeCredential = ({
+  prf = true,
+  prfOutput = PRF_OUTPUT,
+}: { prf?: boolean; prfOutput?: ArrayBuffer | null } = {}) =>
   ({
     rawId: RAW_ID.buffer,
-    getClientExtensionResults: () => (prf ? { prf: { enabled: true, results: { first: prfOutput.slice(0) } } } : {}),
+    getClientExtensionResults: () =>
+      prf
+        ? {
+            prf: {
+              enabled: true,
+              ...(prfOutput ? { results: { first: prfOutput.slice(0) } } : {}),
+            },
+          }
+        : {},
   }) as unknown as PublicKeyCredential;
 
-const makeCredentials = ({ prf = true } = {}): PasskeyCredentialClient => ({
-  create: jest.fn(async () => makeCredential({ prf })),
-  get: jest.fn(async () => makeCredential({ prf })),
+const makeCredentials = ({
+  prf = true,
+  createPrfOutput = PRF_OUTPUT,
+  getPrfOutput = PRF_OUTPUT,
+}: {
+  prf?: boolean;
+  createPrfOutput?: ArrayBuffer | null;
+  getPrfOutput?: ArrayBuffer | null;
+} = {}): PasskeyCredentialClient => ({
+  create: jest.fn(async () => makeCredential({ prf, prfOutput: createPrfOutput })),
+  get: jest.fn(async () => makeCredential({ prf, prfOutput: getPrfOutput })),
 });
 
 const makeSessionClient = () => {
@@ -82,6 +101,40 @@ describe('PasskeyEoaWalletClient', () => {
   afterEach(() => {
     delete (globalThis as any).PublicKeyCredential;
     jest.useRealTimers();
+  });
+
+  it.each([
+    ['encrypted private-key', config],
+    ['passkey-derived', derivedConfig],
+  ])('uses registration PRF output without a follow-up sign-in for %s creation', async (_label, walletConfig) => {
+    const credentials = makeCredentials();
+    const client = new PasskeyEoaWalletClient({
+      config: walletConfig,
+      storage: createMemoryWalletStorage(),
+      credentials,
+      sessionClient: makeSessionClient(),
+      privateKeyFactory: () => PRIVATE_KEY,
+    });
+
+    await client.createWallet();
+
+    expect(credentials.create).toHaveBeenCalledTimes(1);
+    expect(credentials.get).not.toHaveBeenCalled();
+  });
+
+  it('falls back to one assertion when registration reports PRF support without returning output', async () => {
+    const credentials = makeCredentials({ createPrfOutput: null });
+    const client = new PasskeyEoaWalletClient({
+      config: derivedConfig,
+      storage: createMemoryWalletStorage(),
+      credentials,
+      sessionClient: makeSessionClient(),
+    });
+
+    await client.createWallet();
+
+    expect(credentials.create).toHaveBeenCalledTimes(1);
+    expect(credentials.get).toHaveBeenCalledTimes(1);
   });
 
   it('creates an encrypted EOA record without persisting plaintext private keys', async () => {
@@ -296,7 +349,7 @@ describe('PasskeyEoaWalletClient', () => {
 
     await expect(client.sendTransaction({ to: address, value: '0x0' })).resolves.toMatch(/^0x33/);
 
-    expect(credentials.get).toHaveBeenCalledTimes(2);
+    expect(credentials.get).toHaveBeenCalledTimes(1);
     expect(sessionClient.calls).toHaveLength(2);
     expect(requestSpy).toHaveBeenCalledTimes(2);
     expect(sessionClient.locked).toBe(false);

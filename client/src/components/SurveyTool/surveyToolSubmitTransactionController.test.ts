@@ -2,6 +2,7 @@ import {
   ensureIdentifierHash,
   filterChangedResponsesForSubmit,
   normalizeSubmitReceipt,
+  resolveSurveySubmitSessionTarget,
 } from './surveyToolSubmitTransactionController';
 
 const HASH_ZERO = `0x${'0'.repeat(64)}`;
@@ -33,6 +34,25 @@ const makeSubmitOpts = (overrides: Partial<NormalizeSubmitOptions> = {}): Normal
 });
 
 describe('surveyToolSubmitTransactionController', () => {
+  describe('resolveSurveySubmitSessionTarget', () => {
+    it('passes the authoritative config to worker-canonical submission instead of losing it behind a slug', () => {
+      const sessionConfig = {
+        slug: 'demo-sh',
+        corsWorkerUrl: 'https://worker.example',
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        storageProfile: { backend: 'cloudflare' },
+      };
+
+      expect(
+        resolveSurveySubmitSessionTarget({
+          sessionSlug: 'demo-sh',
+          sessionConfig,
+        }),
+      ).toEqual(sessionConfig);
+      expect(resolveSurveySubmitSessionTarget({ sessionSlug: 'legacy', sessionConfig: {} })).toBe('legacy');
+    });
+  });
+
   describe('filterChangedResponsesForSubmit', () => {
     it('single question mode returns single-element arrays with HashZero surveyId', () => {
       const data = {
@@ -337,6 +357,25 @@ describe('surveyToolSubmitTransactionController', () => {
         expect.objectContaining({
           hash: TX_HASH,
           from: '0x123',
+        }),
+      );
+    });
+
+    it('accepts a durable worker-canonical storage submission without an on-chain transaction', async () => {
+      const storageRef = { backend: 'cloudflare', id: 'opaque-response-id', resource: 'responses' };
+      const result = await normalizeSubmitReceipt(
+        {
+          workerCanonicalSubmission: true,
+          storageRefs: [storageRef],
+        },
+        makeSubmitOpts(),
+      );
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          workerCanonicalSubmission: true,
+          storageRefs: [storageRef],
+          __ceSubmissionGroupKey: 'group-1',
         }),
       );
     });

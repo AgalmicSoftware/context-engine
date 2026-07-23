@@ -4,6 +4,8 @@ export type LoginPasskeyNetwork = Record<string, unknown> & {
   name?: unknown;
 };
 
+export type PasskeyWalletActionMode = '' | 'create' | 'sign-in';
+
 export type LoginPasskeyWalletPort = {
   createPasskeyWallet: () => Promise<unknown>;
   getPasskeyWalletChain?: () => unknown;
@@ -24,6 +26,7 @@ export type LoginPasskeyActionsDeps = {
   normalizeAccountForComparison: (account: unknown) => string;
   notifyInfo: (message: string) => void;
   passkeyWallet: LoginPasskeyWalletPort;
+  setActionMode: (mode: PasskeyWalletActionMode) => void;
   setStatus: (patch: { passkeyWalletStatusMessage: string; passkeyWalletStatusTone: string }) => void;
   startAction: () => number;
   updateLoginInfo: (payload: { loginComplete: boolean; loginInProgress: boolean; provider: string | null }) => void;
@@ -89,9 +92,10 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
     mode,
   }: {
     action: () => Promise<unknown>;
-    mode: 'create' | 'sign-in';
+    mode: Exclude<PasskeyWalletActionMode, ''>;
   }): Promise<void> => {
     const passkeyActionId = deps.startAction();
+    deps.setActionMode(mode);
     deps.setStatus({
       passkeyWalletStatusMessage: '',
       passkeyWalletStatusTone: '',
@@ -107,6 +111,7 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
       const address = await action();
       if (!deps.isCurrentAction(passkeyActionId)) return;
       _finalizePasskeyWalletLogin(address, passkeyNetwork);
+      deps.setActionMode('');
     } catch (error) {
       deps.accountLogError(mode === 'create' ? 'Passkey wallet create error:' : 'Passkey wallet sign-in error:', error);
       if (!deps.isCurrentAction(passkeyActionId)) return;
@@ -120,6 +125,7 @@ export const createLoginPasskeyActions = (deps: LoginPasskeyActionsDeps): LoginP
         passkeyWalletStatusMessage: message,
         passkeyWalletStatusTone: 'error',
       });
+      deps.setActionMode('');
       deps.updateLoginInfo({ loginInProgress: false, loginComplete: false, provider: null });
     }
   };

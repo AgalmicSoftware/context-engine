@@ -177,6 +177,8 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     jest.clearAllMocks();
     mockedRefreshSessionRegistryFieldsCache.mockResolvedValue(null);
     mockedReadWorkerResourcePresence.mockResolvedValue(null);
+    mockedGetSessionConfigBySlugOrDefault.mockReturnValue({});
+    mockedGetDemoSessionConfigBySlug.mockReturnValue(null);
     localStorage.clear();
     mockedGetSessionNetwork.mockReturnValue({ id: 84532, chainId: 84532, name: 'Base Sepolia' });
     window.history.replaceState({}, '', '/');
@@ -923,6 +925,35 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     expect(subject.autoSendTestFunds).toHaveBeenCalledTimes(1);
   });
 
+  it('does not request testnet funds for a chainless worker-canonical session', async () => {
+    mockedGetSessionConfigBySlugOrDefault.mockReturnValue(null);
+    mockedGetDemoSessionConfigBySlug.mockReturnValue({
+      slug: 'demo-sh',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    });
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          account: PASSKEY_ADDRESS,
+          activeSessionSlug: 'demo-sh',
+          loginComplete: true,
+          provider: 'passkey_eoa',
+        }),
+      ),
+    );
+    subject.syncWalletBalance = jest.fn(async () => ({
+      balance: ethers.BigNumber.from(0),
+      stale: false,
+    }));
+    subject.autoSendTestFunds = jest.fn();
+
+    await subject.checkAndSendTestFundsIfNeeded();
+
+    expect(subject.syncWalletBalance).not.toHaveBeenCalled();
+    expect(subject.autoSendTestFunds).not.toHaveBeenCalled();
+    expect(subject.state.autoSendTriggered).toBe(false);
+  });
+
   it('stores visible faucet success state for manual settings requests', async () => {
     mockedContractScripts.sendTestnetFunds.mockResolvedValueOnce({
       txHash: '0xfeed1234',
@@ -1064,6 +1095,10 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     );
 
     const pendingCheck = subject.checkAndSendTestFundsIfNeeded();
+    for (let attempt = 0; attempt < 10 && subject.readWalletBalance.mock.calls.length === 0; attempt += 1) {
+      await Promise.resolve();
+    }
+    expect(subject.readWalletBalance).toHaveBeenCalledTimes(1);
     subject.props = buildProps({
       account: ALT_PASSKEY_ADDRESS,
       loginComplete: true,

@@ -890,7 +890,7 @@ describe('SessionWizard rendered validation', () => {
       expect(screen.queryByText('Custom')).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'Session Setup' })).toBeInTheDocument();
-      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toBeInTheDocument();
+      expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();
       expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME)).not.toBeInTheDocument();
       expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PUBLISH)).not.toBeInTheDocument();

@@ -273,6 +273,61 @@ describe('createSessionResponseHydrationController', () => {
     contractScripts.getResponse.mockResolvedValue(null);
   });
 
+  it('hydrates fresh worker-canonical question responses without starting an EVM scan', async () => {
+    const loadWorkerResponses = jest.fn().mockResolvedValue([
+      {
+        questionId: QUESTION_ID_A,
+        responder: RESPONDER_LOWER,
+        response: {
+          questionID: QUESTION_ID_A,
+          responder: RESPONDER,
+          prompt: 'Worker-backed question',
+          type: 'binary',
+          answer: { value: true },
+        },
+        storageRefId: 'worker-response-ref',
+        timestamp: Math.floor(Date.parse('2026-07-22T12:00:00.000Z') / 1000),
+      },
+    ]);
+    const host = createMockHost({
+      chainId: null,
+      getSessionCfg: jest.fn((slug) => ({
+        slug,
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      })),
+      scanScopeNoop: jest.fn(() => true),
+      loadWorkerResponses,
+    });
+    const controller = createSessionResponseHydrationController(host);
+
+    await controller.fetchQuestionResponsesChunkedForGroup('demo-sh');
+
+    expect(loadWorkerResponses).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'demo-sh',
+        sessionConfig: expect.objectContaining({ slug: 'demo-sh' }),
+      }),
+    );
+    expect(contractScripts.getRelevantBlockWindowForFilter).not.toHaveBeenCalled();
+    expect(contractScripts.getQuestionResponsesChunkedWithCallback).not.toHaveBeenCalled();
+    expect(host.getStored('questionsCache', 'demo-sh')).toMatchObject({
+      worker: {
+        questionResponses: {
+          [QUESTION_ID_A]: {
+            [RESPONDER_LOWER]: expect.objectContaining({ answer: { value: true } }),
+          },
+        },
+        workerResponseStorageRefs: {
+          'worker-response-ref': Math.floor(Date.parse('2026-07-22T12:00:00.000Z') / 1000),
+        },
+      },
+    });
+    expect(host.getStateSnapshot()).toMatchObject({
+      isResponsesCacheReady: true,
+      questionResponsesNonce: 1,
+    });
+  });
+
   afterEach(() => {
     jest.useRealTimers();
     jest.restoreAllMocks();
