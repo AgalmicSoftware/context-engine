@@ -96,6 +96,7 @@ export {
   normalizeSessionSlugListForSig,
   resolveSbtSelectorSessionLabel,
   resolveSbtSelectorSessionNetworkId,
+  shouldDiscoverSbtForSessionConfig,
 } from './sbtSelectorSessionRuntimeHelpers';
 export type {
   BuildSbtSelectorDiscoverySessionRefArgs,

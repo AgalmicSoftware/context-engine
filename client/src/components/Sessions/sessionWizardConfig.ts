@@ -1,7 +1,6 @@
 import { LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH } from './sessionWizardPublishFlow';
 import { buildSessionWizardDefaultTemplate } from './sessionWizardDraftState';
 import { deepClone } from './sessionWizardCoreUtils';
-import { toStr } from '../../utilities/shared/primitives.js';
 import type { AnyRecord } from '../shellTypes';
 
 export const LOCAL_WORKER_BUNDLE_BUILD_COMMAND = 'nvm use 20 && npm run worker:bundle';
@@ -15,18 +14,6 @@ export const NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE = `Normal mode still defaul
 export const SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE = `Sponsored publish still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. ${LOCAL_WORKER_BUNDLE_OPTIONAL_FALLBACK_HELP}`;
 
 export const NORMAL_MODE_SHARED_HOSTED_WORKER_ENABLED = false;
-
-type SessionWizardProcessLike = {
-  env?: {
-    NODE_ENV?: unknown;
-  };
-};
-
-export const __test__isSessionWizardDevMode = (
-  proc: SessionWizardProcessLike | undefined = typeof process !== 'undefined' ? process : undefined,
-): boolean => toStr(proc?.env?.NODE_ENV).trim().toLowerCase() !== 'production';
-
-export const DEV_PERSIST_WORKER_SECRETS = __test__isSessionWizardDevMode();
 
 export const METADATA_FIELD_ORDER = [
   'networkChainId',

@@ -21,6 +21,31 @@ import {
   waitFor,
 } from './SessionWizard.workerPanel.testUtils';
 
+const createPublicWorkerVerificationResponder = () => {
+  let publicConfig = {};
+
+  return (normalizedUrl, options = {}) => {
+    if (normalizedUrl.endsWith('/admin/set-config')) {
+      const payload = JSON.parse(options.body || '{}');
+      publicConfig = payload.config || publicConfig;
+      return { ok: true, json: async () => ({ ok: true }) };
+    }
+    if (normalizedUrl.includes('/session-config?slug=')) {
+      const requestedSlug = new URL(normalizedUrl).searchParams.get('slug') || '';
+      return {
+        ok: true,
+        json: async () => ({
+          config: {
+            ...publicConfig,
+            slug: publicConfig.slug || requestedSlug,
+          },
+        }),
+      };
+    }
+    return null;
+  };
+};
+
 describe('SessionWizard worker panel rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
@@ -42,6 +67,7 @@ describe('SessionWizard worker panel rendering', () => {
     workerAuth.buildSignedBootstrapAdminAuth.mockClear();
     mockDecryptWithPassword.mockReturnValueOnce(sponsoredBundleReady);
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+    const respondToPublicWorkerVerification = createPublicWorkerVerificationResponder();
 
     global.fetch = jest.fn(async (url, options = {}) => {
       const normalizedUrl = String(url);
@@ -72,6 +98,8 @@ describe('SessionWizard worker panel rendering', () => {
       if (normalizedUrl.endsWith('/auth/nonce')) {
         return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
       }
+      const publicVerificationResponse = respondToPublicWorkerVerification(normalizedUrl, options);
+      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/admin/set-config') || normalizedUrl.endsWith('/admin/set-secrets')) {
         return { ok: true, json: async () => ({ ok: true }) };
       }
@@ -79,7 +107,7 @@ describe('SessionWizard worker panel rendering', () => {
     });
 
     try {
-      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
       sessionStorage.setItem(
         'ce:sessionWizardDraft:v1',
         JSON.stringify({
@@ -217,6 +245,7 @@ describe('SessionWizard worker panel rendering', () => {
     workerAuth.buildSignedBootstrapAdminAuth.mockClear();
     mockDecryptWithPassword.mockReturnValueOnce(sponsoredBundleReady);
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+    const respondToPublicWorkerVerification = createPublicWorkerVerificationResponder();
 
     global.fetch = jest.fn(async (url, options = {}) => {
       const normalizedUrl = String(url);
@@ -247,6 +276,8 @@ describe('SessionWizard worker panel rendering', () => {
       if (normalizedUrl.endsWith('/auth/nonce')) {
         return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
       }
+      const publicVerificationResponse = respondToPublicWorkerVerification(normalizedUrl, options);
+      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/admin/set-config') || normalizedUrl.endsWith('/admin/set-secrets')) {
         return { ok: true, json: async () => ({ ok: true }) };
       }
@@ -254,7 +285,7 @@ describe('SessionWizard worker panel rendering', () => {
     });
 
     try {
-      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
       sessionStorage.setItem(
         'ce:sessionWizardDraft:v1',
         JSON.stringify({
@@ -376,6 +407,7 @@ describe('SessionWizard worker panel rendering', () => {
     workerAuth.buildSignedBootstrapAdminAuth.mockClear();
     mockDecryptWithPassword.mockReturnValueOnce(sponsoredBundleReady);
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+    const respondToPublicWorkerVerification = createPublicWorkerVerificationResponder();
 
     global.fetch = jest.fn(async (url, options = {}) => {
       const normalizedUrl = String(url);
@@ -406,6 +438,8 @@ describe('SessionWizard worker panel rendering', () => {
       if (normalizedUrl.endsWith('/auth/nonce')) {
         return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
       }
+      const publicVerificationResponse = respondToPublicWorkerVerification(normalizedUrl, options);
+      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/admin/set-config') || normalizedUrl.endsWith('/admin/set-secrets')) {
         return { ok: true, json: async () => ({ ok: true }) };
       }
@@ -413,7 +447,7 @@ describe('SessionWizard worker panel rendering', () => {
     });
 
     try {
-      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id#k=sponsor-secret');
+      window.history.replaceState({}, '', '/session/new?sponsored=sponsor-tx-id');
       sessionStorage.setItem(
         'ce:sessionWizardDraft:v1',
         JSON.stringify({

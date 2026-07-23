@@ -175,8 +175,6 @@ import {
 } from './sessionWizardDraftState';
 import {
   __test__getSessionWizardDefaultAiSettings,
-  __test__isSessionWizardDevMode,
-  DEV_PERSIST_WORKER_SECRETS,
   MANUAL_BUNDLE_URL_OVERRIDE_HELP,
   NORMAL_MODE_MANUAL_BUNDLE_RETRY_MESSAGE,
   NORMAL_MODE_MISSING_HOSTED_BUNDLE_MESSAGE,
@@ -295,7 +293,7 @@ export {
   RESERVED_SESSION_SLUGS,
 } from './sessionWizardSlugValidation';
 export { getSessionWizardSecretFieldTestId } from './sessionWizardUiSupport';
-export { __test__getSessionWizardDefaultAiSettings, __test__isSessionWizardDevMode } from './sessionWizardConfig';
+export { __test__getSessionWizardDefaultAiSettings } from './sessionWizardConfig';
 export {
   deploySessionWizardPendingSbtDraft,
   finalizeSessionWizardPendingSbtDraft,
@@ -469,8 +467,8 @@ const SessionWizard = ({
     [],
   );
   const [encryptionGates, setEncryptionGates] = useState<EncryptionGateState[]>(() => cachedInitialState.initialGates);
-  // Pending SBT drafts carry deploy secrets and claim codes, so keep them out
-  // of localStorage while still surviving same-tab refreshes via sessionStorage.
+  // Pending SBT drafts carry deploy secrets and claim codes, so keep them only
+  // in this mounted tab. Reloading or leaving the wizard intentionally clears them.
   const { pendingSbtDrafts, setPendingSbtDrafts, normalizedPendingSbtDrafts, hasUndeployedPendingSbtDrafts } =
     usePendingSbtDrafts();
   const pendingSbtDraftsRef = useRef(pendingSbtDrafts);
@@ -615,7 +613,6 @@ const SessionWizard = ({
     cachedWizard,
     deployHelperUrlDefault: CLOUDFLARE_DEPLOY_HELPER_URL,
     workerBundleUrlDefault: CLOUDFLARE_WORKER_BUNDLE_URL,
-    devPersistWorkerSecrets: DEV_PERSIST_WORKER_SECRETS,
     defaultAllowedOrigins: DEFAULT_ALLOWED_ORIGINS,
     buildProvisionedSponsoredContextState,
   });
@@ -676,6 +673,9 @@ const SessionWizard = ({
     setSponsoredBundleRetryNonce,
     sponsoredBundleAppliedBundleRef,
     hasSponsoredBundleLink,
+    sponsoredBundleKeyInput,
+    setSponsoredBundleKeyInput,
+    submitSponsoredBundleKey,
     getCurrentWorkerSecrets,
     getCurrentEnabledWorkerSecrets,
     applyWorkerSecretsUpdate,
@@ -804,7 +804,7 @@ const SessionWizard = ({
       ? sessionModeRequirements.visibleWorkerResourceKeys.includes(key)
       : !cloudflareWorkerSbtGateMode || key !== 'lit',
   );
-  const effectivePersistWorkerSecrets = DEV_PERSIST_WORKER_SECRETS && persistWorkerSecrets;
+  const effectivePersistWorkerSecrets = false;
 
   const registryAddress = useMemo(() => {
     return resolveSessionWizardRegistryAddress(registryChainId, draft?.contracts);
@@ -2778,10 +2778,8 @@ const SessionWizard = ({
       deployHelperUrl={deployHelperUrl}
       deployStatusDisplayState={deployStatusDisplayState}
       deployWorkerUrl={deployWorkerUrl}
-      devPersistWorkerSecrets={DEV_PERSIST_WORKER_SECRETS}
       displayedWorkerUrl={displayedWorkerUrl}
       draft={draft}
-      effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
       embeddedDeployHelperEnabled={embeddedDeployHelperEnabled}
       encryptionGates={encryptionGates}
       ensureLightSbtUniverse={ensureLightSbtUniverse}
@@ -2837,13 +2835,14 @@ const SessionWizard = ({
       onPublish={handlePublish}
       onRegistryChainIdChange={handleRegistryChainIdChange}
       onRetrySponsoredBundle={() => setSponsoredBundleRetryNonce((prev) => prev + 1)}
+      onSponsoredBundleKeyChange={setSponsoredBundleKeyInput}
+      onSubmitSponsoredBundleKey={submitSponsoredBundleKey}
       onToggleDisplaySettings={() => setWizardDisplaySettingsOpen((prev) => !prev)}
       onToggleJsonPreview={() => setShowJsonPreview((prev) => !prev)}
       onToggleMoreOptions={() => setMoreOptionsOpen((prev) => !prev)}
       onTogglePublishAdvanced={() => setPublishAdvancedOpen((prev) => !prev)}
       pendingSbtDrafts={pendingSbtDrafts}
       pendingSbtSelectorOptions={pendingSbtSelectorOptions}
-      persistWorkerSecrets={persistWorkerSecrets}
       primaryDraftEntries={primaryDraftEntries}
       provider={provider}
       publishUiPlan={publishUiPlan}
@@ -2881,7 +2880,6 @@ const SessionWizard = ({
       setDeployForm={setDeployForm}
       setDeployHelperUrl={setDeployHelperUrl}
       setNormalModeBundleUrlOverride={setNormalModeBundleUrlOverride}
-      setPersistWorkerSecrets={setPersistWorkerSecrets}
       setWorkerAllowOrigins={setWorkerAllowOrigins}
       setWorkerMode={setWorkerMode}
       setWorkerSecretsEnabled={setWorkerSecretsEnabled}
@@ -2901,6 +2899,7 @@ const SessionWizard = ({
         sessionModeRequirements.publish.deployPendingSbts || sessionModeRequirements.publish.registerSession
       }
       signBootstrapAdminAction={signBootstrapAdminAction}
+      sponsoredBundleKey={sponsoredBundleKeyInput}
       sponsoredBundleStatus={sponsoredBundleStatus}
       sponsoredManualBundleRetryMessage={SPONSORED_MANUAL_BUNDLE_RETRY_MESSAGE}
       sponsoredPublishBundleFileInputRef={sponsoredPublishBundleFileInputRef}

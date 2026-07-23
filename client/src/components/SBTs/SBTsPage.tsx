@@ -22,6 +22,7 @@ import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.j
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
@@ -478,10 +479,49 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       sbtLog.warn('SBTsPage: fallback', e);
     }
 
+    const explicitConfig = isRecord(this.props.sessionConfig) ? this.props.sessionConfig : null;
+    const explicitConfigSlug = normalizeSessionSlug(explicitConfig?.slug || '');
+    const selectedCreateSlug = normalizeSessionSlug(
+      this.props.sessionSlug || explicitConfigSlug || this.props.activeSessionSlug || referrerSlug || '',
+    );
+    const explicitConfigCapabilities = resolveSessionCapabilityProjection(explicitConfig);
+    const explicitConfigIsValidated =
+      explicitConfigCapabilities.profileValid || explicitConfigCapabilities.source === 'legacy_registry';
+    const explicitConfigHasConcreteIdentity = !!(
+      explicitConfigSlug ||
+      selectedCreateSlug ||
+      normalizeSessionSlug(explicitConfig?.sessionId || explicitConfig?.sessionIdHex || '')
+    );
+    const explicitConfigRejected =
+      isCreateRoute &&
+      !!explicitConfig &&
+      (explicitConfigCapabilities.source === 'invalid_profile' ||
+        (explicitConfigCapabilities.source === 'missing' && explicitConfigHasConcreteIdentity) ||
+        (!!explicitConfigSlug && !!selectedCreateSlug && explicitConfigSlug !== selectedCreateSlug) ||
+        (explicitConfigIsValidated && (!explicitConfigSlug || !selectedCreateSlug)));
+
+    if (explicitConfigRejected) {
+      return {
+        activeGroup: null,
+        canonicalSlug: '',
+        urlHasNoSlug: false,
+        onSbtsRoute,
+        isCreateRoute,
+        sessionConfigError: 'The selected session context could not be verified.',
+      };
+    }
+
+    const useExplicitCreateConfig =
+      isCreateRoute && explicitConfigIsValidated && !!explicitConfigSlug && explicitConfigSlug === selectedCreateSlug;
+
     // Resolve by URL → explicit prop → Redux → referrer → default general
     const groupFromUrl = effectiveUrlSlug ? getDisplaySessionConfig(effectiveUrlSlug) : null;
     const propSlugLike = this.props.sessionSlug || this.props.sessionConfig?.slug || '';
-    const groupFromProp = propSlugLike ? getDisplaySessionConfig(propSlugLike) : null;
+    const groupFromProp = useExplicitCreateConfig
+      ? explicitConfig
+      : propSlugLike
+        ? getDisplaySessionConfig(propSlugLike)
+        : null;
     const groupFromRedux = this.props.activeSessionSlug ? getDisplaySessionConfig(this.props.activeSessionSlug) : null;
     const groupFromRef = referrerSlug ? getDisplaySessionConfig(referrerSlug) : null;
     const activeGroup = groupFromUrl || groupFromProp || groupFromRedux || groupFromRef || getDisplaySessionConfig('');
@@ -506,10 +546,17 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       } catch (e) {
         sbtLog.warn('SBTsPage: fallback', e);
       }
-      return { canonicalSlug, urlHasNoSlug: false, onSbtsRoute, isCreateRoute }; // URL is now canonical
+      return {
+        activeGroup,
+        canonicalSlug,
+        urlHasNoSlug: false,
+        onSbtsRoute,
+        isCreateRoute,
+        sessionConfigError: '',
+      }; // URL is now canonical
     }
 
-    return { canonicalSlug, urlHasNoSlug, onSbtsRoute, isCreateRoute };
+    return { activeGroup, canonicalSlug, urlHasNoSlug, onSbtsRoute, isCreateRoute, sessionConfigError: '' };
   }
 
   render() {
@@ -525,9 +572,11 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const showCreateGroupAboveFeatured = this.props.showCreateGroupAboveFeatured === true;
 
     // Resolve routing + slug once per render
-    const { canonicalSlug, urlHasNoSlug, onSbtsRoute, isCreateRoute } = this.getResolvedRouting();
+    const { activeGroup, canonicalSlug, urlHasNoSlug, onSbtsRoute, isCreateRoute, sessionConfigError } =
+      this.getResolvedRouting();
     const effectiveSessionSlug = canonicalSlug; // may be '' (general)
     const allSessionsMode = urlHasNoSlug && !canonicalSlug; // plain /sbts with no redux/referrer slug => enumerate all groups
+    const sessionCapabilities = resolveSessionCapabilityProjection(activeGroup);
     if (isCreateRoute) {
       return (
         <div>
@@ -541,20 +590,44 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
               </button>
             </div>
           </div>
-          <CreateGroupComponent
-            account={account}
-            loginComplete={loginComplete}
-            provider={provider}
-            litHooks={this.props.litHooks}
-            toggleLoginModal={toggleLoginModal}
-            expanded={true}
-            network={network}
-            sessionSlug={effectiveSessionSlug}
-            sessionInfo={sessionInfo}
-            sessionName={sessionName}
-            defaultSbtTags={this.props.defaultSbtTags}
-            sbtCacheRevision={sbtCacheRevision}
-          />
+          {sessionConfigError ? (
+            <aside className={styles.advancedExternalNotice} role="alert">
+              <strong>Advanced/external on-chain SBT unavailable</strong>
+              <span>
+                {sessionConfigError} Return to the session before opening this optional standalone tool again.
+              </span>
+            </aside>
+          ) : sessionCapabilities.usesWorkerGroups ? (
+            <aside
+              className={styles.advancedExternalNotice}
+              data-testid={E2E_TESTIDS.SBT_CREATE_ADVANCED_EXTERNAL_NOTICE}
+              aria-label="Advanced external on-chain SBT creation"
+            >
+              <strong>Advanced/external on-chain SBT</strong>
+              <span>
+                This optional standalone tool deploys an SBT on the selected Network. It does not replace or modify this
+                session&apos;s Worker-native Groups.
+              </span>
+            </aside>
+          ) : null}
+          {!sessionConfigError ? (
+            <CreateGroupComponent
+              account={account}
+              loginComplete={loginComplete}
+              provider={provider}
+              litHooks={this.props.litHooks}
+              toggleLoginModal={toggleLoginModal}
+              expanded={true}
+              network={network}
+              preferConnectedNetworkForAuthoring={sessionCapabilities.isPureWorkerCanonical}
+              sessionConfigOverride={activeGroup}
+              sessionSlug={effectiveSessionSlug}
+              sessionInfo={sessionInfo}
+              sessionName={sessionName}
+              defaultSbtTags={this.props.defaultSbtTags}
+              sbtCacheRevision={sbtCacheRevision}
+            />
+          ) : null}
         </div>
       );
     }

@@ -25,7 +25,6 @@ export const buildCreateSbtFormCachePayload = ({
     documentIDHashes,
     documentURLs,
     documentUrl,
-    groupPassword,
     numInviteLinks,
     exportFormat,
     metadataLockGateIds,
@@ -37,6 +36,22 @@ export const buildCreateSbtFormCachePayload = ({
   } = state;
 
   const safeDist: Record<string, unknown> = { ...Object(sbtDistribution || {}) };
+  [
+    'claimCode',
+    'claimCodes',
+    'groupPassword',
+    'groupPasswordInput',
+    'inviteCode',
+    'inviteCodes',
+    'inviteNonce',
+    'inviteNonces',
+    'invitePayload',
+    'invitePayloads',
+    'password',
+    'passwordList',
+  ].forEach((field) => {
+    delete safeDist[field];
+  });
   const rawMintingEndTime = safeDist.mintingEndTime;
   safeDist.mintingEndTime = rawMintingEndTime
     ? new Date(rawMintingEndTime as string | number | Date).toISOString()
@@ -53,7 +68,6 @@ export const buildCreateSbtFormCachePayload = ({
     documentIDHashes,
     documentURLs,
     documentUrl: normalizeCreateSbtDocumentUrlDraft(documentUrl),
-    groupPassword,
     metadataLockGateIds: normalizeMetadataLockGateIds(metadataLockGateIds),
     predictableAddressEnabled: !!predictableAddressEnabled,
     autoAppliedDefaultTags: Array.isArray(autoAppliedDefaultTags) ? autoAppliedDefaultTags : [],

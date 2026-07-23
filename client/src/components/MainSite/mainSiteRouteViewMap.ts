@@ -21,6 +21,7 @@ export const MAIN_SITE_ROUTE_VIEW_KEYS: MainSiteRouteViewKey[] = [
   'compare',
   'surveysOrQuestionsList',
   'questionDetail',
+  'sbtCreate',
   'sbtsList',
   'sbtDetail',
   'simUser',

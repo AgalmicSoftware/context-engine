@@ -28,6 +28,35 @@ type DeployForm = {
   adminAddress?: string;
 };
 
+const normalizeNativeWorkerOrigin = (value: unknown) => {
+  const candidate = String(value || '').trim();
+  if (!candidate) return '';
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return candidate.toLowerCase();
+    return parsed.origin.toLowerCase();
+  } catch {
+    return candidate.toLowerCase();
+  }
+};
+
+const buildNativeSetupIdentity = ({ sessionSlug, adminAddress }: { sessionSlug: string; adminAddress: string }) =>
+  `${sessionSlug.trim().toLowerCase()}\n${adminAddress.trim().toLowerCase()}`;
+
+const buildNativeVerificationIdentity = ({
+  workerUrl,
+  sessionSlug,
+  adminAddress,
+}: {
+  workerUrl: unknown;
+  sessionSlug: string;
+  adminAddress: string;
+}) =>
+  `${normalizeNativeWorkerOrigin(workerUrl)}\n${buildNativeSetupIdentity({
+    sessionSlug,
+    adminAddress,
+  })}`;
+
 export type WorkerDeploySectionProps = {
   isNormalMode: boolean;
   renderInfoTooltip?: RenderInfoTooltip;
@@ -107,12 +136,14 @@ const WorkerDeploySection = ({
     tokenHmacSecret: string;
     storageEnvelopeKek: string;
   } | null>(null);
+  const [nativeSetupSecretsIdentity, setNativeSetupSecretsIdentity] = React.useState('');
   const [nativeSetupError, setNativeSetupError] = React.useState('');
   const [nativeProgress, setNativeProgress] = React.useState<'generated' | 'opened' | 'verifying' | 'verified' | ''>(
     '',
   );
   const [nativeStatus, setNativeStatus] = React.useState('');
   const [copiedNativeField, setCopiedNativeField] = React.useState('');
+  const [verifiedNativeIdentity, setVerifiedNativeIdentity] = React.useState('');
   const renderTooltip = typeof renderInfoTooltip === 'function' ? renderInfoTooltip : () => null;
   const {
     deployButtonDisabled,
@@ -130,17 +161,62 @@ const WorkerDeploySection = ({
   const nativeDeployUrl = String(cloudflareNativeDeployUrl || '').trim();
   const nativeSessionSlug = String(cloudflareTokenSlug || '').trim();
   const nativeAdminAddress = String(deployForm.adminAddress || account || '').trim();
-  const nativeDeployReady = !!(nativeDeployUrl && nativeSetupSecrets && nativeSessionSlug && nativeAdminAddress);
+  const nativeSetupIdentity = buildNativeSetupIdentity({
+    sessionSlug: nativeSessionSlug,
+    adminAddress: nativeAdminAddress,
+  });
+  const nativeVerificationIdentity = buildNativeVerificationIdentity({
+    workerUrl: displayedWorkerUrl,
+    sessionSlug: nativeSessionSlug,
+    adminAddress: nativeAdminAddress,
+  });
+  const previousNativeSetupIdentityRef = React.useRef(nativeSetupIdentity);
+  const previousNativeVerificationIdentityRef = React.useRef(nativeVerificationIdentity);
+  const currentNativeVerificationIdentityRef = React.useRef(nativeVerificationIdentity);
+  currentNativeVerificationIdentityRef.current = nativeVerificationIdentity;
+  const currentNativeSetupSecrets = nativeSetupSecretsIdentity === nativeSetupIdentity ? nativeSetupSecrets : null;
+  const nativeDeployReady = !!(nativeDeployUrl && currentNativeSetupSecrets && nativeSessionSlug && nativeAdminAddress);
+  const nativeVerificationIsCurrent =
+    nativeProgress === 'verified' && verifiedNativeIdentity === nativeVerificationIdentity;
+
+  React.useEffect(() => {
+    const setupIdentityChanged = previousNativeSetupIdentityRef.current !== nativeSetupIdentity;
+    const verificationIdentityChanged = previousNativeVerificationIdentityRef.current !== nativeVerificationIdentity;
+    previousNativeSetupIdentityRef.current = nativeSetupIdentity;
+    previousNativeVerificationIdentityRef.current = nativeVerificationIdentity;
+    if (!verificationIdentityChanged) return;
+
+    setVerifiedNativeIdentity('');
+    setCopiedNativeField('');
+    if (setupIdentityChanged) {
+      setNativeSetupSecrets(null);
+      setNativeSetupSecretsIdentity('');
+      setNativeSetupError('');
+      setNativeProgress('');
+      setNativeStatus('');
+      return;
+    }
+    setNativeProgress((progress) => (progress ? 'generated' : ''));
+    setNativeStatus((status) =>
+      status && currentNativeSetupSecrets
+        ? 'The Session Worker URL changed. Verify this exact Worker identity before deploying the session.'
+        : '',
+    );
+  }, [currentNativeSetupSecrets, nativeSetupIdentity, nativeVerificationIdentity]);
+
   const generateNativeSetupSecrets = () => {
     try {
       setNativeSetupSecrets(createCloudflareNativeSetupSecrets());
+      setNativeSetupSecretsIdentity(nativeSetupIdentity);
       setNativeSetupError('');
       setNativeProgress('generated');
       setNativeStatus('Setup values generated in this tab. Copy each value into Cloudflare.');
       setCopiedNativeField('');
-    } catch (error) {
+      setVerifiedNativeIdentity('');
+    } catch {
       setNativeSetupSecrets(null);
-      setNativeSetupError(error instanceof Error ? error.message : 'Secure setup-secret generation failed.');
+      setNativeSetupSecretsIdentity('');
+      setNativeSetupError('Secure setup-secret generation failed.');
     }
   };
   const copyNativeValue = async (label: string, value: string) => {
@@ -165,25 +241,40 @@ const WorkerDeploySection = ({
       return;
     }
     setNativeProgress('verifying');
+    setVerifiedNativeIdentity('');
     setNativeStatus(
       'Writing required session config and AI secrets, then verifying Worker reachability, browser origin access, and canonical config readback…',
     );
+    const requestedIdentity = nativeVerificationIdentity;
     try {
       const bootstrap = await verifyNativeWorker({
         sessionSlug: nativeSessionSlug,
         workerQueryValue: candidate,
       });
+      if (currentNativeVerificationIdentityRef.current !== requestedIdentity) return;
+      const returnedOrigin = normalizeNativeWorkerOrigin(bootstrap.workerOrigin);
+      if (
+        returnedOrigin !== normalizeNativeWorkerOrigin(candidate) ||
+        String(bootstrap.sessionSlug || '')
+          .trim()
+          .toLowerCase() !== nativeSessionSlug.toLowerCase()
+      ) {
+        setNativeProgress('generated');
+        setNativeStatus('Worker verification returned a different session identity. Check the Worker URL and retry.');
+        return;
+      }
+      setVerifiedNativeIdentity(requestedIdentity);
       setNativeProgress('verified');
       setNativeStatus(`Session Worker verified at revision ${bootstrap.configRevision}. You can deploy the session.`);
       onNativeWorkerVerified?.(bootstrap);
     } catch (error) {
+      if (currentNativeVerificationIdentityRef.current !== requestedIdentity) return;
+      setVerifiedNativeIdentity('');
       setNativeProgress('opened');
       setNativeStatus(
         error instanceof TypeError
           ? 'The Worker could not be reached, or its CORS policy rejected this browser origin. Check Cloudflare and retry.'
-          : error instanceof Error
-            ? error.message
-            : 'Worker verification failed.',
+          : 'Worker verification failed. Check the Worker URL and session identity, then retry.',
       );
     }
   };
@@ -238,9 +329,9 @@ const WorkerDeploySection = ({
             data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE}
             onClick={generateNativeSetupSecrets}
           >
-            {nativeSetupSecrets ? 'Replace setup values' : 'Generate setup values'}
+            {currentNativeSetupSecrets ? 'Replace setup values' : 'Generate setup values'}
           </Button>
-          {nativeSetupSecrets && (
+          {currentNativeSetupSecrets && (
             <>
               <ol data-testid="ce-wizard-cloudflare-native-checklist">
                 <li>Copy the four setup values below.</li>
@@ -263,22 +354,22 @@ const WorkerDeploySection = ({
                 )}
                 {renderCopyField(
                   'TOKEN_HMAC_SECRET',
-                  nativeSetupSecrets.tokenHmacSecret,
+                  currentNativeSetupSecrets.tokenHmacSecret,
                   E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC,
                 )}
                 {renderCopyField(
                   'CE_STORAGE_ENVELOPE_KEK',
-                  nativeSetupSecrets.storageEnvelopeKek,
+                  currentNativeSetupSecrets.storageEnvelopeKek,
                   E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK,
                 )}
               </div>
             </>
           )}
           {nativeSetupError && <div className={styles.errorText}>{nativeSetupError}</div>}
-          {nativeSetupSecrets && !nativeSessionSlug && (
+          {currentNativeSetupSecrets && !nativeSessionSlug && (
             <div className={styles.errorText}>Enter the session slug before opening Cloudflare.</div>
           )}
-          {nativeSetupSecrets && !nativeAdminAddress && (
+          {currentNativeSetupSecrets && !nativeAdminAddress && (
             <div className={styles.errorText}>Log in with the session admin passkey before opening Cloudflare.</div>
           )}
           {nativeDeployReady && (
@@ -301,7 +392,7 @@ const WorkerDeploySection = ({
             runtime secrets, not Cloudflare credentials; they stay only in this tab and Cloudflare&apos;s encrypted
             Worker-secret store. After deployment, paste the resulting workers.dev URL into the Worker URL field.
           </div>
-          {nativeSetupSecrets ? (
+          {currentNativeSetupSecrets ? (
             <Button
               type="button"
               className={styles.secondaryButton}
@@ -311,14 +402,14 @@ const WorkerDeploySection = ({
             >
               {nativeProgress === 'verifying'
                 ? 'Verifying Session Worker…'
-                : nativeProgress === 'verified'
+                : nativeVerificationIsCurrent
                   ? 'Session Worker verified'
                   : 'Verify Session Worker'}
             </Button>
           ) : null}
           {nativeStatus ? (
             <div
-              className={nativeProgress === 'verified' ? styles.statusNote : styles.helperText}
+              className={nativeVerificationIsCurrent ? styles.statusNote : styles.helperText}
               role="status"
               data-testid="ce-wizard-cloudflare-native-status"
             >

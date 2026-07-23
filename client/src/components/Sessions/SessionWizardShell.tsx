@@ -72,10 +72,8 @@ export type SessionWizardShellProps = {
   deployHelperUrl: WorkerPanelProps['deployHelperUrl'];
   deployStatusDisplayState: WorkerPanelProps['deployStatusDisplayState'];
   deployWorkerUrl: WorkerPanelProps['deployWorkerUrl'];
-  devPersistWorkerSecrets: WorkerPanelProps['devPersistWorkerSecrets'];
   displayedWorkerUrl: WorkerPanelProps['displayedWorkerUrl'];
   draft: SessionWizardShellDraft;
-  effectivePersistWorkerSecrets: WorkerPanelProps['effectivePersistWorkerSecrets'];
   embeddedDeployHelperEnabled: WorkerDeployHelperToggleBoundaryProps['checked'];
   encryptionGates: NonNullable<EncryptionPanelBoundaryProps['encryptionGates']>;
   ensureLightSbtUniverse: EncryptionPanelBoundaryProps['ensureLightSbtUniverse'];
@@ -133,13 +131,14 @@ export type SessionWizardShellProps = {
   onPublish: PublishSectionProps['onPublish'];
   onRegistryChainIdChange: HeaderProps['onRegistryChainIdChange'];
   onRetrySponsoredBundle: IntroStatusRailProps['onRetrySponsoredBundle'];
+  onSponsoredBundleKeyChange?: IntroStatusRailProps['onSponsoredBundleKeyChange'];
+  onSubmitSponsoredBundleKey?: IntroStatusRailProps['onSubmitSponsoredBundleKey'];
   onToggleDisplaySettings: HeaderProps['onToggleDisplaySettings'];
   onToggleJsonPreview: MetadataEditorProps['onToggleJsonPreview'];
   onToggleMoreOptions: MetadataEditorProps['onToggleMoreOptions'];
   onTogglePublishAdvanced: PublishSectionProps['onTogglePublishAdvanced'];
   pendingSbtDrafts: EncryptionPanelBoundaryProps['pendingSbtDrafts'];
   pendingSbtSelectorOptions: EncryptionPanelBoundaryProps['pendingSbtSelectorOptions'];
-  persistWorkerSecrets: WorkerPanelProps['persistWorkerSecrets'];
   primaryDraftEntries: MetadataEditorProps['primaryEntries'];
   provider: WizardModalsProps['provider'];
   publishUiPlan: PublishSectionProps['publishUiPlan'];
@@ -177,7 +176,6 @@ export type SessionWizardShellProps = {
   setDeployForm: WorkerPanelProps['setDeployForm'];
   setDeployHelperUrl: WorkerPanelProps['setDeployHelperUrl'];
   setNormalModeBundleUrlOverride: WorkerPanelProps['setNormalModeBundleUrlOverride'];
-  setPersistWorkerSecrets: WorkerPanelProps['setPersistWorkerSecrets'];
   setWorkerAllowOrigins: WorkerPanelProps['setWorkerAllowOrigins'];
   setWorkerMode: WorkerPanelProps['onWorkerModeChange'];
   setWorkerSecretsEnabled: WorkerPanelProps['setWorkerSecretsEnabled'];
@@ -194,6 +192,7 @@ export type SessionWizardShellProps = {
   showWorkerUrlField: WorkerPanelProps['showWorkerUrlField'];
   showNetworkSelector?: boolean;
   showOnChainGateControls?: boolean;
+  sponsoredBundleKey?: IntroStatusRailProps['sponsoredBundleKey'];
   sponsoredBundleStatus: IntroStatusRailProps['sponsoredBundleStatus'];
   sponsoredManualBundleRetryMessage: PublishSectionProps['sponsoredManualBundleRetryMessage'];
   sponsoredPublishBundleFileInputRef: PublishSectionProps['bundleFileInputRef'];
@@ -243,10 +242,8 @@ const SessionWizardShell = ({
   deployHelperUrl,
   deployStatusDisplayState,
   deployWorkerUrl,
-  devPersistWorkerSecrets,
   displayedWorkerUrl,
   draft,
-  effectivePersistWorkerSecrets,
   embeddedDeployHelperEnabled,
   encryptionGates,
   ensureLightSbtUniverse,
@@ -304,13 +301,14 @@ const SessionWizardShell = ({
   onPublish,
   onRegistryChainIdChange,
   onRetrySponsoredBundle,
+  onSponsoredBundleKeyChange,
+  onSubmitSponsoredBundleKey,
   onToggleDisplaySettings,
   onToggleJsonPreview,
   onToggleMoreOptions,
   onTogglePublishAdvanced,
   pendingSbtDrafts,
   pendingSbtSelectorOptions,
-  persistWorkerSecrets,
   primaryDraftEntries,
   provider,
   publishUiPlan,
@@ -348,7 +346,6 @@ const SessionWizardShell = ({
   setDeployForm,
   setDeployHelperUrl,
   setNormalModeBundleUrlOverride,
-  setPersistWorkerSecrets,
   setWorkerAllowOrigins,
   setWorkerMode,
   setWorkerSecretsEnabled,
@@ -365,6 +362,7 @@ const SessionWizardShell = ({
   showWorkerUrlField,
   showNetworkSelector = true,
   showOnChainGateControls = true,
+  sponsoredBundleKey,
   sponsoredBundleStatus,
   sponsoredManualBundleRetryMessage,
   sponsoredPublishBundleFileInputRef,
@@ -441,9 +439,12 @@ const SessionWizardShell = ({
         onDismissRequirements={onDismissNewSessionRequirementsBanner}
         onFocusNormalModeSection={focusNormalModeSection}
         onRetrySponsoredBundle={onRetrySponsoredBundle}
+        onSponsoredBundleKeyChange={onSponsoredBundleKeyChange}
+        onSubmitSponsoredBundleKey={onSubmitSponsoredBundleKey}
         requiredRequirementIds={newSessionRequiredRequirementIds}
         showNewSessionRequirementsBanner={showNewSessionRequirementsBanner}
         showNormalModeRail
+        sponsoredBundleKey={sponsoredBundleKey}
         sponsoredBundleStatus={sponsoredBundleStatus}
       />
 
@@ -517,13 +518,9 @@ const SessionWizardShell = ({
             draft={draft}
             deployWorkerUrl={deployWorkerUrl}
             deployComplete={deployComplete}
-            devPersistWorkerSecrets={devPersistWorkerSecrets}
-            persistWorkerSecrets={persistWorkerSecrets}
-            setPersistWorkerSecrets={setPersistWorkerSecrets}
             workerSecretsEnabled={workerSecretsEnabled}
             setWorkerSecretsEnabled={setWorkerSecretsEnabled}
             clearWorkerSecretFields={clearWorkerSecretFields}
-            effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
             workerResourceKeys={visibleWorkerResourceKeys}
             renderResourceCard={renderResourceCard}
             workerAllowOrigins={workerAllowOrigins}

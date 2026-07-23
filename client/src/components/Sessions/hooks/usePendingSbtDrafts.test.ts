@@ -2,6 +2,7 @@ import { act, renderHook } from '@testing-library/react';
 import usePendingSbtDrafts, {
   SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY,
   clearSessionWizardPendingSbtDraftsCache,
+  readSessionWizardPendingSbtDraftsCache,
   writeSessionWizardPendingSbtDraftsCache,
 } from './usePendingSbtDrafts.js';
 
@@ -20,6 +21,7 @@ describe('usePendingSbtDrafts', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
+    clearSessionWizardPendingSbtDraftsCache();
   });
 
   afterEach(() => {
@@ -28,42 +30,30 @@ describe('usePendingSbtDrafts', () => {
     sessionStorage.clear();
   });
 
-  it('hydrates initial value from the sessionStorage cache', () => {
+  it('purges legacy sessionStorage drafts instead of hydrating their secrets', () => {
     sessionStorage.setItem(
       SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY,
-      JSON.stringify([buildDraft({ tokenURI: 'ar://pending' })]),
+      JSON.stringify([buildDraft({ groupPassword: 'legacy-secret', tokenURI: 'ar://pending' })]),
     );
-    const getItemSpy = jest.spyOn(Storage.prototype, 'getItem');
 
     const { result } = renderHook(() => usePendingSbtDrafts());
 
-    expect(getItemSpy).toHaveBeenCalledWith(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
-    expect(result.current.pendingSbtDrafts).toHaveLength(1);
-    expect(result.current.pendingSbtDrafts[0]).toMatchObject({
-      predictedAddress: PENDING_ADDRESS,
-      displayName: 'Pending Access',
-      metadataUploadStatus: 'ready',
-    });
+    expect(result.current.pendingSbtDrafts).toEqual([]);
+    expect(sessionStorage.getItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY)).toBeNull();
   });
 
-  it('updates the cache when pending drafts change', () => {
+  it('keeps pending drafts in tab memory without writing browser storage', () => {
     const setItemSpy = jest.spyOn(Storage.prototype, 'setItem');
     const { result } = renderHook(() => usePendingSbtDrafts());
 
     act(() => {
-      result.current.setPendingSbtDrafts([buildDraft()]);
+      result.current.setPendingSbtDrafts([buildDraft({ groupPassword: 'memory-secret' })]);
     });
 
-    expect(setItemSpy).toHaveBeenCalledWith(
-      SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY,
-      expect.stringContaining(PENDING_ADDRESS),
-    );
-    expect(JSON.parse(sessionStorage.getItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY) || '[]')).toEqual([
-      expect.objectContaining({
-        predictedAddress: PENDING_ADDRESS,
-        displayName: 'Pending Access',
-        metadataUploadStatus: 'pending-upload',
-      }),
+    expect(setItemSpy).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY)).toBeNull();
+    expect(readSessionWizardPendingSbtDraftsCache()).toEqual([
+      expect.objectContaining({ groupPassword: 'memory-secret', predictedAddress: PENDING_ADDRESS }),
     ]);
   });
 
@@ -74,29 +64,28 @@ describe('usePendingSbtDrafts', () => {
       }),
     };
 
-    expect(clearSessionWizardPendingSbtDraftsCache({ storage })).toEqual({
-      ok: false,
-      removed: 0,
-      failed: 1,
-      status: 'partial-failure',
-    });
+    expect(clearSessionWizardPendingSbtDraftsCache({ storage })).toEqual(
+      expect.objectContaining({
+        ok: false,
+        failed: 1,
+        status: 'partial-failure',
+      }),
+    );
   });
 
-  it('reports a failed atomic replacement without deleting the prior pending drafts', () => {
-    const prior = JSON.stringify([buildDraft({ displayName: 'Prior draft' })]);
+  it('retains the memory update while reporting a failed legacy-artifact purge', () => {
     const storage = {
-      getItem: jest.fn(() => prior),
-      setItem: jest.fn(() => {
+      removeItem: jest.fn(() => {
         throw new Error('sessionStorage denied');
       }),
-      removeItem: jest.fn(),
     };
 
     expect(writeSessionWizardPendingSbtDraftsCache([buildDraft()], { storage })).toEqual(
-      expect.objectContaining({ ok: false, status: 'write-failed' }),
+      expect.objectContaining({ ok: false, status: 'partial-failure' }),
     );
-    expect(storage.removeItem).not.toHaveBeenCalled();
-    expect(storage.getItem()).toBe(prior);
+    expect(readSessionWizardPendingSbtDraftsCache()).toEqual([
+      expect.objectContaining({ predictedAddress: PENDING_ADDRESS }),
+    ]);
   });
 
   it('derives normalized drafts and undeployed status from state', () => {

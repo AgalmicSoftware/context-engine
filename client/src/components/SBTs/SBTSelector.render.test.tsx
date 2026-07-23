@@ -116,6 +116,10 @@ jest.mock('../../utilities/web3/chainGateway.js', () => {
     slug: '',
     sessionName: 'Context Engine',
     networkChainId: 84532,
+    __registry: {
+      chainId: 84532,
+      sessionIdHex: `0x${'1'.repeat(64)}`,
+    },
     contracts: {
       sbtFactory: {
         address: GENERAL_FACTORY_ADDRESS,
@@ -131,6 +135,10 @@ jest.mock('../../utilities/web3/chainGateway.js', () => {
     slug: 'edge',
     sessionName: 'Edge',
     networkChainId: 84532,
+    __registry: {
+      chainId: 84532,
+      sessionIdHex: `0x${'1'.repeat(64)}`,
+    },
     contracts: {
       sbtFactory: {
         address: EDGE_FACTORY_ADDRESS,

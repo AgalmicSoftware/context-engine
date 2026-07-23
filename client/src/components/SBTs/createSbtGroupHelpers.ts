@@ -361,7 +361,6 @@ type CreateSbtErrorBannerState = {
 type BuildCreateSbtJsonPreviewDataArgs = {
   authoringChain?: CreateSbtAuthoringChainOption | null;
   autoJoinUrl?: unknown;
-  groupPassword?: unknown;
   network?: unknown;
   sbtAddress?: unknown;
   sbtDistribution?: Record<string, unknown>;
@@ -574,7 +573,6 @@ export const getCreateSbtBurnAuthEnum = (burnAuth: unknown): number => {
 export const buildCreateSbtJsonPreviewData = ({
   authoringChain = null,
   autoJoinUrl = '',
-  groupPassword = '',
   network = '',
   sbtAddress = '',
   sbtDistribution = {},
@@ -587,7 +585,6 @@ export const buildCreateSbtJsonPreviewData = ({
   tokenURI: normalizeArweaveUrl(tokenURI),
   network: authoringChain?.name || (typeof network === 'string' ? network : ''),
   distribution: sbtDistribution.distributionOption,
-  groupPassword: sbtDistribution.distributionOption === 'groupPassword' ? groupPassword : undefined,
   autoJoinUrl,
   shareableUrl,
 });

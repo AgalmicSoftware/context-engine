@@ -17,6 +17,7 @@ import {
 } from './sessionWizardAiConfig';
 import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
 import { WORKER_SECRET_CACHE_SAFE_FIELDS } from './sessionWizardWorkerSecretSupport';
+import { sanitizeSessionWizardDraftForBrowserCache } from './sessionWizardBrowserCacheSanitization';
 import {
   classifySessionModeProfileSupport,
   compileSessionModeProfile,
@@ -430,7 +431,6 @@ export const buildSessionWizardCacheWritePayload = ({
   manualMaxFeePerGasGwei = '',
   manualMaxPriorityFeePerGasGwei = '',
   workerSecretsEnabled = true,
-  effectivePersistWorkerSecrets = false,
   workerSecrets = {},
   deployForm = {},
   deployComplete = false,
@@ -442,10 +442,10 @@ export const buildSessionWizardCacheWritePayload = ({
     workerSecrets && typeof workerSecrets === 'object' && !Array.isArray(workerSecrets)
       ? (workerSecrets as AnyRecord)
       : {};
-  const redactedSecrets: AnyRecord = {};
-  Object.keys(workerSecretsRecord).forEach((key) => {
+  const publicWorkerConfig: AnyRecord = {};
+  WORKER_SECRET_CACHE_SAFE_FIELDS.forEach((key) => {
     const value = toStr(workerSecretsRecord[key]).trim();
-    redactedSecrets[key] = WORKER_SECRET_CACHE_SAFE_FIELDS.includes(key) ? value : value ? '[redacted]' : '';
+    if (value) publicWorkerConfig[key] = value;
   });
   const deployFormRecord =
     deployForm && typeof deployForm === 'object' && !Array.isArray(deployForm) ? (deployForm as AnyRecord) : {};
@@ -457,12 +457,12 @@ export const buildSessionWizardCacheWritePayload = ({
 
   return {
     sessionId,
-    draft,
+    draft: sanitizeSessionWizardDraftForBrowserCache(draft),
     privateSlugMode,
     lastManualSlug,
     encryptionGates,
-    // Regression guard: pending CREATE2 SBT drafts remain sessionStorage-only;
-    // this durable wizard cache must not turn them into long-lived local data.
+    // Regression guard: pending CREATE2 SBT drafts remain tab-memory-only;
+    // this durable wizard cache must never contain their deploy or claim secrets.
     pendingSbtDrafts: [],
     encryptedFieldGates,
     gateSelections,
@@ -474,8 +474,8 @@ export const buildSessionWizardCacheWritePayload = ({
     manualMaxFeePerGasGwei,
     manualMaxPriorityFeePerGasGwei,
     workerSecretsEnabled,
-    persistWorkerSecrets: !!effectivePersistWorkerSecrets,
-    workerSecrets: effectivePersistWorkerSecrets ? workerSecretsRecord : redactedSecrets,
+    persistWorkerSecrets: false,
+    workerSecrets: publicWorkerConfig,
     deployForm: durableDeployForm,
     // Remote requirement evidence is intentionally live-memory only. A reload
     // must replay the stable deployment request and reverify the same worker.

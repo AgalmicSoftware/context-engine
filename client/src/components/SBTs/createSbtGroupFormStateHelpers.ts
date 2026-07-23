@@ -117,7 +117,7 @@ export const buildCreateSbtRestoredScalarState = ({
     useImageUrl: !!source.useImageUrl,
     documentIDHashes: source.documentIDHashes || '',
     documentURLs: Array.isArray(source.documentURLs) ? source.documentURLs : [],
-    groupPassword: source.groupPassword || '',
+    groupPassword: '',
     autoAppliedDefaultTags: Array.isArray(source.autoAppliedDefaultTags) ? source.autoAppliedDefaultTags : [],
     dismissedDefaultTags: Array.isArray(source.dismissedDefaultTags) ? source.dismissedDefaultTags : [],
     numInviteLinks: typeof source.numInviteLinks === 'number' ? source.numInviteLinks : currentNumInviteLinks,

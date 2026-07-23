@@ -132,6 +132,8 @@ describe('createSbtGroupFormArtifactHelpers', () => {
         useImageUrl: true,
         sbtDistribution: {
           type: 'password',
+          groupPassword: 'nested-secret',
+          inviteCodes: ['nested-claim'],
           mintingEndTime: endTime,
           network: 84532,
         },
@@ -164,7 +166,6 @@ describe('createSbtGroupFormArtifactHelpers', () => {
       documentIDHashes: ['hash-a'],
       documentURLs: ['https://docs.example/a'],
       documentUrl: 'https://docs.example/pending',
-      groupPassword: 'pw',
       predictableAddressEnabled: true,
       autoAppliedDefaultTags: ['Default'],
       dismissedDefaultTags: [],
@@ -186,6 +187,7 @@ describe('createSbtGroupFormArtifactHelpers', () => {
       documentURLs: [],
       image: [],
     });
+    expect(payload).not.toHaveProperty('groupPassword');
 
     expect(
       buildCreateSbtFormCachePayload({
@@ -199,7 +201,6 @@ describe('createSbtGroupFormArtifactHelpers', () => {
     const groupPasswordPreview = buildCreateSbtJsonPreviewData({
       authoringChain: { name: 'OP Sepolia' },
       autoJoinUrl: 'https://app.example/session?sbt=0xabc',
-      groupPassword: 'secret',
       network: 'Fallback Network',
       sbtAddress: '0xabc',
       sbtDistribution: {
@@ -215,7 +216,6 @@ describe('createSbtGroupFormArtifactHelpers', () => {
       sbtAddress: '0xabc',
       network: 'OP Sepolia',
       distribution: 'groupPassword',
-      groupPassword: 'secret',
       autoJoinUrl: 'https://app.example/session?sbt=0xabc',
       shareableUrl: 'https://app.example/sbt/0xabc',
     });
@@ -236,7 +236,6 @@ describe('createSbtGroupFormArtifactHelpers', () => {
       tokenURI: 'https://example.test/token.json',
       network: 'Base Sepolia',
       distribution: 'open',
-      groupPassword: undefined,
       autoJoinUrl: '',
       shareableUrl: '',
     });
@@ -354,7 +353,7 @@ describe('createSbtGroupFormArtifactHelpers', () => {
           {
             index: 0,
             password: 'pw1',
-            inviteLink: 'https://app.example/sbt/0xabc/pw1',
+            inviteLink: 'https://app.example/sbt/0xabc',
           },
           {
             index: 1,
@@ -405,10 +404,7 @@ describe('createSbtGroupFormArtifactHelpers', () => {
         detailPath: '/sbt/0xabc?session=alpha',
         passwordList: ['pw 1', 'pw/2'],
       }),
-    ).toEqual([
-      'https://app.example/sbt/0xabc/pw%201?session=alpha',
-      'https://app.example/sbt/0xabc/pw%2F2?session=alpha',
-    ]);
+    ).toEqual(['https://app.example/sbt/0xabc?session=alpha', 'https://app.example/sbt/0xabc?session=alpha']);
 
     expect(
       buildCreateSbtInviteLinks({
@@ -419,7 +415,7 @@ describe('createSbtGroupFormArtifactHelpers', () => {
         passwordList: ['group code'],
         sbtAddress: '0xABC',
       }),
-    ).toEqual(['https://app.example/session/alpha?auto=1&sbt=0xABC&gp=encoded%3Agroup%20code']);
+    ).toEqual(['https://app.example/session/alpha?auto=1&sbt=0xABC']);
     expect(
       resolveCreateSbtInviteCodeList({
         listOverride: ['override', 0],

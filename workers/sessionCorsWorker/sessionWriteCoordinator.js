@@ -5,7 +5,10 @@ import {
   stableCanonicalSerialize,
 } from '../shared/deployHelperCore.mjs';
 import { buildSafeSponsoredReceiptBody } from './sponsoredBootstrapGrantStore.js';
-import { applySessionConfigMutation } from './sessionConfigMutation.js';
+import {
+  applySessionConfigMutation,
+  resolveCanonicalWorkerSessionIdHex,
+} from './sessionConfigMutation.js';
 import { normalizeWorkerConfigRecord } from './sessionConfigNormalization.js';
 import { putSessionConfig } from './sessionConfigSecretsStore.js';
 import {
@@ -16,6 +19,14 @@ import {
   findForbiddenCloudflareDeploymentTokenPath,
   findForbiddenWorkerConfigSecretPath,
 } from '../shared/workerSessionConfig.mjs';
+import {
+  createWorkerGroupId,
+  executeWorkerGroupMutation,
+  normalizeWorkerGroupId,
+  normalizeWorkerGroupPrincipal,
+  resolveWorkerGroupBootstrap,
+  resolveWorkerGroupCaps,
+} from './workerGroups.js';
 
 const SPONSORED_DEPLOY_RECORD_KEY = 'sponsored-deploy';
 const DIRECT_DEPLOY_RECORD_KEY = 'direct-deploy';
@@ -24,6 +35,9 @@ const SESSION_CONFIG_AUTHORITY_KEY = 'session-config-authority';
 const AUTH_NONCE_ACTIVE_KEY = 'auth-nonce-active';
 const AUTH_NONCE_USED_KEY = 'auth-nonce-used';
 const AUTH_RATE_RECORD_KEY = 'auth-rate-record';
+const WORKER_GROUP_CAPACITY_META_KEY = 'worker-group-capacity-meta-v3';
+const WORKER_GROUP_CAPACITY_GROUP_PREFIX = 'worker-group-capacity-group-v3:';
+const WORKER_GROUP_CAPACITY_MEMBER_PREFIX = 'worker-group-capacity-member-v3:';
 const RUNNING_LEASE_MS = 65_000;
 const MAX_AUTH_NONCE_LIFETIME_MS = 60 * 60 * 1000;
 const MAX_AUTH_RATE_WINDOW_MS = 8 * 24 * 60 * 60 * 1000;
@@ -162,6 +176,92 @@ const createAttemptId = (cryptoImpl = globalThis.crypto) => {
   return Array.from(bytes).map((value) => value.toString(16).padStart(2, '0')).join('');
 };
 
+const workerGroupCapacityGroupKey = (groupId) => (
+  `${WORKER_GROUP_CAPACITY_GROUP_PREFIX}${encodeURIComponent(normalizeWorkerGroupId(groupId))}`
+);
+
+const workerGroupCapacityMemberKey = ({ groupId, generation, principalDigest }) => (
+  `${WORKER_GROUP_CAPACITY_MEMBER_PREFIX}${encodeURIComponent(normalizeWorkerGroupId(groupId))}:` +
+  `${generation}:${principalDigest}`
+);
+
+const WORKER_GROUP_MUTATIONS = new Set([
+  'create',
+  'update',
+  'delete',
+  'add-member',
+  'remove-member',
+  'join',
+]);
+
+const normalizeWorkerGroupMutation = (payload) => {
+  const slug = normalizeSessionSlug(payload?.slug);
+  const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+  const operation = toTrimmedString(payload?.operation).toLowerCase();
+  const actor = normalizeWorkerGroupPrincipal(payload?.actorPrincipal);
+  if (!slug || !sessionId || !WORKER_GROUP_MUTATIONS.has(operation) || !actor.ok) return null;
+  if (operation === 'create') {
+    if (!isObjectRecord(payload?.input)) return null;
+    const requestedGroupId = toTrimmedString(payload.input.groupId);
+    const groupId = requestedGroupId
+      ? normalizeWorkerGroupId(requestedGroupId)
+      : createWorkerGroupId();
+    if (!groupId) return null;
+    return {
+      slug,
+      sessionId,
+      operation,
+      input: {
+        ...payload.input,
+        groupId,
+      },
+      groupId,
+      actorPrincipal: actor.principal,
+    };
+  }
+  const rawGroupId = toTrimmedString(payload?.groupId);
+  if (!rawGroupId) return null;
+  const normalized = {
+    slug,
+    sessionId,
+    operation,
+    groupId: normalizeWorkerGroupId(rawGroupId),
+    input: isObjectRecord(payload?.input) ? payload.input : {},
+    actorPrincipal: actor.principal,
+  };
+  if (!normalized.groupId) return null;
+  if (operation === 'add-member' || operation === 'remove-member' || operation === 'join') {
+    const principal = normalizeWorkerGroupPrincipal(payload?.principal);
+    if (!principal.ok) return null;
+    normalized.principal = principal.principal;
+    normalized.principalKey = principal.key;
+  }
+  return normalized;
+};
+
+const resolveInitializedWorkerGroupCapacity = (existing, slug, sessionId) => {
+  if (!existing) return null;
+  if (existing.version !== 3 || existing.slug !== slug || existing.sessionId !== sessionId) {
+    return {
+      ok: false,
+      status: 409,
+      reason: 'worker_group_capacity_identity_conflict',
+    };
+  }
+  if (
+    existing.phase === 'ready' &&
+    Number.isSafeInteger(existing.groupCount) &&
+    existing.groupCount >= 0
+  ) {
+    return { ok: true, meta: existing };
+  }
+  return {
+    ok: false,
+    status: 503,
+    reason: 'worker_group_capacity_reconciliation_required',
+  };
+};
+
 export class SessionWriteCoordinator {
   constructor(state, env, deps = {}) {
     this.state = state;
@@ -175,12 +275,634 @@ export class SessionWriteCoordinator {
     this.activeAttemptId = '';
     this.activeDirectAttemptId = '';
     this.sessionConfigTail = Promise.resolve();
+    this.workerGroupTail = Promise.resolve();
   }
 
   serializeSessionConfigOperation(operation) {
     const run = this.sessionConfigTail.then(operation);
     this.sessionConfigTail = run.catch(() => undefined);
     return run;
+  }
+
+  serializeWorkerGroupOperation(operation) {
+    const run = this.workerGroupTail.then(operation);
+    this.workerGroupTail = run.catch(() => undefined);
+    return run;
+  }
+
+  async initializeWorkerGroupCapacity(slug, sessionId) {
+    const existing = await this.state.storage.get(WORKER_GROUP_CAPACITY_META_KEY);
+    const initialized = resolveInitializedWorkerGroupCapacity(existing, slug, sessionId);
+    if (initialized) return initialized;
+
+    // Bootstrap proof may require an external KV read, which cannot run inside
+    // a Durable Object storage transaction. Recheck the durable state after
+    // that await so a slow readiness request cannot overwrite a concurrent
+    // capacity reservation.
+    const bootstrap = await resolveWorkerGroupBootstrap({ env: this.env, slug, sessionId });
+    return this.state.storage.transaction(async (transaction) => {
+      const concurrent = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
+      const concurrentlyInitialized = resolveInitializedWorkerGroupCapacity(concurrent, slug, sessionId);
+      if (concurrentlyInitialized) return concurrentlyInitialized;
+
+      if (!bootstrap.ok) {
+        if (bootstrap.reason === 'worker_group_capacity_reconciliation_required') {
+          await transaction.put(WORKER_GROUP_CAPACITY_META_KEY, {
+            version: 3,
+            slug,
+            sessionId,
+            phase: 'legacy_locked',
+            bootstrapId: '',
+            groupCount: resolveWorkerGroupCaps(this.env).maxGroupsPerSession,
+          });
+        }
+        return bootstrap;
+      }
+      const meta = {
+        version: 3,
+        slug,
+        sessionId,
+        phase: 'ready',
+        bootstrapId: bootstrap.bootstrapId,
+        groupCount: 0,
+      };
+      await transaction.put(WORKER_GROUP_CAPACITY_META_KEY, meta);
+      return { ok: true, meta };
+    });
+  }
+
+  async reserveWorkerGroupSlot({ slug, sessionId, groupId, maxGroupsPerSession }) {
+    return this.state.storage.transaction(async (transaction) => {
+      const meta = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
+      if (
+        meta?.version !== 3 ||
+        meta.slug !== slug ||
+        meta.sessionId !== sessionId ||
+        meta.phase !== 'ready'
+      ) {
+        return { ok: false, status: 503, reason: 'worker_group_capacity_state_unavailable' };
+      }
+      const groupKey = workerGroupCapacityGroupKey(groupId);
+      const prior = await transaction.get(groupKey);
+      if (prior) {
+        return {
+          ok: false,
+          status: 409,
+          reason: prior.active === true ? 'worker_group_exists' : 'worker_group_id_retired',
+        };
+      }
+      if (Number(meta.groupCount || 0) >= maxGroupsPerSession) {
+        return { ok: false, status: 409, reason: 'worker_group_session_cap_exceeded' };
+      }
+      await transaction.put(WORKER_GROUP_CAPACITY_META_KEY, {
+        ...meta,
+        groupCount: Number(meta.groupCount || 0) + 1,
+      });
+      await transaction.put(groupKey, {
+        version: 2,
+        phase: 'creating',
+        active: false,
+        generation: 1,
+        memberCount: 0,
+        joinMode: 'admin_add',
+      });
+      return { ok: true, reserved: true, generation: 1 };
+    });
+  }
+
+  async rollbackWorkerGroupSlot({ slug, sessionId, groupId }) {
+    await this.state.storage.transaction(async (transaction) => {
+      const meta = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
+      const key = workerGroupCapacityGroupKey(groupId);
+      const groupState = await transaction.get(key);
+      if (
+        meta?.version !== 3 ||
+        meta.slug !== slug ||
+        meta.sessionId !== sessionId ||
+        meta.phase !== 'ready' ||
+        groupState?.phase !== 'creating'
+      ) return;
+      await transaction.put(WORKER_GROUP_CAPACITY_META_KEY, {
+        ...meta,
+        groupCount: Math.max(0, Number(meta.groupCount || 0) - 1),
+      });
+      await transaction.delete(key);
+    });
+  }
+
+  async activateWorkerGroupCapacity(group) {
+    await this.state.storage.transaction(async (transaction) => {
+      const groupId = normalizeWorkerGroupId(group?.groupId);
+      const key = workerGroupCapacityGroupKey(groupId);
+      const prior = await transaction.get(key);
+      if (prior?.phase !== 'creating') {
+        throw new Error('Worker group creation reservation is unavailable.');
+      }
+      await transaction.put(key, {
+        ...prior,
+        version: 2,
+        phase: 'active',
+        active: true,
+        joinMode: toTrimmedString(group?.joinMode).toLowerCase() || 'admin_add',
+        memberVisibility: toTrimmedString(group?.memberVisibility).toLowerCase() || 'admin_only',
+      });
+    });
+  }
+
+  async getActiveWorkerGroupCapacity(groupId) {
+    const state = await this.state.storage.get(workerGroupCapacityGroupKey(groupId));
+    if (state?.version !== 2 || state.phase !== 'active' || state.active !== true) {
+      return { ok: false, status: 404, reason: 'worker_group_not_found' };
+    }
+    return { ok: true, state };
+  }
+
+  async beginWorkerGroupUpdate(groupId) {
+    return this.state.storage.transaction(async (transaction) => {
+      const key = workerGroupCapacityGroupKey(groupId);
+      const state = await transaction.get(key);
+      if (state?.phase !== 'active' || state.active !== true) {
+        return { ok: false, status: 404, reason: 'worker_group_not_found' };
+      }
+      await transaction.put(key, {
+        ...state,
+        phase: 'updating',
+        // Closed is the conservative join posture while the KV projection is
+        // ambiguous or a restrictive update is propagating.
+        joinMode: 'admin_add',
+      });
+      return { ok: true, prior: state };
+    });
+  }
+
+  async finalizeWorkerGroupUpdate({ groupId, group }) {
+    await this.state.storage.transaction(async (transaction) => {
+      const key = workerGroupCapacityGroupKey(groupId);
+      const state = await transaction.get(key);
+      if (state?.phase !== 'updating') return;
+      await transaction.put(key, {
+        ...state,
+        phase: 'active',
+        active: true,
+        joinMode: toTrimmedString(group?.joinMode).toLowerCase() || 'admin_add',
+        memberVisibility: toTrimmedString(group?.memberVisibility).toLowerCase() || 'admin_only',
+      });
+    });
+  }
+
+  async rollbackWorkerGroupUpdate({ groupId, prior }) {
+    await this.state.storage.transaction(async (transaction) => {
+      const key = workerGroupCapacityGroupKey(groupId);
+      const state = await transaction.get(key);
+      if (state?.phase === 'updating') await transaction.put(key, prior);
+    });
+  }
+
+  async beginWorkerGroupDelete(groupId) {
+    return this.state.storage.transaction(async (transaction) => {
+      const key = workerGroupCapacityGroupKey(groupId);
+      const state = await transaction.get(key);
+      if (state?.phase !== 'active' || state.active !== true) {
+        return { ok: false, status: 404, reason: 'worker_group_not_found' };
+      }
+      await transaction.put(key, {
+        ...state,
+        phase: 'deleting',
+        active: false,
+        joinMode: 'admin_add',
+      });
+      return { ok: true };
+    });
+  }
+
+  async reserveWorkerGroupMemberSlot({
+    groupId,
+    principalDigest,
+    maxMembersPerGroup,
+  }) {
+    return this.state.storage.transaction(async (transaction) => {
+      const groupKey = workerGroupCapacityGroupKey(groupId);
+      const groupState = await transaction.get(groupKey);
+      if (groupState?.phase !== 'active' || groupState.active !== true) {
+        return { ok: false, status: 404, reason: 'worker_group_not_found' };
+      }
+      const generation = Math.max(1, Number(groupState.generation || 0));
+      const memberKey = workerGroupCapacityMemberKey({
+        groupId,
+        generation,
+        principalDigest,
+      });
+      const memberState = await transaction.get(memberKey);
+      if (memberState?.state === 'active') {
+        return { ok: true, reserved: false, generation, memberKey };
+      }
+      if (memberState?.state === 'reserved' || memberState?.state === 'removing') {
+        return {
+          ok: false,
+          status: 503,
+          reason: 'worker_group_membership_state_pending',
+        };
+      }
+      if (Number(groupState.memberCount || 0) >= maxMembersPerGroup) {
+        return { ok: false, status: 409, reason: 'worker_group_member_cap_exceeded' };
+      }
+      await transaction.put(groupKey, {
+        ...groupState,
+        memberCount: Number(groupState.memberCount || 0) + 1,
+      });
+      await transaction.put(memberKey, {
+        version: 2,
+        state: 'reserved',
+      });
+      return { ok: true, reserved: true, generation, memberKey };
+    });
+  }
+
+  async finalizeWorkerGroupMemberSlot(memberKey) {
+    await this.state.storage.transaction(async (transaction) => {
+      const memberState = await transaction.get(memberKey);
+      if (memberState?.state !== 'reserved') return;
+      await transaction.put(memberKey, {
+        version: 2,
+        state: 'active',
+      });
+    });
+  }
+
+  async rollbackWorkerGroupMemberSlot({ groupId, memberKey }) {
+    await this.state.storage.transaction(async (transaction) => {
+      const groupKey = workerGroupCapacityGroupKey(groupId);
+      const groupState = await transaction.get(groupKey);
+      const memberState = await transaction.get(memberKey);
+      if (groupState?.active && memberState?.state === 'reserved') {
+        await transaction.put(groupKey, {
+          ...groupState,
+          memberCount: Math.max(0, Number(groupState.memberCount || 0) - 1),
+        });
+        await transaction.put(memberKey, {
+          version: 2,
+          state: 'removed',
+        });
+      }
+    });
+  }
+
+  async beginWorkerGroupMemberRemoval({ groupId, principalDigest }) {
+    return this.state.storage.transaction(async (transaction) => {
+      const groupKey = workerGroupCapacityGroupKey(groupId);
+      const groupState = await transaction.get(groupKey);
+      if (groupState?.phase !== 'active' || groupState.active !== true) {
+        return { ok: false, status: 404, reason: 'worker_group_not_found' };
+      }
+      const generation = Math.max(1, Number(groupState.generation || 0));
+      const memberKey = workerGroupCapacityMemberKey({
+        groupId,
+        generation,
+        principalDigest,
+      });
+      const memberState = await transaction.get(memberKey);
+      if (memberState?.state !== 'active') {
+        return {
+          ok: false,
+          status: memberState?.state === 'reserved' || memberState?.state === 'removing'
+            ? 503
+            : 404,
+          reason: memberState?.state === 'reserved' || memberState?.state === 'removing'
+            ? 'worker_group_membership_state_pending'
+            : 'worker_group_member_not_found',
+        };
+      }
+      await transaction.put(memberKey, {
+        version: 2,
+        state: 'removing',
+      });
+      return { ok: true, memberKey };
+    });
+  }
+
+  async releaseWorkerGroupMemberSlot({ groupId, memberKey }) {
+    await this.state.storage.transaction(async (transaction) => {
+      const groupKey = workerGroupCapacityGroupKey(groupId);
+      const groupState = await transaction.get(groupKey);
+      const memberState = await transaction.get(memberKey);
+      if (!groupState || memberState?.state !== 'removing') return;
+      await transaction.put(groupKey, {
+        ...groupState,
+        memberCount: Math.max(0, Number(groupState.memberCount || 0) - 1),
+      });
+      await transaction.put(memberKey, {
+        version: 2,
+        state: 'removed',
+      });
+    });
+  }
+
+  async releaseWorkerGroupCapacity({ slug, sessionId, groupId }) {
+    await this.state.storage.transaction(async (transaction) => {
+      const meta = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
+      const key = workerGroupCapacityGroupKey(groupId);
+      const groupState = await transaction.get(key);
+      if (
+        meta?.version !== 3 ||
+        meta.slug !== slug ||
+        meta.sessionId !== sessionId ||
+        meta.phase !== 'ready' ||
+        groupState?.phase !== 'deleting'
+      ) return;
+      await transaction.put(WORKER_GROUP_CAPACITY_META_KEY, {
+        ...meta,
+        groupCount: Math.max(0, Number(meta.groupCount || 0) - 1),
+      });
+      await transaction.put(key, {
+        ...groupState,
+        phase: 'deleted',
+        active: false,
+        memberCount: 0,
+      });
+    });
+  }
+
+  async executeWorkerGroupReady(payload) {
+    const slug = normalizeSessionSlug(payload?.slug);
+    const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+    if (!slug || !sessionId) {
+      return jsonResponse({
+        ok: false,
+        status: 400,
+        reason: 'worker_group_session_identity_invalid',
+      }, 400);
+    }
+    const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
+    return jsonResponse(initialized, initialized.ok ? 200 : (initialized.status || 503));
+  }
+
+  executeWorkerGroupAuthorization(payload) {
+    return this.serializeWorkerGroupOperation(async () => {
+      const slug = normalizeSessionSlug(payload?.slug);
+      const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+      const groupId = normalizeWorkerGroupId(payload?.groupId);
+      const principal = normalizeWorkerGroupPrincipal(payload?.principal);
+      if (!slug || !sessionId || !groupId || !principal.ok) {
+        return jsonResponse({
+          ok: false,
+          status: 400,
+          reason: 'worker_group_authorization_invalid',
+        }, 400);
+      }
+      const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
+      if (!initialized.ok) {
+        return jsonResponse(initialized, initialized.status || 503);
+      }
+      const group = await this.getActiveWorkerGroupCapacity(groupId);
+      if (!group.ok) return jsonResponse(group, group.status || 404);
+      const principalDigest = await sha256Hex(`worker-group-member:${principal.key}`);
+      const memberKey = workerGroupCapacityMemberKey({
+        groupId,
+        generation: Math.max(1, Number(group.state.generation || 0)),
+        principalDigest,
+      });
+      const member = await this.state.storage.get(memberKey);
+      if (member?.state !== 'active') {
+        return jsonResponse({
+          ok: false,
+          status: 403,
+          reason: 'worker_group_membership_denied',
+          principal: principal.principal,
+        }, 403);
+      }
+      return jsonResponse({
+        ok: true,
+        status: 200,
+        store: 'durable_object',
+        principal: principal.principal,
+        groupId,
+        group: {
+          groupId,
+          joinMode: group.state.joinMode,
+          memberVisibility: group.state.memberVisibility,
+          memberCount: Number(group.state.memberCount || 0),
+        },
+      }, 200);
+    });
+  }
+
+  executeWorkerGroupCatalog(payload) {
+    return this.serializeWorkerGroupOperation(async () => {
+      const slug = normalizeSessionSlug(payload?.slug);
+      const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+      const requestedGroupIds = Array.isArray(payload?.groupIds)
+        ? payload.groupIds.map((groupId) => normalizeWorkerGroupId(groupId))
+        : [];
+      const maxGroups = resolveWorkerGroupCaps(this.env).maxGroupsPerSession;
+      const uniqueGroupIds = [...new Set(requestedGroupIds)];
+      const principal = payload?.principal == null
+        ? null
+        : normalizeWorkerGroupPrincipal(payload.principal);
+      if (
+        !slug ||
+        !sessionId ||
+        !requestedGroupIds.length ||
+        requestedGroupIds.some((groupId) => !groupId) ||
+        uniqueGroupIds.length !== requestedGroupIds.length ||
+        uniqueGroupIds.length > maxGroups ||
+        (principal && !principal.ok)
+      ) {
+        return jsonResponse({
+          ok: false,
+          status: 400,
+          reason: 'worker_group_catalog_invalid',
+        }, 400);
+      }
+      const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
+      if (!initialized.ok) {
+        return jsonResponse(initialized, initialized.status || 503);
+      }
+      const principalDigest = principal
+        ? await sha256Hex(`worker-group-member:${principal.key}`)
+        : '';
+      const groups = [];
+      for (const groupId of uniqueGroupIds) {
+        const group = await this.getActiveWorkerGroupCapacity(groupId);
+        if (!group.ok) continue;
+        let isMember = false;
+        if (principalDigest) {
+          const memberKey = workerGroupCapacityMemberKey({
+            groupId,
+            generation: Math.max(1, Number(group.state.generation || 0)),
+            principalDigest,
+          });
+          const member = await this.state.storage.get(memberKey);
+          isMember = member?.state === 'active';
+        }
+        groups.push({
+          groupId,
+          joinMode: group.state.joinMode,
+          memberVisibility: group.state.memberVisibility,
+          memberCount: Number(group.state.memberCount || 0),
+          isMember,
+        });
+      }
+      return jsonResponse({
+        ok: true,
+        status: 200,
+        store: 'durable_object',
+        groups,
+      }, 200);
+    });
+  }
+
+  async executeWorkerGroupMutation(payload) {
+    return this.serializeWorkerGroupOperation(async () => {
+      const mutation = normalizeWorkerGroupMutation(payload);
+      if (!mutation) {
+        return jsonResponse({
+          ok: false,
+          status: 400,
+          reason: 'worker_group_mutation_invalid',
+        }, 400);
+      }
+      const initialized = await this.initializeWorkerGroupCapacity(mutation.slug, mutation.sessionId);
+      if (!initialized.ok) {
+        return jsonResponse(initialized, initialized.status || 503);
+      }
+      const caps = resolveWorkerGroupCaps(this.env);
+      let groupReservation = null;
+      let memberReservation = null;
+      let updateReservation = null;
+      let removalReservation = null;
+      let principalDigest = '';
+      if (mutation.operation === 'create') {
+        groupReservation = await this.reserveWorkerGroupSlot({
+          slug: mutation.slug,
+          sessionId: mutation.sessionId,
+          groupId: mutation.groupId,
+          maxGroupsPerSession: caps.maxGroupsPerSession,
+        });
+        if (!groupReservation.ok) {
+          return jsonResponse(groupReservation, groupReservation.status || 409);
+        }
+      } else {
+        const activeGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
+        if (!activeGroup.ok) {
+          return jsonResponse(activeGroup, activeGroup.status || 404);
+        }
+        if (
+          mutation.operation === 'join' &&
+          activeGroup.state.joinMode !== 'open'
+        ) {
+          return jsonResponse({
+            ok: false,
+            status: 403,
+            reason: 'worker_group_join_denied',
+          }, 403);
+        }
+        if (mutation.operation === 'update') {
+          updateReservation = await this.beginWorkerGroupUpdate(mutation.groupId);
+          if (!updateReservation.ok) {
+            return jsonResponse(updateReservation, updateReservation.status || 404);
+          }
+        } else if (mutation.operation === 'delete') {
+          const deleting = await this.beginWorkerGroupDelete(mutation.groupId);
+          if (!deleting.ok) return jsonResponse(deleting, deleting.status || 404);
+        }
+      }
+      if (mutation.operation === 'add-member' || mutation.operation === 'join') {
+        principalDigest = await sha256Hex(`worker-group-member:${mutation.principalKey}`);
+        memberReservation = await this.reserveWorkerGroupMemberSlot({
+          groupId: mutation.groupId,
+          principalDigest,
+          maxMembersPerGroup: caps.maxMembersPerGroup,
+        });
+        if (!memberReservation.ok) {
+          return jsonResponse(memberReservation, memberReservation.status || 409);
+        }
+      } else if (mutation.operation === 'remove-member') {
+        principalDigest = await sha256Hex(`worker-group-member:${mutation.principalKey}`);
+        removalReservation = await this.beginWorkerGroupMemberRemoval({
+          groupId: mutation.groupId,
+          principalDigest,
+        });
+        if (!removalReservation.ok) {
+          return jsonResponse(removalReservation, removalReservation.status || 404);
+        }
+      }
+
+      let result;
+      try {
+        result = await executeWorkerGroupMutation({
+          env: this.env,
+          ...mutation,
+          capacityAuthorized: true,
+        });
+      } catch {
+        // KV may have accepted a write before surfacing an error. Retain any
+        // reservation so an ambiguous projection cannot create free capacity.
+        return jsonResponse({
+          ok: false,
+          status: 503,
+          reason: 'worker_group_mutation_ambiguous',
+        }, 503);
+      }
+
+      if (!result.ok) {
+        if (groupReservation?.reserved) {
+          const definitelyPrewrite = new Set([
+            'invalid_join_mode',
+            'join_mode_not_implemented',
+            'invalid_member_visibility',
+            'invalid_group_label',
+            'invalid_group_description',
+            'invalid_group_image_url',
+            'invalid_worker_group_id',
+          ]);
+          if (definitelyPrewrite.has(result.reason)) {
+            await this.rollbackWorkerGroupSlot({
+              slug: mutation.slug,
+              sessionId: mutation.sessionId,
+              groupId: mutation.groupId,
+            });
+          }
+        }
+        if (updateReservation?.ok) {
+          await this.rollbackWorkerGroupUpdate({
+            groupId: mutation.groupId,
+            prior: updateReservation.prior,
+          });
+        }
+        if (memberReservation?.reserved) {
+          await this.rollbackWorkerGroupMemberSlot({
+            groupId: mutation.groupId,
+            memberKey: memberReservation.memberKey,
+          });
+        }
+        return jsonResponse(result, result.status || 400);
+      }
+
+      if (mutation.operation === 'create') {
+        await this.activateWorkerGroupCapacity(result.group);
+      } else if (mutation.operation === 'update') {
+        await this.finalizeWorkerGroupUpdate({
+          groupId: mutation.groupId,
+          group: result.group,
+        });
+      } else if (mutation.operation === 'add-member' || mutation.operation === 'join') {
+        if (memberReservation?.reserved) {
+          await this.finalizeWorkerGroupMemberSlot(memberReservation.memberKey);
+        }
+      } else if (mutation.operation === 'remove-member') {
+        await this.releaseWorkerGroupMemberSlot({
+          groupId: mutation.groupId,
+          memberKey: removalReservation.memberKey,
+        });
+      } else if (mutation.operation === 'delete') {
+        await this.releaseWorkerGroupCapacity({
+          slug: mutation.slug,
+          sessionId: mutation.sessionId,
+          groupId: mutation.groupId,
+        });
+      }
+      return jsonResponse(result, 200);
+    });
   }
 
   async finalizeSessionConfigProjection(revision) {
@@ -799,6 +1521,18 @@ export class SessionWriteCoordinator {
     }
     if (url.pathname === '/auth-state/rate/check') {
       return this.executeAuthRateCheck(payload);
+    }
+    if (url.pathname === '/worker-groups/ready') {
+      return this.executeWorkerGroupReady(payload);
+    }
+    if (url.pathname === '/worker-groups/authorize') {
+      return this.executeWorkerGroupAuthorization(payload);
+    }
+    if (url.pathname === '/worker-groups/catalog') {
+      return this.executeWorkerGroupCatalog(payload);
+    }
+    if (url.pathname === '/worker-groups/mutate') {
+      return this.executeWorkerGroupMutation(payload);
     }
     if (url.pathname === '/deploy-helper') return this.executeDirectDeploy(payload);
     if (url.pathname === '/sponsored-faucet/reserve') {

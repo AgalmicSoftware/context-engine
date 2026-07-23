@@ -43,6 +43,8 @@ type SendContractWriteViaProviderOptions = {
   onBroadcastTxHash?: ((txHash: unknown) => unknown) | null;
   rpcFunction?: string;
   revertMessage?: string;
+  sensitiveArgs?: boolean;
+  resolveSensitiveErrorMessage?: ((error: unknown) => string | null | undefined) | null;
 };
 
 const contractsLog = createLogger('contracts');
@@ -171,6 +173,8 @@ const sendContractWriteViaProvider = async ({
   onBroadcastTxHash,
   rpcFunction = method,
   revertMessage = `${method} transaction reverted on-chain.`,
+  sensitiveArgs = false,
+  resolveSensitiveErrorMessage = null,
 }: SendContractWriteViaProviderOptions = {}): Promise<{ txHash: unknown; receipt: AnyRecord }> => {
   const methodName = String(method || '');
   if (!contract?.interface || typeof contract.interface.encodeFunctionData !== 'function') {
@@ -211,19 +215,46 @@ const sendContractWriteViaProvider = async ({
   rpcLog('RPC Call (Tx):', {
     function: rpcFunction,
     method: 'eth_sendTransaction',
-    params: txParams,
+    params: {
+      from,
+      to,
+      calldataBytes: Math.max(0, (data.length - 2) / 2),
+      hasValue: txParams.value != null,
+      hasGasLimit: txParams.gas != null,
+    },
   });
 
+  const buildSensitiveWriteError = (error: unknown): Error => {
+    if (typeof resolveSensitiveErrorMessage === 'function') {
+      try {
+        const resolvedMessage = String(resolveSensitiveErrorMessage(error) || '').trim();
+        if (resolvedMessage) {
+          return new Error(resolvedMessage);
+        }
+      } catch {
+        // Fall through to the fixed message without exposing the resolver failure.
+      }
+    }
+    return new Error(revertMessage);
+  };
+
   let txHash;
-  if (signingProvider && typeof signingProvider.request === 'function') {
-    txHash = await signingProvider.request({
-      method: 'eth_sendTransaction',
-      params: [txParams],
-    });
-  } else if (ethersProvider && typeof ethersProvider.send === 'function') {
-    txHash = await ethersProvider.send('eth_sendTransaction', [txParams]);
-  } else {
-    throw new Error('Connected wallet provider does not support eth_sendTransaction.');
+  try {
+    if (signingProvider && typeof signingProvider.request === 'function') {
+      txHash = await signingProvider.request({
+        method: 'eth_sendTransaction',
+        params: [txParams],
+      });
+    } else if (ethersProvider && typeof ethersProvider.send === 'function') {
+      txHash = await ethersProvider.send('eth_sendTransaction', [txParams]);
+    } else {
+      throw new Error('Connected wallet provider does not support eth_sendTransaction.');
+    }
+  } catch (error) {
+    if (sensitiveArgs) {
+      throw buildSensitiveWriteError(error);
+    }
+    throw error;
   }
 
   if (typeof onBroadcastTxHash === 'function') {
@@ -243,19 +274,29 @@ const sendContractWriteViaProvider = async ({
   if (!ethersProvider || typeof ethersProvider.waitForTransaction !== 'function') {
     throw new Error('Connected wallet provider does not support waiting for transaction receipts.');
   }
-  const receipt = (await ethersProvider.waitForTransaction(txHash)) as AnyRecord;
+  let receipt: AnyRecord;
+  try {
+    receipt = (await ethersProvider.waitForTransaction(txHash)) as AnyRecord;
+  } catch (error) {
+    if (sensitiveArgs) {
+      throw buildSensitiveWriteError(error);
+    }
+    throw error;
+  }
   if (!receipt || (receipt.status !== undefined && receipt.status !== 1)) {
-    const resolvedRevertMessage = await resolveReceiptRevertMessage({
-      contract,
-      method,
-      args,
-      txOverrides,
-      from,
-      ethersProvider,
-      txParams,
-      receipt,
-      fallbackMessage: revertMessage,
-    });
+    const resolvedRevertMessage = sensitiveArgs
+      ? revertMessage
+      : await resolveReceiptRevertMessage({
+          contract,
+          method,
+          args,
+          txOverrides,
+          from,
+          ethersProvider,
+          txParams,
+          receipt,
+          fallbackMessage: revertMessage,
+        });
     throw new Error(resolvedRevertMessage);
   }
   return { txHash, receipt };

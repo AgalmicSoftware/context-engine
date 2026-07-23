@@ -1,5 +1,9 @@
 import { resolveCanonicalSessionConfig } from '../../utilities/session/canonicalSessionContext.js';
 import {
+  claimsWorkerCanonicalAuthority,
+  resolveSessionCapabilityProjection,
+} from '../../utilities/session/sessionCapabilityProjection';
+import {
   normalizeSessionSlug,
   resolveSessionAliases,
   resolveSessionSlugFromPathname,
@@ -15,6 +19,7 @@ import type {
 type UnknownRecord = Record<string, unknown>;
 
 type SurveyToolSessionSource = {
+  sessionConfig?: SessionConfigLike | null;
   sessionSlug?: string;
 };
 
@@ -48,17 +53,6 @@ const isPlainObject = (value: unknown): value is UnknownRecord =>
 const readPositiveNumber = (value: unknown): number | null => {
   const num = Number(value || 0);
   return Number.isFinite(num) && num > 0 ? num : null;
-};
-const readSessionChainId = (sessionConfig: SessionConfigLike | null | undefined): number | null =>
-  readPositiveNumber(sessionConfig?.networkChainId) ??
-  readPositiveNumber(sessionConfig?.contracts?.surveys?.chainId) ??
-  readPositiveNumber(sessionConfig?.contracts?.sbtFactory?.chainId) ??
-  readPositiveNumber(sessionConfig?.__registry?.chainId) ??
-  readPositiveNumber(sessionConfig?.__registry?.registryChainId);
-const isWorkerCanonicalSessionConfig = (sessionConfig: SessionConfigLike | null | undefined): boolean => {
-  const profile = isPlainObject(sessionConfig?.sessionModeProfile) ? sessionConfig.sessionModeProfile : null;
-  const authority = isPlainObject(profile?.authority) ? profile.authority : null;
-  return authority?.mode === 'worker_canonical';
 };
 const normalizeQuestionIdList = (value: unknown): string[] =>
   Array.isArray(value)
@@ -155,19 +149,24 @@ const resolveSurveyToolNetworkScopedSessionContext = ({
     resolved.sessionSlug || normalizeSessionSlug(sessionSlug),
     ...(Array.isArray(fallbackSessionSlugs) ? fallbackSessionSlugs : []),
   ]);
-  const workerCanonical = isWorkerCanonicalSessionConfig(resolved.sessionConfig);
-  let effectiveNetworkId = workerCanonical
-    ? null
-    : // Prefer the session's configured chain over wallet-facing network props so
-      // cache reads/writes stay scoped to the session even when the wallet UI is on
-      // a different chain (for example Base mainnet vs Base Sepolia).
-      (readSessionChainId(resolved.sessionConfig) ??
-      readPositiveNumber(networkChainId) ??
-      readPositiveNumber(network?.id) ??
-      readPositiveNumber(network?.chainId));
+  const projection = resolveSessionCapabilityProjection(resolved.sessionConfig);
+  const workerCanonical = projection.profileValid && projection.isWorkerCanonical;
+  // Concrete sessions get a chain only from their validated capability
+  // contract. Wallet/default networks cannot promote a pure Worker, missing,
+  // or invalid session into an on-chain response scope.
+  let effectiveNetworkId = projection.showNetworkControls ? projection.chainId : null;
   let effectiveNetworkSourceSlug = effectiveNetworkId || workerCanonical ? resolved.sessionSlug : '';
 
-  if (!workerCanonical && effectiveNetworkId == null && typeof resolveBySlug === 'function') {
+  // Bare multi-session dashboards may adopt a chain from their configured
+  // scan list, but only after that candidate proves its own capabilities.
+  // Explicit missing/invalid sessions and Worker-canonical sessions remain
+  // fail-closed instead of borrowing a wallet or another session's chain.
+  if (
+    resolved.sessionSlug === '' &&
+    effectiveNetworkId == null &&
+    !workerCanonical &&
+    typeof resolveBySlug === 'function'
+  ) {
     for (const fallbackSlug of scopedSessionSlugs) {
       const fallbackResolved =
         fallbackSlug === resolved.sessionSlug
@@ -176,12 +175,22 @@ const resolveSurveyToolNetworkScopedSessionContext = ({
               sessionSlug: fallbackSlug,
               resolveBySlug,
             });
-      const fallbackNetworkId = readSessionChainId(fallbackResolved.sessionConfig);
+      const fallbackProjection = resolveSessionCapabilityProjection(fallbackResolved.sessionConfig);
+      const fallbackNetworkId = fallbackProjection.showNetworkControls ? fallbackProjection.chainId : null;
       if (fallbackNetworkId == null) continue;
       effectiveNetworkId = fallbackNetworkId;
       effectiveNetworkSourceSlug = fallbackResolved.sessionSlug || fallbackSlug || '';
       break;
     }
+  }
+
+  // The empty-slug "general" record is a standalone tool template rather
+  // than a configured session contract, so it may continue to use the
+  // operator-selected network. An explicitly invalid profile still fails
+  // closed because it projects as invalid_profile rather than missing.
+  if (resolved.sessionSlug === '' && projection.source === 'missing' && effectiveNetworkId == null) {
+    effectiveNetworkId =
+      readPositiveNumber(networkChainId) ?? readPositiveNumber(network?.id) ?? readPositiveNumber(network?.chainId);
   }
 
   return {
@@ -268,17 +277,6 @@ export const resolveSurveyToolEffectiveSlug = (input: SurveyToolSessionInput = {
     source: buildSurveyToolSessionSource(input),
   }).sessionSlug || '';
 
-export const resolveSurveyToolSessionContext = ({
-  resolveBySlug,
-  ...input
-}: SurveyToolSessionInput & {
-  resolveBySlug?: ResolveSessionConfigBySlug;
-} = {}): SessionResolutionResult =>
-  resolveCanonicalSessionContext({
-    source: buildSurveyToolSessionSource(input),
-    resolveBySlug,
-  });
-
 export const resolveSurveyToolDraftSessionContext = ({
   resolveBySlug,
   ...input
@@ -316,18 +314,29 @@ export const resolveSurveyToolResponseGateSessionContext = ({
 } = {}): SessionResolutionResult & {
   effectiveSessionConfig: SessionConfigLike | null;
 } => {
-  const resolved = resolveSurveyToolExplicitSessionContext({
-    sessionSlug,
-    resolveBySlug,
+  const providedProjection = resolveSessionCapabilityProjection(sessionConfig);
+  const providedWorkerBoundary = claimsWorkerCanonicalAuthority(sessionConfig);
+  const providedWorkerCanonical =
+    providedWorkerBoundary && providedProjection.profileValid && providedProjection.isWorkerCanonical;
+  const resolved = resolveCanonicalSessionContext({
+    source: {
+      sessionSlug: normalizeSessionSlug(sessionSlug),
+      ...(providedWorkerBoundary ? { sessionConfig } : {}),
+    },
+    resolveBySlug: providedWorkerBoundary ? undefined : resolveBySlug,
   });
 
   return {
     ...resolved,
-    effectiveSessionConfig: mergeSurveyToolResponseGateSessionConfig({
-      resolvedSessionConfig: resolved.sessionConfig,
-      providedSessionConfig: sessionConfig,
-      sessionSlug: resolved.sessionSlug,
-    }),
+    effectiveSessionConfig: providedWorkerBoundary
+      ? providedWorkerCanonical
+        ? resolved.sessionConfig
+        : null
+      : mergeSurveyToolResponseGateSessionConfig({
+          resolvedSessionConfig: resolved.sessionConfig,
+          providedSessionConfig: sessionConfig,
+          sessionSlug: resolved.sessionSlug,
+        }),
   };
 };
 

@@ -5,6 +5,7 @@ import type {
   SurveyQuestionsState,
 } from './surveyQuestionsTypes.js';
 import type { SurveyQuestionsPendingStatsInput } from './surveyQuestionsInstanceFields';
+import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation.js';
 
 export type SurveyQuestionsRuntimeStateRuntime = SurveyQuestionsLegacyRecord;
 
@@ -717,6 +718,14 @@ export const createSurveyQuestionsRuntimeStateRuntime = (
       ? 0
       : (surveyIndexParam ?? propsRef.current.surveyIndex ?? 0);
 
+  const resolveWorkerTargetForProps = (props: SurveyQuestionsProps) => {
+    const sessionSlug = normalizeSessionSlugValue(getSessionSlugHintFromProps(props) || resolveEffectiveSlug(props));
+    return resolveSurveyToolWorkerTargetSignature({
+      sessionConfig: props.sessionConfig,
+      sessionSlug,
+    });
+  };
+
   const didEditDiffInputsChange = (
     prevProps?: SurveyQuestionsProps | null,
     prevState?: SurveyQuestionsState | null,
@@ -726,6 +735,8 @@ export const createSurveyQuestionsRuntimeStateRuntime = (
     const nextSessionSlugHint = getSessionSlugHintFromProps(propsRef.current);
     const prevSessionSlugPinned = getSessionSlugPinnedFromProps(prevProps);
     const nextSessionSlugPinned = getSessionSlugPinnedFromProps(propsRef.current);
+    const prevWorkerTarget = resolveWorkerTargetForProps(prevProps);
+    const nextWorkerTarget = resolveWorkerTargetForProps(propsRef.current);
     const prevStateQuestionPoolSig = buildQuestionIdScopeSignature(prevState.questionPool);
     const nextStateQuestionPoolSig = buildQuestionIdScopeSignature(stateRef.current.questionPool);
     const prevStatePileQuestionsSig = buildQuestionIdScopeSignature(prevState.pileQuestions);
@@ -752,6 +763,7 @@ export const createSurveyQuestionsRuntimeStateRuntime = (
     if (prevProps.networkChainId !== propsRef.current.networkChainId) return true;
     if (prevSessionSlugHint !== nextSessionSlugHint) return true;
     if (prevSessionSlugPinned !== nextSessionSlugPinned) return true;
+    if (prevWorkerTarget.key !== nextWorkerTarget.key || prevWorkerTarget.valid !== nextWorkerTarget.valid) return true;
     return false;
   };
 
@@ -772,6 +784,7 @@ export const createSurveyQuestionsRuntimeStateRuntime = (
     emitPendingStats,
     getPendingStatsSnapshot,
     getActiveSurveyIndex,
+    resolveWorkerTargetForProps,
     didEditDiffInputsChange,
     invalidateDiffCaches,
   };

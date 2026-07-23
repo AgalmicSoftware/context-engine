@@ -1,11 +1,12 @@
 import { getChainById } from '../../variables/chains.js';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { normalizeSlug as canonicalizeSlug, toStr } from '../../utilities/shared/primitives.js';
 import { normalizeWorkerUrl as normalizeWorkerBaseUrl } from '../../utilities/worker/workerUrl.js';
 
 type AdminCapabilitySessionConfig = {
   adminAddress?: unknown;
   __registry?: { registryChainId?: unknown; chainId?: unknown; adminAddress?: unknown } | null;
-  sessionModeProfile?: { authority?: { mode?: unknown } | null } | null;
+  sessionModeProfile?: unknown;
 };
 
 export const getErrorMessage = (error: unknown, fallback = 'Unknown error'): string => {
@@ -53,9 +54,10 @@ export const resolveAdminCapabilities = ({
   const accountLower = toStr(account).trim().toLowerCase();
   const workerAdminAddress = toStr(sessionConfig?.adminAddress).trim().toLowerCase();
   const registryAdminAddress = toStr(sessionConfig?.__registry?.adminAddress).trim().toLowerCase();
-  const isWorkerCanonicalSession =
-    toStr(sessionConfig?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === 'worker_canonical';
+  const capabilities = resolveSessionCapabilityProjection(sessionConfig);
+  const isWorkerCanonicalSession = capabilities.isWorkerCanonical;
   const hasRegistryEntry =
+    capabilities.isRegistryCanonical &&
     Number(sessionConfig?.__registry?.registryChainId || sessionConfig?.__registry?.chainId || 0) > 0;
   const isWorkerAdmin = !!accountLower && accountLower === workerAdminAddress;
   const isRegistryAdmin = !!accountLower && accountLower === registryAdminAddress;
@@ -65,7 +67,8 @@ export const resolveAdminCapabilities = ({
     isWorkerCanonicalSession,
     workerAdminAddress,
     hasRegistryEntry,
-    canAdminWorker: !!sessionConfig && (isWorkerCanonicalSession ? isWorkerAdmin : hasRegistryEntry && isRegistryAdmin),
+    canAdminWorker:
+      !!sessionConfig && (capabilities.usesWorkerAuthority ? isWorkerAdmin : hasRegistryEntry && isRegistryAdmin),
     canAdminRegistry: !!sessionConfig && hasRegistryEntry && isRegistryAdmin,
   };
 };

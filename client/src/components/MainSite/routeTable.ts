@@ -13,6 +13,7 @@ export type MainSiteRouteKey =
   | 'compare'
   | 'surveysOrQuestionsList'
   | 'questionDetail'
+  | 'sbtCreate'
   | 'sbtsList'
   | 'sbtDetail'
   | 'simUser'
@@ -123,6 +124,11 @@ const routeDefinitions: RouteDefinition[] = [
   {
     key: 'questionDetail',
     match: ({ fullPath }) => fullPath.startsWith('/question/'),
+  },
+  {
+    key: 'sbtCreate',
+    match: ({ pathWithoutQuery }) =>
+      isExactRoute(pathWithoutQuery, '/sbts/new') || isExactRoute(pathWithoutQuery, '/groups/new'),
   },
   {
     key: 'sbtsList',

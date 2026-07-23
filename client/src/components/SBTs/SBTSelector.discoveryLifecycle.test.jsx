@@ -4,8 +4,26 @@ import * as sessionRegistryUtils from '../../utilities/web3/sessionRegistry.js';
 import * as sessionScanScopeUtils from '../../utilities/session/sessionScanScope.js';
 import { GLOBAL_SESSION_SELECTION_UPDATED_EVENT } from '../../utilities/session/globalSessionState.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { makeInstance, findElement } from './SBTSelector.testUtils';
+
+const registrySbtSessionConfig = (config = {}) => {
+  const registryChainId = Number(config.networkChainId || config.__registry?.chainId || 84532);
+  const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+  profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+  profile.evm.registryChainId = registryChainId;
+  return { ...config, sessionModeProfile: profile };
+};
+
+const makeRegistrySbtInstance = (props = {}) =>
+  makeInstance({
+    ...props,
+    sessionConfig: registrySbtSessionConfig({
+      slug: props.sessionSlug || 'edge',
+      networkChainId: props.chainId || props.network?.id || props.network?.chainId || 84532,
+      ...(props.sessionConfig || {}),
+    }),
+  });
 
 describe('SBTSelector discovery lifecycle', () => {
   beforeEach(() => {
@@ -22,7 +40,7 @@ describe('SBTSelector discovery lifecycle', () => {
   });
 
   it('collapses scoped discovery to the manually selected source group', async () => {
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       sessionSlug: 'edge',
       enableGroupSelect: true,
     });
@@ -30,6 +48,7 @@ describe('SBTSelector discovery lifecycle', () => {
     instance.loadSBTOptions = jest.fn().mockResolvedValue(null);
     instance.state.groupOverride = true;
     instance.state.sourceSessionSlug = 'beta';
+    instance.getDisplayLookupSessionConfig = (slug) => registrySbtSessionConfig({ slug, networkChainId: 84532 });
 
     const scopeSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanScope').mockReturnValue('list');
     const slugsSpy = jest.spyOn(sessionScanScopeUtils, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha']);
@@ -50,7 +69,7 @@ describe('SBTSelector discovery lifecycle', () => {
   it('recomputes the all-scope request signature when known session slugs change', async () => {
     const selectedAddress = '0x1616161616161616161616161616161616161616';
     const selectedLower = selectedAddress.toLowerCase();
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       selectedSBTs: [{ address: selectedAddress }],
       sbtCacheRevision: 'rev-1',
       defaultFeaturedSBTs: [],
@@ -58,6 +77,7 @@ describe('SBTSelector discovery lifecycle', () => {
     instance._isMounted = true;
     instance.getSessionNetworkId = () => 84532;
     instance.getMetadataLookupConfig = () => ({ slug: 'edge', networkChainId: 84532 });
+    instance.getDisplayLookupSessionConfig = (slug) => registrySbtSessionConfig({ slug, networkChainId: 84532 });
     instance.resolveSbtLabel = jest.fn(() => 'Resolved Name');
     instance.readSbtCacheBySlug = jest.fn(async () => ({
       84532: {
@@ -106,7 +126,7 @@ describe('SBTSelector discovery lifecycle', () => {
         nameLookupState: {},
       },
     };
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       selectedSBTs: [{ address: selectedAddress }],
       sbtCacheRevision: 'rev-1',
       defaultFeaturedSBTs: [],
@@ -146,7 +166,7 @@ describe('SBTSelector discovery lifecycle', () => {
   it('coalesces overlapping option load requests into a single cache read', async () => {
     const selectedAddress = '0x1212121212121212121212121212121212121212';
     const selectedLower = selectedAddress.toLowerCase();
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       selectedSBTs: [{ address: selectedAddress }],
       defaultFeaturedSBTs: [],
     });
@@ -190,7 +210,7 @@ describe('SBTSelector discovery lifecycle', () => {
   it('queues a non-force rerun when request inputs change during an inflight load', async () => {
     const selectedAddress = '0x1313131313131313131313131313131313131313';
     const selectedLower = selectedAddress.toLowerCase();
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       selectedSBTs: [{ address: selectedAddress }],
       defaultFeaturedSBTs: [],
       sbtCacheRevision: 'rev-1',
@@ -247,7 +267,7 @@ describe('SBTSelector discovery lifecycle', () => {
 
   it('prefers session-config chain id over registry/prop/wallet chain sources', () => {
     const chainSpy = jest.spyOn(contractScriptsUtils, 'getSessionChainId').mockReturnValue(11155111);
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       sessionSlug: 'new-slug-not-yet-published',
       chainId: 10,
       network: { chainId: 137 },
@@ -266,6 +286,13 @@ describe('SBTSelector discovery lifecycle', () => {
       sessionSlug: 'new-slug-not-yet-published',
       chainId: 10,
       network: { chainId: 11155111 },
+      sessionConfig: {
+        slug: 'new-slug-not-yet-published',
+        __registry: {
+          chainId: 84532,
+          sessionId: `0x${'1'.repeat(64)}`,
+        },
+      },
     });
     try {
       expect(instance.getSessionNetworkId('new-slug-not-yet-published')).toBe(84532);
@@ -274,7 +301,7 @@ describe('SBTSelector discovery lifecycle', () => {
     }
   });
 
-  it('falls back to default chain id when no session/prop/wallet chain is available', () => {
+  it('fails closed instead of using the default chain for a concrete session without registry identity', () => {
     const chainSpy = jest.spyOn(contractScriptsUtils, 'getSessionChainId').mockReturnValue(null);
     const instance = makeInstance({
       sessionSlug: 'new-slug-not-yet-published',
@@ -283,7 +310,7 @@ describe('SBTSelector discovery lifecycle', () => {
       sessionConfig: {},
     });
     try {
-      expect(instance.getSessionNetworkId('new-slug-not-yet-published')).toBe(DEFAULT_CHAIN_ID);
+      expect(instance.getSessionNetworkId('new-slug-not-yet-published')).toBeNull();
     } finally {
       chainSpy.mockRestore();
     }
@@ -291,7 +318,7 @@ describe('SBTSelector discovery lifecycle', () => {
 
   it('uses provided session config when discovering SBT universe', async () => {
     const factoryAddress = '0x00000000000000000000000000000000000000aa';
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       chainId: 84532,
       sessionSlug: 'draft-slug',
       sessionConfig: {
@@ -333,7 +360,7 @@ describe('SBTSelector discovery lifecycle', () => {
     }
   });
 
-  it('does not use demo-session discovery context when shared config is missing in live mode', async () => {
+  it('fails closed without using demo or default-chain discovery when shared config is missing in live mode', async () => {
     const instance = makeInstance({
       sessionSlug: 'rxc',
       chainId: null,
@@ -359,16 +386,7 @@ describe('SBTSelector discovery lifecycle', () => {
     try {
       await instance.ensureSbtUniverse({ force: true });
 
-      expect(discoverSpy).toHaveBeenCalledWith(
-        'none',
-        expect.objectContaining({
-          slug: 'rxc',
-          networkChainId: DEFAULT_CHAIN_ID,
-        }),
-        expect.objectContaining({
-          onDiscoveredAddresses: expect.any(Function),
-        }),
-      );
+      expect(discoverSpy).not.toHaveBeenCalled();
       expect(demoSpy).not.toHaveBeenCalled();
     } finally {
       strictSpy.mockRestore();
@@ -409,7 +427,7 @@ describe('SBTSelector discovery lifecycle', () => {
 
   it('kicks off shared light-universe discovery when the prop becomes available after mount', () => {
     const ensureLightSbtUniverse = jest.fn().mockResolvedValue(undefined);
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       sessionSlug: 'edge',
     });
     instance._isMounted = true;
@@ -432,7 +450,7 @@ describe('SBTSelector discovery lifecycle', () => {
   });
 
   it('starts discovery before the initial cold-load option refresh on mount', async () => {
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       network: { id: 84532 },
       chainId: null,
     });
@@ -468,7 +486,7 @@ describe('SBTSelector discovery lifecycle', () => {
       sessionSlug: 'draft-slug',
       network: { id: 84532 },
       chainId: 84532,
-      sessionConfig: {
+      sessionConfig: registrySbtSessionConfig({
         slug: 'draft-slug',
         networkChainId: 84532,
         contracts: {
@@ -477,7 +495,7 @@ describe('SBTSelector discovery lifecycle', () => {
             chainId: 84532,
           },
         },
-      },
+      }),
     });
     instance.ensureSbtUniverse = jest.fn(() => Promise.resolve());
     instance.loadSBTOptions = jest.fn(() => Promise.resolve(null));
@@ -601,7 +619,7 @@ describe('SBTSelector discovery lifecycle', () => {
       selectedSBTs: [{ address: selectedAddress }],
       defaultFeaturedSBTs: [],
       sbtCacheRevision: 'rev-1',
-      sessionConfig: {
+      sessionConfig: registrySbtSessionConfig({
         slug: 'draft-slug',
         networkChainId: 84532,
         blockLimits: {
@@ -613,7 +631,7 @@ describe('SBTSelector discovery lifecycle', () => {
             address: '0x00000000000000000000000000000000000000aa',
           },
         },
-      },
+      }),
     });
     instance._isMounted = true;
     instance.getEffectiveGroupSlug = () => 'edge';
@@ -640,7 +658,7 @@ describe('SBTSelector discovery lifecycle', () => {
       await instance.loadSBTOptions();
       instance.props = {
         ...instance.props,
-        sessionConfig: {
+        sessionConfig: registrySbtSessionConfig({
           slug: 'draft-slug-v2',
           networkChainId: 84532,
           blockLimits: {
@@ -652,13 +670,13 @@ describe('SBTSelector discovery lifecycle', () => {
               address: '0x00000000000000000000000000000000000000aa',
             },
           },
-        },
+        }),
       };
       await instance.loadSBTOptions();
 
       instance.props = {
         ...instance.props,
-        sessionConfig: {
+        sessionConfig: registrySbtSessionConfig({
           slug: 'draft-slug-v2',
           networkChainId: 84532,
           blockLimits: {
@@ -670,13 +688,13 @@ describe('SBTSelector discovery lifecycle', () => {
               address: '0x00000000000000000000000000000000000000aa',
             },
           },
-        },
+        }),
       };
       await instance.loadSBTOptions();
 
       instance.props = {
         ...instance.props,
-        sessionConfig: {
+        sessionConfig: registrySbtSessionConfig({
           slug: 'draft-slug-v2',
           networkChainId: 84532,
           blockLimits: {
@@ -688,7 +706,7 @@ describe('SBTSelector discovery lifecycle', () => {
               address: '0x00000000000000000000000000000000000000aa',
             },
           },
-        },
+        }),
       };
       await instance.loadSBTOptions();
 

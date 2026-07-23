@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import { resolveAuthLoginRequestAuthority } from './authLoginRequestAuthority.js';
 
+const workerSessionId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const replacementWorkerSessionId = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
 const createSignedBody = (overrides = {}) => ({
@@ -166,6 +168,50 @@ test('resolveAuthLoginRequestAuthority preserves existing-session CORS passthrou
     ok: false,
     response: corsResponse,
   });
+});
+
+test('resolveAuthLoginRequestAuthority rejects missing or stale canonical identity before nonce use', async () => {
+  for (const requestedSessionId of [undefined, replacementWorkerSessionId]) {
+    let nonceCalled = false;
+    let scopesCalled = false;
+    const result = await resolveAuthLoginRequestAuthority(createRequestArgs({
+      body: createSignedBody({
+        ...(requestedSessionId ? { sessionId: requestedSessionId } : {}),
+      }),
+      deps: createAuthorityDeps({
+        resolveExistingSessionCors: async () => ({
+          ok: true,
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+          config: {
+            allowOrigins: ['https://allowed.example'],
+            sessionId: workerSessionId,
+            sessionModeProfile: {
+              authority: { mode: 'worker_canonical' },
+            },
+          },
+        }),
+        consumeNonce: async () => {
+          nonceCalled = true;
+          return { ok: true };
+        },
+        computeScopesForLogin: async () => {
+          scopesCalled = true;
+          return { groups: true };
+        },
+      }),
+    }));
+
+    assert.deepEqual(result, {
+      ok: false,
+      response: {
+        body: { error: 'Session identity does not match worker session.' },
+        status: 409,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+      },
+    }, String(requestedSessionId));
+    assert.equal(nonceCalled, false, String(requestedSessionId));
+    assert.equal(scopesCalled, false, String(requestedSessionId));
+  }
 });
 
 test('resolveAuthLoginRequestAuthority preserves signature, SIWE, and nonce failure contracts', async () => {

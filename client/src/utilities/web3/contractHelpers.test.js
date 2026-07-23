@@ -1,11 +1,17 @@
 import { createContractHelperMethods } from './contractHelpers.js';
 import { __test__contractBlockCache } from '../cache/contractBlockCache.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
-import { SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY } from '../session/sponsoredBootstrapFunding.js';
+import {
+  SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+  clearSponsoredBootstrapFundingContext,
+  readSponsoredBootstrapFundingContext,
+  writeSponsoredBootstrapFundingContext,
+} from '../session/sponsoredBootstrapFunding.js';
 
 describe('contractHelpers sendTestnetFunds', () => {
   beforeEach(() => {
     sessionStorage.clear();
+    clearSponsoredBootstrapFundingContext();
   });
 
   it('forwards optional faucet proof fields to the authenticated worker request', async () => {
@@ -383,14 +389,11 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('retries testnet funding against the sponsored source session when the requested session is not deployable yet', async () => {
-    sessionStorage.setItem(
-      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
-      JSON.stringify({
-        sessionSlug: 'source-session',
-        workerUrl: 'https://source-worker.example',
-        targetSessionSlug: '',
-      }),
-    );
+    writeSponsoredBootstrapFundingContext({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: '',
+    });
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: true,
@@ -453,15 +456,12 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('redeems a one-time sponsored faucet grant before falling back to authenticated source-session funding', async () => {
-    sessionStorage.setItem(
-      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
-      JSON.stringify({
-        sessionSlug: 'source-session',
-        workerUrl: 'https://source-worker.example',
-        targetSessionSlug: '',
-        faucetGrantToken: 'faucet-grant-1',
-      }),
-    );
+    writeSponsoredBootstrapFundingContext({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: '',
+      faucetGrantToken: 'faucet-grant-1',
+    });
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: true,
@@ -526,14 +526,11 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('does not reuse sponsored bootstrap funding context for a different target session', async () => {
-    sessionStorage.setItem(
-      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
-      JSON.stringify({
-        sessionSlug: 'source-session',
-        workerUrl: 'https://source-worker.example',
-        targetSessionSlug: 'sponsored-target',
-      }),
-    );
+    writeSponsoredBootstrapFundingContext({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: 'sponsored-target',
+    });
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: true,
@@ -587,14 +584,11 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('does not retry sponsored bootstrap funding on non-deployability worker failures', async () => {
-    sessionStorage.setItem(
-      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
-      JSON.stringify({
-        sessionSlug: 'source-session',
-        workerUrl: 'https://source-worker.example',
-        targetSessionSlug: 'sponsored-target',
-      }),
-    );
+    writeSponsoredBootstrapFundingContext({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: 'sponsored-target',
+    });
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: false,
@@ -718,15 +712,12 @@ describe('contractHelpers sendTestnetFunds', () => {
   });
 
   it('retries sponsored bootstrap funding when the deployed worker is missing a local faucet key', async () => {
-    sessionStorage.setItem(
-      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
-      JSON.stringify({
-        sessionSlug: 'source-session',
-        workerUrl: 'https://source-worker.example',
-        targetSessionSlug: 'sponsored-target',
-        faucetGrantToken: 'faucet-grant-1',
-      }),
-    );
+    writeSponsoredBootstrapFundingContext({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: 'sponsored-target',
+      faucetGrantToken: 'faucet-grant-1',
+    });
 
     const fetchWorkerWithAuth = jest.fn(async () => ({
       ok: false,
@@ -798,24 +789,22 @@ describe('contractHelpers sendTestnetFunds', () => {
         to: recipientAddress,
       }),
     });
-    expect(JSON.parse(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY) || '{}')).toEqual({
+    expect(readSponsoredBootstrapFundingContext()).toEqual({
       sessionSlug: 'source-session',
       workerUrl: 'https://source-worker.example',
       targetSessionSlug: 'sponsored-target',
     });
+    expect(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY)).toBeNull();
     expect(result).toEqual({ ok: true, txHash: '0xbootstrap-faucet-grant' });
   });
 
   it('consumes one-time sponsored faucet grants instead of reusing them on later missing-key retries', async () => {
-    sessionStorage.setItem(
-      SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
-      JSON.stringify({
-        sessionSlug: 'source-session',
-        workerUrl: 'https://source-worker.example',
-        targetSessionSlug: 'sponsored-target',
-        faucetGrantToken: 'faucet-grant-1',
-      }),
-    );
+    writeSponsoredBootstrapFundingContext({
+      sessionSlug: 'source-session',
+      workerUrl: 'https://source-worker.example',
+      targetSessionSlug: 'sponsored-target',
+      faucetGrantToken: 'faucet-grant-1',
+    });
 
     const fetchWorkerWithAuth = jest
       .fn()
@@ -879,11 +868,12 @@ describe('contractHelpers sendTestnetFunds', () => {
 
     expect(firstResult).toEqual({ ok: true, txHash: '0xbootstrap-faucet-grant' });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY) || '{}')).toEqual({
+    expect(readSponsoredBootstrapFundingContext()).toEqual({
       sessionSlug: 'source-session',
       workerUrl: 'https://source-worker.example',
       targetSessionSlug: 'sponsored-target',
     });
+    expect(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY)).toBeNull();
 
     await expect(helper.sendTestnetFunds(recipientAddress, 'sponsored-target')).rejects.toThrow(
       'Failed to request test ETH: Server misconfigured: faucetPrivateKey is missing.',

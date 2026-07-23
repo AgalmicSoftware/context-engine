@@ -447,7 +447,7 @@ describe('sessionWizardDraftState', () => {
     expect(next.faucet).toBeUndefined();
   });
 
-  it('builds cache write payloads with redacted worker secrets and durable pending draft isolation', () => {
+  it('builds cache write payloads with public Worker config only and durable pending draft isolation', () => {
     const payload = buildSessionWizardCacheWritePayload({
       sessionId: 'session-1',
       draft: { sessionName: 'Draft' },
@@ -488,8 +488,6 @@ describe('sessionWizardDraftState', () => {
         pendingSbtDrafts: [],
         persistWorkerSecrets: false,
         workerSecrets: {
-          apiToken: '[redacted]',
-          optional: '',
           litApiBase: 'https://api.chipotle.litprotocol.com',
           litGroupId: 'group-1',
           litPkpId: 'pkp-1',
@@ -507,6 +505,7 @@ describe('sessionWizardDraftState', () => {
     expect(payload.deployForm.accountId).toBeUndefined();
     expect(payload.workerRequirementProof).toBeUndefined();
     expect(JSON.stringify(payload)).not.toContain('cf-secret');
+    expect(JSON.stringify(payload)).not.toContain('"apiToken":"secret"');
   });
 
   it('keeps multi-gate resource selections in the cache write payload', () => {
@@ -522,7 +521,7 @@ describe('sessionWizardDraftState', () => {
     expect(payload.resourceGateMap).toBe(resourceGateMap);
   });
 
-  it('keeps worker secrets only when local secret persistence is explicitly enabled', () => {
+  it('never serializes worker credentials even when legacy persistence input is enabled', () => {
     const workerSecrets = {
       apiToken: 'secret',
       accountId: 'account',
@@ -533,7 +532,9 @@ describe('sessionWizardDraftState', () => {
       workerSecrets,
     });
 
-    expect(payload.persistWorkerSecrets).toBe(true);
-    expect(payload.workerSecrets).toBe(workerSecrets);
+    expect(payload.persistWorkerSecrets).toBe(false);
+    expect(payload.workerSecrets).toEqual({});
+    expect(JSON.stringify(payload)).not.toContain('secret');
+    expect(JSON.stringify(payload)).not.toContain('account');
   });
 });

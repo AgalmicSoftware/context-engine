@@ -1,35 +1,37 @@
 #!/usr/bin/env node
 
-const { ethers } = require('ethers');
-const { nowHumanTag } = require('./lib/common');
-const { normalizeRequiredMetadataUri } = require('./lib/arweave-metadata');
-const { resolveChainDefaults } = require('./lib/network-defaults');
-const { buildPasskeyDerivedWallet } = require('./lib/passkey-derived-wallet');
+const { ethers } = require("ethers");
+const { nowHumanTag } = require("./lib/common");
+const { normalizeRequiredMetadataUri } = require("./lib/arweave-metadata");
+const { resolveChainDefaults } = require("./lib/network-defaults");
+const { buildPasskeyDerivedWallet } = require("./lib/passkey-derived-wallet");
 
-const DEFAULT_PASSKEY_RAW_ID_B64URL = 'AQIDBAUGBwgJCgsMDQ4PEA';
-const DEFAULT_GROUP_PASSWORD = 'browserUse';
-const DEFAULT_SESSION_BASE_URL = 'http://127.0.0.1:3000/session';
-const DEFAULT_GAS_PRICE_WEI = '2000000'; // 0.002 gwei
+const DEFAULT_PASSKEY_RAW_ID_B64URL = "AQIDBAUGBwgJCgsMDQ4PEA";
+const DEFAULT_GROUP_PASSWORD = "browserUse";
+const DEFAULT_SESSION_BASE_URL = "http://127.0.0.1:3000/session";
+const DEFAULT_GAS_PRICE_WEI = "2000000"; // 0.002 gwei
 const DEFAULT_GAS_LIMIT_MULTIPLIER_BPS = 12000; // 120%
 
 const factoryAbi = [
-  'function sbtCount() view returns (uint256)',
-  'function createSBT(string name,string symbol,uint256 limitedNumber,address adminAddress,uint256 mintingEndTime,bool hasPasswordMint,uint8 burnAuth,bytes32[] hashedPasswords,string tokenURI,bytes32 groupPasswordHash)',
-  'event SBTCreated(address indexed sbtAddress)',
+  "function sbtCount() view returns (uint256)",
+  "function createSBT(string name,string symbol,uint256 limitedNumber,address adminAddress,uint256 mintingEndTime,bool hasPasswordMint,uint8 burnAuth,bytes32[] hashedPasswords,string tokenURI,bytes32 groupPasswordHash)",
+  "event SBTCreated(address indexed sbtAddress)",
 ];
 
 const sbtAbi = [
-  'function getSBTMetadata() view returns (string name_, string symbol_, uint256 maxTokens_, uint256 mintedTokens_, address admin_, uint256 mintingEndTime_, bool hasPasswordMint_, uint8 burnAuth_, string tokenURI_)',
-  'function groupPasswordHash() view returns (bytes32)',
+  "function getSBTMetadata() view returns (string name_, string symbol_, uint256 maxTokens_, uint256 mintedTokens_, address admin_, uint256 mintingEndTime_, bool hasPasswordMint_, uint8 burnAuth_, string tokenURI_)",
+  "function groupPasswordHash() view returns (bytes32)",
 ];
 
 const toBool = (value) => {
-  const raw = String(value || '').trim().toLowerCase();
-  return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'y';
+  const raw = String(value || "")
+    .trim()
+    .toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes" || raw === "y";
 };
 
 const toInt = (value, fallback) => {
-  const parsed = Number.parseInt(String(value ?? ''), 10);
+  const parsed = Number.parseInt(String(value ?? ""), 10);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
@@ -42,9 +44,9 @@ const toBigNumber = (value, fallback) => {
 };
 
 const normalizeGroupPasswordInput = (raw) => {
-  const trimmed = String(raw || '').trim();
-  const compact = trimmed.replace(/\s+/g, '');
-  if (!compact) return '';
+  const trimmed = String(raw || "").trim();
+  const compact = trimmed.replace(/\s+/g, "");
+  if (!compact) return "";
   if (ethers.utils.isHexString(compact)) {
     try {
       return ethers.utils.toUtf8String(compact);
@@ -56,12 +58,20 @@ const normalizeGroupPasswordInput = (raw) => {
 };
 
 const computeGroupPasswordHash = (password) => {
-  const pwHash = ethers.utils.keccak256(ethers.utils.toUtf8Bytes(password || ''));
-  const salt = ethers.utils.solidityKeccak256(['string'], ['sbt-group-password-v2']);
-  const seed = ethers.utils.solidityKeccak256(['bytes32', 'bytes32'], [pwHash, salt]);
+  const pwHash = ethers.utils.keccak256(
+    ethers.utils.toUtf8Bytes(password || ""),
+  );
+  const salt = ethers.utils.solidityKeccak256(
+    ["string"],
+    ["sbt-group-password-v2"],
+  );
+  const seed = ethers.utils.solidityKeccak256(
+    ["bytes32", "bytes32"],
+    [pwHash, salt],
+  );
   const tmpSk = ethers.utils.keccak256(ethers.utils.arrayify(seed));
   const tmpWallet = new ethers.Wallet(tmpSk);
-  return ethers.utils.solidityKeccak256(['address'], [tmpWallet.address]);
+  return ethers.utils.solidityKeccak256(["address"], [tmpWallet.address]);
 };
 
 const parseCreatedAddress = (receipt) => {
@@ -69,7 +79,7 @@ const parseCreatedAddress = (receipt) => {
   for (const log of receipt.logs || []) {
     try {
       const parsed = iface.parseLog(log);
-      if (parsed?.name === 'SBTCreated' && parsed.args?.sbtAddress) {
+      if (parsed?.name === "SBTCreated" && parsed.args?.sbtAddress) {
         return parsed.args.sbtAddress;
       }
     } catch (_) {}
@@ -81,20 +91,28 @@ async function main() {
   const chain = resolveChainDefaults({ env: process.env });
   const rpcUrl = chain.rpcUrl;
   const expectedChainId = chain.chainId;
-  const rawIdB64Url = process.env.PASSKEY_RAW_ID_B64URL || DEFAULT_PASSKEY_RAW_ID_B64URL;
-  const privateKey = process.env.AI_TEST_PRIVATE_KEY || buildPasskeyDerivedWallet(rawIdB64Url).privateKey;
+  const rawIdB64Url =
+    process.env.PASSKEY_RAW_ID_B64URL || DEFAULT_PASSKEY_RAW_ID_B64URL;
+  const privateKey =
+    process.env.AI_TEST_PRIVATE_KEY ||
+    buildPasskeyDerivedWallet(rawIdB64Url).privateKey;
 
   const factoryAddress = chain.sbtFactory;
-  const groupPassword = normalizeGroupPasswordInput(process.env.GROUP_PASSWORD || DEFAULT_GROUP_PASSWORD);
-  const rawMetadataUri = String(process.env.SBT_METADATA_URI || process.env.E2E_SBT_METADATA_URI || '').trim();
+  const groupPassword = normalizeGroupPasswordInput(
+    process.env.GROUP_PASSWORD || DEFAULT_GROUP_PASSWORD,
+  );
+  const rawMetadataUri = String(
+    process.env.SBT_METADATA_URI || process.env.E2E_SBT_METADATA_URI || "",
+  ).trim();
   const tokenURI = normalizeRequiredMetadataUri(rawMetadataUri);
   if (!tokenURI) {
     throw new Error(
-      'Missing required Arweave metadata URI for tokenURI. ' +
-      'Set SBT_METADATA_URI (or E2E_SBT_METADATA_URI) to an ar:// URI, Arweave gateway URL, or txId.'
+      "Missing required Arweave metadata URI for tokenURI. " +
+        "Set SBT_METADATA_URI (or E2E_SBT_METADATA_URI) to an ar:// URI, Arweave gateway URL, or txId.",
     );
   }
-  const sessionBaseUrl = process.env.SESSION_BASE_URL || DEFAULT_SESSION_BASE_URL;
+  const sessionBaseUrl =
+    process.env.SESSION_BASE_URL || DEFAULT_SESSION_BASE_URL;
   const dryRun = toBool(process.env.DRY_RUN);
   const jsonOnly = toBool(process.env.JSON_ONLY);
 
@@ -102,8 +120,17 @@ async function main() {
   const mintingEndTime = Math.max(0, toInt(process.env.MINTING_END_TIME, 0));
   const burnAuth = Math.max(0, Math.min(3, toInt(process.env.BURN_AUTH, 0)));
   const hasPasswordMint = toBool(process.env.HAS_PASSWORD_MINT);
-  const gasPrice = toBigNumber(process.env.GAS_PRICE_WEI, DEFAULT_GAS_PRICE_WEI);
-  const gasLimitMultiplierBps = Math.max(10000, toInt(process.env.GAS_LIMIT_MULTIPLIER_BPS, DEFAULT_GAS_LIMIT_MULTIPLIER_BPS));
+  const gasPrice = toBigNumber(
+    process.env.GAS_PRICE_WEI,
+    DEFAULT_GAS_PRICE_WEI,
+  );
+  const gasLimitMultiplierBps = Math.max(
+    10000,
+    toInt(
+      process.env.GAS_LIMIT_MULTIPLIER_BPS,
+      DEFAULT_GAS_LIMIT_MULTIPLIER_BPS,
+    ),
+  );
 
   const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
   const wallet = new ethers.Wallet(privateKey, provider);
@@ -111,7 +138,9 @@ async function main() {
 
   const network = await provider.getNetwork();
   if (Number(network.chainId) !== Number(expectedChainId)) {
-    throw new Error(`Chain mismatch: expected ${expectedChainId}, got ${network.chainId}`);
+    throw new Error(
+      `Chain mismatch: expected ${expectedChainId}, got ${network.chainId}`,
+    );
   }
 
   const [beforeCount, balanceWei] = await Promise.all([
@@ -120,10 +149,10 @@ async function main() {
   ]);
 
   const name = process.env.SBT_NAME || `BrowserUse Test SBT ${nowHumanTag()}`;
-  const symbol = process.env.SBT_SYMBOL || `BUSBT${String(beforeCount.toNumber() + 1).padStart(2, '0')}`;
+  const symbol =
+    process.env.SBT_SYMBOL ||
+    `BUSBT${String(beforeCount.toNumber() + 1).padStart(2, "0")}`;
   const groupPasswordHash = computeGroupPasswordHash(groupPassword);
-  const encodedGroupPassword = ethers.utils.hexlify(ethers.utils.toUtf8Bytes(groupPassword));
-
   const createArgs = [
     name,
     symbol,
@@ -150,7 +179,6 @@ async function main() {
     name,
     symbol,
     metadataUri: tokenURI,
-    groupPassword,
     groupPasswordHash,
     estimatedGas: estimatedGas.toString(),
     gasLimit: gasLimit.toString(),
@@ -197,7 +225,9 @@ async function main() {
 
   const sbtAddress = parseCreatedAddress(receipt);
   if (!sbtAddress) {
-    throw new Error(`createSBT mined but SBTCreated event was not found (tx: ${tx.hash})`);
+    throw new Error(
+      `createSBT mined but SBTCreated event was not found (tx: ${tx.hash})`,
+    );
   }
 
   const sbt = new ethers.Contract(sbtAddress, sbtAbi, provider);
@@ -207,7 +237,7 @@ async function main() {
     factory.sbtCount(),
   ]);
 
-  const oneClickUrl = `${sessionBaseUrl}?auto=1&sbt=${encodeURIComponent(sbtAddress)}&gp=${encodeURIComponent(encodedGroupPassword)}`;
+  const claimUrl = `${sessionBaseUrl}?auto=1&sbt=${encodeURIComponent(sbtAddress)}`;
 
   const out = {
     txHash: tx.hash,
@@ -227,7 +257,9 @@ async function main() {
       tokenURI: meta.tokenURI_,
     },
     onchainGroupPasswordHash: onchainGroupHash,
-    oneClickLocalUrl: oneClickUrl,
+    claimUrl,
+    claimInstructions:
+      "Enter GROUP_PASSWORD separately in the group claim form.",
   };
   if (jsonOnly) {
     console.log(JSON.stringify({ dryRun: false, intro, result: out }, null, 2));

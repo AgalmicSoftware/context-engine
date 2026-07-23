@@ -1,5 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
+import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
+import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
+import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import {
   joinWorkerGroup,
   loadWorkerGroupOverview,
@@ -15,9 +19,24 @@ export type WorkerGroupMembershipPanelProps = {
   refreshNonce?: number;
   fetchImpl?: typeof fetch;
   participantAddress?: string;
+  sessionId?: string;
+  sessionSlug?: string;
 };
 
 const emptyOverview: WorkerGroupOverview = { groups: [], memberships: [] };
+type WorkerGroupViewState = {
+  targetKey: string;
+  overview: WorkerGroupOverview;
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  error: string;
+};
+
+const emptyViewState = (targetKey: string): WorkerGroupViewState => ({
+  targetKey,
+  overview: emptyOverview,
+  status: 'idle',
+  error: '',
+});
 
 const WorkerGroupMembershipPanel = ({
   envelope,
@@ -27,37 +46,78 @@ const WorkerGroupMembershipPanel = ({
   refreshNonce = 0,
   fetchImpl = fetch,
   participantAddress = '',
+  sessionId: sessionIdProp = '',
+  sessionSlug: sessionSlugProp = '',
 }: WorkerGroupMembershipPanelProps) => {
-  const [overview, setOverview] = useState<WorkerGroupOverview>(emptyOverview);
-  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-  const [error, setError] = useState('');
-  const [joiningGroupId, setJoiningGroupId] = useState('');
-  const [shareStatus, setShareStatus] = useState('');
   const canReadGroups = canReadGroupsProp ?? envelope?.capabilities?.readGroups === true;
-  const workerUrl = workerUrlProp || envelope?.workerUrl || '';
+  const workerUrl = normalizeWorkerUrl(workerUrlProp || envelope?.workerUrl || '');
   const workerToken = workerTokenProp || envelope?.workerCredential?.token || '';
+  const sessionId = normalizeWorkerCanonicalSessionIdHex(sessionIdProp || envelope?.sessionId || '');
+  const sessionSlug = canonicalizeSessionSlug(sessionSlugProp || envelope?.sessionSlug || '');
+  const targetKey = `${sessionId}\n${sessionSlug}\n${workerUrl}\n${workerToken}`;
+  const targetKeyRef = useRef(targetKey);
+  targetKeyRef.current = targetKey;
+  const requestIdRef = useRef(0);
+  const mutationIdRef = useRef(0);
+  const [viewState, setViewState] = useState<WorkerGroupViewState>(() => emptyViewState(targetKey));
+  const [joiningState, setJoiningState] = useState({ targetKey, groupId: '' });
+  const [shareState, setShareState] = useState({ targetKey, status: '' });
+  const activeViewState = viewState.targetKey === targetKey ? viewState : emptyViewState(targetKey);
+  const overview = activeViewState.overview;
+  const status = activeViewState.status;
+  const error = activeViewState.error;
+  const joiningGroupId = joiningState.targetKey === targetKey ? joiningState.groupId : '';
+  const shareStatus = shareState.targetKey === targetKey ? shareState.status : '';
 
   const reload = useCallback(async () => {
-    if (!canReadGroups || !workerUrl || !workerToken) return;
-    setStatus('loading');
-    setError('');
+    const requestTargetKey = targetKey;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    if (!canReadGroups || !workerUrl || !workerToken || !sessionId || !sessionSlug) {
+      setViewState(emptyViewState(requestTargetKey));
+      return;
+    }
+    setViewState({
+      targetKey: requestTargetKey,
+      overview: emptyOverview,
+      status: 'loading',
+      error: '',
+    });
     try {
       const next = await loadWorkerGroupOverview({
         workerUrl,
         credentialToken: workerToken,
+        sessionId,
+        sessionSlug,
         fetchImpl,
       });
-      setOverview(next);
-      setStatus('ready');
+      if (targetKeyRef.current !== requestTargetKey || requestIdRef.current !== requestId) return;
+      setViewState({
+        targetKey: requestTargetKey,
+        overview: next,
+        status: 'ready',
+        error: '',
+      });
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'worker_group_load_failed');
-      setStatus('error');
+      if (targetKeyRef.current !== requestTargetKey || requestIdRef.current !== requestId) return;
+      setViewState({
+        targetKey: requestTargetKey,
+        overview: emptyOverview,
+        status: 'error',
+        error: loadError instanceof Error ? loadError.message : 'worker_group_load_failed',
+      });
     }
-  }, [canReadGroups, fetchImpl, workerToken, workerUrl]);
+  }, [canReadGroups, fetchImpl, sessionId, sessionSlug, targetKey, workerToken, workerUrl]);
 
   useEffect(() => {
+    setJoiningState({ targetKey, groupId: '' });
+    setShareState({ targetKey, status: '' });
     void reload();
-  }, [refreshNonce, reload]);
+    return () => {
+      requestIdRef.current += 1;
+      mutationIdRef.current += 1;
+    };
+  }, [refreshNonce, reload, targetKey]);
 
   const membershipIds = useMemo(
     () => new Set(overview.memberships.map((membership) => membership.group.groupId)),
@@ -66,31 +126,61 @@ const WorkerGroupMembershipPanel = ({
   const availableGroups = overview.groups.filter((group) => !membershipIds.has(group.groupId));
 
   const handleJoin = async (groupId: string) => {
-    setJoiningGroupId(groupId);
-    setError('');
+    const mutationTargetKey = targetKey;
+    const mutationId = mutationIdRef.current + 1;
+    mutationIdRef.current = mutationId;
+    setJoiningState({ targetKey: mutationTargetKey, groupId });
+    setViewState((current) => ({
+      ...(current.targetKey === mutationTargetKey ? current : emptyViewState(mutationTargetKey)),
+      error: '',
+    }));
     try {
-      await joinWorkerGroup({ workerUrl, credentialToken: workerToken, groupId, fetchImpl });
+      await joinWorkerGroup({
+        workerUrl,
+        credentialToken: workerToken,
+        sessionId,
+        sessionSlug,
+        groupId,
+        fetchImpl,
+      });
+      if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
       await reload();
     } catch (joinError) {
-      setError(joinError instanceof Error ? joinError.message : 'worker_group_join_failed');
-      setStatus('error');
+      if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
+      setViewState((current) => ({
+        ...(current.targetKey === mutationTargetKey ? current : emptyViewState(mutationTargetKey)),
+        status: 'error',
+        error: joinError instanceof Error ? joinError.message : 'worker_group_join_failed',
+      }));
     } finally {
-      setJoiningGroupId('');
+      if (targetKeyRef.current === mutationTargetKey && mutationIdRef.current === mutationId) {
+        setJoiningState({ targetKey: mutationTargetKey, groupId: '' });
+      }
     }
   };
   const copyGroupLink = async (groupId: string) => {
+    const shareTargetKey = targetKey;
     try {
       if (typeof window === 'undefined' || !navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      if (!sessionSlug) throw new Error('Session slug unavailable');
       const currentUrl = new URL(window.location.href);
-      const link = new URL(currentUrl.pathname, currentUrl.origin);
+      const link = new URL(buildPublicRoute(`/session/${encodeURIComponent(sessionSlug)}`), currentUrl.origin);
       const canonicalWorkerUrl = new URL(workerUrl);
       if (!['https:', 'http:'].includes(canonicalWorkerUrl.protocol)) throw new Error('Invalid Worker URL');
       link.searchParams.set('worker', canonicalWorkerUrl.origin);
       link.hash = `group-${encodeURIComponent(groupId)}`;
       await navigator.clipboard.writeText(link.toString());
-      setShareStatus('Group link copied. It contains no invitation token or credential.');
+      if (targetKeyRef.current !== shareTargetKey) return;
+      setShareState({
+        targetKey: shareTargetKey,
+        status: 'Group link copied. It contains no invitation token or credential.',
+      });
     } catch {
-      setShareStatus('Could not copy the group link. Copy the current session URL manually.');
+      if (targetKeyRef.current !== shareTargetKey) return;
+      setShareState({
+        targetKey: shareTargetKey,
+        status: 'Could not copy the group link. Copy the current session URL manually.',
+      });
     }
   };
 

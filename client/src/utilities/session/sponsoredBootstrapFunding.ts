@@ -12,27 +12,21 @@ type SponsoredBootstrapFundingContext = {
 
 export const SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY = 'ce:sponsoredBootstrapFunding:v1';
 
-const canUseSessionStorage = (): boolean =>
-  typeof window !== 'undefined' && typeof window.sessionStorage !== 'undefined';
-
 const hasFundingContext = (value: Partial<SponsoredBootstrapFundingContext> = {}): boolean =>
   !!toStr(value?.sessionSlug).trim() || !!toStr(value?.workerUrl).trim();
 
 const isObj = (value: unknown): value is SponsoredBootstrapFundingInput =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-const persistSponsoredBootstrapFundingContext = (
-  normalized: SponsoredBootstrapFundingContext,
-): SponsoredBootstrapFundingContext => {
-  if (!canUseSessionStorage()) return normalized;
-  try {
-    if (!hasFundingContext(normalized)) {
-      sessionStorage.removeItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY);
-      return normalized;
-    }
-    sessionStorage.setItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY, JSON.stringify(normalized));
-  } catch (_) {}
-  return normalized;
+let memoryFundingContext: SponsoredBootstrapFundingContext | null = null;
+
+const purgeLegacySponsoredBootstrapFundingContext = (): void => {
+  if (typeof window === 'undefined') return;
+  for (const storage of [window.localStorage, window.sessionStorage]) {
+    try {
+      storage?.removeItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY);
+    } catch (_) {}
+  }
 };
 
 export const normalizeSponsoredBootstrapFundingContext = (value: unknown = {}): SponsoredBootstrapFundingContext => {
@@ -49,20 +43,16 @@ export const normalizeSponsoredBootstrapFundingContext = (value: unknown = {}): 
 };
 
 export const readSponsoredBootstrapFundingContext = (): SponsoredBootstrapFundingContext | null => {
-  if (!canUseSessionStorage()) return null;
-  try {
-    const raw = sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY);
-    if (!raw) return null;
-    const normalized = normalizeSponsoredBootstrapFundingContext(JSON.parse(raw));
-    return hasFundingContext(normalized) ? normalized : null;
-  } catch {
-    return null;
-  }
+  purgeLegacySponsoredBootstrapFundingContext();
+  const normalized = normalizeSponsoredBootstrapFundingContext(memoryFundingContext);
+  return hasFundingContext(normalized) ? normalized : null;
 };
 
 export const writeSponsoredBootstrapFundingContext = (value: unknown = {}): SponsoredBootstrapFundingContext => {
+  purgeLegacySponsoredBootstrapFundingContext();
   const normalized = normalizeSponsoredBootstrapFundingContext(value);
-  return persistSponsoredBootstrapFundingContext(normalized);
+  memoryFundingContext = hasFundingContext(normalized) ? normalized : null;
+  return normalized;
 };
 
 export const clearSponsoredBootstrapFaucetGrantToken = (): SponsoredBootstrapFundingContext => {
@@ -71,12 +61,12 @@ export const clearSponsoredBootstrapFaucetGrantToken = (): SponsoredBootstrapFun
     ...(current && typeof current === 'object' ? current : {}),
     faucetGrantToken: '',
   });
-  return persistSponsoredBootstrapFundingContext(normalized);
+  memoryFundingContext = hasFundingContext(normalized) ? normalized : null;
+  purgeLegacySponsoredBootstrapFundingContext();
+  return normalized;
 };
 
 export const clearSponsoredBootstrapFundingContext = (): void => {
-  if (!canUseSessionStorage()) return;
-  try {
-    sessionStorage.removeItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY);
-  } catch (_) {}
+  memoryFundingContext = null;
+  purgeLegacySponsoredBootstrapFundingContext();
 };

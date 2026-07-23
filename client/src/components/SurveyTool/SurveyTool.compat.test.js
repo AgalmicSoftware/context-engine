@@ -55,6 +55,7 @@ describe('SurveyTool compatibility wiring', () => {
             slug: 'edge',
             __registry: {
               registryChainId: 84532,
+              sessionIdHex: '0x00112233445566778899aabbccddeeff',
             },
           }
         : null,

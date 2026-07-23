@@ -3,6 +3,7 @@ import { canonicalizeSessionSlug } from './canonicalSessionContext.js';
 import { overlayCachedSessionWorkerConfig } from './sessionWorkerConfigCache.js';
 import { parseWorkerConfig } from './sessionParsers.js';
 import { resolveSessionCapabilityProjection } from './sessionCapabilityProjection.js';
+import { parseSessionWorkerDiscoveryOrigin, resolveWorkerCanonicalSessionIdHex } from './sessionWorkerDiscovery.js';
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 import type { SessionConfigLike } from './sessionTypes.js';
 
@@ -69,14 +70,24 @@ export const getUsableSessionWorkerUrl = ({
   const normalizedSlug = canonicalizeSessionSlug(slug ?? sessionConfigSource?.slug ?? '');
   if (requireExactWorkerSession) {
     const configuredSlug = canonicalizeSessionSlug(sessionConfigSource?.slug ?? '');
+    const sessionId = resolveWorkerCanonicalSessionIdHex(sessionConfigSource);
     const projection = resolveSessionCapabilityProjection(sessionConfigSource);
     if (
       !normalizedSlug ||
       configuredSlug !== normalizedSlug ||
+      !sessionId ||
       projection.source !== 'profile' ||
       !projection.profileValid ||
       !projection.isWorkerCanonical
     ) {
+      return '';
+    }
+    // Exact Worker-native routes are pinned to the already validated canonical
+    // config. A generic slug cache replica may refresh non-authoritative read
+    // paths, but it must never repoint Groups to a different Worker origin.
+    try {
+      return parseSessionWorkerDiscoveryOrigin(resolveConfiguredSessionWorkerUrlFromConfig(sessionConfigSource));
+    } catch {
       return '';
     }
   }
@@ -84,18 +95,6 @@ export const getUsableSessionWorkerUrl = ({
     slug: normalizedSlug,
     sessionConfig,
   });
-  if (requireExactWorkerSession) {
-    const effectiveSlug = canonicalizeSessionSlug(effectiveSessionConfig?.slug ?? '');
-    const effectiveProjection = resolveSessionCapabilityProjection(effectiveSessionConfig);
-    if (
-      effectiveSlug !== normalizedSlug ||
-      effectiveProjection.source !== 'profile' ||
-      !effectiveProjection.profileValid ||
-      !effectiveProjection.isWorkerCanonical
-    ) {
-      return '';
-    }
-  }
   const configuredUrl = shouldUseSharedFallbackWorkerUrl({
     slug: normalizedSlug,
     sessionConfig: effectiveSessionConfig,

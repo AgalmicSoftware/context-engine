@@ -44,6 +44,11 @@ const buildHookOptions = () => ({
   updateDeploymentState: jest.fn(),
   clearSelectedBundleFile: jest.fn(),
   clearCachedWorkerSecretsAfterDeploy: jest.fn(),
+  verifyPublicWorkerDeployment: jest.fn(async ({ workerUrl }: { workerUrl: unknown }) => ({
+    workerOrigin: String(workerUrl),
+    configRevision: 'test-verification',
+    publicConfig: {},
+  })),
 });
 
 const buildDeployHookOptions = () => {
@@ -369,6 +374,30 @@ describe('useSessionWizardWorkerDeploy', () => {
       }),
     );
     expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith('/deploy'))).toBe(true);
+  });
+
+  it('reports infrastructure-only completion when public config readback is not verified', async () => {
+    const options = buildDeployHookOptions();
+    mockSuccessfulWorkerDeployFetch();
+    options.verifyPublicWorkerDeployment.mockRejectedValue(new TypeError('Failed to fetch'));
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
+    let deployResult;
+
+    await act(async () => {
+      deployResult = await result.current.handleDeployWorker();
+    });
+
+    expect(deployResult).toEqual(
+      expect.objectContaining({
+        ok: false,
+        error: expect.stringMatching(/public config readback.*browser-origin verification.*pending/i),
+      }),
+    );
+    expect(options.updateDeploymentState).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        deployComplete: true,
+      }),
+    );
   });
 
   it('requests and adopts the dedicated Wrapped capability when surfaces.agentHttp is enabled', async () => {
@@ -966,7 +995,9 @@ describe('useSessionWizardWorkerDeploy', () => {
       }
       return { ok: true, status: 200, json: async () => ({ ok: true }) } as Response;
     });
-    const { result } = renderHook(() => useSessionWizardWorkerDeploy(buildDeployHookOptions()));
+    const options = buildDeployHookOptions();
+    options.verifyPublicWorkerDeployment.mockRejectedValue(new Error('Config recovery unavailable.'));
+    const { result } = renderHook(() => useSessionWizardWorkerDeploy(options));
 
     await act(async () => {
       await result.current.handleDeployWorker();

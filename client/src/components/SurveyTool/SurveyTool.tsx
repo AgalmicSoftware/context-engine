@@ -11,7 +11,6 @@ import {
   computeSubmitLabel,
   ensureQuestionsNet,
   ensureSurveysNet,
-  mergeSurveyToolCachePatchIntoSurveysCache,
   readSurveysCache,
   readSurveysCacheAsync,
   readQuestionsCacheAsync,
@@ -40,10 +39,17 @@ import {
   resolveSurveyToolRenderMode,
   resolveSurveyToolSelectorRenderState,
   shouldBumpSurveyToolQuestionsCacheNonce,
+  shouldFetchSurveyToolSurveyIndex,
   shouldFetchSurveyToolSurveysOnPropsChange,
   shouldOpenSurveyToolResultsOnPropsChange,
   shouldRouteSurveyToolMountToQuestions,
 } from './surveyToolTopLevelHelpers';
+import {
+  loadSurveyToolSurveyData,
+  persistSurveyToolCachePatchForCurrentTarget,
+  readSurveyToolScopedCacheNode,
+  shouldUseSurveyToolChainCacheMissFallback,
+} from './surveyToolWorkerCacheIsolation';
 import { SurveySelector } from './SurveySelector';
 
 const LazySurveyQuestions = React.lazy(() =>
@@ -513,7 +519,9 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
       window.history.pushState({}, '', '/questions');
     }
 
-    instance.fetchSurveys();
+    if (shouldFetchSurveyToolSurveyIndex(instance.props)) {
+      instance.fetchSurveys();
+    }
   };
 
   instance.componentDidUpdate = (prevProps: SurveyToolProps) => {
@@ -565,59 +573,19 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
     const surveyReadContext = resolveSurveyReadContext(resolvedProps, slug);
     const effectiveSlug = surveyReadContext.sessionSlug || slug;
     const netIdStr = surveyReadContext.networkIdStr;
-    const loweredSurveyID = String(surveyID).toLowerCase();
-
-    surveyLog.log(`[SurveyTool] Getting data for ${loweredSurveyID} in context: ${effectiveSlug} (Chain: ${netIdStr})`);
-
-    let surveyData: SurveyToolSurveyDataRecord | null = null;
-
-    if (netIdStr) {
-      const surveysCache = ensureSurveysNet(await readSurveysCacheAsync(effectiveSlug), netIdStr);
-
-      if (surveysCache[netIdStr]?.surveys?.[loweredSurveyID]) {
-        surveyData = surveysCache[netIdStr].surveys[loweredSurveyID] as SurveyToolSurveyDataRecord;
-      }
-    }
-
-    if (!surveyData) {
-      const found = instance.findSurveyInAllCaches(loweredSurveyID);
-      if (found) {
-        surveyLog.log(
-          `[SurveyTool] Found survey ${loweredSurveyID} cached in different group: '${found.foundSlug}'. Using cached data.`,
-        );
-        surveyData = found.data as SurveyToolSurveyDataRecord;
-      }
-    }
-
-    if (!surveyData && netIdStr) {
-      surveyLog.log(`[SurveyTool] Cache miss. Fetching from chain for ${effectiveSlug}...`);
-      try {
-        surveyData = (await cs.getSurveyDataById(
-          resolvedProps.provider,
-          loweredSurveyID,
-          effectiveSlug,
-        )) as SurveyToolSurveyDataRecord | null;
-
-        if (surveyData) {
-          surveyData.surveyID = loweredSurveyID;
-          if (!surveyData.questionIDs) surveyData.questionIDs = [];
-          if (!surveyData.creator) surveyData.creator = '';
-          surveyData.id = surveyData.surveyID;
-
-          const cacheToUpdate = ensureSurveysNet(await readSurveysCacheAsync(effectiveSlug), netIdStr);
-          if (!cacheToUpdate[netIdStr])
-            cacheToUpdate[netIdStr] = { surveys: {}, surveysLatestBlock: 0, surveyResponses: {} };
-          if (!cacheToUpdate[netIdStr].surveys) cacheToUpdate[netIdStr].surveys = {};
-
-          cacheToUpdate[netIdStr].surveys[loweredSurveyID] = surveyData;
-          await writeSurveysCache(effectiveSlug, cacheToUpdate);
-        }
-      } catch (e) {
-        surveyLog.error('[SurveyTool] Chain fetch failed:', e);
-      }
-    }
-
-    return surveyData;
+    return loadSurveyToolSurveyData({
+      cacheScope: netIdStr,
+      ensureSurveysNet: (cache, scope) => ensureSurveysNet(cache as SurveyToolRecord, scope),
+      findSurveyInAllCaches: instance.findSurveyInAllCaches,
+      getSurveyDataById: (...args) => cs.getSurveyDataById(...args),
+      logger: surveyLog,
+      provider: resolvedProps.provider,
+      readSurveysCache: readSurveysCacheAsync,
+      sessionConfig: resolvedProps.sessionConfig,
+      sessionSlug: effectiveSlug,
+      surveyId: surveyID,
+      writeSurveysCache,
+    }) as Promise<SurveyToolSurveyDataRecord | null>;
   };
 
   instance.loadInitialData = async () => {
@@ -649,10 +617,16 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
     const prevList = Array.isArray(instance.state.surveys) ? instance.state.surveys : [];
     const prevCount = prevList.length;
 
-    let surveysCache = ensureSurveysNet(await readSurveysCacheAsync(effectiveSlug), netIdStr);
+    const surveysCache = await readSurveysCacheAsync(effectiveSlug);
     if (requestEpoch !== instance._surveyToolFetchEpoch) return;
 
-    const surveyBag = surveysCache?.[netIdStr]?.surveys || {};
+    const scopedSurveyCache = readSurveyToolScopedCacheNode({
+      cache: surveysCache,
+      cacheScope: netIdStr,
+      sessionConfig: resolvedProps.sessionConfig,
+      sessionSlug: effectiveSlug,
+    });
+    const surveyBag = (scopedSurveyCache?.surveys as SurveyToolRecord | undefined) || {};
 
     if (!surveyBag || Object.keys(surveyBag).length === 0) {
       if (prevCount > 0 && !ctxChanged) {
@@ -695,10 +669,21 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
       surveyLog.error('SurveyTool: Network ID undefined in ensureQuestionCached');
       return;
     }
-    let questionsCache = ensureQuestionsNet(await readQuestionsCacheAsync(currentSlug), netIdStr);
+    const cachedQuestions = await readQuestionsCacheAsync(currentSlug);
+    const scopedQuestionsCache = readSurveyToolScopedCacheNode({
+      cache: cachedQuestions,
+      cacheScope: netIdStr,
+      sessionConfig: resolvedProps.sessionConfig,
+      sessionSlug: currentSlug,
+    });
+    const questionsCache = ensureQuestionsNet(
+      netIdStr === 'worker' && !scopedQuestionsCache ? {} : cachedQuestions,
+      netIdStr,
+    );
 
     const qIdLower = String(questionId).toLowerCase();
     if (!questionsCache[netIdStr].questions[qIdLower]) {
+      if (!shouldUseSurveyToolChainCacheMissFallback(netIdStr)) return;
       let fetchSlug = currentSlug;
 
       const sessionNameHint = ctx.sessionName;
@@ -785,8 +770,17 @@ const createLegacySurveyToolInstance = (props: SurveyToolProps) => {
       const newCache = updateCacheFn(prev.cache || {}) as SurveyToolCachePatch;
       if (netIdStr) {
         try {
-          const global = mergeSurveyToolCachePatchIntoSurveysCache(readSurveysCache(effectiveSlug), netIdStr, newCache);
-          writeSurveysCache(effectiveSlug, global);
+          persistSurveyToolCachePatchForCurrentTarget({
+            expectedContext: updateCacheContext,
+            expectedSessionSlug: effectiveSlug,
+            getCurrentContext: () => {
+              const liveProps = instance.getResolvedSurveyToolProps();
+              return resolveUpdateCacheContext(liveProps, resolveEffectiveSlug(liveProps));
+            },
+            patch: newCache,
+            readSurveysCache,
+            writeSurveysCache,
+          });
         } catch (err) {
           surveyLog.warn('[SurveyTool] updateCache merge failed:', err);
         }
@@ -836,8 +830,13 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
   const didRunFetchUpdateEffectRef = useRef(false);
   const didRunAutoOpenUpdateEffectRef = useRef(false);
   const didRunNonceUpdateEffectRef = useRef(false);
-  const prevFetchNetworkIdRef = useRef(props.network?.id);
-  const prevSurveyCacheReadyRef = useRef(props.isSurveyCacheReady);
+  const prevSurveyFetchPropsRef = useRef<SurveyToolProps>({
+    network: { id: props.network?.id },
+    isSurveyCacheReady: props.isSurveyCacheReady,
+    minifiedMode: props.minifiedMode,
+    singleQuestionMode: props.singleQuestionMode,
+    sessionConfig: props.sessionConfig,
+  });
   const prevAutoOpenResultsRef = useRef(props.autoOpenResults);
   const prevQuestionCacheReadyRef = useRef(props.isQuestionCacheReady);
   const prevResponsesCacheReadyRef = useRef(props.isResponsesCacheReady);
@@ -876,59 +875,19 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
     const surveyReadContext = resolveSurveyReadContext(resolvedProps, slug);
     const effectiveSlug = surveyReadContext.sessionSlug || slug;
     const netIdStr = surveyReadContext.networkIdStr;
-    const loweredSurveyID = String(surveyID).toLowerCase();
-
-    surveyLog.log(`[SurveyTool] Getting data for ${loweredSurveyID} in context: ${effectiveSlug} (Chain: ${netIdStr})`);
-
-    let surveyData: SurveyToolSurveyDataRecord | null = null;
-
-    if (netIdStr) {
-      const surveysCache = ensureSurveysNet(await readSurveysCacheAsync(effectiveSlug), netIdStr);
-
-      if (surveysCache[netIdStr]?.surveys?.[loweredSurveyID]) {
-        surveyData = surveysCache[netIdStr].surveys[loweredSurveyID] as SurveyToolSurveyDataRecord;
-      }
-    }
-
-    if (!surveyData) {
-      const found = findSurveyInAllCaches(loweredSurveyID);
-      if (found) {
-        surveyLog.log(
-          `[SurveyTool] Found survey ${loweredSurveyID} cached in different group: '${found.foundSlug}'. Using cached data.`,
-        );
-        surveyData = found.data as SurveyToolSurveyDataRecord;
-      }
-    }
-
-    if (!surveyData && netIdStr) {
-      surveyLog.log(`[SurveyTool] Cache miss. Fetching from chain for ${effectiveSlug}...`);
-      try {
-        surveyData = (await cs.getSurveyDataById(
-          resolvedProps.provider,
-          loweredSurveyID,
-          effectiveSlug,
-        )) as SurveyToolSurveyDataRecord | null;
-
-        if (surveyData) {
-          surveyData.surveyID = loweredSurveyID;
-          if (!surveyData.questionIDs) surveyData.questionIDs = [];
-          if (!surveyData.creator) surveyData.creator = '';
-          surveyData.id = surveyData.surveyID;
-
-          const cacheToUpdate = ensureSurveysNet(await readSurveysCacheAsync(effectiveSlug), netIdStr);
-          if (!cacheToUpdate[netIdStr])
-            cacheToUpdate[netIdStr] = { surveys: {}, surveysLatestBlock: 0, surveyResponses: {} };
-          if (!cacheToUpdate[netIdStr].surveys) cacheToUpdate[netIdStr].surveys = {};
-
-          cacheToUpdate[netIdStr].surveys[loweredSurveyID] = surveyData;
-          await writeSurveysCache(effectiveSlug, cacheToUpdate);
-        }
-      } catch (e) {
-        surveyLog.error('[SurveyTool] Chain fetch failed:', e);
-      }
-    }
-
-    return surveyData;
+    return loadSurveyToolSurveyData({
+      cacheScope: netIdStr,
+      ensureSurveysNet: (cache, scope) => ensureSurveysNet(cache as SurveyToolRecord, scope),
+      findSurveyInAllCaches,
+      getSurveyDataById: (...args) => cs.getSurveyDataById(...args),
+      logger: surveyLog,
+      provider: resolvedProps.provider,
+      readSurveysCache: readSurveysCacheAsync,
+      sessionConfig: resolvedProps.sessionConfig,
+      sessionSlug: effectiveSlug,
+      surveyId: surveyID,
+      writeSurveysCache,
+    }) as Promise<SurveyToolSurveyDataRecord | null>;
   };
 
   const fetchSurveys = useCallback(async () => {
@@ -957,10 +916,16 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
     const prevList = Array.isArray(surveysRef.current) ? surveysRef.current : [];
     const prevCount = prevList.length;
 
-    let surveysCache = ensureSurveysNet(await readSurveysCacheAsync(effectiveSlug), netIdStr);
+    const surveysCache = await readSurveysCacheAsync(effectiveSlug);
     if (requestEpoch !== _surveyToolFetchEpoch.current) return;
 
-    const surveyBag = surveysCache?.[netIdStr]?.surveys || {};
+    const scopedSurveyCache = readSurveyToolScopedCacheNode({
+      cache: surveysCache,
+      cacheScope: netIdStr,
+      sessionConfig: resolvedProps.sessionConfig,
+      sessionSlug: effectiveSlug,
+    });
+    const surveyBag = (scopedSurveyCache?.surveys as SurveyToolRecord | undefined) || {};
 
     if (!surveyBag || Object.keys(surveyBag).length === 0) {
       if (prevCount > 0 && !ctxChanged) {
@@ -1006,10 +971,21 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       surveyLog.error('SurveyTool: Network ID undefined in ensureQuestionCached');
       return;
     }
-    let questionsCache = ensureQuestionsNet(await readQuestionsCacheAsync(currentSlug), netIdStr);
+    const cachedQuestions = await readQuestionsCacheAsync(currentSlug);
+    const scopedQuestionsCache = readSurveyToolScopedCacheNode({
+      cache: cachedQuestions,
+      cacheScope: netIdStr,
+      sessionConfig: resolvedProps.sessionConfig,
+      sessionSlug: currentSlug,
+    });
+    const questionsCache = ensureQuestionsNet(
+      netIdStr === 'worker' && !scopedQuestionsCache ? {} : cachedQuestions,
+      netIdStr,
+    );
 
     const qIdLower = String(questionId).toLowerCase();
     if (!questionsCache[netIdStr].questions[qIdLower]) {
+      if (!shouldUseSurveyToolChainCacheMissFallback(netIdStr)) return;
       let fetchSlug = currentSlug;
 
       const sessionNameHint = ctx.sessionName;
@@ -1099,8 +1075,17 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       }
       if (netIdStr) {
         try {
-          const global = mergeSurveyToolCachePatchIntoSurveysCache(readSurveysCache(effectiveSlug), netIdStr, newCache);
-          writeSurveysCache(effectiveSlug, global);
+          persistSurveyToolCachePatchForCurrentTarget({
+            expectedContext: updateCacheContext,
+            expectedSessionSlug: effectiveSlug,
+            getCurrentContext: () => {
+              const liveProps = getResolvedSurveyToolProps();
+              return resolveUpdateCacheContext(liveProps, resolveEffectiveSlug(liveProps));
+            },
+            patch: newCache,
+            readSurveysCache,
+            writeSurveysCache,
+          });
         } catch (err) {
           surveyLog.warn('[SurveyTool] updateCache merge failed:', err);
         }
@@ -1147,36 +1132,43 @@ const SurveyToolRuntime = (props: SurveyToolProps) => {
       window.history.pushState({}, '', '/questions');
     }
 
-    initialFetchSurveysRef.current();
+    if (shouldFetchSurveyToolSurveyIndex(initialProps)) {
+      initialFetchSurveysRef.current();
+    }
   }, []);
 
   useEffect(() => {
     const currentProps = {
       network: { id: props.network?.id },
       isSurveyCacheReady: props.isSurveyCacheReady,
+      minifiedMode: props.minifiedMode,
+      singleQuestionMode: props.singleQuestionMode,
+      sessionConfig: props.sessionConfig,
     };
     if (!didRunFetchUpdateEffectRef.current) {
       didRunFetchUpdateEffectRef.current = true;
-      prevFetchNetworkIdRef.current = currentProps.network.id;
-      prevSurveyCacheReadyRef.current = currentProps.isSurveyCacheReady;
+      prevSurveyFetchPropsRef.current = currentProps;
       return;
     }
 
     if (
       shouldFetchSurveyToolSurveysOnPropsChange({
-        prevProps: {
-          network: { id: prevFetchNetworkIdRef.current },
-          isSurveyCacheReady: prevSurveyCacheReadyRef.current,
-        },
+        prevProps: prevSurveyFetchPropsRef.current,
         props: currentProps,
       })
     ) {
       fetchSurveys();
     }
 
-    prevFetchNetworkIdRef.current = currentProps.network.id;
-    prevSurveyCacheReadyRef.current = currentProps.isSurveyCacheReady;
-  }, [props.network?.id, props.isSurveyCacheReady, fetchSurveys]);
+    prevSurveyFetchPropsRef.current = currentProps;
+  }, [
+    props.network?.id,
+    props.isSurveyCacheReady,
+    props.minifiedMode,
+    props.singleQuestionMode,
+    props.sessionConfig,
+    fetchSurveys,
+  ]);
 
   useEffect(() => {
     const currentProps = { autoOpenResults: props.autoOpenResults };

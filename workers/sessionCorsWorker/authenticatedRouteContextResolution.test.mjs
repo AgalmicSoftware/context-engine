@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import { resolveAuthenticatedRouteContext } from './authenticatedRouteContextResolution.js';
 
+const workerSessionId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const replacementWorkerSessionId = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
 test('resolveAuthenticatedRouteContext preserves missing session-config failure', async () => {
@@ -95,6 +97,10 @@ test('resolveAuthenticatedRouteContext preserves blocked-origin passthrough resp
 test('resolveAuthenticatedRouteContext returns common authenticated route context on success', async () => {
   const config = {
     authzEpoch: 3,
+    sessionId: workerSessionId,
+    sessionModeProfile: {
+      authority: { mode: 'worker_canonical' },
+    },
     limits: {
       perWalletPerDay: 7,
     },
@@ -110,6 +116,7 @@ test('resolveAuthenticatedRouteContext returns common authenticated route contex
       slug: 'session-a',
       payload: {
         sub: '0xAbC123',
+        sessionId: workerSessionId,
         authzEpoch: 3,
         scopes: { ai: true, fetch: false, groups: true },
       },
@@ -130,6 +137,193 @@ test('resolveAuthenticatedRouteContext returns common authenticated route contex
     config,
     headers,
     scopes: { ai: true, fetch: false, groups: true },
+    address: '0xabc123',
+    limit: 7,
+  });
+});
+
+test('resolveAuthenticatedRouteContext rejects missing and stale canonical session claims', async () => {
+  const headers = { 'Access-Control-Allow-Origin': 'https://allowed.example' };
+  const config = {
+    authzEpoch: 3,
+    sessionId: workerSessionId,
+    sessionModeProfile: {
+      authority: { mode: 'worker_canonical' },
+    },
+  };
+
+  for (const tokenSessionId of [undefined, replacementWorkerSessionId]) {
+    const result = await resolveAuthenticatedRouteContext({
+      request: { headers: new Headers({ Origin: 'https://allowed.example' }) },
+      env: { GROUP_KV: {} },
+      auth: {
+        slug: 'session-a',
+        payload: {
+          sub: '0xabc',
+          ...(tokenSessionId ? { sessionId: tokenSessionId } : {}),
+          authzEpoch: 3,
+          scopes: { groups: true },
+        },
+      },
+      baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+      deps: {
+        getSessionConfig: async () => config,
+        getCorsContext: async () => ({ ok: true, headers }),
+        json: createJsonStub(),
+        toStr: String,
+        SESSION_CONFIG_NOT_FOUND_ERROR: 'Session config not found.',
+      },
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      response: {
+        body: { error: 'Token session identity is stale.' },
+        status: 401,
+        headers,
+      },
+    }, String(tokenSessionId));
+  }
+});
+
+test('resolveAuthenticatedRouteContext rejects stale registry tokens on every Worker Groups route', async () => {
+  const headers = { 'Access-Control-Allow-Origin': 'https://allowed.example' };
+  const config = {
+    authzEpoch: 3,
+    sessionId: replacementWorkerSessionId,
+    sessionModeProfile: {
+      authority: { mode: 'registry_canonical' },
+    },
+  };
+
+  for (const pathname of ['/groups/list', '/groups/my-memberships', '/groups/join']) {
+    for (const tokenSessionId of [undefined, workerSessionId]) {
+      const result = await resolveAuthenticatedRouteContext({
+        request: new Request(`https://worker.example${pathname}?sessionId=${replacementWorkerSessionId}`, {
+          method: pathname === '/groups/join' ? 'POST' : 'GET',
+          headers: { Origin: 'https://allowed.example' },
+        }),
+        env: { GROUP_KV: {} },
+        auth: {
+          slug: 'session-a',
+          payload: {
+            sub: '0xabc',
+            ...(tokenSessionId ? { sessionId: tokenSessionId } : {}),
+            authzEpoch: 3,
+            scopes: { groups: true },
+          },
+        },
+        baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+        deps: {
+          getSessionConfig: async () => config,
+          getCorsContext: async () => ({ ok: true, headers }),
+          json: createJsonStub(),
+          toStr: String,
+          SESSION_CONFIG_NOT_FOUND_ERROR: 'Session config not found.',
+        },
+      });
+
+      assert.deepEqual(result, {
+        ok: false,
+        response: {
+          body: { error: 'Token session identity is stale.' },
+          status: 401,
+          headers,
+        },
+      }, `${pathname}:${String(tokenSessionId)}`);
+    }
+  }
+});
+
+test('resolveAuthenticatedRouteContext accepts a registry Worker Groups token for the exact live session id', async () => {
+  const headers = { 'Access-Control-Allow-Origin': 'https://allowed.example' };
+  const config = {
+    authzEpoch: 3,
+    sessionId: replacementWorkerSessionId,
+    sessionModeProfile: {
+      authority: { mode: 'registry_canonical' },
+    },
+  };
+
+  const result = await resolveAuthenticatedRouteContext({
+    request: new Request(
+      `https://worker.example/groups/list?sessionId=${replacementWorkerSessionId}`,
+      { headers: { Origin: 'https://allowed.example' } },
+    ),
+    env: { GROUP_KV: {} },
+    auth: {
+      slug: 'session-a',
+      payload: {
+        sub: '0xAbC123',
+        sessionId: replacementWorkerSessionId,
+        authzEpoch: 3,
+        scopes: { groups: true },
+      },
+    },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    deps: {
+      getSessionConfig: async () => config,
+      getCorsContext: async () => ({ ok: true, headers }),
+      json: createJsonStub(),
+      toStr: (value) => (typeof value === 'string' ? value : value == null ? '' : String(value)),
+      SESSION_CONFIG_NOT_FOUND_ERROR: 'Session config not found.',
+    },
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    slug: 'session-a',
+    config,
+    headers,
+    scopes: { groups: true },
+    address: '0xabc123',
+    limit: 0,
+  });
+});
+
+test('resolveAuthenticatedRouteContext preserves legacy non-Groups auth without a canonical session claim', async () => {
+  const headers = { 'Access-Control-Allow-Origin': 'https://allowed.example' };
+  const config = {
+    authzEpoch: 3,
+    sessionId: replacementWorkerSessionId,
+    sessionModeProfile: {
+      authority: { mode: 'registry_canonical' },
+    },
+    limits: {
+      perWalletPerDay: 7,
+    },
+  };
+
+  const result = await resolveAuthenticatedRouteContext({
+    request: new Request('https://worker.example/ai', {
+      method: 'POST',
+      headers: { Origin: 'https://allowed.example' },
+    }),
+    env: { GROUP_KV: {} },
+    auth: {
+      slug: 'session-a',
+      payload: {
+        sub: '0xAbC123',
+        authzEpoch: 3,
+        scopes: { ai: true },
+      },
+    },
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    deps: {
+      getSessionConfig: async () => config,
+      getCorsContext: async () => ({ ok: true, headers }),
+      json: createJsonStub(),
+      toStr: (value) => (typeof value === 'string' ? value : value == null ? '' : String(value)),
+      SESSION_CONFIG_NOT_FOUND_ERROR: 'Session config not found.',
+    },
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    slug: 'session-a',
+    config,
+    headers,
+    scopes: { ai: true },
     address: '0xabc123',
     limit: 7,
   });

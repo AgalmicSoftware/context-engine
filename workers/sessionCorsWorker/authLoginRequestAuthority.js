@@ -1,6 +1,7 @@
 import {
   validateBrowserLoginOrigin,
 } from './siweMessageValidation.js';
+import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 
 export const resolveAuthLoginRequestAuthority = async ({
   env,
@@ -102,6 +103,24 @@ export const resolveAuthLoginRequestAuthority = async ({
     return {
       ok: false,
       response: deps?.json?.({ error: deps?.SESSION_CONFIG_NOT_FOUND_ERROR }, 404, headers),
+    };
+  }
+
+  const workerCanonical = String(
+    config?.sessionModeProfile?.authority?.mode || '',
+  ).trim().toLowerCase() === 'worker_canonical';
+  const sessionId = resolveCanonicalWorkerSessionIdHex(config);
+  const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
+  if (workerCanonical && !sessionId) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: 'Worker session identity is invalid.' }, 500, headers),
+    };
+  }
+  if (workerCanonical && requestedSessionId !== sessionId) {
+    return {
+      ok: false,
+      response: deps?.json?.({ error: 'Session identity does not match worker session.' }, 409, headers),
     };
   }
 

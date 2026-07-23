@@ -1,4 +1,4 @@
-import { getWorkerSessionToken, normalizeWorkerUrl } from './workerAuth.js';
+import { clearAllWorkerSessionTokens, getWorkerSessionToken, normalizeWorkerUrl } from './workerAuth.js';
 
 const TEST_ADDRESS = '0x00000000000000000000000000000000000000aa';
 
@@ -114,6 +114,7 @@ describe('error paths', () => {
       return [];
     });
     localStorage.clear();
+    clearAllWorkerSessionTokens();
   });
 
   afterEach(() => {
@@ -130,13 +131,13 @@ describe('error paths', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
-  it('does not reuse expired cached tokens when refresh fails', async () => {
+  it('does not reuse a still-live bearer from legacy persistent storage', async () => {
     const cacheKey = `ce:workerToken:v1:${normalizeWorkerUrl('https://worker.example')}::${TEST_ADDRESS}`;
     localStorage.setItem(
       cacheKey,
       JSON.stringify({
-        token: 'expired-token',
-        exp: Math.floor(Date.now() / 1000) - 60,
+        token: 'persisted-token',
+        exp: Math.floor(Date.now() / 1000) + 3600,
       }),
     );
     global.fetch = jest
@@ -167,5 +168,52 @@ describe('error paths', () => {
     );
 
     expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps arbitrary nonce errors without disclosing remote credential text', async () => {
+    const canaryCredential = 'nonce-credential-canary-never-render';
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(401, { error: `Authorization: Bearer ${canaryCredential}` }));
+
+    const error = await getWorkerSessionToken({
+      workerUrl: 'https://worker.example',
+      context: authContext,
+    }).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      message: 'Worker nonce request failed (401).',
+      reason: 'worker_auth_worker_nonce_failed',
+      status: 401,
+    });
+    expect(String(error?.message || error)).not.toContain(canaryCredential);
+  });
+
+  it('maps arbitrary login errors without disclosing the submitted SIWE signature or message', async () => {
+    const canarySignature = '0xsigned';
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'nonce-1' }))
+      .mockImplementationOnce(async (_url, init) => {
+        const submittedLogin = JSON.parse(String(init?.body || '{}'));
+        expect(submittedLogin.signature).toBe(canarySignature);
+        expect(submittedLogin.message).toContain('wants you to sign in');
+        return jsonResp(403, {
+          error: `Rejected ${submittedLogin.signature}; ${submittedLogin.message}`,
+        });
+      });
+
+    const error = await getWorkerSessionToken({
+      workerUrl: 'https://worker.example',
+      context: authContext,
+    }).catch((caught) => caught);
+
+    expect(error).toMatchObject({
+      message: 'Worker login failed (403).',
+      reason: 'worker_auth_worker_login_failed',
+      status: 403,
+    });
+    expect(String(error?.message || error)).not.toContain(canarySignature);
+    expect(String(error?.message || error)).not.toContain('wants you to sign in');
   });
 });

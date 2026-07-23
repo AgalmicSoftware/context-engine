@@ -6,6 +6,7 @@ import {
   resolveAdminAgentSessionWrappedWorkerOrigin,
   verifyAdminAgentSessionWrappedHealth,
 } from './adminAgentSessionWrapped';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const capability = {
   version: 1 as const,
@@ -16,15 +17,19 @@ const capability = {
   verifiedAt: '2026-07-20T18:00:00.000Z',
 };
 
+const registryModeProfile = (agentHttp = false) => {
+  const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+  profile.surfaces.agentHttp = agentHttp;
+  if (agentHttp) profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+  return profile;
+};
+
 const registrySession = (overrides: Record<string, unknown> = {}) => ({
   slug: 'alpha',
   sessionId: '0x01',
   networkChainId: 11155420,
   corsWorkerUrl: 'https://session-worker.example.workers.dev',
-  sessionModeProfile: {
-    surfaces: { web: true, telegram: false, agentHttp: false },
-    authority: { mode: 'evm_registry_canonical' },
-  },
+  sessionModeProfile: registryModeProfile(),
   __registry: {
     registryChainId: 11155420,
     adminAddress: '0x1111111111111111111111111111111111111111',
@@ -34,7 +39,7 @@ const registrySession = (overrides: Record<string, unknown> = {}) => ({
 
 describe('adminAgentSessionWrapped', () => {
   it.each([
-    ['worker canonical', { sessionModeProfile: { authority: { mode: 'worker_canonical' } } }],
+    ['worker canonical', { sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE) }],
     ['registry canonical', {}],
   ])('allows %s sessions with one paired Worker', (_label, overrides) => {
     expect(
@@ -94,6 +99,23 @@ describe('adminAgentSessionWrapped', () => {
     expect(availability).toEqual(expect.objectContaining({ code: 'incompatible', compatible: false }));
   });
 
+  it('fails closed for a raw compatible authority in an invalid profile', () => {
+    const availability = resolveAdminAgentSessionWrappedAvailability({
+      canAdminWorker: true,
+      sessionConfig: registrySession({
+        sessionModeProfile: {
+          profileVersion: 999,
+          authority: { mode: 'worker_canonical' },
+        },
+      }),
+      sessionWorkerUrl: 'https://session-worker.example.workers.dev',
+    });
+
+    expect(availability).toEqual(
+      expect.objectContaining({ code: 'incompatible', compatible: false, manageable: false }),
+    );
+  });
+
   it('never treats the shared fallback as the dedicated paired Worker origin', () => {
     const generalWorkerSession = {
       slug: '',
@@ -118,19 +140,37 @@ describe('adminAgentSessionWrapped', () => {
   });
 
   it('builds one config patch whose agentHttp bit drives the mirrored capability state', () => {
-    expect(buildAdminAgentSessionWrappedConfigPatch({ sessionConfig: registrySession(), capability })).toEqual({
-      agentSessionWrapped: capability,
-      sessionModeProfile: {
-        surfaces: { web: true, telegram: false, agentHttp: true },
-        authority: { mode: 'evm_registry_canonical' },
-      },
-    });
+    expect(buildAdminAgentSessionWrappedConfigPatch({ sessionConfig: registrySession(), capability })).toEqual(
+      expect.objectContaining({
+        agentSessionWrapped: capability,
+        sessionModeProfile: expect.objectContaining({
+          preset: 'custom',
+          surfaces: expect.objectContaining({ agentHttp: true }),
+          authority: { mode: 'evm_registry_canonical' },
+        }),
+      }),
+    );
     expect(
       buildAdminAgentSessionWrappedConfigPatch({
         sessionConfig: registrySession(),
         capability: { ...capability, enabled: false },
-      }).sessionModeProfile.surfaces.agentHttp,
-    ).toBe(false);
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        sessionModeProfile: expect.objectContaining({
+          surfaces: expect.objectContaining({ agentHttp: false }),
+        }),
+      }),
+    );
+  });
+
+  it('does not synthesize an invalid partial profile for a legacy registry session', () => {
+    const legacySession = registrySession();
+    delete (legacySession as { sessionModeProfile?: unknown }).sessionModeProfile;
+
+    expect(buildAdminAgentSessionWrappedConfigPatch({ sessionConfig: legacySession, capability })).toEqual({
+      agentSessionWrapped: capability,
+    });
   });
 
   it('awaits verified deployment before signed config publication and returns no token', async () => {
@@ -196,7 +236,7 @@ describe('adminAgentSessionWrapped', () => {
   });
 
   it('attaches a missing registry Worker but never rewrites encrypted pointers', async () => {
-    const setSessionFieldsOnChain = jest.fn(async () => ({ ok: true }));
+    const setSessionFieldsOnChain = jest.fn(async (_input: Record<string, unknown>) => ({ ok: true }));
     const buildRegistrySessionFields = jest.fn(({ onChainFields }) => onChainFields);
     await expect(
       ensureAdminAgentSessionWrappedWorkerAttached({
@@ -237,7 +277,7 @@ describe('adminAgentSessionWrapped', () => {
     await ensureAdminAgentSessionWrappedWorkerAttached({
       sessionConfig: registrySession({
         corsWorkerUrl: '',
-        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
       }),
       sessionSlug: 'alpha',
       sessionWorkerUrl: 'https://session-worker.example.workers.dev',

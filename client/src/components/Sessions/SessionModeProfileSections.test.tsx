@@ -6,7 +6,10 @@ import {
   SESSION_MODE_PRESET_IDS,
   cloneSessionModePreset,
   type SessionModeProfile,
+  validateSessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
+
+const VALID_SBT_CONTRACT = '0x00000000000000000000000000000000000000aa';
 
 const renderSection = (section: 'privacy' | 'worker' | 'publish', initialProfile?: SessionModeProfile) => {
   const onChange = jest.fn();
@@ -91,13 +94,44 @@ describe('SessionModeProfileSections', () => {
     expect(screen.getByRole('option', { name: 'Any SBT from this contract' })).toBeInTheDocument();
   });
 
+  it('updates the profile chain atomically when an SBT rule network changes', () => {
+    const { onChange } = renderSection('privacy');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Use default Cloudflare access rules' }));
+    fireEvent.click(screen.getByTestId('ce-new-envelope-add-sbt-onchain'));
+    fireEvent.change(screen.getByRole('textbox', { name: 'SBT contract address' }), {
+      target: { value: VALID_SBT_CONTRACT },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'SBT network' }), {
+      target: { value: '84532' },
+    });
+
+    const [profile, compiled] = onChange.mock.calls.at(-1) as [SessionModeProfile, { storageProfile: any }];
+    expect(profile.evm.registryChainId).toBe(84532);
+    expect(profile.encryption.accessConditions?.conditions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'sbt_onchain',
+          chainId: 84532,
+          contract: VALID_SBT_CONTRACT,
+        }),
+      ]),
+    );
+    expect(validateSessionModeProfile(profile)).toEqual({ valid: true, issues: [] });
+    expect(compiled.storageProfile.payloadAccessControl.accessConditions.conditions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: 'sbt_onchain', chainId: 84532 })]),
+    );
+  });
+
   it('keeps a configured custom SBT chain visible by name instead of dropping it', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.evm.registryChainId = 31337;
     profile.encryption.accessConditions = {
       match: 'any',
-      conditions: [{ kind: 'sbt_onchain', chainId: 31337, contract: '0x1234', anyOrAll: 'any' }],
+      conditions: [{ kind: 'sbt_onchain', chainId: 31337, contract: VALID_SBT_CONTRACT, anyOrAll: 'any' }],
     };
 
+    expect(validateSessionModeProfile(profile)).toEqual({ valid: true, issues: [] });
     renderSection('privacy', profile);
 
     expect(screen.getByRole('option', { name: 'Chain 31337' })).toBeInTheDocument();

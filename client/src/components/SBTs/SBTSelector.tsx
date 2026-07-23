@@ -23,7 +23,7 @@ import {
   SESSION_REGISTRY_CACHE_UPDATED_EVENT,
 } from '../../utilities/web3/sessionRegistry.js';
 import { DEFAULT_CHAIN_ID, USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
-import { createLogger, emitForcedLog } from '../../utilities/logging.js';
+import { createLogger } from '../../utilities/logging.js';
 import { listNamespaceEntriesSync, readCache, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
@@ -39,7 +39,7 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
 import { getCanonicalSessionFeaturedSBTs } from '../../utilities/sbt/sessionFeaturedSBTs.js';
 import { bindSbtSelectorRuntimePorts, isEnsureLightSbtUniverse } from './sbtSelectorRuntimePorts';
-import type { SbtSelectorLogMethod, UnknownRecord } from './sbtSelectorRuntimePorts';
+import type { UnknownRecord } from './sbtSelectorRuntimePorts';
 import { resolveSbtSelectorSelectedSessionContext } from './sbtSelectorSessionResolution.js';
 import {
   buildSbtOptionsRequestSignature,
@@ -143,6 +143,8 @@ import {
   shouldWarmSbtSelectorRegistryCacheForTargets,
   shouldUsePropsSbtSelectorSessionConfigForSlug,
 } from './sbtSelectorHelpers';
+import * as optionsLoad from './sbtSelectorOptionsLoadRuntime';
+import { createSbtSelectorDebugEmitter } from './sbtSelectorDebugRuntime';
 import type {
   NormalizedAdditionalSbtOption,
   SbtNameLookupState,
@@ -364,31 +366,10 @@ const resolveSbtDisplayLabelTyped = sbtSelectorRuntimePorts.resolveSbtDisplayLab
 const writeCacheTyped = sbtSelectorRuntimePorts.writeCache;
 const contractScriptsUntyped = sbtSelectorRuntimePorts.contractScripts;
 const ALLOW_DEMO_SESSION_FALLBACK = !USE_ONCHAIN_SESSION_REGISTRY;
+const emitSbtSelectorDebug = createSbtSelectorDebugEmitter(sbtLog, sbtLogUntyped);
 
 const SELECTED_SBT_HYDRATION_RETRY_MS = 45 * 1000;
 const SHARED_LIGHT_UNIVERSE_KICKOFF_TTL_MS = 60 * 1000;
-
-const emitSbtSelectorDebug = (level: unknown, message: unknown, payload?: unknown): void => {
-  const loggerLevel = String(level || 'log');
-  const dynamicMethod = sbtLogUntyped[loggerLevel];
-  const loggerMethod: SbtSelectorLogMethod =
-    typeof dynamicMethod === 'function'
-      ? (dynamicMethod as SbtSelectorLogMethod).bind(sbtLog)
-      : sbtLogUntyped.log.bind(sbtLog);
-  if (isSbtSelectorForcedDebugEnabled()) {
-    if (typeof payload === 'undefined') {
-      emitForcedLog(loggerLevel, message);
-    } else {
-      emitForcedLog(loggerLevel, message, payload);
-    }
-    return;
-  }
-  if (typeof payload === 'undefined') {
-    loggerMethod(message);
-  } else {
-    loggerMethod(message, payload);
-  }
-};
 
 const DEFAULT_FALLBACK_CHAIN_ID = normalizeChainValue(DEFAULT_CHAIN_ID);
 
@@ -402,6 +383,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
   _isMounted = false;
   _lastSbtOptionsRequestSig = '';
   _loadSbtOptionsInflight: Promise<unknown> | null = null;
+  _sbtOptionsLoadCoordinator = new optionsLoad.SbtOptionsLoadCoordinator();
   _pendingSbtOptionsForceReload = false;
   _pendingSbtOptionsReload = false;
   _pendingSelectedSbtAddresses = new Set<string>();
@@ -646,7 +628,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       normalizeDiscoverySlugs,
       sourceSessionSlug: this.state.sourceSessionSlug,
       ...(slugOverride !== undefined ? { slugOverride } : {}),
-    });
+    }).filter((targetSlug) => this.canDiscoverSbtForSessionSlug(targetSlug));
   };
 
   shouldWarmRegistryCacheForTargets = ({ slugOverride }: SbtSelectorSlugOverrideArgs = {}): boolean => {
@@ -676,6 +658,8 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
       sessionSlug: slug,
     }) as SbtSelectorSessionConfigSigLike | null;
   };
+
+  canDiscoverSbtForSessionSlug = (slugIn: unknown): boolean => optionsLoad.canDiscoverSbtForSelector(this, slugIn);
 
   getSessionNetworkId = (slug: unknown): number | null => {
     return resolveSbtSelectorSessionNetworkId({
@@ -777,6 +761,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
   hydrateSelectedSbtNames = async ({ force = false }: SbtSelectorForceArgs = {}): Promise<void> => {
     const addresses = buildSelectedSbtHydrationAddresses(this.props.selectedSBTs);
     const slug = this.getEffectiveSessionSlug();
+    if (optionsLoad.resetUnsupportedSelectedSbtHydration(this, slug)) return;
     const networkID = this.getSessionNetworkId(slug);
     const metadataLookupCfg = this.getMetadataLookupConfig(slug);
     const sig = buildSelectedSbtHydrationSignature({ addresses, networkID, slug });
@@ -1421,6 +1406,13 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     const slug = normalizeSessionSlug(this.getEffectiveSessionSlug());
     const scopeMode = this.getResolvedScopeMode();
     const targetSlugs = this.getResolvedTargetSlugs();
+    if (slug && !this.canDiscoverSbtForSessionSlug(slug)) {
+      return optionsLoad.disableUnsupportedSbtOptions(this, {
+        scopeMode,
+        sessionConfigSig: buildSessionConfigSig(this.props.sessionConfig),
+        slug,
+      });
+    }
     const featuredEntries = this.getScopeFeaturedEntries({
       targetSlugs,
       effectiveSlug: slug,
@@ -1465,15 +1457,26 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
     }
     if (requestDecision.shouldReturnInflight) {
       if (requestDecision.shouldQueueRerun) {
-        this._pendingSbtOptionsReload = true;
-        this._pendingSbtOptionsForceReload = this._pendingSbtOptionsForceReload || forceReload;
+        return optionsLoad.queueChangedSbtOptionsRequest(this, {
+          forceReload,
+          requestSig,
+          scopeMode,
+          slug,
+          targetSlugs,
+        });
       }
       return this._loadSbtOptionsInflight;
     }
 
+    const loadGuard = this._sbtOptionsLoadCoordinator.begin(requestSig, slug);
+    const isCurrentLoad = (): boolean =>
+      this._sbtOptionsLoadCoordinator.isCurrent(loadGuard, this.canDiscoverSbtForSessionSlug);
+    const applySbtOptionsIfCurrent = (options: SbtSelectorApplyOptionsArgs): SbtSelectorOption[] =>
+      isCurrentLoad() ? this.applySbtOptions(options) : [];
+
     const run = (async () => {
       const shouldEnableLoading = !this.state.loadingOptions;
-      if (shouldEnableLoading) {
+      if (shouldEnableLoading && isCurrentLoad()) {
         this.setState(buildSbtSelectorLoadingOptionsPatch({ loadingOptions: true }));
       }
       const { contexts, contextBySlug } = await this.readScopedCacheContexts(targetSlugs);
@@ -1501,7 +1504,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
         });
       }
       if (!contexts.length && Object.keys(sbtList).length === 0) {
-        this.applySbtOptions({
+        applySbtOptionsIfCurrent({
           sbtList: {},
           featuredEntries,
           ignoredSet,
@@ -1518,7 +1521,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
         return null;
       }
       if (!contexts.length) {
-        this.applySbtOptions({
+        applySbtOptionsIfCurrent({
           sbtList,
           featuredEntries,
           ignoredSet,
@@ -1533,7 +1536,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
         });
         return null;
       }
-      this.applySbtOptions({
+      applySbtOptionsIfCurrent({
         sbtList,
         featuredEntries,
         ignoredSet,
@@ -1557,7 +1560,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
             ...requestContext,
             ...progress,
           });
-          this.applySbtOptions({
+          applySbtOptionsIfCurrent({
             sbtList,
             featuredEntries,
             ignoredSet,
@@ -1588,7 +1591,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
             ...requestContext,
             ...progress,
           });
-          this.applySbtOptions({
+          applySbtOptionsIfCurrent({
             sbtList,
             featuredEntries,
             ignoredSet,
@@ -1600,7 +1603,7 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
         },
       });
 
-      this.applySbtOptions({
+      applySbtOptionsIfCurrent({
         sbtList,
         featuredEntries,
         ignoredSet,
@@ -1619,32 +1622,13 @@ class SBTSelector extends React.Component<SbtSelectorProps, SbtSelectorState> {
 
     this._inflightSbtOptionsRequestSig = requestSig;
     this._loadSbtOptionsInflight = run;
-    try {
-      await run;
-      this._lastSbtOptionsRequestSig = requestSig;
-    } catch (error) {
-      if (this._lastSbtOptionsRequestSig === requestSig) {
-        this._lastSbtOptionsRequestSig = '';
-      }
-      if (this._isMounted && this.state.loadingOptions) {
-        this.setState(buildSbtSelectorLoadingOptionsPatch());
-      }
-      sbtLog.error('SBTSelector option load failed:', error);
-    } finally {
-      if (this._loadSbtOptionsInflight === run) {
-        this._loadSbtOptionsInflight = null;
-      }
-      if (this._inflightSbtOptionsRequestSig === requestSig) {
-        this._inflightSbtOptionsRequestSig = '';
-      }
-      const shouldRerun = this._pendingSbtOptionsReload;
-      const rerunForce = this._pendingSbtOptionsForceReload;
-      this._pendingSbtOptionsReload = false;
-      this._pendingSbtOptionsForceReload = false;
-      if (shouldRerun && this._isMounted) {
-        void this.loadSBTOptions({ force: !!rerunForce });
-      }
-    }
+    await optionsLoad.settleSbtOptionsLoad(this, {
+      buildLoadingPatch: () => buildSbtSelectorLoadingOptionsPatch(),
+      isCurrent: isCurrentLoad,
+      onError: (error) => sbtLog.error('SBTSelector option load failed:', error),
+      requestSig,
+      run,
+    });
     return null;
   };
 

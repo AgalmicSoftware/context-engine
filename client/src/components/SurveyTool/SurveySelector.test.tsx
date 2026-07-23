@@ -384,7 +384,7 @@ describe('SurveySelector', () => {
       isSurveyCacheReady: true,
       singleQuestionMode: false,
       networkChainId: 84532,
-      activeSessionSlug: 'edge',
+      activeSessionSlug: '',
       questionsCacheNonce: 4,
       questionResponsesNonce: 2,
     });

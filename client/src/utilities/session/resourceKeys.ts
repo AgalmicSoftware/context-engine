@@ -1,8 +1,8 @@
 /**
  * @file resourceKeys.js
  * @module resourceKeys
- * @description Worker KV resource key management — stores and resolves per-session RPC keys,
- *              Arweave JWKs, and faucet configuration from local storage and on-chain registry.
+ * @description Worker KV resource key management — keeps per-session RPC keys,
+ *              Arweave JWKs, and faucet configuration in memory and resolves session defaults.
  *
  * Key exports: getEffectiveArweaveKey, getEffectiveRpcKey, getEffectiveFaucetConfig, resourceKeysUtils, getLocalResourceKeys
  */
@@ -12,7 +12,6 @@ import { getGlobalLitHooks } from '../crypto/litProtocol.js';
 import { toStr } from '../shared/primitives.js';
 import { defaultStrictAllowDemoFallback } from '../worker/workerSessionResolution.js';
 import store from '../../store.js';
-import { createLogger } from '../logging.js';
 import {
   canonicalizeSessionSlug,
   isReservedSessionSlugKey,
@@ -91,8 +90,6 @@ type EffectiveFaucetConfigResult = {
   encryptedAvailable: boolean;
 };
 
-const log = createLogger('resourceKeys');
-
 const STORAGE_KEY = 'ce:resourceKeys:v1';
 const RESERVED_KEYS = new Set<string>(['__proto__', 'constructor', 'prototype']);
 const isObj = (value: unknown): value is UnknownRecord => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -158,23 +155,25 @@ const normalizeStore = (raw: unknown = null): ResourceKeyStore => {
   return { v: 1, bySession, byGroup: bySession };
 };
 
-const readStore = (): ResourceKeyStore => {
-  if (typeof window === 'undefined') return normalizeStore(null);
-  try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-    return normalizeStore(parsed);
-  } catch (_) {
-    return normalizeStore(null);
+let memoryStore = normalizeStore(null);
+
+const purgeLegacyStore = (): void => {
+  if (typeof window === 'undefined') return;
+  for (const storage of [window.localStorage, window.sessionStorage]) {
+    try {
+      storage?.removeItem(STORAGE_KEY);
+    } catch (_) {}
   }
 };
 
+const readStore = (): ResourceKeyStore => {
+  purgeLegacyStore();
+  return normalizeStore(memoryStore);
+};
+
 const writeStore = (payload: ResourceKeyStore): void => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  } catch (e) {
-    log.warn('resourceKeys: fallback', e);
-  }
+  purgeLegacyStore();
+  memoryStore = normalizeStore(payload);
 };
 
 export const getLocalResourceKeys = (slugIn = ''): ResourceKeys => {

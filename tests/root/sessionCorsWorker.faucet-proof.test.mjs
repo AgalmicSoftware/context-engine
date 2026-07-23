@@ -12,6 +12,7 @@ const SESSION_CONFIG_KEY = (slug) => `session:${slug}:config`;
 const SESSION_SECRETS_KEY = (slug) => `session:${slug}:secrets`;
 const LOGIN_ORIGIN = 'https://contextengine.sh';
 const LOGIN_DOMAIN = 'contextengine.sh';
+const WORKER_CANONICAL_SESSION_ID = '0x00112233445566778899aabbccddeeff';
 
 const registryIface = new ethers.utils.Interface([
   'function getResourceGate(string,string) view returns (address[] sbtAddresses, uint256 chainId, uint8 mode, uint256 perMemberLimit)',
@@ -206,12 +207,14 @@ const issueWorkerLoginToken = async ({
   env,
   wallet,
   sessionSlug,
+  sessionId,
   onChainGatesByResource,
 }) => {
   const nonceResponse = await sessionCorsWorker.fetch(
     makeJsonRequest('/auth/nonce', {
       address: wallet.address,
       sessionSlug,
+      ...(sessionId ? { sessionId } : {}),
     }),
     env,
     {}
@@ -230,6 +233,7 @@ const issueWorkerLoginToken = async ({
     makeJsonRequest('/auth/login', {
       address: wallet.address,
       sessionSlug,
+      ...(sessionId ? { sessionId } : {}),
       message,
       signature,
     }),
@@ -343,6 +347,7 @@ test('worker-canonical faucet transactions use the authenticated session-secret 
     GROUP_KV: createMemoryKv({
       [SESSION_CONFIG_KEY(sessionSlug)]: JSON.stringify({
         slug: sessionSlug,
+        sessionId: WORKER_CANONICAL_SESSION_ID,
         networkChainId: 84532,
         allowOrigins: [LOGIN_ORIGIN],
         sessionModeProfile: { authority: { mode: 'worker_canonical' } },
@@ -370,6 +375,7 @@ test('worker-canonical faucet transactions use the authenticated session-secret 
       env,
       wallet,
       sessionSlug,
+      sessionId: WORKER_CANONICAL_SESSION_ID,
     });
 
     const response = await sessionCorsWorker.fetch(

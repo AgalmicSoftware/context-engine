@@ -100,7 +100,10 @@ export const E2E_TESTIDS = Object.freeze({
   DATABASE_QUESTION_COUNT_INCREMENT: 'ce-database-question-count-increment',
 
   SESSION_RESULTS_TOGGLE: 'ce-session-results-toggle',
+  SESSION_ADVANCED_ONCHAIN_ACCESS_GATES: 'ce-session-advanced-onchain-access-gates',
+  SESSION_GROUPS_UNAVAILABLE: 'ce-session-groups-unavailable',
   SURVEY_FILTER_TOGGLE: 'ce-survey-filter-toggle',
+  CONTRACTS_ADVANCED_EXTERNAL_NOTICE: 'ce-contracts-advanced-external-notice',
 
   // Wallet display (for E2E assertions)
   WALLET_DISPLAY: 'ce-wallet-display',
@@ -170,6 +173,8 @@ export const E2E_TESTIDS = Object.freeze({
   WIZARD_DEPLOY_STATUS: 'ce-wizard-deploy-status',
   WIZARD_WORKER_URL: 'ce-wizard-worker-url',
   WIZARD_SPONSORED_STATUS: 'ce-wizard-sponsored-status',
+  WIZARD_SPONSORED_KEY_INPUT: 'ce-wizard-sponsored-key-input',
+  WIZARD_SPONSORED_KEY_APPLY: 'ce-wizard-sponsored-key-apply',
   WIZARD_PUBLISH: 'ce-wizard-publish',
   WIZARD_METADATA_URI: 'ce-wizard-metadata-uri',
   WIZARD_ADMIN_URL: 'ce-wizard-admin-url',
@@ -181,6 +186,7 @@ export const E2E_TESTIDS = Object.freeze({
   SPONSOR_CREATE: 'ce-sponsor-create',
   SPONSOR_STATUS: 'ce-sponsor-status',
   SPONSOR_SHARE_URL: 'ce-sponsor-share-url',
+  SPONSOR_SHARE_KEY: 'ce-sponsor-share-key',
   SPONSOR_TX_ID: 'ce-sponsor-tx-id',
 
   // Agent page UI
@@ -311,6 +317,7 @@ export const E2E_TESTIDS = Object.freeze({
 
   // CreateSBTGroup + SBTPage
   SBTS_CREATE_TOGGLE: 'ce-sbts-create-toggle',
+  SBT_CREATE_ADVANCED_EXTERNAL_NOTICE: 'ce-sbt-create-advanced-external-notice',
   SBT_CREATE_NAME_INPUT: 'ce-sbt-create-name-input',
   SBT_CREATE_DESCRIPTION_INPUT: 'ce-sbt-create-description-input',
   SBT_CREATE_NAME_LOCK_ROW: 'ce-sbt-create-name-lock-row',

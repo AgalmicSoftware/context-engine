@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import { dispatchAuthLoginRequest } from './authLoginRequestDispatch.js';
 
+const workerSessionId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const replacementWorkerSessionId = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
 const createSignedBody = (overrides = {}) => ({
@@ -172,7 +174,7 @@ test('dispatchAuthLoginRequest signs tokens with jti and persists the token mark
   };
   const calls = [];
   const request = {
-    json: async () => createSignedBody(),
+    json: async () => createSignedBody({ sessionId: workerSessionId }),
   };
 
   const result = await dispatchAuthLoginRequest({
@@ -192,7 +194,13 @@ test('dispatchAuthLoginRequest signs tokens with jti and persists the token mark
         return {
           ok: true,
           address: '0xabc',
-          config: { authzEpoch: 7 },
+          config: {
+            authzEpoch: 7,
+            sessionId: workerSessionId,
+            sessionModeProfile: {
+              authority: { mode: 'worker_canonical' },
+            },
+          },
           headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
           scopes,
           targetSlug: 'session-a',
@@ -222,7 +230,7 @@ test('dispatchAuthLoginRequest signs tokens with jti and persists the token mark
     ['resolveAuthLoginRequestAuthority', {
       env: { GROUP_KV: {}, TOKEN_HMAC_SECRET: 'test-secret' },
       request,
-      body: createSignedBody(),
+      body: createSignedBody({ sessionId: workerSessionId }),
       slugHint: '',
       baseHeaders: { 'Access-Control-Allow-Origin': '*' },
     }],
@@ -231,6 +239,7 @@ test('dispatchAuthLoginRequest signs tokens with jti and persists the token mark
     ['signToken', {
       sub: '0xABC',
       slug: 'session-a',
+      sessionId: workerSessionId,
       authzEpoch: 7,
       scopes,
       exp: expectedExp,
@@ -245,10 +254,64 @@ test('dispatchAuthLoginRequest signs tokens with jti and persists the token mark
     }],
   ]);
   assert.deepEqual(result, {
-    body: { token: 'signed-token', exp: expectedExp },
+    body: {
+      token: 'signed-token',
+      exp: expectedExp,
+      sessionSlug: 'session-a',
+      sessionId: workerSessionId,
+    },
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
   });
+});
+
+test('dispatchAuthLoginRequest rejects a missing or stale canonical session id before signing', async () => {
+  for (const requestedSessionId of [undefined, replacementWorkerSessionId]) {
+    let signTokenCalled = false;
+    let persistCalled = false;
+    const result = await dispatchAuthLoginRequest({
+      request: {
+        json: async () => createSignedBody({
+          ...(requestedSessionId ? { sessionId: requestedSessionId } : {}),
+        }),
+      },
+      env: { GROUP_KV: {}, TOKEN_HMAC_SECRET: 'test-secret' },
+      baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+      slug: '',
+      deps: createAuthDeps({
+        resolveAuthLoginRequestAuthority: async () => ({
+          ok: true,
+          address: '0xabc',
+          config: {
+            authzEpoch: 7,
+            sessionId: workerSessionId,
+            sessionModeProfile: {
+              authority: { mode: 'worker_canonical' },
+            },
+          },
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+          scopes: { groups: true },
+          targetSlug: 'session-a',
+        }),
+        signToken: async () => {
+          signTokenCalled = true;
+          return 'must-not-sign';
+        },
+        persistAuthTokenRecord: async () => {
+          persistCalled = true;
+        },
+      }),
+    });
+
+    assert.equal(result.status, 409, String(requestedSessionId));
+    assert.deepEqual(
+      result.body,
+      { error: 'Session identity does not match worker session.' },
+      String(requestedSessionId),
+    );
+    assert.equal(signTokenCalled, false, String(requestedSessionId));
+    assert.equal(persistCalled, false, String(requestedSessionId));
+  }
 });
 
 test('dispatchAuthLoginRequest fails closed when token marker persistence fails', async () => {

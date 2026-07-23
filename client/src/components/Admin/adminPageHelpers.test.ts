@@ -9,6 +9,7 @@ import {
   normalizeWorkerUrl,
   resolveAdminCapabilities,
 } from './adminPageHelpers';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('adminPageHelpers', () => {
   it('normalizes errors, slugs, providers, and worker URLs', () => {
@@ -43,25 +44,62 @@ describe('adminPageHelpers', () => {
     expect(buildTxExplorerUrl('0xabc', 0)).toBe('');
   });
 
-  it('keeps worker and registry admin capabilities independent', () => {
+  it('keeps Worker authority projection-bound and does not infer registry authority from stale fields', () => {
     const sessionConfig = {
       adminAddress: '0x00000000000000000000000000000000000000aa',
       __registry: {
         registryChainId: 84532,
         adminAddress: '0x00000000000000000000000000000000000000bb',
       },
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     };
 
     expect(resolveAdminCapabilities({ account: sessionConfig.adminAddress, sessionConfig })).toMatchObject({
       isWorkerCanonicalSession: true,
-      hasRegistryEntry: true,
+      hasRegistryEntry: false,
       canAdminWorker: true,
       canAdminRegistry: false,
     });
     expect(resolveAdminCapabilities({ account: sessionConfig.__registry.adminAddress, sessionConfig })).toMatchObject({
       canAdminWorker: false,
+      canAdminRegistry: false,
+    });
+  });
+
+  it('preserves registry administration for a valid registry-canonical profile', () => {
+    const adminAddress = '0x00000000000000000000000000000000000000bb';
+    const sessionConfig = {
+      __registry: {
+        registryChainId: 84532,
+        adminAddress,
+      },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+    };
+
+    expect(resolveAdminCapabilities({ account: adminAddress, sessionConfig })).toMatchObject({
+      hasRegistryEntry: true,
+      canAdminWorker: true,
       canAdminRegistry: true,
+    });
+  });
+
+  it('fails closed when raw Worker fields are paired with an invalid profile', () => {
+    const adminAddress = '0x00000000000000000000000000000000000000aa';
+    expect(
+      resolveAdminCapabilities({
+        account: adminAddress,
+        sessionConfig: {
+          adminAddress,
+          sessionModeProfile: {
+            profileVersion: 999,
+            authority: { mode: 'worker_canonical' },
+          },
+        },
+      }),
+    ).toMatchObject({
+      isWorkerCanonicalSession: false,
+      canAdminWorker: false,
+      canAdminRegistry: false,
     });
   });
 });

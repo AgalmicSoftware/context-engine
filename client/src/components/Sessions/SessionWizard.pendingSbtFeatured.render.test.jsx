@@ -14,6 +14,7 @@ import {
   waitFor,
   within,
 } from './SessionWizard.workerPanel.testUtils';
+import { clearSessionWizardPendingSbtDraftsCache } from './hooks/usePendingSbtDrafts';
 
 describe('SessionWizard pending featured SBT rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
@@ -29,7 +30,7 @@ describe('SessionWizard pending featured SBT rendering', () => {
     await expectSelectorAddresses('encryption-gate-gate-1', [mockPendingSbtAddress]);
   });
 
-  it('restores the auto-linked Gate A pending draft after a refresh while the pending draft still exists', async () => {
+  it('retains the auto-linked Gate A pending draft during same-tab remounts', async () => {
     const firstRender = renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -162,7 +163,7 @@ describe('SessionWizard pending featured SBT rendering', () => {
     await expectSelectorAddresses('encryption-gate-gate-1', []);
   });
 
-  it('prunes pending featured SBT selections after a refresh when no live sessionStorage draft exists', async () => {
+  it('prunes pending featured SBT selections after a simulated reload releases tab memory', async () => {
     const firstRender = renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -189,7 +190,7 @@ describe('SessionWizard pending featured SBT rendering', () => {
     });
 
     firstRender.unmount();
-    sessionStorage.removeItem('ce:sessionWizardPendingSbtDrafts:v1');
+    clearSessionWizardPendingSbtDraftsCache();
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);

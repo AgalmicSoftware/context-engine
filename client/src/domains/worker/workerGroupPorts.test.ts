@@ -12,6 +12,9 @@ import {
 
 const WORKER_URL = 'https://session-worker.example';
 const WORKER_TOKEN = 'worker-jwt-only';
+const SESSION_SLUG = 'alpha';
+const SESSION_ID = '0x11111111111111111111111111111111';
+const OTHER_SESSION_ID = '0x22222222222222222222222222222222';
 
 describe('worker group ports', () => {
   it('loads visible groups and self-memberships directly with the session-worker credential', async () => {
@@ -21,9 +24,12 @@ describe('worker group ports', () => {
         new Response(
           JSON.stringify({
             ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
             groups: [
               {
                 groupId: 'reviewers',
+                sessionSlug: SESSION_SLUG,
                 label: 'Reviewers',
                 imageUrl: 'https://ar-io.dev/reviewers-image',
                 joinMode: 'open',
@@ -38,15 +44,18 @@ describe('worker group ports', () => {
         new Response(
           JSON.stringify({
             ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
             memberships: [
               {
                 group: {
                   groupId: 'members',
+                  sessionSlug: SESSION_SLUG,
                   label: 'Members',
                   joinMode: 'admin_add',
                   memberVisibility: 'admin_only',
                 },
-                member: { principalKey: 'evm:0xabc' },
+                member: { sessionSlug: SESSION_SLUG, principalKey: 'evm:0xabc' },
                 memberCount: 3,
               },
             ],
@@ -56,7 +65,13 @@ describe('worker group ports', () => {
       );
 
     await expect(
-      loadWorkerGroupOverview({ workerUrl: `${WORKER_URL}/`, credentialToken: WORKER_TOKEN, fetchImpl }),
+      loadWorkerGroupOverview({
+        workerUrl: `${WORKER_URL}/`,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        fetchImpl,
+      }),
     ).resolves.toMatchObject({
       groups: [
         {
@@ -70,7 +85,7 @@ describe('worker group ports', () => {
 
     expect(fetchImpl).toHaveBeenNthCalledWith(
       1,
-      `${WORKER_URL}/groups/list`,
+      `${WORKER_URL}/groups/list?sessionId=${encodeURIComponent(SESSION_ID)}`,
       expect.objectContaining({
         method: 'GET',
         cache: 'no-store',
@@ -79,7 +94,7 @@ describe('worker group ports', () => {
     );
     expect(fetchImpl).toHaveBeenNthCalledWith(
       2,
-      `${WORKER_URL}/groups/my-memberships`,
+      `${WORKER_URL}/groups/my-memberships?sessionId=${encodeURIComponent(SESSION_ID)}`,
       expect.objectContaining({
         method: 'GET',
         cache: 'no-store',
@@ -90,17 +105,33 @@ describe('worker group ports', () => {
 
   it('joins only through the worker route and preserves an explicit worker failure reason', async () => {
     const successfulFetch = jest.fn(
-      async () =>
-        new Response(JSON.stringify({ ok: true, group: { groupId: 'reviewers' } }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
+      async (_input?: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            group: {
+              groupId: 'reviewers',
+              sessionSlug: SESSION_SLUG,
+              label: 'Reviewers',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
     );
 
     await expect(
       joinWorkerGroup({
         workerUrl: WORKER_URL,
         credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
         groupId: 'reviewers',
         fetchImpl: successfulFetch,
       }),
@@ -112,11 +143,11 @@ describe('worker group ports', () => {
         Authorization: `Bearer ${WORKER_TOKEN}`,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ groupId: 'reviewers' }),
+      body: JSON.stringify({ groupId: 'reviewers', sessionId: SESSION_ID }),
     });
 
     const deniedFetch = jest.fn(
-      async () =>
+      async (_input?: RequestInfo | URL, _init?: RequestInit) =>
         new Response(JSON.stringify({ ok: false, reason: 'worker_group_join_denied' }), {
           status: 403,
           headers: { 'content-type': 'application/json' },
@@ -126,16 +157,105 @@ describe('worker group ports', () => {
       joinWorkerGroup({
         workerUrl: WORKER_URL,
         credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
         groupId: 'private',
         fetchImpl: deniedFetch,
       }),
     ).rejects.toMatchObject({ message: 'worker_group_join_denied', status: 403 });
   });
 
+  it('maps arbitrary worker group errors without disclosing the bearer credential', async () => {
+    const canaryCredential = 'worker-jwt-canary-never-render';
+    const deniedFetch = jest.fn(
+      async (_input?: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            ok: false,
+            reason: `Bearer ${canaryCredential}`,
+            error: `Authorization: Bearer ${canaryCredential}`,
+          }),
+          {
+            status: 403,
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
+    );
+
+    const error = await joinWorkerGroup({
+      workerUrl: WORKER_URL,
+      credentialToken: canaryCredential,
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
+      groupId: 'private',
+      fetchImpl: deniedFetch,
+    }).catch((caught) => caught);
+
+    expect(error).toMatchObject({ message: 'worker_group_request_failed_403', status: 403 });
+    expect(String(error?.message || error)).not.toContain(canaryCredential);
+  });
+
   it('binds supported admin operations to their signed worker action and path', async () => {
-    const postSignedRequest = jest.fn(async (request) => ({ data: { ok: true, request } }));
+    const buildGroup = (overrides = {}) => ({
+      groupId: 'reviewers',
+      sessionSlug: SESSION_SLUG,
+      label: 'Reviewers',
+      joinMode: 'open',
+      memberVisibility: 'session',
+      ...overrides,
+    });
+    const postSignedRequest = jest.fn(async (request) => {
+      if (request.action === 'groups/create') {
+        return {
+          data: {
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            group: buildGroup(request.body?.group),
+          },
+        };
+      }
+      if (request.action === 'groups/update') {
+        return {
+          data: {
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            group: buildGroup(request.body?.group),
+          },
+        };
+      }
+      if (request.action === 'groups/list') {
+        return { data: { ok: true, sessionId: SESSION_ID, sessionSlug: SESSION_SLUG, groups: [] } };
+      }
+      if (request.action === 'groups/list-members') {
+        return {
+          data: {
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            group: buildGroup(),
+            members: [],
+          },
+        };
+      }
+      if (request.action === 'groups/add-member') {
+        return {
+          data: {
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            group: buildGroup(),
+            member: { sessionSlug: SESSION_SLUG, principal: request.body?.principal },
+          },
+        };
+      }
+      return { data: { ok: true, sessionId: SESSION_ID, sessionSlug: SESSION_SLUG, request } };
+    });
 
     await createWorkerGroup({
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
       group: {
         label: 'Open reviewers',
         joinMode: 'open',
@@ -144,6 +264,8 @@ describe('worker group ports', () => {
       postSignedRequest,
     });
     await updateWorkerGroup({
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
       groupId: 'reviewers',
       group: {
         label: 'Invited reviewers',
@@ -152,19 +274,33 @@ describe('worker group ports', () => {
       },
       postSignedRequest,
     });
-    await listWorkerGroupsAdmin({ postSignedRequest });
-    await listWorkerGroupMembers({ groupId: 'reviewers', postSignedRequest });
+    await listWorkerGroupsAdmin({ sessionId: SESSION_ID, sessionSlug: SESSION_SLUG, postSignedRequest });
+    await listWorkerGroupMembers({
+      groupId: 'reviewers',
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
+      postSignedRequest,
+    });
     await addWorkerGroupMember({
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
       groupId: 'reviewers',
       principal: { kind: 'evm_address', address: '0x00000000000000000000000000000000000000aa' },
       postSignedRequest,
     });
     await removeWorkerGroupMember({
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
       groupId: 'reviewers',
       principal: { kind: 'evm_address', address: '0x00000000000000000000000000000000000000aa' },
       postSignedRequest,
     });
-    await deleteWorkerGroup({ groupId: 'reviewers', postSignedRequest });
+    await deleteWorkerGroup({
+      groupId: 'reviewers',
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
+      postSignedRequest,
+    });
 
     expect(postSignedRequest).toHaveBeenNthCalledWith(1, {
       action: 'groups/create',
@@ -175,6 +311,7 @@ describe('worker group ports', () => {
           joinMode: 'open',
           memberVisibility: 'session',
         },
+        sessionId: SESSION_ID,
       },
     });
     expect(postSignedRequest).toHaveBeenNthCalledWith(2, {
@@ -187,17 +324,18 @@ describe('worker group ports', () => {
           joinMode: 'admin_add',
           memberVisibility: 'members',
         },
+        sessionId: SESSION_ID,
       },
     });
     expect(postSignedRequest).toHaveBeenNthCalledWith(3, {
       action: 'groups/list',
       path: '/admin/groups/list',
-      body: {},
+      body: { sessionId: SESSION_ID },
     });
     expect(postSignedRequest).toHaveBeenNthCalledWith(4, {
       action: 'groups/list-members',
       path: '/admin/groups/list-members',
-      body: { groupId: 'reviewers' },
+      body: { groupId: 'reviewers', sessionId: SESSION_ID },
     });
     expect(postSignedRequest).toHaveBeenNthCalledWith(5, {
       action: 'groups/add-member',
@@ -205,6 +343,7 @@ describe('worker group ports', () => {
       body: {
         groupId: 'reviewers',
         principal: { kind: 'evm_address', address: '0x00000000000000000000000000000000000000aa' },
+        sessionId: SESSION_ID,
       },
     });
     expect(postSignedRequest).toHaveBeenNthCalledWith(6, {
@@ -213,12 +352,169 @@ describe('worker group ports', () => {
       body: {
         groupId: 'reviewers',
         principal: { kind: 'evm_address', address: '0x00000000000000000000000000000000000000aa' },
+        sessionId: SESSION_ID,
       },
     });
     expect(postSignedRequest).toHaveBeenNthCalledWith(7, {
       action: 'groups/delete',
       path: '/admin/groups/delete',
-      body: { groupId: 'reviewers' },
+      body: { groupId: 'reviewers', sessionId: SESSION_ID },
     });
+  });
+
+  it('preserves the signed member-list cursor contract', async () => {
+    const postSignedRequest = jest.fn(async (_request?: unknown) => ({
+      data: {
+        ok: true,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        group: {
+          groupId: 'reviewers',
+          sessionSlug: SESSION_SLUG,
+          label: 'Reviewers',
+          joinMode: 'admin_add',
+          memberVisibility: 'members',
+        },
+        members: [],
+        nextCursor: 'next-page-token',
+      },
+    }));
+
+    const page = await listWorkerGroupMembers({
+      groupId: 'reviewers',
+      cursor: 'current-page-token',
+      limit: 125,
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
+      postSignedRequest,
+    });
+
+    expect(postSignedRequest).toHaveBeenCalledWith({
+      action: 'groups/list-members',
+      path: '/admin/groups/list-members',
+      body: {
+        groupId: 'reviewers',
+        cursor: 'current-page-token',
+        limit: 125,
+        sessionId: SESSION_ID,
+      },
+    });
+    expect(page.nextCursor).toBe('next-page-token');
+  });
+
+  it.each([
+    [undefined, 'worker_group_response_session_slug_missing'],
+    ['beta', 'worker_group_response_session_slug_mismatch'],
+  ])('rejects a group response with non-exact session provenance (%s)', async (responseSlug, reason) => {
+    const fetchImpl = jest
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            groups: [
+              {
+                groupId: 'reviewers',
+                ...(responseSlug ? { sessionSlug: responseSlug } : {}),
+                label: 'Reviewers',
+                joinMode: 'open',
+                memberVisibility: 'session',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ ok: true, sessionId: SESSION_ID, sessionSlug: SESSION_SLUG, memberships: [] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+
+    await expect(
+      loadWorkerGroupOverview({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        fetchImpl,
+      }),
+    ).rejects.toMatchObject({ message: reason });
+  });
+
+  it('rejects an empty overview whose response envelope belongs to another session', async () => {
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'beta',
+            groups: [],
+            memberships: [],
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
+    );
+
+    await expect(
+      loadWorkerGroupOverview({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        fetchImpl,
+      }),
+    ).rejects.toMatchObject({ message: 'worker_group_response_session_slug_mismatch' });
+  });
+
+  it.each([
+    [undefined, 'worker_group_response_session_identity_missing'],
+    [OTHER_SESSION_ID, 'worker_group_response_session_identity_mismatch'],
+  ])('rejects a response envelope with non-exact session identity (%s)', async (responseSessionId, reason) => {
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            ...(responseSessionId ? { sessionId: responseSessionId } : {}),
+            sessionSlug: SESSION_SLUG,
+            groups: [],
+            memberships: [],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+
+    await expect(
+      loadWorkerGroupOverview({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        fetchImpl,
+      }),
+    ).rejects.toMatchObject({ message: reason });
+  });
+
+  it('rejects a missing expected session identity before issuing a request', async () => {
+    const fetchImpl = jest.fn();
+
+    await expect(
+      loadWorkerGroupOverview({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: '',
+        sessionSlug: SESSION_SLUG,
+        fetchImpl,
+      }),
+    ).rejects.toMatchObject({ message: 'worker_group_expected_session_identity_missing' });
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

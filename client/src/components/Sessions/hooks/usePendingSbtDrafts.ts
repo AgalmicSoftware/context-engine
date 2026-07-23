@@ -1,17 +1,8 @@
 /** @file usePendingSbtDrafts.js */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useSyncExternalStore, type Dispatch, type SetStateAction } from 'react';
 import { ethers } from 'ethers';
-import { createLogger } from '../../../utilities/logging';
-import {
-  removeKeys,
-  safeJsonWrite,
-  type RemoveKeysResult,
-  type SafeJsonWriteResult,
-} from '../../../utilities/cache/storageJson.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
 import type { AnyRecord } from '../../shellTypes';
-
-const log = createLogger('general');
 
 export const SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY = 'ce:sessionWizardPendingSbtDrafts:v1';
 
@@ -25,6 +16,42 @@ export type PendingSbtDraft = AnyRecord & {
   metadataUploadStatus?: string;
   deployed?: boolean;
 };
+
+type SessionStorageLike = {
+  getItem?: (key: string) => string | null;
+  setItem?: (key: string, value: string) => void;
+  removeItem?: (key: string) => void;
+};
+
+type PendingSbtDraftStorageResult = {
+  ok: boolean;
+  removed: number;
+  failed: number;
+  status: 'memory-only' | 'ok' | 'partial-failure';
+};
+
+type PendingSbtDraftClearResult = {
+  ok: boolean;
+  removed: number;
+  failed: number;
+  status: 'ok' | 'partial-failure';
+};
+
+let tabMemoryPendingSbtDrafts: PendingSbtDraft[] = [];
+const emptyPendingSbtDrafts: PendingSbtDraft[] = [];
+const pendingSbtDraftListeners = new Set<() => void>();
+
+const emitPendingSbtDraftChange = () => {
+  pendingSbtDraftListeners.forEach((listener) => listener());
+};
+
+const subscribeToPendingSbtDrafts = (listener: () => void) => {
+  pendingSbtDraftListeners.add(listener);
+  return () => pendingSbtDraftListeners.delete(listener);
+};
+
+const getPendingSbtDraftSnapshot = () => tabMemoryPendingSbtDrafts;
+const getPendingSbtDraftServerSnapshot = () => emptyPendingSbtDrafts;
 
 export const normalizePendingSbtDrafts = (value: unknown): PendingSbtDraft[] => {
   if (!Array.isArray(value)) return [];
@@ -49,69 +76,87 @@ export const normalizePendingSbtDrafts = (value: unknown): PendingSbtDraft[] => 
     .filter((entry): entry is PendingSbtDraft => !!entry);
 };
 
-export const readSessionWizardPendingSbtDraftsCache = (): PendingSbtDraft[] => {
-  if (typeof window === 'undefined' || !window.sessionStorage) return [];
+const getBrowserStorage = (name: 'localStorage' | 'sessionStorage'): SessionStorageLike | null => {
   try {
-    const raw = sessionStorage.getItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
-    return normalizePendingSbtDrafts(raw ? JSON.parse(raw) : []);
-  } catch (_) {
-    return [];
-  }
-};
-
-type SessionStorageLike = {
-  getItem?: (key: string) => string | null;
-  setItem?: (key: string, value: string) => void;
-  removeItem?: (key: string) => void;
-};
-
-type PendingSbtDraftStorageResult = RemoveKeysResult | SafeJsonWriteResult;
-
-const getSessionStorage = (storage?: SessionStorageLike | null): SessionStorageLike | null => {
-  if (storage !== undefined) return storage;
-  try {
-    return typeof window !== 'undefined' ? window.sessionStorage : null;
+    return typeof window !== 'undefined' && window[name] ? window[name] : null;
   } catch (_) {
     return null;
   }
+};
+
+export const purgeLegacySessionWizardPendingSbtDrafts = ({
+  localStorageRef = getBrowserStorage('localStorage'),
+  sessionStorageRef = getBrowserStorage('sessionStorage'),
+  storage = null,
+}: {
+  localStorageRef?: SessionStorageLike | null;
+  sessionStorageRef?: SessionStorageLike | null;
+  storage?: SessionStorageLike | null;
+} = {}): PendingSbtDraftClearResult => {
+  let removed = 0;
+  let failed = 0;
+  const stores = new Set<SessionStorageLike>(
+    [storage, localStorageRef, sessionStorageRef].filter((candidate): candidate is SessionStorageLike => !!candidate),
+  );
+  stores.forEach((storageRef) => {
+    try {
+      storageRef.removeItem?.(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
+      removed += 1;
+    } catch (_) {
+      failed += 1;
+    }
+  });
+  return {
+    ok: failed === 0,
+    removed,
+    failed,
+    status: failed === 0 ? 'ok' : 'partial-failure',
+  };
+};
+
+export const readSessionWizardPendingSbtDraftsCache = (): PendingSbtDraft[] => {
+  purgeLegacySessionWizardPendingSbtDrafts();
+  return normalizePendingSbtDrafts(tabMemoryPendingSbtDrafts);
 };
 
 export const writeSessionWizardPendingSbtDraftsCache = (
   payload: PendingSbtDraft[] = [],
   { storage }: { storage?: SessionStorageLike | null } = {},
 ): PendingSbtDraftStorageResult => {
-  const storageRef = getSessionStorage(storage);
-  const normalized = normalizePendingSbtDrafts(payload);
-  const result = normalized.length
-    ? safeJsonWrite(storageRef, SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY, normalized, { maxBytes: 4 * 1024 * 1024 })
-    : removeKeys(storageRef, SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
-  if (!result.ok) log.warn('SessionWizard: fallback', result.status);
-  return result;
+  const purgeResult = purgeLegacySessionWizardPendingSbtDrafts({ storage });
+  tabMemoryPendingSbtDrafts = normalizePendingSbtDrafts(payload);
+  emitPendingSbtDraftChange();
+  return {
+    ...purgeResult,
+    status: purgeResult.ok ? 'memory-only' : 'partial-failure',
+  };
 };
 
 export const clearSessionWizardPendingSbtDraftsCache = ({
   storage,
 }: {
   storage?: SessionStorageLike | null;
-} = {}): RemoveKeysResult => {
-  const storageRef = getSessionStorage(storage);
-  try {
-    return removeKeys(storageRef, SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY);
-  } catch (_) {
-    return { ok: false, removed: 0, failed: 1, status: 'partial-failure' };
-  }
+} = {}): PendingSbtDraftClearResult => {
+  tabMemoryPendingSbtDrafts = [];
+  const purgeResult = purgeLegacySessionWizardPendingSbtDrafts({ storage });
+  emitPendingSbtDraftChange();
+  return purgeResult;
 };
 
 const usePendingSbtDrafts = () => {
-  const [pendingSbtDrafts, setPendingSbtDrafts] = useState<PendingSbtDraft[]>(() =>
-    readSessionWizardPendingSbtDraftsCache(),
+  purgeLegacySessionWizardPendingSbtDrafts();
+  const pendingSbtDrafts = useSyncExternalStore(
+    subscribeToPendingSbtDrafts,
+    getPendingSbtDraftSnapshot,
+    getPendingSbtDraftServerSnapshot,
   );
+  const setPendingSbtDrafts = useCallback<Dispatch<SetStateAction<PendingSbtDraft[]>>>((nextValue) => {
+    const resolved = typeof nextValue === 'function' ? nextValue(tabMemoryPendingSbtDrafts) : nextValue;
+    const normalized = normalizePendingSbtDrafts(resolved);
+    writeSessionWizardPendingSbtDraftsCache(normalized);
+  }, []);
   const normalizedPendingSbtDrafts = useMemo(() => normalizePendingSbtDrafts(pendingSbtDrafts), [pendingSbtDrafts]);
   const hasUndeployedPendingSbtDrafts = normalizedPendingSbtDrafts.some((entry) => entry.deployed !== true);
-
-  useEffect(() => {
-    writeSessionWizardPendingSbtDraftsCache(pendingSbtDrafts);
-  }, [pendingSbtDrafts]);
 
   return {
     pendingSbtDrafts,
@@ -120,5 +165,7 @@ const usePendingSbtDrafts = () => {
     hasUndeployedPendingSbtDrafts,
   };
 };
+
+purgeLegacySessionWizardPendingSbtDrafts();
 
 export default usePendingSbtDrafts;

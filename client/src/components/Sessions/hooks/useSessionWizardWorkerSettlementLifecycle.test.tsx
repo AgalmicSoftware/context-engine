@@ -259,7 +259,7 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
     expect(browserTab.result.current.settlement).toEqual(expect.objectContaining({ sessionId: publishedSessionId }));
   });
 
-  it('terminal-locks another tab from the tombstone without deleting its pending SBT drafts', async () => {
+  it('terminal-locks another tab and purges the retired pending-SBT storage artifact', async () => {
     sessionStorage.setItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY, '[{"predictedAddress":"0x1"}]');
     const otherTab = renderHook(() => useSessionWizardWorkerSettlementLifecycle(cachedWizard));
     const terminalWorkerSettlement = {
@@ -281,7 +281,7 @@ describe('useSessionWizardWorkerSettlementLifecycle', () => {
 
     await waitFor(() => expect(otherTab.result.current.isSettled).toBe(true));
     expect(otherTab.result.current.settlement).toEqual(expect.objectContaining(identity));
-    await waitFor(() => expect(sessionStorage.getItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY)).not.toBeNull());
+    await waitFor(() => expect(sessionStorage.getItem(SESSION_WIZARD_PENDING_SBT_DRAFTS_KEY)).toBeNull());
   });
 
   it('restores a tombstone-only cache after a real page reload', async () => {

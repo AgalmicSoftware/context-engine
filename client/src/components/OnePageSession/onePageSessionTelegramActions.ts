@@ -17,6 +17,7 @@ import {
   buildTelegramAuthFailureState,
   buildTelegramDataResetState,
   clearTelegramEnvelopeMemoryCache,
+  resolveAgentClientLoginIdentityTarget,
   resolveAgentClientLoginEnvelopeFromEvent,
   resolveTelegramResultsAuthFailureReason,
 } from './onePageSessionTelegramController';
@@ -108,9 +109,14 @@ export const createOnePageSessionTelegramActions = ({
   resolveTelegramAgentBridgeUrl,
   setState,
 }: OnePageSessionTelegramActionDeps): OnePageSessionTelegramActions => {
+  const resolveCurrentIdentityTarget = () =>
+    resolveAgentClientLoginIdentityTarget({
+      sessionConfig: resolveCurrentSessionConfig(),
+      sessionSlug: resolveCurrentSessionSlug(),
+    });
+
   const restoreTelegramEnvelopeFromStorage = (): AgentClientLoginEnvelope | null => {
-    const sessionSlug = resolveCurrentSessionSlug();
-    const envelope = ports.readStoredEnvelope(sessionSlug);
+    const envelope = ports.readStoredEnvelope(resolveCurrentIdentityTarget());
     const state = getState();
     const currentToken = state.telegramClientEnvelope?.bridgeCredential?.token || '';
     const nextToken = envelope?.bridgeCredential?.token || '';
@@ -148,13 +154,13 @@ export const createOnePageSessionTelegramActions = ({
 
   const handleTelegramAuthFailure = (reason: unknown = ''): void => {
     const sessionSlug = resolveCurrentSessionSlug();
-    ports.clearStoredEnvelope(sessionSlug);
+    ports.clearStoredEnvelope(resolveCurrentIdentityTarget());
     clearTelegramEnvelopeMemoryCache(sessionSlug);
     setState(buildTelegramAuthFailureState(reason));
   };
 
   const handleAgentClientLoginEvent = (event: CustomEvent<unknown>): void => {
-    const envelope = resolveAgentClientLoginEnvelopeFromEvent(event, resolveCurrentSessionSlug());
+    const envelope = resolveAgentClientLoginEnvelopeFromEvent(event, resolveCurrentIdentityTarget());
     if (!envelope) return;
     setState({ telegramClientEnvelope: envelope }, () => {
       void loadTelegramAgentData(true);
@@ -262,7 +268,7 @@ export const createOnePageSessionTelegramActions = ({
 
   const handleTelegramLogout = (): void => {
     const sessionSlug = resolveCurrentSessionSlug();
-    ports.clearStoredEnvelope(sessionSlug);
+    ports.clearStoredEnvelope(resolveCurrentIdentityTarget());
     clearTelegramEnvelopeMemoryCache(sessionSlug);
     setState({
       ...buildTelegramDataResetState(),

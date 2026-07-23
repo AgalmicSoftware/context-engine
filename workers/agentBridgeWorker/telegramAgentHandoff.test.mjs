@@ -2,20 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash, createHmac } from 'node:crypto';
-import {
-  handleTelegramAgentHandoffRequest,
-  __test__telegramAgentHandoff,
-} from './telegramAgentHandoff.mjs';
-import {
-  buildTelegramAgentActivityMetadata,
-  listTelegramAgentActivity,
-} from './telegramAgentActivity.mjs';
+import { handleTelegramAgentHandoffRequest, __test__telegramAgentHandoff } from './telegramAgentHandoff.mjs';
+import { buildTelegramAgentActivityMetadata, listTelegramAgentActivity } from './telegramAgentActivity.mjs';
 import { buildTelegramCommandResponse, readAnswerDraft } from './telegramCommands.mjs';
 import { saveTelegramAgentSettingsPatch } from './telegramAgentSettings.mjs';
-import {
-  DRAFT_EDIT_METRIC_KV_PREFIX,
-  buildDraftEditMetricSummary,
-} from './telegramDraftEditMetrics.mjs';
+import { DRAFT_EDIT_METRIC_KV_PREFIX, buildDraftEditMetricSummary } from './telegramDraftEditMetrics.mjs';
 import {
   AGENT_CREDENTIAL_KV_PREFIX,
   AGENT_CREDENTIAL_AUDIENCES,
@@ -32,10 +23,7 @@ import {
   TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES,
   TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES,
 } from './agentCredentials.mjs';
-import {
-  AGENT_ONLY_MODE_CONFIG_KV_PREFIX,
-  AGENT_ONLY_WINDOW_KV_PREFIX,
-} from './telegramAgentOnlyMode.mjs';
+import { AGENT_ONLY_MODE_CONFIG_KV_PREFIX, AGENT_ONLY_WINDOW_KV_PREFIX } from './telegramAgentOnlyMode.mjs';
 import { deriveTelegramResponseExportAccount } from './telegramResponseExport.mjs';
 import { persistTelegramSubmitRecord } from './telegramSubmitQueue.mjs';
 import { persistTelegramProposedQuestion } from './telegramQuestionProposals.mjs';
@@ -114,14 +102,16 @@ function baseEnv(overrides = {}) {
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramGroupOpenAccess: true,
-        managedAccountSubmitAllowed: true,
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+        },
+      ],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
       {
@@ -147,15 +137,17 @@ function telegramOnlyEnv(overrides = {}) {
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        telegramGroupOpenAccess: true,
-        managedAccountSubmitAllowed: true,
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+        },
+      ],
     }),
     ...overrides,
   });
@@ -166,16 +158,18 @@ function agentHttpOnlyEnv(overrides = {}) {
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        sessionModeProfile: {
-          authority: { mode: 'worker_canonical' },
-          surfaces: { agentHttp: true, telegram: false, miniApp: false },
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          sessionModeProfile: {
+            authority: { mode: 'worker_canonical' },
+            surfaces: { agentHttp: true, telegram: false, miniApp: false },
+          },
+          managedAccountSubmitAllowed: true,
         },
-        managedAccountSubmitAllowed: true,
-      }],
+      ],
     }),
     ...overrides,
   });
@@ -234,11 +228,7 @@ function groupMessage(text) {
   };
 }
 
-function agentRequest(path, {
-  method = 'GET',
-  token = 'agent-test-token',
-  body = null,
-} = {}) {
+function agentRequest(path, { method = 'GET', token = 'agent-test-token', body = null } = {}) {
   return new Request(`https://bridge.example${path}`, {
     method,
     headers: {
@@ -254,33 +244,49 @@ function workerJwt(claims = {}) {
   return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode(claims)}.test-signature`;
 }
 
+const MEMBER_SESSION_ID = `0x${'56'.repeat(16)}`;
+const MEMBER_SESSION_WORKER_ORIGIN = 'https://session-worker.example';
+
+function workerHmacToken(claims = {}) {
+  const payloadJson = JSON.stringify({
+    sessionId: MEMBER_SESSION_ID,
+    ...claims,
+  });
+  const payload = Buffer.from(payloadJson).toString('base64url');
+  const signature = createHmac('sha256', 'unit-worker-secret').update(payloadJson).digest('base64url');
+  return `${payload}.${signature}`;
+}
+
 function memberExchangeEnv(authorityMode = 'worker_canonical', overrides = {}) {
-  const sessionWorkerUrl = 'https://session-worker.example';
+  const sessionWorkerUrl = MEMBER_SESSION_WORKER_ORIGIN;
   return baseEnv({
     CE_SESSION_WORKER_BASE_URL: sessionWorkerUrl,
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       version: 1,
       defaultSessionSlug: 'alpha',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        sessionWorkerUrl,
-        sessionModeProfile: {
-          surfaces: { agentHttp: true, telegram: false },
-          authority: { mode: authorityMode },
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          ...(authorityMode === 'worker_canonical' ? { sessionIdHex: MEMBER_SESSION_ID } : {}),
+          sessionWorkerUrl,
+          sessionModeProfile: {
+            surfaces: { agentHttp: true, telegram: false },
+            authority: { mode: authorityMode },
+          },
         },
-      }],
+      ],
     }),
     ...overrides,
   });
 }
 
-test('member exchange issues the same short-lived Wrapped credential for worker and registry canonical sessions', async () => {
+test('member exchange issues the same short-lived Wrapped credential for worker and registry-compatible sessions', async () => {
   const address = '0x1111111111111111111111111111111111111111';
-  for (const authorityMode of ['worker_canonical', 'registry_canonical']) {
+  for (const authorityMode of ['worker_canonical', 'evm_registry_canonical', 'registry_canonical', '']) {
     const env = memberExchangeEnv(authorityMode);
     const exp = Math.floor(Date.now() / 1000) + 3600;
-    const workerCredential = workerJwt({
+    const workerCredential = workerHmacToken({
       sub: address,
       slug: 'alpha',
       scopes: { groups: true },
@@ -300,25 +306,46 @@ test('member exchange issues the same short-lived Wrapped credential for worker 
       env,
       fetchImpl: async (url, init = {}) => {
         calls.push({ url: String(url), init });
-        return new Response(JSON.stringify({
-          ok: true,
-          principal: { kind: 'evm_address', address },
-          memberships: [],
-        }), { status: 200, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            ...(authorityMode === 'worker_canonical'
+              ? {
+                  sessionSlug: 'alpha',
+                  sessionId: MEMBER_SESSION_ID,
+                }
+              : {}),
+            principal: { kind: 'evm_address', address },
+            memberships: [],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       },
     });
     const payload = await jsonBody(response);
     assert.equal(response.status, 200, JSON.stringify(payload));
     assert.match(payload.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
     assert.equal(payload.sessionSlug, 'alpha');
+    assert.equal(payload.sessionWorkerOrigin, MEMBER_SESSION_WORKER_ORIGIN);
+    assert.equal(payload.sessionId, authorityMode === 'worker_canonical' ? MEMBER_SESSION_ID : undefined);
     assert.equal(payload.revocationBoundSeconds <= 3600, true);
     assert.equal(payload.revocationBoundSeconds <= AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS, true);
-    assert.deepEqual(calls.map((call) => call.url), ['https://session-worker.example/groups/my-memberships']);
+    assert.deepEqual(
+      calls.map((call) => call.url),
+      [
+        authorityMode === 'worker_canonical'
+          ? `https://session-worker.example/groups/my-memberships?sessionId=${encodeURIComponent(MEMBER_SESSION_ID)}`
+          : 'https://session-worker.example/groups/my-memberships',
+      ],
+    );
     assert.equal(calls[0].url.includes(workerCredential), false);
     const loaded = await loadAgentCredential({ env, token: payload.token });
     assert.equal(loaded.ok, true);
     assert.equal(loaded.record.audience, AGENT_CREDENTIAL_AUDIENCES.AGENT_BRIDGE);
     assert.equal(loaded.record.credentialKind, AGENT_CREDENTIAL_KINDS.MEMBER);
+    assert.equal(loaded.record.sessionWorkerOrigin, MEMBER_SESSION_WORKER_ORIGIN);
+    assert.equal(loaded.record.sessionAuthorityMode, authorityMode || undefined);
+    assert.equal(loaded.record.sessionId, authorityMode === 'worker_canonical' ? MEMBER_SESSION_ID : undefined);
     assert.deepEqual(loaded.record.scopes, [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL]);
     assert.equal(loaded.record.principal.adapter, 'session_worker');
     assert.equal(loaded.record.principal.principalId.includes(address.toLowerCase()), true);
@@ -328,7 +355,7 @@ test('member exchange issues the same short-lived Wrapped credential for worker 
 test('member exchange accepts Worker credentials only in a header or body and rejects replay', async () => {
   const env = memberExchangeEnv();
   const address = '0x2222222222222222222222222222222222222222';
-  const credential = workerJwt({
+  const credential = workerHmacToken({
     sub: address,
     slug: 'alpha',
     scopes: { groups: true },
@@ -338,21 +365,27 @@ test('member exchange accepts Worker credentials only in a header or body and re
   let fetchCalls = 0;
   const fetchImpl = async () => {
     fetchCalls += 1;
-    return new Response(JSON.stringify({
-      ok: true,
-      principal: { kind: 'evm_address', address },
-      memberships: [],
-    }), { status: 200, headers: { 'content-type': 'application/json' } });
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        sessionSlug: 'alpha',
+        sessionId: MEMBER_SESSION_ID,
+        principal: { kind: 'evm_address', address },
+        memberships: [],
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
   };
-  const exchange = () => handleTelegramAgentHandoffRequest({
-    request: agentRequest('/api/agent/wrapped/member-exchange', {
-      method: 'POST',
-      token: '',
-      body: { sessionSlug: 'alpha', sessionWorkerCredential: credential },
-    }),
-    env,
-    fetchImpl,
-  });
+  const exchange = () =>
+    handleTelegramAgentHandoffRequest({
+      request: agentRequest('/api/agent/wrapped/member-exchange', {
+        method: 'POST',
+        token: '',
+        body: { sessionSlug: 'alpha', sessionWorkerCredential: credential },
+      }),
+      env,
+      fetchImpl,
+    });
 
   assert.equal((await exchange()).status, 200);
   const replay = await exchange();
@@ -361,12 +394,17 @@ test('member exchange accepts Worker credentials only in a header or body and re
   assert.equal(fetchCalls, 1);
 
   const queryOnly = await handleTelegramAgentHandoffRequest({
-    request: agentRequest(`/api/agent/wrapped/member-exchange?sessionWorkerCredential=${encodeURIComponent(credential)}`, {
-      method: 'POST',
-      token: '',
-    }),
+    request: agentRequest(
+      `/api/agent/wrapped/member-exchange?sessionWorkerCredential=${encodeURIComponent(credential)}`,
+      {
+        method: 'POST',
+        token: '',
+      },
+    ),
     env: memberExchangeEnv(),
-    fetchImpl: async () => { throw new Error('query credential must not be used'); },
+    fetchImpl: async () => {
+      throw new Error('query credential must not be used');
+    },
   });
   assert.equal(queryOnly.status, 401);
   assert.equal((await jsonBody(queryOnly)).reason, 'session_worker_credential_missing');
@@ -376,20 +414,23 @@ test('member exchange fails closed before Worker verification when dedicated acc
   const disabledPolicy = JSON.stringify({
     version: 1,
     defaultSessionSlug: 'alpha',
-    sessions: [{
-      sessionSlug: 'alpha',
-      sessionWorkerUrl: 'https://session-worker.example',
-      sessionModeProfile: {
-        surfaces: { agentHttp: false, telegram: false },
-        authority: { mode: 'worker_canonical' },
+    sessions: [
+      {
+        sessionSlug: 'alpha',
+        sessionIdHex: MEMBER_SESSION_ID,
+        sessionWorkerUrl: 'https://session-worker.example',
+        sessionModeProfile: {
+          surfaces: { agentHttp: false, telegram: false },
+          authority: { mode: 'worker_canonical' },
+        },
       },
-    }],
+    ],
   });
   let fetchCalls = 0;
   const response = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/api/agent/wrapped/member-exchange', {
       method: 'POST',
-      token: workerJwt({
+      token: workerHmacToken({
         sub: '0x2222222222222222222222222222222222222222',
         slug: 'alpha',
         scopes: { groups: true },
@@ -398,7 +439,9 @@ test('member exchange fails closed before Worker verification when dedicated acc
       }),
       body: { sessionSlug: 'alpha' },
     }),
-    env: memberExchangeEnv('worker_canonical', { AGENT_BRIDGE_SESSION_POLICY_JSON: disabledPolicy }),
+    env: memberExchangeEnv('worker_canonical', {
+      AGENT_BRIDGE_SESSION_POLICY_JSON: disabledPolicy,
+    }),
     fetchImpl: async () => {
       fetchCalls += 1;
       throw new Error('disabled access must not reach the session Worker');
@@ -415,32 +458,103 @@ test('member exchange denial matrix fails closed without issuing Bridge credenti
   const validClaims = {
     sub: address,
     slug: 'alpha',
+    sessionId: MEMBER_SESSION_ID,
     scopes: { groups: true },
     exp: Math.floor(Date.now() / 1000) + 3600,
     jti: 'denial-jti',
   };
   const cases = [
-    ['wrong-session', { ...validClaims, slug: 'beta' }, 200, { ok: true, principal: { kind: 'evm_address', address }, memberships: [] }, 403, 'session_worker_credential_session_mismatch'],
-    ['wrong-audience', { ...validClaims, aud: 'https://other.example' }, 200, { ok: true, principal: { kind: 'evm_address', address }, memberships: [] }, 403, 'session_worker_credential_audience_mismatch'],
-    ['expired', { ...validClaims, exp: 1 }, 200, { ok: true, principal: { kind: 'evm_address', address }, memberships: [] }, 401, 'session_worker_credential_expired'],
-    ['revoked', validClaims, 401, { ok: false, reason: 'session_worker_credential_revoked' }, 401, 'session_worker_credential_revoked'],
-    ['admin-only', validClaims, 200, { ok: true, principal: { kind: 'agent', grantId: 'admin' }, memberships: [] }, 403, 'session_worker_principal_ineligible'],
+    [
+      'wrong-session',
+      { ...validClaims, slug: 'beta' },
+      200,
+      {
+        ok: true,
+        principal: { kind: 'evm_address', address },
+        memberships: [],
+      },
+      403,
+      'session_worker_credential_session_mismatch',
+    ],
+    [
+      'wrong-audience',
+      { ...validClaims, aud: 'https://other.example' },
+      200,
+      {
+        ok: true,
+        principal: { kind: 'evm_address', address },
+        memberships: [],
+      },
+      403,
+      'session_worker_credential_audience_mismatch',
+    ],
+    [
+      'expired',
+      { ...validClaims, exp: 1 },
+      200,
+      {
+        ok: true,
+        principal: { kind: 'evm_address', address },
+        memberships: [],
+      },
+      401,
+      'session_worker_credential_expired',
+    ],
+    [
+      'revoked',
+      validClaims,
+      401,
+      { ok: false, reason: 'session_worker_credential_revoked' },
+      401,
+      'session_worker_credential_revoked',
+    ],
+    [
+      'admin-only',
+      validClaims,
+      200,
+      {
+        ok: true,
+        principal: { kind: 'agent', grantId: 'admin' },
+        memberships: [],
+      },
+      403,
+      'session_worker_principal_ineligible',
+    ],
     ['wrong-chain', validClaims, 403, { ok: false, reason: 'wrong_chain' }, 403, 'session_worker_membership_denied'],
-    ['rpc-unavailable', validClaims, 503, { ok: false, reason: 'rpc_unavailable' }, 503, 'session_worker_authority_unavailable'],
+    [
+      'rpc-unavailable',
+      validClaims,
+      503,
+      { ok: false, reason: 'rpc_unavailable' },
+      503,
+      'session_worker_authority_unavailable',
+    ],
   ];
   for (const [label, claims, upstreamStatus, upstreamBody, expectedStatus, expectedReason] of cases) {
     const env = memberExchangeEnv();
     const response = await handleTelegramAgentHandoffRequest({
       request: agentRequest('/api/agent/wrapped/member-exchange', {
         method: 'POST',
-        token: workerJwt({ ...claims, jti: `${claims.jti}-${label}` }),
+        token: workerHmacToken({ ...claims, jti: `${claims.jti}-${label}` }),
         body: { sessionSlug: 'alpha' },
       }),
       env,
-      fetchImpl: async () => new Response(JSON.stringify(upstreamBody), {
-        status: upstreamStatus,
-        headers: { 'content-type': 'application/json' },
-      }),
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify(
+            upstreamStatus === 200
+              ? {
+                  sessionSlug: 'alpha',
+                  sessionId: MEMBER_SESSION_ID,
+                  ...upstreamBody,
+                }
+              : upstreamBody,
+          ),
+          {
+            status: upstreamStatus,
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
     });
     assert.equal(response.status, expectedStatus, label);
     assert.equal((await jsonBody(response)).reason, expectedReason, label);
@@ -452,6 +566,97 @@ test('member exchange denial matrix fails closed without issuing Bridge credenti
   }
 });
 
+test('member credentials are rejected before side effects after same-slug identity or origin replacement', async () => {
+  const address = '0x4545454545454545454545454545454545454545';
+  const replacements = [
+    {
+      label: 'identity',
+      sessionId: `0x${'78'.repeat(16)}`,
+      sessionWorkerUrl: 'https://session-worker.example',
+    },
+    {
+      label: 'origin',
+      sessionId: MEMBER_SESSION_ID,
+      sessionWorkerUrl: 'https://replacement-session-worker.example',
+    },
+  ];
+
+  for (const replacement of replacements) {
+    const env = memberExchangeEnv();
+    const exchangeResponse = await handleTelegramAgentHandoffRequest({
+      request: agentRequest('/api/agent/wrapped/member-exchange', {
+        method: 'POST',
+        token: workerHmacToken({
+          sub: address,
+          slug: 'alpha',
+          scopes: { groups: true },
+          exp: Math.floor(Date.now() / 1000) + 3600,
+          jti: `replacement-${replacement.label}`,
+        }),
+        body: { sessionSlug: 'alpha' },
+      }),
+      env,
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionSlug: 'alpha',
+            sessionId: MEMBER_SESSION_ID,
+            principal: { kind: 'evm_address', address },
+            memberships: [],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    });
+    const exchange = await jsonBody(exchangeResponse);
+    assert.equal(exchangeResponse.status, 200, `${replacement.label}: ${JSON.stringify(exchange)}`);
+
+    env.CE_SESSION_WORKER_BASE_URL = replacement.sessionWorkerUrl;
+    env.AGENT_BRIDGE_SESSION_POLICY_JSON = JSON.stringify({
+      version: 1,
+      defaultSessionSlug: 'alpha',
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionIdHex: replacement.sessionId,
+          sessionWorkerUrl: replacement.sessionWorkerUrl,
+          sessionModeProfile: {
+            surfaces: { agentHttp: true, telegram: false },
+            authority: { mode: 'worker_canonical' },
+          },
+        },
+      ],
+    });
+
+    const storeBefore = Array.from(env.AGENT_ACTION_KV.store.entries());
+    let mutationWrites = 0;
+    const originalPut = env.AGENT_ACTION_KV.put.bind(env.AGENT_ACTION_KV);
+    env.AGENT_ACTION_KV.put = async (...args) => {
+      mutationWrites += 1;
+      return originalPut(...args);
+    };
+
+    const rejectedResponse = await handleTelegramAgentHandoffRequest({
+      request: agentRequest('/api/agent/agent-only/answers/bulk?sessionSlug=alpha', {
+        method: 'POST',
+        token: exchange.token,
+        body: {
+          answers: [{ statement_id: 'must-not-write', answer: { value: 'agree' } }],
+        },
+      }),
+      env,
+      fetchImpl: async () => {
+        throw new Error('stale credentials must fail before network access');
+      },
+    });
+    const rejected = await jsonBody(rejectedResponse);
+    assert.equal(rejectedResponse.status, 401, replacement.label);
+    assert.equal(rejected.reason, 'agent_member_credential_authority_stale', replacement.label);
+    assert.equal(mutationWrites, 0, replacement.label);
+    assert.deepEqual(Array.from(env.AGENT_ACTION_KV.store.entries()), storeBefore, replacement.label);
+  }
+});
+
 test('exchanged members submit Wrapped answers without Telegram or an agent-originated chain transaction', async () => {
   const env = memberExchangeEnv('registry_canonical', {
     AGENT_BRIDGE_AGENT_ONLY_TEST_NOW: '2026-06-12T15:06:00.000Z',
@@ -460,7 +665,10 @@ test('exchanged members submit Wrapped answers without Telegram or an agent-orig
   const configResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/api/agent/admin/agent-only/config?sessionSlug=alpha', {
       method: 'POST',
-      body: { enabledQuestionIds: [questionId], windowing: HISTORICAL_AGENT_ONLY_WINDOWING },
+      body: {
+        enabledQuestionIds: [questionId],
+        windowing: HISTORICAL_AGENT_ONLY_WINDOWING,
+      },
     }),
     env,
   });
@@ -479,11 +687,14 @@ test('exchanged members submit Wrapped answers without Telegram or an agent-orig
   const authorityFetch = async (url) => {
     authorityCalls += 1;
     assert.equal(String(url), 'https://session-worker.example/groups/my-memberships');
-    return new Response(JSON.stringify({
-      ok: true,
-      principal: { kind: 'evm_address', address },
-      memberships: [],
-    }), { status: 200, headers: { 'content-type': 'application/json' } });
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        principal: { kind: 'evm_address', address },
+        memberships: [],
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
   };
   const exchangeResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/api/agent/wrapped/member-exchange', {
@@ -517,7 +728,10 @@ test('exchanged members submit Wrapped answers without Telegram or an agent-orig
   const statements = await jsonBody(statementsResponse);
   assert.equal(statementsResponse.status, 200, JSON.stringify(statements));
   assert.equal(statements.window_id, 'w-2026-06-12');
-  assert.deepEqual(statements.statements.map((statement) => statement.statement_id), [questionId]);
+  assert.deepEqual(
+    statements.statements.map((statement) => statement.statement_id),
+    [questionId],
+  );
 
   const answerResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/api/agent/agent-only/answers/bulk?sessionSlug=alpha', {
@@ -527,12 +741,17 @@ test('exchanged members submit Wrapped answers without Telegram or an agent-orig
         window_id: statements.window_id,
         run_id: 'registry-member-run',
         request_id: 'registry-member-answer',
-        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
-        answers: [{
-          statement_id: questionId,
-          answer: { value: 'agree' },
-          confidence: 82,
-        }],
+        agent_metadata: {
+          model: 'unit-model',
+          scaffold_version: 'unit-scaffold',
+        },
+        answers: [
+          {
+            statement_id: questionId,
+            answer: { value: 'agree' },
+            confidence: 82,
+          },
+        ],
       },
     }),
     env,
@@ -546,7 +765,11 @@ test('exchanged members submit Wrapped answers without Telegram or an agent-orig
   assert.equal(JSON.stringify(answer).includes('telegramUserId'), false);
   const submittedRecords = Array.from(env.AGENT_ACTION_KV.store.values())
     .map((value) => {
-      try { return JSON.parse(value); } catch { return null; }
+      try {
+        return JSON.parse(value);
+      } catch {
+        return null;
+      }
     })
     .filter((record) => record?.questionId === questionId && record?.telegramUserId);
   assert.equal(
@@ -583,11 +806,9 @@ async function seedAgentOnlyProposedQuestions(env, sessionSlug = 'alpha', count 
 
 function signInitData(fields = {}, botToken = '') {
   const dataCheckString = Object.entries(fields)
-    .sort(([leftKey, leftValue], [rightKey, rightValue]) => (
-      leftKey === rightKey
-        ? String(leftValue).localeCompare(String(rightValue))
-        : leftKey.localeCompare(rightKey)
-    ))
+    .sort(([leftKey, leftValue], [rightKey, rightValue]) =>
+      leftKey === rightKey ? String(leftValue).localeCompare(String(rightValue)) : leftKey.localeCompare(rightKey),
+    )
     .map(([key, value]) => `${key}=${value}`)
     .join('\n');
   const secretKey = createHmac('sha256', 'WebAppData').update(botToken).digest();
@@ -596,14 +817,19 @@ function signInitData(fields = {}, botToken = '') {
 }
 
 function sha256Hex(value = '') {
-  return createHash('sha256').update(String(value || '')).digest('hex');
+  return createHash('sha256')
+    .update(String(value || ''))
+    .digest('hex');
 }
 
 const LONG_TEST_TOKEN_TTL_SECONDS = 3650 * 24 * 60 * 60;
 
 test('credential rotation preserves the active token when the slot write fails', async () => {
   const env = { AGENT_ACTION_KV: new MemoryKv() };
-  const principal = telegramAgentPrincipal({ telegramUserId: '42', username: 'host' });
+  const principal = telegramAgentPrincipal({
+    telegramUserId: '42',
+    username: 'host',
+  });
   const first = await issueAgentCredential({
     env,
     principal,
@@ -640,6 +866,53 @@ test('credential rotation preserves the active token when the slot write fails',
   );
 });
 
+test('worker-canonical browser credential issuance requires and normalizes the exact Worker identity', async () => {
+  const env = { AGENT_ACTION_KV: new MemoryKv() };
+  const principal = {
+    principalId: 'cesvc_browser-binding',
+    kind: AGENT_CREDENTIAL_KINDS.SERVICE,
+    adapter: 'service',
+  };
+  const baseArgs = {
+    env,
+    principal,
+    sessionSlug: 'alpha',
+    sessionAuthorityMode: 'worker_canonical',
+    audience: AGENT_CREDENTIAL_AUDIENCES.AGENT_BRIDGE_BROWSER,
+    credentialKind: AGENT_CREDENTIAL_KINDS.BROWSER,
+  };
+
+  const missingIdentity = await issueAgentCredential({
+    ...baseArgs,
+    sessionWorkerOrigin: MEMBER_SESSION_WORKER_ORIGIN,
+  });
+  assert.deepEqual(missingIdentity, {
+    ok: false,
+    reason: 'agent_browser_credential_session_identity_invalid',
+  });
+
+  const invalidOrigin = await issueAgentCredential({
+    ...baseArgs,
+    sessionId: MEMBER_SESSION_ID,
+    sessionWorkerOrigin: 'http://session-worker.example',
+  });
+  assert.deepEqual(invalidOrigin, {
+    ok: false,
+    reason: 'agent_browser_credential_worker_origin_invalid',
+  });
+  assert.equal(env.AGENT_ACTION_KV.store.size, 0);
+
+  const issued = await issueAgentCredential({
+    ...baseArgs,
+    sessionId: MEMBER_SESSION_ID.slice(2).toUpperCase(),
+    sessionWorkerOrigin: `${MEMBER_SESSION_WORKER_ORIGIN}/`,
+  });
+  assert.equal(issued.ok, true);
+  assert.equal(issued.record.sessionId, MEMBER_SESSION_ID);
+  assert.equal(issued.record.sessionWorkerOrigin, MEMBER_SESSION_WORKER_ORIGIN);
+  assert.equal(issued.record.sessionAuthorityMode, 'worker_canonical');
+});
+
 test('fixed-date delegation token fixtures declare an explicit TTL', () => {
   const source = readFileSync(new URL(import.meta.url), 'utf8');
   const tokenCalls = source.matchAll(/createTelegramAgentDelegationToken\(\{[\s\S]*?\n\s*\}\)/g);
@@ -653,23 +926,28 @@ test('fixed-date delegation token fixtures declare an explicit TTL', () => {
 });
 
 test('delegated handoff input keeps non-Telegram principals out of Telegram identity fields', () => {
-  const result = __test__telegramAgentHandoff.applyDelegationToInput({
-    authMode: 'agent_credential',
-    delegation: {
-      sessionSlug: 'alpha',
-      scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS],
-      principal: {
-        principalId: 'cesvc_principal-neutral',
-        kind: AGENT_CREDENTIAL_KINDS.SERVICE,
-        adapter: 'service',
-        label: 'Reader',
+  const result = __test__telegramAgentHandoff.applyDelegationToInput(
+    {
+      authMode: 'agent_credential',
+      delegation: {
+        sessionSlug: 'alpha',
+        scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS],
+        principal: {
+          principalId: 'cesvc_principal-neutral',
+          kind: AGENT_CREDENTIAL_KINDS.SERVICE,
+          adapter: 'service',
+          label: 'Reader',
+        },
       },
     },
-  }, {
-    sessionSlug: 'alpha',
-    telegramUserId: 'caller-selected-telegram-user',
-    groupChatId: '-100-caller-selected',
-  }, '/api/agent/questions', 'GET');
+    {
+      sessionSlug: 'alpha',
+      telegramUserId: 'caller-selected-telegram-user',
+      groupChatId: '-100-caller-selected',
+    },
+    '/api/agent/questions',
+    'GET',
+  );
 
   assert.equal(result.ok, true);
   assert.equal(result.input.principalId, 'cesvc_principal-neutral');
@@ -692,28 +970,34 @@ async function jsonBody(response) {
   return response.json();
 }
 
-async function putSubmittedResult(env, {
-  key = '',
-  sessionSlug = 'alpha',
-  telegramUserId = '42',
-  questionId = 'q-binary',
-  label = 'Agree',
-  value = '',
-  comments = '',
-  createdAt = '2026-06-01T12:00:00.000Z',
-} = {}) {
-  await env.AGENT_ACTION_KV.put(key || `telegram:submit-request:${sessionSlug}:${telegramUserId}:${questionId}:${createdAt}`, JSON.stringify({
-    status: 'direct_submitted',
-    sessionSlug,
-    telegramUserId,
-    questionId,
-    answer: {
-      label,
-      value: value || String(label).toLowerCase(),
-      comments,
-    },
-    createdAt,
-  }));
+async function putSubmittedResult(
+  env,
+  {
+    key = '',
+    sessionSlug = 'alpha',
+    telegramUserId = '42',
+    questionId = 'q-binary',
+    label = 'Agree',
+    value = '',
+    comments = '',
+    createdAt = '2026-06-01T12:00:00.000Z',
+  } = {},
+) {
+  await env.AGENT_ACTION_KV.put(
+    key || `telegram:submit-request:${sessionSlug}:${telegramUserId}:${questionId}:${createdAt}`,
+    JSON.stringify({
+      status: 'direct_submitted',
+      sessionSlug,
+      telegramUserId,
+      questionId,
+      answer: {
+        label,
+        value: value || String(label).toLowerCase(),
+        comments,
+      },
+      createdAt,
+    }),
+  );
 }
 
 async function managedAccountAddressForTelegramUser(env, telegramUserId = '42') {
@@ -722,7 +1006,12 @@ async function managedAccountAddressForTelegramUser(env, telegramUserId = '42') 
     normalized: {
       type: 'telegram_mock_update',
       user: { telegramUserId, username: 'host' },
-      chat: { chatId: telegramUserId, chatType: 'private', type: 'private', isPrivate: true },
+      chat: {
+        chatId: telegramUserId,
+        chatType: 'private',
+        type: 'private',
+        isPrivate: true,
+      },
     },
     createdAt: '2026-06-01T12:00:00.000Z',
   });
@@ -731,18 +1020,9 @@ async function managedAccountAddressForTelegramUser(env, telegramUserId = '42') 
 
 test('Telegram agent handoff skill is packaged with the worker', () => {
   const readme = readFileSync(new URL('./README.md', import.meta.url), 'utf8');
-  const source = readFileSync(
-    new URL('./skills/ce-telegram-agent-handoff/SKILL.md', import.meta.url),
-    'utf8',
-  );
-  const reference = readFileSync(
-    new URL('./skills/ce-telegram-bot-reference/SKILL.md', import.meta.url),
-    'utf8',
-  );
-  const wrapped = readFileSync(
-    new URL('./skills/ce-session-wrapped/SKILL.md', import.meta.url),
-    'utf8',
-  );
+  const source = readFileSync(new URL('./skills/ce-telegram-agent-handoff/SKILL.md', import.meta.url), 'utf8');
+  const reference = readFileSync(new URL('./skills/ce-telegram-bot-reference/SKILL.md', import.meta.url), 'utf8');
+  const wrapped = readFileSync(new URL('./skills/ce-session-wrapped/SKILL.md', import.meta.url), 'utf8');
 
   assert.match(source, /name:\s+context-engine/);
   assert.match(source, /^# Context Engine Agent Runtime/m);
@@ -761,7 +1041,10 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.match(source, /statement ids, frozen prompts/);
   assert.match(source, /EdgeOS Read Permission: Yes/);
   assert.match(source, /treat that as the principal's consent to run now/);
-  assert.match(source, /Do not\s+interrupt the run with a separate run, EdgeOS permission, preference, research,\s+or confirmation question/);
+  assert.match(
+    source,
+    /Do not\s+interrupt the run with a separate run, EdgeOS permission, preference, research,\s+or confirmation question/,
+  );
   assert.match(source, /If the setting is absent,\s+default to No and continue/);
   assert.match(source, /runtime `instructions` field from `\/agent-only\/start` is\s+authoritative/);
   assert.match(source, /Do not\s+replace those runtime instructions with cached rules/);
@@ -848,7 +1131,10 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
   assert.doesNotMatch(wrapped, /Session Lab/i);
   assert.doesNotMatch(wrapped, /session-topic/i);
   assert.doesNotMatch(wrapped, /## No Balance Check/);
-  assert.doesNotMatch(wrapped, /skill_view|skills_list|search_files|session_search|mcp_index|hermes insights|\/opt\/hermes/i);
+  assert.doesNotMatch(
+    wrapped,
+    /skill_view|skills_list|search_files|session_search|mcp_index|hermes insights|\/opt\/hermes/i,
+  );
   assert.match(wrapped, /Skip token-vote allocations in the default run/);
   assert.match(wrapped, /multichoice uses\s+`values` arrays/);
   assert.match(wrapped, /Do not POST token votes\s+unless the principal explicitly asks/);
@@ -885,10 +1171,7 @@ test('Telegram agent handoff skill is packaged with the worker', () => {
 });
 
 test('Telegram agent handoff skill version constant matches SKILL.md header', () => {
-  const source = readFileSync(
-    new URL('./skills/ce-telegram-agent-handoff/SKILL.md', import.meta.url),
-    'utf8',
-  );
+  const source = readFileSync(new URL('./skills/ce-telegram-agent-handoff/SKILL.md', import.meta.url), 'utf8');
   const match = source.match(/^\*\*Skill version:\*\*\s*(.+)$/m);
   assert.ok(match);
   assert.equal(match[1], __test__telegramAgentHandoff.CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION);
@@ -920,7 +1203,9 @@ test('Telegram agent handoff exposes dedicated Session Wrapped skill metadata', 
     AGENT_BRIDGE_SESSION_WRAPPED_SKILL_URL: 'https://example.test/skills/ce-session-wrapped/SKILL.md',
   });
   const response = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/api/agent/session-wrapped/skill-version', { token: '' }),
+    request: agentRequest('/api/agent/session-wrapped/skill-version', {
+      token: '',
+    }),
     env,
   });
   const body = await jsonBody(response);
@@ -944,7 +1229,10 @@ test('Telegram agent handoff serves a short skill redirect', async () => {
 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
-  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/);
+  assert.match(
+    location,
+    /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-telegram-agent-handoff\/SKILL\.md/,
+  );
   assert.match(location, /v=2026-07-18-v42-/);
 });
 
@@ -956,7 +1244,10 @@ test('Telegram agent handoff serves a dedicated Session Wrapped skill redirect',
 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
-  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
+  assert.match(
+    location,
+    /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/,
+  );
   assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
 });
 
@@ -968,7 +1259,10 @@ test('Telegram agent handoff serves a short Session Wrapped skill alias', async 
 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
-  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
+  assert.match(
+    location,
+    /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/,
+  );
   assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
 });
 
@@ -980,13 +1274,18 @@ test('Telegram agent handoff serves a short Session Wrapped skill alias to HEAD 
 
   assert.equal(response.status, 302);
   const location = response.headers.get('location') || '';
-  assert.match(location, /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/);
+  assert.match(
+    location,
+    /^https:\/\/raw\.githubusercontent\.com\/AgalmicSoftware\/context-engine\/main\/workers\/agentBridgeWorker\/skills\/ce-session-wrapped\/SKILL\.md/,
+  );
   assert.match(location, /v=2026-07-20-session-wrapped-v1-1-/);
 });
 
 test('Agent-only start payload exposes configurable visual defaults', async () => {
   const response = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/agent-only/start', { token: '' }),
+    request: agentRequest('/telegram/agent/api/agent-only/start', {
+      token: '',
+    }),
     env: baseEnv({
       AGENT_BRIDGE_AGENT_WRAPPED_STORY_DEFAULT: 'true',
       AGENT_BRIDGE_AGENT_WRAPPED_COMPASS_DEFAULT: 'true',
@@ -1009,18 +1308,24 @@ test('Telegram agent handoff wraps unexpected throws as JSON errors', async () =
   const body = await jsonBody(response);
 
   assert.equal(response.status, 500);
-  assert.deepEqual(body, { ok: false, reason: 'telegram_agent_internal_error' });
+  assert.deepEqual(body, {
+    ok: false,
+    reason: 'telegram_agent_internal_error',
+  });
 });
 
 test('Telegram agent skill-version payload includes admin update flag', async () => {
   const env = baseEnv();
-  await env.AGENT_ACTION_KV.put('telegram:agent-skill-update:v1', JSON.stringify({
-    version: 1,
-    updateAvailable: true,
-    latestVersion: '2026-07-18 (v42)',
-    note: 'Refresh before answering.',
-    updatedAt: '2026-05-30T00:00:00.000Z',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:agent-skill-update:v1',
+    JSON.stringify({
+      version: 1,
+      updateAvailable: true,
+      latestVersion: '2026-07-18 (v42)',
+      note: 'Refresh before answering.',
+      updatedAt: '2026-05-30T00:00:00.000Z',
+    }),
+  );
 
   const payload = await __test__telegramAgentHandoff.skillVersionPayloadWithFlag(env);
   assert.equal(payload.updateAvailable, true);
@@ -1260,14 +1565,20 @@ test('Telegram agent questions endpoint caps candidate batches when requested', 
 });
 
 test('Agent credentials remain bound to their issued session across Telegram default flips', async () => {
-  const env = multiTelegramOnlyEnv({ defaultSessionSlug: 'alpha', overrides: { AGENT_BRIDGE_AGENT_API_TOKEN: '' } });
-  await env.AGENT_ACTION_KV.put('telegram:private-session:42', JSON.stringify({
-    version: 1,
-    telegramUserId: '42',
-    sessionSlug: 'alpha',
-    followDefault: true,
-    selectedAt: '2026-06-01T12:00:00.000Z',
-  }));
+  const env = multiTelegramOnlyEnv({
+    defaultSessionSlug: 'alpha',
+    overrides: { AGENT_BRIDGE_AGENT_API_TOKEN: '' },
+  });
+  await env.AGENT_ACTION_KV.put(
+    'telegram:private-session:42',
+    JSON.stringify({
+      version: 1,
+      telegramUserId: '42',
+      sessionSlug: 'alpha',
+      followDefault: true,
+      selectedAt: '2026-06-01T12:00:00.000Z',
+    }),
+  );
   const issued = await createTelegramAgentDelegationToken({
     env,
     telegramUserId: '42',
@@ -1279,28 +1590,40 @@ test('Agent credentials remain bound to their issued session across Telegram def
   });
 
   const alphaResponse = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/questions', { token: issued.token }),
+    request: agentRequest('/telegram/agent/api/questions', {
+      token: issued.token,
+    }),
     env,
   });
   assert.equal((await jsonBody(alphaResponse)).sessionSlug, 'alpha');
 
-  env.AGENT_BRIDGE_SESSION_POLICY_JSON = multiTelegramOnlyEnv({ defaultSessionSlug: 'beta' }).AGENT_BRIDGE_SESSION_POLICY_JSON;
+  env.AGENT_BRIDGE_SESSION_POLICY_JSON = multiTelegramOnlyEnv({
+    defaultSessionSlug: 'beta',
+  }).AGENT_BRIDGE_SESSION_POLICY_JSON;
   const betaResponse = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/questions', { token: issued.token }),
+    request: agentRequest('/telegram/agent/api/questions', {
+      token: issued.token,
+    }),
     env,
   });
   assert.equal((await jsonBody(betaResponse)).sessionSlug, 'alpha');
 });
 
 test('Agent credentials remain bound to their issued session despite a Telegram pinned binding', async () => {
-  const env = multiTelegramOnlyEnv({ defaultSessionSlug: 'alpha', overrides: { AGENT_BRIDGE_AGENT_API_TOKEN: '' } });
-  await env.AGENT_ACTION_KV.put('telegram:private-session:42', JSON.stringify({
-    version: 1,
-    telegramUserId: '42',
-    sessionSlug: 'gamma',
-    followDefault: false,
-    selectedAt: '2026-06-01T12:00:00.000Z',
-  }));
+  const env = multiTelegramOnlyEnv({
+    defaultSessionSlug: 'alpha',
+    overrides: { AGENT_BRIDGE_AGENT_API_TOKEN: '' },
+  });
+  await env.AGENT_ACTION_KV.put(
+    'telegram:private-session:42',
+    JSON.stringify({
+      version: 1,
+      telegramUserId: '42',
+      sessionSlug: 'gamma',
+      followDefault: false,
+      selectedAt: '2026-06-01T12:00:00.000Z',
+    }),
+  );
   const issued = await createTelegramAgentDelegationToken({
     env,
     telegramUserId: '42',
@@ -1311,16 +1634,23 @@ test('Agent credentials remain bound to their issued session despite a Telegram 
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
 
-  env.AGENT_BRIDGE_SESSION_POLICY_JSON = multiTelegramOnlyEnv({ defaultSessionSlug: 'beta' }).AGENT_BRIDGE_SESSION_POLICY_JSON;
+  env.AGENT_BRIDGE_SESSION_POLICY_JSON = multiTelegramOnlyEnv({
+    defaultSessionSlug: 'beta',
+  }).AGENT_BRIDGE_SESSION_POLICY_JSON;
   const response = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/questions', { token: issued.token }),
+    request: agentRequest('/telegram/agent/api/questions', {
+      token: issued.token,
+    }),
     env,
   });
   assert.equal((await jsonBody(response)).sessionSlug, 'alpha');
 });
 
 test('Agent credentials reject attempts to switch their issued session', async () => {
-  const env = multiTelegramOnlyEnv({ defaultSessionSlug: 'alpha', overrides: { AGENT_BRIDGE_AGENT_API_TOKEN: '' } });
+  const env = multiTelegramOnlyEnv({
+    defaultSessionSlug: 'alpha',
+    overrides: { AGENT_BRIDGE_AGENT_API_TOKEN: '' },
+  });
   const issued = await createTelegramAgentDelegationToken({
     env,
     telegramUserId: '42',
@@ -1332,7 +1662,9 @@ test('Agent credentials reject attempts to switch their issued session', async (
   });
 
   const switched = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/questions?sessionSlug=gamma', { token: issued.token }),
+    request: agentRequest('/telegram/agent/api/questions?sessionSlug=gamma', {
+      token: issued.token,
+    }),
     env,
   });
   const switchedBody = await jsonBody(switched);
@@ -1341,22 +1673,32 @@ test('Agent credentials reject attempts to switch their issued session', async (
   assert.equal(switchedBody.sessionSlug, 'alpha');
   assert.equal(await env.AGENT_ACTION_KV.get('telegram:private-session:42'), null);
 
-  env.AGENT_BRIDGE_SESSION_POLICY_JSON = multiTelegramOnlyEnv({ defaultSessionSlug: 'beta' }).AGENT_BRIDGE_SESSION_POLICY_JSON;
+  env.AGENT_BRIDGE_SESSION_POLICY_JSON = multiTelegramOnlyEnv({
+    defaultSessionSlug: 'beta',
+  }).AGENT_BRIDGE_SESSION_POLICY_JSON;
   const omitted = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/questions', { token: issued.token }),
+    request: agentRequest('/telegram/agent/api/questions', {
+      token: issued.token,
+    }),
     env,
   });
   assert.equal((await jsonBody(omitted)).sessionSlug, 'alpha');
 });
 
 test('Agent credentials do not inherit legacy Telegram session bindings', async () => {
-  const env = multiTelegramOnlyEnv({ defaultSessionSlug: 'alpha', overrides: { AGENT_BRIDGE_AGENT_API_TOKEN: '' } });
-  await env.AGENT_ACTION_KV.put('telegram:private-session:42', JSON.stringify({
-    version: 1,
-    telegramUserId: '42',
-    sessionSlug: 'beta',
-    selectedAt: '2026-06-01T12:00:00.000Z',
-  }));
+  const env = multiTelegramOnlyEnv({
+    defaultSessionSlug: 'alpha',
+    overrides: { AGENT_BRIDGE_AGENT_API_TOKEN: '' },
+  });
+  await env.AGENT_ACTION_KV.put(
+    'telegram:private-session:42',
+    JSON.stringify({
+      version: 1,
+      telegramUserId: '42',
+      sessionSlug: 'beta',
+      selectedAt: '2026-06-01T12:00:00.000Z',
+    }),
+  );
   const issued = await createTelegramAgentDelegationToken({
     env,
     telegramUserId: '42',
@@ -1368,7 +1710,9 @@ test('Agent credentials do not inherit legacy Telegram session bindings', async 
   });
 
   const response = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/questions', { token: issued.token }),
+    request: agentRequest('/telegram/agent/api/questions', {
+      token: issued.token,
+    }),
     env,
   });
   assert.equal((await jsonBody(response)).sessionSlug, 'alpha');
@@ -1398,11 +1742,11 @@ test('Telegram agent onboarding returns consent questions and persists first-run
   assert.equal(first.questions.length, 6);
   assert.equal(
     first.questions.find((question) => question.id === 'preference_tailoring')?.prompt,
-    'Can I use your Edge profile, interests, and calendar info to surface relevant CE questions?'
+    'Can I use your Edge profile, interests, and calendar info to surface relevant CE questions?',
   );
   assert.equal(
     first.questions.find((question) => question.id === 'demographic_link_opt_in')?.prompt,
-    'Can I use non-identifying Edge profile fields for research buckets: bio keywords, age bucket, country/region, role, and attendance week?'
+    'Can I use non-identifying Edge profile fields for research buckets: bio keywords, age bucket, country/region, role, and attendance week?',
   );
   assert.equal(first.answers.preference_tailoring, false);
   assert.equal(first.answers.demographic_link_opt_in, false);
@@ -1570,10 +1914,10 @@ test('Telegram agent onboarding asks bucket follow-ups when profile lacks consen
 
   assert.equal(response.status, 200);
   assert.equal(body.groups, undefined);
-  assert.deepEqual(body.groupFollowUpQuestions.map((question) => question.categoryId), [
-    'events_attended',
-    'contribution_role',
-  ]);
+  assert.deepEqual(
+    body.groupFollowUpQuestions.map((question) => question.categoryId),
+    ['events_attended', 'contribution_role'],
+  );
   assert.equal(await env.AGENT_ACTION_KV.get('telegram:lightweight-group-membership:alpha:42'), null);
 });
 
@@ -1626,11 +1970,14 @@ test('Mini App onboarding endpoint validates Telegram initData and mints a scope
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
     AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS: 'https://mini.example',
   });
-  const initData = signInitData({
-    auth_date: String(nowSeconds),
-    query_id: 'mini-onboard-query',
-    user: JSON.stringify({ id: 42, username: 'participant' }),
-  }, env.TELEGRAM_BOT_TOKEN);
+  const initData = signInitData(
+    {
+      auth_date: String(nowSeconds),
+      query_id: 'mini-onboard-query',
+      user: JSON.stringify({ id: 42, username: 'participant' }),
+    },
+    env.TELEGRAM_BOT_TOKEN,
+  );
   const response = await handleTelegramAgentHandoffRequest({
     request: new Request('https://bridge.example/telegram/agent/api/miniapp/onboard', {
       method: 'POST',
@@ -1654,7 +2001,10 @@ test('Mini App onboarding endpoint validates Telegram initData and mints a scope
   assert.equal(body.sessionSlug, 'alpha');
   assert.equal(body.skill, 'context-engine');
   assert.match(body.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
-  const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
+  const loaded = await loadTelegramAgentDelegationToken({
+    env,
+    token: body.token,
+  });
   assert.equal(loaded.ok, true);
   assert.equal(loaded.record.principal.adapterUserId, '42');
   assert.equal(loaded.record.sessionSlug, 'alpha');
@@ -1677,8 +2027,14 @@ test('Mini App onboarding endpoint validates Telegram initData and mints a scope
     env,
   });
   const refreshed = await jsonBody(refreshedResponse);
-  const oldLoaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
-  const refreshedLoaded = await loadTelegramAgentDelegationToken({ env, token: refreshed.token });
+  const oldLoaded = await loadTelegramAgentDelegationToken({
+    env,
+    token: body.token,
+  });
+  const refreshedLoaded = await loadTelegramAgentDelegationToken({
+    env,
+    token: refreshed.token,
+  });
 
   assert.equal(refreshedResponse.status, 200);
   assert.match(refreshed.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
@@ -1686,6 +2042,98 @@ test('Mini App onboarding endpoint validates Telegram initData and mints a scope
   assert.equal(oldLoaded.ok, false);
   assert.equal(refreshedLoaded.ok, true);
   assert.equal(refreshedLoaded.record.principal.adapterUserId, '42');
+});
+
+test('Mini App onboarding accepts initData from the canonical POST header', async () => {
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+    AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS: 'https://mini.example',
+  });
+  const initData = signInitData(
+    {
+      auth_date: String(nowSeconds),
+      query_id: 'mini-onboard-header',
+      user: JSON.stringify({ id: 43, username: 'header-participant' }),
+    },
+    env.TELEGRAM_BOT_TOKEN,
+  );
+  const response = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/miniapp/onboard', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://mini.example',
+        'x-telegram-init-data': initData,
+      },
+      body: JSON.stringify({ startParam: 'onboard__alpha' }),
+    }),
+    env,
+  });
+  const body = await jsonBody(response);
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ok, true);
+  assert.equal(body.sessionSlug, 'alpha');
+  assert.match(body.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
+  const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.record.principal.adapterUserId, '43');
+});
+
+test('Mini App onboarding rejects GET and query-carried initData without echoing it', async () => {
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: '',
+    AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS: 'https://mini.example',
+  });
+  const rawInitData = 'query_id=do-not-echo&auth_date=1&hash=secret-auth-material';
+  const encodedInitData = encodeURIComponent(rawInitData);
+  const getResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request(
+      `https://bridge.example/api/agent/miniapp/onboard?initData=${encodedInitData}`,
+      {
+        method: 'GET',
+        headers: { origin: 'https://mini.example' },
+      },
+    ),
+    env,
+  });
+  const getBody = await jsonBody(getResponse);
+  const postResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request(
+      `https://bridge.example/api/agent/miniapp/onboard?telegramInitData=${encodedInitData}`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'https://mini.example',
+        },
+        body: JSON.stringify({ startParam: 'onboard__alpha' }),
+      },
+    ),
+    env,
+  });
+  const postBody = await jsonBody(postResponse);
+  const optionsResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/miniapp/onboard', {
+      method: 'OPTIONS',
+      headers: { origin: 'https://mini.example' },
+    }),
+    env,
+  });
+
+  assert.equal(getResponse.status, 405);
+  assert.equal(getBody.reason, 'method_not_allowed');
+  assert.equal(postResponse.status, 400);
+  assert.equal(postBody.reason, 'miniapp_initdata_query_forbidden');
+  assert.equal(JSON.stringify(getBody).includes('do-not-echo'), false);
+  assert.equal(JSON.stringify(getBody).includes('secret-auth-material'), false);
+  assert.equal(JSON.stringify(postBody).includes('do-not-echo'), false);
+  assert.equal(JSON.stringify(postBody).includes('secret-auth-material'), false);
+  assert.equal(optionsResponse.status, 204);
+  assert.equal(optionsResponse.headers.get('access-control-allow-methods'), 'POST, OPTIONS');
+  assert.equal(optionsResponse.headers.get('access-control-allow-headers'), 'content-type, x-telegram-init-data');
 });
 
 test('Mini App onboarding rejects a session whose Mini App surface is disabled', async () => {
@@ -1697,23 +2145,28 @@ test('Mini App onboarding rejects a session whose Mini App surface is disabled',
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramGroupOpenAccess: true,
-        sessionModeProfile: {
-          authority: { mode: 'worker_canonical' },
-          surfaces: { telegram: true, miniApp: false, agentHttp: false },
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramGroupOpenAccess: true,
+          sessionModeProfile: {
+            authority: { mode: 'worker_canonical' },
+            surfaces: { telegram: true, miniApp: false, agentHttp: false },
+          },
         },
-      }],
+      ],
     }),
   });
-  const initData = signInitData({
-    auth_date: String(nowSeconds),
-    query_id: 'mini-onboard-disabled-query',
-    user: JSON.stringify({ id: 42, username: 'participant' }),
-  }, env.TELEGRAM_BOT_TOKEN);
+  const initData = signInitData(
+    {
+      auth_date: String(nowSeconds),
+      query_id: 'mini-onboard-disabled-query',
+      user: JSON.stringify({ id: 42, username: 'participant' }),
+    },
+    env.TELEGRAM_BOT_TOKEN,
+  );
 
   const response = await handleTelegramAgentHandoffRequest({
     request: new Request('https://bridge.example/telegram/agent/api/miniapp/onboard', {
@@ -1776,12 +2229,14 @@ test('Invite onboarding mints a user token from a configured Geo invite', async 
     overrides: {
       AGENT_BRIDGE_AGENT_API_TOKEN: '',
       AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
-      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
-        tokenHash: sha256Hex('geo-invite-secret'),
-        sessionSlug: 'beta',
-        label: 'Session Lab',
-        source: 'geo:session-topic',
-      }]),
+      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([
+        {
+          tokenHash: sha256Hex('geo-invite-secret'),
+          sessionSlug: 'beta',
+          label: 'Session Lab',
+          source: 'geo:session-topic',
+        },
+      ]),
     },
   });
   const previous = await createTelegramAgentDelegationToken({
@@ -1816,7 +2271,10 @@ test('Invite onboarding mints a user token from a configured Geo invite', async 
   assert.equal(body.inviteSource, 'geo:session-topic');
   assert.match(body.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
   assert.equal(JSON.stringify(body).includes('geo-invite-secret'), false);
-  const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
+  const loaded = await loadTelegramAgentDelegationToken({
+    env,
+    token: body.token,
+  });
   assert.equal(loaded.ok, true);
   assert.equal(loaded.record.principal.adapterUserId, '42');
   assert.equal(Object.hasOwn(loaded.record.principal, 'label'), false);
@@ -1854,23 +2312,29 @@ test('Invite onboarding creates a transport-neutral user credential and rejects 
   const env = agentHttpOnlyEnv({
     AGENT_BRIDGE_AGENT_API_TOKEN: '',
     AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
-    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
-      tokenHash: sha256Hex('browser-invite-secret'),
-      sessionSlug: 'alpha',
-      label: 'Browser invite',
-      source: 'browser',
-    }]),
+    AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([
+      {
+        tokenHash: sha256Hex('browser-invite-secret'),
+        sessionSlug: 'alpha',
+        label: 'Browser invite',
+        source: 'browser',
+      },
+    ]),
   });
-  const onboardRequest = () => new Request('https://bridge.example/api/agent/invite/onboard', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      inviteToken: 'browser-invite-secret',
-      label: 'Participant',
-    }),
-  });
+  const onboardRequest = () =>
+    new Request('https://bridge.example/api/agent/invite/onboard', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        inviteToken: 'browser-invite-secret',
+        label: 'Participant',
+      }),
+    });
 
-  const response = await handleTelegramAgentHandoffRequest({ request: onboardRequest(), env });
+  const response = await handleTelegramAgentHandoffRequest({
+    request: onboardRequest(),
+    env,
+  });
   const body = await jsonBody(response);
 
   assert.equal(response.status, 200);
@@ -1880,7 +2344,10 @@ test('Invite onboarding creates a transport-neutral user credential and rejects 
   assert.equal(body.principal.adapter, 'invite');
   assert.match(body.principal.principalId, /^cep_[A-Za-z0-9_-]+$/);
   assert.match(body.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
-  const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
+  const loaded = await loadTelegramAgentDelegationToken({
+    env,
+    token: body.token,
+  });
   assert.equal(loaded.ok, true);
   assert.deepEqual(loaded.record.principal, body.principal);
   assert.equal(Object.hasOwn(loaded.record.principal, 'adapterUserId'), false);
@@ -1892,14 +2359,19 @@ test('Invite onboarding creates a transport-neutral user credential and rejects 
   });
   assert.equal(questionsResponse.status, 200);
 
-  const replayResponse = await handleTelegramAgentHandoffRequest({ request: onboardRequest(), env });
+  const replayResponse = await handleTelegramAgentHandoffRequest({
+    request: onboardRequest(),
+    env,
+  });
   const replay = await jsonBody(replayResponse);
   assert.equal(replayResponse.status, 409);
   assert.equal(replay.reason, 'invite_token_redeemed');
 });
 
 test('Root bootstrap mints a named scoped service credential', async () => {
-  const env = agentHttpOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'root-bootstrap-token' });
+  const env = agentHttpOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'root-bootstrap-token',
+  });
   const response = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/api/agent/credentials/service', {
       method: 'POST',
@@ -1920,7 +2392,10 @@ test('Root bootstrap mints a named scoped service credential', async () => {
   assert.equal(body.principal.label, 'question-indexer');
   assert.match(body.principal.principalId, /^cesvc_[A-Za-z0-9_-]+$/);
   assert.match(body.token, /^ceagt_[A-Za-z0-9_-]{32,}$/);
-  const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
+  const loaded = await loadTelegramAgentDelegationToken({
+    env,
+    token: body.token,
+  });
   assert.equal(loaded.ok, true);
   assert.equal(loaded.record.credentialKind, AGENT_CREDENTIAL_KINDS.SERVICE);
   assert.deepEqual(loaded.record.scopes, [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS]);
@@ -1932,7 +2407,9 @@ test('Root bootstrap mints a named scoped service credential', async () => {
   });
   assert.equal(questionsResponse.status, 200);
   const mismatchResponse = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/api/agent/questions?sessionSlug=beta', { token: body.token }),
+    request: agentRequest('/api/agent/questions?sessionSlug=beta', {
+      token: body.token,
+    }),
     env,
   });
   assert.equal(mismatchResponse.status, 403);
@@ -1959,7 +2436,10 @@ test('Credential issuance reports missing managed signer configuration', async (
   const body = await jsonBody(response);
 
   assert.equal(response.status, 503);
-  assert.deepEqual(body, { ok: false, reason: 'managed_demo_signer_not_configured' });
+  assert.deepEqual(body, {
+    ok: false,
+    reason: 'managed_demo_signer_not_configured',
+  });
 });
 
 test('Invite onboarding mode agent_only mints short scoped token without revoking normal token', async () => {
@@ -1970,11 +2450,13 @@ test('Invite onboarding mode agent_only mints short scoped token without revokin
       AGENT_BRIDGE_AGENT_API_TOKEN: '',
       AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
       AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS: '604800',
-      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
-        tokenHash: sha256Hex('agent-only-invite'),
-        sessionSlug: 'alpha',
-        label: 'Agent Only',
-      }]),
+      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([
+        {
+          tokenHash: sha256Hex('agent-only-invite'),
+          sessionSlug: 'alpha',
+          label: 'Agent Only',
+        },
+      ]),
     },
   });
   const previous = await createTelegramAgentDelegationToken({
@@ -2005,17 +2487,22 @@ test('Invite onboarding mode agent_only mints short scoped token without revokin
   assert.equal(body.mode, 'agent_only');
   assert.equal(body.start, 'https://bridge.example/api/agent/agent-only/start');
   assert.equal(Object.hasOwn(body, 'onboarding'), false);
-  const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
+  const loaded = await loadTelegramAgentDelegationToken({
+    env,
+    token: body.token,
+  });
   assert.equal(loaded.ok, true);
-  assert.deepEqual(loaded.record.scopes, [
-    TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
-  ]);
+  assert.deepEqual(loaded.record.scopes, [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL]);
   assert.equal(loaded.record.scopes.includes(TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS), false);
   assert.equal(loaded.record.scopes.includes(TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS), false);
   assert.equal(Object.hasOwn(loaded.record.principal, 'label'), false);
   assert.equal(loaded.record.ttlSeconds, 604800);
   assert.equal((await loadTelegramAgentDelegationToken({ env, token: previous.token })).ok, true);
-  const pointer = await readTelegramAgentOnlyTokenUserPointer({ env, telegramUserId: '42', sessionSlug: 'alpha' });
+  const pointer = await readTelegramAgentOnlyTokenUserPointer({
+    env,
+    telegramUserId: '42',
+    sessionSlug: 'alpha',
+  });
   assert.equal(pointer.tokenHash, loaded.tokenHash);
 });
 
@@ -2028,11 +2515,13 @@ test('Session Wrapped invite onboarding mints wrapped agent-only credential meta
       AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
       AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS: '604800',
       AGENT_BRIDGE_SESSION_WRAPPED_SKILL_URL: 'https://bridge.example/api/agent/session-wrapped/skill',
-      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
-        tokenHash: sha256Hex('wrapped-demo-invite'),
-        sessionSlug: 'session-wrapped',
-        label: 'Session Wrapped',
-      }]),
+      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([
+        {
+          tokenHash: sha256Hex('wrapped-demo-invite'),
+          sessionSlug: 'session-wrapped',
+          label: 'Session Wrapped',
+        },
+      ]),
     },
   });
 
@@ -2060,11 +2549,12 @@ test('Session Wrapped invite onboarding mints wrapped agent-only credential meta
   assert.equal(body.sessionSlug, 'session-wrapped');
   assert.equal(body.start, 'https://bridge.example/api/agent/agent-only/start');
   assert.equal(Object.hasOwn(body, 'onboarding'), false);
-  const loaded = await loadTelegramAgentDelegationToken({ env, token: body.token });
+  const loaded = await loadTelegramAgentDelegationToken({
+    env,
+    token: body.token,
+  });
   assert.equal(loaded.ok, true);
-  assert.deepEqual(loaded.record.scopes, [
-    TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
-  ]);
+  assert.deepEqual(loaded.record.scopes, [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL]);
   assert.equal(loaded.record.sessionSlug, 'session-wrapped');
   assert.equal(Object.hasOwn(loaded.record.principal, 'label'), false);
   assert.equal(loaded.record.ttlSeconds, 604800);
@@ -2083,11 +2573,13 @@ test('Agent-only invite tokens cannot apply normal sponsored question writes eve
     overrides: {
       AGENT_BRIDGE_AGENT_API_TOKEN: '',
       AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
-      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([{
-        tokenHash: sha256Hex('agent-only-admin-invite'),
-        sessionSlug: 'alpha',
-        label: 'Agent Only Admin',
-      }]),
+      AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON: JSON.stringify([
+        {
+          tokenHash: sha256Hex('agent-only-admin-invite'),
+          sessionSlug: 'alpha',
+          label: 'Agent Only Admin',
+        },
+      ]),
     },
   });
   env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = await managedAccountAddressForTelegramUser(env, '42');
@@ -2112,17 +2604,20 @@ test('Agent-only invite tokens cannot apply normal sponsored question writes eve
       token: onboard.token,
       body: {
         approved: true,
-        draftQuestions: [{
-          prompt: 'Should agent-only tokens manage sponsored questions?',
-          questionType: 'binary',
-        }],
+        draftQuestions: [
+          {
+            prompt: 'Should agent-only tokens manage sponsored questions?',
+            questionType: 'binary',
+          },
+        ],
       },
     }),
     env,
   });
   const denied = await jsonBody(applyResponse);
-  const proposedKeys = Array.from(env.AGENT_ACTION_KV.store.keys())
-    .filter((key) => String(key).startsWith('telegram:proposed-question:alpha:'));
+  const proposedKeys = Array.from(env.AGENT_ACTION_KV.store.keys()).filter((key) =>
+    String(key).startsWith('telegram:proposed-question:alpha:'),
+  );
 
   assert.equal(applyResponse.status, 403);
   assert.equal(denied.reason, 'agent_token_scope_denied');
@@ -2151,8 +2646,10 @@ test('Invite onboarding rejects random Telegram ids without a valid invite token
 
   assert.equal(invalidResponse.status, 401);
   assert.equal(invalid.reason, 'invite_token_invalid');
-  assert.equal(Array.from(env.AGENT_ACTION_KV.store.keys()).some((key) => key.includes('agent-delegation-token')), false);
-
+  assert.equal(
+    Array.from(env.AGENT_ACTION_KV.store.keys()).some((key) => key.includes('agent-delegation-token')),
+    false,
+  );
 });
 
 test('Invite onboarding ignores plaintext invite token env config', async () => {
@@ -2176,7 +2673,10 @@ test('Invite onboarding ignores plaintext invite token env config', async () => 
 
   assert.equal(response.status, 503);
   assert.equal(body.reason, 'invite_onboarding_not_configured');
-  assert.equal(Array.from(env.AGENT_ACTION_KV.store.keys()).some((key) => key.includes('agent-delegation-token')), false);
+  assert.equal(
+    Array.from(env.AGENT_ACTION_KV.store.keys()).some((key) => key.includes('agent-delegation-token')),
+    false,
+  );
 });
 
 test('Agent-only routes require agent_autofill scope and serve flagged snapshot pages', async () => {
@@ -2258,7 +2758,10 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       body: {
         window_id: 'w-2026-06-12',
         run_id: 'route-run-1',
-        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+        agent_metadata: {
+          model: 'unit-model',
+          scaffold_version: 'unit-scaffold',
+        },
         answers: [],
       },
     }),
@@ -2269,7 +2772,10 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         window_id: 'w-2026-06-12',
         run_id: 'route-run-1',
         mode: 'linear',
-        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+        agent_metadata: {
+          model: 'unit-model',
+          scaffold_version: 'unit-scaffold',
+        },
         votes: [],
       },
     }),
@@ -2279,7 +2785,10 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       body: { window_id: 'w-2026-06-12', run_id: 'route-run-1' },
     }),
   ]) {
-    const unauthenticated = await handleTelegramAgentHandoffRequest({ request, env });
+    const unauthenticated = await handleTelegramAgentHandoffRequest({
+      request,
+      env,
+    });
     assert.equal(unauthenticated.status, 401);
   }
 
@@ -2293,9 +2802,12 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
   const deniedResponse = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&createdAt=2026-06-12T15%3A06%3A00.000Z', {
-      token: normalToken.token,
-    }),
+    request: agentRequest(
+      '/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&createdAt=2026-06-12T15%3A06%3A00.000Z',
+      {
+        token: normalToken.token,
+      },
+    ),
     env,
   });
   const denied = await jsonBody(deniedResponse);
@@ -2306,7 +2818,11 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
       method: 'POST',
       token: normalToken.token,
-      body: { window_id: 'w-2026-06-12', run_id: 'route-run-1', createdAt: '2026-06-12T15:06:00.000Z' },
+      body: {
+        window_id: 'w-2026-06-12',
+        run_id: 'route-run-1',
+        createdAt: '2026-06-12T15:06:00.000Z',
+      },
     }),
     env,
   });
@@ -2320,9 +2836,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     username: '',
     sessionSlug: 'alpha',
     accountAddress: `0x${'34'.repeat(20)}`,
-    scopes: [
-      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
-    ],
+    scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL],
     credentialKind: AGENT_CREDENTIAL_KINDS.AGENT_ONLY,
     createdAt: '2026-06-12T15:02:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
@@ -2368,9 +2882,12 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(agentOnlySessionMismatch.sessionSlug, 'alpha');
 
   const statementsResponse = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&createdAt=2026-06-12T15%3A06%3A00.000Z', {
-      token: agentOnlyToken.token,
-    }),
+    request: agentRequest(
+      '/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&createdAt=2026-06-12T15%3A06%3A00.000Z',
+      {
+        token: agentOnlyToken.token,
+      },
+    ),
     env,
   });
   const statements = await jsonBody(statementsResponse);
@@ -2381,9 +2898,12 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(JSON.stringify(statements).includes('eval_type'), false);
 
   const compactStatementsResponse = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&compact=1&createdAt=2026-06-12T15%3A06%3A00.000Z', {
-      token: agentOnlyToken.token,
-    }),
+    request: agentRequest(
+      '/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&compact=1&createdAt=2026-06-12T15%3A06%3A00.000Z',
+      {
+        token: agentOnlyToken.token,
+      },
+    ),
     env,
   });
   const compactStatements = await jsonBody(compactStatementsResponse);
@@ -2405,9 +2925,12 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(Object.hasOwn(compactStatements.statements[0], 'window_id'), false);
 
   const clientClockResponse = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&createdAt=2026-06-15T15%3A30%3A00.000Z', {
-      token: agentOnlyToken.token,
-    }),
+    request: agentRequest(
+      '/telegram/agent/api/agent-only/statements?sessionSlug=alpha&limit=2&createdAt=2026-06-15T15%3A30%3A00.000Z',
+      {
+        token: agentOnlyToken.token,
+      },
+    ),
     env,
   });
   const clientClock = await jsonBody(clientClockResponse);
@@ -2423,12 +2946,17 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         run_id: 'route-run-1',
         createdAt: '2026-06-12T15:07:00.000Z',
         request_id: 'route-answers-stale',
-        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
-        answers: [{
-          statement_id: questionIds[0],
-          answer: { value: 'agree' },
-          confidence: 80,
-        }],
+        agent_metadata: {
+          model: 'unit-model',
+          scaffold_version: 'unit-scaffold',
+        },
+        answers: [
+          {
+            statement_id: questionIds[0],
+            answer: { value: 'agree' },
+            confidence: 80,
+          },
+        ],
       },
     }),
     env,
@@ -2447,7 +2975,10 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         createdAt: '2026-06-12T15:07:00.000Z',
         request_id: 'route-votes-stale',
         mode: 'linear',
-        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+        agent_metadata: {
+          model: 'unit-model',
+          scaffold_version: 'unit-scaffold',
+        },
         votes: [{ statement_id: questionIds[0], votes: 1 }],
       },
     }),
@@ -2491,12 +3022,17 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         run_id: 'route-run-1',
         createdAt: '2026-06-12T15:07:00.000Z',
         request_id: 'route-answers-1',
-        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
-        answers: [{
-          statement_id: questionIds[0],
-          answer: { value: 'agree' },
-          confidence: 80,
-        }],
+        agent_metadata: {
+          model: 'unit-model',
+          scaffold_version: 'unit-scaffold',
+        },
+        answers: [
+          {
+            statement_id: questionIds[0],
+            answer: { value: 'agree' },
+            confidence: 80,
+          },
+        ],
       },
     }),
     env,
@@ -2541,7 +3077,10 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         run_id: 'route-run-1',
         createdAt: '2026-06-12T15:07:30.000Z',
         request_id: 'route-answers-2',
-        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+        agent_metadata: {
+          model: 'unit-model',
+          scaffold_version: 'unit-scaffold',
+        },
         answers: [
           {
             statement_id: questionIds[1],
@@ -2608,7 +3147,10 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
         createdAt: '2026-06-12T15:08:00.000Z',
         request_id: 'route-votes-1',
         mode: 'linear',
-        agent_metadata: { model: 'unit-model', scaffold_version: 'unit-scaffold' },
+        agent_metadata: {
+          model: 'unit-model',
+          scaffold_version: 'unit-scaffold',
+        },
         votes: [{ statement_id: questionIds[0], votes: 20 }],
       },
     }),
@@ -2624,9 +3166,12 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     assert.equal(init.headers['content-type'], undefined);
     assert.equal(init.body instanceof FormData, true);
     openAiRequestForm = init.body;
-    return new Response(JSON.stringify({
-      data: [{ b64_json: Buffer.from('fake-png').toString('base64') }],
-    }), { status: 200, headers: { 'content-type': 'application/json' } });
+    return new Response(
+      JSON.stringify({
+        data: [{ b64_json: Buffer.from('fake-png').toString('base64') }],
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    );
   };
   const wrappedResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/agent-only/wrapped-image?sessionSlug=alpha', {
@@ -2670,7 +3215,10 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(wrapped.image_saved, true);
   assert.match(wrapped.image_id, /^\d{13}-[0-9a-f]{8}$/);
   assert.match(wrapped.image_view_id, /^[0-9a-f]{32}$/);
-  assert.equal(wrapped.image_url, `https://bridge.example/api/agent/agent-only/wrapped-image/view/${wrapped.image_view_id}`);
+  assert.equal(
+    wrapped.image_url,
+    `https://bridge.example/api/agent/agent-only/wrapped-image/view/${wrapped.image_view_id}`,
+  );
   assert.match(wrapped.image_prompt_hash, /^sha256:[0-9a-f]{32}$/);
   assert.equal(Object.hasOwn(wrapped, 'prompt'), false);
   assert.equal(typeof openAiRequestForm.get('prompt'), 'string');
@@ -2766,7 +3314,7 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   });
   assert.equal(imageViewHeadResponse.status, 200);
   assert.equal(imageViewHeadResponse.headers.get('content-type'), 'image/png');
-  assert.equal((await imageViewHeadResponse.text()), '');
+  assert.equal(await imageViewHeadResponse.text(), '');
 
   const missingImageViewResponse = await handleTelegramAgentHandoffRequest({
     request: new Request('https://bridge.example/telegram/agent/api/agent-only/wrapped-image/view/not-real'),
@@ -2784,7 +3332,11 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   });
   const imageExportText = await imageExportResponse.text();
   assert.equal(imageExportResponse.status, 200);
-  const imageRows = imageExportText.trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  const imageRows = imageExportText
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
   const wrappedImageRow = imageRows.find((row) => row.image_id === wrapped.image_id);
   assert.ok(wrappedImageRow);
   assert.equal(wrappedImageRow.image_view_id, wrapped.image_view_id);
@@ -2796,12 +3348,19 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(JSON.stringify(imageRows).includes('telegramUserId'), false);
 
   const imageExportWithBase64Response = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=images&format=jsonl&include_base64=true', {
-      token: 'agent-test-token',
-    }),
+    request: agentRequest(
+      '/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=images&format=jsonl&include_base64=true',
+      {
+        token: 'agent-test-token',
+      },
+    ),
     env,
   });
-  const imageRowsWithBase64 = (await imageExportWithBase64Response.text()).trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  const imageRowsWithBase64 = (await imageExportWithBase64Response.text())
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
   assert.equal(imageExportWithBase64Response.status, 200);
   const wrappedImageRowWithBase64 = imageRowsWithBase64.find((row) => row.image_id === wrapped.image_id);
   assert.equal(wrappedImageRowWithBase64.image_base64, Buffer.from('fake-png').toString('base64'));
@@ -2812,54 +3371,85 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     }),
     env,
   });
-  const attemptRows = (await attemptExportResponse.text()).trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  const attemptRows = (await attemptExportResponse.text())
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
   assert.equal(attemptExportResponse.status, 200);
-  assert.equal(attemptRows.some((row) => (
-    row.stage === 'answers_bulk' &&
-    row.ok === true &&
-    row.status === 200 &&
-    row.accepted === 1 &&
-    row.request_id === 'route-answers-1'
-  )), true);
-  assert.equal(attemptRows.some((row) => (
-    row.stage === 'answers_bulk' &&
-    row.ok === false &&
-    row.status === 409 &&
-    row.reason === 'window_mismatch' &&
-    row.request_id === 'route-answers-stale'
-  )), true);
-  assert.equal(attemptRows.some((row) => (
-    row.stage === 'token_votes_bulk' &&
-    row.ok === true &&
-    row.status === 200 &&
-    row.budget_used === 20 &&
-    row.request_id === 'route-votes-1'
-  )), true);
-  assert.equal(attemptRows.some((row) => (
-    row.stage === 'wrapped_image' &&
-    row.ok === false &&
-    row.status === 409 &&
-    row.reason === 'agent_only_wrapped_incomplete_predictions' &&
-    row.statement_count === 5 &&
-    row.agent_response_count === 0
-  )), true);
-  assert.equal(attemptRows.some((row) => (
-    row.stage === 'wrapped_image' &&
-    row.ok === true &&
-    row.status === 200 &&
-    row.mode === 'political_compass' &&
-    row.agent_response_count === 5
-  )), true);
-  assert.equal(attemptRows.some((row) => (
-    row.stage === 'wrapped_image' &&
-    row.ok === true &&
-    row.status === 200 &&
-    row.run_id === 'route-run-1' &&
-    row.mode === 'wrapped' &&
-    row.agent_response_count === 5 &&
-    row.privacy_skip_count === 1
-  )), true);
-  assert.equal(attemptRows.every((row) => row.principal_id.startsWith('cep_')), true);
+  assert.equal(
+    attemptRows.some(
+      (row) =>
+        row.stage === 'answers_bulk' &&
+        row.ok === true &&
+        row.status === 200 &&
+        row.accepted === 1 &&
+        row.request_id === 'route-answers-1',
+    ),
+    true,
+  );
+  assert.equal(
+    attemptRows.some(
+      (row) =>
+        row.stage === 'answers_bulk' &&
+        row.ok === false &&
+        row.status === 409 &&
+        row.reason === 'window_mismatch' &&
+        row.request_id === 'route-answers-stale',
+    ),
+    true,
+  );
+  assert.equal(
+    attemptRows.some(
+      (row) =>
+        row.stage === 'token_votes_bulk' &&
+        row.ok === true &&
+        row.status === 200 &&
+        row.budget_used === 20 &&
+        row.request_id === 'route-votes-1',
+    ),
+    true,
+  );
+  assert.equal(
+    attemptRows.some(
+      (row) =>
+        row.stage === 'wrapped_image' &&
+        row.ok === false &&
+        row.status === 409 &&
+        row.reason === 'agent_only_wrapped_incomplete_predictions' &&
+        row.statement_count === 5 &&
+        row.agent_response_count === 0,
+    ),
+    true,
+  );
+  assert.equal(
+    attemptRows.some(
+      (row) =>
+        row.stage === 'wrapped_image' &&
+        row.ok === true &&
+        row.status === 200 &&
+        row.mode === 'political_compass' &&
+        row.agent_response_count === 5,
+    ),
+    true,
+  );
+  assert.equal(
+    attemptRows.some(
+      (row) =>
+        row.stage === 'wrapped_image' &&
+        row.ok === true &&
+        row.status === 200 &&
+        row.run_id === 'route-run-1' &&
+        row.mode === 'wrapped' &&
+        row.agent_response_count === 5 &&
+        row.privacy_skip_count === 1,
+    ),
+    true,
+  );
+  assert.equal(
+    attemptRows.every((row) => row.principal_id.startsWith('cep_')),
+    true,
+  );
   assert.equal(JSON.stringify(attemptRows).includes('telegramUserId'), false);
   assert.equal(JSON.stringify(attemptRows).includes(agentOnlyToken.token), false);
 
@@ -2906,9 +3496,16 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       storyAttempts += 1;
       storyPrompts.push(init.body.get('prompt'));
       assert.equal(init.body.get('size'), '3240x1152');
-      return new Response(JSON.stringify({
-        data: [{ b64_json: Buffer.from(`fake-story-frame-${storyAttempts}`).toString('base64') }],
-      }), { status: 200, headers: { 'content-type': 'application/json' } });
+      return new Response(
+        JSON.stringify({
+          data: [
+            {
+              b64_json: Buffer.from(`fake-story-frame-${storyAttempts}`).toString('base64'),
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
     },
   });
   const story = await jsonBody(storyResponse);
@@ -2951,7 +3548,11 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
     }),
     env,
   });
-  const storyExportRows = (await storyExportResponse.text()).trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
+  const storyExportRows = (await storyExportResponse.text())
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line));
   assert.equal(storyExportResponse.status, 200);
   const storyExportRow = storyExportRows.find((row) => row.mode === 'wrapped_story');
   assert.equal(storyExportRow.image_id, story.image_id);
@@ -2981,13 +3582,22 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
       compassAttempts += 1;
       compassPrompts.push(init.body.get('prompt'));
       if (compassAttempts === 1) {
-        return new Response(JSON.stringify({
-          error: { code: 'content_policy_violation', message: 'moderation_blocked' },
-        }), { status: 400, headers: { 'content-type': 'application/json' } });
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: 'content_policy_violation',
+              message: 'moderation_blocked',
+            },
+          }),
+          { status: 400, headers: { 'content-type': 'application/json' } },
+        );
       }
-      return new Response(JSON.stringify({
-        data: [{ b64_json: Buffer.from('fake-compass').toString('base64') }],
-      }), { status: 200, headers: { 'content-type': 'application/json' } });
+      return new Response(
+        JSON.stringify({
+          data: [{ b64_json: Buffer.from('fake-compass').toString('base64') }],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
     },
   });
   const compass = await jsonBody(compassResponse);
@@ -3024,9 +3634,12 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
   assert.equal(exported.includes('42'), false);
 
   const pagedMetricsResponse = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=answers&format=jsonl&limit=1', {
-      token: 'agent-test-token',
-    }),
+    request: agentRequest(
+      '/telegram/agent/api/admin/agent-only/export?sessionSlug=alpha&view=answers&format=jsonl&limit=1',
+      {
+        token: 'agent-test-token',
+      },
+    ),
     env,
   });
   const pagedExported = await pagedMetricsResponse.text();
@@ -3037,7 +3650,9 @@ test('Agent-only routes require agent_autofill scope and serve flagged snapshot 
 });
 
 test('Agent-only admin routes accept session admin delegation tokens and reject non-admin tokens', async () => {
-  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' });
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token',
+  });
   const questionIds = await seedAgentOnlyProposedQuestions(env, 'alpha', 2);
   const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
   env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
@@ -3047,9 +3662,7 @@ test('Agent-only admin routes accept session admin delegation tokens and reject 
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'34'.repeat(20)}`,
-    scopes: [
-      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,
-    ],
+    scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS],
     createdAt: '2026-06-12T15:02:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
@@ -3059,9 +3672,7 @@ test('Agent-only admin routes accept session admin delegation tokens and reject 
     username: 'host',
     sessionSlug: 'alpha',
     accountAddress: adminAddress,
-    scopes: [
-      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,
-    ],
+    scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS],
     createdAt: '2026-06-12T15:02:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
@@ -3071,9 +3682,7 @@ test('Agent-only admin routes accept session admin delegation tokens and reject 
     username: '',
     sessionSlug: 'alpha',
     accountAddress: adminAddress,
-    scopes: [
-      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL,
-    ],
+    scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL],
     credentialKind: AGENT_CREDENTIAL_KINDS.AGENT_ONLY,
     createdAt: '2026-06-12T15:02:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
@@ -3114,7 +3723,10 @@ test('Agent-only admin routes accept session admin delegation tokens and reject 
   assert.equal(nonAdminResponse.status, 403);
   assert.notEqual((await jsonBody(nonAdminResponse)).reason, 'agent_only_admin_service_token_required');
   assert.equal(missingScopeResponse.status, 403);
-  assert.equal((await jsonBody(missingScopeResponse)).requiredScope, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS);
+  assert.equal(
+    (await jsonBody(missingScopeResponse)).requiredScope,
+    TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,
+  );
   assert.equal(adminResponse.status, 200, JSON.stringify(adminBody));
   assert.deepEqual(adminBody.config.enabledQuestionIds, questionIds);
   assert.equal(openResponse.status, 200);
@@ -3122,7 +3734,9 @@ test('Agent-only admin routes accept session admin delegation tokens and reject 
 });
 
 test('Telegram admin proposed-question delete route accepts service tokens and session admin tokens', async () => {
-  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' });
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token',
+  });
   const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
   env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
   const serviceResponse = await handleTelegramAgentHandoffRequest({
@@ -3143,9 +3757,7 @@ test('Telegram admin proposed-question delete route accepts service tokens and s
     username: 'participant',
     sessionSlug: 'alpha',
     accountAddress: `0x${'34'.repeat(20)}`,
-    scopes: [
-      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,
-    ],
+    scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS],
     createdAt: '2026-06-12T15:02:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
@@ -3155,9 +3767,7 @@ test('Telegram admin proposed-question delete route accepts service tokens and s
     username: 'admin',
     sessionSlug: 'alpha',
     accountAddress: adminAddress,
-    scopes: [
-      TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS,
-    ],
+    scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS],
     createdAt: '2026-06-12T15:02:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
@@ -3199,7 +3809,9 @@ test('Telegram admin proposed-question delete route accepts service tokens and s
   assert.equal(service.ok, true);
   assert.deepEqual(service.results, [{ questionId: 'ceq_missing_auth', result: 'not_found' }]);
   assert.equal(adminDelegatedResponse.status, 200);
-  assert.deepEqual((await jsonBody(adminDelegatedResponse)).results, [{ questionId: 'ceq_missing_admin', result: 'not_found' }]);
+  assert.deepEqual((await jsonBody(adminDelegatedResponse)).results, [
+    { questionId: 'ceq_missing_admin', result: 'not_found' },
+  ]);
   assert.equal(delegatedNonAdminResponse.status, 403);
   assert.equal((await jsonBody(delegatedNonAdminResponse)).reason, 'response_export_admin_required');
   assert.equal(missingResponse.status, 401);
@@ -3283,8 +3895,14 @@ test('Telegram admin can archive proposed questions without mutating existing ag
   assert.deepEqual(archive.results, [{ questionId: archivedId, result: 'archived' }]);
   assert.equal(archive.configUpdated, true);
   assert.equal(questionsResponse.status, 200, JSON.stringify(questions));
-  assert.equal(questions.questions.some((question) => question.questionId === archivedId), false);
-  assert.equal(questions.questions.some((question) => question.questionId === keptId), true);
+  assert.equal(
+    questions.questions.some((question) => question.questionId === archivedId),
+    false,
+  );
+  assert.equal(
+    questions.questions.some((question) => question.questionId === keptId),
+    true,
+  );
   assert.deepEqual(afterConfig.enabledQuestionIds, [keptId]);
   assert.equal(Object.hasOwn(afterConfig.evalTypesByQuestionId, archivedId), false);
   assert.equal(afterConfig.evalTypesByQuestionId[keptId], 'gold');
@@ -3294,10 +3912,13 @@ test('Telegram admin can archive proposed questions without mutating existing ag
 });
 
 test('Telegram admin can delete proposed questions and remove them from agent-only config', async () => {
-  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' });
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token',
+  });
   const [questionId] = await seedAgentOnlyProposedQuestions(env, 'alpha', 1);
-  const questionKey = Array.from(env.AGENT_ACTION_KV.store.keys())
-    .find((key) => key.startsWith('telegram:proposed-question:alpha:') && key.endsWith(`:${questionId}`));
+  const questionKey = Array.from(env.AGENT_ACTION_KV.store.keys()).find(
+    (key) => key.startsWith('telegram:proposed-question:alpha:') && key.endsWith(`:${questionId}`),
+  );
   await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/agent-only/config?sessionSlug=alpha', {
       method: 'POST',
@@ -3334,7 +3955,9 @@ test('Telegram admin can delete proposed questions and remove them from agent-on
 });
 
 test('Telegram admin proposed-question delete batches continue across missing ids', async () => {
-  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' });
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token',
+  });
   const [questionId] = await seedAgentOnlyProposedQuestions(env, 'alpha', 1);
   const missingId = 'ceq_unknown_batch';
   const response = await handleTelegramAgentHandoffRequest({
@@ -3360,7 +3983,9 @@ test('Telegram admin proposed-question delete batches continue across missing id
 });
 
 test('Telegram admin proposed-question delete skips non-ceq ids before KV reads', async () => {
-  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' });
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token',
+  });
   env.AGENT_ACTION_KV.resetGetCalls();
   const response = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/questions/delete', {
@@ -3382,7 +4007,9 @@ test('Telegram admin proposed-question delete skips non-ceq ids before KV reads'
 });
 
 test('Telegram admin archive does not create an agent-only config record when none exists', async () => {
-  const env = telegramOnlyEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token' });
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_AGENT_API_TOKEN: 'agent-test-token',
+  });
   const [questionId] = await seedAgentOnlyProposedQuestions(env, 'alpha', 1);
   const configKey = `${AGENT_ONLY_MODE_CONFIG_KV_PREFIX}alpha`;
   assert.equal(env.AGENT_ACTION_KV.store.has(configKey), false);
@@ -3408,7 +4035,9 @@ test('Telegram admin archive does not create an agent-only config record when no
 });
 
 test('Telegram bot copied agent token authenticates against handoff questions', async () => {
-  const env = telegramOnlyEnv({ AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example' });
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_PUBLIC_URL: 'https://bridge.example',
+  });
   const command = await buildTelegramCommandResponse({
     update: {
       update_id: 9101,
@@ -3504,13 +4133,21 @@ test('Telegram client login exchanges copied ceagt token for a worker JWT', asyn
   assert.equal(body.accountAddress, accountAddress);
   assert.equal(body.workerUrl, 'https://session-worker.example');
   assert.equal(body.buckets.sessionSlug, 'alpha');
-  assert.equal(body.buckets.categories.some((category) => category.categoryId === 'events_attended' && category.label === 'Attendance'), true);
-  assert.equal(body.buckets.categories.some((category) => category.categoryId === 'primary_focus'), false);
+  assert.equal(
+    body.buckets.categories.some(
+      (category) => category.categoryId === 'events_attended' && category.label === 'Attendance',
+    ),
+    true,
+  );
+  assert.equal(
+    body.buckets.categories.some((category) => category.categoryId === 'primary_focus'),
+    false,
+  );
   assert.equal(JSON.stringify(body).includes(issued.token), false);
-  assert.deepEqual(fetchCalls.map((call) => call.url), [
-    'https://session-worker.example/auth/nonce',
-    'https://session-worker.example/auth/login',
-  ]);
+  assert.deepEqual(
+    fetchCalls.map((call) => call.url),
+    ['https://session-worker.example/auth/nonce', 'https://session-worker.example/auth/login'],
+  );
 });
 
 test('client login derives the worker wallet from a Telegram-optional service principal', async () => {
@@ -3657,6 +4294,161 @@ test('client login returns audience-correct credentials and the Bridge credentia
   assert.equal(nestedExchange.reason, 'agent_credential_exchange_denied');
 });
 
+test('worker-canonical browser credentials fail before route reads or writes after same-slug Worker replacement', async () => {
+  const canonicalSessionPolicy = ({
+    sessionId = MEMBER_SESSION_ID,
+    sessionWorkerUrl = MEMBER_SESSION_WORKER_ORIGIN,
+  } = {}) =>
+    JSON.stringify({
+      version: 1,
+      defaultSessionSlug: 'alpha',
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionIdHex: sessionId,
+          sessionWorkerUrl,
+          sessionModeProfile: {
+            surfaces: { agentHttp: true, telegram: false },
+            authority: { mode: 'worker_canonical' },
+          },
+        },
+      ],
+    });
+  const env = baseEnv({
+    AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS: 'https://client.example',
+    AGENT_BRIDGE_SESSION_POLICY_JSON: canonicalSessionPolicy(),
+  });
+  const sourceCredential = await issueAgentCredential({
+    env,
+    principal: {
+      principalId: 'cesvc_worker-browser-reader',
+      kind: AGENT_CREDENTIAL_KINDS.SERVICE,
+      adapter: 'service',
+      label: 'Worker browser reader',
+    },
+    sessionSlug: 'alpha',
+    scopes: TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_SCOPES,
+    audience: AGENT_CREDENTIAL_AUDIENCES.AGENT_BRIDGE,
+    credentialKind: AGENT_CREDENTIAL_KINDS.SERVICE,
+    ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
+  });
+  const exchangeResponse = await handleTelegramAgentHandoffRequest({
+    request: new Request('https://bridge.example/api/agent/client-login/exchange', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://client.example',
+      },
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        token: sourceCredential.token,
+      }),
+    }),
+    env,
+    fetchImpl: async (url) => {
+      if (String(url).endsWith('/auth/nonce')) {
+        return new Response(
+          JSON.stringify({
+            nonce: 'worker-browser-nonce',
+            sessionSlug: 'alpha',
+            sessionId: MEMBER_SESSION_ID,
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        );
+      }
+      if (String(url).endsWith('/auth/login')) {
+        return new Response(
+          JSON.stringify({
+            token: 'worker-browser-jwt',
+            exp: 2_000_000_000,
+            sessionSlug: 'alpha',
+            sessionId: MEMBER_SESSION_ID,
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        );
+      }
+      throw new Error(`unexpected fetch ${url}`);
+    },
+  });
+  const exchange = await jsonBody(exchangeResponse);
+  assert.equal(exchangeResponse.status, 200, JSON.stringify(exchange));
+
+  const loaded = await loadAgentCredential({
+    env,
+    token: exchange.bridgeCredential.token,
+  });
+  assert.equal(loaded.ok, true);
+  assert.equal(loaded.record.credentialKind, AGENT_CREDENTIAL_KINDS.BROWSER);
+  assert.equal(loaded.record.sessionSlug, 'alpha');
+  assert.equal(loaded.record.sessionId, MEMBER_SESSION_ID);
+  assert.equal(loaded.record.sessionWorkerOrigin, MEMBER_SESSION_WORKER_ORIGIN);
+  assert.equal(loaded.record.sessionAuthorityMode, 'worker_canonical');
+
+  const currentResponse = await handleTelegramAgentHandoffRequest({
+    request: agentRequest('/api/agent/questions?sessionSlug=alpha', {
+      token: exchange.bridgeCredential.token,
+    }),
+    env,
+  });
+  const current = await jsonBody(currentResponse);
+  assert.equal(currentResponse.status, 200, JSON.stringify(current));
+  assert.equal(current.ok, true);
+  assert.equal(current.sessionSlug, 'alpha');
+
+  const storeBefore = Array.from(env.AGENT_ACTION_KV.store.entries());
+  let mutationWrites = 0;
+  const originalPut = env.AGENT_ACTION_KV.put.bind(env.AGENT_ACTION_KV);
+  env.AGENT_ACTION_KV.put = async (...args) => {
+    mutationWrites += 1;
+    return originalPut(...args);
+  };
+
+  for (const replacement of [
+    {
+      label: 'identity',
+      sessionId: `0x${'78'.repeat(16)}`,
+      sessionWorkerUrl: MEMBER_SESSION_WORKER_ORIGIN,
+    },
+    {
+      label: 'origin',
+      sessionId: MEMBER_SESSION_ID,
+      sessionWorkerUrl: 'https://replacement-session-worker.example',
+    },
+  ]) {
+    env.AGENT_BRIDGE_SESSION_POLICY_JSON = canonicalSessionPolicy(replacement);
+    const readCountBefore = env.AGENT_ACTION_KV.getKeys.length;
+    const rejectedResponse = await handleTelegramAgentHandoffRequest({
+      request: agentRequest('/api/agent/preferences?sessionSlug=alpha', {
+        method: 'POST',
+        token: exchange.bridgeCredential.token,
+        body: { allowedUses: ['draft_answers'] },
+      }),
+      env,
+      fetchImpl: async () => {
+        throw new Error('stale browser credentials must fail before network access');
+      },
+    });
+    const rejected = await jsonBody(rejectedResponse);
+    assert.equal(rejectedResponse.status, 401, replacement.label);
+    assert.equal(rejected.reason, 'agent_browser_credential_authority_stale', replacement.label);
+    assert.equal(
+      env.AGENT_ACTION_KV.getKeys
+        .slice(readCountBefore)
+        .some((key) => String(key).startsWith('telegram:agent-settings:v1:')),
+      false,
+      replacement.label,
+    );
+    assert.equal(mutationWrites, 0, replacement.label);
+    assert.deepEqual(Array.from(env.AGENT_ACTION_KV.store.entries()), storeBefore, replacement.label);
+  }
+});
+
 test('Telegram client login ignores caller-supplied workerUrl', async () => {
   const env = telegramOnlyEnv({
     AGENT_BRIDGE_SESSION_WORKER_URL: 'https://session-worker.example',
@@ -3695,18 +4487,21 @@ test('Telegram client login ignores caller-supplied workerUrl', async () => {
   };
 
   const response = await handleTelegramAgentHandoffRequest({
-    request: new Request('https://bridge.example/telegram/agent/api/client-login/exchange?workerUrl=https%3A%2F%2Fattacker.example', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        origin: 'https://client.example',
+    request: new Request(
+      'https://bridge.example/telegram/agent/api/client-login/exchange?workerUrl=https%3A%2F%2Fattacker.example',
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'https://client.example',
+        },
+        body: JSON.stringify({
+          sessionSlug: 'alpha',
+          token: issued.token,
+          workerUrl: 'https://attacker.example',
+        }),
       },
-      body: JSON.stringify({
-        sessionSlug: 'alpha',
-        token: issued.token,
-        workerUrl: 'https://attacker.example',
-      }),
-    }),
+    ),
     env,
     fetchImpl,
   });
@@ -3715,10 +4510,10 @@ test('Telegram client login ignores caller-supplied workerUrl', async () => {
   assert.equal(response.status, 200);
   assert.equal(body.ok, true);
   assert.equal(body.workerUrl, 'https://session-worker.example');
-  assert.deepEqual(fetchCalls.map((call) => call.url), [
-    'https://session-worker.example/auth/nonce',
-    'https://session-worker.example/auth/login',
-  ]);
+  assert.deepEqual(
+    fetchCalls.map((call) => call.url),
+    ['https://session-worker.example/auth/nonce', 'https://session-worker.example/auth/login'],
+  );
 });
 
 test('Telegram client login rejects preview-user and session-mismatched tokens', async () => {
@@ -3763,7 +4558,9 @@ test('Telegram client login rejects preview-user and session-mismatched tokens',
 });
 
 test('Telegram client login exchange ignores raw tokens in URL query parameters', async () => {
-  const env = telegramOnlyEnv({ AGENT_BRIDGE_SESSION_WORKER_URL: 'https://session-worker.example' });
+  const env = telegramOnlyEnv({
+    AGENT_BRIDGE_SESSION_WORKER_URL: 'https://session-worker.example',
+  });
   const issued = await createTelegramAgentDelegationToken({
     env,
     telegramUserId: '42',
@@ -3775,11 +4572,14 @@ test('Telegram client login exchange ignores raw tokens in URL query parameters'
   });
 
   const response = await handleTelegramAgentHandoffRequest({
-    request: new Request(`https://bridge.example/telegram/agent/api/client-login/exchange?token=${issued.token}&agentToken=${issued.token}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sessionSlug: 'alpha' }),
-    }),
+    request: new Request(
+      `https://bridge.example/telegram/agent/api/client-login/exchange?token=${issued.token}&agentToken=${issued.token}`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionSlug: 'alpha' }),
+      },
+    ),
     env,
     fetchImpl: async () => {
       throw new Error('query token must not reach worker auth');
@@ -3825,13 +4625,10 @@ test('Telegram session-meta reports telegram-only status without auth', async ()
   const serialized = JSON.stringify(body);
   assert.equal(serialized.includes(env.TELEGRAM_BOT_TOKEN), false);
   assert.equal(serialized.includes(env.DEMO_SIGNER_ROOT_SECRET), false);
-  assert.deepEqual(Object.keys(body).sort(), [
-    'ok',
-    'sessionSlug',
-    'telegramOnly',
-    'telegramBridgeEnabled',
-    'clientSubmitReady',
-  ].sort());
+  assert.deepEqual(
+    Object.keys(body).sort(),
+    ['ok', 'sessionSlug', 'telegramOnly', 'telegramBridgeEnabled', 'clientSubmitReady'].sort(),
+  );
 });
 
 test('Telegram session-meta exposes public client submit readiness', async () => {
@@ -3857,43 +4654,60 @@ test('Telegram session-meta reads sessionModeProfile before legacy flags', async
   const env = telegramOnlyEnv({
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'profile-telegram',
-      sessions: [{
-        sessionSlug: 'profile-telegram',
-        sessionName: 'Profile Telegram',
-        telegramBridgeEnabled: false,
-        telegramOnly: false,
-        sessionModeProfile: {
-          profileVersion: 1,
-          preset: 'custom',
-          authority: { mode: 'worker_canonical' },
-          evm: { registryChainId: null },
-          storage: { backend: 'cloudflare' },
-          identity: { default: 'passkey', enabled: ['passkey', 'telegram'] },
-          authorization: { mechanisms: ['worker_roles'] },
-          encryption: { mode: 'none' },
-          surfaces: { web: true, telegram: true, miniApp: true, agentHttp: false, mcp: false, ceCc: false },
-          results: { visibility: 'participant_aggregate' },
-          export: { scope: 'admin_raw' },
+      sessions: [
+        {
+          sessionSlug: 'profile-telegram',
+          sessionName: 'Profile Telegram',
+          telegramBridgeEnabled: false,
+          telegramOnly: false,
+          sessionModeProfile: {
+            profileVersion: 1,
+            preset: 'custom',
+            authority: { mode: 'worker_canonical' },
+            evm: { registryChainId: null },
+            storage: { backend: 'cloudflare' },
+            identity: { default: 'passkey', enabled: ['passkey', 'telegram'] },
+            authorization: { mechanisms: ['worker_roles'] },
+            encryption: { mode: 'none' },
+            surfaces: {
+              web: true,
+              telegram: true,
+              miniApp: true,
+              agentHttp: false,
+              mcp: false,
+              ceCc: false,
+            },
+            results: { visibility: 'participant_aggregate' },
+            export: { scope: 'admin_raw' },
+          },
         },
-      }, {
-        sessionSlug: 'profile-web',
-        sessionName: 'Profile Web',
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        sessionModeProfile: {
-          profileVersion: 1,
-          preset: 'custom',
-          authority: { mode: 'worker_canonical' },
-          evm: { registryChainId: null },
-          storage: { backend: 'cloudflare' },
-          identity: { default: 'passkey', enabled: ['passkey'] },
-          authorization: { mechanisms: ['worker_roles'] },
-          encryption: { mode: 'none' },
-          surfaces: { web: true, telegram: false, miniApp: false, agentHttp: false, mcp: false, ceCc: false },
-          results: { visibility: 'participant_aggregate' },
-          export: { scope: 'admin_raw' },
+        {
+          sessionSlug: 'profile-web',
+          sessionName: 'Profile Web',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          sessionModeProfile: {
+            profileVersion: 1,
+            preset: 'custom',
+            authority: { mode: 'worker_canonical' },
+            evm: { registryChainId: null },
+            storage: { backend: 'cloudflare' },
+            identity: { default: 'passkey', enabled: ['passkey'] },
+            authorization: { mechanisms: ['worker_roles'] },
+            encryption: { mode: 'none' },
+            surfaces: {
+              web: true,
+              telegram: false,
+              miniApp: false,
+              agentHttp: false,
+              mcp: false,
+              ceCc: false,
+            },
+            results: { visibility: 'participant_aggregate' },
+            export: { scope: 'admin_raw' },
+          },
         },
-      }],
+      ],
     }),
   });
 
@@ -4046,16 +4860,18 @@ test('Telegram polis results view returns pseudonymized binary vectors', async (
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        telegramGroupOpenAccess: true,
-        managedAccountSubmitAllowed: true,
-        resultsExposure: { anonymizedGroupsEnabled: true, minGroupSize: 2 },
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+          resultsExposure: { anonymizedGroupsEnabled: true, minGroupSize: 2 },
+        },
+      ],
     }),
   });
   await persistTelegramSubmitRecord({
@@ -4136,16 +4952,18 @@ test('Telegram polis results view returns pseudonymized binary vectors', async (
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        telegramGroupOpenAccess: true,
-        managedAccountSubmitAllowed: true,
-        resultsExposure: { anonymizedGroupsEnabled: false },
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+          resultsExposure: { anonymizedGroupsEnabled: false },
+        },
+      ],
     }),
   });
   const gatedResponse = await handleTelegramAgentHandoffRequest({
@@ -4250,10 +5068,12 @@ test('Telegram browser CORS covers question/result reads and preference submit',
       },
       body: JSON.stringify({
         sessionSlug: 'alpha',
-        preferences: [{
-          questionId: 'q-binary',
-          answer: { questionType: 'binary', value: 'agree' },
-        }],
+        preferences: [
+          {
+            questionId: 'q-binary',
+            answer: { questionType: 'binary', value: 'agree' },
+          },
+        ],
         submit: true,
         humanApproved: true,
       }),
@@ -4293,12 +5113,15 @@ test('Telegram result-view cache stores and returns data-version scoped analysis
   assert.equal(issued.ok, true);
 
   const missResponse = await handleTelegramAgentHandoffRequest({
-    request: new Request('https://bridge.example/telegram/agent/api/result-view-cache?sessionSlug=alpha&viewType=polis_clusters&dataVersionKey=v1', {
-      headers: {
-        authorization: `Bearer ${issued.token}`,
-        origin: 'https://client.example',
+    request: new Request(
+      'https://bridge.example/telegram/agent/api/result-view-cache?sessionSlug=alpha&viewType=polis_clusters&dataVersionKey=v1',
+      {
+        headers: {
+          authorization: `Bearer ${issued.token}`,
+          origin: 'https://client.example',
+        },
       },
-    }),
+    ),
     env,
   });
   const miss = await jsonBody(missResponse);
@@ -4369,12 +5192,15 @@ test('Telegram result-view cache stores and returns data-version scoped analysis
   assert.equal(JSON.stringify(serviceSaved).includes(issued.token), false);
 
   const hitResponse = await handleTelegramAgentHandoffRequest({
-    request: new Request('https://bridge.example/telegram/agent/api/result-view-cache?sessionSlug=alpha&viewType=polis_clusters&dataVersionKey=v1', {
-      headers: {
-        authorization: `Bearer ${issued.token}`,
-        origin: 'https://client.example',
+    request: new Request(
+      'https://bridge.example/telegram/agent/api/result-view-cache?sessionSlug=alpha&viewType=polis_clusters&dataVersionKey=v1',
+      {
+        headers: {
+          authorization: `Bearer ${issued.token}`,
+          origin: 'https://client.example',
+        },
       },
-    }),
+    ),
     env,
   });
   const hit = await jsonBody(hitResponse);
@@ -4410,12 +5236,15 @@ test('Telegram result-view cache stores and returns data-version scoped analysis
   assert.equal(circlesSaved.value.representativeNodes[0].label, 'Protocol design');
 
   const circlesHitResponse = await handleTelegramAgentHandoffRequest({
-    request: new Request('https://bridge.example/telegram/agent/api/result-view-cache?sessionSlug=alpha&viewType=circles&dataVersionKey=v1-circles', {
-      headers: {
-        authorization: `Bearer ${issued.token}`,
-        origin: 'https://client.example',
+    request: new Request(
+      'https://bridge.example/telegram/agent/api/result-view-cache?sessionSlug=alpha&viewType=circles&dataVersionKey=v1-circles',
+      {
+        headers: {
+          authorization: `Bearer ${issued.token}`,
+          origin: 'https://client.example',
+        },
       },
-    }),
+    ),
     env,
   });
   const circlesHit = await jsonBody(circlesHitResponse);
@@ -4522,7 +5351,10 @@ test('Telegram agent can mint a Mini App question-series launch link', async () 
         authorization: `Bearer ${readOnly.token}`,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ sessionSlug: 'alpha', questionIds: ['q-freeform'] }),
+      body: JSON.stringify({
+        sessionSlug: 'alpha',
+        questionIds: ['q-freeform'],
+      }),
     }),
     env,
   });
@@ -4542,33 +5374,42 @@ test('Telegram agent activity endpoint scopes ceagt tokens to the delegated user
     createdAt: '2026-12-01T12:00:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
-  await env.AGENT_ACTION_KV.put('telegram:answer-draft:42:alpha:q-binary', JSON.stringify({
-    status: 'draft_saved',
-    telegramUserId: '42',
-    sessionSlug: 'alpha',
-    questionId: 'q-binary',
-    answerLabel: 'Delegated user draft',
-    answerValue: 'Delegated user draft',
-    selectedAt: '2026-12-01T12:01:00.000Z',
-  }));
-  await env.AGENT_ACTION_KV.put('telegram:answer-draft:42:beta:q-binary', JSON.stringify({
-    status: 'draft_saved',
-    telegramUserId: '42',
-    sessionSlug: 'beta',
-    questionId: 'q-binary',
-    answerLabel: 'Wrong session draft',
-    answerValue: 'Wrong session draft',
-    selectedAt: '2026-12-01T12:02:00.000Z',
-  }));
-  await env.AGENT_ACTION_KV.put('telegram:answer-draft:43:alpha:q-binary', JSON.stringify({
-    status: 'draft_saved',
-    telegramUserId: '43',
-    sessionSlug: 'alpha',
-    questionId: 'q-binary',
-    answerLabel: 'Wrong user draft',
-    answerValue: 'Wrong user draft',
-    selectedAt: '2026-12-01T12:03:00.000Z',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:answer-draft:42:alpha:q-binary',
+    JSON.stringify({
+      status: 'draft_saved',
+      telegramUserId: '42',
+      sessionSlug: 'alpha',
+      questionId: 'q-binary',
+      answerLabel: 'Delegated user draft',
+      answerValue: 'Delegated user draft',
+      selectedAt: '2026-12-01T12:01:00.000Z',
+    }),
+  );
+  await env.AGENT_ACTION_KV.put(
+    'telegram:answer-draft:42:beta:q-binary',
+    JSON.stringify({
+      status: 'draft_saved',
+      telegramUserId: '42',
+      sessionSlug: 'beta',
+      questionId: 'q-binary',
+      answerLabel: 'Wrong session draft',
+      answerValue: 'Wrong session draft',
+      selectedAt: '2026-12-01T12:02:00.000Z',
+    }),
+  );
+  await env.AGENT_ACTION_KV.put(
+    'telegram:answer-draft:43:alpha:q-binary',
+    JSON.stringify({
+      status: 'draft_saved',
+      telegramUserId: '43',
+      sessionSlug: 'alpha',
+      questionId: 'q-binary',
+      answerLabel: 'Wrong user draft',
+      answerValue: 'Wrong user draft',
+      selectedAt: '2026-12-01T12:03:00.000Z',
+    }),
+  );
   const response = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/actions?sessionSlug=alpha', {
       token: issued.token,
@@ -4591,32 +5432,42 @@ test('Telegram agent activity endpoint scopes ceagt tokens to the delegated user
 test('Telegram agent activity vote scans use user-scoped prefixes past shared list caps', async () => {
   const env = telegramOnlyEnv();
   for (let index = 0; index < 320; index += 1) {
-    await env.AGENT_ACTION_KV.put(`telegram:agent-question-vote-decision:v1:alpha:42:req-${String(index).padStart(3, '0')}`, JSON.stringify({
-      sessionSlug: 'alpha',
-      telegramUserId: '42',
-      requestId: `other-${index}`,
-      createdAt: `2026-12-01T10:${String(index % 60).padStart(2, '0')}:00.000Z`,
-      decisions: [{
-        questionId: `q-other-${index}`,
-        suggestedVote: 'up',
-        finalVote: 'up',
-        applied: true,
-      }],
-    }));
+    await env.AGENT_ACTION_KV.put(
+      `telegram:agent-question-vote-decision:v1:alpha:42:req-${String(index).padStart(3, '0')}`,
+      JSON.stringify({
+        sessionSlug: 'alpha',
+        telegramUserId: '42',
+        requestId: `other-${index}`,
+        createdAt: `2026-12-01T10:${String(index % 60).padStart(2, '0')}:00.000Z`,
+        decisions: [
+          {
+            questionId: `q-other-${index}`,
+            suggestedVote: 'up',
+            finalVote: 'up',
+            applied: true,
+          },
+        ],
+      }),
+    );
   }
   for (let index = 0; index < 80; index += 1) {
-    await env.AGENT_ACTION_KV.put(`telegram:agent-question-vote-decision:v1:alpha:99:req-${String(index).padStart(3, '0')}`, JSON.stringify({
-      sessionSlug: 'alpha',
-      telegramUserId: '99',
-      requestId: `own-${index}`,
-      createdAt: `2026-12-01T11:${String(index % 60).padStart(2, '0')}:00.000Z`,
-      decisions: [{
-        questionId: `q-own-${index}`,
-        suggestedVote: 'down',
-        finalVote: 'down',
-        applied: true,
-      }],
-    }));
+    await env.AGENT_ACTION_KV.put(
+      `telegram:agent-question-vote-decision:v1:alpha:99:req-${String(index).padStart(3, '0')}`,
+      JSON.stringify({
+        sessionSlug: 'alpha',
+        telegramUserId: '99',
+        requestId: `own-${index}`,
+        createdAt: `2026-12-01T11:${String(index % 60).padStart(2, '0')}:00.000Z`,
+        decisions: [
+          {
+            questionId: `q-own-${index}`,
+            suggestedVote: 'down',
+            finalVote: 'down',
+            applied: true,
+          },
+        ],
+      }),
+    );
   }
 
   const items = await listTelegramAgentActivity({
@@ -4629,8 +5480,14 @@ test('Telegram agent activity vote scans use user-scoped prefixes past shared li
   const decisions = items.filter((item) => item.type === 'question_vote_decision');
 
   assert.equal(decisions.length, 80);
-  assert.equal(decisions.every((item) => item.sessionSlug === 'alpha'), true);
-  assert.equal(decisions.every((item) => item.questionId.startsWith('q-own-')), true);
+  assert.equal(
+    decisions.every((item) => item.sessionSlug === 'alpha'),
+    true,
+  );
+  assert.equal(
+    decisions.every((item) => item.questionId.startsWith('q-own-')),
+    true,
+  );
   assert.equal(JSON.stringify(decisions).includes('q-other-'), false);
 });
 
@@ -4704,7 +5561,9 @@ test('Telegram agent activity uses KV metadata for non-content one-to-one record
     },
   ];
   for (const record of metadataRecords) {
-    await env.AGENT_ACTION_KV.put(record.key, JSON.stringify(record.value), { metadata: record.metadata });
+    await env.AGENT_ACTION_KV.put(record.key, JSON.stringify(record.value), {
+      metadata: record.metadata,
+    });
   }
 
   env.AGENT_ACTION_KV.resetGetCalls();
@@ -4723,18 +5582,24 @@ test('Telegram agent activity uses KV metadata for non-content one-to-one record
     'proposed_question',
   ]);
   assert.equal(JSON.stringify(metadataItems).includes('daily recap'), false);
-  assert.equal(metadataItems.every((item) => !Object.hasOwn(item, 'content')), true);
+  assert.equal(
+    metadataItems.every((item) => !Object.hasOwn(item, 'content')),
+    true,
+  );
 
-  await env.AGENT_ACTION_KV.put('telegram:proposed-question:alpha:q-legacy', JSON.stringify({
-    status: 'active',
-    createdByTelegramUserId: '42',
-    sessionSlug: 'alpha',
-    questionId: 'q-legacy',
-    prompt: 'Should legacy questions still render?',
-    questionType: 'binary',
-    tags: ['legacy'],
-    createdAt: '2026-12-01T12:04:00.000Z',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:proposed-question:alpha:q-legacy',
+    JSON.stringify({
+      status: 'active',
+      createdByTelegramUserId: '42',
+      sessionSlug: 'alpha',
+      questionId: 'q-legacy',
+      prompt: 'Should legacy questions still render?',
+      questionType: 'binary',
+      tags: ['legacy'],
+      createdAt: '2026-12-01T12:04:00.000Z',
+    }),
+  );
   env.AGENT_ACTION_KV.resetGetCalls();
   const fallbackItems = await listTelegramAgentActivity({
     env,
@@ -4744,7 +5609,10 @@ test('Telegram agent activity uses KV metadata for non-content one-to-one record
     limit: 10,
   });
   assert.equal(env.AGENT_ACTION_KV.getCalls, 1);
-  assert.equal(fallbackItems.some((item) => item.summary.includes('legacy questions still render')), true);
+  assert.equal(
+    fallbackItems.some((item) => item.summary.includes('legacy questions still render')),
+    true,
+  );
 
   env.AGENT_ACTION_KV.resetGetCalls();
   const contentItems = await listTelegramAgentActivity({
@@ -4755,8 +5623,14 @@ test('Telegram agent activity uses KV metadata for non-content one-to-one record
     limit: 10,
   });
   assert.equal(env.AGENT_ACTION_KV.getCalls >= 4, true);
-  assert.equal(contentItems.some((item) => item.content?.prompt?.includes('daily recap')), true);
-  assert.equal(contentItems.some((item) => item.content?.answerLabel === 'Agree'), true);
+  assert.equal(
+    contentItems.some((item) => item.content?.prompt?.includes('daily recap')),
+    true,
+  );
+  assert.equal(
+    contentItems.some((item) => item.content?.answerLabel === 'Agree'),
+    true,
+  );
 });
 
 test('Telegram agent can read active questions and draft preferences after group join', async () => {
@@ -4796,7 +5670,10 @@ test('Telegram agent can read active questions and draft preferences after group
         preferences: {
           requireReview: true,
           answersByQuestionId: {
-            'q-binary': { value: 'agree', comments: 'Matches the stated priority.' },
+            'q-binary': {
+              value: 'agree',
+              comments: 'Matches the stated priority.',
+            },
             'q-freeform': { text: 'Review the budget before voting.' },
           },
         },
@@ -4829,15 +5706,18 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(env.AGENT_ACTION_KV.metadata.get('telegram:answer-draft:42:alpha:q-binary')?.o, 'agent_handoff');
   assert.equal(binaryDraft.actionMetadata.authMode, 'root_token');
 
-  await env.AGENT_ACTION_KV.put('telegram:answer-draft:43:alpha:q-binary', JSON.stringify({
-    status: 'draft_saved',
-    telegramUserId: '43',
-    sessionSlug: 'alpha',
-    questionId: 'q-binary',
-    answerLabel: 'Other user draft',
-    answerValue: 'Other user draft',
-    selectedAt: '2026-06-01T12:01:00.000Z',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:answer-draft:43:alpha:q-binary',
+    JSON.stringify({
+      status: 'draft_saved',
+      telegramUserId: '43',
+      sessionSlug: 'alpha',
+      questionId: 'q-binary',
+      answerLabel: 'Other user draft',
+      answerValue: 'Other user draft',
+      selectedAt: '2026-06-01T12:01:00.000Z',
+    }),
+  );
 
   const actionsResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/actions?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123'),
@@ -4845,13 +5725,17 @@ test('Telegram agent can read active questions and draft preferences after group
   });
   const actions = await jsonBody(actionsResponse);
   assert.equal(actionsResponse.status, 200);
-  assert.equal(actions.actions.some((item) => (
-    item.type === 'answer_draft' &&
-    item.sessionSlug === 'alpha' &&
-    item.questionId === 'q-binary' &&
-    item.pendingAction === 'review_draft' &&
-    item.content.answerLabel === 'Agree'
-  )), true);
+  assert.equal(
+    actions.actions.some(
+      (item) =>
+        item.type === 'answer_draft' &&
+        item.sessionSlug === 'alpha' &&
+        item.questionId === 'q-binary' &&
+        item.pendingAction === 'review_draft' &&
+        item.content.answerLabel === 'Agree',
+    ),
+    true,
+  );
   assert.equal(JSON.stringify(actions).includes('Other user draft'), false);
   assert.equal(JSON.stringify(actions).includes('agent-test-token'), false);
 
@@ -4874,7 +5758,10 @@ test('Telegram agent can read active questions and draft preferences after group
         humanApproved: true,
         preferences: {
           answersByQuestionId: {
-            'q-binary': { value: 'unsure', comments: 'User explicitly chose unsure.' },
+            'q-binary': {
+              value: 'unsure',
+              comments: 'User explicitly chose unsure.',
+            },
           },
         },
       },
@@ -4930,8 +5817,13 @@ test('Telegram agent can read active questions and draft preferences after group
         preferences: [
           {
             questionId: 'q-freeform',
-            initialAnswer: { text: 'Ask the user to review this in the Mini App.' },
-            answer: { text: 'Ship the direct chat answer path.', comments: 'User approved direct submission.' },
+            initialAnswer: {
+              text: 'Ask the user to review this in the Mini App.',
+            },
+            answer: {
+              text: 'Ship the direct chat answer path.',
+              comments: 'User approved direct submission.',
+            },
             submit: true,
             humanApproved: true,
           },
@@ -4982,8 +5874,9 @@ test('Telegram agent can read active questions and draft preferences after group
   assert.equal(badSubmit.submittedCount, 0);
   assert.equal(badSubmit.draftCount, 0);
   assert.deepEqual(badSubmit.skipped, [{ questionId: 'q-missing', reason: 'question_not_active_or_answerable' }]);
-  const submitRecordsAfterBadReference = Array.from(env.AGENT_ACTION_KV.store.entries())
-    .filter(([key]) => String(key).startsWith('telegram:submit-request:'));
+  const submitRecordsAfterBadReference = Array.from(env.AGENT_ACTION_KV.store.entries()).filter(([key]) =>
+    String(key).startsWith('telegram:submit-request:'),
+  );
   assert.equal(submitRecordsAfterBadReference.length, 2);
 
   const emptySubmitResponse = await handleTelegramAgentHandoffRequest({
@@ -5014,8 +5907,18 @@ test('Telegram agent can read active questions and draft preferences after group
 test('Telegram agent can read and render topic-map results without raw response records', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      { questionId: 'q-onboarding', questionType: 'binary', prompt: 'Should onboarding be one click?', tags: ['onboarding'] },
-      { questionId: 'q-privacy', questionType: 'binary', prompt: 'Should raw responses stay private?', tags: ['privacy'] },
+      {
+        questionId: 'q-onboarding',
+        questionType: 'binary',
+        prompt: 'Should onboarding be one click?',
+        tags: ['onboarding'],
+      },
+      {
+        questionId: 'q-privacy',
+        questionType: 'binary',
+        prompt: 'Should raw responses stay private?',
+        tags: ['privacy'],
+      },
     ]),
   });
   let counter = 0;
@@ -5026,14 +5929,17 @@ test('Telegram agent can read and render topic-map results without raw response 
     ['q-privacy', '43', 'Agree'],
   ]) {
     counter += 1;
-    await env.AGENT_ACTION_KV.put(`telegram:submit-request:${counter}`, JSON.stringify({
-      status: 'direct_submitted',
-      sessionSlug: 'alpha',
-      telegramUserId,
-      questionId,
-      answer: { label, value: String(label).toLowerCase() },
-      createdAt: `2026-06-01T12:02:0${counter}.000Z`,
-    }));
+    await env.AGENT_ACTION_KV.put(
+      `telegram:submit-request:${counter}`,
+      JSON.stringify({
+        status: 'direct_submitted',
+        sessionSlug: 'alpha',
+        telegramUserId,
+        questionId,
+        answer: { label, value: String(label).toLowerCase() },
+        createdAt: `2026-06-01T12:02:0${counter}.000Z`,
+      }),
+    );
   }
 
   const response = await handleTelegramAgentHandoffRequest({
@@ -5079,7 +5985,10 @@ test('Telegram agent can read and render topic-map results without raw response 
       telegramUserId: '42',
       byStatement: {
         ceq_sidecar: {
-          agent: { answer: { value: 'agent-only-sidecar-answer' }, confidence: 99 },
+          agent: {
+            answer: { value: 'agent-only-sidecar-answer' },
+            confidence: 99,
+          },
           agentSkip: null,
           human: null,
         },
@@ -5088,7 +5997,16 @@ test('Telegram agent can read and render topic-map results without raw response 
       createdAt: '2026-06-12T15:10:00.000Z',
       updatedAt: '2026-06-12T15:10:00.000Z',
     }),
-    { metadata: { v: 1, t: 'ao_ans', sg: 'alpha', w: 'w-2026-06-12', a: 1, s: 0 } },
+    {
+      metadata: {
+        v: 1,
+        t: 'ao_ans',
+        sg: 'alpha',
+        w: 'w-2026-06-12',
+        a: 1,
+        s: 0,
+      },
+    },
   );
 
   const afterAgentOnlyResponse = await handleTelegramAgentHandoffRequest({
@@ -5115,8 +6033,18 @@ test('Telegram agent can read and render topic-map results without raw response 
 test('Telegram agent results exposes consensus and difference as aggregate-only JSON', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      { questionId: 'q-onboarding', questionType: 'binary', prompt: 'Should onboarding be one click?', tags: ['onboarding'] },
-      { questionId: 'q-privacy', questionType: 'binary', prompt: 'Should raw responses stay private?', tags: ['privacy'] },
+      {
+        questionId: 'q-onboarding',
+        questionType: 'binary',
+        prompt: 'Should onboarding be one click?',
+        tags: ['onboarding'],
+      },
+      {
+        questionId: 'q-privacy',
+        questionType: 'binary',
+        prompt: 'Should raw responses stay private?',
+        tags: ['privacy'],
+      },
     ]),
   });
 
@@ -5146,20 +6074,24 @@ test('session-member aggregate results require a canonical worker group at the s
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        managedAccountSubmitAllowed: true,
-        sessionModeProfile: {
-          authority: { mode: 'worker_canonical' },
-          authorization: { mechanisms: ['worker_groups'] },
-          surfaces: { web: true, telegram: true, agentHttp: true },
-          results: { visibility: 'session_member_aggregate' },
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          sessionIdHex: MEMBER_SESSION_ID,
+          sessionWorkerUrl: MEMBER_SESSION_WORKER_ORIGIN,
+          default: true,
+          telegramBridgeEnabled: true,
+          managedAccountSubmitAllowed: true,
+          sessionModeProfile: {
+            authority: { mode: 'worker_canonical' },
+            authorization: { mechanisms: ['worker_groups'] },
+            surfaces: { web: true, telegram: true, agentHttp: true },
+            results: { visibility: 'session_member_aggregate' },
+          },
+          resultsExposure: { aggregateResultsEnabled: true, minGroupSize: 2 },
         },
-        resultsExposure: { aggregateResultsEnabled: true, minGroupSize: 2 },
-      }],
+      ],
     }),
   });
   const accountAddress = await managedAccountAddressForTelegramUser(env, '42');
@@ -5172,58 +6104,87 @@ test('session-member aggregate results require a canonical worker group at the s
     createdAt: '2026-06-01T12:00:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
-  let memberships = [{
-    group: {
-      groupId: 'reviewers',
-      label: 'Reviewers',
-      joinMode: 'admin_add',
-      memberVisibility: 'members',
+  let memberships = [
+    {
+      group: {
+        groupId: 'reviewers',
+        label: 'Reviewers',
+        joinMode: 'admin_add',
+        memberVisibility: 'members',
+      },
+      member: { principalKey: `evm_address:${accountAddress.toLowerCase()}` },
+      memberCount: 2,
     },
-    member: { principalKey: `evm_address:${accountAddress.toLowerCase()}` },
-    memberCount: 2,
-  }];
+  ];
   let membershipsStatus = 200;
   const fetchCalls = [];
   const fetchImpl = async (url, init = {}) => {
     fetchCalls.push({ url: String(url), init });
     if (String(url).endsWith('/auth/nonce')) {
-      return new Response(JSON.stringify({ nonce: 'member-results-nonce' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          nonce: 'member-results-nonce',
+          sessionSlug: 'alpha',
+          sessionId: MEMBER_SESSION_ID,
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
     if (String(url).endsWith('/auth/login')) {
-      return new Response(JSON.stringify({ token: 'member-results-worker-jwt', exp: 1780003600 }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify({
+          token: 'member-results-worker-jwt',
+          exp: 1780003600,
+          sessionSlug: 'alpha',
+          sessionId: MEMBER_SESSION_ID,
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
-    if (String(url).endsWith('/groups/my-memberships')) {
+    if (new URL(String(url)).pathname === '/groups/my-memberships') {
       assert.equal(new Headers(init.headers).get('authorization'), 'Bearer member-results-worker-jwt');
-      return new Response(JSON.stringify(
-        membershipsStatus === 200
-          ? { ok: true, memberships }
-          : { ok: false, error: 'storage unavailable' }
-      ), {
-        status: membershipsStatus,
-        headers: { 'content-type': 'application/json' },
-      });
+      return new Response(
+        JSON.stringify(
+          membershipsStatus === 200
+            ? {
+                ok: true,
+                sessionSlug: 'alpha',
+                sessionId: MEMBER_SESSION_ID,
+                memberships,
+              }
+            : { ok: false, error: 'storage unavailable' },
+        ),
+        {
+          status: membershipsStatus,
+          headers: { 'content-type': 'application/json' },
+        },
+      );
     }
     throw new Error(`unexpected fetch ${url}`);
   };
-  const requestResults = () => handleTelegramAgentHandoffRequest({
-    request: agentRequest('/api/agent/results?sessionSlug=alpha&view=consensus', { token: issued.token }),
-    env,
-    fetchImpl,
-  });
+  const requestResults = () =>
+    handleTelegramAgentHandoffRequest({
+      request: agentRequest('/api/agent/results?sessionSlug=alpha&view=consensus', { token: issued.token }),
+      env,
+      fetchImpl,
+    });
 
   const allowed = await requestResults();
   assert.equal(allowed.status, 200, JSON.stringify(await jsonBody(allowed.clone())));
-  assert.deepEqual(fetchCalls.map((call) => call.url), [
-    'https://session-worker.example/auth/nonce',
-    'https://session-worker.example/auth/login',
-    'https://session-worker.example/groups/my-memberships',
-  ]);
+  assert.deepEqual(
+    fetchCalls.map((call) => call.url),
+    [
+      'https://session-worker.example/auth/nonce',
+      'https://session-worker.example/auth/login',
+      `https://session-worker.example/groups/my-memberships?sessionId=${encodeURIComponent(MEMBER_SESSION_ID)}`,
+    ],
+  );
 
   memberships = [{ ...memberships[0], memberCount: 1 }];
   const belowThreshold = await requestResults();
@@ -5252,8 +6213,18 @@ test('session-member aggregate results require a canonical worker group at the s
 test('Telegram agent groups JSON strips aliases and raw qualitative responses', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      { questionId: 'q-onboarding', questionType: 'binary', prompt: 'Should onboarding be one click?', tags: ['onboarding'] },
-      { questionId: 'q-privacy', questionType: 'binary', prompt: 'Should raw responses stay private?', tags: ['privacy'] },
+      {
+        questionId: 'q-onboarding',
+        questionType: 'binary',
+        prompt: 'Should onboarding be one click?',
+        tags: ['onboarding'],
+      },
+      {
+        questionId: 'q-privacy',
+        questionType: 'binary',
+        prompt: 'Should raw responses stay private?',
+        tags: ['privacy'],
+      },
     ]),
   });
 
@@ -5281,25 +6252,63 @@ test('Telegram agent groups suppress live groups below minGroupSize', async () =
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramGroupOpenAccess: true,
-        managedAccountSubmitAllowed: true,
-        resultsExposure: { anonymizedGroupsEnabled: true, minGroupSize: 3 },
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+          resultsExposure: { anonymizedGroupsEnabled: true, minGroupSize: 3 },
+        },
+      ],
     }),
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      { questionId: 'q-one', questionType: 'binary', prompt: 'Should Alpha publish recaps?', tags: ['results'] },
-      { questionId: 'q-two', questionType: 'binary', prompt: 'Should Alpha ask more questions?', tags: ['results'] },
+      {
+        questionId: 'q-one',
+        questionType: 'binary',
+        prompt: 'Should Alpha publish recaps?',
+        tags: ['results'],
+      },
+      {
+        questionId: 'q-two',
+        questionType: 'binary',
+        prompt: 'Should Alpha ask more questions?',
+        tags: ['results'],
+      },
     ]),
   });
-  await putSubmittedResult(env, { key: 'telegram:submit-request:1', telegramUserId: '42', questionId: 'q-one', label: 'Agree', comments: 'raw private answer one', createdAt: '2026-06-01T12:00:01.000Z' });
-  await putSubmittedResult(env, { key: 'telegram:submit-request:2', telegramUserId: '43', questionId: 'q-one', label: 'Agree', comments: 'raw private answer two', createdAt: '2026-06-01T12:00:02.000Z' });
-  await putSubmittedResult(env, { key: 'telegram:submit-request:3', telegramUserId: '42', questionId: 'q-two', label: 'Disagree', createdAt: '2026-06-01T12:00:03.000Z' });
-  await putSubmittedResult(env, { key: 'telegram:submit-request:4', telegramUserId: '43', questionId: 'q-two', label: 'Disagree', createdAt: '2026-06-01T12:00:04.000Z' });
+  await putSubmittedResult(env, {
+    key: 'telegram:submit-request:1',
+    telegramUserId: '42',
+    questionId: 'q-one',
+    label: 'Agree',
+    comments: 'raw private answer one',
+    createdAt: '2026-06-01T12:00:01.000Z',
+  });
+  await putSubmittedResult(env, {
+    key: 'telegram:submit-request:2',
+    telegramUserId: '43',
+    questionId: 'q-one',
+    label: 'Agree',
+    comments: 'raw private answer two',
+    createdAt: '2026-06-01T12:00:02.000Z',
+  });
+  await putSubmittedResult(env, {
+    key: 'telegram:submit-request:3',
+    telegramUserId: '42',
+    questionId: 'q-two',
+    label: 'Disagree',
+    createdAt: '2026-06-01T12:00:03.000Z',
+  });
+  await putSubmittedResult(env, {
+    key: 'telegram:submit-request:4',
+    telegramUserId: '43',
+    questionId: 'q-two',
+    label: 'Disagree',
+    createdAt: '2026-06-01T12:00:04.000Z',
+  });
 
   const response = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/results?sessionSlug=alpha&telegramUserId=42&view=groups'),
@@ -5320,18 +6329,20 @@ test('Telegram agent result views enforce exposure gates and supported view list
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramGroupOpenAccess: true,
-        managedAccountSubmitAllowed: true,
-        resultsExposure: {
-          aggregateResultsEnabled: false,
-          anonymizedGroupsEnabled: false,
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+          resultsExposure: {
+            aggregateResultsEnabled: false,
+            anonymizedGroupsEnabled: false,
+          },
         },
-      }],
+      ],
     }),
   });
 
@@ -5371,8 +6382,18 @@ test('Telegram agent result views enforce exposure gates and supported view list
 test('Telegram agent can render group results image with demo data', async () => {
   const env = baseEnv({
     AGENT_BRIDGE_DEMO_QUESTIONS_JSON: JSON.stringify([
-      { questionId: 'q-onboarding', questionType: 'binary', prompt: 'Should onboarding be one click?', tags: ['onboarding'] },
-      { questionId: 'q-privacy', questionType: 'binary', prompt: 'Should raw responses stay private?', tags: ['privacy'] },
+      {
+        questionId: 'q-onboarding',
+        questionType: 'binary',
+        prompt: 'Should onboarding be one click?',
+        tags: ['onboarding'],
+      },
+      {
+        questionId: 'q-privacy',
+        questionType: 'binary',
+        prompt: 'Should raw responses stay private?',
+        tags: ['privacy'],
+      },
     ]),
   });
 
@@ -5436,7 +6457,10 @@ test('Telegram agent can rank or filter questions by preference-derived tags', a
 
   assert.equal(filteredResponse.status, 200);
   assert.equal(filtered.relevance.mode, 'filter');
-  assert.deepEqual(filtered.questions.map((question) => question.questionId), ['q-freeform']);
+  assert.deepEqual(
+    filtered.questions.map((question) => question.questionId),
+    ['q-freeform'],
+  );
   assert.equal(filtered.questions[0].tags.includes('strategy'), true);
 });
 
@@ -5491,7 +6515,11 @@ test('Telegram agent tags endpoint returns active tag counts and rejects explici
   assert.equal(body.tags.find((entry) => entry.tag === 'alpha-topic')?.count, 2);
   assert.equal(body.tags.find((entry) => entry.tag === 'shared')?.count, 2);
   assert.equal(body.tags.find((entry) => entry.tag === 'beta-topic')?.count, 1);
-  assert.equal(body.tags.findIndex((entry) => entry.tag === 'alpha-topic') < body.tags.findIndex((entry) => entry.tag === 'shared'), true);
+  assert.equal(
+    body.tags.findIndex((entry) => entry.tag === 'alpha-topic') <
+      body.tags.findIndex((entry) => entry.tag === 'shared'),
+    true,
+  );
   assert.equal(JSON.stringify(body).includes('organizers need a recap'), false);
   assert.equal(JSON.stringify(body).includes('agent-test-token'), false);
   assert.equal(defaultResponse.status, 200);
@@ -5507,14 +6535,16 @@ test('Telegram agent handoff rejects group calls from sessions with a different 
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        approvedTelegramGroupChatIds: ['-100999'],
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          approvedTelegramGroupChatIds: ['-100999'],
+        },
+      ],
     }),
   });
   const response = await handleTelegramAgentHandoffRequest({
@@ -5540,30 +6570,38 @@ test('Telegram agent handoff accepts dynamically approved Telegram groups', asyn
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-        telegramGroupApprovalRequired: true,
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+          telegramGroupApprovalRequired: true,
+        },
+      ],
     }),
   });
-  await env.AGENT_ACTION_KV.put('telegram:group-approval:alpha:-100123', JSON.stringify({
-    version: 1,
-    type: 'telegram_group_approval',
-    sessionSlug: 'alpha',
-    chatId: '-100123',
-    approvedAt: '2026-06-01T12:00:00.000Z',
-  }));
-  await env.AGENT_ACTION_KV.put('telegram:group-session:-100123', JSON.stringify({
-    version: 1,
-    chatId: '-100123',
-    sessionSlug: 'alpha',
-    sessionName: 'Alpha Session',
-    linkedAt: '2026-06-01T12:00:00.000Z',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:group-approval:alpha:-100123',
+    JSON.stringify({
+      version: 1,
+      type: 'telegram_group_approval',
+      sessionSlug: 'alpha',
+      chatId: '-100123',
+      approvedAt: '2026-06-01T12:00:00.000Z',
+    }),
+  );
+  await env.AGENT_ACTION_KV.put(
+    'telegram:group-session:-100123',
+    JSON.stringify({
+      version: 1,
+      chatId: '-100123',
+      sessionSlug: 'alpha',
+      sessionName: 'Alpha Session',
+      linkedAt: '2026-06-01T12:00:00.000Z',
+    }),
+  );
   const response = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/questions', {
       method: 'POST',
@@ -5714,9 +6752,11 @@ test('Telegram agent service token can manage sponsored question queue as sessio
   assert.deepEqual(aliasBody.questionQueue.sponsoredQuestionIds, ['q-binary']);
 });
 
-test('Telegram agent admin can mint a one-use group approval link through the API', async () => {
+test('Telegram agent admin group approval endpoint returns in-group guidance without minting bearer actions', async () => {
   const env = baseEnv();
   env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = await managedAccountAddressForTelegramUser(env, '42');
+  const actionKeysBefore = Array.from(env.AGENT_ACTION_KV.store.keys())
+    .filter((key) => key.startsWith('telegram:action:'));
 
   const adminResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/group-approval-link', {
@@ -5729,8 +6769,6 @@ test('Telegram agent admin can mint a one-use group approval link through the AP
     env,
   });
   const adminBody = await jsonBody(adminResponse);
-  const payload = new URL(adminBody.url).searchParams.get('startgroup');
-  const actionRecord = JSON.parse(await env.AGENT_ACTION_KV.get(`telegram:action:${payload}`));
   const nonAdminResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/group-approval-link', {
       method: 'POST',
@@ -5742,19 +6780,24 @@ test('Telegram agent admin can mint a one-use group approval link through the AP
     env,
   });
   const nonAdmin = await jsonBody(nonAdminResponse);
+  const actionKeysAfter = Array.from(env.AGENT_ACTION_KV.store.keys())
+    .filter((key) => key.startsWith('telegram:action:'));
 
-  assert.equal(adminResponse.status, 200);
-  assert.equal(adminBody.ok, true);
+  assert.equal(adminResponse.status, 409);
+  assert.equal(adminBody.ok, false);
+  assert.equal(adminBody.reason, 'group_approval_link_disabled');
   assert.equal(adminBody.sessionSlug, 'alpha');
-  assert.match(adminBody.url, /^https:\/\/t\.me\/ce_demo_bot\?startgroup=cetg_[a-z0-9]{10,58}$/);
-  assert.equal(payload.length <= 64, true);
-  assert.equal(actionRecord.serverContextRef.sessionSlug, 'alpha');
-  assert.equal(actionRecord.serverContextRef.approvedByTelegramUserId, '42');
+  assert.equal(adminBody.manualApprovalRequired, true);
+  assert.equal(adminBody.joinCommand, '/join alpha');
+  assert.match(adminBody.guidance, /does not create authorization-bearing group links/);
+  assert.equal(Object.hasOwn(adminBody, 'url'), false);
+  assert.equal(JSON.stringify(adminBody).includes('startgroup='), false);
+  assert.deepEqual(actionKeysAfter, actionKeysBefore);
   assert.equal(nonAdminResponse.status, 403);
   assert.equal(nonAdmin.reason, 'group_approval_admin_required');
 });
 
-test('Telegram agent group approval links require an explicit delegated admin scope', async () => {
+test('Telegram agent group approval guidance requires an explicit delegated admin scope', async () => {
   const env = baseEnv({ AGENT_BRIDGE_AGENT_API_TOKEN: '' });
   const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
   const scopedAdminAddress = await managedAccountAddressForTelegramUser(env, '44');
@@ -5798,16 +6841,19 @@ test('Telegram agent group approval links require an explicit delegated admin sc
     env,
   });
   const allowed = await jsonBody(allowedResponse);
-  await env.AGENT_ACTION_KV.put('telegram:group-approval:alpha:-100123', JSON.stringify({
-    version: 1,
-    type: 'telegram_group_approval',
-    sessionSlug: 'alpha',
-    sessionName: 'Alpha Session',
-    chatId: '-100123',
-    approvedByTelegramUserId: '42',
-    approvedByAccountAddress: adminAddress.toLowerCase(),
-    approvalTokenId: 'scope-test',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:group-approval:alpha:-100123',
+    JSON.stringify({
+      version: 1,
+      type: 'telegram_group_approval',
+      sessionSlug: 'alpha',
+      sessionName: 'Alpha Session',
+      chatId: '-100123',
+      approvedByTelegramUserId: '42',
+      approvedByAccountAddress: adminAddress.toLowerCase(),
+      approvalTokenId: 'scope-test',
+    }),
+  );
   const revokeDeniedResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/group-approval-revoke?sessionSlug=alpha&chatId=-100123', {
       method: 'POST',
@@ -5828,9 +6874,12 @@ test('Telegram agent group approval links require an explicit delegated admin sc
   assert.equal(deniedResponse.status, 403);
   assert.equal(denied.reason, 'agent_token_scope_denied');
   assert.equal(denied.requiredScope, 'manage_group_approvals');
-  assert.equal(allowedResponse.status, 200);
-  assert.equal(allowed.ok, true);
-  assert.match(allowed.url, /^https:\/\/t\.me\/ce_demo_bot\?startgroup=cetg_[a-z0-9]{10,58}$/);
+  assert.equal(allowedResponse.status, 409);
+  assert.equal(allowed.ok, false);
+  assert.equal(allowed.reason, 'group_approval_link_disabled');
+  assert.equal(allowed.manualApprovalRequired, true);
+  assert.equal(allowed.joinCommand, '/join alpha');
+  assert.equal(Object.hasOwn(allowed, 'url'), false);
   assert.equal(revokeDeniedResponse.status, 403);
   assert.equal(revokeDenied.reason, 'agent_token_scope_denied');
   assert.equal(revokeDenied.requiredScope, 'manage_group_approvals');
@@ -5842,18 +6891,21 @@ test('Telegram agent admin can revoke group approval through the API', async () 
   const env = baseEnv();
   const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
   env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
-  await env.AGENT_ACTION_KV.put('telegram:group-approval:alpha:-100123', JSON.stringify({
-    version: 1,
-    type: 'telegram_group_approval',
-    sessionSlug: 'alpha',
-    sessionName: 'Alpha Session',
-    chatId: '-100123',
-    chatTitle: 'Alpha Lobby',
-    approvedAt: '2026-12-01T12:00:00.000Z',
-    approvedByTelegramUserId: '42',
-    approvedByAccountAddress: adminAddress.toLowerCase(),
-    approvalTokenId: 'admin_launch',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:group-approval:alpha:-100123',
+    JSON.stringify({
+      version: 1,
+      type: 'telegram_group_approval',
+      sessionSlug: 'alpha',
+      sessionName: 'Alpha Session',
+      chatId: '-100123',
+      chatTitle: 'Alpha Lobby',
+      approvedAt: '2026-12-01T12:00:00.000Z',
+      approvedByTelegramUserId: '42',
+      approvedByAccountAddress: adminAddress.toLowerCase(),
+      approvalTokenId: 'admin_launch',
+    }),
+  );
 
   const revokedResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/group-approval-revoke', {
@@ -5938,33 +6990,58 @@ test('Telegram admin metrics report scoped KV aggregate counts and cache snapsho
     createdAt: '2026-06-01T12:00:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
-  await env.AGENT_ACTION_KV.put('telegram:proposed-question:alpha:q1', JSON.stringify({
-    sessionSlug: 'alpha',
-    questionId: 'q1',
-  }));
-  await env.AGENT_ACTION_KV.put('telegram:proposed-question:beta:q2', JSON.stringify({
-    sessionSlug: 'beta',
-    questionId: 'q2',
-  }));
-  await env.AGENT_ACTION_KV.put('telegram:answer-draft:42:alpha:q1', JSON.stringify({
-    sessionSlug: 'alpha',
-    telegramUserId: '42',
-  }), {
-    metadata: { v: 1, t: 'answer_draft', sg: 'alpha', e: 1, o: 'agent_handoff' },
-  });
-  await env.AGENT_ACTION_KV.put('telegram:answer-draft:43:beta:q2', JSON.stringify({
-    sessionSlug: 'beta',
-    telegramUserId: '43',
-  }));
-  await env.AGENT_ACTION_KV.put(`${DRAFT_EDIT_METRIC_KV_PREFIX}alpha:q1:metric1`, JSON.stringify({
-    type: 'telegram_draft_edit_metric',
-    sessionSlug: 'alpha',
-    questionId: 'q1',
-  }));
-  await env.AGENT_ACTION_KV.put('telegram:lightweight-group-proposal:beta:g1', JSON.stringify({
-    sessionSlug: 'beta',
-    proposedBy: '43',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:proposed-question:alpha:q1',
+    JSON.stringify({
+      sessionSlug: 'alpha',
+      questionId: 'q1',
+    }),
+  );
+  await env.AGENT_ACTION_KV.put(
+    'telegram:proposed-question:beta:q2',
+    JSON.stringify({
+      sessionSlug: 'beta',
+      questionId: 'q2',
+    }),
+  );
+  await env.AGENT_ACTION_KV.put(
+    'telegram:answer-draft:42:alpha:q1',
+    JSON.stringify({
+      sessionSlug: 'alpha',
+      telegramUserId: '42',
+    }),
+    {
+      metadata: {
+        v: 1,
+        t: 'answer_draft',
+        sg: 'alpha',
+        e: 1,
+        o: 'agent_handoff',
+      },
+    },
+  );
+  await env.AGENT_ACTION_KV.put(
+    'telegram:answer-draft:43:beta:q2',
+    JSON.stringify({
+      sessionSlug: 'beta',
+      telegramUserId: '43',
+    }),
+  );
+  await env.AGENT_ACTION_KV.put(
+    `${DRAFT_EDIT_METRIC_KV_PREFIX}alpha:q1:metric1`,
+    JSON.stringify({
+      type: 'telegram_draft_edit_metric',
+      sessionSlug: 'alpha',
+      questionId: 'q1',
+    }),
+  );
+  await env.AGENT_ACTION_KV.put(
+    'telegram:lightweight-group-proposal:beta:g1',
+    JSON.stringify({
+      sessionSlug: 'beta',
+      proposedBy: '43',
+    }),
+  );
   await persistTelegramSubmitRecord({
     env,
     record: {
@@ -6002,8 +7079,9 @@ test('Telegram admin metrics report scoped KV aggregate counts and cache snapsho
     env,
   });
   const root = await jsonBody(rootResponse);
-  const submitRecordGetsAfterRoot = env.AGENT_ACTION_KV.getKeys
-    .filter((key) => String(key).startsWith('telegram:submit-request'));
+  const submitRecordGetsAfterRoot = env.AGENT_ACTION_KV.getKeys.filter((key) =>
+    String(key).startsWith('telegram:submit-request'),
+  );
   const listCallsAfterRoot = env.AGENT_ACTION_KV.listCalls;
   const cachedResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/metrics?sessionSlug=alpha&telegramUserId=42'),
@@ -6099,10 +7177,13 @@ test('Telegram admin metrics respect the visible session cutoff by default', asy
     ],
   });
   for (const slug of ['alpha', 'beta', 'legacy']) {
-    await env.AGENT_ACTION_KV.put(`telegram:proposed-question:${slug}:q1`, JSON.stringify({
-      sessionSlug: slug,
-      questionId: 'q1',
-    }));
+    await env.AGENT_ACTION_KV.put(
+      `telegram:proposed-question:${slug}:q1`,
+      JSON.stringify({
+        sessionSlug: slug,
+        questionId: 'q1',
+      }),
+    );
   }
 
   const visibleResponse = await handleTelegramAgentHandoffRequest({
@@ -6111,7 +7192,9 @@ test('Telegram admin metrics respect the visible session cutoff by default', asy
   });
   const visible = await jsonBody(visibleResponse);
   const legacyResponse = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/admin/metrics?sessionSlug=alpha&telegramUserId=42&includeLegacySessions=1'),
+    request: agentRequest(
+      '/telegram/agent/api/admin/metrics?sessionSlug=alpha&telegramUserId=42&includeLegacySessions=1',
+    ),
     env,
   });
   const legacy = await jsonBody(legacyResponse);
@@ -6121,12 +7204,18 @@ test('Telegram admin metrics respect the visible session cutoff by default', asy
   assert.equal(visible.metricVisibility.mode, 'telegram_visible_sessions');
   assert.deepEqual(visible.metricVisibility.sessionSlugs, ['alpha', 'beta']);
   assert.equal(visible.totals.questionsCreated, 2);
-  assert.deepEqual(visible.perSession.map((entry) => entry.sessionSlug), ['alpha', 'beta']);
+  assert.deepEqual(
+    visible.perSession.map((entry) => entry.sessionSlug),
+    ['alpha', 'beta'],
+  );
   assert.equal(visible.definitions.metricVisibility.includes('includeLegacySessions=1'), true);
   assert.equal(legacyResponse.status, 200);
   assert.equal(legacy.metricVisibility.mode, 'all_sessions');
   assert.equal(legacy.totals.questionsCreated, 3);
-  assert.deepEqual(legacy.perSession.map((entry) => entry.sessionSlug), ['alpha', 'beta', 'legacy']);
+  assert.deepEqual(
+    legacy.perSession.map((entry) => entry.sessionSlug),
+    ['alpha', 'beta', 'legacy'],
+  );
 });
 
 test('Telegram admin metrics falls back to legacy submit record bodies without metadata', async () => {
@@ -6136,13 +7225,16 @@ test('Telegram admin metrics falls back to legacy submit record bodies without m
   });
   const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
   env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES = adminAddress;
-  await env.AGENT_ACTION_KV.put('telegram:submit-request:legacy-alpha-ok', JSON.stringify({
-    requestId: 'legacy-alpha-ok',
-    sessionSlug: 'alpha',
-    telegramUserId: '77',
-    questionId: 'q-legacy',
-    status: 'direct_submitted',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:submit-request:legacy-alpha-ok',
+    JSON.stringify({
+      requestId: 'legacy-alpha-ok',
+      sessionSlug: 'alpha',
+      telegramUserId: '77',
+      questionId: 'q-legacy',
+      status: 'direct_submitted',
+    }),
+  );
 
   env.AGENT_ACTION_KV.resetGetCalls();
   const response = await handleTelegramAgentHandoffRequest({
@@ -6150,8 +7242,9 @@ test('Telegram admin metrics falls back to legacy submit record bodies without m
     env,
   });
   const body = await jsonBody(response);
-  const submitRecordGets = env.AGENT_ACTION_KV.getKeys
-    .filter((key) => String(key).startsWith('telegram:submit-request'));
+  const submitRecordGets = env.AGENT_ACTION_KV.getKeys.filter((key) =>
+    String(key).startsWith('telegram:submit-request'),
+  );
 
   assert.equal(response.status, 200);
   assert.equal(body.totals.questionsAnswered, 1);
@@ -6187,8 +7280,9 @@ test('Telegram admin metrics counts more than one KV page of submit metadata wit
     env,
   });
   const body = await jsonBody(response);
-  const submitRecordGets = env.AGENT_ACTION_KV.getKeys
-    .filter((key) => String(key).startsWith('telegram:submit-request'));
+  const submitRecordGets = env.AGENT_ACTION_KV.getKeys.filter((key) =>
+    String(key).startsWith('telegram:submit-request'),
+  );
 
   assert.equal(response.status, 200);
   assert.equal(body.totals.questionsAnswered, 1005);
@@ -6243,10 +7337,12 @@ test('Telegram admin ceagt token can plan and apply sponsored questions after ap
     sessionSlug: 'alpha',
     references: ['fund proposal'],
     instruction: 'Create a question about edge city outcomes and make it sponsored.',
-    createQuestions: [{
-      prompt: 'Should Alpha prioritize participant follow-up after Session Lab?',
-      questionType: 'binary',
-    }],
+    createQuestions: [
+      {
+        prompt: 'Should Alpha prioritize participant follow-up after Session Lab?',
+        questionType: 'binary',
+      },
+    ],
   };
   const planResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/question-queue/plan', {
@@ -6279,10 +7375,13 @@ test('Telegram admin ceagt token can plan and apply sponsored questions after ap
   });
   const applied = await jsonBody(applyResponse);
   const nextResponse = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/questions/next?sessionSlug=alpha&queueKey=admin-ceagt-smoke&resetQueue=true', {
-      method: 'POST',
-      token: issued.token,
-    }),
+    request: agentRequest(
+      '/telegram/agent/api/questions/next?sessionSlug=alpha&queueKey=admin-ceagt-smoke&resetQueue=true',
+      {
+        method: 'POST',
+        token: issued.token,
+      },
+    ),
     env,
   });
   const next = await jsonBody(nextResponse);
@@ -6353,8 +7452,18 @@ test('Telegram admin default-session endpoint exposes delegated status and servi
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
       sessions: [
-        { sessionSlug: 'alpha', sessionName: 'Alpha Session', telegramBridgeEnabled: true, telegramOnly: true },
-        { sessionSlug: 'beta', sessionName: 'Beta Session', telegramBridgeEnabled: true, telegramOnly: true },
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+        },
+        {
+          sessionSlug: 'beta',
+          sessionName: 'Beta Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+        },
       ],
     }),
   });
@@ -6369,12 +7478,15 @@ test('Telegram admin default-session endpoint exposes delegated status and servi
     createdAt: '2026-12-01T12:00:00.000Z',
     ttlSeconds: LONG_TEST_TOKEN_TTL_SECONDS,
   });
-  await env.AGENT_ACTION_KV.put('telegram:admin-default-session:v1', JSON.stringify({
-    version: 1,
-    sessionSlug: 'beta',
-    updatedBy: '0x1234...abcd',
-    updatedAt: '2026-12-01T12:00:00.000Z',
-  }));
+  await env.AGENT_ACTION_KV.put(
+    'telegram:admin-default-session:v1',
+    JSON.stringify({
+      version: 1,
+      sessionSlug: 'beta',
+      updatedBy: '0x1234...abcd',
+      updatedAt: '2026-12-01T12:00:00.000Z',
+    }),
+  );
 
   const statusResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/admin/default-session?sessionSlug=alpha', {
@@ -6454,12 +7566,14 @@ test('Telegram admin skill-update endpoint exposes status and service-token muta
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Alpha Session',
-        telegramBridgeEnabled: true,
-        telegramOnly: true,
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Alpha Session',
+          telegramBridgeEnabled: true,
+          telegramOnly: true,
+        },
+      ],
     }),
   });
   const adminAddress = await managedAccountAddressForTelegramUser(env, '42');
@@ -6601,14 +7715,18 @@ test('Telegram agent can recommend and auto-apply question importance votes with
   assert.equal(body.recommendations[0].suggestedVote, 'up');
   assert.equal(body.autoApply.ok, true);
   assert.equal(body.autoApply.appliedVotes.length, 1);
-  assert.equal(voteRecords.some((record) => (
-    record.questionId === 'q-binary' &&
-    record.vote === 'up' &&
-    record.source === 'agent_handoff' &&
-    record.agentMetadata.agentName === 'Hermes' &&
-    record.humanApproval.status === 'agent_auto_applied_pending_human_review' &&
-    record.humanApproval.humanReviewed === false
-  )), true);
+  assert.equal(
+    voteRecords.some(
+      (record) =>
+        record.questionId === 'q-binary' &&
+        record.vote === 'up' &&
+        record.source === 'agent_handoff' &&
+        record.agentMetadata.agentName === 'Hermes' &&
+        record.humanApproval.status === 'agent_auto_applied_pending_human_review' &&
+        record.humanApproval.humanReviewed === false,
+    ),
+    true,
+  );
   assert.equal(decisionRecords.length, 1);
   assert.equal(decisionRecords[0].actionMetadata.runId, 'run-123');
   assert.equal(decisionRecords[0].actionMetadata.source, 'agent_handoff');
@@ -6638,9 +7756,9 @@ test('Telegram agent question auto-votes are opt-in by default', async () => {
     env,
   });
   const body = await jsonBody(response);
-  const voteRecordCount = Array.from(env.AGENT_ACTION_KV.store.keys())
-    .filter((key) => key.startsWith('telegram:mini-app-question-vote:v1:alpha:'))
-    .length;
+  const voteRecordCount = Array.from(env.AGENT_ACTION_KV.store.keys()).filter((key) =>
+    key.startsWith('telegram:mini-app-question-vote:v1:alpha:'),
+  ).length;
 
   assert.equal(response.status, 200);
   assert.equal(body.settings.agentAutoApplyQuestionVotes, false);
@@ -6665,19 +7783,23 @@ test('Telegram agent question vote apply records human overrides and respects au
         groupChatId: '-100123',
         sessionSlug: 'alpha',
         approvalText: 'Approve q-binary as a downvote after review.',
-        recommendations: [{
-          questionId: 'q-binary',
-          suggestedVote: 'up',
-          reason: 'Matched funding.',
-          agentNote: 'Suggested upvote for funding relevance.',
-        }],
-        decisions: [{
-          questionId: 'q-binary',
-          suggestedVote: 'up',
-          finalVote: 'down',
-          approved: true,
-          humanNote: 'Not important for this user right now.',
-        }],
+        recommendations: [
+          {
+            questionId: 'q-binary',
+            suggestedVote: 'up',
+            reason: 'Matched funding.',
+            agentNote: 'Suggested upvote for funding relevance.',
+          },
+        ],
+        decisions: [
+          {
+            questionId: 'q-binary',
+            suggestedVote: 'up',
+            finalVote: 'down',
+            approved: true,
+            humanNote: 'Not important for this user right now.',
+          },
+        ],
       },
     }),
     env,
@@ -6758,12 +7880,19 @@ test('Telegram agent can create and dry-run pose a new group question', async ()
   assert.equal(response.status, 200);
   assert.equal(body.posed, true);
   assert.equal(body.sent, false);
-  assert.equal(questions.questions.some((question) => question.prompt === 'What question should the group answer next?'), true);
-  assert.equal(Array.from(env.AGENT_ACTION_KV.metadata.entries()).some(([key, metadata]) => (
-    key.startsWith('telegram:proposed-question:alpha:') &&
-    metadata.t === 'proposed_question' &&
-    metadata.u === '42'
-  )), true);
+  assert.equal(
+    questions.questions.some((question) => question.prompt === 'What question should the group answer next?'),
+    true,
+  );
+  assert.equal(
+    Array.from(env.AGENT_ACTION_KV.metadata.entries()).some(
+      ([key, metadata]) =>
+        key.startsWith('telegram:proposed-question:alpha:') &&
+        metadata.t === 'proposed_question' &&
+        metadata.u === '42',
+    ),
+    true,
+  );
 });
 
 test('Telegram agent can batch-create sourced proposed questions without posing them', async () => {
@@ -6798,7 +7927,13 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
             prompt: 'Which topics need a follow-up discussion?',
             questionType: 'single_choice',
             options: ['onboarding', 'results', 'groups'],
-            references: [{ type: 'url', url: 'https://example.com/followup', title: 'Follow-up note' }],
+            references: [
+              {
+                type: 'url',
+                url: 'https://example.com/followup',
+                title: 'Follow-up note',
+              },
+            ],
           },
         ],
       },
@@ -6814,19 +7949,23 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
     env,
   });
   const questions = await jsonBody(questionsResponse);
-  const sourcedQuestion = questions.questions.find((question) => (
-    question.prompt === 'Should Session Lab organizers publish a daily recap?'
-  ));
-  const singleChoiceQuestion = questions.questions.find((question) => (
-    question.prompt === 'Which topics need a follow-up discussion?'
-  ));
+  const sourcedQuestion = questions.questions.find(
+    (question) => question.prompt === 'Should Session Lab organizers publish a daily recap?',
+  );
+  const singleChoiceQuestion = questions.questions.find(
+    (question) => question.prompt === 'Which topics need a follow-up discussion?',
+  );
   const geoFilteredResponse = await handleTelegramAgentHandoffRequest({
-    request: agentRequest('/telegram/agent/api/questions?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123&tags=geo:edge-node-1&relevanceMode=filter'),
+    request: agentRequest(
+      '/telegram/agent/api/questions?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123&tags=geo:edge-node-1&relevanceMode=filter',
+    ),
     env,
   });
   const geoFiltered = await jsonBody(geoFilteredResponse);
   const backlinkResponse = await handleTelegramAgentHandoffRequest({
-    request: agentRequest(`/telegram/agent/api/geo-backlink?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123&questionId=${encodeURIComponent(body.created[0].questionId)}`),
+    request: agentRequest(
+      `/telegram/agent/api/geo-backlink?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123&questionId=${encodeURIComponent(body.created[0].questionId)}`,
+    ),
     env,
   });
   const backlink = await jsonBody(backlinkResponse);
@@ -6868,9 +8007,18 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
   assert.equal(body.created[2].questionType, 'multichoice');
   assert.equal(body.created[2].singleSelect, true);
   assert.equal(proposedRecords.length, 3);
-  assert.equal(proposedRecords.every((record) => record.status === 'active'), true);
-  assert.equal(proposedRecords.every((record) => record.sponsored !== true), true);
-  assert.equal(proposedRecords.every((record) => record.actionMetadata.endpoint === '/api/agent/questions/create'), true);
+  assert.equal(
+    proposedRecords.every((record) => record.status === 'active'),
+    true,
+  );
+  assert.equal(
+    proposedRecords.every((record) => record.sponsored !== true),
+    true,
+  );
+  assert.equal(
+    proposedRecords.every((record) => record.actionMetadata.endpoint === '/api/agent/questions/create'),
+    true,
+  );
   assert.equal(proposedRecords[2].questionType, 'multichoice');
   assert.equal(proposedRecords[2].singleSelect, true);
   assert.equal(proposedRecords[0].references[0].url, sourceUrl);
@@ -6882,7 +8030,10 @@ test('Telegram agent can batch-create sourced proposed questions without posing 
   assert.equal(singleChoiceQuestion.questionType, 'multichoice');
   assert.equal(singleChoiceQuestion.singleSelect, true);
   assert.equal(geoFilteredResponse.status, 200);
-  assert.deepEqual(geoFiltered.questions.map((question) => question.questionId), [body.created[0].questionId]);
+  assert.deepEqual(
+    geoFiltered.questions.map((question) => question.questionId),
+    [body.created[0].questionId],
+  );
   assert.equal(backlinkResponse.status, 200);
   assert.equal(backlink.backlink.questionId, body.created[0].questionId);
   assert.equal(backlink.backlink.geoRefs[0].geoId, 'edge-node-1');
@@ -6900,15 +8051,17 @@ test('Telegram agent preserves explicit question tags without session tag infere
     AGENT_BRIDGE_SESSION_POLICY_JSON: JSON.stringify({
       defaultSessionSlug: 'alpha',
       riskCeiling: 'submit',
-      sessions: [{
-        sessionSlug: 'alpha',
-        sessionName: 'Session Lab Research',
-        default: true,
-        telegramBridgeEnabled: true,
-        telegramGroupOpenAccess: true,
-        managedAccountSubmitAllowed: true,
-        sessionContext: 'Session Lab governance funding safety research with organizers.',
-      }],
+      sessions: [
+        {
+          sessionSlug: 'alpha',
+          sessionName: 'Session Lab Research',
+          default: true,
+          telegramBridgeEnabled: true,
+          telegramGroupOpenAccess: true,
+          managedAccountSubmitAllowed: true,
+          sessionContext: 'Session Lab governance funding safety research with organizers.',
+        },
+      ],
     }),
   });
   await buildTelegramCommandResponse({
@@ -6924,11 +8077,13 @@ test('Telegram agent preserves explicit question tags without session tag infere
         telegramUserId: '42',
         groupChatId: '-100123',
         sessionSlug: 'alpha',
-        questions: [{
-          prompt: 'Should safety reviewers intervene immediately?',
-          questionType: 'binary',
-          tags: ['ethics', 'safety', 'methodology'],
-        }],
+        questions: [
+          {
+            prompt: 'Should safety reviewers intervene immediately?',
+            questionType: 'binary',
+            tags: ['ethics', 'safety', 'methodology'],
+          },
+        ],
       },
     }),
     env,
@@ -6965,7 +8120,9 @@ test('Telegram agent geo backlinks handle bytes32 question ids without secret fa
   });
 
   const response = await handleTelegramAgentHandoffRequest({
-    request: agentRequest(`/telegram/agent/api/geo-backlink?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123&questionId=${encodeURIComponent(questionId)}`),
+    request: agentRequest(
+      `/telegram/agent/api/geo-backlink?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123&questionId=${encodeURIComponent(questionId)}`,
+    ),
     env,
   });
   const body = await jsonBody(response);
@@ -7010,11 +8167,15 @@ test('Telegram agent can propose Cloudflare-only groups for user approval', asyn
   assert.equal(proposed.ok, true);
   assert.equal(proposed.requiresUserApproval, true);
   assert.equal(proposed.category.categoryId, 'ai_tribe');
-  assert.equal(Array.from(env.AGENT_ACTION_KV.metadata.entries()).some(([key, metadata]) => (
-    key.startsWith('telegram:lightweight-group-proposal:alpha:') &&
-    metadata.t === 'group_proposal' &&
-    metadata.u === '42'
-  )), true);
+  assert.equal(
+    Array.from(env.AGENT_ACTION_KV.metadata.entries()).some(
+      ([key, metadata]) =>
+        key.startsWith('telegram:lightweight-group-proposal:alpha:') &&
+        metadata.t === 'group_proposal' &&
+        metadata.u === '42',
+    ),
+    true,
+  );
 
   const groupsResponse = await handleTelegramAgentHandoffRequest({
     request: agentRequest('/telegram/agent/api/groups?sessionSlug=alpha&telegramUserId=42&groupChatId=-100123'),
@@ -7024,7 +8185,10 @@ test('Telegram agent can propose Cloudflare-only groups for user approval', asyn
 
   assert.equal(groupsResponse.status, 200);
   assert.equal(groups.ok, true);
-  assert.equal(groups.groups.categories.some((category) => category.categoryId === 'ai_tribe'), true);
+  assert.equal(
+    groups.groups.categories.some((category) => category.categoryId === 'ai_tribe'),
+    true,
+  );
   assert.equal(groups.groups.proposals.length, 1);
   assert.match(groups.groups.proposals[0].message, /e\/acc/);
 });
@@ -7046,13 +8210,21 @@ test('Telegram agent can create a worker-local child session record', async () =
         sessionSlug: 'alpha',
         childSessionSlug: 'alpha-breakout-1',
         sessionName: 'Alpha Breakout 1',
-        questions: [{ questionId: 'q-child', questionType: 'freeform', prompt: 'What should this breakout decide?' }],
-        groups: [{
-          categoryId: 'breakout_role',
-          label: 'Breakout role',
-          selectionMode: 'single',
-          options: [{ optionId: 'scribe', label: 'Scribe' }],
-        }],
+        questions: [
+          {
+            questionId: 'q-child',
+            questionType: 'freeform',
+            prompt: 'What should this breakout decide?',
+          },
+        ],
+        groups: [
+          {
+            categoryId: 'breakout_role',
+            label: 'Breakout role',
+            selectionMode: 'single',
+            options: [{ optionId: 'scribe', label: 'Scribe' }],
+          },
+        ],
       },
     }),
     env,

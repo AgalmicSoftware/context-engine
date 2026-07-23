@@ -8,6 +8,14 @@ import styles from './AdminPage.module.scss';
 
 const ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const SESSION_REGISTRY_CACHE_UPDATED_EVENT = 'ce:session-registry-cache-updated';
+const AGENT_SESSION_WRAPPED_CAPABILITY = {
+  version: 1,
+  enabled: true,
+  origin: 'https://wrapped-edge.example.test',
+  protocolVersion: 'agent-session-wrapped-v1',
+  revision: 'wrapped-edge-revision',
+  verifiedAt: '2026-07-20T18:00:00.000Z',
+};
 
 const buildSessionConfig = (overrides = {}) => ({
   slug: 'edge',
@@ -225,7 +233,7 @@ describe('AdminPage rendered interactions', () => {
     expect(screen.queryByText('Connect a wallet to continue.')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Toggle Sessions section' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Refresh sessions' })).toBeInTheDocument();
-    expect(screen.getByTestId('ce-admin-worker-groups')).toHaveTextContent(/Worker access groups/i);
+    expect(screen.queryByTestId('ce-admin-worker-groups')).not.toBeInTheDocument();
     expect(screen.getByTestId('ce-admin-agent-session-wrapped')).toHaveTextContent(/Agent Session Wrapped/i);
 
     const sessionLink = screen.getByRole('link', { name: 'Open session' });
@@ -293,6 +301,69 @@ describe('AdminPage rendered interactions', () => {
     expect(within(metadataPanel).queryByText('Ignored SBT list')).not.toBeInTheDocument();
     expect(within(metadataPanel).queryByText('Start block')).not.toBeInTheDocument();
     expect(within(metadataPanel).queryByText('Faucet amount (ETH)')).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-admin-worker-groups')).toHaveTextContent(/Native Worker Groups/i);
+    expect(screen.getByTestId('ce-admin-worker-groups')).toHaveTextContent(/Worker-owned participant groups/i);
+  });
+
+  it('keeps Worker SBT conditions separate from the registry transaction editor', async () => {
+    sessionEntries = [];
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.evm.registryChainId = 11155420;
+    sessionModeProfile.authorization.mechanisms.push('sbt_onchain');
+    sessionModeProfile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        {
+          kind: 'sbt_onchain',
+          chainId: 11155420,
+          contract: '0x1111111111111111111111111111111111111111',
+          anyOrAll: 'any',
+        },
+      ],
+    };
+    const initialSessionConfig = {
+      slug: 'worker-sbt-admin',
+      sessionId: '0x1234567890abcdef1234567890abcdef',
+      sessionName: 'Worker SBT Admin Session',
+      corsWorkerUrl: 'https://worker-sbt-admin.example.test',
+      adminAddress: ADMIN_ADDRESS,
+      sessionModeProfile,
+    };
+    mockResolveCorsProxyUrl.mockResolvedValue({
+      url: initialSessionConfig.corsWorkerUrl,
+      source: 'session-config',
+      status: 'ok',
+    });
+
+    await renderAdminPage({ initialSessionConfig });
+
+    expect(await screen.findByTestId('ce-admin-worker-sbt-gates')).toHaveTextContent(/Advanced on-chain access gates/i);
+    expect(screen.getByTestId('ce-admin-worker-sbt-gates')).toHaveTextContent(/read-only/i);
+    expect(screen.getByTestId('ce-admin-worker-sbt-gates')).toHaveTextContent(/No registry transaction/i);
+    expect(screen.queryByText('On-chain default gate')).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON)).not.toBeInTheDocument();
+  });
+
+  it('labels Worker groups as a separate agent authorization domain for an enabled Wrapped registry session', async () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.surfaces.agentHttp = true;
+    sessionEntries = [
+      [
+        'edge',
+        buildSessionConfig({
+          sessionModeProfile,
+          agentSessionWrapped: AGENT_SESSION_WRAPPED_CAPABILITY,
+        }),
+      ],
+    ];
+
+    await renderAdminPage();
+
+    const workerGroupsPanel = await screen.findByTestId('ce-admin-worker-groups');
+    expect(workerGroupsPanel).toHaveTextContent(/Worker\/agent access groups/i);
+    expect(workerGroupsPanel).toHaveTextContent(/separate from registry SBT Groups/i);
   });
 
   it('rebinds worker actions across route-only worker session navigation A to B to A', async () => {
@@ -311,7 +382,7 @@ describe('AdminPage rendered interactions', () => {
       corsWorkerUrl: `https://${slug}.example.test`,
       adminAddress: ADMIN_ADDRESS,
       configRevision: `revision-${slug}`,
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     });
     const props = {
       account: ADMIN_ADDRESS,
@@ -355,6 +426,64 @@ describe('AdminPage rendered interactions', () => {
     await probeCurrentSession('worker-b');
     view.rerender(<AdminPage {...props} initialSessionConfig={buildWorkerConfig('worker-a')} />);
     await probeCurrentSession('worker-a');
+  });
+
+  it('does not admit an invalid raw Worker profile as a route-owned admin session', async () => {
+    sessionEntries = [];
+
+    await renderAdminPage({
+      initialSessionConfig: {
+        slug: 'invalid-worker',
+        corsWorkerUrl: 'https://invalid-worker.example.test',
+        adminAddress: ADMIN_ADDRESS,
+        sessionModeProfile: {
+          profileVersion: 999,
+          authority: { mode: 'worker_canonical' },
+        },
+      },
+    });
+
+    await waitFor(() => expect(mockLoadSessionRegistryCache).toHaveBeenCalled());
+    expect(screen.queryByDisplayValue('https://invalid-worker.example.test')).not.toBeInTheDocument();
+  });
+
+  it('shows profile repair guidance for an invalid selected session instead of on-chain registration advice', async () => {
+    sessionEntries = [
+      [
+        'invalid-profile',
+        buildSessionConfig({
+          slug: 'invalid-profile',
+          sessionModeProfile: {
+            profileVersion: 999,
+            authority: { mode: 'worker_canonical' },
+          },
+        }),
+      ],
+    ];
+
+    await renderAdminPage();
+
+    expect(await screen.findByText(/session capability profile is invalid or unsupported/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Register in \/new before using worker actions/i)).not.toBeInTheDocument();
+  });
+
+  it('shows canonical-config repair guidance when the selected session profile is missing', async () => {
+    sessionEntries = [
+      [
+        'missing-profile',
+        {
+          slug: 'missing-profile',
+          sessionName: 'Missing Profile',
+          corsWorkerUrl: 'https://missing-profile.example.test',
+          networkChainId: 11155420,
+        },
+      ],
+    ];
+
+    await renderAdminPage();
+
+    expect(await screen.findByText(/missing a canonical capability profile/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Register in \/new before using worker actions/i)).not.toBeInTheDocument();
   });
 
   it('reveals the tests section only after the worker Test button is clicked', async () => {
@@ -531,7 +660,7 @@ describe('AdminPage rendered interactions', () => {
       getSigner: () => ({ signMessage }),
     }));
     mockBuildSiweMessage.mockReturnValue('rendered-byte-exact-siwe-message');
-    global.fetch = jest.fn((url) => {
+    global.fetch = jest.fn((url, init) => {
       if (String(url).endsWith('/auth/nonce')) {
         return Promise.resolve({
           ok: true,
@@ -540,10 +669,13 @@ describe('AdminPage rendered interactions', () => {
         });
       }
       if (String(url).endsWith('/auth/login')) {
+        const submittedLogin = JSON.parse(init?.body || '{}');
         return Promise.resolve({
           ok: false,
           status: 403,
-          json: async () => ({ error: 'expected-denied' }),
+          json: async () => ({
+            error: `Denied ${submittedLogin.signature}; ${submittedLogin.message}`,
+          }),
         });
       }
       return Promise.resolve({
@@ -579,8 +711,29 @@ describe('AdminPage rendered interactions', () => {
       statement: 'Sign in to Context Engine.',
     });
     await waitFor(() => {
-      expect(screen.getByText('OK (403 expected-denied)')).toBeInTheDocument();
+      expect(screen.getByText('OK (403 worker_auth_worker_login_failed)')).toBeInTheDocument();
     });
+    expect(screen.queryByText(/0xrendered-siwe-signature|rendered-byte-exact-siwe-message/)).not.toBeInTheDocument();
+  });
+
+  it('does not render arbitrary wallet errors from the denied-login signing boundary', async () => {
+    const providerCanary = 'passkey-provider-canary-never-render';
+    const signMessage = jest
+      .fn()
+      .mockRejectedValue(new Error(`Provider echoed rendered-byte-exact-siwe-message and ${providerCanary}`));
+    web3ProviderSpy.mockImplementation(() => ({
+      getSigner: () => ({ signMessage }),
+    }));
+    mockBuildSiweMessage.mockReturnValue('rendered-byte-exact-siwe-message');
+
+    await renderAdminPage();
+    await waitForResolvedWorkerUrl();
+    await clickAndSettle(screen.getByRole('button', { name: 'Test' }));
+    fireEvent.click(screen.getByTestId('ce-admin-denied-chip-login'));
+
+    expect(await screen.findByText('FAILED (Denied access test failed.)')).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(providerCanary, 'i'))).not.toBeInTheDocument();
+    expect(screen.queryByText(/rendered-byte-exact-siwe-message/)).not.toBeInTheDocument();
   });
 
   it('does not reserve hero media space when the session header image fails to load', async () => {

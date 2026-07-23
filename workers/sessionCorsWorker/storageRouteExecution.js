@@ -39,6 +39,7 @@ import {
   resolveRegistryChainId,
   toChainId,
 } from './chainIdNormalization.js';
+import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 
 const encoder = new TextEncoder();
 const RESOLVE_STORAGE_GATE_RUNTIME_CONFIG = Symbol('resolve-storage-gate-runtime-config');
@@ -508,18 +509,50 @@ const evaluateSbtOnchainCondition = async ({ condition, config, requesterAddress
   return { ok: false, reason: 'sbt_onchain_denied', condition: { kind: 'sbt_onchain', chainId, anyOrAll: mode } };
 };
 
-const checkWorkerGroupMembership = async ({ env, slug, groupId, requesterAddress, authScopes, deps }) => {
+const checkWorkerGroupMembership = async ({
+  env,
+  slug,
+  config,
+  groupId,
+  requesterAddress,
+  authScopes,
+  deps,
+}) => {
   const check = typeof deps?.isWorkerGroupMember === 'function' ? deps.isWorkerGroupMember : isWorkerGroupMember;
-  return check({ env, slug, groupId, requesterAddress, authScopes, deps });
+  return check({
+    env,
+    slug,
+    sessionId: resolveCanonicalWorkerSessionIdHex(config),
+    groupId,
+    requesterAddress,
+    authScopes,
+    deps,
+  });
 };
 
-const evaluateWorkerGroupCondition = async ({ condition, env, slug, requesterAddress, authScopes, deps }) => {
+const evaluateWorkerGroupCondition = async ({
+  condition,
+  env,
+  slug,
+  config,
+  requesterAddress,
+  authScopes,
+  deps,
+}) => {
   const groupIds = normalizeGroupIdList(condition.groupIds || condition.groups || condition.groupId);
   if (!groupIds.length) return { ok: false, reason: 'missing_worker_group', condition: { kind: 'worker_group' } };
   let firstFailure = null;
   for (const groupId of groupIds) {
     // eslint-disable-next-line no-await-in-loop
-    const result = await checkWorkerGroupMembership({ env, slug, groupId, requesterAddress, authScopes, deps });
+    const result = await checkWorkerGroupMembership({
+      env,
+      slug,
+      config,
+      groupId,
+      requesterAddress,
+      authScopes,
+      deps,
+    });
     if (result?.ok) {
       return {
         ok: true,
@@ -545,7 +578,15 @@ const evaluateAccessCondition = async ({ condition, env, slug, config, requester
   if (kind === 'agent_grant_scope') return evaluateAgentGrantScopeCondition({ condition, authScopes });
   if (kind === 'sbt_onchain') return evaluateSbtOnchainCondition({ condition, config, requesterAddress, deps });
   if (kind === 'worker_group') {
-    return evaluateWorkerGroupCondition({ condition, env, slug, requesterAddress, authScopes, deps });
+    return evaluateWorkerGroupCondition({
+      condition,
+      env,
+      slug,
+      config,
+      requesterAddress,
+      authScopes,
+      deps,
+    });
   }
   return { ok: false, reason: 'unknown_condition_kind', condition: { kind: kind || 'unknown' } };
 };
@@ -619,7 +660,16 @@ const resolveGroupGateIds = ({ metadata, access }) => normalizeGroupIdList([
   ...normalizeGroupIdList(access.groupIds),
 ]);
 
-const authorizeWorkerGroupAccess = async ({ env, slug, groupIds, requesterAddress, authScopes, baseHeaders, deps }) => {
+const authorizeWorkerGroupAccess = async ({
+  env,
+  slug,
+  config,
+  groupIds,
+  requesterAddress,
+  authScopes,
+  baseHeaders,
+  deps,
+}) => {
   if (!groupIds.length) {
     return {
       ok: false,
@@ -629,7 +679,15 @@ const authorizeWorkerGroupAccess = async ({ env, slug, groupIds, requesterAddres
   let firstFailure = null;
   for (const groupId of groupIds) {
     // eslint-disable-next-line no-await-in-loop
-    const result = await checkWorkerGroupMembership({ env, slug, groupId, requesterAddress, authScopes, deps });
+    const result = await checkWorkerGroupMembership({
+      env,
+      slug,
+      config,
+      groupId,
+      requesterAddress,
+      authScopes,
+      deps,
+    });
     if (result?.ok) {
       return {
         ok: true,
@@ -745,6 +803,7 @@ const authorizeCloudflareStorageAccess = async ({
     const groupAccess = await authorizeWorkerGroupAccess({
       env,
       slug,
+      config,
       groupIds: resolveGroupGateIds({ metadata, access }),
       requesterAddress,
       authScopes,
@@ -873,6 +932,7 @@ const enforceCloudflareUploadPolicy = async ({ env, config, slug, payload, reque
     const groupAccess = await authorizeWorkerGroupAccess({
       env,
       slug,
+      config,
       groupIds,
       requesterAddress,
       authScopes,

@@ -2,6 +2,7 @@ import {
   normalizeAgentSessionWrappedCapability,
   type AgentSessionWrappedCapability,
 } from '../../utilities/session/agentSessionWrapped.js';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability.js';
 import { AGENT_BRIDGE_WORKER_BUNDLE_URL, WORKER_RELEASE_MANIFEST_URL } from '../../variables/publicDeploymentConfig.js';
@@ -26,8 +27,6 @@ export type AdminAgentSessionWrappedAvailability = {
 };
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-const COMPATIBLE_AUTHORITY_MODES = new Set(['worker_canonical', 'evm_registry_canonical', 'registry_canonical']);
-
 const asRecord = (value: unknown): AdminRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as AdminRecord) : {};
 
@@ -47,14 +46,12 @@ const normalizeSessionSlug = (value: unknown): string => {
   return /^[a-z0-9_-]{1,128}$/.test(slug) ? slug : '';
 };
 
-const authorityModeFrom = (sessionConfig: unknown): string => {
-  const config = asRecord(sessionConfig);
-  const profile = asRecord(config.sessionModeProfile);
-  const authority = asRecord(profile.authority);
-  const workerAuthority = asRecord(config.workerAuthority);
-  return toStr(authority.mode || workerAuthority.mode)
-    .trim()
-    .toLowerCase();
+const authorityModeFrom = (sessionConfig: unknown): string =>
+  resolveSessionCapabilityProjection(sessionConfig).authorityMode;
+
+const hasCompatibleAuthority = (sessionConfig: unknown): boolean => {
+  const capabilities = resolveSessionCapabilityProjection(sessionConfig);
+  return capabilities.usesWorkerAuthority || capabilities.isRegistryCanonical;
 };
 
 const registryFrom = (sessionConfig: unknown): AdminRecord => asRecord(asRecord(sessionConfig).__registry);
@@ -97,8 +94,8 @@ export const resolveAdminAgentSessionWrappedAvailability = ({
 } = {}): AdminAgentSessionWrappedAvailability => {
   const config = asRecord(sessionConfig);
   const capability = normalizeAgentSessionWrappedCapability(config.agentSessionWrapped);
-  const mode = authorityModeFrom(config);
-  if (!COMPATIBLE_AUTHORITY_MODES.has(mode)) {
+  const sessionCapabilities = resolveSessionCapabilityProjection(config);
+  if (!sessionCapabilities.usesWorkerAuthority && !sessionCapabilities.isRegistryCanonical) {
     return {
       code: 'incompatible',
       compatible: false,
@@ -107,7 +104,7 @@ export const resolveAdminAgentSessionWrappedAvailability = ({
       capability,
     };
   }
-  if (mode !== 'worker_canonical' && config.corsWorkerUrl && typeof config.corsWorkerUrl === 'object') {
+  if (sessionCapabilities.isRegistryCanonical && config.corsWorkerUrl && typeof config.corsWorkerUrl === 'object') {
     return {
       code: 'encrypted_worker_pointer',
       compatible: true,
@@ -158,11 +155,18 @@ export const buildAdminAgentSessionWrappedConfigPatch = ({
 }) => {
   const config = asRecord(sessionConfig);
   const profile = asRecord(config.sessionModeProfile);
+  const sessionCapabilities = resolveSessionCapabilityProjection(config);
+  if (sessionCapabilities.source === 'legacy_registry' && Object.keys(profile).length === 0) {
+    return {
+      agentSessionWrapped: capability,
+    };
+  }
   const surfaces = asRecord(profile.surfaces);
   return {
     agentSessionWrapped: capability,
     sessionModeProfile: {
       ...profile,
+      preset: 'custom',
       surfaces: {
         ...surfaces,
         agentHttp: capability.enabled,
@@ -187,7 +191,11 @@ export const ensureAdminAgentSessionWrappedWorkerAttached = async ({
   setSessionFieldsOnChain: (input: AdminRecord) => Promise<unknown>;
 }): Promise<{ attached: boolean }> => {
   const config = asRecord(sessionConfig);
-  if (authorityModeFrom(config) === 'worker_canonical') return { attached: false };
+  const sessionCapabilities = resolveSessionCapabilityProjection(config);
+  if (sessionCapabilities.usesWorkerAuthority) return { attached: false };
+  if (!sessionCapabilities.isRegistryCanonical) {
+    throw new Error('Registry Worker attachment requires a validated registry-canonical session.');
+  }
   const workerOrigin = normalizeHttpsOrigin(sessionWorkerUrl);
   const slug = normalizeSessionSlug(sessionSlug || config.slug);
   const registry = registryFrom(config);
@@ -261,7 +269,7 @@ export const applyAdminAgentSessionWrappedChange = async ({
   if (!token) throw new Error('Enter a request-only Cloudflare API token.');
   if (!helperOrigin) throw new Error('The deploy-helper URL is unavailable.');
   if (!workerOrigin) throw new Error('A compatible paired session Worker is required.');
-  if (!slug || !requestId || !COMPATIBLE_AUTHORITY_MODES.has(authorityMode)) {
+  if (!slug || !requestId || !hasCompatibleAuthority(sessionConfig)) {
     throw new Error('Wrapped deployment identity or session authority is invalid.');
   }
 

@@ -139,9 +139,10 @@ describe('SbtPageAdminActions', () => {
     );
 
     expect(screen.getByText('Generate Additional Password Invites')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /claim-one/ })).toHaveAttribute(
+    expect(screen.getByText(/claim-one/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /join\/0xsbt/ })).toHaveAttribute(
       'href',
-      'https://session.example.test/join/0xsbt/claim-one',
+      'https://session.example.test/join/0xsbt',
     );
 
     fireEvent.change(screen.getByPlaceholderText('Number of additional passwords'), {
@@ -162,23 +163,22 @@ describe('SbtPageAdminActions', () => {
     expect(onExportPasswords).toHaveBeenCalledTimes(1);
   });
 
-  it('exposes encrypted local recovery as an explicit browser-only opt-in', () => {
+  it('exposes tab-memory recovery as an explicit opt-in', () => {
     const onEncryptedRecoveryChange = jest.fn();
     render(<SbtPageAdminActions {...createProps({ onEncryptedRecoveryChange })} />);
 
-    const toggle = screen.getByRole('checkbox', { name: 'Keep encrypted recovery on this browser' });
+    const toggle = screen.getByRole('checkbox', { name: 'Keep recovery codes in this tab' });
     expect(toggle).not.toBeChecked();
     fireEvent.click(toggle);
     expect(onEncryptedRecoveryChange).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/does not protect against a compromised browser profile/i)).toBeInTheDocument();
+    expect(screen.getByText(/reloading or closing the tab clears them/i)).toBeInTheDocument();
   });
 
-  it('offers a scoped clear action for legacy or encrypted local recovery', () => {
+  it('offers a scoped clear action for tab-memory recovery', () => {
     const onClearLocalRecovery = jest.fn();
     render(<SbtPageAdminActions {...createProps({ onClearLocalRecovery })} />);
 
-    expect(screen.getByText(/legacy recovery may contain plaintext/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Clear local recovery' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear tab recovery' }));
     expect(onClearLocalRecovery).toHaveBeenCalledTimes(1);
   });
 
@@ -306,10 +306,11 @@ describe('SbtPageAdminActions', () => {
       />,
     );
 
-    expect(screen.getByText('Previously Generated Password Invites')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /claim-one/ })).toHaveAttribute(
+    expect(screen.getByText('Password Invites Kept in This Tab')).toBeInTheDocument();
+    expect(screen.getByText(/claim-one/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /join\/0xsbt/ })).toHaveAttribute(
       'href',
-      'https://session.example.test/join/0xsbt/claim-one',
+      'https://session.example.test/join/0xsbt',
     );
 
     rerender(

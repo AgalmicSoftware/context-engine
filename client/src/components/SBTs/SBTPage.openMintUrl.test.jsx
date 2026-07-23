@@ -159,7 +159,6 @@ describe('SBTPage admin open-mint URL', () => {
     try {
       const account = '0x00000000000000000000000000000000000000a2';
       const sbtAddress = '0x00000000000000000000000000000000000000a1';
-      const encodedPassword = encodeURIComponent(cryptoUtils.encodeGroupPasswordForUrl('claim-code'));
       const subject = createSubject({
         SBTAddress: sbtAddress,
         account,
@@ -181,7 +180,7 @@ describe('SBTPage admin open-mint URL', () => {
       };
 
       expect(flattenText(subject.renderAdminActions())).toContain(
-        `http://localhost/ce/session/edge?auto=1&sbt=${sbtAddress}&gp=${encodedPassword}`,
+        `http://localhost/ce/session/edge?auto=1&sbt=${sbtAddress}`,
       );
     } finally {
       if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
@@ -206,7 +205,6 @@ describe('SBTPage admin open-mint URL', () => {
 
     try {
       const sbtAddress = '0x00000000000000000000000000000000000000a1';
-      const encodedPassword = encodeURIComponent(cryptoUtils.encodeGroupPasswordForUrl('claim-code'));
       const subject = createSubject({
         SBTAddress: sbtAddress,
         sessionSlug: 'edge',
@@ -227,8 +225,9 @@ describe('SBTPage admin open-mint URL', () => {
 
       expect(capturedBlob).not.toBeNull();
       expect(String(capturedBlob.parts.join(''))).toContain(
-        `http://localhost/ce/session/edge?auto=1&sbt=${sbtAddress}&gp=${encodedPassword}`,
+        `http://localhost/ce/session/edge?auto=1&sbt=${sbtAddress}`,
       );
+      expect(String(capturedBlob.parts.join(''))).not.toContain('gp=');
     } finally {
       global.Blob = OriginalBlob;
       URL.createObjectURL = originalCreateObjectUrl;

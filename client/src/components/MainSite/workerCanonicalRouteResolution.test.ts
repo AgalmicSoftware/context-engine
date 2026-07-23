@@ -5,6 +5,8 @@ import {
 import type { WorkerCanonicalRouteController } from './workerCanonicalRouteController';
 
 const controller: WorkerCanonicalRouteController = {
+  getActiveVerifiedConfig: () => null,
+  getVerifiedConfig: () => null,
   hasVerifiedRoute: () => false,
   handleBootstrapResolved: () => undefined,
   isSessionSlug: () => false,

@@ -36,7 +36,6 @@ import {
   upsertCachedSessionWorkerConfig,
 } from '../../utilities/session/sessionWorkerConfigCache.js';
 import { getUsableSessionWorkerUrl } from '../../utilities/session/sessionWorkerAvailability.js';
-import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../utilities/session/sponsoredFlags.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import SBTSelector from '../SBTs/SBTSelector';
@@ -49,6 +48,7 @@ import AdminPageWorkerSecretsPanel from './AdminPageWorkerSecretsPanel';
 import AdminAgentSessionWrappedPanel from './AdminAgentSessionWrappedPanel';
 import { resolveAdminAgentSessionWrappedWorkerOrigin } from './adminAgentSessionWrapped';
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
+import { resolveAdminCapabilityRoute, resolveAdminSessionRecoveryMessage } from './adminPageCapabilityRoutingHelpers';
 import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
 import {
@@ -198,9 +198,12 @@ const AdminPageRuntime = ({
   const initialWorkerCanonicalConfigRef = useRef<AdminSessionConfigLike | null>(null);
   if (!initialWorkerCanonicalConfigRef.current) {
     const candidate = asAdminSessionConfig(initialSessionConfig);
-    const candidateProfile = asAdminSessionConfig(candidate.sessionModeProfile);
-    const candidateAuthority = asAdminSessionConfig(candidateProfile.authority);
-    if (candidateAuthority.mode === 'worker_canonical' && normalizeSlug(candidate.slug)) {
+    const candidateCapabilities = resolveAdminCapabilityRoute(candidate).sessionCapabilities;
+    if (
+      candidateCapabilities.profileValid &&
+      candidateCapabilities.isWorkerCanonical &&
+      normalizeSlug(candidate.slug)
+    ) {
       initialWorkerCanonicalConfigRef.current = candidate;
     }
   }
@@ -597,7 +600,8 @@ const AdminPageRuntime = ({
     const match = availableSessions.find(([slug]) => slug === selectedSlug);
     return match ? asAdminSessionConfig(match[1]) : null;
   }, [availableSessions, selectedSlug]);
-  const sessionCapabilities = useMemo(() => resolveSessionCapabilityProjection(selectedConfig), [selectedConfig]);
+  const adminCapabilityRoute = useMemo(() => resolveAdminCapabilityRoute(selectedConfig), [selectedConfig]);
+  const { sessionCapabilities, selectedWorkerSessionId } = adminCapabilityRoute;
   const effectiveWorkerCorsState = useMemo(() => {
     if (!selectedConfig) return { origins: [], reported: false };
     const cachedWorkerConfig: any =
@@ -731,7 +735,7 @@ const AdminPageRuntime = ({
   );
 
   useEffect(() => {
-    if (!relevantSessionChainId) {
+    if (!sessionCapabilities.usesChainMetadata || !relevantSessionChainId) {
       setMetadataLatestBlock(null);
       setMetadataLatestBlockStatus('');
       return;
@@ -753,7 +757,7 @@ const AdminPageRuntime = ({
     return () => {
       cancelled = true;
     };
-  }, [relevantSessionChainId]);
+  }, [relevantSessionChainId, sessionCapabilities.usesChainMetadata]);
 
   useEffect(() => {
     if (metadataDraftTouched) return;
@@ -859,6 +863,17 @@ const AdminPageRuntime = ({
           slug: selectedSlug,
           sessionConfig: selectedConfig,
           allowSharedFallback: true,
+        }),
+      ),
+    [selectedConfig, selectedSlug],
+  );
+  const exactSelectedConfigWorkerUrl = useMemo(
+    () =>
+      normalizeWorkerUrl(
+        getUsableSessionWorkerUrl({
+          slug: selectedSlug,
+          sessionConfig: selectedConfig,
+          requireExactWorkerSession: true,
         }),
       ),
     [selectedConfig, selectedSlug],
@@ -1091,6 +1106,7 @@ const AdminPageRuntime = ({
       return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
         action,
         slug,
+        sessionId: selectedWorkerSessionId || undefined,
         body,
         workerUrl: baseUrl,
         context: {
@@ -1107,6 +1123,7 @@ const AdminPageRuntime = ({
       selectedConfig,
       selectedConfigWorkerUrl,
       selectedSlug,
+      selectedWorkerSessionId,
       toggleLoginModal,
       workerUrl,
     ],
@@ -1512,8 +1529,13 @@ const AdminPageRuntime = ({
     setDeniedStatus(`Testing ${key} (expect 403)…`);
     try {
       const { loginResp, loginData } = await attemptWorkerLogin();
+      const loginError = adminWorkerPorts.siweLogin.createRemoteError({
+        kind: 'worker_login',
+        payload: loginData,
+        status: loginResp.status,
+      });
       if (loginResp.status === 403) {
-        const detail = toStr(loginData?.error || 'Forbidden').trim();
+        const detail = loginError?.reason || 'worker_auth_worker_login_failed';
         setDeniedResults((prev) => ({ ...prev, [key]: `OK (403 ${detail})` }));
         setDeniedStatus(`Expected 403 for ${key}.`);
         return;
@@ -1523,11 +1545,11 @@ const AdminPageRuntime = ({
         setDeniedStatus('Unexpectedly allowed login; gating may be misconfigured.');
         return;
       }
-      const detail = toStr(loginData?.error || `Login failed (${loginResp.status})`).trim();
+      const detail = loginError?.message || `Worker login failed (${loginResp.status}).`;
       setDeniedResults((prev) => ({ ...prev, [key]: `FAILED (${detail})` }));
       setDeniedStatus(detail);
     } catch (err: any) {
-      const msg = getErrorMessage(err, 'Denied test failed.');
+      const msg = adminWorkerPorts.siweLogin.getRemoteErrorMessage(err) || 'Denied access test failed.';
       setDeniedResults((prev) => ({ ...prev, [key]: `FAILED (${msg})` }));
       setDeniedStatus(msg);
     } finally {
@@ -1592,6 +1614,8 @@ const AdminPageRuntime = ({
 
   const { isWorkerCanonicalSession, workerAdminAddress, hasRegistryEntry, canAdminWorker, canAdminRegistry } =
     resolveAdminCapabilities({ account, sessionConfig: selectedConfig });
+  const { showAdminWorkerGroups, workerGroupsPanelTitle, workerGroupsPanelDescription } = adminCapabilityRoute;
+  const sessionRecoveryMessage = resolveAdminSessionRecoveryMessage({ sessionCapabilities, hasRegistryEntry });
   const baseWorkerUrl = normalizeWorkerUrl(workerUrl);
   const canRunTests = !!baseWorkerUrl && !!account;
   const canRunHealthTest = !!baseWorkerUrl && (defaultGateIsEmpty || walletReady);
@@ -2533,10 +2557,8 @@ const AdminPageRuntime = ({
               </div>
             )}
             {corsPatchStatus && <div className={styles.statusNote}>{corsPatchStatus}</div>}
-            {selectedConfig && !hasRegistryEntry && !isWorkerCanonicalSession && (
-              <div className={styles.warningNote}>
-                Session is not registered on-chain yet. Register in /new before using worker actions.
-              </div>
+            {selectedConfig && sessionRecoveryMessage && (
+              <div className={styles.warningNote}>{sessionRecoveryMessage}</div>
             )}
           </div>
         </div>
@@ -2698,7 +2720,7 @@ const AdminPageRuntime = ({
           )}
         </section>
 
-        {sessionCapabilities.usesOnChainSbt || sessionCapabilities.isRegistryCanonical ? (
+        {sessionCapabilities.isRegistryCanonical ? (
           <section className={`${styles.panel} ${styles.gatePanel}`}>
             <div className={styles.panelHeader}>
               <div className={styles.panelTitleGroup}>
@@ -2797,6 +2819,16 @@ const AdminPageRuntime = ({
           </section>
         ) : null}
 
+        {sessionCapabilities.usesOnChainSbt && !sessionCapabilities.isRegistryCanonical ? (
+          <section className={`${styles.panel} ${styles.gatePanel}`} data-testid="ce-admin-worker-sbt-gates">
+            <div className={styles.panelTitle}>Advanced on-chain access gates</div>
+            <div className={styles.statusNote}>
+              This Worker-owned session checks the SBT conditions in its validated profile. Gate editing is read-only
+              here; update and republish the profile through the session wizard. No registry transaction is available.
+            </div>
+          </section>
+        ) : null}
+
         <AdminAgentSessionWrappedPanel
           canAdminWorker={canAdminWorker}
           sessionConfig={selectedConfig}
@@ -2807,12 +2839,17 @@ const AdminPageRuntime = ({
           onConfigUpdated={handleAgentSessionWrappedConfigUpdated}
         />
 
-        <AdminWorkerGroupsPanel
-          canAdminWorker={canAdminWorker}
-          sessionSlug={normalizeSlug(selectedSlug)}
-          workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
-          postSignedRequest={postSignedAdminRequest}
-        />
+        {showAdminWorkerGroups ? (
+          <AdminWorkerGroupsPanel
+            canAdminWorker={canAdminWorker}
+            sessionId={selectedWorkerSessionId}
+            sessionSlug={normalizeSlug(selectedSlug)}
+            workerUrl={sessionCapabilities.usesWorkerGroups ? exactSelectedConfigWorkerUrl : selectedConfigWorkerUrl}
+            postSignedRequest={postSignedAdminRequest}
+            title={workerGroupsPanelTitle}
+            description={workerGroupsPanelDescription}
+          />
+        ) : null}
 
         <AdminPageWorkerSecretsPanel
           workerSecretsOpen={workerSecretsOpen}

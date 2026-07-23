@@ -12,16 +12,19 @@ import {
   resolveCurrentSessionSlugForProps,
   resolveTelegramAgentBridgeUrl,
   resolveTelegramResultsAuthFailureReason,
+  type AgentClientLoginEnvelopeMemoryGlobal,
 } from './onePageSessionTelegramController';
 
 const buildEnvelope = (sessionSlug: string): AgentClientLoginEnvelope => ({
   v: 2,
+  sessionId: '0x11111111111111111111111111111111',
   sessionSlug,
   address: '0x0000000000000000000000000000000000000001',
   bridgeCredential: { kind: 'agent_bridge_browser_token', token: 'ceagt_bridge_test' },
   workerCredential: { kind: 'session_worker_jwt', token: 'jwt-worker-test' },
   agentBridgeUrl: 'https://bridge.example',
-  capabilities: { submitAnswers: true },
+  workerUrl: 'https://session-worker.example',
+  capabilities: { submitAnswers: true, readGroups: true },
   expiresAt: '2026-01-01T00:00:00.000Z',
 });
 
@@ -87,22 +90,25 @@ describe('onePageSessionTelegramController', () => {
   });
 
   it('uses normalized envelope cache keys for cache writes and clears', () => {
-    const globalTarget = {
+    const globalTarget: AgentClientLoginEnvelopeMemoryGlobal = {
       __CE_AGENT_CLIENT_LOGIN_ENVELOPES__: {
         alpha: buildEnvelope('alpha'),
         general: buildEnvelope('general'),
       },
     };
 
-    expect(getAgentClientLoginEnvelopeMemoryKey(' General ')).toBe('general');
-    expect(cacheAgentClientLoginEnvelope(buildEnvelope(' Beta '), globalTarget)).toBe('beta');
-    expect(globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__.beta).toMatchObject({ sessionSlug: ' Beta ' });
+    expect(getAgentClientLoginEnvelopeMemoryKey(' General ')).toBe(
+      'general\nno-session-id\nno-worker-origin\nno-bridge-origin',
+    );
+    const betaKey = cacheAgentClientLoginEnvelope(buildEnvelope(' Beta '), globalTarget);
+    expect(betaKey).toContain('beta\n0x11111111111111111111111111111111');
+    expect(globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__?.[betaKey]).toMatchObject({ sessionSlug: ' Beta ' });
 
     clearTelegramEnvelopeMemoryCache(' Alpha ', globalTarget);
     clearTelegramEnvelopeMemoryCache('', globalTarget);
 
     expect(globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__).toEqual({
-      beta: expect.objectContaining({ sessionSlug: ' Beta ' }),
+      [betaKey]: expect.objectContaining({ sessionSlug: ' Beta ' }),
     });
   });
 
@@ -138,8 +144,20 @@ describe('onePageSessionTelegramController', () => {
       },
     });
 
-    expect(resolveAgentClientLoginEnvelopeFromEvent(matching, 'alpha')).toBe(envelope);
-    expect(resolveAgentClientLoginEnvelopeFromEvent(mismatch, 'alpha')).toBeNull();
-    expect(resolveAgentClientLoginEnvelopeFromEvent(missingToken, 'alpha')).toBeNull();
+    const target = {
+      sessionSlug: 'alpha',
+      sessionId: envelope.sessionId,
+      workerUrl: envelope.workerUrl,
+      agentBridgeUrl: envelope.agentBridgeUrl,
+    };
+    expect(resolveAgentClientLoginEnvelopeFromEvent(matching, target)).toBe(envelope);
+    expect(resolveAgentClientLoginEnvelopeFromEvent(mismatch, target)).toBeNull();
+    expect(
+      resolveAgentClientLoginEnvelopeFromEvent(matching, {
+        ...target,
+        sessionId: '0x22222222222222222222222222222222',
+      }),
+    ).toBeNull();
+    expect(resolveAgentClientLoginEnvelopeFromEvent(missingToken, target)).toBeNull();
   });
 });

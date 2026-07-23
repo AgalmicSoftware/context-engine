@@ -40,6 +40,7 @@ export type ResolveCreateSbtAuthoringChainOptionsArgs = {
 export type ResolveCreateSbtPreferredAuthoringChainIdArgs = {
   availableChainIds?: unknown[];
   network?: unknown;
+  preferConnectedNetworkForAuthoring?: boolean;
   resolvedSessionConfig?: Record<string, unknown> | null;
   selectedChainId?: unknown;
   sessionConfigOverride?: Record<string, unknown> | null;
@@ -200,20 +201,22 @@ export const resolveCreateSbtAuthoringChainOptions = ({
 export const resolveCreateSbtPreferredAuthoringChainId = ({
   availableChainIds = [],
   network = null,
+  preferConnectedNetworkForAuthoring = false,
   resolvedSessionConfig = null,
   selectedChainId = null,
   sessionConfigOverride = null,
 }: ResolveCreateSbtPreferredAuthoringChainIdArgs = {}): number | null => {
   const networkRecord = isCreateSbtAuthoringPlainObject(network) ? network : {};
-  // Regression guard: authoring follows the form/session chain first and only
-  // consults the connected wallet as a last-resort fallback.
+  const connectedNetworkCandidates = [networkRecord.id, networkRecord.chainId];
+  const sessionNetworkCandidates = [sessionConfigOverride?.networkChainId, resolvedSessionConfig?.networkChainId];
+  // Registry and hybrid sessions author on their configured chain. Standalone
+  // SBT tooling opened from a pure Worker session has no session-owned chain,
+  // so its connected network must take precedence over legacy metadata.
   return selectPreferredChainId(
     [
       selectedChainId,
-      sessionConfigOverride?.networkChainId,
-      resolvedSessionConfig?.networkChainId,
-      networkRecord.id,
-      networkRecord.chainId,
+      ...(preferConnectedNetworkForAuthoring ? connectedNetworkCandidates : sessionNetworkCandidates),
+      ...(preferConnectedNetworkForAuthoring ? sessionNetworkCandidates : connectedNetworkCandidates),
     ],
     availableChainIds,
   );

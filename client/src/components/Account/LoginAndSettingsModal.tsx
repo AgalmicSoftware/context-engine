@@ -83,7 +83,7 @@ import { initCacheManager, listNamespaceEntriesSync, removeCache } from '../../u
 import { toStr } from '../../utilities/shared/primitives.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import { isTelegramFirstSessionConfig } from '../../utilities/session/sessionBackendKind';
-import type { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import {
   exchangeAgentClientLogin,
   extractAgentClientToken,
@@ -115,9 +115,12 @@ import {
   formatLoginSettingsAiProviderLabel,
 } from './loginSettingsAiDisplayHelpers';
 import LoginAgentTokenPanel from './LoginAgentTokenPanel';
-import { createLoginAgentActions } from './loginAndSettingsAgentTokenActions';
+import {
+  createLoginAgentActions,
+  resolveValidatedWorkerCanonicalLoginConfig,
+} from './loginAndSettingsAgentTokenActions';
 import { createLoginPasskeyActions } from './loginAndSettingsPasskeyActions';
-import type { PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
+import type { LoginPasskeyNetwork, PasskeyWalletActionMode } from './loginAndSettingsPasskeyActions';
 
 const LoginSettingsAiConfigContent = React.lazy(() => import('./LoginSettingsAiConfigContent'));
 const LoginSettingsResourceKeysContent = React.lazy(() => import('./LoginSettingsResourceKeysContent'));
@@ -127,6 +130,9 @@ const normalizeAccountForComparison = (value: unknown): string =>
   String(value || '')
     .trim()
     .toLowerCase();
+type LoginTargetNetwork = LoginPasskeyNetwork & {
+  blockExplorers?: { default?: { name?: unknown; url?: unknown } };
+};
 interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'network'>> {
   provider: string;
   network: WagmiInjectedProps['network'] | null;
@@ -152,6 +158,7 @@ interface LoginAndSettingsModalProps extends Partial<Omit<WagmiInjectedProps, 'n
   changeActiveSessionSlug: (payload?: unknown) => void;
   updateGlobalSessionSelection: (payload?: unknown) => void;
   sessionSlug?: string;
+  sessionConfig?: unknown;
   [key: string]: unknown;
 }
 
@@ -374,7 +381,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   _passkeyWalletActionId: number = 0;
   _sponsoredSessionSourcesMemo: { key: string; value: SponsoredSessionSources } | null = null;
   _settingsOverviewMemo: { key: string; value: LoginSettingsOverviewContext } | null = null;
-  _sessionCapabilityProjectionResolver: typeof resolveSessionCapabilityProjection | null = null;
+  _sessionCapabilityProjectionResolver: typeof resolveSessionCapabilityProjection = resolveSessionCapabilityProjection;
   _passkeyActions = createLoginPasskeyActions({
     accountLogError: (message, error) => accountLog.error(message, error),
     changeAccount: (payload) => this.props.changeAccount(payload),
@@ -445,6 +452,12 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     props: LoginAndSettingsModalProps = this.props,
     state: Partial<LoginAndSettingsModalState> = this.state,
   ) => {
+    const verifiedWorkerConfig = resolveValidatedWorkerCanonicalLoginConfig({
+      sessionConfig: props.sessionConfig,
+      normalizeSessionSlug: normalizeSettingsSessionSlug,
+    });
+    const verifiedWorkerSlug = normalizeSettingsSessionSlug(verifiedWorkerConfig?.slug);
+    if (verifiedWorkerSlug) return verifiedWorkerSlug;
     const resolvedSlug = normalizeSettingsSessionSlug(
       resolveActiveSessionSlug({
         activeSessionSlug: props.activeSessionSlug,
@@ -460,7 +473,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       ? normalizedPropList[0]
       : String(normalizedPropList || '')
           .split(',')
-          .map((slug: any) => slug.trim())
+          .map((slug) => slug.trim())
           .filter(Boolean)[0];
     const effectiveListPrimary = listModePrimary || normalizeSettingsSessionSlug(propListPrimary);
     const listIncludesGeneral =
@@ -481,29 +494,50 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     return this.getActiveSessionSlug();
   };
 
-  getTargetNetwork = () => {
+  getActiveSessionCapabilities = () => {
     const slug = this.getActiveSessionSlug();
-    const ch = getSessionNetwork(slug);
-    if (ch) return ch;
+    return this._sessionCapabilityProjectionResolver(this.getDisplaySessionConfig(slug));
+  };
+
+  buildTargetNetworkDescriptor = (chainId: number): LoginTargetNetwork => ({
+    id: chainId,
+    chainId,
+    name: `Chain ${chainId}`,
+    network: String(chainId),
+    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+    rpcUrls: { default: { http: [] }, public: { http: [] } },
+    blockExplorers: { default: { name: '', url: '' } },
+    unsupported: false,
+  });
+
+  getGlobalTargetNetwork = (): LoginTargetNetwork => {
+    const connectedNetwork =
+      this.props.provider === 'wagmi'
+        ? this.props.wagmiNetwork || this.props.network
+        : this.props.network || this.props.wagmiNetwork;
+    if (Number(readChainIdLike(connectedNetwork)) > 0) return connectedNetwork as LoginTargetNetwork;
 
     const fallback = getChainById(DEFAULT_CHAIN_ID);
     if (fallback) return fallback;
 
-    return {
-      id: DEFAULT_CHAIN_ID,
-      chainId: DEFAULT_CHAIN_ID,
-      name: `Chain ${DEFAULT_CHAIN_ID}`,
-      network: String(DEFAULT_CHAIN_ID),
-      nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-      rpcUrls: { default: { http: [] }, public: { http: [] } },
-      blockExplorers: { default: { name: '', url: '' } },
-      unsupported: false,
-    };
+    return this.buildTargetNetworkDescriptor(DEFAULT_CHAIN_ID);
+  };
+
+  getTargetNetwork = (): LoginTargetNetwork => {
+    const slug = this.getActiveSessionSlug();
+    const capabilities = this.getActiveSessionCapabilities();
+    const projectedChainId =
+      capabilities.showNetworkControls && Number(capabilities.chainId) > 0 ? Number(capabilities.chainId) : null;
+    if (!projectedChainId) return this.getGlobalTargetNetwork();
+
+    const configuredNetwork = getSessionNetwork(slug);
+    if (Number(readChainIdLike(configuredNetwork)) === projectedChainId) return configuredNetwork as LoginTargetNetwork;
+
+    return getChainById(projectedChainId) || this.buildTargetNetworkDescriptor(projectedChainId);
   };
 
   async componentDidMount() {
     this._isMounted = true;
-    void this.loadSessionCapabilityProjection();
     this.checkAndSendTestFundsIfNeeded();
 
     // Passkey wallet session rehydration
@@ -564,19 +598,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       }
     }
     this.setState(nextState, cb);
-  };
-
-  loadSessionCapabilityProjection = async () => {
-    if (this._sessionCapabilityProjectionResolver) return;
-    try {
-      const capabilityModule = await import('../../utilities/session/sessionCapabilityProjection');
-      if (!this._isMounted) return;
-      this._sessionCapabilityProjectionResolver = capabilityModule.resolveSessionCapabilityProjection;
-      this._settingsOverviewMemo = null;
-      this.forceUpdate();
-    } catch (error) {
-      accountLog.error('Failed to load session capability projection:', error);
-    }
   };
 
   getWalletChainId = (props: LoginAndSettingsModalProps = this.props) =>
@@ -878,7 +899,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     if (activeSessionChanged) {
       this.loadAiSettings();
       this.loadResourceKeys();
-      this.syncPasskeyWalletChain();
+      const capabilities = this.getActiveSessionCapabilities();
+      if (capabilities.showNetworkControls && capabilities.chainId) {
+        this.syncPasskeyWalletChain(this.getTargetNetwork());
+      }
     }
     if (needsSponsoredAccessRefresh) this.loadSponsoredAccess();
 
@@ -921,8 +945,8 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
           chainId,
         },
       });
-    } catch (err) {
-      accountLog.warn('[WorkerAuth] Session token request failed:', err);
+    } catch {
+      accountLog.warn('[WorkerAuth] Session token request failed.');
     }
   };
 
@@ -1158,16 +1182,20 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   loadSponsoredAccess = async () => {
     const slug = this.getActiveSessionSlug();
+    const verifiedWorkerConfig = resolveValidatedWorkerCanonicalLoginConfig({
+      sessionConfig: this.props.sessionConfig,
+      expectedSlug: slug,
+      normalizeSessionSlug: normalizeSettingsSessionSlug,
+    });
     const reqId = (this._sponsoredReqId = (this._sponsoredReqId || 0) + 1);
     this.setStateIfMounted({ sponsoredAccessLoading: true, workerResourcePresence: null });
     try {
       const { loadLoginSettingsSponsoredAccess } = await import('./loginSettingsSponsoredAccessRuntime');
       const { accessMap, workerResourcePresence } = await loadLoginSettingsSponsoredAccess({
         slug,
-        sessionConfig: getSessionConfigBySlugOrDefault(slug) || {},
+        sessionConfig: verifiedWorkerConfig || getSessionConfigBySlugOrDefault(slug) || {},
         account: this.props.account || '',
         providerLike: this.props.provider || null,
-        fallbackChainId: this.getTargetNetwork()?.id,
         // Regression guard: old workers may reject resource-presence. Only probe
         // when the settings UI that consumes the result is actually visible.
         includeWorkerResourcePresence: !!this.props.loginModalToggled,
@@ -1324,7 +1352,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     this.setState({
       resourceKeys: saved,
       resourceKeysDirty: false,
-      resourceKeysStatus: 'Saved.',
+      resourceKeysStatus: 'Available for this tab; cleared on reload.',
     });
   };
 
@@ -1345,7 +1373,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
     this.setState({
       resourceKeys,
       resourceKeysDirty: false,
-      resourceKeysStatus: 'Local overrides cleared.',
+      resourceKeysStatus: 'In-memory overrides cleared.',
     });
   };
 
@@ -1375,8 +1403,13 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
 
   renderAgentTokenLoginPanel = () => {
     if (!this.shouldShowAgentTokenLogin()) return null;
-    const { sessionSlug } = this.getAgentTokenLoginSessionContext();
-    const cachedEnvelope = readAgentClientLoginEnvelope(sessionSlug);
+    const { agentBridgeUrl, sessionId, sessionSlug, workerUrl } = this.getAgentTokenLoginSessionContext();
+    const cachedEnvelope = readAgentClientLoginEnvelope({
+      sessionSlug,
+      sessionId,
+      workerUrl,
+      agentBridgeUrl,
+    });
     return (
       <LoginAgentTokenPanel
         agentTokenError={this.state.agentTokenError}
@@ -1677,7 +1710,6 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   toggleAiSettingsPanel = () => {
-    void this.loadSessionCapabilityProjection();
     this.setState((prevState: Readonly<LoginAndSettingsModal['state']>) => ({
       aiSettingsOpen: !prevState.aiSettingsOpen,
     }));
@@ -2196,7 +2228,7 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
                       title: 'Resource keys',
                       summary:
                         useLocalRpc || useLocalArweave
-                          ? 'Local key overrides enabled'
+                          ? 'In-memory key overrides enabled'
                           : 'Using session-sponsored fallbacks',
                       children: (
                         <Suspense fallback={<div className={styles.aiSettingsHint}>Loading resource settings…</div>}>
@@ -2333,14 +2365,36 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
   };
 
   getModalDisplay = () => {
+    const activeSessionSlug = this.getActiveSessionSlug();
+    const activeSessionConfig = this.getDisplaySessionConfig(activeSessionSlug);
+    const activeSessionCapabilities = this._sessionCapabilityProjectionResolver(activeSessionConfig);
+    const hasConcreteActiveSession = !!normalizeSettingsSessionSlug(activeSessionSlug);
+    const sessionIdentityUnavailable =
+      hasConcreteActiveSession &&
+      (activeSessionCapabilities.source === 'missing' || activeSessionCapabilities.source === 'invalid_profile');
+    const isValidatedPasskeyOnlyWorkerSession =
+      activeSessionCapabilities.profileValid &&
+      activeSessionCapabilities.isWorkerCanonical &&
+      activeSessionCapabilities.usesPasskeyIdentity &&
+      !activeSessionCapabilities.usesWalletIdentity;
+    const showAdvancedWalletAccess =
+      isValidatedPasskeyOnlyWorkerSession && !activeSessionCapabilities.isPureWorkerCanonical;
+    const showWalletIdentity =
+      !sessionIdentityUnavailable &&
+      (activeSessionCapabilities.isRegistryCanonical ||
+        (activeSessionCapabilities.profileValid && activeSessionCapabilities.usesWalletIdentity) ||
+        !hasConcreteActiveSession);
     const activeChain = this.props.wagmiNetwork || this.props.network || this.getTargetNetwork();
-    const showTestnetOnly = !!activeChain?.testnet;
-    const activeSessionSlug = this.props.loginComplete ? this.getActiveSessionSlug() : '';
-    const activeSessionConfig = this.props.loginComplete ? this.getDisplaySessionConfig(activeSessionSlug) : null;
+    const showTestnetOnly = (showWalletIdentity || showAdvancedWalletAccess) && !!activeChain?.testnet;
+    const activeSessionNetworkChainId =
+      activeSessionCapabilities.showNetworkControls && activeSessionCapabilities.chainId
+        ? activeSessionCapabilities.chainId
+        : null;
 
     return LoginModalDisplayBody({
       account: this.props.account,
       activeSessionConfig,
+      activeSessionNetworkChainId,
       activeSessionSlug,
       handleLogout: this.handleLogout,
       handlePasskeyWalletCreate: this.handlePasskeyWalletCreate,
@@ -2360,7 +2414,10 @@ export class LoginAndSettingsModal extends Component<LoginAndSettingsModalProps,
       passkeyMode: this.state.passkeyMode,
       provider: this.props.provider,
       renderAgentTokenLoginPanel: this.renderAgentTokenLoginPanel,
+      sessionIdentityUnavailable,
+      showAdvancedWalletAccess,
       showTestnetOnly,
+      showWalletIdentity,
     });
   };
 

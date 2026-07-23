@@ -2,6 +2,8 @@ import React, { act } from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
+import { clearAgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
+import { MetaMaskLoginButton } from '../../app/runtime/walletUiRuntime.js';
 import styles from './Account.module.scss';
 
 jest.mock('@rainbow-me/rainbowkit', () => ({
@@ -153,6 +155,54 @@ const RAW_AGENT_TOKEN = 'ceagt_abcdefghijklmnopqrstuvwxyz123456';
 const ORIGINAL_TERMINOLOGY_MODE = process.env.REACT_APP_TERMINOLOGY_MODE;
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 
+const buildRegistrySessionConfig = (overrides = {}) => {
+  const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+  const chainId = Number(overrides.networkChainId || 84532);
+  if (sessionModeProfile.evm.registryChainId !== chainId) {
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+  }
+  sessionModeProfile.evm.registryChainId = chainId;
+  return {
+    networkChainId: chainId,
+    sessionModeProfile,
+    ...overrides,
+  };
+};
+
+const buildPureWorkerSessionConfig = (overrides = {}) => ({
+  slug: 'demo-sh',
+  sessionName: 'Demo Session',
+  corsWorkerUrl: 'https://demo-sh.example.test',
+  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  ...overrides,
+});
+
+const buildHybridWorkerSessionConfig = (overrides = {}) => {
+  const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+  sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+  sessionModeProfile.evm.registryChainId = 11155420;
+  sessionModeProfile.encryption = { mode: 'lit' };
+  sessionModeProfile.storage.payloadAccessControl = {
+    ...sessionModeProfile.storage.payloadAccessControl,
+    encryption: 'lit',
+  };
+  return {
+    slug: 'hybrid',
+    sessionName: 'Hybrid Session',
+    corsWorkerUrl: 'https://hybrid.example.test',
+    sessionModeProfile,
+    ...overrides,
+  };
+};
+
+const treeHasElementType = (node, expectedType) => {
+  if (node == null) return false;
+  if (Array.isArray(node)) return node.some((child) => treeHasElementType(child, expectedType));
+  if (typeof node !== 'object') return false;
+  if (node.type === expectedType) return true;
+  return treeHasElementType(node.props?.children, expectedType);
+};
+
 const buildProps = (overrides = {}) => ({
   account: '',
   activeSessionSlug: '',
@@ -241,7 +291,12 @@ const buildWrongNetworkSubject = ({
     String(slug || '')
       .trim()
       .toLowerCase() === 'edge'
-      ? sessionConfig || { slug: 'edge', sessionName: 'Edge Session', sponsoredKeys: { rpc: 'edge-rpc' } }
+      ? sessionConfig ||
+        buildRegistrySessionConfig({
+          slug: 'edge',
+          sessionName: 'Edge Session',
+          sponsoredKeys: { rpc: 'edge-rpc' },
+        })
       : {},
   );
   isolatedCheckSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
@@ -316,6 +371,95 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     getAllSessionSlugs.mockReturnValue([]);
     getSessionConfigBySlugOrDefault.mockImplementation(() => ({}));
     checkSponsoredAccess.mockImplementation(async () => ({ status: 'unknown' }));
+  });
+
+  it('resolves a signed-out pure Worker session and presents passkey as its only identity path', () => {
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
+      slug === 'demo-sh' ? buildPureWorkerSessionConfig() : {},
+    );
+    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'demo-sh' }));
+
+    const tree = subject.getModalDisplay();
+    render(tree);
+
+    expect(getSessionConfigBySlugOrDefault).toHaveBeenCalledWith('demo-sh');
+    expect(screen.getByText('Account uses a passkey:')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ethereum wallet' })).not.toBeInTheDocument();
+    expect(screen.queryByText('test network only')).not.toBeInTheDocument();
+    expect(treeHasElementType(tree, MetaMaskLoginButton)).toBe(false);
+  });
+
+  it('retains the signed-out wallet identity path for registry sessions', () => {
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
+      slug === 'registry' ? buildRegistrySessionConfig({ slug: 'registry' }) : {},
+    );
+    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'registry' }));
+
+    const tree = subject.getModalDisplay();
+    render(tree);
+
+    expect(getSessionConfigBySlugOrDefault).toHaveBeenCalledWith('registry');
+    expect(screen.getByRole('link', { name: 'Ethereum wallet' })).toBeInTheDocument();
+    expect(screen.getByText('test network only')).toBeInTheDocument();
+    expect(treeHasElementType(tree, MetaMaskLoginButton)).toBe(true);
+  });
+
+  it.each([
+    [
+      'missing',
+      {
+        slug: 'unavailable',
+        networkChainId: 11155420,
+      },
+    ],
+    [
+      'invalid',
+      {
+        slug: 'unavailable',
+        networkChainId: 11155420,
+        sessionModeProfile: {
+          profileVersion: 1,
+          authority: { mode: 'worker_canonical' },
+        },
+      },
+    ],
+  ])('fails closed for a concrete %s capability profile instead of inferring wallet auth', (_label, config) => {
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (slug === 'unavailable' ? config : {}));
+    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'unavailable' }));
+
+    const tree = subject.getModalDisplay();
+    render(tree);
+
+    expect(screen.getByTestId('ce-session-identity-unavailable')).toHaveTextContent(
+      /capability profile is unavailable or invalid/i,
+    );
+    expect(screen.queryByRole('link', { name: 'Ethereum wallet' })).not.toBeInTheDocument();
+    expect(screen.queryByText('test network only')).not.toBeInTheDocument();
+    expect(treeHasElementType(tree, MetaMaskLoginButton)).toBe(false);
+  });
+
+  it('retains the signed-out wallet access path for validated Worker hybrids', () => {
+    const hybridConfig = buildHybridWorkerSessionConfig();
+    expect(resolveSessionCapabilityProjection(hybridConfig)).toMatchObject({
+      profileValid: true,
+      isWorkerCanonical: true,
+      isPureWorkerCanonical: false,
+      usesRpc: true,
+    });
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) => (slug === 'hybrid' ? hybridConfig : {}));
+    const subject = new LoginAndSettingsModal(buildProps({ activeSessionSlug: 'hybrid' }));
+
+    const tree = subject.getModalDisplay();
+    render(tree);
+
+    expect(screen.getByText('Account uses a passkey:')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ethereum wallet' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-advanced-wallet-access')).toHaveTextContent('Advanced on-chain access');
+    expect(screen.getByTestId('ce-advanced-wallet-access')).toHaveTextContent(
+      "Use an Ethereum wallet only for this session's optional on-chain gates.",
+    );
+    expect(screen.getByText('test network only')).toBeInTheDocument();
+    expect(treeHasElementType(tree, MetaMaskLoginButton)).toBe(true);
   });
 
   it('renders passkey auth without a MetaMask login control by default', () => {
@@ -400,6 +544,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
   it('shows worker session access and AI state without chain resource controls', () => {
     const subject = buildWrongNetworkSubject({
+      mode: 'crypto',
       aiSettingsOpen: true,
       sessionConfig: {
         slug: 'edge',
@@ -602,7 +747,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
         .trim()
         .toLowerCase();
       if (normalized === 'demo') {
-        return {
+        return buildRegistrySessionConfig({
           slug: 'demo',
           sessionName: 'Demo Session',
           sponsoredKeys: {
@@ -611,16 +756,16 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
             rpc: 'demo-rpc',
             txGas: 'demo-gas',
           },
-        };
+        });
       }
       if (normalized === 'edge') {
-        return {
+        return buildRegistrySessionConfig({
           slug: 'edge',
           sessionName: 'Edge Session',
           sponsoredKeys: {
             ai: 'edge-ai',
           },
-        };
+        });
       }
       return {};
     });
@@ -1039,7 +1184,13 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
 
   it('renders logged-in controls and disconnects wagmi users from the modal', async () => {
     getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
-      slug === 'demo-1' ? { slug: 'demo-1', sessionName: 'Demo Session', networkChainId: 11155420 } : {},
+      slug === 'demo-1'
+        ? buildRegistrySessionConfig({
+            slug: 'demo-1',
+            sessionName: 'Demo Session',
+            networkChainId: 11155420,
+          })
+        : {},
     );
     const props = buildProps({
       account: WAGMI_ADDRESS,
@@ -1077,6 +1228,34 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
     });
   });
 
+  it('does not pass legacy chain metadata into the account profile for a pure Worker session', () => {
+    getSessionConfigBySlugOrDefault.mockImplementation((slug) =>
+      slug === 'demo-sh'
+        ? {
+            slug: 'demo-sh',
+            sessionName: 'Worker Session',
+            networkChainId: 11155420,
+            corsWorkerUrl: 'https://demo-sh.example.test',
+            sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+          }
+        : {},
+    );
+    const subject = new LoginAndSettingsModal(
+      buildProps({
+        account: WAGMI_ADDRESS,
+        activeSessionSlug: 'demo-sh',
+        loginComplete: true,
+        provider: 'wagmi',
+      }),
+    );
+
+    render(subject.getModalDisplay());
+
+    expect(screen.getByTestId('mock-user-page')).toHaveAttribute('data-active-session-slug', 'demo-sh');
+    expect(screen.getByTestId('mock-user-page')).toHaveAttribute('data-network-chain-id', '');
+    expect(screen.getByTestId('mock-user-page')).toHaveAttribute('data-session-config-chain-id', '11155420');
+  });
+
   it('replaces the legacy settings summary strip with compact supported-resource cards', async () => {
     getAllSessionSlugs.mockReturnValue(['demo', 'edge']);
     getSessionConfigBySlugOrDefault.mockImplementation((slug) => {
@@ -1084,7 +1263,7 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
         .trim()
         .toLowerCase();
       if (normalized === 'demo') {
-        return {
+        return buildRegistrySessionConfig({
           slug: 'demo',
           sessionName: 'Demo Session',
           sponsoredKeys: {
@@ -1092,16 +1271,16 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
             arweave: 'demo-ar',
             rpc: 'demo-rpc',
           },
-        };
+        });
       }
       if (normalized === 'edge') {
-        return {
+        return buildRegistrySessionConfig({
           slug: 'edge',
           sessionName: 'Edge Session',
           sponsoredKeys: {
             ai: 'edge-ai',
           },
-        };
+        });
       }
       return {};
     });
@@ -1302,11 +1481,13 @@ describe('LoginAndSettingsModal rendered auth flow', () => {
       },
     };
     subject.getSessionDescriptor = jest.fn(() => ({ label: 'Edge Session' }));
-    subject.getDisplaySessionConfig = jest.fn(() => ({
-      slug: 'edge',
-      sessionName: 'Edge Session',
-      sponsoredKeys: { rpc: 'edge-rpc' },
-    }));
+    subject.getDisplaySessionConfig = jest.fn(() =>
+      buildRegistrySessionConfig({
+        slug: 'edge',
+        sessionName: 'Edge Session',
+        sponsoredKeys: { rpc: 'edge-rpc' },
+      }),
+    );
     subject.getSettingsSessionOptions = jest.fn(() => [{ slug: 'edge', label: 'Edge Session' }]);
     subject.getSponsoredSessionSources = jest.fn(() => ({
       byResource: {
@@ -1490,6 +1671,7 @@ describe('LoginAndSettingsModal agent token login', () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
+    clearAgentClientLoginEnvelope('alpha');
     window.history.replaceState({}, '', '/session/alpha');
     global.fetch = jest.fn(
       async () =>
@@ -1516,6 +1698,7 @@ describe('LoginAndSettingsModal agent token login', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    clearAgentClientLoginEnvelope('alpha');
     window.localStorage.clear();
     window.sessionStorage.clear();
     delete global.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__;
@@ -1551,6 +1734,8 @@ describe('LoginAndSettingsModal agent token login', () => {
     expect(window.location.href).not.toContain(RAW_AGENT_TOKEN);
     expect(JSON.stringify(window.localStorage)).not.toContain(RAW_AGENT_TOKEN);
     expect(Object.values(window.sessionStorage).join('\n')).not.toContain(RAW_AGENT_TOKEN);
+    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('bridge-browser-token');
+    expect(Object.values(window.sessionStorage).join('\n')).not.toContain('jwt-session-token');
     expect(JSON.stringify(props.changeAccount.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
     expect(JSON.stringify(props.updateLoginInfo.mock.calls)).not.toContain(RAW_AGENT_TOKEN);
   });

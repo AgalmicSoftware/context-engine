@@ -287,4 +287,36 @@ describe('sessionWorkerAvailability', () => {
       }),
     ).toBe('');
   });
+
+  it('pins exact Worker targets to the validated origin and identity instead of a newer slug cache', () => {
+    const exactConfig = {
+      ...demoSessions['demo-sh'],
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    upsertCachedSessionWorkerConfig({
+      slug: exactConfig.slug,
+      config: {
+        corsWorkerUrl: 'https://cross-session-cache.example',
+      },
+    });
+
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: exactConfig.slug,
+        sessionConfig: exactConfig,
+        requireExactWorkerSession: true,
+      }),
+    ).toBe(exactConfig.corsWorkerUrl.replace(/\/+$/, ''));
+
+    expect(
+      getUsableSessionWorkerUrl({
+        slug: exactConfig.slug,
+        sessionConfig: {
+          ...exactConfig,
+          sessionId: '',
+        },
+        requireExactWorkerSession: true,
+      }),
+    ).toBe('');
+  });
 });

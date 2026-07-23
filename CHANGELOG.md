@@ -6,12 +6,25 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Telegram group approval no longer creates bearer-capability `startgroup`
+  URLs. Bot, Mini App, and Agent API compatibility surfaces now direct a
+  configured session admin to approve from inside the target group with
+  `/join <session>`, while legacy approval payloads fail closed. Mini App
+  onboarding now accepts signed Telegram `initData` only in a POST JSON body or
+  the canonical request header; GET and query-string credential transport are
+  rejected.
 - Worker-canonical sessions now project setup, account settings, Admin metadata,
   diagnostics, secrets, and route errors from the active capability profile.
   Pure Cloudflare sessions use passkey access, Worker config, AI, storage, and
   native Groups without presenting RPC, gas, faucet, Arweave, Lit, registry, or
   SBT requirements; explicitly enabled hybrid and registry sessions retain
-  their chain controls.
+  their chain controls. Profile compilation, persistence, canonical readback,
+  and Worker validation now reject schema-only, unavailable, malformed, and
+  cross-lineage combinations instead of inferring capabilities from legacy
+  chain fields. Session pages also suppress wallet/network controls, Lit hooks,
+  SBT auto-mint and filters, non-Cloudflare document references, and Polis
+  blockchain metadata for pure Worker profiles, clearing stale chain-backed
+  state when the active capability profile changes.
 - The native `/new` deployment path now presents an honest Cloudflare dashboard
   checklist with copy controls, return guidance, and Worker URL/CORS/canonical
   config verification before success. The deploy-helper remains a collapsed
@@ -23,7 +36,12 @@ All notable changes to this project will be documented in this file.
   opening the on-chain SBT deployment form. Group records support names,
   descriptions, HTTPS images, open or admin-added membership, and visibility
   without contract addresses, chain transactions, gas, RPC, or burn settings;
-  chain-backed sessions retain the legacy SBT flow.
+  the client pins the exact Worker origin while nonce/login, JWT, Group
+  request/response, record, and Durable Object state bind the canonical slug and
+  session ID. Missing or conflicting identity and pre-existing same-slug data
+  fail closed with reconciliation required, late cross-session responses are
+  discarded, Worker/SBT hybrids label their on-chain conditions separately as
+  Advanced access, and registry-backed sessions retain the legacy SBT flow.
 - Git-backed Netlify builds now bind the native Cloudflare Deploy Button to
   Netlify's exact public `COMMIT_REF`; builds without a public commit remain
   fail-closed with the native deployment card disabled.
@@ -354,12 +372,19 @@ All notable changes to this project will be documented in this file.
 - Added explicit dual-field helpers, made question/survey/response client and CE-CC records prefer `storageRef` before legacy `arweaveTxId`, extended worker storage tests for `questions`, `surveys`, and `responses`, and documented the future canonical `storageRef` naming migration.
 - Routed Cloudflare-configured session question, survey, and response writes through sessionCorsWorker `/storage/upload`, using opaque bytes32-compatible Cloudflare IDs in existing Surveys pointer fields without changing the contract ABI; readers now try Cloudflare `storageRef` resolution before Arweave fallback.
 - Clarified Cloudflare setup permissions for R2 payload blobs, D1/KV metadata indexes, and Durable Objects only for signer/runtime coordination.
-- Added `/new` Cloudflare payload access modes: default `worker_sbt_gate` worker-enforced SBT access control without Lit credential requirements, plus a `lit_encrypted` scaffold that requires pre-encrypted payloads and rejects plaintext Cloudflare uploads until the Lit envelope path is complete.
+- Added the then-current `/new` Cloudflare payload aliases:
+  `worker_sbt_gate` was the default in this release and `lit_encrypted` required
+  pre-encrypted payloads. Both names are now legacy read compatibility; current
+  profiles use explicit `gate` and `encryption` fields, and pure Worker profiles
+  do not default to an SBT gate.
 - Fixed encrypted Document Library image thumbnails so scoped Lit hooks arriving after initial render trigger preview loading.
 
 ### Remaining TODOs
 
-- Finish the Cloudflare `lit_encrypted` envelope producer/reader so documents, private questions/responses, surveys, and generated artifacts can be encrypted before `/storage/upload` without routing through Lit-Arweave.
+- Finish the Cloudflare `encryption: "lit"` envelope producer/reader (legacy
+  alias `lit_encrypted`) so documents, private questions/responses, surveys, and
+  generated artifacts can be encrypted before `/storage/upload` without routing
+  through Lit-Arweave.
 - Once all public and agent readers are storageRef-aware, rename the top-level payload pointer contract to `storageRef` in API docs and schemas, leaving `arweaveTxId` as a deprecated Arweave compatibility alias.
 
 ## 2026-05-04

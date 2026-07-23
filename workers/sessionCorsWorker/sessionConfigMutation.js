@@ -50,6 +50,11 @@ const resolveCanonicalSessionIdentity = (config) => {
   };
 };
 
+export const resolveCanonicalWorkerSessionIdHex = (config) => {
+  const identity = resolveCanonicalSessionIdentity(config);
+  return !identity.invalid && identity.value ? `0x${identity.value}` : '';
+};
+
 const normalizeConfigRevision = (value) => {
   if (typeof value !== 'string' || value !== value.trim()) return '';
   return /^[a-z0-9._:-]{1,128}$/i.test(value) ? value : '';

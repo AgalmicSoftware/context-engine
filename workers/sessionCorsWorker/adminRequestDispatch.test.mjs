@@ -10,6 +10,7 @@ import {
 } from './sessionConfigSecretsStore.js';
 import { mergeWorkerConfigRecords } from './sessionConfigNormalization.js';
 import { applySessionConfigMutation } from './sessionConfigMutation.js';
+import { executeWorkerGroupMutation } from './workerGroups.js';
 
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
@@ -18,6 +19,65 @@ const createSignedBody = (overrides = {}) => ({
   message: 'signed-message',
   signature: '0xsig',
   ...overrides,
+});
+
+const createWorkerSessionModeProfile = () => ({
+  profileVersion: 1,
+  preset: 'custom',
+  authority: { mode: 'worker_canonical' },
+  evm: { registryChainId: null },
+  storage: {
+    backend: 'cloudflare',
+    payloadAccessControl: { gate: 'none', encryption: 'none' },
+  },
+  identity: { default: 'passkey', enabled: ['passkey'] },
+  authorization: { mechanisms: ['worker_roles'] },
+  encryption: { mode: 'none' },
+  surfaces: {
+    web: true,
+    telegram: false,
+    miniApp: false,
+    agentHttp: false,
+    mcp: false,
+    ceCc: false,
+  },
+  results: {
+    visibility: 'public_full_if_storage_public',
+    exposure: {
+      aggregateResultsEnabled: true,
+      anonymizedGroupsEnabled: false,
+      minGroupSize: 2,
+    },
+  },
+  export: { scope: 'all_session' },
+});
+
+const createRegistrySessionModeProfile = () => ({
+  profileVersion: 1,
+  preset: 'custom',
+  authority: { mode: 'evm_registry_canonical' },
+  evm: { registryChainId: 11155420 },
+  storage: { backend: 'arweave' },
+  identity: { default: 'wallet', enabled: ['wallet', 'passkey'] },
+  authorization: { mechanisms: ['sbt_onchain'] },
+  encryption: { mode: 'none' },
+  surfaces: {
+    web: true,
+    telegram: false,
+    miniApp: false,
+    agentHttp: false,
+    mcp: false,
+    ceCc: false,
+  },
+  results: {
+    visibility: 'public_full_if_storage_public',
+    exposure: {
+      aggregateResultsEnabled: true,
+      anonymizedGroupsEnabled: false,
+      minGroupSize: 2,
+    },
+  },
+  export: { scope: 'all_session' },
 });
 
 const createMemoryKv = () => {
@@ -225,22 +285,27 @@ test('dispatchAdminRequest merges config and persists the result after authority
 });
 
 test('dispatchAdminRequest rejects explicit invalid security modes before config persistence', async () => {
+  const invalidAuthority = createWorkerSessionModeProfile();
+  invalidAuthority.authority.mode = 'registry';
+  const invalidEncryption = createWorkerSessionModeProfile();
+  invalidEncryption.encryption.mode = 'mystery';
+  const invalidKeyProvider = createWorkerSessionModeProfile();
+  invalidKeyProvider.encryption = {
+    mode: 'worker_envelope',
+    keyProvider: 'cloudflare_secrets_store',
+  };
   const invalidConfigs = [
     {
       path: 'sessionModeProfile.authority.mode',
-      config: { sessionModeProfile: { authority: { mode: 'registry' } } },
+      config: { sessionModeProfile: invalidAuthority },
     },
     {
       path: 'sessionModeProfile.encryption.mode',
-      config: { sessionModeProfile: { encryption: { mode: 'mystery' } } },
+      config: { sessionModeProfile: invalidEncryption },
     },
     {
       path: 'sessionModeProfile.encryption.keyProvider',
-      config: {
-        sessionModeProfile: {
-          encryption: { mode: 'worker_envelope', keyProvider: 'cloudflare_secrets_store' },
-        },
-      },
+      config: { sessionModeProfile: invalidKeyProvider },
     },
     {
       path: 'storageProfile.payloadAccessControl.gate',
@@ -344,7 +409,7 @@ test('dispatchAdminRequest rejects changes to an initialized worker-canonical id
     slug: 'session-a',
     sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     corsWorkerUrl: 'https://session-a.workers.dev',
-    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    sessionModeProfile: createWorkerSessionModeProfile(),
     sessionName: 'Canonical Session',
   };
   const unsafePatches = [
@@ -359,7 +424,7 @@ test('dispatchAdminRequest rejects changes to an initialized worker-canonical id
     },
     {
       label: 'authority mode',
-      config: { sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } } },
+      config: { sessionModeProfile: createRegistrySessionModeProfile() },
     },
     {
       label: 'worker URL',
@@ -403,7 +468,7 @@ test('dispatchAdminRequest treats sessionId and sessionIdHex as one immutable ca
     slug: 'session-a',
     sessionIdHex: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     corsWorkerUrl: 'https://session-a.workers.dev',
-    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    sessionModeProfile: createWorkerSessionModeProfile(),
   };
 
   for (const config of [
@@ -466,7 +531,7 @@ test('dispatchAdminRequest finalizes the first canonical publication revision an
     sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     configRevision: 'deployment-seed',
     corsWorkerUrl: 'https://session-a.workers.dev',
-    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    sessionModeProfile: createWorkerSessionModeProfile(),
     sessionName: 'Deployment seed',
   };
   let persistedConfig = deploymentConfig;
@@ -539,7 +604,7 @@ test('dispatchAdminRequest permits non-identity updates to an initialized worker
     slug: 'session-a',
     sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     corsWorkerUrl: 'https://session-a.workers.dev',
-    sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    sessionModeProfile: createWorkerSessionModeProfile(),
     sessionName: 'Canonical Session',
   };
   const writes = [];
@@ -790,9 +855,7 @@ test('dispatchAdminRequest preserves explicitly public key fields and structural
     publicKey: 'public-id',
     resourceKey: 'default',
     authorization: { roles: { moderator: ['0x00000000000000000000000000000000000000aa'] } },
-    sessionModeProfile: {
-      authorization: { mechanisms: ['worker_roles'] },
-    },
+    sessionModeProfile: createWorkerSessionModeProfile(),
   };
 
   const result = await dispatchAdminRequest({
@@ -924,9 +987,11 @@ test('dispatchAdminRequest returns allowed-key secret presence without exposing 
 
 test('dispatchAdminRequest routes signed worker group CRUD through admin auth', async () => {
   let authorityCalled = false;
+  const sessionId = '0x00112233445566778899aabbccddeeff';
   const result = await dispatchAdminRequest({
     request: {
       json: async () => createSignedBody({
+        sessionId,
         group: {
           groupId: 'reviewers',
           label: 'Reviewers',
@@ -952,12 +1017,19 @@ test('dispatchAdminRequest routes signed worker group CRUD through admin auth', 
         return {
           ok: true,
           address: '0x0000000000000000000000000000000000000abc',
-          existingConfig: { adminAddress: '0x0000000000000000000000000000000000000abc' },
+          existingConfig: {
+            adminAddress: '0x0000000000000000000000000000000000000abc',
+            sessionId,
+          },
           headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
           targetSlug: 'session-a',
         };
       },
       now: () => Date.parse('2026-02-03T04:05:06.000Z'),
+      executeCoordinatedWorkerGroupMutation: (args) => executeWorkerGroupMutation({
+        ...args,
+        deps: { now: () => Date.parse('2026-02-03T04:05:06.000Z') },
+      }),
     }),
   });
 

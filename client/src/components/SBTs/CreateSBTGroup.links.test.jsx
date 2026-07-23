@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react';
 
 import CreateSBTGroup from './CreateSBTGroup';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import { cryptoUtils } from '../../utilities/crypto/cryptography.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 const makeInstance = (props = {}) => {
@@ -115,7 +114,6 @@ describe('CreateSBTGroup success links', () => {
 
   it('canonicalizes reserved session aliases when building limited invite links', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000b1';
-    const encodedPassword = encodeURIComponent(cryptoUtils.encodeGroupPasswordForUrl('shared-secret'));
     const buildInviteInstance = (sessionSlug) => {
       const instance = makeInstance({ sessionSlug });
       instance.state = {
@@ -132,13 +130,13 @@ describe('CreateSBTGroup success links', () => {
     const generalInstance = buildInviteInstance('general');
     await generalInstance.generateSBTInviteLinks(sbtAddress, ['shared-secret']);
     expect(generalInstance.state.sbtInviteLinks).toEqual([
-      `http://localhost/session?auto=1&sbt=${encodeURIComponent(sbtAddress)}&gp=${encodedPassword}`,
+      `http://localhost/session?auto=1&sbt=${encodeURIComponent(sbtAddress)}`,
     ]);
 
     const debateInstance = buildInviteInstance('debate');
     await debateInstance.generateSBTInviteLinks(sbtAddress, ['shared-secret']);
     expect(debateInstance.state.sbtInviteLinks).toEqual([
-      `http://localhost/session/debate?auto=1&sbt=${encodeURIComponent(sbtAddress)}&gp=${encodedPassword}`,
+      `http://localhost/session/debate?auto=1&sbt=${encodeURIComponent(sbtAddress)}`,
     ]);
   });
 
@@ -148,7 +146,6 @@ describe('CreateSBTGroup success links', () => {
 
     try {
       const sbtAddress = '0x00000000000000000000000000000000000000b1';
-      const encodedPassword = encodeURIComponent(cryptoUtils.encodeGroupPasswordForUrl('shared-secret'));
       const instance = makeInstance({ sessionSlug: 'edge' });
       instance.state = {
         ...instance.state,
@@ -162,7 +159,7 @@ describe('CreateSBTGroup success links', () => {
       await instance.generateSBTInviteLinks(sbtAddress, ['shared-secret']);
 
       expect(instance.state.sbtInviteLinks).toEqual([
-        `http://localhost/ce/session/edge?auto=1&sbt=${encodeURIComponent(sbtAddress)}&gp=${encodedPassword}`,
+        `http://localhost/ce/session/edge?auto=1&sbt=${encodeURIComponent(sbtAddress)}`,
       ]);
     } finally {
       if (previousPublicUrl === undefined) delete process.env.PUBLIC_URL;
@@ -173,10 +170,7 @@ describe('CreateSBTGroup success links', () => {
   it('builds unlimited invite links with session-hinted SBT detail paths', async () => {
     const sbtAddress = '0x00000000000000000000000000000000000000b1';
     const instance = makeInstance({ sessionSlug: 'edge' });
-    const expectedInvitePath = buildSbtDetailPath(sbtAddress, 'edge').replace(
-      /\?session=edge$/,
-      '/shared-secret?session=edge',
-    );
+    const expectedInvitePath = buildSbtDetailPath(sbtAddress, 'edge');
 
     await instance.generateSBTInviteLinks(sbtAddress, ['shared-secret']);
 

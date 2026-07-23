@@ -1,4 +1,5 @@
 import { normalizeSessionSlug } from '../session/sessionNaming.js';
+import { normalizeWorkerCanonicalSessionIdHex } from '../session/sessionWorkerDiscovery.js';
 import { toStr } from '../shared/primitives.js';
 import { normalizeAddress } from '../web3/addressNormalization.js';
 import { normalizeWorkerUrl } from './workerUrl.js';
@@ -6,11 +7,13 @@ import { normalizeWorkerUrl } from './workerUrl.js';
 const STORAGE_PREFIX = 'ce:workerToken:v1';
 const TOKEN_SKEW_SECONDS = 30;
 const MAX_TOKEN_CACHE_TTL_SECONDS = 24 * 60 * 60;
+const tokenMemoryCache = new Map<string, string>();
 
 type TokenCacheScope = {
   address?: unknown;
   maxTtlSeconds?: unknown;
   nowSeconds?: unknown;
+  sessionId?: unknown;
   sessionSlug?: unknown;
   skewSeconds?: unknown;
   workerUrl?: unknown;
@@ -20,6 +23,7 @@ type TokenCacheEnvelopeInput = {
   address?: unknown;
   exp?: unknown;
   issuedAt?: unknown;
+  sessionId?: unknown;
   sessionSlug?: unknown;
   token?: unknown;
   workerUrl?: unknown;
@@ -29,10 +33,30 @@ type TokenCacheEntry = Record<string, unknown>;
 
 export const isWorkerTokenCacheKey = (key: unknown): boolean => String(key || '').startsWith(`${STORAGE_PREFIX}:`);
 
+export const purgePersistedTokenCache = (): void => {
+  if (typeof window === 'undefined') return;
+  try {
+    const storage = window.localStorage;
+    for (let index = storage.length - 1; index >= 0; index -= 1) {
+      const key = storage.key(index);
+      if (isWorkerTokenCacheKey(key)) storage.removeItem(String(key));
+    }
+  } catch (_) {}
+};
+
+// Worker bearer credentials used to be written to localStorage. Purge those
+// records at startup and keep all newly issued credentials page-memory-only.
+purgePersistedTokenCache();
+
 export const readTokenCache = (key: string): unknown | null => {
   if (typeof window === 'undefined') return null;
   try {
-    return JSON.parse(localStorage.getItem(key) || 'null');
+    // Remove a legacy record defensively if another older tab wrote it after
+    // this module initialized. It must never become an authentication source.
+    window.localStorage.removeItem(key);
+  } catch (_) {}
+  try {
+    return JSON.parse(tokenMemoryCache.get(key) || 'null');
   } catch {
     return null;
   }
@@ -42,6 +66,7 @@ export const normalizeTokenCacheEntry = (
   entry: unknown,
   {
     workerUrl,
+    sessionId,
     sessionSlug,
     address,
     nowSeconds = Math.floor(Date.now() / 1000),
@@ -73,6 +98,11 @@ export const normalizeTokenCacheEntry = (
     return { ok: false, status: 'expired' };
   }
 
+  const expectedSessionId = normalizeWorkerCanonicalSessionIdHex(sessionId);
+  if (expectedSessionId && Number(record.v || 0) < 1) {
+    return { ok: false, status: 'scope-mismatch' };
+  }
+
   if (Number(record.v || 0) >= 1) {
     const issuedAt = Number(record.issuedAt || 0) || null;
     const maxTtl = Number(maxTtlSeconds || 0);
@@ -84,10 +114,12 @@ export const normalizeTokenCacheEntry = (
     const expectedAddress = normalizeAddress(address);
     const entryWorkerUrl = normalizeWorkerUrl(record.workerUrl);
     const entrySlug = normalizeSessionSlug(record.sessionSlug);
+    const entrySessionId = normalizeWorkerCanonicalSessionIdHex(record.sessionId);
     const entryAddress = normalizeAddress(record.address);
     if (
       (expectedWorkerUrl && entryWorkerUrl && expectedWorkerUrl !== entryWorkerUrl) ||
       entrySlug !== expectedSlug ||
+      (expectedSessionId && entrySessionId !== expectedSessionId) ||
       (expectedAddress && entryAddress && expectedAddress !== entryAddress)
     ) {
       return { ok: false, status: 'scope-mismatch' };
@@ -112,9 +144,7 @@ export const readScopedTokenCache = (
   const normalized = normalizeTokenCacheEntry(parsed, scope);
   if (normalized.ok) return normalized;
   if (parsed) {
-    try {
-      localStorage.removeItem(key);
-    } catch (_) {}
+    tokenMemoryCache.delete(key);
   }
   return null;
 };
@@ -123,6 +153,7 @@ export const buildTokenCacheEnvelope = ({
   token,
   exp,
   workerUrl,
+  sessionId,
   sessionSlug,
   address,
   issuedAt = Math.floor(Date.now() / 1000),
@@ -130,6 +161,7 @@ export const buildTokenCacheEnvelope = ({
   address: string;
   expiresAt: number;
   issuedAt: number;
+  sessionId: string;
   sessionSlug: string;
   token: string;
   v: 1;
@@ -137,6 +169,7 @@ export const buildTokenCacheEnvelope = ({
 } => ({
   v: 1,
   workerUrl: normalizeWorkerUrl(workerUrl),
+  sessionId: normalizeWorkerCanonicalSessionIdHex(sessionId),
   sessionSlug: normalizeSessionSlug(sessionSlug),
   address: normalizeAddress(address),
   issuedAt: Number(issuedAt || 0) || Math.floor(Date.now() / 1000),
@@ -147,31 +180,45 @@ export const buildTokenCacheEnvelope = ({
 export const writeTokenCache = (key: string, payload: unknown): void => {
   if (typeof window === 'undefined') return;
   try {
-    localStorage.setItem(key, JSON.stringify(payload));
+    window.localStorage.removeItem(key);
+  } catch (_) {}
+  try {
+    const serialized = JSON.stringify(payload);
+    if (typeof serialized === 'string') tokenMemoryCache.set(key, serialized);
   } catch (_) {}
 };
 
 export const clearTokenCache = (key: string): void => {
+  tokenMemoryCache.delete(key);
   if (typeof window === 'undefined') return;
   try {
-    localStorage.removeItem(key);
+    window.localStorage.removeItem(key);
   } catch (_) {}
+};
+
+export const clearAllTokenCaches = (): void => {
+  tokenMemoryCache.clear();
+  purgePersistedTokenCache();
 };
 
 export const buildTokenCacheKey = ({
   workerUrl,
   slug,
+  sessionId,
   address,
 }: {
   address?: unknown;
+  sessionId?: unknown;
   slug?: unknown;
   workerUrl?: unknown;
 } = {}): string => {
   const resolvedUrl = normalizeWorkerUrl(workerUrl);
   const normalizedSlug = normalizeSessionSlug(slug);
+  const normalizedSessionId = normalizeWorkerCanonicalSessionIdHex(sessionId);
   const normalizedAddress = normalizeAddress(address);
+  const identityScope = normalizedSessionId ? `:${normalizedSessionId}` : '';
   if (normalizedAddress) {
-    return `${STORAGE_PREFIX}:${resolvedUrl}:${normalizedSlug}:${normalizedAddress}`;
+    return `${STORAGE_PREFIX}:${resolvedUrl}:${normalizedSlug}${identityScope}:${normalizedAddress}`;
   }
-  return `${STORAGE_PREFIX}:${resolvedUrl}:${normalizedSlug}`;
+  return `${STORAGE_PREFIX}:${resolvedUrl}:${normalizedSlug}${identityScope}`;
 };

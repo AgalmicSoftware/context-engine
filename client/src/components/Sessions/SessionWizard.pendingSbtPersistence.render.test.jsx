@@ -9,11 +9,12 @@ import {
   selectNormalModeCard,
   waitFor,
 } from './SessionWizard.workerPanel.testUtils';
+import { clearSessionWizardPendingSbtDraftsCache } from './hooks/usePendingSbtDrafts';
 
-describe('SessionWizard pending SBT persistence rendering', () => {
+describe('SessionWizard pending SBT tab-memory rendering', () => {
   beforeEach(resetSessionWizardWorkerPanelTestState);
 
-  it('keeps pending SBT drafts out of localStorage while persisting them in sessionStorage for refresh recovery', async () => {
+  it('keeps pending SBT drafts in mounted state without writing either browser storage', async () => {
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -27,15 +28,12 @@ describe('SessionWizard pending SBT persistence rendering', () => {
       expect(cachedRaw).not.toContain('claim-code-1');
       expect(cachedRaw).not.toContain('shared-secret');
       expect(JSON.parse(cachedRaw).pendingSbtDrafts).toEqual([]);
-      const sessionRaw = sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1') || '';
-      expect(sessionRaw).toContain('claim-code-1');
-      expect(sessionRaw).toContain('shared-secret');
-      expect(JSON.parse(sessionRaw)).toEqual([
-        expect.objectContaining({
-          predictedAddress: mockPendingSbtAddress,
-          displayName: 'Pending SBT',
-        }),
-      ]);
+      expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
+      expect(localStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
+      expect(screen.getByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toHaveAttribute(
+        'data-ce-sbt-address',
+        mockPendingSbtAddress.toLowerCase(),
+      );
     });
   });
 
@@ -63,7 +61,7 @@ describe('SessionWizard pending SBT persistence rendering', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).not.toBeInTheDocument();
   });
 
-  it('restores pending SBT drafts from sessionStorage after a refresh', async () => {
+  it('clears pending SBT drafts on simulated reload and purges a legacy sessionStorage payload', async () => {
     const firstRender = renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
@@ -73,20 +71,19 @@ describe('SessionWizard pending SBT persistence rendering', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
 
     expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toBeInTheDocument();
-    await waitFor(() => {
-      expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toContain(mockPendingSbtAddress);
-    });
 
     firstRender.unmount();
+    clearSessionWizardPendingSbtDraftsCache();
+    sessionStorage.setItem(
+      'ce:sessionWizardPendingSbtDrafts:v1',
+      JSON.stringify([{ predictedAddress: mockPendingSbtAddress, groupPassword: 'legacy-secret' }]),
+    );
     renderLoggedInSessionWizard();
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     selectNormalModeCard('Privacy');
 
-    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toHaveAttribute(
-      'data-ce-sbt-address',
-      mockPendingSbtAddress.toLowerCase(),
-    );
-    expect(screen.getByText(mockPendingSbtAddress)).toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).not.toBeInTheDocument();
+    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
   });
 });

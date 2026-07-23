@@ -17,6 +17,7 @@ import { getWorkerSessionToken, clearAllWorkerSessionTokens } from '../../utilit
 import { notify } from '../../utilities/ui/notify.js';
 import * as sessionScanScope from '../../utilities/session/sessionScanScope.js';
 import { baseSepolia, getDefaultHttpRpc } from '../../variables/chains.js';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 jest.mock('@rainbow-me/rainbowkit', () => ({
   ConnectButton: () => null,
@@ -49,7 +50,7 @@ jest.mock('../../wallet/passkeyWallet.js', () => ({
 }));
 
 jest.mock('../../utilities/ai/aiSettings.js', () => {
-  const actual = jest.requireActual('../../utilities/ai/aiSettings.js');
+  const actual = jest.requireActual('../../utilities/ai/aiSettings.js') as Record<string, unknown>;
   return {
     __esModule: true,
     ...actual,
@@ -161,6 +162,33 @@ const treeHasPropValue = (node: any, propName: string, expected: any): boolean =
 const PASSKEY_ADDRESS = '0x1111111111111111111111111111111111111111';
 const WAGMI_ADDRESS = '0x2222222222222222222222222222222222222222';
 const ALT_PASSKEY_ADDRESS = '0x3333333333333333333333333333333333333333';
+const buildRegistryFundingConfig = (slug = '', chainId = 84532) => {
+  const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+  if (sessionModeProfile.evm.registryChainId !== chainId) {
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+  }
+  sessionModeProfile.evm.registryChainId = chainId;
+  return {
+    slug,
+    networkChainId: chainId,
+    sessionModeProfile,
+    __registry: {
+      registryChainId: chainId,
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+    },
+  };
+};
+const buildPureWorkerConfig = (slug = 'demo-sh') => ({
+  slug,
+  networkChainId: 11155420,
+  corsWorkerUrl: `https://${slug}.example.test`,
+  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+});
+const enableRegistryFundingForAllSessions = () => {
+  mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: string) =>
+    buildRegistryFundingConfig(String(slug || '')),
+  );
+};
 
 const mountClassSubject = (subject: any) => {
   subject._isMounted = true;
@@ -447,7 +475,11 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     }
   });
 
-  it('does not prefetch worker auth when navigating between sessions', () => {
+  it('does not let a pure Worker session legacy chain drive target resolution or passkey resync', () => {
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: string) =>
+      slug === 'demo-sh' ? buildPureWorkerConfig() : buildRegistryFundingConfig(slug),
+    );
+    mockedGetSessionNetwork.mockReturnValue({ id: 11155420, chainId: 11155420, name: 'OP Sepolia' });
     const prevProps = buildProps({
       account: PASSKEY_ADDRESS,
       provider: 'passkey_eoa',
@@ -458,7 +490,42 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       account: PASSKEY_ADDRESS,
       provider: 'passkey_eoa',
       loginComplete: true,
-      activeSessionSlug: 'demo',
+      activeSessionSlug: 'demo-sh',
+      network: { id: 84532, chainId: 84532, name: 'Base Sepolia' },
+    });
+    const subject = mountClassSubject(new LoginAndSettingsModalSubject(nextProps));
+    subject.checkAndSendTestFundsIfNeeded = jest.fn();
+    subject.loadAiSettings = jest.fn();
+    subject.loadResourceKeys = jest.fn();
+    subject.loadSponsoredAccess = jest.fn();
+    subject.syncPasskeyWalletChain = jest.fn();
+
+    expect(subject.getTargetNetwork()).toEqual(expect.objectContaining({ id: 84532 }));
+    expect(mockedGetSessionNetwork).not.toHaveBeenCalled();
+
+    subject.componentDidUpdate(prevProps, subject.state);
+
+    expect(subject.checkAndSendTestFundsIfNeeded).toHaveBeenCalledTimes(1);
+    expect(subject.loadAiSettings).toHaveBeenCalledTimes(1);
+    expect(subject.loadResourceKeys).toHaveBeenCalledTimes(1);
+    expect(subject.loadSponsoredAccess).toHaveBeenCalledTimes(1);
+    expect(subject.syncPasskeyWalletChain).not.toHaveBeenCalled();
+    expect(getWorkerSessionToken).not.toHaveBeenCalled();
+  });
+
+  it('preserves passkey resync when navigating to a validated on-chain session', () => {
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: string) => buildRegistryFundingConfig(slug, 84532));
+    const prevProps = buildProps({
+      account: PASSKEY_ADDRESS,
+      provider: 'passkey_eoa',
+      loginComplete: true,
+      activeSessionSlug: 'edge',
+    });
+    const nextProps = buildProps({
+      account: PASSKEY_ADDRESS,
+      provider: 'passkey_eoa',
+      loginComplete: true,
+      activeSessionSlug: 'registry',
     });
     const subject = mountClassSubject(new LoginAndSettingsModalSubject(nextProps));
     subject.checkAndSendTestFundsIfNeeded = jest.fn();
@@ -469,12 +536,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     subject.componentDidUpdate(prevProps, subject.state);
 
-    expect(subject.checkAndSendTestFundsIfNeeded).toHaveBeenCalledTimes(1);
-    expect(subject.loadAiSettings).toHaveBeenCalledTimes(1);
-    expect(subject.loadResourceKeys).toHaveBeenCalledTimes(1);
-    expect(subject.loadSponsoredAccess).toHaveBeenCalledTimes(1);
-    expect(subject.syncPasskeyWalletChain).toHaveBeenCalledTimes(1);
-    expect(getWorkerSessionToken).not.toHaveBeenCalled();
+    expect(subject.syncPasskeyWalletChain).toHaveBeenCalledWith(expect.objectContaining({ id: 84532 }));
   });
 
   it('refreshes worker resource presence when account settings are opened', () => {
@@ -683,6 +745,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('uses wagmi balance props for faucet checks without Redux balance state', async () => {
+    enableRegistryFundingForAllSessions();
     const subject = mountClassSubject(
       new LoginAndSettingsModalSubject(
         buildProps({
@@ -704,6 +767,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('does not repeat automatic faucet sends for the same low-balance context', async () => {
+    enableRegistryFundingForAllSessions();
     const subject = mountClassSubject(
       new LoginAndSettingsModalSubject(
         buildProps({
@@ -776,6 +840,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('uses the live wagmi address for faucet checks before Redux account catches up', async () => {
+    enableRegistryFundingForAllSessions();
     const nextWagmiAddress = '0x4444444444444444444444444444444444444444';
     const subject = mountClassSubject(
       new LoginAndSettingsModalSubject(
@@ -806,6 +871,10 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('uses the active session chain for faucet requests even when the wallet is on another chain', async () => {
+    enableRegistryFundingForAllSessions();
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: string) =>
+      buildRegistryFundingConfig(String(slug || ''), slug === 'demo-1' ? 11155420 : 84532),
+    );
     mockedGetSessionNetwork.mockImplementation((slug: string) =>
       slug === 'demo-1'
         ? { id: 11155420, chainId: 11155420, name: 'OP Sepolia' }
@@ -842,6 +911,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('preserves the zero-balance state when auto-funding is disabled', async () => {
+    enableRegistryFundingForAllSessions();
     const subject = mountClassSubject(
       new LoginAndSettingsModalSubject(
         buildProps({
@@ -875,6 +945,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('keeps the balance unset when passkey balance reads fail', async () => {
+    enableRegistryFundingForAllSessions();
     const getBalance = jest.fn(async () => {
       throw new Error('rpc timeout');
     });
@@ -904,6 +975,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('triggers passkey faucet checks after a successful balance sync', async () => {
+    enableRegistryFundingForAllSessions();
     const subject = mountClassSubject(
       new LoginAndSettingsModalSubject(
         buildProps({
@@ -929,7 +1001,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     mockedGetSessionConfigBySlugOrDefault.mockReturnValue(null);
     mockedGetDemoSessionConfigBySlug.mockReturnValue({
       slug: 'demo-sh',
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     });
     const subject = mountClassSubject(
       new LoginAndSettingsModalSubject(
@@ -1076,6 +1148,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
   });
 
   it('ignores stale balance reads after the active wallet changes', async () => {
+    enableRegistryFundingForAllSessions();
     let resolveBalance!: (value: any) => void;
     const subject = mountClassSubject(
       new LoginAndSettingsModalSubject(
@@ -1481,6 +1554,54 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     );
   });
 
+  it('keeps a validated direct Worker prop authoritative over same-slug registry settings', async () => {
+    const workerConfig = {
+      ...buildPureWorkerConfig('worker-session'),
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      configRevision: 'route-revision-1',
+      sponsoredKeys: { ai: true },
+    };
+    mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) =>
+      String(slug || '') === 'worker-session'
+        ? {
+            slug: 'worker-session',
+            corsWorkerUrl: 'https://registry-worker.example',
+            sponsoredKeys: { rpc: true },
+          }
+        : {},
+    );
+    mockedCheckSponsoredAccess.mockResolvedValue({ status: 'unknown' });
+    const subject = mountClassSubject(
+      new LoginAndSettingsModalSubject(
+        buildProps({
+          activeSessionSlug: 'stale-selection',
+          account: '0x00000000000000000000000000000000000000aa',
+          loginModalToggled: true,
+          sessionConfig: workerConfig,
+        }),
+      ),
+    );
+
+    expect(subject.getActiveSessionSlug()).toBe('worker-session');
+    expect(subject.getDisplaySessionConfig('worker-session')).toBe(workerConfig);
+
+    await subject.loadSponsoredAccess();
+
+    expect(mockedCheckSponsoredAccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionConfig: workerConfig,
+        sessionSlug: 'worker-session',
+        resourceKey: 'ai',
+      }),
+    );
+    expect(mockedReadWorkerResourcePresence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionConfig: workerConfig,
+        sessionSlug: 'worker-session',
+      }),
+    );
+  });
+
   it('keeps loadSponsoredAccess strict when only a demo-session config exists', async () => {
     mockedGetSessionConfigBySlugOrDefault.mockImplementation((slug: any) => (String(slug || '') === 'rxc' ? null : {}));
     mockedGetDemoSessionConfigBySlug.mockImplementation((slug: any) =>
@@ -1508,7 +1629,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
 
     await subject.loadSponsoredAccess();
 
-    expect(checkSponsoredAccess).toHaveBeenCalledTimes(4);
+    expect(checkSponsoredAccess).toHaveBeenCalledTimes(1);
     mockedCheckSponsoredAccess.mock.calls.forEach(([arg]: any[]) => {
       expect(arg).toEqual(
         expect.objectContaining({
@@ -1518,6 +1639,11 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
       );
       expect(arg.sessionConfig).toEqual({});
     });
+    expect(mockedCheckSponsoredAccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resourceKey: 'ai',
+      }),
+    );
     expect(getDemoSessionConfigBySlug).not.toHaveBeenCalled();
     expect(readWorkerResourcePresence).not.toHaveBeenCalled();
   });
@@ -1526,6 +1652,7 @@ describe('LoginAndSettingsModal cache clearing performance guards', () => {
     mockedGetSessionConfigBySlugOrDefault.mockReturnValue({
       slug: 'demo-1',
       corsWorkerUrl: 'https://worker.example',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     });
 
     const hiddenSubject = mountClassSubject(

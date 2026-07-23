@@ -9,6 +9,8 @@ import {
   createSessionWizardWorkerSettlement,
   type SessionWizardWorkerSettlementInput,
 } from './sessionWizardWorkerSettlement.js';
+import { WORKER_SECRET_CACHE_SAFE_FIELDS } from './sessionWizardWorkerSecretSupport.js';
+import { sanitizeSessionWizardDraftForBrowserCache } from './sessionWizardBrowserCacheSanitization.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 
@@ -174,6 +176,45 @@ const getJsonValueSignature = (value: unknown): string => {
   }
 };
 
+const sanitizeSessionWizardDraftCacheCredentials = (value: unknown): { changed: boolean; value: unknown } => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return { changed: false, value };
+  const cached = { ...(value as Record<string, unknown>) };
+  if (cached.draft && typeof cached.draft === 'object' && !Array.isArray(cached.draft)) {
+    cached.draft = sanitizeSessionWizardDraftForBrowserCache(cached.draft);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(cached, 'persistWorkerSecrets')) {
+    cached.persistWorkerSecrets = false;
+  }
+  if (Object.prototype.hasOwnProperty.call(cached, 'workerRequirementProof')) {
+    delete cached.workerRequirementProof;
+  }
+  ['initialSponsoredBundleKey', 'sponsoredBundleKey', 'faucetGrantToken', 'deployGrantToken'].forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(cached, key)) delete cached[key];
+  });
+
+  if (cached.deployForm && typeof cached.deployForm === 'object' && !Array.isArray(cached.deployForm)) {
+    const deployForm = { ...(cached.deployForm as Record<string, unknown>) };
+    delete deployForm.apiToken;
+    delete deployForm.deployGrantToken;
+    cached.deployForm = deployForm;
+  }
+
+  if (cached.workerSecrets && typeof cached.workerSecrets === 'object' && !Array.isArray(cached.workerSecrets)) {
+    const source = cached.workerSecrets as Record<string, unknown>;
+    cached.workerSecrets = WORKER_SECRET_CACHE_SAFE_FIELDS.reduce<Record<string, string>>((result, key) => {
+      const entry = toStr(source[key]).trim();
+      if (entry) result[key] = entry;
+      return result;
+    }, {});
+  }
+
+  return {
+    changed: getJsonValueSignature(cached) !== getJsonValueSignature(value),
+    value: cached,
+  };
+};
+
 export const readSessionWizardDraftCache = ({ storage }: SessionWizardDraftCacheOptions = {}): unknown | null => {
   const storageRef = getDraftStorage(storage);
   if (!storageRef) return null;
@@ -184,22 +225,38 @@ export const readSessionWizardDraftCache = ({ storage }: SessionWizardDraftCache
     // state so this tab can resume autosaving (or seed the legacy draft below).
     result = safeJsonRead(storageRef, SESSION_WIZARD_CACHE_KEY);
   }
-  if (result.ok) return result.value;
+  if (result.ok) {
+    const sanitized = sanitizeSessionWizardDraftCacheCredentials(result.value);
+    if (!sanitized.changed) return sanitized.value;
+    const cleanup = safeJsonWrite(storageRef, SESSION_WIZARD_CACHE_KEY, sanitized.value, {
+      maxBytes: SESSION_WIZARD_DRAFT_CACHE_MAX_BYTES,
+    });
+    if (cleanup.ok) return sanitized.value;
+    removeKeys(storageRef, SESSION_WIZARD_CACHE_KEY);
+    return null;
+  }
   if (storage !== undefined || result.status !== 'missing') return null;
 
   const legacyStorage = getLegacyDraftStorage();
   const legacyResult = safeJsonRead(legacyStorage, SESSION_WIZARD_CACHE_KEY);
   if (!legacyResult.ok) return null;
+  const sanitizedLegacy = sanitizeSessionWizardDraftCacheCredentials(legacyResult.value);
+  if (sanitizedLegacy.changed) {
+    const cleanup = safeJsonWrite(legacyStorage, SESSION_WIZARD_CACHE_KEY, sanitizedLegacy.value, {
+      maxBytes: SESSION_WIZARD_DRAFT_CACHE_MAX_BYTES,
+    });
+    if (!cleanup.ok) return null;
+  }
   // Seed the old shared draft into this tab, then retire the legacy copy on a
   // best-effort basis. Web Storage has no cross-tab compare-and-swap primitive,
   // so concurrent old tabs may both seed a copy; all subsequent writes remain
   // isolated in sessionStorage and a stale legacy key must not wedge autosave.
-  const migrationWrite = safeJsonWrite(storageRef, SESSION_WIZARD_CACHE_KEY, legacyResult.value, {
+  const migrationWrite = safeJsonWrite(storageRef, SESSION_WIZARD_CACHE_KEY, sanitizedLegacy.value, {
     maxBytes: SESSION_WIZARD_DRAFT_CACHE_MAX_BYTES,
   });
   if (!migrationWrite.ok) return null;
   removeKeys(legacyStorage, SESSION_WIZARD_CACHE_KEY);
-  return legacyResult.value;
+  return sanitizedLegacy.value;
 };
 
 export const writeSessionWizardDraftCache = (
@@ -207,6 +264,7 @@ export const writeSessionWizardDraftCache = (
   options: SessionWizardDraftCacheWriteOptions = {},
 ): SessionWizardDraftCacheWriteResult => {
   const { storage, maxBytes } = options;
+  const sanitizedPayload = sanitizeSessionWizardDraftCacheCredentials(payload).value;
   const storageRef = getDraftStorage(storage);
   if (!storageRef) {
     return {
@@ -245,7 +303,7 @@ export const writeSessionWizardDraftCache = (
       };
     }
   }
-  return safeJsonWrite(storageRef, SESSION_WIZARD_CACHE_KEY, payload, {
+  return safeJsonWrite(storageRef, SESSION_WIZARD_CACHE_KEY, sanitizedPayload, {
     maxBytes: maxBytes ?? SESSION_WIZARD_DRAFT_CACHE_MAX_BYTES,
   });
 };

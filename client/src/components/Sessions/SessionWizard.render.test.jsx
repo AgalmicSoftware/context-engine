@@ -16,6 +16,10 @@ import {
 } from '../ContractPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import {
+  clearSessionWizardPendingSbtDraftsCache,
+  readSessionWizardPendingSbtDraftsCache,
+} from './hooks/usePendingSbtDrafts.js';
 
 const mockRegisterSessionOnChain = jest.fn();
 const mockFetchSessionFromRegistry = jest.fn();
@@ -385,13 +389,24 @@ const createPendingFeaturedDraft = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
   await waitFor(() => {
     expect(screen.queryByTestId('mock-create-sbt-group')).not.toBeInTheDocument();
-    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toContain(mockPendingSbtAddress);
+  });
+  expect(readSessionWizardPendingSbtDraftsCache()).toEqual([
+    expect.objectContaining({ predictedAddress: mockPendingSbtAddress }),
+  ]);
+  await ensureGateASelectorVisible();
+  await waitFor(() => {
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toHaveAttribute(
+      'data-ce-sbt-address',
+      mockPendingSbtAddress.toLowerCase(),
+    );
+    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
   });
 };
 
 describe('SessionWizard rendered validation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    clearSessionWizardPendingSbtDraftsCache();
     mockCreateSbtDraftQueue = [];
     mockCreateSBT.mockReset();
     mockFinalizeDeferredCreateSbtDraftUpload.mockReset();

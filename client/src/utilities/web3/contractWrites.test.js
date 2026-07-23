@@ -1,7 +1,21 @@
 import { ethers } from 'ethers';
 import { resolveTxGasOverrides, sendContractWriteViaProvider } from './contractWrites.js';
 
+const mockRpcLog = jest.fn();
+jest.mock('../logging.js', () => ({
+  createLogger: (category) => ({
+    debug: jest.fn(),
+    error: jest.fn(),
+    log: category === 'rpc' ? (...args) => mockRpcLog(...args) : jest.fn(),
+    warn: jest.fn(),
+  }),
+}));
+
 describe('contractWrites gas override fallbacks', () => {
+  beforeEach(() => {
+    mockRpcLog.mockClear();
+  });
+
   it('uses the fallback gas limit directly when preferFallbackGasLimit is enabled', async () => {
     const estimateFn = jest.fn().mockResolvedValue(ethers.BigNumber.from('123456'));
     const contract = {
@@ -158,5 +172,89 @@ describe('contractWrites gas override fallbacks', () => {
     expect(contract.callStatic.mintThing).toHaveBeenCalledWith('value', {
       from: '0x00000000000000000000000000000000000000aa',
     });
+  });
+
+  it('never logs sensitive calldata or copies provider errors into sensitive write failures', async () => {
+    const rawCredential = 'claim-secret-sentinel';
+    const encodedCredential = `0x${Array.from(new TextEncoder().encode(rawCredential))
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('')}`;
+    const signingProvider = {
+      request: jest.fn().mockResolvedValue('0xtxhash'),
+    };
+    const ethersProvider = {
+      waitForTransaction: jest.fn().mockResolvedValue({ status: 0, blockNumber: 123, transactionHash: '0xtxhash' }),
+      call: jest.fn().mockRejectedValue(new Error(`provider echoed ${rawCredential} ${encodedCredential}`)),
+    };
+    const signer = {
+      getAddress: jest.fn().mockResolvedValue('0x00000000000000000000000000000000000000aa'),
+    };
+    const contract = {
+      address: '0x00000000000000000000000000000000000000bb',
+      interface: {
+        encodeFunctionData: jest.fn().mockReturnValue(encodedCredential),
+      },
+      callStatic: {
+        claimWithPassword: jest.fn().mockRejectedValue(new Error(`provider echoed ${rawCredential}`)),
+      },
+    };
+
+    await expect(
+      sendContractWriteViaProvider({
+        signingProvider,
+        ethersProvider,
+        signer,
+        contract,
+        method: 'claimWithPassword',
+        args: [rawCredential],
+        revertMessage: 'claimWithPassword transaction reverted on-chain.',
+        sensitiveArgs: true,
+      }),
+    ).rejects.toThrow('claimWithPassword transaction reverted on-chain.');
+
+    const serializedLogs = JSON.stringify(mockRpcLog.mock.calls);
+    expect(serializedLogs).not.toContain(rawCredential);
+    expect(serializedLogs).not.toContain(encodedCredential);
+    expect(contract.callStatic.claimWithPassword).not.toHaveBeenCalled();
+    expect(ethersProvider.call).not.toHaveBeenCalled();
+  });
+
+  it('replaces provider broadcast errors for writes with sensitive arguments', async () => {
+    const rawCredential = 'claim-broadcast-secret-sentinel';
+    const encodedCredential = `0x${Array.from(new TextEncoder().encode(rawCredential))
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('')}`;
+    const signingProvider = {
+      request: jest.fn().mockRejectedValue(new Error(`provider echoed ${rawCredential} ${encodedCredential}`)),
+    };
+    const ethersProvider = {
+      waitForTransaction: jest.fn(),
+    };
+    const signer = {
+      getAddress: jest.fn().mockResolvedValue('0x00000000000000000000000000000000000000aa'),
+    };
+    const contract = {
+      address: '0x00000000000000000000000000000000000000bb',
+      interface: {
+        encodeFunctionData: jest.fn().mockReturnValue(encodedCredential),
+      },
+    };
+
+    await expect(
+      sendContractWriteViaProvider({
+        signingProvider,
+        ethersProvider,
+        signer,
+        contract,
+        method: 'claimWithPassword',
+        args: [rawCredential],
+        revertMessage: 'claimWithPassword transaction failed.',
+        sensitiveArgs: true,
+      }),
+    ).rejects.toThrow('claimWithPassword transaction failed.');
+
+    expect(ethersProvider.waitForTransaction).not.toHaveBeenCalled();
+    expect(JSON.stringify(mockRpcLog.mock.calls)).not.toContain(rawCredential);
+    expect(JSON.stringify(mockRpcLog.mock.calls)).not.toContain(encodedCredential);
   });
 });

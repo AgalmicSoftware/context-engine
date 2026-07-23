@@ -53,13 +53,9 @@ export type WorkerPanelProps = {
   draft?: DraftState;
   deployWorkerUrl?: string;
   deployComplete: boolean;
-  devPersistWorkerSecrets: boolean;
-  persistWorkerSecrets: boolean;
-  setPersistWorkerSecrets: (value: boolean) => void;
   workerSecretsEnabled: boolean;
   setWorkerSecretsEnabled: (value: boolean) => void;
   clearWorkerSecretFields: () => void;
-  effectivePersistWorkerSecrets: boolean;
   workerResourceKeys?: string[];
   renderResourceCard?: (resourceKey: string, index: number) => React.ReactNode;
   workerAllowOrigins: string;
@@ -117,13 +113,9 @@ const WorkerPanel = ({
   draft = {},
   deployWorkerUrl,
   deployComplete,
-  devPersistWorkerSecrets,
-  persistWorkerSecrets,
-  setPersistWorkerSecrets,
   workerSecretsEnabled,
   setWorkerSecretsEnabled,
   clearWorkerSecretFields,
-  effectivePersistWorkerSecrets,
   workerResourceKeys = [],
   renderResourceCard,
   workerAllowOrigins,
@@ -261,13 +253,9 @@ const WorkerPanel = ({
             isNormalMode={isNormalMode}
             translate={translate}
             renderInfoTooltip={renderInfoTooltip}
-            devPersistWorkerSecrets={devPersistWorkerSecrets}
-            persistWorkerSecrets={persistWorkerSecrets}
-            setPersistWorkerSecrets={setPersistWorkerSecrets}
             workerSecretsEnabled={workerSecretsEnabled}
             setWorkerSecretsEnabled={setWorkerSecretsEnabled}
             clearWorkerSecretFields={clearWorkerSecretFields}
-            effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
             workerResourceKeys={workerResourceKeys}
             renderResource={renderResource}
             workerAllowOrigins={workerAllowOrigins}

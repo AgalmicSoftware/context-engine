@@ -26,6 +26,7 @@ type AccountSectionProps = {
   sendTestETH?: (amountToSend: unknown) => void;
   demoMode?: unknown;
   toggleDemoMode?: (demoModeOn: boolean) => void;
+  sessionConfig?: unknown;
 };
 
 const LoginButton = LoginButtonRaw as React.ComponentType<any>;
@@ -80,6 +81,7 @@ class AccountSection extends Component<AccountSectionProps> {
           sendTestETH={(amountToSend: unknown) => this.props.sendTestETH?.(amountToSend)}
           demoMode={this.props.demoMode}
           toggleDemoMode={(demoModeOn: boolean) => this.props.toggleDemoMode?.(demoModeOn)}
+          sessionConfig={this.props.sessionConfig}
         />
         {topRight}
       </>

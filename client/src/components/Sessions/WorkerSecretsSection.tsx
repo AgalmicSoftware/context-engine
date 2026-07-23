@@ -17,13 +17,9 @@ export type WorkerSecretsSectionProps = {
   isNormalMode: boolean;
   translate?: (key: string) => string;
   renderInfoTooltip?: RenderInfoTooltip;
-  devPersistWorkerSecrets: boolean;
-  persistWorkerSecrets: boolean;
-  setPersistWorkerSecrets: (value: boolean) => void;
   workerSecretsEnabled: boolean;
   setWorkerSecretsEnabled: (value: boolean) => void;
   clearWorkerSecretFields: () => void;
-  effectivePersistWorkerSecrets: boolean;
   workerResourceKeys?: string[];
   renderResource?: (resourceKey: string, index: number) => React.ReactNode;
   workerAllowOrigins: string;
@@ -35,13 +31,9 @@ const WorkerSecretsSection = ({
   isNormalMode,
   translate,
   renderInfoTooltip,
-  devPersistWorkerSecrets,
-  persistWorkerSecrets,
-  setPersistWorkerSecrets,
   workerSecretsEnabled,
   setWorkerSecretsEnabled,
   clearWorkerSecretFields,
-  effectivePersistWorkerSecrets,
   workerResourceKeys = [],
   renderResource,
   workerAllowOrigins,
@@ -58,24 +50,6 @@ const WorkerSecretsSection = ({
         <div className={styles.workerSecretsHeader}>
           <div className={styles.workerSecretsTitle}>Worker secrets</div>
           <div className={styles.workerSecretsToggles}>
-            {devPersistWorkerSecrets && (
-              <Label className={styles.workerToggle}>
-                <Input
-                  type="checkbox"
-                  checked={persistWorkerSecrets}
-                  onChange={(e) => setPersistWorkerSecrets(!!e.target.checked)}
-                />
-                <span>Dev: keep secrets on refresh</span>
-                {renderTooltip({
-                  id: 'gw-worker-persist-secrets-tip',
-                  content:
-                    'Stores worker secrets in localStorage so they survive refresh. Do not enable on shared machines.',
-                  placement: 'right',
-                  testId: 'ce-wizard-worker-tooltip-gw-worker-persist-secrets-tip',
-                  ariaLabel: 'Persist worker secrets info',
-                })}
-              </Label>
-            )}
             <Label className={styles.workerToggle}>
               <Input
                 type="checkbox"
@@ -114,9 +88,7 @@ const WorkerSecretsSection = ({
               })}
             </div>
             <div className={styles.helperText}>
-              {effectivePersistWorkerSecrets
-                ? 'Developer mode: secrets are cached locally and will survive refresh.'
-                : 'Secrets are not saved locally — re-enter them if you refresh the page.'}
+              Secrets stay in this tab&apos;s memory only — re-enter them if you refresh the page.
             </div>
           </>
         )}

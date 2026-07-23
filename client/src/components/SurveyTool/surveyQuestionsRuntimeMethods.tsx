@@ -1132,6 +1132,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     emitPendingStats,
     getPendingStatsSnapshot,
     getActiveSurveyIndex,
+    resolveWorkerTargetForProps,
     didEditDiffInputsChange,
     invalidateDiffCaches,
   } = createSurveyQuestionsRuntimeStateRuntime({
@@ -1266,8 +1267,11 @@ export const createSurveyQuestionsRuntimeMethods = (
 
   const runDefaultComponentDidUpdate = async (prevProps: SurveyQuestionsProps, prevState: SurveyQuestionsState) => {
     const diffInputsChanged = didEditDiffInputsChange(prevProps, prevState);
+    const workerTargetChanged =
+      resolveWorkerTargetForProps(prevProps).key !== resolveWorkerTargetForProps(propsRef.current).key;
     if (diffInputsChanged) {
       const propsHydrationContextChanged =
+        workerTargetChanged ||
         prevProps.isStandalone !== propsRef.current.isStandalone ||
         prevProps.minifiedMode !== propsRef.current.minifiedMode ||
         prevProps.surveyIndex !== propsRef.current.surveyIndex ||
@@ -1326,7 +1330,7 @@ export const createSurveyQuestionsRuntimeMethods = (
       const acctSig = String(propsRef.current.account || '')
         .trim()
         .toLowerCase();
-      const nextSig = `${slugSig}|${acctSig}`;
+      const nextSig = `${slugSig}|${acctSig}|${resolveWorkerTargetForProps(propsRef.current).key}`;
       if (nextSig !== inst._priorResponseHydrationContextSig) {
         inst._priorResponseHydrationContextSig = nextSig;
         inst._priorResponseBackfillAttempted = new Set();
@@ -1397,6 +1401,7 @@ export const createSurveyQuestionsRuntimeMethods = (
         prevProps.questionID !== propsRef.current.questionID ||
         prevProps.responderAddress !== propsRef.current.responderAddress;
       const groupContextChanged =
+        workerTargetChanged ||
         getSessionSlugHintFromProps(prevProps) !== getSessionSlugHintFromProps(propsRef.current) ||
         getSessionSlugPinnedFromProps(prevProps) !== getSessionSlugPinnedFromProps(propsRef.current);
 
@@ -2394,6 +2399,7 @@ export const createSurveyQuestionsRuntimeMethods = (
     prepareJsonAndHash,
     resolveFieldEncryptionAudience,
     resolveFieldEncryptionGateId,
+    resolveEffectiveResponseGateConfig,
     resolveSessionChainId,
     submitSurveyResponse: (
       overrideState: SurveyQuestionsLegacyValue = null,
@@ -2667,8 +2673,8 @@ export const createSurveyQuestionsRuntimeMethods = (
       singleQuestionMode: context ? !!context.singleQuestionMode : !!propsRef.current.singleQuestionMode,
       isStandalone: context ? !!context.isStandalone : !!propsRef.current.isStandalone,
       deepClone: (obj: SurveyQuestionsLegacyValue) => deepClone(obj),
-      resolveSubmittedCacheWriteContext: (slug: SurveyQuestionsLegacyValue) =>
-        resolveSubmittedCacheWriteContext(contextProps, slug),
+      resolveSubmittedCacheWriteContext: (slug: SurveyQuestionsLegacyValue, current = false) =>
+        resolveSubmittedCacheWriteContext(current ? propsRef.current : contextProps, slug),
     });
   };
 

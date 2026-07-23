@@ -190,7 +190,7 @@ describe('createSbtGroupHelpers', () => {
       documentIDHashes: 'hash-a',
       documentURLs: ['https://docs.example/a'],
       exportFormat: 'json',
-      groupPassword: 'group-pass',
+      groupPassword: '',
       numInviteLinks: 0,
       sbtDescription: 'Description',
       sbtImageUrl: 'https://image.example/a.png',

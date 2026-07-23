@@ -211,11 +211,31 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
     return true;
   };
 
+  const filterScanEligibleSlugs = (
+    slugs: string[],
+    scopeContext: SessionScanScopeContext,
+    operation: string,
+  ): string[] => {
+    const seen = new Set<string>();
+    const eligible: string[] = [];
+    slugs.forEach((slugIn) => {
+      const slug = normalizeSessionSlug(slugIn ?? '');
+      if (seen.has(slug)) return;
+      seen.add(slug);
+      if (isSessionSlugAllowedForScan(slug, scopeContext)) eligible.push(slug);
+      else logScopeSkipOnce(operation, slug, scopeContext);
+    });
+    return eligible;
+  };
+
   const getScopedSessionSlugs = (scopeIn?: string): string[] => {
     const scope = typeof scopeIn === 'string' ? scopeIn : getSessionScanScope();
-    if (scope === 'all') return getAllSessionSlugs();
     const scopeContext = getSessionScanScopeContext(scope);
-    const scoped = getAllowedSessionSlugs(scopeContext.scope, scopeContext.list, scopeContext.activeSlug);
+    const candidates =
+      scope === 'all'
+        ? getAllSessionSlugs()
+        : getAllowedSessionSlugs(scopeContext.scope, scopeContext.list, scopeContext.activeSlug);
+    const scoped = filterScanEligibleSlugs(candidates, scopeContext, 'getScopedSessionSlugs');
     if (!scoped.length && scopeContext.scope === 'list') {
       logScopeSkipOnce('getScopedSessionSlugs:list-empty', '', scopeContext);
     }
@@ -252,19 +272,7 @@ export const createSessionScanPolicy = (host: SessionScanPolicyHost): SessionSca
   const getScopeFilteredSlugs = (slugs: string[] = [], scopeIn: string | null = null): string[] => {
     const scopeContext = getSessionScanScopeContext(scopeIn || undefined);
     const input = Array.isArray(slugs) ? slugs : [];
-    if (scopeContext.scope === 'all') {
-      return Array.from(new Set(input.map((s) => normalizeSessionSlug(s ?? ''))));
-    }
-    const seen = new Set<string>();
-    const out: string[] = [];
-    input.forEach((slug) => {
-      const normalized = normalizeSessionSlug(slug ?? '');
-      if (seen.has(normalized)) return;
-      seen.add(normalized);
-      if (isSessionSlugAllowedForScan(normalized, scopeContext)) out.push(normalized);
-      else logScopeSkipOnce('getScopeFilteredSlugs', normalized, scopeContext);
-    });
-    return out;
+    return filterScanEligibleSlugs(input, scopeContext, 'getScopeFilteredSlugs');
   };
 
   const destroy = (): void => {

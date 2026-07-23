@@ -11,6 +11,13 @@ import {
 import { isResponseRecencyNewer, toResponseRecencyPair } from './responseRecency.js';
 import { sbtEventStreamsPort } from '../../domains/sbts/sbtEventStreamsPort.js';
 import type { SbtEventStreamsPort } from '../../domains/sbts/sbtPorts.js';
+import { readWorkerMetadataSessionConfig, type WorkerMetadataHydrationHost } from './workerCanonicalCacheHydration';
+import {
+  hydrateSessionWorkerSurveyCache,
+  isWorkerMetadataHydrationInFlight,
+  resolveWorkerMetadataHydrationTarget,
+} from './sessionWorkerMetadataCacheRuntime';
+import { createSessionCacheRevisionUpdater } from './sessionCacheRevisionRuntime';
 
 type StateRecord = Record<string, unknown>;
 type CacheRecord = Record<string, unknown>;
@@ -133,7 +140,7 @@ interface SurveyContractScripts {
 }
 type SurveyEventStreamsPort = Pick<SbtEventStreamsPort, 'listenForSurveyEvents' | 'removeSurveyEventsListener'>;
 
-export interface SessionSurveyCacheHost {
+export interface SessionSurveyCacheHost extends WorkerMetadataHydrationHost {
   [key: string]: unknown;
   setState?: (updater: SetStateArg, cb?: () => void) => void;
   getState?: () => Record<string, unknown>;
@@ -142,7 +149,6 @@ export interface SessionSurveyCacheHost {
   updateSurveysCacheAtomic: (slug: string, updater: SurveysCacheAtomicUpdater) => Promise<boolean>;
   updateUserCacheAtomic: (slug: string, updater: UserCacheAtomicUpdater) => Promise<boolean>;
   getActiveSessionSlug?: () => string;
-  getSessionCfg?: (slug: string) => CacheRecord | null | undefined;
   getSessionChainId?: (slug: string) => string | number | null | undefined;
   getSessionScanScope?: () => string;
   shouldSkipSessionScanForSlug?: (slug: string, op: string, scopeCtx?: unknown) => boolean;
@@ -180,7 +186,6 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
   let _surveyInitInFlight: Record<string, Promise<void> | undefined> = {};
   let _surveyInitPending: Record<string, SurveyInitOptions | undefined> = {};
   let _pendingSurveyMetadataRetryTimers: Record<string, ReturnType<typeof setTimeout> | undefined> = {};
-
   const setState = (updater: SetStateArg, cb?: () => void): void => {
     if (typeof host.setState === 'function') {
       host.setState(updater, cb);
@@ -195,7 +200,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
     String(typeof host.getActiveSessionSlug === 'function' ? host.getActiveSessionSlug() || '' : '');
   const getSessionBlockWindowRef = (slugIn: string): CacheRecord | string => {
     const slug = normalizeSessionSlug(slugIn || '');
-    const cfg = typeof host.getSessionCfg === 'function' ? host.getSessionCfg(slug) : null;
+    const cfg = readWorkerMetadataSessionConfig(host, slug);
     if (!cfg || typeof cfg !== 'object') return slug;
     // Regression guard: preserve resolved demo block limits across chain scans.
     return {
@@ -243,27 +248,11 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
       );
     }
   };
-  const queueLocalRevisionUpdate = (opts: QueueLocalRevisionUpdateOptions = {}): void => {
-    if (typeof host.queueLocalRevisionUpdate === 'function') {
-      host.queueLocalRevisionUpdate(opts);
-      return;
-    }
-    const shouldBumpQuestionResponsesNonce = !!opts?.needsQuestionResponsesNonce;
-    const shouldCheckAllCachesReady = !!opts?.checkAllCachesReady;
-    if (!shouldBumpQuestionResponsesNonce && !shouldCheckAllCachesReady) return;
-    setState(
-      (prev) => {
-        const next: StateRecord = {};
-        if (shouldBumpQuestionResponsesNonce) {
-          next.questionResponsesNonce = Number(prev?.questionResponsesNonce || 0) + 1;
-        }
-        return Object.keys(next).length ? next : null;
-      },
-      () => {
-        if (shouldCheckAllCachesReady) checkAllCachesReady();
-      },
-    );
-  };
+  const queueLocalRevisionUpdate = createSessionCacheRevisionUpdater<StateRecord, QueueLocalRevisionUpdateOptions>({
+    host,
+    setState,
+    checkAllCachesReady,
+  });
   const isCacheRecord = (value: unknown): value is CacheRecord =>
     !!value && typeof value === 'object' && !Array.isArray(value);
   const createSurveyNetworkCache = (initialLastBlock: number): SurveyNetworkCache => ({
@@ -329,7 +318,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
 
   const isInitInFlight = (slugIn = ''): boolean => {
     const slug = normalizeSessionSlug(slugIn || '');
-    return !!_surveyInitInFlight?.[slug];
+    return isWorkerMetadataHydrationInFlight(_surveyInitInFlight, host, slug);
   };
 
   const destroy = (): void => {
@@ -370,27 +359,48 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
         if (suppressUiState || !isMounted()) return;
         setState(nextState, cb);
       };
-
+      const workerTarget = resolveWorkerMetadataHydrationTarget(host, slug);
+      const initRunKey = workerTarget.runKey;
       if (
+        !workerTarget.isWorkerCanonical &&
         scanScopeNoop(slug, 'initializeSurveyCacheForGroup', () => {
           setSurveyState({ isSurveyCacheReady: true }, checkAllCachesReady);
         })
       ) {
         return Promise.resolve();
       }
-
       _surveyInitInFlight = _surveyInitInFlight || {};
       _surveyInitPending = _surveyInitPending || {};
-      if (_surveyInitInFlight[slug]) {
-        _surveyInitPending[slug] = mergePendingSurveyInitOpts(_surveyInitPending[slug], rerunOpts);
-        return _surveyInitInFlight[slug]!;
+      if (_surveyInitInFlight[initRunKey]) {
+        _surveyInitPending[initRunKey] = mergePendingSurveyInitOpts(_surveyInitPending[initRunKey], rerunOpts);
+        return _surveyInitInFlight[initRunKey]!;
       }
-
       const run: Promise<void> = (async (): Promise<void> => {
         mainSiteLog.log('initializeSurveyCacheForGroup() - invoked', { slug });
         setSurveyState((prev) =>
           prev.surveyCacheInitializationError ? { surveyCacheInitializationError: false } : null,
         );
+
+        if (workerTarget.isWorkerCanonical) {
+          await hydrateSessionWorkerSurveyCache<SurveysCache>({
+            host,
+            target: workerTarget,
+            sessionSlug: slug,
+            createPersistenceError: () =>
+              new SurveyCachePersistenceError(`Failed to persist Worker surveys cache for ${slug}`),
+            onSuccess: (count) => {
+              setSurveyState({ isSurveyCacheReady: true });
+              if (count > 0) queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
+              if (!suppressUiState) checkAllCachesReady();
+            },
+            onError: (error) => {
+              mainSiteLog.error('Error hydrating Worker survey metadata:', error);
+              setSurveyState({ surveyCacheInitializationError: true });
+            },
+          });
+          return;
+        }
+
         const networkID = String(getSessionChainId(slug) || '');
 
         const { fromBlock: baseFrom, toBlock: baseTo } = await surveyContractScripts.getRelevantBlockWindowForFilter(
@@ -1128,10 +1138,10 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
       })();
 
       const finalizeRun = (): void => {
-        delete _surveyInitInFlight[slug];
-        if (_surveyInitPending[slug]) {
-          const pendingOpts = _surveyInitPending[slug];
-          delete _surveyInitPending[slug];
+        delete _surveyInitInFlight[initRunKey];
+        if (_surveyInitPending[initRunKey]) {
+          const pendingOpts = _surveyInitPending[initRunKey];
+          delete _surveyInitPending[initRunKey];
           setTimeout(() => {
             try {
               if (!isMounted()) return;
@@ -1144,7 +1154,7 @@ export const createSessionSurveyCacheController = (host: SessionSurveyCacheHost)
       };
 
       const flight = run.finally(finalizeRun);
-      _surveyInitInFlight[slug] = flight;
+      _surveyInitInFlight[initRunKey] = flight;
       return flight;
     } catch (err: unknown) {
       return Promise.reject(err);

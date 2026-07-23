@@ -4,6 +4,7 @@ import { renderSurveyPileViewMode } from './surveyQuestionsTestHarness';
 import { createPileViewRuntimeStrategy } from './SurveyPileViewMode';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { t } from '../../utilities/ui/terminology.js';
@@ -51,10 +52,19 @@ const renderPile = (props = {}) =>
     ...props,
   });
 
-const createDefaultGatedSessionConfig = () => ({
+const createLegacyChainSessionConfig = () => ({
   slug: 'edge',
   networkChainId: 84532,
   __registry: {
+    sessionIdHex: '0x00112233445566778899aabbccddeeff',
+    registryChainId: 84532,
+  },
+});
+
+const createDefaultGatedSessionConfig = () => ({
+  ...createLegacyChainSessionConfig(),
+  __registry: {
+    ...createLegacyChainSessionConfig().__registry,
     gateAuthority: 'onchain',
     gatesByResource: {
       default: {
@@ -133,6 +143,10 @@ describe('SurveyPileViewMode gated empty states', () => {
   });
 
   it('prefers gated empty state once masked questions are cached even if cache-ready stays false', async () => {
+    const sessionConfig = createLegacyChainSessionConfig();
+    jest
+      .spyOn(contractScriptsModule, 'getSessionConfigBySlug')
+      .mockImplementation((slug) => (slug === 'edge' ? sessionConfig : null));
     mockQuestionsCache({
       questions: {
         q1: {
@@ -143,7 +157,9 @@ describe('SurveyPileViewMode gated empty states', () => {
       },
     });
 
-    renderPile();
+    renderPile({
+      sessionConfig,
+    });
 
     const lockedBanner = await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER);
     expect(lockedBanner).toBeInTheDocument();
@@ -163,6 +179,10 @@ describe('SurveyPileViewMode gated empty states', () => {
   });
 
   it('shows gate requirements in gated pile empty state when masked question gate details are available', async () => {
+    const sessionConfig = createLegacyChainSessionConfig();
+    jest
+      .spyOn(contractScriptsModule, 'getSessionConfigBySlug')
+      .mockImplementation((slug) => (slug === 'edge' ? sessionConfig : null));
     const gateSbt = SESSION_SBT;
     mockQuestionsCache({
       questions: {
@@ -179,7 +199,9 @@ describe('SurveyPileViewMode gated empty states', () => {
     });
     jest.spyOn(sbtDisplayNameUtils, 'resolveSbtDisplayLabel').mockReturnValue('VIP SBT');
 
-    renderPile();
+    renderPile({
+      sessionConfig,
+    });
 
     expect(await screen.findByTestId(E2E_TESTIDS.SURVEY_LOCKED_BANNER)).toBeInTheDocument();
     expect(screen.getByText(`This session's questions are ${t('gatedLower')}`)).toBeInTheDocument();

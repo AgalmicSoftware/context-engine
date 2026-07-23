@@ -4,6 +4,7 @@ import {
   normalizeSubmitReceipt,
   resolveSurveySubmitSessionTarget,
 } from './surveyToolSubmitTransactionController';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const HASH_ZERO = `0x${'0'.repeat(64)}`;
 const TX_HASH = `0x${'a'.repeat(64)}`;
@@ -39,7 +40,7 @@ describe('surveyToolSubmitTransactionController', () => {
       const sessionConfig = {
         slug: 'demo-sh',
         corsWorkerUrl: 'https://worker.example',
-        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
         storageProfile: { backend: 'cloudflare' },
       };
 
@@ -49,7 +50,20 @@ describe('surveyToolSubmitTransactionController', () => {
           sessionConfig,
         }),
       ).toEqual(sessionConfig);
-      expect(resolveSurveySubmitSessionTarget({ sessionSlug: 'legacy', sessionConfig: {} })).toBe('legacy');
+      expect(() => resolveSurveySubmitSessionTarget({ sessionSlug: 'missing', sessionConfig: {} })).toThrow(
+        /missing, invalid, or unsupported/i,
+      );
+      expect(
+        resolveSurveySubmitSessionTarget({
+          sessionSlug: 'legacy',
+          sessionConfig: {
+            __registry: {
+              registryChainId: 11155420,
+              sessionIdHex: '0x00112233445566778899aabbccddeeff',
+            },
+          },
+        }),
+      ).toBe('legacy');
     });
   });
 
@@ -195,7 +209,7 @@ describe('surveyToolSubmitTransactionController', () => {
 
   describe('ensureIdentifierHash', () => {
     it('uses hashIdentifier when available', () => {
-      const hashIdentifier = jest.fn(() => 'hashed-by-helper');
+      const hashIdentifier = jest.fn((_value: unknown) => 'hashed-by-helper');
       const isHexString = jest.fn(() => false);
       const id = jest.fn((value: string) => `id:${value}`);
 
@@ -213,7 +227,7 @@ describe('surveyToolSubmitTransactionController', () => {
     });
 
     it('falls back to isHexString check for 32-byte hex', () => {
-      const isHexString = jest.fn(() => true);
+      const isHexString = jest.fn((_value: unknown, _length: number) => true);
       const id = jest.fn((value: string) => `id:${value}`);
       const value = `0x${'AB'.repeat(32)}`;
 
@@ -426,7 +440,7 @@ describe('surveyToolSubmitTransactionController', () => {
         makeSubmitOpts({
           questionResponses,
           surveyResponse,
-          deepClone,
+          deepClone: deepClone as NormalizeSubmitOptions['deepClone'],
         }),
       );
 

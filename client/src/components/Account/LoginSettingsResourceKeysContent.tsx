@@ -70,7 +70,7 @@ const LoginSettingsResourceKeysContent = ({
               checked={useLocalRpc}
               onChange={(event) => handleResourceToggleLocal('rpc', event)}
             />
-            <span>Use local override</span>
+            <span>Use in-memory override</span>
           </label>
           <div className={styles.aiSettingsHint}>
             {formatResourceSponsorHint({
@@ -105,7 +105,7 @@ const LoginSettingsResourceKeysContent = ({
               checked={useLocalArweave}
               onChange={(event) => handleResourceToggleLocal('arweave', event)}
             />
-            <span>Use local override</span>
+            <span>Use in-memory override</span>
           </label>
           <div className={styles.aiSettingsHint}>
             {formatResourceSponsorHint({
@@ -120,11 +120,11 @@ const LoginSettingsResourceKeysContent = ({
     </div>
     <div className={styles.aiSettingsFooterRow}>
       <div className={styles.aiSettingsStatus}>
-        {resourceKeysStatus || 'Stored locally; only sent on the request that needs them.'}
+        {resourceKeysStatus || 'Held in memory for this tab; cleared on reload.'}
       </div>
       <div className={styles.aiSettingsActions}>
         <Button size="sm" color="info" onClick={handleSaveResourceKeys} disabled={!resourceKeysDirty}>
-          Save keys
+          Use for this tab
         </Button>
         <Button size="sm" color="secondary" outline onClick={handleClearResourceKeys}>
           Clear keys

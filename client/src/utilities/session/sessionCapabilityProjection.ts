@@ -53,6 +53,11 @@ const getProfileCandidate = (value: unknown): { present: boolean; value: unknown
   return input.profileVersion === 1 ? { present: true, value: input } : { present: false, value: undefined };
 };
 
+export const claimsWorkerCanonicalAuthority = (value: unknown): boolean => {
+  const candidate = getProfileCandidate(value);
+  return candidate.present && asRecord(asRecord(candidate.value).authority).mode === 'worker_canonical';
+};
+
 const hasOnChainCondition = (document: unknown): boolean =>
   Array.isArray(asRecord(document).conditions) &&
   (asRecord(document).conditions as SessionModeAccessConditionDocument['conditions']).some(

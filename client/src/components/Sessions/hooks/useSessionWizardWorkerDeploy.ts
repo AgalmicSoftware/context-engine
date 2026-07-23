@@ -74,6 +74,11 @@ import {
   normalizeSessionWizardWorkerUrl as normalizeWorkerUrl,
 } from '../sessionWizardUrlSupport';
 import { verifyNativeSessionWorker } from '../sessionWizardNativeWorkerVerification';
+import {
+  completeSessionWizardWorkerPublicDeployment,
+  verifySessionWizardWorkerPublicDeployment,
+} from '../sessionWizardWorkerPublicVerification';
+import { postSessionWizardLitBootstrap } from '../sessionWizardWorkerDeployRequests';
 import type { AnyRecord, ChainIdLike, NetworkLike, WorkerSecretSyncResult, WorkerSecretsLike } from '../../shellTypes';
 type DeployFormLike = AnyRecord & {
   apiToken?: string;
@@ -161,6 +166,7 @@ type UseSessionWizardWorkerDeployOptions = {
   updateDeploymentState?: (nextState?: SessionWizardWorkerDeployStateUpdate) => void;
   clearSelectedBundleFile?: () => void;
   clearCachedWorkerSecretsAfterDeploy?: () => void;
+  verifyPublicWorkerDeployment?: typeof verifySessionWizardWorkerPublicDeployment;
 };
 
 const readRuntime = (
@@ -186,6 +192,7 @@ const useSessionWizardWorkerDeploy = ({
   updateDeploymentState = () => undefined,
   clearSelectedBundleFile = () => undefined,
   clearCachedWorkerSecretsAfterDeploy = () => undefined,
+  verifyPublicWorkerDeployment = verifySessionWizardWorkerPublicDeployment,
 }: UseSessionWizardWorkerDeployOptions = {}) => {
   const { runtimeRef, resolvedWalletAccountRef, sponsoredBundleAppliedBundleRef } = refs;
   const deployRequestInFlightRef = useRef(false);
@@ -546,11 +553,7 @@ const useSessionWizardWorkerDeploy = ({
         if (!markSessionWizardDeployAttemptCompleted(deployAttemptIdentity)) {
           throw new Error('Could not durably record the completed worker deployment.');
         }
-        const {
-          resolvedDeployWorkerUrl,
-          displayWorkerUrl,
-          deployComplete: isDeployVerified,
-        } = resolveDeployWorkerState({
+        const { resolvedDeployWorkerUrl, displayWorkerUrl } = resolveDeployWorkerState({
           responseWorkerUrl: data?.workerUrl,
           configuredWorkerUrl: configuredWorkerUrlBeforeDeploy,
         });
@@ -636,22 +639,7 @@ const useSessionWizardWorkerDeploy = ({
                     workerUrl,
                     accountOverride: resolvedAdmin,
                   }),
-                postBootstrap: async ({ auth, requestBody, workerUrl, slug: targetSlug }) => {
-                  const requestBodyWithSlug = {
-                    sessionSlug: targetSlug,
-                    ...requestBody,
-                  };
-                  const bootstrapRes = await fetch(`${workerUrl}/admin/lit-chipotle-bootstrap-session`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...requestBodyWithSlug, ...auth }),
-                  });
-                  const bootstrapData = await bootstrapRes.json().catch(() => ({}));
-                  if (!bootstrapRes.ok) {
-                    throw new Error(bootstrapData?.error || 'Failed to auto-bootstrap the Lit session account.');
-                  }
-                  return bootstrapData;
-                },
+                postBootstrap: postSessionWizardLitBootstrap,
                 ensureSessionConfig: ensureWorkerSessionConfig,
                 applyBootstrappedConfig: async ({ apiBase, litActionCid, litGroupId, litPkpId, result }) => {
                   const recoveredLitCredentials = resolveCompleteSessionWizardLitRuntime({
@@ -708,7 +696,8 @@ const useSessionWizardWorkerDeploy = ({
               });
               const provisionData = await provisionRes.json().catch(() => ({}));
               if (!provisionRes.ok) {
-                throw new Error(provisionData?.error || 'Failed to auto-provision the Lit action.');
+                void provisionData;
+                throw new Error(`Failed to auto-provision the Lit action (${provisionRes.status}).`);
               }
               return provisionData;
             },
@@ -797,11 +786,22 @@ const useSessionWizardWorkerDeploy = ({
               });
               const secretsData = await secretsRes.json().catch(() => ({}));
               if (!secretsRes.ok) {
-                throw new Error(secretsData?.error || 'Failed to sync worker secrets after deploy.');
+                void secretsData;
+                throw new Error(`Failed to sync worker secrets after deploy (${secretsRes.status}).`);
               }
             },
           });
         }
+        configSyncStatus = await completeSessionWizardWorkerPublicDeployment({
+          workerUrl: resolvedDeployWorkerUrl,
+          slug,
+          sessionId: runtime.sessionId || runtime.sessionIdHex,
+          adminAddress: resolvedAdmin,
+          config: workerConfigPayload,
+          isWorkerCanonical: modeRequirements.isWorkerCanonical,
+          signAdminAction: (input) => signTypedAdminAction({ ...input, accountOverride: resolvedAdmin }),
+          verify: verifyPublicWorkerDeployment,
+        });
         const { requiredLitRuntimeReady, requiredWorkerSecretsReady } = resolveSessionWizardWorkerRuntimeReadiness({
           requiredWorkerSecretFields,
           deploySecrets,
@@ -816,7 +816,7 @@ const useSessionWizardWorkerDeploy = ({
         // Regression guard: manual and forced deploys must keep the publish step
         // open until selected-profile secrets are remote; the same terminal request
         // ID then resumes signed sync without provisioning a second worker.
-        const remoteWorkerReady = isDeployVerified && requiredWorkerSecretsReady;
+        const remoteWorkerReady = requiredWorkerSecretsReady;
         const workerRequirementProof =
           remoteWorkerReady && modeRequirements.isWorkerCanonical
             ? buildSessionWizardWorkerRequirementProof({
@@ -956,6 +956,7 @@ const useSessionWizardWorkerDeploy = ({
       sponsoredBundleAppliedBundleRef,
       updateDeploymentState,
       updateDraftValue,
+      verifyPublicWorkerDeployment,
     ],
   );
 

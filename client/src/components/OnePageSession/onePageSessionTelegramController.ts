@@ -1,5 +1,11 @@
 import { resolveSessionBackendKind, type TelegramSessionMeta } from '../../utilities/session/sessionBackendKind';
-import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
+import {
+  agentClientLoginEnvelopeMatchesIdentity,
+  type AgentClientLoginEnvelope,
+  type AgentClientLoginIdentityTarget,
+} from '../../utilities/session/agentClientLogin';
+import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
+import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
 import type { TelegramResultsDataset } from '../../utilities/session/telegramSessionBackend';
 
 export const DEFAULT_AGENT_BRIDGE_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev';
@@ -102,6 +108,22 @@ export const resolveTelegramAgentBridgeUrl = (sessionConfig: unknown = null): st
   ).replace(/\/+$/g, '');
 };
 
+export const resolveAgentClientLoginIdentityTarget = ({
+  sessionConfig,
+  sessionSlug,
+}: {
+  sessionConfig: unknown;
+  sessionSlug: unknown;
+}): AgentClientLoginIdentityTarget => {
+  const cfg = toRecord(sessionConfig);
+  return {
+    sessionSlug: normalizeOnePageSessionSlug(sessionSlug || cfg.slug),
+    sessionId: resolveWorkerCanonicalSessionIdHex(cfg),
+    workerUrl: normalizeWorkerUrl(toTrimmedString(cfg.sessionWorkerUrl || cfg.workerUrl || cfg.corsWorkerUrl)),
+    agentBridgeUrl: resolveTelegramAgentBridgeUrl(cfg),
+  };
+};
+
 export const isOnePageTelegramBackendMode = ({
   sessionConfig,
   sessionSlug,
@@ -140,8 +162,15 @@ export const buildTelegramDataResetState = (): OnePageSessionTelegramDataResetSt
   telegramPolisDataset: null,
 });
 
-export const getAgentClientLoginEnvelopeMemoryKey = (sessionSlug: unknown): string =>
-  normalizeOnePageSessionSlug(sessionSlug) || 'general';
+export const getAgentClientLoginEnvelopeMemoryKey = (target: unknown | AgentClientLoginIdentityTarget): string => {
+  const source = isRecord(target) ? target : { sessionSlug: target };
+  return [
+    normalizeOnePageSessionSlug(source.sessionSlug) || 'general',
+    resolveWorkerCanonicalSessionIdHex({ sessionId: source.sessionId }) || 'no-session-id',
+    normalizeWorkerUrl(toTrimmedString(source.workerUrl)) || 'no-worker-origin',
+    normalizeWorkerUrl(toTrimmedString(source.agentBridgeUrl)) || 'no-bridge-origin',
+  ].join('\n');
+};
 
 export const clearTelegramEnvelopeMemoryCache = (
   sessionSlug: unknown,
@@ -150,7 +179,12 @@ export const clearTelegramEnvelopeMemoryCache = (
   try {
     const cache = globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__;
     if (cache && typeof cache === 'object') {
-      delete cache[getAgentClientLoginEnvelopeMemoryKey(sessionSlug)];
+      const normalizedSlug = normalizeOnePageSessionSlug(sessionSlug);
+      Object.entries(cache).forEach(([key, value]) => {
+        if (normalizeOnePageSessionSlug(toRecord(value).sessionSlug) === normalizedSlug) {
+          delete cache[key];
+        }
+      });
     }
   } catch (_) {}
 };
@@ -159,7 +193,12 @@ export const cacheAgentClientLoginEnvelope = (
   envelope: AgentClientLoginEnvelope,
   globalTarget: AgentClientLoginEnvelopeMemoryGlobal = globalThis as AgentClientLoginEnvelopeMemoryGlobal,
 ): string => {
-  const key = getAgentClientLoginEnvelopeMemoryKey(envelope.sessionSlug);
+  const key = getAgentClientLoginEnvelopeMemoryKey({
+    sessionSlug: envelope.sessionSlug,
+    sessionId: envelope.sessionId,
+    workerUrl: envelope.workerUrl,
+    agentBridgeUrl: envelope.agentBridgeUrl,
+  });
   if (
     !globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ ||
     typeof globalTarget.__CE_AGENT_CLIENT_LOGIN_ENVELOPES__ !== 'object'
@@ -188,12 +227,11 @@ const isAgentClientLoginEnvelope = (value: unknown): value is AgentClientLoginEn
 
 export const resolveAgentClientLoginEnvelopeFromEvent = (
   event: CustomEvent<unknown>,
-  currentSessionSlug: unknown,
+  target: unknown | AgentClientLoginIdentityTarget,
 ): AgentClientLoginEnvelope | null => {
   const detail = toRecord(event?.detail);
   const envelope = detail.envelope;
   if (!isAgentClientLoginEnvelope(envelope)) return null;
-  if (normalizeOnePageSessionSlug(envelope.sessionSlug) !== normalizeOnePageSessionSlug(currentSessionSlug))
-    return null;
+  if (!agentClientLoginEnvelopeMatchesIdentity(envelope, target)) return null;
   return envelope;
 };

@@ -24,8 +24,18 @@ import {
   resolveSurveyToolSurveyReadContext,
   resolveSurveyToolUpdateCacheContext,
 } from './surveyToolSessionResolution.js';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile.js';
 
 const makeResolveBySlug = (resolver: (slug: string) => any) => jest.fn(resolver);
+const makeLegacyRegistryConfig = (slug: string, extra: Record<string, unknown> = {}) => ({
+  slug,
+  networkChainId: 84532,
+  __registry: {
+    registryChainId: 84532,
+    sessionIdHex: '0x00112233445566778899aabbccddeeff',
+  },
+  ...extra,
+});
 
 describe('surveyToolSessionResolution', () => {
   it('canonicalizes explicit general routes and preserves SurveyTool prop precedence', () => {
@@ -148,6 +158,75 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
+  it('does not augment a validated Worker response-gate config from a same-slug registry session', () => {
+    const workerConfig = {
+      slug: 'worker-edge',
+      lit: {
+        litNetwork: 'worker-lit',
+      },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    const resolveBySlug = makeResolveBySlug(() => ({
+      slug: 'worker-edge',
+      lit: {
+        litNetwork: 'registry-lit',
+        accessControlConditions: [{ contractAddress: '0xregistry' }],
+      },
+      sponsored: {
+        defaultGateId: 'registry_gate',
+        gates: {
+          registry_gate: { gateId: 'registry_gate', type: 'sbt' },
+        },
+      },
+      __registry: {
+        registryChainId: 84532,
+        gatesByResource: {
+          responses: ['registry_gate'],
+        },
+      },
+    }));
+
+    const resolved = resolveSurveyToolResponseGateSessionContext({
+      sessionSlug: 'worker-edge',
+      sessionConfig: workerConfig,
+      resolveBySlug,
+    });
+
+    expect(resolveBySlug).not.toHaveBeenCalled();
+    expect(resolved.sessionConfig).toBe(workerConfig);
+    expect(resolved.effectiveSessionConfig).toEqual(workerConfig);
+    expect(resolved.effectiveSessionConfig?.lit).toEqual({ litNetwork: 'worker-lit' });
+    expect(resolved.effectiveSessionConfig?.sponsored).toBeUndefined();
+    expect(resolved.effectiveSessionConfig?.__registry).toBeUndefined();
+  });
+
+  it('treats an invalid Worker authority claim as a fail-closed response-gate boundary', () => {
+    const invalidWorkerConfig = {
+      slug: 'worker-edge',
+      sessionModeProfile: {
+        profileVersion: 1,
+        preset: 'custom',
+        authority: { mode: 'worker_canonical' },
+      },
+    };
+    const resolveBySlug = makeResolveBySlug(() =>
+      makeLegacyRegistryConfig('worker-edge', {
+        lit: { litNetwork: 'registry-lit' },
+        sponsored: { defaultGateId: 'registry-gate' },
+      }),
+    );
+
+    const resolved = resolveSurveyToolResponseGateSessionContext({
+      sessionSlug: 'worker-edge',
+      sessionConfig: invalidWorkerConfig,
+      resolveBySlug,
+    });
+
+    expect(resolveBySlug).not.toHaveBeenCalled();
+    expect(resolved.sessionConfig).toBe(invalidWorkerConfig);
+    expect(resolved.effectiveSessionConfig).toBeNull();
+  });
+
   it('keeps unresolved question-config slugs off borrowed general blocked/highlighted ids', () => {
     const resolveBySlug = makeResolveBySlug((slug) =>
       slug === ''
@@ -200,7 +279,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved draft-storage slugs on pending network scope unless props provide the chain id', () => {
+  it('keeps unresolved draft-storage slugs fail-closed even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolDraftStorageContext({
@@ -223,15 +302,15 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved response-hydration slugs off cache scope unless props provide the chain id', () => {
+  it('keeps unresolved response-hydration slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolResponseHydrationContext({
@@ -254,8 +333,8 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
@@ -267,7 +346,7 @@ describe('surveyToolSessionResolution', () => {
       slug === 'demo-sh'
         ? {
             slug,
-            sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+            sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
           }
         : null,
     );
@@ -296,7 +375,7 @@ describe('surveyToolSessionResolution', () => {
     });
   });
 
-  it('keeps unresolved question-bootstrap slugs off bootstrap network scope unless props provide the chain id', () => {
+  it('keeps unresolved question-bootstrap slugs off bootstrap scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolQuestionBootstrapContext({
@@ -319,15 +398,15 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved question-read-cache slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved question-read-cache slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolQuestionReadCacheContext({
@@ -350,8 +429,8 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
@@ -365,6 +444,7 @@ describe('surveyToolSessionResolution', () => {
             slug: 'edge',
             __registry: {
               registryChainId: 84532,
+              sessionIdHex: '0x00112233445566778899aabbccddeeff',
             },
           }
         : null,
@@ -389,7 +469,7 @@ describe('surveyToolSessionResolution', () => {
     });
   });
 
-  it('keeps unresolved questions-dashboard-load slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved dashboard-load slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolQuestionsDashboardLoadContext({
@@ -412,8 +492,8 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
@@ -421,9 +501,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('recovers questions-dashboard network scope from fallback list slugs when bare /questions has no base session config', () => {
-    const resolveBySlug = makeResolveBySlug((slug) =>
-      slug === 'alpha' ? { slug: 'alpha', networkChainId: 84532 } : null,
-    );
+    const resolveBySlug = makeResolveBySlug((slug) => (slug === 'alpha' ? makeLegacyRegistryConfig('alpha') : null));
 
     const resolved = resolveSurveyToolQuestionsDashboardLoadContext({
       sessionSlug: '',
@@ -443,7 +521,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).toHaveBeenCalledWith('alpha');
   });
 
-  it('keeps unresolved question-payload-cache-write slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved question-payload writes off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolQuestionPayloadCacheWriteContext({
@@ -466,15 +544,15 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved ensure-question-cached slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved ensure-question-cached calls fail-closed when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolEnsureQuestionCachedContext({
@@ -497,15 +575,15 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved question-count slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved question-count slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolQuestionCountContext({
@@ -528,8 +606,8 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
@@ -537,9 +615,7 @@ describe('surveyToolSessionResolution', () => {
   });
 
   it('recovers question-count network scope from fallback list slugs when bare /questions has no base session config', () => {
-    const resolveBySlug = makeResolveBySlug((slug) =>
-      slug === 'alpha' ? { slug: 'alpha', networkChainId: 84532 } : null,
-    );
+    const resolveBySlug = makeResolveBySlug((slug) => (slug === 'alpha' ? makeLegacyRegistryConfig('alpha') : null));
 
     const resolved = resolveSurveyToolQuestionCountContext({
       sessionSlug: '',
@@ -559,7 +635,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).toHaveBeenCalledWith('alpha');
   });
 
-  it('keeps unresolved id-lookup slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved id-lookup slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolIdLookupContext({
@@ -582,15 +658,15 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved survey-read slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved survey-read slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolSurveyReadContext({
@@ -613,15 +689,15 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved update-cache slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved update-cache slugs off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolUpdateCacheContext({
@@ -644,15 +720,15 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved submitted-cache-write slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved submitted-cache writes off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolSubmittedCacheWriteContext({
@@ -675,15 +751,15 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved pile-warm-seed slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved pile warm seeds off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolPileWarmSeedContext({
@@ -706,15 +782,15 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved pile-load slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved pile loads off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolPileLoadContext({
@@ -737,15 +813,15 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved pile-response-read slugs off cache/network scope unless props provide the chain id', () => {
+  it('keeps unresolved pile-response reads off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolPileResponseReadContext({
@@ -768,8 +844,8 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
@@ -779,13 +855,11 @@ describe('surveyToolSessionResolution', () => {
   it('prefers the resolved session chain over wallet-facing network props for pile cache contexts', () => {
     const resolveBySlug = makeResolveBySlug((slug) =>
       slug === 'edge'
-        ? {
-            slug: 'edge',
-            networkChainId: 84532,
+        ? makeLegacyRegistryConfig('edge', {
             contracts: {
               surveys: { chainId: 84532 },
             },
-          }
+          })
         : null,
     );
 
@@ -814,7 +888,7 @@ describe('surveyToolSessionResolution', () => {
     });
   });
 
-  it('keeps unresolved pile-filter slugs off cache/config scope unless props provide the chain id', () => {
+  it('keeps unresolved pile filters off cache/config scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) =>
       slug === ''
         ? {
@@ -848,8 +922,8 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       blockedQuestionIds: [],
       highlightedQuestionIds: [],
       error: 'Session config not found for "missing-session-slug".',
@@ -858,7 +932,7 @@ describe('surveyToolSessionResolution', () => {
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved decrypt-hydration slugs off cache scope unless props provide the chain id', () => {
+  it('keeps unresolved decrypt hydration off cache scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) => (slug === '' ? { slug: '', networkChainId: 84532 } : null));
 
     const unresolved = resolveSurveyToolDecryptHydrationContext({
@@ -881,15 +955,15 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');
     expect(resolveBySlug).not.toHaveBeenCalledWith('');
   });
 
-  it('keeps unresolved response-json slugs off metadata scope unless props provide the chain id', () => {
+  it('keeps unresolved response JSON off metadata scope even when props provide a chain id', () => {
     const resolveBySlug = makeResolveBySlug((slug) =>
       slug === '' ? { slug: '', networkChainId: 84532, sessionName: 'General Session' } : null,
     );
@@ -914,8 +988,8 @@ describe('surveyToolSessionResolution', () => {
     expect(propsPinned).toMatchObject({
       sessionSlug: 'missing-session-slug',
       sessionConfig: null,
-      networkId: 84532,
-      networkIdStr: '84532',
+      networkId: null,
+      networkIdStr: '',
       error: 'Session config not found for "missing-session-slug".',
     });
     expect(resolveBySlug).toHaveBeenCalledWith('missing-session-slug');

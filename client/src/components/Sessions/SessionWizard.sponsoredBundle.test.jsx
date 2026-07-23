@@ -13,7 +13,6 @@ const defaultNormalizeWorkerUrl = (value = '') => String(value || '').trim();
 const testWebCrypto = require('crypto').webcrypto;
 const originalCrypto = global.crypto;
 const originalFetch = global.fetch;
-const originalIndexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB');
 
 jest.setTimeout(20000);
 
@@ -154,7 +153,11 @@ jest.mock('../../variables/appConfig.js', () => {
 });
 
 import SessionWizard, { __test__resetSessionWizardSponsoredBundleCacheKey } from './SessionWizard';
-import { SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY } from '../../utilities/session/sponsoredBootstrapFunding.js';
+import {
+  SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY,
+  clearSponsoredBootstrapFundingContext,
+  readSponsoredBootstrapFundingContext,
+} from '../../utilities/session/sponsoredBootstrapFunding.js';
 import {
   SPONSORED_DEPLOY_NOTICE,
   SPONSORED_FAUCET_NOTICE,
@@ -176,7 +179,6 @@ import {
   createDeferred,
   seedWizardCache,
 } from './SessionWizard.sponsoredBundleFixtures.testUtils';
-import { createIndexedDbMock } from './SessionWizard.sponsoredBundleIndexedDb.testUtils';
 
 const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
 const renderLoggedInSessionWizard = (props = {}) =>
@@ -195,11 +197,8 @@ describe('SessionWizard sponsored bundle flow', () => {
     global.fetch = createDefaultFetchMock();
     localStorage.clear();
     sessionStorage.clear();
+    clearSponsoredBootstrapFundingContext();
     window.history.replaceState({}, '', '/');
-    Object.defineProperty(globalThis, 'indexedDB', {
-      value: createIndexedDbMock(),
-      configurable: true,
-    });
     mockDownloadDataFromArweave.mockResolvedValue(buildEnvelope());
     mockUploadDataToArweave.mockResolvedValue('a'.repeat(43));
     mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
@@ -210,11 +209,6 @@ describe('SessionWizard sponsored bundle flow', () => {
   afterAll(() => {
     global.fetch = originalFetch;
     global.crypto = originalCrypto;
-    if (originalIndexedDbDescriptor) {
-      Object.defineProperty(globalThis, 'indexedDB', originalIndexedDbDescriptor);
-    } else {
-      delete globalThis.indexedDB;
-    }
   });
 
   it('auto-applies sponsored bundle secrets, re-enables worker secrets, and disables secret persistence', async () => {
@@ -246,13 +240,14 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(screen.queryByText('Lit usage API key')).not.toBeInTheDocument();
     expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('https://sponsored-rpc.example.test');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
-    expect(getToggleCheckbox('Dev: keep secrets on refresh')).not.toBeChecked();
+    expect(screen.queryByText('Dev: keep secrets on refresh')).not.toBeInTheDocument();
     expect(getToggleCheckbox('Require users to pay for usage')).not.toBeChecked();
-    expect(JSON.parse(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY) || '{}')).toEqual({
+    expect(readSponsoredBootstrapFundingContext()).toEqual({
       sessionSlug: 'source-session',
       workerUrl: 'https://source-worker.example.test',
       targetSessionSlug: '',
     });
+    expect(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY)).toBeNull();
 
     await waitFor(() => {
       const cachedRaw = sessionStorage.getItem('ce:sessionWizardDraft:v1') || '{}';
@@ -281,15 +276,16 @@ describe('SessionWizard sponsored bundle flow', () => {
     });
 
     await waitFor(() => {
-      expect(JSON.parse(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY) || '{}')).toEqual({
+      expect(readSponsoredBootstrapFundingContext()).toEqual({
         sessionSlug: 'source-session',
         workerUrl: 'https://source-worker.example.test',
         targetSessionSlug: 'fresh-sponsored-target',
       });
     });
+    expect(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY)).toBeNull();
   }, 15000);
 
-  it('persists faucet grant tokens in the sponsored bootstrap funding context', async () => {
+  it('keeps faucet grant tokens only in the in-memory sponsored bootstrap funding context', async () => {
     mockDecryptWithPassword.mockResolvedValueOnce({
       openaiKey: 'sponsored-openai',
       anthropicKey: 'sponsored-anthropic',
@@ -314,12 +310,13 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     await expectSponsoredStatus('Sponsored resources applied.');
 
-    expect(JSON.parse(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY) || '{}')).toEqual({
+    expect(readSponsoredBootstrapFundingContext()).toEqual({
       sessionSlug: 'source-session',
       workerUrl: 'https://source-worker.example.test',
       targetSessionSlug: '',
       faucetGrantToken: 'faucet-grant-token',
     });
+    expect(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY)).toBeNull();
   }, 15000);
 
   it('clears stale deployed worker state from a previous session when a sponsored bundle is applied', async () => {
@@ -453,8 +450,8 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(screen.getAllByText('Use URL').length).toBeGreaterThan(0);
   }, 15000);
 
-  it('removes the sponsored bundle hash secret after applying the bundle', async () => {
-    window.history.replaceState({}, '', '/session/new?sponsored=sponsor_tx_id#k=bundle-secret&preview=1');
+  it('keeps an explicitly handed-off bundle key out of the current URL', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor_tx_id#preview=1');
 
     renderSessionWizard({
       initialSponsoredBundleId: 'sponsor_tx_id',
@@ -464,9 +461,10 @@ describe('SessionWizard sponsored bundle flow', () => {
     continueNewSessionEntry();
     await expectSponsoredStatus('Sponsored resources applied.');
     expect(window.location.hash).toBe('#preview=1');
+    expect(window.location.href).not.toContain('bundle-secret');
   });
 
-  it('keeps the prior sponsored status when the parent rerenders after hash scrubbing', async () => {
+  it('keeps the prior sponsored status when the parent drops its one-time key prop', async () => {
     const { rerender } = renderSessionWizard({
       initialSponsoredBundleId: 'sponsor_tx_id',
       initialSponsoredBundleKey: 'bundle-secret',
@@ -483,7 +481,7 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(mockDownloadDataFromArweave).toHaveBeenCalledTimes(1);
   });
 
-  it('restores the pre-sponsored secrets and deploy token when the route is no longer sponsored', async () => {
+  it('does not restore legacy persisted secrets when the route is no longer sponsored', async () => {
     seedWizardCache({
       workerSecretsEnabled: false,
       persistWorkerSecrets: true,
@@ -506,7 +504,6 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
     expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('https://sponsored-rpc.example.test');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
-    expect(getToggleCheckbox('Dev: keep secrets on refresh')).not.toBeChecked();
     expect(getToggleCheckbox('Require users to pay for usage')).not.toBeChecked();
 
     rerender(<SessionWizard network={{ id: 84532 }} initialSponsoredBundleId="" initialSponsoredBundleKey="" />);
@@ -515,10 +512,10 @@ describe('SessionWizard sponsored bundle flow', () => {
       expect(screen.queryByTestId('ce-wizard-sponsored-status')).not.toBeInTheDocument();
     });
     expect(sessionStorage.getItem(SPONSORED_BOOTSTRAP_FUNDING_CONTEXT_KEY)).toBeNull();
-    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('cached-openai');
+    expect(readSponsoredBootstrapFundingContext()).toBeNull();
+    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('');
     expect(getFieldInputByLabel('Custom RPC URL')).toHaveValue('');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
-    expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
     expect(getToggleCheckbox('Require users to pay for usage')).toBeChecked();
   });
 
@@ -546,7 +543,6 @@ describe('SessionWizard sponsored bundle flow', () => {
     fireEvent.change(getFieldInputByLabel('OpenAI key *'), {
       target: { value: 'edited-openai' },
     });
-    fireEvent.click(getToggleCheckbox('Dev: keep secrets on refresh'));
     fireEvent.click(getToggleCheckbox('Require users to pay for usage'));
 
     rerender(
@@ -571,7 +567,6 @@ describe('SessionWizard sponsored bundle flow', () => {
     );
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('edited-openai');
-    expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
     expect(getToggleCheckbox('Require users to pay for usage')).toBeChecked();
 
     await act(async () => {
@@ -583,7 +578,6 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
     expect(getFieldInputByLabel('Admin address')).toHaveValue('0x00000000000000000000000000000000000000cc');
-    expect(getToggleCheckbox('Dev: keep secrets on refresh')).not.toBeChecked();
     expect(getToggleCheckbox('Require users to pay for usage')).not.toBeChecked();
 
     rerender(<SessionWizard network={{ id: 84532 }} initialSponsoredBundleId="" initialSponsoredBundleKey="" />);
@@ -594,11 +588,13 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('edited-openai');
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_API_TOKEN)).toHaveValue('');
     expect(getFieldInputByLabel('Admin address')).toHaveValue('0x00000000000000000000000000000000000000cc');
-    expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
     expect(getToggleCheckbox('Require users to pay for usage')).toBeChecked();
   });
 
-  it('restores sponsored resources after the hash key is scrubbed within the same tab', async () => {
+  it('restores sponsored resources from memory within the same tab without persisting credentials', async () => {
+    sessionStorage.setItem('ce:sessionWizardSponsoredBundle:v1', 'legacy-ciphertext');
+    sessionStorage.setItem('ce:sessionWizardSponsoredBundle:ek:v1', 'legacy-key');
+    sessionStorage.setItem('ce:sessionWizardSponsoredBundle:tabId:v1', 'legacy-tab');
     const firstRender = renderSessionWizard({
       initialSponsoredBundleId: 'sponsor_tx_id',
       initialSponsoredBundleKey: 'bundle-secret',
@@ -607,11 +603,9 @@ describe('SessionWizard sponsored bundle flow', () => {
     await expectSponsoredStatus('Sponsored resources applied.');
     expect(mockDownloadDataFromArweave).toHaveBeenCalledTimes(1);
     await waitFor(() => {
-      const cachedRaw = sessionStorage.getItem('ce:sessionWizardSponsoredBundle:v1') || '';
-      expect(cachedRaw).toContain('"ciphertext"');
-      expect(cachedRaw).not.toContain('sponsored-openai');
-      expect(cachedRaw).not.toContain('https://sponsored-rpc.example.test');
+      expect(sessionStorage.getItem('ce:sessionWizardSponsoredBundle:v1')).toBeNull();
       expect(sessionStorage.getItem('ce:sessionWizardSponsoredBundle:ek:v1')).toBeNull();
+      expect(sessionStorage.getItem('ce:sessionWizardSponsoredBundle:tabId:v1')).toBeNull();
     });
 
     firstRender.unmount();
@@ -639,24 +633,14 @@ describe('SessionWizard sponsored bundle flow', () => {
     expect(mockDownloadDataFromArweave).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to memory-only sponsored bundle cache storage when IndexedDB is unavailable', async () => {
-    Object.defineProperty(globalThis, 'indexedDB', {
-      value: undefined,
-      configurable: true,
-    });
-    __test__resetSessionWizardSponsoredBundleCacheKey();
-
+  it('requires the key again after the memory-only sponsored bundle cache resets', async () => {
     const firstRender = renderSessionWizard({
       initialSponsoredBundleId: 'sponsor_tx_id',
       initialSponsoredBundleKey: 'bundle-secret',
     });
 
     await expectSponsoredStatus('Sponsored resources applied.');
-    await waitFor(() => {
-      const cachedRaw = sessionStorage.getItem('ce:sessionWizardSponsoredBundle:v1') || '';
-      expect(cachedRaw).toContain('"ciphertext"');
-      expect(sessionStorage.getItem('ce:sessionWizardSponsoredBundle:ek:v1')).toBeNull();
-    });
+    expect(sessionStorage.getItem('ce:sessionWizardSponsoredBundle:v1')).toBeNull();
 
     firstRender.unmount();
     __test__resetSessionWizardSponsoredBundleCacheKey();
@@ -666,11 +650,12 @@ describe('SessionWizard sponsored bundle flow', () => {
       initialSponsoredBundleKey: '',
     });
 
-    await expectSponsoredStatus('Malformed sponsored link.');
+    await expectSponsoredStatus('Enter the sponsored bundle decryption key to continue.');
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_KEY_INPUT)).toBeInTheDocument();
     expect(mockDownloadDataFromArweave).toHaveBeenCalledTimes(1);
   });
 
-  it('preserves existing worker secrets when the sponsored bundle only provides a subset of fields', async () => {
+  it('does not revive persisted worker secrets when a sponsored bundle provides only a subset of fields', async () => {
     seedWizardCache({
       workerSecretsEnabled: true,
       persistWorkerSecrets: true,
@@ -701,8 +686,8 @@ describe('SessionWizard sponsored bundle flow', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
-    expect(getFieldInputByLabel('Arweave JWK *')).toHaveValue('{"kty":"cached"}');
-    expect(getFieldInputByLabel('Faucet private key')).toHaveValue('0xcachedfaucet');
+    expect(getFieldInputByLabel('Arweave JWK *')).toHaveValue('');
+    expect(getFieldInputByLabel('Faucet private key')).toHaveValue('');
   });
 
   it('shows advanced faucet provenance for sponsored raw faucet keys and hides it after manual edits', async () => {
@@ -877,7 +862,7 @@ describe('SessionWizard sponsored bundle flow', () => {
     }
   });
 
-  it('rejects expired bundles without mutating existing worker secret fields', async () => {
+  it('rejects expired bundles without reviving persisted worker secret fields', async () => {
     seedWizardCache({
       workerSecretsEnabled: false,
       persistWorkerSecrets: true,
@@ -905,13 +890,12 @@ describe('SessionWizard sponsored bundle flow', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
-    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('cached-openai');
-    expect(getToggleCheckbox('Dev: keep secrets on refresh')).toBeChecked();
+    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('');
     expect(getToggleCheckbox('Require users to pay for usage')).toBeChecked();
   });
 
-  it('removes the sponsored bundle hash secret after a terminal sponsored-bundle failure', async () => {
-    window.history.replaceState({}, '', '/session/new?sponsored=sponsor_tx_id#k=bundle-secret&preview=1');
+  it('does not write the explicit bundle key into the URL after a terminal sponsored-bundle failure', async () => {
+    window.history.replaceState({}, '', '/session/new?sponsored=sponsor_tx_id#preview=1');
     mockDecryptWithPassword.mockResolvedValue({
       openaiKey: 'expired-openai',
       meta: {
@@ -930,9 +914,10 @@ describe('SessionWizard sponsored bundle flow', () => {
     continueNewSessionEntry();
     await expectSponsoredStatus('Sponsored bundle expired.');
     expect(window.location.hash).toBe('#preview=1');
+    expect(window.location.href).not.toContain('bundle-secret');
   });
 
-  it('rejects malformed envelopes without mutating existing worker secret fields', async () => {
+  it('rejects malformed envelopes without reviving persisted worker secret fields', async () => {
     seedWizardCache({
       workerSecrets: {
         openaiKey: 'cached-openai',
@@ -957,17 +942,27 @@ describe('SessionWizard sponsored bundle flow', () => {
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
-    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('cached-openai');
+    expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('');
   });
 
-  it('surfaces malformed sponsored links before any bundle download runs', async () => {
+  it('accepts a non-URL decryption key before downloading the sponsored bundle', async () => {
     renderSessionWizard({
       initialSponsoredBundleId: 'sponsor_tx_id',
       initialSponsoredBundleKey: '',
     });
 
-    await expectSponsoredStatus('Malformed sponsored link.');
+    await expectSponsoredStatus('Enter the sponsored bundle decryption key to continue.');
     expect(mockDownloadDataFromArweave).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_KEY_INPUT), {
+      target: { value: 'separately-shared-key' },
+    });
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_KEY_APPLY));
+
+    await expectSponsoredStatus('Sponsored resources applied.');
+    expect(mockDecryptWithPassword).toHaveBeenCalledWith(expect.anything(), 'separately-shared-key');
+    expect(window.location.href).not.toContain('separately-shared-key');
+    expect(Object.values(sessionStorage).join('\n')).not.toContain('separately-shared-key');
   });
 
   it('lets the user retry transient sponsored bundle load failures in place', async () => {

@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 
 import { escapeSbtCsvField } from './sbtCsvExportHelpers';
+import { sanitizeSbtClaimIdentityUrl } from './sbtClaimUrlSafety';
 
 type ResolveSbtPagePasswordExportSelectionArgs = {
   adminGeneratedPasswords?: unknown;
@@ -184,9 +185,7 @@ export const encodeSbtPageGroupPasswordForUrl = (
 
 export const buildSbtPagePasswordInviteLink = ({
   baseUrl = '',
-  code = '',
   demoPath = '',
-  encodeGroupPassword = null,
   isInvite = false,
   sbtAddr = '',
   sbtBasePathValue = '',
@@ -194,20 +193,16 @@ export const buildSbtPagePasswordInviteLink = ({
   const origin = String(baseUrl || '');
   const routePath = String(demoPath || '');
   const address = String(sbtAddr || '');
-  const codeText = String(code ?? '');
   if (isInvite) {
-    const encodePassword =
-      typeof encodeGroupPassword === 'function' ? encodeGroupPassword : (password: string) => password;
-    return `${origin}${routePath}?auto=1&sbt=${encodeURIComponent(address)}&gp=${encodeURIComponent(encodePassword(codeText))}`;
+    return `${origin}${routePath}?auto=1&sbt=${encodeURIComponent(address)}`;
   }
-  return `${origin}${String(sbtBasePathValue || '')}/${address}/${codeText}`;
+  return `${origin}${String(sbtBasePathValue || '')}/${address}`;
 };
 
 export const buildSbtPagePasswordExportRows = ({
   baseUrl = '',
   codeLabel = 'password',
   demoPath = '',
-  encodeGroupPassword = null,
   isInvite = false,
   passwordsToExport = [],
   sbtAddr = '',
@@ -218,9 +213,7 @@ export const buildSbtPagePasswordExportRows = ({
     [label]: code,
     inviteLink: buildSbtPagePasswordInviteLink({
       baseUrl,
-      code,
       demoPath,
-      encodeGroupPassword,
       isInvite,
       sbtAddr,
       sbtBasePathValue,
@@ -240,7 +233,12 @@ export const buildSbtPagePasswordExportFile = ({
     format === 'json' || format === 'csv' ? format : null;
   if (!passwordExportFormat) return null;
 
-  const exportRows = Array.isArray(rows) ? (rows as SbtPagePasswordExportRow[]) : [];
+  const exportRows: SbtPagePasswordExportRow[] = Array.isArray(rows)
+    ? (rows as SbtPagePasswordExportRow[]).map((row): SbtPagePasswordExportRow => ({
+        ...row,
+        inviteLink: sanitizeSbtClaimIdentityUrl(row?.inviteLink),
+      }))
+    : [];
   const label = String(codeLabel || 'password');
   const fileNameBase = String(sbtSymbolOrName || 'SBT');
   const fileSuffix = String(fileLabel || 'passwords');

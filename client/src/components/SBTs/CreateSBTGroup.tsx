@@ -65,6 +65,7 @@ import {
   getScopedCreateSbtFormCacheKey,
   hasMeaningfulCreateSbtFormPayload,
   LEGACY_CREATE_SBT_FORM_CACHE_KEY,
+  sanitizeCreateSbtFormCachePayload,
 } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { isCryptoMode, t } from '../../utilities/ui/terminology.js';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerAuth.js';
@@ -637,6 +638,7 @@ type CreateSbtInputChangeEvent = {
 };
 type CreateSbtGroupProps = Record<string, unknown> & {
   deferredDeploy?: unknown;
+  preferConnectedNetworkForAuthoring?: boolean;
 };
 type FinalizeDeferredCreateSbtDraftUploadArgs = {
   authoringPayload?: unknown;
@@ -936,8 +938,9 @@ class CreateSBTGroup extends Component<any, any> {
         sessionStorage.removeItem(LEGACY_CREATE_SBT_FORM_CACHE_KEY);
         return false;
       }
-      const parsedRecord = isPlainObject(parsed) ? parsed : null;
+      const parsedRecord = sanitizeCreateSbtFormCachePayload(parsed);
       if (!parsedRecord) return false;
+      const safeRaw = JSON.stringify(parsedRecord);
       const cachedSlug = String(parsedRecord._sessionSlug || 'general').toLowerCase();
       const currentSlug = (this.getEffectiveSessionSlug() || 'general').toLowerCase();
       if (cachedSlug !== currentSlug) {
@@ -947,7 +950,7 @@ class CreateSBTGroup extends Component<any, any> {
         return false;
       }
       try {
-        sessionStorage.setItem(scopedCacheKey, raw);
+        sessionStorage.setItem(scopedCacheKey, safeRaw);
         sessionStorage.removeItem(LEGACY_CREATE_SBT_FORM_CACHE_KEY);
       } catch (e) {
         sbtLog.warn('CreateSBTGroup: fallback', e);
@@ -955,7 +958,7 @@ class CreateSBTGroup extends Component<any, any> {
       if (!this.applyAuthoringPayload(parsedRecord)) return false;
 
       // Keep last snapshot so we don't immediately rewrite
-      this._lastSavedCacheJSON = raw;
+      this._lastSavedCacheJSON = safeRaw;
       return true;
     } catch (e) {
       return false;
@@ -1024,6 +1027,7 @@ class CreateSBTGroup extends Component<any, any> {
       sessionConfigOverride: sources.sessionConfigOverride,
       resolvedSessionConfig: sources.resolvedSessionConfig,
       network: this.props.network,
+      preferConnectedNetworkForAuthoring: this.props.preferConnectedNetworkForAuthoring === true,
       availableChainIds: this.getAuthoringChainOptions().map((chain) => chain.id),
     });
   };
@@ -1405,7 +1409,8 @@ class CreateSBTGroup extends Component<any, any> {
       this.props.sessionConfigOverride !== prevProps.sessionConfigOverride ||
       this.props.sessionConfig !== prevProps.sessionConfig ||
       this.props.sessionSlug !== prevProps.sessionSlug ||
-      this.props.slug !== prevProps.slug;
+      this.props.slug !== prevProps.slug ||
+      this.props.preferConnectedNetworkForAuthoring !== prevProps.preferConnectedNetworkForAuthoring;
     const lockAudienceChanged =
       authoringContextChanged ||
       prevState.network !== this.state.network ||
@@ -3123,7 +3128,6 @@ class CreateSBTGroup extends Component<any, any> {
     const jsonData = buildCreateSbtJsonPreviewData({
       authoringChain,
       autoJoinUrl,
-      groupPassword,
       network,
       sbtName,
       sbtAddress,
@@ -3438,16 +3442,11 @@ class CreateSBTGroup extends Component<any, any> {
 
       // Shareable links
       const publicAutoJoinUrl = this.buildSessionAutoJoinUrl(sbtAddress);
-      const encodedGroupPassword = cryptoUtils.encodeGroupPasswordForUrl(groupPassword);
 
       if (distributionOption === 'groupPassword' && !isLimited) {
-        const secureUrl = publicAutoJoinUrl; // no password in URL
-        const oneClick = `${secureUrl}&gp=${encodeURIComponent(encodedGroupPassword)}`; // password embedded
-
-        this.setState(buildCreateSbtShareableUrlPatch({ autoJoinUrl: oneClick }));
+        this.setState(buildCreateSbtShareableUrlPatch({ autoJoinUrl: publicAutoJoinUrl }));
       } else if (distributionOption === 'groupPassword' && isLimited) {
-        const autoJoinUrl = `${publicAutoJoinUrl}&gp=${encodeURIComponent(encodedGroupPassword)}`;
-        this.setState(buildCreateSbtShareableUrlPatch({ autoJoinUrl }));
+        this.setState(buildCreateSbtShareableUrlPatch({ autoJoinUrl: publicAutoJoinUrl }));
         await this.generateSBTInviteLinks(sbtAddress, [groupPassword]);
       } else if (distributionOption === 'anyoneCanMint') {
         const autoJoinUrl = publicAutoJoinUrl;
@@ -3475,17 +3474,12 @@ class CreateSBTGroup extends Component<any, any> {
     const isInvite = distribution.isLimited && distribution.distributionOption === 'groupPassword';
     const base = window.location.origin;
     const demoPath = buildSessionRoutePath(this.getEffectiveSessionSlug(), readPublicUrlBasePath());
-    const encodeGroupPassword = (code: unknown) => {
-      const normalized = cryptoUtils.normalizeGroupPasswordInput(code);
-      return cryptoUtils.encodeGroupPasswordForUrl(normalized) || '';
-    };
     const sbtAddressText = String(sbtAddress || '');
     const detailPath = this.buildSbtPagePath(sbtAddressText);
     const sbtInviteLinks = buildCreateSbtInviteLinks({
       base,
       demoPath,
       detailPath,
-      encodeGroupPassword,
       isInvite,
       passwordList: list,
       sbtAddress: sbtAddressText,
@@ -4524,8 +4518,8 @@ class CreateSBTGroup extends Component<any, any> {
               <>
                 {/* Auto-Join URL (Group Password) */}
                 {this.renderShareableBlock(
-                  sbtDistribution.isLimited ? 'Auto-Join URL (Group Password)' : 'Auto-Join URL (One-Click)',
-                  'Password embedded - use with caution. Anyone with this link can join immediately.',
+                  'Claim URL (Password Entered Separately)',
+                  'This link identifies the group only. Send the exported claim password separately; the recipient enters it in the claim form.',
                   null,
                   autoJoinUrl,
                   'qr-code-one-click',
@@ -4558,7 +4552,7 @@ class CreateSBTGroup extends Component<any, any> {
 
         {successDisplayState.shouldRenderPasswordRecovery && (
           <div className={styles.sbtInviteLinks}>
-            <h3>Password Recovery</h3>
+            <h3>Password Export &amp; Tab Recovery</h3>
             <SbtEncryptedRecoveryControl
               checked={this.state.encryptedRecoveryEnabled === true}
               mode="create"

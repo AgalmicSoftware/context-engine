@@ -3,6 +3,7 @@ import { getEffectiveFaucetConfig, getLocalResourceKeys, saveLocalResourceKeys }
 describe('resourceKeys session fallback policy', () => {
   beforeEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
   });
 
   it('does not inherit the general session faucet config for unknown non-general slugs', async () => {
@@ -33,7 +34,7 @@ describe('resourceKeys session fallback policy', () => {
     expect(resolved.balanceThresholdEth).toBe('');
   });
 
-  it('preserves exact non-alias session slugs in local resource key storage', () => {
+  it('preserves exact non-alias session slugs in in-memory resource-key state', () => {
     saveLocalResourceKeys(' Team A! ', {
       rpc: {
         useLocal: true,
@@ -48,20 +49,24 @@ describe('resourceKeys session fallback policy', () => {
     expect(exact.rpc.apiKey).toBe('secret-key');
     expect(collapsed.rpc.useLocal).toBe(false);
     expect(collapsed.rpc.apiKey).toBe('');
+    expect(localStorage.getItem('ce:resourceKeys:v1')).toBeNull();
   });
 
-  it('skips reserved local-storage session keys instead of collapsing them into the general session', () => {
+  it('purges legacy browser-storage keys without importing their secrets into memory', () => {
     localStorage.setItem(
       'ce:resourceKeys:v1',
-      '{"bySession":{"":{"rpc":{"useLocal":true,"apiKey":"general-key"}},"__proto__":{"rpc":{"useLocal":true,"apiKey":"proto-key"}},"constructor":{"rpc":{"useLocal":true,"apiKey":"constructor-key"}},"prototype":{"rpc":{"useLocal":true,"apiKey":"prototype-key"}},"alpha":{"rpc":{"useLocal":true,"apiKey":"alpha-key"}}}}',
+      '{"bySession":{"legacy":{"rpc":{"useLocal":true,"apiKey":"legacy-secret"}}}}',
+    );
+    sessionStorage.setItem(
+      'ce:resourceKeys:v1',
+      '{"bySession":{"legacy":{"rpc":{"useLocal":true,"apiKey":"legacy-session-secret"}}}}',
     );
 
-    const general = getLocalResourceKeys('');
-    const alpha = getLocalResourceKeys('alpha');
+    const legacy = getLocalResourceKeys('legacy');
 
-    expect(general.rpc.useLocal).toBe(true);
-    expect(general.rpc.apiKey).toBe('general-key');
-    expect(alpha.rpc.useLocal).toBe(true);
-    expect(alpha.rpc.apiKey).toBe('alpha-key');
+    expect(legacy.rpc.useLocal).toBe(false);
+    expect(legacy.rpc.apiKey).toBe('');
+    expect(localStorage.getItem('ce:resourceKeys:v1')).toBeNull();
+    expect(sessionStorage.getItem('ce:resourceKeys:v1')).toBeNull();
   });
 });

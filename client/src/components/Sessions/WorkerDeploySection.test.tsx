@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import WorkerDeploySection, { type WorkerDeploySectionProps } from './WorkerDeploySection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
@@ -135,6 +135,99 @@ describe('WorkerDeploySection', () => {
     });
     expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
       /verified at revision revision-7/i,
+    );
+  });
+
+  it('invalidates native verification when the exact Worker session identity changes', async () => {
+    let resolveVerification:
+      | ((value: {
+          config: { slug: string };
+          configRevision: string;
+          sessionId: string;
+          sessionSlug: string;
+          workerOrigin: string;
+        }) => void)
+      | undefined;
+    const verifyNativeWorker = jest.fn(
+      () =>
+        new Promise<{
+          config: { slug: string };
+          configRevision: string;
+          sessionId: string;
+          sessionSlug: string;
+          workerOrigin: string;
+        }>((resolve) => {
+          resolveVerification = resolve;
+        }),
+    );
+    const onNativeWorkerVerified = jest.fn();
+    const { rerender } = renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'session-a',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://session-a.example.workers.dev',
+      verifyNativeWorker,
+      onNativeWorkerVerified,
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+    rerenderWorkerDeploySection(rerender, {
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'session-b',
+      account: '0x0000000000000000000000000000000000000002',
+      displayedWorkerUrl: 'https://session-b.example.workers.dev',
+      verifyNativeWorker,
+      onNativeWorkerVerified,
+    });
+
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC)).not.toBeInTheDocument();
+    await act(async () => {
+      resolveVerification?.({
+        config: { slug: 'session-a' },
+        configRevision: 'revision-a',
+        sessionId: '0x11111111111111111111111111111111',
+        sessionSlug: 'session-a',
+        workerOrigin: 'https://session-a.example.workers.dev',
+      });
+      await Promise.resolve();
+    });
+
+    expect(onNativeWorkerVerified).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('ce-wizard-cloudflare-native-status')).not.toBeInTheDocument();
+  });
+
+  it('invalidates a completed native verification when the Worker URL changes', async () => {
+    const verifyNativeWorker = jest.fn().mockResolvedValue({
+      config: { slug: 'demo-sh' },
+      configRevision: 'revision-7',
+      sessionId: '0x11111111111111111111111111111111',
+      sessionSlug: 'demo-sh',
+      workerOrigin: 'https://demo-sh.example.workers.dev',
+    });
+    const { rerender } = renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://demo-sh.example.workers.dev',
+      verifyNativeWorker,
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+    expect(await screen.findByText('Session Worker verified')).toBeInTheDocument();
+
+    rerenderWorkerDeploySection(rerender, {
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://other.example.workers.dev',
+      verifyNativeWorker,
+    });
+
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-verify')).toHaveTextContent('Verify Session Worker');
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
+      /Worker URL changed.*Verify this exact Worker identity/i,
     );
   });
 

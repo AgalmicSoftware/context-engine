@@ -1,4 +1,5 @@
 import { normalizeSessionSlug } from '../../utilities/web3/chainGateway.js';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 import { normalizeDiscoverySlugs } from './sbtSelectorScopeHelpers';
 
 export type SbtLookupKeyArgs = {
@@ -63,6 +64,11 @@ export type ResolveSbtSelectorSessionLabelArgs = {
 };
 
 export type ResolveSbtSelectorSessionChainId = (slug: string) => unknown;
+
+export type ShouldDiscoverSbtForSessionConfigArgs = {
+  sessionConfig?: unknown;
+  sessionSlug?: unknown;
+};
 
 type SbtSelectorFeaturedSignatureEntry = Record<string, unknown> & {
   address?: unknown;
@@ -141,6 +147,21 @@ export const getNormalizedNetworkChainValue = (network: unknown): number | null 
   return normalizeChainValue(record.id || record.chainId || 0);
 };
 
+export const shouldDiscoverSbtForSessionConfig = ({
+  sessionConfig = null,
+  sessionSlug = '',
+}: ShouldDiscoverSbtForSessionConfigArgs = {}): boolean => {
+  const config = isSbtSelectorRuntimeRecord(sessionConfig) ? sessionConfig : {};
+  const projection = resolveSessionCapabilityProjection(config);
+  if (projection.source === 'legacy_registry' || projection.isRegistryCanonical || projection.usesOnChainSbt) {
+    return true;
+  }
+  // The empty global scope remains an explicit on-chain tool. A concrete
+  // session must prove SBT capability instead of inheriting a wallet/default
+  // network or cached registry universe.
+  return !normalizeSessionSlug(sessionSlug || '') && Object.keys(config).length === 0;
+};
+
 export const resolveSbtSelectorSessionNetworkId = ({
   defaultFallbackChainId = null,
   directChainId = null,
@@ -154,6 +175,21 @@ export const resolveSbtSelectorSessionNetworkId = ({
 }: ResolveSbtSelectorSessionNetworkIdArgs = {}): number | null => {
   const sessionConfig =
     shouldUsePropsSessionConfig && isSbtSelectorRuntimeRecord(propsSessionConfig) ? propsSessionConfig : null;
+  const displayLookupCfg = isSbtSelectorRuntimeRecord(displayLookupSessionConfig) ? displayLookupSessionConfig : {};
+  const capabilityConfig = sessionConfig || displayLookupCfg;
+  if (!shouldDiscoverSbtForSessionConfig({ sessionConfig: capabilityConfig, sessionSlug: slug })) return null;
+
+  const projection = resolveSessionCapabilityProjection(capabilityConfig);
+  if (projection.source === 'profile') {
+    const profile =
+      isSbtSelectorRuntimeRecord(capabilityConfig.sessionModeProfile) &&
+      isSbtSelectorRuntimeRecord(capabilityConfig.sessionModeProfile.evm)
+        ? capabilityConfig.sessionModeProfile
+        : capabilityConfig;
+    const evm = isSbtSelectorRuntimeRecord(profile.evm) ? profile.evm : {};
+    return normalizeChainValue(evm.registryChainId);
+  }
+
   const sessionConfigChainId = normalizeChainValue(sessionConfig?.networkChainId);
   if (sessionConfigChainId) return sessionConfigChainId;
 
@@ -162,7 +198,6 @@ export const resolveSbtSelectorSessionNetworkId = ({
   );
   if (registryChainId) return registryChainId;
 
-  const displayLookupCfg = isSbtSelectorRuntimeRecord(displayLookupSessionConfig) ? displayLookupSessionConfig : {};
   const displayContracts = isSbtSelectorRuntimeRecord(displayLookupCfg.contracts) ? displayLookupCfg.contracts : {};
   const displaySbtFactory = isSbtSelectorRuntimeRecord(displayContracts.sbtFactory) ? displayContracts.sbtFactory : {};
   const displaySurveys = isSbtSelectorRuntimeRecord(displayContracts.surveys) ? displayContracts.surveys : {};

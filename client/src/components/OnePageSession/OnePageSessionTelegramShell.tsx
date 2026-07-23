@@ -53,6 +53,8 @@ export type OnePageSessionTelegramShellProps = {
   telegramSessionMeta: TelegramSessionMeta | null;
   telegramSubmittedQuestionIds: string[];
   telegramSubmittingQuestionId: string;
+  workerGroupSessionId: string;
+  workerGroupWorkerUrl: string;
   titleText: string;
   onLogout: () => void;
   onOpenLoginModal: () => void;
@@ -94,6 +96,8 @@ const OnePageSessionTelegramShell = ({
   telegramSessionMeta,
   telegramSubmittedQuestionIds,
   telegramSubmittingQuestionId,
+  workerGroupSessionId,
+  workerGroupWorkerUrl,
   titleText,
   onLogout,
   onOpenLoginModal,
@@ -185,7 +189,12 @@ const OnePageSessionTelegramShell = ({
           <Suspense fallback={<LazyFallback label="Loading Telegram groups..." minHeight="20vh" />}>
             <TelegramBucketCards cards={loadTelegramGroups(telegramClientEnvelope)} onReconnect={onOpenLoginModal} />
           </Suspense>
-          <WorkerGroupMembershipPanel envelope={telegramClientEnvelope} />
+          <WorkerGroupMembershipPanel
+            envelope={telegramClientEnvelope}
+            sessionId={workerGroupSessionId}
+            sessionSlug={displaySessionSlug}
+            workerUrl={workerGroupWorkerUrl}
+          />
           <section className={styles.telegramListPanel} data-testid="ce-session-telegram-results">
             <div className={styles.telegramListHeader}>
               <span>Results</span>

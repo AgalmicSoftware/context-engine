@@ -399,6 +399,25 @@ export const normalizeWorkerCanonicalSessionIdHex = (value: unknown): string => 
   return '';
 };
 
+export const resolveWorkerCanonicalSessionIdHex = (value: unknown): string => {
+  if (!isRecord(value)) return '';
+  const rawSessionId = Object.prototype.hasOwnProperty.call(value, 'sessionId') ? value.sessionId : undefined;
+  const rawSessionIdHex = Object.prototype.hasOwnProperty.call(value, 'sessionIdHex') ? value.sessionIdHex : undefined;
+  const hasSessionId = rawSessionId !== undefined && rawSessionId !== null && rawSessionId !== '';
+  const hasSessionIdHex = rawSessionIdHex !== undefined && rawSessionIdHex !== null && rawSessionIdHex !== '';
+  const sessionId = normalizeWorkerCanonicalSessionIdHex(rawSessionId);
+  const sessionIdHex = normalizeWorkerCanonicalSessionIdHex(rawSessionIdHex);
+  if (
+    (!sessionId && !sessionIdHex) ||
+    (hasSessionId && !sessionId) ||
+    (hasSessionIdHex && !sessionIdHex) ||
+    (sessionId && sessionIdHex && sessionId !== sessionIdHex)
+  ) {
+    return '';
+  }
+  return sessionId || sessionIdHex;
+};
+
 const comparableSessionId = (value: string): string => value.replace(/^0x/, '').replace(/-/g, '');
 
 const validateConfigSessionId = (config: UnknownRecord): string => {

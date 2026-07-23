@@ -7,7 +7,6 @@ import CEDateTimeInput from '../Shared/CEDateTimeInput';
 import { USE_ONCHAIN_SESSION_REGISTRY } from '../../variables/appConfig.js';
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { sponsoredBundlePort } from '../../domains/storage/sponsoredBundlePorts.js';
-import { adminArweavePort } from '../../domains/storage/adminArweavePorts.js';
 import { adminWorkerPorts } from '../../domains/worker/adminWorkerPorts.js';
 import {
   getUsableSessionWorkerUrl,
@@ -16,6 +15,7 @@ import {
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { toStr, normalizeSlug as canonicalizeSlug } from '../../utilities/shared/primitives.js';
 import { notify } from '../../utilities/ui/notify.js';
+import { SponsorHandoffResult } from './SponsorHandoffResult';
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -410,13 +410,8 @@ const SponsorPage = ({
   const [createBusy, setCreateBusy] = useState(false);
   const [createStatus, setCreateStatus] = useState('');
   const [shareUrl, setShareUrl] = useState('');
+  const [shareKey, setShareKey] = useState('');
   const [shareTxId, setShareTxId] = useState('');
-  const shareTxUrl = shareTxId
-    ? (() => {
-        const normalized = adminArweavePort.normalizeArweaveUrl(shareTxId);
-        return normalized === shareTxId ? `https://ar-io.dev/${shareTxId}` : normalized;
-      })()
-    : '';
   const [workerUrlOverrideDirty, setWorkerUrlOverrideDirty] = useState(false);
   const requestedFetchKeyRef = useRef('');
   const requestedAutoRefreshKeyRef = useRef('');
@@ -719,6 +714,7 @@ const SponsorPage = ({
     setCreateBusy(false);
     setCreateStatus('');
     setShareUrl('');
+    setShareKey('');
     setShareTxId('');
   }, [createContextKey]);
 
@@ -730,6 +726,7 @@ const SponsorPage = ({
     setWorkerUrlEditable(false);
     setCreateStatus('');
     setShareUrl('');
+    setShareKey('');
     setShareTxId('');
   }, [selectedSlug]);
 
@@ -866,6 +863,7 @@ const SponsorPage = ({
     setCreateBusy(true);
     setCreateStatus('');
     setShareUrl('');
+    setShareKey('');
     setShareTxId('');
     try {
       if (!selectedConfig) throw new Error('Select a session.');
@@ -1006,6 +1004,7 @@ const SponsorPage = ({
       });
       if (!isCurrentCreateRequest()) return;
       setShareUrl(result.url);
+      setShareKey(secret);
       setShareTxId(result.txId);
       setCreateStatus('Sponsored URL ready.');
     } catch (error) {
@@ -1204,9 +1203,10 @@ const SponsorPage = ({
         <section className={`${styles.panel} ${styles.metadataPanel}`}>
           <div className={styles.panelHeader}>
             <div className={styles.panelTitleGroup}>
-              <div className={styles.panelTitle}>Create share URL</div>
+              <div className={styles.panelTitle}>Create sponsored handoff</div>
               <div className={styles.panelHint}>
-                `txId` lives in the query string and the decrypt secret stays in `#k=` client-side only.
+                The URL contains only the opaque bundle ID. Share the decryption key separately; it stays in memory and
+                is never added to the URL or browser storage.
               </div>
             </div>
           </div>
@@ -1314,38 +1314,7 @@ const SponsorPage = ({
             </div>
           ) : null}
 
-          {shareUrl ? (
-            <>
-              <div className={styles.heroCardInputShell}>
-                <Input
-                  value={shareUrl}
-                  readOnly
-                  className={styles.heroCardInput}
-                  aria-label="Sponsored share URL"
-                  data-testid={E2E_TESTIDS.SPONSOR_SHARE_URL}
-                />
-                <div className={styles.heroCardInputActions}>
-                  <button
-                    type="button"
-                    className={`${styles.heroCardInputActionButton} ${styles.heroCardInputIconButton}`}
-                    onClick={() => handleCopy(shareUrl, 'Copied sponsored URL')}
-                    title="Copy sponsored URL"
-                    aria-label="Copy sponsored URL"
-                  >
-                    <FontAwesomeIcon icon={faClipboard} />
-                  </button>
-                </div>
-              </div>
-              {shareTxId ? (
-                <div className={styles.statusNote} data-testid={E2E_TESTIDS.SPONSOR_TX_ID}>
-                  Arweave tx:{' '}
-                  <a href={shareTxUrl} target="_blank" rel="noreferrer">
-                    {shareTxId}
-                  </a>
-                </div>
-              ) : null}
-            </>
-          ) : null}
+          <SponsorHandoffResult shareKey={shareKey} shareTxId={shareTxId} shareUrl={shareUrl} onCopy={handleCopy} />
         </section>
       </div>
     </div>

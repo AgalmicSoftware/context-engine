@@ -6,6 +6,7 @@ import {
   normalizeWorkerCanonicalSessionIdHex,
   parseSessionWorkerDiscoveryOrigin,
   parseSessionWorkerDiscoveryQuery,
+  resolveWorkerCanonicalSessionIdHex,
   validateWorkerCanonicalSessionBootstrap,
   WorkerSessionBootstrapRequestError,
 } from './sessionWorkerDiscovery';
@@ -83,6 +84,25 @@ describe('sessionWorkerDiscovery origin validation', () => {
     expect(() => parseSessionWorkerDiscoveryOrigin('http://localhost:8787', { environment: 'production' })).toThrow();
     expect(() => parseSessionWorkerDiscoveryOrigin('http://localhost:8787', { environment: 'Production' })).toThrow();
     expect(() => parseSessionWorkerDiscoveryOrigin('https://127.0.0.1', { environment: 'production' })).toThrow();
+  });
+
+  it('rejects malformed or conflicting canonical session ID aliases', () => {
+    expect(resolveWorkerCanonicalSessionIdHex({ sessionId: SESSION_ID })).toBe(SESSION_ID);
+    expect(resolveWorkerCanonicalSessionIdHex({ sessionIdHex: SESSION_ID })).toBe(SESSION_ID);
+    expect(
+      resolveWorkerCanonicalSessionIdHex({
+        sessionId: SESSION_ID,
+        sessionIdHex: SESSION_ID.toUpperCase(),
+      }),
+    ).toBe(SESSION_ID);
+    expect(resolveWorkerCanonicalSessionIdHex({ sessionId: 'malformed', sessionIdHex: SESSION_ID })).toBe('');
+    expect(resolveWorkerCanonicalSessionIdHex({ sessionId: SESSION_ID, sessionIdHex: 'malformed' })).toBe('');
+    expect(
+      resolveWorkerCanonicalSessionIdHex({
+        sessionId: SESSION_ID,
+        sessionIdHex: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      }),
+    ).toBe('');
   });
 
   it.each([

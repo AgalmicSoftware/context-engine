@@ -178,6 +178,7 @@ export const dispatchAdminRequest = async ({
     const response = await (deps?.dispatchAdminWorkerGroupRequest || dispatchAdminWorkerGroupRequest)({
       action,
       body,
+      config: existingConfig,
       env,
       slug: targetSlug,
       adminAddress: authorityResult.address || body?.address,
@@ -189,6 +190,7 @@ export const dispatchAdminRequest = async ({
         now: deps?.now,
         randomUUID: deps?.randomUUID,
         getRandomValues: deps?.getRandomValues,
+        executeCoordinatedWorkerGroupMutation: deps?.executeCoordinatedWorkerGroupMutation,
       },
     });
     if (response) return response;

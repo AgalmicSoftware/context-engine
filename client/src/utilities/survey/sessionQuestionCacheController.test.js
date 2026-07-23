@@ -102,11 +102,78 @@ const {
   shouldFlushCoalescedRun,
 } = require('../session/mainSiteProgressHelpers.js');
 const { isMaskedQuestionPayload, pickBetterQuestionPayload } = require('./questionRouting.js');
+const { resolveWorkerCanonicalCacheIdentity } = require('./workerCanonicalCacheIdentity.js');
 
 const NETWORK_ID = '11155420';
 const SESSION_SLUG = 'alpha';
 const ACCOUNT = '0xUser';
 const PROVIDER_LIKE = 'provider-like';
+const WORKER_SESSION_ID = `0x${'3'.repeat(32)}`;
+
+const createWorkerCanonicalSessionConfig = ({
+  hybrid = false,
+  sessionId = WORKER_SESSION_ID,
+  workerUrl = 'https://alpha-worker.example.test',
+} = {}) => ({
+  slug: SESSION_SLUG,
+  sessionId,
+  corsWorkerUrl: workerUrl,
+  sessionModeProfile: {
+    profileVersion: 1,
+    preset: 'custom',
+    authority: { mode: 'worker_canonical' },
+    evm: { registryChainId: hybrid ? 11155420 : null },
+    storage: {
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'none', encryption: hybrid ? 'worker_envelope' : 'none' },
+    },
+    identity: { default: 'passkey', enabled: ['passkey'] },
+    authorization: { mechanisms: ['worker_roles'] },
+    encryption: hybrid
+      ? {
+          mode: 'worker_envelope',
+          keyProvider: 'worker_secret',
+          accessConditions: {
+            match: 'any',
+            conditions: [
+              {
+                kind: 'sbt_onchain',
+                chainId: 11155420,
+                contract: '0x1111111111111111111111111111111111111111',
+                anyOrAll: 'any',
+              },
+            ],
+          },
+        }
+      : { mode: 'none' },
+    surfaces: {
+      web: true,
+      telegram: false,
+      miniApp: false,
+      agentHttp: false,
+      mcp: false,
+      ceCc: false,
+    },
+    results: {
+      visibility: 'public_full_if_storage_public',
+      exposure: {
+        aggregateResultsEnabled: true,
+        anonymizedGroupsEnabled: false,
+        minGroupSize: 2,
+      },
+    },
+    export: { scope: 'all_session' },
+  },
+  storageProfile: {
+    backend: 'cloudflare',
+    resources: { questions: 'active', surveys: 'active' },
+    payloadAccessControl: {
+      gate: 'none',
+      encryption: 'none',
+      mode: 'public_read',
+    },
+  },
+});
 
 const deepClone = (value) => (value == null ? value : JSON.parse(JSON.stringify(value)));
 
@@ -427,6 +494,156 @@ describe('createSessionQuestionCacheController', () => {
   });
 
   describe('initializeQuestionCacheForGroup', () => {
+    it('hydrates fresh Worker/SBT question metadata before the chain-scan no-op without RPC calls', async () => {
+      const sessionCfg = createWorkerCanonicalSessionConfig({ hybrid: true });
+      const loadQuestions = jest.fn().mockResolvedValue([
+        {
+          id: '0xworkerquestion',
+          createdAtMs: 123,
+          storageRefId: 'cf_question_fresh',
+          storageRef: {
+            backend: 'cloudflare',
+            id: 'cf_question_fresh',
+            resource: 'questions',
+          },
+          payload: {
+            id: '0xworkerquestion',
+            prompt: 'Fresh Worker question',
+            sessionId: WORKER_SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+          },
+        },
+      ]);
+      const host = createMockHost({
+        sessionCfg,
+        chainId: null,
+        scanScopeNoop: jest.fn(() => true),
+        workerCanonicalMetadataHydrationPort: { loadQuestions },
+      });
+      const controller = createSessionQuestionCacheController(host);
+
+      await controller.initializeQuestionCacheForGroup(SESSION_SLUG);
+
+      expect(loadQuestions).toHaveBeenCalledWith({
+        account: ACCOUNT,
+        providerLike: PROVIDER_LIKE,
+        sessionSlug: SESSION_SLUG,
+        sessionConfig: sessionCfg,
+      });
+      expect(host.scanScopeNoop).not.toHaveBeenCalled();
+      expect(host.getSessionChainId).not.toHaveBeenCalled();
+      expect(contractScripts.getRelevantBlockWindowForFilter).not.toHaveBeenCalled();
+      expect(contractScripts.getAllQuestionIDsChunkedWithCallback).not.toHaveBeenCalled();
+      expect(contractScripts.getQuestionData).not.toHaveBeenCalled();
+      expect(host.getStored('questionsCache', SESSION_SLUG)).toEqual(
+        expect.objectContaining({
+          worker: expect.objectContaining({
+            questions: {
+              '0xworkerquestion': expect.objectContaining({
+                id: '0xworkerquestion',
+                prompt: 'Fresh Worker question',
+              }),
+            },
+          }),
+        }),
+      );
+      expect(host.getStateSnapshot()).toMatchObject({ isQuestionCacheReady: true });
+    });
+
+    it('starts same-slug Worker B independently, clears empty B, and discards delayed Worker A metadata', async () => {
+      const sessionConfigA = createWorkerCanonicalSessionConfig();
+      const sessionConfigB = createWorkerCanonicalSessionConfig({
+        sessionId: `0x${'6'.repeat(32)}`,
+        workerUrl: 'https://alpha-worker-b.example.test',
+      });
+      const identityA = resolveWorkerCanonicalCacheIdentity({
+        sessionConfig: sessionConfigA,
+        sessionSlug: SESSION_SLUG,
+      });
+      const identityB = resolveWorkerCanonicalCacheIdentity({
+        sessionConfig: sessionConfigB,
+        sessionSlug: SESSION_SLUG,
+      });
+      const delayedA = createDeferred();
+      const delayedB = createDeferred();
+      const workerALoaderStarted = createDeferred();
+      const workerBLoaderStarted = createDeferred();
+      let currentSessionConfig = sessionConfigA;
+      const loadQuestions = jest.fn(({ sessionConfig }) => {
+        if (sessionConfig === sessionConfigA) {
+          workerALoaderStarted.resolve();
+          return delayedA.promise;
+        }
+        workerBLoaderStarted.resolve();
+        return delayedB.promise;
+      });
+      const host = createMockHost({
+        chainId: null,
+        initialStorage: {
+          questionsCache: {
+            [SESSION_SLUG]: {
+              worker: {
+                ...createQuestionCacheNetworkNode({
+                  questions: {
+                    'question-a-cached': {
+                      id: 'question-a-cached',
+                      prompt: 'Cached Session A question',
+                    },
+                  },
+                }),
+                workerCanonicalIdentity: identityA,
+              },
+            },
+          },
+        },
+        getSessionCfg: jest.fn(() => currentSessionConfig),
+        workerCanonicalMetadataHydrationPort: { loadQuestions },
+      });
+      const controller = createSessionQuestionCacheController(host);
+
+      const runA = controller.initializeQuestionCacheForGroup(SESSION_SLUG);
+      await workerALoaderStarted.promise;
+      expect(controller.isInitInFlight(SESSION_SLUG)).toBe(true);
+
+      currentSessionConfig = sessionConfigB;
+      const runB = controller.initializeQuestionCacheForGroup(SESSION_SLUG);
+      await workerBLoaderStarted.promise;
+
+      expect(loadQuestions).toHaveBeenCalledTimes(2);
+      expect(host.getStored('questionsCache', SESSION_SLUG).worker).toMatchObject({
+        questions: {},
+        workerCanonicalIdentity: identityB,
+      });
+
+      delayedB.resolve([]);
+      await runB;
+      delayedA.resolve([
+        {
+          id: 'question-a-delayed',
+          createdAtMs: 789,
+          storageRefId: 'cf_question_a_delayed',
+          storageRef: {
+            backend: 'cloudflare',
+            id: 'cf_question_a_delayed',
+            resource: 'questions',
+          },
+          payload: {
+            id: 'question-a-delayed',
+            prompt: 'Delayed Session A question',
+            sessionId: sessionConfigA.sessionId,
+            sessionSlug: SESSION_SLUG,
+          },
+        },
+      ]);
+      await runA;
+
+      expect(host.getStored('questionsCache', SESSION_SLUG).worker).toMatchObject({
+        questions: {},
+        workerCanonicalIdentity: identityB,
+      });
+      expect(controller.isInitInFlight(SESSION_SLUG)).toBe(false);
+    });
+
     it('short-circuits via scanScopeNoop and marks question cache ready', async () => {
       const host = createMockHost({
         scanScopeNoop: jest.fn((slug, op, onSkipped) => {

@@ -17,6 +17,7 @@ import {
 } from './SessionWizard.workerPanel.testUtils';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import { getSessionWizardWorkerSettlementStorageKey } from './sessionWizardWorkerSettlement';
+import { readSessionWizardPendingSbtDraftsCache } from './hooks/usePendingSbtDrafts';
 
 const chooseCustomWorkerWithoutDeploy = async () => {
   fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
@@ -442,14 +443,19 @@ describe('SessionWizard publish boundary rendering', () => {
     expect(mockCreateSBT).not.toHaveBeenCalled();
     expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
     expect(mockFetchSessionFromRegistry).not.toHaveBeenCalled();
-    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toContain(mockPendingSbtAddress);
+    expect(readSessionWizardPendingSbtDraftsCache()).toEqual([
+      expect.objectContaining({ predictedAddress: mockPendingSbtAddress }),
+    ]);
+    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
   });
 
   it('blocks the actual worker-canonical publish action after secret, provider, or profile requirement edits', async () => {
     const originalFetch = global.fetch;
     const workerUrl = 'https://requirement-proof-worker.example.test';
-    global.fetch = jest.fn(async (url) => {
-      if (String(url).endsWith('/deploy')) {
+    let persistedConfig = null;
+    global.fetch = jest.fn(async (url, init = {}) => {
+      const normalizedUrl = String(url);
+      if (normalizedUrl.endsWith('/deploy')) {
         return {
           ok: true,
           status: 200,
@@ -462,6 +468,15 @@ describe('SessionWizard publish boundary rendering', () => {
           }),
         };
       }
+      if (normalizedUrl.endsWith('/admin/set-config')) {
+        persistedConfig = JSON.parse(String(init.body || '{}')).config;
+        return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      }
+      if (normalizedUrl.endsWith('/session-config')) {
+        const { litCredentials: _privateLitDescriptor, ...publicConfig } = persistedConfig || {};
+        if (publicConfig.ai) publicConfig.ai = { models: publicConfig.ai.models };
+        return { ok: true, status: 200, json: async () => ({ config: publicConfig }) };
+      }
       return { ok: true, status: 200, json: async () => ({ ok: true, nonce: 'wizard-admin-nonce' }) };
     });
 
@@ -473,13 +488,18 @@ describe('SessionWizard publish boundary rendering', () => {
         sessionInfo: 'Verified custom worker requirement snapshot.',
         openaiKey: 'sk-remotely-verified',
       });
+      const configWritesAfterDeploy = global.fetch.mock.calls.filter(([url]) =>
+        String(url).endsWith('/admin/set-config'),
+      ).length;
       const publishButton = await openPublishSection();
       await waitFor(() => expect(publishButton).not.toBeDisabled());
 
       fireEvent.change(openAiKeyInput, { target: { value: 'sk-locally-edited' } });
       await waitFor(() => expect(publishButton).toBeDisabled());
       fireEvent.click(publishButton);
-      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(0);
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
+        configWritesAfterDeploy,
+      );
 
       fireEvent.change(openAiKeyInput, { target: { value: 'sk-remotely-verified' } });
       await waitFor(() => expect(publishButton).not.toBeDisabled());
@@ -500,7 +520,9 @@ describe('SessionWizard publish boundary rendering', () => {
       await waitFor(() => expect(publishButton).toBeDisabled());
       fireEvent.click(publishButton);
 
-      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(0);
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
+        configWritesAfterDeploy,
+      );
       expect(mockRegisterSessionOnChain).not.toHaveBeenCalled();
     } finally {
       global.fetch = originalFetch;
@@ -547,6 +569,9 @@ describe('SessionWizard publish boundary rendering', () => {
         sessionInfo: 'One canonical session per worker.',
         openaiKey: 'sk-existing-worker',
       });
+      const configWritesAfterDeploy = global.fetch.mock.calls.filter(([url]) =>
+        String(url).endsWith('/admin/set-config'),
+      ).length;
       const publishButton = await openPublishSection();
       const deployButton = await screen.findByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER);
 
@@ -557,7 +582,9 @@ describe('SessionWizard publish boundary rendering', () => {
       fireEvent.click(publishButton);
 
       await waitFor(() => {
-        expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
+        expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
+          configWritesAfterDeploy + 1,
+        );
         expect(publishButton).toBeDisabled();
         expect(deployButton).toBeDisabled();
       });
@@ -577,7 +604,9 @@ describe('SessionWizard publish boundary rendering', () => {
       ).toEqual(expect.objectContaining(expectedSettlement));
 
       fireEvent.click(publishButton);
-      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
+        configWritesAfterDeploy + 1,
+      );
 
       firstView.unmount();
       renderLoggedInSessionWizard();
@@ -594,7 +623,9 @@ describe('SessionWizard publish boundary rendering', () => {
       expect(screen.getByRole('link', { name: restoredSessionUrl })).toHaveAttribute('href', restoredSessionUrl);
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_ADMIN_URL)).toHaveAttribute('href', restoredAdminUrl);
       fireEvent.click(reloadedPublishButton);
-      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(1);
+      expect(global.fetch.mock.calls.filter(([url]) => String(url).endsWith('/admin/set-config'))).toHaveLength(
+        configWritesAfterDeploy + 1,
+      );
       expect(readWizardCache()).toEqual({
         terminalWorkerSettlement: expect.objectContaining(expectedSettlement),
       });
@@ -685,6 +716,7 @@ describe('SessionWizard publish boundary rendering', () => {
 
   it('passes uploaded metadata through the register boundary without custom deploy execution', async () => {
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
+    const { getEffectiveArweaveKey } = require('../../utilities/session/resourceKeys.js');
     const uploadedTxId = 'd'.repeat(43);
     const uploadEvents = [];
     const restoreLogging = enableGeneralInfoLogging();
@@ -704,6 +736,10 @@ describe('SessionWizard publish boundary rendering', () => {
       resolveRegister = resolve;
     });
     mockRegisterSessionOnChain.mockImplementation(async () => registerPromise);
+    getEffectiveArweaveKey.mockResolvedValue({
+      arweaveJwk: '{"kty":"ephemeral-test-key"}',
+      source: 'memory',
+    });
     seedVerifiedWorkerCache('https://worker.example.test', {
       persistWorkerSecrets: false,
       workerSecretsEnabled: false,
@@ -766,7 +802,7 @@ describe('SessionWizard publish boundary rendering', () => {
       );
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_METADATA_URI)).toHaveTextContent(`ar://${uploadedTxId}`);
       await waitFor(() => {
-        expect(readWizardCache().workerSecrets?.arweaveJwk).toBe('');
+        expect(readWizardCache().workerSecrets?.arweaveJwk).toBeUndefined();
       });
       await act(async () => {
         resolveRegister({ txs: [] });
@@ -780,6 +816,7 @@ describe('SessionWizard publish boundary rendering', () => {
 
   it('uploads a session header before metadata with request-scoped logs', async () => {
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
+    const { getEffectiveArweaveKey } = require('../../utilities/session/resourceKeys.js');
     const headerTxId = 'h'.repeat(43);
     const metadataTxId = 'm'.repeat(43);
     const uploadEvents = [];
@@ -795,8 +832,14 @@ describe('SessionWizard publish boundary rendering', () => {
       uploadEvents.push(`upload:${format}:${uploadOptions.requestId || ''}`);
       return format === 'json' ? metadataTxId : headerTxId;
     });
+    getEffectiveArweaveKey.mockResolvedValue({
+      arweaveJwk: '{"kty":"ephemeral-header-test-key"}',
+      source: 'memory',
+    });
+    seedVerifiedWorkerCache('https://worker.example.test', {
+      workerSecretsEnabled: false,
+    });
     mockRegisterSessionOnChain.mockResolvedValue({ txs: [] });
-    seedVerifiedWorkerCache();
 
     try {
       const view = renderLoggedInSessionWizard();
@@ -899,13 +942,20 @@ describe('SessionWizard publish boundary rendering', () => {
 
   it('resets progress and keeps publish retryable after metadata upload failure', async () => {
     const { arweaveClient } = require('../../utilities/arweave/arweaveClient.js');
+    const { getEffectiveArweaveKey } = require('../../utilities/session/resourceKeys.js');
     const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     let rejectUpload = () => {};
     const uploadPromise = new Promise((_, reject) => {
       rejectUpload = reject;
     });
     arweaveClient.uploadDataToArweave.mockReturnValue(uploadPromise);
-    seedVerifiedWorkerCache();
+    getEffectiveArweaveKey.mockResolvedValue({
+      arweaveJwk: '{"kty":"ephemeral-failure-test-key"}',
+      source: 'memory',
+    });
+    seedVerifiedWorkerCache('https://worker.example.test', {
+      workerSecretsEnabled: false,
+    });
 
     renderLoggedInSessionWizard();
     enableAdvancedMode();
