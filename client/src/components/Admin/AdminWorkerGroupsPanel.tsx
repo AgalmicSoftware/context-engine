@@ -421,7 +421,12 @@ const AdminWorkerGroupsPanel = ({
             <option value="session">All session members</option>
           </Input>
         </FormGroup>
-        <Button color="primary" disabled={busy} onClick={handleCreate}>
+        <Button
+          color="primary"
+          data-testid="ce-admin-worker-group-create-submit"
+          disabled={busy}
+          onClick={handleCreate}
+        >
           Create group
         </Button>
       </div>

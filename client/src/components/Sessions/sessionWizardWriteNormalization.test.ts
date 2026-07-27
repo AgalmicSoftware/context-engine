@@ -426,6 +426,7 @@ describe('sessionWizardWriteNormalization', () => {
           participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
           anonymousScopes: [],
         },
+        groupCreationPolicy: 'participants',
       }),
     );
     expect(payload.contracts).toBeUndefined();
@@ -440,6 +441,22 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.ai.models.transcription).toEqual({ provider: 'openai', model: 'whisper-1' });
     expect(payload.ai.models.transcription).not.toHaveProperty('rpcUrl');
     expect(JSON.stringify(payload)).not.toMatch(/must-never-persist|0xRegistry|rpc\.example|faucet\.example/i);
+  });
+
+  test('buildSessionWizardWorkerConfigPayload preserves an explicit admin-only group creation policy', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'restricted-groups',
+      draft: {
+        sessionModeProfile,
+        groupCreationPolicy: 'admin_only',
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+
+    expect(payload.groupCreationPolicy).toBe('admin_only');
   });
 
   test('buildSessionWizardWorkerConfigPayload keeps only the Lit public descriptor for worker-canonical Lit mode', () => {

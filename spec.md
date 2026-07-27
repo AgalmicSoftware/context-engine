@@ -45,7 +45,8 @@ Primary storage and authority split:
 ## Glossary (Core Concepts)
 
 - Session: A named "space" (identified by `slug` and/or `sessionId`) that ties together contracts, metadata, worker config, and access gates.
-- Group: Typically an SBT contract (non-transferable ERC-721) representing membership/entitlement.
+- Group: Either an on-chain SBT contract representing membership/entitlement,
+  or a Worker-native group record for a Worker-canonical session.
 - Gate: An access rule stored on-chain in `SessionRegistry` that says which SBT(s) are required (and whether Any/All) to access a resource.
 - Passkey EOA wallet: A passkey-unlocked embedded EOA wallet using WebAuthn PRF
   to derive the EOA key by default, with optional AES-GCM encrypted private-key
@@ -128,14 +129,24 @@ Deep-dive docs:
 - `docs/session-registry.md`
 - `docs/session-cors-worker.md`
 
-### 2) SBT Groups (Membership and Gating)
+### 2) Groups (Membership and Gating)
 
 What users can do:
 - Create SBT contracts (via `SBTFactory`) with tokenURI metadata stored on Arweave.
+- Create chain-free Worker-native groups in a Worker-canonical session. The
+  session's `groupCreationPolicy` chooses configured admins only or all
+  authenticated participants with the `groups` scope; participant-created
+  groups are forced to open self-join and session visibility.
 - Mint/claim SBTs using multiple distribution modes (open claim, password claim, invite-limited flows, and signature-based flows).
 - View SBT group details and mint status, and interact with group gates (as used by the session and worker).
 
 What the system does:
+- Keeps Worker-native group IDs, records, membership, and capacity bound to the
+  exact Worker origin, slug, and canonical session ID. Signed admins retain
+  edit, delete, and membership management under either creation policy.
+- Applies the same group-creation choice to Context Engine's session-bound
+  on-chain SBT creation controls. This is not factory-level authorization:
+  public SBT factory methods remain independently callable on-chain.
 - Uses SBT ownership for worker auth gating (scopes for AI/Arweave/transcribe/faucet/fetch/Lit delegation).
 - Uses SBT ownership for Lit encryption access control (decrypting gated metadata and responses).
 
@@ -331,6 +342,11 @@ Worker API (selected endpoints):
 - `POST /ai`: AI proxy (provider-based); authenticated by default, with anonymous access supported when the session config allows it. Also supports `POST /` with `{ action: "ai", ... }`.
 - `POST /transcribe`: Transcription proxy; authenticated by default, with anonymous access supported when the session config allows it.
 - `POST /arweave/upload`: Authenticated Arweave upload (also supports an admin-signed bootstrap path when no auth header).
+- `POST /groups/create`: Authenticated participant Worker-group creation,
+  enabled only by `groupCreationPolicy: "participants"` and forced to an open,
+  session-visible record.
+- `POST /admin/groups/create`: Signed-admin Worker-group creation under either
+  creation policy.
 - `POST /lit/chipotle-action`: Authenticated worker-mediated Lit Chipotle execution for check/encrypt/decrypt requests.
 - `POST /sponsored/redeem-deploy`: Redeem a sponsored worker deploy grant.
 - `POST /sponsored/redeem-faucet`: Redeem a sponsored faucet grant.
@@ -359,7 +375,10 @@ Client-side:
 - `client/src/variables/local-contracts.json`: local chain contract address overrides (written by deploy scripts).
 
 Worker-side:
-- Worker KV session config and secrets (see `docs/session-cors-worker.md` for shapes and bindings).
+- Worker KV session config and secrets, including the top-level
+  `groupCreationPolicy` enum (`admin_only` or `participants`; omitted legacy
+  Worker configs default to `admin_only`). See `docs/session-cors-worker.md` for
+  shapes and bindings.
 
 Resource keys:
 - Keys can live in worker secrets, with optional per-user local overrides (see `docs/resource-keys.md`).

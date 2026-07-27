@@ -4,6 +4,7 @@ import {
   compileSessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
 import {
+  applyGroupCreationPolicyToDraft,
   applySessionModeProfileSelectionToDraft,
   applyStorageProfileChangeToModeDraft,
 } from './sessionWizardModeProfileDraftController';
@@ -58,5 +59,24 @@ describe('sessionWizardModeProfileDraftController', () => {
     expect(next.sessionMode).toBeUndefined();
     expect(next.telegramBridgeEnabled).toBeUndefined();
     expect(next.telegram).toEqual({ keep: 'value' });
+    expect(next.groupCreationPolicy).toBe('participants');
+  });
+
+  it('persists either group creation policy across Worker and registry profile selections', () => {
+    const registryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const restricted = applyGroupCreationPolicyToDraft({}, 'admin_only');
+    const registryDraft = applySessionModeProfileSelectionToDraft(
+      restricted,
+      registryProfile,
+      compileSessionModeProfile(registryProfile),
+    );
+    expect(registryDraft.groupCreationPolicy).toBe('admin_only');
+
+    const workerProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const participantDraft = applyGroupCreationPolicyToDraft(registryDraft, 'participants');
+    expect(
+      applySessionModeProfileSelectionToDraft(participantDraft, workerProfile, compileSessionModeProfile(workerProfile))
+        .groupCreationPolicy,
+    ).toBe('participants');
   });
 });

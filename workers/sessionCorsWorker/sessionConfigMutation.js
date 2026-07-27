@@ -26,6 +26,10 @@ const toTrimmedString = (value) => (
 );
 
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+const validGroupCreationPolicy = (config) =>
+  !hasOwn(config, 'groupCreationPolicy') ||
+  config?.groupCreationPolicy === 'admin_only' ||
+  config?.groupCreationPolicy === 'participants';
 
 const getWorkerAuthorityMode = (config) => toTrimmedString(
   config?.sessionModeProfile?.authority?.mode,
@@ -151,7 +155,15 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
       return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
     }
-    const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig);
+    if (!validGroupCreationPolicy(incomingConfig)) {
+      return { ok: false, status: 400, error: 'Invalid group creation policy.' };
+    }
+    // A patch may update the profile without resending the already-persisted
+    // canonical storage object. The complete merged record below remains
+    // strict and is the only record eligible for persistence.
+    const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig, {
+      allowPartialProfileStorage: true,
+    });
     if (!incomingModeValidation.ok) {
       return {
         ok: false,
@@ -193,6 +205,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   }
   if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
     return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
+  }
+  if (!validGroupCreationPolicy(mergedConfig)) {
+    return { ok: false, status: 400, error: 'Invalid group creation policy.' };
   }
   const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
   if (!mergedModeValidation.ok) {

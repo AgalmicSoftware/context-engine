@@ -196,11 +196,11 @@ test('resolveAuthenticatedRouteContext rejects stale registry tokens on every Wo
     },
   };
 
-  for (const pathname of ['/groups/list', '/groups/my-memberships', '/groups/join']) {
+  for (const pathname of ['/groups/list', '/groups/my-memberships', '/groups/create', '/groups/join']) {
     for (const tokenSessionId of [undefined, workerSessionId]) {
       const result = await resolveAuthenticatedRouteContext({
         request: new Request(`https://worker.example${pathname}?sessionId=${replacementWorkerSessionId}`, {
-          method: pathname === '/groups/join' ? 'POST' : 'GET',
+          method: pathname === '/groups/create' || pathname === '/groups/join' ? 'POST' : 'GET',
           headers: { Origin: 'https://allowed.example' },
         }),
         env: { GROUP_KV: {} },

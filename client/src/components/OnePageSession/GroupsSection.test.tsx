@@ -86,6 +86,26 @@ describe('OnePageSessionGroupsSection authority routing', () => {
     expect(props.ensureLightSbtUniverse).not.toHaveBeenCalled();
   });
 
+  it('shows participant creation for an opted-in Worker session and keeps legacy Worker sessions admin-only', () => {
+    const participantConfig = { ...workerConfig(), groupCreationPolicy: 'participants' };
+    const participantProps = {
+      ...buildProps(participantConfig),
+      account: '0x00000000000000000000000000000000000000cc',
+    };
+    const { rerender } = render(<OnePageSessionGroupsSection {...participantProps} />);
+
+    expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
+
+    const legacyConfig = workerConfig();
+    rerender(
+      <OnePageSessionGroupsSection
+        {...buildProps(legacyConfig)}
+        account="0x00000000000000000000000000000000000000cc"
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Create' })).not.toBeInTheDocument();
+  });
+
   it('keeps native Groups primary for a Worker+SBT hybrid and shows only configured Advanced conditions', () => {
     const config = workerConfig();
     config.sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
@@ -162,5 +182,32 @@ describe('OnePageSessionGroupsSection authority routing', () => {
         ensureLightSbtUniverse: props.ensureLightSbtUniverse,
       }),
     );
+  });
+
+  it('applies the selected creation policy to registry-backed session controls', () => {
+    const config = {
+      slug: 'alpha',
+      groupCreationPolicy: 'admin_only',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+      __registry: {
+        registryChainId: 11155420,
+        adminAddress: ADMIN,
+        sessionIdHex: '0x00112233445566778899aabbccddeeff',
+      },
+    };
+    const props = {
+      ...buildProps(config),
+      account: '0x00000000000000000000000000000000000000cc',
+    };
+    const { rerender } = render(<OnePageSessionGroupsSection {...props} />);
+    expect(screen.queryByRole('button', { name: 'Create' })).not.toBeInTheDocument();
+
+    rerender(
+      <OnePageSessionGroupsSection
+        {...buildProps({ ...config, groupCreationPolicy: 'participants' })}
+        account="0x00000000000000000000000000000000000000cc"
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument();
   });
 });

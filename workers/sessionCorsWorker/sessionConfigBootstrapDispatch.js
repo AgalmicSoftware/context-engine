@@ -2,6 +2,9 @@ import {
   projectPublicWorkerSessionConfig,
 } from '../shared/workerSessionConfig.mjs';
 import {
+  validateWorkerConfigModeValues,
+} from '../shared/workerConfigModeValidation.mjs';
+import {
   isWorkerCanonicalSessionConfig,
 } from './workerCanonicalAuthority.js';
 import {
@@ -75,6 +78,13 @@ export const dispatchSessionConfigBootstrapRequest = async ({
   const config = await deps?.getSessionConfig?.(env, slug);
   // Do not expose chain-canonical config through a caller-selected worker.
   if (!config || !isWorkerCanonicalSessionConfig(config)) {
+    return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
+  }
+  // The public readback is the client's authority for capability projection.
+  // Refuse contradictory profile/storage records instead of advertising one
+  // policy while storage routes enforce another.
+  const modeValidation = validateWorkerConfigModeValues(config);
+  if (!modeValidation.ok) {
     return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
   }
   const corsContext = await deps?.getCorsContext?.({ request, config });

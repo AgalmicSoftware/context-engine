@@ -29,6 +29,7 @@ const PUBLIC_CONFIG_KEYS = Object.freeze([
   'sessionModeProfile',
   'agentSessionWrapped',
   'workerAuthority',
+  'groupCreationPolicy',
   'storageProfile',
   'ai',
   'limits',
@@ -49,6 +50,7 @@ const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   'sessionHeaderImg',
   'sessionModeProfile',
   'workerAuthority',
+  'groupCreationPolicy',
   'ai',
   'contracts',
 ]);

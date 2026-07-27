@@ -1,4 +1,9 @@
-import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset, validateSessionModeProfile } from './sessionModeProfile';
+import {
+  SESSION_MODE_PRESET_IDS,
+  cloneSessionModePreset,
+  compileSessionModeProfile,
+  validateSessionModeProfile,
+} from './sessionModeProfile';
 import {
   validateDeploymentModeValues,
   validateWorkerConfigModeValues,
@@ -7,8 +12,13 @@ import {
 const expectValidatorParity = (profile, expectedValid) => {
   expect(validateSessionModeProfile(profile).valid).toBe(expectedValid);
   const expectedWorkerResult = expectedValid ? { ok: true } : expect.objectContaining({ ok: false });
-  expect(validateDeploymentModeValues({ sessionModeProfile: profile })).toEqual(expectedWorkerResult);
-  expect(validateWorkerConfigModeValues({ sessionModeProfile: profile })).toEqual(expectedWorkerResult);
+  const storageProfile = expectedValid ? compileSessionModeProfile(profile).storageProfile : undefined;
+  const profileBearingRecord = {
+    sessionModeProfile: profile,
+    ...(storageProfile ? { storageProfile } : {}),
+  };
+  expect(validateDeploymentModeValues(profileBearingRecord)).toEqual(expectedWorkerResult);
+  expect(validateWorkerConfigModeValues(profileBearingRecord)).toEqual(expectedWorkerResult);
 };
 
 describe('session mode profile client/Worker validator parity', () => {
@@ -19,6 +29,39 @@ describe('session mode profile client/Worker validator parity', () => {
     ]) {
       expectValidatorParity(cloneSessionModePreset(preset), true);
     }
+  });
+
+  it('rejects gated Cloudflare public-results claims on both validators', () => {
+    const gatedPublicResults = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    gatedPublicResults.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    gatedPublicResults.results.visibility = 'public_full_if_storage_public';
+    expectValidatorParity(gatedPublicResults, false);
+
+    const publicReadResults = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    publicReadResults.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    publicReadResults.encryption = { mode: 'none' };
+    publicReadResults.storage.payloadAccessControl = { gate: 'none', encryption: 'none' };
+    publicReadResults.results.visibility = 'public_full_if_storage_public';
+    expectValidatorParity(publicReadResults, true);
+
+    const conditionGatedPublicResults = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    conditionGatedPublicResults.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    conditionGatedPublicResults.encryption = { mode: 'none' };
+    conditionGatedPublicResults.storage.payloadAccessControl = {
+      gate: 'none',
+      encryption: 'none',
+      accessConditions: {
+        match: 'any',
+        conditions: [{ kind: 'worker_role', role: 'reviewer' }],
+      },
+    };
+    conditionGatedPublicResults.results.visibility = 'public_full_if_storage_public';
+    expectValidatorParity(conditionGatedPublicResults, false);
+
+    const encryptedPublicResults = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    encryptedPublicResults.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    encryptedPublicResults.encryption = { mode: 'lit' };
+    expectValidatorParity(encryptedPublicResults, false);
   });
 
   it('rejects otherwise valid mutations that retain a named preset id', () => {

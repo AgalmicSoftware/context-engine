@@ -56997,6 +56997,7 @@ var PUBLIC_CONFIG_KEYS = Object.freeze([
   "sessionModeProfile",
   "agentSessionWrapped",
   "workerAuthority",
+  "groupCreationPolicy",
   "storageProfile",
   "ai",
   "limits",
@@ -57016,6 +57017,7 @@ var DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   "sessionHeaderImg",
   "sessionModeProfile",
   "workerAuthority",
+  "groupCreationPolicy",
   "ai",
   "contracts"
 ]);
@@ -57431,17 +57433,21 @@ var validatePayloadAccessControl = (record, path) => {
   }
   return valid();
 };
-var validateStorageProfile = (profile, path, { allowString = false } = {}) => {
+var validateStorageProfile = (profile, path, { allowString = false, requireCanonicalBackend = false } = {}) => {
   if (allowString && typeof profile === "string") {
     return DEPLOY_STORAGE_BACKENDS.has(profile) ? valid() : invalid(`${path}.backend`);
   }
   if (!isObj3(profile)) return invalid(path);
   const backendKeys = ["backend", "profile", "storageProfile"].filter((key) => hasOwn(profile, key));
   if (!backendKeys.length) return invalid(`${path}.backend`);
+  if (requireCanonicalBackend && !hasOwn(profile, "backend")) return invalid(`${path}.backend`);
   for (const key of backendKeys) {
     const result = validateEnumField(profile, key, `${path}.${key}`, DEPLOY_STORAGE_BACKENDS);
     if (!result.ok) return result;
   }
+  const backend = profile[backendKeys[0]];
+  const conflictingBackendKey = backendKeys.find((key) => profile[key] !== backend);
+  if (conflictingBackendKey) return invalid(`${path}.${conflictingBackendKey}`);
   for (const key of ["payloadAccessMode", "accessControlMode"]) {
     const result = validateEnumField(profile, key, `${path}.${key}`, PAYLOAD_ACCESS_MODES);
     if (!result.ok) return result;
@@ -57623,6 +57629,9 @@ var validateVersionedSessionModeProfile = (profile, path) => {
   if (!results.ok) return results;
   result = validateRequiredEnumField(results.value, "visibility", `${path}.results.visibility`, RESULTS_VISIBILITIES);
   if (!result.ok) return result;
+  if (results.value.visibility === "public_full_if_storage_public" && (encryption.value.mode !== "none" || storage.value.backend === "cloudflare" && (!payloadAccess || payloadAccess.gate !== "none" || hasOwn(payloadAccess, "accessConditions")))) {
+    return invalid(`${path}.results.visibility`);
+  }
   const exposure = validateRequiredObjectField(results.value, "exposure", `${path}.results.exposure`, [
     "aggregateResultsEnabled",
     "anonymizedGroupsEnabled",
@@ -57690,11 +57699,102 @@ var validateSessionModeProfile = (profile, path) => {
   if (!hasOwn(profile, "profileVersion")) return invalid(`${path}.profileVersion`);
   return validateVersionedSessionModeProfile(profile, path);
 };
-var validateWorkerConfigModeValues = (config) => {
+var resolveProfileStorageSide = (config, { allowMissing = false, requirePersistedCanonicalKey = false } = {}) => {
+  const hasStorageProfile = hasOwn(config, "storageProfile");
+  const hasStorageBackend = hasOwn(config, "storageBackend");
+  if (hasStorageProfile && hasStorageBackend) return invalid("storageBackend");
+  if (!hasStorageProfile && !hasStorageBackend) {
+    return allowMissing ? { ok: true, value: null, key: "" } : invalid("storageProfile");
+  }
+  const key = hasStorageProfile ? "storageProfile" : "storageBackend";
+  if (requirePersistedCanonicalKey && key !== "storageProfile") return invalid("storageBackend");
+  const value = config[key];
+  return isObj3(value) ? { ok: true, value, key } : invalid("storageProfile");
+};
+var profileStorageBackendMatches = ({ profile, storageBackend }) => {
+  const profileBackend = profile?.storage?.backend;
+  if (profileBackend === "cloudflare") return storageBackend === "cloudflare";
+  if (profileBackend !== "arweave") return false;
+  if (profile?.encryption?.mode === "lit") {
+    return storageBackend === "arweave" || storageBackend === "lit-arweave";
+  }
+  return storageBackend === "arweave";
+};
+var validateCanonicalStorageAccessConditions = ({ profile, storageSide }) => {
+  for (const key of ["accessConditions", "conditions"]) {
+    if (hasOwn(storageSide, key)) return invalid(`storageProfile.${key}`);
+  }
+  const cloudflare = isObj3(storageSide.cloudflare) ? storageSide.cloudflare : {};
+  for (const key of ["accessConditions", "conditions"]) {
+    if (hasOwn(cloudflare, key)) return invalid(`storageProfile.cloudflare.${key}`);
+  }
+  const storageAccess = isObj3(storageSide.payloadAccessControl) ? storageSide.payloadAccessControl : {};
+  if (hasOwn(storageAccess, "conditions")) {
+    return invalid("storageProfile.payloadAccessControl.conditions");
+  }
+  const profileAccess = isObj3(profile?.storage?.payloadAccessControl) ? profile.storage.payloadAccessControl : {};
+  const profileEncryption = isObj3(profile?.encryption) ? profile.encryption : {};
+  const effectiveProfileConditions = hasOwn(profileEncryption, "accessConditions") ? profileEncryption.accessConditions : profileAccess.accessConditions;
+  const profileHasConditions = hasOwn(profileEncryption, "accessConditions") || hasOwn(profileAccess, "accessConditions");
+  const storageHasConditions = hasOwn(storageAccess, "accessConditions");
+  if (storageHasConditions) {
+    const result = validateAccessConditions(
+      storageAccess.accessConditions,
+      "storageProfile.payloadAccessControl.accessConditions"
+    );
+    if (!result.ok) return result;
+  }
+  if (profileHasConditions !== storageHasConditions || profileHasConditions && !sessionModeValuesEqual(effectiveProfileConditions, storageAccess.accessConditions)) {
+    return invalid("storageProfile.payloadAccessControl.accessConditions");
+  }
+  return valid();
+};
+var validateProfileStoragePolicyCoherence = ({ profile, storageSide }) => {
+  const profileStorage = isObj3(profile.storage) ? profile.storage : {};
+  const storageBackend = storageSide.backend;
+  if (!profileStorageBackendMatches({ profile, storageBackend })) {
+    return invalid("storageProfile.backend");
+  }
+  if (storageBackend !== "cloudflare") {
+    return hasOwn(storageSide, "payloadAccessControl") ? invalid("storageProfile.payloadAccessControl") : valid();
+  }
+  for (const key of ["gate", "encryption", "payloadAccessMode", "accessControlMode"]) {
+    if (hasOwn(storageSide, key)) return invalid(`storageProfile.${key}`);
+  }
+  const profileAccess = isObj3(profileStorage.payloadAccessControl) ? profileStorage.payloadAccessControl : {};
+  const storageAccess = isObj3(storageSide.payloadAccessControl) ? storageSide.payloadAccessControl : {};
+  const effectiveProfileGate = profile?.encryption?.mode === "lit" ? "none" : profileAccess.gate;
+  if (!hasOwn(storageAccess, "gate") || storageAccess.gate !== effectiveProfileGate) {
+    return invalid("storageProfile.payloadAccessControl.gate");
+  }
+  if (!hasOwn(storageAccess, "encryption") || storageAccess.encryption !== profileAccess.encryption) {
+    return invalid("storageProfile.payloadAccessControl.encryption");
+  }
+  return validateCanonicalStorageAccessConditions({ profile, storageSide });
+};
+var validateWorkerConfigModeValues = (config, { allowPartialProfileStorage = false } = {}) => {
   if (!isObj3(config)) return invalid("config");
+  let profile = null;
   if (hasOwn(config, "sessionModeProfile")) {
     const result = validateSessionModeProfile(config.sessionModeProfile, "sessionModeProfile");
     if (!result.ok) return result;
+    profile = config.sessionModeProfile;
+  }
+  if (profile) {
+    const storageSource = resolveProfileStorageSide(config, {
+      allowMissing: allowPartialProfileStorage,
+      requirePersistedCanonicalKey: true
+    });
+    if (!storageSource.ok) return storageSource;
+    if (!storageSource.value) return valid();
+    const storageResult = validateStorageProfile(storageSource.value, "storageProfile", {
+      requireCanonicalBackend: true
+    });
+    if (!storageResult.ok) return storageResult;
+    return validateProfileStoragePolicyCoherence({
+      profile,
+      storageSide: storageSource.value
+    });
   }
   if (hasOwn(config, "storageProfile")) {
     const result = validateStorageProfile(config.storageProfile, "storageProfile");
@@ -57704,9 +57804,23 @@ var validateWorkerConfigModeValues = (config) => {
 };
 var validateDeploymentModeValues = (body) => {
   if (!isObj3(body)) return invalid("request");
+  let profile = null;
   if (hasOwn(body, "sessionModeProfile")) {
     const result = validateSessionModeProfile(body.sessionModeProfile, "sessionModeProfile");
     if (!result.ok) return result;
+    profile = body.sessionModeProfile;
+  }
+  if (profile) {
+    const storageSource = resolveProfileStorageSide(body);
+    if (!storageSource.ok) return storageSource;
+    const storageResult = validateStorageProfile(storageSource.value, "storageProfile", {
+      requireCanonicalBackend: true
+    });
+    if (!storageResult.ok) return storageResult;
+    return validateProfileStoragePolicyCoherence({
+      profile,
+      storageSide: storageSource.value
+    });
   }
   if (hasOwn(body, "storageProfile")) {
     const result = validateStorageProfile(body.storageProfile, "storageProfile", { allowString: true });
@@ -58904,6 +59018,12 @@ var executeDeployHelperRequestCore = async ({
   const adminHatId = toStr13(body?.adminHatId).trim();
   const adminAddress = toStr13(body?.adminAddress).trim();
   const workerCanonicalRequested = toStr13(body?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === "worker_canonical";
+  const groupCreationPolicy = body?.groupCreationPolicy == null ? "admin_only" : toStr13(body.groupCreationPolicy).trim().toLowerCase();
+  if (!["admin_only", "participants"].includes(groupCreationPolicy)) {
+    return buildFailure(400, {
+      error: 'groupCreationPolicy must be "admin_only" or "participants".'
+    });
+  }
   if (workerCanonicalRequested && !/^0x[0-9a-f]{40}$/i.test(adminAddress)) {
     return buildFailure(400, { error: "A valid adminAddress is required for worker-canonical deploys." });
   }
@@ -59044,7 +59164,8 @@ var executeDeployHelperRequestCore = async ({
       rpcUrlsByChainId,
       faucet: faucet2
     } : {},
-    ...selectDeployWorkerSessionConfigFields(body)
+    ...selectDeployWorkerSessionConfigFields(body),
+    groupCreationPolicy
   };
   if (workerCanonicalRequested) {
     config.workerAuthority = workerCanonicalAuthority.value;
@@ -60390,6 +60511,7 @@ var WORKER_CANONICAL_PUBLICATION_REVISION_KEY = "workerCanonicalPublicationRevis
 var WORKER_GROUPS_BOOTSTRAP_KEY = "workerGroupsBootstrap";
 var toTrimmedString5 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var hasOwn3 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+var validGroupCreationPolicy = (config) => !hasOwn3(config, "groupCreationPolicy") || config?.groupCreationPolicy === "admin_only" || config?.groupCreationPolicy === "participants";
 var getWorkerAuthorityMode = (config) => toTrimmedString5(
   config?.sessionModeProfile?.authority?.mode
 ).toLowerCase();
@@ -60491,7 +60613,12 @@ var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
     if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
       return { ok: false, status: 400, error: "Secret-like values are not allowed in public session config fields." };
     }
-    const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig);
+    if (!validGroupCreationPolicy(incomingConfig)) {
+      return { ok: false, status: 400, error: "Invalid group creation policy." };
+    }
+    const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig, {
+      allowPartialProfileStorage: true
+    });
     if (!incomingModeValidation.ok) {
       return {
         ok: false,
@@ -60523,6 +60650,9 @@ var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
   }
   if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
     return { ok: false, status: 400, error: "Secret-like values are not allowed in public session config fields." };
+  }
+  if (!validGroupCreationPolicy(mergedConfig)) {
+    return { ok: false, status: 400, error: "Invalid group creation policy." };
   }
   const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
   if (!mergedModeValidation.ok) {
@@ -61978,6 +62108,7 @@ var resolveWorkerGroupSessionIdentity = ({ config, slug } = {}) => {
   }
   return { ok: true, sessionSlug, sessionId };
 };
+var participantGroupCreationAllowed = (config) => config?.groupCreationPolicy === "participants";
 var dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, headers, deps } = {}) => {
   const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
   if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, headers);
@@ -62271,6 +62402,40 @@ var workerGroupsRoute = async ({
     }
     if (!result.ok) return routeError(deps, result, baseHeaders);
     return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
+  }
+  if (path === "/groups/create" && method === "POST") {
+    if (!participantGroupCreationAllowed(config)) {
+      return routeError(
+        deps,
+        {
+          status: 403,
+          reason: "worker_group_creation_admin_only"
+        },
+        baseHeaders
+      );
+    }
+    const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
+    const result = await mutate({
+      env,
+      slug,
+      sessionId: sessionIdentity.sessionId,
+      operation: "create",
+      input: {
+        label: routeBody?.group?.label,
+        description: routeBody?.group?.description,
+        imageUrl: routeBody?.group?.imageUrl,
+        joinMode: WORKER_GROUP_JOIN_MODES.OPEN,
+        memberVisibility: WORKER_GROUP_MEMBER_VISIBILITY.SESSION
+      },
+      actorPrincipal: actor.principal
+    });
+    if (!result.ok) return routeError(deps, result, baseHeaders);
+    return jsonResponse(
+      deps,
+      { ok: true, ...sessionIdentity, store: result.store, group: result.group },
+      200,
+      baseHeaders
+    );
   }
   if (path === "/groups/join" && method === "POST") {
     const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
@@ -75133,6 +75298,10 @@ var dispatchSessionConfigBootstrapRequest = async ({
   if (!config || !isWorkerCanonicalSessionConfig(config)) {
     return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
   }
+  const modeValidation = validateWorkerConfigModeValues(config);
+  if (!modeValidation.ok) {
+    return deps?.json?.({ error: constants?.sessionConfigNotFoundError }, 404, protectedBaseHeaders);
+  }
   const corsContext = await deps?.getCorsContext?.({ request, config });
   if (!corsContext?.ok) return protectBootstrapResponse(corsContext?.response, protectedBaseHeaders);
   return deps?.json?.({
@@ -76181,7 +76350,7 @@ var dispatchAuthenticatedSecretPathRoute = async ({
   const isTranscribeRoute = path === "/transcribe" && method === "POST";
   const isArweaveUploadRoute = path === "/arweave/upload" && method === "POST";
   const isStorageRoute = path === "/storage/upload" && method === "POST" || path === "/storage/read" && (method === "GET" || method === "POST") || path === "/storage/list" && (method === "GET" || method === "POST") || path === "/storage/export-envelopes" && (method === "GET" || method === "POST");
-  const isWorkerGroupsRoute = path === "/groups/my-memberships" && (method === "GET" || method === "POST") || path === "/groups/list" && (method === "GET" || method === "POST") || path === "/groups/join" && method === "POST";
+  const isWorkerGroupsRoute = path === "/groups/my-memberships" && (method === "GET" || method === "POST") || path === "/groups/list" && (method === "GET" || method === "POST") || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST";
   if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute) {
     return { handled: false };
   }

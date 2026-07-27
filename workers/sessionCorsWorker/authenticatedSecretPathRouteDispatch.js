@@ -26,6 +26,7 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
   const isWorkerGroupsRoute = (
     (path === '/groups/my-memberships' && (method === 'GET' || method === 'POST')) ||
     (path === '/groups/list' && (method === 'GET' || method === 'POST')) ||
+    (path === '/groups/create' && method === 'POST') ||
     (path === '/groups/join' && method === 'POST')
   );
   if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute) {

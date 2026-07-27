@@ -35,6 +35,43 @@ const buildSessionConfig = (overrides = {}) => ({
   ...overrides,
 });
 
+const buildWorkerCanonicalLitModeConfig = () => ({
+  sessionModeProfile: {
+    profileVersion: 1,
+    preset: 'custom',
+    authority: { mode: 'worker_canonical' },
+    evm: { registryChainId: 84532 },
+    storage: {
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'none', encryption: 'lit' },
+    },
+    identity: { default: 'passkey', enabled: ['passkey'] },
+    authorization: { mechanisms: ['worker_roles'] },
+    encryption: { mode: 'lit' },
+    surfaces: {
+      web: true,
+      telegram: false,
+      miniApp: false,
+      agentHttp: false,
+      mcp: false,
+      ceCc: false,
+    },
+    results: {
+      visibility: 'participant_aggregate',
+      exposure: {
+        aggregateResultsEnabled: true,
+        anonymizedGroupsEnabled: false,
+        minGroupSize: 2,
+      },
+    },
+    export: { scope: 'admin_raw' },
+  },
+  storageProfile: {
+    backend: 'cloudflare',
+    payloadAccessControl: { gate: 'none', encryption: 'lit' },
+  },
+});
+
 const makeJsonRequest = (path, body, init = {}) => new Request(`https://worker.example${path}`, {
   method: init.method || 'POST',
   headers: {
@@ -350,7 +387,7 @@ test('worker-canonical faucet transactions use the authenticated session-secret 
         sessionId: WORKER_CANONICAL_SESSION_ID,
         networkChainId: 84532,
         allowOrigins: [LOGIN_ORIGIN],
-        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        ...buildWorkerCanonicalLitModeConfig(),
         workerAuthority: {
           version: 1,
           participantScopes: ['faucet'],

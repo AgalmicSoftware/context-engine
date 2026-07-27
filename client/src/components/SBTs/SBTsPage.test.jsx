@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { SBTsPage } from './SBTsPage';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { getDemoSessionConfigBySlug, getSessionLists } from '../../utilities/web3/chainGateway.js';
@@ -9,10 +9,14 @@ import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const mockSBTPage = jest.fn();
+const mockSBTsList = jest.fn();
 const mockCreateGroup = jest.fn();
 const mockIsCryptoMode = jest.fn(() => true);
 
-jest.mock('./SBTsList', () => () => null);
+jest.mock('./SBTsList', () => (props) => {
+  mockSBTsList(props);
+  return null;
+});
 jest.mock('./CreateSBTGroup', () => (props) => {
   mockCreateGroup(props);
   return (
@@ -226,6 +230,7 @@ describe('SBTsPage auto-feature flag', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const workerSessionConfig = {
       slug: 'demo-sh',
+      groupCreationPolicy: 'participants',
       networkChainId: 11155420,
       sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     };
@@ -922,6 +927,11 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('supports externally controlled embedded create state while hiding the mini action row', () => {
+    const workerSessionConfig = {
+      slug: 'alpha',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
     render(
       <SBTsPage
         sbtCacheRevision={0}
@@ -933,6 +943,7 @@ describe('SBTsPage auto-feature flag', () => {
         isSBTCacheReady={true}
         defaultFeaturedSBTs={[]}
         sessionSlug="alpha"
+        sessionConfig={workerSessionConfig}
         sessionName="Alpha"
         sessionInfo="Alpha session"
         hideMiniActionRow={true}
@@ -942,6 +953,148 @@ describe('SBTsPage auto-feature flag', () => {
 
     expect(screen.queryByRole('button', { name: /^View All$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Create$/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId('create-group-panel')).toBeInTheDocument();
+    expect(screen.getAllByTestId('ce-sbt-create-advanced-external-notice')).toHaveLength(1);
+    expect(screen.getByText(/does not replace or modify this session's Worker-native Groups/i)).toBeInTheDocument();
+  });
+
+  it('shows the external SBT notice from an unregistered Worker /groups/:slug route', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    contractScripts.getSessionConfigBySlug.mockReturnValue(null);
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    const workerSessionConfig = {
+      slug: 'unregistered-worker',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    window.history.replaceState({}, '', '/groups/unregistered-worker');
+
+    render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        loginComplete={true}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={true}
+        defaultFeaturedSBTs={[]}
+        sessionSlug="unregistered-worker"
+        sessionConfig={workerSessionConfig}
+      />,
+    );
+
+    expect(mockSBTsList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'unregistered-worker',
+        sessionConfig: workerSessionConfig,
+      }),
+    );
+    fireEvent.click(screen.getByTestId('ce-sbts-create-toggle'));
+    expect(screen.getByTestId('create-group-panel')).toBeInTheDocument();
+    expect(screen.getAllByTestId('ce-sbt-create-advanced-external-notice')).toHaveLength(1);
+    expect(screen.getByText(/does not replace or modify this session's Worker-native Groups/i)).toBeInTheDocument();
+  });
+
+  it('prefers an exact Worker route config over a same-slug registry config', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const workerSessionConfig = {
+      slug: 'shared-slug',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    const registrySessionConfig = {
+      slug: 'shared-slug',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+    };
+    contractScripts.getSessionConfigBySlug.mockReturnValue(registrySessionConfig);
+    window.history.replaceState({}, '', '/groups/shared-slug');
+
+    render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        loginComplete={true}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={true}
+        defaultFeaturedSBTs={[]}
+        sessionSlug="shared-slug"
+        sessionConfig={workerSessionConfig}
+      />,
+    );
+
+    expect(mockSBTsList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionSlug: 'shared-slug',
+        sessionConfig: workerSessionConfig,
+      }),
+    );
+    fireEvent.click(screen.getByTestId('ce-sbts-create-toggle'));
+    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toBeInTheDocument();
+  });
+
+  it('enforces the selected registry-session creation policy in Context Engine routes', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const adminAddress = '0x00000000000000000000000000000000000000aa';
+    const participantAddress = '0x00000000000000000000000000000000000000bb';
+    const registryConfig = {
+      slug: 'restricted',
+      groupCreationPolicy: 'admin_only',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+      __registry: {
+        registryChainId: 11155420,
+        adminAddress,
+        sessionIdHex: '0x00112233445566778899aabbccddeeff',
+      },
+    };
+    contractScripts.getSessionConfigBySlug.mockReturnValue(registryConfig);
+    window.history.replaceState({}, '', '/groups/restricted');
+
+    const { rerender } = render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 11155420, name: 'OP Sepolia' }}
+        account={participantAddress}
+        loginComplete={true}
+        isSBTCacheReady={true}
+        sessionSlug="restricted"
+        sessionConfig={registryConfig}
+      />,
+    );
+
+    expect(screen.queryByTestId('ce-sbts-create-toggle')).not.toBeInTheDocument();
+
+    window.history.replaceState({}, '', `${sbtsListPath()}/new`);
+    rerender(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 11155420, name: 'OP Sepolia' }}
+        account={participantAddress}
+        loginComplete={true}
+        isSBTCacheReady={true}
+        sessionSlug="restricted"
+        sessionConfig={registryConfig}
+      />,
+    );
+    expect(screen.getByTestId('ce-session-group-creation-policy-denied')).toBeInTheDocument();
+    expect(screen.queryByTestId('create-group-panel')).not.toBeInTheDocument();
+
+    rerender(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 11155420, name: 'OP Sepolia' }}
+        account={adminAddress}
+        loginComplete={true}
+        isSBTCacheReady={true}
+        sessionSlug="restricted"
+        sessionConfig={registryConfig}
+      />,
+    );
     expect(screen.getByTestId('create-group-panel')).toBeInTheDocument();
   });
 
@@ -981,6 +1134,11 @@ describe('SBTsPage auto-feature flag', () => {
         isSBTCacheReady={true}
         defaultFeaturedSBTs={[featuredAddress]}
         sessionSlug="alpha"
+        sessionConfig={{
+          slug: 'alpha',
+          groupCreationPolicy: 'participants',
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+        }}
         sessionName="Alpha"
         sessionInfo="Alpha session"
         hideMiniActionRow={true}

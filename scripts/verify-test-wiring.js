@@ -242,6 +242,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:public-release-surface', 'scripts/verify-public-release-surface.js');
   expectScriptContains('verify:public-assets', 'scripts/verify-public-assets.js');
   expectScriptContains('verify:public-text', 'scripts/verify-public-text.js');
+  expectScriptContains('verify:public-text:prepared', 'scripts/verify-prepared-public-text.sh');
   expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
   expectScriptContains('coverage-floor:check', 'scripts/check-client-coverage-floors.mjs');
   expectScriptContains('client:bundle-budget:check', 'scripts/check-client-bundle-budget.mjs');
@@ -290,7 +291,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'npm --prefix client run build',
     'npm run client:bundle-budget:check',
   );
-  expectGateContains('public-text', 'npm run verify:public-text');
+  expectGateContains('public-text', 'npm run verify:public-text:prepared');
   expectGateContains('contracts', 'npm run test:contracts');
   expectGateContains('contracts', 'npm run abi:check');
   expectGateOmits('contracts', 'npm run verify:abi-sync');

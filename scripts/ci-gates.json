@@ -147,11 +147,11 @@
     "public-text": {
       "commands": [
         {
-          "label": "Verify public text exposure",
+          "label": "Prepare and verify public text exposure",
           "command": "npm",
           "args": [
             "run",
-            "verify:public-text"
+            "verify:public-text:prepared"
           ]
         }
       ]

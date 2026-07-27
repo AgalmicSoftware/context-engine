@@ -158,6 +158,7 @@ export type SBTsListProps = {
   sbtCacheRevision?: unknown;
   sbtRealtimeCoverageBySlug?: SbtListBooleanBySlug | UnknownRecord;
   sbtScanProgressBySlug?: SbtListLiveProgressBySlug | UnknownRecord;
+  sessionConfig?: UnknownRecord | null;
   sessionSlug?: unknown;
   toggleLoginModal?: unknown;
   viewMode?: 'standard' | 'modal' | string;

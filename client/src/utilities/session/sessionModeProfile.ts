@@ -537,6 +537,25 @@ export const validateSessionModeProfile = (
       'That results visibility option is not available yet. Choose an enforced results policy.',
     );
   }
+  // Public stored-results visibility is only truthful for unencrypted data.
+  // Cloudflare payloads must also be public-read with no condition document:
+  // the Worker evaluates access conditions before it considers gate=none.
+  if (
+    visibilityValid &&
+    String(results?.visibility) === 'public_full_if_storage_public' &&
+    (String(encryption?.mode) !== SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.NONE ||
+      (storageBackend === 'cloudflare' &&
+        (!payloadAccess ||
+          String(payloadAccess.gate) !== SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE ||
+          hasOwn(payloadAccess, 'accessConditions') ||
+          hasOwn(encryption, 'accessConditions'))))
+  ) {
+    addIssue(
+      'results.visibility',
+      'public_results_require_public_storage',
+      'Public stored-results visibility requires unencrypted public-read storage without access conditions.',
+    );
+  }
   const exposure = requireRecord('results.exposure', results?.exposure, [
     'aggregateResultsEnabled',
     'anonymizedGroupsEnabled',

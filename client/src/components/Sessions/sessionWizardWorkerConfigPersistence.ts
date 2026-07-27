@@ -68,6 +68,7 @@ const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'allowOrigins',
   'sessionModeProfile',
   'workerAuthority',
+  'groupCreationPolicy',
   'storageProfile',
   'ai',
   'limits',

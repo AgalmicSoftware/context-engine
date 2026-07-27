@@ -34,6 +34,7 @@
     "verify:public-release-surface": "node scripts/verify-public-release-surface.js",
     "verify:public-assets": "node scripts/verify-public-assets.js",
     "verify:public-text": "node scripts/verify-public-text.js",
+    "verify:public-text:prepared": "bash scripts/verify-prepared-public-text.sh",
     "verify:public-release-pii": "bash scripts/verify-public-release-pii.sh",
     "verify:release-assets": "bash scripts/verify-release-assets.sh",
     "arweave:jwk": "npm run -s ai:node -- scripts/arweave-jwk.js",

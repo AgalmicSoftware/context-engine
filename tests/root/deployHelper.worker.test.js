@@ -16,6 +16,7 @@ const makeWorkerSessionModeProfile = ({
   encryption = 'worker_envelope',
   registryChainId = encryption === 'lit' ? 11155420 : null,
   agentHttp = false,
+  accessConditions = null,
 } = {}) => ({
   profileVersion: 1,
   preset: 'custom',
@@ -30,6 +31,7 @@ const makeWorkerSessionModeProfile = ({
   encryption: {
     mode: encryption,
     ...(encryption === 'worker_envelope' ? { keyProvider: 'worker_secret' } : {}),
+    ...(accessConditions ? { accessConditions: JSON.parse(JSON.stringify(accessConditions)) } : {}),
   },
   surfaces: {
     web: true,
@@ -49,6 +51,31 @@ const makeWorkerSessionModeProfile = ({
   },
   export: { scope: 'admin_raw' },
 });
+
+const makeWorkerStorageProfile = (sessionModeProfile = makeWorkerSessionModeProfile()) => {
+  const profileAccess = sessionModeProfile.storage.payloadAccessControl;
+  const accessConditions =
+    sessionModeProfile.encryption.accessConditions ||
+    profileAccess.accessConditions;
+  return {
+    backend: sessionModeProfile.storage.backend,
+    payloadAccessControl: {
+      gate: profileAccess.gate,
+      encryption: profileAccess.encryption,
+      ...(accessConditions
+        ? { accessConditions: JSON.parse(JSON.stringify(accessConditions)) }
+        : {}),
+    },
+  };
+};
+
+const makeWorkerModeDeployFields = (options = {}) => {
+  const sessionModeProfile = makeWorkerSessionModeProfile(options);
+  return {
+    sessionModeProfile,
+    storageProfile: makeWorkerStorageProfile(sessionModeProfile),
+  };
+};
 
 const cfSuccess = (result = {}) => new Response(JSON.stringify({
   success: true,
@@ -730,6 +757,16 @@ describe('deploy-helper worker', () => {
     invalidEncryption.encryption.mode = '';
     const invalidKeyProvider = makeWorkerSessionModeProfile();
     invalidKeyProvider.encryption.keyProvider = 'external_kms';
+    const conditionProfile = makeWorkerSessionModeProfile();
+    conditionProfile.storage.payloadAccessControl.accessConditions = {
+      match: 'all',
+      conditions: [{ kind: 'worker_role', role: 'admin' }],
+    };
+    const litProfile = makeWorkerSessionModeProfile({ encryption: 'lit' });
+    const coherentWorkerStorage = {
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' },
+    };
     const invalidRequests = [
       {
         path: 'sessionModeProfile.authority.mode',
@@ -767,6 +804,54 @@ describe('deploy-helper worker', () => {
           storageProfile: {
             backend: 'cloudflare',
             payloadAccessControl: { mode: 'public-read' },
+          },
+        },
+      },
+      {
+        path: 'storageProfile',
+        value: {
+          sessionModeProfile: makeWorkerSessionModeProfile(),
+        },
+      },
+      {
+        path: 'storageBackend',
+        value: {
+          sessionModeProfile: makeWorkerSessionModeProfile(),
+          storageProfile: 'cloudflare',
+          storageBackend: coherentWorkerStorage,
+        },
+      },
+      {
+        path: 'storageProfile.backend',
+        value: {
+          sessionModeProfile: makeWorkerSessionModeProfile(),
+          storageProfile: { backend: 'arweave' },
+        },
+      },
+      {
+        path: 'storageProfile.payloadAccessControl.accessConditions',
+        value: {
+          sessionModeProfile: conditionProfile,
+          storageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: {
+              gate: 'none',
+              encryption: 'worker_envelope',
+              accessConditions: {
+                match: 'any',
+                conditions: [{ kind: 'worker_role', role: 'member' }],
+              },
+            },
+          },
+        },
+      },
+      {
+        path: 'storageProfile.payloadAccessControl.encryption',
+        value: {
+          sessionModeProfile: litProfile,
+          storageProfile: {
+            backend: 'cloudflare',
+            payloadAccessControl: { mode: 'lit_encrypted', gate: 'none' },
           },
         },
       },
@@ -877,6 +962,7 @@ describe('deploy-helper worker', () => {
           sessionSlug: 'alpha-session',
           adminAddress: '0x00000000000000000000000000000000000000aa',
           sessionModeProfile: makeWorkerSessionModeProfile(),
+          storageProfile: makeWorkerStorageProfile(),
           bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
         }),
         {},
@@ -936,6 +1022,7 @@ describe('deploy-helper worker', () => {
           sessionSlug: 'alpha-session',
           adminAddress: '0x00000000000000000000000000000000000000aa',
           sessionModeProfile: makeWorkerSessionModeProfile(),
+          storageProfile: makeWorkerStorageProfile(),
           bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
         }),
         {},
@@ -1236,6 +1323,12 @@ describe('deploy-helper worker', () => {
       cfSuccess({}),
     ]);
     global.fetch = fetchMock;
+    const accessConditions = {
+      match: 'all',
+      conditions: [{ kind: 'worker_role', role: 'admin' }],
+    };
+    const sessionModeProfile = makeWorkerSessionModeProfile();
+    sessionModeProfile.storage.payloadAccessControl.accessConditions = accessConditions;
 
     try {
       const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
@@ -1247,6 +1340,7 @@ describe('deploy-helper worker', () => {
         configRevision: 'revision-a',
         sessionName: 'Alpha Session',
         sessionInfo: 'Worker-canonical session',
+        groupCreationPolicy: 'participants',
         adminAddress: '0x00000000000000000000000000000000000000aa',
         ai: {
           models: { fast: { provider: 'openai', model: 'gpt-5' } },
@@ -1257,11 +1351,15 @@ describe('deploy-helper worker', () => {
         },
         cfApiToken: 'cf-alias-never-store',
         scopes: { cloudflare: { credentials: { token: 'nested-cf-never-store' } } },
-        sessionModeProfile: makeWorkerSessionModeProfile(),
+        sessionModeProfile,
         bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
         storageProfile: {
           backend: 'cloudflare',
-          payloadAccessControl: { gate: 'none', encryption: 'worker_envelope' },
+          payloadAccessControl: {
+            gate: 'none',
+            encryption: 'worker_envelope',
+            accessConditions,
+          },
         },
         secrets: { openaiKey: 'sk-never-store' },
       }), {}, {});
@@ -1282,7 +1380,13 @@ describe('deploy-helper worker', () => {
           participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
           anonymousScopes: [],
         },
+        groupCreationPolicy: 'participants',
         ai: { models: { fast: { provider: 'openai', model: 'gpt-5' } } },
+      }));
+      expect(configWrite.storageProfile.payloadAccessControl).toEqual(expect.objectContaining({
+        gate: configWrite.sessionModeProfile.storage.payloadAccessControl.gate,
+        encryption: configWrite.sessionModeProfile.storage.payloadAccessControl.encryption,
+        accessConditions: configWrite.sessionModeProfile.storage.payloadAccessControl.accessConditions,
       }));
       expect(serialized).not.toContain('cf-never-store');
       expect(serialized).not.toContain('cf-alias-never-store');
@@ -1398,7 +1502,7 @@ describe('deploy-helper worker', () => {
         networkChainId: 11155420,
         rpcUrl: 'https://rpc.example.test',
         rpcUrlsByChainId: { 11155420: ['https://rpc.example.test'] },
-        sessionModeProfile: makeWorkerSessionModeProfile({ encryption: 'lit' }),
+        ...makeWorkerModeDeployFields({ encryption: 'lit' }),
         bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
         secrets: {
           customRpcUrl: 'https://rpc.example.test',
@@ -1442,6 +1546,7 @@ describe('deploy-helper worker', () => {
       sessionSlug: 'alpha-session',
       adminAddress: '0x00000000000000000000000000000000000000aa',
       sessionModeProfile: makeWorkerSessionModeProfile(),
+      storageProfile: makeWorkerStorageProfile(),
       workerAuthority: {
         version: 2,
         participantScopes: ['storage'],
@@ -1453,6 +1558,26 @@ describe('deploy-helper worker', () => {
 
     expect(response.status).toBe(400);
     expect(payload?.error).toBe('Worker-canonical authority policy must use version 1.');
+    expect(fetchMock.calls).toHaveLength(0);
+    expect(fetchMock.workerNamePreflightCalls).toHaveLength(0);
+  });
+
+  it('rejects an invalid group creation policy before Cloudflare mutation', async () => {
+    const fetchMock = makeFetchSequence([]);
+    global.fetch = fetchMock;
+
+    const response = await deployHelperWorker.fetch(makeJsonRequest('/deploy', {
+      apiToken: 'cf-token',
+      accountId: 'acc-123',
+      workerName: 'test-worker',
+      sessionSlug: 'alpha-session',
+      groupCreationPolicy: 'everyone',
+      bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
+    }), {}, {});
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload?.error).toBe('groupCreationPolicy must be "admin_only" or "participants".');
     expect(fetchMock.calls).toHaveLength(0);
     expect(fetchMock.workerNamePreflightCalls).toHaveLength(0);
   });
@@ -1470,6 +1595,7 @@ describe('deploy-helper worker', () => {
       allowOverwrite: true,
       adminAddress: '0x00000000000000000000000000000000000000aa',
       sessionModeProfile: makeWorkerSessionModeProfile(),
+      storageProfile: makeWorkerStorageProfile(),
       bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
     }), {}, {});
     const payload = await response.json();
@@ -2093,6 +2219,7 @@ describe('deploy-helper worker', () => {
         sessionSlug: 'alpha-session',
         adminAddress: '0x00000000000000000000000000000000000000aa',
         sessionModeProfile: makeWorkerSessionModeProfile(),
+        storageProfile: makeWorkerStorageProfile(),
         bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
       }), {}, {});
       const payload = await response.json();
@@ -2321,6 +2448,7 @@ describe('deploy-helper worker', () => {
         sessionSlug: 'alpha-session',
         adminAddress: '0x00000000000000000000000000000000000000aa',
         sessionModeProfile: makeWorkerSessionModeProfile(),
+        storageProfile: makeWorkerStorageProfile(),
         bundleUrl: 'https://bundles.example.test/sessionCorsWorker.bundle.js',
       }), {}, {});
       const payload = await response.json();

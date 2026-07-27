@@ -349,6 +349,7 @@ test('dispatchAuthenticatedSecretPathRoute rejects arweave-only tokens for worke
   const routes = [
     { path: '/groups/list', method: 'GET' },
     { path: '/groups/my-memberships', method: 'GET' },
+    { path: '/groups/create', method: 'POST' },
     { path: '/groups/join', method: 'POST' },
   ];
   const scopesWithoutGroups = [

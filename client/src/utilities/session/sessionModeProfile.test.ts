@@ -318,6 +318,7 @@ describe('sessionModeProfile', () => {
     const arweaveLit = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     arweaveLit.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     arweaveLit.encryption = { mode: 'lit' };
+    arweaveLit.results.visibility = 'participant_aggregate';
 
     const workerReadbackCompatibility = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     workerReadbackCompatibility.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
@@ -343,6 +344,55 @@ describe('sessionModeProfile', () => {
       );
       expect(() => compileSessionModeProfile(profile)).not.toThrow();
     }
+  });
+
+  it('rejects public stored-results visibility when Cloudflare payloads are gated', () => {
+    const gatedPublicResults = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    gatedPublicResults.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    gatedPublicResults.results.visibility = 'public_full_if_storage_public';
+
+    const result = validateSessionModeProfile(gatedPublicResults);
+    expect(result.valid).toBe(false);
+    expect(result.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'results.visibility', code: 'public_results_require_public_storage' }),
+      ]),
+    );
+    expect(classifySessionModeProfileSupport(gatedPublicResults).status).toBe('invalid');
+
+    const publicReadResults = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    publicReadResults.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    publicReadResults.encryption = { mode: 'none' };
+    publicReadResults.storage.payloadAccessControl = { gate: 'none', encryption: 'none' };
+    publicReadResults.results.visibility = 'public_full_if_storage_public';
+    expect(classifySessionModeProfileSupport(publicReadResults).status).toBe('reachable');
+
+    const conditionGatedPublicResults = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    conditionGatedPublicResults.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    conditionGatedPublicResults.encryption = { mode: 'none' };
+    conditionGatedPublicResults.storage.payloadAccessControl = {
+      gate: 'none',
+      encryption: 'none',
+      accessConditions: {
+        match: 'any',
+        conditions: [{ kind: 'worker_role', role: 'reviewer' }],
+      },
+    };
+    conditionGatedPublicResults.results.visibility = 'public_full_if_storage_public';
+    expect(validateSessionModeProfile(conditionGatedPublicResults).issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'results.visibility', code: 'public_results_require_public_storage' }),
+      ]),
+    );
+
+    const encryptedPublicResults = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    encryptedPublicResults.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    encryptedPublicResults.encryption = { mode: 'lit' };
+    expect(validateSessionModeProfile(encryptedPublicResults).issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: 'results.visibility', code: 'public_results_require_public_storage' }),
+      ]),
+    );
   });
 
   it('classifies schema-only and unavailable profiles separately while all fail compilation', () => {

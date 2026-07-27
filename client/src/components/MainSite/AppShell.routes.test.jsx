@@ -246,6 +246,7 @@ jest.mock('../SBTs/SBTsList', () => {
         'data-testid': 'mock-sbts-page',
         'data-network-id': String(props.network?.id || ''),
         'data-session-slug': String(props.sessionSlug || ''),
+        'data-session-config-slug': String(props.sessionConfig?.slug || ''),
         'data-all-sessions-mode': String(props.allSessionsMode === true),
       });
     },
@@ -2379,6 +2380,7 @@ describe('AppShell route render smoke', () => {
     expect(await screen.findByTestId('mock-sbts-page')).toHaveAttribute('data-network-id', '84532');
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-all-sessions-mode', 'false');
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-slug', 'edge');
+    expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-config-slug', 'edge');
   });
 
   it.each(['/sbts/new', '/groups/new/'])('renders the standalone SBT create route for %s', async (path) => {

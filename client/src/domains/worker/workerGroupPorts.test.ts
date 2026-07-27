@@ -1,6 +1,7 @@
 import {
   addWorkerGroupMember,
   createWorkerGroup,
+  createWorkerGroupAsParticipant,
   deleteWorkerGroup,
   joinWorkerGroup,
   listWorkerGroupMembers,
@@ -163,6 +164,57 @@ describe('worker group ports', () => {
         fetchImpl: deniedFetch,
       }),
     ).rejects.toMatchObject({ message: 'worker_group_join_denied', status: 403 });
+  });
+
+  it('creates a participant group through the bearer-authenticated session route', async () => {
+    const fetchImpl = jest.fn(
+      async (_input?: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            group: {
+              groupId: 'participant-review',
+              sessionSlug: SESSION_SLUG,
+              label: 'Participant review',
+              description: 'Open working group.',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+
+    await expect(
+      createWorkerGroupAsParticipant({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        group: { label: 'Participant review', description: 'Open working group.' },
+        fetchImpl,
+      }),
+    ).resolves.toMatchObject({
+      group: {
+        groupId: 'participant-review',
+        joinMode: 'open',
+        memberVisibility: 'session',
+      },
+    });
+    expect(fetchImpl).toHaveBeenCalledWith(`${WORKER_URL}/groups/create`, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${WORKER_TOKEN}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        group: { label: 'Participant review', description: 'Open working group.' },
+        sessionId: SESSION_ID,
+      }),
+    });
   });
 
   it('maps arbitrary worker group errors without disclosing the bearer credential', async () => {

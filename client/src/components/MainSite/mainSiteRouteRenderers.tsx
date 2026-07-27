@@ -356,6 +356,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
     const { fullPath, defaultSessionNetwork } = ctx;
     const routeSessionSlug = host.getSbtListRouteSessionSlug(fullPath);
     const allSessionsMode = !routeSessionSlug;
+    const routeSessionConfig = routeSessionSlug ? host.getDisplaySessionCfg(routeSessionSlug) : null;
     return (
       <Suspense fallback={<LazyFallback label={`Loading ${t('sbts')}...`} />}>
         <RouteErrorBoundary resetKey={fullPath}>
@@ -370,6 +371,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
               toggleLoginModal={host.props.toggleLoginModal}
               miniaturized={false}
               sessionSlug={routeSessionSlug || undefined}
+              sessionConfig={routeSessionConfig}
               allSessionsMode={allSessionsMode}
               isSBTCacheReady={host.state.isSBTCacheReady}
               sbtCacheRevision={host.state.sbtCacheRevision}

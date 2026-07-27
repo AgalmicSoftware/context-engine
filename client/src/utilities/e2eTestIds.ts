@@ -102,6 +102,10 @@ export const E2E_TESTIDS = Object.freeze({
   SESSION_RESULTS_TOGGLE: 'ce-session-results-toggle',
   SESSION_ADVANCED_ONCHAIN_ACCESS_GATES: 'ce-session-advanced-onchain-access-gates',
   SESSION_GROUPS_UNAVAILABLE: 'ce-session-groups-unavailable',
+  SESSION_GROUP_CREATION_POLICY_DENIED: 'ce-session-group-creation-policy-denied',
+  SESSION_WORKER_PARTICIPANT_GROUP_CREATE: 'ce-session-worker-participant-group-create',
+  SESSION_WORKER_PARTICIPANT_GROUP_LABEL: 'ce-session-worker-participant-group-label',
+  SESSION_WORKER_PARTICIPANT_GROUP_SUBMIT: 'ce-session-worker-participant-group-submit',
   SURVEY_FILTER_TOGGLE: 'ce-survey-filter-toggle',
   CONTRACTS_ADVANCED_EXTERNAL_NOTICE: 'ce-contracts-advanced-external-notice',
 
@@ -127,6 +131,7 @@ export const E2E_TESTIDS = Object.freeze({
   WIZARD_SLUG_TAKEN: 'ce-wizard-slug-taken',
   WIZARD_MODE_NORMAL: 'ce-wizard-mode-normal',
   WIZARD_MODE_ADVANCED: 'ce-wizard-mode-advanced',
+  WIZARD_GROUP_CREATION_POLICY: 'ce-wizard-group-creation-policy',
   WIZARD_METADATA_PANEL_TOGGLE: 'ce-wizard-metadata-panel-toggle',
   WIZARD_WORKER_MODE_TOGGLE: 'ce-wizard-worker-mode-toggle',
   WIZARD_WORKER_MODE_BUTTON: 'ce-wizard-worker-mode-button',

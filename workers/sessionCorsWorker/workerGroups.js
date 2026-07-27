@@ -1706,6 +1706,9 @@ const resolveWorkerGroupSessionIdentity = ({ config, slug } = {}) => {
 	return { ok: true, sessionSlug, sessionId };
 };
 
+const participantGroupCreationAllowed = (config) =>
+	config?.groupCreationPolicy === 'participants';
+
 export const dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, headers, deps } = {}) => {
 	const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
 	if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, headers);
@@ -2000,6 +2003,40 @@ export const workerGroupsRoute = async ({
 		}
 		if (!result.ok) return routeError(deps, result, baseHeaders);
 		return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
+	}
+	if (path === '/groups/create' && method === 'POST') {
+		if (!participantGroupCreationAllowed(config)) {
+			return routeError(
+				deps,
+				{
+					status: 403,
+					reason: 'worker_group_creation_admin_only',
+				},
+				baseHeaders,
+			);
+		}
+		const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
+		const result = await mutate({
+			env,
+			slug,
+			sessionId: sessionIdentity.sessionId,
+			operation: 'create',
+			input: {
+				label: routeBody?.group?.label,
+				description: routeBody?.group?.description,
+				imageUrl: routeBody?.group?.imageUrl,
+				joinMode: WORKER_GROUP_JOIN_MODES.OPEN,
+				memberVisibility: WORKER_GROUP_MEMBER_VISIBILITY.SESSION,
+			},
+			actorPrincipal: actor.principal,
+		});
+		if (!result.ok) return routeError(deps, result, baseHeaders);
+		return jsonResponse(
+			deps,
+			{ ok: true, ...sessionIdentity, store: result.store, group: result.group },
+			200,
+			baseHeaders,
+		);
 	}
 	if (path === '/groups/join' && method === 'POST') {
 		const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;

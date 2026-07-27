@@ -234,9 +234,7 @@ const WorkerGroupMembershipPanel = ({
           >
             Copy group link
           </button>
-          <span>
-            Leaving is not supported by the current Worker authority contract; ask an admin to remove membership.
-          </span>
+          <span>Leaving is not supported by the current Worker group policy; ask an admin to remove membership.</span>
         </article>
       ))}
       {availableGroups.map((group) => (

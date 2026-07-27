@@ -25,6 +25,10 @@ import {
   normalizeSessionStorageProfileConfig,
 } from './sessionWizardStorageProfile';
 import {
+  DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
+  normalizeGroupCreationPolicy,
+} from '../../utilities/session/groupCreationPolicy';
+import {
   classifySessionModeProfileSupport,
   compileSessionModeProfile,
   hasLegacyTelegramFirstSessionFlags,
@@ -338,21 +342,27 @@ export const buildSessionWizardWorkerConfigPayload = ({
     });
   const modeRequirements = resolveSessionWizardModeRequirements(effectiveSessionModeProfile);
   const isWorkerCanonical = modeRequirements.isWorkerCanonical;
-  const workerAuthority = isObj(resolvedDeployPayload.workerAuthority)
-    ? cloneValue(resolvedDeployPayload.workerAuthority)
-    : isWorkerCanonical
-      ? {
-          version: 1,
-          participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
-          anonymousScopes: [],
-        }
-      : undefined;
+  const workerAuthority = isObj(resolvedDraft.workerAuthority)
+    ? cloneValue(resolvedDraft.workerAuthority)
+    : isObj(resolvedDeployPayload.workerAuthority)
+      ? cloneValue(resolvedDeployPayload.workerAuthority)
+      : isWorkerCanonical
+        ? {
+            version: 1,
+            participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
+            anonymousScopes: [],
+          }
+        : undefined;
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
     sessionName: trimString(resolvedDraft.sessionName),
     sessionInfo: trimString(resolvedDraft.sessionInfo),
     sessionHeaderImg: trimString(resolvedDraft.sessionHeaderImg),
+    groupCreationPolicy: normalizeGroupCreationPolicy(
+      resolvedDraft.groupCreationPolicy,
+      DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
+    ),
     ai: buildSessionWizardPublicAiConfig(resolvedDraft.ai),
     registryAddress: isWorkerCanonical ? '' : trimString(resolvedDeployPayload.registryAddress || registryAddress),
     registryChainId: isWorkerCanonical

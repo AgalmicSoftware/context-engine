@@ -487,6 +487,18 @@ key providers, or malformed mode containers return `400` before account lookup,
 Cloudflare mutation, coordinator persistence, or KV write. Omit an optional
 field to select its documented default; do not send an empty value.
 
+When `sessionModeProfile` is present, deployment must carry exactly one
+object-valued storage source (`storageProfile`, or the legacy deploy-only
+`storageBackend` object); persisted config uses the canonical `storageProfile`
+name. The storage backend must agree with the profile (`lit-arweave` is
+compatible only with an Arweave + Lit profile). For Cloudflare, the canonical
+top-level payload gate, encryption mode, and effective `accessConditions`
+document must exactly match the compiled profile policy. Missing storage,
+simultaneous aliases, backend/policy divergence, condition aliases, and
+partially explicit legacy mode shapes fail closed. Signed profile-only patches
+may omit the unchanged storage object, but the complete merged record is
+revalidated before KV persistence.
+
 Where older clients still need one string, the worker and client derive the legacy `payloadAccessMode` from the v2 object.
 
 - Current pure Worker profiles use `gate: "role_gate"` with
@@ -608,9 +620,16 @@ Worker URL, a slug-only cache, SessionRegistry, SBT discovery, or a global
 session scan.
 
 In a `worker_canonical` web session, the expanded Groups section reads and joins
-these records directly and gives the configured worker admin the signed
-create/edit/member controls. It never opens the legacy SBT deployment form and
-does not request a contract address, chain, RPC, gas, or burn policy. A
+these records directly. The top-level `groupCreationPolicy` is either
+`admin_only` or `participants`; missing legacy values fail closed to
+`admin_only`. Under `participants`, an authenticated principal with the
+session's `groups` scope may create a group through the bearer-authenticated
+member route. The Worker ignores caller-selected identifiers and access modes,
+generates the ID, and forces the new group to open self-join with session
+visibility. The configured worker admin retains the signed create, edit,
+delete, and membership controls under either policy. This flow never opens the
+legacy SBT deployment form and does not request a contract address, chain, RPC,
+gas, or burn policy. A
 Worker/SBT or Worker/Lit hybrid keeps **Native Worker Groups** as its participant
 Group authority and labels the chain-dependent controls separately as
 **Advanced on-chain access**. Registry-canonical sessions retain the existing
@@ -727,6 +746,9 @@ Implemented routes:
   budget.
 - `GET|POST /groups/list`: authenticated member route. It returns session-visible groups and member-visible groups for the caller.
 - `GET|POST /groups/my-memberships`: authenticated self view. A principal can always see its own memberships. Each row includes the active `memberCount` for that group without exposing the other principals.
+- `POST /groups/create`: authenticated participant create, available only when
+  `groupCreationPolicy: "participants"`. The Worker generates the group ID and
+  forces `joinMode: "open"` plus `memberVisibility: "session"`.
 - `POST /groups/join`: authenticated self-join for `joinMode: "open"` groups only.
 
 `memberVisibility` defaults to `admin_only`. `members` lets members see the group metadata, and `session` lets any authenticated session principal see the group metadata. Self-membership visibility is always allowed. `passkey_account` and `evm_address` principals use normalized EVM addresses, `telegram` uses the bridge principal id string, and `agent` uses the grant id. Malformed principals fail closed.
@@ -1482,7 +1504,9 @@ Never return secrets in responses.
 
 - Security-sensitive `sessionModeProfile` and `storageProfile` enum values are
   validated before merge and again on the complete record before persistence.
-  Read compatibility for legacy values is not a write-time fallback.
+  Read compatibility for legacy values is not a write-time fallback. A
+  profile-bearing complete record must retain the canonical, coherent
+  `storageProfile` described above.
 - The session slug is taken from the signed request context, not trusted from `config.slug`.
 - After a worker-canonical session is initialized, its slug, worker URL, authority
   mode, and normalized `sessionId`/`sessionIdHex` identity are immutable. Attempts
@@ -1710,6 +1734,9 @@ Signed login/bootstrap requests:
     unless it is canonical and exactly matches the resolved header slug.
   - Public, CORS-scoped bootstrap for persisted `worker_canonical` sessions;
     registry-canonical or missing configs return `404`.
+  - A profile/storage record that fails canonical coherence also returns the
+    generic `404` before CORS-scoped projection, so a fresh client cannot
+    advertise capabilities that the storage routes would enforce differently.
   - Returns `{ ok, sessionSlug, config }` with the sanitized canonical config
     needed by a fresh browser. It never returns the session secrets envelope,
     Cloudflare token, provider credentials, Lit credentials, RPC/faucet config,

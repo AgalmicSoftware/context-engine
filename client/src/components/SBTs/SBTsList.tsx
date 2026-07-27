@@ -16,6 +16,9 @@ import { faSpinner, faSync, faTrash, faPlus, faCog } from '@fortawesome/free-sol
 import { Button } from 'reactstrap';
 import SBTPage from './SBTPage';
 import CreateGroup from './CreateSBTGroup';
+import SbtCreateAdvancedExternalNotice, {
+  shouldShowAdvancedExternalSbtNotice,
+} from './SbtCreateAdvancedExternalNotice';
 import TagModal from '../TagPage/TagModal';
 import SbtListSessionUniversePanel from './SbtListSessionUniversePanel';
 import { SbtListDetailsPanel, SbtListMetaRow } from './SbtListCardChrome';
@@ -174,6 +177,7 @@ const SBTsList = ({
   network,
   account,
   litHooks,
+  sessionConfig,
   sessionSlug,
   loginComplete,
   miniaturized,
@@ -198,6 +202,11 @@ const SBTsList = ({
   interactiveMiniCards = false,
 }: SBTsListProps) => {
   const routeSlug = normalizeSessionSlug(sessionSlug || '');
+  const explicitRouteSessionConfig = useMemo(() => {
+    if (!routeSlug || !isRecord(sessionConfig)) return null;
+    const configSlug = normalizeSessionSlug(sessionConfig.slug || sessionConfig.sessionSlug || '');
+    return configSlug === routeSlug ? sessionConfig : null;
+  }, [routeSlug, sessionConfig]);
   // Determine if we should enumerate ALL groups (route-based fallback + explicit prop)
   const allSessionsMode = useMemo(() => {
     if (allSessionsModeProp) return true;
@@ -848,11 +857,15 @@ const SBTsList = ({
     return clearRecentLiveProgressTimeout;
   }, [clearRecentLiveProgressTimeout, sbtScanProgressBySlug]);
 
-  const getDisplaySessionConfig = useCallback((slugIn: unknown) => {
-    const slug = normalizeSessionSlug(slugIn || '');
-    if (isSbtListSyntheticNoSessionSlug(slug)) return null;
-    return getSessionConfigBySlug(slug) || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) || null;
-  }, []);
+  const getDisplaySessionConfig = useCallback(
+    (slugIn: unknown) => {
+      const slug = normalizeSessionSlug(slugIn || '');
+      if (isSbtListSyntheticNoSessionSlug(slug)) return null;
+      if (explicitRouteSessionConfig && slug === routeSlug) return explicitRouteSessionConfig;
+      return getSessionConfigBySlug(slug) || getDemoSessionConfigBySlug(slug, { allowDemoFallback: true }) || null;
+    },
+    [explicitRouteSessionConfig, routeSlug],
+  );
 
   const getDisplaySessionChainId = useCallback(
     (slugIn: unknown): string => {
@@ -2915,6 +2928,9 @@ const SBTsList = ({
       {/* In all-groups embedded mode, keep CreateGroup panel above universe chooser. */}
       {shouldRenderCreateGroupPanel && (
         <div className={styles.createGroupPanelWrap}>
+          {shouldShowAdvancedExternalSbtNotice(getDisplaySessionConfig(listSlug)) ? (
+            <SbtCreateAdvancedExternalNotice />
+          ) : null}
           <CreateGroup
             account={account}
             loginComplete={loginComplete}
