@@ -11,17 +11,28 @@ import {
 
 const VALID_SBT_CONTRACT = '0x00000000000000000000000000000000000000aa';
 
-const renderSection = (section: 'privacy' | 'worker' | 'publish', initialProfile?: SessionModeProfile) => {
+const renderSection = (
+  section: 'privacy' | 'worker' | 'publish',
+  initialProfile?: SessionModeProfile,
+  initialGroupCreationPolicy = 'participants',
+) => {
   const onChange = jest.fn();
+  const onGroupCreationPolicyChange = jest.fn();
   const seed = initialProfile || cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
 
   const Harness = () => {
     const [profile, setProfile] = useState(seed);
+    const [groupCreationPolicy, setGroupCreationPolicy] = useState(initialGroupCreationPolicy);
     return (
       <SessionModeProfileSections
         section={section}
         registryChainId={11155420}
         value={profile}
+        groupCreationPolicy={groupCreationPolicy}
+        onGroupCreationPolicyChange={(next) => {
+          onGroupCreationPolicyChange(next);
+          setGroupCreationPolicy(next);
+        }}
         onChange={(next, compiled) => {
           onChange(next, compiled);
           setProfile(next);
@@ -31,7 +42,7 @@ const renderSection = (section: 'privacy' | 'worker' | 'publish', initialProfile
   };
 
   render(<Harness />);
-  return { onChange };
+  return { onChange, onGroupCreationPolicyChange };
 };
 
 describe('SessionModeProfileSections', () => {
@@ -44,6 +55,29 @@ describe('SessionModeProfileSections', () => {
     expect(screen.getByRole('combobox', { name: 'Who can see results' })).toBeInTheDocument();
     expect(screen.queryByText('Surfaces')).not.toBeInTheDocument();
     expect(screen.queryByText('Export scope')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['Cloudflare', cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE)],
+    ['on-chain', cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED)],
+  ])('offers admin and participant group creation policies for %s sessions', (_label, profile) => {
+    const { onGroupCreationPolicyChange } = renderSection('worker', profile);
+    const policy = screen.getByRole('radiogroup', { name: 'Who can create groups?' });
+
+    expect(within(policy).getByRole('radio', { name: 'All participants' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(within(policy).getByRole('radio', { name: 'Admins only' }));
+    expect(onGroupCreationPolicyChange).toHaveBeenLastCalledWith('admin_only');
+    expect(within(policy).getByRole('radio', { name: 'Admins only' })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('discloses the public-factory limit for on-chain admin-only policy', () => {
+    renderSection(
+      'worker',
+      cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+      'admin_only',
+    );
+
+    expect(screen.getByText(/Public SBT factories remain callable directly on-chain/i)).toBeInTheDocument();
   });
 
   it('uses the explicit Cloudflare defaults and reveals plain-language custom rules only on override', () => {
@@ -172,6 +206,9 @@ describe('SessionModeProfileSections', () => {
           backend: 'cloudflare',
           payloadAccessControl: expect.objectContaining({ gate: 'role_gate' }),
         }),
+        identity: { default: 'passkey', enabled: ['passkey'] },
+        authorization: { mechanisms: ['worker_roles'] },
+        results: expect.objectContaining({ visibility: 'participant_aggregate' }),
       }),
       expect.objectContaining({
         storageProfile: expect.objectContaining({
@@ -243,6 +280,29 @@ describe('SessionModeProfileSections', () => {
     const visibility = screen.getByRole('combobox', { name: 'Who can see results' });
     expect(within(visibility).getByRole('option', { name: /Admins only/i })).toBeDisabled();
     expect(within(visibility).getByRole('option', { name: /redacted summary/i })).toBeDisabled();
+    expect(within(visibility).getByRole('option', { name: /public stored results/i })).toBeDisabled();
+  });
+
+  it('offers public results only for unencrypted Arweave storage and coerces them when encryption is enabled', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const { onChange } = renderSection('privacy', profile);
+    const visibility = screen.getByRole('combobox', { name: 'Who can see results' });
+
+    expect(within(visibility).getByRole('option', { name: /public stored results/i })).toBeEnabled();
+    expect(visibility).toHaveValue('public_full_if_storage_public');
+
+    fireEvent.click(screen.getByTestId('ce-new-encryption-lit'));
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        storage: { backend: 'arweave' },
+        encryption: { mode: 'lit' },
+        results: expect.objectContaining({ visibility: 'participant_aggregate' }),
+      }),
+      expect.any(Object),
+    );
+    expect(within(visibility).getByRole('option', { name: /public stored results/i })).toBeDisabled();
+    expect(visibility).toHaveValue('participant_aggregate');
   });
 
   it('lets a minimum group size be cleared while editing before committing a valid integer', () => {

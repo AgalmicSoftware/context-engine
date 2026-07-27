@@ -21,7 +21,13 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
     (path === '/storage/list' && (method === 'GET' || method === 'POST')) ||
     (path === '/storage/export-envelopes' && (method === 'GET' || method === 'POST'))
   );
-  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute) {
+  const isWorkerGroupsRoute = (
+    (path === '/groups/my-memberships' && (method === 'GET' || method === 'POST')) ||
+    (path === '/groups/list' && (method === 'GET' || method === 'POST')) ||
+    (path === '/groups/create' && method === 'POST') ||
+    (path === '/groups/join' && method === 'POST')
+  );
+  if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute) {
     return { handled: false };
   }
   const isParticipantWrite = (

@@ -3,23 +3,47 @@ import type { UnknownRecord } from '../../utilities/session/sessionTypes';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { deepClone } from './sessionWizardCoreUtils';
 import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
+import {
+  DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
+  normalizeGroupCreationPolicy,
+  type GroupCreationPolicy,
+} from '../../utilities/session/groupCreationPolicy';
 
 type SessionWizardModeDraft = UnknownRecord & {
   sessionMode?: unknown;
   sessionModeProfile?: unknown;
   storageProfile?: unknown;
-  telegram?: unknown;
+  groupCreationPolicy?: unknown;
+  telegram?: UnknownRecord;
   telegramBridgeEnabled?: unknown;
   telegramMode?: unknown;
   telegramOnly?: unknown;
   telegram_only?: unknown;
 };
 
+type DraftWithGroupCreationPolicy<Draft extends SessionWizardModeDraft> = Draft & {
+  groupCreationPolicy: GroupCreationPolicy;
+};
+
+type DraftWithSelectedModeProfile<Draft extends SessionWizardModeDraft> = DraftWithGroupCreationPolicy<Draft> & {
+  sessionModeProfile: SessionModeProfile;
+  storageProfile: UnknownRecord;
+};
+
 const isRecord = (value: unknown): value is UnknownRecord =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-export const applyStorageProfileChangeToModeDraft = (
-  prev: SessionWizardModeDraft,
+export const applyGroupCreationPolicyToDraft = <Draft extends SessionWizardModeDraft>(
+  prev: Draft,
+  groupCreation: GroupCreationPolicy,
+): DraftWithGroupCreationPolicy<Draft> => {
+  const next = deepClone(prev) as DraftWithGroupCreationPolicy<Draft>;
+  next.groupCreationPolicy = normalizeGroupCreationPolicy(groupCreation, DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY);
+  return next;
+};
+
+export const applyStorageProfileChangeToModeDraft = <Draft extends SessionWizardModeDraft>(
+  prev: Draft,
   nextProfile: unknown,
 ): SessionWizardModeDraft => {
   const next = deepClone(prev);
@@ -53,11 +77,15 @@ export const applyStorageProfileChangeToModeDraft = (
 export const applySessionModeProfileSelectionToDraft = (
   prev: SessionWizardModeDraft,
   profile: SessionModeProfile,
-  compiled: CompiledSessionModeProfile,
-): SessionWizardModeDraft => {
-  const next = deepClone(prev);
-  next.sessionModeProfile = { ...profile };
+  compiled: { storageProfile: UnknownRecord },
+): DraftWithSelectedModeProfile<Draft> => {
+  const next = deepClone(prev) as DraftWithSelectedModeProfile<Draft>;
+  next.sessionModeProfile = deepClone(profile);
   next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+  next.groupCreationPolicy = normalizeGroupCreationPolicy(
+    next.groupCreationPolicy,
+    DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
+  );
   delete next.telegramOnly;
   delete next.telegram_only;
   delete next.telegramMode;

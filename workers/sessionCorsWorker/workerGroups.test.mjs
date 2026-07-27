@@ -1015,6 +1015,94 @@ test('member routes respect visibility and open join mode', async () => {
 	assert.equal(memberships.memberships[0].memberCount, 1);
 });
 
+test('participant group creation requires the explicit policy and forces an open session-visible group', async () => {
+	let mutation = null;
+	const deps = {
+		json,
+		executeCoordinatedWorkerGroupMutation: async (args) => {
+			mutation = args;
+			return {
+				ok: true,
+				store: 'kv',
+				group: {
+					groupId: 'generated-group',
+					sessionSlug: 'session-a',
+					label: args.input.label,
+					description: args.input.description,
+					joinMode: args.input.joinMode,
+					memberVisibility: args.input.memberVisibility,
+				},
+			};
+		},
+	};
+	const request = () => new Request('https://worker.example/groups/create', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify({
+			group: {
+				groupId: 'participant-chosen-id',
+				label: 'Participant review',
+				description: 'Open working group.',
+				joinMode: 'admin_add',
+				memberVisibility: 'admin_only',
+			},
+		}),
+	});
+
+	const denied = await workerGroupsRoute({
+		path: '/groups/create',
+		method: 'POST',
+		request: request(),
+		env: {},
+		slug: 'session-a',
+		requesterAddress: member.address,
+		authScopes: { groups: true },
+		baseHeaders: {},
+		deps,
+	});
+	assert.equal(denied.status, 403);
+	assert.equal(denied.body.reason, 'worker_group_creation_admin_only');
+	assert.equal(mutation, null);
+	for (const groupCreationPolicy of ['Participants', ' participants ', true]) {
+		const noncanonical = await workerGroupsRoute({
+			path: '/groups/create',
+			method: 'POST',
+			request: request(),
+			config: { sessionId, groupCreationPolicy },
+			env: {},
+			slug: 'session-a',
+			requesterAddress: member.address,
+			authScopes: { groups: true },
+			baseHeaders: {},
+			deps,
+		});
+		assert.equal(noncanonical.status, 403);
+		assert.equal(noncanonical.body.reason, 'worker_group_creation_admin_only');
+		assert.equal(mutation, null);
+	}
+
+	const created = await workerGroupsRoute({
+		path: '/groups/create',
+		method: 'POST',
+		request: request(),
+		config: { sessionId, groupCreationPolicy: 'participants' },
+		env: {},
+		slug: 'session-a',
+		requesterAddress: member.address,
+		authScopes: { groups: true },
+		baseHeaders: {},
+		deps,
+	});
+	assert.equal(created.status, 200);
+	assert.equal(created.body.sessionId, sessionId);
+	assert.equal(created.body.sessionSlug, 'session-a');
+	assert.equal(mutation.operation, 'create');
+	assert.equal(mutation.input.groupId, undefined);
+	assert.equal(mutation.input.joinMode, 'open');
+	assert.equal(mutation.input.memberVisibility, 'session');
+	assert.deepEqual(mutation.actorPrincipal, member);
+});
+
 test('same slug with a replacement session id cannot expose prior groups or members', async () => {
 	const kv = createMockKv();
 	const env = installCoordinatorBinding({ CE_WORKER_GROUPS_KV: kv });

@@ -2399,21 +2399,6 @@ describe('AppShell route render smoke', () => {
     expect(screen.getByTestId('mock-sbt-create-page')).toHaveAttribute('data-session-slug', 'edge');
   });
 
-  it.each(['/sbts/new', '/groups/new/'])('renders the standalone SBT create route for %s', async (path) => {
-    const sessionConfig = buildSessionConfig();
-    const subject = createSubject({
-      path,
-      activeSessionSlug: 'edge',
-      sessionConfig,
-    });
-
-    render(subject.render());
-
-    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SBTS_ROOT)).toBeInTheDocument();
-    expect(await screen.findByTestId('mock-sbt-create-page')).toHaveAttribute('data-network-id', '84532');
-    expect(screen.getByTestId('mock-sbt-create-page')).toHaveAttribute('data-session-slug', 'edge');
-  });
-
   it('does not access window directly while rendering atlas and stubbed experimental routes', () => {
     const debateSubject = createSubject({ path: '/debate' });
     const atlasSubject = createSubject({ path: '/atlas' });

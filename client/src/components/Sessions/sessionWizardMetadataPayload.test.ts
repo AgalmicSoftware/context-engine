@@ -32,6 +32,7 @@ describe('resolveSessionWizardMetadataPayloadBase', () => {
       sponsoredSbtAddress: '0xsponsored',
       autoFeatureSBTsWithFeaturedSbtTags: true,
       defaultFeaturedSBTs: ['0xAAA', { address: '0xbbb' }, { sbtAddress: '0xAAA' }],
+      groupCreationPolicy: 'admin_only',
     };
 
     const metadata = resolveSessionWizardMetadataPayloadBase({
@@ -47,6 +48,7 @@ describe('resolveSessionWizardMetadataPayloadBase', () => {
         sessionIdHex: '0x00000000000000000000000000000001',
         autoFeatureSBTsBySessionSlug: true,
         defaultFeaturedSBTs: ['0xAAA', '0xbbb'],
+        groupCreationPolicy: 'admin_only',
       }),
     );
     expect(metadata).not.toHaveProperty('sessionInfo');

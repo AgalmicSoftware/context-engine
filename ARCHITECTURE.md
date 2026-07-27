@@ -186,13 +186,13 @@ Lit opt-in:
 | **Utilities** | |
 | Web3 / contracts | `utilities/web3/contractScripts.js` (compat barrel), `contractScripts.impl.ts`, `contractHelpers.ts`, `contractEventListeners.ts`, `contractProfile.ts`, `sessionRegistry.ts` |
 | Wallet | `client/src/wallet/` passkey EOA wallet config, encrypted keystore, EIP-1193 provider, and soft-session worker |
-| Crypto / Lit | `utilities/crypto/litProtocol.js`, `cryptography.js`, `encryptedFields.js` |
-| Arweave | `utilities/arweave/arweaveScripts.js`, `arweaveUrls.js` |
-| Session helpers | `utilities/session/sessionNaming.js`, `sessionMetadata.js`, `resourceKeys.js`, `sessionModeProfile.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, `telegramSessionBackend.ts` |
-| Worker auth | `utilities/worker/workerAuth.js`, `corsProxy.js` |
-| Cache | `utilities/cache/cacheScripts.js`, `storageManager.js` |
-| AI | `utilities/ai/aiScripts.js`, `aiSettings.js` |
-| Survey logic | `utilities/survey/questionRouting.js`, `filterStateUtils.js`, `compareUsers.js` |
+| Crypto / Lit | `utilities/crypto/litProtocol.ts`, `cryptography.ts`, `encryptedFields.ts` |
+| Arweave | `utilities/arweave/arweaveClient.js`, `arweaveUrls.ts` |
+| Session helpers | `utilities/session/sessionNaming.ts`, `sessionMetadata.ts`, `resourceKeys.ts`, `sessionModeProfile.ts`, `groupCreationPolicy.ts`, `sessionBackendKind.ts`, `agentClientLogin.ts`, `telegramAgentData.ts`, `telegramSessionBackend.ts` |
+| Worker auth | `utilities/worker/workerAuth.ts`, `corsProxy.ts` |
+| Cache | `utilities/cache/cacheScripts.ts`, `storageManager.ts` |
+| AI | `utilities/ai/aiClient.js`, `aiSettings.ts` |
+| Survey logic | `utilities/survey/questionRouting.ts`, `filterStateUtils.ts`, `compareUsers.ts` |
 | **Config / variables** | |
 | Feature flags | `variables/appConfig.ts` |
 | Chain config | `variables/chains.ts` |

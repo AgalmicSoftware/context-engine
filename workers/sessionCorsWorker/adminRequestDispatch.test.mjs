@@ -52,6 +52,11 @@ const createWorkerSessionModeProfile = () => ({
   export: { scope: 'all_session' },
 });
 
+const createWorkerStorageProfile = () => ({
+  backend: 'cloudflare',
+  payloadAccessControl: { gate: 'none', encryption: 'none' },
+});
+
 const createRegistrySessionModeProfile = () => ({
   profileVersion: 1,
   preset: 'custom',
@@ -410,6 +415,7 @@ test('dispatchAdminRequest rejects changes to an initialized worker-canonical id
     sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     corsWorkerUrl: 'https://session-a.workers.dev',
     sessionModeProfile: createWorkerSessionModeProfile(),
+    storageProfile: createWorkerStorageProfile(),
     sessionName: 'Canonical Session',
   };
   const unsafePatches = [
@@ -424,7 +430,10 @@ test('dispatchAdminRequest rejects changes to an initialized worker-canonical id
     },
     {
       label: 'authority mode',
-      config: { sessionModeProfile: createRegistrySessionModeProfile() },
+      config: {
+        sessionModeProfile: createRegistrySessionModeProfile(),
+        storageProfile: { backend: 'arweave' },
+      },
     },
     {
       label: 'worker URL',
@@ -469,6 +478,7 @@ test('dispatchAdminRequest treats sessionId and sessionIdHex as one immutable ca
     sessionIdHex: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     corsWorkerUrl: 'https://session-a.workers.dev',
     sessionModeProfile: createWorkerSessionModeProfile(),
+    storageProfile: createWorkerStorageProfile(),
   };
 
   for (const config of [
@@ -532,6 +542,7 @@ test('dispatchAdminRequest finalizes the first canonical publication revision an
     configRevision: 'deployment-seed',
     corsWorkerUrl: 'https://session-a.workers.dev',
     sessionModeProfile: createWorkerSessionModeProfile(),
+    storageProfile: createWorkerStorageProfile(),
     sessionName: 'Deployment seed',
   };
   let persistedConfig = deploymentConfig;
@@ -605,6 +616,7 @@ test('dispatchAdminRequest permits non-identity updates to an initialized worker
     sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     corsWorkerUrl: 'https://session-a.workers.dev',
     sessionModeProfile: createWorkerSessionModeProfile(),
+    storageProfile: createWorkerStorageProfile(),
     sessionName: 'Canonical Session',
   };
   const writes = [];
@@ -853,6 +865,7 @@ test('dispatchAdminRequest preserves allowlisted structural authorization', asyn
   const config = {
     authorization: { roles: { moderator: ['0x00000000000000000000000000000000000000aa'] } },
     sessionModeProfile: createWorkerSessionModeProfile(),
+    storageProfile: createWorkerStorageProfile(),
   };
 
   const result = await dispatchAdminRequest({

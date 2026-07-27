@@ -61,7 +61,6 @@ const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   'sessionModeProfile',
   'workerAuthority',
   'groupCreationPolicy',
-  'storageProfile',
   'ai',
   'networkChainId',
   'contracts',

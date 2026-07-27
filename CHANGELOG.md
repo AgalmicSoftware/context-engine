@@ -21,7 +21,10 @@ All notable changes to this project will be documented in this file.
   their chain controls. Profile compilation, persistence, canonical readback,
   and Worker validation now reject schema-only, unavailable, malformed, and
   cross-lineage combinations instead of inferring capabilities from legacy
-  chain fields. Session pages also suppress wallet/network controls, Lit hooks,
+  chain fields. Profile-bearing Worker records now require one matching
+  canonical storage object, including exact backend, payload policy, and access
+  conditions; incoherent deploys, mutations, and public readbacks fail closed.
+  Public-result claims require unencrypted public storage. Session pages also suppress wallet/network controls, Lit hooks,
   SBT auto-mint and filters, non-Cloudflare document references, and Polis
   blockchain metadata for pure Worker profiles, clearing stale chain-backed
   state when the active capability profile changes.
@@ -41,13 +44,24 @@ All notable changes to this project will be documented in this file.
   session ID. Missing or conflicting identity and pre-existing same-slug data
   fail closed with reconciliation required, late cross-session responses are
   discarded, Worker/SBT hybrids label their on-chain conditions separately as
-  Advanced access, and registry-backed sessions retain the legacy SBT flow.
+  Advanced access, every reachable on-chain SBT creator labels itself external
+  to Worker-native Groups, and registry-backed sessions retain the legacy SBT
+  flow.
+- Every `/new` mode now offers an admin-only or all-participants group-creation
+  policy. Worker participants use an authenticated, chain-free create route
+  that forces open session-visible groups while admin mutation controls remain
+  signed; registry sessions enforce the choice across their session and SBT
+  page controls while disclosing that public factories remain independently
+  callable on-chain. Legacy Worker configs remain admin-only.
 - Git-backed Netlify builds now bind the native Cloudflare Deploy Button to
   Netlify's exact public `COMMIT_REF`; builds without a public commit remain
   fail-closed with the native deployment card disabled.
 - Public-release scrubbing now preserves the byte-stable generated Cloudflare
   Worker package while continuing to scan its bundled dependency contacts,
   preventing email-shaped wordlist data from being rewritten after hashing.
+  Hosted public-text verification now builds a temporary canonical release
+  artifact and scans its actual bytes, while direct source-tree verification
+  remains strict.
 - SBT claim and invite codes now default to explicit export without silent
   browser persistence; existing scoped recovery entries remain readable for
   compatibility.

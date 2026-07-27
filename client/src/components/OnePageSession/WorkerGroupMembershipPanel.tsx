@@ -356,6 +356,15 @@ const WorkerGroupMembershipPanel = ({
           {membership.group.description ? <span>{membership.group.description}</span> : null}
           <span>Member</span>
           {typeof membership.memberCount === 'number' ? <span>{membership.memberCount} members</span> : null}
+          <button
+            type="button"
+            className={styles.telegramSecondaryButton}
+            onClick={() => void copyGroupLink(membership.group.groupId)}
+            aria-label={`Copy ${membership.group.label} group link`}
+          >
+            Copy group link
+          </button>
+          <span>Leaving is not supported by the current Worker group policy; ask an admin to remove membership.</span>
         </article>
       ))}
       {availableGroups.map((group) => (

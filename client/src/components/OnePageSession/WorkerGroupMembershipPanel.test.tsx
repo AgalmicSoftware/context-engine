@@ -665,6 +665,8 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.getByText('3 members')).toBeInTheDocument();
     expect(screen.getByText('Invited reviewers')).toBeInTheDocument();
     expect(screen.getByText(/No invitation token is created/i)).toBeInTheDocument();
+    expect(screen.getByText(/Leaving is not supported by the current Worker group policy/i)).toBeInTheDocument();
+    expect(screen.queryByText(/contract|network|rpc|gas|mint/i)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Copy Invited reviewers group link' }));
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1));
     const copiedGroupLink = new URL(String((navigator.clipboard.writeText as jest.Mock).mock.calls[0][0]));

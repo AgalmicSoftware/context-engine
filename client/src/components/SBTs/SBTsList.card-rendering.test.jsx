@@ -346,6 +346,109 @@ describe('SBTsList card rendering and navigation', () => {
     expect(onNavigateToSbt).toHaveBeenCalledWith(alphaAddress, buildSbtDetailPath(alphaAddress, 'alpha'));
   });
 
+  it('labels the list-mode create panel as an external on-chain tool only for Worker-native sessions', async () => {
+    const workerCanonicalProfile = {
+      profileVersion: 1,
+      preset: 'custom',
+      authority: { mode: 'worker_canonical' },
+      evm: { registryChainId: null },
+      storage: { backend: 'cloudflare', payloadAccessControl: { gate: 'none', encryption: 'none' } },
+      identity: { default: 'passkey', enabled: ['passkey'] },
+      authorization: { mechanisms: ['worker_roles'] },
+      encryption: { mode: 'none' },
+      surfaces: { web: true, telegram: false, miniApp: false, agentHttp: false, mcp: false, ceCc: false },
+      results: {
+        visibility: 'public_full_if_storage_public',
+        exposure: { aggregateResultsEnabled: true, anonymizedGroupsEnabled: false, minGroupSize: 2 },
+      },
+      export: { scope: 'all_session' },
+    };
+    mockGetSessionConfigBySlug.mockImplementation((slug) => {
+      const normalized = String(slug || '')
+        .trim()
+        .toLowerCase();
+      if (normalized === 'alpha') {
+        return {
+          sessionName: 'Alpha',
+          blockLimits: { start: 1000 },
+          corsWorkerUrl: 'https://worker.example',
+          sessionModeProfile: workerCanonicalProfile,
+        };
+      }
+      if (normalized === 'custom-universe-session') {
+        return {
+          sessionName: 'custom universe session',
+          blockLimits: { start: 3000 },
+          corsWorkerUrl: 'https://worker.example',
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        };
+      }
+      if (normalized === 'beta') {
+        return {
+          sessionName: 'Beta',
+          blockLimits: { start: 2000 },
+          corsWorkerUrl: 'https://worker.example',
+          networkChainId: 84532,
+          __registry: {
+            chainId: 84532,
+            sessionId: '0xbeef',
+            adminAddress: '0x00000000000000000000000000000000000000ad',
+          },
+        };
+      }
+      return {
+        sessionName: normalized || 'General',
+        blockLimits: { start: 1 },
+        corsWorkerUrl: 'https://worker.example',
+      };
+    });
+
+    const sharedProps = {
+      provider: 'mock',
+      network: { id: 84532, name: 'Base Sepolia' },
+      account: '',
+      loginComplete: true,
+      miniaturized: false,
+      toggleLoginModal: jest.fn(),
+      sbtCacheRevision: 0,
+      onRequestSbtCacheRefresh: jest.fn(),
+      isSBTCacheReady: true,
+      refreshSbtData: jest.fn(),
+      latestBlockNumber: 0,
+      ensureLightSbtDiscovery: jest.fn(),
+    };
+
+    const workerRender = render(<SBTsList {...sharedProps} sessionSlug="alpha" />);
+    fireEvent.click((await screen.findAllByRole('button', { name: /create group/i }))[0]);
+    expect(await screen.findByTestId('create-group-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toBeInTheDocument();
+    expect(screen.getByText(/does not replace or modify this session's Worker-native Groups/i)).toBeInTheDocument();
+    workerRender.unmount();
+
+    const registryRender = render(<SBTsList {...sharedProps} sessionSlug="beta" />);
+    fireEvent.click((await screen.findAllByRole('button', { name: /create group/i }))[0]);
+    expect(await screen.findByTestId('create-group-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-sbt-create-advanced-external-notice')).toBeNull();
+    registryRender.unmount();
+
+    const invalidWorkerRender = render(<SBTsList {...sharedProps} sessionSlug="custom-universe-session" />);
+    fireEvent.click((await screen.findAllByRole('button', { name: /create group/i }))[0]);
+    expect(await screen.findByTestId('create-group-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toBeInTheDocument();
+    invalidWorkerRender.unmount();
+
+    render(
+      <SBTsList
+        {...sharedProps}
+        sessionSlug="unregistered-worker"
+        sessionConfig={{ slug: 'unregistered-worker', sessionModeProfile: workerCanonicalProfile }}
+      />,
+    );
+    fireEvent.click((await screen.findAllByRole('button', { name: /create group/i }))[0]);
+    expect(await screen.findByTestId('create-group-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toBeInTheDocument();
+  });
+
   it('does not duplicate featured SBT addresses in minting sections', async () => {
     const featuredAddress = '0x00000000000000000000000000000000000000f1';
     const liveAddress = '0x00000000000000000000000000000000000000f2';

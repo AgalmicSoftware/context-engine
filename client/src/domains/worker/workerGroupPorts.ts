@@ -93,6 +93,7 @@ const SAFE_REMOTE_WORKER_GROUP_REASONS = new Set([
   'worker_group_capacity_state_unavailable',
   'worker_group_catalog_invalid',
   'worker_group_coordination_unavailable',
+  'worker_group_creation_admin_only',
   'worker_group_join_denied',
   'worker_group_member_cap_exceeded',
   'worker_group_member_not_found',
@@ -401,6 +402,39 @@ export const joinWorkerGroup = async ({
     const group = normalizeGroup(payload.group, expectedSessionSlug);
     if (!group) throw new WorkerGroupRequestError('worker_group_response_group_invalid');
     return { ...payload, group };
+  });
+};
+
+export const createWorkerGroupAsParticipant = async ({
+  workerUrl,
+  credentialToken,
+  sessionId,
+  sessionSlug,
+  group,
+  fetchImpl = fetch,
+}: {
+  workerUrl: unknown;
+  credentialToken: unknown;
+  sessionId: unknown;
+  sessionSlug: unknown;
+  group: Pick<WorkerGroup, 'label'> & Partial<Pick<WorkerGroup, 'description' | 'imageUrl'>>;
+  fetchImpl?: typeof fetch;
+}): Promise<UnknownRecord> => {
+  const expectedSessionSlug = normalizeExpectedSessionSlug(sessionSlug);
+  const expectedSessionId = normalizeExpectedSessionId(sessionId);
+  return requestMemberRoute({
+    workerUrl,
+    credentialToken,
+    sessionId: expectedSessionId,
+    sessionSlug: expectedSessionSlug,
+    path: '/groups/create',
+    method: 'POST',
+    body: { group },
+    fetchImpl,
+  }).then((payload) => {
+    const created = normalizeGroup(payload.group, expectedSessionSlug);
+    if (!created) throw new WorkerGroupRequestError('worker_group_response_group_invalid');
+    return { ...payload, group: created };
   });
 };
 

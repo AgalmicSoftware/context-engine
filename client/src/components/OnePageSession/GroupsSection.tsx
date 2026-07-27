@@ -6,6 +6,11 @@ import SBTsPage from '../SBTs/SBTsPage';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection.js';
 import { isCryptoMode, t } from '../../utilities/ui/terminology.js';
+import {
+  GROUP_CREATION_POLICIES,
+  LEGACY_GROUP_CREATION_POLICY,
+  resolveGroupCreationPolicy,
+} from '../../utilities/session/groupCreationPolicy';
 import styles from './OnePageSession.module.scss';
 import WorkerSessionGroupsPanel from './WorkerSessionGroupsPanel';
 
@@ -141,7 +146,14 @@ const OnePageSessionGroupsSection = ({
   });
   const canAttemptWorkerGroupCreate =
     groupAdminCapabilities.canAdminWorker || !groupAdminCapabilities.workerAdminAddress;
-  const canCreateGroup = usesRegistryGroups || (usesWorkerNativeGroups && canAttemptWorkerGroupCreate);
+  const groupCreationPolicy = resolveGroupCreationPolicy(
+    sessionConfigForGroups,
+    usesRegistryGroups ? GROUP_CREATION_POLICIES.PARTICIPANTS : LEGACY_GROUP_CREATION_POLICY,
+  );
+  const participantGroupCreationEnabled = groupCreationPolicy === GROUP_CREATION_POLICIES.PARTICIPANTS;
+  const canCreateGroup =
+    (usesRegistryGroups && (participantGroupCreationEnabled || groupAdminCapabilities.canAdminRegistry)) ||
+    (usesWorkerNativeGroups && (participantGroupCreationEnabled || canAttemptWorkerGroupCreate));
 
   return (
     <div className={`${styles.sectionContainer} ${showGroups ? styles.sectionExpanded : ''}`}>

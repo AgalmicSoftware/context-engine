@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+const { scrubPublicPackageJson } = require('./scrub-public-package-json');
 const { verifyPublicText } = require('./verify-public-text');
 
 function writeFile(rootDir, relativePath, contents) {
@@ -57,5 +58,62 @@ test('verifyPublicText does not confuse public domains with local agent settings
   withFixture((rootDir) => {
     writeFile(rootDir, 'sources.json', '{"url":"https://platform.claude.com/docs"}\n');
     assert.deepEqual(verifyPublicText(rootDir).findings, []);
+  });
+});
+
+test('verifyPublicText rejects an unsanitized root package.json', () => {
+  withFixture((rootDir) => {
+    writeFile(rootDir, 'package.json', `${JSON.stringify({
+      name: 'fixture',
+      scripts: {
+        'test:cc': 'node scripts/run-contextengine-cc-tests.js',
+        build: 'node scripts/build.js',
+      },
+    }, null, 2)}\n`);
+
+    assert.deepEqual(
+      verifyPublicText(rootDir).findings.map(({ file, kind }) => ({ file, kind })),
+      [{ file: 'package.json', kind: 'private companion path' }],
+    );
+  });
+});
+
+test('verifyPublicText accepts a root package.json physically scrubbed for release', () => {
+  withFixture((rootDir) => {
+    const packageJsonPath = path.join(rootDir, 'package.json');
+    writeFile(rootDir, 'package.json', `${JSON.stringify({
+      name: 'fixture',
+      scripts: {
+        'test:cc': 'node scripts/run-contextengine-cc-tests.js',
+        'test:cc:coverage': 'NODE_V8_COVERAGE=coverage node scripts/run-contextengine-cc-tests.js --flag',
+        build: 'node scripts/build.js',
+      },
+    }, null, 2)}\n`);
+
+    scrubPublicPackageJson(packageJsonPath);
+
+    const preparedPackageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    assert.deepEqual(preparedPackageJson.scripts, { build: 'node scripts/build.js' });
+    assert.deepEqual(verifyPublicText(rootDir).findings, []);
+  });
+});
+
+test('verifyPublicText still fails on companion references that survive the package.json scrub', () => {
+  withFixture((rootDir) => {
+    writeFile(rootDir, 'package.json', `${JSON.stringify({
+      name: 'fixture',
+      description: 'mirrors contextEngine-cc runtime helpers',
+      scripts: { build: 'node scripts/build.js' },
+    }, null, 2)}\n`);
+    writeFile(rootDir, 'client/package.json', `${JSON.stringify({
+      name: 'client-fixture',
+      scripts: { leak: 'node ../scripts/run-contextengine-cc-tests.js' },
+    }, null, 2)}\n`);
+
+    const { findings } = verifyPublicText(rootDir);
+    assert.deepEqual(findings.map(({ file, kind }) => ({ file, kind })), [
+      { file: 'client/package.json', kind: 'private companion path' },
+      { file: 'package.json', kind: 'private companion path' },
+    ]);
   });
 });

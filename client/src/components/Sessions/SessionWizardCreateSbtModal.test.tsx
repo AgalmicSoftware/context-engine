@@ -35,7 +35,7 @@ const buildProps = (
 });
 
 describe('SessionWizardCreateSbtModal', () => {
-  it('does not add an external on-chain notice for a Worker-native draft', () => {
+  it('labels SBT creation as external to a Worker-native session', () => {
     render(
       <SessionWizardCreateSbtModal
         {...buildProps(cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE))}
@@ -43,10 +43,12 @@ describe('SessionWizardCreateSbtModal', () => {
     );
 
     expect(screen.getByTestId('create-sbt-group')).toBeInTheDocument();
-    expect(screen.queryByText(/Advanced\/external on-chain SBT/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toHaveTextContent(
+      /does not replace or modify this session's Worker-native Groups/i,
+    );
   });
 
-  it('continues to render the SBT draft creator for a registry session', () => {
+  it('does not show the Worker-native notice for a registry session', () => {
     render(
       <SessionWizardCreateSbtModal
         {...buildProps(cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED))}
@@ -54,5 +56,6 @@ describe('SessionWizardCreateSbtModal', () => {
     );
 
     expect(screen.getByTestId('create-sbt-group')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-sbt-create-advanced-external-notice')).not.toBeInTheDocument();
   });
 });

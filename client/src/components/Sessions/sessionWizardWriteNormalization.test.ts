@@ -390,6 +390,7 @@ describe('sessionWizardWriteNormalization', () => {
           participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
           anonymousScopes: [],
         },
+        groupCreationPolicy: 'participants',
       }),
     );
     expect(payload.contracts).toBeUndefined();
@@ -402,6 +403,68 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.faucet).toBeUndefined();
     expect(payload.litCredentials).toBeUndefined();
     expect(JSON.stringify(payload)).not.toMatch(/must-never-persist|0xRegistry|rpc\.example|faucet\.example/i);
+  });
+
+  test('buildSessionWizardWorkerConfigPayload preserves an explicit admin-only group creation policy', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'restricted-groups',
+      draft: {
+        sessionModeProfile,
+        groupCreationPolicy: 'admin_only',
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+
+    expect(payload.groupCreationPolicy).toBe('admin_only');
+  });
+
+  test('buildSessionWizardWorkerConfigPayload keeps only the Lit public descriptor for worker-canonical Lit mode', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.encryption = { mode: 'lit' };
+    sessionModeProfile.evm.registryChainId = DEFAULT_CONFIG_CHAIN_ID;
+    sessionModeProfile.storage.payloadAccessControl = {
+      ...sessionModeProfile.storage.payloadAccessControl!,
+      encryption: 'lit',
+    };
+
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'worker-lit-session',
+      draft: {
+        sessionName: 'Worker Lit Session',
+        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
+        sessionModeProfile,
+      },
+      deployPayload: {
+        rpcUrl: 'https://rpc.example',
+        rpcUrlsByChainId: { [DEFAULT_CONFIG_CHAIN_ID]: ['https://rpc.example'] },
+      },
+      workerSecrets: {
+        litApiBase: ' https://api.chipotle.litprotocol.com ',
+        litGroupId: ' group_123 ',
+        litPkpId: ' pkp_123 ',
+        litActionCid: ' bafy123 ',
+        litAccountApiKey: 'must-never-persist',
+        litUsageApiKey: 'must-never-persist',
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+
+    expect(payload.litCredentials).toEqual({
+      litApiBase: 'https://api.chipotle.litprotocol.com',
+      litGroupId: 'group_123',
+      litPkpId: 'pkp_123',
+      litActionCid: 'bafy123',
+    });
+    expect(payload.networkChainId).toBe(DEFAULT_CONFIG_CHAIN_ID);
+    expect(payload.rpcUrl).toBeUndefined();
+    expect(payload.rpcUrlsByChainId).toBeUndefined();
+    expect(JSON.stringify(payload)).not.toContain('must-never-persist');
   });
   test('session storage profile is session-owned metadata and worker config, with Cloudflare secrets omitted', () => {
     const metadata = sanitizeSessionWizardMetadataPayload(

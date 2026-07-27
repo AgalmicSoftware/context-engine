@@ -2,7 +2,6 @@ import {
   SESSION_MODE_PRESET_IDS,
   cloneSessionModePreset,
   compileSessionModeProfile,
-  sessionModeAllowsAnonymousWorkerGroupDiscovery,
   validateSessionModeProfile,
 } from './sessionModeProfile';
 import {
@@ -64,31 +63,6 @@ describe('session mode profile client/Worker validator parity', () => {
     encryptedPublicResults.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     encryptedPublicResults.encryption = { mode: 'lit' };
     expectValidatorParity(encryptedPublicResults, false);
-  });
-
-  it('keeps anonymous group discovery aligned with canonical public and private modes', () => {
-    const publicProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    publicProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
-    publicProfile.encryption = { mode: 'none' };
-    publicProfile.storage.payloadAccessControl = { gate: 'none', encryption: 'none' };
-    publicProfile.results.visibility = 'public_full_if_storage_public';
-    publicProfile.export.scope = 'all_session';
-    const publicConfig = {
-      sessionModeProfile: publicProfile,
-      storageProfile: compileSessionModeProfile(publicProfile).storageProfile,
-      groupCreationPolicy: 'admin_only',
-    };
-    expect(sessionModeAllowsAnonymousWorkerGroupDiscovery(publicProfile)).toBe(true);
-    expect(workerConfigAllowsAnonymousGroupDiscovery(publicConfig)).toBe(true);
-
-    const privateProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
-    const privateConfig = {
-      sessionModeProfile: privateProfile,
-      storageProfile: compileSessionModeProfile(privateProfile).storageProfile,
-      groupCreationPolicy: 'participants',
-    };
-    expect(sessionModeAllowsAnonymousWorkerGroupDiscovery(privateProfile)).toBe(false);
-    expect(workerConfigAllowsAnonymousGroupDiscovery(privateConfig)).toBe(false);
   });
 
   it('rejects otherwise valid mutations that retain a named preset id', () => {

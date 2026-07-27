@@ -367,7 +367,6 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
               miniaturized={false}
               sessionSlug={routeSessionSlug || undefined}
               sessionConfig={routeSessionConfig}
-              workerGroupId={workerGroupId || undefined}
               allSessionsMode={allSessionsMode}
               isSBTCacheReady={host.state.isSBTCacheReady}
               sbtCacheRevision={host.state.sbtCacheRevision}

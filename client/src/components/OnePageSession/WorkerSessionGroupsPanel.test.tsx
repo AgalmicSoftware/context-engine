@@ -6,6 +6,7 @@ import { postSignedAdminWorkerRequest } from '../Admin/adminPageSignedWorkerRequ
 import WorkerSessionGroupsPanel from './WorkerSessionGroupsPanel';
 
 const mockMembershipPanel = jest.fn();
+const mockParticipantCreatePanel = jest.fn();
 
 jest.mock('../../utilities/worker/workerAuth', () => ({
   buildSignedAdminActionAuth: jest.fn(),
@@ -17,6 +18,10 @@ jest.mock('../Admin/adminPageSignedWorkerRequest', () => ({
 jest.mock('./WorkerGroupMembershipPanel', () => (props: unknown) => {
   mockMembershipPanel(props);
   return <div data-testid="membership-panel">Memberships</div>;
+});
+jest.mock('./WorkerParticipantGroupCreatePanel', () => (props: unknown) => {
+  mockParticipantCreatePanel(props);
+  return <div data-testid="participant-create-panel">Participant create</div>;
 });
 
 const mockGetWorkerSessionToken = getWorkerSessionToken as jest.MockedFunction<typeof getWorkerSessionToken>;
@@ -229,6 +234,37 @@ describe('WorkerSessionGroupsPanel', () => {
 
     await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalled());
     expect(screen.getByText('Only the configured worker admin can create groups.')).toBeInTheDocument();
+    expect(screen.queryByTestId('ce-admin-worker-groups')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('participant-create-panel')).not.toBeInTheDocument();
+  });
+
+  it('lets a non-admin participant create when the exact session policy enables it', async () => {
+    mockGetWorkerSessionToken.mockResolvedValue('participant-worker-token');
+    render(
+      <WorkerSessionGroupsPanel
+        account="0x00000000000000000000000000000000000000bb"
+        provider="wagmi"
+        networkChainId={11155420}
+        sessionConfig={{
+          ...sessionConfig,
+          sessionId: SESSION_ID,
+          sessionIdHex: undefined,
+          groupCreationPolicy: 'participants',
+        }}
+        sessionSlug="demo-sh"
+        showCreate={true}
+      />,
+    );
+
+    expect(await screen.findByTestId('participant-create-panel')).toBeInTheDocument();
+    expect(mockParticipantCreatePanel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: SESSION_ID,
+        sessionSlug: 'demo-sh',
+        workerToken: 'participant-worker-token',
+        workerUrl: 'https://demo-sh-worker.example',
+      }),
+    );
     expect(screen.queryByTestId('ce-admin-worker-groups')).not.toBeInTheDocument();
   });
 

@@ -18,6 +18,13 @@ import {
   type SessionModeResultsVisibility,
   type SessionModeSurface,
 } from '../../utilities/session/sessionModeProfile';
+import {
+  DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
+  normalizeGroupCreationPolicy,
+  GROUP_CREATION_POLICIES,
+  type GroupCreationPolicy,
+} from '../../utilities/session/groupCreationPolicy';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 export type SessionModeProfileSection = 'privacy' | 'worker' | 'publish';
 
@@ -26,6 +33,8 @@ export type SessionModeProfileSectionsProps = {
   registryChainId?: number | null;
   value?: unknown;
   onChange: (profile: SessionModeProfile, compiled: { storageProfile: AnyRecord }) => void;
+  groupCreationPolicy?: unknown;
+  onGroupCreationPolicyChange?: (policy: GroupCreationPolicy) => void;
 };
 
 const RESULT_VISIBILITY_OPTIONS: Array<{ value: SessionModeResultsVisibility; label: string; available?: boolean }> = [
@@ -99,11 +108,28 @@ const setWorkerEnvelopeCondition = (profile: SessionModeProfile, conditions?: Se
   else delete profile.encryption.accessConditions;
 };
 
+const hasSbtOnchainCondition = (profile: SessionModeProfile): boolean =>
+  [profile.encryption.accessConditions, profile.storage.payloadAccessControl?.accessConditions].some(
+    (document) =>
+      Array.isArray(document?.conditions) && document.conditions.some((condition) => condition.kind === 'sbt_onchain'),
+  );
+
+const supportsWizardPublicResults = (profile: SessionModeProfile): boolean =>
+  profile.storage.backend === 'arweave' && profile.encryption.mode === 'none';
+
+const coerceUnavailablePublicResults = (profile: SessionModeProfile): void => {
+  if (profile.results.visibility === 'public_full_if_storage_public' && !supportsWizardPublicResults(profile)) {
+    profile.results.visibility = 'participant_aggregate';
+  }
+};
+
 const SessionModeProfileSections = ({
   section,
   registryChainId = null,
   value = null,
   onChange,
+  groupCreationPolicy: groupCreationPolicyValue = null,
+  onGroupCreationPolicyChange,
 }: SessionModeProfileSectionsProps): React.ReactElement => {
   const profile = isProfile(value) ? value : null;
   const validation = useMemo(
@@ -135,6 +161,10 @@ const SessionModeProfileSections = ({
   }
 
   if (section === 'worker') {
+    const groupCreationPolicy = normalizeGroupCreationPolicy(
+      groupCreationPolicyValue,
+      DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
+    );
     return (
       <section className={styles.modeSection} aria-label="Participation channels">
         <div className={styles.modeSectionHeading}>
@@ -165,6 +195,25 @@ const SessionModeProfileSections = ({
           Agent Session Wrapped deploys an additional per-session Worker/Bridge. Telegram stays optional and is off by
           default.
         </p>
+        <FormRow label="Who can create groups?">
+          <div>
+            <SegmentedButtons
+              ariaLabel="Who can create groups?"
+              options={[
+                { value: GROUP_CREATION_POLICIES.ADMIN_ONLY, label: 'Admins only' },
+                { value: GROUP_CREATION_POLICIES.PARTICIPANTS, label: 'All participants' },
+              ]}
+              value={groupCreationPolicy}
+              onChange={(policy) => onGroupCreationPolicyChange?.(policy as GroupCreationPolicy)}
+              dataTestIdPrefix={E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY}
+            />
+            <p className={styles.helperText}>
+              {profile.authority.mode === 'worker_canonical'
+                ? 'Participant-created groups are open to session participants. Updating groups and managing membership remain admin-only.'
+                : 'This controls group creation in Context Engine. Public SBT factories remain callable directly on-chain, so “Admins only” cannot block independent contract deployments.'}
+            </p>
+          </div>
+        </FormRow>
         <ValidationIssues issues={sectionValidationIssues} />
       </section>
     );
@@ -248,8 +297,8 @@ const SessionModeProfileSections = ({
                         ? 'lit'
                         : 'none',
                 };
-                if (draft.results.visibility === 'public_full_if_storage_public') {
-                  draft.results.visibility = 'participant_aggregate';
+                if (draft.encryption.mode !== 'lit' && !hasSbtOnchainCondition(draft)) {
+                  draft.evm.registryChainId = null;
                 }
               } else {
                 draft.authority.mode = 'evm_registry_canonical';
@@ -260,6 +309,7 @@ const SessionModeProfileSections = ({
                   draft.export.scope = 'admin_raw';
                 }
               }
+              coerceUnavailablePublicResults(draft);
             })
           }
         />
@@ -291,6 +341,7 @@ const SessionModeProfileSections = ({
               if (mode === 'none' && draft.export.scope === 'encrypted_envelopes_only') {
                 draft.export.scope = 'admin_raw';
               }
+              coerceUnavailablePublicResults(draft);
             })
           }
           dataTestIdPrefix="ce-new-encryption"
@@ -367,7 +418,7 @@ const SessionModeProfileSections = ({
               value={option.value}
               disabled={
                 option.available === false ||
-                (option.value === 'public_full_if_storage_public' && profile.storage.backend === 'cloudflare')
+                (option.value === 'public_full_if_storage_public' && !supportsWizardPublicResults(profile))
               }
             >
               {option.label}

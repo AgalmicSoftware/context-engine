@@ -7,8 +7,10 @@ import { resolveSessionCapabilityProjection } from '../../utilities/session/sess
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { buildSignedAdminActionAuth, getWorkerSessionToken } from '../../utilities/worker/workerAuth';
+import { GROUP_CREATION_POLICIES, resolveGroupCreationPolicy } from '../../utilities/session/groupCreationPolicy';
 import type { PostSignedWorkerGroupRequest } from '../../domains/worker/workerGroupPorts';
 import WorkerGroupMembershipPanel from './WorkerGroupMembershipPanel';
+import WorkerParticipantGroupCreatePanel from './WorkerParticipantGroupCreatePanel';
 import styles from './OnePageSession.module.scss';
 
 type UnknownRecord = Record<string, unknown>;
@@ -82,6 +84,7 @@ const WorkerSessionGroupsPanel = ({
   const adminCapabilities = resolveAdminCapabilities({ account, sessionConfig: config });
   const canAttemptWorkerAdmin =
     adminCapabilities.canAdminWorker || (!adminCapabilities.workerAdminAddress && !!normalizedAccount);
+  const participantGroupCreationEnabled = resolveGroupCreationPolicy(config) === GROUP_CREATION_POLICIES.PARTICIPANTS;
   const chainId = projection.hasOnChainComponent && projection.chainId ? projection.chainId : 1;
 
   const authenticate = useCallback(async () => {
@@ -227,6 +230,16 @@ const WorkerSessionGroupsPanel = ({
             autoLoad={true}
             onGroupsChanged={() => setGroupsRevision((revision) => revision + 1)}
           />
+        ) : participantGroupCreationEnabled ? (
+          workerToken ? (
+            <WorkerParticipantGroupCreatePanel
+              sessionId={canonicalSessionId}
+              sessionSlug={canonicalSessionSlug}
+              workerToken={workerToken}
+              workerUrl={workerUrl}
+              onGroupsChanged={() => setGroupsRevision((revision) => revision + 1)}
+            />
+          ) : null
         ) : (
           <div className={styles.workerGroupNotice}>Only the configured worker admin can create groups.</div>
         )

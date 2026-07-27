@@ -7,6 +7,9 @@ import styles from './SBTsPage.module.scss';
 import sbtPageStyles from './SBTPage.module.scss';
 import SBTsList from './SBTsList';
 import CreateGroup from './CreateSBTGroup';
+import SbtCreateAdvancedExternalNotice, {
+  shouldShowAdvancedExternalSbtNotice,
+} from './SbtCreateAdvancedExternalNotice';
 import SBTPage from './SBTPage';
 import WorkerSessionGroupsPanel from '../OnePageSession/WorkerSessionGroupsPanel';
 import {
@@ -25,6 +28,8 @@ import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
 import { workerGroupNavigationPort } from '../../domains/worker/workerGroupNavigationPort';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
+import { resolveAdminCapabilities } from '../Admin/adminPageHelpers';
+import { GROUP_CREATION_POLICIES, resolveGroupCreationPolicy } from '../../utilities/session/groupCreationPolicy';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { isCryptoMode, sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
@@ -516,20 +521,30 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       };
     }
 
-    const useExplicitCreateConfig =
-      isCreateRoute && explicitConfigIsValidated && !!explicitConfigSlug && explicitConfigSlug === selectedCreateSlug;
+    const selectedRouteSlug = normalizeSessionSlug(effectiveUrlSlug || selectedCreateSlug);
+    const useExplicitSessionConfig =
+      explicitConfigIsValidated && !!explicitConfigSlug && explicitConfigSlug === selectedRouteSlug;
+    const exactExplicitGroup = useExplicitSessionConfig ? explicitConfig : null;
 
-    // Resolve by URL → explicit prop → Redux → referrer → default general
+    // An exact validated config supplied by the route is the freshest authority
+    // for that slug and must not be shadowed by a same-slug registry cache row.
+    // Otherwise resolve by URL → prop → Redux → referrer → default general.
     const groupFromUrl = effectiveUrlSlug ? getDisplaySessionConfig(effectiveUrlSlug) : null;
     const propSlugLike = this.props.sessionSlug || this.props.sessionConfig?.slug || '';
-    const groupFromProp = useExplicitCreateConfig
-      ? explicitConfig
+    const groupFromProp = exactExplicitGroup
+      ? exactExplicitGroup
       : propSlugLike
         ? getDisplaySessionConfig(propSlugLike)
         : null;
     const groupFromRedux = this.props.activeSessionSlug ? getDisplaySessionConfig(this.props.activeSessionSlug) : null;
     const groupFromRef = referrerSlug ? getDisplaySessionConfig(referrerSlug) : null;
-    const activeGroup = groupFromUrl || groupFromProp || groupFromRedux || groupFromRef || getDisplaySessionConfig('');
+    const activeGroup =
+      exactExplicitGroup ||
+      groupFromUrl ||
+      groupFromProp ||
+      groupFromRedux ||
+      groupFromRef ||
+      getDisplaySessionConfig('');
 
     const explicitSourceSlug = normalizeSessionSlug(
       effectiveUrlSlug || propSlugLike || this.props.activeSessionSlug || referrerSlug || '',
@@ -586,6 +601,32 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const effectiveSessionSlug = canonicalSlug; // may be '' (general)
     const allSessionsMode = urlHasNoSlug && !canonicalSlug; // plain /sbts with no redux/referrer slug => enumerate all groups
     const sessionCapabilities = resolveSessionCapabilityProjection(activeGroup);
+    const groupCreationPolicy = resolveGroupCreationPolicy(
+      activeGroup,
+      sessionCapabilities.isRegistryCanonical
+        ? GROUP_CREATION_POLICIES.PARTICIPANTS
+        : GROUP_CREATION_POLICIES.ADMIN_ONLY,
+    );
+    const sessionAdminCapabilities = resolveAdminCapabilities({ account, sessionConfig: activeGroup });
+    const canCreateForSession =
+      !activeGroup ||
+      (!sessionCapabilities.isWorkerCanonical && !sessionCapabilities.isRegistryCanonical) ||
+      groupCreationPolicy === GROUP_CREATION_POLICIES.PARTICIPANTS ||
+      sessionAdminCapabilities.canAdminRegistry ||
+      sessionAdminCapabilities.canAdminWorker;
+    const renderCreationDenied = () => (
+      <aside
+        className={styles.advancedExternalNotice}
+        role="alert"
+        data-testid={E2E_TESTIDS.SESSION_GROUP_CREATION_POLICY_DENIED}
+      >
+        <strong>Group creation is limited to session admins</strong>
+        <span>
+          This session’s Context Engine controls hide the creation form for other participants. Public SBT factories can
+          still be called independently on-chain.
+        </span>
+      </aside>
+    );
     if (isCreateRoute) {
       return (
         <div>
@@ -606,20 +647,10 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
                 {sessionConfigError} Return to the session before opening this optional standalone tool again.
               </span>
             </aside>
-          ) : sessionCapabilities.usesWorkerGroups ? (
-            <aside
-              className={styles.advancedExternalNotice}
-              data-testid={E2E_TESTIDS.SBT_CREATE_ADVANCED_EXTERNAL_NOTICE}
-              aria-label="Advanced external on-chain SBT creation"
-            >
-              <strong>Advanced/external on-chain SBT</strong>
-              <span>
-                This optional standalone tool deploys an SBT on the selected Network. It does not replace or modify this
-                session&apos;s Worker-native Groups.
-              </span>
-            </aside>
+          ) : shouldShowAdvancedExternalSbtNotice(activeGroup) ? (
+            <SbtCreateAdvancedExternalNotice />
           ) : null}
-          {!sessionConfigError ? (
+          {!sessionConfigError && canCreateForSession ? (
             <CreateGroupComponent
               account={account}
               loginComplete={loginComplete}
@@ -636,6 +667,8 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
               defaultSbtTags={this.props.defaultSbtTags}
               sbtCacheRevision={sbtCacheRevision}
             />
+          ) : !sessionConfigError ? (
+            renderCreationDenied()
           ) : null}
         </div>
       );
@@ -719,25 +752,22 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const showFeaturedColdStartSpinner = !hasFeaturedCards && (!isSBTCacheReady || featuredScanActive);
     const renderCreateGroupPanel = () => (
       <>
+        {shouldShowAdvancedExternalSbtNotice(activeGroup) ? <SbtCreateAdvancedExternalNotice /> : null}
         {canCreateForSession ? (
-          usesWorkerNativeCreate ? (
-            renderWorkerCreatePanel()
-          ) : (
-            <CreateGroupComponent
-              account={account}
-              loginComplete={loginComplete}
-              provider={provider}
-              litHooks={this.props.litHooks}
-              toggleLoginModal={toggleLoginModal}
-              expanded={effectiveShowCreateGroup}
-              network={network}
-              sessionSlug={effectiveSessionSlug}
-              sessionInfo={sessionInfo}
-              sessionName={sessionName}
-              defaultSbtTags={this.props.defaultSbtTags}
-              sbtCacheRevision={sbtCacheRevision}
-            />
-          )
+          <CreateGroupComponent
+            account={account}
+            loginComplete={loginComplete}
+            provider={provider}
+            litHooks={this.props.litHooks}
+            toggleLoginModal={toggleLoginModal}
+            expanded={effectiveShowCreateGroup}
+            network={network}
+            sessionSlug={effectiveSessionSlug}
+            sessionInfo={sessionInfo}
+            sessionName={sessionName}
+            defaultSbtTags={this.props.defaultSbtTags}
+            sbtCacheRevision={sbtCacheRevision}
+          />
         ) : (
           renderCreationDenied()
         )}
@@ -850,13 +880,15 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
                 >
                   <FontAwesomeIcon icon={faExpand} /> View All
                 </button>
-                <button
-                  className={styles.showResultsButton}
-                  onClick={this.toggleCreateGroup}
-                  data-testid={E2E_TESTIDS.SBTS_CREATE_TOGGLE}
-                >
-                  <FontAwesomeIcon icon={faPlus} /> {effectiveShowCreateGroup ? 'Exit' : 'Create'}
-                </button>
+                {canCreateForSession ? (
+                  <button
+                    className={styles.showResultsButton}
+                    onClick={this.toggleCreateGroup}
+                    data-testid={E2E_TESTIDS.SBTS_CREATE_TOGGLE}
+                  >
+                    <FontAwesomeIcon icon={faPlus} /> {effectiveShowCreateGroup ? 'Exit' : 'Create'}
+                  </button>
+                ) : null}
               </div>
             )}
           </div>
@@ -884,7 +916,6 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
             /* group-aware routing */
             sessionSlug={effectiveSessionSlug}
             sessionConfig={activeGroup}
-            selectedGroupId={routeWorkerGroupId}
             allSessionsMode={allSessionsMode}
             ensureLightSbtDiscovery={this.props.ensureLightSbtDiscovery}
             ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}
