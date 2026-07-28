@@ -188,7 +188,6 @@ const manualChunkGroups = [
   {
     name: 'vendor-ui',
     patterns: [
-      '/node_modules/@dnd-kit/',
       '/node_modules/@fortawesome/',
       '/node_modules/@popperjs/',
       '/node_modules/@vanilla-extract/',

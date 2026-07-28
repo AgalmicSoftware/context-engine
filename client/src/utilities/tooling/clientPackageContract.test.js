@@ -196,6 +196,7 @@ describe('client package modernization contract', () => {
     expect(viteConfig).not.toContain("'/node_modules/poseidon-lite/constants/1.js'");
     expect(viteConfig).not.toContain("'/node_modules/poseidon-lite/constants/4.js'");
     expect(viteConfig).not.toContain("'/node_modules/poseidon-lite/constants/16.js'");
+    expect(viteConfig).not.toContain("'/node_modules/@dnd-kit/'");
     expect(viteConfig).not.toContain('vendor-lit');
     expect(viteConfig).toContain("'/node_modules/hash.js/'");
     expect(viteConfig).toContain("'/node_modules/inherits/'");
