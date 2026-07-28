@@ -167,7 +167,9 @@ describe('PostViz presentation variants', () => {
     );
 
     const multichoice = screen.getByRole('group', { name: 'Which area would I delegate first?' });
+    const freeform = screen.getByRole('group', { name: 'What is my personal AI fire alarm?' });
     expect(multichoice).toHaveClass('responseTypeMultiSelectPanel');
+    expect(freeform).toHaveClass('responseTypeFreeformPanel');
     expect(within(multichoice).getByText('event filtering')).toBeInTheDocument();
     expect(within(multichoice).getByLabelText('event filtering: 3')).toBeInTheDocument();
   });

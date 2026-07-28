@@ -443,6 +443,7 @@ export const ResponseTypeGridPresentation = ({
     <div className={`${styles.responseTypeGrid} ${precision ? styles.responseTypePrecisionGrid : ''}`}>
       {panels.map((panel) => {
         const isMultiSelect = panel.kind.toLowerCase() === 'multi-select';
+        const isFreeform = panel.kind.toLowerCase() === 'freeform';
         const maxValue = Math.max(...panel.counts.map((count) => count.value), 1);
         const orderedCounts = isMultiSelect
           ? [...panel.counts].sort((a, b) => b.value - a.value || a.label.localeCompare(b.label))
@@ -460,7 +461,9 @@ export const ResponseTypeGridPresentation = ({
             key={`${panel.kind}-${panel.title}`}
             className={`${styles.responseTypePanel} ${
               isMultiSelect ? styles.responseTypeMultiSelectPanel : ''
-            } ${precision ? styles.responseTypePrecisionPanel : ''}`}
+            } ${isFreeform ? styles.responseTypeFreeformPanel : ''} ${
+              precision ? styles.responseTypePrecisionPanel : ''
+            }`}
             role="group"
             aria-label={panel.title}
           >

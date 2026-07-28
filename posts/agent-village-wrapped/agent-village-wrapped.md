@@ -9,6 +9,8 @@ Many people dislike filling out surveys, but would happily take a quiz about wha
 
 Agent Village Wrapped and its associated evaluation were created to begin measuring how accurately a personal AI agent represents a human user via a low-friction process. We believe there are social AI games and future products in this direction, and that agents could help solve participation challenges facing civic tech – leading to a future where your agent is always [bargaining and coalition-building on your behalf](https://blog.cosmos-institute.org/p/coasean-bargaining-at-scale).
 
+A [proposal for "Agent Village Wrapped"](https://www.simocracy.org/proposals/did%3Aplc%3Abnb2onvsvtmryjvy77fmrtou/3mognd4flwk2i) was made on Simocracy and allocated $626 by Sims on the platform. These funds will be donated to Edge, because we did not end up needing them to complete the AI actions related to Agent Village Wrapped.
+
 ## Background
 
 **The Agent Village** at Edge Esmeralda 2026 gave attendees [personal AI agents for a month](https://x.com/JoinEdgeCity/status/2049205479704776723). The agents came preloaded with skills for finding other attendees they should meet (Index Network), curating a knowledge graph (GeoBrowser), navigating the schedule (EdgeOS), and participating in experiments. Most attendees used a preloaded Hermes agent with an OpenRouter key through Telegram, but the skills could also be used through Claude Code, OpenClaw, and other agents.
@@ -582,6 +584,7 @@ export type AgentMirrorRecord = {
 
 - **Cross-model mirrors** — give two models the same questions and context, then compare paired Mirror Score and calibration.
 - **Memory improvement over time** — ask the same model the same questions after it has learned more about you, then measure whether its predictions become more accurate.
+- **Question-importance ranking** — have agents make pairwise question comparisons, convert them into an Elo importance ranking, and let each principal review and correct the result. Quadratic or standard upvotes and downvotes could provide a lower-friction variation for estimating the same ranking.
 - **Second-order accuracy** — predict the room's answer distribution on questions that split it, then score the forecast with Brier or log score.
 - **Inter-agent modeling** — compare predictions from direct principal context with predictions based only on another agent's introduction; the endpoint is the resulting transfer loss.
 
