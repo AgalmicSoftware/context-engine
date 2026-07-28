@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - main
+      - 'release-staging*'
   pull_request:
     branches:
       - master
@@ -79,13 +80,34 @@ jobs:
           --dist dist
           --output "${{ runner.temp }}/worker-bundle-candidate"
 
-      - name: Upload tested Worker bundle candidate
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: worker-bundle-candidate-${{ github.sha }}
-          path: ${{ runner.temp }}/worker-bundle-candidate
-          if-no-files-found: error
-          retention-days: 1
+      - name: Typecheck client
+        run: npm run typecheck:client
+
+      - name: Verify release version surfaces
+        run: npm run verify:release-version
+
+      - name: Verify release-staging version advancement
+        if: ${{ startsWith(github.ref_name, 'release-staging') || startsWith(github.head_ref, 'release-staging') }}
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          node scripts/release-version.mjs verify-ref --candidate-ref HEAD --baseline-ref origin/main
+
+      - name: Verify public release surface
+        run: npm run verify:public-release-surface
+      - name: Verify public asset ownership
+        run: npm run verify:public-assets
+
+      - name: Verify public text exposure
+        run: npm run verify:public-text
+
+      - name: Build worker bundles
+        run: npm run worker:bundle
+
+      - name: Verify worker bundle sync
+        run: npm run verify:worker-bundle
+
+      - name: Build client
+        run: npm --prefix client run build
 
   contracts:
     runs-on: ubuntu-latest

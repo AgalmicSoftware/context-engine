@@ -53,6 +53,8 @@ if ! should_protect_remote; then
 fi
 
 blocked_refs=()
+release_candidate_shas=()
+release_baseline_shas=()
 
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -n "${local_ref:-}" ] || continue
@@ -65,6 +67,13 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     blocked_refs+=("$remote_ref")
     continue
   fi
+
+  case "$remote_ref" in
+    refs/heads/release-staging*)
+      release_candidate_shas+=("$local_sha")
+      release_baseline_shas+=("$remote_sha")
+      ;;
+  esac
 
   case "$local_ref" in
     refs/heads/*|refs/tags/*)
@@ -85,5 +94,30 @@ if [ "${#blocked_refs[@]}" -gt 0 ]; then
   printf 'Rejected ref: %s\n' "${blocked_refs[0]}" >&2
   exit 1
 fi
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+for index in "${!release_candidate_shas[@]}"; do
+  candidate_sha="${release_candidate_shas[$index]}"
+  baseline_sha="${release_baseline_shas[$index]}"
+  verify_args=(
+    verify-ref
+    --repo-root "$repo_root"
+    --candidate-ref "$candidate_sha"
+  )
+
+  if [ "$baseline_sha" != "$ZERO_OID" ]; then
+    verify_args+=(--baseline-ref "$baseline_sha")
+  fi
+
+  main_ref="refs/remotes/${REMOTE_NAME}/main"
+  if git rev-parse --verify --quiet "${main_ref}^{commit}" >/dev/null; then
+    verify_args+=(--baseline-ref "$main_ref")
+  fi
+
+  if ! node "$repo_root/scripts/release-version.mjs" "${verify_args[@]}" >&2; then
+    printf 'Blocked release-staging push: public application version verification failed.\n' >&2
+    exit 1
+  fi
+done
 
 exit 0

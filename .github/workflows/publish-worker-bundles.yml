@@ -47,18 +47,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SELECTED_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.run_id || github.event.workflow_run.id }}
         run: |
-          set -euo pipefail
-          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${SELECTED_RUN_ID}" > "${RUNNER_TEMP}/ci-run.json"
-          node scripts/worker-release-artifacts.mjs validate-run \
-            --run-json "${RUNNER_TEMP}/ci-run.json" \
-            --repository "$GITHUB_REPOSITORY" \
-            --github-output "$GITHUB_OUTPUT"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          APP_VERSION="$(node -p 'require("./package.json").version')"
+          RELEASE_STAMP="$(date -u +'%Y-%m-%d %H:%M UTC')"
+          TAG_NAME="worker-bundles-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
+          RELEASE_NAME="Context Engine ${APP_VERSION} worker bundles (${SHORT_SHA})"
+          {
+            echo "tag_name=${TAG_NAME}"
+            echo "release_name=${RELEASE_NAME}"
+            echo "release_stamp=${RELEASE_STAMP}"
+            echo "app_version=${APP_VERSION}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Checkout exact successful CI source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ steps.run.outputs.sourceCommit }}
-          fetch-depth: 2
+          tag_name: ${{ steps.meta.outputs.tag_name }}
+          name: ${{ steps.meta.outputs.release_name }}
+          make_latest: true
+          body: |
+            Automated worker bundle release for Context Engine `${{ steps.meta.outputs.app_version }}` at `${{ github.sha }}` on `${{ github.ref_name }}`.
 
       - name: Download exact immutable CI artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4

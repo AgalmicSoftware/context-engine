@@ -29,6 +29,11 @@ Options:
   --sanitize-private-replay-messages
                Rewrite known private tokens in replayed commit messages instead
                of refusing otherwise-public commits
+  --release-version <MAJOR.MINOR.PATCH>
+               Use an explicit operator-selected public application version
+               instead of the automatic next patch
+  --acknowledge-patch
+               Keep a patch bump after reviewing a major/minor suggestion
   --force-with-lease
                Replace an existing local target branch safely
   -h, --help   Show this help text
@@ -106,10 +111,18 @@ AUTO_PUSH=0
 EXPLICIT_FORCE_WITH_LEASE=0
 ALLOW_DIVERGED_SOURCE=0
 SANITIZE_PRIVATE_REPLAY_MESSAGES=0
+EXPLICIT_RELEASE_VERSION=""
+ACKNOWLEDGE_PATCH=0
 REPLAYED_COUNT=0
 SKIPPED_COUNT=0
 REMOTE_BRANCH_EXISTS=0
 REMOTE_BRANCH_SHA=""
+RELEASE_VERSION=""
+RELEASE_IMPACT=""
+RELEASE_CHANGED_PATHS_FILE=""
+RELEASE_SUBJECTS_FILE=""
+RELEASE_PLAN_FILE=""
+RELEASE_VERSIONING_ENABLED=0
 
 cleanup() {
   if [ "${SYNC_PUBLIC_HISTORY_KEEP_TMP:-0}" = "1" ]; then
@@ -689,6 +702,87 @@ verify_public_node_tests() {
   run_public_npm_script "test:node" "Node tests"
 }
 
+collect_source_release_evidence() {
+  local commit_sha
+  local changed_path
+
+  : > "$RELEASE_CHANGED_PATHS_FILE"
+  : > "$RELEASE_SUBJECTS_FILE"
+
+  for commit_sha in "${COMMITS[@]}"; do
+    git -C "$REPO_ROOT" log -1 --format='%s' "$commit_sha" >> "$RELEASE_SUBJECTS_FILE"
+    while IFS= read -r changed_path; do
+      [ -n "$changed_path" ] || continue
+      if ! path_matches_strip_pattern "$changed_path" "$commit_sha"; then
+        printf '%s\n' "$changed_path" >> "$RELEASE_CHANGED_PATHS_FILE"
+      fi
+    done < <(git -C "$REPO_ROOT" diff-tree --no-commit-id --name-only -r --root "$commit_sha")
+  done
+
+  sort -u "$RELEASE_CHANGED_PATHS_FILE" -o "$RELEASE_CHANGED_PATHS_FILE"
+}
+
+collect_replayed_release_evidence() {
+  git -C "$TEMP_CLONE" diff --name-only "$TARGET_BASE..$TARGET_BRANCH" \
+    | sort -u > "$RELEASE_CHANGED_PATHS_FILE"
+  git -C "$TEMP_CLONE" log --format='%s' "$TARGET_BASE..$TARGET_BRANCH" \
+    > "$RELEASE_SUBJECTS_FILE"
+}
+
+plan_release_candidate_version() {
+  local dry_run="$1"
+  local args=(
+    plan
+    --repo-root "$TEMP_CLONE"
+    --main-ref origin/main
+    --changed-paths-file "$RELEASE_CHANGED_PATHS_FILE"
+    --subjects-file "$RELEASE_SUBJECTS_FILE"
+    --result-file "$RELEASE_PLAN_FILE"
+  )
+
+  if [ "$REMOTE_BRANCH_EXISTS" -eq 1 ]; then
+    args+=(--staging-ref "origin/$TARGET_BRANCH")
+  fi
+  if [ -n "$EXPLICIT_RELEASE_VERSION" ]; then
+    args+=(--release-version "$EXPLICIT_RELEASE_VERSION")
+  fi
+  if [ "$ACKNOWLEDGE_PATCH" -eq 1 ]; then
+    args+=(--acknowledge-patch)
+  fi
+  if [ "$dry_run" -eq 1 ]; then
+    args+=(--dry-run)
+  fi
+
+  RELEASE_VERSION=$(node "$REPO_ROOT/scripts/release-version.mjs" "${args[@]}")
+  RELEASE_IMPACT=$(node -p "require(process.argv[1]).impact.level" "$RELEASE_PLAN_FILE")
+}
+
+stamp_release_candidate_version() {
+  local message_file="$TMP_ROOT/release-version-message.txt"
+
+  node "$REPO_ROOT/scripts/release-version.mjs" \
+    stamp \
+    --root "$TEMP_CLONE" \
+    --version "$RELEASE_VERSION" >&2
+
+  git -C "$TEMP_CLONE" add \
+    package.json \
+    package-lock.json \
+    client/package.json \
+    client/package-lock.json
+
+  {
+    printf 'chore: bump public version to %s\n' "$RELEASE_VERSION"
+    if [ "$ACKNOWLEDGE_PATCH" -eq 1 ] && [ "$RELEASE_IMPACT" != "patch" ]; then
+      printf '\nRelease impact suggested %s; operator acknowledged a patch release.\n' "$RELEASE_IMPACT"
+    fi
+  } > "$message_file"
+
+  git -C "$TEMP_CLONE" \
+    -c "core.hooksPath=$REPLAY_HOOKS_DIR" \
+    commit --quiet --no-gpg-sign --file "$message_file"
+}
+
 ensure_private_branch_guard() {
   if [ ! -f "$PRIVATE_BRANCH_GUARD_INSTALLER" ]; then
     fail "Private branch guard installer was not found: $PRIVATE_BRANCH_GUARD_INSTALLER" 1
@@ -733,6 +827,16 @@ while [ $# -gt 0 ]; do
     --sanitize-private-replay-messages)
       SANITIZE_PRIVATE_REPLAY_MESSAGES=1
       ;;
+    --release-version)
+      shift
+      if [ $# -eq 0 ]; then
+        fail "--release-version requires MAJOR.MINOR.PATCH." 1
+      fi
+      EXPLICIT_RELEASE_VERSION="$1"
+      ;;
+    --acknowledge-patch)
+      ACKNOWLEDGE_PATCH=1
+      ;;
     --force-with-lease)
       EXPLICIT_FORCE_WITH_LEASE=1
       ;;
@@ -752,6 +856,12 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+
+case "$TARGET_BRANCH" in
+  release-staging*)
+    RELEASE_VERSIONING_ENABLED=1
+    ;;
+esac
 
 if ! git -C "$REPO_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
   fail "Repository root is not a git repository: $REPO_ROOT" 1
@@ -878,6 +988,9 @@ fi
 
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/sync-public-history.XXXXXX")
 TEMP_CLONE="$TMP_ROOT/replay"
+RELEASE_CHANGED_PATHS_FILE="$TMP_ROOT/release-changed-paths.txt"
+RELEASE_SUBJECTS_FILE="$TMP_ROOT/release-subjects.txt"
+RELEASE_PLAN_FILE="$TMP_ROOT/release-plan.json"
 REPLAY_HOOKS_DIR="$TMP_ROOT/replay-hooks"
 mkdir -p "$REPLAY_HOOKS_DIR"
 
@@ -898,6 +1011,8 @@ if git -C "$TEMP_CLONE" ls-remote --exit-code --heads origin "$TARGET_BRANCH" >/
   else
     log_info "Remote branch origin/$TARGET_BRANCH already exists and will be refreshed automatically with --force-with-lease."
   fi
+  git -C "$TEMP_CLONE" fetch --quiet origin \
+    "refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
 fi
 
 git -C "$TEMP_CLONE" checkout --quiet -B "$TARGET_BRANCH" "$TARGET_BASE"
@@ -918,6 +1033,11 @@ if [ "$DRY_RUN" -eq 1 ]; then
     fi
   done
 
+  if [ "$RELEASE_VERSIONING_ENABLED" -eq 1 ]; then
+    collect_source_release_evidence
+    plan_release_candidate_version 1
+  fi
+
   printf 'Dry run complete.\n'
   printf 'Would replay: %s\n' "$REPLAYED_COUNT"
   printf 'Would skip: %s\n' "$SKIPPED_COUNT"
@@ -925,6 +1045,10 @@ if [ "$DRY_RUN" -eq 1 ]; then
   printf 'Source base: %s\n' "$SOURCE_BASE"
   printf 'Target base: %s\n' "$TARGET_BASE"
   printf 'Branch name: %s\n' "$TARGET_BRANCH"
+  if [ "$RELEASE_VERSIONING_ENABLED" -eq 1 ]; then
+    printf 'Release impact suggestion: %s\n' "$RELEASE_IMPACT"
+    printf 'Proposed release version: %s\n' "$RELEASE_VERSION"
+  fi
   exit 0
 fi
 
@@ -984,6 +1108,12 @@ for commit_sha in "${COMMITS[@]}"; do
   replayed_head=$(git -C "$TEMP_CLONE" rev-parse HEAD)
   log_info "Replayed $commit_sha -> $replayed_head | $subject"
 done
+
+if [ "$RELEASE_VERSIONING_ENABLED" -eq 1 ]; then
+  collect_replayed_release_evidence
+  plan_release_candidate_version 0
+  stamp_release_candidate_version
+fi
 
 if strip_findings=$(verify_strip_patterns_absent); then
   :
@@ -1048,6 +1178,10 @@ printf 'Target base: %s\n' "$TARGET_BASE"
 printf 'Branch name: %s\n' "$TARGET_BRANCH"
 printf 'Replayed commits: %s\n' "$REPLAYED_COUNT"
 printf 'Skipped commits: %s\n' "$SKIPPED_COUNT"
+if [ "$RELEASE_VERSIONING_ENABLED" -eq 1 ]; then
+  printf 'Release impact suggestion: %s\n' "$RELEASE_IMPACT"
+  printf 'Release version: %s\n' "$RELEASE_VERSION"
+fi
 printf 'Temp dir: %s\n' "$TMP_ROOT"
 if [ "$AUTO_PUSH" -eq 1 ]; then
   printf 'Pushed: yes\n'
