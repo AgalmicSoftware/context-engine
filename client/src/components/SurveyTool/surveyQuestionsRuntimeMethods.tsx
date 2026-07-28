@@ -1399,13 +1399,13 @@ export const createSurveyQuestionsRuntimeMethods = (
     inst._hasMounted = true;
     const loadHasher: SurveyQuestionsLegacyValue = async () => {
       try {
-        const { poseidon }: SurveyQuestionsLegacyValue = await import('poseidon-lite');
-        if (typeof poseidon === 'function' && inst._isMounted) {
-          setState(buildHasherState(poseidon));
-          surveyLog.log('✅ ZK-Compatible Poseidon Hasher Loaded (poseidon-lite)');
+        const poseidonHasher = await loadPoseidonHasher();
+        if (inst._isMounted) {
+          setState(buildHasherState(poseidonHasher));
+          surveyLog.log('✅ ZK-Compatible Poseidon Hasher Loaded (poseidon-lite arities 2/3)');
         }
       } catch (e: any) {
-        surveyLog.warn('⚠️ Failed to load Real Poseidon. Falling back to Keccak (Non-ZK).', e);
+        surveyLog.warn('⚠️ Poseidon commitments unavailable; Keccak commitments remain enabled.', e);
       }
     };
     loadHasher();

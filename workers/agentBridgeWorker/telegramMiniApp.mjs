@@ -23,6 +23,7 @@ import {
 } from './onChainResponses.mjs';
 import {
   buildOpaqueActionId,
+  createRandomTelegramStartAction,
   createTelegramCallbackAction,
   parseOpaqueActionId,
 } from './opaqueActions.mjs';
@@ -109,7 +110,6 @@ import {
   shortQuestionId,
   sessionUsesWorkerBackedQuestions,
   summarizeQuestionResults,
-  telegramGroupApprovalGuidance,
   telegramVisibleSessions,
   normalizeGeneratedQuestionCandidates,
   bridgeOpenAiApiKey,
@@ -160,6 +160,7 @@ const MINI_APP_RESULT_GROUP_COUNT = 2;
 const MINI_APP_LOADING_VISUAL_SPINNER = 'spinner';
 const MINI_APP_LOADING_VISUAL_GIF = 'gif';
 const MINI_APP_LAUNCH_RECOVERY_MESSAGE = 'This Mini App launch expired or Telegram reopened an old view. Close this screen, open the Context Engine bot, and send /start to get a fresh Mini App button.';
+const MINI_APP_GROUP_APPROVAL_LINK_TTL_SECONDS = 7 * 24 * 60 * 60;
 const MINI_APP_RESULTS_EXPOSURE_FIELDS = Object.freeze({
   published_questions: 'publishedQuestionsEnabled',
   aggregate_results: 'aggregateResultsEnabled',
@@ -597,7 +598,7 @@ async function buildMiniAppAdminState({
       { action: 'export_access', label: 'Manage permissions' },
       { action: 'results_settings', label: 'Results settings' },
       { action: 'question_queue', label: 'Question queue' },
-      { action: 'group_link', label: 'Approve group' },
+      { action: 'group_link', label: 'Add group link' },
     ],
   };
 }
@@ -3732,6 +3733,14 @@ function miniAppResultsExposureState(session = {}) {
   };
 }
 
+function telegramAddBotToGroupUrl(env = {}, payload = '') {
+  const username = safeString(env.TELEGRAM_BOT_USERNAME).replace(/^@+/, '');
+  const token = safeString(payload);
+  return username && token
+    ? `https://t.me/${username}?startgroup=${encodeURIComponent(token)}`
+    : '';
+}
+
 function miniAppLaunchRecovery(env = {}) {
   const username = safeString(env.TELEGRAM_BOT_USERNAME).replace(/^@+/, '');
   return {
@@ -4009,11 +4018,38 @@ async function handleAdminGroupLinkRequest({
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
   const context = await resolveMiniAppAdminContext({ request, env, body, requireManage: true });
   if (!context.ok) return json({ ok: false, error: context.error || 'admin_access_denied' }, { status: context.status || 403 });
-  const approval = telegramGroupApprovalGuidance(context.session.sessionSlug);
+  if (request.method !== 'POST') {
+    return json({
+      ok: true,
+      sessionSlug: context.session.sessionSlug,
+      link: '',
+      botCommands: miniAppAdminBotCommands(context.session.sessionSlug),
+    });
+  }
+  const expiresAt = new Date(Date.now() + MINI_APP_GROUP_APPROVAL_LINK_TTL_SECONDS * 1000).toISOString();
+  const start = createRandomTelegramStartAction({
+    action: TELEGRAM_BRIDGE_ACTIONS.APPROVE_TELEGRAM_GROUP,
+    lane: TELEGRAM_CHAT_LANES.GROUP_LOBBY,
+    serverContextRef: {
+      sessionSlug: context.session.sessionSlug,
+      approvedByTelegramUserId: context.auth.user?.telegramUserId,
+      approvedByAccountAddress: context.manager.accountAddress,
+    },
+    createdAt: new Date().toISOString(),
+    expiresAt,
+  });
+  await persistActionRecord(env, start.deepLinkPayload, {
+    ...start.record,
+    deepLinkPayload: start.deepLinkPayload,
+    oneUse: true,
+  }, { ttlSeconds: MINI_APP_GROUP_APPROVAL_LINK_TTL_SECONDS });
+  const link = telegramAddBotToGroupUrl(env, start.deepLinkPayload);
+  if (!link) return json({ ok: false, error: 'telegram_bot_username_missing' }, { status: 400 });
   return json({
     ok: true,
     sessionSlug: context.session.sessionSlug,
-    ...approval,
+    link,
+    expiresAt,
     botCommands: miniAppAdminBotCommands(context.session.sessionSlug),
   });
 }

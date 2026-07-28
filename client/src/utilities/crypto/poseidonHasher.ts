@@ -31,7 +31,10 @@ export const loadPoseidonHasher = async ({
   loadPoseidon2 = () => import('poseidon-lite/poseidon2'),
   loadPoseidon3 = () => import('poseidon-lite/poseidon3'),
 }: PoseidonLoaders = {}): Promise<PoseidonHasher> => {
-  const [poseidon2Module, poseidon3Module] = await Promise.all([loadPoseidon2(), loadPoseidon3()]);
+  const [poseidon2Module, poseidon3Module] = await Promise.all([
+    loadPoseidon2(),
+    loadPoseidon3(),
+  ]);
 
   return createPoseidonHasher({
     poseidon2: poseidon2Module.poseidon2 as PoseidonFunction,

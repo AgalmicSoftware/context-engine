@@ -736,7 +736,7 @@ test('Telegram group access is closed by default until an admin or open-access p
   assert.equal(await openEnv.AGENT_ACTION_KV.get('telegram:group-approval:alpha:-100123'), null);
 });
 
-test('group approval link commands return verified in-group guidance without minting bearer actions', async () => {
+test('admin-generated group approval link approves the first Telegram group that uses it', async () => {
   const now = '2026-05-08T12:00:00.000Z';
   const accountAddress = await privateManagedAccountAddress(baseEnv(), now);
   const env = baseEnv({
@@ -752,43 +752,46 @@ test('group approval link commands return verified in-group guidance without min
       }],
     }),
   });
-  const legacyPayload = 'cetg_1234567890abcdef';
-  await env.AGENT_ACTION_KV.put(`telegram:action:${legacyPayload}`, JSON.stringify({
-    type: 'agent_bridge_opaque_action',
-    actionId: legacyPayload,
-    action: 'approve_telegram_group',
-    lane: 'group_lobby',
-    serverContextRef: {
-      sessionSlug: 'alpha',
-      approvedByTelegramUserId: '42',
-      approvedByAccountAddress: accountAddress,
-    },
-    createdAt: now,
-  }));
-  const putCountBefore = env.AGENT_ACTION_KV.putCalls.length;
-  const guidance = await buildTelegramCommandResponse({
+  const beforeApproval = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now,
+  });
+  const link = await buildTelegramCommandResponse({
     update: privateMessage('/group_link alpha'),
     env,
     now,
   });
-  const legacyAttempt = await buildTelegramCommandResponse({
-    update: groupMessage(`/start ${legacyPayload}`),
+  const invite = flattenButtons(link.response.replyMarkup).find((button) => button.text === 'Add Bot To Group');
+  const payload = new URL(invite.url).searchParams.get('startgroup');
+  const approved = await buildTelegramCommandResponse({
+    update: groupMessage(`/start ${payload}`),
     env,
     now: '2026-05-08T12:00:01.000Z',
   });
+  const approvalRecord = JSON.parse(await env.AGENT_ACTION_KV.get('telegram:group-approval:alpha:-100123'));
+  const afterApproval = await buildTelegramCommandResponse({
+    update: groupMessage('/sessions'),
+    env,
+    now: '2026-05-08T12:00:02.000Z',
+  });
+  const reusedElsewhere = await buildTelegramCommandResponse({
+    update: groupMessageFrom(`/start ${payload}`, { chatId: -100999, title: 'Other Lobby' }),
+    env,
+    now: '2026-05-08T12:00:03.000Z',
+  });
 
-  assert.equal(guidance.screen, 'telegram_group_approval_guidance');
-  assert.match(guidance.response.text, /does not create authorization-bearing group links/);
-  assert.match(guidance.response.text, /\/join alpha/);
-  assert.deepEqual(flattenButtons(guidance.response.replyMarkup), []);
-  assert.equal(JSON.stringify(guidance).includes('startgroup='), false);
-  assert.equal(JSON.stringify(guidance).includes('cetg_'), false);
-  assert.equal(legacyAttempt.screen, 'telegram_group_approval_link_disabled');
-  assert.match(legacyAttempt.response.text, /cannot authorize a Telegram group/);
-  assert.match(legacyAttempt.response.text, /\/join alpha/);
-  assert.equal(JSON.stringify(legacyAttempt).includes(legacyPayload), false);
-  assert.equal(await env.AGENT_ACTION_KV.get('telegram:group-approval:alpha:-100123'), null);
-  assert.equal(env.AGENT_ACTION_KV.putCalls.length, putCountBefore);
+  assert.equal(beforeApproval.response.text.includes('- alpha (Alpha Session)'), false);
+  assert.equal(link.screen, 'telegram_group_approval_link');
+  assert.match(invite.url, /^https:\/\/t\.me\/ce_demo_bot\?startgroup=cetg_[a-z0-9]{10,58}$/);
+  assert.equal(payload.length <= 64, true);
+  assert.equal(approved.screen, 'telegram_group_approved');
+  assert.match(approved.response.text, /Group approved for Alpha Session/);
+  assert.equal(approvalRecord.chatId, '-100123');
+  assert.equal(approvalRecord.sessionSlug, 'alpha');
+  assert.match(afterApproval.response.text, /- alpha \(Alpha Session\)/);
+  assert.equal(reusedElsewhere.screen, 'telegram_group_approval_token_used');
+  assert.equal((await env.AGENT_ACTION_KV.get('telegram:group-approval:alpha:-100999')), null);
 });
 
 test('admin can revoke a Telegram group approval and close access again', async () => {
@@ -2723,8 +2726,8 @@ test('/start and /me show admin actions only to the configured export admin', as
     'Export Access',
     'Results Settings',
     'Question Queue',
+    'Add Bot To Group Link',
   ]);
-  assert.match(adminView.response.text, /run \/join alpha in that group as a configured session admin/);
   assert.equal(settingsView.screen, 'results_settings');
   assert.match(settingsView.response.text, /Anonymized groups: off/);
   assert.equal(toggled.screen, 'results_settings');

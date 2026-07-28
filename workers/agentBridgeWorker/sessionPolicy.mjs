@@ -16,20 +16,6 @@ function safeString(value) {
   return String(value || '').trim();
 }
 
-function normalizeCanonicalSessionId(value) {
-  const normalized = safeString(value).toLowerCase().replace(/^0x/, '').replace(/-/g, '');
-  return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized)
-    ? `0x${normalized}`
-    : '';
-}
-
-function resolveCanonicalSessionId(session = {}) {
-  const rawValues = [session.sessionId, session.sessionIdHex].filter((value) => safeString(value));
-  const normalized = rawValues.map(normalizeCanonicalSessionId);
-  const unique = new Set(normalized.filter(Boolean));
-  return normalized.some((value) => !value) || unique.size !== 1 ? '' : [...unique][0];
-}
-
 function normalizeBool(value = false) {
   if (value === true) return true;
   const normalized = safeString(value).toLowerCase();
@@ -310,15 +296,12 @@ export function normalizeSessionPolicy(input = {}, {
     const profileTelegramEnabled = sessionModeProfileTelegramEnabled(session);
     const profileTelegramFirst = sessionModeProfileTelegramFirst(session);
     const profileSurfaces = sessionModeProfileSurfaces(session);
-    const profileAuthority = sessionModeProfileAuthority(session);
-    const workerCanonical = safeString(profileAuthority?.mode).toLowerCase() === 'worker_canonical';
     const telegramBridgeEnabled = profileTelegramEnabled === null
       ? session.telegramBridgeEnabled !== false
       : profileTelegramEnabled;
     return {
     sessionMode: safeString(session.sessionMode || session.mode || session.telegramMode || session.telegram?.mode).toLowerCase(),
     sessionSlug: safeString(session.sessionSlug || session.slug || session.name).toLowerCase(),
-    sessionIdHex: resolveCanonicalSessionId(session) || null,
     sessionName: safeString(session.sessionName || session.name || session.slug),
     createdAt: safeString(
       session.createdAt ||
@@ -469,15 +452,11 @@ export function normalizeSessionPolicy(input = {}, {
       session.corsWorkerUrl ||
       session.ceSessionWorkerBaseUrl ||
       session.CE_SESSION_WORKER_BASE_URL ||
-      (workerCanonical
-        ? ''
-        : (
-          input.sessionWorkerUrl ||
-          input.workerUrl ||
-          input.corsWorkerUrl ||
-          input.ceSessionWorkerBaseUrl ||
-          input.CE_SESSION_WORKER_BASE_URL
-        ))
+      input.sessionWorkerUrl ||
+      input.workerUrl ||
+      input.corsWorkerUrl ||
+      input.ceSessionWorkerBaseUrl ||
+      input.CE_SESSION_WORKER_BASE_URL
     ) || null,
     workerSessionSlug: safeString(
       session.workerSessionSlug ||

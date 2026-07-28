@@ -2382,7 +2382,7 @@ export function renderTelegramMiniAppBrowserAsset({
       export_access: 'Manage permissions',
       results_settings: 'Results settings',
       question_queue: 'Question queue',
-      group_link: 'Approve group',
+      group_link: 'Add group link',
       export_allow: 'Add admin',
       export_revoke: 'Remove admin',
     };
@@ -4856,6 +4856,31 @@ export function renderTelegramMiniAppBrowserAsset({
       if (!sessionSlug) return;
       await copyAdminCommand('/export_all ' + sessionSlug, 'Export command copied. Paste it in the CE bot.');
     }
+    async function createAdminGroupLink() {
+      const sessionSlug = activeAdminSessionSlug();
+      if (!sessionSlug) return;
+      state.adminBusy = true;
+      state.adminPanelMessage = '';
+      renderAdmin();
+      try {
+        const response = await fetch('/telegram/mini-app/api/admin/group-link', {
+          method: 'POST',
+          headers: headers(),
+          body: JSON.stringify({ launch, sessionSlug }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || body.ok === false) {
+          state.adminPanelMessage = 'Could not create group link: ' + (body.error || 'group_link_failed');
+        } else {
+          state.adminData = body;
+          state.adminPanelMessage = 'Group invite link created.';
+        }
+      } catch {
+        state.adminPanelMessage = 'Could not create group link. Check connection and try again.';
+      }
+      state.adminBusy = false;
+      renderAdmin();
+    }
     function appendAdminActionPanel(sessionSlug) {
       const action = state.adminActiveAction;
       if (!action) return;
@@ -4996,19 +5021,21 @@ export function renderTelegramMiniAppBrowserAsset({
         command.textContent = 'Bot command: /question_queue 1 3 4';
         panel.append(label, row, candidates, command);
       } else if (action === 'group_link') {
-        const guidance = document.createElement('span');
-        guidance.textContent = state.adminData?.guidance ||
-          'Add the bot to the target Telegram group, then have a configured session admin approve it from inside that group.';
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'secondary';
         button.disabled = state.adminBusy;
-        button.textContent = 'Copy in-group approval command';
-        button.onclick = () => copyAdminCommand(
-          state.adminData?.joinCommand || ('/join ' + sessionSlug),
-          'Approval command copied. Run it inside the target group as a configured session admin.',
-        );
-        panel.append(guidance, button);
+        button.textContent = state.adminData?.link ? 'Create another link' : 'Create add-bot-to-group link';
+        button.onclick = createAdminGroupLink;
+        panel.appendChild(button);
+        if (state.adminData?.link) {
+          const link = document.createElement('a');
+          link.href = state.adminData.link;
+          link.textContent = state.adminData.link;
+          link.target = '_blank';
+          link.rel = 'noreferrer';
+          panel.appendChild(link);
+        }
       }
       if (state.adminPanelMessage) {
         const note = document.createElement('span');

@@ -29,7 +29,6 @@ function completeEnv(overrides = {}) {
       defaultSessionSlug: 'wrapped-alpha',
       sessions: [{
         sessionSlug: 'wrapped-alpha',
-        sessionIdHex: `0x${'12'.repeat(16)}`,
         sessionWorkerUrl: sessionWorkerOrigin,
         sessionModeProfile: {
           surfaces: { agentHttp: true, telegram: true },

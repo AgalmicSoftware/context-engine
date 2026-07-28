@@ -3,6 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv, transformWithEsbuild } from 'vite';
+import { createBundleReportPlugin } from './scripts/bundle-report.mjs';
+import { writePostSocialPreviewHtml } from './scripts/post-social-preview.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, 'src');
@@ -166,33 +168,7 @@ const manualChunkGroups = [
     ],
   },
   {
-    name: 'vendor-crypto-zk-poseidon-low',
-    patterns: [
-      '/node_modules/poseidon-lite/constants/1.js',
-      '/node_modules/poseidon-lite/constants/2.js',
-      '/node_modules/poseidon-lite/constants/3.js',
-      '/node_modules/poseidon-lite/constants/4.js',
-      '/node_modules/poseidon-lite/constants/5.js',
-      '/node_modules/poseidon-lite/constants/6.js',
-      '/node_modules/poseidon-lite/constants/7.js',
-      '/node_modules/poseidon-lite/constants/8.js',
-    ],
-  },
-  {
-    name: 'vendor-crypto-zk-poseidon-high',
-    patterns: [
-      '/node_modules/poseidon-lite/constants/9.js',
-      '/node_modules/poseidon-lite/constants/10.js',
-      '/node_modules/poseidon-lite/constants/11.js',
-      '/node_modules/poseidon-lite/constants/12.js',
-      '/node_modules/poseidon-lite/constants/13.js',
-      '/node_modules/poseidon-lite/constants/14.js',
-      '/node_modules/poseidon-lite/constants/15.js',
-      '/node_modules/poseidon-lite/constants/16.js',
-    ],
-  },
-  {
-    name: 'vendor-crypto-zk',
+    name: 'vendor-crypto-zk-poseidon',
     patterns: [
       '/node_modules/poseidon-lite/',
     ],
@@ -538,6 +514,9 @@ export default defineConfig(({ mode }) => {
       jsToTsCompatibilityPlugin(),
       litContractsSubpathShim(),
       walletProfileBundleGuardPlugin(walletRuntimeProfile),
+      ...(process.env.CE_BUNDLE_REPORT === '1'
+        ? [createBundleReportPlugin({ rootDir: __dirname })]
+        : []),
       publicAssetsCompatibilityPlugin(),
       postsAssetsCompatibilityPlugin(),
       {
