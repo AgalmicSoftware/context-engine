@@ -38,7 +38,10 @@ npm run lint
 # Includes JS/JSX, `src/utilities/ui`, shared UI, informational UI, MainContent, auxiliary page, shell support, dev/E2E support, Telegram demo setup, gate UI, CommunityTab, PolisReport, DebateMap, Navbar, and ContractPage components.
 
 npm start
-# Serve the production build.
+# Preview the existing production build locally with Vite.
+
+npm run analyze
+# Build and write deterministic build/bundle-report.json and .html reports.
 ```
 
 ## Docs

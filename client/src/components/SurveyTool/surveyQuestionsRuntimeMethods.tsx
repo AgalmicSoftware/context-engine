@@ -1,4 +1,5 @@
 import type * as React from 'react';
+import { loadPoseidonHasher } from '../../utilities/crypto/poseidonHasher.js';
 import type {
   SurveyQuestionsAuthoringPanelDisplayState,
   SurveyQuestionsAuthoringRouteReadinessDescriptor,
@@ -1151,18 +1152,18 @@ export const createSurveyQuestionsRuntimeMethods = (
       setState(buildAutoDecryptDisabledState());
     }
 
-    // Lazy load ZK-compatible Poseidon hasher (poseidon-lite)
+    // Lazy-load only the two Poseidon arities used by commitment serialization.
     inst._isMounted = true;
     inst._hasMounted = true;
     const loadHasher: SurveyQuestionsLegacyValue = async () => {
       try {
-        const { poseidon }: SurveyQuestionsLegacyValue = await import('poseidon-lite');
-        if (typeof poseidon === 'function' && inst._isMounted) {
-          setState(buildHasherState(poseidon));
-          surveyLog.log('✅ ZK-Compatible Poseidon Hasher Loaded (poseidon-lite)');
+        const poseidonHasher = await loadPoseidonHasher();
+        if (inst._isMounted) {
+          setState(buildHasherState(poseidonHasher));
+          surveyLog.log('✅ ZK-Compatible Poseidon Hasher Loaded (poseidon-lite arities 2/3)');
         }
       } catch (e: any) {
-        surveyLog.warn('⚠️ Failed to load Real Poseidon. Falling back to Keccak (Non-ZK).', e);
+        surveyLog.warn('⚠️ Poseidon commitments unavailable; Keccak commitments remain enabled.', e);
       }
     };
     loadHasher();

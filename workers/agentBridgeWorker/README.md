@@ -104,19 +104,19 @@ should not reimplement web UX business logic.
 
 Initial Telegram-facing capabilities:
 
-| Capability                                | Canonical request                             | Safe Telegram lanes                              | Status                                                            |
-| ----------------------------------------- | --------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------- |
-| Action menu                               | `GET /api/agent/actions`                      | group, private, Mini App                         | catalog scaffold                                                  |
-| Managed demo account setup                | `POST /api/agent/accounts/create`             | private, Mini App                                | implemented canonical handoff                                     |
-| Account summary                           | `GET /api/agent/accounts/me`                  | private, Mini App                                | worker-local until canonical                                      |
-| Settings overview                         | `GET /api/agent/settings`                     | private, Mini App                                | planned contract-only                                             |
-| Settings update                           | `POST /api/agent/settings/update-request`     | private, Mini App                                | pending canonical handoff                                         |
-| Questions                                 | `GET /api/agent/questions`                    | group, private, Mini App                         | worker-local index until canonical                                |
-| Client session metadata                   | `GET /api/agent/session-meta`                 | web client, private                              | implemented telegram-first classification                         |
-| Client token exchange                     | `POST /api/agent/client-login/exchange`       | web client, private                              | implemented short-lived browser credential exchange               |
-| Wrapped member exchange                   | `POST /api/agent/wrapped/member-exchange`     | direct HTTPS, private                            | implemented pinned session-Worker verification                    |
-| Response submit request                   | `POST /api/agent/responses/submit-request`    | private, Mini App                                | direct on-chain when enabled; otherwise pending canonical handoff |
-| SBT claim/create, decrypt, storage access | existing `/api/agent/*` routes in the catalog | private or Mini App unless explicitly group-safe | planned or contract-only                                          |
+| Capability | Canonical request | Safe Telegram lanes | Status |
+| --- | --- | --- | --- |
+| Action menu | `GET /api/agent/actions` | group, private, Mini App | catalog scaffold |
+| Managed demo account setup | `POST /api/agent/accounts/create` | private, Mini App | implemented canonical handoff |
+| Account summary | `GET /api/agent/accounts/me` | private, Mini App | worker-local until canonical |
+| Settings overview | `GET /api/agent/settings` | private, Mini App | planned contract-only |
+| Settings update | `POST /api/agent/settings/update-request` | private, Mini App | pending canonical handoff |
+| Questions | `GET /api/agent/questions` | group, private, Mini App | worker-local index until canonical |
+| Client session metadata | `GET /api/agent/session-meta` | web client, private | implemented telegram-first classification |
+| Client token exchange | `POST /api/agent/client-login/exchange` | web client, private | implemented short-lived browser credential exchange |
+| Wrapped member exchange | `POST /api/agent/wrapped/member-exchange` | direct HTTPS, private | implemented pinned session-Worker verification |
+| Response submit request | `POST /api/agent/responses/submit-request` | private, Mini App | direct on-chain when enabled; otherwise pending canonical handoff |
+| SBT claim/create, decrypt, storage access | existing `/api/agent/*` routes in the catalog | private or Mini App unless explicitly group-safe | planned or contract-only |
 
 Settings updates currently accept only safe structured fields such as
 `draftStyle` (`concise`, `balanced`, `detailed`).
@@ -310,26 +310,26 @@ npm run load:agent-only
 
 Every `telegram_screen_state` carries launch metadata: a command, an opaque callback, or the `t.me/<bot>?start=<opaque-action-id>` deep link template.
 
-| State                                        | Launch                                                                                                                         |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `setup_welcome`, `test_checklist`            | `/start`                                                                                                                       |
-| `agent_action_menu`                          | `/actions`, `/agent`, or `callback:<opaque-action-id>`                                                                         |
-| `agent_account_create`                       | hidden `/create_agent` compatibility command, `callback:<opaque-action-id>`, or `t.me/<bot>?start=<opaque-action-id>`          |
-| `agent_settings_overview`                    | `/settings`, `callback:<opaque-action-id>`, or `t.me/<bot>?start=<opaque-action-id>`                                           |
-| `agent_settings_edit`                        | `/settings` edit callback or Mini App                                                                                          |
-| `group_session_card`, `account_created`      | `/join`                                                                                                                        |
-| `private_start`                              | `/start <opaque-action-id>` or `t.me/<bot>?start=<opaque-action-id>`                                                           |
-| `question_list`                              | `/questions`                                                                                                                   |
-| `pose_question`                              | `/pose_question`, `/q`, deprecated `/drop_question`, or `callback:<pose_question_action>`                                      |
-| `generated_question_candidates`              | `/generate_questions`                                                                                                          |
-| `my_account`, `joined_sbts`                  | `/me` or `/account`                                                                                                            |
-| SBT join/create states                       | `/sbt <sbt-address-or-group-id-or-link>`, `/join_sbt <sbt-address-or-invite-code-or-link>`, `/create_sbt_group [session-slug]` |
-| `onboarding`                                 | `/onboarding`                                                                                                                  |
-| question cards                               | `/questions`                                                                                                                   |
-| `doc_library`, `doc_detail`                  | `/attachments`; alias `/docs`                                                                                                  |
-| `generate_questions`                         | `/generate_questions`                                                                                                          |
-| `account_recovered`                          | `/recover_key`                                                                                                                 |
-| confirmation, submitted, draft, retry states | opaque callback actions                                                                                                        |
+| State | Launch |
+| --- | --- |
+| `setup_welcome`, `test_checklist` | `/start` |
+| `agent_action_menu` | `/actions`, `/agent`, or `callback:<opaque-action-id>` |
+| `agent_account_create` | hidden `/create_agent` compatibility command, `callback:<opaque-action-id>`, or `t.me/<bot>?start=<opaque-action-id>` |
+| `agent_settings_overview` | `/settings`, `callback:<opaque-action-id>`, or `t.me/<bot>?start=<opaque-action-id>` |
+| `agent_settings_edit` | `/settings` edit callback or Mini App |
+| `group_session_card`, `account_created` | `/join` |
+| `private_start` | `/start <opaque-action-id>` or `t.me/<bot>?start=<opaque-action-id>` |
+| `question_list` | `/questions` |
+| `pose_question` | `/pose_question`, `/q`, deprecated `/drop_question`, or `callback:<pose_question_action>` |
+| `generated_question_candidates` | `/generate_questions` |
+| `my_account`, `joined_sbts` | `/me` or `/account` |
+| SBT join/create states | `/sbt <sbt-address-or-group-id-or-link>`, `/join_sbt <sbt-address-or-invite-code-or-link>`, `/create_sbt_group [session-slug]` |
+| `onboarding` | `/onboarding` |
+| question cards | `/questions` |
+| `doc_library`, `doc_detail` | `/attachments`; alias `/docs` |
+| `generate_questions` | `/generate_questions` |
+| `account_recovered` | `/recover_key` |
+| confirmation, submitted, draft, retry states | opaque callback actions |
 
 The group session-linked card says `Session: <session>` and exposes `Join Session`, `View Questions`, `Groups`, and policy-allowed `Pose Question`. `View Questions` is the group-lobby default action. `Join Session` opens private chat and routes participants without a configured account to private account setup. Group messages remain safe public summaries only and never include account state, private answers, keys, grants, or gated/private document contents.
 
@@ -367,20 +367,13 @@ The web client login path never places a raw `ceagt_` token in a URL, durable
 browser storage, Redux state, or logs. For agent-enabled sessions, users paste
 the token or copied install info into the login modal; the client calls
 `POST /api/agent/client-login/exchange` once, clears the pasted token from
-component state after exchange, and keeps the returned short-lived versioned
-envelope only in page memory. A reload requires a fresh exchange, and startup
-removes legacy browser-stored Agent envelopes and Session Worker JWTs. The
-envelope keeps the Bridge browser credential separate from the session-worker
-JWT. For `worker_canonical` sessions, the Bridge browser credential is bound to
-the normalized session slug, canonical 16-byte session ID, and exact Worker
-origin. Every authenticated Bridge request re-resolves the current session
-policy and rejects that credential before route reads or writes if a same-slug
-Worker identity or origin has replaced it; the user must exchange again.
-Registry-compatible sessions retain their existing unbound browser-credential
-behavior. Current question, result, and submit calls send only the Bridge
-credential to the Bridge. The access-group panel sends only the worker JWT
-directly to the canonical session worker for group listing, self-membership
-reads, and open self-join. The worker JWT is never sent back to the Bridge. The
+component state after exchange, and stores only the returned short-lived
+versioned envelope in tab-scoped `sessionStorage`. The envelope keeps the
+Bridge browser credential separate from the session-worker JWT. Current
+question, result, and submit calls send only the Bridge credential to the
+Bridge. The access-group panel sends only the worker JWT directly to the
+canonical session worker for group listing, self-membership reads, and open
+self-join. The worker JWT is never sent back to the Bridge. The
 `GET /api/agent/session-meta?sessionSlug=<slug>` endpoint returns public
 session metadata, including `clientSubmitReady`, which tells the client whether
 direct answer submit is deploy-ready for that session.
@@ -404,9 +397,7 @@ Mini App onboarding, activity, and settings routes re-evaluate the current
 session policy on every request. If the Mini App surface has been disabled,
 onboarding does not mint a credential; if no eligible session remains or a
 launch for one session attempts to update another, the route returns a denial
-before reading activity or persisting settings. Mini App onboarding is
-POST-only and accepts signed Telegram `initData` only in the JSON body or
-`X-Telegram-Init-Data` header; URL query transport is rejected.
+before reading activity or persisting settings.
 
 ## Bot Commands
 
@@ -597,36 +588,36 @@ makes no Telegram API request.
 
 Required values:
 
-| Value                                                         | Where it goes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Optional `TELEGRAM_BOT_TOKEN` from BotFather                  | Required only when Telegram is enabled; paste into untracked `.dev.vars` and live apply writes it as a Worker secret                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Optional `TELEGRAM_BOT_USERNAME` from BotFather, without `@`  | Required only when Telegram is enabled; deployed as a plain Worker var                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Optional Telegram bot display name                            | Set `TELEGRAM_BOT_NAME` or `AGENT_BRIDGE_TELEGRAM_BOT_NAME` to override the default `Context Engine`; live apply calls Telegram `setMyName`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Optional `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Required only when Telegram is enabled; live apply writes it as a Worker secret and Telegram sends it as `X-Telegram-Bot-Api-Secret-Token`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `DEMO_SIGNER_ROOT_SECRET` random high-entropy string          | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `DEMO_SIGNER_ROOT_SECRET`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| `AGENT_BRIDGE_AGENT_API_TOKEN` random high-entropy string     | Paste into `.dev.vars`; `deploy:apply -- --apply` writes the root/bootstrap and break-glass secret. Use it to mint named service credentials; do not distribute it as an integration token                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Production web client origins                                 | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.sh,https://www.contextengine.sh,https://contextengine.xyz,https://www.contextengine.xyz` so the canonical `.sh` clients can exchange agent credentials and read result-view cache entries while the redirecting `.xyz` origins remain compatible during migration. Result-view cache writes require root authority. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges                                                                                                                                                                                                                                                                  |
-| Optional one-time onboarding invite                           | Store a SHA-256 hash in `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES`, or use `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON` records with `tokenHash`, `sessionSlug`, `label`, and `source`. The agent sends the plaintext invite only in the JSON body of `POST /api/agent/invite/onboard`. Telegram identity may be included by a Telegram adapter but is not required                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Optional OpenAI key for Telegram AI                           | Paste into untracked `.dev.vars` as `AGENT_BRIDGE_OPENAI_API_KEY` or `OPENAI_API_KEY`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_OPENAI_API_KEY`. Telegram question generation, AI search, add-question formatting, group analysis, and transcription pass it as a request-local `apiKey` to the configured session worker when that session worker has no per-session `openaiKey` secret                                                                                                                                                                                                                                                                                                                                                                |
-| Optional OpenAI key for Wrapped posters                       | The deterministic local SVG renderer is the default and needs no key. To opt into OpenAI poster generation, set `AGENT_BRIDGE_WRAPPED_POSTER_RENDERER=openai` and provide only `AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY`; the deploy helper writes that separately named Worker secret and never copies the general Bridge or session-Worker AI key into it                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Public deployed `agentBridgeWorker` URL                       | Paste or derive the Workers.dev base URL as `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev`; live apply can derive it when the token can read the account workers.dev subdomain                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| CE/session worker base URL                                    | Paste into `CE_SESSION_WORKER_BASE_URL`, for example `https://<session-worker>.<workers-subdomain>.workers.dev`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Default chain and RPC URL                                     | Use `DEFAULT_CHAIN_ID=11155420` and preserve `DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network` unless the selected session resolves another supported chain                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Optional extra RPC URL                                        | Put an Infura or other OP Sepolia fallback in `ADDITIONAL_RPC_URL`; this is additive and does not replace the default POKT/PATH RPC. The Worker tries `DEFAULT_RPC_URL` first, then `ADDITIONAL_RPC_URL` for live SessionRegistry reads                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Optional question source                                      | Omit `AGENT_BRIDGE_QUESTION_SOURCE` for live question reads. Use `fixture` only for local preview/demo copy, or `live_or_fixture` when a temporary fixture fallback is intentional                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Optional question cache tuning                                | `AGENT_BRIDGE_RPC_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY`, `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS`, and explicit `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` tune the Telegram worker-local index. Defaults are sufficient when session metadata includes `blockLimits.start` or the registry exposes `SessionCreated` for the slug. `AGENT_BRIDGE_QUESTION_STORAGE_BACKEND=cloudflare` is a debug override; normal deployments derive Cloudflare question reads from the session storage profile                                                                                                                                    |
-| Optional Telegram session cutoff                              | `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` filters `/start`, `/sessions`, and the Mini App session picker to Telegram-visible sessions with `createdAt`, `sessionCreatedAt`, `groupCreatedAt`, or a supported created timestamp at or after the cutoff. Accepts ISO timestamps or Unix seconds/milliseconds. Sessions missing creation metadata are hidden while this cutoff is set, except the configured default Telegram-only session remains selectable so a single active demo session can still boot. To hide only a test session, give that session a strictly earlier `createdAt` and set the cutoff between it and the real sessions                                                                                                                                     |
-| Optional per-session Telegram group allowlist                 | Add `approvedTelegramGroupChatIds` / `telegramApprovedGroupChatIds` / `approvedTelegramChats` to a session policy entry to restrict which Telegram groups can bind to that session. Set `telegramGroupApprovalRequired: true` when a session should require explicit approval even before any groups are listed. The secure dynamic flow is to add the bot to the target group and have a configured session admin run `/join <session>` inside that group; the Worker verifies the admin and target chat together before persisting approval. Operators can instead run `/group_id` in the target group and copy its numeric `chat.id` into policy. `/group_link` remains guidance-only and never creates an authorization-bearing URL. Sessions without an allowlist or approval-required flag remain available to any group where the bot is present |
-| Optional Telegram API timeout                                 | `AGENT_BRIDGE_TELEGRAM_API_TIMEOUT_MS` bounds outbound Bot API calls before media sends fall back to document/text replies; default `8000`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Optional response export allowlist                            | `AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES` is a comma-separated or JSON-array list of managed Telegram ETH addresses allowed to use `/export_all` and manage added exporters. Session policy can also use `responseExportAllowedAddresses` or `telegramResponseExportAllowedAddresses` for per-session root admin allowlists. Root admins can grant additional session-scoped exporters through `/export_allow` without changing config                                                                                                                                                                                                                                                                                                                                        |
-| Optional agent-only token TTL                                 | `AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS` overrides the default 7-day lifespan for `mode: "agent_only"` invite onboarding tokens                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| Cloudflare account ID                                         | Do not ask the operator to paste this in product setup. `/telegram-demo-setup` and `deploy:plan` derive the account from `CLOUDFLARE_API_TOKEN`; if multiple accounts are visible, setup blocks because account selection is not implemented yet. `CLOUDFLARE_ACCOUNT_ID` is a developer fallback only                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Cloudflare API token                                          | Put in untracked local env as `CLOUDFLARE_API_TOKEN`; never commit it. The planning helper validates presence and prints only redacted status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| KV namespace                                                  | `deploy:apply -- --apply` creates or reuses and binds as `AGENT_ACTION_KV` for opaque callback/action IDs and replay cache                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| R2 bucket                                                     | Optional. `deploy:apply -- --apply --enable-doc-storage` or `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` creates or reuses and binds `AGENT_DOCS_R2` for bridge-owned demo artifact and document bytes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| D1 database                                                   | Optional. `deploy:apply -- --apply --enable-doc-storage` or `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` creates or reuses and binds `AGENT_DOCS_D1` for bridge-owned event/audit/index records                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Managed demo root secret                                      | `DEMO_SIGNER_ROOT_SECRET` is required for deterministic testnet managed-account derivation; deployment fails closed when it is absent                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Draft-generation AI policy                                    | `AGENT_AI_PROVIDER=ce_session_policy`; use sponsored/session AI through allowed session policy and do not duplicate canonical session secrets in this worker                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Value | Where it goes |
+| --- | --- |
+| Optional `TELEGRAM_BOT_TOKEN` from BotFather | Required only when Telegram is enabled; paste into untracked `.dev.vars` and live apply writes it as a Worker secret |
+| Optional `TELEGRAM_BOT_USERNAME` from BotFather, without `@` | Required only when Telegram is enabled; deployed as a plain Worker var |
+| Optional Telegram bot display name | Set `TELEGRAM_BOT_NAME` or `AGENT_BRIDGE_TELEGRAM_BOT_NAME` to override the default `Context Engine`; live apply calls Telegram `setMyName` |
+| Optional `TELEGRAM_WEBHOOK_SECRET` random high-entropy string | Required only when Telegram is enabled; live apply writes it as a Worker secret and Telegram sends it as `X-Telegram-Bot-Api-Secret-Token` |
+| `DEMO_SIGNER_ROOT_SECRET` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes deployed Worker secret `DEMO_SIGNER_ROOT_SECRET` |
+| `AGENT_BRIDGE_AGENT_API_TOKEN` random high-entropy string | Paste into `.dev.vars`; `deploy:apply -- --apply` writes the root/bootstrap and break-glass secret. Use it to mint named service credentials; do not distribute it as an integration token |
+| Production web client origins | Set `AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS=https://contextengine.sh,https://www.contextengine.sh,https://contextengine.xyz,https://www.contextengine.xyz` so the canonical `.sh` clients can exchange agent credentials and read result-view cache entries while the redirecting `.xyz` origins remain compatible during migration. Result-view cache writes require root authority. Add Mini App origins to `AGENT_BRIDGE_MINIAPP_ALLOWED_ORIGINS`; those origins are also accepted for client-login exchanges |
+| Optional one-time onboarding invite | Store a SHA-256 hash in `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITE_TOKEN_HASHES`, or use `AGENT_BRIDGE_TRUSTED_ONBOARDING_INVITES_JSON` records with `tokenHash`, `sessionSlug`, `label`, and `source`. The agent sends the plaintext invite only in the JSON body of `POST /api/agent/invite/onboard`. Telegram identity may be included by a Telegram adapter but is not required |
+| Optional OpenAI key for Telegram AI | Paste into untracked `.dev.vars` as `AGENT_BRIDGE_OPENAI_API_KEY` or `OPENAI_API_KEY`; `deploy:apply -- --apply` writes deployed Worker secret `AGENT_BRIDGE_OPENAI_API_KEY`. Telegram question generation, AI search, add-question formatting, group analysis, and transcription pass it as a request-local `apiKey` to the configured session worker when that session worker has no per-session `openaiKey` secret |
+| Optional OpenAI key for Wrapped posters | The deterministic local SVG renderer is the default and needs no key. To opt into OpenAI poster generation, set `AGENT_BRIDGE_WRAPPED_POSTER_RENDERER=openai` and provide only `AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY`; the deploy helper writes that separately named Worker secret and never copies the general Bridge or session-Worker AI key into it |
+| Public deployed `agentBridgeWorker` URL | Paste or derive the Workers.dev base URL as `AGENT_BRIDGE_PUBLIC_URL`, for example `https://ce-agent-bridge-worker.<workers-subdomain>.workers.dev`; live apply can derive it when the token can read the account workers.dev subdomain |
+| CE/session worker base URL | Paste into `CE_SESSION_WORKER_BASE_URL`, for example `https://<session-worker>.<workers-subdomain>.workers.dev` |
+| Default chain and RPC URL | Use `DEFAULT_CHAIN_ID=11155420` and preserve `DEFAULT_RPC_URL=https://op-sepolia-testnet.api.pocket.network` unless the selected session resolves another supported chain |
+| Optional extra RPC URL | Put an Infura or other OP Sepolia fallback in `ADDITIONAL_RPC_URL`; this is additive and does not replace the default POKT/PATH RPC. The Worker tries `DEFAULT_RPC_URL` first, then `ADDITIONAL_RPC_URL` for live SessionRegistry reads |
+| Optional question source | Omit `AGENT_BRIDGE_QUESTION_SOURCE` for live question reads. Use `fixture` only for local preview/demo copy, or `live_or_fixture` when a temporary fixture fallback is intentional |
+| Optional question cache tuning | `AGENT_BRIDGE_RPC_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS`, `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS`, `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY`, `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS`, and explicit `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` tune the Telegram worker-local index. Defaults are sufficient when session metadata includes `blockLimits.start` or the registry exposes `SessionCreated` for the slug. `AGENT_BRIDGE_QUESTION_STORAGE_BACKEND=cloudflare` is a debug override; normal deployments derive Cloudflare question reads from the session storage profile |
+| Optional Telegram session cutoff | `AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER` filters `/start`, `/sessions`, and the Mini App session picker to Telegram-visible sessions with `createdAt`, `sessionCreatedAt`, `groupCreatedAt`, or a supported created timestamp at or after the cutoff. Accepts ISO timestamps or Unix seconds/milliseconds. Sessions missing creation metadata are hidden while this cutoff is set, except the configured default Telegram-only session remains selectable so a single active demo session can still boot. To hide only a test session, give that session a strictly earlier `createdAt` and set the cutoff between it and the real sessions |
+| Optional per-session Telegram group allowlist | Add `approvedTelegramGroupChatIds` / `telegramApprovedGroupChatIds` / `approvedTelegramChats` to a session policy entry to restrict which Telegram groups can bind to that session. Set `telegramGroupApprovalRequired: true` when a session should require static approval or an admin-generated invite link even before any groups are listed. Run `/group_id` inside the target Telegram group to have the bot display the numeric `chat.id` to copy into the policy. Configured export admins can run `/group_link [session]` or use Admin Actions to create a one-use `https://t.me/<bot>?startgroup=<opaque>` link that approves the first group that opens it. Sessions without an allowlist or approval-required flag remain available to any group where the bot is present |
+| Optional Telegram API timeout | `AGENT_BRIDGE_TELEGRAM_API_TIMEOUT_MS` bounds outbound Bot API calls before media sends fall back to document/text replies; default `8000` |
+| Optional response export allowlist | `AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES` is a comma-separated or JSON-array list of managed Telegram ETH addresses allowed to use `/export_all` and manage added exporters. Session policy can also use `responseExportAllowedAddresses` or `telegramResponseExportAllowedAddresses` for per-session root admin allowlists. Root admins can grant additional session-scoped exporters through `/export_allow` without changing config |
+| Optional agent-only token TTL | `AGENT_BRIDGE_AGENT_ONLY_TOKEN_TTL_SECONDS` overrides the default 7-day lifespan for `mode: "agent_only"` invite onboarding tokens |
+| Cloudflare account ID | Do not ask the operator to paste this in product setup. `/telegram-demo-setup` and `deploy:plan` derive the account from `CLOUDFLARE_API_TOKEN`; if multiple accounts are visible, setup blocks because account selection is not implemented yet. `CLOUDFLARE_ACCOUNT_ID` is a developer fallback only |
+| Cloudflare API token | Put in untracked local env as `CLOUDFLARE_API_TOKEN`; never commit it. The planning helper validates presence and prints only redacted status |
+| KV namespace | `deploy:apply -- --apply` creates or reuses and binds as `AGENT_ACTION_KV` for opaque callback/action IDs and replay cache |
+| R2 bucket | Optional. `deploy:apply -- --apply --enable-doc-storage` or `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` creates or reuses and binds `AGENT_DOCS_R2` for bridge-owned demo artifact and document bytes |
+| D1 database | Optional. `deploy:apply -- --apply --enable-doc-storage` or `AGENT_BRIDGE_ENABLE_DOC_STORAGE=true` creates or reuses and binds `AGENT_DOCS_D1` for bridge-owned event/audit/index records |
+| Managed demo root secret | `DEMO_SIGNER_ROOT_SECRET` is required for deterministic testnet managed-account derivation; deployment fails closed when it is absent |
+| Draft-generation AI policy | `AGENT_AI_PROVIDER=ce_session_policy`; use sponsored/session AI through allowed session policy and do not duplicate canonical session secrets in this worker |
 
 When Telegram is enabled, `deploy:apply -- --apply` sets the webhook and
 Telegram slash-command menu automatically. The visible command menu advertises the active
@@ -703,12 +694,10 @@ and agent handoff calls that include `groupChatId` are limited to those
 approved Telegram group IDs. If `telegramGroupApprovalRequired` is true, the
 same checks apply even before a static list is populated. `/group_id` returns
 the current group's `chat.id` so a session admin can copy it into policy.
-For dynamic approval, add the bot to the target group and have a configured
-session admin run `/join <session>` inside that group. The Worker verifies the
-admin and target chat together before storing the approval and binding the
-session. `/group_link [session]` and the Mini App admin surface provide these
-instructions only; they never mint authorization-bearing URLs or action tokens.
-When a participant answers a posed group
+Configured export admins can also generate a one-use Add Bot To Group link from
+Admin Actions or `/group_link [session]`; the first group that opens the
+`startgroup` link is stored in Worker KV as an approved group and bound to that
+session. When a participant answers a posed group
 question before opening a private chat, the worker derives or reuses their
 managed Telegram demo account on demand and binds that question's session to
 the user. If a session cannot direct-submit because policy, gate, faucet, or
@@ -773,20 +762,20 @@ vars.
 
 Question cache controls:
 
-| Var                                                                               | Purpose                                                                                                                                                                                             |
-| --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AGENT_BRIDGE_QUESTION_SOURCE`                                                    | Defaults to `live`; use `fixture` only for local preview/demo copy or `live_or_fixture` for explicit fallback                                                                                       |
-| `AGENT_BRIDGE_QUESTION_LIVE_FALLBACK_TIMEOUT_MS`                                  | In `live_or_fixture`, maximum live question wait before returning a loading state and continuing live indexing in the background; default `2500`                                                    |
-| `AGENT_BRIDGE_RPC_TIMEOUT_MS`                                                     | Per-RPC timeout before trying the next configured RPC URL; default `5000`                                                                                                                           |
-| `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS`                                        | Per-gateway timeout for question payload JSON reads; default `2500`. If all gateways miss but an on-chain pointer exists, Telegram shows an unavailable/retryable row instead of inventing a prompt |
-| `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS`                                         | Freshness TTL before a cached Telegram question index schedules a background refresh; default `300`                                                                                                 |
-| `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY`                                       | Concurrent payload reads while materializing question records; default `4`                                                                                                                          |
-| `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS`                                         | Maximum log chunks scanned before replying on a cold Telegram request; default `1`, with the rest completed through Worker background indexing                                                      |
-| `AGENT_BRIDGE_QUESTION_STORAGE_BACKEND`                                           | Optional debug override for question payload pointers. Leave unset in normal deployments so session metadata selects Arweave or Cloudflare                                                          |
-| `AGENT_BRIDGE_QUESTION_SCAN_BLOCKS`                                               | Recent-block fallback window used only when `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN=1`; default `130000`                                                                                         |
-| `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` | Optional manual scan bounds for faster live smoke runs                                                                                                                                              |
-| `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN`                                       | Emergency/debug only. Allows recent-block fallback when neither metadata nor `SessionCreated` can scope the session; leave unset for normal live smoke                                              |
-| `AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW`                                            | Local/operator debug only. Enables `/mock/telegram/preview` and `/mock/telegram/preview-update`; leave unset in live deployments                                                                    |
+| Var | Purpose |
+| --- | --- |
+| `AGENT_BRIDGE_QUESTION_SOURCE` | Defaults to `live`; use `fixture` only for local preview/demo copy or `live_or_fixture` for explicit fallback |
+| `AGENT_BRIDGE_QUESTION_LIVE_FALLBACK_TIMEOUT_MS` | In `live_or_fixture`, maximum live question wait before returning a loading state and continuing live indexing in the background; default `2500` |
+| `AGENT_BRIDGE_RPC_TIMEOUT_MS` | Per-RPC timeout before trying the next configured RPC URL; default `5000` |
+| `AGENT_BRIDGE_QUESTION_PAYLOAD_TIMEOUT_MS` | Per-gateway timeout for question payload JSON reads; default `2500`. If all gateways miss but an on-chain pointer exists, Telegram shows an unavailable/retryable row instead of inventing a prompt |
+| `AGENT_BRIDGE_QUESTION_CACHE_TTL_SECONDS` | Freshness TTL before a cached Telegram question index schedules a background refresh; default `300` |
+| `AGENT_BRIDGE_QUESTION_PAYLOAD_CONCURRENCY` | Concurrent payload reads while materializing question records; default `4` |
+| `AGENT_BRIDGE_QUESTION_FOREGROUND_CHUNKS` | Maximum log chunks scanned before replying on a cold Telegram request; default `1`, with the rest completed through Worker background indexing |
+| `AGENT_BRIDGE_QUESTION_STORAGE_BACKEND` | Optional debug override for question payload pointers. Leave unset in normal deployments so session metadata selects Arweave or Cloudflare |
+| `AGENT_BRIDGE_QUESTION_SCAN_BLOCKS` | Recent-block fallback window used only when `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN=1`; default `130000` |
+| `AGENT_BRIDGE_QUESTION_SCAN_START_BLOCK` / `AGENT_BRIDGE_QUESTION_SCAN_END_BLOCK` | Optional manual scan bounds for faster live smoke runs |
+| `AGENT_BRIDGE_ALLOW_UNSCOPED_QUESTION_SCAN` | Emergency/debug only. Allows recent-block fallback when neither metadata nor `SessionCreated` can scope the session; leave unset for normal live smoke |
+| `AGENT_BRIDGE_ENABLE_TELEGRAM_PREVIEW` | Local/operator debug only. Enables `/mock/telegram/preview` and `/mock/telegram/preview-update`; leave unset in live deployments |
 
 ## Interactive Preview
 
@@ -955,11 +944,10 @@ Current v0 scope:
 - Admin actions are available inside the Mini App for managed Telegram accounts
   with configured or delegated export/admin access. The admin panel can download
   the response export zip, add or remove delegated admin addresses, update
-  results exposure settings, set the sponsored question queue, and show the
-  verified in-group approval command. It never creates an authorization-bearing
-  group link. The permissions panel also shows equivalent bot commands such as
-  `/export_allow 0x... <session>` and `/export_revoke 0x...
-<session>` for operators who prefer the bot.
+  results exposure settings, set the sponsored question queue, and generate a
+  one-use add-bot-to-group link. The permissions panel also shows equivalent bot
+  commands such as `/export_allow 0x... <session>` and `/export_revoke 0x...
+  <session>` for operators who prefer the bot.
 - `submit=true` attempts direct on-chain submit by default when the session has
   a worker URL and Surveys address, and session policy allows managed Telegram
   demo submit. The worker authenticates the managed account to the session
@@ -1112,12 +1100,10 @@ token mints, agent-created questions, submitted answer records, answer drafts,
 group proposals, distinct respondents, and registry session count. Submit
 metrics are counted from KV list metadata for current records, with a legacy
 body-read fallback, so large Telegram-only sessions avoid one KV read per
-response. `POST /api/agent/group-approval-link` is a compatibility endpoint
-that now returns `409 group_approval_link_disabled` plus the verified in-group
-`/join <session>` guidance and never mints a token or URL.
-`POST /api/agent/group-approval-revoke` remains the root/break-glass operator
-route for removing approved Telegram groups. Normal user-scoped admins should
-approve from inside the target group.
+response. `POST /api/agent/group-approval-link` and
+`/group-approval-revoke` are root/break-glass operator routes for managing
+approved Telegram groups; normal user-scoped admin tokens should use the
+in-group approval flow instead.
 
 ## Draft Provenance And Research Metrics
 
@@ -1244,12 +1230,7 @@ dedicated Bridge.
   write `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET`. An explicitly
   selected OpenAI Wrapped renderer may additionally write
   `AGENT_BRIDGE_WRAPPED_POSTER_OPENAI_API_KEY`; local poster rendering needs no
-  provider secret. The dedicated Agent Session Wrapped deployment generates its
-  two required runtime secrets independently with 256 bits from Web Crypto;
-  neither is derived from the request-only Cloudflare token, deployment
-  identity, or the other secret. Existing bindings are preserved on replay,
-  and an ambiguous write must be confirmed by an exact secret-name inventory
-  before activation continues.
+  provider secret.
 - Worker vars: `AGENT_BRIDGE_PUBLIC_URL`, `CE_SESSION_WORKER_BASE_URL`,
   `DEFAULT_CHAIN_ID`, `DEFAULT_RPC_URL`, and optional `ADDITIONAL_RPC_URL`;
   Telegram-enabled deployments additionally write `TELEGRAM_BRIDGE_ENABLED`

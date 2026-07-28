@@ -26,20 +26,6 @@ function lower(value) {
   return safeString(value).toLowerCase();
 }
 
-function normalizeCanonicalWorkerSessionId(value) {
-  const normalized = lower(value).replace(/^0x/, '').replace(/-/g, '');
-  return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized)
-    ? `0x${normalized}`
-    : '';
-}
-
-function resolveCanonicalWorkerSessionId(session = {}) {
-  const rawValues = [session.sessionId, session.sessionIdHex].filter((value) => safeString(value));
-  const normalized = rawValues.map(normalizeCanonicalWorkerSessionId);
-  const unique = new Set(normalized.filter(Boolean));
-  return normalized.some((value) => !value) || unique.size !== 1 ? '' : [...unique][0];
-}
-
 function envFlagEnabled(value = '') {
   return ['1', 'true', 'yes', 'on'].includes(lower(value));
 }
@@ -66,30 +52,6 @@ function normalizeBaseUrl(value = '') {
   } catch {
     return '';
   }
-}
-
-function normalizeCanonicalWorkerOrigin(value = '') {
-  try {
-    const parsed = new URL(safeString(value));
-    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return '';
-    if (parsed.pathname !== '/' || parsed.search || parsed.hash) return '';
-    return parsed.origin;
-  } catch {
-    return '';
-  }
-}
-
-function resolveCanonicalSessionWorkerOrigin(session = {}) {
-  const rawValues = [
-    session.sessionWorkerUrl,
-    session.workerUrl,
-    session.corsWorkerUrl,
-    session.ceSessionWorkerBaseUrl,
-    session.CE_SESSION_WORKER_BASE_URL,
-  ].filter((value) => safeString(value));
-  const normalized = rawValues.map(normalizeCanonicalWorkerOrigin);
-  const unique = new Set(normalized.filter(Boolean));
-  return normalized.some((value) => !value) || unique.size !== 1 ? '' : [...unique][0];
 }
 
 function normalizeOrigin(value = '') {
@@ -445,10 +407,7 @@ export async function authenticateSessionWorker({
   ethersLib = ethers,
   now = new Date(),
 } = {}) {
-  const workerCanonical = lower(session?.sessionModeProfile?.authority?.mode) === 'worker_canonical';
-  const baseUrl = workerCanonical
-    ? resolveCanonicalSessionWorkerOrigin(session)
-    : normalizeBaseUrl(workerUrl || resolveSessionWorkerUrl(env, session));
+  const baseUrl = normalizeBaseUrl(workerUrl || resolveSessionWorkerUrl(env, session));
   if (!baseUrl) return { ok: false, skipped: true, reason: 'session_worker_url_missing' };
   if (typeof fetchImpl !== 'function') return { ok: false, reason: 'fetch_unavailable' };
 
@@ -469,39 +428,24 @@ export async function authenticateSessionWorker({
   );
   const fallbackSlug = safeString(session.sessionSlug || session.slug);
   const sessionSlugCandidates = [configuredWorkerSlug || fallbackSlug];
-  const sessionId = resolveCanonicalWorkerSessionId(session);
-  if (workerCanonical && (!sessionSlugCandidates[0] || !sessionId)) {
-    return { ok: false, reason: 'session_worker_identity_missing' };
-  }
-  if (!workerCanonical && sessionSlugCandidates[0]) sessionSlugCandidates.push('');
+  if (sessionSlugCandidates[0]) sessionSlugCandidates.push('');
   const originCandidates = resolveLoginOriginCandidates(env, session);
   let lastAuthError = null;
   for (const origin of originCandidates) {
     const originUrl = new URL(origin);
     for (const authSessionSlug of sessionSlugCandidates) {
       try {
-        const nonceResponse = await checkedJsonFetch(fetchImpl, `${baseUrl}/auth/nonce`, {
+        const nonce = await checkedJsonFetch(fetchImpl, `${baseUrl}/auth/nonce`, {
           method: 'POST',
           headers: jsonHeaders(origin),
           body: JSON.stringify({
             address: wallet.address,
             ...(authSessionSlug ? { sessionSlug: authSessionSlug } : {}),
-            ...(workerCanonical ? { sessionId } : {}),
           }),
         }, {
           tokenField: 'nonce',
           errorPrefix: 'worker_nonce_failed',
-        }).then(({ body }) => body);
-        if (
-          workerCanonical &&
-          (
-            lower(nonceResponse.sessionSlug) !== lower(authSessionSlug) ||
-            normalizeCanonicalWorkerSessionId(nonceResponse.sessionId) !== sessionId
-          )
-        ) {
-          throw new Error('worker_nonce_failed: session_worker_identity_mismatch');
-        }
-        const nonce = nonceResponse.nonce;
+        }).then(({ body }) => body.nonce);
 
         const message = `${originUrl.host} wants you to sign in with your Ethereum account:\n`
           + `${wallet.address}\n\nSign in to Context Engine.\n\n`
@@ -518,28 +462,16 @@ export async function authenticateSessionWorker({
             message,
             signature,
             ...(authSessionSlug ? { sessionSlug: authSessionSlug } : {}),
-            ...(workerCanonical ? { sessionId } : {}),
           }),
         }, {
           tokenField: 'token',
           errorPrefix: 'worker_login_failed',
         }).then(({ body }) => body);
 
-        if (
-          workerCanonical &&
-          (
-            lower(login.sessionSlug) !== lower(authSessionSlug) ||
-            normalizeCanonicalWorkerSessionId(login.sessionId) !== sessionId
-          )
-        ) {
-          throw new Error('worker_login_failed: session_worker_identity_mismatch');
-        }
-
         return {
           ok: true,
           token: login.token,
           exp: login.exp || null,
-          ...(workerCanonical ? { sessionId } : {}),
           workerUrl: baseUrl,
           accountAddress: wallet.address,
           origin,

@@ -34,8 +34,10 @@ npm run build
 npm run preview
 ```
 
-The Vite production build writes to `client/build/`, which is also what
-`npm start` serves. Client unit tests run through standalone Jest 30:
+The Vite production build writes to `client/build/`. Both `npm start` and
+`npm run preview` open Vite's local preview server for that existing build;
+production hosting should serve the static `build/` output through the chosen
+deployment platform. Client unit tests run through standalone Jest 30:
 
 ```bash
 cd client
