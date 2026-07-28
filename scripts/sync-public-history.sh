@@ -603,6 +603,143 @@ ensure_public_node_modules_link() {
   )
 }
 
+verify_public_test_wiring() {
+  local verifier="$TEMP_CLONE/scripts/verify-test-wiring.js"
+  local node_path="$REPO_ROOT/node_modules"
+
+  if [ ! -f "$verifier" ]; then
+    log_info "Skipping public release test wiring checks; scripts/verify-test-wiring.js was not found in replay output."
+    return 0
+  fi
+
+  if [ ! -f "$TEMP_CLONE/package.json" ]; then
+    fail "Cannot run public test wiring checks; package.json was not found in replay output." 1
+  fi
+
+  ensure_public_node_modules_link
+
+  log_info "Running public release test wiring checks."
+  (
+    cd "$TEMP_CLONE"
+    if [ -d "$node_path" ]; then
+      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run test:wiring
+    else
+      npm run test:wiring
+    fi
+  )
+}
+
+verify_public_type_debt() {
+  local ratchet="$TEMP_CLONE/scripts/check-type-debt-ratchet.mjs"
+  local node_path="$REPO_ROOT/node_modules"
+
+  if [ ! -f "$ratchet" ]; then
+    log_info "Skipping public release type-debt ratchet; scripts/check-type-debt-ratchet.mjs was not found in replay output."
+    return 0
+  fi
+
+  if [ ! -f "$TEMP_CLONE/package.json" ]; then
+    fail "Cannot run public type-debt ratchet; package.json was not found in replay output." 1
+  fi
+
+  ensure_public_node_modules_link
+
+  log_info "Running public release type-debt ratchet."
+  (
+    cd "$TEMP_CLONE"
+    if [ -d "$node_path" ]; then
+      NODE_PATH="$node_path${NODE_PATH:+:$NODE_PATH}" npm run type-debt:check
+    else
+      npm run type-debt:check
+    fi
+  )
+}
+
+verify_public_node_tests() {
+  run_public_npm_script "test:node" "Node tests"
+}
+
+collect_source_release_evidence() {
+  local commit_sha
+  local changed_path
+
+  : > "$RELEASE_CHANGED_PATHS_FILE"
+  : > "$RELEASE_SUBJECTS_FILE"
+
+  for commit_sha in "${COMMITS[@]}"; do
+    git -C "$REPO_ROOT" log -1 --format='%s' "$commit_sha" >> "$RELEASE_SUBJECTS_FILE"
+    while IFS= read -r changed_path; do
+      [ -n "$changed_path" ] || continue
+      if ! path_matches_strip_pattern "$changed_path" "$commit_sha"; then
+        printf '%s\n' "$changed_path" >> "$RELEASE_CHANGED_PATHS_FILE"
+      fi
+    done < <(git -C "$REPO_ROOT" diff-tree --no-commit-id --name-only -r --root "$commit_sha")
+  done
+
+  sort -u "$RELEASE_CHANGED_PATHS_FILE" -o "$RELEASE_CHANGED_PATHS_FILE"
+}
+
+collect_replayed_release_evidence() {
+  git -C "$TEMP_CLONE" diff --name-only "$TARGET_BASE..$TARGET_BRANCH" \
+    | sort -u > "$RELEASE_CHANGED_PATHS_FILE"
+  git -C "$TEMP_CLONE" log --format='%s' "$TARGET_BASE..$TARGET_BRANCH" \
+    > "$RELEASE_SUBJECTS_FILE"
+}
+
+plan_release_candidate_version() {
+  local dry_run="$1"
+  local args=(
+    plan
+    --repo-root "$TEMP_CLONE"
+    --main-ref origin/main
+    --changed-paths-file "$RELEASE_CHANGED_PATHS_FILE"
+    --subjects-file "$RELEASE_SUBJECTS_FILE"
+    --result-file "$RELEASE_PLAN_FILE"
+  )
+
+  if [ "$REMOTE_BRANCH_EXISTS" -eq 1 ]; then
+    args+=(--staging-ref "origin/$TARGET_BRANCH")
+  fi
+  if [ -n "$EXPLICIT_RELEASE_VERSION" ]; then
+    args+=(--release-version "$EXPLICIT_RELEASE_VERSION")
+  fi
+  if [ "$ACKNOWLEDGE_PATCH" -eq 1 ]; then
+    args+=(--acknowledge-patch)
+  fi
+  if [ "$dry_run" -eq 1 ]; then
+    args+=(--dry-run)
+  fi
+
+  RELEASE_VERSION=$(node "$REPO_ROOT/scripts/release-version.mjs" "${args[@]}")
+  RELEASE_IMPACT=$(node -p "require(process.argv[1]).impact.level" "$RELEASE_PLAN_FILE")
+}
+
+stamp_release_candidate_version() {
+  local message_file="$TMP_ROOT/release-version-message.txt"
+
+  node "$REPO_ROOT/scripts/release-version.mjs" \
+    stamp \
+    --root "$TEMP_CLONE" \
+    --version "$RELEASE_VERSION" >&2
+
+  git -C "$TEMP_CLONE" add \
+    package.json \
+    package-lock.json \
+    client/package.json \
+    client/package-lock.json
+
+  {
+    printf 'chore: bump public version to %s\n' "$RELEASE_VERSION"
+    if [ "$ACKNOWLEDGE_PATCH" -eq 1 ] && [ "$RELEASE_IMPACT" != "patch" ]; then
+      printf '\nRelease impact suggested %s; operator acknowledged a patch release.\n' "$RELEASE_IMPACT"
+    fi
+  } > "$message_file"
+
+  git -C "$TEMP_CLONE" \
+    -c "core.hooksPath=$REPLAY_HOOKS_DIR" \
+    commit --quiet --no-gpg-sign --file "$message_file"
+}
+
 ensure_private_branch_guard() {
   if [ ! -f "$PRIVATE_BRANCH_GUARD_INSTALLER" ]; then
     fail "Private branch guard installer was not found: $PRIVATE_BRANCH_GUARD_INSTALLER" 1
@@ -808,6 +945,9 @@ fi
 
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/sync-public-history.XXXXXX")
 TEMP_CLONE="$TMP_ROOT/replay"
+RELEASE_CHANGED_PATHS_FILE="$TMP_ROOT/release-changed-paths.txt"
+RELEASE_SUBJECTS_FILE="$TMP_ROOT/release-subjects.txt"
+RELEASE_PLAN_FILE="$TMP_ROOT/release-plan.json"
 REPLAY_HOOKS_DIR="$TMP_ROOT/replay-hooks"
 mkdir -p "$REPLAY_HOOKS_DIR"
 

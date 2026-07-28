@@ -14,6 +14,7 @@ const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js
 const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
 const PII_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-pii.sh');
 const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
+const RELEASE_VERSION_SOURCE_PATH = path.join(__dirname, 'release-version.mjs');
 const PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
 const PRE_PUSH_HOOK_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-sync-public-history-tests');
@@ -68,6 +69,11 @@ function installSyncScriptFixture(sourceDir) {
     sourceDir,
     path.join('scripts', 'scrub-public-package-json.js'),
     fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
+  );
+  writeFile(
+    sourceDir,
+    path.join('scripts', 'release-version.mjs'),
+    fs.readFileSync(RELEASE_VERSION_SOURCE_PATH, 'utf8'),
   );
   writeFile(
     sourceDir,
@@ -138,7 +144,36 @@ function setupSourceRepo() {
     writeFile(
       sourceDir,
       'package.json',
-      `${JSON.stringify({ scripts: { 'test:node': 'node scripts/public-node-test-fixture.js' } }, null, 2)}\n`,
+      `${JSON.stringify({
+        name: 'contextEngine',
+        version: '0.1.0',
+        scripts: { 'test:node': 'node scripts/public-node-test-fixture.js' },
+      }, null, 2)}\n`,
+    );
+    writeFile(
+      sourceDir,
+      'package-lock.json',
+      `${JSON.stringify({
+        name: 'contextEngine',
+        version: '0.1.0',
+        lockfileVersion: 3,
+        packages: { '': { name: 'contextEngine', version: '0.1.0' } },
+      }, null, 2)}\n`,
+    );
+    writeFile(
+      sourceDir,
+      path.join('client', 'package.json'),
+      `${JSON.stringify({ name: 'client', version: '0.1.0', private: true }, null, 2)}\n`,
+    );
+    writeFile(
+      sourceDir,
+      path.join('client', 'package-lock.json'),
+      `${JSON.stringify({
+        name: 'client',
+        version: '0.1.0',
+        lockfileVersion: 3,
+        packages: { '': { name: 'client', version: '0.1.0' } },
+      }, null, 2)}\n`,
     );
     writeFile(sourceDir, path.join('scripts', 'public-node-test-fixture.js'), "console.log('public node fixture passed');\n");
     commitAll(sourceDir, 'Initial public base', {
@@ -220,6 +255,8 @@ function setupSourceRepo() {
       'package.json',
       `${JSON.stringify(
         {
+          name: 'contextEngine',
+          version: '0.1.0',
           scripts: {
             'test:node': 'node scripts/public-node-test-fixture.js',
             'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
@@ -398,6 +435,8 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.match(result.stdout, /Branch name: release-staging/);
     assert.match(result.stdout, /Replayed commits: 2/);
     assert.match(result.stdout, /Skipped commits: 2/);
+    assert.match(result.stdout, /Release impact suggestion: patch/);
+    assert.match(result.stdout, /Release version: 0\.1\.1/);
     assert.match(result.stdout, /To push: git push -u origin release-staging/);
 
     const tempDir = parseSummaryValue(result.stdout, 'Temp dir');
@@ -434,50 +473,12 @@ test('sync-public-history replays public commits, skips private-only commits, an
     );
     const commitBodies = replayedShas.map((sha) => git(sourceDir, ['show', '--quiet', '--format=%B', sha]));
     assert.deepEqual(commitBodies, [
-      `Public commit title\n\nPublic commit body line.\n\nCE-Private-Source: ${sourceShasBySubject.get('Public commit title')}\n\n`,
-      `Mixed commit\n\nCE-Private-Source: ${sourceShasBySubject.get('Mixed commit')}\n\n`,
+      'Public commit title\n\nPublic commit body line.\n\n',
+      'Mixed commit\n\n',
+      'chore: bump public version to 0.1.1\n\n',
     ]);
     assert.equal(JSON.parse(git(sourceDir, ['show', 'release-staging:package.json'])).version, '0.1.1');
     assert.equal(JSON.parse(git(sourceDir, ['show', 'release-staging:client/package.json'])).version, '0.1.1');
-
-    const preCutoverPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', replayedShas[0]]);
-    assert.doesNotMatch(preCutoverPaths, /^workers\/agentBridgeWorker\//m);
-    assert.doesNotMatch(preCutoverPaths, /^scripts\/run-agent-bridge-worker-tests\.js$/m);
-
-    assert.equal(
-      git(sourceDir, ['show', `${replayedShas[1]}:workers/agentBridgeWorker/worker.js`]),
-      'public agent bridge worker\n',
-    );
-    assert.equal(
-      git(sourceDir, ['show', `${replayedShas[1]}:scripts/run-agent-bridge-worker-tests.js`]),
-      'agent bridge test runner\n',
-    );
-    assert.equal(
-      git(sourceDir, ['show', `${replayedShas[1]}:workers/agentBridgeWorker/PUBLIC_RELEASE_CUTOVER`]),
-      [
-        'context-engine-agent-bridge-public-cutover-v1',
-        'audited=2025-01-04',
-        'scope=workers/agentBridgeWorker,scripts/run-agent-bridge-worker-tests.js',
-        '',
-      ].join('\n'),
-    );
-    const retiredPrivatePath = spawnSync(
-      'git',
-      ['cat-file', '-e', `${replayedShas[1]}:workers/agentBridgeWorker/retired-private-notes.txt`],
-      { cwd: sourceDir, encoding: 'utf8' },
-    );
-    assert.notEqual(retiredPrivatePath.status, 0);
-
-    const firstWorkerAppearance = git(sourceDir, [
-      'log',
-      '--reverse',
-      '--format=%s',
-      'origin/main..release-staging',
-      '--',
-      'workers/agentBridgeWorker',
-      'scripts/run-agent-bridge-worker-tests.js',
-    ]).trim().split('\n');
-    assert.deepEqual(firstWorkerAppearance, ['Mixed commit']);
 
     const preCutoverPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', replayedShas[0]]);
     assert.doesNotMatch(preCutoverPaths, /^workers\/agentBridgeWorker\//m);

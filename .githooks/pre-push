@@ -41,6 +41,10 @@ if ! should_protect_remote; then
   exit 0
 fi
 
+blocked_refs=()
+release_candidate_shas=()
+release_baseline_shas=()
+
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ -n "${local_ref:-}" ] || continue
 
@@ -52,6 +56,57 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     printf 'Blocked push of the private `dev` branch to %s.\n' "$REMOTE_NAME" >&2
     printf 'Use `scripts/sync-public-history.sh` to publish `release-staging` instead.\n' >&2
     printf 'If this push is truly intentional, rerun with `CE_ALLOW_PRIVATE_BRANCH_PUSH=1`.\n' >&2
+    exit 1
+  fi
+
+  case "$remote_ref" in
+    refs/heads/release-staging*)
+      release_candidate_shas+=("$local_sha")
+      release_baseline_shas+=("$remote_sha")
+      ;;
+  esac
+
+  case "$local_ref" in
+    refs/heads/*|refs/tags/*)
+      if ! is_allowed_public_ref "$local_ref"; then
+        blocked_refs+=("$local_ref")
+      fi
+      ;;
+  esac
+done
+
+if [ "${#blocked_refs[@]}" -gt 0 ]; then
+  if consume_push_override; then
+    exit 0
+  fi
+
+  printf 'Blocked push to public Context Engine remote %s.\n' "${REMOTE_NAME:-remote}" >&2
+  printf 'Allowed refs are refs/heads/main, refs/heads/release-staging*, and refs/tags/*.\n' >&2
+  printf 'Rejected ref: %s\n' "${blocked_refs[0]}" >&2
+  exit 1
+fi
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+for index in "${!release_candidate_shas[@]}"; do
+  candidate_sha="${release_candidate_shas[$index]}"
+  baseline_sha="${release_baseline_shas[$index]}"
+  verify_args=(
+    verify-ref
+    --repo-root "$repo_root"
+    --candidate-ref "$candidate_sha"
+  )
+
+  if [ "$baseline_sha" != "$ZERO_OID" ]; then
+    verify_args+=(--baseline-ref "$baseline_sha")
+  fi
+
+  main_ref="refs/remotes/${REMOTE_NAME}/main"
+  if git rev-parse --verify --quiet "${main_ref}^{commit}" >/dev/null; then
+    verify_args+=(--baseline-ref "$main_ref")
+  fi
+
+  if ! node "$repo_root/scripts/release-version.mjs" "${verify_args[@]}" >&2; then
+    printf 'Blocked release-staging push: public application version verification failed.\n' >&2
     exit 1
   fi
 done

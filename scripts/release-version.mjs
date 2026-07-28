@@ -254,7 +254,7 @@ const readRangeEvidence = (repoRoot, range) => {
 
 const parseArgs = (argv) => {
   const [command, ...tokens] = argv;
-  const options = { baselineRefs: [], minimumRefs: [] };
+  const options = { baselineRefs: [] };
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
     if (token === '--acknowledge-patch' || token === '--dry-run' || token === '--json') {
@@ -268,7 +268,6 @@ const parseArgs = (argv) => {
     index += 1;
     const key = token.slice(2).replaceAll('-', '_');
     if (key === 'baseline_ref') options.baselineRefs.push(value);
-    else if (key === 'minimum_ref') options.minimumRefs.push(value);
     else options[key] = value;
   }
   return { command, options };
@@ -330,21 +329,11 @@ const verifyCandidateRef = (options) => {
   const baselines = options.baselineRefs
     .filter((ref) => ref && ref !== '0000000000000000000000000000000000000000' && refExists(repoRoot, ref))
     .map((ref) => ({ ref, version: readVersionAtRef(repoRoot, ref).version }));
-  const minimums = options.minimumRefs
-    .filter((ref) => ref && ref !== '0000000000000000000000000000000000000000' && refExists(repoRoot, ref))
-    .map((ref) => ({ ref, version: readVersionAtRef(repoRoot, ref).version }));
 
   for (const baseline of baselines) {
     if (compareVersions(candidate.version, baseline.version) <= 0) {
       throw new Error(
         `Candidate version ${candidate.version} must be greater than ${baseline.ref} (${baseline.version})`,
-      );
-    }
-  }
-  for (const minimum of minimums) {
-    if (compareVersions(candidate.version, minimum.version) < 0) {
-      throw new Error(
-        `Candidate version ${candidate.version} must not be lower than ${minimum.ref} (${minimum.version})`,
       );
     }
   }
@@ -359,7 +348,6 @@ const usage = () => {
   node scripts/release-version.mjs stamp --root DIR --version X.Y.Z
   node scripts/release-version.mjs verify-worktree [--root DIR]
   node scripts/release-version.mjs verify-ref --candidate-ref REF [--baseline-ref REF ...]
-    [--minimum-ref REF ...]
 `);
 };
 
