@@ -644,6 +644,119 @@ describe('PostsPage', () => {
     expect(screen.getByRole('link', { name: /Posts/i })).toHaveAttribute('href', '/posts');
   });
 
+  it('keeps the detail back link 50 percent larger than the prior post scale', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.backLink\s*{[\s\S]*font-size:\s*1\.74rem;/);
+  });
+
+  it('keeps markdown bold callouts brighter than body copy', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.postParagraph\s*{[\s\S]*strong\s*{[\s\S]*color:\s*\$text;/);
+  });
+
+  it('keeps the post date aligned to the right of post tags', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.postDate\s*{[\s\S]*margin-left:\s*auto;/);
+    expect(scss).toMatch(/\.tagList\s*{[\s\S]*flex:\s*1 1 auto;/);
+  });
+
+  it('keeps the post hero and title inside the mobile article width', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.postHeader\s*{[\s\S]*grid-template-columns:\s*minmax\(0, 1fr\);/);
+    expect(scss).toMatch(/\.postTitle\s*{[\s\S]*min-width:\s*0;[\s\S]*overflow-wrap:\s*anywhere;/);
+    expect(scss).toMatch(/\.postMeta\s*{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/);
+  });
+
+  it('keeps full rating questions readable in the precision matrix', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.precisionQuestionText\s*{[\s\S]*font-size:\s*0\.94rem;[\s\S]*line-height:\s*1\.42;/);
+  });
+
+  it('uses green post tags in a single metadata row through tablet widths', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.tag\s*{[\s\S]*border:\s*1px solid rgba\(77, 255, 164, 0\.36\);[\s\S]*background:\s*rgba\(77, 255, 164, 0\.1\);[\s\S]*color:\s*#4dffa4;/,
+    );
+    expect(scss).toMatch(
+      /@media \(max-width: 820px\)\s*{[\s\S]*\.postMeta\s*{[\s\S]*flex-wrap:\s*nowrap;[\s\S]*align-items:\s*center;[\s\S]*\.tagList\s*{[\s\S]*width:\s*70%;[\s\S]*max-width:\s*70%;[\s\S]*flex:\s*0 1 70%;[\s\S]*flex-wrap:\s*nowrap;[\s\S]*overflow-x:\s*auto;[\s\S]*\.postDate\s*{[\s\S]*flex:\s*0 0 auto;[\s\S]*margin-left:\s*auto;[\s\S]*text-align:\s*right;/,
+    );
+  });
+
+  it('wraps every mobile tag inside the 70 percent metadata column without scrolling', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /@media \(max-width: 560px\)\s*{[\s\S]*\.postMeta\s*{[\s\S]*display:\s*flex;[\s\S]*align-items:\s*flex-end;[\s\S]*\.tagList\s*{[\s\S]*width:\s*70%;[\s\S]*max-width:\s*70%;[\s\S]*flex-wrap:\s*wrap;[\s\S]*overflow-x:\s*visible;[\s\S]*\.tag\s*{[\s\S]*font-size:\s*0\.78rem;[\s\S]*\.postDate\s*{[\s\S]*align-self:\s*flex-end;/,
+    );
+  });
+
+  it('places the editorial response legend beside its ring chart', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.editorialRingLayout\s*{[\s\S]*display:\s*grid;[\s\S]*grid-template-columns:\s*minmax\(94px, 124px\) minmax\(0, 1fr\);[\s\S]*align-items:\s*center;/,
+    );
+  });
+
+  it('expands precision freeform responses to use their available panel space', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.responseTypePrecisionPanel\.responseTypeFreeformPanel\s*{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*\.responseQuotes\s*{[\s\S]*flex:\s*1 1 auto;[\s\S]*grid-auto-rows:\s*minmax\(0, 1fr\);[\s\S]*\.responseQuotes figure\s*{[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*center;[\s\S]*\.responseQuotes blockquote\s*{[\s\S]*font-size:\s*clamp\(1\.2rem, 2\.2cqi, 1\.55rem\);[\s\S]*line-height:\s*1\.4;/,
+    );
+  });
+
+  it('uses the multichoice question size for every precision response heading', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.responseTypePrecisionPanel,[\s\S]*h4\s*{[\s\S]*font-size:\s*clamp\(1\.2rem, 2\.1cqi, 1\.55rem\);[\s\S]*line-height:\s*1\.3;/,
+    );
+  });
+
+  it('keeps binary chart axis labels prominent', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.binaryBeeswarmYAxisLabel\s*{[\s\S]*font-size:\s*15px;/);
+    expect(scss).toMatch(/\.binaryBeeswarmAxisLabel\s*{[\s\S]*font-size:\s*16px;/);
+  });
+
+  it('keeps confidence-band labels and counts readable', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.editorialBarMeta\s*{[\s\S]*font-size:\s*0\.94rem;[\s\S]*line-height:\s*1\.3;/);
+  });
+
+  it('keeps both editorial pie legends readable and matched', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(
+      /\.editorialLegendRow\s*{[\s\S]*font-size:\s*0\.94rem;[\s\S]*> span:last-child\s*{[\s\S]*font-size:\s*0\.82rem;/,
+    );
+    expect(scss).toMatch(
+      /\.responsePieLegendItem\s*{[\s\S]*font-size:\s*0\.94rem;[\s\S]*\.responsePieLegendValue\s*{[\s\S]*> span\s*{[\s\S]*font-size:\s*0\.82rem;/,
+    );
+  });
+
+  it('contains the post header image within the available viewport width', () => {
+    const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
+
+    expect(scss).toMatch(/\.pageShell\s*{[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;/);
+    expect(scss).toMatch(
+      /\.postArticle\s*{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*min-width:\s*0;[\s\S]*box-sizing:\s*border-box;/,
+    );
+    expect(scss).toMatch(
+      /\.postHeroFigure\s*{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;[\s\S]*box-sizing:\s*border-box;/,
+    );
+    expect(scss).toMatch(/\.postHeroImage,[\s\S]*\.postImage\s*{[\s\S]*width:\s*100%;[\s\S]*max-width:\s*100%;/);
+  });
+
   it('does not fetch posts when the config disables the page', async () => {
     const fetcher = jest.fn<ReturnType<PostsFetch>, Parameters<PostsFetch>>();
 

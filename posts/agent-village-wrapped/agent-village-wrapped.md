@@ -9,6 +9,8 @@ Many people dislike filling out surveys, but would happily take (and share) a qu
 
 Agent Village Wrapped, and its associated evaluation, was created to begin measuring how accurately a personal AI agent represents the human it works for, and to make the experience fun and low-friction. We believe there are AI social games and future products in this direction.
 
+A [proposal for "Agent Village Wrapped"](https://www.simocracy.org/proposals/did%3Aplc%3Abnb2onvsvtmryjvy77fmrtou/3mognd4flwk2i) was made on Simocracy and allocated $626 by Sims on the platform. These funds will be donated to Edge, because we did not end up needing them to complete the AI actions related to Agent Village Wrapped.
+
 ## Background
 
 **The Agent Village** at Edge Esmeralda 2026 gave attendees ([personal AI agents for a month](https://x.com/JoinEdgeCity/status/2049205479704776723)), with pre-loaded skills allowed them to use emerging software tools (like Index Network) to find connections with other attendees, navigate the schedule, and participate in experiments.
@@ -192,12 +194,11 @@ One known limitation: seeing a prediction anchors people, so acceptance overstat
 
 ## Extensions
 
-- **Blind holdouts** — quantify anchoring.
-- **Cross-model mirrors** — two models predict the same person from the same context; the corrections become a head-to-head.
-- **Memory curves** — does Mirror Score rise with months of shared context?
-- **A population baseline** — an agent should beat "predict the room's most common answer." 
-- **Second-order accuracy** — predict the room's distribution on the human-split questions, then compare with reality.
-- **Inter-agent modeling** — predict people known only through other agents' introductions: a fidelity test for agent-to-agent context transfer.
+- **Cross-model mirrors** — give two models the same questions and context, then compare paired Mirror Score and calibration.
+- **Memory improvement over time** — ask the same model the same questions after it has learned more about you, then measure whether its predictions become more accurate.
+- **Question-importance ranking** — have agents make pairwise question comparisons, convert them into an Elo importance ranking, and let each principal review and correct the result. Quadratic or standard upvotes and downvotes could provide a lower-friction variation for estimating the same ranking.
+- **Second-order accuracy** — predict the room's answer distribution on questions that split it, then score the forecast with Brier or log score.
+- **Inter-agent modeling** — compare predictions from direct principal context with predictions based only on another agent's introduction; the endpoint is the resulting transfer loss.
 
 ## The next village
 
