@@ -2208,6 +2208,7 @@ describe('AppShell route render smoke', () => {
     subject.initializeSurveyCache = jest.fn(async () => undefined);
     subject.startSbtEventListener = jest.fn();
     subject.startSurveyAndQuestionEventListener = jest.fn();
+    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => false);
     subject.setReadinessStateIfChanged = jest.fn((patch) => {
       subject.state = { ...subject.state, ...(patch || {}) };
     });
@@ -2223,7 +2224,65 @@ describe('AppShell route render smoke', () => {
     expect(subject.fetchQuestionResponsesChunkedForGroup).not.toHaveBeenCalled();
     expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
     expect(subject.initializeSbtCacheForGroup).not.toHaveBeenCalled();
+    expect(subject.initializeWorkerCanonicalCachesForGroup).not.toHaveBeenCalled();
 
+    subject.componentWillUnmount();
+  });
+
+  it('does not initialize the active Worker session cache on static non-cache routes', async () => {
+    const workerConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = stubMainSiteMountSideEffects(
+      createSubject({
+        path: '/contracts',
+        activeSessionSlug: 'demo-sh',
+        sessionConfig: workerConfig,
+      }),
+    );
+    subject.preloadAboutDemoSessionData = jest.fn(() => null);
+    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => true);
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(subject.initializeWorkerCanonicalCachesForGroup).not.toHaveBeenCalled();
+    expect(subject.getInitializableSessionNetwork).not.toHaveBeenCalled();
+    subject.componentWillUnmount();
+  });
+
+  it('does not initialize a resolved Worker session while a static route remains active', () => {
+    const workerConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = stubMainSiteMountSideEffects(
+      createSubject({
+        path: '/contracts',
+        activeSessionSlug: 'demo-sh',
+        sessionConfig: workerConfig,
+      }),
+    );
+    subject._mounted = true;
+    subject.getCurrentPathname = jest.fn(() => '/contracts');
+    subject.handleNetworkChange = jest.fn();
+    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => true);
+    subject.state = {
+      ...subject.state,
+      sessionPathResolutionNonce: 1,
+    };
+    const previousState = {
+      ...subject.state,
+      sessionPathResolutionNonce: 0,
+    };
+
+    subject.componentDidUpdate(subject.props, previousState);
+
+    expect(subject.initializeWorkerCanonicalCachesForGroup).not.toHaveBeenCalled();
     subject.componentWillUnmount();
   });
 
