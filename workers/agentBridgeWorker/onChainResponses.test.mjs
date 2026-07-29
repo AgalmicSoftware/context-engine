@@ -108,6 +108,138 @@ test('authenticates managed Telegram account against the session worker without 
   assert.match(loginBody.signature, /^0x[0-9a-f]+$/);
 });
 
+test('worker-canonical agent auth sends and verifies the exact session identity', async () => {
+  const { principal, account } = await makeAccount();
+  const calls = [];
+  const sessionId = `0x${'12'.repeat(16)}`;
+  const result = await authenticateSessionWorker({
+    env: {
+      DEMO_SIGNER_ROOT_SECRET: 'root-a',
+      AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
+      DEFAULT_CHAIN_ID: '11155420',
+      CE_SESSION_WORKER_BASE_URL: 'https://generic-worker.example',
+    },
+    session: {
+      sessionSlug: 'alpha',
+      sessionIdHex: sessionId,
+      sessionWorkerUrl: 'https://session.example',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    },
+    principal,
+    account,
+    workerUrl: 'https://caller-selected-worker.example',
+    fetchImpl: async (url, init = {}) => {
+      calls.push({ url: String(url), init });
+      if (String(url).endsWith('/auth/nonce')) {
+        return new Response(JSON.stringify({
+          nonce: 'nonce-exact',
+          sessionSlug: 'alpha',
+          sessionId,
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }
+      return new Response(JSON.stringify({
+        token: 'worker-token',
+        exp: 2_000_000_000,
+        sessionSlug: 'alpha',
+        sessionId,
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    },
+    now: new Date('2026-05-11T12:00:00.000Z'),
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.sessionId, sessionId);
+  assert.equal(result.workerUrl, 'https://session.example');
+  assert.equal(calls.every(({ url }) => String(url).startsWith('https://session.example/')), true);
+  assert.equal(JSON.parse(calls[0].init.body).sessionId, sessionId);
+  assert.equal(JSON.parse(calls[1].init.body).sessionId, sessionId);
+});
+
+test('worker-canonical agent auth does not inherit caller-selected or generic Worker URLs', async () => {
+  const { principal, account } = await makeAccount();
+  let fetchCalls = 0;
+  const result = await authenticateSessionWorker({
+    env: {
+      DEMO_SIGNER_ROOT_SECRET: 'root-a',
+      AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
+      CE_SESSION_WORKER_BASE_URL: 'https://generic-worker.example',
+      SESSION_WORKER_URL: 'https://other-generic-worker.example',
+    },
+    session: {
+      sessionSlug: 'alpha',
+      sessionIdHex: `0x${'12'.repeat(16)}`,
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    },
+    principal,
+    account,
+    workerUrl: 'https://caller-selected-worker.example',
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      throw new Error('must not fetch');
+    },
+  });
+
+  assert.deepEqual(result, { ok: false, skipped: true, reason: 'session_worker_url_missing' });
+  assert.equal(fetchCalls, 0);
+});
+
+test('worker-canonical agent auth fails before signing when canonical identity is missing', async () => {
+  const { principal, account } = await makeAccount();
+  let fetchCalls = 0;
+  const result = await authenticateSessionWorker({
+    env: {
+      DEMO_SIGNER_ROOT_SECRET: 'root-a',
+      AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
+    },
+    session: {
+      sessionSlug: 'alpha',
+      sessionWorkerUrl: 'https://session.example',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    },
+    principal,
+    account,
+    fetchImpl: async () => {
+      fetchCalls += 1;
+      throw new Error('must not fetch');
+    },
+  });
+
+  assert.deepEqual(result, { ok: false, reason: 'session_worker_identity_missing' });
+  assert.equal(fetchCalls, 0);
+});
+
+test('worker-canonical agent auth rejects malformed or conflicting identity aliases even when one alias is valid', async () => {
+  const { principal, account } = await makeAccount();
+  const validSessionId = `0x${'12'.repeat(16)}`;
+  let fetchCalls = 0;
+  for (const identityAliases of [
+    { sessionId: validSessionId, sessionIdHex: 'not-a-session-id' },
+    { sessionId: validSessionId, sessionIdHex: `0x${'34'.repeat(16)}` },
+  ]) {
+    const result = await authenticateSessionWorker({
+      env: {
+        DEMO_SIGNER_ROOT_SECRET: 'root-a',
+        AGENT_BRIDGE_DEPLOYMENT_ID: 'deploy-a',
+      },
+      session: {
+        sessionSlug: 'alpha',
+        ...identityAliases,
+        sessionWorkerUrl: 'https://session.example',
+        sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      },
+      principal,
+      account,
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        throw new Error('must not fetch');
+      },
+    });
+
+    assert.deepEqual(result, { ok: false, reason: 'session_worker_identity_missing' });
+  }
+  assert.equal(fetchCalls, 0);
+});
+
 test('session worker auth retries trusted fallback origins after CORS origin rejection', async () => {
   const { principal, account } = await makeAccount();
   const calls = [];

@@ -303,6 +303,13 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
       error: `Invalid session config mode at ${mergedModeValidation.path}.`,
     };
   }
+  if (kind === 'set-config') {
+    const fieldValidation = validateWorkerCanonicalIncomingFields({
+      incomingConfig,
+      mergedConfig,
+    });
+    if (!fieldValidation.ok) return fieldValidation;
+  }
 
   if (changesInitializedWorkerCanonicalIdentity({ existingConfig: authorityExisting, mergedConfig })) {
     return {

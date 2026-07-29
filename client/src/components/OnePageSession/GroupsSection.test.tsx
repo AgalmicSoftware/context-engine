@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 import OnePageSessionGroupsSection, { type GroupsSectionProps } from './GroupsSection';
 
@@ -84,6 +84,23 @@ describe('OnePageSessionGroupsSection authority routing', () => {
     expect(mockSbtGroupsPage).not.toHaveBeenCalled();
     expect(props.ensureLightSbtDiscovery).not.toHaveBeenCalled();
     expect(props.ensureLightSbtUniverse).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Refresh groups' })).toBeInTheDocument();
+    expect(mockWorkerGroupsPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        refreshNonce: 0,
+        showGroupDescriptions: false,
+        showMembershipListHeader: false,
+      }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh groups' }));
+    expect(mockWorkerGroupsPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        refreshNonce: 1,
+        showGroupDescriptions: false,
+        showMembershipListHeader: false,
+      }),
+    );
   });
 
   it('shows participant creation for an opted-in Worker session and keeps legacy Worker sessions admin-only', () => {

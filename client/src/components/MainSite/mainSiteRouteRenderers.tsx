@@ -349,7 +349,6 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
   _renderSbtsListRoute: (ctx: RouteRenderCtx) => {
     const { fullPath, searchStr, defaultSessionNetwork } = ctx;
     const routeSessionSlug = host.getSbtListRouteSessionSlug(fullPath, searchStr);
-    const workerGroupId = readWorkerGroupIdFromPath(fullPath);
     const allSessionsMode = !routeSessionSlug;
     const routeSessionConfig = routeSessionSlug ? host.getDisplaySessionCfg(routeSessionSlug) : null;
     return (

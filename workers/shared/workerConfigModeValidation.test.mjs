@@ -530,3 +530,27 @@ test('mode validation rejects malformed raw v1 access rules at their exact path'
     path: 'sessionModeProfile.encryption.accessConditions.conditions.0.role',
   });
 });
+
+test('mode validation accepts Worker end timestamps and rejects invalid or decentralized values', () => {
+  assert.deepEqual(
+    validateWorkerConfigModeValues({
+      ...completeModeConfig(fastCloudflareProfile()),
+      sessionEndsAt: '2030-01-02T03:04:00Z',
+    }),
+    { ok: true },
+  );
+  assert.deepEqual(
+    validateWorkerConfigModeValues({
+      ...completeModeConfig(fastCloudflareProfile()),
+      sessionEndsAt: 'not-a-date',
+    }),
+    { ok: false, path: 'sessionEndsAt' },
+  );
+  assert.deepEqual(
+    validateWorkerConfigModeValues({
+      ...completeModeConfig(decentralizedProfile()),
+      sessionEndsAt: '2030-01-02T03:04:00Z',
+    }),
+    { ok: false, path: 'sessionEndsAt' },
+  );
+});

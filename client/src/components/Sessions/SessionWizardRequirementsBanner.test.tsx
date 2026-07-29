@@ -91,9 +91,13 @@ describe('SessionWizardRequirementsBanner', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/permissions prefilled/i)).toBeInTheDocument();
     expect(screen.getByText(/copy it into the Worker step/i)).toBeInTheDocument();
-    expect(screen.getByText(/Under Account Resources, choose only the account/i)).toBeInTheDocument();
-    expect(screen.getByText(/earliest expiration Cloudflare permits/i)).toBeInTheDocument();
-    expect(screen.getByText(/revoke it after deployment succeeds or you abandon the attempt/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Under Account Resources, choose only the account/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/earliest expiration Cloudflare permits/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/revoke it after deployment succeeds or you abandon the attempt/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Token setup and security guide' })).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
+    );
     expect(screen.getByRole('link', { name: 'AI provider key' })).toBeInTheDocument();
     expect(screen.queryByText(/Arweave|Lit|RPC|wallet|faucet|funding|gas/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/not required/i)).not.toBeInTheDocument();

@@ -17,7 +17,7 @@ const cloudflareSessionConfig = {
 
 describe('workerGroupImageUpload', () => {
   it('uploads a Worker-native image through session storage and returns its public Worker URL', async () => {
-    const uploadData = jest.fn(async (_file: Blob, _format: string, _options: unknown) => ({
+    const uploadData = jest.fn(async () => ({
       storage: 'cloudflare',
       storageRef: {
         backend: 'cloudflare',

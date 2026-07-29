@@ -215,7 +215,6 @@ export function resolveMainSiteRouteMatch({
     pathWithoutQuery === '/debate/' ||
     pathWithoutQuery.startsWith('/tag/') ||
     firstPathSegment === 'groups' ||
-    isWorkerGroupDetailRoute ||
     isStaticNonCacheRoute(fullPath);
   const context: RouteDefinitionContext = {
     firstPathSegment,

@@ -36,6 +36,12 @@ const ADMIN = '0x00000000000000000000000000000000000000aa';
 const SESSION_ID = '0x11111111111111111111111111111111';
 const OTHER_SESSION_ID = '0x22222222222222222222222222222222';
 const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+const publicSessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+publicSessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+publicSessionModeProfile.storage.payloadAccessControl = { gate: 'none', encryption: 'none' };
+publicSessionModeProfile.encryption = { mode: 'none' };
+publicSessionModeProfile.results.visibility = 'public_full_if_storage_public';
+publicSessionModeProfile.export.scope = 'all_session';
 const sessionConfig = {
   slug: 'demo-sh',
   sessionIdHex: SESSION_ID,
@@ -137,7 +143,7 @@ describe('WorkerSessionGroupsPanel', () => {
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), {
       target: { value: 'Native reviewers' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
     await waitFor(() =>
       expect(mockPostSignedAdminWorkerRequest).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -164,6 +170,57 @@ describe('WorkerSessionGroupsPanel', () => {
     expect(screen.queryByLabelText(/network|contract address|rpc|gas|mint/i)).not.toBeInTheDocument();
   });
 
+  it('forwards the session header refresh state to the membership list', async () => {
+    const publicSessionConfig = {
+      ...sessionConfig,
+      sessionModeProfile: publicSessionModeProfile,
+    };
+    const { rerender } = render(
+      <WorkerSessionGroupsPanel
+        account=""
+        provider={null}
+        networkChainId={null}
+        sessionConfig={publicSessionConfig}
+        sessionSlug="demo-sh"
+        showCreate={false}
+        refreshNonce={4}
+        showGroupDescriptions={false}
+        showMembershipListHeader={false}
+      />,
+    );
+
+    expect(await screen.findByTestId('membership-panel')).toBeInTheDocument();
+    expect(mockMembershipPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        refreshNonce: 4,
+        showDescriptions: false,
+        showListHeader: false,
+      }),
+    );
+
+    rerender(
+      <WorkerSessionGroupsPanel
+        account=""
+        provider={null}
+        networkChainId={null}
+        sessionConfig={publicSessionConfig}
+        sessionSlug="demo-sh"
+        showCreate={false}
+        refreshNonce={5}
+        showGroupDescriptions={false}
+        showMembershipListHeader={false}
+      />,
+    );
+
+    expect(mockMembershipPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        refreshNonce: 5,
+        showDescriptions: false,
+        showListHeader: false,
+      }),
+    );
+  });
+
   it('asks a signed-out visitor to sign in without rendering contract management', () => {
     const toggleLoginModal = jest.fn();
     render(
@@ -182,6 +239,153 @@ describe('WorkerSessionGroupsPanel', () => {
     expect(toggleLoginModal).toHaveBeenCalledWith(true);
     expect(getWorkerSessionToken).not.toHaveBeenCalled();
     expect(screen.queryByTestId('ce-admin-worker-groups')).not.toBeInTheDocument();
+  });
+
+  it('shows public ungated groups to a signed-out visitor independently of creation policy', () => {
+    const toggleLoginModal = jest.fn();
+    render(
+      <WorkerSessionGroupsPanel
+        account=""
+        provider="wagmi"
+        networkChainId={11155420}
+        sessionConfig={{
+          ...sessionConfig,
+          sessionName: 'Demo Session',
+          groupCreationPolicy: 'admin_only',
+          sessionModeProfile: publicSessionModeProfile,
+        }}
+        sessionSlug="demo-sh"
+        showCreate={true}
+        toggleLoginModal={toggleLoginModal}
+      />,
+    );
+
+    expect(screen.getByTestId('membership-panel')).toBeInTheDocument();
+    expect(mockMembershipPanel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        allowAnonymousGroupDiscovery: true,
+        canReadGroups: true,
+        sessionId: SESSION_ID,
+        sessionSlug: 'demo-sh',
+      }),
+    );
+    expect(mockGetWorkerSessionToken).not.toHaveBeenCalled();
+    expect(screen.getByTestId('ce-session-worker-group-create-active-session')).toHaveTextContent('Demo Session');
+    expect(screen.getByTestId('ce-session-worker-group-create-active-session')).toHaveTextContent('/demo-sh');
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(toggleLoginModal).toHaveBeenCalledWith(true);
+    expect(screen.queryByTestId('ce-admin-worker-groups')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('participant-create-panel')).not.toBeInTheDocument();
+  });
+
+  it('shows the participant creation form before login for a public participant-created session', () => {
+    const toggleLoginModal = jest.fn();
+    render(
+      <WorkerSessionGroupsPanel
+        account=""
+        provider="wagmi"
+        networkChainId={11155420}
+        sessionConfig={{
+          ...sessionConfig,
+          sessionName: 'Demo Session',
+          groupCreationPolicy: 'participants',
+          sessionModeProfile: publicSessionModeProfile,
+        }}
+        sessionSlug="demo-sh"
+        showCreate={true}
+        toggleLoginModal={toggleLoginModal}
+      />,
+    );
+
+    expect(screen.getByTestId('membership-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('participant-create-panel')).toBeInTheDocument();
+    expect(mockParticipantCreatePanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        authenticationRequired: true,
+        participantAddress: '',
+        workerToken: '',
+      }),
+    );
+    const participantProps = mockParticipantCreatePanel.mock.calls.at(-1)?.[0] as {
+      onRequestAuthentication?: () => void;
+    };
+    participantProps.onRequestAuthentication?.();
+    expect(toggleLoginModal).toHaveBeenCalledWith(true);
+    expect(mockGetWorkerSessionToken).not.toHaveBeenCalled();
+  });
+
+  it('keeps a remembered account anonymous on a public groups route until creation is requested', async () => {
+    mockGetWorkerSessionToken.mockResolvedValue('public-action-token');
+    const publicConfig = {
+      ...sessionConfig,
+      sessionName: 'Demo Session',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: publicSessionModeProfile,
+    };
+    const { rerender } = render(
+      <WorkerSessionGroupsPanel
+        account={ADMIN}
+        provider="wagmi"
+        networkChainId={11155420}
+        sessionConfig={publicConfig}
+        sessionSlug="demo-sh"
+        showCreate={false}
+      />,
+    );
+
+    expect(screen.getByTestId('membership-panel')).toBeInTheDocument();
+    expect(mockMembershipPanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        allowAnonymousGroupDiscovery: true,
+        workerToken: '',
+      }),
+    );
+    expect(mockGetWorkerSessionToken).not.toHaveBeenCalled();
+
+    rerender(
+      <WorkerSessionGroupsPanel
+        account={ADMIN}
+        provider="wagmi"
+        networkChainId={11155420}
+        sessionConfig={publicConfig}
+        sessionSlug="demo-sh"
+        showCreate={true}
+      />,
+    );
+
+    await waitFor(() => expect(mockGetWorkerSessionToken).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(mockMembershipPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          allowAnonymousGroupDiscovery: true,
+          workerToken: 'public-action-token',
+        }),
+      ),
+    );
+  });
+
+  it('keeps a private session sign-in-only when participants may create groups', () => {
+    const toggleLoginModal = jest.fn();
+    render(
+      <WorkerSessionGroupsPanel
+        account=""
+        provider="wagmi"
+        networkChainId={11155420}
+        sessionConfig={{
+          ...sessionConfig,
+          groupCreationPolicy: 'participants',
+        }}
+        sessionSlug="demo-sh"
+        showCreate={true}
+        toggleLoginModal={toggleLoginModal}
+      />,
+    );
+
+    expect(screen.queryByTestId('membership-panel')).not.toBeInTheDocument();
+    expect(screen.getByText('Sign in to view or join this session’s groups.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(toggleLoginModal).toHaveBeenCalledWith(true);
+    expect(mockGetWorkerSessionToken).not.toHaveBeenCalled();
   });
 
   it('uses only the validated hybrid profile chain for Worker auth signing context', async () => {
@@ -233,7 +437,7 @@ describe('WorkerSessionGroupsPanel', () => {
     );
 
     await waitFor(() => expect(getWorkerSessionToken).toHaveBeenCalled());
-    expect(screen.getByText('Only the configured worker admin can create groups.')).toBeInTheDocument();
+    expect(screen.getByText('Only the configured session admin can create groups.')).toBeInTheDocument();
     expect(screen.queryByTestId('ce-admin-worker-groups')).not.toBeInTheDocument();
     expect(screen.queryByTestId('participant-create-panel')).not.toBeInTheDocument();
   });
@@ -266,6 +470,43 @@ describe('WorkerSessionGroupsPanel', () => {
       }),
     );
     expect(screen.queryByTestId('ce-admin-worker-groups')).not.toBeInTheDocument();
+  });
+
+  it('keeps signed-out create-only UX editable until final authentication', () => {
+    const toggleLoginModal = jest.fn();
+    render(
+      <WorkerSessionGroupsPanel
+        account=""
+        provider="wagmi"
+        networkChainId={11155420}
+        sessionConfig={{
+          ...sessionConfig,
+          sessionName: 'Demo Session',
+          groupCreationPolicy: 'participants',
+        }}
+        sessionName="Demo Session"
+        sessionSlug="demo-sh"
+        showCreate={true}
+        createOnly={true}
+        toggleLoginModal={toggleLoginModal}
+      />,
+    );
+
+    expect(screen.getByTestId('participant-create-panel')).toBeInTheDocument();
+    expect(mockParticipantCreatePanel).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        authenticationRequired: true,
+        sessionName: 'Demo Session',
+        sessionSlug: 'demo-sh',
+        workerToken: '',
+      }),
+    );
+    expect(screen.queryByText(/on-chain|contract address|gas|RPC/i)).not.toBeInTheDocument();
+    const participantProps = mockParticipantCreatePanel.mock.calls.at(-1)?.[0] as {
+      onRequestAuthentication?: () => void;
+    };
+    participantProps.onRequestAuthentication?.();
+    expect(toggleLoginModal).toHaveBeenCalledWith(true);
   });
 
   it('does not reuse a stale worker token after the active account changes', async () => {

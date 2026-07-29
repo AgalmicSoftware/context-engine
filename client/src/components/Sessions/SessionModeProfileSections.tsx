@@ -71,6 +71,8 @@ const DEFAULT_CUSTOM_ACCESS_CONDITIONS: SessionModeAccessConditionDocument = {
   ],
 };
 
+const WORKER_ENVELOPE_DISABLED_HELP_ID = 'ce-new-encryption-worker-envelope-help';
+
 const defaultCloudflarePayloadAccessControl = (): NonNullable<SessionModeProfile['storage']['payloadAccessControl']> =>
   JSON.parse(
     JSON.stringify(cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE).storage.payloadAccessControl),
@@ -186,8 +188,8 @@ const SessionModeProfileSections = ({
                     if (surface.value === 'miniApp' && event.target.checked) draft.surfaces.telegram = true;
                   })
                 }
-              />{' '}
-              {surface.label}
+              />
+              <span className={styles.modeCheckboxText}>{surface.label}</span>
             </Label>
           ))}
         </div>
@@ -326,6 +328,7 @@ const SessionModeProfileSections = ({
               label: 'Cloudflare',
               disabled: !!workerEnvelopeDisabledReason,
               title: workerEnvelopeDisabledReason,
+              describedBy: workerEnvelopeDisabledReason ? WORKER_ENVELOPE_DISABLED_HELP_ID : undefined,
             },
           ]}
           value={profile.encryption.mode}
@@ -347,7 +350,11 @@ const SessionModeProfileSections = ({
           dataTestIdPrefix="ce-new-encryption"
         />
         {litDisabledReason ? <div className={styles.helperText}>{litDisabledReason}</div> : null}
-        {workerEnvelopeDisabledReason ? <div className={styles.helperText}>{workerEnvelopeDisabledReason}</div> : null}
+        {workerEnvelopeDisabledReason ? (
+          <div id={WORKER_ENVELOPE_DISABLED_HELP_ID} className={styles.helperText}>
+            {workerEnvelopeDisabledReason}
+          </div>
+        ) : null}
         {profile.encryption.mode === 'worker_envelope' ? (
           <div className={styles.modeAdvancedNested}>
             <ul className={styles.modeSummaryList}>
@@ -519,7 +526,7 @@ const FormRow = ({ label, children }: FormRowProps): React.ReactElement => (
 
 type SegmentedButtonsProps = {
   ariaLabel: string;
-  options: Array<{ value: string; label: string; disabled?: boolean; title?: string }>;
+  options: Array<{ value: string; label: string; disabled?: boolean; title?: string; describedBy?: string }>;
   value: string;
   onChange: (value: string) => void;
   dataTestIdPrefix?: string;
@@ -546,6 +553,7 @@ const SegmentedButtons = ({
             type="button"
             role="radio"
             aria-checked={isSelected}
+            aria-describedby={option.describedBy}
             disabled={option.disabled}
             title={option.title}
             tabIndex={option.disabled || (!isSelected && !(selectedEnabledIndex < 0 && enabledIndex === 0)) ? -1 : 0}

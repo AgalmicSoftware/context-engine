@@ -20,6 +20,8 @@ type SessionWizardModeProfileControlsProps<Draft extends SessionModeDraft, Secti
   entryOnly: boolean;
   onContinue: () => void;
   onEnterAdvancedMode: () => void;
+  onEnterNormalMode: () => void;
+  customizing: boolean;
   registryChainId: number | null;
   setCollapsedSections: Dispatch<SetStateAction<Sections>>;
   setDraft: Dispatch<SetStateAction<Draft>>;
@@ -52,6 +54,8 @@ const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sec
   entryOnly,
   onContinue,
   onEnterAdvancedMode,
+  onEnterNormalMode,
+  customizing,
   registryChainId,
   setCollapsedSections,
   setDraft,
@@ -88,9 +92,15 @@ const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sec
         {...sharedSectionProps}
         onContinue={onContinue}
         onCustomize={() => {
+          if (customizing) {
+            onEnterNormalMode();
+            return;
+          }
           onEnterAdvancedMode();
           focusSessionModeProfilePrivacy(setCollapsedSections);
         }}
+        onSelectPreset={onEnterNormalMode}
+        customizing={customizing}
         entryOnly={entryOnly}
         showContinue={showContinue}
       />

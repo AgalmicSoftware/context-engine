@@ -8,7 +8,9 @@ import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessio
 import { resolveWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { buildSignedAdminActionAuth, getWorkerSessionToken } from '../../utilities/worker/workerAuth';
 import { GROUP_CREATION_POLICIES, resolveGroupCreationPolicy } from '../../utilities/session/groupCreationPolicy';
+import { sessionModeAllowsAnonymousWorkerGroupDiscovery } from '../../utilities/session/sessionModeProfile';
 import type { PostSignedWorkerGroupRequest } from '../../domains/worker/workerGroupPorts';
+import { WorkerGroupCreateMessage } from '../Shared/WorkerGroupCreateForm';
 import WorkerGroupMembershipPanel from './WorkerGroupMembershipPanel';
 import WorkerParticipantGroupCreatePanel from './WorkerParticipantGroupCreatePanel';
 import styles from './OnePageSession.module.scss';
@@ -21,7 +23,13 @@ export type WorkerSessionGroupsPanelProps = {
   networkChainId: unknown;
   sessionConfig: unknown;
   sessionSlug: string;
+  sessionName?: string;
   showCreate: boolean;
+  createOnly?: boolean;
+  refreshNonce?: number;
+  selectedGroupId?: string;
+  showGroupDescriptions?: boolean;
+  showMembershipListHeader?: boolean;
   toggleLoginModal?: (open: boolean) => void;
 };
 
@@ -48,7 +56,13 @@ const WorkerSessionGroupsPanel = ({
   provider,
   sessionConfig,
   sessionSlug,
+  sessionName,
   showCreate,
+  createOnly = false,
+  refreshNonce = 0,
+  selectedGroupId = '',
+  showGroupDescriptions = true,
+  showMembershipListHeader = true,
   toggleLoginModal,
 }: WorkerSessionGroupsPanelProps) => {
   const config = asRecord(sessionConfig);
@@ -64,6 +78,7 @@ const WorkerSessionGroupsPanel = ({
     canonicalSessionSlug.length > 0 &&
     configuredSessionSlug === canonicalSessionSlug;
   const normalizedAccount = toText(account);
+  const activeSessionName = toText(sessionName) || toText(config.sessionName) || canonicalSessionSlug;
   const workerUrl = useMemo(
     () =>
       getUsableSessionWorkerUrl({
@@ -76,6 +91,7 @@ const WorkerSessionGroupsPanel = ({
   const targetKey = `${canonicalSessionId}\n${canonicalSessionSlug}\n${workerUrl}\n${normalizedAccount.toLowerCase()}`;
   const [authState, setAuthState] = useState<WorkerGroupsAuthState>(() => emptyAuthState(targetKey));
   const [groupsRevision, setGroupsRevision] = useState(0);
+  const [preserveSignedOutParticipantDraft, setPreserveSignedOutParticipantDraft] = useState(false);
   const authRequestIdRef = useRef(0);
   const activeAuthState = authState.targetKey === targetKey ? authState : emptyAuthState(targetKey);
   const workerToken = activeAuthState.token;
@@ -85,7 +101,9 @@ const WorkerSessionGroupsPanel = ({
   const canAttemptWorkerAdmin =
     adminCapabilities.canAdminWorker || (!adminCapabilities.workerAdminAddress && !!normalizedAccount);
   const participantGroupCreationEnabled = resolveGroupCreationPolicy(config) === GROUP_CREATION_POLICIES.PARTICIPANTS;
+  const allowAnonymousGroupDiscovery = sessionModeAllowsAnonymousWorkerGroupDiscovery(config.sessionModeProfile);
   const chainId = projection.hasOnChainComponent && projection.chainId ? projection.chainId : 1;
+  const shouldAuthenticateOnRender = !allowAnonymousGroupDiscovery || (showCreate && !!normalizedAccount);
 
   const authenticate = useCallback(async () => {
     const requestTargetKey = targetKey;
@@ -138,11 +156,32 @@ const WorkerSessionGroupsPanel = ({
 
   useEffect(() => {
     setGroupsRevision(0);
-    void authenticate();
+    authRequestIdRef.current += 1;
+    if (shouldAuthenticateOnRender) {
+      void authenticate();
+    } else {
+      setAuthState(emptyAuthState(targetKey));
+    }
     return () => {
       authRequestIdRef.current += 1;
     };
-  }, [authenticate]);
+  }, [authenticate, shouldAuthenticateOnRender, targetKey]);
+
+  useEffect(() => {
+    if (!showCreate || !participantGroupCreationEnabled) {
+      setPreserveSignedOutParticipantDraft(false);
+    } else if (!normalizedAccount) {
+      setPreserveSignedOutParticipantDraft(true);
+    }
+  }, [normalizedAccount, participantGroupCreationEnabled, showCreate]);
+
+  const requestActionAuthentication = useCallback(() => {
+    if (!normalizedAccount) {
+      toggleLoginModal?.(true);
+      return;
+    }
+    if (authStatus !== 'loading') void authenticate();
+  }, [authStatus, authenticate, normalizedAccount, toggleLoginModal]);
 
   const postSignedRequest = useCallback<PostSignedWorkerGroupRequest>(
     (args = {}) => {
@@ -168,6 +207,13 @@ const WorkerSessionGroupsPanel = ({
   );
 
   if (!hasExactWorkerProfile) {
+    if (createOnly) {
+      return (
+        <WorkerGroupCreateMessage sessionName={activeSessionName} sessionSlug={canonicalSessionSlug}>
+          Group creation is unavailable because this session does not have a valid Groups configuration.
+        </WorkerGroupCreateMessage>
+      );
+    }
     return (
       <div className={styles.workerGroupNotice}>
         This session does not have an exact, validated Worker Groups profile.
@@ -176,26 +222,129 @@ const WorkerSessionGroupsPanel = ({
   }
 
   if (!workerUrl) {
+    if (createOnly) {
+      return (
+        <WorkerGroupCreateMessage sessionName={activeSessionName} sessionSlug={canonicalSessionSlug}>
+          Group creation is unavailable because this session does not have a configured worker.
+        </WorkerGroupCreateMessage>
+      );
+    }
     return <div className={styles.workerGroupNotice}>This session does not have a configured Cloudflare worker.</div>;
   }
 
-  if (!normalizedAccount) {
+  const shouldUseParticipantCreate =
+    participantGroupCreationEnabled &&
+    (preserveSignedOutParticipantDraft || !normalizedAccount || !adminCapabilities.canAdminWorker);
+  const renderCreatePanel = () => {
+    if (shouldUseParticipantCreate) {
+      return (
+        <WorkerParticipantGroupCreatePanel
+          key={`worker-participant-create:${canonicalSessionId}:${canonicalSessionSlug}:${workerUrl}`}
+          sessionId={canonicalSessionId}
+          sessionConfig={sessionConfig}
+          sessionName={activeSessionName}
+          participantAddress={normalizedAccount}
+          sessionSlug={canonicalSessionSlug}
+          workerToken={workerToken}
+          workerUrl={workerUrl}
+          authenticationRequired={!normalizedAccount || !workerToken}
+          authenticationBusy={!!normalizedAccount && authStatus === 'loading'}
+          onRequestAuthentication={requestActionAuthentication}
+          onGroupsChanged={() => setGroupsRevision((revision) => revision + 1)}
+        />
+      );
+    }
+    if (adminCapabilities.canAdminWorker) {
+      return (
+        <AdminWorkerGroupsPanel
+          key={`worker-admin-groups:${targetKey}`}
+          canAdminWorker={true}
+          sessionId={canonicalSessionId}
+          sessionConfig={sessionConfig}
+          sessionName={activeSessionName}
+          sessionSlug={canonicalSessionSlug}
+          workerUrl={workerUrl}
+          workerAuthContext={{ account, providerLike: provider, chainId }}
+          workerToken={workerToken}
+          postSignedRequest={postSignedRequest}
+          autoLoad={!createOnly}
+          createOnly={createOnly}
+          onGroupsChanged={() => setGroupsRevision((revision) => revision + 1)}
+        />
+      );
+    }
+    if (!normalizedAccount) {
+      return (
+        <WorkerGroupCreateMessage
+          actionLabel="Sign in"
+          onAction={requestActionAuthentication}
+          sessionName={activeSessionName}
+          sessionSlug={canonicalSessionSlug}
+          testId="ce-session-worker-groups-login"
+        >
+          Sign in to verify permission to create a group in this session.
+        </WorkerGroupCreateMessage>
+      );
+    }
+    if (canAttemptWorkerAdmin) {
+      return (
+        <AdminWorkerGroupsPanel
+          key={`worker-admin-groups:${targetKey}`}
+          canAdminWorker={true}
+          sessionId={canonicalSessionId}
+          sessionConfig={sessionConfig}
+          sessionName={activeSessionName}
+          sessionSlug={canonicalSessionSlug}
+          workerUrl={workerUrl}
+          workerAuthContext={{ account, providerLike: provider, chainId }}
+          workerToken={workerToken}
+          postSignedRequest={postSignedRequest}
+          autoLoad={!createOnly}
+          createOnly={createOnly}
+          onGroupsChanged={() => setGroupsRevision((revision) => revision + 1)}
+        />
+      );
+    }
+    return (
+      <WorkerGroupCreateMessage sessionName={activeSessionName} sessionSlug={canonicalSessionSlug}>
+        Only the configured session admin can create groups.
+      </WorkerGroupCreateMessage>
+    );
+  };
+
+  if (!normalizedAccount && !allowAnonymousGroupDiscovery) {
+    if (createOnly) return <div data-testid="ce-session-worker-groups-native">{renderCreatePanel()}</div>;
     return (
       <div className={styles.workerGroupNotice} data-testid="ce-session-worker-groups-login">
-        <span>Sign in to view or join this session’s Cloudflare groups.</span>
-        <button type="button" className={styles.telegramPrimaryButton} onClick={() => toggleLoginModal?.(true)}>
+        <span>Sign in to view or join this session’s groups.</span>
+        <button type="button" className={styles.telegramPrimaryButton} onClick={requestActionAuthentication}>
           Sign in
         </button>
       </div>
     );
   }
 
+  if (createOnly) {
+    return (
+      <div className={styles.workerGroupsPanel} data-testid="ce-session-worker-groups-native">
+        {authStatus === 'loading' ? (
+          <div className={styles.workerGroupNotice}>Authenticating with the session…</div>
+        ) : null}
+        {authError ? (
+          <div className={styles.workerGroupNotice}>
+            <span>{authError}</span>
+            <button type="button" className={styles.telegramSecondaryButton} onClick={() => void authenticate()}>
+              Retry
+            </button>
+          </div>
+        ) : null}
+        {renderCreatePanel()}
+      </div>
+    );
+  }
+
   return (
     <div className={styles.workerGroupsPanel} data-testid="ce-session-worker-groups-native">
-      <div className={styles.workerGroupNotice}>
-        These groups live in the session’s Cloudflare worker. They do not require a contract address, chain transaction,
-        gas, or RPC configuration.
-      </div>
       {authStatus === 'loading' ? (
         <div className={styles.workerGroupNotice}>Authenticating with the session…</div>
       ) : null}
@@ -207,43 +356,25 @@ const WorkerSessionGroupsPanel = ({
           </button>
         </div>
       ) : null}
-      {workerToken ? (
+      {workerToken || allowAnonymousGroupDiscovery ? (
         <WorkerGroupMembershipPanel
           key={`worker-memberships:${targetKey}`}
           canReadGroups={true}
+          allowAnonymousGroupDiscovery={allowAnonymousGroupDiscovery}
           workerUrl={workerUrl}
           workerToken={workerToken}
+          sessionConfig={sessionConfig}
           sessionId={canonicalSessionId}
           sessionSlug={canonicalSessionSlug}
-          refreshNonce={groupsRevision}
+          refreshNonce={groupsRevision + refreshNonce}
+          selectedGroupId={selectedGroupId}
+          showDescriptions={showGroupDescriptions}
+          showListHeader={showMembershipListHeader}
+          participantAddress={normalizedAccount}
+          onSignIn={requestActionAuthentication}
         />
       ) : null}
-      {showCreate ? (
-        canAttemptWorkerAdmin ? (
-          <AdminWorkerGroupsPanel
-            key={`worker-admin-groups:${targetKey}`}
-            canAdminWorker={true}
-            sessionId={canonicalSessionId}
-            sessionSlug={canonicalSessionSlug}
-            workerUrl={workerUrl}
-            postSignedRequest={postSignedRequest}
-            autoLoad={true}
-            onGroupsChanged={() => setGroupsRevision((revision) => revision + 1)}
-          />
-        ) : participantGroupCreationEnabled ? (
-          workerToken ? (
-            <WorkerParticipantGroupCreatePanel
-              sessionId={canonicalSessionId}
-              sessionSlug={canonicalSessionSlug}
-              workerToken={workerToken}
-              workerUrl={workerUrl}
-              onGroupsChanged={() => setGroupsRevision((revision) => revision + 1)}
-            />
-          ) : null
-        ) : (
-          <div className={styles.workerGroupNotice}>Only the configured worker admin can create groups.</div>
-        )
-      ) : null}
+      {showCreate ? renderCreatePanel() : null}
     </div>
   );
 };

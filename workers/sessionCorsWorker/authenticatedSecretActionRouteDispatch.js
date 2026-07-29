@@ -1,5 +1,6 @@
 import { isModelAllowed } from './aiRequestNormalization.js';
 import { executeSessionLitChipotleAction } from './chipotleClient.js';
+import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 
 const resolveDefaultModelForProvider = (provider) => {
   if (provider === 'anthropic') return 'claude-3-5-sonnet-20240620';

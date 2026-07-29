@@ -8,13 +8,13 @@ import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
   normalizeSessionSlug,
-} from '../../domains/sessions/sessionConfig.js';
-import { workerGroupNavigationPort } from '../../domains/worker/workerGroupNavigationPort';
+} from '../../utilities/web3/chainGateway.js';
 import {
   claimsWorkerCanonicalAuthority,
   resolveSessionCapabilityProjection,
 } from '../../utilities/session/sessionCapabilityProjection.js';
 import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import { buildWorkerGroupsPath, readWorkerGroupIdFromHash } from '../../utilities/worker/workerGroupRoutes';
 import { buildSbtListRootClassName } from './sbtListHelpers';
 import { isRecord } from './sbtListRuntimeValues';
 import type { SBTsListProps, UnknownRecord } from './sbtListTypes';
@@ -69,12 +69,7 @@ const WorkerGroupsListRoute = ({ props, workerSessionConfig }: WorkerGroupsListR
       : '';
   const sessionName = configuredSessionName || querySessionName || sessionSlug;
   const sessionHref = buildPublicRoute(`/session/${encodeURIComponent(sessionSlug)}`);
-  const selectedGroupId =
-    String(props.selectedGroupId || '').trim() ||
-    (typeof window !== 'undefined'
-      ? workerGroupNavigationPort.readGroupIdFromPath(window.location.pathname) ||
-        workerGroupNavigationPort.readGroupIdFromHash(window.location.hash)
-      : '');
+  const selectedGroupId = typeof window !== 'undefined' ? readWorkerGroupIdFromHash(window.location.hash) : '';
 
   useEffect(() => {
     if (!sessionSlug || !sessionName || typeof window === 'undefined') return;
@@ -89,8 +84,8 @@ const WorkerGroupsListRoute = ({ props, workerSessionConfig }: WorkerGroupsListR
     if (![1, 2].includes(routeParts.length) || !['groups', 'sbts'].includes(routeRoot)) return;
     if (routeParts.length === 2 && routeSlug !== sessionSlug) return;
     const currentUrl = new URL(window.location.href);
-    const canonicalPath = workerGroupNavigationPort.buildPath({
-      groupId: workerGroupNavigationPort.readGroupIdFromHash(currentUrl.hash),
+    const canonicalPath = buildWorkerGroupsPath({
+      groupId: readWorkerGroupIdFromHash(currentUrl.hash),
       rootPath: `/${routeRoot}`,
       sessionSlug,
     });

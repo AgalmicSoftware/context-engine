@@ -28,14 +28,20 @@ describe('AdminWorkerGroupsPanel', () => {
   });
 
   it('manages the supported group and membership operations through signed worker requests', async () => {
-    const buildGroup = (group = {}) => ({
-      groupId: 'reviewers',
-      sessionSlug: 'alpha',
-      label: 'Reviewers',
-      joinMode: 'admin_add',
-      memberVisibility: 'members',
-      ...group,
-    });
+    const buildGroup = (group: Record<string, unknown> = {}) => {
+      const built: Record<string, unknown> = {
+        groupId: 'reviewers',
+        sessionSlug: 'alpha',
+        label: 'Reviewers',
+        joinMode: 'admin_add',
+        memberVisibility: 'members',
+        ...group,
+      };
+      if (built.memberLimit === 0) delete built.memberLimit;
+      if (!built.joinEndsAt) delete built.joinEndsAt;
+      if (!built.adminAddress) delete built.adminAddress;
+      return built;
+    };
     const postSignedRequest = jest.fn(async ({ action, body }) => {
       if (action === 'groups/list') {
         return {
@@ -139,8 +145,17 @@ describe('AdminWorkerGroupsPanel', () => {
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-mode'), {
       target: { value: 'open' },
     });
+    fireEvent.change(screen.getByLabelText('Tag'), { target: { value: 'reviewers' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add tag' }));
+    fireEvent.change(screen.getByLabelText('Reference URL'), {
+      target: { value: 'https://docs.example.test/brief' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add reference URL' }));
+    fireEvent.change(screen.getByLabelText('Member limit'), { target: { value: '25' } });
+    fireEvent.change(screen.getByLabelText('Join deadline'), { target: { value: '2030-01-01T12:00' } });
+    fireEvent.change(screen.getByLabelText('Group admin address'), { target: { value: ADDRESS } });
     expect(screen.getByTestId('ce-admin-worker-group-create-visibility')).toHaveValue('session');
-    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
     await waitFor(() =>
       expect(postSignedRequest).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -152,6 +167,11 @@ describe('AdminWorkerGroupsPanel', () => {
               label: 'Open participants',
               description: 'Public acceleration discussion group.',
               imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/rocket.jpg',
+              tags: ['reviewers'],
+              documentURLs: ['https://docs.example.test/brief'],
+              memberLimit: 25,
+              joinEndsAt: new Date('2030-01-01T12:00').toISOString(),
+              adminAddress: ADDRESS,
               joinMode: 'open',
               memberVisibility: 'session',
             }),

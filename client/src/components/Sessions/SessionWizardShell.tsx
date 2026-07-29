@@ -166,7 +166,7 @@ export type SessionWizardShellProps = {
   sessionHeaderPreviewSrc: WizardModalsProps['sessionHeaderPreviewSrc'];
   sessionMetadataHeaderAccessory: MetadataEditorProps['headerAccessory'];
   sessionModeProfileControl?: React.ReactNode;
-  sessionModeProfilePrivacyControl?: EncryptionPanelBoundaryProps['sessionModeProfilePrivacyControl'];
+  sessionModeProfilePrivacyControl?: React.ReactNode;
   sessionModeProfileWorkerControl?: WorkerPanelProps['sessionModeProfileWorkerControl'];
   sessionModeProfilePublishControl?: PublishSectionProps['sessionModeProfilePublishControl'];
   sessionModeProfileStepComplete?: boolean;
@@ -449,6 +449,8 @@ const SessionWizardShell = ({
       />
 
       <>
+        {!isNormalMode ? sessionModeProfilePrivacyControl : null}
+
         {(!isNormalMode || !collapsedSections.encryption) && (
           <EncryptionPanel
             isNormalMode={isNormalMode}
@@ -476,7 +478,6 @@ const SessionWizardShell = ({
             addEncryptionGate={addEncryptionGate}
             pendingSbtDrafts={pendingSbtDrafts}
             removePendingSbtDraft={removePendingSbtDraft}
-            sessionModeProfilePrivacyControl={isNormalMode ? null : sessionModeProfilePrivacyControl}
             isWorkerCanonical={isWorkerCanonical}
             showOnChainGateControls={showOnChainGateControls}
           />

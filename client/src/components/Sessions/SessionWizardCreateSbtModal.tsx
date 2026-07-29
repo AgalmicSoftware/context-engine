@@ -3,9 +3,6 @@ import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import styles from './SessionWizard.module.scss';
 import CreateSBTGroup from '../SBTs/CreateSBTGroup';
-import SbtCreateAdvancedExternalNotice, {
-  shouldShowAdvancedExternalSbtNotice,
-} from '../SBTs/SbtCreateAdvancedExternalNotice';
 
 type GateLike = {
   id?: string;
@@ -80,7 +77,6 @@ const SessionWizardCreateSbtModal = ({
         {`Add ${t('sbt')} to Session`}
       </ModalHeader>
       <ModalBody className={styles.createSbtModalBody}>
-        {shouldShowAdvancedExternalSbtNotice(sessionConfigOverride) ? <SbtCreateAdvancedExternalNotice /> : null}
         <CreateSBTGroup
           account={account}
           provider={provider}

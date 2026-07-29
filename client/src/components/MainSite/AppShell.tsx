@@ -59,7 +59,10 @@ import {
   type SessionMetaRefreshController,
 } from '../../utilities/session/sessionMetaController.js';
 import { type SessionScanPolicy } from '../../utilities/session/mainSiteSessionScanPolicy.js';
-import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
+import {
+  claimsWorkerCanonicalAuthority,
+  resolveSessionCapabilityProjection,
+} from '../../utilities/session/sessionCapabilityProjection';
 import {
   createSessionProfileScanController,
   type SessionProfileScanController,
@@ -1454,7 +1457,10 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   getSbtListRouteSessionSlug = (pathIn = '', searchIn = '') =>
     getSbtListRouteSessionSlugFn(
       this.getEffectiveRoutePath(pathIn || (typeof window !== 'undefined' ? window.location.pathname : '') || ''),
-      { normalizeSessionSlug },
+      {
+        normalizeSessionSlug,
+        search: searchIn || (typeof window !== 'undefined' ? window.location.search : '') || '',
+      },
     );
 
   getUserAddressFromPath = (pathIn = '') =>
@@ -2435,9 +2441,10 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     this.refreshSessionInfo();
     this.refreshSessionMetaFields();
     this.refreshGroupCredentials();
-    const activeProjection = resolveSessionCapabilityProjection(this.getDisplaySessionCfg(slug));
+    const activeProjection = resolveSessionCapabilityProjection(bootstrapSessionConfig);
     const hasExplicitSessionTarget =
       !!this.getSessionTokenFromPath(bootstrapPath) ||
+      !!this.getSbtListRouteSessionSlug(bootstrapPath, currentSearch) ||
       resolveMainSiteRouteSessionSlugHint({
         search: currentSearch,
         allowSessionIdLookup: true,

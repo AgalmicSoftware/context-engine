@@ -103,9 +103,10 @@ $muted-text: tokens.$ce-muted-text;
 
 .headerTitleBlock {
   display: grid;
-  flex: 1 1 300px;
+  flex: 0 0 auto;
   gap: 6px;
-  min-width: 280px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .headerActions {
@@ -114,6 +115,7 @@ $muted-text: tokens.$ce-muted-text;
   align-items: flex-start;
   gap: 12px;
   flex-wrap: wrap;
+  min-width: 0;
   max-width: 100%;
   margin-left: auto;
 }
@@ -123,6 +125,7 @@ $muted-text: tokens.$ce-muted-text;
   justify-items: end;
   gap: 7px;
   min-width: 0;
+  max-width: 100%;
 }
 
 .headerSecondaryActions {
@@ -131,13 +134,6 @@ $muted-text: tokens.$ce-muted-text;
   justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-.modeHint {
-  max-width: 620px;
-  font-size: 13px;
-  line-height: 1.45;
-  color: $muted-text;
 }
 
 .headerChainSelector {
@@ -160,93 +156,6 @@ $muted-text: tokens.$ce-muted-text;
 .headerChainInput {
   width: auto;
   min-width: 200px;
-}
-
-.wizardModeToggle {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  padding: 4px;
-  border-radius: var(--ce-radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.wizardModeBtn {
-  background: transparent;
-  border: 1px solid transparent;
-  color: inherit;
-  font-size: 0.75rem;
-  opacity: 0.72;
-  cursor: pointer;
-  padding: 6px 12px;
-  border-radius: var(--ce-radius-pill);
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease,
-    opacity 0.2s ease;
-}
-
-.wizardModeBtnActive {
-  opacity: 1;
-  border-color: rgba(77, 255, 164, 0.35);
-  background: rgba(77, 255, 164, 0.12);
-}
-
-.wizardSettingsMenu {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.wizardSettingsBackdrop {
-  position: fixed;
-  inset: 0;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  z-index: 30;
-}
-
-.wizardSettingsButton {
-  position: relative;
-  z-index: 32;
-}
-
-.wizardSettingsPanel {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  min-width: 220px;
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(18, 22, 50, 0.96);
-  box-shadow:
-    0 16px 32px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  z-index: 31;
-}
-
-.wizardSettingsLabel {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: $muted-text;
-}
-
-.wizardSettingsPanel .wizardModeToggle {
-  width: 100%;
-}
-
-.wizardSettingsPanel .wizardModeBtn {
-  flex: 1 1 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .normalModeRail {
@@ -2747,22 +2656,179 @@ $muted-text: tokens.$ce-muted-text;
   justify-content: flex-end;
   gap: 7px;
   min-width: 0;
+  max-width: 100%;
 }
 
-.modeProfileCompactLabel {
-  color: rgba(244, 247, 255, 0.66);
-  font-size: 0.68rem;
+.modeProfileEntryPanel {
+  display: grid;
+  width: min(100%, 860px);
+  margin: 0 auto;
+  gap: 20px;
+}
+
+.modeProfileEntryIntro {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 620px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.modeProfileEntryPrompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.modeProfileArchitectureLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(143, 255, 196, 0.76);
+  font-size: 0.82rem;
+  line-height: 1;
+  transition:
+    color 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover,
+  &:focus-visible {
+    color: #ffffff;
+    transform: translateY(-1px);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #8fffc4;
+    outline-offset: 3px;
+    border-radius: var(--ce-radius-round);
+  }
+}
+
+.modeProfileEntryEyebrow {
+  color: #8fffc4;
+  font-size: 0.7rem;
+  font-weight: 850;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.modePresetCards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.modePresetCard {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-height: 280px;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+  color: #f4f7ff;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.modePresetCard:hover,
+.modePresetCard:focus-visible {
+  border-color: rgba(77, 255, 164, 0.62);
+  background: rgba(77, 255, 164, 0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32);
+  transform: translateY(-2px);
+}
+
+.modePresetCard:focus-visible {
+  outline: 2px solid #8fffc4;
+  outline-offset: 3px;
+}
+
+.modePresetCardSelected {
+  border-color: rgba(77, 255, 164, 0.72);
+  background: rgba(77, 255, 164, 0.12);
+}
+
+.modePresetCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modePresetCardTitle,
+.modePresetCardProvider,
+.modePresetCardDescription,
+.modePresetCardRequirementsLabel,
+.modePresetCardRequirementsValue {
+  display: block;
+}
+
+.modePresetCardTitle {
+  color: #ffffff;
+  font-size: 1.35rem;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.modePresetCardProvider {
+  margin-top: 5px;
+  color: #8fffc4;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.modePresetCardDescription {
+  margin-top: 24px;
+  color: rgba(244, 247, 255, 0.78);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.modePresetCardRequirements {
+  display: grid;
+  gap: 7px;
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.modePresetCardRequirementsLabel {
+  color: rgba(244, 247, 255, 0.62);
+  font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
+.modePresetCardRequirementsValue {
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 750;
+  line-height: 1.45;
+}
+
 .modePresetToggle {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   gap: 4px;
   box-sizing: border-box;
+  min-width: 0;
   max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
   padding: 3px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--ce-radius-pill);
@@ -2817,7 +2883,6 @@ $muted-text: tokens.$ce-muted-text;
   cursor: not-allowed;
 }
 
-.modePresetBadge,
 .modePresetSoon {
   display: inline-flex;
   align-items: center;
@@ -2829,21 +2894,24 @@ $muted-text: tokens.$ce-muted-text;
   text-transform: uppercase;
 }
 
-.modePresetBadge {
-  border: 1px solid rgba(122, 255, 203, 0.34);
-  color: rgba(161, 255, 221, 0.96);
-}
-
 .modePresetSoon {
   border: 1px solid rgba(244, 247, 255, 0.18);
   color: rgba(244, 247, 255, 0.52);
 }
 
 .modeProfilePanel .moreOptionsToggle {
-  min-height: 34px;
+  flex: 0 0 auto;
+  align-self: center;
+  min-height: 42px;
   padding: 5px 9px;
   border-radius: var(--ce-radius-pill);
   font-size: 0.7rem;
+}
+
+.modeProfilePanel .moreOptionsToggleActive {
+  border-color: rgba(77, 255, 164, 0.62);
+  background: rgba(77, 255, 164, 0.18);
+  color: #ffffff;
 }
 
 .modeSavedProfile {
@@ -2863,9 +2931,10 @@ $muted-text: tokens.$ce-muted-text;
 }
 
 .modeCheckboxRow {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
   gap: 10px;
+  width: 100%;
 }
 
 .modeSection {
@@ -2990,15 +3059,32 @@ $muted-text: tokens.$ce-muted-text;
   gap: 10px;
 }
 
-.modeCheckboxRow {
-  flex-wrap: wrap;
+.modeCheckboxLabel {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 48px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(244, 247, 255, 0.18);
+  border-radius: var(--ce-radius-10);
+  background: rgba(8, 12, 26, 0.26);
+  color: rgba(244, 247, 255, 0.9);
+  line-height: 1.3;
+
+  > input[type='checkbox'] {
+    position: static;
+    flex: 0 0 auto;
+    margin: 0 !important;
+    opacity: 1;
+  }
 }
 
-.modeCheckboxLabel {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0;
+.modeCheckboxText {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .modeNumberLabel {
@@ -3073,26 +3159,30 @@ $muted-text: tokens.$ce-muted-text;
 
   .modeProfilePanel {
     box-sizing: border-box;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     width: 100%;
     justify-content: flex-start;
   }
 
-  .modeProfileCompactLabel {
-    width: 100%;
+  .modeProfileEntryPanel {
+    gap: 16px;
+  }
+
+  .modePresetCards {
+    grid-template-columns: 1fr;
+  }
+
+  .modePresetCard {
+    min-height: 230px;
+    padding: 20px;
   }
 
   .modePresetToggle {
-    width: 100%;
-    overflow-x: auto;
+    width: auto;
   }
 
   .modePresetButton {
     flex: 1 0 auto;
-  }
-
-  .modePresetBadge {
-    display: none;
   }
 
   .modeSection {

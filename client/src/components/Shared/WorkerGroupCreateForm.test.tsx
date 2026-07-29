@@ -93,7 +93,7 @@ describe('WorkerGroupCreateForm image chooser', () => {
   it('uploads a selected image before enabling group creation and retains the resulting URL', async () => {
     let finishUpload: (value: string) => void = () => {};
     const onImageFileUpload = jest.fn(
-      (_file: Blob) =>
+      () =>
         new Promise<string>((resolve) => {
           finishUpload = resolve;
         }),

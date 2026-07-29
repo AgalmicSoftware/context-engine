@@ -129,6 +129,11 @@ import {
   type SessionWizardRegisterTxEntry,
 } from './sessionWizardPublishController';
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
+import { resolveSessionWizardModeFieldPolicy } from './sessionWizardModeFieldPolicy';
+import {
+  checkSessionWizardWorkerSlugExists,
+  resolveSessionWizardSlugAvailabilityPort,
+} from './sessionWizardSlugAvailability';
 import { createSessionWizardPublishRuntimeController } from './sessionWizardPublishRuntimeController';
 import {
   resolveSessionWizardPublishRequestDescriptor,
@@ -898,9 +903,48 @@ const SessionWizard = ({
     [draft?.storageProfile],
   );
   const cloudflareWorkerSbtGateMode = isWorkerSbtGateCloudflareStorageProfile(normalizedDraftStorageProfile);
-  const visibleWorkerResourceKeys = useMemo(
-    () => workerResourceKeys.filter((key) => !cloudflareWorkerSbtGateMode || key !== 'lit'),
-    [cloudflareWorkerSbtGateMode, workerResourceKeys],
+  const sessionModeRequirements = resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile, {
+    hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
+  });
+  const modeFieldPolicy = useMemo(
+    () => resolveSessionWizardModeFieldPolicy(sessionModeRequirements),
+    [sessionModeRequirements],
+  );
+  const workerSlugAvailabilityUrl = normalizeBaseUrl(toStr(draft.corsWorkerUrl).trim());
+  const checkWorkerSessionSlugExists = useCallback(
+    async ({ slug }: SessionSlugExistsArgs): Promise<boolean> =>
+      checkSessionWizardWorkerSlugExists({
+        workerUrl: workerSlugAvailabilityUrl,
+        slug,
+      }),
+    [workerSlugAvailabilityUrl],
+  );
+  const slugAvailabilityPort = resolveSessionWizardSlugAvailabilityPort({
+    isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
+    registerSession: sessionModeRequirements.publish.registerSession,
+    workerUrl: workerSlugAvailabilityUrl,
+    checkRegistrySlug: checkSessionSlugExists,
+    checkWorkerSlug: checkWorkerSessionSlugExists,
+  });
+  const { slugAvailability } = useSessionSlugState({
+    enabled: slugAvailabilityPort.enabled,
+    slug: draft?.slug,
+    privateSlugMode,
+    registryChainId,
+    isReservedSlug: isReservedSessionSlug,
+    sessionExists: slugAvailabilityPort.sessionExists,
+  });
+  const workerCanonicalSettlement = useSessionWizardWorkerSettlementLifecycle(cachedWizard, {
+    currentIdentity: { workerUrl: deployWorkerUrl || draft.corsWorkerUrl, slug: draft.slug, sessionId },
+    isWorkerCanonical: sessionModeRequirements.isWorkerCanonical,
+    publishStatus: sessionPublishState.status,
+    setSessionUrl,
+    setAdminUrl,
+  });
+  const visibleWorkerResourceKeys = workerResourceKeys.filter((key) =>
+    sessionModeRequirements.selected
+      ? sessionModeRequirements.visibleWorkerResourceKeys.includes(key)
+      : !cloudflareWorkerSbtGateMode || key !== 'lit',
   );
   const effectivePersistWorkerSecrets = false;
 
@@ -4147,61 +4191,73 @@ const SessionWizard = ({
     [sessionWizardTooltipsEnabled],
   );
 
-  const renderResourceInputs = (resourceKey: string) => {
-    const fields = getResourceSecretFields(resourceKey);
-    return (
-      <WorkerResourceInputs
-        resourceKey={resourceKey}
-        fields={fields}
-        workerSecrets={workerSecrets}
-        workerSecretsEnabled={workerSecretsEnabled}
-        isNormalMode={isNormalMode}
-        showSponsoredFaucetNotice={showSponsoredFaucetNotice}
-        effectiveDefaultWorkerRpcUrl={effectiveDefaultWorkerRpcUrl}
-        getSecretFieldTestId={getSessionWizardSecretFieldTestId}
-        onUpdateSecret={(fieldKey: string, nextValue: string) => {
-          applyWorkerSecretsUpdate((prev: WorkerSecretsLike) => ({ ...prev, [fieldKey]: nextValue }));
-        }}
-      />
-    );
-  };
-
-  const renderResourceCard = (resourceKey: string) => {
-    const fallbackGateId = defaultGateId || resourceGateOptions[0]?.value || '';
-    const gateId = resourceGateMap[resourceKey] || fallbackGateId;
-    const resourceGateOptionValues = (resourceGateOptions || []).map((option) => option?.value).filter(Boolean);
-    const selectedGateIds = normalizeGateIds(gateId)
-      .filter((id) => resourceGateOptionValues.includes(id))
-      .filter(Boolean);
-    return (
-      <WorkerResourceCard
-        key={resourceKey}
-        resourceKey={resourceKey}
-        label={RESOURCE_LABELS[resourceKey] || resourceKey}
-        tooltipText={RESOURCE_SECTION_TOOLTIPS[resourceKey] || ''}
-        renderInfoTooltip={renderSessionWizardInfoTooltip}
-        gateOptions={gateOptions}
-        selectedGateIds={selectedGateIds}
-        onChangeSelectedGateIds={(nextIds: unknown) => {
-          updateResourceGate(
-            resourceKey,
-            resolveSessionWizardResourceGateSelectionUpdate({
-              nextIds,
-              availableGateIds: resourceGateSelectionState.availableGateIds,
-              fallbackGateId: resourceGateSelectionState.fallbackGateId,
-            }),
-          );
-        }}
-        open={openResourceGateKey === resourceKey}
-        onToggleOpen={(nextOpen) => setOpenResourceGateKey(nextOpen ? resourceKey : '')}
-        disabled={resourceGateOptions.length <= 1}
-      >
-        {renderResourceInputs(resourceKey)}
-      </WorkerResourceCard>
-    );
-  };
-
-  const orderedDraftEntries = useMemo(() => getSessionWizardOrderedDraftEntries(draft), [draft]);
+  const renderField = buildSessionWizardDraftFieldRenderer({
+    blockLimitDuration,
+    blockLimitUnit,
+    compactSessionHeaderInputRef,
+    compactSessionHeaderMode,
+    defaultGateId,
+    draft,
+    draftRef,
+    encryptedFieldGates,
+    encryptionGates,
+    ensureLightSbtUniverse,
+    fieldErrors,
+    gateOptions,
+    getGateById,
+    handleClearSessionHeaderPreview,
+    handlePasteSessionHeaderFromClipboard,
+    handleRemoveDefaultFeaturedSbt,
+    latestBlockStatus,
+    latestChainBlock,
+    launchCreateSbtModal,
+    markBlockStartManual,
+    metadataObjectCollapsed,
+    modeFieldPolicy,
+    network,
+    normalizeGateIds,
+    openContractViewerModal,
+    openLockKey,
+    pendingSbtSelectorOptions,
+    privateSlugMode,
+    registryChainId,
+    renderSessionWizardInfoTooltip,
+    resolvedActiveSessionSlug,
+    sbtCacheRevision,
+    selectorSourceChainId,
+    selectorSourceSessionConfig,
+    sessionHeaderMode,
+    sessionHeaderPreviewSrc,
+    sessionHeaderUploadStatus,
+    sessionHeaderUploadStatusTone,
+    sessionWizardTooltipsEnabled,
+    setBlockLimitDuration,
+    setBlockLimitUnit,
+    setCompactSessionHeaderMode,
+    setDefaultGateId,
+    setDraft,
+    setEncryptedFieldGates,
+    setMetadataObjectCollapsed,
+    setOpenLockKey,
+    setSessionHeaderFile,
+    setSessionHeaderMode,
+    setSessionHeaderPreviewModalOpen,
+    setSessionHeaderStatus,
+    setShowPromptPreview,
+    setWorkerUrlAutoFilled,
+    showPromptPreview,
+    slugAvailability,
+    slugPinnedByPendingSbtDrafts,
+    togglePrivateSlugMode,
+    updateArrayValue,
+    updateDraftValue,
+    workerSecretsEnabled,
+    wizardMode,
+  });
+  const orderedDraftEntries = useMemo(
+    () => getSessionWizardOrderedDraftEntries(draft, modeFieldPolicy),
+    [draft, modeFieldPolicy],
+  );
 
   const registerChainId = Number(registryChainId || draft.networkChainId || 0) || null;
   const registerExplorerBaseUrl = getExplorerBaseUrl(registerChainId);
@@ -4615,6 +4671,8 @@ const SessionWizard = ({
     entryOnly: showSessionModeProfileEntryStep,
     onContinue: () => setSessionModeProfileStepComplete(true),
     onEnterAdvancedMode: handleEnterAdvancedMode,
+    onEnterNormalMode: handleEnterNormalMode,
+    customizing: wizardMode === 'advanced',
     registryChainId,
     setCollapsedSections,
     setDraft,

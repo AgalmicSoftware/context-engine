@@ -40,7 +40,7 @@ describe('AboutPage', () => {
     expect(hero).toBeInTheDocument();
     expect(
       within(hero).getByText(
-        'An open-source toolkit for deliberation, sensemaking, and negotiation (for humans and AI agents)',
+        'An open-source toolkit for deliberation, decision-making, and negotiation (for humans and AI agents)',
       ),
     ).toBeVisible();
     expect(demoLink).toHaveAttribute('href', getAboutDemoSessionPath());

@@ -2,6 +2,10 @@ import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import { getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import {
+  SESSION_MODE_PRESET_IDS,
+  cloneSessionModePreset,
+} from '../../utilities/session/sessionModeProfile';
+import {
   buildWorkerUrlResolutionDisplay,
   buildWorkerSessionConfigPayload,
   getSessionReadRpcConfig,
@@ -328,5 +332,50 @@ describe('adminPageWorkerSessionConfigHelpers', () => {
         },
       }),
     );
+  });
+
+  it('allowlists Worker-native config and omits legacy chain controls', () => {
+    const sessionModeProfile = cloneSessionModePreset(
+      SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
+    );
+    const payload = buildWorkerSessionConfigPayload({
+      sessionConfig: {
+        slug: 'worker-admin',
+        sessionId: '0x11111111111111111111111111111111',
+        sessionModeProfile,
+        storageProfile: {
+          backend: 'cloudflare',
+          payloadAccessControl: sessionModeProfile.storage.payloadAccessControl,
+        },
+        sessionEndsAt: '2099-01-02T03:04:00.000Z',
+        defaultGroupTags: 'facilitators,reviewers',
+        networkChainId: DEFAULT_CHAIN_ID,
+        registryAddress: '0x1111111111111111111111111111111111111111',
+        blockLimits: { start: 100 },
+        contracts: {
+          surveys: { address: '0x2222222222222222222222222222222222222222' },
+        },
+        faucet: { amountEth: '0.001' },
+      },
+      account: ACCOUNT,
+      fallbackChainId: DEFAULT_CHAIN_ID,
+    });
+
+    expect(payload).toEqual(
+      expect.objectContaining({
+        slug: 'worker-admin',
+        sessionId: '0x11111111111111111111111111111111',
+        sessionEndsAt: '2099-01-02T03:04:00.000Z',
+        defaultGroupTags: 'facilitators,reviewers',
+        sessionModeProfile,
+      }),
+    );
+    expect(payload).not.toHaveProperty('networkChainId');
+    expect(payload).not.toHaveProperty('registryAddress');
+    expect(payload).not.toHaveProperty('blockLimits');
+    expect(payload).not.toHaveProperty('contracts');
+    expect(payload).not.toHaveProperty('faucet');
+    expect(payload).not.toHaveProperty('rpcUrl');
+    expect(payload).not.toHaveProperty('rpcUrlsByChainId');
   });
 });

@@ -34,7 +34,7 @@ export const isSbtListRoutePath = (effectivePath: string): boolean => {
 
 export const getSbtListRouteSessionSlug = (
   effectivePath: string,
-  opts: { normalizeSessionSlug: SessionSlugNormalizer },
+  opts: { normalizeSessionSlug: SessionSlugNormalizer; search?: string },
 ): string => {
   const parts = splitCleanPath(effectivePath);
   const root = String(parts[0] || '')

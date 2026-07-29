@@ -131,7 +131,7 @@ export const E2E_TESTIDS = Object.freeze({
   WIZARD_SLUG_AVAILABLE: 'ce-wizard-slug-available',
   WIZARD_SLUG_TAKEN: 'ce-wizard-slug-taken',
   WIZARD_MODE_NORMAL: 'ce-wizard-mode-normal',
-  WIZARD_MODE_ADVANCED: 'ce-wizard-mode-advanced',
+  WIZARD_MODE_ADVANCED: 'ce-wizard-customize',
   WIZARD_GROUP_CREATION_POLICY: 'ce-wizard-group-creation-policy',
   WIZARD_METADATA_PANEL_TOGGLE: 'ce-wizard-metadata-panel-toggle',
   WIZARD_WORKER_MODE_TOGGLE: 'ce-wizard-worker-mode-toggle',
@@ -323,7 +323,6 @@ export const E2E_TESTIDS = Object.freeze({
 
   // CreateSBTGroup + SBTPage
   SBTS_CREATE_TOGGLE: 'ce-sbts-create-toggle',
-  SBT_CREATE_ADVANCED_EXTERNAL_NOTICE: 'ce-sbt-create-advanced-external-notice',
   SBT_CREATE_NAME_INPUT: 'ce-sbt-create-name-input',
   SBT_CREATE_DESCRIPTION_INPUT: 'ce-sbt-create-description-input',
   SBT_CREATE_NAME_LOCK_ROW: 'ce-sbt-create-name-lock-row',

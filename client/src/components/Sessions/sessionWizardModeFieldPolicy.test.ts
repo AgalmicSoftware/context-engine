@@ -1,9 +1,14 @@
-import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
+import {
+  SESSION_MODE_PRESET_IDS,
+  cloneSessionModePreset,
+} from '../../utilities/session/sessionModeProfile';
 import { resolveSessionWizardModeFieldPolicy } from './sessionWizardModeFieldPolicy';
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
 
 const cloudflareRequirements = () =>
-  resolveSessionWizardModeRequirements(cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE));
+  resolveSessionWizardModeRequirements(
+    cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  );
 
 describe('sessionWizardModeFieldPolicy', () => {
   it('shows Worker timing and Group defaults without chain-only controls for pure Cloudflare', () => {
@@ -34,7 +39,9 @@ describe('sessionWizardModeFieldPolicy', () => {
       ],
     };
 
-    expect(resolveSessionWizardModeFieldPolicy(resolveSessionWizardModeRequirements(profile))).toEqual({
+    expect(
+      resolveSessionWizardModeFieldPolicy(resolveSessionWizardModeRequirements(profile)),
+    ).toEqual({
       showBlockLimits: false,
       showFaucet: false,
       showSessionEndsAt: true,

@@ -161,7 +161,7 @@ describe('SessionWizard publish boundary rendering', () => {
     fireEvent.click(publishButton);
     await waitFor(() => expect(mockSessionExists).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByLabelText('Customize hosting (advanced options)'));
+    enableAdvancedMode();
     fireEvent.change(await screen.findByLabelText('Who can see results'), {
       target: { value: 'private_admin' },
     });
@@ -519,7 +519,7 @@ describe('SessionWizard publish boundary rendering', () => {
 
       fireEvent.change(fastProviderSelect, { target: { value: 'openai' } });
       await waitFor(() => expect(publishButton).not.toBeDisabled());
-      fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
+      enableAdvancedMode();
       const encryptionOptions = within(screen.getByRole('radiogroup', { name: /encryption/i }));
       fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
       await waitFor(() =>

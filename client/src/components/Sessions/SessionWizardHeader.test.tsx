@@ -20,7 +20,7 @@ describe('SessionWizardHeader', () => {
     jest.clearAllMocks();
   });
 
-  it('renders the default mode controls and forwards mode clicks', () => {
+  it('renders the profile control without a duplicate Normal or Advanced switch', () => {
     render(
       <SessionWizardHeader
         {...baseProps}
@@ -32,18 +32,10 @@ describe('SessionWizardHeader', () => {
 
     expect(screen.getByRole('heading', { name: 'Session Setup (Cloudflare)' })).toBeInTheDocument();
     const hostingControl = screen.getByTestId('hosting-profile-control');
-    const normalMode = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL);
     expect(hostingControl).toBeInTheDocument();
-    expect(hostingControl.compareDocumentPosition(normalMode) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.queryByText('Advanced mode shows the full session configuration.')).not.toBeInTheDocument();
-    expect(normalMode).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toHaveAttribute('aria-pressed', 'false');
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
-
-    expect(baseProps.onEnterAdvancedMode).toHaveBeenCalledTimes(1);
-    expect(baseProps.onEnterNormalMode).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Normal')).not.toBeInTheDocument();
+    expect(screen.queryByText('Advanced')).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL)).not.toBeInTheDocument();
   });
 
   it('renders sponsored display settings without changing the mode test ids', () => {

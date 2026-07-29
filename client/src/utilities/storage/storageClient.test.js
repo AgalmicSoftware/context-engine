@@ -97,6 +97,49 @@ describe('storageClient', () => {
     expect(result.storageRef.backend).toBe('cloudflare');
   });
 
+  test('uses an existing Worker credential for Cloudflare file uploads without triggering another auth flow', async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: 'cf_01j7safeopaqueid',
+          storageRef: {
+            backend: 'cloudflare',
+            id: 'cf_01j7safeopaqueid',
+            uri: '/storage/read?id=cf_01j7safeopaqueid',
+            contentType: 'image/png',
+            resource: 'images',
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+    const file = new File(['image'], 'group.png', { type: 'image/png' });
+
+    const result = await uploadDataToSessionStorage(file, 'png', {
+      sessionSlug: 'alpha',
+      sessionConfig: { storageProfile: { backend: 'cloudflare' } },
+      workerUrl: 'https://worker.example',
+      credentialToken: 'existing-worker-token',
+      fetchImpl,
+      resource: 'images',
+      contentType: 'image/png',
+    });
+
+    expect(fetchWorkerWithAuth).not.toHaveBeenCalled();
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://worker.example/storage/upload',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.any(Headers),
+        body: expect.any(FormData),
+      }),
+    );
+    const requestHeaders = fetchImpl.mock.calls[0][1].headers;
+    expect(requestHeaders.get('Authorization')).toBe('Bearer existing-worker-token');
+    expect(requestHeaders.get('X-Group-Slug')).toBe('alpha');
+    expect(result.storageRef.resource).toBe('images');
+  });
+
   test('rejects plaintext uploads when Cloudflare lit_encrypted mode is selected', async () => {
     await expect(
       uploadDataToSessionStorage({ ok: true }, 'json', {

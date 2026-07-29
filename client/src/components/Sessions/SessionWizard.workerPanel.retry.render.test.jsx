@@ -151,7 +151,7 @@ describe('SessionWizard worker panel retry rendering', () => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).toBeInTheDocument();
       expect(
         screen.getByText(
-          'Normal mode still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. Optional fallback: Run nvm use 20 && npm run worker:bundle from the repo root, then choose /dist/sessionCorsWorker.bundle.js.',
+          'Guided setup still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. Optional fallback: Run nvm use 20 && npm run worker:bundle from the repo root, then choose /dist/sessionCorsWorker.bundle.js.',
         ),
       ).toBeInTheDocument();
     } finally {

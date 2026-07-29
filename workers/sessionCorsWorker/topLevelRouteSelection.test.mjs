@@ -196,3 +196,35 @@ test('resolveTopLevelRouteSelection lets storage reads try anonymous public-read
     { kind: 'authenticated' }
   );
 });
+
+test('resolveTopLevelRouteSelection lets unsigned group discovery try the anonymous policy gate', () => {
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/groups/list',
+      method: 'GET',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'anonymous', anonymousRoute: 'groups' }
+  );
+
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/groups/list',
+      method: 'GET',
+      request: createRequest({ Authorization: 'Bearer token' }),
+      deps: { toStr: String },
+    }),
+    { kind: 'authenticated' }
+  );
+
+  assert.deepEqual(
+    resolveTopLevelRouteSelection({
+      path: '/groups/list',
+      method: 'POST',
+      request: createRequest(),
+      deps: { toStr: String },
+    }),
+    { kind: 'authenticated' }
+  );
+});

@@ -93,11 +93,26 @@ For the default `Fast & Cheap (Cloudflare)` preset:
    and the isolated `deploy/cloudflare/session-worker/` package. Cloudflare
    provisions the Worker, KV namespace, and Durable Object in the user's own
    account.
-3. The user pastes the two runtime secrets into Cloudflare's encrypted secret
-   fields, deploys, and returns the resulting `workers.dev` URL to the wizard.
-4. The wizard verifies the Worker and performs the signed initial session
-   configuration write. No Cloudflare credential crosses a Context
-   Engine-operated origin.
+3. The user copies all four displayed values into Cloudflare, including the two
+   runtime secrets in Cloudflare's encrypted secret fields, deploys, and
+   returns the resulting `workers.dev` URL to the wizard.
+4. The wizard verifies reachability, browser-origin/CORS access, and canonical
+   config identity/readback before it accepts the Worker and performs the
+   signed initial session configuration write. No Cloudflare credential
+   crosses a Context Engine-operated origin.
+
+The initial and signed follow-up config writes use the selected capability
+profile as an allowlist. Pure Worker-canonical sessions keep generic session
+defaults (`defaultTags`, `defaultGroupTags`, `questionsGenPrompt`, and
+`defaultFilterState`) and may set `sessionEndsAt`, but reject `blockLimits`,
+faucet/registry fields, and contract maps. A Worker profile that explicitly
+uses on-chain SBT authorization may additionally persist its network and only
+the `sbtFactory` contract; it does not inherit Surveys or Session Registry
+controls. Registry-canonical deployments preserve their existing chain fields.
+
+This is a manual dashboard handoff, not browser OAuth, an automatic callback,
+or a one-click deployment. Keep the wizard tab open while completing the
+Cloudflare steps.
 
 The generated runtime secrets are `TOKEN_HMAC_SECRET` and
 `CE_STORAGE_ENVELOPE_KEK`. They secure the deployed app runtime; they do not
@@ -108,7 +123,25 @@ grant Cloudflare account access. The Worker is deployed with
 
 For the default `Fast & Cheap (Cloudflare)` preset:
 
-1) Fill in the Cloudflare API token and one key for the selected AI provider.
+### API token setup and handling
+
+The legacy deploy-helper fallback uses a short-lived Cloudflare API token. Keep
+the following constraints in mind before creating or pasting one:
+
+- Cloudflare may preselect **All accounts**. Before creating the token, restrict
+  **Account Resources** to the one account where this Worker will run.
+- Context Engine infers the account during deployment only when the token can
+  see exactly one account.
+- The browser sends the token only for the current deployment attempt to the
+  deploy helper at `https://ce-deploy-helper.agalmic.workers.dev/`. The helper
+  uses it to call Cloudflare. The token is not saved to the session draft or
+  browser storage, and it is not installed in the deployed Session Worker.
+- Set the earliest expiration Cloudflare permits that still covers setup and an
+  immediate retry. Revoke the token as soon as deployment succeeds or you
+  abandon the attempt from
+  [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens).
+
+1. Fill in the Cloudflare API token and one key for the selected AI provider.
    - The "Create prefilled API token" link opens a Cloudflare token template with the required
      `Workers Scripts: Edit` and `Workers KV Storage: Edit` permissions used by the default
      deploy-helper path. The helper's workers.dev subdomain calls are also covered by
@@ -119,24 +152,8 @@ For the default `Fast & Cheap (Cloudflare)` preset:
    - CLI equivalent for agents/local setup: `npm run -s cloudflare:token-link -- --slug <session-slug>`
      Add `--include-r2-storage` only for an advanced deployment that manages an existing R2 bucket;
      the flag does not create the bucket.
-   - When the template preselects `All accounts`, restrict Account Resources to the one account
-     where the session worker will run before creating the token.
-   - Set the earliest expiration Cloudflare permits that still covers setup and an immediate
-     retry. Revoke the token from the Cloudflare API Tokens page as soon as deployment succeeds
-     or the attempt is abandoned.
    - The template auto-names the token as `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMAM` or `contextEngine-corsSessionWorker-<session-slug>-MONDD-YYYY-HHMMPM` (local time).
-   - The first-party wizard derives the worker name and does not ask for a
-     Cloudflare account ID. The deploy-helper resolves exactly one visible
-     account from the API token and stops when the token exposes zero or multiple
-     accounts.
-   - On the direct default `/new` path, the token is deploy-helper request input
-     only. It is rejected from canonical session config and must not appear in
-     worker config/secrets, URLs, metadata, logs, analytics, or browser/durable
-     storage. The Worker step displays the exact deploy-helper URL that receives
-     the one-attempt HTTPS request; that helper is the component that presents
-     the token to Cloudflare. The separate legacy sponsored deploy-grant path
-     below retains its existing short-lived server-side grant record.
-2) Click "Deploy worker". The default preset does not ask for an Arweave JWK,
+2. Click "Deploy worker". The default preset does not ask for an Arweave JWK,
    Lit key, user RPC URL/key, faucet key, wallet connector, funding, or gas.
    Those inputs remain available only when an explicit Lit, decentralized, or
    other chain-backed profile requires them.
@@ -341,6 +358,12 @@ Worker-canonical discovery:
   client keeps the slug on the worker-native discovery path and skips EVM
   block-window scans. Chainless worker-canonical profiles also skip automatic
   testnet faucet funding.
+- Worker-canonical `sessionEndsAt` is an optional ISO timestamp. At or after
+  that instant participant AI, transcription, fetch, upload, Group create, and
+  Group join routes return `410` with `code: "session_ended"`. Group discovery,
+  storage reads/lists, result reads, authentication, and signed admin routes
+  remain available. This is a Worker lifecycle boundary, not an EVM block
+  limit.
 - For a validated explicit-Lit worker profile, the profile's
   `evm.registryChainId` is authoritative for the route network and the effective
   session config passed to response-gate and auto-mint consumers. A stale
@@ -601,20 +624,25 @@ session scan.
 In a `worker_canonical` web session, the expanded Groups section reads and joins
 these records directly. The top-level `groupCreationPolicy` is either
 `admin_only` or `participants`; missing legacy values fail closed to
-`admin_only`. Under `participants`, an authenticated principal with the
-session's `groups` scope may create a group through the bearer-authenticated
-member route. The Worker ignores caller-selected identifiers and access modes,
-generates the ID, and forces the new group to open self-join with session
-visibility. The configured worker admin retains the signed create, edit,
-delete, and membership controls under either policy. This flow never opens the
+`admin_only`. Under `participants`, creating still requires an authenticated
+principal with the session's `groups` scope. The Worker ignores caller-selected
+identifiers and access modes, generates participant-created IDs, and forces
+those groups to open self-join with session visibility. The configured worker
+admin retains the signed create, edit, delete, and membership controls under
+either policy. Group discovery is independent: an unsigned `GET /groups/list`
+is accepted only when the validated session mode declares public stored results
+over unencrypted, ungated Cloudflare storage. It returns only `session`-visible
+group metadata, never memberships, member identities, member counts, or groups
+restricted to admins/members. Private, gated, and encrypted modes keep discovery
+authenticated. This flow never opens the
 legacy SBT deployment form and does not request a contract address, chain, RPC,
 gas, or burn policy. A
 Worker/SBT or Worker/Lit hybrid keeps **Native Worker Groups** as its participant
 Group authority and labels the chain-dependent controls separately as
 **Advanced on-chain access**. Registry-canonical sessions retain the existing
 SBT Groups experience. Agent-enabled sessions use the session-worker JWT
-returned by client login to call `/groups/list`, `/groups/my-memberships`, and
-`/groups/join` directly. A dedicated Agent Session Wrapped Bridge may also
+returned by client login to call `/groups/list`, `/groups/my-memberships`,
+`/groups/members`, `/groups/join`, and `/groups/leave` directly. A dedicated Agent Session Wrapped Bridge may also
 validate that same JWT at its deployment-pinned `/groups/my-memberships`
 endpoint before issuing a shorter, session-bound Bridge credential; the Bridge
 does not evaluate the login's SIWE, registry, RPC, SBT, or gate logic. The Admin
@@ -651,8 +679,23 @@ origin. Failed deploy/redeploy attempts preserve the last verified record.
 Group records and membership rows are stored separately in KV and stamped with
 the canonical session ID. A group record has a generated `groupId`, label,
 optional description and HTTPS `imageUrl`, join mode, and member visibility; it
-has no contract address. Image URLs are limited to 2,048 characters, must use
-HTTPS, and cannot contain URL credentials. The worker uses
+may also carry up to 20 unique tags, up to 10 public HTTPS `documentURLs`, a
+per-group `memberLimit`, a UTC `joinEndsAt`, and a normalized EVM
+`adminAddress`. A group-specific member limit is enforced inside the Durable
+Object in addition to the deployment-wide safety cap. `joinEndsAt` closes
+participant self-join, while signed session admins retain explicit membership
+management. Participant-created records derive `adminAddress` from the signed
+principal. The address identifies responsibility for the group; the current
+mutation authority remains the configured session admin. The record has no
+contract address. Image and document URLs are limited to 2,048 characters, must use
+HTTPS, and cannot contain URL credentials. The client group creator offers the
+same compact URL, clipboard-paste, upload, and preview controls as the SBT
+creator. Pasted or selected image files are uploaded through the active session
+storage backend before group creation. Public, unencrypted Cloudflare sessions
+render their `/storage/read` image URLs anonymously; private Cloudflare sessions
+fetch those same URLs with the existing session credential and render a local
+blob URL, without putting credentials in group metadata or query parameters.
+The worker uses
 `CE_WORKER_GROUPS_KV` when present, otherwise the storage index KV aliases. D1
 and envelope-audit bindings are never group stores, so adding an unrelated
 database cannot switch group authority away from existing KV state. Membership
@@ -678,7 +721,8 @@ is durably marked `legacy_locked` and returns
 KV scan is never treated as proof that legacy data is empty.
 
 Once ready, the Durable Object is the strongly consistent authority for active
-groups, member identities, join mode, and group/member capacity. KV is a
+groups, member identities, join mode, join deadline, and group/member capacity,
+including each configured per-group member limit. KV is a
 readable projection. The object reserves capacity before KV writes, keeps
 conservative pending state after ambiguous writes, and changes member markers
 from `active` to `removed` exactly once. Membership-gated storage and login
@@ -696,12 +740,15 @@ and return `503` when an indexed KV record is unavailable or malformed, or when
 coordinator authorization fails mid-read, instead of presenting a false empty
 or partial state.
 
-Legacy or same-slug/recreated-session namespaces need a separate authenticated,
-resumable reconciliation workflow with old writers quiesced before they can be
-marked ready. That migration must stamp and prove the intended canonical
-session ID; it is intentionally not inferred or auto-finalized by this release.
-Ambiguous KV writes intentionally retain conservative coordinator reservations;
-a future authenticated repair workflow should reconcile those reservations.
+An admin-signed `groups/reconcile-empty` action can repair only the narrow case
+where a matching coordinator was previously marked `legacy_locked`, the
+server-managed fresh-deployment proof is now valid, and the exhaustive scan
+finds no current or deleted Group rows. It rechecks the exact slug/session ID
+inside the Durable Object transaction and is idempotent once ready. It cannot
+adopt or erase existing data. Legacy or same-slug/recreated-session namespaces
+that contain rows still need a separate authenticated, resumable migration with
+old writers quiesced. Ambiguous KV writes intentionally retain conservative
+coordinator reservations; they are not eligible for the empty-state repair.
 Whole-group deletion cannot safely fan out through every member principal index
 in one invocation, so stale per-principal index pointers remain fail-closed
 through the coordinator until a bounded compaction or index-generation
@@ -714,23 +761,71 @@ Implemented routes:
   the same `sessionId` in their JSON body. Successful responses include
   `sessionSlug` and `sessionId`. A mismatch returns `409` before principal
   resolution, coordinator access, or KV mutation.
-- `POST /admin/groups/create`: admin-signed create. `joinMode` supports `admin_add` and `open`; `password` and `invite` are recognized but rejected with `join_mode_not_implemented`.
-- `POST /admin/groups/update`: admin-signed update for label, description, HTTPS image URL, join mode, and member visibility.
+- `POST /admin/groups/create`: admin-signed create. Alongside label,
+  description, and image, records accept `tags` (maximum 20),
+  `documentURLs` (maximum 10 public HTTPS URLs), `memberLimit` (1–1,000),
+  future `joinEndsAt`, and `adminAddress`. `joinMode` supports `admin_add` and
+  `open`; `password` and `invite` are recognized but rejected with
+  `join_mode_not_implemented`.
+- `POST /admin/groups/update`: admin-signed update for group metadata,
+  membership limit/deadline, join mode, and member visibility. A limit cannot
+  be reduced below the current authoritative member count.
 - `POST /admin/groups/delete`: admin-signed tombstone. Deletion revokes future `group_gate` and `worker_group` condition checks.
 - `POST /admin/groups/add-member` / `POST /admin/groups/remove-member`: admin-signed membership mutation.
+- `POST /admin/groups/reconcile-empty`: admin-signed, idempotent repair for a
+  matching `legacy_locked` coordinator only when the server-managed bootstrap
+  proof and an exhaustive zero-row scan both succeed.
 - `POST /admin/groups/list` and `POST /admin/groups/list-members`: admin-signed
   group/member views. Member rows are cursor-paginated at no more than 250 per
   request; the response returns `nextCursor`, and Admin exposes an explicitly
   signed **Load more** action rather than exceeding the Worker KV operation
   budget.
-- `GET|POST /groups/list`: authenticated member route. It returns session-visible groups and member-visible groups for the caller.
+- `GET /groups/list`: anonymous discovery is allowed only when the validated
+  Worker-canonical profile declares `public_full_if_storage_public` over
+  unencrypted Cloudflare storage with `gate: "none"` and no access conditions.
+  It returns only redacted, session-visible group metadata. The request must
+  include the exact session slug header and canonical session ID. With a Worker
+  credential, `GET` remains the authenticated member route and additionally
+  returns member-visible groups for the caller. Authenticated `POST` remains
+  supported. `groupCreationPolicy` does not affect discovery.
 - `GET|POST /groups/my-memberships`: authenticated self view. A principal can always see its own memberships. Each row includes the active `memberCount` for that group without exposing the other principals.
+- `GET|POST /groups/members`: authenticated, cursor-paginated member identity
+  view. `memberVisibility: "session"` allows any authenticated session
+  principal; `"members"` requires an active membership in that Group; and
+  `"admin_only"` remains available only through the signed Admin member-list
+  route. The response includes the authoritative count and redacted principals
+  but never KV keys or mutation-actor fields.
 - `POST /groups/create`: authenticated participant create, available only when
   `groupCreationPolicy: "participants"`. The Worker generates the group ID and
-  forces `joinMode: "open"` plus `memberVisibility: "session"`.
-- `POST /groups/join`: authenticated self-join for `joinMode: "open"` groups only.
+  forces `joinMode: "open"` plus `memberVisibility: "session"`. It accepts the
+  safe metadata and limit/deadline fields above, but derives `adminAddress`
+  from the authenticated principal.
+- `POST /groups/join`: authenticated self-join for `joinMode: "open"` groups
+  only, before `joinEndsAt` and while the per-group and deployment-wide member
+  limits have capacity.
+- `POST /groups/leave`: authenticated self-removal from any current membership.
+  The Worker derives the principal from the bearer credential and ignores any
+  caller-supplied principal, so a participant cannot remove another member.
 
-`memberVisibility` defaults to `admin_only`. `members` lets members see the group metadata, and `session` lets any authenticated session principal see the group metadata. Self-membership visibility is always allowed. `passkey_account` and `evm_address` principals use normalized EVM addresses, `telegram` uses the bridge principal id string, and `agent` uses the grant id. Malformed principals fail closed.
+The client presents a selected Worker Group with the same high-level detail
+hierarchy as an on-chain SBT where the concepts apply: **Stats**, **Actions**,
+and **More**. Worker-native terms remain explicit. Stats show the member limit
+and a live join-deadline countdown (or an infinity icon/no deadline). The
+current member count comes from an authenticated self-membership or an
+authorized member-list response. When the configured visibility permits it, a
+user icon opens the same style of member browser used for on-chain SBT holders.
+Actions use Join/Leave rather than Mint/Burn. More renders the group's
+validated public document references and tags. Contract address, network, gas,
+transaction, and burn controls are never synthesized for a Worker-native
+group.
+
+`memberVisibility` defaults to `admin_only`. `members` lets members see the
+group metadata and member identities, while `session` lets any authenticated
+session principal see both. Self-membership visibility is always allowed, but
+does not grant an `admin_only` identity list. Anonymous discovery never returns
+member identities or counts. `passkey_account` and `evm_address` principals use
+normalized EVM addresses, `telegram` uses the bridge principal id string, and
+`agent` uses the grant id. Malformed principals fail closed.
 
 Upload policy `group_allowlist` may be supplied on Cloudflare storage uploads with `groupId`/`groupIds`; the uploader must be a member before payload bytes are persisted. Existing SBT upload behavior is unchanged.
 
@@ -771,6 +866,11 @@ R2 / Durable Objects:
   retain at-least-once retry semantics: success means both writes completed, while
   a failed or response-lost attempt may leave an invisible orphan or a readable
   duplicate. There is no upload receipt journal or key-rotation state machine.
+- `CE_WORKER_GROUP_COORDINATOR` optionally binds an independently migrated
+  `WorkerGroupWriteCoordinator` namespace. When present, Worker Group routes
+  use it while authorization, deployment, and session-key coordination remain
+  on `CE_SESSION_COORDINATOR`. Deployments without it retain the
+  single-coordinator behavior.
 
 Vars:
 - `TOKEN_HMAC_SECRET` (HMAC secret for session tokens; automated deployment

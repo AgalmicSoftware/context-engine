@@ -1,7 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEraser, faPlus, faTimes } from '@fortawesome/free-solid-svg-icons';
-import type { WorkerGroupJoinMode, WorkerGroupMemberVisibility } from '../../domains/worker/workerGroupPorts';
+import type {
+  WorkerGroupJoinMode,
+  WorkerGroupMemberVisibility,
+} from '../../domains/worker/workerGroupPorts';
 import { validateWorkerGroupImageFile } from '../../domains/worker/workerGroupImageUpload';
 import createStyles from '../SBTs/CreateSBTGroup.module.scss';
 import CompactImageChooser from './CompactImageChooser';
@@ -58,7 +61,13 @@ type WorkerGroupCreateMessageProps = {
   testId?: string;
 };
 
-const ActiveSessionContext = ({ sessionName, sessionSlug }: { sessionName?: string; sessionSlug: string }) => (
+const ActiveSessionContext = ({
+  sessionName,
+  sessionSlug,
+}: {
+  sessionName?: string;
+  sessionSlug: string;
+}) => (
   <div className={styles.sessionContext} data-testid="ce-session-worker-group-create-active-session">
     <div className={styles.sessionContextCopy}>
       <span className={styles.sessionContextLabel}>Active session</span>
@@ -296,21 +305,21 @@ const WorkerGroupCreateForm = ({
 
   const hasDraft = Boolean(
     label ||
-    description ||
-    imageUrl ||
-    selectedImageFile ||
-    tags.length ||
-    documentURLs.length ||
-    memberLimit ||
-    joinEndsAt ||
-    adminAddress,
+      description ||
+      imageUrl ||
+      selectedImageFile ||
+      tags.length ||
+      documentURLs.length ||
+      memberLimit ||
+      joinEndsAt ||
+      adminAddress,
   );
   const imageUrlInvalid = Boolean(imageUrl.trim() && !/^https:\/\//i.test(imageUrl.trim()));
   const imageSelectionPending = Boolean(selectedImageFile && !imageUrl.trim());
   const memberLimitNumber = Number(memberLimit);
   const memberLimitInvalid = Boolean(
     memberLimit.trim() &&
-    (!Number.isSafeInteger(memberLimitNumber) || memberLimitNumber < 1 || memberLimitNumber > 1000),
+      (!Number.isSafeInteger(memberLimitNumber) || memberLimitNumber < 1 || memberLimitNumber > 1000),
   );
   const joinEndsAtTime = joinEndsAt ? new Date(joinEndsAt).getTime() : 0;
   const joinEndsAtInvalid = Boolean(joinEndsAt && (!Number.isFinite(joinEndsAtTime) || joinEndsAtTime <= Date.now()));
@@ -421,7 +430,11 @@ const WorkerGroupCreateForm = ({
                 urlInputTestId={imageTestId}
                 urlPlaceholder="Paste image URL"
                 urlInputAriaLabel="Image URL"
-                selectedFileLabel={selectedImageFile ? String((selectedImageFile as File).name || 'Pasted image') : ''}
+                selectedFileLabel={
+                  selectedImageFile
+                    ? String((selectedImageFile as File).name || 'Pasted image')
+                    : ''
+                }
                 previewFile={selectedImageFile}
                 previewSrc={selectedImageFile ? '' : imageUrl}
                 previewAlt="Group artwork preview"
@@ -496,12 +509,7 @@ const WorkerGroupCreateForm = ({
                     }
                   }}
                 />
-                <button
-                  type="button"
-                  aria-label="Add tag"
-                  disabled={!tagInput.trim() || tags.length >= 20}
-                  onClick={addTag}
-                >
+                <button type="button" aria-label="Add tag" disabled={!tagInput.trim() || tags.length >= 20} onClick={addTag}>
                   <FontAwesomeIcon icon={faPlus} />
                 </button>
               </div>
@@ -626,7 +634,9 @@ const WorkerGroupCreateForm = ({
                   value={memberVisibility}
                   aria-label="Who can see members"
                   data-testid={memberVisibilityTestId}
-                  onChange={(event) => onMemberVisibilityChange?.(event.target.value as WorkerGroupMemberVisibility)}
+                  onChange={(event) =>
+                    onMemberVisibilityChange?.(event.target.value as WorkerGroupMemberVisibility)
+                  }
                 >
                   <option value="admin_only">Admins only</option>
                   <option value="members">Group members</option>

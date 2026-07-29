@@ -298,85 +298,12 @@ import SessionWizard, {
   resolveSessionWizardChipotleHookConfig,
   resolveSessionWizardSelectorSourceConfig,
   resolveSessionWizardWorkerBaseUrl,
-} from './SessionWizard';
-
-const renderSessionWizard = (props = {}) => render(<SessionWizard network={{ id: 84532 }} {...props} />);
-const createTooltipStore = (tooltipsEnabled = true) => createStore(
-  (state = { sessionState: { tooltipsEnabled } }, action) => {
-    if (action.type === 'SET_TOOLTIPS') {
-      return {
-        sessionState: {
-          tooltipsEnabled: action.payload,
-        },
-      };
-    }
-    return state;
-  }
-);
-const renderSessionWizardWithTooltipStore = ({ tooltipsEnabled = true, props = {} } = {}) => {
-  const store = createTooltipStore(tooltipsEnabled);
-  const view = render(
-    <Provider store={store}>
-      <SessionWizard network={{ id: 84532 }} {...props} />
-    </Provider>
-  );
-  return { store, ...view };
-};
-const renderLoggedInSessionWizard = (props = {}) => renderSessionWizard({
-  account: TEST_ADMIN_ADDRESS,
-  loginComplete: true,
-  toggleLoginModal: jest.fn(),
-  ...props,
-});
-const getWizardResourceCard = (resourceKey) => (
-  screen.getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
-    .find((card) => card.getAttribute('data-ce-resource-key') === resourceKey)
-);
-const enableAdvancedMode = () => {
-  fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
-};
-const selectNormalModeCard = (label) => {
-  fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
-};
-const getMockSelectorById = (selectorId) => (
-  screen.queryAllByTestId('mock-wizard-sbt-selector')
-    .find((node) => node.getAttribute('data-selector-id') === selectorId)
-);
-const expectSelectorAddresses = async (selectorId, expectedAddresses) => {
-  await waitFor(() => {
-    const selector = getMockSelectorById(selectorId);
-    expect(selector).toBeTruthy();
-    expect(selector).toHaveAttribute('data-selected-addresses', expectedAddresses.join(','));
-  });
-};
-const openAdvancedMoreOptions = async () => {
-  enableAdvancedMode();
-  fireEvent.click(screen.getByRole('button', { name: /more options/i }));
-};
-const getFeaturedCreateButton = async () => await waitFor(() => {
-  const button = screen.getAllByTestId(E2E_TESTIDS.WIZARD_CREATE_SBT).find(
-    (node) => node.getAttribute('data-ce-sbt-target') === 'defaultFeaturedSBTs'
-  );
-  expect(button).toBeTruthy();
-  return button;
-});
-const ensureGateASelectorVisible = async () => {
-  if (!getMockSelectorById('encryption-gate-gate-1')) {
-    fireEvent.click(screen.getByRole('button', { name: /groups allowed to decrypt locked fields/i }));
-  }
-  await waitFor(() => {
-    expect(getMockSelectorById('encryption-gate-gate-1')).toBeTruthy();
-  });
-};
-const createPendingFeaturedDraft = async () => {
-  await openAdvancedMoreOptions();
-  fireEvent.click(await getFeaturedCreateButton());
-  fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
-  await waitFor(() => {
-    expect(screen.queryByTestId('mock-create-sbt-group')).not.toBeInTheDocument();
-    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toContain(mockPendingSbtAddress);
-  });
-};
+  screen,
+  selectNormalModeCard,
+  createPublicWorkerVerificationResponder,
+  enableAdvancedMode,
+  waitFor,
+} from './SessionWizard.workerPanel.testUtils';
 
 describe('SessionWizard worker panel rendering', () => {
   beforeEach(() => {
@@ -463,7 +390,7 @@ describe('SessionWizard worker panel rendering', () => {
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveAttribute('readonly');
     expect(
       screen.getByText(
-        'Normal mode deploys use the GitHub-hosted worker bundle automatically. If a retry needs a different source, keep this Git URL as the default and add a manual bundle URL or upload below after a fetch failure.',
+        'Guided deploys use the GitHub-hosted worker bundle automatically. If a retry needs a different source, keep this Git URL as the default and add a manual bundle URL or upload below after a fetch failure.',
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText('Worker name')).not.toBeInTheDocument();
@@ -584,7 +511,8 @@ describe('SessionWizard worker panel rendering', () => {
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
-    global.fetch = jest.fn(async (url) => {
+    const respondToPublicWorkerVerification = createPublicWorkerVerificationResponder();
+    global.fetch = jest.fn(async (url, options = {}) => {
       const normalizedUrl = String(url);
       if (normalizedUrl.endsWith('/deploy')) {
         return {
@@ -600,6 +528,8 @@ describe('SessionWizard worker panel rendering', () => {
       if (normalizedUrl.endsWith('/auth/nonce')) {
         return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
       }
+      const publicVerificationResponse = respondToPublicWorkerVerification(normalizedUrl, options);
+      if (publicVerificationResponse) return publicVerificationResponse;
       return { ok: true, json: async () => ({ ok: true }) };
     });
 
@@ -622,7 +552,7 @@ describe('SessionWizard worker panel rendering', () => {
         expect(advancedBundleUrlInput).toHaveValue('https://bundles.example.test/custom-sessionCorsWorker.bundle.js');
       });
 
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
       selectNormalModeCard('Worker');
 
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue(WORKER_BUNDLE_URL);

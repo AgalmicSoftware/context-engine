@@ -349,16 +349,12 @@ const getWizardResourceCard = (resourceKey) =>
     .getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
     .find((card) => card.getAttribute('data-ce-resource-key') === resourceKey);
 const enableAdvancedMode = () => {
+  ensureSessionModeProfileReady();
+  const customizeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
+  if (customizeButton.getAttribute('aria-pressed') === 'true') return;
   act(() => {
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    fireEvent.click(customizeButton);
   });
-  if (hasCommittedSessionModeProfile()) return;
-  const preset = screen.queryByTestId(resolveSessionModePresetTestId());
-  if (preset) {
-    act(() => {
-      fireEvent.click(preset);
-    });
-  }
 };
 const readCachedSessionWizardDraft = () => {
   try {
@@ -411,34 +407,32 @@ function commitSessionModeProfileGateIfPresent() {
 const ensureSessionModeProfileSelected = () => {
   if (hasCommittedSessionModeProfile()) return;
   const presetTestId = resolveSessionModePresetTestId();
-  if (screen.queryByTestId(presetTestId)) {
-    act(() => {
-      fireEvent.click(screen.getByTestId(presetTestId));
-    });
-    return;
-  }
-  const normalModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL);
-  const advancedModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
-  if (!normalModeButton || !advancedModeButton) return;
-  const wasNormalMode = normalModeButton.getAttribute('aria-pressed') === 'true';
-  act(() => {
-    fireEvent.click(advancedModeButton);
-  });
-  const preset = screen.queryByTestId(presetTestId);
-  if (preset) {
-    act(() => {
-      fireEvent.click(preset);
-    });
-  }
-  if (wasNormalMode) {
-    act(() => {
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
-    });
-  }
+  clickSessionModePresetForTest(presetTestId);
 };
 const selectNormalModeCard = (label) => {
   ensureSessionModeProfileSelected();
+  const customizeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
+  if (customizeButton?.getAttribute('aria-pressed') === 'true') {
+    fireEvent.click(customizeButton);
+  }
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
+};
+const createPublicWorkerVerificationResponder = () => {
+  let publicConfig = {};
+  return (url, options = {}) => {
+    const normalizedUrl = String(url);
+    if (normalizedUrl.endsWith('/admin/set-config')) {
+      const payload = JSON.parse(String(options.body || '{}'));
+      publicConfig = payload.config || publicConfig;
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    }
+    if (normalizedUrl.includes('/session-config')) {
+      const { litCredentials: _privateLitDescriptor, ...verifiedConfig } = publicConfig;
+      if (verifiedConfig.ai) verifiedConfig.ai = { models: verifiedConfig.ai.models };
+      return { ok: true, status: 200, json: async () => ({ config: verifiedConfig }) };
+    }
+    return null;
+  };
 };
 const getMockSelectorById = (selectorId) =>
   screen

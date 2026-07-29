@@ -2562,6 +2562,34 @@ describe('AppShell route render smoke', () => {
     expect(subject._registryBootstrapScopeKey).toBe('');
   });
 
+  it('does not bootstrap an on-chain registry RPC for a query-scoped pure Worker Groups route', async () => {
+    const workerConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      networkChainId: DEFAULT_NETWORK.id,
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = stubMainSiteMountSideEffects(
+      createSubject({
+        path: '/groups',
+        search: '?sessionName=demo-sh',
+        activeSessionSlug: 'stale-session',
+        sessionConfig: workerConfig,
+      }),
+    );
+    subject.getDisplaySessionChainId = jest.fn(() => null);
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(subject.getBootstrapActiveSessionSlug('/groups', '?sessionName=demo-sh')).toBe('demo-sh');
+    expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
+    expect(loadGroupRegistryCache).not.toHaveBeenCalled();
+    expect(subject._registryBootstrapPromise).toBeNull();
+    expect(subject._registryBootstrapScopeKey).toBe('');
+  });
+
   it('keeps an exact pure Worker question route free of registry and wallet-chain context', async () => {
     const questionId = `0x${'12'.repeat(32)}`;
     const workerConfig = buildSessionConfig({

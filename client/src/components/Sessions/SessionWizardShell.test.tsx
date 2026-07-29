@@ -57,7 +57,6 @@ jest.mock('./SessionWizardNormalModeRail', () => (props: any) => (
 
 jest.mock('./EncryptionPanel', () => (props: any) => (
   <section data-testid="shell-encryption" data-collapsed={String(props.isCollapsed)}>
-    {props.sessionModeProfilePrivacyControl}
     <button type="button" onClick={props.onToggleCollapsed}>
       toggle encryption
     </button>
@@ -470,7 +469,7 @@ describe('SessionWizardShell', () => {
     expect(screen.queryByTestId('shell-modals')).not.toBeInTheDocument();
   });
 
-  it('places profile settings in their advanced wizard sections instead of normal mode', () => {
+  it('places custom profile settings in the relevant flow sections and keeps privacy ahead of access rules', () => {
     const normalProps = baseProps();
     const { unmount } = render(<SessionWizardShell {...normalProps} />);
 
@@ -484,7 +483,10 @@ describe('SessionWizardShell', () => {
     advancedProps.wizardMode = 'advanced';
     render(<SessionWizardShell {...advancedProps} />);
 
-    expect(screen.getByTestId('shell-encryption')).toContainElement(screen.getByTestId('shell-mode-profile-privacy'));
+    const privacySettings = screen.getByTestId('shell-mode-profile-privacy');
+    const encryptionPanel = screen.getByTestId('shell-encryption');
+    expect(encryptionPanel).not.toContainElement(privacySettings);
+    expect(privacySettings.compareDocumentPosition(encryptionPanel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByTestId('shell-worker')).toContainElement(screen.getByTestId('shell-mode-profile-worker'));
     expect(screen.getByTestId('shell-publish')).toContainElement(screen.getByTestId('shell-mode-profile-publish'));
   });

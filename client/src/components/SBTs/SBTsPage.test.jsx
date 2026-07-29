@@ -11,6 +11,7 @@ import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities
 const mockSBTPage = jest.fn();
 const mockSBTsList = jest.fn();
 const mockCreateGroup = jest.fn();
+const mockWorkerGroupCreate = jest.fn();
 const mockIsCryptoMode = jest.fn(() => true);
 
 jest.mock('./SBTsList', () => (props) => {
@@ -22,6 +23,16 @@ jest.mock('./CreateSBTGroup', () => (props) => {
   return (
     <div data-testid="create-group-panel" data-network-name={props.network?.name || ''}>
       Create Group Panel
+    </div>
+  );
+});
+jest.mock('../OnePageSession/WorkerSessionGroupsPanel', () => (props) => {
+  mockWorkerGroupCreate(props);
+  return (
+    <div data-testid="worker-group-create-panel">
+      <span>Active session</span>
+      <span>{props.sessionName}</span>
+      <span>/{props.sessionSlug}</span>
     </div>
   );
 });
@@ -226,7 +237,7 @@ describe('SBTsPage auto-feature flag', () => {
     replaceStateSpy.mockRestore();
   });
 
-  it('uses an explicitly supplied unregistered Worker session for standalone Advanced/external authoring', () => {
+  it('uses an explicitly supplied Worker session for session-scoped group creation', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const workerSessionConfig = {
       slug: 'demo-sh',
@@ -253,23 +264,65 @@ describe('SBTsPage auto-feature flag', () => {
       />,
     );
 
-    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toHaveTextContent(
-      /Advanced\/external on-chain SBT/i,
-    );
-    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toHaveTextContent(
-      /does not replace or modify this session's Worker-native Groups/i,
-    );
-    expect(screen.getByTestId('create-group-panel')).toHaveAttribute('data-network-name', 'Base Sepolia');
-    expect(mockCreateGroup).toHaveBeenCalledWith(
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('Active session');
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('/demo-sh');
+    expect(screen.queryByText(/on-chain|contract address|gas|RPC/i)).not.toBeInTheDocument();
+    expect(mockWorkerGroupCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        network: expect.objectContaining({ id: 84532, name: 'Base Sepolia' }),
-        preferConnectedNetworkForAuthoring: true,
-        sessionConfigOverride: workerSessionConfig,
+        createOnly: true,
+        sessionConfig: workerSessionConfig,
         sessionSlug: 'demo-sh',
+        showCreate: true,
       }),
     );
+    expect(mockCreateGroup).not.toHaveBeenCalled();
     expect(contractScripts.getSessionConfigBySlug).not.toHaveBeenCalledWith('demo-sh');
     expect(getDemoSessionConfigBySlug).not.toHaveBeenCalledWith('demo-sh', { allowDemoFallback: true });
+  });
+
+  it('routes a query-scoped built-in Worker group list before asynchronous session discovery completes', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const workerSessionConfig = {
+      slug: 'demo-sh',
+      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+      sessionName: 'Demo Session',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    contractScripts.getSessionConfigBySlug.mockReturnValue(null);
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    getDemoSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === 'demo-sh' ? workerSessionConfig : null,
+    );
+    window.history.replaceState({}, '', '/groups?sessionName=demo-sh#group-public-reviewers');
+
+    render(
+      <SBTsPage
+        provider="wagmi"
+        network={null}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={false}
+        sessionSlug="demo-sh"
+        sessionConfig={null}
+      />,
+    );
+
+    expect(mockSBTsList).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe('/groups');
+    expect(window.location.search).toBe('?sessionName=demo-sh');
+    expect(window.location.hash).toBe('#group-public-reviewers');
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        networkChainId: null,
+        sessionConfig: workerSessionConfig,
+        sessionName: 'Demo Session',
+        sessionSlug: 'demo-sh',
+        showCreate: false,
+      }),
+    );
   });
 
   it('fails closed instead of re-resolving a mismatched explicit standalone session config', () => {
@@ -1053,148 +1106,6 @@ describe('SBTsPage auto-feature flag', () => {
         showCreate: true,
       }),
     );
-  });
-
-  it('enforces the selected registry-session creation policy in Context Engine routes', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
-    const adminAddress = '0x00000000000000000000000000000000000000aa';
-    const participantAddress = '0x00000000000000000000000000000000000000bb';
-    const registryConfig = {
-      slug: 'restricted',
-      groupCreationPolicy: 'admin_only',
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
-      __registry: {
-        registryChainId: 11155420,
-        adminAddress,
-        sessionIdHex: '0x00112233445566778899aabbccddeeff',
-      },
-    };
-    contractScripts.getSessionConfigBySlug.mockReturnValue(registryConfig);
-    window.history.replaceState({}, '', '/groups/restricted');
-
-    const { rerender } = render(
-      <SBTsPage
-        sbtCacheRevision={0}
-        provider="wagmi"
-        network={{ id: 11155420, name: 'OP Sepolia' }}
-        account={participantAddress}
-        loginComplete={true}
-        isSBTCacheReady={true}
-        sessionSlug="restricted"
-        sessionConfig={registryConfig}
-      />,
-    );
-
-    expect(screen.queryByTestId('ce-sbts-create-toggle')).not.toBeInTheDocument();
-
-    window.history.replaceState({}, '', `${sbtsListPath()}/new`);
-    rerender(
-      <SBTsPage
-        sbtCacheRevision={0}
-        provider="wagmi"
-        network={{ id: 11155420, name: 'OP Sepolia' }}
-        account={participantAddress}
-        loginComplete={true}
-        isSBTCacheReady={true}
-        sessionSlug="restricted"
-        sessionConfig={registryConfig}
-      />,
-    );
-    expect(screen.getByTestId('ce-session-group-creation-policy-denied')).toBeInTheDocument();
-    expect(screen.queryByTestId('create-group-panel')).not.toBeInTheDocument();
-
-    rerender(
-      <SBTsPage
-        sbtCacheRevision={0}
-        provider="wagmi"
-        network={{ id: 11155420, name: 'OP Sepolia' }}
-        account={adminAddress}
-        loginComplete={true}
-        isSBTCacheReady={true}
-        sessionSlug="restricted"
-        sessionConfig={registryConfig}
-      />,
-    );
-    expect(screen.getByTestId('create-group-panel')).toBeInTheDocument();
-    expect(screen.getAllByTestId('ce-sbt-create-advanced-external-notice')).toHaveLength(1);
-    expect(screen.getByText(/does not replace or modify this session's Worker-native Groups/i)).toBeInTheDocument();
-  });
-
-  it('shows the external SBT notice from an unregistered Worker /groups/:slug route', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
-    contractScripts.getSessionConfigBySlug.mockReturnValue(null);
-    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
-    const workerSessionConfig = {
-      slug: 'unregistered-worker',
-      groupCreationPolicy: 'participants',
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-    };
-    window.history.replaceState({}, '', '/groups/unregistered-worker');
-
-    render(
-      <SBTsPage
-        sbtCacheRevision={0}
-        provider="wagmi"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        loginComplete={true}
-        toggleLoginModal={jest.fn()}
-        isSBTCacheReady={true}
-        defaultFeaturedSBTs={[]}
-        sessionSlug="unregistered-worker"
-        sessionConfig={workerSessionConfig}
-      />,
-    );
-
-    expect(mockSBTsList).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionSlug: 'unregistered-worker',
-        sessionConfig: workerSessionConfig,
-      }),
-    );
-    fireEvent.click(screen.getByTestId('ce-sbts-create-toggle'));
-    expect(screen.getByTestId('create-group-panel')).toBeInTheDocument();
-    expect(screen.getAllByTestId('ce-sbt-create-advanced-external-notice')).toHaveLength(1);
-    expect(screen.getByText(/does not replace or modify this session's Worker-native Groups/i)).toBeInTheDocument();
-  });
-
-  it('prefers an exact Worker route config over a same-slug registry config', () => {
-    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
-    const workerSessionConfig = {
-      slug: 'shared-slug',
-      groupCreationPolicy: 'participants',
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
-    };
-    const registrySessionConfig = {
-      slug: 'shared-slug',
-      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
-    };
-    contractScripts.getSessionConfigBySlug.mockReturnValue(registrySessionConfig);
-    window.history.replaceState({}, '', '/groups/shared-slug');
-
-    render(
-      <SBTsPage
-        sbtCacheRevision={0}
-        provider="wagmi"
-        network={{ id: 84532, name: 'Base Sepolia' }}
-        account=""
-        loginComplete={true}
-        toggleLoginModal={jest.fn()}
-        isSBTCacheReady={true}
-        defaultFeaturedSBTs={[]}
-        sessionSlug="shared-slug"
-        sessionConfig={workerSessionConfig}
-      />,
-    );
-
-    expect(mockSBTsList).toHaveBeenCalledWith(
-      expect.objectContaining({
-        sessionSlug: 'shared-slug',
-        sessionConfig: workerSessionConfig,
-      }),
-    );
-    fireEvent.click(screen.getByTestId('ce-sbts-create-toggle'));
-    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toBeInTheDocument();
   });
 
   it('enforces the selected registry-session creation policy in Context Engine routes', () => {

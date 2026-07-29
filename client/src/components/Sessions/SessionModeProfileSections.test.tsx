@@ -176,8 +176,12 @@ describe('SessionModeProfileSections', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     renderSection('privacy', profile);
 
-    expect(screen.getByText(/Cloudflare encryption requires Cloudflare storage/)).toBeInTheDocument();
-    expect(screen.getByTestId('ce-new-encryption-worker_envelope')).toBeDisabled();
+    const explanation = screen.getByText(/Cloudflare encryption requires Cloudflare storage/);
+    const cloudflareEncryption = screen.getByTestId('ce-new-encryption-worker_envelope');
+
+    expect(explanation).toHaveAttribute('id', 'ce-new-encryption-worker-envelope-help');
+    expect(cloudflareEncryption).toBeDisabled();
+    expect(cloudflareEncryption).toHaveAttribute('aria-describedby', explanation.id);
   });
 
   it('shows privacy validation beside the invalid privacy rule', () => {
@@ -235,6 +239,12 @@ describe('SessionModeProfileSections', () => {
 
     expect(screen.getByRole('region', { name: 'Participation channels' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Website' })).toBeChecked();
+    expect(
+      within(screen.getByRole('group', { name: 'Session participation channels' })).getAllByRole('checkbox'),
+    ).toHaveLength(4);
+    for (const label of ['Website', 'Telegram', 'Telegram Mini App', 'Agent Session Wrapped']) {
+      expect(screen.getByRole('checkbox', { name: label })).toHaveAccessibleName(label);
+    }
     const wrapped = screen.getByRole('checkbox', { name: 'Agent Session Wrapped' });
     expect(wrapped).not.toBeChecked();
     expect(screen.getByText(/additional per-session Worker\/Bridge/i)).toBeInTheDocument();

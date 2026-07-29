@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, FormGroup, Input, Label } from 'reactstrap';
 import {
   addWorkerGroupMember,
@@ -18,15 +18,23 @@ import {
   type WorkerGroupMember,
   type WorkerGroupMemberVisibility,
 } from '../../domains/worker/workerGroupPorts';
+import { uploadWorkerGroupImage } from '../../domains/worker/workerGroupImageUpload';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
 import { normalizeWorkerCanonicalSessionIdHex } from '../../utilities/session/sessionWorkerDiscovery.js';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl.js';
+import WorkerGroupCreateForm from '../Shared/WorkerGroupCreateForm';
+import WorkerGroupImage from '../Shared/WorkerGroupImage';
 import styles from './AdminPage.module.scss';
 
 type WorkerGroupDraft = {
   label: string;
   description: string;
   imageUrl: string;
+  tags: string[];
+  documentURLs: string[];
+  memberLimit: string;
+  joinEndsAt: string;
+  adminAddress: string;
   joinMode: WorkerGroupJoinMode;
   memberVisibility: WorkerGroupMemberVisibility;
 };
@@ -34,23 +42,51 @@ type WorkerGroupDraft = {
 export type AdminWorkerGroupsPanelProps = {
   canAdminWorker: boolean;
   sessionId: string;
+  sessionConfig?: unknown;
   sessionSlug: string;
   workerUrl: string;
   workerToken?: string;
   workerAuthContext?: unknown;
   postSignedRequest: PostSignedWorkerGroupRequest;
   autoLoad?: boolean;
+  createOnly?: boolean;
   onGroupsChanged?: () => void;
   title?: string;
   description?: string;
+  sessionName?: string;
 };
 
 const emptyDraft = (adminAddress = '', tags: string[] = []): WorkerGroupDraft => ({
   label: '',
   description: '',
   imageUrl: '',
+  tags: [...tags],
+  documentURLs: [],
+  memberLimit: '',
+  joinEndsAt: '',
+  adminAddress,
   joinMode: 'admin_add',
   memberVisibility: 'admin_only',
+});
+
+const toLocalDateTimeInput = (value: unknown): string => {
+  const date = new Date(String(value || ''));
+  if (!Number.isFinite(date.getTime())) return '';
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return offsetDate.toISOString().slice(0, 19);
+};
+
+const buildGroupInput = (draft: WorkerGroupDraft, label: string) => ({
+  label,
+  description: draft.description.trim(),
+  imageUrl: draft.imageUrl.trim(),
+  tags: draft.tags,
+  documentURLs: draft.documentURLs,
+  memberLimit: draft.memberLimit.trim() ? Number(draft.memberLimit) : 0,
+  joinEndsAt: draft.joinEndsAt ? new Date(draft.joinEndsAt).toISOString() : '',
+  adminAddress: draft.adminAddress.trim(),
+  joinMode: draft.joinMode,
+  memberVisibility: draft.memberVisibility,
 });
 
 const withJoinMode = (draft: WorkerGroupDraft, joinMode: WorkerGroupJoinMode): WorkerGroupDraft => ({
@@ -70,15 +106,18 @@ type LocalGroupUpdater = (groups: WorkerGroup[], result: unknown) => WorkerGroup
 const AdminWorkerGroupsPanel = ({
   canAdminWorker,
   sessionId,
+  sessionConfig,
   sessionSlug,
   workerUrl,
   workerToken = '',
   workerAuthContext = null,
   postSignedRequest,
   autoLoad = false,
+  createOnly = false,
   onGroupsChanged,
   title = 'Worker access groups',
   description = 'Manage the supported open and admin-added authorization groups.',
+  sessionName,
 }: AdminWorkerGroupsPanelProps) => {
   const defaultGroupTags = useMemo(() => normalizeWorkerGroupDefaultTags(sessionConfig), [sessionConfig]);
   const defaultGroupTagsKey = defaultGroupTags.join('\u0000');
@@ -110,7 +149,7 @@ const AdminWorkerGroupsPanel = ({
     },
     [normalizedWorkerUrl, postSignedRequest],
   );
-  const targetKey = `${normalizedSessionId}\n${normalizedSessionSlug}\n${normalizedWorkerUrl}`;
+  const targetKey = `${normalizedSessionId}\n${normalizedSessionSlug}\n${normalizedWorkerUrl}\n${defaultGroupTagsKey}`;
   const targetGenerationRef = useRef({ key: targetKey, generation: 0 });
   if (targetGenerationRef.current.key !== targetKey) {
     targetGenerationRef.current = {
@@ -143,7 +182,8 @@ const AdminWorkerGroupsPanel = ({
       return true;
     } catch (error) {
       if (!isCurrentTarget(requestTargetKey, requestGeneration)) return false;
-      setStatus(error instanceof Error ? error.message : 'Could not load worker groups.');
+      const message = error instanceof Error ? error.message : 'Could not load worker groups.';
+      setStatus(message);
       return false;
     } finally {
       if (isCurrentTarget(requestTargetKey, requestGeneration)) setBusy(false);
@@ -160,7 +200,7 @@ const AdminWorkerGroupsPanel = ({
 
   useEffect(() => {
     setGroups([]);
-    setCreateDraft(emptyDraft());
+    setCreateDraft(emptyDraft(signedAccount, defaultGroupTags));
     setEditingGroupId('');
     setEditDraft(emptyDraft());
     setMemberGroupId('');
@@ -169,8 +209,15 @@ const AdminWorkerGroupsPanel = ({
     setMemberAddressDraft('');
     setBusy(false);
     setStatus('');
-    if (autoLoad) void loadGroups();
-  }, [autoLoad, loadGroups, targetKey]);
+    if (autoLoad && !createOnly) void loadGroups();
+  }, [
+    autoLoad,
+    createOnly,
+    defaultGroupTags,
+    loadGroups,
+    signedAccount,
+    targetKey,
+  ]); // targetKey includes normalized defaults.
 
   const runMutation = async (
     operation: () => Promise<unknown>,
@@ -208,7 +255,7 @@ const AdminWorkerGroupsPanel = ({
     void runMutation(
       () =>
         createWorkerGroup({
-          group: { ...createDraft, label },
+          group: buildGroupInput(createDraft, label),
           sessionId: normalizedSessionId,
           sessionSlug: normalizedSessionSlug,
           postSignedRequest: postExactSignedRequest,
@@ -232,6 +279,11 @@ const AdminWorkerGroupsPanel = ({
       label: group.label,
       description: group.description || '',
       imageUrl: group.imageUrl || '',
+      tags: group.tags || [],
+      documentURLs: group.documentURLs || [],
+      memberLimit: group.memberLimit ? String(group.memberLimit) : '',
+      joinEndsAt: toLocalDateTimeInput(group.joinEndsAt),
+      adminAddress: group.adminAddress || '',
       joinMode: group.joinMode,
       memberVisibility: group.memberVisibility,
     });
@@ -247,7 +299,7 @@ const AdminWorkerGroupsPanel = ({
       () =>
         updateWorkerGroup({
           groupId: editingGroupId,
-          group: { ...editDraft, label },
+          group: buildGroupInput(editDraft, label),
           sessionId: normalizedSessionId,
           sessionSlug: normalizedSessionSlug,
           postSignedRequest: postExactSignedRequest,
@@ -421,90 +473,22 @@ const AdminWorkerGroupsPanel = ({
         </Button>
       </div>
 
-      <div className={styles.formRow}>
-        <FormGroup>
-          <Label for="worker-group-create-label">Group label</Label>
-          <Input
-            id="worker-group-create-label"
-            data-testid="ce-admin-worker-group-create-label"
-            value={createDraft.label}
-            onChange={(event) => setCreateDraft((draft) => ({ ...draft, label: event.target.value }))}
-          />
-        </FormGroup>
-        <FormGroup>
-          <Label for="worker-group-create-description">Description</Label>
-          <Input
-            id="worker-group-create-description"
-            type="textarea"
-            data-testid="ce-admin-worker-group-create-description"
-            value={createDraft.description}
-            onChange={(event) => setCreateDraft((draft) => ({ ...draft, description: event.target.value }))}
-          />
-        </FormGroup>
-        <FormGroup>
-          <Label for="worker-group-create-image">Image URL</Label>
-          <Input
-            id="worker-group-create-image"
-            type="url"
-            data-testid="ce-admin-worker-group-create-image"
-            placeholder="https://…"
-            value={createDraft.imageUrl}
-            onChange={(event) => setCreateDraft((draft) => ({ ...draft, imageUrl: event.target.value }))}
-          />
-        </FormGroup>
-        <FormGroup>
-          <Label for="worker-group-create-mode">Join mode</Label>
-          <Input
-            id="worker-group-create-mode"
-            type="select"
-            data-testid="ce-admin-worker-group-create-mode"
-            value={createDraft.joinMode}
-            onChange={(event) =>
-              setCreateDraft((draft) => withJoinMode(draft, event.target.value as WorkerGroupJoinMode))
-            }
-          >
-            <option value="admin_add">Admin adds members</option>
-            <option value="open">Open self-join</option>
-          </Input>
-        </FormGroup>
-        <FormGroup>
-          <Label for="worker-group-create-visibility">Group visibility</Label>
-          <Input
-            id="worker-group-create-visibility"
-            type="select"
-            data-testid="ce-admin-worker-group-create-visibility"
-            value={createDraft.memberVisibility}
-            onChange={(event) =>
-              setCreateDraft((draft) => ({
-                ...draft,
-                memberVisibility: event.target.value as WorkerGroupMemberVisibility,
-              }))
-            }
-          >
-            <option value="admin_only">Admins only</option>
-            <option value="members">Group members</option>
-            <option value="session">All session members</option>
-          </Input>
-        </FormGroup>
-        <Button
-          color="primary"
-          data-testid="ce-admin-worker-group-create-submit"
-          disabled={busy}
-          onClick={handleCreate}
-        >
-          Create group
-        </Button>
-      </div>
+      {createForm}
 
       <div className={styles.grid}>
         {groups.map((group) => (
           <div key={group.groupId} className={styles.statusItem}>
             {group.imageUrl ? (
-              <img
+              <WorkerGroupImage
                 src={group.imageUrl}
                 alt=""
                 className={styles.workerGroupImage}
-                data-testid="ce-admin-worker-group-image"
+                context={workerAuthContext}
+                sessionConfig={sessionConfig}
+                sessionSlug={normalizedSessionSlug}
+                testId="ce-admin-worker-group-image"
+                workerToken={workerToken}
+                workerUrl={normalizedWorkerUrl}
               />
             ) : null}
             <strong>{group.label}</strong>
@@ -517,11 +501,7 @@ const AdminWorkerGroupsPanel = ({
                 {url}
               </a>
             ))}
-            {group.memberLimit ? (
-              <span>Limit: {group.memberLimit} members</span>
-            ) : (
-              <span>No group-specific member limit</span>
-            )}
+            {group.memberLimit ? <span>Limit: {group.memberLimit} members</span> : <span>No group-specific member limit</span>}
             {group.joinEndsAt ? <span>Join deadline: {new Date(group.joinEndsAt).toLocaleString()}</span> : null}
             {group.adminAddress ? <span>Group admin: {group.adminAddress}</span> : null}
             <div>
@@ -600,6 +580,43 @@ const AdminWorkerGroupsPanel = ({
               data-testid="ce-admin-worker-group-edit-image"
               value={editDraft.imageUrl}
               onChange={(event) => setEditDraft((draft) => ({ ...draft, imageUrl: event.target.value }))}
+            />
+          </FormGroup>
+          <FormGroup>
+            <Label for="worker-group-edit-tags">Tags</Label>
+            <Input
+              id="worker-group-edit-tags"
+              value={editDraft.tags.join(', ')}
+              placeholder="research, reviewers"
+              onChange={(event) =>
+                setEditDraft((draft) => ({
+                  ...draft,
+                  tags: event.target.value
+                    .split(',')
+                    .map((tag) => tag.trim())
+                    .filter(Boolean)
+                    .slice(0, 20),
+                }))
+              }
+            />
+          </FormGroup>
+          <FormGroup>
+            <Label for="worker-group-edit-document-urls">Reference URLs</Label>
+            <Input
+              id="worker-group-edit-document-urls"
+              type="textarea"
+              value={editDraft.documentURLs.join('\n')}
+              placeholder="One HTTPS URL per line"
+              onChange={(event) =>
+                setEditDraft((draft) => ({
+                  ...draft,
+                  documentURLs: event.target.value
+                    .split(/\r?\n/)
+                    .map((url) => url.trim())
+                    .filter(Boolean)
+                    .slice(0, 10),
+                }))
+              }
             />
           </FormGroup>
           <FormGroup>

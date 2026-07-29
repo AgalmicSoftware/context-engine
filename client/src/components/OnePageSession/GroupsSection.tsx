@@ -1,6 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCaretDown, faCaretUp, faExpand, faPlus, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import {
+  faCaretDown,
+  faCaretUp,
+  faExpand,
+  faPlus,
+  faQuestionCircle,
+  faSyncAlt,
+} from '@fortawesome/free-solid-svg-icons';
 import { resolveAdminCapabilities } from '../Admin/adminPageHelpers';
 import SBTsPage from '../SBTs/SBTsPage';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -121,6 +128,7 @@ const OnePageSessionGroupsSection = ({
   onToggleEmbeddedCreateGroup,
   onToggleGroups,
 }: GroupsSectionProps) => {
+  const [workerGroupsRefreshNonce, setWorkerGroupsRefreshNonce] = useState(0);
   const sessionConfigForGroups =
     embeddedGroupsSessionConfig && typeof embeddedGroupsSessionConfig === 'object'
       ? embeddedGroupsSessionConfig
@@ -203,6 +211,17 @@ const OnePageSessionGroupsSection = ({
                   {showEmbeddedCreateGroup ? 'Exit' : 'Create'}
                 </button>
               ) : null}
+              {usesWorkerNativeGroups ? (
+                <button
+                  type="button"
+                  onClick={() => setWorkerGroupsRefreshNonce((nonce) => nonce + 1)}
+                  className={`${styles.sectionHeaderActionButton} ${styles.sectionHeaderIconButton}`}
+                  aria-label="Refresh groups"
+                  title="Refresh groups"
+                >
+                  <FontAwesomeIcon icon={faSyncAlt} />
+                </button>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -217,8 +236,12 @@ const OnePageSessionGroupsSection = ({
                 provider={provider}
                 networkChainId={networkChainId}
                 sessionConfig={sessionConfigForGroups}
+                sessionName={String(sessionName || '')}
                 sessionSlug={embeddedGroupsSessionSlug}
                 showCreate={showEmbeddedCreateGroup}
+                refreshNonce={workerGroupsRefreshNonce}
+                showGroupDescriptions={false}
+                showMembershipListHeader={false}
                 toggleLoginModal={toggleLoginModal as ((open: boolean) => void) | undefined}
               />
               {usesConfiguredOnChainGates ? (

@@ -2,6 +2,7 @@ import {
   buildTokenName,
   buildCloudflareTokenTemplateUrl,
   buildCloudflareTokenTemplatePermissions,
+  CLOUDFLARE_TOKEN_SETUP_GUIDE_URL,
 } from './cloudflareTokenTemplate.js';
 
 describe('cloudflareTokenTemplate', () => {
@@ -32,8 +33,20 @@ describe('cloudflareTokenTemplate', () => {
     ]);
   });
 
-  test('can omit R2/D1 scopes for the default Telegram smoke deploy', () => {
-    const permissions = buildCloudflareTokenTemplatePermissions({ includeDocStorage: false });
+  test('points legacy token guidance at the canonical worker documentation', () => {
+    expect(CLOUDFLARE_TOKEN_SETUP_GUIDE_URL).toBe(
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
+    );
+  });
+
+  test('adds only R2 when an advanced deployment explicitly opts into R2 storage', () => {
+    const url = new URL(
+      buildCloudflareTokenTemplateUrl({
+        slug: 'alpha-session',
+        includeR2Storage: true,
+      }),
+    );
+    const permissions = JSON.parse(url.searchParams.get('permissionGroupKeys') || '[]');
 
     expect(permissions).toEqual([
       { key: 'workers_scripts', type: 'edit' },

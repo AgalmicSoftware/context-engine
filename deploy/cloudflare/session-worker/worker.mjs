@@ -56978,7 +56978,9 @@ var PUBLIC_CONFIG_KEYS = Object.freeze([
   "sessionName",
   "sessionInfo",
   "sessionHeaderImg",
+  "sessionEndsAt",
   "defaultTags",
+  "defaultGroupTags",
   "defaultSbtTags",
   "questionsGenPrompt",
   "defaultFilterState",
@@ -57015,10 +57017,20 @@ var DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   "sessionName",
   "sessionInfo",
   "sessionHeaderImg",
+  "sessionEndsAt",
+  "defaultTags",
+  "defaultGroupTags",
+  "defaultSbtTags",
+  "questionsGenPrompt",
+  "defaultFilterState",
+  "defaultFeaturedSBTs",
+  "autoFeatureSBTsBySessionSlug",
   "sessionModeProfile",
   "workerAuthority",
   "groupCreationPolicy",
+  "storageProfile",
   "ai",
+  "networkChainId",
   "contracts"
 ]);
 var OPEN_CONFIG_SUBTREE_KEYS = Object.freeze([
@@ -57223,10 +57235,70 @@ var findForbiddenWorkerConfigSecretPath = (config, path = "config") => {
   return findForbiddenRecursiveSecretAliasPath(recursiveSource, path);
 };
 var projectPublicWorkerSessionConfig = (config) => selectFields(isObj2(config) ? config : {}, PUBLIC_CONFIG_KEYS);
-var selectDeployWorkerSessionConfigFields = (body) => selectFields(isObj2(body) ? body : {}, DEPLOY_CANONICAL_CONFIG_KEYS);
+var profileUsesOnChainSbt = (profile) => {
+  if (profile?.authorization?.mechanisms?.includes?.("sbt_onchain")) return true;
+  return [
+    profile?.encryption?.accessConditions,
+    profile?.storage?.payloadAccessControl?.accessConditions
+  ].some((document) => document?.conditions?.some?.((condition) => condition?.kind === "sbt_onchain"));
+};
+var selectDeployWorkerSessionConfigFields = (body) => {
+  const source = isObj2(body) ? body : {};
+  const selected = selectFields(source, DEPLOY_CANONICAL_CONFIG_KEYS);
+  if (source?.sessionModeProfile?.authority?.mode !== "worker_canonical") return selected;
+  const usesOnChainSbt = profileUsesOnChainSbt(source.sessionModeProfile);
+  if (!usesOnChainSbt) {
+    delete selected.defaultSbtTags;
+    delete selected.defaultFeaturedSBTs;
+    delete selected.autoFeatureSBTsBySessionSlug;
+    delete selected.contracts;
+  } else if (isObj2(selected.contracts)) {
+    selected.contracts = selectFields(selected.contracts, ["sbtFactory"], "config.contracts");
+  }
+  if (!usesOnChainSbt && source?.sessionModeProfile?.encryption?.mode !== "lit") {
+    delete selected.networkChainId;
+  }
+  return selected;
+};
 var sanitizeWorkerConfigOpenSubtree = (value) => {
   const sanitized = sanitizePublicValue(value, "config.open");
   return sanitized === OMIT_PUBLIC_VALUE ? {} : sanitized;
+};
+
+// workers/shared/sessionLifecycle.mjs
+var toTrimmedString5 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var normalizeSessionEndsAt = (value) => {
+  const raw = toTrimmedString5(value);
+  if (!raw) return { ok: true, value: "" };
+  const timestamp = Date.parse(raw);
+  if (!Number.isFinite(timestamp)) {
+    return { ok: false, value: "" };
+  }
+  return {
+    ok: true,
+    value: new Date(timestamp).toISOString()
+  };
+};
+var resolveSessionLifecycle = (config, { now = Date.now } = {}) => {
+  const normalized = normalizeSessionEndsAt(config?.sessionEndsAt);
+  const nowMs = Number(typeof now === "function" ? now() : now);
+  return {
+    sessionEndsAt: normalized.ok ? normalized.value : "",
+    ended: normalized.ok && !!normalized.value && Number.isFinite(nowMs) && Date.parse(normalized.value) <= nowMs
+  };
+};
+var buildSessionEndedResponse = ({ config, headers, json: json2, now } = {}) => {
+  const lifecycle = resolveSessionLifecycle(config, { now });
+  if (!lifecycle.ended) return null;
+  return json2?.(
+    {
+      error: "This session has ended.",
+      code: "session_ended",
+      sessionEndsAt: lifecycle.sessionEndsAt
+    },
+    410,
+    headers
+  );
 };
 
 // workers/shared/workerConfigModeValidation.mjs
@@ -57774,11 +57846,17 @@ var validateProfileStoragePolicyCoherence = ({ profile, storageSide }) => {
 };
 var validateWorkerConfigModeValues = (config, { allowPartialProfileStorage = false } = {}) => {
   if (!isObj3(config)) return invalid("config");
+  if (hasOwn(config, "sessionEndsAt") && !normalizeSessionEndsAt(config.sessionEndsAt).ok) {
+    return invalid("sessionEndsAt");
+  }
   let profile = null;
   if (hasOwn(config, "sessionModeProfile")) {
     const result = validateSessionModeProfile(config.sessionModeProfile, "sessionModeProfile");
     if (!result.ok) return result;
     profile = config.sessionModeProfile;
+  }
+  if (profile && hasOwn(config, "sessionEndsAt") && profile?.authority?.mode !== "worker_canonical") {
+    return invalid("sessionEndsAt");
   }
   if (profile) {
     const storageSource = resolveProfileStorageSide(config, {
@@ -57801,6 +57879,16 @@ var validateWorkerConfigModeValues = (config, { allowPartialProfileStorage = fal
     if (!result.ok) return result;
   }
   return valid();
+};
+var workerConfigAllowsAnonymousGroupDiscovery = (config) => {
+  if (!isObj3(config) || !validateWorkerConfigModeValues(config).ok) return false;
+  const profile = isObj3(config.sessionModeProfile) ? config.sessionModeProfile : {};
+  const authority = isObj3(profile.authority) ? profile.authority : {};
+  const storage = isObj3(profile.storage) ? profile.storage : {};
+  const payloadAccess = isObj3(storage.payloadAccessControl) ? storage.payloadAccessControl : {};
+  const encryption = isObj3(profile.encryption) ? profile.encryption : {};
+  const results = isObj3(profile.results) ? profile.results : {};
+  return authority.mode === "worker_canonical" && storage.backend === "cloudflare" && payloadAccess.gate === "none" && payloadAccess.encryption === "none" && !hasOwn(payloadAccess, "accessConditions") && encryption.mode === "none" && !hasOwn(encryption, "accessConditions") && results.visibility === "public_full_if_storage_public";
 };
 var validateDeploymentModeValues = (body) => {
   if (!isObj3(body)) return invalid("request");
@@ -60509,20 +60597,109 @@ var selectResourceGateKeysForScopes = (resourceKeys, requestedScopes) => {
 // workers/sessionCorsWorker/sessionConfigMutation.js
 var WORKER_CANONICAL_PUBLICATION_REVISION_KEY = "workerCanonicalPublicationRevision";
 var WORKER_GROUPS_BOOTSTRAP_KEY = "workerGroupsBootstrap";
-var toTrimmedString5 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var WORKER_CANONICAL_SET_CONFIG_KEYS = /* @__PURE__ */ new Set([
+  "slug",
+  "sessionId",
+  "sessionIdHex",
+  "configRevision",
+  "sessionName",
+  "sessionInfo",
+  "sessionHeaderImg",
+  "sessionEndsAt",
+  "defaultTags",
+  "defaultGroupTags",
+  "defaultSbtTags",
+  "questionsGenPrompt",
+  "defaultFilterState",
+  "defaultFeaturedSBTs",
+  "autoFeatureSBTsBySessionSlug",
+  "adminAddress",
+  "adminAddresses",
+  "corsWorkerUrl",
+  "allowOrigins",
+  "sessionModeProfile",
+  "agentSessionWrapped",
+  "workerAuthority",
+  "workerRoles",
+  "roles",
+  "authorization",
+  "groupCreationPolicy",
+  "storageProfile",
+  "storageEnvelope",
+  "ai",
+  "limits",
+  "scopes",
+  "networkChainId",
+  "contracts",
+  "embeddedDeployHelperEnabled",
+  "litCredentials",
+  WORKER_GROUPS_BOOTSTRAP_KEY
+]);
+var toTrimmedString6 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var hasOwn3 = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
 var validGroupCreationPolicy = (config) => !hasOwn3(config, "groupCreationPolicy") || config?.groupCreationPolicy === "admin_only" || config?.groupCreationPolicy === "participants";
-var getWorkerAuthorityMode = (config) => toTrimmedString5(
+var getWorkerAuthorityMode = (config) => toTrimmedString6(
   config?.sessionModeProfile?.authority?.mode
 ).toLowerCase();
+var workerCanonicalUsesOnChainSbt = (config) => {
+  const profile = config?.sessionModeProfile;
+  if (profile?.authorization?.mechanisms?.includes?.("sbt_onchain")) return true;
+  const conditionSources = [
+    profile?.encryption?.accessConditions,
+    profile?.storage?.payloadAccessControl?.accessConditions
+  ];
+  return conditionSources.some((source) => source?.conditions?.some?.((condition) => condition?.kind === "sbt_onchain"));
+};
+var workerCanonicalUsesChain = (config) => workerCanonicalUsesOnChainSbt(config) || config?.sessionModeProfile?.encryption?.mode === "lit";
+var validateWorkerCanonicalIncomingFields = ({ incomingConfig, mergedConfig } = {}) => {
+  if (getWorkerAuthorityMode(mergedConfig) !== "worker_canonical") return { ok: true };
+  const unsupportedKey = Object.keys(incomingConfig || {}).find(
+    (key) => !WORKER_CANONICAL_SET_CONFIG_KEYS.has(key)
+  );
+  if (unsupportedKey) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Unsupported worker-canonical session config field: ${unsupportedKey}.`
+    };
+  }
+  const usesOnChainSbt = workerCanonicalUsesOnChainSbt(mergedConfig);
+  const sbtOnlyKeys = ["defaultSbtTags", "defaultFeaturedSBTs", "autoFeatureSBTsBySessionSlug"];
+  const unsupportedSbtKey = sbtOnlyKeys.find((key) => hasOwn3(incomingConfig, key) && !usesOnChainSbt);
+  if (unsupportedSbtKey) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Worker-native Group sessions do not accept ${unsupportedSbtKey}.`
+    };
+  }
+  if (hasOwn3(incomingConfig, "networkChainId") && !workerCanonicalUsesChain(mergedConfig)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Worker-native Group sessions do not accept networkChainId."
+    };
+  }
+  if (hasOwn3(incomingConfig, "contracts")) {
+    const contractKeys = Object.keys(incomingConfig?.contracts || {});
+    if (!usesOnChainSbt || contractKeys.some((key) => key !== "sbtFactory")) {
+      return {
+        ok: false,
+        status: 400,
+        error: "Worker-canonical sessions accept only the on-chain SBT Group Factory contract."
+      };
+    }
+  }
+  return { ok: true };
+};
 var normalizeCanonicalSessionId = (value) => {
-  const raw = toTrimmedString5(value).toLowerCase();
+  const raw = toTrimmedString6(value).toLowerCase();
   if (!raw) return "";
   const normalized = raw.replace(/^0x/, "").replace(/-/g, "");
   return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? normalized : "";
 };
 var resolveCanonicalSessionIdentity = (config) => {
-  const rawValues = ["sessionId", "sessionIdHex"].filter((key) => hasOwn3(config, key) && toTrimmedString5(config?.[key])).map((key) => config[key]);
+  const rawValues = ["sessionId", "sessionIdHex"].filter((key) => hasOwn3(config, key) && toTrimmedString6(config?.[key])).map((key) => config[key]);
   const normalizedValues = rawValues.map(normalizeCanonicalSessionId);
   const uniqueValues = new Set(normalizedValues.filter(Boolean));
   return {
@@ -60546,8 +60723,8 @@ var changesInitializedWorkerCanonicalIdentity = ({ existingConfig, mergedConfig 
   if (existingSessionIdentity.invalid || mergedSessionIdentity.invalid) return true;
   if (existingSessionIdentity.value && mergedSessionIdentity.value !== existingSessionIdentity.value) return true;
   return ["slug", "corsWorkerUrl"].some((key) => {
-    const existingValue = toTrimmedString5(existingConfig?.[key]);
-    return !!existingValue && toTrimmedString5(mergedConfig?.[key]) !== existingValue;
+    const existingValue = toTrimmedString6(existingConfig?.[key]);
+    return !!existingValue && toTrimmedString6(mergedConfig?.[key]) !== existingValue;
   });
 };
 var resolveWorkerCanonicalPublicationWrite = ({
@@ -60595,7 +60772,7 @@ var resolveWorkerCanonicalPublicationWrite = ({
 var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
   const authorityExisting = normalizeWorkerConfigRecord(existingConfig) || {};
   const existing = normalizeWorkerConfigRecord(existingConfig, { slug }) || {};
-  const kind = toTrimmedString5(mutation?.kind);
+  const kind = toTrimmedString6(mutation?.kind);
   let incomingConfig;
   let mergedConfig;
   if (kind === "set-config") {
@@ -60662,6 +60839,13 @@ var applySessionConfigMutation = ({ existingConfig, mutation, slug } = {}) => {
       error: `Invalid session config mode at ${mergedModeValidation.path}.`
     };
   }
+  if (kind === "set-config") {
+    const fieldValidation = validateWorkerCanonicalIncomingFields({
+      incomingConfig,
+      mergedConfig
+    });
+    if (!fieldValidation.ok) return fieldValidation;
+  }
   if (changesInitializedWorkerCanonicalIdentity({ existingConfig: authorityExisting, mergedConfig })) {
     return {
       ok: false,
@@ -60716,6 +60900,10 @@ var WORKER_GROUP_MEMBER_VISIBILITY = Object.freeze({
 var DEFAULT_WORKER_GROUP_MAX_GROUPS_PER_SESSION = 100;
 var DEFAULT_WORKER_GROUP_MAX_MEMBERS_PER_GROUP = 1e3;
 var MAX_WORKER_GROUP_IMAGE_URL_LENGTH = 2048;
+var MAX_WORKER_GROUP_DOCUMENT_URLS = 10;
+var MAX_WORKER_GROUP_TAGS = 20;
+var MAX_WORKER_GROUP_TAG_LENGTH = 64;
+var MAX_WORKER_GROUP_MEMBER_LIMIT = 1e3;
 var MAX_WORKER_GROUP_ID_LENGTH = 80;
 var MAX_WORKER_GROUP_SESSION_SLUG_LENGTH = 128;
 var DEFAULT_WORKER_GROUP_MEMBER_PAGE_SIZE = 250;
@@ -60850,6 +61038,53 @@ var normalizeImageUrl = (value) => {
     return { ok: false };
   }
 };
+var normalizeGroupTags = (value) => {
+  if (value == null) return { ok: true, value: [] };
+  if (!Array.isArray(value) || value.length > MAX_WORKER_GROUP_TAGS) return { ok: false };
+  const tags = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const candidate of value) {
+    if (typeof candidate !== "string") return { ok: false };
+    const tag = trim2(candidate);
+    if (!tag || tag.length > MAX_WORKER_GROUP_TAG_LENGTH) return { ok: false };
+    const key = tag.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tags.push(tag);
+  }
+  return { ok: true, value: tags };
+};
+var normalizeGroupDocumentUrls = (value) => {
+  if (value == null) return { ok: true, value: [] };
+  if (!Array.isArray(value) || value.length > MAX_WORKER_GROUP_DOCUMENT_URLS) return { ok: false };
+  const documentURLs = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const candidate of value) {
+    if (typeof candidate !== "string") return { ok: false };
+    const normalized = normalizeImageUrl(candidate);
+    if (!normalized.ok || !normalized.value) return { ok: false };
+    if (seen.has(normalized.value)) continue;
+    seen.add(normalized.value);
+    documentURLs.push(normalized.value);
+  }
+  return { ok: true, value: documentURLs };
+};
+var normalizeGroupMemberLimit = (value) => {
+  if (value == null || value === "" || Number(value) === 0) return { ok: true, value: 0 };
+  const memberLimit = Number(value);
+  if (!Number.isSafeInteger(memberLimit) || memberLimit < 1 || memberLimit > MAX_WORKER_GROUP_MEMBER_LIMIT) {
+    return { ok: false };
+  }
+  return { ok: true, value: memberLimit };
+};
+var normalizeGroupJoinEndsAt = (value, deps = {}, { allowPast = false } = {}) => {
+  const raw = trim2(value);
+  if (!raw) return { ok: true, value: "" };
+  const timestamp = Date.parse(raw);
+  const now = Number(deps.now?.() || Date.now());
+  if (!Number.isFinite(timestamp) || !allowPast && timestamp <= now) return { ok: false };
+  return { ok: true, value: new Date(timestamp).toISOString() };
+};
 var normalizeEvmAddress = (value, deps = {}) => {
   const address = trim2(value);
   if (typeof deps.isAddress === "function" && !deps.isAddress(address)) return "";
@@ -60964,6 +61199,21 @@ var normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps =
   if (description.length > 500) return { ok: false, status: 400, reason: "invalid_group_description" };
   const imageUrlResult = normalizeImageUrl(input.imageUrl ?? existing?.imageUrl);
   if (!imageUrlResult.ok) return { ok: false, status: 400, reason: "invalid_group_image_url" };
+  const tagsResult = normalizeGroupTags(input.tags ?? existing?.tags);
+  if (!tagsResult.ok) return { ok: false, status: 400, reason: "invalid_group_tags" };
+  const documentUrlsResult = normalizeGroupDocumentUrls(input.documentURLs ?? existing?.documentURLs);
+  if (!documentUrlsResult.ok) return { ok: false, status: 400, reason: "invalid_group_document_urls" };
+  const memberLimitResult = normalizeGroupMemberLimit(
+    Object.prototype.hasOwnProperty.call(input, "memberLimit") ? input.memberLimit : existing?.memberLimit
+  );
+  if (!memberLimitResult.ok) return { ok: false, status: 400, reason: "invalid_group_member_limit" };
+  const joinEndsAtResult = Object.prototype.hasOwnProperty.call(input, "joinEndsAt") ? normalizeGroupJoinEndsAt(input.joinEndsAt, deps, { allowPast: !!existing }) : { ok: true, value: trim2(existing?.joinEndsAt) };
+  if (!joinEndsAtResult.ok) return { ok: false, status: 400, reason: "invalid_group_join_end" };
+  const requestedAdminAddress = Object.prototype.hasOwnProperty.call(input, "adminAddress") ? trim2(input.adminAddress) : trim2(existing?.adminAddress || actorPrincipal?.address);
+  const adminAddress = requestedAdminAddress ? normalizeEvmAddress(requestedAdminAddress, deps) : "";
+  if (requestedAdminAddress && !adminAddress) {
+    return { ok: false, status: 400, reason: "invalid_group_admin_address" };
+  }
   const updatedAt = nowIso(deps);
   return {
     ok: true,
@@ -60971,6 +61221,11 @@ var normalizeGroupPatch = ({ input = {}, actorPrincipal, existing = null, deps =
       label,
       description: description || void 0,
       imageUrl: imageUrlResult.value || void 0,
+      tags: tagsResult.value.length ? tagsResult.value : void 0,
+      documentURLs: documentUrlsResult.value.length ? documentUrlsResult.value : void 0,
+      memberLimit: memberLimitResult.value || void 0,
+      joinEndsAt: joinEndsAtResult.value || void 0,
+      adminAddress: adminAddress || void 0,
       joinMode,
       memberVisibility,
       updatedAt,
@@ -60999,7 +61254,7 @@ var kvGetLegacyJson = async (kv, key) => {
     return null;
   }
 };
-var resolveWorkerGroupBootstrap = async ({ env, slug, sessionId } = {}) => {
+var resolveWorkerGroupBootstrap = async ({ env, slug, sessionId, requireExhaustiveEmptyScan = false } = {}) => {
   const canonicalSlug = canonicalWorkerGroupSessionSlug(slug);
   const canonicalSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId });
   if (!canonicalSlug || !canonicalSessionId) {
@@ -61008,6 +61263,13 @@ var resolveWorkerGroupBootstrap = async ({ env, slug, sessionId } = {}) => {
   const explicitBootstrapId = trim2(env?.CE_WORKER_GROUPS_BOOTSTRAP);
   if (explicitBootstrapId === WORKER_GROUPS_FRESH_BOOTSTRAP_SENTINEL) {
     const kv2 = resolveWorkerGroupsKv(env);
+    if (requireExhaustiveEmptyScan && typeof kv2?.list !== "function") {
+      return {
+        ok: false,
+        status: 503,
+        reason: "worker_group_capacity_state_unavailable"
+      };
+    }
     if (typeof kv2?.list === "function") {
       try {
         const existingGroups = await scanWorkerGroupRecordsForIdentity({
@@ -61043,6 +61305,13 @@ var resolveWorkerGroupBootstrap = async ({ env, slug, sessionId } = {}) => {
   const kv = resolveWorkerGroupsKv(env);
   if (!kv?.get) {
     return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
+  }
+  if (requireExhaustiveEmptyScan && typeof kv.list !== "function") {
+    return {
+      ok: false,
+      status: 503,
+      reason: "worker_group_capacity_state_unavailable"
+    };
   }
   try {
     const configSlug = normalizeWorkerSessionSlug(canonicalSlug);
@@ -61572,6 +61841,11 @@ var redactGroupForMember = (group) => ({
   label: group.label,
   ...group.description ? { description: group.description } : {},
   ...group.imageUrl ? { imageUrl: group.imageUrl } : {},
+  ...Array.isArray(group.tags) && group.tags.length ? { tags: group.tags } : {},
+  ...Array.isArray(group.documentURLs) && group.documentURLs.length ? { documentURLs: group.documentURLs } : {},
+  ...Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? { memberLimit: group.memberLimit } : {},
+  ...group.joinEndsAt ? { joinEndsAt: group.joinEndsAt } : {},
+  ...group.adminAddress ? { adminAddress: group.adminAddress } : {},
   joinMode: group.joinMode,
   memberVisibility: group.memberVisibility,
   createdAt: group.createdAt,
@@ -61694,9 +61968,11 @@ var addWorkerGroupMember = async ({
     existing = existingRecord && !existingRecord.removedAt ? existingRecord : null;
   } else {
     const caps = resolveWorkerGroupCaps(env);
+    const configuredMemberLimit = Number.isSafeInteger(group.memberLimit) && group.memberLimit > 0 ? group.memberLimit : caps.maxMembersPerGroup;
+    const effectiveMemberLimit = Math.min(configuredMemberLimit, caps.maxMembersPerGroup);
     const members = await listMembershipRecords({ store, slug, sessionId, groupId });
     existing = members.find((member2) => member2.principalKey === normalized.key);
-    if (!existing && members.length >= caps.maxMembersPerGroup) {
+    if (!existing && members.length >= effectiveMemberLimit) {
       return { ok: false, status: 409, reason: "worker_group_member_cap_exceeded" };
     }
   }
@@ -61860,6 +62136,68 @@ var listWorkerGroupMembers = async ({ env, slug, sessionId, groupId, cursor, lim
     nextCursor: page.nextCursor
   };
 };
+var redactWorkerGroupMemberForViewer = (member) => ({
+  groupId: normalizeWorkerGroupId(member?.groupId),
+  sessionSlug: normalizeWorkerSessionSlug(member?.sessionSlug),
+  principal: member?.principal,
+  addedAt: trim2(member?.addedAt)
+});
+var listWorkerGroupMembersForPrincipal = async ({
+  env,
+  slug,
+  sessionId,
+  groupId,
+  principal,
+  cursor,
+  limit,
+  deps = {}
+} = {}) => {
+  const normalizedGroupId = normalizeWorkerGroupId(groupId);
+  if (!normalizedGroupId) {
+    return { ok: false, status: 400, reason: "invalid_worker_group_id" };
+  }
+  const catalog = await (deps.readCoordinatedWorkerGroupCatalog || readCoordinatedWorkerGroupCatalog)({
+    env,
+    slug,
+    sessionId,
+    groupIds: [normalizedGroupId],
+    principal
+  });
+  if (!catalog.ok) return normalizeWorkerGroupMembershipFailure(catalog);
+  if (!Array.isArray(catalog.groups) || catalog.groups.length !== 1 || normalizeWorkerGroupId(catalog.groups[0]?.groupId) !== normalizedGroupId) {
+    return { ok: false, status: 404, reason: "worker_group_not_found" };
+  }
+  const authority = catalog.groups[0];
+  const memberVisibility = trim2(authority?.memberVisibility).toLowerCase();
+  const joinMode = trim2(authority?.joinMode).toLowerCase();
+  const memberCount = Number(authority?.memberCount);
+  if (!Object.values(WORKER_GROUP_MEMBER_VISIBILITY).includes(memberVisibility) || !IMPLEMENTED_JOIN_MODES.has(joinMode) || !Number.isSafeInteger(memberCount) || memberCount < 0) {
+    return normalizeWorkerGroupMembershipFailure();
+  }
+  const canViewMembers = memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.SESSION || memberVisibility === WORKER_GROUP_MEMBER_VISIBILITY.MEMBERS && authority?.isMember === true;
+  if (!canViewMembers) {
+    return { ok: false, status: 403, reason: "worker_group_member_list_forbidden" };
+  }
+  const page = await (deps.listWorkerGroupMembers || listWorkerGroupMembers)({
+    env,
+    slug,
+    sessionId,
+    groupId: normalizedGroupId,
+    cursor,
+    limit
+  });
+  if (!page.ok) return page;
+  return {
+    ...page,
+    group: redactGroupForMember({
+      ...page.group,
+      joinMode,
+      memberVisibility
+    }),
+    members: (page.members || []).map(redactWorkerGroupMemberForViewer),
+    memberCount
+  };
+};
 var listWorkerGroupMemberships = async ({ env, slug, sessionId, principal, deps = {} } = {}) => {
   const store = resolveWorkerGroupStore(env);
   if (!store) return { ok: false, status: 501, reason: "worker_group_store_not_configured" };
@@ -61970,6 +62308,10 @@ var executeWorkerGroupMutation = async ({
     if (group.joinMode !== WORKER_GROUP_JOIN_MODES.OPEN) {
       return { ok: false, status: 403, reason: "worker_group_join_denied" };
     }
+    const joinEndsAt = Date.parse(trim2(group.joinEndsAt));
+    if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(deps.now?.() || Date.now())) {
+      return { ok: false, status: 403, reason: "worker_group_join_ended" };
+    }
     return addWorkerGroupMember({
       env,
       slug,
@@ -61994,7 +62336,7 @@ var callWorkerGroupCoordinator = async ({ env, slug, sessionId, path, payload = 
   if (!sessionSlug || !canonicalSessionId) {
     return { ok: false, status: 400, reason: "worker_group_session_identity_invalid" };
   }
-  const coordinator = env?.CE_SESSION_COORDINATOR;
+  const coordinator = env?.CE_WORKER_GROUP_COORDINATOR || env?.CE_SESSION_COORDINATOR;
   if (!coordinator?.idFromName || !coordinator?.get) {
     return workerGroupCoordinationUnavailable();
   }
@@ -62027,6 +62369,12 @@ var checkCoordinatedWorkerGroupReady = async ({ env, slug, sessionId } = {}) => 
   slug,
   sessionId,
   path: "/worker-groups/ready"
+});
+var reconcileCoordinatedWorkerGroupCapacity = async ({ env, slug, sessionId } = {}) => callWorkerGroupCoordinator({
+  env,
+  slug,
+  sessionId,
+  path: "/worker-groups/reconcile-empty"
 });
 var readCoordinatedWorkerGroupCatalog = async ({ env, slug, sessionId, groupIds, principal } = {}) => callWorkerGroupCoordinator({
   env,
@@ -62109,6 +62457,62 @@ var resolveWorkerGroupSessionIdentity = ({ config, slug } = {}) => {
   return { ok: true, sessionSlug, sessionId };
 };
 var participantGroupCreationAllowed = (config) => config?.groupCreationPolicy === "participants";
+var dispatchPublicWorkerGroupListRequest = async ({ request, config, env, slug, baseHeaders, deps = {} } = {}) => {
+  const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
+  if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, baseHeaders);
+  if (!workerConfigAllowsAnonymousGroupDiscovery(config)) {
+    return routeError(
+      deps,
+      {
+        status: 403,
+        reason: "worker_group_discovery_not_public"
+      },
+      baseHeaders
+    );
+  }
+  let requestedSessionId = "";
+  try {
+    requestedSessionId = resolveCanonicalWorkerSessionIdHex({
+      sessionId: new URL(request?.url || "").searchParams.get("sessionId")
+    });
+  } catch {
+    requestedSessionId = "";
+  }
+  if (requestedSessionId !== sessionIdentity.sessionId) {
+    return routeError(
+      deps,
+      {
+        status: 409,
+        reason: "worker_group_session_identity_mismatch"
+      },
+      baseHeaders
+    );
+  }
+  const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
+    env,
+    slug,
+    sessionId: sessionIdentity.sessionId
+  });
+  if (!ready.ok) return routeError(deps, ready, baseHeaders);
+  let result;
+  try {
+    result = await (deps?.listWorkerGroups || listWorkerGroups)({
+      env,
+      slug,
+      sessionId: sessionIdentity.sessionId,
+      admin: false,
+      expectedGroupCount: ready.meta?.groupCount
+    });
+  } catch {
+    result = {
+      ok: false,
+      status: 503,
+      reason: "worker_group_projection_unavailable"
+    };
+  }
+  if (!result.ok) return routeError(deps, result, baseHeaders);
+  return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, groups: result.groups }, 200, baseHeaders);
+};
 var dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, adminAddress, headers, deps } = {}) => {
   const sessionIdentity = resolveWorkerGroupSessionIdentity({ config, slug });
   if (!sessionIdentity.ok) return routeError(deps, sessionIdentity, headers);
@@ -62129,6 +62533,26 @@ var dispatchAdminWorkerGroupRequest = async ({ action, body, config, env, slug, 
   );
   if (!actor.ok) {
     return jsonResponse(deps, { error: "Invalid admin principal.", reason: actor.reason }, 400, headers);
+  }
+  if (action === "groups/reconcile-empty") {
+    const result = await (deps?.reconcileCoordinatedWorkerGroupCapacity || reconcileCoordinatedWorkerGroupCapacity)({
+      env,
+      slug,
+      sessionId: sessionIdentity.sessionId
+    });
+    if (!result.ok) return routeError(deps, result, headers);
+    return jsonResponse(
+      deps,
+      {
+        ok: true,
+        ...sessionIdentity,
+        store: "durable_object",
+        repaired: result.repaired === true,
+        groupCount: Number(result.meta?.groupCount || 0)
+      },
+      200,
+      headers
+    );
   }
   const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
   if (action === "groups/create") {
@@ -62376,6 +62800,49 @@ var workerGroupsRoute = async ({
       baseHeaders
     );
   }
+  if (path === "/groups/members" && (method === "GET" || method === "POST")) {
+    const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
+      env,
+      slug,
+      sessionId: sessionIdentity.sessionId
+    });
+    if (!ready.ok) return routeError(deps, ready, baseHeaders);
+    let result;
+    try {
+      const requestUrl = method === "GET" ? new URL(request?.url || "") : null;
+      result = await (deps?.listWorkerGroupMembersForPrincipal || listWorkerGroupMembersForPrincipal)({
+        env,
+        slug,
+        sessionId: sessionIdentity.sessionId,
+        groupId: method === "GET" ? requestUrl?.searchParams.get("groupId") : routeBody?.groupId,
+        principal: actor.principal,
+        cursor: method === "GET" ? requestUrl?.searchParams.get("cursor") : routeBody?.cursor,
+        limit: method === "GET" ? requestUrl?.searchParams.get("limit") : routeBody?.limit,
+        deps
+      });
+    } catch {
+      result = {
+        ok: false,
+        status: 503,
+        reason: "worker_group_projection_unavailable"
+      };
+    }
+    if (!result.ok) return routeError(deps, result, baseHeaders);
+    return jsonResponse(
+      deps,
+      {
+        ok: true,
+        ...sessionIdentity,
+        store: result.store,
+        group: result.group,
+        members: result.members,
+        memberCount: result.memberCount,
+        nextCursor: result.nextCursor
+      },
+      200,
+      baseHeaders
+    );
+  }
   if (path === "/groups/list" && (method === "GET" || method === "POST")) {
     const ready = await (deps?.checkCoordinatedWorkerGroupReady || checkCoordinatedWorkerGroupReady)({
       env,
@@ -62424,18 +62891,18 @@ var workerGroupsRoute = async ({
         label: routeBody?.group?.label,
         description: routeBody?.group?.description,
         imageUrl: routeBody?.group?.imageUrl,
+        tags: routeBody?.group?.tags,
+        documentURLs: routeBody?.group?.documentURLs,
+        memberLimit: routeBody?.group?.memberLimit,
+        joinEndsAt: routeBody?.group?.joinEndsAt,
+        adminAddress: actor.principal?.address,
         joinMode: WORKER_GROUP_JOIN_MODES.OPEN,
         memberVisibility: WORKER_GROUP_MEMBER_VISIBILITY.SESSION
       },
       actorPrincipal: actor.principal
     });
     if (!result.ok) return routeError(deps, result, baseHeaders);
-    return jsonResponse(
-      deps,
-      { ok: true, ...sessionIdentity, store: result.store, group: result.group },
-      200,
-      baseHeaders
-    );
+    return jsonResponse(deps, { ok: true, ...sessionIdentity, store: result.store, group: result.group }, 200, baseHeaders);
   }
   if (path === "/groups/join" && method === "POST") {
     const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
@@ -62457,6 +62924,33 @@ var workerGroupsRoute = async ({
         store: result.store,
         group: result.group,
         member: result.member
+      },
+      200,
+      baseHeaders
+    );
+  }
+  if (path === "/groups/leave" && method === "POST") {
+    const mutate = deps?.executeCoordinatedWorkerGroupMutation || executeCoordinatedWorkerGroupMutation;
+    const result = await mutate({
+      env,
+      slug,
+      sessionId: sessionIdentity.sessionId,
+      operation: "remove-member",
+      groupId: routeBody.groupId,
+      // A participant may only remove the principal authenticated by this
+      // request. Never accept a caller-supplied principal on this route.
+      principal: actor.principal,
+      actorPrincipal: actor.principal
+    });
+    if (!result.ok) return routeError(deps, result, baseHeaders);
+    return jsonResponse(
+      deps,
+      {
+        ok: true,
+        ...sessionIdentity,
+        store: result.store,
+        groupId: result.groupId,
+        principal: result.principal
       },
       200,
       baseHeaders
@@ -63303,7 +63797,7 @@ var ADMIN_ACTION_AUTH_FIELDS = Object.freeze([
   "audience",
   "expiration"
 ]);
-var toTrimmedString6 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString7 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var buildAdminActionMessage = ({
   action,
   slug,
@@ -63312,11 +63806,11 @@ var buildAdminActionMessage = ({
   audience,
   expiration
 } = {}) => ({
-  action: toTrimmedString6(action),
-  slug: toTrimmedString6(slug),
-  bodyHash: toTrimmedString6(bodyHash),
-  nonce: toTrimmedString6(nonce),
-  audience: toTrimmedString6(audience),
+  action: toTrimmedString7(action),
+  slug: toTrimmedString7(slug),
+  bodyHash: toTrimmedString7(bodyHash),
+  nonce: toTrimmedString7(nonce),
+  audience: toTrimmedString7(audience),
   expiration: Number.isFinite(Number(expiration)) ? Number(expiration) : 0
 });
 var buildAdminActionTypedData = (params = {}) => ({
@@ -64018,12 +64512,12 @@ var putKvJson = async (env, key, value, ttlSeconds) => {
 
 // workers/sessionCorsWorker/sponsoredBootstrapGrantStore.js
 var DEFAULT_TOKEN_BYTE_LENGTH = 24;
-var toTrimmedString7 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString8 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var SPONSORED_GRANT_TYPES = Object.freeze({
   deploy: "deploy-worker",
   faucet: "faucet-tx"
 });
-var buildSponsoredGrantKvKey = (token = "") => `sponsoredGrant:${toTrimmedString7(token)}`;
+var buildSponsoredGrantKvKey = (token = "") => `sponsoredGrant:${toTrimmedString8(token)}`;
 var buildSponsoredGrantToken = ({
   byteLength = DEFAULT_TOKEN_BYTE_LENGTH,
   cryptoImpl = globalThis.crypto
@@ -64036,7 +64530,7 @@ var buildSponsoredGrantToken = ({
   return Array.from(bytes2).map((value) => value.toString(16).padStart(2, "0")).join("");
 };
 var computeSponsoredGrantExpirationTtl = (expiresAt = "", nowMs = Date.now()) => {
-  const normalized = toTrimmedString7(expiresAt);
+  const normalized = toTrimmedString8(expiresAt);
   if (!normalized) return null;
   const expirationMs = Date.parse(normalized);
   if (!Number.isFinite(expirationMs)) {
@@ -64058,10 +64552,10 @@ var writeSponsoredGrantRecord = async (env, token, record, ttlSeconds = null, de
 };
 var deleteSponsoredGrantRecord = async (env, token) => env?.GROUP_KV?.delete?.(buildSponsoredGrantKvKey(token));
 var normalizeSensitiveValues = (values = []) => Array.from(new Set(
-  (Array.isArray(values) ? values : []).map((value) => toTrimmedString7(value)).filter((value) => value.length >= 4)
+  (Array.isArray(values) ? values : []).map((value) => toTrimmedString8(value)).filter((value) => value.length >= 4)
 )).sort((left, right) => right.length - left.length);
 var redactSponsoredSensitiveText = (value, sensitiveValues = []) => {
-  let redacted = toTrimmedString7(value);
+  let redacted = toTrimmedString8(value);
   normalizeSensitiveValues(sensitiveValues).forEach((secret) => {
     redacted = redacted.split(secret).join("[REDACTED]");
   });
@@ -64149,15 +64643,15 @@ var buildSponsoredGrantContinuationRecord = ({
   requestDigest,
   state
 } = {}) => {
-  const expiresAt = toTrimmedString7(grantRecord?.expiresAt);
-  const sourceAllowOrigins = Array.isArray(grantRecord?.sourceConfig?.allowOrigins) ? grantRecord.sourceConfig.allowOrigins.map((value) => toTrimmedString7(value)).filter(Boolean) : [];
+  const expiresAt = toTrimmedString8(grantRecord?.expiresAt);
+  const sourceAllowOrigins = Array.isArray(grantRecord?.sourceConfig?.allowOrigins) ? grantRecord.sourceConfig.allowOrigins.map((value) => toTrimmedString8(value)).filter(Boolean) : [];
   return {
-    type: toTrimmedString7(grantRecord?.type),
-    sourceSessionSlug: toTrimmedString7(grantRecord?.sourceSessionSlug),
+    type: toTrimmedString8(grantRecord?.type),
+    sourceSessionSlug: toTrimmedString8(grantRecord?.sourceSessionSlug),
     sourceConfig: sourceAllowOrigins.length ? { allowOrigins: sourceAllowOrigins } : {},
     ...expiresAt ? { expiresAt } : {},
     state,
-    requestDigest: toTrimmedString7(requestDigest)
+    requestDigest: toTrimmedString8(requestDigest)
   };
 };
 var writeSponsoredGrantReceipt = async ({
@@ -64169,7 +64663,7 @@ var writeSponsoredGrantReceipt = async ({
   sensitiveValues = [],
   nowMs = Date.now()
 } = {}) => {
-  const expiresAt = toTrimmedString7(grantRecord?.expiresAt);
+  const expiresAt = toTrimmedString8(grantRecord?.expiresAt);
   const ttlSeconds = expiresAt ? computeSponsoredGrantExpirationTtl(expiresAt, nowMs) : null;
   const safeRecord = {
     ...buildSponsoredGrantContinuationRecord({
@@ -64256,7 +64750,7 @@ var WRAPPED_SESSION_KEY_FIELDS = [
   "wrapAlg",
   "wrappedKey"
 ];
-var toTrimmedString8 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString9 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var isObjectRecord = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var normalizePositiveSafeInteger = (value) => {
   const numeric = Number(value);
@@ -64278,9 +64772,9 @@ var normalizeWrappedSessionKeyRecord = (value, slug) => {
   if (!isObjectRecord(value)) return null;
   const fields = Object.keys(value).sort();
   if (fields.join(",") !== [...WRAPPED_SESSION_KEY_FIELDS].sort().join(",")) return null;
-  const createdAt = toTrimmedString8(value.createdAt);
+  const createdAt = toTrimmedString9(value.createdAt);
   const createdAtMs = Date.parse(createdAt);
-  if (value.version !== 1 || value.keyProvider !== "worker_secret" || value.alg !== "AES-256-GCM" || value.wrapAlg !== "AES-GCM-KW-v1" || toTrimmedString8(value.keyId) !== `session:${slug}:${createdAt}` || !Number.isFinite(createdAtMs) || new Date(createdAtMs).toISOString() !== createdAt || !isBase64url(value.iv, 16) || !isBase64url(value.wrappedKey, 64)) return null;
+  if (value.version !== 1 || value.keyProvider !== "worker_secret" || value.alg !== "AES-256-GCM" || value.wrapAlg !== "AES-GCM-KW-v1" || toTrimmedString9(value.keyId) !== `session:${slug}:${createdAt}` || !Number.isFinite(createdAtMs) || new Date(createdAtMs).toISOString() !== createdAt || !isBase64url(value.iv, 16) || !isBase64url(value.wrappedKey, 64)) return null;
   return Object.fromEntries(WRAPPED_SESSION_KEY_FIELDS.map((field) => [field, value[field]]));
 };
 var normalizePublicSessionConfig = (value, slug) => {
@@ -64352,12 +64846,12 @@ var WORKER_GROUP_MUTATIONS = /* @__PURE__ */ new Set([
 var normalizeWorkerGroupMutation = (payload) => {
   const slug = normalizeSessionSlug(payload?.slug);
   const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
-  const operation = toTrimmedString8(payload?.operation).toLowerCase();
+  const operation = toTrimmedString9(payload?.operation).toLowerCase();
   const actor = normalizeWorkerGroupPrincipal(payload?.actorPrincipal);
   if (!slug || !sessionId || !WORKER_GROUP_MUTATIONS.has(operation) || !actor.ok) return null;
   if (operation === "create") {
     if (!isObjectRecord(payload?.input)) return null;
-    const requestedGroupId = toTrimmedString8(payload.input.groupId);
+    const requestedGroupId = toTrimmedString9(payload.input.groupId);
     const groupId = requestedGroupId ? normalizeWorkerGroupId(requestedGroupId) : createWorkerGroupId();
     if (!groupId) return null;
     return {
@@ -64372,7 +64866,7 @@ var normalizeWorkerGroupMutation = (payload) => {
       actorPrincipal: actor.principal
     };
   }
-  const rawGroupId = toTrimmedString8(payload?.groupId);
+  const rawGroupId = toTrimmedString9(payload?.groupId);
   if (!rawGroupId) return null;
   const normalized = {
     slug,
@@ -64468,6 +64962,55 @@ var SessionWriteCoordinator = class {
       return { ok: true, meta };
     });
   }
+  async reconcileEmptyWorkerGroupCapacity(slug, sessionId) {
+    const existing = await this.state.storage.get(WORKER_GROUP_CAPACITY_META_KEY);
+    const initialized = resolveInitializedWorkerGroupCapacity(existing, slug, sessionId);
+    if (initialized?.ok) {
+      return { ...initialized, repaired: false };
+    }
+    if (initialized?.reason === "worker_group_capacity_identity_conflict") return initialized;
+    if (existing?.version !== 3 || existing.slug !== slug || existing.sessionId !== sessionId || existing.phase !== "legacy_locked") {
+      return {
+        ok: false,
+        status: 409,
+        reason: "worker_group_capacity_repair_not_applicable"
+      };
+    }
+    const bootstrap = await resolveWorkerGroupBootstrap({
+      env: this.env,
+      slug,
+      sessionId,
+      requireExhaustiveEmptyScan: true
+    });
+    if (!bootstrap.ok) return bootstrap;
+    return this.state.storage.transaction(async (transaction) => {
+      const concurrent = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
+      const concurrentlyInitialized = resolveInitializedWorkerGroupCapacity(concurrent, slug, sessionId);
+      if (concurrentlyInitialized?.ok) {
+        return { ...concurrentlyInitialized, repaired: false };
+      }
+      if (concurrentlyInitialized?.reason === "worker_group_capacity_identity_conflict") {
+        return concurrentlyInitialized;
+      }
+      if (concurrent?.version !== 3 || concurrent.slug !== slug || concurrent.sessionId !== sessionId || concurrent.phase !== "legacy_locked") {
+        return {
+          ok: false,
+          status: 409,
+          reason: "worker_group_capacity_repair_not_applicable"
+        };
+      }
+      const meta = {
+        version: 3,
+        slug,
+        sessionId,
+        phase: "ready",
+        bootstrapId: bootstrap.bootstrapId,
+        groupCount: 0
+      };
+      await transaction.put(WORKER_GROUP_CAPACITY_META_KEY, meta);
+      return { ok: true, repaired: true, meta };
+    });
+  }
   async reserveWorkerGroupSlot({ slug, sessionId, groupId, maxGroupsPerSession }) {
     return this.state.storage.transaction(async (transaction) => {
       const meta = await transaction.get(WORKER_GROUP_CAPACITY_META_KEY);
@@ -64527,8 +65070,10 @@ var SessionWriteCoordinator = class {
         version: 2,
         phase: "active",
         active: true,
-        joinMode: toTrimmedString8(group?.joinMode).toLowerCase() || "admin_add",
-        memberVisibility: toTrimmedString8(group?.memberVisibility).toLowerCase() || "admin_only"
+        joinMode: toTrimmedString9(group?.joinMode).toLowerCase() || "admin_add",
+        memberVisibility: toTrimmedString9(group?.memberVisibility).toLowerCase() || "admin_only",
+        memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
+        joinEndsAt: toTrimmedString9(group?.joinEndsAt)
       });
     });
   }
@@ -64565,8 +65110,10 @@ var SessionWriteCoordinator = class {
         ...state,
         phase: "active",
         active: true,
-        joinMode: toTrimmedString8(group?.joinMode).toLowerCase() || "admin_add",
-        memberVisibility: toTrimmedString8(group?.memberVisibility).toLowerCase() || "admin_only"
+        joinMode: toTrimmedString9(group?.joinMode).toLowerCase() || "admin_add",
+        memberVisibility: toTrimmedString9(group?.memberVisibility).toLowerCase() || "admin_only",
+        memberLimit: normalizePositiveSafeInteger(group?.memberLimit),
+        joinEndsAt: toTrimmedString9(group?.joinEndsAt)
       });
     });
   }
@@ -64621,7 +65168,9 @@ var SessionWriteCoordinator = class {
           reason: "worker_group_membership_state_pending"
         };
       }
-      if (Number(groupState.memberCount || 0) >= maxMembersPerGroup) {
+      const configuredMemberLimit = normalizePositiveSafeInteger(groupState.memberLimit);
+      const effectiveMemberLimit = configuredMemberLimit ? Math.min(configuredMemberLimit, maxMembersPerGroup) : maxMembersPerGroup;
+      if (Number(groupState.memberCount || 0) >= effectiveMemberLimit) {
         return { ok: false, status: 409, reason: "worker_group_member_cap_exceeded" };
       }
       await transaction.put(groupKey2, {
@@ -64736,6 +65285,21 @@ var SessionWriteCoordinator = class {
     }
     const initialized = await this.initializeWorkerGroupCapacity(slug, sessionId);
     return jsonResponse2(initialized, initialized.ok ? 200 : initialized.status || 503);
+  }
+  executeWorkerGroupReconcileEmpty(payload) {
+    return this.serializeWorkerGroupOperation(async () => {
+      const slug = normalizeSessionSlug(payload?.slug);
+      const sessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: payload?.sessionId });
+      if (!slug || !sessionId) {
+        return jsonResponse2({
+          ok: false,
+          status: 400,
+          reason: "worker_group_session_identity_invalid"
+        }, 400);
+      }
+      const reconciled = await this.reconcileEmptyWorkerGroupCapacity(slug, sessionId);
+      return jsonResponse2(reconciled, reconciled.ok ? 200 : reconciled.status || 503);
+    });
   }
   executeWorkerGroupAuthorization(payload) {
     return this.serializeWorkerGroupOperation(async () => {
@@ -64856,6 +65420,7 @@ var SessionWriteCoordinator = class {
       let updateReservation = null;
       let removalReservation = null;
       let principalDigest = "";
+      let activeGroup = null;
       if (mutation.operation === "create") {
         groupReservation = await this.reserveWorkerGroupSlot({
           slug: mutation.slug,
@@ -64867,7 +65432,7 @@ var SessionWriteCoordinator = class {
           return jsonResponse2(groupReservation, groupReservation.status || 409);
         }
       } else {
-        const activeGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
+        activeGroup = await this.getActiveWorkerGroupCapacity(mutation.groupId);
         if (!activeGroup.ok) {
           return jsonResponse2(activeGroup, activeGroup.status || 404);
         }
@@ -64878,7 +65443,27 @@ var SessionWriteCoordinator = class {
             reason: "worker_group_join_denied"
           }, 403);
         }
+        if (mutation.operation === "join") {
+          const joinEndsAt = Date.parse(toTrimmedString9(activeGroup.state.joinEndsAt));
+          if (Number.isFinite(joinEndsAt) && joinEndsAt <= Number(this.now())) {
+            return jsonResponse2({
+              ok: false,
+              status: 403,
+              reason: "worker_group_join_ended"
+            }, 403);
+          }
+        }
         if (mutation.operation === "update") {
+          if (Object.prototype.hasOwnProperty.call(mutation.input, "memberLimit")) {
+            const requestedMemberLimit = Number(mutation.input.memberLimit);
+            if (Number.isSafeInteger(requestedMemberLimit) && requestedMemberLimit > 0 && requestedMemberLimit < Number(activeGroup.state.memberCount || 0)) {
+              return jsonResponse2({
+                ok: false,
+                status: 409,
+                reason: "worker_group_member_limit_below_current"
+              }, 409);
+            }
+          }
           updateReservation = await this.beginWorkerGroupUpdate(mutation.groupId);
           if (!updateReservation.ok) {
             return jsonResponse2(updateReservation, updateReservation.status || 404);
@@ -64931,6 +65516,11 @@ var SessionWriteCoordinator = class {
             "invalid_group_label",
             "invalid_group_description",
             "invalid_group_image_url",
+            "invalid_group_tags",
+            "invalid_group_document_urls",
+            "invalid_group_member_limit",
+            "invalid_group_join_end",
+            "invalid_group_admin_address",
             "invalid_worker_group_id"
           ]);
           if (definitelyPrewrite.has(result.reason)) {
@@ -65145,8 +65735,8 @@ var SessionWriteCoordinator = class {
   async executeAuthNonceIssue(payload) {
     const nowMs = Number(this.now()) || Date.now();
     const slug = normalizeSessionSlug(payload?.slug);
-    const address = toTrimmedString8(payload?.address).toLowerCase();
-    const nonce = toTrimmedString8(payload?.nonce);
+    const address = toTrimmedString9(payload?.address).toLowerCase();
+    const nonce = toTrimmedString9(payload?.nonce);
     const expiresAtMs = normalizeBoundedFutureTimestamp(
       payload?.expiresAtMs,
       nowMs,
@@ -65175,8 +65765,8 @@ var SessionWriteCoordinator = class {
   async executeAuthNonceConsume(payload) {
     const nowMs = Number(this.now()) || Date.now();
     const slug = normalizeSessionSlug(payload?.slug);
-    const address = toTrimmedString8(payload?.address).toLowerCase();
-    const nonce = toTrimmedString8(payload?.nonce);
+    const address = toTrimmedString9(payload?.address).toLowerCase();
+    const nonce = toTrimmedString9(payload?.nonce);
     const usedExpiresAtMs = normalizeBoundedFutureTimestamp(
       payload?.usedExpiresAtMs,
       nowMs,
@@ -65188,7 +65778,7 @@ var SessionWriteCoordinator = class {
     const result = await this.state.storage.transaction(async (transaction) => {
       const used = await transaction.get(AUTH_NONCE_USED_KEY);
       const entries = Array.isArray(used?.entries) ? used.entries.filter((entry) => Number(entry?.expiresAtMs || 0) > nowMs) : [];
-      if (entries.some((entry) => toTrimmedString8(entry?.nonce) === nonce)) {
+      if (entries.some((entry) => toTrimmedString9(entry?.nonce) === nonce)) {
         await transaction.put(AUTH_NONCE_USED_KEY, { version: 1, entries });
         return { ok: false, error: "Nonce already used." };
       }
@@ -65211,8 +65801,8 @@ var SessionWriteCoordinator = class {
   async executeAuthRateCheck(payload) {
     const nowMs = Number(this.now()) || Date.now();
     const slug = normalizeSessionSlug(payload?.slug);
-    const route = toTrimmedString8(payload?.route).toLowerCase();
-    const identity = toTrimmedString8(payload?.identity).toLowerCase();
+    const route = toTrimmedString9(payload?.route).toLowerCase();
+    const identity = toTrimmedString9(payload?.identity).toLowerCase();
     const limit = normalizePositiveSafeInteger(payload?.limit);
     const resetAtMs = normalizeBoundedFutureTimestamp(
       payload?.resetAtMs,
@@ -65240,13 +65830,13 @@ var SessionWriteCoordinator = class {
     const nowMs = Number(this.now()) || Date.now();
     return this.state.storage.transaction(async (transaction) => {
       const existing = await transaction.get(SPONSORED_DEPLOY_RECORD_KEY);
-      if (existing && toTrimmedString8(existing.requestDigest) !== requestDigest) {
+      if (existing && toTrimmedString9(existing.requestDigest) !== requestDigest) {
         return { kind: "conflict" };
       }
       if (existing?.state === "terminal" && existing.result) {
         return { kind: "terminal", result: existing.result };
       }
-      if (existing?.state === "running" && (this.activeAttemptId === toTrimmedString8(existing.attemptId) || nowMs - Number(existing.startedAtMs || 0) < RUNNING_LEASE_MS)) {
+      if (existing?.state === "running" && (this.activeAttemptId === toTrimmedString9(existing.attemptId) || nowMs - Number(existing.startedAtMs || 0) < RUNNING_LEASE_MS)) {
         return { kind: "pending" };
       }
       const attemptId = createAttemptId(this.crypto);
@@ -65263,7 +65853,7 @@ var SessionWriteCoordinator = class {
   async finalizeSponsoredDeploy({ requestDigest, attemptId, result, terminal }) {
     await this.state.storage.transaction(async (transaction) => {
       const existing = await transaction.get(SPONSORED_DEPLOY_RECORD_KEY);
-      if (toTrimmedString8(existing?.requestDigest) !== requestDigest || toTrimmedString8(existing?.attemptId) !== attemptId || existing?.state !== "running") {
+      if (toTrimmedString9(existing?.requestDigest) !== requestDigest || toTrimmedString9(existing?.attemptId) !== attemptId || existing?.state !== "running") {
         return;
       }
       await transaction.put(SPONSORED_DEPLOY_RECORD_KEY, terminal ? {
@@ -65284,20 +65874,20 @@ var SessionWriteCoordinator = class {
     const nowMs = Number(this.now()) || Date.now();
     return this.state.storage.transaction(async (transaction) => {
       const existing = await transaction.get(DIRECT_DEPLOY_RECORD_KEY);
-      if (existing && toTrimmedString8(existing.immutableIdentityDigest) !== immutableIdentityDigest) {
+      if (existing && toTrimmedString9(existing.immutableIdentityDigest) !== immutableIdentityDigest) {
         return { kind: "identity-conflict" };
       }
-      if (existing && toTrimmedString8(existing.accountId) !== accountId) {
+      if (existing && toTrimmedString9(existing.accountId) !== accountId) {
         return { kind: "account-conflict" };
       }
       if (existing?.state === "terminal" && existing.result) {
         return {
           kind: "terminal",
           result: existing.result,
-          requestDigestMatches: toTrimmedString8(existing.requestDigest) === requestDigest
+          requestDigestMatches: toTrimmedString9(existing.requestDigest) === requestDigest
         };
       }
-      if (existing?.state === "running" && (this.activeDirectAttemptId === toTrimmedString8(existing.attemptId) || nowMs - Number(existing.startedAtMs || 0) < RUNNING_LEASE_MS)) {
+      if (existing?.state === "running" && (this.activeDirectAttemptId === toTrimmedString9(existing.attemptId) || nowMs - Number(existing.startedAtMs || 0) < RUNNING_LEASE_MS)) {
         return { kind: "pending" };
       }
       const attemptId = createAttemptId(this.crypto);
@@ -65323,7 +65913,7 @@ var SessionWriteCoordinator = class {
   }) {
     await this.state.storage.transaction(async (transaction) => {
       const existing = await transaction.get(DIRECT_DEPLOY_RECORD_KEY);
-      if (existing?.state !== "running" || toTrimmedString8(existing.requestDigest) !== requestDigest || toTrimmedString8(existing.immutableIdentityDigest) !== immutableIdentityDigest || toTrimmedString8(existing.accountId) !== accountId || toTrimmedString8(existing.attemptId) !== attemptId) return;
+      if (existing?.state !== "running" || toTrimmedString9(existing.requestDigest) !== requestDigest || toTrimmedString9(existing.immutableIdentityDigest) !== immutableIdentityDigest || toTrimmedString9(existing.accountId) !== accountId || toTrimmedString9(existing.attemptId) !== attemptId) return;
       await transaction.put(DIRECT_DEPLOY_RECORD_KEY, terminal ? {
         version: 1,
         state: "terminal",
@@ -65343,17 +65933,17 @@ var SessionWriteCoordinator = class {
     });
   }
   async executeDirectDeploy(payload) {
-    const requestDigest = toTrimmedString8(payload?.requestDigest);
-    const immutableIdentityDigest = toTrimmedString8(payload?.immutableIdentityDigest);
+    const requestDigest = toTrimmedString9(payload?.requestDigest);
+    const immutableIdentityDigest = toTrimmedString9(payload?.immutableIdentityDigest);
     const deployBody = payload?.deployBody && typeof payload.deployBody === "object" ? payload.deployBody : null;
     if (!requestDigest || !immutableIdentityDigest || !deployBody) {
       return jsonResponse2({ error: "Invalid direct deploy coordination request." }, 400);
     }
     const account = await this.lookupCloudflareAccount({
-      apiToken: toTrimmedString8(deployBody.apiToken || deployBody.token),
+      apiToken: toTrimmedString9(deployBody.apiToken || deployBody.token),
       env: this.env
     });
-    if (!account?.ok || !toTrimmedString8(account.accountId)) {
+    if (!account?.ok || !toTrimmedString9(account.accountId)) {
       const lookupStatus = Number(account?.status || 0);
       const responseStatus = lookupStatus === 404 || lookupStatus === 409 ? lookupStatus : 502;
       const safeError = buildSafeSponsoredReceiptBody({
@@ -65366,7 +65956,7 @@ var SessionWriteCoordinator = class {
         body: safeError
       }, responseStatus);
     }
-    const accountId = toTrimmedString8(account.accountId);
+    const accountId = toTrimmedString9(account.accountId);
     const reservation = await this.reserveDirectDeploy({ requestDigest, immutableIdentityDigest, accountId });
     if (reservation.kind === "terminal") {
       const replayResult = buildDirectDeployTerminalReplay(reservation);
@@ -65415,7 +66005,7 @@ var SessionWriteCoordinator = class {
       rawResult = await this.executeDeployHelperRequest({
         body: deployBody,
         env: this.env,
-        requestOrigin: toTrimmedString8(payload?.requestOrigin),
+        requestOrigin: toTrimmedString9(payload?.requestOrigin),
         consoleImpl: console,
         coordinationBypass: true,
         coordinatedRequestDigest,
@@ -65453,7 +66043,7 @@ var SessionWriteCoordinator = class {
   async reserveSponsoredFaucet(requestDigest) {
     return this.state.storage.transaction(async (transaction) => {
       const existing = await transaction.get(SPONSORED_FAUCET_RECORD_KEY);
-      if (existing && toTrimmedString8(existing.requestDigest) !== requestDigest) {
+      if (existing && toTrimmedString9(existing.requestDigest) !== requestDigest) {
         return { kind: "conflict" };
       }
       if (existing?.state === "terminal" && existing.receipt) {
@@ -65478,7 +66068,7 @@ var SessionWriteCoordinator = class {
     };
     return this.state.storage.transaction(async (transaction) => {
       const existing = await transaction.get(SPONSORED_FAUCET_RECORD_KEY);
-      if (toTrimmedString8(existing?.requestDigest) !== requestDigest) return null;
+      if (toTrimmedString9(existing?.requestDigest) !== requestDigest) return null;
       if (existing?.state === "terminal" && existing.receipt) return existing.receipt;
       if (existing?.state !== "running") return null;
       await transaction.put(SPONSORED_FAUCET_RECORD_KEY, {
@@ -65515,6 +66105,9 @@ var SessionWriteCoordinator = class {
     if (url.pathname === "/worker-groups/ready") {
       return this.executeWorkerGroupReady(payload);
     }
+    if (url.pathname === "/worker-groups/reconcile-empty") {
+      return this.executeWorkerGroupReconcileEmpty(payload);
+    }
     if (url.pathname === "/worker-groups/authorize") {
       return this.executeWorkerGroupAuthorization(payload);
     }
@@ -65526,20 +66119,20 @@ var SessionWriteCoordinator = class {
     }
     if (url.pathname === "/deploy-helper") return this.executeDirectDeploy(payload);
     if (url.pathname === "/sponsored-faucet/reserve") {
-      const requestDigest2 = toTrimmedString8(payload?.requestDigest);
+      const requestDigest2 = toTrimmedString9(payload?.requestDigest);
       if (!requestDigest2) return jsonResponse2({ error: "Invalid sponsored faucet reservation." }, 400);
       const reservation2 = await this.reserveSponsoredFaucet(requestDigest2);
       return jsonResponse2(reservation2, reservation2.kind === "conflict" ? 409 : reservation2.kind === "pending" ? 503 : 200);
     }
     if (url.pathname === "/sponsored-faucet/finalize") {
-      const requestDigest2 = toTrimmedString8(payload?.requestDigest);
+      const requestDigest2 = toTrimmedString9(payload?.requestDigest);
       const receipt = payload?.receipt && typeof payload.receipt === "object" ? payload.receipt : null;
       if (!requestDigest2 || !receipt) return jsonResponse2({ error: "Invalid sponsored faucet receipt." }, 400);
       const storedReceipt = await this.finalizeSponsoredFaucet({ requestDigest: requestDigest2, receipt });
       return storedReceipt ? jsonResponse2({ kind: "terminal", receipt: storedReceipt }, 200) : jsonResponse2({ error: "Sponsored faucet reservation does not match." }, 409);
     }
     if (url.pathname !== "/sponsored-deploy") return jsonResponse2({ error: "Not found." }, 404);
-    const requestDigest = toTrimmedString8(payload?.requestDigest);
+    const requestDigest = toTrimmedString9(payload?.requestDigest);
     const deployBody = payload?.deployBody && typeof payload.deployBody === "object" ? payload.deployBody : null;
     const sensitiveValues = Array.isArray(payload?.sensitiveValues) ? payload.sensitiveValues : [];
     if (!requestDigest || !deployBody) {
@@ -65575,7 +66168,7 @@ var SessionWriteCoordinator = class {
       rawResult = await this.executeDeployHelperRequest({
         body: deployBody,
         env: this.env,
-        requestOrigin: toTrimmedString8(payload?.requestOrigin),
+        requestOrigin: toTrimmedString9(payload?.requestOrigin),
         consoleImpl: console,
         coordinationBypass: true
       });
@@ -65584,7 +66177,7 @@ var SessionWriteCoordinator = class {
         ok: false,
         status: 502,
         body: {
-          error: toTrimmedString8(error?.message || error) || "Failed to run embedded sponsored deploy.",
+          error: toTrimmedString9(error?.message || error) || "Failed to run embedded sponsored deploy.",
           deploymentRequestPending: true
         }
       };
@@ -65603,6 +66196,8 @@ var SessionWriteCoordinator = class {
       if (this.activeAttemptId === reservation.attemptId) this.activeAttemptId = "";
     }
   }
+};
+var WorkerGroupWriteCoordinator = class extends SessionWriteCoordinator {
 };
 var executeCoordinatedSponsoredDeploy = async ({
   env,
@@ -65623,7 +66218,7 @@ var executeCoordinatedSponsoredDeploy = async ({
       }
     };
   }
-  const normalizedGrantToken = toTrimmedString8(grantToken);
+  const normalizedGrantToken = toTrimmedString9(grantToken);
   if (!normalizedGrantToken) {
     return { ok: false, status: 400, body: { error: "Missing sponsored deploy grant identity." } };
   }
@@ -65696,7 +66291,7 @@ var issueCoordinatedAuthNonce = async ({
   const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
   return callAuthStateCoordinator({
     env,
-    identity: `auth-nonce:${toTrimmedString8(slug)}:${toTrimmedString8(address).toLowerCase()}`,
+    identity: `auth-nonce:${toTrimmedString9(slug)}:${toTrimmedString9(address).toLowerCase()}`,
     path: "/auth-state/nonce/issue",
     payload: {
       slug,
@@ -65718,7 +66313,7 @@ var consumeCoordinatedAuthNonce = async ({
   const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
   return callAuthStateCoordinator({
     env,
-    identity: `auth-nonce:${toTrimmedString8(slug)}:${toTrimmedString8(address).toLowerCase()}`,
+    identity: `auth-nonce:${toTrimmedString9(slug)}:${toTrimmedString9(address).toLowerCase()}`,
     path: "/auth-state/nonce/consume",
     payload: {
       slug,
@@ -65738,11 +66333,11 @@ var checkCoordinatedAuthRateLimit = async ({
   now = Date.now
 } = {}) => {
   const nowMs = Number(typeof now === "function" ? now() : now) || Date.now();
-  const normalizedRoute = toTrimmedString8(route).toLowerCase();
-  const normalizedIdentity = toTrimmedString8(identity).toLowerCase();
+  const normalizedRoute = toTrimmedString9(route).toLowerCase();
+  const normalizedIdentity = toTrimmedString9(identity).toLowerCase();
   return callAuthStateCoordinator({
     env,
-    identity: `auth-rate:${toTrimmedString8(slug)}:${normalizedRoute}:${normalizedIdentity}`,
+    identity: `auth-rate:${toTrimmedString9(slug)}:${normalizedRoute}:${normalizedIdentity}`,
     path: "/auth-state/rate/check",
     payload: {
       slug,
@@ -65826,8 +66421,8 @@ var executeCoordinatedSessionConfigMutation = async ({
   };
 };
 var reserveCoordinatedSponsoredFaucet = async ({ env, grantToken, requestDigest } = {}) => {
-  const token = toTrimmedString8(grantToken);
-  const digest = toTrimmedString8(requestDigest);
+  const token = toTrimmedString9(grantToken);
+  const digest = toTrimmedString9(requestDigest);
   const stub = token ? await resolveCoordinatorStub(env, `sponsored-faucet:${token}`) : null;
   if (!stub) return { kind: "unavailable" };
   try {
@@ -65847,7 +66442,7 @@ var finalizeCoordinatedSponsoredFaucet = async ({
   requestDigest,
   receipt
 } = {}) => {
-  const token = toTrimmedString8(grantToken);
+  const token = toTrimmedString9(grantToken);
   const stub = token ? await resolveCoordinatorStub(env, `sponsored-faucet:${token}`) : null;
   if (!stub) return null;
   try {
@@ -67633,7 +68228,7 @@ var getDefaultArweaveCtorCandidates = () => [
   { name: "arweave", loader: async () => await Promise.resolve().then(() => __toESM(require_web(), 1)) }
 ];
 var resolveCtorFromModule = (moduleValue) => (moduleValue && typeof moduleValue.init === "function" ? moduleValue : null) || (moduleValue?.default && typeof moduleValue.default.init === "function" ? moduleValue.default : null) || (moduleValue?.Arweave && typeof moduleValue.Arweave.init === "function" ? moduleValue.Arweave : null) || (moduleValue?.default?.Arweave && typeof moduleValue.default.Arweave.init === "function" ? moduleValue.default.Arweave : null) || (moduleValue?.default?.default && typeof moduleValue.default.default.init === "function" ? moduleValue.default.default : null);
-var toTrimmedString9 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
+var toTrimmedString10 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
 var noop = () => {
 };
 var resolveLog = (deps) => typeof deps?.log === "function" ? deps.log : noop;
@@ -67652,11 +68247,11 @@ var uploadTransactionWithFallback = async ({ arweave, tx, deps }) => {
       return;
     }
     const status = res?.status || "unknown";
-    const statusText = toTrimmedString9(res?.statusText || "", deps);
+    const statusText = toTrimmedString10(res?.statusText || "", deps);
     let responseBody = "";
     if (typeof res?.text === "function") {
       try {
-        responseBody = toTrimmedString9(await res.text(), deps);
+        responseBody = toTrimmedString10(await res.text(), deps);
       } catch {
         responseBody = "";
       }
@@ -68284,7 +68879,7 @@ var normalizeFaucetRequest = ({
 // workers/sessionCorsWorker/faucetExecution.js
 var DEFAULT_GAS_PRICE_HEX = "0x3b9aca00";
 var DEFAULT_ACCESS_DENIED_ERROR = "Access denied.";
-var toTrimmedString10 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
+var toTrimmedString11 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
 var resolveJson2 = (deps) => deps?.json || json;
 var resolveLog2 = (deps) => typeof deps?.log === "function" ? deps.log : () => {
 };
@@ -68342,11 +68937,11 @@ var faucet = async ({
       logContext.rpcUrl = maskRpcUrl(normalizedRpcUrls[0]);
       logContext.rpcUrls = normalizedRpcUrls.map((rpcUrl) => maskRpcUrl(rpcUrl));
     } else {
-      if (/^https?:\/\//i.test(toTrimmedString10(logContext.rpcUrl, deps))) {
+      if (/^https?:\/\//i.test(toTrimmedString11(logContext.rpcUrl, deps))) {
         logContext.rpcUrl = maskRpcUrl(logContext.rpcUrl);
       }
       if (Array.isArray(logContext.rpcUrls)) {
-        logContext.rpcUrls = logContext.rpcUrls.map((rpcUrl) => /^https?:\/\//i.test(toTrimmedString10(rpcUrl, deps)) ? maskRpcUrl(rpcUrl) : rpcUrl);
+        logContext.rpcUrls = logContext.rpcUrls.map((rpcUrl) => /^https?:\/\//i.test(toTrimmedString11(rpcUrl, deps)) ? maskRpcUrl(rpcUrl) : rpcUrl);
       }
     }
     log2("[faucet] request", logContext);
@@ -69203,14 +69798,14 @@ var readTranscribeRequestPayload = async ({ request } = {}) => {
 // workers/sessionCorsWorker/endpointConfig.js
 var DEFAULT_OPENAI_TRANSCRIBE_URL = "https://api.openai.com/v1/audio/transcriptions";
 var OPENAI_TRANSCRIBE_URL_ENV = "CE_OPENAI_TRANSCRIBE_URL";
-var toTrimmedString11 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString12 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var resolveOpenAiTranscribeUrl = ({
   constants = null,
   env = null
-} = {}) => toTrimmedString11(constants?.openAiTranscribeUrl) || toTrimmedString11(constants?.OPENAI_TRANSCRIBE_URL) || toTrimmedString11(env?.[OPENAI_TRANSCRIBE_URL_ENV]) || DEFAULT_OPENAI_TRANSCRIBE_URL;
+} = {}) => toTrimmedString12(constants?.openAiTranscribeUrl) || toTrimmedString12(constants?.OPENAI_TRANSCRIBE_URL) || toTrimmedString12(env?.[OPENAI_TRANSCRIBE_URL_ENV]) || DEFAULT_OPENAI_TRANSCRIBE_URL;
 
 // workers/sessionCorsWorker/transcribeExecution.js
-var toTrimmedString12 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
+var toTrimmedString13 = (value, deps) => deps?.toStr ? deps.toStr(value).trim() : (typeof value === "string" ? value : value == null ? "" : String(value)).trim();
 var transcribe = async ({
   request,
   secrets,
@@ -69231,7 +69826,7 @@ var transcribe = async ({
     upstreamFormData
   } = normalizedRequest.payload || {};
   let targetUrl = resolveOpenAiTranscribeUrl({ constants });
-  let key = requestApiKey || toTrimmedString12(secrets?.openaiKey, deps);
+  let key = requestApiKey || toTrimmedString13(secrets?.openaiKey, deps);
   if (provider === "custom") {
     targetUrl = requestRpcUrl;
     if (deps?.isBlockedOutboundUrl?.(targetUrl)) {
@@ -71531,6 +72126,7 @@ var dispatchAnonymousRouteWithWorkerDeps = async ({
   deps: {
     readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
     storageRoute: deps?.storageRoute,
+    dispatchPublicWorkerGroupListRequest: deps?.dispatchPublicWorkerGroupListRequest,
     evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
     getSessionSecrets: (sessionSlug) => deps?.getSessionSecrets?.(env, sessionSlug),
     transcribe: deps?.transcribe,
@@ -71541,6 +72137,7 @@ var dispatchAnonymousRouteWithWorkerDeps = async ({
     proxyOpenRouter: deps?.proxyOpenRouter,
     proxyCustomRPC: deps?.proxyCustomRPC,
     json: deps?.json,
+    now: deps?.now,
     ANONYMOUS_ROUTE_DENIED_ERROR: constants?.anonymousRouteDeniedError
   }
 });
@@ -71587,7 +72184,8 @@ var dispatchAnonymousRouteEntryWithWorkerDeps = async ({
         proxyOpenAI: deps?.proxyOpenAI,
         proxyOpenRouter: deps?.proxyOpenRouter,
         proxyCustomRPC: deps?.proxyCustomRPC,
-        json: deps?.json
+        json: deps?.json,
+        now: deps?.now
       },
       constants: {
         anonymousRouteDeniedError: constants?.anonymousRouteDeniedError
@@ -71653,7 +72251,8 @@ var dispatchAuthenticatedRouteWithWorkerDeps = async ({
         getAddress: deps?.getAddress,
         transcribe: deps?.transcribe,
         arweaveUpload: deps?.arweaveUpload,
-        storageRoute: deps?.storageRoute
+        storageRoute: deps?.storageRoute,
+        now: deps?.now
       }
     }),
     readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
@@ -71666,7 +72265,8 @@ var dispatchAuthenticatedRouteWithWorkerDeps = async ({
         fetchImage: deps?.fetchImage,
         fetchUrl: deps?.fetchUrl,
         checkRateLimit: deps?.checkRateLimit,
-        json: deps?.json
+        json: deps?.json,
+        now: deps?.now
       }
     }),
     dispatchAuthenticatedSecretActionRoute: (value) => deps?.dispatchAuthenticatedSecretActionRoute?.({
@@ -71685,7 +72285,8 @@ var dispatchAuthenticatedRouteWithWorkerDeps = async ({
         checkRateLimit: deps?.checkRateLimit,
         getSessionSecrets: deps?.getSessionSecrets,
         json: deps?.json,
-        toStr: deps?.toStr
+        toStr: deps?.toStr,
+        now: deps?.now
       }
     }),
     json: deps?.json
@@ -71816,7 +72417,7 @@ var dispatchAuthenticatedRouteEntryWithWorkerDeps = async ({
 });
 
 // workers/sessionCorsWorker/adminRequestAuthority.js
-var toTrimmedString13 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString14 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var resolveEthersCompat2 = (loadedModule) => loadedModule?.ethers || loadedModule?.default?.ethers || loadedModule?.default || loadedModule || null;
 var ethers2 = resolveEthersCompat2(lib_exports);
 var getEthersFn3 = (...candidates) => candidates.find((fn) => typeof fn === "function") || null;
@@ -71857,7 +72458,7 @@ var verifyTypedDataCompat = (...args) => {
   }
   return verifyFn(...args);
 };
-var normalizeAddressLower2 = (value) => toTrimmedString13(value).toLowerCase();
+var normalizeAddressLower2 = (value) => toTrimmedString14(value).toLowerCase();
 var normalizeUnixSeconds = (value, deps) => {
   const raw = Number(
     value != null ? value : typeof deps?.now === "function" ? deps.now() : Date.now()
@@ -71939,12 +72540,12 @@ var resolveAdminRequestAuthority = async ({
     address,
     signature
   } = deps?.normalizeSignedWorkerRequest?.(body) || {};
-  const signedAction = toTrimmedString13(body?.action);
+  const signedAction = toTrimmedString14(body?.action);
   const signedSlugProvided = body && typeof body === "object" && Object.prototype.hasOwnProperty.call(body, "slug") && body?.slug != null;
-  const signedSlug = signedSlugProvided ? toTrimmedString13(body?.slug) : null;
-  const signedBodyHash = toTrimmedString13(body?.bodyHash).toLowerCase();
-  const nonce = toTrimmedString13(body?.nonce);
-  const audience = toTrimmedString13(body?.audience);
+  const signedSlug = signedSlugProvided ? toTrimmedString14(body?.slug) : null;
+  const signedBodyHash = toTrimmedString14(body?.bodyHash).toLowerCase();
+  const nonce = toTrimmedString14(body?.nonce);
+  const audience = toTrimmedString14(body?.audience);
   const expiration = body?.expiration;
   const slugContext = deps?.resolveWorkerBodySlugContext?.({ body, env, slugHint }) || {
     ok: false,
@@ -72002,7 +72603,7 @@ var resolveAdminRequestAuthority = async ({
     };
   }
   const buildAdminActionBodyHash2 = typeof deps?.buildAdminActionBodyHash === "function" ? deps.buildAdminActionBodyHash : buildAdminActionBodyHash;
-  const actualBodyHash = toTrimmedString13(buildAdminActionBodyHash2(body)).toLowerCase();
+  const actualBodyHash = toTrimmedString14(buildAdminActionBodyHash2(body)).toLowerCase();
   if (!actualBodyHash || actualBodyHash !== signedBodyHash) {
     return {
       ok: false,
@@ -72211,13 +72812,13 @@ var DEFAULT_PAGE_NUMBER = 0;
 var DEFAULT_PAGE_SIZE = 100;
 var { getPathRpcUrl: getPathRpcUrl2, getPublicRpcUrls: getPublicRpcUrls2 } = import_rpcDefaults4.default;
 var ethersUtils2 = ethers_exports?.utils || ethers_exports;
-var toTrimmedString14 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString15 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var isObj11 = (value) => !!value && typeof value === "object" && !Array.isArray(value);
 var normalizeChipotleRpcCandidateList = (value = []) => {
   const out = [];
   const seen = /* @__PURE__ */ new Set();
   (Array.isArray(value) ? value : [value]).forEach((entry) => {
-    const trimmed = toTrimmedString14(entry);
+    const trimmed = toTrimmedString15(entry);
     if (!trimmed) return;
     const key = trimmed.toLowerCase();
     if (seen.has(key)) return;
@@ -72227,12 +72828,12 @@ var normalizeChipotleRpcCandidateList = (value = []) => {
   return out;
 };
 var normalizeValidChipotlePkpId = (value = "") => {
-  const trimmed = toTrimmedString14(value);
+  const trimmed = toTrimmedString15(value);
   if (!trimmed || trimmed === "0") return "";
   return trimmed;
 };
-var normalizeChipotleMembershipValue = (value = "") => toTrimmedString14(value).toLowerCase();
-var normalizeHostname = (value = "") => toTrimmedString14(value).toLowerCase().replace(/^\[(.*)\]$/, "$1");
+var normalizeChipotleMembershipValue = (value = "") => toTrimmedString15(value).toLowerCase();
+var normalizeHostname = (value = "") => toTrimmedString15(value).toLowerCase().replace(/^\[(.*)\]$/, "$1");
 var parseIpv4Octets2 = (hostname = "") => {
   const normalized = normalizeHostname(hostname);
   const parts = normalized.split(".");
@@ -72275,13 +72876,13 @@ var isApprovedLocalChipotleApiHost = (hostname = "") => {
   return normalized === "localhost" || normalized.endsWith(".localhost") || normalized === "::1" || normalized === "0:0:0:0:0:0:0:1" || ipv4Octets && ipv4Octets[0] === 127;
 };
 var isTruthyFlag = (value) => ["1", "true", "yes", "on"].includes(
-  toTrimmedString14(value).toLowerCase()
+  toTrimmedString15(value).toLowerCase()
 );
 var isLitChipotleLocalApiBaseAllowed = (env = {}) => isTruthyFlag(env?.[LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG]) || isTruthyFlag(env?.[LEGACY_LOCAL_LIT_CHIPOTLE_API_BASE_ALLOW_FLAG]);
 var normalizeLitChipotleApiBase = (value, {
   allowLocalApiBase = false
 } = {}) => {
-  const raw = toTrimmedString14(value);
+  const raw = toTrimmedString15(value);
   const candidate = raw || DEFAULT_LIT_API_BASE;
   let parsed;
   try {
@@ -72292,7 +72893,7 @@ var normalizeLitChipotleApiBase = (value, {
   const hostname = normalizeHostname(parsed.hostname);
   const isApprovedLocalHost = isApprovedLocalChipotleApiHost(hostname);
   const localOverrideAllowed = allowLocalApiBase === true && isApprovedLocalHost;
-  const protocol = toTrimmedString14(parsed.protocol).toLowerCase();
+  const protocol = toTrimmedString15(parsed.protocol).toLowerCase();
   if (parsed.username || parsed.password) {
     throw new Error("Lit Chipotle API base URL must not include credentials.");
   }
@@ -72321,7 +72922,7 @@ var normalizeLitChipotleApiBase = (value, {
   return parsed.origin.replace(/\/+$/, "");
 };
 var normalizeChipotleRequestPath = (path) => {
-  const raw = toTrimmedString14(path);
+  const raw = toTrimmedString15(path);
   if (!raw) return "/";
   if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith("//") || raw.includes("\\")) {
     throw new Error("Lit Chipotle request path must be relative.");
@@ -72341,7 +72942,7 @@ var buildChipotleUrl = (apiBase, path, { allowLocalApiBase = false } = {}) => {
   return `${normalizedBase}${CHIPOTLE_API_PREFIX}${normalizedPath}`;
 };
 var parseJsonIfPossible = (value) => {
-  const trimmed = toTrimmedString14(value);
+  const trimmed = toTrimmedString15(value);
   if (!trimmed) return {};
   try {
     return JSON.parse(trimmed);
@@ -72352,7 +72953,7 @@ var parseJsonIfPossible = (value) => {
 var extractChipotleErrorMessage = (status, body, fallback) => {
   if (typeof body === "string" && body.trim()) return body.trim();
   if (isObj11(body)) {
-    const nestedError = toTrimmedString14(body.error || body.message || body.detail);
+    const nestedError = toTrimmedString15(body.error || body.message || body.detail);
     if (nestedError) return nestedError;
   }
   return `${fallback} (${Number(status || 0) || 500})`;
@@ -72370,7 +72971,7 @@ var fetchChipotleJson = async ({
   if (typeof fetchImpl !== "function") {
     throw new Error("Fetch unavailable for Chipotle request.");
   }
-  const normalizedApiKey = toTrimmedString14(apiKey);
+  const normalizedApiKey = toTrimmedString15(apiKey);
   const headers = {};
   if (body !== void 0) {
     headers["Content-Type"] = "application/json";
@@ -72388,14 +72989,14 @@ var fetchChipotleJson = async ({
       ...body !== void 0 ? { body: JSON.stringify(body) } : {}
     });
   } catch (error) {
-    throw new Error(toTrimmedString14(error?.message || error) || "Chipotle request failed.");
+    throw new Error(toTrimmedString15(error?.message || error) || "Chipotle request failed.");
   }
   const text = await response2.text().catch(() => "");
   const parsed = parseJsonIfPossible(text);
   if (!response2.ok) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
-  if (isObj11(parsed) && toTrimmedString14(parsed.error || "").trim()) {
+  if (isObj11(parsed) && toTrimmedString15(parsed.error || "").trim()) {
     throw new Error(extractChipotleErrorMessage(response2.status, parsed, "Chipotle request failed"));
   }
   return parsed;
@@ -72409,9 +73010,9 @@ var resolveLitChipotleRuntime = ({
   const litCredentials = isObj11(config?.litCredentials) ? config.litCredentials : {};
   const requestBody = isObj11(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
-  const envApiKey = toTrimmedString14(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
-  const requestApiKey = toTrimmedString14(requestBody.litUsageApiKey || requestBody.apiKey);
-  const secretApiKey = toTrimmedString14(secrets?.litUsageApiKey);
+  const envApiKey = toTrimmedString15(env?.LIT_USAGE_API_KEY || env?.LIT_ACCOUNT_API_KEY);
+  const requestApiKey = toTrimmedString15(requestBody.litUsageApiKey || requestBody.apiKey);
+  const secretApiKey = toTrimmedString15(secrets?.litUsageApiKey);
   const litUsageApiKey = requestApiKey || secretApiKey || envApiKey;
   let apiKeySource = "missing";
   if (requestApiKey) apiKeySource = "request";
@@ -72425,11 +73026,11 @@ var resolveLitChipotleRuntime = ({
     allowLocalApiBase,
     litUsageApiKey,
     apiKeySource,
-    litGroupId: toTrimmedString14(requestBody.litGroupId || litCredentials.litGroupId),
-    litPkpId: toTrimmedString14(requestBody.litPkpId || litCredentials.litPkpId),
-    litActionCid: toTrimmedString14(requestBody.litActionCid || litCredentials.litActionCid),
-    customRpcUrl: toTrimmedString14(requestBody.customRpcUrl || secrets?.customRpcUrl),
-    customRpcKey: toTrimmedString14(requestBody.customRpcKey || secrets?.customRpcKey)
+    litGroupId: toTrimmedString15(requestBody.litGroupId || litCredentials.litGroupId),
+    litPkpId: toTrimmedString15(requestBody.litPkpId || litCredentials.litPkpId),
+    litActionCid: toTrimmedString15(requestBody.litActionCid || litCredentials.litActionCid),
+    customRpcUrl: toTrimmedString15(requestBody.customRpcUrl || secrets?.customRpcUrl),
+    customRpcKey: toTrimmedString15(requestBody.customRpcKey || secrets?.customRpcKey)
   };
 };
 var resolveLitChipotleProvisioningRuntime = ({
@@ -72441,11 +73042,11 @@ var resolveLitChipotleProvisioningRuntime = ({
   const litCredentials = isObj11(config?.litCredentials) ? config.litCredentials : {};
   const requestBody = isObj11(body) ? body : {};
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
-  const secretManagementApiKey = toTrimmedString14(secrets?.litAccountApiKey);
-  const envManagementApiKey = toTrimmedString14(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
+  const secretManagementApiKey = toTrimmedString15(secrets?.litAccountApiKey);
+  const envManagementApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY || env?.LIT_USAGE_API_KEY);
   const litManagementApiKey = secretManagementApiKey || envManagementApiKey;
-  const litGroupId = toTrimmedString14(requestBody.litGroupId || requestBody.groupId || litCredentials.litGroupId);
-  const litGroupName = toTrimmedString14(requestBody.litGroupName || requestBody.groupName);
+  const litGroupId = toTrimmedString15(requestBody.litGroupId || requestBody.groupId || litCredentials.litGroupId);
+  const litGroupName = toTrimmedString15(requestBody.litGroupName || requestBody.groupName);
   const resolvedGroupSelector = litGroupId || litGroupName;
   let apiKeySource = "missing";
   if (secretManagementApiKey) apiKeySource = "session-secret";
@@ -72459,24 +73060,24 @@ var resolveLitChipotleProvisioningRuntime = ({
     litManagementApiKey,
     apiKeySource,
     litGroupId: resolvedGroupSelector,
-    litPkpId: toTrimmedString14(requestBody.litPkpId || requestBody.pkpId || litCredentials.litPkpId),
-    litActionCid: toTrimmedString14(requestBody.litActionCid || litCredentials.litActionCid)
+    litPkpId: toTrimmedString15(requestBody.litPkpId || requestBody.pkpId || litCredentials.litPkpId),
+    litActionCid: toTrimmedString15(requestBody.litActionCid || litCredentials.litActionCid)
   };
 };
 var ensureChipotleApiKey = (runtime = {}) => {
-  if (!toTrimmedString14(runtime?.litUsageApiKey)) {
+  if (!toTrimmedString15(runtime?.litUsageApiKey)) {
     throw new Error("Lit API key not configured.");
   }
 };
 var ensureChipotleManagementApiKey = (runtime = {}) => {
-  if (!toTrimmedString14(runtime?.litManagementApiKey)) {
+  if (!toTrimmedString15(runtime?.litManagementApiKey)) {
     throw new Error("Lit account API key not configured.");
   }
 };
 var buildPagedPath = (path, params = {}) => {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    const trimmed = toTrimmedString14(value);
+    const trimmed = toTrimmedString15(value);
     if (!trimmed) return;
     query.set(key, trimmed);
   });
@@ -72485,7 +73086,7 @@ var buildPagedPath = (path, params = {}) => {
 };
 var runtimeAllowsLocalApiBase = (runtime = {}) => runtime?.allowLocalApiBase === true;
 var listGroupWallets = async ({ runtime, fetchImpl } = {}) => {
-  if (!toTrimmedString14(runtime?.litGroupId)) return [];
+  if (!toTrimmedString15(runtime?.litGroupId)) return [];
   const response2 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     apiKey: runtime.litUsageApiKey,
@@ -72501,7 +73102,7 @@ var listGroupWallets = async ({ runtime, fetchImpl } = {}) => {
 };
 var listActions = async ({ runtime, fetchImpl, groupId } = {}) => {
   const rawGroupId = groupId === null ? "" : groupId === void 0 ? runtime?.litGroupId : groupId;
-  const resolvedGroupId = toTrimmedString14(rawGroupId);
+  const resolvedGroupId = toTrimmedString15(rawGroupId);
   if (groupId !== void 0 && groupId !== null && !resolvedGroupId && groupId !== "") return [];
   const response2 = await fetchChipotleJson({
     apiBase: runtime.litApiBase,
@@ -72517,7 +73118,7 @@ var listActions = async ({ runtime, fetchImpl, groupId } = {}) => {
   return Array.isArray(response2) ? response2 : [];
 };
 var listGroupActions = async ({ runtime, fetchImpl } = {}) => {
-  if (!toTrimmedString14(runtime?.litGroupId)) return [];
+  if (!toTrimmedString15(runtime?.litGroupId)) return [];
   return listActions({ runtime, fetchImpl, groupId: runtime.litGroupId });
 };
 var listGroups = async ({ runtime, fetchImpl } = {}) => {
@@ -72547,7 +73148,7 @@ var listWallets = async ({ runtime, fetchImpl } = {}) => {
   return Array.isArray(response2) ? response2 : [];
 };
 var resolveActionCidMembership = async ({ runtime, actions = [], fetchImpl } = {}) => {
-  const configuredCid = toTrimmedString14(runtime?.litActionCid);
+  const configuredCid = toTrimmedString15(runtime?.litActionCid);
   if (!configuredCid) return null;
   if (!Array.isArray(actions)) return null;
   const configuredCidLower = configuredCid.toLowerCase();
@@ -72563,8 +73164,8 @@ var resolveActionCidMembership = async ({ runtime, actions = [], fetchImpl } = {
   });
 };
 var createStatusWarning = (step, error) => ({
-  step: toTrimmedString14(step),
-  message: toTrimmedString14(error?.message || error) || "Unknown Chipotle status error."
+  step: toTrimmedString15(step),
+  message: toTrimmedString15(error?.message || error) || "Unknown Chipotle status error."
 });
 var readLitChipotleStatus = async ({
   runtime = {},
@@ -72630,13 +73231,13 @@ var readLitChipotleStatus = async ({
       hasConfiguredPkp: groupHasConfiguredPkp,
       hasConfiguredAction: groupHasConfiguredAction
     },
-    ready: !!toTrimmedString14(runtime.litUsageApiKey) && groupHasConfiguredPkp !== false && groupHasConfiguredAction !== false
+    ready: !!toTrimmedString15(runtime.litUsageApiKey) && groupHasConfiguredPkp !== false && groupHasConfiguredAction !== false
   };
 };
 var deriveLitActionCid = async ({ runtime = {}, actionCode = "", fetchImpl = globalThis.fetch } = {}) => {
-  const normalizedCode = toTrimmedString14(actionCode);
+  const normalizedCode = toTrimmedString15(actionCode);
   if (!normalizedCode) throw new Error("Lit Action code is required.");
-  return toTrimmedString14(await fetchChipotleJson({
+  return toTrimmedString15(await fetchChipotleJson({
     apiBase: runtime.litApiBase,
     allowLocalApiBase: runtimeAllowsLocalApiBase(runtime),
     path: "/get_lit_action_ipfs_id",
@@ -72646,13 +73247,13 @@ var deriveLitActionCid = async ({ runtime = {}, actionCode = "", fetchImpl = glo
   }));
 };
 var normalizeSessionScopedNameSegment = (value, fallback = "session") => {
-  const normalized = toTrimmedString14(value).toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
+  const normalized = toTrimmedString15(value).toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
   return normalized || fallback;
 };
-var normalizeGateMode2 = (value) => toTrimmedString14(value).toLowerCase() === "all" ? "all" : "any";
+var normalizeGateMode2 = (value) => toTrimmedString15(value).toLowerCase() === "all" ? "all" : "any";
 var isPrivateHostname = isPrivateOrLocalHostname;
 var validateChipotleRpcUrl = (value = "") => {
-  const raw = toTrimmedString14(value);
+  const raw = toTrimmedString15(value);
   if (!raw) throw new Error("Lit Chipotle RPC URL is required.");
   let parsed;
   try {
@@ -72699,7 +73300,7 @@ var resolveSessionChipotleRpcUrl = ({
 } = {}) => {
   const requestBody = isObj11(request) ? request : {};
   const normalizedChainId = toChainId(chainId);
-  const requestRpcUrl = toTrimmedString14(requestBody.rpcUrl || requestBody.customRpcUrl);
+  const requestRpcUrl = toTrimmedString15(requestBody.rpcUrl || requestBody.customRpcUrl);
   const candidates = normalizeChipotleRpcCandidateList([
     secrets?.customRpcUrl,
     ...resolveConfigMappedChipotleRpcUrls({ config, chainId: normalizedChainId }),
@@ -72743,18 +73344,18 @@ var buildSessionBootstrapMetadata = ({
     requestBody.sessionSlug || requestBody.slug || sessionSlug,
     "session"
   );
-  const sessionName = toTrimmedString14(requestBody.sessionName) || slugSegment;
-  const accountName = toTrimmedString14(requestBody.accountName) || `ce-session-${slugSegment}`;
-  const groupName = toTrimmedString14(requestBody.groupName) || `${accountName}-default`;
-  const usageKeyName = toTrimmedString14(requestBody.usageKeyName) || `${groupName}-runtime`;
+  const sessionName = toTrimmedString15(requestBody.sessionName) || slugSegment;
+  const accountName = toTrimmedString15(requestBody.accountName) || `ce-session-${slugSegment}`;
+  const groupName = toTrimmedString15(requestBody.groupName) || `${accountName}-default`;
+  const usageKeyName = toTrimmedString15(requestBody.usageKeyName) || `${groupName}-runtime`;
   return {
     sessionName,
     accountName,
-    accountDescription: toTrimmedString14(requestBody.accountDescription) || `Context Engine Lit account for session ${sessionName}`,
+    accountDescription: toTrimmedString15(requestBody.accountDescription) || `Context Engine Lit account for session ${sessionName}`,
     groupName,
-    groupDescription: toTrimmedString14(requestBody.groupDescription) || `Default Lit group for session ${sessionName}`,
+    groupDescription: toTrimmedString15(requestBody.groupDescription) || `Default Lit group for session ${sessionName}`,
     usageKeyName,
-    usageKeyDescription: toTrimmedString14(requestBody.usageKeyDescription) || `Scoped runtime key for session ${sessionName}`
+    usageKeyDescription: toTrimmedString15(requestBody.usageKeyDescription) || `Scoped runtime key for session ${sessionName}`
   };
 };
 var createLitChipotleAccount = async ({
@@ -72774,13 +73375,13 @@ var createLitChipotleAccount = async ({
     body: {
       account_name: metadata.accountName,
       account_description: metadata.accountDescription,
-      ...toTrimmedString14(requestBody.accountEmail) ? { email: toTrimmedString14(requestBody.accountEmail) } : {}
+      ...toTrimmedString15(requestBody.accountEmail) ? { email: toTrimmedString15(requestBody.accountEmail) } : {}
     },
     fetchImpl
   });
   return {
-    accountApiKey: toTrimmedString14(response2?.api_key),
-    accountWalletAddress: toTrimmedString14(response2?.wallet_address),
+    accountApiKey: toTrimmedString15(response2?.api_key),
+    accountWalletAddress: toTrimmedString15(response2?.wallet_address),
     metadata
   };
 };
@@ -72806,7 +73407,7 @@ var createLitChipotleGroup = async ({
     fetchImpl
   });
   return {
-    groupId: toTrimmedString14(response2?.group_id),
+    groupId: toTrimmedString15(response2?.group_id),
     metadata
   };
 };
@@ -72821,10 +73422,10 @@ var createLitChipotleWallet = async ({
     path: "/create_wallet",
     fetchImpl
   });
-  const walletAddress = toTrimmedString14(response2?.wallet_address);
+  const walletAddress = toTrimmedString15(response2?.wallet_address);
   const wallets = await listWallets({ runtime, fetchImpl }).catch(() => []);
   const matchedWallet = wallets.find((entry) => {
-    const entryWalletAddress = toTrimmedString14(entry?.wallet_address).toLowerCase();
+    const entryWalletAddress = toTrimmedString15(entry?.wallet_address).toLowerCase();
     return !!walletAddress && entryWalletAddress === walletAddress.toLowerCase();
   });
   return {
@@ -72864,7 +73465,7 @@ var createLitChipotleUsageKey = async ({
     fetchImpl
   });
   return {
-    usageApiKey: toTrimmedString14(response2?.usage_api_key),
+    usageApiKey: toTrimmedString15(response2?.usage_api_key),
     metadata
   };
 };
@@ -72881,16 +73482,16 @@ var readChipotleBillingBalance = async ({
   fetchImpl
 }).catch(() => null);
 var resolveProvisioningGroupId = async ({ runtime = {}, fetchImpl = globalThis.fetch } = {}) => {
-  const rawGroupId = toTrimmedString14(runtime?.litGroupId);
+  const rawGroupId = toTrimmedString15(runtime?.litGroupId);
   if (!rawGroupId) throw new Error("Lit group ID not configured.");
   if (/^\d+$/.test(rawGroupId)) return rawGroupId;
   const groups = await listGroups({ runtime, fetchImpl });
   const match = groups.find((group) => {
-    const candidateId = toTrimmedString14(group?.id);
-    const candidateName = toTrimmedString14(group?.name);
+    const candidateId = toTrimmedString15(group?.id);
+    const candidateName = toTrimmedString15(group?.name);
     return candidateId === rawGroupId || candidateName === rawGroupId;
   });
-  const resolvedId = toTrimmedString14(match?.id);
+  const resolvedId = toTrimmedString15(match?.id);
   if (!resolvedId) throw new Error(`Lit group not found: ${rawGroupId}`);
   return resolvedId;
 };
@@ -72912,8 +73513,8 @@ var ensureActionMetadata = async ({ runtime = {}, litActionCid = "", actionName 
     method: "POST",
     body: {
       action_ipfs_cid: litActionCid,
-      name: toTrimmedString14(actionName) || "Context Engine Lit Action",
-      description: toTrimmedString14(actionDescription) || "Provisioned by Context Engine"
+      name: toTrimmedString15(actionName) || "Context Engine Lit Action",
+      description: toTrimmedString15(actionDescription) || "Provisioned by Context Engine"
     },
     fetchImpl
   });
@@ -72978,7 +73579,7 @@ var ensurePkpInGroup = async ({ runtime = {}, groupId = "", fetchImpl = globalTh
     method: "POST",
     body: {
       group_id: Number(groupId),
-      pkp_id: toTrimmedString14(runtime?.litPkpId)
+      pkp_id: toTrimmedString15(runtime?.litPkpId)
     },
     fetchImpl
   });
@@ -72993,11 +73594,11 @@ var provisionLitChipotleAction = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   ensureChipotleManagementApiKey(runtime);
-  if (!toTrimmedString14(runtime?.litPkpId)) {
+  if (!toTrimmedString15(runtime?.litPkpId)) {
     throw new Error("Lit PKP ID not configured.");
   }
   const actionRequest = isObj11(request) ? request : {};
-  const actionCode = toTrimmedString14(actionRequest.actionCode || actionRequest.code);
+  const actionCode = toTrimmedString15(actionRequest.actionCode || actionRequest.code);
   if (!actionCode) {
     throw new Error("Lit Action code is required.");
   }
@@ -73027,7 +73628,7 @@ var provisionLitChipotleAction = async ({
     apiKeySource: runtime.apiKeySource,
     litActionCid,
     litGroupId: resolvedGroupId,
-    litPkpId: toTrimmedString14(runtime.litPkpId),
+    litPkpId: toTrimmedString15(runtime.litPkpId),
     steps: {
       derivedCid: true,
       registeredAction: metadata.created,
@@ -73045,16 +73646,16 @@ var bootstrapLitChipotleSession = async ({
   fetchImpl = globalThis.fetch
 } = {}) => {
   const litCredentials = isObj11(config?.litCredentials) ? config.litCredentials : {};
-  const secretAccountApiKey = toTrimmedString14(secrets?.litAccountApiKey);
+  const secretAccountApiKey = toTrimmedString15(secrets?.litAccountApiKey);
   const requestBody = isObj11(request) ? request : {};
-  const requestAccountApiKey = toTrimmedString14(requestBody.litAccountApiKey);
-  const envAccountApiKey = toTrimmedString14(env?.LIT_ACCOUNT_API_KEY);
+  const requestAccountApiKey = toTrimmedString15(requestBody.litAccountApiKey);
+  const envAccountApiKey = toTrimmedString15(env?.LIT_ACCOUNT_API_KEY);
   const existingAccountApiKey = secretAccountApiKey || requestAccountApiKey || envAccountApiKey;
   const existingAccountApiKeySource = secretAccountApiKey ? "session-secret" : requestAccountApiKey ? "admin-request" : envAccountApiKey ? "worker-env" : "missing";
-  const existingUsageApiKey = toTrimmedString14(secrets?.litUsageApiKey);
-  const existingGroupId = toTrimmedString14(litCredentials?.litGroupId);
-  const existingPkpId = toTrimmedString14(litCredentials?.litPkpId);
-  const existingActionCid = toTrimmedString14(litCredentials?.litActionCid);
+  const existingUsageApiKey = toTrimmedString15(secrets?.litUsageApiKey);
+  const existingGroupId = toTrimmedString15(litCredentials?.litGroupId);
+  const existingPkpId = toTrimmedString15(litCredentials?.litPkpId);
+  const existingActionCid = toTrimmedString15(litCredentials?.litActionCid);
   const allowLocalApiBase = isLitChipotleLocalApiBaseAllowed(env);
   const litApiBase = normalizeLitChipotleApiBase(
     requestBody.litApiBase || litCredentials.litApiBase || env?.LIT_API_BASE || DEFAULT_LIT_API_BASE,
@@ -73091,7 +73692,7 @@ var bootstrapLitChipotleSession = async ({
       }
     };
   }
-  const actionCode = toTrimmedString14(requestBody.actionCode || requestBody.code);
+  const actionCode = toTrimmedString15(requestBody.actionCode || requestBody.code);
   if (!actionCode && !existingActionCid) {
     throw new Error("Lit Action code is required.");
   }
@@ -73111,7 +73712,7 @@ var bootstrapLitChipotleSession = async ({
         sessionSlug,
         fetchImpl
       });
-      groupId2 = toTrimmedString14(group2.groupId);
+      groupId2 = toTrimmedString15(group2.groupId);
       if (!groupId2) {
         throw new Error("Lit session bootstrap did not return a group ID.");
       }
@@ -73124,7 +73725,7 @@ var bootstrapLitChipotleSession = async ({
         runtime: runtime2,
         fetchImpl
       });
-      litPkpId2 = toTrimmedString14(wallet2.litPkpId);
+      litPkpId2 = toTrimmedString15(wallet2.litPkpId);
       if (!litPkpId2) {
         throw new Error("Lit session bootstrap did not return a PKP ID.");
       }
@@ -73168,7 +73769,7 @@ var bootstrapLitChipotleSession = async ({
         sessionSlug,
         fetchImpl
       });
-      usageApiKey = toTrimmedString14(usageKey2.usageApiKey);
+      usageApiKey = toTrimmedString15(usageKey2.usageApiKey);
       if (!usageApiKey) {
         throw new Error("Lit session bootstrap did not return a usage API key.");
       }
@@ -73233,7 +73834,7 @@ var bootstrapLitChipotleSession = async ({
     sessionSlug,
     fetchImpl
   });
-  const groupId = toTrimmedString14(group.groupId);
+  const groupId = toTrimmedString15(group.groupId);
   if (!groupId) {
     throw new Error("Lit session bootstrap did not return a group ID.");
   }
@@ -73241,7 +73842,7 @@ var bootstrapLitChipotleSession = async ({
     runtime,
     fetchImpl
   });
-  const litPkpId = toTrimmedString14(wallet.litPkpId);
+  const litPkpId = toTrimmedString15(wallet.litPkpId);
   if (!litPkpId) {
     throw new Error("Lit session bootstrap did not return a PKP ID.");
   }
@@ -73304,7 +73905,7 @@ var bootstrapLitChipotleSession = async ({
     },
     secretOutputs: {
       litAccountApiKey: account.accountApiKey,
-      litUsageApiKey: toTrimmedString14(usageKey.usageApiKey)
+      litUsageApiKey: toTrimmedString15(usageKey.usageApiKey)
     },
     steps: {
       createdAccount: true,
@@ -73325,8 +73926,8 @@ var executeLitChipotleAction = async ({
 } = {}) => {
   ensureChipotleApiKey(runtime);
   const actionRequest = isObj11(request) ? request : {};
-  const code = toTrimmedString14(actionRequest.code);
-  const ipfsId = toTrimmedString14(
+  const code = toTrimmedString15(actionRequest.code);
+  const ipfsId = toTrimmedString15(
     actionRequest.ipfsId || actionRequest.ipfs_id || runtime.litActionCid
   );
   if (!code && !ipfsId) {
@@ -73352,7 +73953,7 @@ var executeLitChipotleAction = async ({
       fetchImpl
     });
   } catch (error) {
-    const message = toTrimmedString14(error?.message || error);
+    const message = toTrimmedString15(error?.message || error);
     if (/not found/i.test(message)) {
       throw new Error("Lit Chipotle action was not found or is not permitted for this session usage key. Re-run Lit Chipotle provisioning for this session worker.");
     }
@@ -73383,15 +73984,15 @@ var executeSessionLitChipotleAction = async ({
     body: {}
   });
   ensureChipotleApiKey(runtime);
-  const litPkpId = toTrimmedString14(litCredentials?.litPkpId || runtime.litPkpId);
+  const litPkpId = toTrimmedString15(litCredentials?.litPkpId || runtime.litPkpId);
   if (!litPkpId) {
     throw new Error("Lit PKP ID not configured.");
   }
-  const litActionCid = toTrimmedString14(litCredentials?.litActionCid || runtime.litActionCid);
+  const litActionCid = toTrimmedString15(litCredentials?.litActionCid || runtime.litActionCid);
   if (!litActionCid) {
     throw new Error("Lit Action CID not configured.");
   }
-  const actionCode = toTrimmedString14(requestBody.actionCode || requestBody.code);
+  const actionCode = toTrimmedString15(requestBody.actionCode || requestBody.code);
   if (!actionCode) {
     throw new Error("Lit Action code is required.");
   }
@@ -73399,7 +74000,7 @@ var executeSessionLitChipotleAction = async ({
   if (derivedActionCid !== litActionCid) {
     throw new Error("Lit Action code does not match the configured Lit Action CID.");
   }
-  const op = toTrimmedString14(requestBody.op).toLowerCase();
+  const op = toTrimmedString15(requestBody.op).toLowerCase();
   if (!["check", "encrypt", "decrypt"].includes(op)) {
     throw new Error("Lit Chipotle op must be check, encrypt, or decrypt.");
   }
@@ -73436,7 +74037,7 @@ var executeSessionLitChipotleAction = async ({
     chainId: gateChainId,
     op
   });
-  const normalizedRequesterAddress = toTrimmedString14(requesterAddress);
+  const normalizedRequesterAddress = toTrimmedString15(requesterAddress);
   if (!normalizedRequesterAddress) {
     throw new Error("Requester address unavailable for Lit Chipotle action.");
   }
@@ -73470,7 +74071,7 @@ var executeSessionLitChipotleAction = async ({
     if (metadataVersion && metadataVersion !== 2) {
       throw new Error("Lit Chipotle legacy wrapped keys are not supported.");
     }
-    jsParams.ciphertext = toTrimmedString14(requestBody.ciphertext);
+    jsParams.ciphertext = toTrimmedString15(requestBody.ciphertext);
     if (!jsParams.ciphertext) {
       throw new Error("Lit Chipotle decrypt requires ciphertext.");
     }
@@ -73492,7 +74093,7 @@ var executeSessionLitChipotleAction = async ({
       fetchImpl
     });
   } catch (error) {
-    const message = toTrimmedString14(error?.message || error).toLowerCase();
+    const message = toTrimmedString15(error?.message || error).toLowerCase();
     if (!message.includes("no cached code found") && !message.includes("cache miss for ipfs id")) {
       throw error;
     }
@@ -73519,7 +74120,7 @@ var ALLOWED_SECRET_KEYS = [
   "litAccountApiKey",
   "litUsageApiKey"
 ];
-var toTrimmedString15 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString16 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var recordAuthFailure2 = async ({ env, deps } = {}) => {
   try {
     await (deps?.recordAbuseEvent || recordAbuseEvent)({
@@ -73533,7 +74134,7 @@ var recordAuthFailure2 = async ({ env, deps } = {}) => {
 var buildSecretPresenceManifest = (secrets) => {
   const source = secrets && typeof secrets === "object" ? secrets : {};
   return ALLOWED_SECRET_KEYS.reduce((acc, key) => {
-    acc[key] = !!toTrimmedString15(source[key]);
+    acc[key] = !!toTrimmedString16(source[key]);
     return acc;
   }, {});
 };
@@ -73545,9 +74146,9 @@ var buildSetConfigIncomingConfig = ({
   const incoming = body?.config && typeof body.config === "object" ? body.config : null;
   if (!incoming) return null;
   const nextIncoming = { ...incoming };
-  const hasIncomingAdminAddress = !!toTrimmedString15(nextIncoming.adminAddress);
+  const hasIncomingAdminAddress = !!toTrimmedString16(nextIncoming.adminAddress);
   if (!existingConfig && !hasIncomingAdminAddress) {
-    const requestedAdminAddress = toTrimmedString15(body?.adminAddress);
+    const requestedAdminAddress = toTrimmedString16(body?.adminAddress);
     if (requestedAdminAddress && deps?.isAddress?.(requestedAdminAddress)) {
       nextIncoming.adminAddress = requestedAdminAddress;
     }
@@ -73641,7 +74242,8 @@ var dispatchAdminRequest = async ({
         now: deps?.now,
         randomUUID: deps?.randomUUID,
         getRandomValues: deps?.getRandomValues,
-        executeCoordinatedWorkerGroupMutation: deps?.executeCoordinatedWorkerGroupMutation
+        executeCoordinatedWorkerGroupMutation: deps?.executeCoordinatedWorkerGroupMutation,
+        reconcileCoordinatedWorkerGroupCapacity: deps?.reconcileCoordinatedWorkerGroupCapacity
       }
     });
     if (response2) return response2;
@@ -73821,7 +74423,7 @@ var dispatchAdminRequest = async ({
         env,
         slug: targetSlug,
         config: existingConfig,
-        resource: toTrimmedString15(body?.resource),
+        resource: toTrimmedString16(body?.resource),
         includeSessionEnvelope: true,
         deps: {
           now: deps?.now
@@ -73843,17 +74445,17 @@ var dispatchAdminRequest = async ({
     }
     const deployRequest = grantRequest?.deploy && typeof grantRequest.deploy === "object" ? grantRequest.deploy : {};
     const faucetRequest = grantRequest?.faucet && typeof grantRequest.faucet === "object" ? grantRequest.faucet : {};
-    const cloudflareApiToken = toTrimmedString15(deployRequest.cloudflareApiToken);
-    const faucetPrivateKey = typeof deps?.normalizeSecretValue === "function" ? deps.normalizeSecretValue(faucetRequest.faucetPrivateKey) : toTrimmedString15(faucetRequest.faucetPrivateKey);
-    const bootstrapWorkerUrl = toTrimmedString15(
+    const cloudflareApiToken = toTrimmedString16(deployRequest.cloudflareApiToken);
+    const faucetPrivateKey = typeof deps?.normalizeSecretValue === "function" ? deps.normalizeSecretValue(faucetRequest.faucetPrivateKey) : toTrimmedString16(faucetRequest.faucetPrivateKey);
+    const bootstrapWorkerUrl = toTrimmedString16(
       grantRequest.bootstrapWorkerUrl || existingConfig?.corsWorkerUrl || ""
     );
-    const expiresAt = toTrimmedString15(grantRequest.expiresAt);
+    const expiresAt = toTrimmedString16(grantRequest.expiresAt);
     const embeddedDeployHelperEnabled = normalizeEmbeddedDeployHelperEnabled(
       env?.DEPLOY_HELPER_ENABLED,
       true
     );
-    if (!cloudflareApiToken && !toTrimmedString15(faucetPrivateKey)) {
+    if (!cloudflareApiToken && !toTrimmedString16(faucetPrivateKey)) {
       return deps?.json?.(
         { error: "At least one sponsored deploy or faucet credential is required." },
         400,
@@ -73896,7 +74498,7 @@ var dispatchAdminRequest = async ({
         );
       }
       let faucetGrantToken = "";
-      if (toTrimmedString15(faucetPrivateKey)) {
+      if (toTrimmedString16(faucetPrivateKey)) {
         faucetGrantToken = buildSponsoredGrantToken();
         await writeSponsoredGrantRecord(
           env,
@@ -73905,7 +74507,7 @@ var dispatchAdminRequest = async ({
             type: SPONSORED_GRANT_TYPES.faucet,
             sourceSessionSlug: targetSlug,
             sourceConfig,
-            faucetPrivateKey: toTrimmedString15(faucetPrivateKey),
+            faucetPrivateKey: toTrimmedString16(faucetPrivateKey),
             issuedAt,
             expiresAt
           },
@@ -73981,7 +74583,7 @@ var dispatchAdminRequestWithWorkerDeps = async ({
 });
 
 // workers/sessionCorsWorker/adminAbuseSummaryDispatch.js
-var toTrimmedString16 = (value, deps) => {
+var toTrimmedString17 = (value, deps) => {
   if (typeof deps?.toStr === "function") return deps.toStr(value).trim();
   return value == null ? "" : String(value).trim();
 };
@@ -74031,7 +74633,7 @@ var dispatchAdminAbuseSummaryRequest = async ({
   });
   if (corsContext && !corsContext.ok) return corsContext.response;
   const headers = corsContext?.headers || baseHeaders;
-  const address = toTrimmedString16(auth.payload?.sub, deps).toLowerCase();
+  const address = toTrimmedString17(auth.payload?.sub, deps).toLowerCase();
   const isAdmin = await deps?.validateAdmin?.({
     env,
     slug: targetSlug,
@@ -74847,9 +75449,9 @@ var dispatchBootstrapArweaveUploadWithWorkerDeps = async ({
 
 // workers/sessionCorsWorker/sponsoredBootstrapRedeemDispatch.js
 var INVALID_GRANT_ERROR = "Invalid, expired, or already used sponsored bootstrap grant.";
-var toTrimmedString17 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
+var toTrimmedString18 = (value) => typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 var isExpiredGrant = (record = {}, nowMs = Date.now()) => {
-  const expiresAt = toTrimmedString17(record?.expiresAt);
+  const expiresAt = toTrimmedString18(record?.expiresAt);
   if (!expiresAt) return false;
   const expirationMs = Date.parse(expiresAt);
   if (!Number.isFinite(expirationMs)) return false;
@@ -74880,7 +75482,7 @@ var buildDeployExecutionFailure = (error) => ({
   ok: false,
   status: 502,
   body: {
-    error: toTrimmedString17(error?.message || error) || "Failed to run embedded sponsored deploy."
+    error: toTrimmedString18(error?.message || error) || "Failed to run embedded sponsored deploy."
   }
 });
 var buildSponsoredRequestDigest = async (action, payload, requestOrigin = "") => sha256Hex2(
@@ -74920,7 +75522,7 @@ var redactSponsoredDeployFailure = (result, sensitiveValues = []) => ({
 });
 var resolveSponsoredRedemptionReplay = ({ grantRecord, requestDigest, deps, headers } = {}) => {
   if (grantRecord?.state !== "redeemed" && grantRecord?.state !== "redeeming") return null;
-  if (toTrimmedString17(grantRecord?.requestDigest) !== requestDigest) {
+  if (toTrimmedString18(grantRecord?.requestDigest) !== requestDigest) {
     return buildGrantErrorResponse(
       deps,
       headers,
@@ -74956,7 +75558,7 @@ var dispatchSponsoredBootstrapRedeem = async ({
   }
   const tokenField = action === "deploy" ? "deployGrantToken" : "faucetGrantToken";
   const expectedGrantType = action === "deploy" ? SPONSORED_GRANT_TYPES.deploy : SPONSORED_GRANT_TYPES.faucet;
-  const grantToken = toTrimmedString17(body?.[tokenField]);
+  const grantToken = toTrimmedString18(body?.[tokenField]);
   if (!grantToken) {
     return buildGrantErrorResponse(deps, baseHeaders, 400, `Missing ${tokenField}.`);
   }
@@ -75030,7 +75632,7 @@ var dispatchSponsoredBootstrapRedeem = async ({
         requestDigest: requestDigest2,
         deployBody: {
           ...effectiveDeployPayload,
-          apiToken: toTrimmedString17(grantRecord?.cloudflareApiToken)
+          apiToken: toTrimmedString18(grantRecord?.cloudflareApiToken)
         },
         requestOrigin,
         sensitiveValues
@@ -75060,7 +75662,7 @@ var dispatchSponsoredBootstrapRedeem = async ({
       headers
     );
   }
-  const recipientAddress = toTrimmedString17(body?.to || body?.recipient || body?.address);
+  const recipientAddress = toTrimmedString18(body?.to || body?.recipient || body?.address);
   if (!recipientAddress) {
     return buildGrantErrorResponse(deps, headers, 400, "Missing address.");
   }
@@ -75131,11 +75733,11 @@ var dispatchSponsoredBootstrapRedeem = async ({
         to: recipientAddress
       },
       secrets: {
-        faucetPrivateKey: toTrimmedString17(grantRecord?.faucetPrivateKey)
+        faucetPrivateKey: toTrimmedString18(grantRecord?.faucetPrivateKey)
       },
       config: sourceConfig,
       baseHeaders: headers,
-      slug: toTrimmedString17(grantRecord?.sourceSessionSlug),
+      slug: toTrimmedString18(grantRecord?.sourceSessionSlug),
       requesterAddress: recipientAddress,
       tokenHasFaucetScope: true
     });
@@ -75373,6 +75975,12 @@ var resolveTopLevelRouteSelection = ({
     return {
       kind: "anonymous",
       anonymousRoute: "storage"
+    };
+  }
+  if (!hasTrimmedAuthorization && path === "/groups/list" && method === "GET") {
+    return {
+      kind: "anonymous",
+      anonymousRoute: "groups"
     };
   }
   return { kind: "authenticated" };
@@ -75650,7 +76258,8 @@ var createWorkerRouteShellWithWorkerDeps = ({
             proxyAnthropic: deps?.proxyAnthropic,
             proxyOpenAI: deps?.proxyOpenAI,
             proxyOpenRouter: deps?.proxyOpenRouter,
-            proxyCustomRPC: deps?.proxyCustomRPC
+            proxyCustomRPC: deps?.proxyCustomRPC,
+            now: deps?.now
           },
           constants: {
             missingSlugError: constants?.missingSlugError,
@@ -75688,6 +76297,7 @@ var createWorkerRouteShellWithWorkerDeps = ({
           storageRoute: deps?.storageRoute,
           fetchImage: deps?.fetchImage,
           fetchUrl: deps?.fetchUrl,
+          now: deps?.now,
           normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
           proxyAnthropic: deps?.proxyAnthropic,
           proxyOpenAI: deps?.proxyOpenAI,
@@ -76350,9 +76960,17 @@ var dispatchAuthenticatedSecretPathRoute = async ({
   const isTranscribeRoute = path === "/transcribe" && method === "POST";
   const isArweaveUploadRoute = path === "/arweave/upload" && method === "POST";
   const isStorageRoute = path === "/storage/upload" && method === "POST" || path === "/storage/read" && (method === "GET" || method === "POST") || path === "/storage/list" && (method === "GET" || method === "POST") || path === "/storage/export-envelopes" && (method === "GET" || method === "POST");
-  const isWorkerGroupsRoute = path === "/groups/my-memberships" && (method === "GET" || method === "POST") || path === "/groups/list" && (method === "GET" || method === "POST") || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST";
+  const isWorkerGroupsRoute = path === "/groups/my-memberships" && (method === "GET" || method === "POST") || path === "/groups/members" && (method === "GET" || method === "POST") || path === "/groups/list" && (method === "GET" || method === "POST") || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
   if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute) {
     return { handled: false };
+  }
+  const isParticipantWrite = isTranscribeRoute || isArweaveUploadRoute || path === "/storage/upload" && method === "POST" || path === "/groups/create" && method === "POST" || path === "/groups/join" && method === "POST" || path === "/groups/leave" && method === "POST";
+  const endedResponse = isParticipantWrite ? buildSessionEndedResponse({ config, headers, json: deps?.json, now: deps?.now }) : null;
+  if (endedResponse) {
+    return {
+      handled: true,
+      response: endedResponse
+    };
   }
   const route = isTranscribeRoute ? "transcribe" : isStorageRoute ? "storage" : isWorkerGroupsRoute ? "groups" : "arweave";
   const scope = route === "storage" && scopes?.storage !== true ? "arweave" : route;
@@ -76511,6 +77129,20 @@ var dispatchAuthenticatedSecretActionRoute = async ({
   const isLitChipotleAction = path === "/lit/chipotle-action" || action === "lit_chipotle_execute";
   if (!isFaucetAction && !isAiAction && !isLitChipotleAction) {
     return { handled: false };
+  }
+  if (isAiAction) {
+    const endedResponse = buildSessionEndedResponse({
+      config,
+      headers,
+      json: deps?.json,
+      now: deps?.now
+    });
+    if (endedResponse) {
+      return {
+        handled: true,
+        response: endedResponse
+      };
+    }
   }
   if (isFaucetAction) {
     const toStr21 = typeof deps?.toStr === "function" ? deps.toStr : (value) => typeof value === "string" ? value : value == null ? "" : String(value);
@@ -76744,6 +77376,18 @@ var dispatchAuthenticatedNonSecretActionRoute = async ({
   if (!isFetchImageAction && !isFetchUrlAction) {
     return { handled: false };
   }
+  const endedResponse = buildSessionEndedResponse({
+    config,
+    headers,
+    json: deps?.json,
+    now: deps?.now
+  });
+  if (endedResponse) {
+    return {
+      handled: true,
+      response: endedResponse
+    };
+  }
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({
     scopes,
     scope: "fetch",
@@ -76870,6 +77514,19 @@ var dispatchAnonymousRoute = async ({
     headers,
     env
   } = anonymousContext || {};
+  if (path === "/groups/list") {
+    const dispatchPublicWorkerGroupListRequest2 = deps?.dispatchPublicWorkerGroupListRequest || dispatchPublicWorkerGroupListRequest;
+    return dispatchPublicWorkerGroupListRequest2({
+      request,
+      config,
+      env,
+      slug,
+      baseHeaders: headers,
+      deps: {
+        json: deps?.json
+      }
+    });
+  }
   if ((path === "/storage/read" || path === "/storage/list") && typeof deps?.storageRoute === "function") {
     return deps.storageRoute({
       path,
@@ -76882,6 +77539,13 @@ var dispatchAnonymousRoute = async ({
       baseHeaders: headers
     });
   }
+  const endedResponse = buildSessionEndedResponse({
+    config,
+    headers,
+    json: deps?.json,
+    now: deps?.now
+  });
+  if (endedResponse) return endedResponse;
   if (path === "/transcribe") {
     const transcribeRequest = await deps?.readTranscribeRequestPayload?.({ request });
     if (!transcribeRequest?.ok) {
@@ -77406,6 +78070,7 @@ var worker_default = {
 };
 export {
   SessionWriteCoordinator,
+  WorkerGroupWriteCoordinator,
   worker_default as default,
   workerAuthGateUtils
 };

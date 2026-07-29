@@ -93,6 +93,8 @@ const FIELD_TOOLTIPS: Record<string, string> = {
   storageProfile: 'Advanced: choose the session-owned storage profile for documents, context, and media payloads.',
   defaultTags:
     'Suggested tags for AI-assisted question tagging. They guide the model, but they do not limit which questions or surveys appear.',
+  defaultGroupTags:
+    'Suggested tags prefilled when an admin or participant creates a Worker-native Group for this session.',
   defaultSbtTags: `Suggested tags for ${t('sbts')} created from this session. Matching tags are prefilled in the Create ${t('sbt')} flow, and you can still change them.`,
   questionsGenPrompt: 'Extra instructions for the AI when it generates questions for this session.',
   defaultFilterState:
@@ -192,7 +194,9 @@ export const shouldHideSessionWizardField = ({
   }
   const keyString = pathKey(currentPath);
 
-  if (path.length === 0 && (SESSION_WIZARD_ADMIN_ONLY_FIELDS.has(key) || SESSION_WIZARD_HIDDEN_FIELDS.has(key))) {
+  // These legacy faucet values are secret material, so a dedicated guided
+  // control must never be able to opt them back into the public draft renderer.
+  if (keyString === 'faucet.privateKey' || keyString === 'faucet.encryptedPrivateKey') {
     return true;
   }
 
@@ -227,10 +231,16 @@ export const shouldHideSessionWizardField = ({
   return false;
 };
 
-export const getSessionWizardOrderedDraftEntries = (draft: DraftLike | null | undefined): Array<[string, unknown]> => {
+export const getSessionWizardOrderedDraftEntries = (
+  draft: DraftLike | null | undefined,
+  modeFieldPolicy?: SessionWizardModeFieldPolicy,
+): Array<[string, unknown]> => {
   const source = draft && typeof draft === 'object' ? draft : {};
   const keys = Object.keys(source).filter(
-    (key) => !WORKER_ONLY_DRAFT_FIELDS.has(key) && !(key === 'storageProfile' && source.sessionModeProfile),
+    (key) =>
+      !WORKER_ONLY_DRAFT_FIELDS.has(key) &&
+      !(key === 'storageProfile' && source.sessionModeProfile) &&
+      !isSessionWizardModeHiddenTopLevelField(key, modeFieldPolicy),
   );
   const orderedKeys = [
     ...TOP_LEVEL_FIELD_ORDER.filter((key) => keys.includes(key)),

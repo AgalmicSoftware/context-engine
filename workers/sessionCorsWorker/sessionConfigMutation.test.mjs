@@ -173,6 +173,134 @@ test('set-config validates profile patches against the complete canonical storag
   });
 });
 
+test('set-config accepts Worker lifecycle and generic Group defaults', () => {
+  const result = applySessionConfigMutation({
+    existingConfig: cloneJson(profileBearingConfig),
+    mutation: {
+      kind: 'set-config',
+      incomingConfig: {
+        sessionEndsAt: '2030-01-02T03:04:00Z',
+        defaultTags: 'governance,ai',
+        defaultGroupTags: 'facilitators,reviewers',
+        questionsGenPrompt: 'Prefer concrete tradeoffs.',
+        defaultFilterState: { sort: 'recent' },
+      },
+    },
+    slug: 'session-a',
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.config.sessionEndsAt, '2030-01-02T03:04:00Z');
+  assert.equal(result.config.defaultGroupTags, 'facilitators,reviewers');
+});
+
+test('set-config rejects chain-only and SBT-only fields for pure Worker sessions', () => {
+  for (const [field, value, error] of [
+    ['blockLimits', { start: 100 }, 'Unsupported worker-canonical session config field: blockLimits.'],
+    ['faucet', { amountEth: '0.001' }, 'Unsupported worker-canonical session config field: faucet.'],
+    ['registryAddress', '0x0000000000000000000000000000000000000001', 'Unsupported worker-canonical session config field: registryAddress.'],
+    ['networkChainId', 11155420, 'Worker-native Group sessions do not accept networkChainId.'],
+    ['defaultSbtTags', 'token-holders', 'Worker-native Group sessions do not accept defaultSbtTags.'],
+    [
+      'contracts',
+      { sbtFactory: { address: '0x0000000000000000000000000000000000000001', chainId: 11155420 } },
+      'Worker-canonical sessions accept only the on-chain SBT Group Factory contract.',
+    ],
+  ]) {
+    const result = applySessionConfigMutation({
+      existingConfig: cloneJson(profileBearingConfig),
+      mutation: { kind: 'set-config', incomingConfig: { [field]: value } },
+      slug: 'session-a',
+    });
+    assert.deepEqual(result, { ok: false, status: 400, error }, field);
+  }
+});
+
+test('set-config rejects public-looking fields outside the Worker allowlist', () => {
+  for (const [field, value] of [
+    ['publicKey', 'public-id'],
+    ['resourceKey', 'default'],
+    ['keyProvider', 'worker_secret'],
+  ]) {
+    const result = applySessionConfigMutation({
+      existingConfig: cloneJson(profileBearingConfig),
+      mutation: { kind: 'set-config', incomingConfig: { [field]: value } },
+      slug: 'session-a',
+    });
+    assert.deepEqual(result, {
+      ok: false,
+      status: 400,
+      error: `Unsupported worker-canonical session config field: ${field}.`,
+    });
+  }
+});
+
+test('set-config accepts only Group Factory chain config for explicit Worker plus on-chain SBT', () => {
+  const sessionModeProfile = cloneJson(workerModeProfile);
+  sessionModeProfile.evm.registryChainId = 11155420;
+  sessionModeProfile.authorization.mechanisms.push('sbt_onchain');
+  sessionModeProfile.storage.payloadAccessControl.accessConditions = {
+    match: 'any',
+    conditions: [
+      { kind: 'worker_role', role: 'admin' },
+      {
+        kind: 'sbt_onchain',
+        chainId: 11155420,
+        contract: '0x0000000000000000000000000000000000000001',
+        anyOrAll: 'any',
+      },
+    ],
+  };
+  const storageProfile = cloneJson(canonicalWorkerStorageProfile);
+  storageProfile.payloadAccessControl.accessConditions =
+    cloneJson(sessionModeProfile.storage.payloadAccessControl.accessConditions);
+  const existingConfig = {
+    ...baseConfig,
+    sessionModeProfile,
+    storageProfile,
+  };
+  const accepted = applySessionConfigMutation({
+    existingConfig,
+    mutation: {
+      kind: 'set-config',
+      incomingConfig: {
+        networkChainId: 11155420,
+        defaultSbtTags: 'token-holders',
+        contracts: {
+          sbtFactory: {
+            address: '0x0000000000000000000000000000000000000002',
+            chainId: 11155420,
+          },
+        },
+      },
+    },
+    slug: 'session-a',
+  });
+  assert.equal(accepted.ok, true);
+  assert.deepEqual(Object.keys(accepted.config.contracts), ['sbtFactory']);
+
+  const rejected = applySessionConfigMutation({
+    existingConfig,
+    mutation: {
+      kind: 'set-config',
+      incomingConfig: {
+        contracts: {
+          surveys: {
+            address: '0x0000000000000000000000000000000000000003',
+            chainId: 11155420,
+          },
+        },
+      },
+    },
+    slug: 'session-a',
+  });
+  assert.deepEqual(rejected, {
+    ok: false,
+    status: 400,
+    error: 'Worker-canonical sessions accept only the on-chain SBT Group Factory contract.',
+  });
+});
+
 test('set-config rejects merged backend aliases and access-condition divergence', () => {
   const existingConfig = {
     ...cloneJson(profileBearingConfig),

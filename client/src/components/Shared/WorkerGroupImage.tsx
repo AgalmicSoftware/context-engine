@@ -57,8 +57,9 @@ const WorkerGroupImage = ({
   });
   const [resolvedSrc, setResolvedSrc] = useState(protectedWorkerImage ? '' : source);
   const contextKey = useMemo(() => {
-    const record =
-      context && typeof context === 'object' && !Array.isArray(context) ? (context as Record<string, unknown>) : {};
+    const record = context && typeof context === 'object' && !Array.isArray(context)
+      ? (context as Record<string, unknown>)
+      : {};
     return `${toText(record.account).toLowerCase()}\n${toText(record.chainId)}`;
   }, [context]);
 
@@ -118,7 +119,14 @@ const WorkerGroupImage = ({
   ]);
 
   if (!resolvedSrc) return null;
-  return <img src={resolvedSrc} alt={alt} className={className} {...(testId ? { 'data-testid': testId } : {})} />;
+  return (
+    <img
+      src={resolvedSrc}
+      alt={alt}
+      className={className}
+      {...(testId ? { 'data-testid': testId } : {})}
+    />
+  );
 };
 
 export default WorkerGroupImage;
