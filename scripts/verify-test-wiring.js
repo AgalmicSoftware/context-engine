@@ -150,6 +150,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/dead-exports-baseline.json');
   expectFile('scripts/check-baseline-monotonicity.mjs');
   expectFile('scripts/check-baseline-monotonicity.test.mjs');
+  expectFile('scripts/resolve-baseline-monotonicity-base.mjs');
+  expectFile('scripts/resolve-baseline-monotonicity-base.test.mjs');
   expectFile('scripts/resolve-baseline-growth-approval.mjs');
   expectFile('scripts/resolve-baseline-growth-approval.test.mjs');
   expectFile(gateManifestPath);
@@ -351,8 +353,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('test:', 'the final aggregate test job');
   expectWorkflowContains('run: npm run ci:gate -- wiring-and-release', 'the manifest-backed wiring-and-release gate');
   expectWorkflowContains('run: npm run ci:gate -- public-text', 'the hosted public-text gate');
-  expectWorkflowContains('BASELINE_MONOTONICITY_BASE:', 'baseline monotonicity base env');
-  expectWorkflowContains("github.event.pull_request.base.sha || github.event.before", 'exact event comparison SHA selection');
+  expectWorkflowContains('node scripts/resolve-baseline-monotonicity-base.mjs', 'baseline monotonicity base resolver');
+  expectWorkflowContains(
+    'BASELINE_MONOTONICITY_BASE: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}',
+    'resolved baseline monotonicity SHA',
+  );
   expectWorkflowContains('node scripts/resolve-baseline-growth-approval.mjs', 'verified baseline growth approval resolver');
   expectWorkflowContains('BASELINE_MONOTONICITY_APPROVED:', 'verified baseline growth approval output');
   expectWorkflowContains('--require-base-sha', 'fail-closed baseline SHA requirement');
@@ -396,6 +401,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     '/.github/workflows/promote-worker-bundles.yml @AgalmicSoftware',
     '/.github/workflows/public-drift.yml @AgalmicSoftware',
     '/scripts/check-baseline-monotonicity.mjs @AgalmicSoftware',
+    '/scripts/resolve-baseline-monotonicity-base.mjs @AgalmicSoftware',
     '/scripts/resolve-baseline-growth-approval.mjs @AgalmicSoftware',
     '/scripts/ci-gates.json @AgalmicSoftware',
     '/scripts/run-ci-gates.mjs @AgalmicSoftware',

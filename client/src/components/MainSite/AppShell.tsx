@@ -197,7 +197,7 @@ import {
   NotFoundRoute as NotFoundRouteRaw,
   SessionLoadingSkeleton as SessionLoadingSkeletonRaw,
 } from './routeStatusViews';
-import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE } from './routeConfig.js';
+import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE, isStaticNonCacheRoute } from './routeConfig.js';
 import { resolveMainSiteRouteMatch } from './routeTable.js';
 import { renderMainSiteRouteView } from './mainSiteRouteViewMap.js';
 import { createMainSiteRouteRenderers } from './mainSiteRouteRenderers.js';
@@ -2573,18 +2573,25 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       pathname.startsWith('/question/') ||
       pathname.startsWith('/questions/results');
     const isBuiltInDemoSessionRoute = this.isBuiltInDemoSessionRoutePath(pathname);
+    const shouldInitializeActiveSessionCaches = !isStaticNonCacheRoute(pathname);
     mainSiteLog.log(
-      isDemoPath ? 'Initializing caches (demo prioritized order)...' : 'Initializing caches sequentially...',
+      shouldInitializeActiveSessionCaches
+        ? isDemoPath
+          ? 'Initializing caches (demo prioritized order)...'
+          : 'Initializing caches sequentially...'
+        : 'Skipping active session cache initialization for static route.',
     );
 
-    const workerCanonicalCachesInitialized = await this.initializeWorkerCanonicalCachesForGroup(slug, {
-      resetReadiness: true,
-    });
-    const sessionNet = this.getInitializableSessionNetwork(slug, pathname);
+    const workerCanonicalCachesInitialized = shouldInitializeActiveSessionCaches
+      ? await this.initializeWorkerCanonicalCachesForGroup(slug, {
+          resetReadiness: true,
+        })
+      : false;
+    const sessionNet = shouldInitializeActiveSessionCaches ? this.getInitializableSessionNetwork(slug, pathname) : null;
     mainSiteLog.log('session network (derived):', sessionNet);
     if (workerCanonicalCachesInitialized) {
       mainSiteLog.log('Worker-canonical caches initialized from the verified session authority.');
-    } else if (sessionNet && sessionNet.id) {
+    } else if (shouldInitializeActiveSessionCaches && sessionNet && sessionNet.id) {
       if (isSbtDetailRoute) {
         // SBT detail: load only this SBT first, defer everything else
         try {
@@ -3126,7 +3133,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       })();
     }
 
-    if (sessionPathResolutionChanged) {
+    if (sessionPathResolutionChanged && !isStaticNonCacheRoute(currPath)) {
       const workerRouteSlug = this.getBootstrapActiveSessionSlug(currPath, currSearch);
       void this.initializeWorkerCanonicalCachesForGroup(workerRouteSlug, { resetReadiness: true });
     }
