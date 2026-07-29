@@ -4,11 +4,14 @@ import { faTimes } from '@fortawesome/free-solid-svg-icons';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './SessionWizard.module.scss';
-import { buildCloudflareTokenTemplateUrl } from './cloudflareTokenTemplate.js';
-import { CLOUDFLARE_NATIVE_DEPLOY_URL } from '../../variables/publicDeploymentConfig.js';
+import {
+  buildCloudflareTokenTemplateUrl,
+  CLOUDFLARE_TOKEN_SETUP_GUIDE_URL,
+} from './cloudflareTokenTemplate.js';
 import type { SessionWizardRequirementId } from './sessionWizardModeRequirements';
 
 export const SESSION_WIZARD_REQUIREMENT_LINKS = Object.freeze({
+  cloudflareAccount: 'https://dash.cloudflare.com/',
   openaiApiKey: 'https://platform.openai.com/api-keys',
   litApiKeys: 'https://developer.litprotocol.com/management/api_keys',
   arweaveWallet: 'https://docs.arweave.org/developers/wallets/arweave-wallet',
@@ -71,20 +74,14 @@ const SessionWizardRequirementsBanner = ({
         <ul className={styles.newSessionBannerList}>
           {hasResolvedRequirements && requires('cloudflareAccount') ? (
             <li>
-              {CLOUDFLARE_NATIVE_DEPLOY_URL ? (
-                <a
-                  href={CLOUDFLARE_NATIVE_DEPLOY_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={styles.newSessionBannerLink}
-                >
-                  Cloudflare account
-                </a>
-              ) : (
-                'Cloudflare account'
-              )}{' '}
-              — the Worker step deploys the full Session Worker through Cloudflare&apos;s native flow. It does not ask
-              for a Cloudflare API token or use the Context Engine deploy helper.
+              <a
+                href={SESSION_WIZARD_REQUIREMENT_LINKS.cloudflareAccount}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.newSessionBannerLink}
+              >
+                Cloudflare account
+              </a>
             </li>
           ) : null}
           {requires('cloudflareApiToken') ? (
@@ -99,9 +96,16 @@ const SessionWizardRequirementsBanner = ({
                 Cloudflare API token
               </a>{' '}
               — if you&apos;re already logged into Cloudflare, this link opens a token form with permissions prefilled.
-              Under Account Resources, choose only the account that will own the session Worker; create the token, then
-              copy it into the Worker step. Set the earliest expiration Cloudflare permits that still covers setup and
-              an immediate retry; revoke it after deployment succeeds or you abandon the attempt.
+              Create the token, then copy it into the Worker step.{' '}
+              <a
+                href={CLOUDFLARE_TOKEN_SETUP_GUIDE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.newSessionBannerLink}
+              >
+                Token setup and security guide
+              </a>
+              .
             </li>
           ) : null}
           {requires('aiProviderKey') ? (

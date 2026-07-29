@@ -14,7 +14,7 @@ export const LOCAL_WORKER_BUNDLE_FALLBACK_FILE_PATH = '/dist/sessionCorsWorker.b
 export const CLOUDFLARE_MISSING_HANDLER_ERROR = 'no registered event handlers';
 export const DEPLOY_HELPER_BUNDLE_FETCH_ERROR = 'failed to fetch bundle';
 export const NORMAL_MODE_HOSTED_BUNDLE_HELP_MESSAGE =
-  'Normal mode deploys use the GitHub-hosted worker bundle automatically. If a retry needs a different source, keep this Git URL as the default and add a manual bundle URL or upload below after a fetch failure.';
+  'Guided deploys use the GitHub-hosted worker bundle automatically. If a retry needs a different source, keep this Git URL as the default and add a manual bundle URL or upload below after a fetch failure.';
 
 export const getSessionWizardNormalModeBundleUrlOverrideValidationError = (value: unknown = ''): string => {
   const raw = toStr(value).trim();

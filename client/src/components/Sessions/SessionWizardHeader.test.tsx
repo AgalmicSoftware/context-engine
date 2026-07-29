@@ -20,7 +20,7 @@ describe('SessionWizardHeader', () => {
     jest.clearAllMocks();
   });
 
-  it('renders the default mode controls and forwards mode clicks', () => {
+  it('renders the profile control without a duplicate Normal or Advanced switch', () => {
     render(
       <SessionWizardHeader
         {...baseProps}
@@ -32,18 +32,10 @@ describe('SessionWizardHeader', () => {
 
     expect(screen.getByRole('heading', { name: 'Session Setup (Cloudflare)' })).toBeInTheDocument();
     const hostingControl = screen.getByTestId('hosting-profile-control');
-    const normalMode = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL);
     expect(hostingControl).toBeInTheDocument();
-    expect(hostingControl.compareDocumentPosition(normalMode) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.queryByText('Advanced mode shows the full session configuration.')).not.toBeInTheDocument();
-    expect(normalMode).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).toHaveAttribute('aria-pressed', 'false');
-
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
-
-    expect(baseProps.onEnterAdvancedMode).toHaveBeenCalledTimes(1);
-    expect(baseProps.onEnterNormalMode).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Normal')).not.toBeInTheDocument();
+    expect(screen.queryByText('Advanced')).not.toBeInTheDocument();
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL)).not.toBeInTheDocument();
   });
 
   it('gives the initial profile cards the full header surface before setup continues', () => {
@@ -61,23 +53,15 @@ describe('SessionWizardHeader', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED)).not.toBeInTheDocument();
   });
 
-  it('renders sponsored display settings without changing the mode test ids', () => {
+  it('does not reintroduce a display-mode menu for sponsored setup links', () => {
     render(<SessionWizardHeader {...baseProps} hasSponsoredBundleLink wizardDisplaySettingsOpen />);
 
-    const settingsButton = screen.getByRole('button', { name: 'Session wizard display settings' });
-    expect(settingsButton).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('dialog', { name: 'Session wizard display settings' })).toBeInTheDocument();
-    expect(screen.getByText('Display mode')).toBeInTheDocument();
-    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL)).toBeInTheDocument();
-
-    fireEvent.click(settingsButton);
-    fireEvent.click(screen.getByRole('button', { name: 'Close session wizard display settings' }));
-
-    expect(baseProps.onToggleDisplaySettings).toHaveBeenCalledTimes(1);
-    expect(baseProps.onCloseDisplaySettings).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: 'Session wizard display settings' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Session wizard display settings' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Display mode')).not.toBeInTheDocument();
   });
 
-  it('renders the advanced hint and network selector boundary', () => {
+  it('renders the custom network selector without an Advanced-mode label', () => {
     render(
       <SessionWizardHeader
         {...baseProps}
@@ -92,7 +76,7 @@ describe('SessionWizardHeader', () => {
       />,
     );
 
-    expect(screen.getByText('Advanced mode shows the full session configuration.')).toBeInTheDocument();
+    expect(screen.queryByText(/Advanced mode/i)).not.toBeInTheDocument();
     const chainSelector = screen.getByText('Network:').parentElement;
     expect(chainSelector).toBeTruthy();
     expect(within(chainSelector as HTMLElement).getByRole('combobox')).toHaveValue('84532');

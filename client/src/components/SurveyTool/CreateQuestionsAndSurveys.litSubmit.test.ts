@@ -30,6 +30,7 @@ const buildRegistryLitProfile = () => {
   const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
   profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
   profile.encryption = { mode: 'lit' };
+  profile.results.visibility = 'participant_aggregate';
   return profile;
 };
 

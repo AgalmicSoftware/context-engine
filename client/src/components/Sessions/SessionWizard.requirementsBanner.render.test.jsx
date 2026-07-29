@@ -61,8 +61,12 @@ describe('SessionWizard new-session requirements banner', () => {
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
     await selectCloudflarePreset();
 
-    expect(screen.queryByRole('link', { name: 'Cloudflare account' })).not.toBeInTheDocument();
-    expect(screen.getByText(/does not ask for a Cloudflare API token/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cloudflare account' })).toHaveAttribute(
+      'href',
+      'https://dash.cloudflare.com/',
+    );
+    expect(screen.queryByText(/does not ask for a Cloudflare API token/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Worker step deploys the full Session Worker/i)).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_TOKEN_ONBOARDING_LINK)).not.toBeInTheDocument();
   });
 

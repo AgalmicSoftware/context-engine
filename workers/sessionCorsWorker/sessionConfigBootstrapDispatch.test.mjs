@@ -243,7 +243,9 @@ test('projectPublicWorkerSessionConfig cannot expose the non-enumerable runtime 
 
 test('projectPublicWorkerSessionConfig keeps worker-canonical editable text metadata reload-safe', () => {
   const projected = projectPublicWorkerSessionConfig({
+    sessionEndsAt: '2099-01-02T03:04:00.000Z',
     defaultTags: 'worker, canonical',
+    defaultGroupTags: 'facilitators,reviewers',
     defaultSbtTags: 'member',
     questionsGenPrompt: 'Ask a worker-owned question',
     defaultFilterState: { sort: 'recent' },
@@ -258,7 +260,9 @@ test('projectPublicWorkerSessionConfig keeps worker-canonical editable text meta
   });
 
   assert.deepEqual(projected, {
+    sessionEndsAt: '2099-01-02T03:04:00.000Z',
     defaultTags: 'worker, canonical',
+    defaultGroupTags: 'facilitators,reviewers',
     defaultSbtTags: 'member',
     questionsGenPrompt: 'Ask a worker-owned question',
     defaultFilterState: { sort: 'recent' },

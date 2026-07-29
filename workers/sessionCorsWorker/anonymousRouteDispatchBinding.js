@@ -13,6 +13,7 @@ export const dispatchAnonymousRouteWithWorkerDeps = async ({
     deps: {
       readTranscribeRequestPayload: deps?.readTranscribeRequestPayload,
       storageRoute: deps?.storageRoute,
+      dispatchPublicWorkerGroupListRequest: deps?.dispatchPublicWorkerGroupListRequest,
       evaluateAnonymousRouteAccess: deps?.evaluateAnonymousRouteAccess,
       getSessionSecrets: (sessionSlug) => deps?.getSessionSecrets?.(env, sessionSlug),
       transcribe: deps?.transcribe,
@@ -23,6 +24,7 @@ export const dispatchAnonymousRouteWithWorkerDeps = async ({
       proxyOpenRouter: deps?.proxyOpenRouter,
       proxyCustomRPC: deps?.proxyCustomRPC,
       json: deps?.json,
+      now: deps?.now,
       ANONYMOUS_ROUTE_DENIED_ERROR: constants?.anonymousRouteDeniedError,
     },
   })

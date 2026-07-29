@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 
 import SessionModeProfileField from './SessionModeProfileField';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('SessionModeProfileField', () => {
@@ -10,11 +11,20 @@ describe('SessionModeProfileField', () => {
     render(<SessionModeProfileField registryChainId={11155420} onChange={onChange} entryOnly />);
 
     expect(screen.queryByTestId('ce-new-preset-continue')).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'How should this session run?' })).toBeInTheDocument();
+    expect(screen.queryByText('How should this session run?')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Select the infrastructure path that matches the inputs you have available.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Choose a setup')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'View the deployment architecture diagram on GitHub' })).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/README.md#architecture-at-a-glance',
+    );
     expect(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByTestId('ce-new-preset-trustless_public_decentralized')).toHaveAttribute('aria-checked', 'false');
     expect(screen.getByText('Cloudflare login / AI API Key')).toBeInTheDocument();
-    expect(screen.getByText('AI API Key / Arweave wallet / RPC URL / testnet gas')).toBeInTheDocument();
+    expect(screen.getByText('AI API Key / Arweave wallet / RPC URL / EVM testnet gas')).toBeInTheDocument();
+    expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /advanced options/i })).not.toBeInTheDocument();
     const selector = screen.getByRole('radiogroup', { name: 'Session hosting profile' });
     expect(within(selector).getByRole('radio', { name: 'Fast & Cheap (Cloudflare)' })).toBeInTheDocument();
@@ -42,8 +52,9 @@ describe('SessionModeProfileField', () => {
     fireEvent.click(screen.getByTestId('ce-new-preset-fast_cheap_cloudflare'));
 
     expect(screen.queryByText('Cloudflare login / AI API Key')).not.toBeInTheDocument();
-    expect(screen.getByText('Hosting')).toBeInTheDocument();
-    expect(screen.getByRole('radio', { name: 'Cloudflare (recommended)' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByText('Hosting')).not.toBeInTheDocument();
+    expect(screen.queryByText('Recommended')).not.toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Cloudflare' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('radio', { name: /Corporate.*coming later/i })).toBeDisabled();
   });
 
@@ -60,10 +71,38 @@ describe('SessionModeProfileField', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
+    const customizeButton = screen.getByRole('button', { name: 'Customize session settings' });
+    expect(customizeButton).toHaveAttribute('aria-pressed', 'false');
+    expect(customizeButton).toHaveAttribute('data-testid', E2E_TESTIDS.WIZARD_MODE_ADVANCED);
+    fireEvent.click(customizeButton);
 
     expect(onCustomize).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('region', { name: 'Advanced hosting options' })).not.toBeInTheDocument();
+  });
+
+  it('marks Customize active and returns to the guided flow when a preset is selected', () => {
+    const onSelectPreset = jest.fn();
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    render(
+      <SessionModeProfileField
+        registryChainId={11155420}
+        value={cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE)}
+        onChange={jest.fn()}
+        onSelectPreset={onSelectPreset}
+        onCustomize={jest.fn()}
+        customizing
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Finish customizing session settings' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Finish customizing session settings' })).toHaveTextContent('Done');
+    fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
+
+    expect(onSelectPreset).toHaveBeenCalledTimes(1);
+    confirmSpy.mockRestore();
   });
 
   it('selects a preset and emits the compiled storage profile', () => {
@@ -157,7 +196,7 @@ describe('SessionModeProfileField', () => {
 
     fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
 
-    expect(confirmSpy).toHaveBeenCalledWith('Switch preset and replace incompatible advanced settings?');
+    expect(confirmSpy).toHaveBeenCalledWith('Switch preset and replace incompatible custom settings?');
     expect(onChange).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
   });

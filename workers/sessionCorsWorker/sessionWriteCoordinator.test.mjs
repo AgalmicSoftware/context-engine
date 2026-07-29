@@ -451,6 +451,79 @@ test('SessionWriteCoordinator admits exactly one distinct concurrent member add 
 	assert.equal([...kv.values.keys()].filter((key) => key.startsWith('ce-worker-group-member:')).length, 1);
 });
 
+test('SessionWriteCoordinator authoritatively enforces per-group membership limits and join deadlines', async () => {
+	const kv = createWorkerGroupKv();
+	const env = {
+		CE_WORKER_GROUPS_KV: kv,
+		CE_WORKER_GROUPS_BOOTSTRAP: 'fresh-template-v2',
+		CE_WORKER_GROUP_MAX_MEMBERS_PER_GROUP: '5',
+	};
+	let coordinatorNow = Date.now();
+	const coordinator = new SessionWriteCoordinator(createTransactionalState().state, env, {
+		now: () => coordinatorNow,
+	});
+	const actorPrincipal = {
+		kind: 'evm_address',
+		address: '0x0000000000000000000000000000000000000abc',
+	};
+	const mutate = async (payload) => {
+		const response = await coordinator.fetch(
+			createCoordinatorRequest('/worker-groups/mutate', {
+				slug: 'session-a',
+				actorPrincipal,
+				...payload,
+			}),
+		);
+		return { response, body: await response.json() };
+	};
+
+	const limited = await mutate({
+		operation: 'create',
+		input: {
+			groupId: 'limited',
+			label: 'Limited',
+			joinMode: 'open',
+			memberVisibility: 'session',
+			memberLimit: 1,
+		},
+	});
+	assert.equal(limited.response.status, 200);
+	const firstJoin = await mutate({
+		operation: 'join',
+		groupId: 'limited',
+		principal: { kind: 'evm_address', address: '0x0000000000000000000000000000000000000def' },
+	});
+	assert.equal(firstJoin.response.status, 200);
+	const secondJoin = await mutate({
+		operation: 'join',
+		groupId: 'limited',
+		principal: { kind: 'evm_address', address: '0x0000000000000000000000000000000000000fed' },
+	});
+	assert.equal(secondJoin.response.status, 409);
+	assert.equal(secondJoin.body.reason, 'worker_group_member_cap_exceeded');
+
+	const deadline = new Date(coordinatorNow + 60_000).toISOString();
+	const timed = await mutate({
+		operation: 'create',
+		input: {
+			groupId: 'timed',
+			label: 'Timed',
+			joinMode: 'open',
+			memberVisibility: 'session',
+			joinEndsAt: deadline,
+		},
+	});
+	assert.equal(timed.response.status, 200);
+	coordinatorNow += 61_000;
+	const lateJoin = await mutate({
+		operation: 'join',
+		groupId: 'timed',
+		principal: { kind: 'telegram', principalId: 'telegram:late' },
+	});
+	assert.equal(lateJoin.response.status, 403);
+	assert.equal(lateJoin.body.reason, 'worker_group_join_ended');
+});
+
 test('coordinated Worker Group CRUD keeps capacity authoritative across release and join', async () => {
 	const env = installWorkerGroupCoordinatorBinding({
 		CE_WORKER_GROUPS_KV: createWorkerGroupKv(),
@@ -601,6 +674,106 @@ test('Worker Group capacity initialization locks unprovisioned legacy KV state',
 	assert.equal(createOverflow.status, 503);
 	assert.equal((await createOverflow.json()).reason, 'worker_group_capacity_reconciliation_required');
 	assert.equal([...kv.values.keys()].filter((key) => key.startsWith('ce-worker-group-member:')).length, 0);
+});
+
+test('signed empty-state reconciliation repairs only a proven-empty legacy lock', async () => {
+	const kv = createWorkerGroupKv();
+	const env = { CE_WORKER_GROUPS_KV: kv };
+	const { state } = createTransactionalState();
+	const coordinator = new SessionWriteCoordinator(state, env);
+	const actorPrincipal = {
+		kind: 'evm_address',
+		address: '0x0000000000000000000000000000000000000abc',
+	};
+	const locked = await coordinator.fetch(
+		createCoordinatorRequest('/worker-groups/ready', { slug: 'session-a' }),
+	);
+	assert.equal(locked.status, 503);
+	assert.equal((await locked.json()).reason, 'worker_group_capacity_reconciliation_required');
+
+	const mismatched = await coordinator.fetch(
+		createCoordinatorRequest('/worker-groups/reconcile-empty', {
+			slug: 'session-a',
+			sessionId: replacementWorkerSessionId,
+		}),
+	);
+	assert.equal(mismatched.status, 409);
+	assert.equal((await mismatched.json()).reason, 'worker_group_capacity_identity_conflict');
+
+	env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
+	const repaired = await coordinator.fetch(
+		createCoordinatorRequest('/worker-groups/reconcile-empty', { slug: 'session-a' }),
+	);
+	assert.equal(repaired.status, 200);
+	assert.deepEqual(
+		await repaired.json(),
+		{
+			ok: true,
+			repaired: true,
+			meta: {
+				version: 3,
+				slug: 'session-a',
+				sessionId: workerSessionId,
+				phase: 'ready',
+				bootstrapId: 'fresh-template-v2',
+				groupCount: 0,
+			},
+		},
+	);
+
+	const repeated = await coordinator.fetch(
+		createCoordinatorRequest('/worker-groups/reconcile-empty', { slug: 'session-a' }),
+	);
+	assert.equal(repeated.status, 200);
+	assert.equal((await repeated.json()).repaired, false);
+
+	const created = await coordinator.fetch(
+		createCoordinatorRequest('/worker-groups/mutate', {
+			slug: 'session-a',
+			operation: 'create',
+			input: {
+				groupId: 'post-repair',
+				label: 'Post repair',
+				joinMode: 'admin_add',
+				memberVisibility: 'members',
+			},
+			actorPrincipal,
+		}),
+	);
+	assert.equal(created.status, 200);
+	assert.equal((await created.json()).group.groupId, 'post-repair');
+});
+
+test('empty-state reconciliation refuses a legacy lock when any group record exists', async () => {
+	const kv = createWorkerGroupKv();
+	const env = { CE_WORKER_GROUPS_KV: kv };
+	const coordinator = new SessionWriteCoordinator(createTransactionalState().state, env);
+	const actorPrincipal = {
+		kind: 'evm_address',
+		address: '0x0000000000000000000000000000000000000abc',
+	};
+	const locked = await coordinator.fetch(
+		createCoordinatorRequest('/worker-groups/ready', { slug: 'session-a' }),
+	);
+	assert.equal(locked.status, 503);
+
+	await createWorkerGroup({
+		env,
+		slug: 'session-a',
+		input: {
+			groupId: 'existing',
+			label: 'Existing',
+			joinMode: 'admin_add',
+			memberVisibility: 'members',
+		},
+		actorPrincipal,
+	});
+	env.CE_WORKER_GROUPS_BOOTSTRAP = 'fresh-template-v2';
+	const rejected = await coordinator.fetch(
+		createCoordinatorRequest('/worker-groups/reconcile-empty', { slug: 'session-a' }),
+	);
+	assert.equal(rejected.status, 503);
+	assert.equal((await rejected.json()).reason, 'worker_group_capacity_reconciliation_required');
 });
 
 test('stale duplicate member removal cannot release the same durable capacity twice', async () => {

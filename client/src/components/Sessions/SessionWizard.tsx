@@ -112,6 +112,7 @@ import {
   type SessionWizardRegisterTxEntry,
 } from './sessionWizardPublishController';
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
+import { resolveSessionWizardModeFieldPolicy } from './sessionWizardModeFieldPolicy';
 import {
   checkSessionWizardWorkerSlugExists,
   resolveSessionWizardSlugAvailabilityPort,
@@ -768,6 +769,10 @@ const SessionWizard = ({
   const sessionModeRequirements = resolveSessionWizardModeRequirements(draft.sessionModeProfile as SessionModeProfile, {
     hasPendingSbtDrafts: hasUndeployedPendingSbtDrafts,
   });
+  const modeFieldPolicy = useMemo(
+    () => resolveSessionWizardModeFieldPolicy(sessionModeRequirements),
+    [sessionModeRequirements],
+  );
   const workerSlugAvailabilityUrl = normalizeBaseUrl(toStr(draft.corsWorkerUrl).trim());
   const checkWorkerSessionSlugExists = useCallback(
     async ({ slug }: SessionSlugExistsArgs): Promise<boolean> =>
@@ -2408,6 +2413,7 @@ const SessionWizard = ({
     launchCreateSbtModal,
     markBlockStartManual,
     metadataObjectCollapsed,
+    modeFieldPolicy,
     network,
     normalizeGateIds,
     openContractViewerModal,
@@ -2448,7 +2454,10 @@ const SessionWizard = ({
     workerSecretsEnabled,
     wizardMode,
   });
-  const orderedDraftEntries = useMemo(() => getSessionWizardOrderedDraftEntries(draft), [draft]);
+  const orderedDraftEntries = useMemo(
+    () => getSessionWizardOrderedDraftEntries(draft, modeFieldPolicy),
+    [draft, modeFieldPolicy],
+  );
 
   const registerChainId = Number(registryChainId || draft.networkChainId || 0) || null;
   const registerExplorerBaseUrl = getExplorerBaseUrl(registerChainId);
@@ -2742,6 +2751,8 @@ const SessionWizard = ({
     entryOnly: showSessionModeProfileEntryStep,
     onContinue: () => setSessionModeProfileStepComplete(true),
     onEnterAdvancedMode: handleEnterAdvancedMode,
+    onEnterNormalMode: handleEnterNormalMode,
+    customizing: wizardMode === 'advanced',
     registryChainId,
     setCollapsedSections,
     setDraft,

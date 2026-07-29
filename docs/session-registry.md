@@ -19,6 +19,13 @@ test the flow. The final switch will remove the local JSON fallback.
 - Arweave session metadata: non-authoritative content/config only (session text, UI defaults, contracts, block limits, encryption envelopes, etc).
 - Worker config (`session:{slug}:config` in KV): operational settings only (registry address/RPCs, limits, scopes, worker/runtime pointers, admin/Hats config, and mirrored `blockLimits` for scanner bootstrap), not gate authority.
 
+For a profile-bearing Worker-canonical session, the profile narrows that generic
+description: `sessionEndsAt` and generic UI/Group defaults live in Worker
+config, while block limits, faucet configuration, and registry contracts are
+rejected. Explicit Worker + on-chain SBT profiles may retain only their network
+and `sbtFactory` contract. Registry-canonical sessions continue to use
+Arweave/registry chain fields as described below.
+
 Rationale:
 - Duplicating gate authority in Arweave created drift risk (metadata could be stale while on-chain gates changed).
 - `/auth/login` already evaluates contract gates and then mints a short-lived token; duplicating gates in metadata gives minimal auth-path performance benefit while adding consistency risk.
@@ -163,6 +170,13 @@ Notes:
   - Questions may use any subset (including all) or none of the default tags.
   - `defaultTags` does **not** filter which questions/surveys are shown; sessions handle scoping.
 - `defaultSbtTags` is a comma-separated list of preferred SBT tags.
+- `defaultGroupTags` is the Worker-native equivalent and prefills tags in
+  participant and admin Group creation. Readers fall back to
+  `defaultSbtTags` for older Worker configs.
+- `sessionEndsAt` is an optional ISO timestamp for Worker-canonical sessions.
+  It closes participant resource and mutation routes while leaving reads and
+  signed admin routes available; it is not a replacement for on-chain
+  `blockLimits`.
   - In `CreateSBTGroup`, relevant defaults can auto-apply from that list based on the SBT name/description.
   - The full list remains optional guidance; irrelevant defaults are not blindly injected into every new SBT.
 - `sessionHeaderImg` (and similar image fields like group/SBT `logo`/`image`) can be stored as:

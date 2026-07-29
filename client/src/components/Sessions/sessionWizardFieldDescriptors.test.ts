@@ -5,6 +5,16 @@ import {
   shouldHideSessionWizardField,
   splitSessionWizardDraftEntries,
 } from './sessionWizardFieldDescriptors';
+import type { SessionWizardModeFieldPolicy } from './sessionWizardModeFieldPolicy';
+
+const pureWorkerPolicy: SessionWizardModeFieldPolicy = {
+  showBlockLimits: false,
+  showFaucet: false,
+  showSessionEndsAt: true,
+  showWorkerGroupDefaults: true,
+  showSbtDefaults: false,
+  visibleContractKeys: [],
+};
 
 describe('sessionWizardFieldDescriptors', () => {
   it('orders draft entries with canonical top-level keys first and omits worker-only fields', () => {
@@ -32,6 +42,7 @@ describe('sessionWizardFieldDescriptors', () => {
     const { primaryEntries, moreOptionsEntries } = splitSessionWizardDraftEntries(
       [
         ['sessionName', 'Demo'],
+        ['sessionEndsAt', '2099-01-01T00:00:00.000Z'],
         ['blockLimits', { start: 1, end: 2 }],
         ['defaultTags', 'ai'],
       ],
@@ -39,12 +50,12 @@ describe('sessionWizardFieldDescriptors', () => {
     );
 
     expect(primaryEntries.map(([key]) => key)).toEqual(['sessionName']);
-    expect(moreOptionsEntries.map(([key]) => key)).toEqual(['blockLimits', 'defaultTags']);
+    expect(moreOptionsEntries.map(([key]) => key)).toEqual(['sessionEndsAt', 'blockLimits', 'defaultTags']);
   });
 
   it('resolves labels and tooltips from field descriptors', () => {
     expect(getSessionWizardFieldLabel('sessionName', 'sessionName')).toBe('Session Name');
-    expect(getSessionWizardFieldTooltip(['faucet', 'privateKey'], '')).toContain('Lock to store as Lit-encrypted.');
+    expect(getSessionWizardFieldTooltip(['sessionEndsAt'], '')).toContain('participant writes stop');
   });
 
   it('applies shared field visibility rules', () => {
@@ -83,5 +94,71 @@ describe('sessionWizardFieldDescriptors', () => {
         wizardMode: 'advanced',
       }),
     ).toBe(false);
+  });
+
+  it('keeps capability-hidden fields hidden even when guided controls force rendering', () => {
+    for (const key of ['contracts', 'blockLimits', 'faucet', 'defaultSbtTags']) {
+      expect(
+        shouldHideSessionWizardField({
+          forceShow: true,
+          key,
+          path: [],
+          currentPath: [key],
+          wizardMode: 'normal',
+          modeFieldPolicy: pureWorkerPolicy,
+        }),
+      ).toBe(true);
+    }
+    expect(
+      shouldHideSessionWizardField({
+        forceShow: true,
+        key: 'sessionEndsAt',
+        path: [],
+        currentPath: ['sessionEndsAt'],
+        wizardMode: 'normal',
+        modeFieldPolicy: pureWorkerPolicy,
+      }),
+    ).toBe(false);
+    expect(
+      shouldHideSessionWizardField({
+        forceShow: true,
+        key: 'corsWorkerUrl',
+        path: [],
+        currentPath: ['corsWorkerUrl'],
+        wizardMode: 'normal',
+        modeFieldPolicy: pureWorkerPolicy,
+      }),
+    ).toBe(false);
+
+    for (const [key, path] of [
+      ['privateKey', ['faucet']],
+      ['encryptedPrivateKey', ['faucet']],
+    ] as const) {
+      expect(
+        shouldHideSessionWizardField({
+          forceShow: true,
+          key,
+          path: [...path],
+          currentPath: [...path, key],
+          wizardMode: 'advanced',
+        }),
+      ).toBe(true);
+    }
+  });
+
+  it('removes incompatible entries from ordered Cloudflare fields', () => {
+    const ordered = getSessionWizardOrderedDraftEntries(
+      {
+        contracts: {},
+        blockLimits: {},
+        faucet: {},
+        sessionEndsAt: '',
+        defaultGroupTags: 'facilitators',
+        defaultSbtTags: 'token-holders',
+      },
+      pureWorkerPolicy,
+    );
+
+    expect(ordered.map(([key]) => key)).toEqual(['sessionEndsAt', 'defaultGroupTags']);
   });
 });

@@ -1,5 +1,6 @@
 import { isModelAllowed } from './aiRequestNormalization.js';
 import { executeSessionLitChipotleAction } from './chipotleClient.js';
+import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 
 const resolveDefaultModelForProvider = (provider) => {
   if (provider === 'anthropic') return 'claude-3-5-sonnet-20240620';
@@ -34,6 +35,20 @@ export const dispatchAuthenticatedSecretActionRoute = async ({
   const isLitChipotleAction = path === '/lit/chipotle-action' || action === 'lit_chipotle_execute';
   if (!isFaucetAction && !isAiAction && !isLitChipotleAction) {
     return { handled: false };
+  }
+  if (isAiAction) {
+    const endedResponse = buildSessionEndedResponse({
+      config,
+      headers,
+      json: deps?.json,
+      now: deps?.now,
+    });
+    if (endedResponse) {
+      return {
+        handled: true,
+        response: endedResponse,
+      };
+    }
   }
 
   if (isFaucetAction) {

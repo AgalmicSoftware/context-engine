@@ -42,7 +42,7 @@ describe('SessionWizard worker resource rendering', () => {
   const selectTrustlessPublicPreset = async () => selectPreset('trustless_public_decentralized');
   const selectLitProfile = async (selectBasePreset) => {
     await selectBasePreset();
-    fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
+    enableAdvancedMode();
     const encryptionOptions = within(screen.getByRole('radiogroup', { name: /encryption/i }));
     fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
     await waitFor(() => {
@@ -94,7 +94,6 @@ describe('SessionWizard worker resource rendering', () => {
     expect(screen.queryByText('Session Storage')).not.toBeInTheDocument();
 
     enableAdvancedMode();
-    fireEvent.click(screen.getByRole('button', { name: /advanced options/i }));
     const storageOptions = within(await screen.findByRole('radiogroup', { name: 'Data storage' }));
     const arweaveOption = storageOptions.getByRole('radio', { name: 'Arweave' });
     const cloudflareOption = storageOptions.getByRole('radio', { name: 'Cloudflare' });

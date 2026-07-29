@@ -26,11 +26,19 @@ const jsonResponse = (value, status = 200) => new Response(JSON.stringify(value)
 const cloudflareSuccess = (result = {}) => ({ ok: true, status: 200, data: { success: true, result } });
 const cloudflareMissing = () => ({ ok: false, status: 404, error: 'not found' });
 
-function successfulHarness({ existing = false, healthOk = true, accessEnabled = true } = {}) {
+function successfulHarness({
+  existing = false,
+  healthOk = true,
+  accessEnabled = true,
+  commitSecretThenFail = '',
+} = {}) {
   const calls = [];
   let uploadMetadata = null;
   let workerName = '';
   let kvId = 'kv-wrapped-alpha';
+  let kvExists = existing;
+  let ambiguousSecret = commitSecretThenFail;
+  const secretNames = new Set(existing ? REQUIRED_TEST_SECRET_NAMES : []);
   const cfFetchImpl = async (_token, path, init = {}) => {
     const method = init.method || 'GET';
     calls.push({ kind: 'cloudflare', path, method, body: init.body });
@@ -38,9 +46,10 @@ function successfulHarness({ existing = false, healthOk = true, accessEnabled = 
       return cloudflareSuccess({ subdomain: 'tenant', status: 'active' });
     }
     if (path.includes('/storage/kv/namespaces?per_page=100')) {
-      return cloudflareSuccess(existing ? [{ id: kvId, title: 'ContextEngineAgentSessionWrapped:wrapped-alpha:d8a43d33e492' }] : []);
+      return cloudflareSuccess(kvExists ? [{ id: kvId, title: 'ContextEngineAgentSessionWrapped:wrapped-alpha:d8a43d33e492' }] : []);
     }
     if (path.endsWith('/storage/kv/namespaces') && method === 'POST') {
+      kvExists = true;
       return cloudflareSuccess({ id: kvId });
     }
     const settingsMatch = path.match(/\/workers\/scripts\/([^/]+)\/settings$/);
@@ -81,12 +90,17 @@ function successfulHarness({ existing = false, healthOk = true, accessEnabled = 
       return cloudflareSuccess({ id: workerName });
     }
     if (path.endsWith('/secrets') && method === 'GET') {
-      return cloudflareSuccess(existing ? [
-        { name: 'DEMO_SIGNER_ROOT_SECRET', type: 'secret_text' },
-        { name: 'AGENT_BRIDGE_AGENT_API_TOKEN', type: 'secret_text' },
-      ] : []);
+      return cloudflareSuccess([...secretNames].map((name) => ({ name, type: 'secret_text' })));
     }
-    if (path.endsWith('/secrets') && method === 'PUT') return cloudflareSuccess({});
+    if (path.endsWith('/secrets') && method === 'PUT') {
+      const secret = JSON.parse(init.body);
+      secretNames.add(secret.name);
+      if (ambiguousSecret === secret.name) {
+        ambiguousSecret = '';
+        return { ok: false, status: 502, error: 'secret response lost' };
+      }
+      return cloudflareSuccess({});
+    }
     if (path.endsWith('/subdomain') && method === 'POST') return cloudflareSuccess({ enabled: true });
     throw new Error(`Unexpected Cloudflare request ${method} ${path}`);
   };
@@ -110,6 +124,11 @@ function successfulHarness({ existing = false, healthOk = true, accessEnabled = 
   };
   return { calls, cfFetchImpl, fetchImpl, getUploadMetadata: () => uploadMetadata };
 }
+
+const REQUIRED_TEST_SECRET_NAMES = Object.freeze([
+  'DEMO_SIGNER_ROOT_SECRET',
+  'AGENT_BRIDGE_AGENT_API_TOKEN',
+]);
 
 function deployHelperHarness(options = {}) {
   const harness = successfulHarness(options);
@@ -180,6 +199,58 @@ test('dedicated Wrapped deployment awaits upload, secrets, activation, and autho
   assert.equal(orderedKinds.indexOf('upload') < orderedKinds.indexOf('secret'), true);
   assert.equal(orderedKinds.lastIndexOf('secret') < orderedKinds.indexOf('activate'), true);
   assert.equal(orderedKinds.indexOf('activate') < orderedKinds.indexOf('health'), true);
+});
+
+test('dedicated Wrapped deployment generates independent runtime secrets without deriving them from the API token', async () => {
+  const harness = successfulHarness();
+  const entropy = ['11'.repeat(32), '22'.repeat(32)];
+  const generatedInputs = [];
+  const result = await executeAgentSessionWrappedDeployment({
+    body: body(),
+    accountId: 'account-123',
+    cfFetchImpl: harness.cfFetchImpl,
+    fetchImpl: harness.fetchImpl,
+    randomSecretImpl: () => {
+      const next = entropy[generatedInputs.length];
+      generatedInputs.push(next);
+      return next;
+    },
+  });
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(generatedInputs, entropy);
+  const secretWrites = harness.calls
+    .filter((call) => call.path?.endsWith('/secrets') && call.method === 'PUT')
+    .map((call) => JSON.parse(call.body));
+  assert.deepEqual(secretWrites.map(({ name, text }) => ({ name, text })), [
+    { name: 'DEMO_SIGNER_ROOT_SECRET', text: entropy[0] },
+    { name: 'AGENT_BRIDGE_AGENT_API_TOKEN', text: entropy[1] },
+  ]);
+  assert.notEqual(secretWrites[0].text, secretWrites[1].text);
+  assert.equal(JSON.stringify(result).includes(entropy[0]), false);
+  assert.equal(JSON.stringify(result).includes(entropy[1]), false);
+  assert.equal(JSON.stringify(result).includes('cf-request-only-token'), false);
+});
+
+test('dedicated Wrapped deployment inventories a secret after an ambiguous committed write', async () => {
+  const harness = successfulHarness({ commitSecretThenFail: 'DEMO_SIGNER_ROOT_SECRET' });
+  const result = await executeAgentSessionWrappedDeployment({
+    body: body(),
+    accountId: 'account-123',
+    cfFetchImpl: harness.cfFetchImpl,
+    fetchImpl: harness.fetchImpl,
+  });
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.body.secrets, {
+    generated: ['DEMO_SIGNER_ROOT_SECRET', 'AGENT_BRIDGE_AGENT_API_TOKEN'],
+    preserved: [],
+  });
+  const secretWrites = harness.calls
+    .filter((call) => call.path?.endsWith('/secrets') && call.method === 'PUT')
+    .map((call) => JSON.parse(call.body).name);
+  assert.deepEqual(secretWrites, REQUIRED_TEST_SECRET_NAMES);
+  assert.equal(harness.calls.some((call) => call.path?.endsWith('/secrets') && call.method === 'GET'), true);
 });
 
 test('dedicated Wrapped deployment disables access in place through the sole agentHttp bit', async () => {
@@ -260,6 +331,49 @@ test('dedicated Wrapped deployment accepts an HTTPS release bundle URL with a pa
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.equal(result.body.upload.reused, false);
   assert.equal(harness.calls.some((call) => call.url === 'https://downloads.example/release/agent-bridge.bundle.js'), true);
+});
+
+test('dedicated Wrapped deployment rejects manifest drift before any Cloudflare mutation', async () => {
+  const cloudflareCalls = [];
+  const manifestUrl = 'https://downloads.example/release/worker-release-manifest.json';
+  const bundleUrl = 'https://downloads.example/release/agentBridgeWorker.bundle.js';
+  const result = await executeAgentSessionWrappedDeployment({
+    body: body({ bundleText: '', bundleUrl, bundleManifestUrl: manifestUrl }),
+    accountId: 'account-123',
+    cfFetchImpl: async (...args) => {
+      cloudflareCalls.push(args);
+      throw new Error('Cloudflare must not be reached');
+    },
+    fetchImpl: async (url) => {
+      if (url === manifestUrl) {
+        return jsonResponse({
+          schemaVersion: 1,
+          artifactSet: 'context-engine-worker-bundles',
+          source: { commit: 'a'.repeat(40), ref: 'refs/heads/main', tree: 'b'.repeat(40) },
+          replay: {
+            privateSourceCommit: 'c'.repeat(40),
+            publicReplayCommit: 'a'.repeat(40),
+            publicCommit: 'a'.repeat(40),
+            publicTree: 'b'.repeat(40),
+          },
+          builder: { workflow: 'CI', runId: '123' },
+          artifacts: [{
+            kind: 'agent-bridge-worker',
+            file: 'agentBridgeWorker.bundle.js',
+            bytes: 42,
+            sha256: 'd'.repeat(64),
+          }],
+        });
+      }
+      if (url === bundleUrl) return new Response('export default { fetch() {} };', { status: 200 });
+      throw new Error(`unexpected URL: ${url}`);
+    },
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 409);
+  assert.equal(result.body.step, 'bundle_provenance');
+  assert.equal(cloudflareCalls.length, 0);
 });
 
 test('dedicated Wrapped deployment withholds capability when health or authority proof fails', async () => {

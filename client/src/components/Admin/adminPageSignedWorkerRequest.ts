@@ -76,6 +76,10 @@ export const postSignedAdminWorkerRequest = async ({
         responseError,
       }),
     );
+    Object.assign(lastError, {
+      status: response.status,
+      reason: typeof data?.reason === 'string' ? data.reason : '',
+    });
     throw lastError;
   }
 

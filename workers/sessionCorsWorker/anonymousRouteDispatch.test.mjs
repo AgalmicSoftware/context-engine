@@ -12,6 +12,81 @@ const createAnonymousContext = () => ({
   headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
 });
 
+test('dispatchAnonymousRoute forwards public group discovery without loading secrets', async () => {
+  const request = new Request(
+    'https://worker.example/groups/list?sessionId=0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    { method: 'GET' },
+  );
+  const response = new Response('public groups');
+  let secretLookupCalled = false;
+
+  const result = await dispatchAnonymousRoute({
+    path: '/groups/list',
+    request,
+    anonymousContext: {
+      ...createAnonymousContext(),
+      config: {
+        sessionId: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        groupCreationPolicy: 'participants',
+        sessionEndsAt: '2000-01-01T00:00:00Z',
+      },
+      env: { GROUP_KV: 'group-kv' },
+    },
+    deps: {
+      dispatchPublicWorkerGroupListRequest: async (value) => {
+        assert.equal(value.request, request);
+        assert.equal(value.slug, 'session-a');
+        assert.deepEqual(value.env, { GROUP_KV: 'group-kv' });
+        assert.equal(value.config.groupCreationPolicy, 'participants');
+        assert.deepEqual(value.baseHeaders, { 'Access-Control-Allow-Origin': 'https://allowed.example' });
+        return response;
+      },
+      getSessionSecrets: async () => {
+        secretLookupCalled = true;
+        return {};
+      },
+      json: () => null,
+    },
+  });
+
+  assert.equal(result, response);
+  assert.equal(secretLookupCalled, false);
+});
+
+test('dispatchAnonymousRoute blocks anonymous AI after the session ends', async () => {
+  let bodyRead = false;
+  const result = await dispatchAnonymousRoute({
+    path: '/ai',
+    request: new Request('https://worker.example/ai', { method: 'POST' }),
+    anonymousContext: {
+      ...createAnonymousContext(),
+      config: {
+        ...createAnonymousContext().config,
+        sessionEndsAt: '2030-01-02T03:04:00Z',
+      },
+    },
+    deps: {
+      now: () => Date.parse('2030-01-02T03:04:00Z'),
+      readAiRequestPayload: async () => {
+        bodyRead = true;
+        return { ok: true };
+      },
+      json: (body, status, headers) => ({ body, status, headers }),
+    },
+  });
+
+  assert.equal(bodyRead, false);
+  assert.deepEqual(result, {
+    body: {
+      error: 'This session has ended.',
+      code: 'session_ended',
+      sessionEndsAt: '2030-01-02T03:04:00.000Z',
+    },
+    status: 410,
+    headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+  });
+});
+
 test('dispatchAnonymousRoute forwards public storage reads to storageRoute without requester auth', async () => {
   const request = new Request('https://worker.example/storage/read?id=ref1', { method: 'GET' });
   const response = new Response('public payload');

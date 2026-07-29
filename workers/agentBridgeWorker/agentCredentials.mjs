@@ -1,8 +1,5 @@
 import { AGENT_BRIDGE_WORKER_VERSION } from './constants.mjs';
-import {
-  createOpaqueAgentPrincipalId,
-  normalizeAgentPrincipal,
-} from './agentPrincipal.mjs';
+import { createOpaqueAgentPrincipalId, normalizeAgentPrincipal } from './agentPrincipal.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
 
 export { createOpaqueAgentPrincipalId, normalizeAgentPrincipal } from './agentPrincipal.mjs';
@@ -61,6 +58,22 @@ const textEncoder = new TextEncoder();
 
 function safeString(value) {
   return String(value || '').trim();
+}
+
+function normalizeSessionId(value = '') {
+  const normalized = safeString(value).toLowerCase().replace(/^0x/, '').replace(/-/g, '');
+  return /^[0-9a-f]{32}$/.test(normalized) && !/^0+$/.test(normalized) ? `0x${normalized}` : '';
+}
+
+function normalizeHttpsOrigin(value = '') {
+  try {
+    const parsed = new URL(safeString(value));
+    if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return '';
+    if (parsed.pathname !== '/' || parsed.search || parsed.hash) return '';
+    return parsed.origin;
+  } catch {
+    return '';
+  }
 }
 
 function nowIso() {
@@ -136,9 +149,7 @@ function normalizeScopes(scopes = [], { defaultIfEmpty = false } = {}) {
 }
 
 function normalizeTtlSeconds(value, fallback = AGENT_CREDENTIAL_DEFAULT_TTL_SECONDS) {
-  return Number.isFinite(Number(value)) && Number(value) > 0
-    ? Math.floor(Number(value))
-    : fallback;
+  return Number.isFinite(Number(value)) && Number(value) > 0 ? Math.floor(Number(value)) : fallback;
 }
 
 async function readKvJson(kv, key) {
@@ -193,12 +204,12 @@ export async function readAgentCredentialSlot({
   const tokenHash = safeString(parsed.tokenHash).toLowerCase();
   return /^[0-9a-f]{64}$/.test(tokenHash)
     ? {
-      ok: true,
-      key,
-      tokenHash,
-      issuedAt: safeString(parsed.issuedAt),
-      updatedAt: safeString(parsed.updatedAt),
-    }
+        ok: true,
+        key,
+        tokenHash,
+        issuedAt: safeString(parsed.issuedAt),
+        updatedAt: safeString(parsed.updatedAt),
+      }
     : {};
 }
 
@@ -206,6 +217,9 @@ export async function issueAgentCredential({
   env = {},
   principal = {},
   sessionSlug = '',
+  sessionId = '',
+  sessionWorkerOrigin = '',
+  sessionAuthorityMode = '',
   accountAddress = '',
   scopes = AGENT_CREDENTIAL_DEFAULT_SCOPES,
   audience = AGENT_CREDENTIAL_AUDIENCES.AGENT_BRIDGE,
@@ -223,6 +237,36 @@ export async function issueAgentCredential({
   if (!slug) return { ok: false, reason: 'session_required' };
   const normalizedAudience = safeString(audience);
   const normalizedKind = safeString(credentialKind);
+  const memberCredential = normalizedKind === AGENT_CREDENTIAL_KINDS.MEMBER;
+  const normalizedSessionAuthorityMode = safeString(sessionAuthorityMode).toLowerCase();
+  const workerCanonicalBrowserCredential =
+    normalizedKind === AGENT_CREDENTIAL_KINDS.BROWSER && normalizedSessionAuthorityMode === 'worker_canonical';
+  const authorityBoundCredential = memberCredential || workerCanonicalBrowserCredential;
+  const rawSessionId = safeString(sessionId);
+  const normalizedSessionId = normalizeSessionId(rawSessionId);
+  const normalizedSessionWorkerOrigin = normalizeHttpsOrigin(sessionWorkerOrigin);
+  if (authorityBoundCredential && rawSessionId && !normalizedSessionId) {
+    return {
+      ok: false,
+      reason: workerCanonicalBrowserCredential
+        ? 'agent_browser_credential_session_identity_invalid'
+        : 'agent_member_credential_session_identity_invalid',
+    };
+  }
+  if (workerCanonicalBrowserCredential && !normalizedSessionId) {
+    return {
+      ok: false,
+      reason: 'agent_browser_credential_session_identity_invalid',
+    };
+  }
+  if (authorityBoundCredential && !normalizedSessionWorkerOrigin) {
+    return {
+      ok: false,
+      reason: workerCanonicalBrowserCredential
+        ? 'agent_browser_credential_worker_origin_invalid'
+        : 'agent_member_credential_worker_origin_invalid',
+    };
+  }
   const slotKey = credentialSlotKey({
     principalId: normalizedPrincipal.principalId,
     sessionSlug: slug,
@@ -254,6 +298,13 @@ export async function issueAgentCredential({
     status: 'active',
     principal: normalizedPrincipal,
     sessionSlug: slug,
+    ...(authorityBoundCredential
+      ? {
+          ...(normalizedSessionId ? { sessionId: normalizedSessionId } : {}),
+          sessionWorkerOrigin: normalizedSessionWorkerOrigin,
+          ...(normalizedSessionAuthorityMode ? { sessionAuthorityMode: normalizedSessionAuthorityMode } : {}),
+        }
+      : {}),
     accountAddress: safeString(accountAddress),
     scopes: normalizeScopes(scopes, { defaultIfEmpty: true }),
     audience: normalizedAudience,
@@ -289,6 +340,13 @@ export async function issueAgentCredential({
     version: 2,
     principalId: normalizedPrincipal.principalId,
     sessionSlug: slug,
+    ...(authorityBoundCredential
+      ? {
+          ...(normalizedSessionId ? { sessionId: normalizedSessionId } : {}),
+          sessionWorkerOrigin: normalizedSessionWorkerOrigin,
+          ...(normalizedSessionAuthorityMode ? { sessionAuthorityMode: normalizedSessionAuthorityMode } : {}),
+        }
+      : {}),
     audience: normalizedAudience,
     credentialKind: normalizedKind,
     tokenHash,
@@ -297,7 +355,9 @@ export async function issueAgentCredential({
   };
   assertNoSecretShape(slot, 'Agent credential slots must not serialize bearer tokens.');
   try {
-    await kv.put(slotKey, JSON.stringify(slot), { expirationTtl: normalizedTtl });
+    await kv.put(slotKey, JSON.stringify(slot), {
+      expirationTtl: normalizedTtl,
+    });
   } catch {
     await deleteKvBestEffort(kv, recordKey);
     return { ok: false, reason: 'agent_token_pointer_write_failed' };

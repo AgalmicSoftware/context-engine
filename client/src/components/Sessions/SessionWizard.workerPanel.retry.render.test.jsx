@@ -6,6 +6,7 @@ import {
   resetSessionWizardWorkerPanelTestState,
   screen,
   selectNormalModeCard,
+  createPublicWorkerVerificationResponder,
   enableAdvancedMode,
   waitFor,
 } from './SessionWizard.workerPanel.testUtils';
@@ -60,7 +61,7 @@ describe('SessionWizard worker panel retry rendering', () => {
         target: { files: [advancedBundleFile] },
       });
 
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
       selectNormalModeCard('Worker');
 
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue(WORKER_BUNDLE_URL);
@@ -150,7 +151,7 @@ describe('SessionWizard worker panel retry rendering', () => {
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).toBeInTheDocument();
       expect(
         screen.getByText(
-          'Normal mode still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. Optional fallback: Run nvm use 20 && npm run worker:bundle from the repo root, then choose /dist/sessionCorsWorker.bundle.js.',
+          'Guided setup still defaults to the GitHub-hosted bundle. Retry with a manual bundle URL or upload a bundle file. Optional fallback: Run nvm use 20 && npm run worker:bundle from the repo root, then choose /dist/sessionCorsWorker.bundle.js.',
         ),
       ).toBeInTheDocument();
     } finally {
@@ -168,6 +169,7 @@ describe('SessionWizard worker panel retry rendering', () => {
     let deployCallCount = 0;
 
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+    const respondToPublicWorkerVerification = createPublicWorkerVerificationResponder();
     global.fetch = jest.fn(async (url, options = {}) => {
       const normalizedUrl = String(url);
       if (normalizedUrl.endsWith('/deploy')) {
@@ -197,6 +199,8 @@ describe('SessionWizard worker panel retry rendering', () => {
       if (normalizedUrl.endsWith('/auth/nonce')) {
         return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
       }
+      const publicVerificationResponse = respondToPublicWorkerVerification(normalizedUrl, options);
+      if (publicVerificationResponse) return publicVerificationResponse;
       return { ok: true, json: async () => ({ ok: true }) };
     });
 
@@ -417,6 +421,7 @@ describe('SessionWizard worker panel retry rendering', () => {
     let deployCallCount = 0;
 
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
+    const respondToPublicWorkerVerification = createPublicWorkerVerificationResponder();
     global.fetch = jest.fn(async (url, options = {}) => {
       const normalizedUrl = String(url);
       if (normalizedUrl.endsWith('/deploy')) {
@@ -446,6 +451,8 @@ describe('SessionWizard worker panel retry rendering', () => {
       if (normalizedUrl.endsWith('/auth/nonce')) {
         return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
       }
+      const publicVerificationResponse = respondToPublicWorkerVerification(normalizedUrl, options);
+      if (publicVerificationResponse) return publicVerificationResponse;
       return { ok: true, json: async () => ({ ok: true }) };
     });
 

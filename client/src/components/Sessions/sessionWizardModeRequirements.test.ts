@@ -116,11 +116,17 @@ describe('sessionWizardModeRequirements', () => {
   });
 
   it('preserves decentralized Arweave, RPC, funding, registry, and optional Lit requirements', () => {
-    const plain = resolveSessionWizardModeRequirements(decentralizedProfile());
+    const decentralized = decentralizedProfile();
+    const plain = resolveSessionWizardModeRequirements(decentralized);
     const litProfile: SessionModeProfile = {
-      ...decentralizedProfile(),
+      ...decentralized,
       preset: 'custom',
       encryption: { mode: 'lit' },
+      results: {
+        ...decentralized.results,
+        visibility: 'participant_aggregate',
+      },
+      export: { scope: 'encrypted_envelopes_only' },
     };
     const lit = resolveSessionWizardModeRequirements(litProfile);
 

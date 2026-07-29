@@ -1,8 +1,12 @@
 import React from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { Button } from 'reactstrap';
 
 import styles from './SessionWizard.module.scss';
 import type { AnyRecord } from '../shellTypes';
+import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
   SESSION_MODE_DEFAULT_REGISTRY_CHAIN_ID,
   SESSION_MODE_PRESET_IDS,
@@ -17,6 +21,8 @@ export type SessionModeProfileFieldProps = {
   onChange: (profile: SessionModeProfile, compiled: { storageProfile: AnyRecord }) => void;
   onContinue?: () => void;
   onCustomize?: () => void;
+  onSelectPreset?: () => void;
+  customizing?: boolean;
   entryOnly?: boolean;
   showContinue?: boolean;
 };
@@ -25,12 +31,11 @@ const HOSTING_PRESETS = [
   {
     id: SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
     label: 'Cloudflare',
-    ariaLabel: 'Cloudflare (recommended)',
+    ariaLabel: 'Cloudflare',
     entryLabel: 'Fast & Cheap',
     entryProvider: 'Cloudflare',
     entryDescription: 'Launch a dedicated Session Worker without an on-chain publish step.',
     entryRequirements: 'Cloudflare login / AI API Key',
-    recommended: true,
   },
   {
     id: SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
@@ -39,10 +44,11 @@ const HOSTING_PRESETS = [
     entryLabel: 'Trustless & Public',
     entryProvider: 'Decentralized',
     entryDescription: 'Publish session authority on-chain and store public data with Arweave.',
-    entryRequirements: 'AI API Key / Arweave wallet / RPC URL / testnet gas',
-    recommended: false,
+    entryRequirements: 'AI API Key / Arweave wallet / RPC URL / EVM testnet gas',
   },
 ] as const;
+
+const ARCHITECTURE_README_URL = `${PUBLIC_REPO_URL}/blob/${PUBLIC_GITHUB_BRANCH}/README.md#architecture-at-a-glance`;
 
 const isProfile = (value: unknown): value is SessionModeProfile =>
   !!value &&
@@ -73,6 +79,8 @@ const SessionModeProfileField = ({
   onChange,
   onContinue,
   onCustomize,
+  onSelectPreset,
+  customizing = false,
   entryOnly = false,
   showContinue = true,
 }: SessionModeProfileFieldProps): React.ReactElement => {
@@ -88,13 +96,17 @@ const SessionModeProfileField = ({
       profilesDiffer(profile, nextProfile) &&
       typeof window !== 'undefined' &&
       typeof window.confirm === 'function' &&
-      !window.confirm('Switch preset and replace incompatible advanced settings?')
+      !window.confirm('Switch preset and replace incompatible custom settings?')
     ) {
       return;
     }
     const compiled = compileSessionModeProfile(nextProfile);
     onChange(nextProfile, { storageProfile: compiled.storageProfile });
-    if (entryOnly && typeof onContinue === 'function') onContinue();
+    if (entryOnly && typeof onContinue === 'function') {
+      onContinue();
+    } else {
+      onSelectPreset?.();
+    }
   };
 
   const handlePresetKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
@@ -140,7 +152,6 @@ const SessionModeProfileField = ({
                 <span className={styles.modePresetCardTitle}>{preset.entryLabel}</span>
                 <span className={styles.modePresetCardProvider}>{preset.entryProvider}</span>
               </span>
-              {preset.recommended ? <span className={styles.modePresetCardBadge}>Recommended</span> : null}
             </span>
             <span className={styles.modePresetCardDescription}>{preset.entryDescription}</span>
             <span className={styles.modePresetCardRequirements}>
@@ -149,10 +160,7 @@ const SessionModeProfileField = ({
             </span>
           </>
         ) : (
-          <>
-            <span>{preset.label}</span>
-            {preset.recommended ? <span className={styles.modePresetBadge}>Recommended</span> : null}
-          </>
+          <span>{preset.label}</span>
         )}
       </button>
     );
@@ -166,34 +174,41 @@ const SessionModeProfileField = ({
       {entryOnly ? (
         <>
           <div className={styles.modeProfileEntryIntro}>
-            <span className={styles.modeProfileEntryEyebrow}>Choose a setup</span>
-            <h2>How should this session run?</h2>
-            <p>Select the infrastructure path that matches the inputs you have available.</p>
+            <span className={styles.modeProfileEntryPrompt}>
+              <span className={styles.modeProfileEntryEyebrow}>Choose a setup</span>
+              <a
+                className={styles.modeProfileArchitectureLink}
+                href={ARCHITECTURE_README_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="View the deployment architecture diagram on GitHub"
+                title="View the deployment architecture diagram on GitHub"
+              >
+                <FontAwesomeIcon icon={faQuestionCircle} aria-hidden="true" />
+              </a>
+            </span>
           </div>
           <div className={styles.modePresetCards} role="radiogroup" aria-label="Session hosting profile">
             {HOSTING_PRESETS.map((preset, index) => renderPreset(preset, index, true))}
           </div>
         </>
       ) : (
-        <>
-          <span className={styles.modeProfileCompactLabel}>Hosting</span>
-          <div className={styles.modePresetToggle} role="radiogroup" aria-label="Session hosting profile">
-            {HOSTING_PRESETS.map((preset, index) => renderPreset(preset, index, false))}
-            <button
-              type="button"
-              role="radio"
-              aria-label="Corporate (coming later)"
-              aria-checked="false"
-              className={`${styles.modePresetButton} ${styles.modePresetButtonDisabled}`}
-              title="Corporate hosting is coming later"
-              disabled
-              tabIndex={-1}
-            >
-              <span>Corporate</span>
-              <span className={styles.modePresetSoon}>Later</span>
-            </button>
-          </div>
-        </>
+        <div className={styles.modePresetToggle} role="radiogroup" aria-label="Session hosting profile">
+          {HOSTING_PRESETS.map((preset, index) => renderPreset(preset, index, false))}
+          <button
+            type="button"
+            role="radio"
+            aria-label="Corporate (coming later)"
+            aria-checked="false"
+            className={`${styles.modePresetButton} ${styles.modePresetButtonDisabled}`}
+            title="Corporate hosting is coming later"
+            disabled
+            tabIndex={-1}
+          >
+            <span>Corporate</span>
+            <span className={styles.modePresetSoon}>Later</span>
+          </button>
+        </div>
       )}
 
       {entryOnly && profile ? (
@@ -208,11 +223,13 @@ const SessionModeProfileField = ({
       {!entryOnly ? (
         <button
           type="button"
-          className={styles.moreOptionsToggle}
+          className={`${styles.moreOptionsToggle} ${customizing ? styles.moreOptionsToggleActive : ''}`}
           onClick={onCustomize}
-          aria-label="Customize hosting (advanced options)"
+          aria-label={customizing ? 'Finish customizing session settings' : 'Customize session settings'}
+          aria-pressed={customizing}
+          data-testid={E2E_TESTIDS.WIZARD_MODE_ADVANCED}
         >
-          Customize
+          {customizing ? 'Done' : 'Customize'}
         </button>
       ) : null}
 

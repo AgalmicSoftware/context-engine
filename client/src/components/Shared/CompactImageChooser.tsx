@@ -20,6 +20,8 @@ type CompactImageChooserProps = {
   showUrlInput?: boolean;
   urlValue?: string;
   urlInputName?: string;
+  urlInputType?: React.HTMLInputTypeAttribute;
+  urlMaxLength?: number;
   onUrlChange?: React.ChangeEventHandler<HTMLInputElement>;
   onToggleUrlMode?: React.MouseEventHandler<HTMLButtonElement>;
   onPaste?: React.MouseEventHandler<HTMLButtonElement>;
@@ -43,6 +45,7 @@ type CompactImageChooserProps = {
   uploadAriaLabel?: string;
   clearAriaLabel?: string;
   expandAriaLabel?: string;
+  disabled?: boolean;
 };
 
 const toText = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
@@ -69,6 +72,8 @@ const CompactImageChooser = ({
   showUrlInput = false,
   urlValue = '',
   urlInputName = '',
+  urlInputType = 'text',
+  urlMaxLength,
   onUrlChange,
   onToggleUrlMode,
   onPaste,
@@ -92,6 +97,7 @@ const CompactImageChooser = ({
   uploadAriaLabel = 'Upload image',
   clearAriaLabel = 'Remove image',
   expandAriaLabel = 'Expand image preview',
+  disabled = false,
 }: CompactImageChooserProps) => {
   const [generatedPreviewSrc, setGeneratedPreviewSrc] = useState('');
   const [expandedOpen, setExpandedOpen] = useState(false);
@@ -138,6 +144,7 @@ const CompactImageChooser = ({
               className={joinClassNames(styles.modeButton, isUrlMode ? styles.modeButtonActive : '')}
               onClick={onToggleUrlMode}
               aria-pressed={isUrlMode}
+              disabled={disabled}
               {...(urlButtonTestId ? { 'data-testid': urlButtonTestId } : {})}
             >
               URL
@@ -147,6 +154,7 @@ const CompactImageChooser = ({
             type="button"
             className={styles.modeButton}
             onClick={onPaste}
+            disabled={disabled}
             {...(pasteButtonTestId ? { 'data-testid': pasteButtonTestId } : {})}
           >
             Paste
@@ -157,6 +165,7 @@ const CompactImageChooser = ({
             onClick={onUploadClick}
             aria-label={uploadAriaLabel}
             aria-pressed={isUploadMode}
+            disabled={disabled}
             {...(uploadButtonTestId ? { 'data-testid': uploadButtonTestId } : {})}
           >
             Upload
@@ -168,6 +177,7 @@ const CompactImageChooser = ({
             onChange={onFileChange}
             ref={fileInputRef}
             className={styles.fileInput}
+            disabled={disabled}
             {...(fileInputTestId ? { 'data-testid': fileInputTestId } : {})}
           />
         </div>
@@ -180,13 +190,15 @@ const CompactImageChooser = ({
 
         {showUrlInput ? (
           <input
-            type="text"
+            type={urlInputType}
             name={urlInputName}
             value={urlValue}
             onChange={onUrlChange}
+            maxLength={urlMaxLength}
             placeholder={urlPlaceholder}
             aria-label={urlInputAriaLabel}
             className={styles.urlInput}
+            disabled={disabled}
             {...(urlInputTestId ? { 'data-testid': urlInputTestId } : {})}
           />
         ) : null}
@@ -235,6 +247,7 @@ const CompactImageChooser = ({
                 className={styles.clearButton}
                 aria-label={clearAriaLabel}
                 title="Remove image"
+                disabled={disabled}
               >
                 <FontAwesomeIcon icon={faTimes} />
               </button>

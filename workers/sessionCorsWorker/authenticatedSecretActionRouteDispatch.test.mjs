@@ -21,6 +21,35 @@ test('dispatchAuthenticatedSecretActionRoute ignores unrelated actions', async (
   assert.deepEqual(result, { handled: false });
 });
 
+test('dispatchAuthenticatedSecretActionRoute blocks authenticated AI after the session ends', async () => {
+  let preflightCalled = false;
+  const result = await dispatchAuthenticatedSecretActionRoute({
+    path: '/ai',
+    action: '',
+    config: { sessionEndsAt: '2030-01-02T03:04:00Z' },
+    headers: { 'Access-Control-Allow-Origin': '*' },
+    deps: {
+      now: () => Date.parse('2030-01-02T03:04:00Z'),
+      json: (body, status, headers) => ({ body, status, headers }),
+      evaluateAuthenticatedRoutePreflight: async () => {
+        preflightCalled = true;
+        return { ok: true };
+      },
+    },
+  });
+
+  assert.equal(preflightCalled, false);
+  assert.deepEqual(result.response, {
+    body: {
+      error: 'This session has ended.',
+      code: 'session_ended',
+      sessionEndsAt: '2030-01-02T03:04:00.000Z',
+    },
+    status: 410,
+    headers: { 'Access-Control-Allow-Origin': '*' },
+  });
+});
+
 test('dispatchAuthenticatedSecretActionRoute preserves ai preflight failure passthrough', async () => {
   const response = new Response(JSON.stringify({ error: 'Token missing ai scope.' }), {
     status: 403,

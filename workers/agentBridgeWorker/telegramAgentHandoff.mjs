@@ -1,8 +1,4 @@
-import {
-  AGENT_BRIDGE_EVENT_TYPES,
-  TELEGRAM_BRIDGE_ACTIONS,
-  TELEGRAM_CHAT_LANES,
-} from './constants.mjs';
+import { AGENT_BRIDGE_EVENT_TYPES, TELEGRAM_BRIDGE_ACTIONS, TELEGRAM_CHAT_LANES } from './constants.mjs';
 import {
   buildParticipantGraph,
   buildTelegramCommandResponse,
@@ -11,7 +7,6 @@ import {
   consensusQuestionsForResults,
   loadQuestionsForSession,
   loadSubmittedResultRecords,
-  mintTelegramGroupApprovalLink,
   parseAgentOnboardingStartParam,
   persistActionRecord,
   persistAnswerDraft,
@@ -24,6 +19,7 @@ import {
   readPrivateSessionBinding,
   resolveAgentTokenSession,
   summarizeQuestionResults,
+  telegramGroupApprovalGuidance,
   telegramVisibleSessions,
   writeAgentSkillUpdateFlag,
   writeAdminDefaultSessionOverride,
@@ -51,10 +47,7 @@ import {
   resolveMiniAppSessionInvocation,
   resolveSessionInvocation,
 } from './sessionPolicy.mjs';
-import {
-  deleteTelegramGroupApproval,
-  evaluateTelegramGroupSessionAccessForEnv,
-} from './telegramGroupApprovals.mjs';
+import { deleteTelegramGroupApproval, evaluateTelegramGroupSessionAccessForEnv } from './telegramGroupApprovals.mjs';
 import { telegramBotApiRequest } from './telegramSender.mjs';
 import { buildOpaqueActionId, createRandomTelegramCallbackAction } from './opaqueActions.mjs';
 import { assertNoSecretShape } from './redaction.mjs';
@@ -64,20 +57,14 @@ import {
   persistTelegramLightweightGroupProposal,
   saveTelegramLightweightGroupMembership,
 } from './telegramGroups.mjs';
-import {
-  loadTelegramAgentSettings,
-  saveTelegramAgentSettingsPatch,
-} from './telegramAgentSettings.mjs';
+import { loadTelegramAgentSettings, saveTelegramAgentSettingsPatch } from './telegramAgentSettings.mjs';
 import {
   DRAFT_EDIT_METRIC_KV_PREFIX,
   answerFromAgentInitial,
   answerFromStoredDraft,
   persistDraftEditMetric,
 } from './telegramDraftEditMetrics.mjs';
-import {
-  AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX,
-  listTelegramAgentActivity,
-} from './telegramAgentActivity.mjs';
+import { AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX, listTelegramAgentActivity } from './telegramAgentActivity.mjs';
 import { listRegistrySessionsForBridge } from './registrySessions.mjs';
 import {
   loadTelegramQuestionQueueConfig,
@@ -105,6 +92,8 @@ import {
   persistSessionWorkerMemberExchange,
   readSessionWorkerMemberExchange,
   resolvePinnedSessionWorkerAuthority,
+  validateSessionWorkerBrowserCredentialBinding,
+  validateSessionWorkerMemberCredentialBinding,
   verifySessionWorkerMembership,
 } from './sessionWorkerAuthority.mjs';
 import {
@@ -138,10 +127,12 @@ const DEFAULT_AGENT_BRIDGE_PUBLIC_URL = 'https://ce-agent-bridge-worker.agalmic.
 const LEGACY_AGENT_API_PREFIX = '/telegram/agent/api';
 const CANONICAL_AGENT_API_PREFIX = '/api/agent';
 const DEFAULT_AGENT_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/api/agent/skill?v=42';
-const DEFAULT_AGENT_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
+const DEFAULT_AGENT_RAW_SKILL_URL =
+  'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/agentBridgeWorker/skills/ce-telegram-agent-handoff/SKILL.md';
 const CE_TELEGRAM_AGENT_HANDOFF_SKILL_VERSION = '2026-07-18 (v42)';
 const DEFAULT_SESSION_WRAPPED_SKILL_URL = 'https://ce-agent-bridge-worker.agalmic.workers.dev/session-wrapped';
-const DEFAULT_SESSION_WRAPPED_RAW_SKILL_URL = 'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/agentBridgeWorker/skills/ce-session-wrapped/SKILL.md';
+const DEFAULT_SESSION_WRAPPED_RAW_SKILL_URL =
+  'https://raw.githubusercontent.com/AgalmicSoftware/context-engine/main/workers/agentBridgeWorker/skills/ce-session-wrapped/SKILL.md';
 const CE_SESSION_WRAPPED_SKILL_VERSION = '2026-07-20 (session-wrapped-v1.1)';
 const MINI_APP_QUESTION_VOTE_KV_PREFIX = 'telegram:mini-app-question-vote:v1:';
 const AGENT_QUESTION_VOTE_DECISION_KV_PREFIX = 'telegram:agent-question-vote-decision:v1:';
@@ -167,7 +158,8 @@ const TELEGRAM_AGENT_ONBOARDING_QUESTIONS = Object.freeze([
   },
   {
     id: 'demographic_link_opt_in',
-    prompt: 'Can I use non-identifying Edge profile fields for research buckets: bio keywords, age bucket, country/region, role, and attendance week?',
+    prompt:
+      'Can I use non-identifying Edge profile fields for research buckets: bio keywords, age bucket, country/region, role, and attendance week?',
   },
   {
     id: 'draft_responses',
@@ -210,7 +202,9 @@ function normalizeBoolean(value, fallback = false) {
 }
 
 function sanitizeSessionSlug(value = '') {
-  return lower(value).replace(/[^a-z0-9_-]/g, '').slice(0, 128);
+  return lower(value)
+    .replace(/[^a-z0-9_-]/g, '')
+    .slice(0, 128);
 }
 
 function safeJsonParse(value, fallback = null) {
@@ -263,22 +257,21 @@ function json(data, init = {}) {
 }
 
 function agentBridgePublicUrl(env = {}) {
-  return safeString(env.AGENT_BRIDGE_PUBLIC_URL || env.PUBLIC_URL || DEFAULT_AGENT_BRIDGE_PUBLIC_URL).replace(/\/+$/, '');
+  return safeString(env.AGENT_BRIDGE_PUBLIC_URL || env.PUBLIC_URL || DEFAULT_AGENT_BRIDGE_PUBLIC_URL).replace(
+    /\/+$/,
+    '',
+  );
 }
 
 function agentSkillUrl(env = {}) {
-  return safeString(
-    env.AGENT_BRIDGE_AGENT_SKILL_URL ||
-      env.CE_TELEGRAM_AGENT_SKILL_URL ||
-      DEFAULT_AGENT_SKILL_URL
-  );
+  return safeString(env.AGENT_BRIDGE_AGENT_SKILL_URL || env.CE_TELEGRAM_AGENT_SKILL_URL || DEFAULT_AGENT_SKILL_URL);
 }
 
 function sessionWrappedSkillUrl(env = {}) {
   return safeString(
     env.AGENT_BRIDGE_SESSION_WRAPPED_SKILL_URL ||
       env.AGENT_BRIDGE_AGENT_WRAPPED_SKILL_URL ||
-      DEFAULT_SESSION_WRAPPED_SKILL_URL
+      DEFAULT_SESSION_WRAPPED_SKILL_URL,
   );
 }
 
@@ -342,12 +335,13 @@ function isSessionWrappedOnboardingRequest(body = {}) {
     body.contextEngine?.flow,
     body.contextEngine?.source,
   ].map((value) => lower(value));
-  return labels.some((label) => (
-    label === 'ce-session-wrapped' ||
-    label === 'session-wrapped' ||
-    label === 'session_wrapped' ||
-    label.includes('session-wrapped')
-  ));
+  return labels.some(
+    (label) =>
+      label === 'ce-session-wrapped' ||
+      label === 'session-wrapped' ||
+      label === 'session_wrapped' ||
+      label.includes('session-wrapped'),
+  );
 }
 
 function trustedOnboardingInviteValueList(value = '') {
@@ -395,7 +389,11 @@ async function persistInviteRedemption({ env = {}, tokenHash = '', credential = 
     await kv.put(`${AGENT_INVITE_REDEMPTION_KV_PREFIX}${tokenHash}`, JSON.stringify(record));
     return { ok: true, record };
   } catch {
-    return { ok: false, status: 503, reason: 'invite_redemption_persist_failed' };
+    return {
+      ok: false,
+      status: 503,
+      reason: 'invite_redemption_persist_failed',
+    };
   }
 }
 
@@ -427,12 +425,19 @@ async function resolveTrustedOnboardingInvite(env = {}, inviteToken = '') {
   const supplied = safeString(inviteToken);
   if (!supplied) return { ok: false, status: 400, reason: 'invite_token_required' };
   const records = trustedOnboardingInviteRecords(env);
-  if (!records.length) return { ok: false, status: 503, reason: 'invite_onboarding_not_configured' };
+  if (!records.length)
+    return {
+      ok: false,
+      status: 503,
+      reason: 'invite_onboarding_not_configured',
+    };
   const suppliedHash = await sha256Hex(supplied);
   for (const record of records) {
     const recordHash = /^[0-9a-f]{64}$/.test(safeString(record.tokenHash))
       ? safeString(record.tokenHash).toLowerCase()
-      : (record.token ? await sha256Hex(record.token) : '');
+      : record.token
+        ? await sha256Hex(record.token)
+        : '';
     if (recordHash && timingSafeEqualString(recordHash, suppliedHash)) {
       return {
         ok: true,
@@ -462,8 +467,8 @@ function miniAppOnboardCorsHeaders(request, env = {}) {
   if (!allowed.includes(origin) && !allowed.includes('*')) return null;
   return {
     'access-control-allow-origin': allowed.includes('*') ? origin : origin,
-    'access-control-allow-methods': 'GET, POST, OPTIONS',
-    'access-control-allow-headers': 'content-type, x-telegram-init-data, telegram-web-app-init-data, x-ce-telegram-init-data',
+    'access-control-allow-methods': 'POST, OPTIONS',
+    'access-control-allow-headers': 'content-type, x-telegram-init-data',
     'access-control-max-age': '600',
     vary: 'Origin',
   };
@@ -481,10 +486,7 @@ function jsonMiniAppOnboard(request, env, data, init = {}) {
 }
 
 function clientLoginAllowedOrigins(env = {}) {
-  return [
-    ...safeString(env.AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS).split(','),
-    ...miniAppOnboardAllowedOrigins(env),
-  ]
+  return [...safeString(env.AGENT_BRIDGE_CLIENT_LOGIN_ALLOWED_ORIGINS).split(','), ...miniAppOnboardAllowedOrigins(env)]
     .map((entry) => safeString(entry).replace(/\/+$/, ''))
     .filter(Boolean);
 }
@@ -573,9 +575,7 @@ function configuredSessionMetaPolicy(env = {}) {
 function sessionMetaFromPolicy(policy = {}, sessionSlug = '', env = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const session = Array.isArray(policy.linkedSessions)
-    ? policy.linkedSessions.find((entry) => (
-      entry.sessionSlug === slug || lower(entry.sessionName) === slug
-    ))
+    ? policy.linkedSessions.find((entry) => entry.sessionSlug === slug || lower(entry.sessionName) === slug)
     : null;
   const telegramBridgeEnabled = session?.telegramBridgeEnabled === true;
   return {
@@ -670,21 +670,20 @@ function extractTelegramAgentToken(value = '') {
 
 async function readMiniAppOnboardInput(request) {
   const url = new URL(request.url);
-  const body = request.method === 'POST'
-    ? await request.json().catch(() => ({}))
-    : {};
+  const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
   return {
-    ...body,
     initData: safeString(
       body.initData ||
-      body.telegramInitData ||
-      url.searchParams.get('initData') ||
-      url.searchParams.get('telegramInitData') ||
-      request.headers.get('X-Telegram-Init-Data') ||
-      request.headers.get('Telegram-Web-App-Init-Data') ||
-      request.headers.get('X-Ce-Telegram-Init-Data')
+        body.telegramInitData ||
+        request.headers.get('X-Telegram-Init-Data'),
     ),
-    startParam: safeString(body.startParam || body.startapp || body.startApp || url.searchParams.get('startParam') || url.searchParams.get('startapp')),
+    startParam: safeString(
+      body.startParam ||
+        body.startapp ||
+        body.startApp ||
+        url.searchParams.get('startParam') ||
+        url.searchParams.get('startapp'),
+    ),
     sessionSlug: safeString(body.sessionSlug || url.searchParams.get('sessionSlug')),
   };
 }
@@ -696,9 +695,10 @@ function firstValue(...values) {
 function stableJson(value) {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
   if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => (
-      `${JSON.stringify(key)}:${stableJson(value[key])}`
-    )).join(',')}}`;
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`)
+      .join(',')}}`;
   }
   return JSON.stringify(value ?? null);
 }
@@ -716,7 +716,10 @@ function stableFingerprint(value = {}) {
 function kvKeySafePart(value = '') {
   const text = safeString(value);
   if (!text) return '';
-  const safe = text.replace(/[^a-zA-Z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 56);
+  const safe = text
+    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 56);
   return `${safe || 'ref'}_${stableFingerprint(text)}`;
 }
 
@@ -736,9 +739,7 @@ function suppliedAgentToken(request) {
   const authorization = safeString(request.headers.get('authorization'));
   const bearer = authorization.match(/^Bearer\s+(.+)$/i);
   const supplied = safeString(
-    bearer?.[1] ||
-    request.headers.get('x-ce-agent-token') ||
-    request.headers.get('x-context-engine-agent-token')
+    bearer?.[1] || request.headers.get('x-ce-agent-token') || request.headers.get('x-context-engine-agent-token'),
   );
   return extractTelegramAgentToken(supplied) || supplied;
 }
@@ -748,7 +749,8 @@ function agentTokenRefreshError(reason = 'agent_token_invalid') {
     ok: false,
     status: 401,
     reason,
-    message: 'This Context Engine agent credential is expired, revoked, or no longer available. Obtain a new credential through the original onboarding channel, then store it privately as bearer auth.',
+    message:
+      'This Context Engine agent credential is expired, revoked, or no longer available. Obtain a new credential through the original onboarding channel, then store it privately as bearer auth.',
     action: 'obtain_new_agent_credential',
   };
 }
@@ -760,10 +762,56 @@ async function authenticateAgentHandoff(request, env = {}) {
     return { ok: false, status: 401, reason: 'agent_api_token_invalid' };
   }
   if (expected && timingSafeEqualString(supplied, expected)) {
-    return { ok: true, authMode: 'root_token', principalKind: 'root', elevated: true };
+    return {
+      ok: true,
+      authMode: 'root_token',
+      principalKind: 'root',
+      elevated: true,
+    };
   }
-  const delegated = await loadTelegramAgentDelegationToken({ env, token: supplied });
+  const delegated = await loadTelegramAgentDelegationToken({
+    env,
+    token: supplied,
+  });
   if (delegated.ok) {
+    if (delegated.record.credentialKind === AGENT_CREDENTIAL_KINDS.MEMBER) {
+      const authority = resolvePinnedSessionWorkerAuthority({
+        policyJson: env.AGENT_BRIDGE_SESSION_POLICY_JSON,
+        sessionWorkerOrigin: env.CE_SESSION_WORKER_BASE_URL,
+      });
+      if (!authority.ok) {
+        return {
+          ok: false,
+          status: 503,
+          reason: 'agent_member_credential_authority_unavailable',
+        };
+      }
+      const binding = validateSessionWorkerMemberCredentialBinding({
+        authority,
+        credentialRecord: delegated.record,
+      });
+      if (!binding.ok) return agentTokenRefreshError(binding.reason);
+    } else if (delegated.record.credentialKind === AGENT_CREDENTIAL_KINDS.BROWSER) {
+      let resolved;
+      try {
+        const policy = await loadSessionPolicy(env);
+        resolved = resolveAgentHttpSessionInvocation(policy, delegated.record.sessionSlug);
+      } catch {
+        return {
+          ok: false,
+          status: 503,
+          reason: 'agent_browser_credential_authority_unavailable',
+        };
+      }
+      if (!resolved?.ok) {
+        return agentTokenRefreshError('agent_browser_credential_authority_stale');
+      }
+      const binding = validateSessionWorkerBrowserCredentialBinding({
+        session: resolved.session,
+        credentialRecord: delegated.record,
+      });
+      if (!binding.ok) return agentTokenRefreshError(binding.reason);
+    }
     return {
       ok: true,
       authMode: 'agent_credential',
@@ -805,7 +853,14 @@ async function handleServiceCredentialBootstrapRequest({ request, env = {}, crea
   const policy = await loadSessionPolicy(env);
   const resolved = resolveAgentHttpSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
-    return json({ ok: false, reason: resolved.reason || 'session_not_found', sessionSlug }, { status: 404 });
+    return json(
+      {
+        ok: false,
+        reason: resolved.reason || 'session_not_found',
+        sessionSlug,
+      },
+      { status: 404 },
+    );
   }
   const principal = {
     principalId: createOpaqueAgentPrincipalId(AGENT_CREDENTIAL_KINDS.SERVICE),
@@ -831,9 +886,15 @@ async function handleServiceCredentialBootstrapRequest({ request, env = {}, crea
     createdAt,
   });
   if (!issued.ok) {
-    return json({ ok: false, reason: issued.reason || 'service_credential_create_failed' }, {
-      status: issued.reason === 'agent_token_storage_unavailable' ? 503 : 500,
-    });
+    return json(
+      {
+        ok: false,
+        reason: issued.reason || 'service_credential_create_failed',
+      },
+      {
+        status: issued.reason === 'agent_token_storage_unavailable' ? 503 : 500,
+      },
+    );
   }
   const response = {
     ok: true,
@@ -850,9 +911,8 @@ async function handleServiceCredentialBootstrapRequest({ request, env = {}, crea
 }
 
 function normalizeAgentTelegramContext(input = {}) {
-  const telegram = input.telegram && typeof input.telegram === 'object' && !Array.isArray(input.telegram)
-    ? input.telegram
-    : {};
+  const telegram =
+    input.telegram && typeof input.telegram === 'object' && !Array.isArray(input.telegram) ? input.telegram : {};
   const telegramUserId = safeString(input.telegramUserId || input.userId || telegram.telegramUserId || telegram.userId);
   const username = safeString(input.username || telegram.username);
   const groupChatId = safeString(input.groupChatId || input.chatId || telegram.groupChatId || telegram.chatId);
@@ -890,42 +950,74 @@ function inputFromRequest(request, body = {}) {
     username: safeString(body.username || url.searchParams.get('username')),
     tags: body.tags || url.searchParams.get('tags') || url.searchParams.get('tag'),
     interests: body.interests || url.searchParams.get('interests'),
-    sessionsAttended: body.sessionsAttended || body.attendedSessions || url.searchParams.get('sessionsAttended') || url.searchParams.get('attendedSessions'),
+    sessionsAttended:
+      body.sessionsAttended ||
+      body.attendedSessions ||
+      url.searchParams.get('sessionsAttended') ||
+      url.searchParams.get('attendedSessions'),
     relevanceMode: safeString(body.relevanceMode || url.searchParams.get('relevanceMode')),
-    questionTypes: body.questionTypes || body.questionType || url.searchParams.get('questionTypes') || url.searchParams.get('questionType'),
+    questionTypes:
+      body.questionTypes ||
+      body.questionType ||
+      url.searchParams.get('questionTypes') ||
+      url.searchParams.get('questionType'),
     limit: Object.hasOwn(body, 'limit') ? body.limit : url.searchParams.get('limit'),
     count: Object.hasOwn(body, 'count') ? body.count : url.searchParams.get('count'),
     topN: Object.hasOwn(body, 'topN') ? body.topN : url.searchParams.get('topN'),
     cursor: safeString(body.cursor || url.searchParams.get('cursor')),
-    windowId: safeString(body.windowId || body.window_id || url.searchParams.get('windowId') || url.searchParams.get('window')),
+    windowId: safeString(
+      body.windowId || body.window_id || url.searchParams.get('windowId') || url.searchParams.get('window'),
+    ),
     compact: Object.hasOwn(body, 'compact') ? body.compact : url.searchParams.get('compact'),
     format: safeString(body.format || url.searchParams.get('format')),
-    include_base64: Object.hasOwn(body, 'include_base64') ? body.include_base64 : url.searchParams.get('include_base64'),
+    include_base64: Object.hasOwn(body, 'include_base64')
+      ? body.include_base64
+      : url.searchParams.get('include_base64'),
     includeBase64: Object.hasOwn(body, 'includeBase64') ? body.includeBase64 : url.searchParams.get('includeBase64'),
     queueKey: safeString(body.queueKey || url.searchParams.get('queueKey')),
     advance: Object.hasOwn(body, 'advance') ? body.advance : url.searchParams.get('advance'),
-    resetQueue: Object.hasOwn(body, 'resetQueue') ? body.resetQueue : (body.reset || url.searchParams.get('resetQueue') || url.searchParams.get('reset')),
-    includeSponsored: Object.hasOwn(body, 'includeSponsored') ? body.includeSponsored : url.searchParams.get('includeSponsored'),
-    sponsoredFirst: Object.hasOwn(body, 'sponsoredFirst') ? body.sponsoredFirst : url.searchParams.get('sponsoredFirst'),
+    resetQueue: Object.hasOwn(body, 'resetQueue')
+      ? body.resetQueue
+      : body.reset || url.searchParams.get('resetQueue') || url.searchParams.get('reset'),
+    includeSponsored: Object.hasOwn(body, 'includeSponsored')
+      ? body.includeSponsored
+      : url.searchParams.get('includeSponsored'),
+    sponsoredFirst: Object.hasOwn(body, 'sponsoredFirst')
+      ? body.sponsoredFirst
+      : url.searchParams.get('sponsoredFirst'),
     questionIds: Object.hasOwn(body, 'questionIds') ? body.questionIds : url.searchParams.get('questionIds'),
-    orderedQuestionIds: Object.hasOwn(body, 'orderedQuestionIds') ? body.orderedQuestionIds : url.searchParams.get('orderedQuestionIds'),
-    skippedQuestionIds: Object.hasOwn(body, 'skippedQuestionIds') ? body.skippedQuestionIds : url.searchParams.get('skippedQuestionIds'),
+    orderedQuestionIds: Object.hasOwn(body, 'orderedQuestionIds')
+      ? body.orderedQuestionIds
+      : url.searchParams.get('orderedQuestionIds'),
+    skippedQuestionIds: Object.hasOwn(body, 'skippedQuestionIds')
+      ? body.skippedQuestionIds
+      : url.searchParams.get('skippedQuestionIds'),
     questionSeries: Object.hasOwn(body, 'questionSeries') ? body.questionSeries : undefined,
-    draftAnswersByQuestionId: Object.hasOwn(body, 'draftAnswersByQuestionId') ? body.draftAnswersByQuestionId : undefined,
-    prefilledDraftsByQuestionId: Object.hasOwn(body, 'prefilledDraftsByQuestionId') ? body.prefilledDraftsByQuestionId : undefined,
-    sponsoredQuestionIds: Object.hasOwn(body, 'sponsoredQuestionIds') ? body.sponsoredQuestionIds : url.searchParams.get('sponsoredQuestionIds'),
-    sponsoredQuestions: Object.hasOwn(body, 'sponsoredQuestions') ? body.sponsoredQuestions : url.searchParams.get('sponsoredQuestions'),
+    draftAnswersByQuestionId: Object.hasOwn(body, 'draftAnswersByQuestionId')
+      ? body.draftAnswersByQuestionId
+      : undefined,
+    prefilledDraftsByQuestionId: Object.hasOwn(body, 'prefilledDraftsByQuestionId')
+      ? body.prefilledDraftsByQuestionId
+      : undefined,
+    sponsoredQuestionIds: Object.hasOwn(body, 'sponsoredQuestionIds')
+      ? body.sponsoredQuestionIds
+      : url.searchParams.get('sponsoredQuestionIds'),
+    sponsoredQuestions: Object.hasOwn(body, 'sponsoredQuestions')
+      ? body.sponsoredQuestions
+      : url.searchParams.get('sponsoredQuestions'),
     operation: safeString(body.operation || url.searchParams.get('operation')),
     clearQueue: Object.hasOwn(body, 'clear') ? body.clear : url.searchParams.get('clear'),
     view: safeString(body.view || body.mode || url.searchParams.get('view') || url.searchParams.get('mode')),
-    viewType: safeString(body.viewType || body.type || url.searchParams.get('viewType') || url.searchParams.get('type')),
+    viewType: safeString(
+      body.viewType || body.type || url.searchParams.get('viewType') || url.searchParams.get('type'),
+    ),
     dataVersionKey: safeString(
       body.dataVersionKey ||
-      body.dataKey ||
-      body.cacheKey ||
-      url.searchParams.get('dataVersionKey') ||
-      url.searchParams.get('dataKey') ||
-      url.searchParams.get('cacheKey')
+        body.dataKey ||
+        body.cacheKey ||
+        url.searchParams.get('dataVersionKey') ||
+        url.searchParams.get('dataKey') ||
+        url.searchParams.get('cacheKey'),
     ),
     value: Object.hasOwn(body, 'value') ? body.value : undefined,
     result: Object.hasOwn(body, 'result') ? body.result : undefined,
@@ -933,10 +1025,14 @@ function inputFromRequest(request, body = {}) {
     demo: Object.hasOwn(body, 'demo') ? body.demo : url.searchParams.get('demo'),
     includeLegacySessions: Object.hasOwn(body, 'includeLegacySessions')
       ? body.includeLegacySessions
-      : (body.includeLegacy || url.searchParams.get('includeLegacySessions') || url.searchParams.get('includeLegacy')),
+      : body.includeLegacy || url.searchParams.get('includeLegacySessions') || url.searchParams.get('includeLegacy'),
     questionId: safeString(body.questionId || url.searchParams.get('questionId')),
-    geoId: safeString(body.geoId || body.geoNodeId || url.searchParams.get('geoId') || url.searchParams.get('geoNodeId')),
-    geoRefs: Object.hasOwn(body, 'geoRefs') ? body.geoRefs : (body.geoIds || url.searchParams.get('geoRefs') || url.searchParams.get('geoIds')),
+    geoId: safeString(
+      body.geoId || body.geoNodeId || url.searchParams.get('geoId') || url.searchParams.get('geoNodeId'),
+    ),
+    geoRefs: Object.hasOwn(body, 'geoRefs')
+      ? body.geoRefs
+      : body.geoIds || url.searchParams.get('geoRefs') || url.searchParams.get('geoIds'),
   };
 }
 
@@ -1010,10 +1106,7 @@ function delegationScopeForRequest(pathname = '', method = 'GET') {
   if (pathname === '/api/agent/question-queue/apply') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS;
   }
-  if (
-    pathname === '/api/agent/group-approval-link' ||
-    pathname === '/api/agent/group-approval-revoke'
-  ) {
+  if (pathname === '/api/agent/group-approval-link' || pathname === '/api/agent/group-approval-revoke') {
     return TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.MANAGE_GROUP_APPROVALS;
   }
   if (pathname === '/api/agent/question-votes/recommend') {
@@ -1041,27 +1134,27 @@ function onboardingAnswersFromSettings(settings = {}) {
   const uses = new Set(Array.isArray(settings.allowedUses) ? settings.allowedUses : []);
   const profileFields = new Set(Array.isArray(settings.allowedProfileFields) ? settings.allowedProfileFields : []);
   return {
-    preference_tailoring: uses.has('rank_questions') ||
+    preference_tailoring:
+      uses.has('rank_questions') ||
       profileFields.has('interests') ||
       profileFields.has('sessions_attended') ||
       profileFields.has('roles'),
-    demographics_research: uses.has('research_demographics') ||
-      profileFields.has('non_identifying_demographics'),
-    demographic_link_opt_in: settings.demographicLinkOptIn === true ||
-      uses.has('link_demographics_research'),
-    attendance_context_opt_in: settings.attendanceLinkOptIn === true ||
+    demographics_research: uses.has('research_demographics') || profileFields.has('non_identifying_demographics'),
+    demographic_link_opt_in: settings.demographicLinkOptIn === true || uses.has('link_demographics_research'),
+    attendance_context_opt_in:
+      settings.attendanceLinkOptIn === true ||
       uses.has('link_attendance_context') ||
       profileFields.has('edge_attendance'),
     draft_responses: uses.has('draft_answers'),
-    draft_divergence_research: settings.draftDivergenceOptIn === true ||
-      uses.has('research_draft_divergence'),
+    draft_divergence_research: settings.draftDivergenceOptIn === true || uses.has('research_draft_divergence'),
     auto_apply_question_votes: settings.agentAutoApplyQuestionVotes === true,
     edge_daily_digest: settings.dailyDigestOptIn === true,
   };
 }
 
 function normalizeOnboardingTopicPreferences(input = {}, settings = {}) {
-  const source = input.topicPreferences ||
+  const source =
+    input.topicPreferences ||
     input.topics ||
     input.interests ||
     input.answers?.topic_preferences ||
@@ -1120,8 +1213,9 @@ function onboardingProfileText(input = {}) {
 }
 
 function explicitProfileRoleText(input = {}) {
-  const sources = onboardingProfileSources(input)
-    .filter((source) => source && typeof source === 'object' && !Array.isArray(source));
+  const sources = onboardingProfileSources(input).filter(
+    (source) => source && typeof source === 'object' && !Array.isArray(source),
+  );
   const values = [];
   for (const source of sources) {
     values.push(
@@ -1130,7 +1224,7 @@ function explicitProfileRoleText(input = {}) {
       source.contributionRole,
       source.contribution_role,
       source.edgeRole,
-      source.edge_role
+      source.edge_role,
     );
   }
   return collectProfileTextParts(values).join(', ').slice(0, 80);
@@ -1146,7 +1240,11 @@ function inferAttendanceSelectionsFromProfile(input = {}) {
   if (/\b(?:entire|whole|full)\s+month\b|\ball\s+(?:month|four|4)\b|\bmonth[-\s]*long\b/.test(text)) {
     selected.push('entire_month');
   }
-  if (/\bprevious\s+edge\b|\bpast\s+edge\b|\battended\s+edge\s+(?:before|previously)\b|\battended\s+previous\s+edge\b/.test(text)) {
+  if (
+    /\bprevious\s+edge\b|\bpast\s+edge\b|\battended\s+edge\s+(?:before|previously)\b|\battended\s+previous\s+edge\b/.test(
+      text,
+    )
+  ) {
     selected.push('attended_previous_edge_events');
   }
   return [...new Set(selected)];
@@ -1160,7 +1258,8 @@ function inferContributionRoleSelectionsFromProfile(input = {}) {
   if (/\b(?:founder|operator|startup|operations|product)\b/.test(text)) selected.push('founder_operator');
   if (/\b(?:investor|vc|venture|fund)\b/.test(text)) selected.push('investor');
   if (/\b(?:artist|designer|creative)\b/.test(text)) selected.push('artist_designer');
-  if (/\b(?:community|host|organizer|organiser|facilitator|program\s+lead|event\s+lead)\b/.test(text)) selected.push('community_host');
+  if (/\b(?:community|host|organizer|organiser|facilitator|program\s+lead|event\s+lead)\b/.test(text))
+    selected.push('community_host');
   if (!selected.length) {
     const explicitRole = explicitProfileRoleText(input);
     if (explicitRole) selected.push('other');
@@ -1203,20 +1302,16 @@ function mergeOnboardingSelections(...sources) {
 function normalizeOnboardingGroupMembershipInput(input = {}, answers = {}) {
   const groups = plainObject(input.groups);
   const rawSelections = plainObject(
-    input.groupSelections ||
-    input.bucketSelections ||
-    input.demographicBuckets ||
-    groups.selections
+    input.groupSelections || input.bucketSelections || input.demographicBuckets || groups.selections,
   );
   const rawDetails = plainObject(
-    input.groupDetails ||
-    input.bucketDetails ||
-    input.demographicDetails ||
-    groups.details
+    input.groupDetails || input.bucketDetails || input.demographicDetails || groups.details,
   );
   const allowedCategories = new Set();
   if (answers.demographic_link_opt_in === true || answers.demographics_research === true) {
-    ['age_bucket', 'country_relationship', 'region', 'ai_tribe', 'contribution_role'].forEach((id) => allowedCategories.add(id));
+    ['age_bucket', 'country_relationship', 'region', 'ai_tribe', 'contribution_role'].forEach((id) =>
+      allowedCategories.add(id),
+    );
   }
   if (answers.attendance_context_opt_in === true) {
     allowedCategories.add('events_attended');
@@ -1228,7 +1323,13 @@ function normalizeOnboardingGroupMembershipInput(input = {}, answers = {}) {
     if (!allowedCategories.has(category)) continue;
     const values = Array.isArray(value) ? value : safeString(value).split(/[\n,;|]+/);
     const normalized = values
-      .map((entry) => safeString(entry).toLowerCase().replace(/[^a-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80))
+      .map((entry) =>
+        safeString(entry)
+          .toLowerCase()
+          .replace(/[^a-z0-9_-]+/g, '_')
+          .replace(/^_+|_+$/g, '')
+          .slice(0, 80),
+      )
       .filter(Boolean)
       .slice(0, 12);
     if (normalized.length) selections[category] = [...new Set(normalized)];
@@ -1245,7 +1346,7 @@ function normalizeOnboardingGroupMembershipInput(input = {}, answers = {}) {
         Object.entries(value)
           .map(([key, entry]) => [safeString(key).slice(0, 64), safeString(entry).slice(0, 160)])
           .filter(([key, entry]) => key && entry)
-          .slice(0, 12)
+          .slice(0, 12),
       );
     } else {
       const detail = safeString(value).slice(0, 160);
@@ -1269,27 +1370,31 @@ function onboardingGroupFollowUpQuestions({ answers = {}, groups = {} } = {}) {
   if (answers.attendance_context_opt_in === true && !Array.isArray(selections.events_attended)) {
     questions.push({
       categoryId: 'events_attended',
-      prompt: 'Which Edge weeks are you attending: Week 1, Week 2, Week 3, Week 4, or Entire Month? Have you attended previous Edge events?',
+      prompt:
+        'Which Edge weeks are you attending: Week 1, Week 2, Week 3, Week 4, or Entire Month? Have you attended previous Edge events?',
     });
   }
-  if ((answers.demographic_link_opt_in === true || answers.demographics_research === true) && !Array.isArray(selections.contribution_role)) {
+  if (
+    (answers.demographic_link_opt_in === true || answers.demographics_research === true) &&
+    !Array.isArray(selections.contribution_role)
+  ) {
     questions.push({
       categoryId: 'contribution_role',
-      prompt: 'What role best describes you for research: builder, researcher, founder/operator, investor, artist/designer, community host, or other?',
+      prompt:
+        'What role best describes you for research: builder, researcher, founder/operator, investor, artist/designer, community host, or other?',
     });
   }
   return questions;
 }
 
 function normalizeOnboardingAnswers(input = {}, settings = {}) {
-  const source = input.answers && typeof input.answers === 'object' && !Array.isArray(input.answers)
-    ? input.answers
-    : input;
+  const source =
+    input.answers && typeof input.answers === 'object' && !Array.isArray(input.answers) ? input.answers : input;
   const previous = onboardingAnswersFromSettings(settings);
   const answers = TELEGRAM_AGENT_ONBOARDING_QUESTIONS.reduce((result, question) => {
     result[question.id] = normalizeBoolean(
       Object.hasOwn(source, question.id) ? source[question.id] : undefined,
-      previous[question.id] === true ? true : false
+      previous[question.id] === true ? true : false,
     );
     return result;
   }, {});
@@ -1297,16 +1402,16 @@ function normalizeOnboardingAnswers(input = {}, settings = {}) {
     Object.hasOwn(source, 'demographic_link_opt_in') ? source.demographic_link_opt_in : undefined,
     previous.demographic_link_opt_in === true ||
       previous.demographics_research === true ||
-      previous.attendance_context_opt_in === true
+      previous.attendance_context_opt_in === true,
   );
   answers.demographic_link_opt_in = combinedResearchLink;
   answers.demographics_research = normalizeBoolean(
     Object.hasOwn(source, 'demographics_research') ? source.demographics_research : undefined,
-    combinedResearchLink
+    combinedResearchLink,
   );
   answers.attendance_context_opt_in = normalizeBoolean(
     Object.hasOwn(source, 'attendance_context_opt_in') ? source.attendance_context_opt_in : undefined,
-    combinedResearchLink
+    combinedResearchLink,
   );
   return answers;
 }
@@ -1357,7 +1462,8 @@ function settingsPatchFromOnboardingAnswers(answers = {}, completedAt = '') {
 }
 
 function normalizeOnboardingDigestTimeOfDay(input = {}, settings = {}) {
-  const raw = input.digestTimeOfDay ||
+  const raw =
+    input.digestTimeOfDay ||
     input.digestWindow ||
     input.digestTime ||
     input.answers?.digest_time_of_day ||
@@ -1376,7 +1482,10 @@ function publicOnboardingState({ sessionSlug = '', settings = {}, groups = null 
     order: index + 1,
     answer: answers[question.id] === true,
   }));
-  const groupFollowUpQuestions = onboardingGroupFollowUpQuestions({ answers, groups: groups || {} });
+  const groupFollowUpQuestions = onboardingGroupFollowUpQuestions({
+    answers,
+    groups: groups || {},
+  });
   const payload = {
     ok: true,
     sessionSlug: sanitizeSessionSlug(sessionSlug),
@@ -1420,7 +1529,10 @@ function parseAddressList(value = '') {
   if (!raw) return [];
   const parsed = safeJsonParse(raw, null);
   if (Array.isArray(parsed)) return parsed.map(normalizeAddress).filter(Boolean);
-  return raw.split(/[\s,;]+/).map(normalizeAddress).filter(Boolean);
+  return raw
+    .split(/[\s,;]+/)
+    .map(normalizeAddress)
+    .filter(Boolean);
 }
 
 function isRootResponseExportAdmin(env = {}, accountAddress = '') {
@@ -1429,9 +1541,7 @@ function isRootResponseExportAdmin(env = {}, accountAddress = '') {
   return parseAddressList(env.AGENT_BRIDGE_RESPONSE_EXPORT_ALLOWED_ADDRESSES).includes(account);
 }
 
-async function listMetricKvEntriesByPrefix(env = {}, prefix = '', {
-  limit = 10000,
-} = {}) {
+async function listMetricKvEntriesByPrefix(env = {}, prefix = '', { limit = 10000 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!prefix || !kv || typeof kv.list !== 'function') return [];
   const maxEntries = Math.max(1, Math.min(ADMIN_METRICS_SUBMIT_ENTRY_LIMIT, Number(limit) || 10000));
@@ -1439,20 +1549,20 @@ async function listMetricKvEntriesByPrefix(env = {}, prefix = '', {
   const entries = [];
   let cursor = undefined;
   do {
-    const page = await kv.list({
-      prefix,
-      limit: pageLimit,
-      ...(cursor ? { cursor } : {}),
-    }).catch(() => null);
+    const page = await kv
+      .list({
+        prefix,
+        limit: pageLimit,
+        ...(cursor ? { cursor } : {}),
+      })
+      .catch(() => null);
     const keys = Array.isArray(page?.keys) ? page.keys : [];
     for (const entry of keys) {
       const key = safeString(entry?.name || entry);
       if (!key) continue;
       entries.push({
         key,
-        metadata: entry && typeof entry === 'object' && !Array.isArray(entry)
-          ? (entry.metadata || null)
-          : null,
+        metadata: entry && typeof entry === 'object' && !Array.isArray(entry) ? entry.metadata || null : null,
       });
       if (entries.length >= maxEntries) return entries;
     }
@@ -1468,9 +1578,7 @@ async function readMetricRecord(env = {}, key = '') {
   return record && typeof record === 'object' && !Array.isArray(record) ? record : null;
 }
 
-async function listHandoffKvRecordsByPrefix(env = {}, prefix = '', {
-  limit = 10000,
-} = {}) {
+async function listHandoffKvRecordsByPrefix(env = {}, prefix = '', { limit = 10000 } = {}) {
   const entries = await listMetricKvEntriesByPrefix(env, prefix, { limit });
   const records = [];
   for (const entry of entries) {
@@ -1563,9 +1671,8 @@ function publicSessionMetric(metric = {}) {
   const out = {
     sessionSlug: sanitizeSessionSlug(metric.sessionSlug),
     agentsOnboarded: Number(metric.agentsOnboarded || 0),
-    distinctUsersOnboarded: metric._usersOnboarded instanceof Set
-      ? metric._usersOnboarded.size
-      : Number(metric.distinctUsersOnboarded || 0),
+    distinctUsersOnboarded:
+      metric._usersOnboarded instanceof Set ? metric._usersOnboarded.size : Number(metric.distinctUsersOnboarded || 0),
     questionsCreated: Number(metric.questionsCreated || 0),
     questionsAnswered: Number(metric.questionsAnswered || 0),
     answerDrafts: Number(metric.answerDrafts || 0),
@@ -1575,9 +1682,8 @@ function publicSessionMetric(metric = {}) {
     groupProposals: Number(metric.groupProposals || 0),
     sessionsWithBridgeActivity: 0,
     registrySessionCount: Number(metric.registrySessionCount || 0),
-    distinctRespondents: metric._respondents instanceof Set
-      ? metric._respondents.size
-      : Number(metric.distinctRespondents || 0),
+    distinctRespondents:
+      metric._respondents instanceof Set ? metric._respondents.size : Number(metric.distinctRespondents || 0),
   };
   out.sessionsWithBridgeActivity = [
     out.agentsOnboarded,
@@ -1588,21 +1694,25 @@ function publicSessionMetric(metric = {}) {
     out.agentDraftedAnswers,
     out.draftEditMetrics,
     out.groupProposals,
-  ].some((count) => count > 0) ? 1 : 0;
+  ].some((count) => count > 0)
+    ? 1
+    : 0;
   return out;
 }
 
 function telegramSessionCutoffConfigured(env = {}, policy = {}) {
-  return Boolean(safeString(
-    env.AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER ||
-    env.AGENT_BRIDGE_TELEGRAM_SESSIONS_CREATED_AFTER ||
-    env.AGENT_BRIDGE_TELEGRAM_GROUP_CREATED_AFTER ||
-    env.AGENT_BRIDGE_SESSION_CREATED_AFTER ||
-    policy.telegramSessionCreatedAfter ||
-    policy.telegramSessionsCreatedAfter ||
-    policy.telegramGroupCreatedAfter ||
-    policy.sessionCreatedAfter
-  ));
+  return Boolean(
+    safeString(
+      env.AGENT_BRIDGE_TELEGRAM_SESSION_CREATED_AFTER ||
+        env.AGENT_BRIDGE_TELEGRAM_SESSIONS_CREATED_AFTER ||
+        env.AGENT_BRIDGE_TELEGRAM_GROUP_CREATED_AFTER ||
+        env.AGENT_BRIDGE_SESSION_CREATED_AFTER ||
+        policy.telegramSessionCreatedAfter ||
+        policy.telegramSessionsCreatedAfter ||
+        policy.telegramGroupCreatedAfter ||
+        policy.sessionCreatedAfter,
+    ),
+  );
 }
 
 function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = 'GET') {
@@ -1610,7 +1720,12 @@ function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = '
   const delegation = auth.delegation || {};
   const scope = delegationScopeForRequest(pathname, method);
   if (!scope || !delegationTokenHasScope(delegation, scope)) {
-    return { ok: false, status: 403, reason: 'agent_token_scope_denied', requiredScope: scope || 'unsupported_route' };
+    return {
+      ok: false,
+      status: 403,
+      reason: 'agent_token_scope_denied',
+      requiredScope: scope || 'unsupported_route',
+    };
   }
   const requestedSessionSlug = sanitizeSessionSlug(input.sessionSlug);
   const delegatedSessionSlug = sanitizeSessionSlug(delegation.sessionSlug);
@@ -1623,12 +1738,11 @@ function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = '
     };
   }
   const isAgentOnlyToken = delegationTokenHasScope(delegation, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL);
-  const allowedAgentOnlyPath = (
+  const allowedAgentOnlyPath =
     pathname === AGENT_ONLY_ENDPOINTS.statements ||
     pathname === AGENT_ONLY_ENDPOINTS.answersBulk ||
     pathname === AGENT_ONLY_ENDPOINTS.tokenVotesBulk ||
-    pathname === AGENT_ONLY_ENDPOINTS.wrappedImage
-  );
+    pathname === AGENT_ONLY_ENDPOINTS.wrappedImage;
   if (isAgentOnlyToken && !allowedAgentOnlyPath) {
     return {
       ok: false,
@@ -1647,14 +1761,16 @@ function applyDelegationToInput(auth = {}, input = {}, pathname = '', method = '
       ...input,
       principalId: safeString(principal.principalId || principalUserId),
       principalAdapter,
-      adapterMetadata: isTelegramPrincipal ? {
-        telegram: {
-          userId: principalUserId,
-          username: safeString(input.username || principal.label),
-          groupChatId: safeString(input.groupChatId),
-          chatId: safeString(input.chatId),
-        },
-      } : {},
+      adapterMetadata: isTelegramPrincipal
+        ? {
+            telegram: {
+              userId: principalUserId,
+              username: safeString(input.username || principal.label),
+              groupChatId: safeString(input.groupChatId),
+              chatId: safeString(input.chatId),
+            },
+          }
+        : {},
       telegramUserId: isTelegramPrincipal ? principalUserId : '',
       username: safeString(input.username || principal.label),
       sessionSlug: delegatedSessionSlug,
@@ -1676,27 +1792,33 @@ async function resolveHandoffContext({
   const delegatedPrincipal = delegation?.principal || null;
   const legacyTelegramUserId = safeString(input.telegramUserId);
   const principalId = safeString(input.principalId || delegatedPrincipal?.principalId || legacyTelegramUserId);
-  const principalAdapter = lower(input.principalAdapter || delegatedPrincipal?.adapter || (legacyTelegramUserId ? 'telegram' : 'http'));
+  const principalAdapter = lower(
+    input.principalAdapter || delegatedPrincipal?.adapter || (legacyTelegramUserId ? 'telegram' : 'http'),
+  );
   if (!principalId) {
     return { ok: false, status: 400, reason: 'telegram_user_required' };
   }
-  const storageSubjectId = principalAdapter === 'telegram'
-    ? safeString(legacyTelegramUserId || delegatedPrincipal?.adapterUserId || principalId)
-    : principalId;
+  const storageSubjectId =
+    principalAdapter === 'telegram'
+      ? safeString(legacyTelegramUserId || delegatedPrincipal?.adapterUserId || principalId)
+      : principalId;
   const storageContext = normalizeAgentTelegramContext({
     ...input,
     telegramUserId: storageSubjectId,
     groupChatId: principalAdapter === 'telegram' ? safeString(input.groupChatId) : '',
     chatId: principalAdapter === 'telegram' ? safeString(input.chatId) : '',
   });
-  const adapterMetadata = principalAdapter === 'telegram' ? {
-    telegram: {
-      userId: legacyTelegramUserId || safeString(input.adapterMetadata?.telegram?.userId),
-      username: safeString(input.username || input.adapterMetadata?.telegram?.username),
-      groupChatId: safeString(input.groupChatId || input.adapterMetadata?.telegram?.groupChatId),
-      chatId: safeString(input.chatId || input.adapterMetadata?.telegram?.chatId),
-    },
-  } : {};
+  const adapterMetadata =
+    principalAdapter === 'telegram'
+      ? {
+          telegram: {
+            userId: legacyTelegramUserId || safeString(input.adapterMetadata?.telegram?.userId),
+            username: safeString(input.username || input.adapterMetadata?.telegram?.username),
+            groupChatId: safeString(input.groupChatId || input.adapterMetadata?.telegram?.groupChatId),
+            chatId: safeString(input.chatId || input.adapterMetadata?.telegram?.chatId),
+          },
+        }
+      : {};
   const principal = delegatedPrincipal || {
     principalId,
     kind: AGENT_CREDENTIAL_KINDS.USER,
@@ -1709,23 +1831,31 @@ async function resolveHandoffContext({
   const groupBindingSlug = delegation ? '' : bindingSessionSlug(groupBinding, policy);
   const privateBindingSlug = bindingSessionSlug(privateBinding, policy);
   const sessionSlug = sanitizeSessionSlug(
-    requestedSessionSlug ||
-    groupBindingSlug ||
-    privateBindingSlug ||
-    policy.defaultSessionSlug
+    requestedSessionSlug || groupBindingSlug || privateBindingSlug || policy.defaultSessionSlug,
   );
   const resolved = resolveAgentHttpSessionInvocation(policy, sessionSlug);
   if (!resolved.ok) {
-    return { ok: false, status: 404, reason: resolved.reason || 'session_not_found', sessionSlug };
+    return {
+      ok: false,
+      status: 404,
+      reason: resolved.reason || 'session_not_found',
+      sessionSlug,
+    };
   }
-  const effectiveGroupBinding = groupBinding?.followDefault === true
-    ? { ...groupBinding, sessionSlug: resolved.session.sessionSlug }
-    : groupBinding;
-  const effectivePrivateBinding = privateBinding?.followDefault === true
-    ? { ...privateBinding, sessionSlug: resolved.session.sessionSlug }
-    : privateBinding;
+  const effectiveGroupBinding =
+    groupBinding?.followDefault === true
+      ? { ...groupBinding, sessionSlug: resolved.session.sessionSlug }
+      : groupBinding;
+  const effectivePrivateBinding =
+    privateBinding?.followDefault === true
+      ? { ...privateBinding, sessionSlug: resolved.session.sessionSlug }
+      : privateBinding;
   if (storageContext.chat?.isPrivate !== true) {
-    const groupAccess = await evaluateTelegramGroupSessionAccessForEnv({ env, session: resolved.session, normalized: storageContext });
+    const groupAccess = await evaluateTelegramGroupSessionAccessForEnv({
+      env,
+      session: resolved.session,
+      normalized: storageContext,
+    });
     if (!groupAccess.ok) {
       return {
         ok: false,
@@ -1743,14 +1873,23 @@ async function resolveHandoffContext({
       normalized: storageContext,
       session: resolved.session,
       groupBinding: effectiveGroupBinding,
-      privateBinding: effectivePrivateBinding || (delegation ? {
-        sessionSlug: resolved.session.sessionSlug,
-        source: 'agent_credential',
-      } : null),
+      privateBinding:
+        effectivePrivateBinding ||
+        (delegation
+          ? {
+              sessionSlug: resolved.session.sessionSlug,
+              source: 'agent_credential',
+            }
+          : null),
       requestedSessionSlug: resolved.session.sessionSlug,
     });
     if (!permission.ok) {
-      return { ok: false, status: 403, reason: permission.reason, sessionSlug: resolved.session.sessionSlug };
+      return {
+        ok: false,
+        status: 403,
+        reason: permission.reason,
+        sessionSlug: resolved.session.sessionSlug,
+      };
     }
   }
   return {
@@ -1779,32 +1918,30 @@ function questionIsUnavailable(question = {}) {
   return question.payloadUnavailable === true || lower(question.visibility) === 'payload_unavailable';
 }
 
-function publicAgentQuestion(question = {}, {
-  session = {},
-} = {}) {
+function publicAgentQuestion(question = {}, { session = {} } = {}) {
   const questionId = safeString(question.questionId || question.id);
   const locked = questionIsLocked(question);
   const unavailable = questionIsUnavailable(question);
-  const prompt = locked || unavailable
-    ? ''
-    : safeString(question.questionText || question.prompt || question.title);
+  const prompt = locked || unavailable ? '' : safeString(question.questionText || question.prompt || question.title);
   const questionType = safeString(question.questionType || question.type || 'freeform') || 'freeform';
   const options = Array.isArray(question.options) ? question.options.map(safeString).filter(Boolean) : [];
   const references = locked || unavailable ? [] : normalizeQuestionReferences(question.references);
-  const geoRefs = locked || unavailable
-    ? []
-    : normalizeQuestionGeoRefs(question.geoRefs || question.geoIds || question.geoId);
+  const geoRefs =
+    locked || unavailable ? [] : normalizeQuestionGeoRefs(question.geoRefs || question.geoIds || question.geoId);
   const explicitTags = locked || unavailable ? [] : normalizeQuestionTags(question.tags);
-  const tags = locked || unavailable
-    ? []
-    : (explicitTags.length ? explicitTags : inferQuestionTags({
-      question,
-      prompt,
-      questionType,
-      options,
-      session,
-      sessionContext: sessionContextFromPolicySession(session),
-    }));
+  const tags =
+    locked || unavailable
+      ? []
+      : explicitTags.length
+        ? explicitTags
+        : inferQuestionTags({
+            question,
+            prompt,
+            questionType,
+            options,
+            session,
+            sessionContext: sessionContextFromPolicySession(session),
+          });
   return {
     questionId,
     sessionSlug: sanitizeSessionSlug(question.sessionSlug),
@@ -1853,17 +1990,13 @@ function firstAnswerValue(...values) {
 }
 
 function submitRecordAnswerForAgent(record = {}) {
-  const answer = record.answer && typeof record.answer === 'object' && !Array.isArray(record.answer)
-    ? record.answer
-    : {};
+  const answer =
+    record.answer && typeof record.answer === 'object' && !Array.isArray(record.answer) ? record.answer : {};
   const parsed = safeJsonParse(answer.value || record.answerValue, null);
   const structured = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
-  const questionType = safeString(firstAnswerValue(
-    structured.questionType,
-    record.questionType,
-    answer.questionType,
-    record.controlType,
-  ));
+  const questionType = safeString(
+    firstAnswerValue(structured.questionType, record.questionType, answer.questionType, record.controlType),
+  );
   const label = safeAnswerString(firstAnswerValue(answer.label, structured.label, record.answerLabel));
   const base = {
     requestId: safeString(record.requestId),
@@ -1885,11 +2018,15 @@ function submitRecordAnswerForAgent(record = {}) {
   if (questionType === 'freeform') {
     return {
       ...base,
-      text: safeAnswerString(firstAnswerValue(structured.text, structured.value, answer.text, answer.value, record.answerText)),
+      text: safeAnswerString(
+        firstAnswerValue(structured.text, structured.value, answer.text, answer.value, record.answerText),
+      ),
       ...(safeAnswerString(structured.comments) ? { comments: safeAnswerString(structured.comments) } : {}),
     };
   }
-  const value = Object.hasOwn(structured, 'value') ? structured.value : firstAnswerValue(answer.value, record.answerValue);
+  const value = Object.hasOwn(structured, 'value')
+    ? structured.value
+    : firstAnswerValue(answer.value, record.answerValue);
   return {
     ...base,
     value,
@@ -1897,11 +2034,7 @@ function submitRecordAnswerForAgent(record = {}) {
   };
 }
 
-async function loadAgentQuestionAnswerState({
-  env = {},
-  context = {},
-  questions = [],
-} = {}) {
+async function loadAgentQuestionAnswerState({ env = {}, context = {}, questions = [] } = {}) {
   const telegramUserId = safeString(context.storageContext?.user?.telegramUserId);
   const questionByRef = new Map();
   const sessionSlugs = new Set();
@@ -1920,10 +2053,16 @@ async function loadAgentQuestionAnswerState({
     };
   }
   const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
-  const indexedRecordGroups = await Promise.all([...sessionSlugs].map((sessionSlug) => {
-    const prefix = submitRequestUserKvPrefix({ sessionSlug, telegramUserId });
-    return prefix ? listHandoffKvRecordsByPrefix(env, prefix, { limit: ADMIN_METRICS_SUBMIT_ENTRY_LIMIT }) : [];
-  }));
+  const indexedRecordGroups = await Promise.all(
+    [...sessionSlugs].map((sessionSlug) => {
+      const prefix = submitRequestUserKvPrefix({ sessionSlug, telegramUserId });
+      return prefix
+        ? listHandoffKvRecordsByPrefix(env, prefix, {
+            limit: ADMIN_METRICS_SUBMIT_ENTRY_LIMIT,
+          })
+        : [];
+    }),
+  );
   const records = dedupeSubmitRecordsByRequestId(indexedRecordGroups.flat());
   const answeredByRef = new Map();
   records.forEach((record) => {
@@ -1975,12 +2114,14 @@ function sortAgentQuestionsByAnswerState(questions = []) {
 }
 
 function normalizePreferenceTagHints(input = {}) {
-  const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
-    ? input.preferences
-    : {};
-  const profile = preferences.profile && typeof preferences.profile === 'object' && !Array.isArray(preferences.profile)
-    ? preferences.profile
-    : {};
+  const preferences =
+    input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
+      ? input.preferences
+      : {};
+  const profile =
+    preferences.profile && typeof preferences.profile === 'object' && !Array.isArray(preferences.profile)
+      ? preferences.profile
+      : {};
   const source = [
     input.tags,
     input.interests,
@@ -1998,9 +2139,10 @@ function normalizePreferenceTagHints(input = {}) {
 }
 
 function normalizePreferenceSessionHints(input = {}) {
-  const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
-    ? input.preferences
-    : {};
+  const preferences =
+    input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
+      ? input.preferences
+      : {};
   const source = [
     input.sessionsAttended,
     input.attendedSessions,
@@ -2012,9 +2154,10 @@ function normalizePreferenceSessionHints(input = {}) {
   const slugs = new Set();
   const names = new Set();
   source.forEach((entry) => {
-    const raw = entry && typeof entry === 'object' && !Array.isArray(entry)
-      ? firstValue(entry.sessionSlug, entry.slug, entry.id, entry.sessionName, entry.name, entry.title)
-      : entry;
+    const raw =
+      entry && typeof entry === 'object' && !Array.isArray(entry)
+        ? firstValue(entry.sessionSlug, entry.slug, entry.id, entry.sessionName, entry.name, entry.title)
+        : entry;
     const text = safeString(raw);
     if (!text) return;
     const slug = sanitizeSessionSlug(text);
@@ -2024,11 +2167,10 @@ function normalizePreferenceSessionHints(input = {}) {
   return { slugs: [...slugs], tags: [...names] };
 }
 
-function questionRelevance(question = {}, {
-  tagHints = [],
-  sessionHints = { slugs: [], tags: [] },
-  session = {},
-} = {}) {
+function questionRelevance(
+  question = {},
+  { tagHints = [], sessionHints = { slugs: [], tags: [] }, session = {} } = {},
+) {
   const qTags = normalizeQuestionTags(question.tags);
   const tagSet = new Set(qTags);
   const promptText = [
@@ -2038,7 +2180,9 @@ function questionRelevance(question = {}, {
     session.sessionName,
     session.sessionSlug,
     sessionContextFromPolicySession(session),
-  ].map((value) => safeString(value).toLowerCase()).join(' ');
+  ]
+    .map((value) => safeString(value).toLowerCase())
+    .join(' ');
   const matchedTags = [];
   let score = 0;
   tagHints.forEach((tag) => {
@@ -2119,17 +2263,30 @@ async function loadPublicQuestionsForHandoff({ env = {}, context = {}, waitUntil
   const questions = [];
   let skippedMalformed = 0;
   (Array.isArray(loaded.questions) ? loaded.questions : []).forEach((question) => {
-    const normalized = safePublicAgentQuestion(question, { session: context.session });
+    const normalized = safePublicAgentQuestion(question, {
+      session: context.session,
+    });
     skippedMalformed += normalized.skippedMalformed;
     if (normalized.question) questions.push(normalized.question);
   });
-  return { loaded: withPublicSkippedMalformed(loaded, skippedMalformed), questions };
+  return {
+    loaded: withPublicSkippedMalformed(loaded, skippedMalformed),
+    questions,
+  };
 }
 
 async function handleQuestionsRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
-  const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const { loaded, questions } = await loadPublicQuestionsForHandoff({
+    env,
+    context,
+    waitUntil,
+  });
   const ranked = rankQuestionsByPreferences(questions, input, context);
-  const answerState = await loadAgentQuestionAnswerState({ env, context, questions: ranked.questions });
+  const answerState = await loadAgentQuestionAnswerState({
+    env,
+    context,
+    questions: ranked.questions,
+  });
   const rankedWithAnswerState = applyAgentQuestionAnswerState(ranked.questions, answerState, context);
   const requestedQuestionId = safeString(input.questionId);
   const responseQuestions = requestedQuestionId
@@ -2161,7 +2318,11 @@ async function handleQuestionsRequest({ env = {}, context = {}, input = {}, wait
 }
 
 async function handleTagsRequest({ env = {}, context = {}, waitUntil = null } = {}) {
-  const { questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const { questions } = await loadPublicQuestionsForHandoff({
+    env,
+    context,
+    waitUntil,
+  });
   const counts = new Map();
   questions.forEach((question) => {
     normalizeQuestionTags(question.tags).forEach((tag) => {
@@ -2194,7 +2355,11 @@ function emptyTagsResponse(sessionSlug = '') {
 }
 
 async function handleNextQuestionRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
-  const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const { loaded, questions } = await loadPublicQuestionsForHandoff({
+    env,
+    context,
+    waitUntil,
+  });
   const ranked = rankQuestionsByPreferences(questions, input, context);
   const queueConfig = await loadTelegramQuestionQueueConfig({
     env,
@@ -2209,22 +2374,25 @@ async function handleNextQuestionRequest({ env = {}, context = {}, input = {}, w
     input,
     createdAt: input.createdAt || null,
   });
-  return json({
-    ok: selected.ok,
-    sessionSlug: context.session.sessionSlug,
-    permissionMode: context.permission.mode,
-    questionSource: loaded.source || '',
-    questionSourceReason: loaded.reason || '',
-    relevance: ranked.relevance,
-    queueConfig: {
-      source: queueConfig.source || '',
-      sponsoredQuestionCount: queueConfig.sponsoredQuestionIds.length,
+  return json(
+    {
+      ok: selected.ok,
+      sessionSlug: context.session.sessionSlug,
+      permissionMode: context.permission.mode,
+      questionSource: loaded.source || '',
+      questionSourceReason: loaded.reason || '',
+      relevance: ranked.relevance,
+      queueConfig: {
+        source: queueConfig.source || '',
+        sponsoredQuestionCount: queueConfig.sponsoredQuestionIds.length,
+      },
+      question: selected.question || null,
+      sponsored: selected.sponsored === true,
+      reason: selected.reason,
+      queue: selected.queue,
     },
-    question: selected.question || null,
-    sponsored: selected.sponsored === true,
-    reason: selected.reason,
-    queue: selected.queue,
-  }, { status: selected.ok ? 200 : 404 });
+    { status: selected.ok ? 200 : 404 },
+  );
 }
 
 function normalizeQuestionQueueRefs(value = []) {
@@ -2244,16 +2412,16 @@ function normalizeQuestionQueueRefs(value = []) {
 function normalizeQuestionQueueReferenceInputs(input = {}) {
   return normalizeQuestionQueueRefs(
     input.references ||
-    input.reference ||
-    input.queries ||
-    input.query ||
-    input.sponsoredQuestionRefs ||
-    input.questionRefs ||
-    input.sponsoredQuestionIds ||
-    input.questionIds ||
-    input.sponsoredQuestions ||
-    input.questionsToSponsor ||
-    input.ids
+      input.reference ||
+      input.queries ||
+      input.query ||
+      input.sponsoredQuestionRefs ||
+      input.questionRefs ||
+      input.sponsoredQuestionIds ||
+      input.questionIds ||
+      input.sponsoredQuestions ||
+      input.questionsToSponsor ||
+      input.ids,
   );
 }
 
@@ -2271,18 +2439,43 @@ function findQuestionQueueCandidate(questions = [], ref = '') {
     return questions[numeric - 1] || null;
   }
   const normalized = lower(token);
-  return questions.find((question) => (
-    lower(question.questionId) === normalized ||
-    lower(question.id) === normalized ||
-    lower(question.questionId).startsWith(normalized)
-  )) || null;
+  return (
+    questions.find(
+      (question) =>
+        lower(question.questionId) === normalized ||
+        lower(question.id) === normalized ||
+        lower(question.questionId).startsWith(normalized),
+    ) || null
+  );
 }
 
 function tokenizeQuestionQueueReference(value = '') {
   const stop = new Set([
-    'a', 'an', 'and', 'are', 'as', 'be', 'by', 'for', 'from', 'is', 'it',
-    'make', 'mark', 'of', 'on', 'or', 'question', 'questions', 'sponsor',
-    'sponsored', 'that', 'the', 'this', 'to', 'with',
+    'a',
+    'an',
+    'and',
+    'are',
+    'as',
+    'be',
+    'by',
+    'for',
+    'from',
+    'is',
+    'it',
+    'make',
+    'mark',
+    'of',
+    'on',
+    'or',
+    'question',
+    'questions',
+    'sponsor',
+    'sponsored',
+    'that',
+    'the',
+    'this',
+    'to',
+    'with',
   ]);
   return lower(value)
     .split(/[^a-z0-9]+/)
@@ -2299,7 +2492,9 @@ function questionQueueCandidateSearchText(question = {}) {
     question.questionType,
     Array.isArray(question.tags) ? question.tags.join(' ') : '',
     Array.isArray(question.options) ? question.options.join(' ') : '',
-  ].map((value) => safeString(value).toLowerCase()).join(' ');
+  ]
+    .map((value) => safeString(value).toLowerCase())
+    .join(' ');
 }
 
 function scoreQuestionQueueCandidate(question = {}, ref = '') {
@@ -2317,7 +2512,10 @@ function scoreQuestionQueueCandidate(question = {}, ref = '') {
 
 function findQuestionQueueCandidateByText(questions = [], ref = '') {
   const scored = questions
-    .map((question) => ({ question, score: scoreQuestionQueueCandidate(question, ref) }))
+    .map((question) => ({
+      question,
+      score: scoreQuestionQueueCandidate(question, ref),
+    }))
     .filter((entry) => entry.score > 0)
     .sort((left, right) => right.score - left.score);
   return scored[0]?.question || null;
@@ -2325,11 +2523,7 @@ function findQuestionQueueCandidateByText(questions = [], ref = '') {
 
 function resolveQuestionQueueRefs(input = {}, questions = []) {
   const refs = normalizeQuestionQueueRefs(
-    input.sponsoredQuestionIds ||
-    input.questionIds ||
-    input.sponsoredQuestions ||
-    input.questions ||
-    input.ids
+    input.sponsoredQuestionIds || input.questionIds || input.sponsoredQuestions || input.questions || input.ids,
   );
   const ids = [];
   const skipped = [];
@@ -2387,32 +2581,52 @@ function topicFromInstruction(value = '') {
 
 function normalizeQuestionDraftInputs(input = {}) {
   const source = input.createQuestions || input.newQuestions || input.questionsToCreate || input.draftQuestions || [];
-  const entries = Array.isArray(source) ? source : (source ? [source] : []);
-  const questions = entries.map((entry) => {
-    if (typeof entry === 'string') return { prompt: entry };
-    if (entry && typeof entry === 'object' && !Array.isArray(entry)) return entry;
-    return null;
-  }).filter(Boolean);
+  const entries = Array.isArray(source) ? source : source ? [source] : [];
+  const questions = entries
+    .map((entry) => {
+      if (typeof entry === 'string') return { prompt: entry };
+      if (entry && typeof entry === 'object' && !Array.isArray(entry)) return entry;
+      return null;
+    })
+    .filter(Boolean);
   const directPrompt = safeString(input.createQuestionPrompt || input.newQuestionPrompt);
   if (directPrompt) questions.push({ prompt: directPrompt, questionType: input.questionType });
   const instruction = safeString(input.instruction || input.promptRequest || input.request);
   if (input.create === true && instruction) {
     const topic = topicFromInstruction(instruction) || (!questions.length ? instruction : '');
-    if (topic) questions.push({ prompt: `Should this session prioritize ${topic}?`, questionType: input.questionType || 'binary' });
+    if (topic)
+      questions.push({
+        prompt: `Should this session prioritize ${topic}?`,
+        questionType: input.questionType || 'binary',
+      });
   } else if (/\b(create|draft|new|write|add)\b/i.test(instruction) && /\bquestion\b/i.test(instruction)) {
     const topic = topicFromInstruction(instruction);
-    if (topic) questions.push({ prompt: `Should this session prioritize ${topic}?`, questionType: input.questionType || 'binary' });
+    if (topic)
+      questions.push({
+        prompt: `Should this session prioritize ${topic}?`,
+        questionType: input.questionType || 'binary',
+      });
   }
   return questions
     .map((entry) => ({
-      prompt: safeString(entry.prompt || entry.questionText || entry.text).replace(/\s+/g, ' ').slice(0, 1000),
+      prompt: safeString(entry.prompt || entry.questionText || entry.text)
+        .replace(/\s+/g, ' ')
+        .slice(0, 1000),
       questionType: safeString(entry.questionType || entry.type || input.questionType || 'binary') || 'binary',
       options: Array.isArray(entry.options) ? entry.options.map(safeString).filter(Boolean).slice(0, 12) : [],
       tags: normalizeQuestionTags(entry.tags || input.tags),
-      sessionContext: safeString(entry.sessionContext || input.sessionContext || input.context || sessionContextFromPolicySession(input.session || {})),
+      sessionContext: safeString(
+        entry.sessionContext ||
+          input.sessionContext ||
+          input.context ||
+          sessionContextFromPolicySession(input.session || {}),
+      ),
     }))
     .filter((entry) => entry.prompt)
-    .filter((entry, index, values) => values.findIndex((candidate) => lower(candidate.prompt) === lower(entry.prompt)) === index)
+    .filter(
+      (entry, index, values) =>
+        values.findIndex((candidate) => lower(candidate.prompt) === lower(entry.prompt)) === index,
+    )
     .slice(0, 20);
 }
 
@@ -2429,8 +2643,7 @@ function questionQueueCandidateSummary(question = {}, index = 0) {
 function isQuestionQueueClearRequested(input = {}) {
   const operation = lower(input.operation);
   const clear = lower(input.clearQueue);
-  return ['clear', 'reset', 'none', 'empty'].includes(operation) ||
-    ['true', '1', 'yes', 'on'].includes(clear);
+  return ['clear', 'reset', 'none', 'empty'].includes(operation) || ['true', '1', 'yes', 'on'].includes(clear);
 }
 
 async function loadAgentAdminStatus({ env = {}, context = {}, input = {} } = {}) {
@@ -2454,14 +2667,13 @@ async function loadAgentAdminStatus({ env = {}, context = {}, input = {} } = {})
   };
 }
 
-async function requireQuestionQueueAdmin({
-  env = {},
-  context = {},
-  input = {},
-  allowDelegatedAdmin = false,
-} = {}) {
+async function requireQuestionQueueAdmin({ env = {}, context = {}, input = {}, allowDelegatedAdmin = false } = {}) {
   if (context.authMode !== 'root_token' && !(allowDelegatedAdmin && context.authMode === 'agent_credential')) {
-    return { ok: false, status: 403, reason: 'question_queue_root_token_required' };
+    return {
+      ok: false,
+      status: 403,
+      reason: 'question_queue_root_token_required',
+    };
   }
   const manager = await canManageResponseExportAllowlist({
     env,
@@ -2480,12 +2692,7 @@ async function requireQuestionQueueAdmin({
   return { ok: true, manager };
 }
 
-async function buildSponsoredQuestionPlan({
-  env = {},
-  context = {},
-  input = {},
-  waitUntil = null,
-} = {}) {
+async function buildSponsoredQuestionPlan({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
   const admin = await requireQuestionQueueAdmin({
     env,
     context,
@@ -2493,10 +2700,17 @@ async function buildSponsoredQuestionPlan({
     allowDelegatedAdmin: true,
   });
   if (!admin.ok) return { ok: false, admin, status: admin.status || 403 };
-  const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const { loaded, questions } = await loadPublicQuestionsForHandoff({
+    env,
+    context,
+    waitUntil,
+  });
   const candidates = questionQueueCandidates(questions);
   const resolved = resolveNaturalQuestionQueueRefs(input, candidates);
-  const drafts = normalizeQuestionDraftInputs({ ...input, session: context.session });
+  const drafts = normalizeQuestionDraftInputs({
+    ...input,
+    session: context.session,
+  });
   const sponsoredQuestionIds = [...resolved.ids];
   const queueConfig = await loadTelegramQuestionQueueConfig({
     env,
@@ -2525,7 +2739,8 @@ async function buildSponsoredQuestionPlan({
     requiresConfirmation: true,
     confirmation: {
       endpoint: '/api/agent/question-queue/apply',
-      required: 'Show resolvedExistingQuestions and draftQuestions to the admin, then call apply only after explicit approval.',
+      required:
+        'Show resolvedExistingQuestions and draftQuestions to the admin, then call apply only after explicit approval.',
     },
   };
 }
@@ -2541,21 +2756,24 @@ async function handleAdminStatusRequest({ env = {}, context = {}, input = {} } =
   return json(status);
 }
 
-async function handleAdminDefaultSessionRequest({
-  env = {},
-  context = {},
-  input = {},
-  method = 'GET',
-} = {}) {
+async function handleAdminDefaultSessionRequest({ env = {}, context = {}, input = {}, method = 'GET' } = {}) {
   const methodName = safeString(method).toUpperCase();
   if (methodName === 'GET') {
-    const admin = await requireQuestionQueueAdmin({ env, context, input, allowDelegatedAdmin: true });
+    const admin = await requireQuestionQueueAdmin({
+      env,
+      context,
+      input,
+      allowDelegatedAdmin: true,
+    });
     if (!admin.ok) {
-      return json({
-        ok: false,
-        reason: admin.reason,
-        accountAddress: admin.accountAddress || '',
-      }, { status: admin.status || 403 });
+      return json(
+        {
+          ok: false,
+          reason: admin.reason,
+          accountAddress: admin.accountAddress || '',
+        },
+        { status: admin.status || 403 },
+      );
     }
     const policy = await loadSessionPolicy(env);
     const payload = {
@@ -2570,27 +2788,37 @@ async function handleAdminDefaultSessionRequest({
     return json(payload);
   }
 
-  const clearRequested = methodName === 'DELETE' ||
-    (methodName === 'POST' && normalizeBoolean(input.clear, false));
+  const clearRequested = methodName === 'DELETE' || (methodName === 'POST' && normalizeBoolean(input.clear, false));
   if (methodName === 'POST' && !clearRequested) {
-    const admin = await requireQuestionQueueAdmin({ env, context, input, allowDelegatedAdmin: false });
+    const admin = await requireQuestionQueueAdmin({
+      env,
+      context,
+      input,
+      allowDelegatedAdmin: false,
+    });
     if (!admin.ok) {
-      return json({
-        ok: false,
-        reason: admin.reason,
-        accountAddress: admin.accountAddress || '',
-      }, { status: admin.status || 403 });
+      return json(
+        {
+          ok: false,
+          reason: admin.reason,
+          accountAddress: admin.accountAddress || '',
+        },
+        { status: admin.status || 403 },
+      );
     }
     const slug = sanitizeSessionSlug(input.sessionSlug || input.defaultSessionSlug || input.slug);
     if (!slug) return json({ ok: false, reason: 'invalid_session_slug' }, { status: 400 });
     const policy = await loadSessionPolicy(env);
     const resolved = resolveSessionInvocation(policy, slug);
     if (!resolved.ok) {
-      return json({
-        ok: false,
-        reason: resolved.reason,
-        sessionSlug: slug,
-      }, { status: resolved.reason === 'session_not_linked' ? 404 : 400 });
+      return json(
+        {
+          ok: false,
+          reason: resolved.reason,
+          sessionSlug: slug,
+        },
+        { status: resolved.reason === 'session_not_linked' ? 404 : 400 },
+      );
     }
     const written = await writeAdminDefaultSessionOverride({
       env,
@@ -2599,10 +2827,13 @@ async function handleAdminDefaultSessionRequest({
       createdAt: input.createdAt || null,
     });
     if (!written.ok) {
-      return json({
-        ok: false,
-        reason: written.reason || 'admin_default_session_write_failed',
-      }, { status: 500 });
+      return json(
+        {
+          ok: false,
+          reason: written.reason || 'admin_default_session_write_failed',
+        },
+        { status: 500 },
+      );
     }
     const payload = {
       ok: true,
@@ -2614,20 +2845,31 @@ async function handleAdminDefaultSessionRequest({
   }
 
   if (methodName === 'DELETE' || clearRequested) {
-    const admin = await requireQuestionQueueAdmin({ env, context, input, allowDelegatedAdmin: false });
+    const admin = await requireQuestionQueueAdmin({
+      env,
+      context,
+      input,
+      allowDelegatedAdmin: false,
+    });
     if (!admin.ok) {
-      return json({
-        ok: false,
-        reason: admin.reason,
-        accountAddress: admin.accountAddress || '',
-      }, { status: admin.status || 403 });
+      return json(
+        {
+          ok: false,
+          reason: admin.reason,
+          accountAddress: admin.accountAddress || '',
+        },
+        { status: admin.status || 403 },
+      );
     }
     const cleared = await clearAdminDefaultSessionOverride(env);
     if (!cleared.ok) {
-      return json({
-        ok: false,
-        reason: cleared.reason || 'admin_default_session_clear_failed',
-      }, { status: 500 });
+      return json(
+        {
+          ok: false,
+          reason: cleared.reason || 'admin_default_session_clear_failed',
+        },
+        { status: 500 },
+      );
     }
     const policy = await loadSessionPolicy(env);
     const payload = {
@@ -2643,17 +2885,21 @@ async function handleAdminDefaultSessionRequest({
   return json({ ok: false, reason: 'method_not_allowed' }, { status: 405 });
 }
 
-async function handleAdminSkillUpdateRequest({
-  env = {},
-  context = {},
-  input = {},
-  method = 'GET',
-} = {}) {
+async function handleAdminSkillUpdateRequest({ env = {}, context = {}, input = {}, method = 'GET' } = {}) {
   const methodName = safeString(method).toUpperCase();
   if (methodName === 'GET') {
-    const admin = await requireQuestionQueueAdmin({ env, context, input, allowDelegatedAdmin: true });
+    const admin = await requireQuestionQueueAdmin({
+      env,
+      context,
+      input,
+      allowDelegatedAdmin: true,
+    });
     if (!admin.ok) {
-      const payload = { ok: false, reason: admin.reason, accountAddress: admin.accountAddress || '' };
+      const payload = {
+        ok: false,
+        reason: admin.reason,
+        accountAddress: admin.accountAddress || '',
+      };
       assertNoSecretShape(payload, 'Telegram admin skill-update denied response must not serialize secrets.');
       return json(payload, { status: admin.status || 403 });
     }
@@ -2670,9 +2916,18 @@ async function handleAdminSkillUpdateRequest({
   }
 
   if (methodName === 'POST') {
-    const admin = await requireQuestionQueueAdmin({ env, context, input, allowDelegatedAdmin: false });
+    const admin = await requireQuestionQueueAdmin({
+      env,
+      context,
+      input,
+      allowDelegatedAdmin: false,
+    });
     if (!admin.ok) {
-      const payload = { ok: false, reason: admin.reason, accountAddress: admin.accountAddress || '' };
+      const payload = {
+        ok: false,
+        reason: admin.reason,
+        accountAddress: admin.accountAddress || '',
+      };
       assertNoSecretShape(payload, 'Telegram admin skill-update denied response must not serialize secrets.');
       return json(payload, { status: admin.status || 403 });
     }
@@ -2684,7 +2939,10 @@ async function handleAdminSkillUpdateRequest({
       createdAt: input.createdAt || null,
     });
     if (!written.ok) {
-      const payload = { ok: false, reason: written.reason || 'agent_skill_update_write_failed' };
+      const payload = {
+        ok: false,
+        reason: written.reason || 'agent_skill_update_write_failed',
+      };
       assertNoSecretShape(payload, 'Telegram admin skill-update write failure must not serialize secrets.');
       return json(payload, { status: 500 });
     }
@@ -2699,15 +2957,27 @@ async function handleAdminSkillUpdateRequest({
   }
 
   if (methodName === 'DELETE') {
-    const admin = await requireQuestionQueueAdmin({ env, context, input, allowDelegatedAdmin: false });
+    const admin = await requireQuestionQueueAdmin({
+      env,
+      context,
+      input,
+      allowDelegatedAdmin: false,
+    });
     if (!admin.ok) {
-      const payload = { ok: false, reason: admin.reason, accountAddress: admin.accountAddress || '' };
+      const payload = {
+        ok: false,
+        reason: admin.reason,
+        accountAddress: admin.accountAddress || '',
+      };
       assertNoSecretShape(payload, 'Telegram admin skill-update denied response must not serialize secrets.');
       return json(payload, { status: admin.status || 403 });
     }
     const cleared = await clearAgentSkillUpdateFlag(env);
     if (!cleared.ok) {
-      const payload = { ok: false, reason: cleared.reason || 'agent_skill_update_clear_failed' };
+      const payload = {
+        ok: false,
+        reason: cleared.reason || 'agent_skill_update_clear_failed',
+      };
       assertNoSecretShape(payload, 'Telegram admin skill-update clear failure must not serialize secrets.');
       return json(payload, { status: 500 });
     }
@@ -2727,16 +2997,14 @@ async function handleAdminSkillUpdateRequest({
   return json(payload, { status: 405 });
 }
 
-async function handleOnboardingRequest({
-  env = {},
-  context = {},
-  input = {},
-  body = {},
-  method = 'GET',
-} = {}) {
+async function handleOnboardingRequest({ env = {}, context = {}, input = {}, body = {}, method = 'GET' } = {}) {
   const sessionSlug = context.session.sessionSlug;
   const telegramUserId = context.storageContext.user.telegramUserId;
-  const current = await loadTelegramAgentSettings({ env, sessionSlug, telegramUserId });
+  const current = await loadTelegramAgentSettings({
+    env,
+    sessionSlug,
+    telegramUserId,
+  });
   if (safeString(method).toUpperCase() !== 'POST') {
     const groups = await loadTelegramLightweightGroups({
       env,
@@ -2750,12 +3018,11 @@ async function handleOnboardingRequest({
   const answers = normalizeOnboardingAnswers(body, current);
   const patch = {
     ...settingsPatchFromOnboardingAnswers(answers, completedAt),
-    topicPreferences: answers.preference_tailoring === true
-      ? normalizeOnboardingTopicPreferences(body, current)
-      : [],
-    digestTimeOfDay: answers.edge_daily_digest === true
-      ? normalizeOnboardingDigestTimeOfDay(body, current)
-      : (current.digestTimeOfDay || 'morning'),
+    topicPreferences: answers.preference_tailoring === true ? normalizeOnboardingTopicPreferences(body, current) : [],
+    digestTimeOfDay:
+      answers.edge_daily_digest === true
+        ? normalizeOnboardingDigestTimeOfDay(body, current)
+        : current.digestTimeOfDay || 'morning',
   };
   const groupMembership = normalizeOnboardingGroupMembershipInput(body, answers);
   let savedGroups = null;
@@ -2778,10 +3045,13 @@ async function handleOnboardingRequest({
     createdAt: completedAt,
   });
   if (!saved.ok) {
-    return json({
-      ok: false,
-      reason: saved.reason || 'onboarding_settings_save_failed',
-    }, { status: 400 });
+    return json(
+      {
+        ok: false,
+        reason: saved.reason || 'onboarding_settings_save_failed',
+      },
+      { status: 400 },
+    );
   }
   const payload = {
     ...publicOnboardingState({
@@ -2810,7 +3080,9 @@ async function saveAdminMetricsCache(env = {}, cacheKey = '', payload = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!cacheKey || !kv || typeof kv.put !== 'function') return;
   assertNoSecretShape(payload, 'Telegram admin metrics cache payload must not serialize secrets.');
-  await kv.put(cacheKey, JSON.stringify(payload), { expirationTtl: ADMIN_METRICS_CACHE_TTL_SECONDS });
+  await kv.put(cacheKey, JSON.stringify(payload), {
+    expirationTtl: ADMIN_METRICS_CACHE_TTL_SECONDS,
+  });
 }
 
 function normalizeResultViewType(value = '') {
@@ -2846,7 +3118,10 @@ function normalizeGenericResultViewValue(value = {}, depth = 0) {
     Object.entries(value)
       .slice(0, RESULT_VIEW_GENERIC_MAX_OBJECT_KEYS)
       .forEach(([key, entry]) => {
-        const safeKey = safeString(key).replace(/[^0-9A-Za-z_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 64);
+        const safeKey = safeString(key)
+          .replace(/[^0-9A-Za-z_-]+/g, '_')
+          .replace(/^_+|_+$/g, '')
+          .slice(0, 64);
         if (!safeKey) return;
         const normalized = normalizeGenericResultViewValue(entry, depth + 1);
         if (normalized !== undefined) out[safeKey] = normalized;
@@ -2862,12 +3137,13 @@ function normalizeResultViewAnalysisValue(value = {}, viewType = 'polis_clusters
     return normalizeGenericResultViewValue(value);
   }
   const input = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  const clustersInput = input.clusters && typeof input.clusters === 'object' && !Array.isArray(input.clusters)
-    ? input.clusters
-    : input;
+  const clustersInput =
+    input.clusters && typeof input.clusters === 'object' && !Array.isArray(input.clusters) ? input.clusters : input;
   const clusters = {};
   for (const [clusterKey, clusterValue] of Object.entries(clustersInput || {})) {
-    const key = safeString(clusterKey).replace(/[^0-9A-Za-z_-]+/g, '').slice(0, 24);
+    const key = safeString(clusterKey)
+      .replace(/[^0-9A-Za-z_-]+/g, '')
+      .slice(0, 24);
     if (!key || !clusterValue || typeof clusterValue !== 'object' || Array.isArray(clusterValue)) continue;
     clusters[key] = {
       name: safeString(clusterValue.name).slice(0, 160),
@@ -2878,11 +3154,7 @@ function normalizeResultViewAnalysisValue(value = {}, viewType = 'polis_clusters
   return { clusters };
 }
 
-async function loadResultViewCache(env = {}, {
-  sessionSlug = '',
-  viewType = '',
-  dataVersionKey = '',
-} = {}) {
+async function loadResultViewCache(env = {}, { sessionSlug = '', viewType = '', dataVersionKey = '' } = {}) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.get !== 'function') return null;
   const key = resultViewCacheKey(sessionSlug, viewType, dataVersionKey);
@@ -2896,12 +3168,10 @@ async function loadResultViewCache(env = {}, {
   };
 }
 
-async function saveResultViewCache(env = {}, {
-  sessionSlug = '',
-  viewType = '',
-  dataVersionKey = '',
-  value = {},
-} = {}) {
+async function saveResultViewCache(
+  env = {},
+  { sessionSlug = '', viewType = '', dataVersionKey = '', value = {} } = {},
+) {
   const kv = env?.AGENT_ACTION_KV;
   if (!kv || typeof kv.put !== 'function') return null;
   const slug = sanitizeSessionSlug(sessionSlug);
@@ -2938,7 +3208,11 @@ async function handleResultViewCacheRequest({ env = {}, context = {}, input = {}
     return jsonResultViewCache(request, env, { ok: false, reason: 'data_version_key_required' }, { status: 400 });
   }
   if (method === 'GET') {
-    const cached = await loadResultViewCache(env, { sessionSlug, viewType, dataVersionKey });
+    const cached = await loadResultViewCache(env, {
+      sessionSlug,
+      viewType,
+      dataVersionKey,
+    });
     if (cached) return jsonResultViewCache(request, env, cached);
     return jsonResultViewCache(request, env, {
       ok: true,
@@ -2986,19 +3260,34 @@ async function handleResultViewCacheHttpRequest({ request, env = {} } = {}) {
     return jsonResultViewCache(request, env, { ok: false, reason: auth.reason }, { status: auth.status || 401 });
   }
   if (request.method === 'POST' && auth.authMode !== 'root_token') {
-    return jsonResultViewCache(request, env, {
-      ok: false,
-      reason: 'result_view_cache_write_root_token_required',
-    }, { status: 403 });
+    return jsonResultViewCache(
+      request,
+      env,
+      {
+        ok: false,
+        reason: 'result_view_cache_write_root_token_required',
+      },
+      { status: 403 },
+    );
   }
-  const delegated = applyDelegationToInput(auth, inputFromRequest(request, body), toCanonicalAgentApiPathname(url.pathname), request.method);
+  const delegated = applyDelegationToInput(
+    auth,
+    inputFromRequest(request, body),
+    toCanonicalAgentApiPathname(url.pathname),
+    request.method,
+  );
   if (!delegated.ok) {
-    return jsonResultViewCache(request, env, {
-      ok: false,
-      reason: delegated.reason,
-      requiredScope: delegated.requiredScope,
-      sessionSlug: delegated.sessionSlug || '',
-    }, { status: delegated.status || 403 });
+    return jsonResultViewCache(
+      request,
+      env,
+      {
+        ok: false,
+        reason: delegated.reason,
+        requiredScope: delegated.requiredScope,
+        sessionSlug: delegated.sessionSlug || '',
+      },
+      { status: delegated.status || 403 },
+    );
   }
   const input = delegated.input;
   const context = await resolveHandoffContext({
@@ -3008,11 +3297,16 @@ async function handleResultViewCacheHttpRequest({ request, env = {} } = {}) {
     requireQuestionAuthoring: false,
   });
   if (!context.ok) {
-    return jsonResultViewCache(request, env, {
-      ok: false,
-      reason: context.reason,
-      sessionSlug: context.sessionSlug || '',
-    }, { status: context.status || 400 });
+    return jsonResultViewCache(
+      request,
+      env,
+      {
+        ok: false,
+        reason: context.reason,
+        sessionSlug: context.sessionSlug || '',
+      },
+      { status: context.status || 400 },
+    );
   }
   return handleResultViewCacheRequest({ env, context, input, request });
 }
@@ -3044,11 +3338,12 @@ async function buildAdminMetricsSnapshot({
   visibleSessionSlugs = null,
 } = {}) {
   const scopedSessionSlug = scope === 'session' ? sanitizeSessionSlug(sessionSlug) : '';
-  const visibleSlugSet = visibleSessionSlugs instanceof Set
-    ? visibleSessionSlugs
-    : (Array.isArray(visibleSessionSlugs)
-      ? new Set(visibleSessionSlugs.map(sanitizeSessionSlug).filter(Boolean))
-      : null);
+  const visibleSlugSet =
+    visibleSessionSlugs instanceof Set
+      ? visibleSessionSlugs
+      : Array.isArray(visibleSessionSlugs)
+        ? new Set(visibleSessionSlugs.map(sanitizeSessionSlug).filter(Boolean))
+        : null;
   const inScope = (slug = '') => {
     const normalized = sanitizeSessionSlug(slug);
     if (!normalized) return false;
@@ -3064,9 +3359,8 @@ async function buildAdminMetricsSnapshot({
 
   const tokenEntries = await listMetricKvEntriesByPrefix(env, TELEGRAM_AGENT_DELEGATION_TOKEN_KV_PREFIX);
   for (const entry of tokenEntries) {
-    const metadata = entry.metadata && typeof entry.metadata === 'object' && !Array.isArray(entry.metadata)
-      ? entry.metadata
-      : null;
+    const metadata =
+      entry.metadata && typeof entry.metadata === 'object' && !Array.isArray(entry.metadata) ? entry.metadata : null;
     let tokenSessionSlug = sanitizeSessionSlug(metadata?.sg);
     let telegramUserId = safeString(metadata?.p || metadata?.u);
     if (!tokenSessionSlug || !telegramUserId) {
@@ -3086,7 +3380,8 @@ async function buildAdminMetricsSnapshot({
 
   const proposedEntries = await listMetricKvEntriesByPrefix(env, PROPOSED_QUESTION_KV_PREFIX);
   for (const entry of proposedEntries) {
-    const slug = sanitizeSessionSlug(entry.metadata?.sg) || sessionFromSessionFirstKey(entry.key, PROPOSED_QUESTION_KV_PREFIX);
+    const slug =
+      sanitizeSessionSlug(entry.metadata?.sg) || sessionFromSessionFirstKey(entry.key, PROPOSED_QUESTION_KV_PREFIX);
     if (!slug || !inScope(slug)) continue;
     totals.questionsCreated += 1;
     activitySessions.add(slug);
@@ -3121,7 +3416,9 @@ async function buildAdminMetricsSnapshot({
 
   const groupEntries = await listMetricKvEntriesByPrefix(env, LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX);
   for (const entry of groupEntries) {
-    const slug = sanitizeSessionSlug(entry.metadata?.sg) || sessionFromSessionFirstKey(entry.key, LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX);
+    const slug =
+      sanitizeSessionSlug(entry.metadata?.sg) ||
+      sessionFromSessionFirstKey(entry.key, LIGHTWEIGHT_GROUP_PROPOSAL_KV_PREFIX);
     if (!slug || !inScope(slug)) continue;
     totals.groupProposals += 1;
     activitySessions.add(slug);
@@ -3134,9 +3431,8 @@ async function buildAdminMetricsSnapshot({
   });
   const submittedStatuses = new Set(SUBMITTED_RESULT_STATUSES);
   for (const entry of submitEntries) {
-    const meta = entry.metadata && typeof entry.metadata === 'object' && !Array.isArray(entry.metadata)
-      ? entry.metadata
-      : null;
+    const meta =
+      entry.metadata && typeof entry.metadata === 'object' && !Array.isArray(entry.metadata) ? entry.metadata : null;
     let status = safeString(meta?.st);
     let slug = sanitizeSessionSlug(meta?.sg);
     let telegramUserId = safeString(meta?.u);
@@ -3171,7 +3467,10 @@ async function buildAdminMetricsSnapshot({
     sessionMetric(perSession, parsed.sessionSlug)?._respondents.add(parsed.telegramUserId);
   }
 
-  const registry = await listRegistrySessionsForBridge({ env }).catch(() => ({ ok: false, sessions: [] }));
+  const registry = await listRegistrySessionsForBridge({ env }).catch(() => ({
+    ok: false,
+    sessions: [],
+  }));
   const registrySessionCount = Array.isArray(registry?.sessions) ? registry.sessions.length : 0;
   totals.distinctUsersOnboarded = onboardedUsers.size;
   totals.distinctRespondents = respondents.size;
@@ -3197,25 +3496,30 @@ async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } 
     createdAt: input.createdAt || null,
   });
   if (!manager.ok) {
-    return json({
-      ok: false,
-      reason: 'metrics_admin_required',
-      accountAddress: manager.accountAddress || '',
-    }, { status: 403 });
+    return json(
+      {
+        ok: false,
+        reason: 'metrics_admin_required',
+        accountAddress: manager.accountAddress || '',
+      },
+      { status: 403 },
+    );
   }
   const rootAdmin = isRootResponseExportAdmin(env, manager.accountAddress);
   const scope = rootAdmin ? 'global' : 'session';
   const sessionSlug = context.session.sessionSlug;
   const includeLegacySessions = normalizeBoolean(input.includeLegacySessions, false);
   const cutoffConfigured = rootAdmin && telegramSessionCutoffConfigured(env, context.policy);
-  const visibleSessionSlugs = cutoffConfigured && !includeLegacySessions
-    ? new Set(telegramVisibleSessions(context.policy, env)
-      .map((session) => sanitizeSessionSlug(session.sessionSlug || session.slug))
-      .filter(Boolean))
-    : null;
-  const visibilityCachePart = scope === 'global' && cutoffConfigured
-    ? (includeLegacySessions ? 'legacy' : 'visible')
-    : 'all';
+  const visibleSessionSlugs =
+    cutoffConfigured && !includeLegacySessions
+      ? new Set(
+          telegramVisibleSessions(context.policy, env)
+            .map((session) => sanitizeSessionSlug(session.sessionSlug || session.slug))
+            .filter(Boolean),
+        )
+      : null;
+  const visibilityCachePart =
+    scope === 'global' && cutoffConfigured ? (includeLegacySessions ? 'legacy' : 'visible') : 'all';
   const cacheKey = `${ADMIN_METRICS_CACHE_KV_PREFIX}${scope}:${scope === 'session' ? sessionSlug : visibilityCachePart}`;
   const cached = await loadAdminMetricsCache(env, cacheKey);
   if (cached) return json(cached);
@@ -3233,13 +3537,14 @@ async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } 
     sessionSlug,
     visibleSessionSlugs,
   });
-  const metricVisibility = scope === 'global' && cutoffConfigured
-    ? {
-      mode: includeLegacySessions ? 'all_sessions' : 'telegram_visible_sessions',
-      includeLegacySessions,
-      sessionSlugs: visibleSessionSlugs ? [...visibleSessionSlugs].sort() : [],
-    }
-    : { mode: scope === 'session' ? 'session' : 'all_sessions' };
+  const metricVisibility =
+    scope === 'global' && cutoffConfigured
+      ? {
+          mode: includeLegacySessions ? 'all_sessions' : 'telegram_visible_sessions',
+          includeLegacySessions,
+          sessionSlugs: visibleSessionSlugs ? [...visibleSessionSlugs].sort() : [],
+        }
+      : { mode: scope === 'session' ? 'session' : 'all_sessions' };
   const payload = {
     ok: true,
     scope,
@@ -3249,14 +3554,21 @@ async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } 
     metricVisibility,
     definitions: {
       agentsOnboarded: 'Delegation-token mints observed by the worker; this is not a count of external skill installs.',
-      registrySessionCount: 'Count of sessions from the cached on-chain SessionRegistry read; the worker does not create registry sessions.',
-      sessionsWithBridgeActivity: 'Distinct session slugs with bridge KV activity such as token mints, drafts, proposed questions, group proposals, or submitted answers.',
-      draftEditMetrics: 'Opt-in draft-edit metric records that compare an initial agent draft with the saved or submitted answer without storing raw answer text.',
-      answerDraftsEdited: 'Live drafts whose content changed at least once after the first save (point-in-time KV scan, decays with draft TTL).',
-      agentDraftedAnswers: 'Live drafts whose first revision was written through the agent handoff preferences endpoint.',
-      metricVisibility: 'When the Telegram session created-after cutoff is configured, root-admin global metrics default to currently visible Telegram sessions. Add includeLegacySessions=1 for a historical all-session sweep.',
+      registrySessionCount:
+        'Count of sessions from the cached on-chain SessionRegistry read; the worker does not create registry sessions.',
+      sessionsWithBridgeActivity:
+        'Distinct session slugs with bridge KV activity such as token mints, drafts, proposed questions, group proposals, or submitted answers.',
+      draftEditMetrics:
+        'Opt-in draft-edit metric records that compare an initial agent draft with the saved or submitted answer without storing raw answer text.',
+      answerDraftsEdited:
+        'Live drafts whose content changed at least once after the first save (point-in-time KV scan, decays with draft TTL).',
+      agentDraftedAnswers:
+        'Live drafts whose first revision was written through the agent handoff preferences endpoint.',
+      metricVisibility:
+        'When the Telegram session created-after cutoff is configured, root-admin global metrics default to currently visible Telegram sessions. Add includeLegacySessions=1 for a historical all-session sweep.',
       questionsAnswered: `Submit queue records with submitted statuses over the rolling ${Math.round(SUBMIT_REQUEST_TTL_SECONDS / 86400)} day submit-record window.`,
-      agentOnly: 'Agent-only sidecar predictions, privacy skips, and token allocations counted from KV metadata only; these records are source-separated from normal drafts and submits.',
+      agentOnly:
+        'Agent-only sidecar predictions, privacy skips, and token allocations counted from KV metadata only; these records are source-separated from normal drafts and submits.',
     },
     totals: snapshot.totals,
     agentOnly,
@@ -3269,7 +3581,10 @@ async function handleAdminMetricsRequest({ env = {}, context = {}, input = {} } 
 
 async function handleAgentOnlyStartRequest({ request, env = {} } = {}) {
   if (request.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: sessionMetaCorsHeaders() });
+    return new Response(null, {
+      status: 204,
+      headers: sessionMetaCorsHeaders(),
+    });
   }
   if (request.method !== 'GET') {
     return jsonSessionMeta(request, env, { ok: false, reason: 'method_not_allowed' }, { status: 405 });
@@ -3290,18 +3605,12 @@ async function handleAgentOnlyStartRequest({ request, env = {} } = {}) {
 
 function agentOnlyRequestNow(env = {}) {
   const raw = safeString(
-    env.AGENT_BRIDGE_AGENT_ONLY_REQUEST_NOW ||
-    env.AGENT_BRIDGE_AGENT_ONLY_TEST_NOW ||
-    env.AGENT_BRIDGE_TEST_NOW,
+    env.AGENT_BRIDGE_AGENT_ONLY_REQUEST_NOW || env.AGENT_BRIDGE_AGENT_ONLY_TEST_NOW || env.AGENT_BRIDGE_TEST_NOW,
   );
   return Number.isFinite(Date.parse(raw)) ? new Date(Date.parse(raw)).toISOString() : null;
 }
 
-async function handleAgentOnlyStatementsRequest({
-  env = {},
-  context = {},
-  input = {},
-} = {}) {
+async function handleAgentOnlyStatementsRequest({ env = {}, context = {}, input = {} } = {}) {
   const page = await getAgentOnlyStatementsPage({
     env,
     sessionSlug: context.session.sessionSlug,
@@ -3310,17 +3619,12 @@ async function handleAgentOnlyStatementsRequest({
     compact: normalizeBoolean(input.compact, false) || lower(input.format) === 'compact',
     now: agentOnlyRequestNow(env),
   });
-  const status = page.ok === false ? (page.status || 500) : 200;
+  const status = page.ok === false ? page.status || 500 : 200;
   assertNoSecretShape(page, 'Agent-only statements response must not serialize secrets.');
   return json(page, { status });
 }
 
-async function handleAgentOnlyAnswersBulkRequest({
-  env = {},
-  context = {},
-  input = {},
-  body = {},
-} = {}) {
+async function handleAgentOnlyAnswersBulkRequest({ env = {}, context = {}, input = {}, body = {} } = {}) {
   const result = await submitAgentOnlyAnswersBulk({
     env,
     sessionSlug: context.session.sessionSlug,
@@ -3328,7 +3632,7 @@ async function handleAgentOnlyAnswersBulkRequest({
     body,
     now: agentOnlyRequestNow(env),
   });
-  const status = result.ok === false ? (result.status || 400) : 200;
+  const status = result.ok === false ? result.status || 400 : 200;
   await recordAgentOnlyAttemptEventQuietly({
     env,
     sessionSlug: context.session.sessionSlug,
@@ -3343,12 +3647,7 @@ async function handleAgentOnlyAnswersBulkRequest({
   return json(result, { status });
 }
 
-async function handleAgentOnlyTokenVotesBulkRequest({
-  env = {},
-  context = {},
-  input = {},
-  body = {},
-} = {}) {
+async function handleAgentOnlyTokenVotesBulkRequest({ env = {}, context = {}, input = {}, body = {} } = {}) {
   const result = await submitAgentOnlyTokenVotesBulk({
     env,
     sessionSlug: context.session.sessionSlug,
@@ -3356,7 +3655,7 @@ async function handleAgentOnlyTokenVotesBulkRequest({
     body,
     now: agentOnlyRequestNow(env),
   });
-  const status = result.ok === false ? (result.status || 400) : 200;
+  const status = result.ok === false ? result.status || 400 : 200;
   await recordAgentOnlyAttemptEventQuietly({
     env,
     sessionSlug: context.session.sessionSlug,
@@ -3381,21 +3680,24 @@ function base64ToBytes(value = '') {
 }
 
 function agentOnlyWrappedImageViewUrl(env = {}, imageViewId = '') {
-  const id = safeString(imageViewId).replace(/[^a-fA-F0-9]/g, '').slice(0, 32);
-  return id ? `${agentBridgePublicUrl(env)}${toCanonicalAgentApiPathname(AGENT_ONLY_ENDPOINTS.wrappedImage)}/view/${encodeURIComponent(id)}` : '';
+  const id = safeString(imageViewId)
+    .replace(/[^a-fA-F0-9]/g, '')
+    .slice(0, 32);
+  return id
+    ? `${agentBridgePublicUrl(env)}${toCanonicalAgentApiPathname(AGENT_ONLY_ENDPOINTS.wrappedImage)}/view/${encodeURIComponent(id)}`
+    : '';
 }
 
-async function handleAgentOnlyWrappedImageViewRequest({
-  env = {},
-  imageViewId = '',
-  method = 'GET',
-} = {}) {
+async function handleAgentOnlyWrappedImageViewRequest({ env = {}, imageViewId = '', method = 'GET' } = {}) {
   const result = await loadAgentOnlyWrappedImageByViewId({ env, imageViewId });
   if (!result.ok) {
-    return json({
-      ok: false,
-      reason: result.reason || 'wrapped_image_not_found',
-    }, { status: result.status || 404 });
+    return json(
+      {
+        ok: false,
+        reason: result.reason || 'wrapped_image_not_found',
+      },
+      { status: result.status || 404 },
+    );
   }
   const imageResponse = new Response(base64ToBytes(result.image_base64), {
     status: 200,
@@ -3431,7 +3733,7 @@ async function handleAgentOnlyWrappedImageRequest({
     now: agentOnlyRequestNow(env),
     fetchImpl,
   });
-  const status = result.ok === false ? (result.status || 400) : 200;
+  const status = result.ok === false ? result.status || 400 : 200;
   await recordAgentOnlyAttemptEventQuietly({
     env,
     sessionSlug: context.session.sessionSlug,
@@ -3460,31 +3762,34 @@ async function handleAgentOnlyWrappedImageRequest({
   }
   const includeBase64Input = lower(input.include_base64 || input.includeBase64);
   const omitBase64 =
-    responseFormat === 'json_url'
-    || body.compact === true
-    || body.include_base64 === false
-    || body.includeBase64 === false
-    || includeBase64Input === 'false';
+    responseFormat === 'json_url' ||
+    body.compact === true ||
+    body.include_base64 === false ||
+    body.includeBase64 === false ||
+    includeBase64Input === 'false';
   const includeBase64 =
-    !omitBase64
-    && (
-      responseFormat === 'json_base64'
-      || responseFormat === 'json_with_base64'
-      || body.include_base64 === true
-      || body.includeBase64 === true
-      || includeBase64Input === 'true'
-    );
+    !omitBase64 &&
+    (responseFormat === 'json_base64' ||
+      responseFormat === 'json_with_base64' ||
+      body.include_base64 === true ||
+      body.includeBase64 === true ||
+      includeBase64Input === 'true');
   const payload = {
     ...result,
-    ...(result.image_view_id ? {
-      image_url: agentOnlyWrappedImageViewUrl(env, result.image_view_id),
-    } : {}),
+    ...(result.image_view_id
+      ? {
+          image_url: agentOnlyWrappedImageViewUrl(env, result.image_view_id),
+        }
+      : {}),
   };
   if (!includeBase64) {
     delete payload.image_base64;
   }
   delete payload.prompt;
-  assertNoSecretShape({ ...payload, image_base64: '[image omitted]' }, 'Agent-only wrapped image response metadata must not serialize secrets.');
+  assertNoSecretShape(
+    { ...payload, image_base64: '[image omitted]' },
+    'Agent-only wrapped image response metadata must not serialize secrets.',
+  );
   return json(payload, { status, headers: { 'cache-control': 'no-store' } });
 }
 
@@ -3507,21 +3812,17 @@ function normalizeAdminQuestionDeleteIds(body = {}) {
   return ids;
 }
 
-async function removeProcessedQuestionIdsFromAgentOnlyConfig({
-  env = {},
-  sessionSlug = '',
-  results = [],
-} = {}) {
-  const idsToRemove = new Set((Array.isArray(results) ? results : [])
-    .filter((entry) => !['failed', 'not_proposed'].includes(safeString(entry?.result)))
-    .map((entry) => safeString(entry?.questionId))
-    .filter((id) => id.startsWith('ceq_')));
+async function removeProcessedQuestionIdsFromAgentOnlyConfig({ env = {}, sessionSlug = '', results = [] } = {}) {
+  const idsToRemove = new Set(
+    (Array.isArray(results) ? results : [])
+      .filter((entry) => !['failed', 'not_proposed'].includes(safeString(entry?.result)))
+      .map((entry) => safeString(entry?.questionId))
+      .filter((id) => id.startsWith('ceq_')),
+  );
   if (!idsToRemove.size) return false;
   const loaded = await loadAgentOnlyModeConfig({ env, sessionSlug });
   if (loaded.source !== 'kv') return false;
-  const current = Array.isArray(loaded.config?.enabledQuestionIds)
-    ? loaded.config.enabledQuestionIds
-    : [];
+  const current = Array.isArray(loaded.config?.enabledQuestionIds) ? loaded.config.enabledQuestionIds : [];
   const next = current.filter((id) => !idsToRemove.has(safeString(id)));
   if (next.length === current.length) return false;
   const saved = await saveAgentOnlyModeConfig({
@@ -3536,11 +3837,7 @@ async function removeProcessedQuestionIdsFromAgentOnlyConfig({
   return saved.ok !== false;
 }
 
-async function handleAdminQuestionsDeleteRequest({
-  env = {},
-  input = {},
-  body = {},
-} = {}) {
+async function handleAdminQuestionsDeleteRequest({ env = {}, input = {}, body = {} } = {}) {
   const sessionSlug = sanitizeSessionSlug(input.sessionSlug || body.sessionSlug);
   if (!sessionSlug) return json({ ok: false, reason: 'session_slug_required' }, { status: 400 });
   // Mode is read from body.mode only: input.view aggregates ?view=/?mode= query
@@ -3557,22 +3854,34 @@ async function handleAdminQuestionsDeleteRequest({
   const results = [];
   for (const questionId of questionIds) {
     try {
-      const processed = mode === 'delete'
-        ? await deleteTelegramProposedQuestion({ env, sessionSlug, questionId })
-        : await archiveTelegramProposedQuestion({
-          env,
-          sessionSlug,
-          questionId,
-          now: input.createdAt || null,
-        });
-      results.push({ questionId, result: safeString(processed?.result) || 'failed' });
+      const processed =
+        mode === 'delete'
+          ? await deleteTelegramProposedQuestion({
+              env,
+              sessionSlug,
+              questionId,
+            })
+          : await archiveTelegramProposedQuestion({
+              env,
+              sessionSlug,
+              questionId,
+              now: input.createdAt || null,
+            });
+      results.push({
+        questionId,
+        result: safeString(processed?.result) || 'failed',
+      });
     } catch {
       results.push({ questionId, result: 'failed' });
     }
   }
   let configUpdated = false;
   try {
-    configUpdated = await removeProcessedQuestionIdsFromAgentOnlyConfig({ env, sessionSlug, results });
+    configUpdated = await removeProcessedQuestionIdsFromAgentOnlyConfig({
+      env,
+      sessionSlug,
+      results,
+    });
   } catch {
     configUpdated = false;
   }
@@ -3581,12 +3890,7 @@ async function handleAdminQuestionsDeleteRequest({
   return json(payload);
 }
 
-async function handleAdminAgentOnlyConfigRequest({
-  env = {},
-  input = {},
-  body = {},
-  method = 'GET',
-} = {}) {
+async function handleAdminAgentOnlyConfigRequest({ env = {}, input = {}, body = {}, method = 'GET' } = {}) {
   const sessionSlug = sanitizeSessionSlug(input.sessionSlug || body.sessionSlug);
   if (!sessionSlug) return json({ ok: false, reason: 'session_slug_required' }, { status: 400 });
   if (method === 'GET') {
@@ -3605,16 +3909,12 @@ async function handleAdminAgentOnlyConfigRequest({
     updatedBy: 'service',
     createdAt: input.createdAt || null,
   });
-  const status = saved.ok === false ? (saved.status || 400) : 200;
+  const status = saved.ok === false ? saved.status || 400 : 200;
   assertNoSecretShape(saved, 'Agent-only admin config save response must not serialize secrets.');
   return json(saved, { status });
 }
 
-async function handleAdminAgentOnlyWindowOpenRequest({
-  env = {},
-  input = {},
-  body = {},
-} = {}) {
+async function handleAdminAgentOnlyWindowOpenRequest({ env = {}, input = {}, body = {} } = {}) {
   const sessionSlug = sanitizeSessionSlug(input.sessionSlug || body.sessionSlug);
   if (!sessionSlug) return json({ ok: false, reason: 'session_slug_required' }, { status: 400 });
   const opened = await materializeAgentOnlyWindow({
@@ -3625,25 +3925,22 @@ async function handleAdminAgentOnlyWindowOpenRequest({
   });
   const payload = opened.ok
     ? {
-      ok: true,
-      created: opened.created === true,
-      extended: opened.extended === true,
-      addedStatementCount: Number(opened.addedStatementCount || 0) || 0,
-      windowId: opened.snapshot.windowId,
-      statementCount: Array.isArray(opened.snapshot.statements) ? opened.snapshot.statements.length : 0,
-      opensAt: opened.snapshot.opensAt,
-      closesAt: opened.snapshot.closesAt,
-    }
+        ok: true,
+        created: opened.created === true,
+        extended: opened.extended === true,
+        addedStatementCount: Number(opened.addedStatementCount || 0) || 0,
+        windowId: opened.snapshot.windowId,
+        statementCount: Array.isArray(opened.snapshot.statements) ? opened.snapshot.statements.length : 0,
+        opensAt: opened.snapshot.opensAt,
+        closesAt: opened.snapshot.closesAt,
+      }
     : opened;
-  const status = payload.ok === false ? (payload.status || 400) : 200;
+  const status = payload.ok === false ? payload.status || 400 : 200;
   assertNoSecretShape(payload, 'Agent-only admin window-open response must not serialize secrets.');
   return json(payload, { status });
 }
 
-async function handleAdminAgentOnlyExportRequest({
-  env = {},
-  input = {},
-} = {}) {
+async function handleAdminAgentOnlyExportRequest({ env = {}, input = {} } = {}) {
   const sessionSlug = sanitizeSessionSlug(input.sessionSlug);
   if (!sessionSlug) return json({ ok: false, reason: 'session_slug_required' }, { status: 400 });
   const includeBase64Input = lower(input.include_base64 || input.includeBase64);
@@ -3679,43 +3976,52 @@ async function handleAdminAgentOnlyExportRequest({
   });
 }
 
-async function handleQuestionQueuePlanRequest({
-  env = {},
-  context = {},
-  input = {},
-  waitUntil = null,
-} = {}) {
-  const plan = await buildSponsoredQuestionPlan({ env, context, input, waitUntil });
+async function handleQuestionQueuePlanRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
+  const plan = await buildSponsoredQuestionPlan({
+    env,
+    context,
+    input,
+    waitUntil,
+  });
   if (!plan.ok) {
-    return json({
-      ok: false,
-      reason: plan.admin?.reason || 'question_queue_admin_required',
-      accountAddress: plan.admin?.accountAddress || '',
-    }, { status: plan.status || 403 });
+    return json(
+      {
+        ok: false,
+        reason: plan.admin?.reason || 'question_queue_admin_required',
+        accountAddress: plan.admin?.accountAddress || '',
+      },
+      { status: plan.status || 403 },
+    );
   }
   return json(plan);
 }
 
-async function handleQuestionQueueApplyRequest({
-  env = {},
-  context = {},
-  input = {},
-  waitUntil = null,
-} = {}) {
-  const plan = await buildSponsoredQuestionPlan({ env, context, input, waitUntil });
+async function handleQuestionQueueApplyRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
+  const plan = await buildSponsoredQuestionPlan({
+    env,
+    context,
+    input,
+    waitUntil,
+  });
   if (!plan.ok) {
-    return json({
-      ok: false,
-      reason: plan.admin?.reason || 'question_queue_admin_required',
-      accountAddress: plan.admin?.accountAddress || '',
-    }, { status: plan.status || 403 });
+    return json(
+      {
+        ok: false,
+        reason: plan.admin?.reason || 'question_queue_admin_required',
+        accountAddress: plan.admin?.accountAddress || '',
+      },
+      { status: plan.status || 403 },
+    );
   }
   if (!hasExplicitSponsoredQueueApproval(input)) {
-    return json({
-      ...plan,
-      ok: false,
-      reason: 'sponsored_question_confirmation_required',
-    }, { status: 400 });
+    return json(
+      {
+        ...plan,
+        ok: false,
+        reason: 'sponsored_question_confirmation_required',
+      },
+      { status: 400 },
+    );
   }
   const createdQuestions = [];
   const createdQuestionIds = [];
@@ -3740,7 +4046,10 @@ async function handleQuestionQueueApplyRequest({
       createdAt: input.createdAt || null,
     });
     if (!saved.ok) {
-      plan.skipped.push({ prompt: draft.prompt, reason: saved.reason || 'question_create_failed' });
+      plan.skipped.push({
+        prompt: draft.prompt,
+        reason: saved.reason || 'question_create_failed',
+      });
       continue;
     }
     createdQuestionIds.push(saved.questionId);
@@ -3757,12 +4066,15 @@ async function handleQuestionQueueApplyRequest({
     .filter((id, index, values) => values.indexOf(id) === index)
     .slice(0, 50);
   if (!nextIds.length) {
-    return json({
-      ...plan,
-      ok: false,
-      reason: 'sponsored_question_targets_required',
-      createdQuestions,
-    }, { status: 400 });
+    return json(
+      {
+        ...plan,
+        ok: false,
+        reason: 'sponsored_question_targets_required',
+        createdQuestions,
+      },
+      { status: 400 },
+    );
   }
   const saved = await saveTelegramQuestionQueueConfig({
     env,
@@ -3773,11 +4085,14 @@ async function handleQuestionQueueApplyRequest({
     createdAt: input.createdAt || null,
   });
   if (!saved.ok) {
-    return json({
-      ok: false,
-      reason: saved.reason || 'question_queue_save_failed',
-      sessionSlug: context.session.sessionSlug,
-    }, { status: 500 });
+    return json(
+      {
+        ok: false,
+        reason: saved.reason || 'question_queue_save_failed',
+        sessionSlug: context.session.sessionSlug,
+      },
+      { status: 500 },
+    );
   }
   return json({
     ok: true,
@@ -3808,14 +4123,21 @@ async function handleQuestionQueueRequest({
 } = {}) {
   const admin = await requireQuestionQueueAdmin({ env, context, input });
   if (!admin.ok) {
-    return json({
-      ok: false,
-      reason: admin.reason,
-      accountAddress: admin.accountAddress || '',
-    }, { status: admin.status || 403 });
+    return json(
+      {
+        ok: false,
+        reason: admin.reason,
+        accountAddress: admin.accountAddress || '',
+      },
+      { status: admin.status || 403 },
+    );
   }
 
-  const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const { loaded, questions } = await loadPublicQuestionsForHandoff({
+    env,
+    context,
+    waitUntil,
+  });
   const candidates = questionQueueCandidates(questions);
   const candidateSummaries = candidates.map(questionQueueCandidateSummary);
   const writeRequested = safeString(method).toUpperCase() !== 'GET';
@@ -3824,26 +4146,30 @@ async function handleQuestionQueueRequest({
   let saved = null;
 
   if (writeRequested) {
-    const resolved = clearRequested
-      ? { refs: [], ids: [], skipped: [] }
-      : resolveQuestionQueueRefs(input, candidates);
+    const resolved = clearRequested ? { refs: [], ids: [], skipped: [] } : resolveQuestionQueueRefs(input, candidates);
     skipped = resolved.skipped;
     if (!clearRequested && !resolved.refs.length) {
-      return json({
-        ok: false,
-        reason: 'question_queue_question_ids_required',
-        sessionSlug: context.session.sessionSlug,
-        candidates: candidateSummaries,
-      }, { status: 400 });
+      return json(
+        {
+          ok: false,
+          reason: 'question_queue_question_ids_required',
+          sessionSlug: context.session.sessionSlug,
+          candidates: candidateSummaries,
+        },
+        { status: 400 },
+      );
     }
     if (!clearRequested && !resolved.ids.length) {
-      return json({
-        ok: false,
-        reason: 'question_queue_no_matching_questions',
-        sessionSlug: context.session.sessionSlug,
-        skipped,
-        candidates: candidateSummaries,
-      }, { status: 400 });
+      return json(
+        {
+          ok: false,
+          reason: 'question_queue_no_matching_questions',
+          sessionSlug: context.session.sessionSlug,
+          skipped,
+          candidates: candidateSummaries,
+        },
+        { status: 400 },
+      );
     }
     saved = await saveTelegramQuestionQueueConfig({
       env,
@@ -3854,18 +4180,23 @@ async function handleQuestionQueueRequest({
       createdAt: input.createdAt || null,
     });
     if (!saved.ok) {
-      return json({
-        ok: false,
-        reason: saved.reason || 'question_queue_save_failed',
-        sessionSlug: context.session.sessionSlug,
-      }, { status: 500 });
+      return json(
+        {
+          ok: false,
+          reason: saved.reason || 'question_queue_save_failed',
+          sessionSlug: context.session.sessionSlug,
+        },
+        { status: 500 },
+      );
     }
   }
 
-  const queueConfig = saved?.config || await loadTelegramQuestionQueueConfig({
-    env,
-    sessionSlug: context.session.sessionSlug,
-  });
+  const queueConfig =
+    saved?.config ||
+    (await loadTelegramQuestionQueueConfig({
+      env,
+      sessionSlug: context.session.sessionSlug,
+    }));
   return json({
     ok: true,
     sessionSlug: context.session.sessionSlug,
@@ -3875,7 +4206,9 @@ async function handleQuestionQueueRequest({
     questionQueue: {
       source: queueConfig.source || (saved ? 'kv' : ''),
       sponsoredQuestionIds: Array.isArray(queueConfig.sponsoredQuestionIds) ? queueConfig.sponsoredQuestionIds : [],
-      sponsoredQuestionCount: Array.isArray(queueConfig.sponsoredQuestionIds) ? queueConfig.sponsoredQuestionIds.length : 0,
+      sponsoredQuestionCount: Array.isArray(queueConfig.sponsoredQuestionIds)
+        ? queueConfig.sponsoredQuestionIds.length
+        : 0,
       updatedAt: safeString(queueConfig.updatedAt),
     },
     saved: saved?.ok === true,
@@ -3884,11 +4217,7 @@ async function handleQuestionQueueRequest({
   });
 }
 
-async function handleGroupApprovalLinkRequest({
-  env = {},
-  context = {},
-  input = {},
-} = {}) {
+async function handleGroupApprovalLinkRequest({ env = {}, context = {}, input = {} } = {}) {
   const admin = await requireQuestionQueueAdmin({
     env,
     context,
@@ -3896,41 +4225,27 @@ async function handleGroupApprovalLinkRequest({
     allowDelegatedAdmin: true,
   });
   if (!admin.ok) {
-    return json({
-      ok: false,
-      reason: 'group_approval_admin_required',
-      accountAddress: admin.accountAddress || '',
-    }, { status: admin.status || 403 });
+    return json(
+      {
+        ok: false,
+        reason: 'group_approval_admin_required',
+        accountAddress: admin.accountAddress || '',
+      },
+      { status: admin.status || 403 },
+    );
   }
-  const minted = await mintTelegramGroupApprovalLink({
-    env,
-    session: context.session,
-    approvedByTelegramUserId: context.storageContext.user.telegramUserId,
-    approvedByAccountAddress: admin.manager.accountAddress,
-    createdAt: input.createdAt || null,
-  });
-  if (!minted.url) {
-    return json({
-      ok: false,
-      reason: 'telegram_bot_username_missing',
-      sessionSlug: context.session.sessionSlug,
-    }, { status: 500 });
-  }
+  const approval = telegramGroupApprovalGuidance(context.session.sessionSlug);
   const response = {
-    ok: true,
-    url: minted.url,
-    expiresAt: minted.expiresAt,
+    ok: false,
     sessionSlug: context.session.sessionSlug,
+    ...approval,
+    reason: 'group_approval_link_disabled',
   };
-  assertNoSecretShape(response, 'Telegram group approval link response must not serialize secrets.');
-  return json(response);
+  assertNoSecretShape(response, 'Telegram group approval guidance response must not serialize secrets.');
+  return json(response, { status: 409 });
 }
 
-async function handleGroupApprovalRevokeRequest({
-  env = {},
-  context = {},
-  input = {},
-} = {}) {
+async function handleGroupApprovalRevokeRequest({ env = {}, context = {}, input = {} } = {}) {
   const admin = await requireQuestionQueueAdmin({
     env,
     context,
@@ -3938,19 +4253,25 @@ async function handleGroupApprovalRevokeRequest({
     allowDelegatedAdmin: true,
   });
   if (!admin.ok) {
-    return json({
-      ok: false,
-      reason: 'group_approval_admin_required',
-      accountAddress: admin.accountAddress || '',
-    }, { status: admin.status || 403 });
+    return json(
+      {
+        ok: false,
+        reason: 'group_approval_admin_required',
+        accountAddress: admin.accountAddress || '',
+      },
+      { status: admin.status || 403 },
+    );
   }
   const chatId = safeString(input.chatId || input.groupChatId);
   if (!chatId) {
-    return json({
-      ok: false,
-      reason: 'telegram_group_chat_id_required',
-      sessionSlug: context.session.sessionSlug,
-    }, { status: 400 });
+    return json(
+      {
+        ok: false,
+        reason: 'telegram_group_chat_id_required',
+        sessionSlug: context.session.sessionSlug,
+      },
+      { status: 400 },
+    );
   }
   const revoked = await deleteTelegramGroupApproval({
     env,
@@ -3973,11 +4294,7 @@ function normalizeTelegramQuestionVote(value = '') {
   return vote === 'up' || vote === 'down' ? vote : '';
 }
 
-function telegramQuestionVoteKey({
-  sessionSlug = '',
-  questionId = '',
-  telegramUserId = '',
-} = {}) {
+function telegramQuestionVoteKey({ sessionSlug = '', questionId = '', telegramUserId = '' } = {}) {
   const slug = sanitizeSessionSlug(sessionSlug);
   const qid = kvKeySafePart(questionId);
   const user = kvKeySafePart(telegramUserId);
@@ -3991,9 +4308,10 @@ function normalizeQuestionIdSet(value) {
 }
 
 function normalizeNegativePreferenceTagHints(input = {}) {
-  const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
-    ? input.preferences
-    : {};
+  const preferences =
+    input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
+      ? input.preferences
+      : {};
   const source = [
     input.deprioritizeTags,
     input.downvoteTags,
@@ -4018,9 +4336,10 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
   const tagHints = normalizePreferenceTagHints(input);
   const negativeTags = normalizeNegativePreferenceTagHints(input);
   const sessionHints = normalizePreferenceSessionHints(input);
-  const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
-    ? input.preferences
-    : {};
+  const preferences =
+    input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
+      ? input.preferences
+      : {};
   const importantIds = normalizeQuestionIdSet(input.importantQuestionIds || preferences.importantQuestionIds);
   const deprioritizeIds = normalizeQuestionIdSet(input.deprioritizeQuestionIds || preferences.deprioritizeQuestionIds);
   const limit = recommendationLimit(input);
@@ -4030,12 +4349,16 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
     sessionHints.slugs.length ||
     sessionHints.tags.length ||
     importantIds.size ||
-    deprioritizeIds.size
+    deprioritizeIds.size,
   );
   const entries = (Array.isArray(questions) ? questions : [])
     .filter((question) => question.answerable === true)
     .map((question, index) => {
-      const positive = questionRelevance(question, { tagHints, sessionHints, session: context.session });
+      const positive = questionRelevance(question, {
+        tagHints,
+        sessionHints,
+        session: context.session,
+      });
       const negative = questionRelevance(question, {
         tagHints: negativeTags,
         sessionHints: { slugs: [], tags: [] },
@@ -4048,7 +4371,7 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
       const suggestedVote = negativeScore > positiveScore && negativeScore > 0 ? 'down' : 'up';
       const rawScore = Math.max(positiveScore, negativeScore);
       const fallbackScore = rawScore > 0 ? rawScore : Math.max(1, questions.length - index);
-      const confidence = Math.max(0.35, Math.min(0.95, 0.45 + (fallbackScore / 100)));
+      const confidence = Math.max(0.35, Math.min(0.95, 0.45 + fallbackScore / 100));
       const matchedTags = suggestedVote === 'down' ? negative.matchedTags : positive.matchedTags;
       const reason = matchedTags.length
         ? `Matched ${suggestedVote === 'down' ? 'deprioritized' : 'relevant'} tags: ${matchedTags.join(', ')}.`
@@ -4073,11 +4396,9 @@ function buildQuestionVoteRecommendations(questions = [], input = {}, context = 
       };
     })
     .filter((entry) => !hasTargeting || entry.score > Math.max(1, questions.length - entry.index));
-  entries.sort((left, right) => (
-    right.score - left.score ||
-    (left.suggestedVote === 'up' ? -1 : 1) ||
-    left.index - right.index
-  ));
+  entries.sort(
+    (left, right) => right.score - left.score || (left.suggestedVote === 'up' ? -1 : 1) || left.index - right.index,
+  );
   return {
     recommendations: entries.slice(0, limit).map(({ index, ...entry }) => entry),
     relevance: {
@@ -4097,12 +4418,23 @@ async function persistAgentQuestionVoteRecommendations({
   createdAt = new Date().toISOString(),
 } = {}) {
   const kv = env?.AGENT_ACTION_KV;
-  if (!kv || typeof kv.put !== 'function') return { ok: false, reason: 'question_vote_recommendation_storage_unavailable' };
+  if (!kv || typeof kv.put !== 'function')
+    return {
+      ok: false,
+      reason: 'question_vote_recommendation_storage_unavailable',
+    };
   const telegramUserId = safeString(context.storageContext?.user?.telegramUserId);
   const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug);
-  if (!telegramUserId || !sessionSlug) return { ok: false, reason: 'question_vote_recommendation_context_incomplete' };
-  const requestId = safeString(input.requestId || input.idempotencyKey) ||
-    buildOpaqueActionId(`agent_question_vote_recommendations|${sessionSlug}|${telegramUserId}|${stableFingerprint(recommendations)}|${createdAt}`);
+  if (!telegramUserId || !sessionSlug)
+    return {
+      ok: false,
+      reason: 'question_vote_recommendation_context_incomplete',
+    };
+  const requestId =
+    safeString(input.requestId || input.idempotencyKey) ||
+    buildOpaqueActionId(
+      `agent_question_vote_recommendations|${sessionSlug}|${telegramUserId}|${stableFingerprint(recommendations)}|${createdAt}`,
+    );
   const record = {
     type: 'telegram_agent_question_vote_recommendation',
     version: 1,
@@ -4124,17 +4456,15 @@ async function persistAgentQuestionVoteRecommendations({
   assertNoSecretShape(record, 'Telegram agent question vote recommendation records must not serialize secrets.');
   await kv.put(
     `${AGENT_QUESTION_VOTE_RECOMMENDATION_KV_PREFIX}${sessionSlug}:${kvKeySafePart(telegramUserId)}:${requestId}`,
-    JSON.stringify(record)
+    JSON.stringify(record),
   );
   return { ok: true, requestId, record };
 }
 
-const SECRETISH_METADATA_KEY_RE = /(?:secret|token|api.?key|private.?key|password|authorization|bearer|signature|mnemonic|seed)/i;
+const SECRETISH_METADATA_KEY_RE =
+  /(?:secret|token|api.?key|private.?key|password|authorization|bearer|signature|mnemonic|seed)/i;
 
-function sanitizeResearchMetadata(value, {
-  depth = 0,
-  maxString = 600,
-} = {}) {
+function sanitizeResearchMetadata(value, { depth = 0, maxString = 600 } = {}) {
   if (value === undefined || value === null) return null;
   if (typeof value === 'string') return value.slice(0, maxString);
   if (typeof value === 'number' || typeof value === 'boolean') return value;
@@ -4145,18 +4475,28 @@ function sanitizeResearchMetadata(value, {
   if (typeof value !== 'object') return safeString(value).slice(0, maxString);
   if (depth >= 3) return {};
   const result = {};
-  Object.entries(value).slice(0, 30).forEach(([key, entry]) => {
-    const safeKey = safeString(key).replace(/[^a-zA-Z0-9_.:-]+/g, '_').slice(0, 80);
-    if (!safeKey || SECRETISH_METADATA_KEY_RE.test(safeKey)) return;
-    result[safeKey] = sanitizeResearchMetadata(entry, { depth: depth + 1, maxString });
-  });
+  Object.entries(value)
+    .slice(0, 30)
+    .forEach(([key, entry]) => {
+      const safeKey = safeString(key)
+        .replace(/[^a-zA-Z0-9_.:-]+/g, '_')
+        .slice(0, 80);
+      if (!safeKey || SECRETISH_METADATA_KEY_RE.test(safeKey)) return;
+      result[safeKey] = sanitizeResearchMetadata(entry, {
+        depth: depth + 1,
+        maxString,
+      });
+    });
   return result;
 }
 
 function normalizeAgentMetadata(input = {}) {
-  const agent = input.agent && typeof input.agent === 'object' && !Array.isArray(input.agent)
-    ? input.agent
-    : (input.agentMetadata && typeof input.agentMetadata === 'object' && !Array.isArray(input.agentMetadata) ? input.agentMetadata : {});
+  const agent =
+    input.agent && typeof input.agent === 'object' && !Array.isArray(input.agent)
+      ? input.agent
+      : input.agentMetadata && typeof input.agentMetadata === 'object' && !Array.isArray(input.agentMetadata)
+        ? input.agentMetadata
+        : {};
   return sanitizeResearchMetadata({
     agentId: firstValue(input.agentId, agent.agentId, agent.id),
     agentName: firstValue(input.agentName, agent.agentName, agent.name),
@@ -4219,7 +4559,11 @@ async function applyAgentQuestionVotes({
   const telegramUserId = safeString(context.storageContext?.user?.telegramUserId);
   const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug);
   if (!telegramUserId || !sessionSlug) return { ok: false, reason: 'question_vote_context_incomplete' };
-  const settings = await loadTelegramAgentSettings({ env, sessionSlug, telegramUserId });
+  const settings = await loadTelegramAgentSettings({
+    env,
+    sessionSlug,
+    telegramUserId,
+  });
   const autoApplyRequested = input.autoApply === true || lower(input.applyMode) === 'auto';
   if (autoApplyRequested && settings.agentAutoApplyQuestionVotes === false) {
     return {
@@ -4229,17 +4573,23 @@ async function applyAgentQuestionVotes({
     };
   }
 
-  const questionById = new Map((Array.isArray(questions) ? questions : [])
-    .filter((question) => question.answerable === true)
-    .map((question) => [safeString(question.questionId), question]));
-  const recommendationById = new Map((Array.isArray(recommendations) ? recommendations : [])
-    .map((recommendation) => [safeString(recommendation.questionId), recommendation]));
+  const questionById = new Map(
+    (Array.isArray(questions) ? questions : [])
+      .filter((question) => question.answerable === true)
+      .map((question) => [safeString(question.questionId), question]),
+  );
+  const recommendationById = new Map(
+    (Array.isArray(recommendations) ? recommendations : []).map((recommendation) => [
+      safeString(recommendation.questionId),
+      recommendation,
+    ]),
+  );
   const decisionInputs = Array.isArray(input.decisions)
     ? input.decisions
-    : (Array.isArray(input.votes) ? input.votes : []);
-  const sourceDecisions = decisionInputs.length
-    ? decisionInputs
-    : (autoApplyRequested ? recommendations : []);
+    : Array.isArray(input.votes)
+      ? input.votes
+      : [];
+  const sourceDecisions = decisionInputs.length ? decisionInputs : autoApplyRequested ? recommendations : [];
   const approvalText = normalizeApprovalText(input.approvalText || input.humanApproval || input.userApproval || '');
   const agentMetadata = normalizeAgentMetadata(input);
   const actionMetadata = sanitizeResearchMetadata({
@@ -4270,12 +4620,16 @@ async function applyAgentQuestionVotes({
       skipped.push({ questionId, reason: 'vote_not_understood' });
       continue;
     }
-    const explicitApproval = explicitApprovalValue(entry?.approved ?? entry?.approval ?? entry?.decision ?? entry?.status);
+    const explicitApproval = explicitApprovalValue(
+      entry?.approved ?? entry?.approval ?? entry?.decision ?? entry?.status,
+    );
     const naturalApproval = approvalFromNaturalLanguage(approvalText, questionId);
     const approved = autoApplyRequested ? true : (explicitApproval ?? naturalApproval ?? false);
     const approvalStatus = autoApplyRequested
       ? 'agent_auto_applied_pending_human_review'
-      : (approved ? 'human_approved' : 'human_rejected_or_missing');
+      : approved
+        ? 'human_approved'
+        : 'human_rejected_or_missing';
     const decision = {
       questionId,
       suggestedVote: suggestedVote || finalVote,
@@ -4294,14 +4648,16 @@ async function applyAgentQuestionVotes({
       skipped.push({ questionId, reason: 'question_vote_not_approved' });
       continue;
     }
-    const voteKey = telegramQuestionVoteKey({ sessionSlug, questionId, telegramUserId });
+    const voteKey = telegramQuestionVoteKey({
+      sessionSlug,
+      questionId,
+      telegramUserId,
+    });
     if (!voteKey) {
       skipped.push({ questionId, reason: 'question_vote_ref_incomplete' });
       continue;
     }
-    const previous = typeof kv.get === 'function'
-      ? safeJsonParse(await kv.get(voteKey).catch(() => null), null)
-      : null;
+    const previous = typeof kv.get === 'function' ? safeJsonParse(await kv.get(voteKey).catch(() => null), null) : null;
     const voteRecord = {
       type: 'telegram_mini_app_question_vote',
       version: 1,
@@ -4343,7 +4699,8 @@ async function applyAgentQuestionVotes({
     approvalText,
     actionMetadata,
   });
-  const requestId = safeString(input.requestId || input.idempotencyKey) ||
+  const requestId =
+    safeString(input.requestId || input.idempotencyKey) ||
     buildOpaqueActionId(`agent_question_votes|${sessionSlug}|${telegramUserId}|${decisionFingerprint}|${createdAt}`);
   const decisionRecordKey = `${AGENT_QUESTION_VOTE_DECISION_KV_PREFIX}${sessionSlug}:${kvKeySafePart(telegramUserId)}:${requestId}`;
   const decisionRecord = {
@@ -4368,29 +4725,30 @@ async function applyAgentQuestionVotes({
     ok: true,
     requestId,
     decisionRecordKey,
-    settings: { agentAutoApplyQuestionVotes: settings.agentAutoApplyQuestionVotes !== false },
+    settings: {
+      agentAutoApplyQuestionVotes: settings.agentAutoApplyQuestionVotes !== false,
+    },
     appliedVotes,
     skipped,
     decisions,
   };
 }
 
-async function handleQuestionVoteRecommendationsRequest({
-  env = {},
-  context = {},
-  input = {},
-  waitUntil = null,
-} = {}) {
-  const { loaded, questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+async function handleQuestionVoteRecommendationsRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
+  const { loaded, questions } = await loadPublicQuestionsForHandoff({
+    env,
+    context,
+    waitUntil,
+  });
   const built = buildQuestionVoteRecommendations(questions, input, context);
   const recommendationRecord = built.recommendations.length
     ? await persistAgentQuestionVoteRecommendations({
-      env,
-      context,
-      input,
-      recommendations: built.recommendations,
-      createdAt: input.createdAt || new Date().toISOString(),
-    })
+        env,
+        context,
+        input,
+        recommendations: built.recommendations,
+        createdAt: input.createdAt || new Date().toISOString(),
+      })
     : { ok: false, reason: 'no_recommendations' };
   const settings = await loadTelegramAgentSettings({
     env,
@@ -4399,19 +4757,20 @@ async function handleQuestionVoteRecommendationsRequest({
   });
   let autoApply = null;
   if (input.autoApply === true || lower(input.applyMode) === 'auto') {
-    autoApply = settings.agentAutoApplyQuestionVotes === false
-      ? {
-        ok: false,
-        reason: 'agent_question_vote_auto_apply_disabled',
-        appliedVotes: [],
-      }
-      : await applyAgentQuestionVotes({
-        env,
-        context,
-        input: { ...input, autoApply: true },
-        questions,
-        recommendations: built.recommendations,
-      });
+    autoApply =
+      settings.agentAutoApplyQuestionVotes === false
+        ? {
+            ok: false,
+            reason: 'agent_question_vote_auto_apply_disabled',
+            appliedVotes: [],
+          }
+        : await applyAgentQuestionVotes({
+            env,
+            context,
+            input: { ...input, autoApply: true },
+            questions,
+            recommendations: built.recommendations,
+          });
   }
   return json({
     ok: true,
@@ -4429,10 +4788,12 @@ async function handleQuestionVoteRecommendationsRequest({
     },
     relevance: built.relevance,
     recommendations: built.recommendations,
-    recommendationRecord: recommendationRecord.ok ? {
-      requestId: recommendationRecord.requestId,
-      status: recommendationRecord.record.status,
-    } : null,
+    recommendationRecord: recommendationRecord.ok
+      ? {
+          requestId: recommendationRecord.requestId,
+          status: recommendationRecord.record.status,
+        }
+      : null,
     autoApply,
     approval: {
       endpoint: '/api/agent/question-votes/apply',
@@ -4441,13 +4802,12 @@ async function handleQuestionVoteRecommendationsRequest({
   });
 }
 
-async function handleQuestionVoteApplyRequest({
-  env = {},
-  context = {},
-  input = {},
-  waitUntil = null,
-} = {}) {
-  const { questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+async function handleQuestionVoteApplyRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
+  const { questions } = await loadPublicQuestionsForHandoff({
+    env,
+    context,
+    waitUntil,
+  });
   const recommendations = Array.isArray(input.recommendations)
     ? input.recommendations
     : buildQuestionVoteRecommendations(questions, input, context).recommendations;
@@ -4461,11 +4821,7 @@ async function handleQuestionVoteApplyRequest({
   return json(applied, { status: applied.ok ? 200 : 400 });
 }
 
-async function handleActionsRequest({
-  env = {},
-  context = {},
-  input = {},
-} = {}) {
+async function handleActionsRequest({ env = {}, context = {}, input = {} } = {}) {
   const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug || input.sessionSlug);
   const items = await listTelegramAgentActivity({
     env,
@@ -4486,9 +4842,9 @@ async function handleActionsRequest({
 function directLinkMiniAppShortName(env = {}) {
   return safeString(
     env.AGENT_BRIDGE_MINIAPP_SHORT_NAME ||
-    env.AGENT_BRIDGE_MINI_APP_SHORT_NAME ||
-    env.TELEGRAM_MINIAPP_SHORT_NAME ||
-    env.TELEGRAM_MINI_APP_SHORT_NAME
+      env.AGENT_BRIDGE_MINI_APP_SHORT_NAME ||
+      env.TELEGRAM_MINIAPP_SHORT_NAME ||
+      env.TELEGRAM_MINI_APP_SHORT_NAME,
   ).replace(/^@+/, '');
 }
 
@@ -4505,7 +4861,8 @@ function directLinkMiniAppUrl(env = {}, launch = '') {
 }
 
 function normalizeMiniAppLaunchQuestionIds(input = {}, questions = []) {
-  const source = input.questionSeries?.questionIds ||
+  const source =
+    input.questionSeries?.questionIds ||
     input.questionSeries?.orderedQuestionIds ||
     input.orderedQuestionIds ||
     input.questionIds ||
@@ -4527,7 +4884,8 @@ function normalizeMiniAppLaunchQuestionIds(input = {}, questions = []) {
 }
 
 function normalizeMiniAppLaunchDrafts(input = {}, questionIds = []) {
-  const source = input.questionSeries?.draftAnswersByQuestionId ||
+  const source =
+    input.questionSeries?.draftAnswersByQuestionId ||
     input.questionSeries?.prefilledDraftsByQuestionId ||
     input.questionSeries?.draftsByQuestionId ||
     input.draftAnswersByQuestionId ||
@@ -4561,22 +4919,26 @@ function normalizeMiniAppLaunchDrafts(input = {}, questionIds = []) {
   return out;
 }
 
-async function handleMiniAppLaunchRequest({
-  env = {},
-  context = {},
-  input = {},
-  waitUntil = null,
-} = {}) {
-  const { questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+async function handleMiniAppLaunchRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
+  const { questions } = await loadPublicQuestionsForHandoff({
+    env,
+    context,
+    waitUntil,
+  });
   const resolved = normalizeMiniAppLaunchQuestionIds(input, questions);
   if (!resolved.ids.length) {
-    return json({
-      ok: false,
-      reason: 'mini_app_launch_questions_required',
-      skipped: resolved.skipped,
-    }, { status: 400 });
+    return json(
+      {
+        ok: false,
+        reason: 'mini_app_launch_questions_required',
+        skipped: resolved.skipped,
+      },
+      { status: 400 },
+    );
   }
-  const skipIds = new Set(normalizeQuestionQueueRefs(input.questionSeries?.skippedQuestionIds || input.skippedQuestionIds).map(lower));
+  const skipIds = new Set(
+    normalizeQuestionQueueRefs(input.questionSeries?.skippedQuestionIds || input.skippedQuestionIds).map(lower),
+  );
   const skippedQuestionIds = resolved.ids.filter((questionId) => skipIds.has(lower(questionId)));
   const draftAnswersByQuestionId = normalizeMiniAppLaunchDrafts(input, resolved.ids);
   const callback = createRandomTelegramCallbackAction({
@@ -4619,7 +4981,8 @@ async function handleMiniAppLaunchRequest({
     skipped: resolved.skipped,
     skippedQuestionCount: skippedQuestionIds.length,
     prefilledDraftCount: Object.keys(draftAnswersByQuestionId).length,
-    instructions: 'Send link to the user. The Mini App opens the ordered question series with editable prefilled drafts and local skip controls.',
+    instructions:
+      'Send link to the user. The Mini App opens the ordered question series with editable prefilled drafts and local skip controls.',
   });
 }
 
@@ -4629,23 +4992,26 @@ function agentBoolean(value) {
 }
 
 function aggregateResultsEnabledForAgent(session = {}) {
-  const exposure = session.resultsExposure && typeof session.resultsExposure === 'object' && !Array.isArray(session.resultsExposure)
-    ? session.resultsExposure
-    : {};
+  const exposure =
+    session.resultsExposure && typeof session.resultsExposure === 'object' && !Array.isArray(session.resultsExposure)
+      ? session.resultsExposure
+      : {};
   return exposure.aggregateResultsEnabled !== false;
 }
 
 function anonymizedGroupsEnabledForAgent(session = {}) {
-  const exposure = session.resultsExposure && typeof session.resultsExposure === 'object' && !Array.isArray(session.resultsExposure)
-    ? session.resultsExposure
-    : {};
+  const exposure =
+    session.resultsExposure && typeof session.resultsExposure === 'object' && !Array.isArray(session.resultsExposure)
+      ? session.resultsExposure
+      : {};
   return exposure.anonymizedGroupsEnabled === true;
 }
 
 function agentResultsMinGroupSize(session = {}) {
-  const exposure = session.resultsExposure && typeof session.resultsExposure === 'object' && !Array.isArray(session.resultsExposure)
-    ? session.resultsExposure
-    : {};
+  const exposure =
+    session.resultsExposure && typeof session.resultsExposure === 'object' && !Array.isArray(session.resultsExposure)
+      ? session.resultsExposure
+      : {};
   const n = Math.floor(Number(exposure.minGroupSize));
   return Number.isFinite(n) && n >= 2 ? n : 5;
 }
@@ -4670,7 +5036,11 @@ async function authorizeSessionMemberAggregateResults({
   const delegation = context.delegation || {};
   const accountAddress = safeString(delegation.accountAddress);
   if (!accountAddress || !delegation.principal) {
-    return { ok: false, status: 403, reason: 'session_member_aggregate_membership_denied' };
+    return {
+      ok: false,
+      status: 403,
+      reason: 'session_member_aggregate_membership_denied',
+    };
   }
 
   let login;
@@ -4683,43 +5053,76 @@ async function authorizeSessionMemberAggregateResults({
       fetchImpl,
     });
   } catch {
-    return { ok: false, status: 503, reason: 'session_member_aggregate_membership_unavailable' };
+    return {
+      ok: false,
+      status: 503,
+      reason: 'session_member_aggregate_membership_unavailable',
+    };
   }
   if (!login?.ok || !safeString(login.token) || !safeString(login.workerUrl)) {
-    return { ok: false, status: 503, reason: 'session_member_aggregate_membership_unavailable' };
+    return {
+      ok: false,
+      status: 503,
+      reason: 'session_member_aggregate_membership_unavailable',
+    };
   }
 
   let response;
   let body;
   try {
-    response = await fetchImpl(`${login.workerUrl}/groups/my-memberships`, {
+    const membershipsUrl = login.sessionId
+      ? `${login.workerUrl}/groups/my-memberships?sessionId=${encodeURIComponent(login.sessionId)}`
+      : `${login.workerUrl}/groups/my-memberships`;
+    response = await fetchImpl(membershipsUrl, {
       method: 'GET',
       headers: { authorization: `Bearer ${login.token}` },
       cache: 'no-store',
     });
     body = await response.json();
   } catch {
-    return { ok: false, status: 503, reason: 'session_member_aggregate_membership_unavailable' };
+    return {
+      ok: false,
+      status: 503,
+      reason: 'session_member_aggregate_membership_unavailable',
+    };
   }
   if (!response.ok || body?.ok !== true || !Array.isArray(body.memberships)) {
     const denied = response.status === 401 || response.status === 403;
     return {
       ok: false,
       status: denied ? 403 : 503,
-      reason: denied
-        ? 'session_member_aggregate_membership_denied'
-        : 'session_member_aggregate_membership_unavailable',
+      reason: denied ? 'session_member_aggregate_membership_denied' : 'session_member_aggregate_membership_unavailable',
+    };
+  }
+  if (
+    login.sessionId &&
+    (safeString(body.sessionSlug).toLowerCase() !== safeString(context.session.sessionSlug).toLowerCase() ||
+      safeString(body.sessionId).toLowerCase() !== safeString(login.sessionId).toLowerCase())
+  ) {
+    return {
+      ok: false,
+      status: 503,
+      reason: 'session_member_aggregate_membership_unavailable',
     };
   }
   if (!body.memberships.length) {
-    return { ok: false, status: 403, reason: 'session_member_aggregate_membership_denied' };
+    return {
+      ok: false,
+      status: 403,
+      reason: 'session_member_aggregate_membership_denied',
+    };
   }
 
   const minGroupSize = agentResultsMinGroupSize(context.session);
   const qualifies = body.memberships.some((membership) => Number(membership?.memberCount) >= minGroupSize);
   return qualifies
     ? { ok: true }
-    : { ok: false, status: 403, reason: 'session_member_aggregate_min_group_size_not_met', minGroupSize };
+    : {
+        ok: false,
+        status: 403,
+        reason: 'session_member_aggregate_min_group_size_not_met',
+        minGroupSize,
+      };
 }
 
 function sessionMemberAggregateDenial(access = {}) {
@@ -4755,16 +5158,18 @@ function anonymizeAgentGroups(groups = [], minGroupSize = 2) {
     averageScore: Number(group.averageScore || 0),
     topStatements: Array.isArray(group.topStatements)
       ? group.topStatements.map((statement) => ({
-        label: safeString(statement.label),
-        prompt: safeString(statement.prompt),
-        cluster: statement.cluster && typeof statement.cluster === 'object' && !Array.isArray(statement.cluster)
-          ? statement.cluster
-          : {},
-        overall: statement.overall && typeof statement.overall === 'object' && !Array.isArray(statement.overall)
-          ? statement.overall
-          : {},
-        differenceScore: Number(statement.differenceScore || 0),
-      }))
+          label: safeString(statement.label),
+          prompt: safeString(statement.prompt),
+          cluster:
+            statement.cluster && typeof statement.cluster === 'object' && !Array.isArray(statement.cluster)
+              ? statement.cluster
+              : {},
+          overall:
+            statement.overall && typeof statement.overall === 'object' && !Array.isArray(statement.overall)
+              ? statement.overall
+              : {},
+          differenceScore: Number(statement.differenceScore || 0),
+        }))
       : [],
   }));
   return {
@@ -4774,12 +5179,31 @@ function anonymizeAgentGroups(groups = [], minGroupSize = 2) {
 }
 
 function demoAgentResultsQuestions(questions = []) {
-  const source = Array.isArray(questions) && questions.length ? questions : [
-    { questionId: 'demo-q-1', questionType: 'binary', prompt: 'Should onboarding optimize for one-click agent setup?' },
-    { questionId: 'demo-q-2', questionType: 'binary', prompt: 'Should admins sponsor organizer-priority questions first?' },
-    { questionId: 'demo-q-3', questionType: 'binary', prompt: 'Should topic maps hide raw response text by default?' },
-    { questionId: 'demo-q-4', questionType: 'binary', prompt: 'Should agents draft answers from natural language context?' },
-  ];
+  const source =
+    Array.isArray(questions) && questions.length
+      ? questions
+      : [
+          {
+            questionId: 'demo-q-1',
+            questionType: 'binary',
+            prompt: 'Should onboarding optimize for one-click agent setup?',
+          },
+          {
+            questionId: 'demo-q-2',
+            questionType: 'binary',
+            prompt: 'Should admins sponsor organizer-priority questions first?',
+          },
+          {
+            questionId: 'demo-q-3',
+            questionType: 'binary',
+            prompt: 'Should topic maps hide raw response text by default?',
+          },
+          {
+            questionId: 'demo-q-4',
+            questionType: 'binary',
+            prompt: 'Should agents draft answers from natural language context?',
+          },
+        ];
   return source.slice(0, 6).map((question, index) => ({
     ...question,
     questionId: safeString(question.questionId || question.id) || `demo-q-${index + 1}`,
@@ -4795,7 +5219,7 @@ function demoAgentResultsRecords(questions = []) {
     ['Unsure', 'Agree', 'Agree', 'Disagree'],
     ['Disagree', 'Disagree', 'Unsure', 'Agree'],
   ];
-  return demoAgentResultsQuestions(questions).flatMap((question, questionIndex) => (
+  return demoAgentResultsQuestions(questions).flatMap((question, questionIndex) =>
     Array.from({ length: 4 }, (_, participantIndex) => {
       const label = labels[questionIndex % labels.length][participantIndex % 4];
       return {
@@ -4806,21 +5230,19 @@ function demoAgentResultsRecords(questions = []) {
         questionType: question.questionType,
         createdAt: `demo-results-${questionIndex + 1}-${participantIndex + 1}`,
       };
-    })
-  ));
+    }),
+  );
 }
 
-async function loadAgentResultsDataset({
-  env = {},
-  context = {},
-  input = {},
-} = {}) {
+async function loadAgentResultsDataset({ env = {}, context = {}, input = {} } = {}) {
   const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug || input.sessionSlug);
   const loaded = await loadQuestionsForSession(env, sessionSlug);
   const questions = Array.isArray(loaded.questions) ? loaded.questions : [];
   const demo = agentBoolean(input.demo);
   const sourceQuestions = demo ? demoAgentResultsQuestions(questions) : questions;
-  const sourceRecords = demo ? demoAgentResultsRecords(sourceQuestions) : await loadSubmittedResultRecords(env, sessionSlug);
+  const sourceRecords = demo
+    ? demoAgentResultsRecords(sourceQuestions)
+    : await loadSubmittedResultRecords(env, sessionSlug);
   return {
     sessionSlug,
     questions,
@@ -4836,28 +5258,21 @@ async function loadAgentResultsDataset({
 // identical granularity, just shaped for the client-side polis math.
 const AGENT_POLIS_BINARY_LABELS = new Set(['Agree', 'Disagree', 'Unsure']);
 
-function buildAgentPolisDataset({
-  sessionSlug = '',
-  sourceRecords = [],
-  sourceQuestions = [],
-  demo = false,
-} = {}) {
+function buildAgentPolisDataset({ sessionSlug = '', sourceRecords = [], sourceQuestions = [], demo = false } = {}) {
   const binaryQuestions = consensusQuestionsForResults(sourceQuestions);
   const binaryQuestionIds = new Set(
-    binaryQuestions.map((question) => safeString(question.questionId || question.id)).filter(Boolean)
+    binaryQuestions.map((question) => safeString(question.questionId || question.id)).filter(Boolean),
   );
-  const records = (Array.isArray(sourceRecords) ? sourceRecords : []).filter((record) => (
-    binaryQuestionIds.has(safeString(record.questionId)) &&
-    AGENT_POLIS_BINARY_LABELS.has(safeString(record.label)) &&
-    safeString(record.telegramUserId)
-  ));
+  const records = (Array.isArray(sourceRecords) ? sourceRecords : []).filter(
+    (record) =>
+      binaryQuestionIds.has(safeString(record.questionId)) &&
+      AGENT_POLIS_BINARY_LABELS.has(safeString(record.label)) &&
+      safeString(record.telegramUserId),
+  );
   // Latest answer per participant+question wins (records arrive createdAt-sorted).
   const latestByParticipantQuestion = new Map();
   for (const record of records) {
-    latestByParticipantQuestion.set(
-      `${safeString(record.telegramUserId)}|${safeString(record.questionId)}`,
-      record
-    );
+    latestByParticipantQuestion.set(`${safeString(record.telegramUserId)}|${safeString(record.questionId)}`, record);
   }
   const latestRecords = Array.from(latestByParticipantQuestion.values());
   const participants = Array.from(new Set(latestRecords.map((record) => safeString(record.telegramUserId))));
@@ -4897,64 +5312,86 @@ function buildAgentPolisDataset({
 
 function aggregateQuestionRows(records = [], questions = [], view = 'consensus') {
   const consensusQuestions = consensusQuestionsForResults(questions);
-  const consensusQuestionIds = new Set(consensusQuestions.map((question) => safeString(question.questionId || question.id)).filter(Boolean));
+  const consensusQuestionIds = new Set(
+    consensusQuestions.map((question) => safeString(question.questionId || question.id)).filter(Boolean),
+  );
   const consensusRecords = records.filter((record) => consensusQuestionIds.has(safeString(record.questionId)));
-  const rows = summarizeQuestionResults(consensusRecords, consensusQuestions).map((summary) => {
-    const counts = summary.counts.map(([label, count]) => ({ label, count }));
-    const maxCount = counts.reduce((max, item) => Math.max(max, Number(item.count || 0)), 0);
-    const agreementScore = summary.total > 0 ? maxCount / summary.total : 0;
-    return {
-      questionId: safeString(summary.questionId),
-      prompt: safeString(summary.prompt),
-      total: Number(summary.total || 0),
-      participants: Number(summary.participants || 0),
-      counts,
-      agreementScore: Number(agreementScore.toFixed(3)),
-      differenceScore: Number(Number(summary.differenceScore || 0).toFixed(3)),
-      hasDifference: summary.hasDifference === true,
-    };
-  }).filter((row) => row.total > 0);
-  return rows.sort((left, right) => (
+  const rows = summarizeQuestionResults(consensusRecords, consensusQuestions)
+    .map((summary) => {
+      const counts = summary.counts.map(([label, count]) => ({ label, count }));
+      const maxCount = counts.reduce((max, item) => Math.max(max, Number(item.count || 0)), 0);
+      const agreementScore = summary.total > 0 ? maxCount / summary.total : 0;
+      return {
+        questionId: safeString(summary.questionId),
+        prompt: safeString(summary.prompt),
+        total: Number(summary.total || 0),
+        participants: Number(summary.participants || 0),
+        counts,
+        agreementScore: Number(agreementScore.toFixed(3)),
+        differenceScore: Number(Number(summary.differenceScore || 0).toFixed(3)),
+        hasDifference: summary.hasDifference === true,
+      };
+    })
+    .filter((row) => row.total > 0);
+  return rows.sort((left, right) =>
     view === 'difference'
-      ? right.differenceScore - left.differenceScore || right.total - left.total || left.prompt.localeCompare(right.prompt)
-      : right.agreementScore - left.agreementScore || right.total - left.total || left.prompt.localeCompare(right.prompt)
-  ));
+      ? right.differenceScore - left.differenceScore ||
+        right.total - left.total ||
+        left.prompt.localeCompare(right.prompt)
+      : right.agreementScore - left.agreementScore ||
+        right.total - left.total ||
+        left.prompt.localeCompare(right.prompt),
+  );
 }
 
 function beeswarmRowsFromAgentQuestionRows(rows = []) {
   return rows.slice(0, 3).map((row, index) => ({
     label: `Q${index + 1}`,
     prompt: row.prompt,
-    answers: row.counts.flatMap((item) => (
-      new Array(Math.max(0, Number(item.count || 0))).fill(item.label)
-    )),
+    answers: row.counts.flatMap((item) => new Array(Math.max(0, Number(item.count || 0))).fill(item.label)),
   }));
 }
 
-async function buildAgentTopicMap({
-  env = {},
-  context = {},
-  input = {},
-} = {}) {
+async function buildAgentTopicMap({ env = {}, context = {}, input = {} } = {}) {
   const sessionSlug = sanitizeSessionSlug(context.session?.sessionSlug || input.sessionSlug);
   const loaded = await loadQuestionsForSession(env, sessionSlug);
   const questions = Array.isArray(loaded.questions) ? loaded.questions : [];
   const records = await loadSubmittedResultRecords(env, sessionSlug);
   const demo = agentBoolean(input.demo);
-  const sourceQuestions = demo ? [
-    { questionId: 'demo-topic-q-1', prompt: 'Should onboarding optimize for one-click agent setup?', tags: ['onboarding'] },
-    { questionId: 'demo-topic-q-2', prompt: 'Should admins sponsor organizer-priority questions first?', tags: ['question-cadence'] },
-    { questionId: 'demo-topic-q-3', prompt: 'Should topic maps hide raw response text by default?', tags: ['privacy'] },
-    { questionId: 'demo-topic-q-4', prompt: 'Should agents draft answers from natural language context?', tags: ['agent-workflow'] },
-  ] : questions;
-  const sourceRecords = demo ? sourceQuestions.flatMap((question, questionIndex) => (
-    Array.from({ length: 4 }, (_, participantIndex) => ({
-      telegramUserId: `demo-user-${participantIndex + 1}`,
-      questionId: question.questionId,
-      label: ['Agree', 'Unsure', 'Disagree', 'Agree'][(questionIndex + participantIndex) % 4],
-      createdAt: `demo-topic-${questionIndex}-${participantIndex}`,
-    }))
-  )) : records;
+  const sourceQuestions = demo
+    ? [
+        {
+          questionId: 'demo-topic-q-1',
+          prompt: 'Should onboarding optimize for one-click agent setup?',
+          tags: ['onboarding'],
+        },
+        {
+          questionId: 'demo-topic-q-2',
+          prompt: 'Should admins sponsor organizer-priority questions first?',
+          tags: ['question-cadence'],
+        },
+        {
+          questionId: 'demo-topic-q-3',
+          prompt: 'Should topic maps hide raw response text by default?',
+          tags: ['privacy'],
+        },
+        {
+          questionId: 'demo-topic-q-4',
+          prompt: 'Should agents draft answers from natural language context?',
+          tags: ['agent-workflow'],
+        },
+      ]
+    : questions;
+  const sourceRecords = demo
+    ? sourceQuestions.flatMap((question, questionIndex) =>
+        Array.from({ length: 4 }, (_, participantIndex) => ({
+          telegramUserId: `demo-user-${participantIndex + 1}`,
+          questionId: question.questionId,
+          label: ['Agree', 'Unsure', 'Disagree', 'Agree'][(questionIndex + participantIndex) % 4],
+          createdAt: `demo-topic-${questionIndex}-${participantIndex}`,
+        })),
+      )
+    : records;
   const topicMap = await loadOrBuildTelegramTopicMap({
     env,
     session: context.session,
@@ -4981,18 +5418,30 @@ async function handleResultsRequest({
 } = {}) {
   const view = normalizeAgentResultsView(input.view || 'topic-map');
   if (!AGENT_RESULTS_SUPPORTED_VIEWS.includes(view)) {
-    const body = { ok: false, reason: 'unsupported_results_view', supportedViews: AGENT_RESULTS_SUPPORTED_VIEWS };
+    const body = {
+      ok: false,
+      reason: 'unsupported_results_view',
+      supportedViews: AGENT_RESULTS_SUPPORTED_VIEWS,
+    };
     assertNoSecretShape(body, 'Telegram agent results unsupported-view response must not serialize secrets.');
     return json(body, { status: 400 });
   }
   const demo = agentBoolean(input.demo);
   if (view === 'topic-map') {
     if (!demo && !aggregateResultsEnabledForAgent(context.session)) {
-      const body = { ok: false, reason: 'level_3_aggregate_results_admin_disabled' };
+      const body = {
+        ok: false,
+        reason: 'level_3_aggregate_results_admin_disabled',
+      };
       assertNoSecretShape(body, 'Telegram agent results gate response must not serialize secrets.');
       return json(body, { status: 403 });
     }
-    const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+    const memberAccess = await authorizeSessionMemberAggregateResults({
+      env,
+      context,
+      input,
+      fetchImpl,
+    });
     if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
     const built = await buildAgentTopicMap({ env, context, input });
     const body = {
@@ -5010,11 +5459,19 @@ async function handleResultsRequest({
   }
   if (['consensus', 'difference'].includes(view)) {
     if (!demo && !aggregateResultsEnabledForAgent(context.session)) {
-      const body = { ok: false, reason: 'level_3_aggregate_results_admin_disabled' };
+      const body = {
+        ok: false,
+        reason: 'level_3_aggregate_results_admin_disabled',
+      };
       assertNoSecretShape(body, 'Telegram agent results gate response must not serialize secrets.');
       return json(body, { status: 403 });
     }
-    const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+    const memberAccess = await authorizeSessionMemberAggregateResults({
+      env,
+      context,
+      input,
+      fetchImpl,
+    });
     if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
     const loaded = await loadAgentResultsDataset({ env, context, input });
     const rows = aggregateQuestionRows(loaded.sourceRecords, loaded.sourceQuestions, view);
@@ -5036,7 +5493,12 @@ async function handleResultsRequest({
       assertNoSecretShape(body, 'Telegram agent polis gate response must not serialize secrets.');
       return json(body, { status: 403 });
     }
-    const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+    const memberAccess = await authorizeSessionMemberAggregateResults({
+      env,
+      context,
+      input,
+      fetchImpl,
+    });
     if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
     const loaded = await loadAgentResultsDataset({ env, context, input });
     const body = buildAgentPolisDataset(loaded);
@@ -5060,7 +5522,12 @@ async function handleResultsRequest({
     assertNoSecretShape(body, 'Telegram agent groups gate response must not serialize secrets.');
     return json(body, { status: 403 });
   }
-  const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+  const memberAccess = await authorizeSessionMemberAggregateResults({
+    env,
+    context,
+    input,
+    fetchImpl,
+  });
   if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
   const loaded = await loadAgentResultsDataset({ env, context, input });
   const graph = buildParticipantGraph(loaded.sourceRecords, loaded.sourceQuestions);
@@ -5090,18 +5557,30 @@ async function handleResultsImageRequest({
 } = {}) {
   const view = normalizeAgentResultsView(input.view || 'topic-map');
   if (!AGENT_RESULTS_IMAGE_SUPPORTED_VIEWS.includes(view)) {
-    const body = { ok: false, reason: 'unsupported_results_view', supportedViews: AGENT_RESULTS_IMAGE_SUPPORTED_VIEWS };
+    const body = {
+      ok: false,
+      reason: 'unsupported_results_view',
+      supportedViews: AGENT_RESULTS_IMAGE_SUPPORTED_VIEWS,
+    };
     assertNoSecretShape(body, 'Telegram agent results-image unsupported-view response must not serialize secrets.');
     return json(body, { status: 400 });
   }
   const demo = agentBoolean(input.demo);
   if (view === 'topic-map') {
     if (!demo && !aggregateResultsEnabledForAgent(context.session)) {
-      const body = { ok: false, reason: 'level_3_aggregate_results_admin_disabled' };
+      const body = {
+        ok: false,
+        reason: 'level_3_aggregate_results_admin_disabled',
+      };
       assertNoSecretShape(body, 'Telegram agent results-image gate response must not serialize secrets.');
       return json(body, { status: 403 });
     }
-    const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+    const memberAccess = await authorizeSessionMemberAggregateResults({
+      env,
+      context,
+      input,
+      fetchImpl,
+    });
     if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
     const built = await buildAgentTopicMap({ env, context, input });
     if (!built.topicMap.availability.available && !built.demo) {
@@ -5132,11 +5611,19 @@ async function handleResultsImageRequest({
   }
   if (view === 'consensus') {
     if (!demo && !aggregateResultsEnabledForAgent(context.session)) {
-      const body = { ok: false, reason: 'level_3_aggregate_results_admin_disabled' };
+      const body = {
+        ok: false,
+        reason: 'level_3_aggregate_results_admin_disabled',
+      };
       assertNoSecretShape(body, 'Telegram agent consensus image gate response must not serialize secrets.');
       return json(body, { status: 403 });
     }
-    const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+    const memberAccess = await authorizeSessionMemberAggregateResults({
+      env,
+      context,
+      input,
+      fetchImpl,
+    });
     if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
     const loaded = await loadAgentResultsDataset({ env, context, input });
     const rows = aggregateQuestionRows(loaded.sourceRecords, loaded.sourceQuestions, 'consensus');
@@ -5171,7 +5658,12 @@ async function handleResultsImageRequest({
     assertNoSecretShape(body, 'Telegram agent groups image gate response must not serialize secrets.');
     return json(body, { status: 403 });
   }
-  const memberAccess = await authorizeSessionMemberAggregateResults({ env, context, input, fetchImpl });
+  const memberAccess = await authorizeSessionMemberAggregateResults({
+    env,
+    context,
+    input,
+    fetchImpl,
+  });
   if (!memberAccess.ok) return sessionMemberAggregateDenial(memberAccess);
   const loaded = await loadAgentResultsDataset({ env, context, input });
   const graph = buildParticipantGraph(loaded.sourceRecords, loaded.sourceQuestions);
@@ -5207,16 +5699,16 @@ async function handleResultsImageRequest({
 }
 
 function normalizePreferenceEntries(input = {}) {
-  const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
-    ? input.preferences
-    : input;
+  const preferences =
+    input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
+      ? input.preferences
+      : input;
   const preferenceArray = Array.isArray(input.preferences) ? input.preferences : [];
   if (preferenceArray.length) {
     return preferenceArray.map((entry) => {
       const source = entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : { answer: entry };
-      const nestedAnswer = source.answer && typeof source.answer === 'object' && !Array.isArray(source.answer)
-        ? source.answer
-        : null;
+      const nestedAnswer =
+        source.answer && typeof source.answer === 'object' && !Array.isArray(source.answer) ? source.answer : null;
       return {
         questionId: safeString(source.questionId || source.id),
         answer: nestedAnswer ? { ...source, ...nestedAnswer } : source,
@@ -5225,12 +5717,15 @@ function normalizePreferenceEntries(input = {}) {
   }
   const byId = preferences.answersByQuestionId || preferences.draftsByQuestionId || input.answersByQuestionId;
   if (byId && typeof byId === 'object' && !Array.isArray(byId)) {
-    const initialById = preferences.initialAnswersByQuestionId || preferences.initialDraftsByQuestionId ||
-      input.initialAnswersByQuestionId || input.initialDraftsByQuestionId || {};
+    const initialById =
+      preferences.initialAnswersByQuestionId ||
+      preferences.initialDraftsByQuestionId ||
+      input.initialAnswersByQuestionId ||
+      input.initialDraftsByQuestionId ||
+      {};
     return Object.entries(byId).map(([questionId, answer]) => {
-      const initialAnswer = initialById && typeof initialById === 'object' && !Array.isArray(initialById)
-        ? initialById[questionId]
-        : null;
+      const initialAnswer =
+        initialById && typeof initialById === 'object' && !Array.isArray(initialById) ? initialById[questionId] : null;
       if (!initialAnswer) return { questionId, answer };
       const source = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : { value: answer };
       return { questionId, answer: { ...source, initialAnswer } };
@@ -5240,9 +5735,8 @@ function normalizePreferenceEntries(input = {}) {
   if (Array.isArray(drafts)) {
     return drafts.map((entry) => {
       const source = entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : { answer: entry };
-      const nestedAnswer = source.answer && typeof source.answer === 'object' && !Array.isArray(source.answer)
-        ? source.answer
-        : null;
+      const nestedAnswer =
+        source.answer && typeof source.answer === 'object' && !Array.isArray(source.answer) ? source.answer : null;
       return {
         questionId: safeString(source.questionId || source.id),
         answer: nestedAnswer ? { ...source, ...nestedAnswer } : source,
@@ -5253,17 +5747,19 @@ function normalizePreferenceEntries(input = {}) {
 }
 
 function normalizeDraftForQuestion(answer = {}, question = {}) {
-  const source = answer && typeof answer === 'object' && !Array.isArray(answer)
-    ? answer
-    : { value: answer };
+  const source = answer && typeof answer === 'object' && !Array.isArray(answer) ? answer : { value: answer };
   const questionType = safeString(question.questionType || source.questionType || 'freeform');
   const comments = safeString(source.comments || source.additionalComments || source.reason || source.rationale);
   if (questionType === 'binary') {
     const raw = lower(firstValue(source.value, source.answer, source.choice, source.stance, source.label));
-    const value = raw === 'yes' || raw === 'true' ? 'agree'
-      : raw === 'no' || raw === 'false' ? 'disagree'
-      : raw === 'maybe' || raw === 'unknown' ? 'unsure'
-      : raw;
+    const value =
+      raw === 'yes' || raw === 'true'
+        ? 'agree'
+        : raw === 'no' || raw === 'false'
+          ? 'disagree'
+          : raw === 'maybe' || raw === 'unknown'
+            ? 'unsure'
+            : raw;
     if (!['agree', 'disagree', 'unsure'].includes(value)) return null;
     return {
       label: titleAnswer(value),
@@ -5301,10 +5797,14 @@ function normalizeDraftForQuestion(answer = {}, question = {}) {
 }
 
 function directSubmitRequested(input = {}) {
-  const preferences = input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
-    ? input.preferences
-    : {};
-  const submit = normalizeBoolean(firstValue(input.submit, input.submitAnswers, preferences.submit, preferences.submitAnswers), false);
+  const preferences =
+    input.preferences && typeof input.preferences === 'object' && !Array.isArray(input.preferences)
+      ? input.preferences
+      : {};
+  const submit = normalizeBoolean(
+    firstValue(input.submit, input.submitAnswers, preferences.submit, preferences.submitAnswers),
+    false,
+  );
   const approved = normalizeBoolean(
     firstValue(
       input.humanApproved,
@@ -5312,21 +5812,24 @@ function directSubmitRequested(input = {}) {
       input.userApproved,
       preferences.humanApproved,
       preferences.approved,
-      preferences.userApproved
+      preferences.userApproved,
     ),
-    false
+    false,
   );
   return submit === true && approved === true;
 }
 
 async function handlePreferencesRequest({ env = {}, context = {}, input = {}, waitUntil = null } = {}) {
   const loaded = await loadQuestionsForSession(env, context.session.sessionSlug, { waitUntil });
-  const questions = (Array.isArray(loaded.questions) ? loaded.questions : [])
-    .filter((question) => !questionIsLocked(question) && !questionIsUnavailable(question));
+  const questions = (Array.isArray(loaded.questions) ? loaded.questions : []).filter(
+    (question) => !questionIsLocked(question) && !questionIsUnavailable(question),
+  );
   const byId = new Map(questions.map((question) => [safeString(question.questionId || question.id), question]));
   const entries = normalizePreferenceEntries(input);
   const agentMetadata = normalizeAgentMetadata(input);
-  const hasAgentMetadata = agentMetadata && typeof agentMetadata === 'object' &&
+  const hasAgentMetadata =
+    agentMetadata &&
+    typeof agentMetadata === 'object' &&
     Object.values(agentMetadata).some((value) => value !== null && value !== undefined && value !== '');
   const clientSource = safeString(firstValue(input.source, input.client, input.integration)).slice(0, 120);
   const rootSubmitRequested = directSubmitRequested(input);
@@ -5363,11 +5866,11 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     if (!shouldSubmit) reviewRequired = true;
     const previousDraft = draftEditOptIn
       ? await readAnswerDraft({
-        env,
-        normalized: context.storageContext,
-        sessionSlug: context.session.sessionSlug,
-        selectedQuestionId: questionId,
-      })
+          env,
+          normalized: context.storageContext,
+          sessionSlug: context.session.sessionSlug,
+          selectedQuestionId: questionId,
+        })
       : null;
     const saved = await persistAnswerDraft({
       env,
@@ -5396,7 +5899,11 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
       continue;
     }
     const draftRecord = { ...saved.draft, key: saved.key };
-    drafts.push({ questionId, answerLabel: draft.label, controlType: draft.controlType });
+    drafts.push({
+      questionId,
+      answerLabel: draft.label,
+      controlType: draft.controlType,
+    });
     if (draftEditOptIn) {
       const initialAnswer = answerFromAgentInitial(entry.answer) || answerFromStoredDraft(previousDraft);
       if (initialAnswer) {
@@ -5438,7 +5945,10 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
         createdAt: input.createdAt || null,
       });
       if (!submit.ok) {
-        skipped.push({ questionId, reason: submit.reason || 'submit_request_failed' });
+        skipped.push({
+          questionId,
+          reason: submit.reason || 'submit_request_failed',
+        });
         continue;
       }
       submitted.push({
@@ -5464,16 +5974,20 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
     ...(submitted.length ? { submitted } : {}),
     ...(draftEditMetrics.length ? { draftEditMetrics } : {}),
     reviewRequired: finalReviewRequired,
-    review: !finalReviewRequired ? {
-      route: '/api/agent/preferences',
-      note: 'Human-approved answers were submitted without requiring Mini App finalization.',
-    } : submitted.length ? {
-      route: '/api/agent/preferences',
-      note: 'Human-approved answers were submitted; remaining drafts are saved for user review.',
-    } : {
-      route: '/telegram/mini-app',
-      note: 'Drafted preferences are saved for user review. Add submit=true and humanApproved=true only when the user explicitly authorizes direct submission.',
-    },
+    review: !finalReviewRequired
+      ? {
+          route: '/api/agent/preferences',
+          note: 'Human-approved answers were submitted without requiring Mini App finalization.',
+        }
+      : submitted.length
+        ? {
+            route: '/api/agent/preferences',
+            note: 'Human-approved answers were submitted; remaining drafts are saved for user review.',
+          }
+        : {
+            route: '/telegram/mini-app',
+            note: 'Drafted preferences are saved for user review. Add submit=true and humanApproved=true only when the user explicitly authorizes direct submission.',
+          },
   };
   assertNoSecretShape(payload, 'Telegram agent preference response must not serialize secrets.');
   return json(payload, { status: directSubmitIncomplete ? 422 : 200 });
@@ -5482,12 +5996,14 @@ async function handlePreferencesRequest({ env = {}, context = {}, input = {}, wa
 function normalizeCreateQuestionBatch(input = {}) {
   const questions = Array.isArray(input.questions)
     ? input.questions
-    : (Array.isArray(input.questionDrafts) ? input.questionDrafts : []);
-  return questions.slice(0, 21).map((question) => (
-    question && typeof question === 'object' && !Array.isArray(question)
-      ? question
-      : { prompt: question }
-  ));
+    : Array.isArray(input.questionDrafts)
+      ? input.questionDrafts
+      : [];
+  return questions
+    .slice(0, 21)
+    .map((question) =>
+      question && typeof question === 'object' && !Array.isArray(question) ? question : { prompt: question },
+    );
 }
 
 function normalizeSourceUrl(value = '') {
@@ -5505,7 +6021,9 @@ function normalizeSourceUrl(value = '') {
 function sourceTagForUrl(value = '') {
   const url = normalizeSourceUrl(value);
   if (!url) return '';
-  const hostname = safeString(new URL(url).hostname).replace(/^www\./i, '').toLowerCase();
+  const hostname = safeString(new URL(url).hostname)
+    .replace(/^www\./i, '')
+    .toLowerCase();
   return normalizeQuestionTags([`src:${hostname}`])[0] || '';
 }
 
@@ -5514,46 +6032,48 @@ function referencesForCreatedQuestion(question = {}, batchSourceUrl = '') {
   if (explicit.length) return explicit;
   const sourceUrl = normalizeSourceUrl(question.sourceUrl || question.url || batchSourceUrl);
   if (!sourceUrl) return [];
-  return normalizeQuestionReferences([{
-    type: 'url',
-    url: sourceUrl,
-    title: question.sourceTitle || question.title,
-  }]);
+  return normalizeQuestionReferences([
+    {
+      type: 'url',
+      url: sourceUrl,
+      title: question.sourceTitle || question.title,
+    },
+  ]);
 }
 
 function geoRefsForCreatedQuestion(question = {}, input = {}) {
   return normalizeQuestionGeoRefs(
-    question.geoRefs ||
-    question.geoIds ||
-    question.geoId ||
-    input.geoRefs ||
-    input.geoIds ||
-    input.geoId
+    question.geoRefs || question.geoIds || question.geoId || input.geoRefs || input.geoIds || input.geoId,
   );
 }
 
 function singleSelectForCreatedQuestion(question = {}) {
   const type = lower(question.questionType || question.type);
   const mode = lower(question.selectionMode || question.selectMode || question.select_mode);
-  return question.singleSelect === true
-    || question.singleChoice === true
-    || question.oneSelectionOnly === true
-    || mode === 'single'
-    || type === 'single_choice'
-    || type === 'single-choice';
+  return (
+    question.singleSelect === true ||
+    question.singleChoice === true ||
+    question.oneSelectionOnly === true ||
+    mode === 'single' ||
+    type === 'single_choice' ||
+    type === 'single-choice'
+  );
 }
 
-async function handleCreateQuestionsRequest({
-  env = {},
-  context = {},
-  input = {},
-} = {}) {
+async function handleCreateQuestionsRequest({ env = {}, context = {}, input = {} } = {}) {
   const batch = normalizeCreateQuestionBatch(input);
   if (!batch.length) {
     return json({ ok: false, reason: 'questions_create_batch_required' }, { status: 400 });
   }
   if (batch.length > 20) {
-    return json({ ok: false, reason: 'questions_create_batch_too_large', maxQuestions: 20 }, { status: 400 });
+    return json(
+      {
+        ok: false,
+        reason: 'questions_create_batch_too_large',
+        maxQuestions: 20,
+      },
+      { status: 400 },
+    );
   }
   const batchSourceUrl = normalizeSourceUrl(input.sourceUrl || input.url || input.link);
   if ((input.sourceUrl || input.url || input.link) && !batchSourceUrl) {
@@ -5562,7 +6082,9 @@ async function handleCreateQuestionsRequest({
   const created = [];
   const skipped = [];
   for (const question of batch) {
-    const prompt = safeString(question.prompt || question.questionText || question.text).replace(/\s+/g, ' ').slice(0, 1000);
+    const prompt = safeString(question.prompt || question.questionText || question.text)
+      .replace(/\s+/g, ' ')
+      .slice(0, 1000);
     if (!prompt) {
       skipped.push({ prompt: '', reason: 'question_prompt_missing' });
       continue;
@@ -5585,16 +6107,21 @@ async function handleCreateQuestionsRequest({
         prompt,
         questionType: question.questionType || question.type || 'binary',
         options: question.options,
-        ratingScale: question.ratingScale || question.rating_scale || {
-          min: question.min,
-          max: question.max,
-          step: question.step,
-        },
+        ratingScale: question.ratingScale ||
+          question.rating_scale || {
+            min: question.min,
+            max: question.max,
+            step: question.step,
+          },
         singleSelect: singleSelectForCreatedQuestion(question),
         tags,
         references,
         geoRefs,
-        sessionContext: question.sessionContext || input.sessionContext || input.context || sessionContextFromPolicySession(context.session),
+        sessionContext:
+          question.sessionContext ||
+          input.sessionContext ||
+          input.context ||
+          sessionContextFromPolicySession(context.session),
         metadata: {
           source: 'agent_handoff',
           authMode: safeString(context.authMode),
@@ -5604,11 +6131,17 @@ async function handleCreateQuestionsRequest({
         createdAt: input.createdAt || question.createdAt || null,
       });
     } catch (error) {
-      skipped.push({ prompt, reason: safeString(error?.message || error) || 'question_create_failed' });
+      skipped.push({
+        prompt,
+        reason: safeString(error?.message || error) || 'question_create_failed',
+      });
       continue;
     }
     if (!saved.ok) {
-      skipped.push({ prompt, reason: saved.reason || 'question_create_failed' });
+      skipped.push({
+        prompt,
+        reason: saved.reason || 'question_create_failed',
+      });
       continue;
     }
     created.push({
@@ -5636,15 +6169,22 @@ async function handleGeoBacklinkRequest({ env = {}, context = {}, input = {}, wa
   if (!questionId) {
     return json({ ok: false, reason: 'question_id_required' }, { status: 400 });
   }
-  const { questions } = await loadPublicQuestionsForHandoff({ env, context, waitUntil });
+  const { questions } = await loadPublicQuestionsForHandoff({
+    env,
+    context,
+    waitUntil,
+  });
   const question = questions.find((candidate) => safeString(candidate.questionId) === questionId);
   if (!question) {
-    return json({
-      ok: false,
-      reason: 'question_not_found',
-      sessionSlug: context.session.sessionSlug,
-      questionId,
-    }, { status: 404 });
+    return json(
+      {
+        ok: false,
+        reason: 'question_not_found',
+        sessionSlug: context.session.sessionSlug,
+        questionId,
+      },
+      { status: 404 },
+    );
   }
   const requestedGeoRefs = normalizeQuestionGeoRefs(input.geoRefs || input.geoId);
   const existingGeoRefs = normalizeQuestionGeoRefs(question.geoRefs);
@@ -5676,12 +6216,7 @@ async function handleGeoBacklinkRequest({ env = {}, context = {}, input = {}, wa
   return json(payload);
 }
 
-async function handlePoseRequest({
-  env = {},
-  context = {},
-  input = {},
-  fetchImpl = globalThis.fetch,
-} = {}) {
+async function handlePoseRequest({ env = {}, context = {}, input = {}, fetchImpl = globalThis.fetch } = {}) {
   const prompt = safeString(input.prompt || input.questionText || input.text);
   const explicitQuestionId = safeString(input.questionId || input.id);
   let questionId = explicitQuestionId;
@@ -5693,11 +6228,12 @@ async function handlePoseRequest({
       prompt,
       questionType: input.questionType || 'freeform',
       options: input.options,
-      ratingScale: input.ratingScale || input.rating_scale || {
-        min: input.min,
-        max: input.max,
-        step: input.step,
-      },
+      ratingScale: input.ratingScale ||
+        input.rating_scale || {
+          min: input.min,
+          max: input.max,
+          step: input.step,
+        },
       tags: input.tags,
       sessionContext: input.sessionContext || input.context || sessionContextFromPolicySession(context.session),
       metadata: {
@@ -5729,7 +6265,11 @@ async function handlePoseRequest({
       },
     },
   };
-  const commandResponse = await buildTelegramCommandResponse({ update, env, now: input.createdAt || null });
+  const commandResponse = await buildTelegramCommandResponse({
+    update,
+    env,
+    now: input.createdAt || null,
+  });
   const send = input.send !== false;
   let telegramSend = null;
   if (send && commandResponse.ok && commandResponse.response?.text && safeString(env.TELEGRAM_BOT_TOKEN)) {
@@ -5744,23 +6284,35 @@ async function handlePoseRequest({
       fetchImpl,
     });
   }
-  return json({
-    ok: commandResponse.ok === true,
-    sessionSlug: context.session.sessionSlug,
-    questionId,
-    posed: commandResponse.posed === true,
-    sent: telegramSend ? telegramSend.ok === true : false,
-    sendReason: telegramSend ? (telegramSend.ok ? '' : telegramSend.error) : (send ? 'telegram_bot_token_missing_or_send_skipped' : 'send_disabled'),
-  }, { status: commandResponse.ok === true ? 200 : 400 });
+  return json(
+    {
+      ok: commandResponse.ok === true,
+      sessionSlug: context.session.sessionSlug,
+      questionId,
+      posed: commandResponse.posed === true,
+      sent: telegramSend ? telegramSend.ok === true : false,
+      sendReason: telegramSend
+        ? telegramSend.ok
+          ? ''
+          : telegramSend.error
+        : send
+          ? 'telegram_bot_token_missing_or_send_skipped'
+          : 'send_disabled',
+    },
+    { status: commandResponse.ok === true ? 200 : 400 },
+  );
 }
 
 function telegramOnlyRouteGuard(context = {}) {
   if (context.session?.telegramOnly === true) return null;
-  return json({
-    ok: false,
-    reason: 'telegram_only_session_required',
-    sessionSlug: context.session?.sessionSlug || '',
-  }, { status: 403 });
+  return json(
+    {
+      ok: false,
+      reason: 'telegram_only_session_required',
+      sessionSlug: context.session?.sessionSlug || '',
+    },
+    { status: 403 },
+  );
 }
 
 async function handleGroupsRequest({ env = {}, context = {} } = {}) {
@@ -5810,11 +6362,7 @@ async function handleChildSessionRequest({ env = {}, context = {}, input = {} } 
   return json(saved, { status: saved.ok ? 200 : 400 });
 }
 
-async function handleMiniAppOnboardRequest({
-  request,
-  env = {},
-  createdAt = null,
-} = {}) {
+async function handleMiniAppOnboardRequest({ request, env = {}, createdAt = null } = {}) {
   const cors = miniAppOnboardCorsHeaders(request, env);
   if (cors === null) {
     return json({ ok: false, reason: 'origin_not_allowed' }, { status: 403 });
@@ -5822,23 +6370,30 @@ async function handleMiniAppOnboardRequest({
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: cors || {} });
   }
-  if (!['GET', 'POST'].includes(request.method)) {
+  if (request.method !== 'POST') {
     return jsonMiniAppOnboard(request, env, { ok: false, reason: 'method_not_allowed' }, { status: 405 });
+  }
+  const requestUrl = new URL(request.url);
+  if (requestUrl.searchParams.has('initData') || requestUrl.searchParams.has('telegramInitData')) {
+    return jsonMiniAppOnboard(
+      request,
+      env,
+      { ok: false, reason: 'miniapp_initdata_query_forbidden' },
+      { status: 400 },
+    );
   }
 
   const input = await readMiniAppOnboardInput(request);
   const ttlSeconds = Number(env.AGENT_BRIDGE_MINIAPP_INITDATA_TTL_SECONDS || 3600);
   const validationEnv = {
     ...env,
-    AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS: Number.isFinite(ttlSeconds) && ttlSeconds > 0
-      ? String(Math.floor(ttlSeconds))
-      : '3600',
+    AGENT_BRIDGE_MINI_APP_AUTH_MAX_AGE_SECONDS:
+      Number.isFinite(ttlSeconds) && ttlSeconds > 0 ? String(Math.floor(ttlSeconds)) : '3600',
   };
   const validated = await validateTelegramMiniAppInitData(input.initData, validationEnv);
   if (!validated.ok) {
-    const reason = validated.reason === 'telegram_init_data_expired'
-      ? 'miniapp_initdata_expired'
-      : 'miniapp_initdata_invalid';
+    const reason =
+      validated.reason === 'telegram_init_data_expired' ? 'miniapp_initdata_expired' : 'miniapp_initdata_invalid';
     return jsonMiniAppOnboard(request, env, { ok: false, reason }, { status: 401 });
   }
   const telegramUserId = safeString(validated.user?.telegramUserId);
@@ -5873,19 +6428,29 @@ async function handleMiniAppOnboardRequest({
     explicitSessionSlug: sessionSlug,
   });
   if (!resolved.ok) {
-    return jsonMiniAppOnboard(request, env, {
-      ok: false,
-      reason: resolved.reason || 'session_not_found',
-      sessionSlug: resolved.sessionSlug || sessionSlug || '',
-    }, { status: 404 });
+    return jsonMiniAppOnboard(
+      request,
+      env,
+      {
+        ok: false,
+        reason: resolved.reason || 'session_not_found',
+        sessionSlug: resolved.sessionSlug || sessionSlug || '',
+      },
+      { status: 404 },
+    );
   }
   const miniAppResolved = resolveMiniAppSessionInvocation(policy, resolved.session.sessionSlug);
   if (!miniAppResolved.ok) {
-    return jsonMiniAppOnboard(request, env, {
-      ok: false,
-      reason: miniAppResolved.reason || 'mini_app_session_unavailable',
-      sessionSlug: miniAppResolved.sessionSlug || resolved.session.sessionSlug,
-    }, { status: miniAppResolved.reason === 'session_not_linked' ? 404 : 403 });
+    return jsonMiniAppOnboard(
+      request,
+      env,
+      {
+        ok: false,
+        reason: miniAppResolved.reason || 'mini_app_session_unavailable',
+        sessionSlug: miniAppResolved.sessionSlug || resolved.session.sessionSlug,
+      },
+      { status: miniAppResolved.reason === 'session_not_linked' ? 404 : 403 },
+    );
   }
 
   const account = await deriveManagedDemoAccount({
@@ -5905,13 +6470,19 @@ async function handleMiniAppOnboardRequest({
     createdAt,
   });
   if (!issued.ok) {
-    return jsonMiniAppOnboard(request, env, {
-      ok: false,
-      reason: issued.reason || 'agent_token_create_failed',
-    }, { status: 500 });
+    return jsonMiniAppOnboard(
+      request,
+      env,
+      {
+        ok: false,
+        reason: issued.reason || 'agent_token_create_failed',
+      },
+      { status: 500 },
+    );
   }
   if (sessionSlug) {
-    const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
+    const followDefault =
+      sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
     await persistTelegramUserSessionBinding({
       env,
       normalized,
@@ -5934,11 +6505,7 @@ async function handleMiniAppOnboardRequest({
   return jsonMiniAppOnboard(request, env, response);
 }
 
-async function handleInviteOnboardRequest({
-  request,
-  env = {},
-  createdAt = null,
-} = {}) {
+async function handleInviteOnboardRequest({ request, env = {}, createdAt = null } = {}) {
   if (request.method === 'OPTIONS') {
     return new Response(null, {
       status: 204,
@@ -5956,11 +6523,7 @@ async function handleInviteOnboardRequest({
 
   const body = await readRequestJson(request);
   const inviteToken = safeString(
-    body.inviteToken ||
-      body.contextEngineInviteToken ||
-      body.contextEngine?.inviteToken ||
-      body.invite ||
-      body.token
+    body.inviteToken || body.contextEngineInviteToken || body.contextEngine?.inviteToken || body.invite || body.token,
   );
   const invite = await resolveTrustedOnboardingInvite(env, inviteToken);
   if (!invite.ok) {
@@ -5974,26 +6537,31 @@ async function handleInviteOnboardRequest({
     return json({ ok: false, reason: 'invite_token_redeemed' }, { status: 409 });
   }
 
-  const telegramUserId = safeString(body.telegramUserId || body.userId || body.telegram?.telegramUserId || body.telegram?.userId);
+  const telegramUserId = safeString(
+    body.telegramUserId || body.userId || body.telegram?.telegramUserId || body.telegram?.userId,
+  );
   const policy = await loadSessionPolicy(env);
   const requestedSessionSlug = sanitizeSessionSlug(body.sessionSlug || body.defaultSessionSlug || body.slug);
   const invitedSessionSlug = sanitizeSessionSlug(invite.invite.sessionSlug);
   if (invitedSessionSlug && requestedSessionSlug && invitedSessionSlug !== requestedSessionSlug) {
-    return json({
-      ok: false,
-      reason: 'invite_session_mismatch',
-      sessionSlug: invitedSessionSlug,
-    }, { status: 403 });
+    return json(
+      {
+        ok: false,
+        reason: 'invite_session_mismatch',
+        sessionSlug: invitedSessionSlug,
+      },
+      { status: 403 },
+    );
   }
   const explicitSessionSlug = invitedSessionSlug || requestedSessionSlug;
   const principal = telegramUserId
     ? telegramAgentPrincipal({ telegramUserId })
     : {
-      principalId: createOpaqueAgentPrincipalId(AGENT_CREDENTIAL_KINDS.USER),
-      kind: AGENT_CREDENTIAL_KINDS.USER,
-      adapter: 'invite',
-      label: safeString(body.label || body.name || invite.invite.label).slice(0, 120),
-    };
+        principalId: createOpaqueAgentPrincipalId(AGENT_CREDENTIAL_KINDS.USER),
+        kind: AGENT_CREDENTIAL_KINDS.USER,
+        adapter: 'invite',
+        label: safeString(body.label || body.name || invite.invite.label).slice(0, 120),
+      };
   const normalized = {
     type: 'telegram_mock_update',
     updateId: safeString(body.updateId) || `invite-onboard-${Date.now()}`,
@@ -6012,7 +6580,12 @@ async function handleInviteOnboardRequest({
     },
   };
   const resolved = telegramUserId
-    ? await resolveAgentTokenSession({ env, normalized, policy, explicitSessionSlug })
+    ? await resolveAgentTokenSession({
+        env,
+        normalized,
+        policy,
+        explicitSessionSlug,
+      })
     : resolveAgentHttpSessionInvocation(policy, explicitSessionSlug || policy.defaultSessionSlug);
   if (!resolved.ok) {
     const payload = {
@@ -6038,22 +6611,24 @@ async function handleInviteOnboardRequest({
     principal,
     sessionSlug: resolved.session.sessionSlug,
     accountAddress: account.accountAddress,
-    scopes: agentOnly
-      ? [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL]
-      : undefined,
+    scopes: agentOnly ? [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL] : undefined,
     credentialKind: agentOnly ? AGENT_CREDENTIAL_KINDS.AGENT_ONLY : AGENT_CREDENTIAL_KINDS.USER,
-    ttlSeconds: agentOnly
-      ? agentOnlyTokenTtlSeconds(env)
-      : TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
+    ttlSeconds: agentOnly ? agentOnlyTokenTtlSeconds(env) : TELEGRAM_AGENT_DELEGATION_TOKEN_DEFAULT_TTL_SECONDS,
     createdAt,
   });
   if (!issued.ok) {
-    const payload = { ok: false, reason: issued.reason || 'agent_token_create_failed' };
+    const payload = {
+      ok: false,
+      reason: issued.reason || 'agent_token_create_failed',
+    };
     assertNoSecretShape(payload, 'Agent invite onboarding token failure must not serialize secrets.');
-    return json(payload, { status: issued.reason === 'agent_token_storage_unavailable' ? 503 : 500 });
+    return json(payload, {
+      status: issued.reason === 'agent_token_storage_unavailable' ? 503 : 500,
+    });
   }
   if (telegramUserId && explicitSessionSlug) {
-    const followDefault = sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
+    const followDefault =
+      sanitizeSessionSlug(resolved.session.sessionSlug) === sanitizeSessionSlug(policy.defaultSessionSlug);
     await persistTelegramUserSessionBinding({
       env,
       normalized,
@@ -6088,14 +6663,20 @@ async function handleInviteOnboardRequest({
     accountAddress: account.accountAddress,
     inviteLabel: invite.invite.label || '',
     inviteSource: safeString(body.source || invite.invite.source).slice(0, 160),
-    ...(agentOnly ? {
-      mode: 'agent_only',
-      start: `${agentBridgePublicUrl(env)}${toCanonicalAgentApiPathname(AGENT_ONLY_ENDPOINTS.start)}`,
-    } : {}),
+    ...(agentOnly
+      ? {
+          mode: 'agent_only',
+          start: `${agentBridgePublicUrl(env)}${toCanonicalAgentApiPathname(AGENT_ONLY_ENDPOINTS.start)}`,
+        }
+      : {}),
   };
 
   if (telegramUserId && !agentOnly) {
-    const settings = await loadTelegramAgentSettings({ env, sessionSlug: resolved.session.sessionSlug, telegramUserId });
+    const settings = await loadTelegramAgentSettings({
+      env,
+      sessionSlug: resolved.session.sessionSlug,
+      telegramUserId,
+    });
     const groups = await loadTelegramLightweightGroups({
       env,
       session: resolved.session,
@@ -6113,11 +6694,7 @@ async function handleInviteOnboardRequest({
   return json(response);
 }
 
-async function handleClientLoginExchangeRequest({
-  request,
-  env = {},
-  fetchImpl = globalThis.fetch,
-} = {}) {
+async function handleClientLoginExchangeRequest({ request, env = {}, fetchImpl = globalThis.fetch } = {}) {
   const cors = clientLoginCorsHeaders(request, env);
   if (cors === null) {
     return json({ ok: false, reason: 'origin_not_allowed' }, { status: 403 });
@@ -6130,34 +6707,41 @@ async function handleClientLoginExchangeRequest({
   }
   const body = await readRequestJson(request);
   const suppliedToken = extractTelegramAgentToken(
-    body.token ||
-    body.agentToken ||
-    body.telegramToken ||
-    request.headers.get('authorization')
+    body.token || body.agentToken || body.telegramToken || request.headers.get('authorization'),
   );
   if (!suppliedToken) {
     return jsonClientLogin(request, env, { ok: false, reason: 'agent_token_missing' }, { status: 401 });
   }
-  const delegated = await loadTelegramAgentDelegationToken({ env, token: suppliedToken });
+  const delegated = await loadTelegramAgentDelegationToken({
+    env,
+    token: suppliedToken,
+  });
   if (!delegated.ok) {
     const unavailable = delegated.reason === 'agent_token_storage_unavailable';
-    return jsonClientLogin(request, env, {
-      ok: false,
-      reason: delegated.reason || 'agent_token_invalid',
-    }, { status: unavailable ? 503 : 401 });
+    return jsonClientLogin(
+      request,
+      env,
+      {
+        ok: false,
+        reason: delegated.reason || 'agent_token_invalid',
+      },
+      { status: unavailable ? 503 : 401 },
+    );
   }
-  const exchangeableKinds = new Set([
-    AGENT_CREDENTIAL_KINDS.USER,
-    AGENT_CREDENTIAL_KINDS.SERVICE,
-  ]);
+  const exchangeableKinds = new Set([AGENT_CREDENTIAL_KINDS.USER, AGENT_CREDENTIAL_KINDS.SERVICE]);
   if (
     delegated.record.audience !== AGENT_CREDENTIAL_AUDIENCES.AGENT_BRIDGE ||
     !exchangeableKinds.has(delegated.record.credentialKind)
   ) {
-    return jsonClientLogin(request, env, {
-      ok: false,
-      reason: 'agent_credential_exchange_denied',
-    }, { status: 403 });
+    return jsonClientLogin(
+      request,
+      env,
+      {
+        ok: false,
+        reason: 'agent_credential_exchange_denied',
+      },
+      { status: 403 },
+    );
   }
   const requestedSessionSlug = sanitizeSessionSlug(body.sessionSlug);
   const context = await resolveHandoffContext({
@@ -6165,15 +6749,17 @@ async function handleClientLoginExchangeRequest({
     input: {
       principalId: safeString(delegated.record.principal?.principalId),
       principalAdapter: safeString(delegated.record.principal?.adapter),
-      adapterMetadata: delegated.record.principal?.adapter === 'telegram' ? {
-        telegram: {
-          userId: safeString(delegated.record.principal?.adapterUserId),
-          username: safeString(delegated.record.principal?.label),
-        },
-      } : {},
-      telegramUserId: delegated.record.principal?.adapter === 'telegram'
-        ? safeString(delegated.record.principal?.adapterUserId)
-        : '',
+      adapterMetadata:
+        delegated.record.principal?.adapter === 'telegram'
+          ? {
+              telegram: {
+                userId: safeString(delegated.record.principal?.adapterUserId),
+                username: safeString(delegated.record.principal?.label),
+              },
+            }
+          : {},
+      telegramUserId:
+        delegated.record.principal?.adapter === 'telegram' ? safeString(delegated.record.principal?.adapterUserId) : '',
       username: safeString(delegated.record.principal?.label),
       sessionSlug: requestedSessionSlug,
     },
@@ -6184,20 +6770,25 @@ async function handleClientLoginExchangeRequest({
     requireQuestionAuthoring: false,
   });
   if (!context.ok) {
-    return jsonClientLogin(request, env, {
-      ok: false,
-      reason: context.reason,
-      sessionSlug: context.sessionSlug || requestedSessionSlug || '',
-    }, { status: context.status || 400 });
+    return jsonClientLogin(
+      request,
+      env,
+      {
+        ok: false,
+        reason: context.reason,
+        sessionSlug: context.sessionSlug || requestedSessionSlug || '',
+      },
+      { status: context.status || 400 },
+    );
   }
   const account = delegated.record.accountAddress
     ? { accountAddress: delegated.record.accountAddress }
     : await deriveManagedDemoAccount({
-      principal: delegated.record.principal,
-      deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID,
-      rootSecret: env.DEMO_SIGNER_ROOT_SECRET || env.AGENT_BRIDGE_DEMO_ROOT_SECRET || '',
-      createdAt: safeString(delegated.record.issuedAt),
-    });
+        principal: delegated.record.principal,
+        deploymentId: env.AGENT_BRIDGE_DEPLOYMENT_ID,
+        rootSecret: env.DEMO_SIGNER_ROOT_SECRET || env.AGENT_BRIDGE_DEMO_ROOT_SECRET || '',
+        createdAt: safeString(delegated.record.issuedAt),
+      });
   const login = await authenticateSessionWorker({
     env,
     session: context.session,
@@ -6207,16 +6798,30 @@ async function handleClientLoginExchangeRequest({
     fetchImpl,
   });
   if (!login.ok) {
-    return jsonClientLogin(request, env, {
-      ok: false,
-      reason: login.reason || 'session_worker_login_failed',
-      skipped: login.skipped === true,
-    }, { status: login.skipped ? 400 : 502 });
+    return jsonClientLogin(
+      request,
+      env,
+      {
+        ok: false,
+        reason: login.reason || 'session_worker_login_failed',
+        skipped: login.skipped === true,
+      },
+      { status: login.skipped ? 400 : 502 },
+    );
   }
+  const sessionAuthorityMode = safeString(context.session?.sessionModeProfile?.authority?.mode).toLowerCase();
+  const workerCanonical = sessionAuthorityMode === 'worker_canonical';
   const bridgeCredential = await issueAgentCredential({
     env,
     principal: delegated.record.principal,
     sessionSlug: context.session.sessionSlug,
+    ...(workerCanonical
+      ? {
+          sessionId: login.sessionId,
+          sessionWorkerOrigin: login.workerUrl,
+          sessionAuthorityMode,
+        }
+      : {}),
     accountAddress: login.accountAddress,
     scopes: delegated.record.scopes,
     audience: AGENT_CREDENTIAL_AUDIENCES.AGENT_BRIDGE_BROWSER,
@@ -6224,10 +6829,17 @@ async function handleClientLoginExchangeRequest({
     ttlSeconds: AGENT_BROWSER_CREDENTIAL_TTL_SECONDS,
   });
   if (!bridgeCredential.ok) {
-    return jsonClientLogin(request, env, {
-      ok: false,
-      reason: bridgeCredential.reason || 'agent_browser_credential_create_failed',
-    }, { status: bridgeCredential.reason === 'agent_token_storage_unavailable' ? 503 : 500 });
+    return jsonClientLogin(
+      request,
+      env,
+      {
+        ok: false,
+        reason: bridgeCredential.reason || 'agent_browser_credential_create_failed',
+      },
+      {
+        status: bridgeCredential.reason === 'agent_token_storage_unavailable' ? 503 : 500,
+      },
+    );
   }
   const groups = await loadTelegramLightweightGroups({
     env,
@@ -6238,6 +6850,7 @@ async function handleClientLoginExchangeRequest({
   const payload = {
     ok: true,
     sessionSlug: context.session.sessionSlug,
+    ...(login.sessionId ? { sessionId: login.sessionId } : {}),
     accountAddress: login.accountAddress,
     workerUrl: login.workerUrl,
     bridgeCredential: {
@@ -6254,11 +6867,18 @@ async function handleClientLoginExchangeRequest({
     capabilities: {
       readQuestions: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS),
       draftAnswers: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS),
-      submitAnswers: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS) && directSubmitFeatureEnabled(env),
-      voteQuestions: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.APPLY_QUESTION_VOTES),
+      submitAnswers:
+        delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.DRAFT_ANSWERS) &&
+        directSubmitFeatureEnabled(env),
+      voteQuestions: delegationTokenHasScope(
+        delegated.record,
+        TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.APPLY_QUESTION_VOTES,
+      ),
       poseQuestions: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.POSE_QUESTIONS),
       readResults: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_QUESTIONS),
-      readGroups: delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_GROUPS),
+      readGroups:
+        (!workerCanonical || !!login.sessionId) &&
+        delegationTokenHasScope(delegated.record, TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.READ_GROUPS),
       admin: false,
       export: false,
     },
@@ -6278,18 +6898,14 @@ function suppliedSessionWorkerCredential(request, body = {}) {
   const bearer = authorization.match(/^Bearer\s+(.+)$/i);
   return safeString(
     bearer?.[1] ||
-    request.headers.get('x-ce-session-worker-token') ||
-    body.sessionWorkerCredential ||
-    body.workerCredential ||
-    body.sessionWorkerToken
+      request.headers.get('x-ce-session-worker-token') ||
+      body.sessionWorkerCredential ||
+      body.workerCredential ||
+      body.sessionWorkerToken,
   );
 }
 
-async function handleWrappedMemberExchangeRequest({
-  request,
-  env = {},
-  fetchImpl = globalThis.fetch,
-} = {}) {
+async function handleWrappedMemberExchangeRequest({ request, env = {}, fetchImpl = globalThis.fetch } = {}) {
   if (request.method !== 'POST') {
     return json({ ok: false, reason: 'method_not_allowed' }, { status: 405 });
   }
@@ -6310,11 +6926,14 @@ async function handleWrappedMemberExchangeRequest({
   }
   const requestedSessionSlug = sanitizeSessionSlug(body.sessionSlug);
   if (requestedSessionSlug && requestedSessionSlug !== authority.sessionSlug) {
-    return json({
-      ok: false,
-      reason: 'session_worker_credential_session_mismatch',
-      sessionSlug: authority.sessionSlug,
-    }, { status: 403 });
+    return json(
+      {
+        ok: false,
+        reason: 'session_worker_credential_session_mismatch',
+        sessionSlug: authority.sessionSlug,
+      },
+      { status: 403 },
+    );
   }
   const replay = await readSessionWorkerMemberExchange({ env, credential });
   if (!replay.ok) return json({ ok: false, reason: replay.reason }, { status: 503 });
@@ -6337,14 +6956,14 @@ async function handleWrappedMemberExchangeRequest({
     adapterUserId: principalAddress,
     label: 'Session member',
   };
-  const ttlSeconds = Math.min(
-    AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS,
-    membership.remainingTtlSeconds,
-  );
+  const ttlSeconds = Math.min(AGENT_MEMBER_CREDENTIAL_MAX_TTL_SECONDS, membership.remainingTtlSeconds);
   const issued = await issueAgentCredential({
     env,
     principal,
     sessionSlug: authority.sessionSlug,
+    sessionId: authority.sessionId || '',
+    sessionWorkerOrigin: authority.sessionWorkerOrigin,
+    sessionAuthorityMode: authority.authorityMode,
     accountAddress: membership.principal.address,
     scopes: [TELEGRAM_AGENT_DELEGATION_TOKEN_SCOPES.AGENT_AUTOFILL],
     audience: AGENT_CREDENTIAL_AUDIENCES.AGENT_BRIDGE,
@@ -6352,9 +6971,12 @@ async function handleWrappedMemberExchangeRequest({
     ttlSeconds,
   });
   if (!issued.ok) {
-    return json({ ok: false, reason: issued.reason }, {
-      status: issued.reason === 'agent_token_storage_unavailable' ? 503 : 500,
-    });
+    return json(
+      { ok: false, reason: issued.reason },
+      {
+        status: issued.reason === 'agent_token_storage_unavailable' ? 503 : 500,
+      },
+    );
   }
   const consumed = await persistSessionWorkerMemberExchange({
     env,
@@ -6371,6 +6993,8 @@ async function handleWrappedMemberExchangeRequest({
     ok: true,
     token: issued.token,
     sessionSlug: authority.sessionSlug,
+    ...(authority.sessionId ? { sessionId: authority.sessionId } : {}),
+    sessionWorkerOrigin: authority.sessionWorkerOrigin,
     principal: issued.record.principal,
     accountAddress: membership.principal.address,
     scopes: issued.record.scopes,
@@ -6447,19 +7071,25 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   if (routePathname === '/api/agent/session-wrapped/skill-version' && request.method === 'GET') {
     return json(sessionWrappedSkillVersionPayload(env));
   }
-  if ((routePathname === '/api/agent/session-wrapped/skill' || url.pathname === '/session-wrapped') && (request.method === 'GET' || request.method === 'HEAD')) {
+  if (
+    (routePathname === '/api/agent/session-wrapped/skill' || url.pathname === '/session-wrapped') &&
+    (request.method === 'GET' || request.method === 'HEAD')
+  ) {
     return sessionWrappedSkillRedirectResponse();
   }
 
   if (routePathname === '/api/agent/admin/questions/delete') {
     const auth = await authenticateAgentHandoff(request, env);
     if (!auth.ok) {
-      return json({
-        ok: false,
-        reason: auth.reason,
-        ...(auth.message ? { message: auth.message } : {}),
-        ...(auth.action ? { action: auth.action } : {}),
-      }, { status: auth.status });
+      return json(
+        {
+          ok: false,
+          reason: auth.reason,
+          ...(auth.message ? { message: auth.message } : {}),
+          ...(auth.action ? { action: auth.action } : {}),
+        },
+        { status: auth.status },
+      );
     }
     if (request.method !== 'POST') {
       return json({ ok: false, reason: 'method_not_allowed' }, { status: 405 });
@@ -6471,12 +7101,15 @@ async function handleTelegramAgentHandoffRequestUnsafe({
     }
     const delegated = applyDelegationToInput(auth, rawInput, routePathname, request.method);
     if (!delegated.ok) {
-      return json({
-        ok: false,
-        reason: delegated.reason,
-        requiredScope: delegated.requiredScope,
-        sessionSlug: delegated.sessionSlug || '',
-      }, { status: delegated.status || 403 });
+      return json(
+        {
+          ok: false,
+          reason: delegated.reason,
+          requiredScope: delegated.requiredScope,
+          sessionSlug: delegated.sessionSlug || '',
+        },
+        { status: delegated.status || 403 },
+      );
     }
     const context = await resolveHandoffContext({
       env,
@@ -6485,7 +7118,14 @@ async function handleTelegramAgentHandoffRequestUnsafe({
       requireQuestionAuthoring: false,
     });
     if (!context.ok) {
-      return json({ ok: false, reason: context.reason, sessionSlug: context.sessionSlug || '' }, { status: context.status });
+      return json(
+        {
+          ok: false,
+          reason: context.reason,
+          sessionSlug: context.sessionSlug || '',
+        },
+        { status: context.status },
+      );
     }
     const admin = await requireQuestionQueueAdmin({
       env,
@@ -6494,13 +7134,20 @@ async function handleTelegramAgentHandoffRequestUnsafe({
       allowDelegatedAdmin: true,
     });
     if (!admin.ok) {
-      return json({
-        ok: false,
-        reason: admin.reason,
-        accountAddress: admin.accountAddress || '',
-      }, { status: admin.status || 403 });
+      return json(
+        {
+          ok: false,
+          reason: admin.reason,
+          accountAddress: admin.accountAddress || '',
+        },
+        { status: admin.status || 403 },
+      );
     }
-    return handleAdminQuestionsDeleteRequest({ env, input: delegated.input, body });
+    return handleAdminQuestionsDeleteRequest({
+      env,
+      input: delegated.input,
+      body,
+    });
   }
 
   const adminAgentOnlyPaths = new Set([
@@ -6511,12 +7158,15 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   if (adminAgentOnlyPaths.has(routePathname)) {
     const auth = await authenticateAgentHandoff(request, env);
     if (!auth.ok) {
-      return json({
-        ok: false,
-        reason: auth.reason,
-        ...(auth.message ? { message: auth.message } : {}),
-        ...(auth.action ? { action: auth.action } : {}),
-      }, { status: auth.status });
+      return json(
+        {
+          ok: false,
+          reason: auth.reason,
+          ...(auth.message ? { message: auth.message } : {}),
+          ...(auth.action ? { action: auth.action } : {}),
+        },
+        { status: auth.status },
+      );
     }
     const body = await readRequestJson(request);
     const rawInput = inputFromRequest(request, body);
@@ -6524,12 +7174,15 @@ async function handleTelegramAgentHandoffRequestUnsafe({
     if (auth.authMode !== 'root_token') {
       const delegated = applyDelegationToInput(auth, rawInput, routePathname, request.method);
       if (!delegated.ok) {
-        return json({
-          ok: false,
-          reason: delegated.reason,
-          requiredScope: delegated.requiredScope,
-          sessionSlug: delegated.sessionSlug || '',
-        }, { status: delegated.status || 403 });
+        return json(
+          {
+            ok: false,
+            reason: delegated.reason,
+            requiredScope: delegated.requiredScope,
+            sessionSlug: delegated.sessionSlug || '',
+          },
+          { status: delegated.status || 403 },
+        );
       }
       const context = await resolveHandoffContext({
         env,
@@ -6538,7 +7191,14 @@ async function handleTelegramAgentHandoffRequestUnsafe({
         requireQuestionAuthoring: false,
       });
       if (!context.ok) {
-        return json({ ok: false, reason: context.reason, sessionSlug: context.sessionSlug || '' }, { status: context.status });
+        return json(
+          {
+            ok: false,
+            reason: context.reason,
+            sessionSlug: context.sessionSlug || '',
+          },
+          { status: context.status },
+        );
       }
       const admin = await requireQuestionQueueAdmin({
         env,
@@ -6547,16 +7207,24 @@ async function handleTelegramAgentHandoffRequestUnsafe({
         allowDelegatedAdmin: true,
       });
       if (!admin.ok) {
-        return json({
-          ok: false,
-          reason: admin.reason,
-          accountAddress: admin.accountAddress || '',
-        }, { status: admin.status || 403 });
+        return json(
+          {
+            ok: false,
+            reason: admin.reason,
+            accountAddress: admin.accountAddress || '',
+          },
+          { status: admin.status || 403 },
+        );
       }
       input = delegated.input;
     }
     if (routePathname === '/api/agent/admin/agent-only/config') {
-      return handleAdminAgentOnlyConfigRequest({ env, input, body, method: request.method });
+      return handleAdminAgentOnlyConfigRequest({
+        env,
+        input,
+        body,
+        method: request.method,
+      });
     }
     if (routePathname === '/api/agent/admin/agent-only/window/open' && request.method === 'POST') {
       return handleAdminAgentOnlyWindowOpenRequest({ env, input, body });
@@ -6569,31 +7237,38 @@ async function handleTelegramAgentHandoffRequestUnsafe({
 
   const auth = await authenticateAgentHandoff(request, env);
   if (!auth.ok) {
-    return json({
-      ok: false,
-      reason: auth.reason,
-      ...(auth.message ? { message: auth.message } : {}),
-      ...(auth.action ? { action: auth.action } : {}),
-    }, { status: auth.status });
+    return json(
+      {
+        ok: false,
+        reason: auth.reason,
+        ...(auth.message ? { message: auth.message } : {}),
+        ...(auth.action ? { action: auth.action } : {}),
+      },
+      { status: auth.status },
+    );
   }
 
   const body = await readRequestJson(request);
   const delegated = applyDelegationToInput(auth, inputFromRequest(request, body), routePathname, request.method);
   if (!delegated.ok) {
-    return json({
-      ok: false,
-      reason: delegated.reason,
-      requiredScope: delegated.requiredScope,
-      sessionSlug: delegated.sessionSlug || '',
-    }, { status: delegated.status || 403 });
+    return json(
+      {
+        ok: false,
+        reason: delegated.reason,
+        requiredScope: delegated.requiredScope,
+        sessionSlug: delegated.sessionSlug || '',
+      },
+      { status: delegated.status || 403 },
+    );
   }
-  const input = routePathname === '/api/agent/group-approval-revoke'
-    ? {
-      ...delegated.input,
-      chatId: safeString(delegated.input.chatId || delegated.input.groupChatId),
-      groupChatId: '',
-    }
-    : delegated.input;
+  const input =
+    routePathname === '/api/agent/group-approval-revoke'
+      ? {
+          ...delegated.input,
+          chatId: safeString(delegated.input.chatId || delegated.input.groupChatId),
+          groupChatId: '',
+        }
+      : delegated.input;
   const routeRequiresQuestionAuthoring = ![
     '/api/agent/admin/status',
     '/api/agent/admin/metrics',
@@ -6623,12 +7298,15 @@ async function handleTelegramAgentHandoffRequestUnsafe({
   if (!context.ok) {
     if (routePathname === '/api/agent/tags' && context.status === 404) {
       if (safeString(input.sessionSlug)) {
-        return json({
-          ok: false,
-          reason: 'session_not_found',
-          sessionSlug: context.sessionSlug || sanitizeSessionSlug(input.sessionSlug),
-          message: 'Unknown sessionSlug. Omit sessionSlug to use the current default session.',
-        }, { status: 404 });
+        return json(
+          {
+            ok: false,
+            reason: 'session_not_found',
+            sessionSlug: context.sessionSlug || sanitizeSessionSlug(input.sessionSlug),
+            message: 'Unknown sessionSlug. Omit sessionSlug to use the current default session.',
+          },
+          { status: 404 },
+        );
       }
       const fallbackContext = await resolveHandoffContext({
         env,
@@ -6641,11 +7319,25 @@ async function handleTelegramAgentHandoffRequestUnsafe({
         return handleTagsRequest({ env, context: fallbackContext, waitUntil });
       }
       if (fallbackContext.status !== 404) {
-        return json({ ok: false, reason: fallbackContext.reason, sessionSlug: fallbackContext.sessionSlug || '' }, { status: fallbackContext.status });
+        return json(
+          {
+            ok: false,
+            reason: fallbackContext.reason,
+            sessionSlug: fallbackContext.sessionSlug || '',
+          },
+          { status: fallbackContext.status },
+        );
       }
       return emptyTagsResponse(context.sessionSlug || input.sessionSlug);
     }
-    return json({ ok: false, reason: context.reason, sessionSlug: context.sessionSlug || '' }, { status: context.status });
+    return json(
+      {
+        ok: false,
+        reason: context.reason,
+        sessionSlug: context.sessionSlug || '',
+      },
+      { status: context.status },
+    );
   }
 
   if (routePathname === '/api/agent/questions' && (request.method === 'GET' || request.method === 'POST')) {
@@ -6664,7 +7356,13 @@ async function handleTelegramAgentHandoffRequestUnsafe({
     return handleAgentOnlyTokenVotesBulkRequest({ env, context, input, body });
   }
   if (routePathname === AGENT_ONLY_ENDPOINTS.wrappedImage && request.method === 'POST') {
-    return handleAgentOnlyWrappedImageRequest({ env, context, input, body, fetchImpl });
+    return handleAgentOnlyWrappedImageRequest({
+      env,
+      context,
+      input,
+      body,
+      fetchImpl,
+    });
   }
   if (routePathname === '/api/agent/admin/status' && (request.method === 'GET' || request.method === 'POST')) {
     return handleAdminStatusRequest({ env, context, input });
@@ -6673,16 +7371,38 @@ async function handleTelegramAgentHandoffRequestUnsafe({
     return handleAdminMetricsRequest({ env, context, input });
   }
   if (routePathname === '/api/agent/admin/default-session') {
-    return handleAdminDefaultSessionRequest({ env, context, input, method: request.method });
+    return handleAdminDefaultSessionRequest({
+      env,
+      context,
+      input,
+      method: request.method,
+    });
   }
   if (routePathname === '/api/agent/admin/skill-update') {
-    return handleAdminSkillUpdateRequest({ env, context, input, method: request.method });
+    return handleAdminSkillUpdateRequest({
+      env,
+      context,
+      input,
+      method: request.method,
+    });
   }
   if (routePathname === '/api/agent/onboarding' && (request.method === 'GET' || request.method === 'POST')) {
-    return handleOnboardingRequest({ env, context, input, body, method: request.method });
+    return handleOnboardingRequest({
+      env,
+      context,
+      input,
+      body,
+      method: request.method,
+    });
   }
   if (routePathname === '/api/agent/question-queue' && (request.method === 'GET' || request.method === 'POST')) {
-    return handleQuestionQueueRequest({ env, context, input, waitUntil, method: request.method });
+    return handleQuestionQueueRequest({
+      env,
+      context,
+      input,
+      waitUntil,
+      method: request.method,
+    });
   }
   if (routePathname === '/api/agent/question-queue/plan' && request.method === 'POST') {
     return handleQuestionQueuePlanRequest({ env, context, input, waitUntil });
@@ -6700,7 +7420,12 @@ async function handleTelegramAgentHandoffRequestUnsafe({
     return handleNextQuestionRequest({ env, context, input, waitUntil });
   }
   if (routePathname === '/api/agent/question-votes/recommend' && request.method === 'POST') {
-    return handleQuestionVoteRecommendationsRequest({ env, context, input, waitUntil });
+    return handleQuestionVoteRecommendationsRequest({
+      env,
+      context,
+      input,
+      waitUntil,
+    });
   }
   if (routePathname === '/api/agent/question-votes/apply' && request.method === 'POST') {
     return handleQuestionVoteApplyRequest({ env, context, input, waitUntil });

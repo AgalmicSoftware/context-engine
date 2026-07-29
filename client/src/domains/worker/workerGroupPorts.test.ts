@@ -4,9 +4,14 @@ import {
   createWorkerGroupAsParticipant,
   deleteWorkerGroup,
   joinWorkerGroup,
+  leaveWorkerGroup,
   listWorkerGroupMembers,
   listWorkerGroupsAdmin,
+  loadPublicWorkerGroups,
+  loadWorkerGroupMembers,
   loadWorkerGroupOverview,
+  normalizeWorkerGroupDefaultTags,
+  reconcileEmptyWorkerGroupsAdmin,
   removeWorkerGroupMember,
   updateWorkerGroup,
 } from './workerGroupPorts';
@@ -18,6 +23,65 @@ const SESSION_ID = '0x11111111111111111111111111111111';
 const OTHER_SESSION_ID = '0x22222222222222222222222222222222';
 
 describe('worker group ports', () => {
+  it('normalizes Worker Group defaults with legacy SBT-tag fallback', () => {
+    expect(
+      normalizeWorkerGroupDefaultTags({
+        defaultGroupTags: ' Facilitators,reviewers,facilitators ',
+        defaultSbtTags: 'ignored',
+      }),
+    ).toEqual(['Facilitators', 'reviewers']);
+    expect(normalizeWorkerGroupDefaultTags({ defaultSbtTags: ['legacy', 'tags'] })).toEqual([
+      'legacy',
+      'tags',
+    ]);
+  });
+
+  it('loads public session-visible groups without sending a credential', async () => {
+    const fetchImpl = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            groups: [
+              {
+                groupId: 'public-reviewers',
+                sessionSlug: SESSION_SLUG,
+                label: 'Public reviewers',
+                joinMode: 'open',
+                memberVisibility: 'session',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+
+    await expect(
+      loadPublicWorkerGroups({
+        workerUrl: `${WORKER_URL}/`,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        fetchImpl,
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        groupId: 'public-reviewers',
+        label: 'Public reviewers',
+      }),
+    ]);
+
+    expect(fetchImpl).toHaveBeenCalledWith(`${WORKER_URL}/groups/list?sessionId=${encodeURIComponent(SESSION_ID)}`, {
+      method: 'GET',
+      cache: 'no-store',
+      headers: {
+        'X-Session-Slug': SESSION_SLUG,
+      },
+    });
+    expect(JSON.stringify(fetchImpl.mock.calls)).not.toContain('Authorization');
+  });
+
   it('loads visible groups and self-memberships directly with the session-worker credential', async () => {
     const fetchImpl = jest
       .fn()
@@ -104,7 +168,147 @@ describe('worker group ports', () => {
     );
   });
 
-  it('joins only through the worker route and preserves an explicit worker failure reason', async () => {
+  it('loads a permission-visible member page without exposing storage keys or mutation actors', async () => {
+    const fetchImpl = jest.fn(
+      async (_input?: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            group: {
+              groupId: 'reviewers',
+              sessionSlug: SESSION_SLUG,
+              label: 'Reviewers',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+            members: [
+              {
+                groupId: 'reviewers',
+                sessionSlug: SESSION_SLUG,
+                principal: {
+                  kind: 'evm_address',
+                  address: '0x00000000000000000000000000000000000000AA',
+                },
+                addedAt: '2026-07-28T12:00:00.000Z',
+                principalKey: 'must-not-survive-normalization',
+                addedBy: 'must-not-survive-normalization',
+              },
+              {
+                groupId: 'reviewers',
+                sessionSlug: SESSION_SLUG,
+                principal: { kind: 'telegram', principalId: 'telegram:12345' },
+                addedAt: '2026-07-28T12:01:00.000Z',
+              },
+            ],
+            memberCount: 3,
+            nextCursor: 'next-page-token',
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+
+    const page = await loadWorkerGroupMembers({
+      workerUrl: WORKER_URL,
+      credentialToken: WORKER_TOKEN,
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
+      groupId: 'reviewers',
+      cursor: 'current-page-token',
+      limit: 25,
+      fetchImpl,
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(`${WORKER_URL}/groups/members`, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${WORKER_TOKEN}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        groupId: 'reviewers',
+        cursor: 'current-page-token',
+        limit: 25,
+        sessionId: SESSION_ID,
+      }),
+    });
+    expect(page).toMatchObject({
+      group: { groupId: 'reviewers', memberVisibility: 'session' },
+      memberCount: 3,
+      nextCursor: 'next-page-token',
+      members: [
+        {
+          principal: {
+            kind: 'evm_address',
+            address: '0x00000000000000000000000000000000000000aa',
+          },
+        },
+        { principal: { kind: 'telegram', principalId: 'telegram:12345' } },
+      ],
+    });
+    expect(JSON.stringify(page.members)).not.toMatch(/principalKey|addedBy|must-not-survive/);
+  });
+
+  it('preserves member-list denial and rejects malformed member identities', async () => {
+    const deniedFetch = jest.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: false, reason: 'worker_group_member_list_forbidden' }), {
+          status: 403,
+          headers: { 'content-type': 'application/json' },
+        }),
+    );
+    await expect(
+      loadWorkerGroupMembers({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        groupId: 'admin-only',
+        fetchImpl: deniedFetch,
+      }),
+    ).rejects.toMatchObject({ message: 'worker_group_member_list_forbidden', status: 403 });
+
+    const malformedFetch = jest.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            group: {
+              groupId: 'reviewers',
+              sessionSlug: SESSION_SLUG,
+              label: 'Reviewers',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+            members: [
+              {
+                groupId: 'reviewers',
+                sessionSlug: SESSION_SLUG,
+                principal: { kind: 'telegram', principalId: '<script>' },
+              },
+            ],
+            memberCount: 1,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+    );
+    await expect(
+      loadWorkerGroupMembers({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        groupId: 'reviewers',
+        fetchImpl: malformedFetch,
+      }),
+    ).rejects.toMatchObject({ message: 'worker_group_response_member_invalid' });
+  });
+
+  it('joins and leaves only through self-service worker routes and preserves explicit failure reasons', async () => {
     const successfulFetch = jest.fn(
       async (_input?: RequestInfo | URL, _init?: RequestInit) =>
         new Response(
@@ -164,6 +368,43 @@ describe('worker group ports', () => {
         fetchImpl: deniedFetch,
       }),
     ).rejects.toMatchObject({ message: 'worker_group_join_denied', status: 403 });
+
+    const leaveFetch = jest.fn(
+      async (_input?: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: SESSION_SLUG,
+            groupId: 'reviewers',
+            principal: { kind: 'evm_address', address: '0x00000000000000000000000000000000000000aa' },
+          }),
+          {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          },
+        ),
+    );
+
+    await expect(
+      leaveWorkerGroup({
+        workerUrl: WORKER_URL,
+        credentialToken: WORKER_TOKEN,
+        sessionId: SESSION_ID,
+        sessionSlug: SESSION_SLUG,
+        groupId: 'reviewers',
+        fetchImpl: leaveFetch,
+      }),
+    ).resolves.toMatchObject({ ok: true, groupId: 'reviewers' });
+    expect(leaveFetch).toHaveBeenCalledWith(`${WORKER_URL}/groups/leave`, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${WORKER_TOKEN}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ groupId: 'reviewers', sessionId: SESSION_ID }),
+    });
   });
 
   it('creates a participant group through the bearer-authenticated session route', async () => {
@@ -179,6 +420,11 @@ describe('worker group ports', () => {
               sessionSlug: SESSION_SLUG,
               label: 'Participant review',
               description: 'Open working group.',
+              tags: ['reviewers'],
+              documentURLs: ['https://docs.example.test/brief'],
+              memberLimit: 25,
+              joinEndsAt: '2030-01-01T12:00:00.000Z',
+              adminAddress: '0x00000000000000000000000000000000000000aa',
               joinMode: 'open',
               memberVisibility: 'session',
             },
@@ -193,7 +439,15 @@ describe('worker group ports', () => {
         credentialToken: WORKER_TOKEN,
         sessionId: SESSION_ID,
         sessionSlug: SESSION_SLUG,
-        group: { label: 'Participant review', description: 'Open working group.' },
+        group: {
+          label: 'Participant review',
+          description: 'Open working group.',
+          tags: ['reviewers'],
+          documentURLs: ['https://docs.example.test/brief'],
+          memberLimit: 25,
+          joinEndsAt: '2030-01-01T12:00:00.000Z',
+          adminAddress: '0x00000000000000000000000000000000000000aa',
+        },
         fetchImpl,
       }),
     ).resolves.toMatchObject({
@@ -201,6 +455,8 @@ describe('worker group ports', () => {
         groupId: 'participant-review',
         joinMode: 'open',
         memberVisibility: 'session',
+        tags: ['reviewers'],
+        memberLimit: 25,
       },
     });
     expect(fetchImpl).toHaveBeenCalledWith(`${WORKER_URL}/groups/create`, {
@@ -211,7 +467,15 @@ describe('worker group ports', () => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        group: { label: 'Participant review', description: 'Open working group.' },
+        group: {
+          label: 'Participant review',
+          description: 'Open working group.',
+          tags: ['reviewers'],
+          documentURLs: ['https://docs.example.test/brief'],
+          memberLimit: 25,
+          joinEndsAt: '2030-01-01T12:00:00.000Z',
+          adminAddress: '0x00000000000000000000000000000000000000aa',
+        },
         sessionId: SESSION_ID,
       }),
     });
@@ -353,6 +617,11 @@ describe('worker group ports', () => {
       sessionSlug: SESSION_SLUG,
       postSignedRequest,
     });
+    await reconcileEmptyWorkerGroupsAdmin({
+      sessionId: SESSION_ID,
+      sessionSlug: SESSION_SLUG,
+      postSignedRequest,
+    });
 
     expect(postSignedRequest).toHaveBeenNthCalledWith(1, {
       action: 'groups/create',
@@ -411,6 +680,11 @@ describe('worker group ports', () => {
       action: 'groups/delete',
       path: '/admin/groups/delete',
       body: { groupId: 'reviewers', sessionId: SESSION_ID },
+    });
+    expect(postSignedRequest).toHaveBeenNthCalledWith(8, {
+      action: 'groups/reconcile-empty',
+      path: '/admin/groups/reconcile-empty',
+      body: { sessionId: SESSION_ID },
     });
   });
 

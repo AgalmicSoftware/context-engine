@@ -379,6 +379,14 @@ describe('sessionWizardWriteNormalization', () => {
         sessionName: 'Two Key Session',
         sessionInfo: 'Worker-canonical session content.',
         sessionHeaderImg: 'https://images.example/header.png',
+        sessionEndsAt: '2099-01-02T03:04:00Z',
+        defaultTags: 'governance,ai',
+        defaultGroupTags: 'facilitators,reviewers',
+        questionsGenPrompt: 'Prefer concrete tradeoffs.',
+        defaultFilterState: { sort: 'recent' },
+        defaultSbtTags: 'must-not-persist',
+        defaultFeaturedSBTs: ['0x0000000000000000000000000000000000000001'],
+        autoFeatureSBTsBySessionSlug: true,
         networkChainId: DEFAULT_CONFIG_CHAIN_ID,
         blockLimits: { start: 250 },
         contracts: {
@@ -420,6 +428,11 @@ describe('sessionWizardWriteNormalization', () => {
         sessionName: 'Two Key Session',
         sessionInfo: 'Worker-canonical session content.',
         sessionHeaderImg: 'https://images.example/header.png',
+        sessionEndsAt: '2099-01-02T03:04:00.000Z',
+        defaultTags: 'governance,ai',
+        defaultGroupTags: 'facilitators,reviewers',
+        questionsGenPrompt: 'Prefer concrete tradeoffs.',
+        defaultFilterState: { sort: 'recent' },
         adminAddress: '0x00000000000000000000000000000000000000aa',
         workerAuthority: {
           version: 1,
@@ -430,6 +443,9 @@ describe('sessionWizardWriteNormalization', () => {
       }),
     );
     expect(payload.contracts).toBeUndefined();
+    expect(payload.defaultSbtTags).toBeUndefined();
+    expect(payload.defaultFeaturedSBTs).toBeUndefined();
+    expect(payload.autoFeatureSBTsBySessionSlug).toBeUndefined();
     expect(payload.blockLimits).toBeUndefined();
     expect(payload.registryAddress).toBeUndefined();
     expect(payload.registryChainId).toBeUndefined();
@@ -441,6 +457,66 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.ai.models.transcription).toEqual({ provider: 'openai', model: 'whisper-1' });
     expect(payload.ai.models.transcription).not.toHaveProperty('rpcUrl');
     expect(JSON.stringify(payload)).not.toMatch(/must-never-persist|0xRegistry|rpc\.example|faucet\.example/i);
+  });
+
+  test('buildSessionWizardWorkerConfigPayload keeps only SBT defaults and Group Factory for explicit hybrid mode', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.evm.registryChainId = DEFAULT_CONFIG_CHAIN_ID;
+    sessionModeProfile.authorization.mechanisms.push('sbt_onchain');
+    sessionModeProfile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        {
+          kind: 'sbt_onchain',
+          chainId: DEFAULT_CONFIG_CHAIN_ID,
+          contract: '0x0000000000000000000000000000000000000001',
+          anyOrAll: 'any',
+        },
+      ],
+    };
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'hybrid-session',
+      draft: {
+        sessionModeProfile,
+        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
+        defaultGroupTags: 'worker-groups',
+        defaultSbtTags: 'on-chain-groups',
+        defaultFeaturedSBTs: [
+          '0x0000000000000000000000000000000000000002',
+          '0x0000000000000000000000000000000000000002',
+        ],
+        autoFeatureSBTsBySessionSlug: false,
+        contracts: {
+          surveys: {
+            address: '0x0000000000000000000000000000000000000010',
+            chainId: DEFAULT_CONFIG_CHAIN_ID,
+          },
+          sbtFactory: {
+            address: '0x0000000000000000000000000000000000000020',
+            chainId: DEFAULT_CONFIG_CHAIN_ID,
+          },
+          sessionRegistry: {
+            address: '0x0000000000000000000000000000000000000030',
+            chainId: DEFAULT_CONFIG_CHAIN_ID,
+          },
+        },
+      },
+    });
+
+    expect(payload.networkChainId).toBe(DEFAULT_CONFIG_CHAIN_ID);
+    expect(payload.defaultGroupTags).toBe('worker-groups');
+    expect(payload.defaultSbtTags).toBe('on-chain-groups');
+    expect(payload.defaultFeaturedSBTs).toEqual([
+      '0x0000000000000000000000000000000000000002',
+    ]);
+    expect(payload.autoFeatureSBTsBySessionSlug).toBe(false);
+    expect(payload.contracts).toEqual({
+      sbtFactory: {
+        address: '0x0000000000000000000000000000000000000020',
+        chainId: DEFAULT_CONFIG_CHAIN_ID,
+      },
+    });
   });
 
   test('buildSessionWizardWorkerConfigPayload preserves an explicit admin-only group creation policy', () => {

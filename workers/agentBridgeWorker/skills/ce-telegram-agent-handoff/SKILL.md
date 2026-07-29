@@ -417,7 +417,8 @@ metrics default to visible Telegram sessions and exclude old demo/smoke
 sessions unless `includeLegacySessions=1` is explicitly requested.
 
 Use the detailed bot reference for Telegram command screens, Mini App opaque
-launches, group approval links, export flows, and lower-level operator details.
+launches, verified in-group approval, export flows, and lower-level operator
+details.
 
 ## Troubleshooting
 

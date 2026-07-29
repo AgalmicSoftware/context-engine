@@ -27,6 +27,7 @@ export const dispatchAuthenticatedRouteWithWorkerDeps = async ({
           transcribe: deps?.transcribe,
           arweaveUpload: deps?.arweaveUpload,
           storageRoute: deps?.storageRoute,
+          now: deps?.now,
         },
       }),
       readAuthenticatedActionPayload: deps?.readAuthenticatedActionPayload,
@@ -40,6 +41,7 @@ export const dispatchAuthenticatedRouteWithWorkerDeps = async ({
           fetchUrl: deps?.fetchUrl,
           checkRateLimit: deps?.checkRateLimit,
           json: deps?.json,
+          now: deps?.now,
         },
       }),
       dispatchAuthenticatedSecretActionRoute: (value) => deps?.dispatchAuthenticatedSecretActionRoute?.({
@@ -59,6 +61,7 @@ export const dispatchAuthenticatedRouteWithWorkerDeps = async ({
           getSessionSecrets: deps?.getSessionSecrets,
           json: deps?.json,
           toStr: deps?.toStr,
+          now: deps?.now,
         },
       }),
       json: deps?.json,

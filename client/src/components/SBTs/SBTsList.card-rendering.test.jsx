@@ -20,6 +20,7 @@ var mockSessionRegistryReadCache = jest.fn();
 var mockReadSessionScanScope = jest.fn();
 var mockReadSessionScanSlugs = jest.fn();
 var mockCreateGroup = jest.fn();
+var mockWorkerGroupCreate = jest.fn();
 const mockSBTPage = jest.fn();
 const mockTagModal = jest.fn();
 
@@ -49,6 +50,16 @@ jest.mock('./CreateSBTGroup', () => {
     mockCreateGroup(props);
     return React.createElement('div', { 'data-testid': 'create-group-panel' }, 'Create Group Panel');
   };
+});
+jest.mock('../OnePageSession/WorkerSessionGroupsPanel', () => (props) => {
+  mockWorkerGroupCreate(props);
+  return (
+    <div data-testid="worker-group-create-panel">
+      <span>Active session</span>
+      <span>{props.sessionName}</span>
+      <span>/{props.sessionSlug}</span>
+    </div>
+  );
 });
 jest.mock('../TagPage/TagModal', () => (props) => {
   mockTagModal(props);
@@ -263,6 +274,7 @@ describe('SBTsList card rendering and navigation', () => {
     mockCreateGroup.mockReset();
     setupGroupMocks();
     globalThis.CE_SBT_SYNC_BAR_RESEARCH_BLOCK_STEP = 50;
+    window.history.replaceState({}, '', '/');
     localStorage.clear();
     sessionStorage.clear();
     localStorage.setItem('dg:lastActiveSbtGroup', 'alpha');
@@ -346,7 +358,7 @@ describe('SBTsList card rendering and navigation', () => {
     expect(onNavigateToSbt).toHaveBeenCalledWith(alphaAddress, buildSbtDetailPath(alphaAddress, 'alpha'));
   });
 
-  it('labels the list-mode create panel as an external on-chain tool only for Worker-native sessions', async () => {
+  it('routes list-mode creation to the active Worker session and keeps registry creation separate', async () => {
     const workerCanonicalProfile = {
       profileVersion: 1,
       preset: 'custom',
@@ -418,25 +430,49 @@ describe('SBTsList card rendering and navigation', () => {
       ensureLightSbtDiscovery: jest.fn(),
     };
 
+    window.history.replaceState({}, '', '/groups/alpha?view=public&sessionName=Wrong');
     const workerRender = render(<SBTsList {...sharedProps} sessionSlug="alpha" />);
+    const sessionHero = await screen.findByTestId('ce-worker-groups-session-hero');
+    expect(sessionHero).toHaveTextContent('Active session');
+    expect(sessionHero).toHaveTextContent('Alpha');
+    expect(sessionHero).not.toHaveTextContent('/alpha');
+    expect(sessionHero).not.toHaveTextContent('Open session');
+    const activeSessionLink = screen.getByRole('link', { name: 'Open session Alpha' });
+    expect(activeSessionLink).toHaveAttribute('href', '/session/alpha');
+    expect(activeSessionLink.querySelector('svg')).toBeInTheDocument();
+    await waitFor(() => {
+      const query = new URLSearchParams(window.location.search);
+      expect(window.location.pathname).toBe('/groups');
+      expect(query.get('sessionName')).toBe('alpha');
+      expect(query.get('view')).toBe('public');
+    });
     fireEvent.click((await screen.findAllByRole('button', { name: /create group/i }))[0]);
-    expect(await screen.findByTestId('create-group-panel')).toBeInTheDocument();
-    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toBeInTheDocument();
-    expect(screen.getByText(/does not replace or modify this session's Worker-native Groups/i)).toBeInTheDocument();
+    expect(await screen.findByTestId('worker-group-create-panel')).toHaveTextContent('Alpha');
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('/alpha');
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        sessionSlug: 'alpha',
+        showCreate: true,
+      }),
+    );
+    expect(mockGetRelevantBlockWindowForFilter).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Loading latest block|Blocks left/i)).not.toBeInTheDocument();
     workerRender.unmount();
 
+    window.history.replaceState({}, '', '/groups/beta');
     const registryRender = render(<SBTsList {...sharedProps} sessionSlug="beta" />);
     fireEvent.click((await screen.findAllByRole('button', { name: /create group/i }))[0]);
     expect(await screen.findByTestId('create-group-panel')).toBeInTheDocument();
-    expect(screen.queryByTestId('ce-sbt-create-advanced-external-notice')).toBeNull();
     registryRender.unmount();
 
+    window.history.replaceState({}, '', '/groups/custom-universe-session');
     const invalidWorkerRender = render(<SBTsList {...sharedProps} sessionSlug="custom-universe-session" />);
     fireEvent.click((await screen.findAllByRole('button', { name: /create group/i }))[0]);
-    expect(await screen.findByTestId('create-group-panel')).toBeInTheDocument();
-    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toBeInTheDocument();
+    expect(await screen.findByTestId('worker-group-create-panel')).toHaveTextContent('/custom-universe-session');
     invalidWorkerRender.unmount();
 
+    window.history.replaceState({}, '', '/groups/unregistered-worker');
     render(
       <SBTsList
         {...sharedProps}
@@ -445,8 +481,7 @@ describe('SBTsList card rendering and navigation', () => {
       />,
     );
     fireEvent.click((await screen.findAllByRole('button', { name: /create group/i }))[0]);
-    expect(await screen.findByTestId('create-group-panel')).toBeInTheDocument();
-    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toBeInTheDocument();
+    expect(await screen.findByTestId('worker-group-create-panel')).toHaveTextContent('/unregistered-worker');
   });
 
   it('does not duplicate featured SBT addresses in minting sections', async () => {

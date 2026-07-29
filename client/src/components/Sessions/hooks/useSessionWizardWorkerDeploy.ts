@@ -428,13 +428,12 @@ const useSessionWizardWorkerDeploy = ({
           resolveWorkerFaucetConfig,
         });
         [
-          'sessionId',
-          'sessionName',
-          'sessionInfo',
-          'sessionHeaderImg',
-          'sessionModeProfile',
-          'workerAuthority',
-          'ai',
+          'sessionId', 'sessionName', 'sessionInfo', 'sessionHeaderImg',
+          'sessionEndsAt', 'defaultTags', 'defaultGroupTags',
+          'questionsGenPrompt', 'defaultFilterState',
+          'defaultSbtTags', 'defaultFeaturedSBTs', 'autoFeatureSBTsBySessionSlug',
+          'sessionModeProfile', 'workerAuthority', 'groupCreationPolicy',
+          'ai', 'contracts',
         ].forEach((key) => {
           if (canonicalSeedConfig[key] !== undefined) payload[key] = canonicalSeedConfig[key];
         });

@@ -1,4 +1,5 @@
 import { toStr } from '../../utilities/shared/primitives.js';
+import { buildPublicRepoBlobUrl } from '../../variables/publicRepoMetadata.js';
 
 type CloudflareTokenPermission = {
   key: string;
@@ -6,6 +7,9 @@ type CloudflareTokenPermission = {
 };
 
 export const CLOUDFLARE_API_TOKENS_URL = 'https://dash.cloudflare.com/profile/api-tokens';
+export const CLOUDFLARE_TOKEN_SETUP_GUIDE_URL = buildPublicRepoBlobUrl(
+  'docs/session-cors-worker.md#api-token-setup-and-handling',
+);
 
 export const CLOUDFLARE_TOKEN_TEMPLATE_BASE_PERMISSIONS = Object.freeze([
   { key: 'workers_scripts', type: 'edit' },

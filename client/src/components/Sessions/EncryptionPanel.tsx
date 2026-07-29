@@ -61,7 +61,6 @@ export type EncryptionPanelProps = {
   addEncryptionGate: () => void;
   pendingSbtDrafts?: PendingSbtDraft[];
   removePendingSbtDraft: (address?: string) => void;
-  sessionModeProfilePrivacyControl?: React.ReactNode;
   isWorkerCanonical?: boolean;
   showOnChainGateControls?: boolean;
 };
@@ -92,7 +91,6 @@ const EncryptionPanel = ({
   addEncryptionGate,
   pendingSbtDrafts,
   removePendingSbtDraft,
-  sessionModeProfilePrivacyControl = null,
   isWorkerCanonical = false,
   showOnChainGateControls = true,
 }: EncryptionPanelProps) => {
@@ -148,7 +146,6 @@ const EncryptionPanel = ({
       </div>
       {!isCollapsed && (
         <div className={styles.panelBody}>
-          {sessionModeProfilePrivacyControl}
           {isWorkerCanonical && !showOnChainGateControls ? (
             <div className={styles.modeSummaryList} data-testid="ce-new-worker-native-access-summary">
               Passkey identity, Session Worker roles, and Worker-native Groups control access. Optional SBT/Lit

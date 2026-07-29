@@ -860,12 +860,9 @@ test('dispatchAdminRequest rejects nested provider secret aliases and generic to
   assert.equal(writes, 0);
 });
 
-test('dispatchAdminRequest preserves explicitly public key fields and structural authorization', async () => {
+test('dispatchAdminRequest preserves allowlisted structural authorization', async () => {
   const writes = [];
   const config = {
-    keyProvider: 'worker_secret',
-    publicKey: 'public-id',
-    resourceKey: 'default',
     authorization: { roles: { moderator: ['0x00000000000000000000000000000000000000aa'] } },
     sessionModeProfile: createWorkerSessionModeProfile(),
     storageProfile: createWorkerStorageProfile(),
@@ -1051,6 +1048,45 @@ test('dispatchAdminRequest routes signed worker group CRUD through admin auth', 
   assert.equal(result.body.ok, true);
   assert.equal(result.body.group.groupId, 'reviewers');
   assert.equal(result.body.group.createdBy.kind, 'evm_address');
+});
+
+test('dispatchAdminRequest keeps empty group-state reconciliation behind signed admin auth', async () => {
+  const sessionId = '0x00112233445566778899aabbccddeeff';
+  let reconcileArgs = null;
+  const result = await dispatchAdminRequest({
+    request: {
+      json: async () => createSignedBody({ sessionId }),
+    },
+    env: {},
+    baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+    slug: '',
+    action: 'groups/reconcile-empty',
+    deps: createAdminDeps({
+      resolveAdminRequestAuthority: async () => ({
+        ok: true,
+        address: '0x0000000000000000000000000000000000000abc',
+        existingConfig: {
+          adminAddress: '0x0000000000000000000000000000000000000abc',
+          sessionId,
+        },
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example.test' },
+        targetSlug: 'session-a',
+      }),
+      reconcileCoordinatedWorkerGroupCapacity: async (args) => {
+        reconcileArgs = args;
+        return { ok: true, repaired: true, meta: { groupCount: 0 } };
+      },
+    }),
+  });
+
+  assert.deepEqual(reconcileArgs, {
+    env: {},
+    slug: 'session-a',
+    sessionId,
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.repaired, true);
+  assert.equal(result.body.groupCount, 0);
 });
 
 test('dispatchAdminRequest does not touch groups when admin auth fails', async () => {

@@ -191,6 +191,7 @@ export const dispatchAdminRequest = async ({
         randomUUID: deps?.randomUUID,
         getRandomValues: deps?.getRandomValues,
         executeCoordinatedWorkerGroupMutation: deps?.executeCoordinatedWorkerGroupMutation,
+        reconcileCoordinatedWorkerGroupCapacity: deps?.reconcileCoordinatedWorkerGroupCapacity,
       },
     });
     if (response) return response;

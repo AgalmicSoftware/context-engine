@@ -801,6 +801,26 @@ export const validateSessionModeProfile = (
   return { valid: issues.length === 0, issues };
 };
 
+export const sessionModeAllowsAnonymousWorkerGroupDiscovery = (profile: unknown): boolean => {
+  if (!validateSessionModeProfile(profile).valid) return false;
+  const root = isRecord(profile) ? profile : {};
+  const authority = isRecord(root.authority) ? root.authority : {};
+  const storage = isRecord(root.storage) ? root.storage : {};
+  const payloadAccess = isRecord(storage.payloadAccessControl) ? storage.payloadAccessControl : {};
+  const encryption = isRecord(root.encryption) ? root.encryption : {};
+  const results = isRecord(root.results) ? root.results : {};
+  return (
+    authority.mode === 'worker_canonical' &&
+    storage.backend === 'cloudflare' &&
+    payloadAccess.gate === SESSION_STORAGE_PAYLOAD_ACCESS_GATES.NONE &&
+    payloadAccess.encryption === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.NONE &&
+    !hasOwn(payloadAccess, 'accessConditions') &&
+    encryption.mode === SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES.NONE &&
+    !hasOwn(encryption, 'accessConditions') &&
+    results.visibility === 'public_full_if_storage_public'
+  );
+};
+
 export const classifySessionModeProfileSupport = (profile: unknown): SessionModeProfileSupportClassification => {
   const validation = validateSessionModeProfile(profile);
   if (validation.valid) return { status: 'reachable', validation };

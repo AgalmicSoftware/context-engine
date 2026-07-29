@@ -228,7 +228,9 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     await expectSponsoredStatus('Sponsored resources applied.');
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    enableAdvancedMode();
+    const encryptionOptions = within(screen.getByRole('radiogroup', { name: /Encryption/i }));
+    fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
@@ -270,7 +272,7 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     await expectSponsoredStatus('Sponsored resources applied.');
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    enableAdvancedMode();
     fireEvent.change(await screen.findByTestId(E2E_TESTIDS.WIZARD_SLUG), {
       target: { value: 'fresh-sponsored-target' },
     });
@@ -365,7 +367,7 @@ describe('SessionWizard sponsored bundle flow', () => {
       target: { value: 'Deploy this with the sponsored worker.' },
     });
 
-    const rail = document.querySelector('[aria-label="Normal mode sections"]');
+    const rail = document.querySelector('[aria-label="Session setup steps"]');
     expect(rail).not.toBeNull();
 
     await waitFor(() => {
@@ -442,7 +444,7 @@ describe('SessionWizard sponsored bundle flow', () => {
       target: { value: 'Deploy this with the sponsored worker.' },
     });
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    enableAdvancedMode();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(await screen.findByText('Worker bundle source')).toBeInTheDocument();
@@ -498,7 +500,7 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     await expectSponsoredStatus('Sponsored resources applied.');
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    enableAdvancedMode();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
@@ -537,7 +539,7 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     await expectSponsoredStatus('Loading sponsored bundle…');
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    enableAdvancedMode();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     fireEvent.change(getFieldInputByLabel('OpenAI key *'), {
@@ -617,13 +619,13 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     await expectSponsoredStatus('Sponsored resources applied.');
 
-    fireEvent.click(screen.getByRole('button', { name: /Advanced options/i }));
+    enableAdvancedMode();
     const encryptionOptions = within(screen.getByRole('radiogroup', { name: /Encryption/i }));
     fireEvent.click(encryptionOptions.getByRole('radio', { name: 'Lit' }));
     await waitFor(() => {
       expect(encryptionOptions.getByRole('radio', { name: 'Lit' })).toHaveAttribute('aria-checked', 'true');
     });
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    enableAdvancedMode();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
@@ -682,7 +684,7 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     await expectSponsoredStatus('Sponsored resources applied.');
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    enableAdvancedMode();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('sponsored-openai');
@@ -887,7 +889,7 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     await expectSponsoredStatus('Sponsored bundle expired.');
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    enableAdvancedMode();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('');
@@ -939,7 +941,7 @@ describe('SessionWizard sponsored bundle flow', () => {
 
     await expectSponsoredStatus('Invalid sponsored bundle.');
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    enableAdvancedMode();
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_WORKER_PANEL_TOGGLE));
 
     expect(getFieldInputByLabel('OpenAI key *')).toHaveValue('');

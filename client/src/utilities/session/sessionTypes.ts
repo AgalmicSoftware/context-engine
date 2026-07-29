@@ -46,6 +46,12 @@ export interface SessionMetadata extends UnknownRecord {
   slug?: string;
   sessionName?: string;
   sessionInfo?: string;
+  sessionEndsAt?: string;
+  defaultTags?: string;
+  defaultGroupTags?: string | string[];
+  defaultSbtTags?: string;
+  questionsGenPrompt?: string;
+  defaultFilterState?: UnknownRecord | null;
   sessionInfoEncrypted?: string | JsonRecord | null;
   encryptedSessionInfo?: string | JsonRecord | null;
   orgName?: string;

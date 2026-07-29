@@ -9,7 +9,10 @@ import type {
   fetchWorkerCanonicalSessionBootstrap,
   WorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerDiscovery';
-import { buildCloudflareTokenTemplateUrl, CLOUDFLARE_API_TOKENS_URL } from './cloudflareTokenTemplate.js';
+import {
+  buildCloudflareTokenTemplateUrl,
+  CLOUDFLARE_TOKEN_SETUP_GUIDE_URL,
+} from './cloudflareTokenTemplate.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
@@ -157,7 +160,6 @@ const WorkerDeploySection = ({
   const cloudflareTokenTemplateHref = buildCloudflareTokenTemplateUrl({
     slug: cloudflareTokenSlug,
   });
-  const cloudflareTokenReceiver = String(deployHelperUrl || '').trim();
   const nativeDeployUrl = String(cloudflareNativeDeployUrl || '').trim();
   const nativeSessionSlug = String(cloudflareTokenSlug || '').trim();
   const nativeAdminAddress = String(deployForm.adminAddress || account || '').trim();
@@ -420,10 +422,10 @@ const WorkerDeploySection = ({
       )}
       {shouldUseSponsoredAutoDeployFlow && (
         <div className={styles.statusNote}>
-          Sponsored deploy bundle is ready. Normal mode will use the GitHub-hosted worker bundle automatically. If a
+          Sponsored deploy bundle is ready. Guided setup will use the GitHub-hosted worker bundle automatically. If a
           retry needs a different source, keep that Git URL as the default and add a manual bundle URL or upload
-          override after a fetch failure. In advanced mode you can still switch between Upload file and Use URL for
-          manual testing.
+          override after a fetch failure. While customizing, you can switch between Upload file and Use URL for manual
+          testing.
         </div>
       )}
       {(!shouldUseSponsoredAutoDeployFlow || !isNormalMode) && (
@@ -610,32 +612,9 @@ const WorkerDeploySection = ({
                   its generated value, then paste it into the field above.
                 </div>
                 <div className={styles.helperText}>
-                  Cloudflare may preselect All accounts. Before creating the token, restrict Account Resources to the
-                  one account where this worker will run.
-                </div>
-                <div className={styles.helperText}>
-                  Account is inferred during deploy only when the token can see exactly one account.
-                </div>
-                <div className={styles.helperText}>
-                  This browser sends this token only for this deployment attempt to the deploy helper
-                  {cloudflareTokenReceiver ? (
-                    <>
-                      {' '}
-                      at <code>{cloudflareTokenReceiver}</code>
-                    </>
-                  ) : (
-                    ' at the deploy-helper URL shown above'
-                  )}
-                  . The helper uses it to call Cloudflare; it is not saved to the session draft or browser storage and
-                  is not installed in the deployed Session Worker.
-                </div>
-                <div className={styles.helperText}>
-                  Set the earliest expiration Cloudflare permits that still covers setup and an immediate retry. Revoke
-                  the token as soon as deployment succeeds or you abandon the attempt from{' '}
-                  <a href={CLOUDFLARE_API_TOKENS_URL} target="_blank" rel="noopener noreferrer">
-                    Cloudflare API Tokens
+                  <a href={CLOUDFLARE_TOKEN_SETUP_GUIDE_URL} target="_blank" rel="noopener noreferrer">
+                    Cloudflare API token setup and security guide
                   </a>
-                  .
                 </div>
               </FormGroup>
               <FormGroup>

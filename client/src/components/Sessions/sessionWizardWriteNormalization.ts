@@ -37,6 +37,8 @@ import {
   type SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
+import { normalizeSessionWizardDefaultFeaturedSbtMetadata } from './sessionWizardMetadataPayload';
+import { normalizeSessionWizardEndsAt } from './sessionWizardSessionLifecycle';
 import type {
   AnyRecord,
   ChainIdLike,
@@ -342,6 +344,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
     });
   const modeRequirements = resolveSessionWizardModeRequirements(effectiveSessionModeProfile);
   const isWorkerCanonical = modeRequirements.isWorkerCanonical;
+  const usesOnChainSbt = isWorkerCanonical && modeRequirements.publish.deployPendingSbts;
   const workerAuthority = isObj(resolvedDraft.workerAuthority)
     ? cloneValue(resolvedDraft.workerAuthority)
     : isObj(resolvedDeployPayload.workerAuthority)
@@ -358,7 +361,11 @@ export const buildSessionWizardWorkerConfigPayload = ({
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
     sessionName: trimString(resolvedDraft.sessionName),
     sessionInfo: trimString(resolvedDraft.sessionInfo),
-    sessionHeaderImg: trimString(resolvedDraft.sessionHeaderImg),
+    sessionHeaderImg: trimString(resolvedDraft.sessionHeader || resolvedDraft.sessionHeaderImg),
+    defaultTags: trimString(resolvedDraft.defaultTags),
+    defaultGroupTags: trimString(resolvedDraft.defaultGroupTags),
+    questionsGenPrompt: trimString(resolvedDraft.questionsGenPrompt),
+    defaultFilterState: cloneValue(resolvedDraft.defaultFilterState ?? null),
     groupCreationPolicy: normalizeGroupCreationPolicy(
       resolvedDraft.groupCreationPolicy,
       DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
@@ -397,6 +404,15 @@ export const buildSessionWizardWorkerConfigPayload = ({
   };
 
   if (isWorkerCanonical) {
+    const sessionEndsAt = normalizeSessionWizardEndsAt(resolvedDraft.sessionEndsAt);
+    if (sessionEndsAt) next.sessionEndsAt = sessionEndsAt;
+    if (usesOnChainSbt) {
+      next.defaultSbtTags = trimString(resolvedDraft.defaultSbtTags);
+      next.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(
+        resolvedDraft.defaultFeaturedSBTs,
+      );
+      next.autoFeatureSBTsBySessionSlug = resolvedDraft.autoFeatureSBTsBySessionSlug !== false;
+    }
     delete next.registryAddress;
     delete next.registryChainId;
     delete next.faucet;
@@ -422,6 +438,10 @@ export const buildSessionWizardWorkerConfigPayload = ({
   }
   if (!isWorkerCanonical && Object.keys(normalizedContracts).length) {
     next.contracts = normalizedContracts;
+  } else if (usesOnChainSbt && normalizedContracts.sbtFactory) {
+    next.contracts = {
+      sbtFactory: normalizedContracts.sbtFactory,
+    };
   }
 
   const sessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(sessionId);

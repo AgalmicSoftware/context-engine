@@ -61,6 +61,32 @@ Important:
 - Secrets live in the worker's secrets store or encrypted sponsored bundles,
   never in public Worker config or Arweave session metadata.
 
+### Mode-aligned optional settings
+
+`Customize` reveals only settings supported by the selected profile:
+
+| Selected profile | Optional settings shown |
+| --- | --- |
+| Pure Cloudflare | Worker session end time, question defaults, Worker Group tag defaults, and Worker-backed privacy/results controls |
+| Cloudflare with explicit on-chain SBT access | The pure Cloudflare settings plus SBT curation and the on-chain Group Factory/network controls required by that access mode |
+| Decentralized | Block/time limits, Surveys, Group Factory and Session Registry contracts, and optional testnet faucet settings |
+
+Pure Cloudflare setup does not display or persist block numbers, registry
+contracts, Surveys contracts, faucet settings, or an EVM network. Choosing
+`Customize` does not override this capability boundary.
+
+The optional **Session end time** is a timestamp for Worker-canonical sessions.
+It must be in the future when the session is published. At that instant the
+Session Worker stops participant AI, transcription, fetch, upload, Group
+creation, and Group join work. Existing public or authorized Groups, stored
+payloads, and results remain readable, and signed admin recovery/configuration
+routes remain available.
+
+`Default Group Tags` seeds the tags in both participant and admin Worker Group
+creation. Existing Worker sessions that only carry `defaultSbtTags` use that
+value as a compatibility fallback; new pure Cloudflare sessions persist the
+generic `defaultGroupTags` field instead.
+
 ## Sponsored Bundles: Skip Manual Config
 
 If you do not want the recipient to paste worker secrets manually into `/new`, use `/sponsor`.
@@ -144,7 +170,10 @@ immutable. A release enables the native card by setting
 replay commit. The private source commit is not interchangeable with its public
 replay SHA. Moving branches, tags, abbreviated hashes, and non-GitHub sources
 are rejected. The token-based helper procedure later in this guide applies only
-to the legacy fallback.
+to the legacy fallback. See
+[API token setup and handling](session-cors-worker.md#api-token-setup-and-handling)
+for its account selection, one-attempt handling, expiration, and revocation
+requirements.
 
 ### 2. AI provider key
 
@@ -373,9 +402,17 @@ by the session worker.
 
 After publishing a worker-canonical session, its Groups section manages native
 Cloudflare records. The worker admin supplies the group name, optional
-description and HTTPS image, join mode, and visibility. No SBT contract is
-deployed, so there is no contract address, network transaction, gas payment,
-RPC setting, or burn authorization. The client pins the validated Worker origin,
+description and HTTPS image, tags, public HTTPS reference URLs, an optional
+per-group member limit, an optional self-join deadline, group-admin address,
+join mode, and visibility. The deadline closes participant self-join; configured
+session admins can still manage membership. Image input supports a
+direct HTTPS URL, clipboard paste, or local upload with preview; uploaded files
+are published through the selected session storage before the group record is
+created. Public, ungated sessions can render stored group artwork before
+sign-in, while private-session storage reads keep using the authenticated
+session credential. No SBT contract is deployed, so there is no contract
+address, network transaction, gas payment, RPC setting, or burn authorization.
+The client pins the validated Worker origin,
 canonical slug, and canonical session ID. Worker-canonical nonce/login requests,
 login responses, JWTs, Group requests, Group responses, stored records, and the
 Durable Object coordinator all carry or verify that same slug/session-ID pair.
@@ -393,9 +430,12 @@ The **Who can create groups?** choice is available for every `/new` mode and is
 persisted as `groupCreationPolicy`:
 
 - **All participants** is the new-session default. In Worker-native sessions,
-  an authenticated participant with the `groups` scope can create an open,
-  session-visible group without a wallet transaction; the Worker generates its
-  ID and admins retain edit, delete, and membership controls. In
+  an authenticated participant with the `groups` scope can join or create an
+  open, session-visible group without a wallet transaction. Participants can
+  supply the same tags, reference URLs, member limit, and join deadline as an
+  admin; the Worker generates the ID and records the signed participant address
+  as the group administrator instead of trusting a submitted address. Session
+  admins retain edit, delete, and membership controls. In
   registry-canonical sessions, the session's SBT creation UI remains available
   to participants.
 - **Admins only** hides and rejects the session-bound creation path for other
@@ -403,6 +443,13 @@ persisted as `groupCreationPolicy`:
   fail-closed default. For on-chain sessions this is a Context Engine UX
   policy, not a factory-level access control: the deployed public SBT factory
   can still be called independently outside the session UI.
+
+Group discovery is a separate privacy decision. A valid Worker-canonical mode
+with public stored results, unencrypted Cloudflare storage, and no payload
+access gate exposes only redacted, session-visible group metadata before
+sign-in. Participant-, member-, or admin-visible results modes and any gated or
+encrypted storage mode keep group discovery and results behind authentication,
+regardless of who may create groups.
 
 Ordinary pure-Worker session pages project that same chain-free contract
 downstream. Account settings do not offer Ethereum, MetaMask, or testnet

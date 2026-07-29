@@ -21,6 +21,56 @@ test('dispatchAuthenticatedSecretPathRoute ignores unrelated routes', async () =
   assert.deepEqual(result, { handled: false });
 });
 
+test('dispatchAuthenticatedSecretPathRoute blocks participant writes after the session ends but keeps reads open', async () => {
+  let groupRouteCalls = 0;
+  const deps = {
+    now: () => Date.parse('2030-01-02T03:04:00Z'),
+    json: (body, status, headers) => ({ body, status, headers }),
+    workerGroupsRoute: async () => {
+      groupRouteCalls += 1;
+      return new Response('groups');
+    },
+    evaluateAuthenticatedRoutePreflight: async () => ({ ok: true }),
+  };
+  const base = {
+    config: { sessionEndsAt: '2030-01-02T03:04:00Z' },
+    headers: { 'Access-Control-Allow-Origin': '*' },
+    deps,
+  };
+
+  for (const path of ['/groups/create', '/groups/join', '/groups/leave']) {
+    const blocked = await dispatchAuthenticatedSecretPathRoute({
+      ...base,
+      path,
+      method: 'POST',
+    });
+    assert.deepEqual(blocked, {
+      handled: true,
+      response: {
+        body: {
+          error: 'This session has ended.',
+          code: 'session_ended',
+          sessionEndsAt: '2030-01-02T03:04:00.000Z',
+        },
+        status: 410,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      },
+    }, path);
+  }
+  assert.equal(groupRouteCalls, 0);
+
+  for (const path of ['/groups/list', '/groups/members']) {
+    const readable = await dispatchAuthenticatedSecretPathRoute({
+      ...base,
+      path,
+      method: 'GET',
+    });
+    assert.equal(readable.handled, true);
+    assert.equal(readable.response.status, 200);
+  }
+  assert.equal(groupRouteCalls, 2);
+});
+
 test('dispatchAuthenticatedSecretPathRoute preserves preflight failure passthrough', async () => {
   const response = new Response(JSON.stringify({ error: 'Token missing transcribe scope.' }), {
     status: 403,
@@ -349,8 +399,10 @@ test('dispatchAuthenticatedSecretPathRoute rejects arweave-only tokens for worke
   const routes = [
     { path: '/groups/list', method: 'GET' },
     { path: '/groups/my-memberships', method: 'GET' },
+    { path: '/groups/members', method: 'POST' },
     { path: '/groups/create', method: 'POST' },
     { path: '/groups/join', method: 'POST' },
+    { path: '/groups/leave', method: 'POST' },
   ];
   const scopesWithoutGroups = [
     { arweave: true, groups: false },

@@ -11,6 +11,8 @@ import styles from './SBTPage.module.scss';
 type SbtPageRelevantInfoProps = {
   documentIDHashes: string[];
   documentURLs: string[];
+  documentUrlsArePublic?: boolean;
+  introText?: React.ReactNode;
   onOpenEncryptedDoc: (url: string) => void;
   shouldRenderDocumentIdHashes: boolean;
   shouldRenderDocumentUrls: boolean;
@@ -21,6 +23,8 @@ type SbtPageRelevantInfoProps = {
 const SbtPageRelevantInfo = ({
   documentIDHashes,
   documentURLs,
+  documentUrlsArePublic = false,
+  introText = 'This section shows relevant documents, URLs, tags, and IDs.',
   onOpenEncryptedDoc,
   shouldRenderDocumentIdHashes,
   shouldRenderDocumentUrls,
@@ -30,14 +34,14 @@ const SbtPageRelevantInfo = ({
   <div className={styles.relevantInfo}>
     <Alert color="info" fade={false}>
       <FontAwesomeIcon icon={faInfoCircle} style={resolveSbtPageMutedInfoIconStyle()} />
-      This section shows relevant documents, URLs, tags, and IDs.
+      {introText}
     </Alert>
     {shouldRenderDocumentUrls && (
       <div className={styles.docUrlsSection}>
         <h4>Document URLs:</h4>
         <ul className={styles.docUrlList}>
           {documentURLs.map((url, index) => {
-            const litDoc = litStorage.isLitArweaveUrl(url);
+            const litDoc = !documentUrlsArePublic && litStorage.isLitArweaveUrl(url);
             return (
               <li key={index} className={styles.docUrlItem}>
                 <span className={styles.docUrlBadge}>{litDoc ? 'Encrypted Doc' : 'Doc URL'}</span>

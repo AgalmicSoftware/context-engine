@@ -155,7 +155,7 @@ const createWorkerCanonicalSessionConfig = ({
       ceCc: false,
     },
     results: {
-      visibility: 'public_full_if_storage_public',
+      visibility: hybrid ? 'participant_aggregate' : 'public_full_if_storage_public',
       exposure: {
         aggregateResultsEnabled: true,
         anonymizedGroupsEnabled: false,

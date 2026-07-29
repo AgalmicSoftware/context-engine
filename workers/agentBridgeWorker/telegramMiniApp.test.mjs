@@ -404,7 +404,7 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /id="adminPanel"[^>]*aria-label="Admin actions"/);
   assert.match(html, /id="closeAdmin"[^>]*aria-label="Close admin actions"/);
   assert.match(html, /el\.showAdmin\.onclick = \(\) => \{[\s\S]*state\.sessionsPanelOpen = false;[\s\S]*renderSessionPicker\(\);[\s\S]*renderAdmin\(\);[\s\S]*setPanelOpen\(el\.adminPanel, el\.showAdmin, true\);/);
-  assert.match(html, /const ADMIN_ACTION_LABELS = \{[\s\S]*export_all: 'Export data'[\s\S]*export_access: 'Manage permissions'[\s\S]*question_queue: 'Question queue'[\s\S]*group_link: 'Add group link'[\s\S]*export_allow: 'Add admin'[\s\S]*export_revoke: 'Remove admin'/);
+  assert.match(html, /const ADMIN_ACTION_LABELS = \{[\s\S]*export_all: 'Export data'[\s\S]*export_access: 'Manage permissions'[\s\S]*question_queue: 'Question queue'[\s\S]*group_link: 'Approve group'[\s\S]*export_allow: 'Add admin'[\s\S]*export_revoke: 'Remove admin'/);
   assert.match(html, /const DEFAULT_ADMIN_ACTION_IDS = \['export_all', 'export_access', 'results_settings', 'question_queue', 'group_link'\]/);
   assert.match(html, /function normalizeAdminActions\(adminActions = \[\]\)/);
   assert.match(html, /const remappedAccessAction = \['export_allow', 'export_revoke'\]\.includes\(actionId\);/);
@@ -416,6 +416,8 @@ test('Mini App keeps primary actions visible while retrying unavailable question
   assert.match(html, /button\.dataset\.action = action\.action;/);
   assert.match(html, /button\.textContent = 'Copy export command';/);
   assert.match(html, /copyAdminCommand\('\/export_all ' \+ sessionSlug, 'Export command copied\. Paste it in the CE bot\.'\)/);
+  assert.match(html, /button\.textContent = 'Copy in-group approval command';/);
+  assert.equal(html.includes('startgroup='), false);
   assert.equal(html.includes('Download response export'), false);
   assert.equal(html.includes("link.download = 'context-engine-'"), false);
   assert.match(html, /function appendAdminAddressList\(panel, title, entries = \[\]\)/);
@@ -1793,6 +1795,7 @@ test('Mini App exposes admin state only for configured export admin managed wall
   assert.equal(adminState.admin.actions.map((action) => action.action).includes('export_revoke'), false);
   assert.equal(adminState.admin.actions.map((action) => action.action).includes('question_queue'), true);
   assert.equal(adminState.admin.actions.map((action) => action.action).includes('group_link'), true);
+  assert.equal(adminState.admin.actions.find((action) => action.action === 'group_link').label, 'Approve group');
   assert.equal(adminState.admin.actions.find((action) => action.action === 'export_all').label, 'Export data');
   assert.equal(adminState.admin.actions.find((action) => action.action === 'export_access').label, 'Manage permissions');
   assert.equal(adminState.admin.actions.find((action) => action.action === 'question_queue').label, 'Question queue');
@@ -1838,7 +1841,7 @@ test('Mini App treats dynamically added response addresses as admin-capable in t
   assert.equal(state.admin.actions.map((action) => action.action).includes('results_settings'), true);
 });
 
-test('Mini App admin endpoints manage permissions, results settings, queue, and group invite links', async () => {
+test('Mini App admin endpoints manage permissions, results settings, queue, and secure group approval guidance', async () => {
   const createdAt = '2026-05-25T12:00:00.000Z';
   const rootSecret = 'test-root-secret-for-mini-admin-endpoints';
   const adminAccount = await deriveTelegramResponseExportAccount({
@@ -1929,7 +1932,16 @@ test('Mini App admin endpoints manage permissions, results settings, queue, and 
   const linkBody = await linkResponse.json();
   assert.equal(linkResponse.status, 200);
   assert.equal(linkBody.ok, true);
-  assert.match(linkBody.link, /^https:\/\/t\.me\/contextengineer_bot\?startgroup=cetg_/);
+  assert.equal(linkBody.manualApprovalRequired, true);
+  assert.equal(linkBody.reason, 'explicit_group_admin_confirmation_required');
+  assert.equal(linkBody.joinCommand, '/join alpha');
+  assert.match(linkBody.guidance, /does not create authorization-bearing group links/);
+  assert.equal(Object.hasOwn(linkBody, 'link'), false);
+  assert.equal(JSON.stringify(linkBody).includes('startgroup='), false);
+  assert.equal(
+    Array.from(kv.store.keys()).some((key) => key.startsWith('telegram:action:cetg_')),
+    false,
+  );
 });
 
 test('Mini App documents endpoint lists fixture docs and stores lightweight uploads', async () => {

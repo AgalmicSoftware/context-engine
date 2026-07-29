@@ -2843,8 +2843,10 @@ const AdminPageRuntime = ({
           <AdminWorkerGroupsPanel
             canAdminWorker={canAdminWorker}
             sessionId={selectedWorkerSessionId}
+            sessionConfig={selectedConfig}
             sessionSlug={normalizeSlug(selectedSlug)}
             workerUrl={sessionCapabilities.usesWorkerGroups ? exactSelectedConfigWorkerUrl : selectedConfigWorkerUrl}
+            workerAuthContext={testContext}
             postSignedRequest={postSignedAdminRequest}
             title={workerGroupsPanelTitle}
             description={workerGroupsPanelDescription}

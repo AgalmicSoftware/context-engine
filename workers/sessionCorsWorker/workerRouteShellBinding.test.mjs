@@ -482,6 +482,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves admin and anonymous branch 
             proxyOpenAI: 'proxyOpenAI',
             proxyOpenRouter: 'proxyOpenRouter',
             proxyCustomRPC: 'proxyCustomRPC',
+            now: 'now',
           });
           assert.deepEqual(value.constants, {
             missingSlugError: 'Missing sessionSlug.',
@@ -547,6 +548,7 @@ test('createWorkerRouteShellWithWorkerDeps preserves authenticated fallback afte
           storageRoute: 'storageRoute',
           fetchImage: 'fetchImage',
           fetchUrl: 'fetchUrl',
+          now: 'now',
           normalizeAiRequestPayload: 'normalizeAiRequestPayload',
           proxyAnthropic: 'proxyAnthropic',
           proxyOpenAI: 'proxyOpenAI',

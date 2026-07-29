@@ -16,9 +16,7 @@ import { faSpinner, faSync, faTrash, faPlus, faCog } from '@fortawesome/free-sol
 import { Button } from 'reactstrap';
 import SBTPage from './SBTPage';
 import CreateGroup from './CreateSBTGroup';
-import SbtCreateAdvancedExternalNotice, {
-  shouldShowAdvancedExternalSbtNotice,
-} from './SbtCreateAdvancedExternalNotice';
+import WorkerSessionGroupsPanel from '../OnePageSession/WorkerSessionGroupsPanel';
 import TagModal from '../TagPage/TagModal';
 import SbtListSessionUniversePanel from './SbtListSessionUniversePanel';
 import { SbtListDetailsPanel, SbtListMetaRow } from './SbtListCardChrome';
@@ -44,6 +42,7 @@ import {
   readStoredGlobalSessionSelection,
 } from '../../utilities/session/globalSessionState.js';
 import { hasUsableSessionWorkerConfig } from '../../utilities/session/sessionWorkerAvailability.js';
+import { claimsWorkerCanonicalAuthority, resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection.js';
 import { getSbtDescriptionText, getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { readPublicUrlBasePath, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import {
@@ -163,16 +162,15 @@ import type {
   SbtSessionUniverseSnapshot,
   UnknownRecord,
 } from './sbtListTypes';
+import WorkerGroupsListRoute, { resolveSbtListWorkerRouteConfig } from './WorkerGroupsListRoute';
 
 export const __test__areSbtListArraysEqual = areSbtListArraysEqual;
-
 export const __test__getSbtCardDetails = getSbtCardDetails;
-
 export const __test__buildSbtRenderBuckets = buildSbtListRenderBuckets;
 
 export { readSbtListCacheMetaSnapshot as readSbtCacheMetaSnapshot };
 
-const SBTsList = ({
+const OnChainSBTsList = ({
   provider,
   network,
   account,
@@ -2760,6 +2758,11 @@ const SBTsList = ({
 
   const showEmbeddedCreateGroupControl = embeddedMode && allSessionsMode;
   const shouldRenderCreateGroupPanel = showCreateGroup && (!embeddedMode || showEmbeddedCreateGroupControl);
+  const createSessionConfig = getDisplaySessionConfig(listSlug);
+  const createSessionCapabilities = resolveSessionCapabilityProjection(createSessionConfig);
+  const usesWorkerNativeCreate = (createSessionCapabilities.source === 'profile' &&
+    createSessionCapabilities.profileValid && createSessionCapabilities.isWorkerCanonical) ||
+    claimsWorkerCanonicalAuthority(createSessionConfig);
 
   const rootClassName = viewMode === 'modal' ? styles.modalViewContainer : styles.standardViewContainer;
 
@@ -2928,26 +2931,25 @@ const SBTsList = ({
       {/* In all-groups embedded mode, keep CreateGroup panel above universe chooser. */}
       {shouldRenderCreateGroupPanel && (
         <div className={styles.createGroupPanelWrap}>
-          {shouldShowAdvancedExternalSbtNotice(getDisplaySessionConfig(listSlug)) ? (
-            <SbtCreateAdvancedExternalNotice />
-          ) : null}
-          <CreateGroup
-            account={account}
-            loginComplete={loginComplete}
-            provider={provider}
-            litHooks={litHooks}
-            toggleLoginModal={toggleLoginModal}
-            expanded={showCreateGroup}
-            network={network}
-            sessionSlug={listSlug}
-            lockGateSessionSources={
-              showEmbeddedCreateGroupControl && isListModeScopeEnabled ? embeddedCreateGroupLockGateSources : undefined
-            }
-            lockGatePreferredSessionSlug={
-              showEmbeddedCreateGroupControl && isListModeScopeEnabled ? listSlug : undefined
-            }
-            sbtCacheRevision={sbtCacheRevision}
-          />
+          {usesWorkerNativeCreate ? (
+            <WorkerSessionGroupsPanel
+              account={account} provider={provider}
+              networkChainId={network?.chainId || null} sessionConfig={createSessionConfig}
+              sessionName={String(createSessionConfig?.sessionName || '')} sessionSlug={listSlug}
+              showCreate={true} createOnly={true}
+              toggleLoginModal={toggleLoginModal as ((open: boolean) => void) | undefined}
+            />
+          ) : (
+            <CreateGroup
+              account={account} loginComplete={loginComplete}
+              provider={provider} litHooks={litHooks}
+              toggleLoginModal={toggleLoginModal}
+              expanded={showCreateGroup} network={network} sessionSlug={listSlug}
+              lockGateSessionSources={showEmbeddedCreateGroupControl && isListModeScopeEnabled ? embeddedCreateGroupLockGateSources : undefined}
+              lockGatePreferredSessionSlug={showEmbeddedCreateGroupControl && isListModeScopeEnabled ? listSlug : undefined}
+              sbtCacheRevision={sbtCacheRevision}
+            />
+          )}
         </div>
       )}
 
@@ -3011,4 +3013,11 @@ const SBTsList = ({
   );
 };
 
+const SBTsList = (props: SBTsListProps) => {
+  const workerSessionConfig = resolveSbtListWorkerRouteConfig(props);
+  if (!workerSessionConfig) return <OnChainSBTsList {...props} />;
+  return <WorkerGroupsListRoute props={props} workerSessionConfig={workerSessionConfig} />;
+};
+
+export { resolveSbtListWorkerRouteConfig };
 export default SBTsList;

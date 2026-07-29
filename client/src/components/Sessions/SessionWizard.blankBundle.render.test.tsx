@@ -292,7 +292,7 @@ describe('SessionWizard blank bundle render regression', () => {
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_FILE_INPUT)).toBeInTheDocument();
     expect(
       screen.getAllByText(
-        'No default hosted worker bundle URL is configured for normal mode. Provide a manual bundle URL or upload a bundle file below. Optional fallback: Run nvm use 20 && npm run worker:bundle from the repo root, then choose /dist/sessionCorsWorker.bundle.js.',
+        'No default hosted worker bundle URL is configured for guided setup. Provide a manual bundle URL or upload a bundle file below. Optional fallback: Run nvm use 20 && npm run worker:bundle from the repo root, then choose /dist/sessionCorsWorker.bundle.js.',
       ),
     ).toHaveLength(2);
 
@@ -543,7 +543,7 @@ describe('SessionWizard blank bundle render regression', () => {
       target: { value: '{"kty":"RSA","n":"blank-bundle-regression"}' },
     });
 
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
     fireEvent.click(await screen.findByRole('button', { name: /step \d+: worker/i }));
 
     await waitFor(() => {

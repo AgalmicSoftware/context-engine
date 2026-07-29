@@ -13,16 +13,12 @@ const getToggleCheckbox = (labelText) =>
   screen.getByText(labelText).closest('label').querySelector('input[type="checkbox"]');
 
 const enableAdvancedMode = () => {
+  ensureSessionModeProfileSelected();
+  const customizeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
+  if (customizeButton.getAttribute('aria-pressed') === 'true') return;
   act(() => {
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
+    fireEvent.click(customizeButton);
   });
-  if (hasCommittedSessionModeProfile()) return;
-  const arweavePreset = screen.queryByTestId('ce-new-preset-trustless_public_decentralized');
-  if (arweavePreset) {
-    act(() => {
-      fireEvent.click(arweavePreset);
-    });
-  }
 };
 
 const hasCommittedSessionModeProfile = () => {
@@ -45,22 +41,10 @@ const ensureSessionModeProfileSelected = () => {
     }
     return;
   }
-  const normalModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL);
-  const advancedModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
-  if (!normalModeButton || !advancedModeButton) return;
-  const wasNormalMode = normalModeButton.getAttribute('aria-pressed') === 'true';
-  act(() => {
-    fireEvent.click(advancedModeButton);
-  });
   const arweavePreset = screen.queryByTestId('ce-new-preset-trustless_public_decentralized');
   if (arweavePreset) {
     act(() => {
       fireEvent.click(arweavePreset);
-    });
-  }
-  if (wasNormalMode) {
-    act(() => {
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
     });
   }
 };
@@ -71,6 +55,10 @@ const continueNewSessionEntry = () => {
 
 const selectNormalModeCard = (label) => {
   ensureSessionModeProfileSelected();
+  const customizeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
+  if (customizeButton?.getAttribute('aria-pressed') === 'true') {
+    fireEvent.click(customizeButton);
+  }
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
 };
 

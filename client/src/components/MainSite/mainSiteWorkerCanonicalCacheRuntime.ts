@@ -8,6 +8,7 @@ export type MainSiteWorkerCanonicalCacheRuntimeHost = {
   initializeSurveyCacheForGroup: (slug: string, opts?: UnknownRecord) => Promise<void>;
   fetchQuestionResponsesChunkedForGroup: (slug: string, opts?: UnknownRecord) => Promise<void>;
   setReadinessStateIfChanged: (patch: UnknownRecord, callback?: () => void) => unknown;
+  checkAllCachesReady: () => unknown;
   startSbtEventListenerForGroup: (slug: string) => unknown;
 };
 
@@ -45,7 +46,9 @@ export const initializeMainSiteWorkerCanonicalCaches = async ({
 
   await host.initializeSurveyCacheForGroup(sessionSlug);
   if (!isCurrent()) return true;
-  host.setReadinessStateIfChanged({ isSurveyCacheReady: true });
+  host.setReadinessStateIfChanged({ isSurveyCacheReady: true }, () => {
+    if (isCurrent()) host.checkAllCachesReady();
+  });
 
   return true;
 };

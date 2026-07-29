@@ -40,6 +40,12 @@ describe('getSbtListRouteSessionSlug', () => {
     expect(getSbtListRouteSessionSlug('/sbts/new', { normalizeSessionSlug })).toBe('');
     expect(getSbtListRouteSessionSlug('/sbts', { normalizeSessionSlug })).toBe('');
     expect(getSbtListRouteSessionSlug('/groups/MyGroup', { normalizeSessionSlug })).toBe('mygroup');
+    expect(
+      getSbtListRouteSessionSlug('/groups', {
+        normalizeSessionSlug,
+        search: '?sessionName=Demo-SH',
+      }),
+    ).toBe('demo-sh');
   });
 });
 

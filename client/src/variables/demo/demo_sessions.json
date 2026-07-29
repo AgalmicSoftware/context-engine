@@ -50,7 +50,10 @@
     "sessionInfo": "Public Cloudflare-backed demo session seeded with the Context corpus questions.",
     "sessionHeaderImg": null,
     "corsWorkerUrl": "https://ce-demo-sh-481bb6cd0a81.agalmic.workers.dev/",
+    "groupCreationPolicy": "participants",
     "allowOrigins": [
+      "http://127.0.0.1:3000",
+      "http://localhost:3000",
       "https://contextengine.sh",
       "https://www.contextengine.sh"
     ],

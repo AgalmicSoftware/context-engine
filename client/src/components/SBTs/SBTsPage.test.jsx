@@ -11,6 +11,7 @@ import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities
 const mockSBTPage = jest.fn();
 const mockSBTsList = jest.fn();
 const mockCreateGroup = jest.fn();
+const mockWorkerGroupCreate = jest.fn();
 const mockIsCryptoMode = jest.fn(() => true);
 
 jest.mock('./SBTsList', () => (props) => {
@@ -22,6 +23,16 @@ jest.mock('./CreateSBTGroup', () => (props) => {
   return (
     <div data-testid="create-group-panel" data-network-name={props.network?.name || ''}>
       Create Group Panel
+    </div>
+  );
+});
+jest.mock('../OnePageSession/WorkerSessionGroupsPanel', () => (props) => {
+  mockWorkerGroupCreate(props);
+  return (
+    <div data-testid="worker-group-create-panel">
+      <span>Active session</span>
+      <span>{props.sessionName}</span>
+      <span>/{props.sessionSlug}</span>
     </div>
   );
 });
@@ -226,7 +237,7 @@ describe('SBTsPage auto-feature flag', () => {
     replaceStateSpy.mockRestore();
   });
 
-  it('uses an explicitly supplied unregistered Worker session for standalone Advanced/external authoring', () => {
+  it('uses an explicitly supplied Worker session for session-scoped group creation', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const workerSessionConfig = {
       slug: 'demo-sh',
@@ -253,23 +264,65 @@ describe('SBTsPage auto-feature flag', () => {
       />,
     );
 
-    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toHaveTextContent(
-      /Advanced\/external on-chain SBT/i,
-    );
-    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toHaveTextContent(
-      /does not replace or modify this session's Worker-native Groups/i,
-    );
-    expect(screen.getByTestId('create-group-panel')).toHaveAttribute('data-network-name', 'Base Sepolia');
-    expect(mockCreateGroup).toHaveBeenCalledWith(
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('Active session');
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('/demo-sh');
+    expect(screen.queryByText(/on-chain|contract address|gas|RPC/i)).not.toBeInTheDocument();
+    expect(mockWorkerGroupCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        network: expect.objectContaining({ id: 84532, name: 'Base Sepolia' }),
-        preferConnectedNetworkForAuthoring: true,
-        sessionConfigOverride: workerSessionConfig,
+        createOnly: true,
+        sessionConfig: workerSessionConfig,
         sessionSlug: 'demo-sh',
+        showCreate: true,
       }),
     );
+    expect(mockCreateGroup).not.toHaveBeenCalled();
     expect(contractScripts.getSessionConfigBySlug).not.toHaveBeenCalledWith('demo-sh');
     expect(getDemoSessionConfigBySlug).not.toHaveBeenCalledWith('demo-sh', { allowDemoFallback: true });
+  });
+
+  it('routes a query-scoped built-in Worker group list before asynchronous session discovery completes', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const workerSessionConfig = {
+      slug: 'demo-sh',
+      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+      sessionName: 'Demo Session',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    contractScripts.getSessionConfigBySlug.mockReturnValue(null);
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    getDemoSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === 'demo-sh' ? workerSessionConfig : null,
+    );
+    window.history.replaceState({}, '', '/groups?sessionName=demo-sh#group-public-reviewers');
+
+    render(
+      <SBTsPage
+        provider="wagmi"
+        network={null}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={false}
+        sessionSlug="demo-sh"
+        sessionConfig={null}
+      />,
+    );
+
+    expect(mockSBTsList).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe('/groups');
+    expect(window.location.search).toBe('?sessionName=demo-sh');
+    expect(window.location.hash).toBe('#group-public-reviewers');
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        networkChainId: null,
+        sessionConfig: workerSessionConfig,
+        sessionName: 'Demo Session',
+        sessionSlug: 'demo-sh',
+        showCreate: false,
+      }),
+    );
   });
 
   it('fails closed instead of re-resolving a mismatched explicit standalone session config', () => {
@@ -953,12 +1006,12 @@ describe('SBTsPage auto-feature flag', () => {
 
     expect(screen.queryByRole('button', { name: /^View All$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Create$/i })).not.toBeInTheDocument();
-    expect(screen.getByTestId('create-group-panel')).toBeInTheDocument();
-    expect(screen.getAllByTestId('ce-sbt-create-advanced-external-notice')).toHaveLength(1);
-    expect(screen.getByText(/does not replace or modify this session's Worker-native Groups/i)).toBeInTheDocument();
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('Alpha');
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('/alpha');
+    expect(screen.queryByText(/on-chain|contract address|gas|RPC/i)).not.toBeInTheDocument();
   });
 
-  it('shows the external SBT notice from an unregistered Worker /groups/:slug route', () => {
+  it('routes an unregistered Worker /groups/:slug list directly to the active Worker session', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     contractScripts.getSessionConfigBySlug.mockReturnValue(null);
     contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
@@ -984,16 +1037,25 @@ describe('SBTsPage auto-feature flag', () => {
       />,
     );
 
-    expect(mockSBTsList).toHaveBeenCalledWith(
+    expect(mockSBTsList).not.toHaveBeenCalled();
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        sessionSlug: 'unregistered-worker',
+        createOnly: false,
         sessionConfig: workerSessionConfig,
+        sessionSlug: 'unregistered-worker',
+        showCreate: false,
       }),
     );
     fireEvent.click(screen.getByTestId('ce-sbts-create-toggle'));
-    expect(screen.getByTestId('create-group-panel')).toBeInTheDocument();
-    expect(screen.getAllByTestId('ce-sbt-create-advanced-external-notice')).toHaveLength(1);
-    expect(screen.getByText(/does not replace or modify this session's Worker-native Groups/i)).toBeInTheDocument();
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('/unregistered-worker');
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        sessionConfig: workerSessionConfig,
+        sessionSlug: 'unregistered-worker',
+        showCreate: true,
+      }),
+    );
   });
 
   it('prefers an exact Worker route config over a same-slug registry config', () => {
@@ -1025,14 +1087,25 @@ describe('SBTsPage auto-feature flag', () => {
       />,
     );
 
-    expect(mockSBTsList).toHaveBeenCalledWith(
+    expect(mockSBTsList).not.toHaveBeenCalled();
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        sessionSlug: 'shared-slug',
+        createOnly: false,
         sessionConfig: workerSessionConfig,
+        sessionSlug: 'shared-slug',
+        showCreate: false,
       }),
     );
     fireEvent.click(screen.getByTestId('ce-sbts-create-toggle'));
-    expect(screen.getByTestId('ce-sbt-create-advanced-external-notice')).toBeInTheDocument();
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('/shared-slug');
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        sessionConfig: workerSessionConfig,
+        sessionSlug: 'shared-slug',
+        showCreate: true,
+      }),
+    );
   });
 
   it('enforces the selected registry-session creation policy in Context Engine routes', () => {

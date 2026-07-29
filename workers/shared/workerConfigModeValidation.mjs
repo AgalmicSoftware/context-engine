@@ -1,3 +1,5 @@
+import { normalizeSessionEndsAt } from './sessionLifecycle.mjs';
+
 const isObj = (value) => !!value && typeof value === 'object' && !Array.isArray(value);
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
 
@@ -669,12 +671,22 @@ export const validateWorkerConfigModeValues = (
   { allowPartialProfileStorage = false } = {},
 ) => {
   if (!isObj(config)) return invalid('config');
+  if (hasOwn(config, 'sessionEndsAt') && !normalizeSessionEndsAt(config.sessionEndsAt).ok) {
+    return invalid('sessionEndsAt');
+  }
 
   let profile = null;
   if (hasOwn(config, 'sessionModeProfile')) {
     const result = validateSessionModeProfile(config.sessionModeProfile, 'sessionModeProfile');
     if (!result.ok) return result;
     profile = config.sessionModeProfile;
+  }
+  if (
+    profile &&
+    hasOwn(config, 'sessionEndsAt') &&
+    profile?.authority?.mode !== 'worker_canonical'
+  ) {
+    return invalid('sessionEndsAt');
   }
   if (profile) {
     const storageSource = resolveProfileStorageSide(config, {
@@ -697,6 +709,26 @@ export const validateWorkerConfigModeValues = (
     if (!result.ok) return result;
   }
   return valid();
+};
+
+export const workerConfigAllowsAnonymousGroupDiscovery = (config) => {
+  if (!isObj(config) || !validateWorkerConfigModeValues(config).ok) return false;
+  const profile = isObj(config.sessionModeProfile) ? config.sessionModeProfile : {};
+  const authority = isObj(profile.authority) ? profile.authority : {};
+  const storage = isObj(profile.storage) ? profile.storage : {};
+  const payloadAccess = isObj(storage.payloadAccessControl) ? storage.payloadAccessControl : {};
+  const encryption = isObj(profile.encryption) ? profile.encryption : {};
+  const results = isObj(profile.results) ? profile.results : {};
+  return (
+    authority.mode === 'worker_canonical' &&
+    storage.backend === 'cloudflare' &&
+    payloadAccess.gate === 'none' &&
+    payloadAccess.encryption === 'none' &&
+    !hasOwn(payloadAccess, 'accessConditions') &&
+    encryption.mode === 'none' &&
+    !hasOwn(encryption, 'accessConditions') &&
+    results.visibility === 'public_full_if_storage_public'
+  );
 };
 
 export const validateDeploymentModeValues = (body) => {

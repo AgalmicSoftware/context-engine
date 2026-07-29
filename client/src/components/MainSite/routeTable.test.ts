@@ -122,6 +122,27 @@ describe('MainSite route table', () => {
         shouldBypassCacheHydrationWait: true,
       }),
     );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/groups/demo-sh', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtsList',
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/groups/new', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtCreate',
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/sbts/demo-sh', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtsList',
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: false,
+      }),
+    );
     expect(resolveMainSiteRouteMatch({ fullPath: '/not-a-route', isAddress })).toEqual(
       expect.objectContaining({
         key: 'notFound',

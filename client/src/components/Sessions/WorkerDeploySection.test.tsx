@@ -316,8 +316,12 @@ describe('WorkerDeploySection', () => {
       { key: 'workers_scripts', type: 'edit' },
       { key: 'workers_kv_storage', type: 'edit' },
     ]);
-    expect(screen.getByText(/Cloudflare may preselect All accounts/i)).toBeInTheDocument();
-    expect(screen.getByText(/only when the token can see exactly one account/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Cloudflare may preselect All accounts/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/only when the token can see exactly one account/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cloudflare API token setup and security guide' })).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
+    );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
     expect(handleDeployWorker).toHaveBeenCalledTimes(1);
@@ -338,7 +342,7 @@ describe('WorkerDeploySection', () => {
       String(screen.getByRole('link', { name: 'Create prefilled API token' }).getAttribute('href')),
     );
     expect(tokenUrl.searchParams.get('accountId')).toBe('*');
-    expect(screen.getByText(/Cloudflare may preselect All accounts/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Cloudflare may preselect All accounts/i)).not.toBeInTheDocument();
   });
 
   it('describes the least-privilege default Cloudflare token scopes', () => {
@@ -354,23 +358,18 @@ describe('WorkerDeploySection', () => {
     );
   });
 
-  it('discloses the raw-token receiver, shortest lifetime, and revocation step', () => {
+  it('links to token handling documentation instead of repeating operational guidance', () => {
     renderWorkerDeploySection({
       deployHelperUrl: 'https://deploy-helper.example.test',
     });
 
-    expect(screen.getByText('https://deploy-helper.example.test')).toBeInTheDocument();
-    expect(
-      screen.getByText(/browser sends this token only for this deployment attempt to the deploy helper/i),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/not saved to the session draft or browser storage/i)).toBeInTheDocument();
-    expect(screen.getByText(/earliest expiration Cloudflare permits/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/revoke the token as soon as deployment succeeds or you abandon the attempt/i),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Cloudflare API Tokens' })).toHaveAttribute(
+    expect(screen.queryByText(/browser sends this token only for this deployment attempt/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not saved to the session draft or browser storage/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/earliest expiration Cloudflare permits/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/revoke the token as soon as deployment succeeds/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cloudflare API token setup and security guide' })).toHaveAttribute(
       'href',
-      'https://dash.cloudflare.com/profile/api-tokens',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
     );
   });
 

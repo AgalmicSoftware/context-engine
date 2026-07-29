@@ -1,0 +1,326 @@
+@use 'scss/variables' as tokens;
+
+.sessionContext {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(77, 255, 164, 0.3);
+  border-radius: var(--ce-radius-12);
+  background: rgba(77, 255, 164, 0.08);
+}
+
+.sessionContextCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sessionContextLabel {
+  color: rgba(244, 247, 255, 0.62);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sessionContextName {
+  color: var(--ce-color-white);
+  font-size: 1rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.sessionContextSlug {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--ce-radius-pill);
+  background: rgba(0, 0, 0, 0.22);
+  color: #{tokens.$ce-clickable};
+  font-size: 0.82rem;
+}
+
+.sectionHeading {
+  margin: 0 0 14px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.infoGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(220px, 0.65fr);
+  gap: 16px;
+}
+
+.fieldStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+}
+
+.field label {
+  margin: 0;
+  color: rgba(244, 247, 255, 0.72);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.field input,
+.field textarea,
+.accessSelect,
+.accessInput,
+.inlineInputRow input {
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--ce-radius-10);
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ce-color-white);
+  font-family: var(--ce-font-mono);
+  font-size: 1rem;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.field textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
+.field input:focus,
+.field textarea:focus,
+.accessSelect:focus,
+.accessInput:focus,
+.inlineInputRow input:focus {
+  border-color: #{tokens.$ce-clickable};
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 2px rgba(77, 255, 164, 0.15);
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.imageColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metadataGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.metadataCard {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ce-radius-10);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.metadataCard > label {
+  margin: 0;
+  color: rgba(244, 247, 255, 0.72);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.inlineInputRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 8px;
+}
+
+.inlineInputRow button,
+.tagPill button,
+.urlPill button {
+  border: 1px solid rgba(77, 255, 164, 0.35);
+  border-radius: var(--ce-radius-8);
+  background: rgba(77, 255, 164, 0.1);
+  color: #{tokens.$ce-clickable};
+  cursor: pointer;
+}
+
+.inlineInputRow button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.pillList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.tagPill,
+.urlPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--ce-radius-pill);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(244, 247, 255, 0.8);
+  font-size: 0.78rem;
+}
+
+.urlPill span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tagPill button,
+.urlPill button {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.imageLabel {
+  color: rgba(244, 247, 255, 0.72);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.accessStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.accessRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(190px, 0.55fr);
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ce-radius-10);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.accessCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.accessLabel {
+  color: var(--ce-color-white);
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.accessHelp,
+.formHelp {
+  color: rgba(244, 247, 255, 0.68);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.fixedValue {
+  justify-self: end;
+  padding: 7px 11px;
+  border: 1px solid rgba(77, 255, 164, 0.28);
+  border-radius: var(--ce-radius-pill);
+  background: rgba(77, 255, 164, 0.08);
+  color: #{tokens.$ce-clickable};
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.accessInput {
+  min-width: 0;
+}
+
+.status {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--ce-radius-10);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(244, 247, 255, 0.82);
+  line-height: 1.45;
+}
+
+.messageBody {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--ce-radius-12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.messageBody p {
+  margin: 0;
+  color: rgba(244, 247, 255, 0.78);
+  line-height: 1.5;
+}
+
+.messageAction {
+  padding: 11px 18px;
+  border: 1px solid rgba(77, 255, 164, 0.55);
+  border-radius: var(--ce-radius-pill);
+  background: rgba(77, 255, 164, 0.12);
+  color: #{tokens.$ce-clickable};
+  cursor: pointer;
+  font-family: var(--ce-font-mono);
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .sessionContext {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .infoGrid,
+  .metadataGrid,
+  .accessRow {
+    grid-template-columns: 1fr;
+  }
+
+  .fixedValue {
+    justify-self: start;
+  }
+}

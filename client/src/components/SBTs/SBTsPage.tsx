@@ -7,10 +7,8 @@ import styles from './SBTsPage.module.scss';
 import sbtPageStyles from './SBTPage.module.scss';
 import SBTsList from './SBTsList';
 import CreateGroup from './CreateSBTGroup';
-import SbtCreateAdvancedExternalNotice, {
-  shouldShowAdvancedExternalSbtNotice,
-} from './SbtCreateAdvancedExternalNotice';
 import SBTPage from './SBTPage';
+import WorkerSessionGroupsPanel from '../OnePageSession/WorkerSessionGroupsPanel';
 import {
   getDemoSessionConfigBySlug,
   getSessionConfigBySlug,
@@ -24,8 +22,12 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import { buildWorkerGroupsPath, readWorkerGroupIdFromHash } from '../../utilities/worker/workerGroupRoutes';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
-import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
+import {
+  claimsWorkerCanonicalAuthority,
+  resolveSessionCapabilityProjection,
+} from '../../utilities/session/sessionCapabilityProjection';
 import { resolveAdminCapabilities } from '../Admin/adminPageHelpers';
 import { GROUP_CREATION_POLICIES, resolveGroupCreationPolicy } from '../../utilities/session/groupCreationPolicy';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
@@ -557,7 +559,16 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     // Canonicalize (silent) if we are on /sbts and have a non-empty slug to show
     if (!isCreateRoute && urlHasNoSlug && canonicalSlug) {
       try {
-        window.history.replaceState(null, '', buildPublicRoute(`${sbtsListPath()}/${canonicalSlug}`));
+        const activeGroupCapabilities = resolveSessionCapabilityProjection(activeGroup);
+        const canonicalPath =
+          activeGroupCapabilities.profileValid && activeGroupCapabilities.isWorkerCanonical
+            ? buildWorkerGroupsPath({
+                groupId: typeof window !== 'undefined' ? readWorkerGroupIdFromHash(window.location.hash) : '',
+                rootPath: parts[0] === 'sbts' ? '/sbts' : '/groups',
+                sessionSlug: canonicalSlug,
+              })
+            : buildPublicRoute(`${sbtsListPath()}/${canonicalSlug}`);
+        window.history.replaceState(null, '', canonicalPath);
       } catch (e) {
         sbtLog.warn('SBTsPage: fallback', e);
       }
@@ -590,8 +601,32 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const { activeGroup, canonicalSlug, urlHasNoSlug, onSbtsRoute, isCreateRoute, sessionConfigError } =
       this.getResolvedRouting();
     const effectiveSessionSlug = canonicalSlug; // may be '' (general)
+    const activeWorkerSessionSlug = normalizeSessionSlug(
+      effectiveSessionSlug || this.props.sessionSlug || (activeGroup as Record<string, unknown> | null)?.slug || '',
+    );
     const allSessionsMode = urlHasNoSlug && !canonicalSlug; // plain /sbts with no redux/referrer slug => enumerate all groups
     const sessionCapabilities = resolveSessionCapabilityProjection(activeGroup);
+    const activeGroupClaimsWorkerAuthority =
+      (sessionCapabilities.source === 'profile' &&
+        sessionCapabilities.profileValid &&
+        sessionCapabilities.isWorkerCanonical) ||
+      claimsWorkerCanonicalAuthority(activeGroup);
+    const fallbackWorkerSessionConfig =
+      !activeGroupClaimsWorkerAuthority && activeWorkerSessionSlug
+        ? getDemoSessionConfigBySlug(activeWorkerSessionSlug, { allowDemoFallback: true })
+        : null;
+    const fallbackWorkerCapabilities = resolveSessionCapabilityProjection(fallbackWorkerSessionConfig);
+    const fallbackHasExactWorkerAuthority =
+      fallbackWorkerCapabilities.source === 'profile' &&
+      fallbackWorkerCapabilities.profileValid &&
+      fallbackWorkerCapabilities.isWorkerCanonical &&
+      normalizeSessionSlug(fallbackWorkerSessionConfig?.slug || '') === activeWorkerSessionSlug;
+    const workerSessionConfig = activeGroupClaimsWorkerAuthority
+      ? activeGroup
+      : fallbackHasExactWorkerAuthority
+        ? fallbackWorkerSessionConfig
+        : null;
+    const usesWorkerNativeCreate = !!workerSessionConfig;
     const groupCreationPolicy = resolveGroupCreationPolicy(
       activeGroup,
       sessionCapabilities.isRegistryCanonical
@@ -612,12 +647,29 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         data-testid={E2E_TESTIDS.SESSION_GROUP_CREATION_POLICY_DENIED}
       >
         <strong>Group creation is limited to session admins</strong>
-        <span>
-          This session’s Context Engine controls hide the creation form for other participants. Public SBT factories can
-          still be called independently on-chain.
-        </span>
+        <span>This session’s configuration hides the creation form for other participants.</span>
       </aside>
     );
+    const renderWorkerGroupsPanel = ({
+      createOnly = false,
+      showCreate = false,
+    }: {
+      createOnly?: boolean;
+      showCreate?: boolean;
+    } = {}) => (
+      <WorkerSessionGroupsPanel
+        account={account}
+        provider={provider}
+        networkChainId={(network as Record<string, unknown> | null)?.chainId || null}
+        sessionConfig={workerSessionConfig}
+        sessionName={String((workerSessionConfig as Record<string, unknown> | null)?.sessionName || sessionName || '')}
+        sessionSlug={activeWorkerSessionSlug}
+        showCreate={showCreate}
+        createOnly={createOnly}
+        toggleLoginModal={toggleLoginModal as ((open: boolean) => void) | undefined}
+      />
+    );
+    const renderWorkerCreatePanel = () => renderWorkerGroupsPanel({ createOnly: true, showCreate: true });
     if (isCreateRoute) {
       return (
         <div>
@@ -633,34 +685,55 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
           </div>
           {sessionConfigError ? (
             <aside className={styles.advancedExternalNotice} role="alert">
-              <strong>Advanced/external on-chain SBT unavailable</strong>
-              <span>
-                {sessionConfigError} Return to the session before opening this optional standalone tool again.
-              </span>
+              <strong>Group creation unavailable</strong>
+              <span>{sessionConfigError} Return to the session and try again.</span>
             </aside>
-          ) : shouldShowAdvancedExternalSbtNotice(activeGroup) ? (
-            <SbtCreateAdvancedExternalNotice />
           ) : null}
           {!sessionConfigError && canCreateForSession ? (
-            <CreateGroupComponent
-              account={account}
-              loginComplete={loginComplete}
-              provider={provider}
-              litHooks={this.props.litHooks}
-              toggleLoginModal={toggleLoginModal}
-              expanded={true}
-              network={network}
-              preferConnectedNetworkForAuthoring={sessionCapabilities.isPureWorkerCanonical}
-              sessionConfigOverride={activeGroup}
-              sessionSlug={effectiveSessionSlug}
-              sessionInfo={sessionInfo}
-              sessionName={sessionName}
-              defaultSbtTags={this.props.defaultSbtTags}
-              sbtCacheRevision={sbtCacheRevision}
-            />
+            usesWorkerNativeCreate ? (
+              renderWorkerCreatePanel()
+            ) : (
+              <CreateGroupComponent
+                account={account}
+                loginComplete={loginComplete}
+                provider={provider}
+                litHooks={this.props.litHooks}
+                toggleLoginModal={toggleLoginModal}
+                expanded={true}
+                network={network}
+                preferConnectedNetworkForAuthoring={sessionCapabilities.isPureWorkerCanonical}
+                sessionConfigOverride={activeGroup}
+                sessionSlug={effectiveSessionSlug}
+                sessionInfo={sessionInfo}
+                sessionName={sessionName}
+                defaultSbtTags={this.props.defaultSbtTags}
+                sbtCacheRevision={sbtCacheRevision}
+              />
+            )
           ) : !sessionConfigError ? (
             renderCreationDenied()
           ) : null}
+        </div>
+      );
+    }
+
+    if (usesWorkerNativeCreate && onSbtsRoute && activeWorkerSessionSlug) {
+      return (
+        <div>
+          {!hideMiniActionRow ? (
+            <div className={styles.container}>
+              <div className={styles.buttonRow}>
+                <button
+                  className={styles.showResultsButton}
+                  onClick={this.toggleCreateGroup}
+                  data-testid={E2E_TESTIDS.SBTS_CREATE_TOGGLE}
+                >
+                  <FontAwesomeIcon icon={faPlus} /> {effectiveShowCreateGroup ? 'Exit Group Creation' : 'Create Group'}
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {renderWorkerGroupsPanel({ showCreate: effectiveShowCreateGroup })}
         </div>
       );
     }
@@ -743,22 +816,25 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const showFeaturedColdStartSpinner = !hasFeaturedCards && (!isSBTCacheReady || featuredScanActive);
     const renderCreateGroupPanel = () => (
       <>
-        {shouldShowAdvancedExternalSbtNotice(activeGroup) ? <SbtCreateAdvancedExternalNotice /> : null}
         {canCreateForSession ? (
-          <CreateGroupComponent
-            account={account}
-            loginComplete={loginComplete}
-            provider={provider}
-            litHooks={this.props.litHooks}
-            toggleLoginModal={toggleLoginModal}
-            expanded={effectiveShowCreateGroup}
-            network={network}
-            sessionSlug={effectiveSessionSlug}
-            sessionInfo={sessionInfo}
-            sessionName={sessionName}
-            defaultSbtTags={this.props.defaultSbtTags}
-            sbtCacheRevision={sbtCacheRevision}
-          />
+          usesWorkerNativeCreate ? (
+            renderWorkerCreatePanel()
+          ) : (
+            <CreateGroupComponent
+              account={account}
+              loginComplete={loginComplete}
+              provider={provider}
+              litHooks={this.props.litHooks}
+              toggleLoginModal={toggleLoginModal}
+              expanded={effectiveShowCreateGroup}
+              network={network}
+              sessionSlug={effectiveSessionSlug}
+              sessionInfo={sessionInfo}
+              sessionName={sessionName}
+              defaultSbtTags={this.props.defaultSbtTags}
+              sbtCacheRevision={sbtCacheRevision}
+            />
+          )
         ) : (
           renderCreationDenied()
         )}
