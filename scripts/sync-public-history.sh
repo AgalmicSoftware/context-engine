@@ -115,6 +115,7 @@ EXPLICIT_RELEASE_VERSION=""
 ACKNOWLEDGE_PATCH=0
 REPLAYED_COUNT=0
 SKIPPED_COUNT=0
+LATEST_REPLAYED_SOURCE_COMMIT=""
 REMOTE_BRANCH_EXISTS=0
 REMOTE_BRANCH_SHA=""
 RELEASE_VERSION=""
@@ -778,6 +779,11 @@ stamp_release_candidate_version() {
     fi
   } > "$message_file"
 
+  if [ -z "$LATEST_REPLAYED_SOURCE_COMMIT" ]; then
+    fail "Cannot bind the release version commit without a replayed private source commit." 2
+  fi
+  bind_public_replay_to_source "$LATEST_REPLAYED_SOURCE_COMMIT" "$message_file"
+
   git -C "$TEMP_CLONE" \
     -c "core.hooksPath=$REPLAY_HOOKS_DIR" \
     commit --quiet --no-gpg-sign --file "$message_file"
@@ -1105,6 +1111,7 @@ for commit_sha in "${COMMITS[@]}"; do
       commit --quiet --no-gpg-sign --file "$message_file"
 
   REPLAYED_COUNT=$((REPLAYED_COUNT + 1))
+  LATEST_REPLAYED_SOURCE_COMMIT="$commit_sha"
   replayed_head=$(git -C "$TEMP_CLONE" rev-parse HEAD)
   log_info "Replayed $commit_sha -> $replayed_head | $subject"
 done
