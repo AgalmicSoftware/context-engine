@@ -35,6 +35,7 @@ test('verify-public-release-pii passes clean text while warning on public values
   withFixture((rootDir) => {
     const corpusContact = `public-contact${'@'}example.org`;
     const packageMaintainer = `maintainer${'@'}example.org`;
+    const publicGitIdentity = `agalmicsoftware${'@'}protonmail.com`;
     const securityContact = `contextengine${'@'}protonmail.com`;
     const bundledVendorContact = `me${'@'}ricmoo.com`;
 
@@ -68,6 +69,7 @@ test('verify-public-release-pii passes clean text while warning on public values
       `Mixed-case mention: ContextEngine${'@'}Protonmail.COM`,
       '',
     ].join('\n'));
+    writeFile(rootDir, 'scripts/public-history.sh', `PUBLIC_GIT_EMAIL="${publicGitIdentity}"\n`);
     writeFile(
       rootDir,
       'deploy/cloudflare/session-worker/worker.mjs',
@@ -84,6 +86,7 @@ test('verify-public-release-pii passes clean text while warning on public values
     assert.match(result.stderr, /WARN public-email: deploy\/cloudflare\/session-worker\/worker\.mjs:1/);
     assert.match(result.stderr, /WARN public-email: SECURITY\.md:2/);
     assert.match(result.stderr, /WARN public-email: SECURITY\.md:3/);
+    assert.match(result.stderr, /WARN public-email: scripts\/public-history\.sh:1/);
   });
 });
 
