@@ -22,7 +22,7 @@ import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { hasCachedCreateSbtForm } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
-import { buildWorkerGroupsPath, readWorkerGroupIdFromHash } from '../../utilities/worker/workerGroupRoutes';
+import { workerGroupNavigationPort } from '../../domains/worker/workerGroupNavigationPort';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import {
   claimsWorkerCanonicalAuthority,
@@ -577,8 +577,11 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         const activeGroupCapabilities = resolveSessionCapabilityProjection(activeGroup);
         const canonicalPath =
           activeGroupCapabilities.profileValid && activeGroupCapabilities.isWorkerCanonical
-            ? buildWorkerGroupsPath({
-                groupId: typeof window !== 'undefined' ? readWorkerGroupIdFromHash(window.location.hash) : '',
+            ? workerGroupNavigationPort.buildPath({
+                groupId:
+                  typeof window !== 'undefined'
+                    ? workerGroupNavigationPort.readGroupIdFromHash(window.location.hash)
+                    : '',
                 rootPath: parts[0] === 'sbts' ? '/sbts' : '/groups',
                 sessionSlug: canonicalSlug,
               })
@@ -613,7 +616,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const showCreateGroupAboveFeatured = this.props.showCreateGroupAboveFeatured === true;
     const routeWorkerGroupId = String(
       this.props.workerGroupId ||
-        (typeof window !== 'undefined' ? readWorkerGroupIdFromHash(window.location.hash) : ''),
+        (typeof window !== 'undefined' ? workerGroupNavigationPort.readGroupIdFromHash(window.location.hash) : ''),
     ).trim();
 
     // Resolve routing + slug once per render
