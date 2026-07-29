@@ -95,7 +95,12 @@ const withJoinMode = (draft: WorkerGroupDraft, joinMode: WorkerGroupJoinMode): W
   memberVisibility: joinMode === 'open' && draft.memberVisibility === 'admin_only' ? 'session' : draft.memberVisibility,
 });
 
-const memberAddress = (member: WorkerGroupMember): string => String(member.principal?.address || '').trim();
+const memberAddress = (member: WorkerGroupMember): string => {
+  const principal = member.principal;
+  return principal?.kind === 'evm_address' || principal?.kind === 'passkey_account'
+    ? String(principal.address || '').trim()
+    : '';
+};
 const memberIdentity = (member: WorkerGroupMember): string =>
   String(member.principalKey || memberAddress(member) || `${member.groupId || ''}\n${member.addedAt || ''}`);
 const asRecord = (value: unknown): Record<string, unknown> =>

@@ -222,7 +222,7 @@ const workerGroupPrincipalIdentity = (member: WorkerGroupMember): string => {
   if (!principal) return '';
   if (principal.kind === 'evm_address' || principal.kind === 'passkey_account') return principal.address;
   if (principal.kind === 'telegram') return principal.principalId;
-  return principal.grantId;
+  return principal.kind === 'agent' ? principal.grantId : '';
 };
 
 const workerGroupPrincipalKindLabel = (member: WorkerGroupMember): string => {

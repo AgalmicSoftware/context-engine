@@ -350,8 +350,21 @@ describe('WorkerGroupMembershipPanel', () => {
                 sessionSlug: 'alpha',
                 principal: { kind: 'telegram', principalId: 'telegram:12345' },
               },
+              {
+                groupId: 'reviewers',
+                sessionSlug: 'alpha',
+                principal: {
+                  kind: 'passkey_account',
+                  address: '0x00000000000000000000000000000000000000bb',
+                },
+              },
+              {
+                groupId: 'reviewers',
+                sessionSlug: 'alpha',
+                principal: { kind: 'agent', grantId: 'agent-grant-1' },
+              },
             ],
-            memberCount: 2,
+            memberCount: 4,
             nextCursor: '',
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
@@ -393,7 +406,9 @@ describe('WorkerGroupMembershipPanel', () => {
       '/u/0x00000000000000000000000000000000000000aa',
     );
     expect(screen.getByText('Telegram · telegram:12345')).toBeInTheDocument();
-    expect(screen.getByText('(2)')).toBeInTheDocument();
+    expect(screen.getByTitle('0x00000000000000000000000000000000000000bb')).toHaveTextContent(/^Passkey · /);
+    expect(screen.getByText('Agent · agent-grant-1')).toBeInTheDocument();
+    expect(screen.getByText('(4)')).toBeInTheDocument();
     expect(screen.queryByText(/must-not-render/)).not.toBeInTheDocument();
     expect(fetchImpl.mock.calls.filter(([url]) => new URL(String(url)).pathname.endsWith('/groups/members'))).toHaveLength(
       1,

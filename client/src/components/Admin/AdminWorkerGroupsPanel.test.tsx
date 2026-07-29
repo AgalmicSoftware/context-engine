@@ -261,6 +261,11 @@ describe('AdminWorkerGroupsPanel', () => {
               principal: { kind: 'evm_address', address: ADDRESS },
               principalKey: `evm:${ADDRESS}`,
             },
+            {
+              sessionSlug: 'alpha',
+              principal: { kind: 'telegram', principalId: 'telegram:12345' },
+              principalKey: 'telegram:12345',
+            },
           ],
           nextCursor: 'page-2',
         },
@@ -280,6 +285,8 @@ describe('AdminWorkerGroupsPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Manage Reviewers members' }));
     expect(await screen.findByText(ADDRESS)).toBeInTheDocument();
+    expect(screen.getByText('telegram:12345')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove telegram:12345' })).not.toBeInTheDocument();
     const loadMore = screen.getByRole('button', { name: 'Load more members' });
     fireEvent.click(loadMore);
 
