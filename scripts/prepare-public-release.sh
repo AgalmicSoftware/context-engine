@@ -129,7 +129,10 @@ const emailRe = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/ig;
 // Intentionally public addresses that must survive the sweep (e.g. the
 // SECURITY.md vulnerability-reporting contact). Keep in sync with the
 // allowlist in scripts/verify-public-release-pii.sh.
-const allowedPublicEmails = new Set(['contextengine@protonmail.com']);
+const allowedPublicEmails = new Set([
+  'agalmicsoftware@protonmail.com',
+  'contextengine@protonmail.com',
+]);
 const homePathRe = /(?:^|[\s"'(=:{])((?:\/Users|\/home)\/[A-Za-z0-9._-]+(?:\/[^\s"'`<>\\)]*)?)/g;
 
 function isProbablyBinary(buffer) {

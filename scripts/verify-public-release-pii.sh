@@ -127,7 +127,10 @@ function isAllowedGeneratedWorkerEmail(relativePath, email) {
 
 // Intentionally public addresses (e.g. the SECURITY.md vulnerability-reporting
 // contact). Keep in sync with the allowlist in scripts/prepare-public-release.sh.
-const allowedPublicEmailAddresses = new Set(['contextengine@protonmail.com']);
+const allowedPublicEmailAddresses = new Set([
+  'agalmicsoftware@protonmail.com',
+  'contextengine@protonmail.com',
+]);
 
 function scanTextFile(relativePath, text, findings, warnings) {
   const lines = text.split(/\r?\n/);
