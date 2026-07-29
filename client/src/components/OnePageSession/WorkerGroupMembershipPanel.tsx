@@ -26,6 +26,7 @@ import SbtPageRelevantInfo from '../SBTs/SbtPageRelevantInfo';
 import sbtsPageStyles from '../SBTs/SBTsPage.module.scss';
 import WorkerGroupCard from './WorkerGroupCard';
 import { resolveWorkerGroupJoinWindowDisplay } from './workerGroupDisplayHelpers';
+import { reconcileConfirmedWorkerGroupMembership } from './workerGroupMembershipProjection';
 import styles from './OnePageSession.module.scss';
 
 export type WorkerGroupMembershipPanelProps = {
@@ -82,53 +83,6 @@ const emptyMemberListState = (targetKey: string, groupId = ''): WorkerGroupMembe
   members: [],
   nextCursor: '',
 });
-
-const reconcileConfirmedGroupMembership = ({
-  overview,
-  group,
-  isMember,
-  sessionSlug,
-}: {
-  overview: WorkerGroupOverview;
-  group: WorkerGroup;
-  isMember: boolean;
-  sessionSlug: string;
-}): WorkerGroupOverview => {
-  const hasGroup = overview.groups.some((candidate) => candidate.groupId === group.groupId);
-  const groups = hasGroup
-    ? overview.groups.map((candidate) => (candidate.groupId === group.groupId ? group : candidate))
-    : [...overview.groups, group];
-  const existingMembership = overview.memberships.find(
-    (membership) => membership.group.groupId === group.groupId,
-  );
-
-  if (!isMember) {
-    return {
-      groups,
-      memberships: overview.memberships.filter(
-        (membership) => membership.group.groupId !== group.groupId,
-      ),
-    };
-  }
-
-  return {
-    groups,
-    memberships: existingMembership
-      ? overview.memberships.map((membership) =>
-          membership.group.groupId === group.groupId ? { ...membership, group } : membership,
-        )
-      : [
-          ...overview.memberships,
-          {
-            group,
-            member: {
-              groupId: group.groupId,
-              sessionSlug,
-            },
-          },
-        ],
-  };
-};
 
 const groupJoinHasEnded = (group: WorkerGroup): boolean =>
   Boolean(group.joinEndsAt && Date.parse(group.joinEndsAt) <= Date.now());
@@ -742,7 +696,7 @@ const WorkerGroupMembershipPanel = ({
         if (current.targetKey !== mutationTargetKey) return current;
         return {
           ...current,
-          overview: reconcileConfirmedGroupMembership({
+          overview: reconcileConfirmedWorkerGroupMembership({
             overview: current.overview,
             group,
             isMember: true,
@@ -794,7 +748,7 @@ const WorkerGroupMembershipPanel = ({
         if (current.targetKey !== mutationTargetKey) return current;
         return {
           ...current,
-          overview: reconcileConfirmedGroupMembership({
+          overview: reconcileConfirmedWorkerGroupMembership({
             overview: current.overview,
             group,
             isMember: false,
