@@ -54,92 +54,23 @@ import {
   resolveSBTsPageFeaturedSbtSessionSlug as resolveFeaturedSbtSessionSlug,
   resolveSBTsPageReferrerSessionSlug as resolveReferrerSessionSlug,
   resolveSBTsPageCacheFeaturedCardLinkStyle as resolveCacheFeaturedCardLinkStyle,
-  type SBTsPageFeaturedProgressLike as FeaturedProgressLike,
-  type SBTsPageFeaturedSbtLike as FeaturedSbtLike,
-  type SBTsPageFeaturedSbtMetadataLike as FeaturedSbtMetadataLike,
-  type SBTsPageSessionConfigLike as SBTSessionConfigLike,
-  type SBTsPageUnknownRecord as UnknownRecord,
 } from './sbtOverviewPageHelpers';
-type FeaturedEntry = {
-  address: string;
-  sessionSlug: string;
-};
-type CacheBackedFeaturedCard = {
-  address: string;
-  sessionSlug: string;
-  sbt: FeaturedSbtLike & { sbtInfo: FeaturedSbtMetadataLike };
-};
-type FeaturedRenderEntry =
-  { kind: 'cache'; entry: CacheBackedFeaturedCard } | { kind: 'fallback'; entry: FeaturedEntry };
-type MemoBucket<T> = {
-  key: string;
-  result: T[];
-};
-
-type FeaturedListArgs = {
-  baseFeaturedList?: unknown;
-  effectiveSessionSlug?: unknown;
-  autoFeature?: unknown;
-  baseFeaturedListIsConfigured?: unknown;
-  requireExplicitSessionSlug?: unknown;
-  isSBTCacheReady?: unknown;
-  isAllSessionsMode?: boolean;
-  progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
-};
-type FeaturedEntriesArgs = {
-  baseFeaturedList?: unknown;
-  effectiveSessionSlug?: unknown;
-  effectiveSessionAutoFeature?: unknown;
-  requireExplicitAutoFeatureSessionSlug?: unknown;
-  isSBTCacheReady?: unknown;
-  isAllSessionsMode?: boolean;
-  includeListScopeSessions?: boolean;
-  listScopeSessionSlugs?: unknown;
-  progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
-};
-type FeaturedCacheCardsArgs = {
-  featuredEntries?: unknown;
-  isSBTCacheReady?: unknown;
-  progressBySlug?: Record<string, FeaturedProgressLike | unknown>;
-};
-
-type SBTsPageProps = UnknownRecord & {
-  sessionSlug?: string | null;
-  sessionConfig?: SBTSessionConfigLike | null;
-  activeSessionSlug?: string | null;
-  sessionName?: string;
-  sessionInfo?: string;
-  workerGroupId?: string;
-  provider?: unknown;
-  network?: unknown;
-  account?: unknown;
-  litHooks?: unknown;
-  loginComplete?: boolean;
-  toggleLoginModal?: unknown;
-  isSBTCacheReady?: boolean;
-  sbtCacheRevision?: number | string | null;
-  defaultSbtTags?: unknown;
-  defaultFeaturedSBTs?: unknown[];
-  onCreateGroupToggleExternal?: () => void;
-  showCreateGroupExternal?: boolean;
-  hideMiniActionRow?: boolean;
-  showCreateGroupAboveFeatured?: boolean;
-  preferCacheBackedFeaturedCards?: boolean;
-  requireExplicitAutoFeatureSessionSlug?: boolean;
-  miniaturized?: boolean;
-  refreshSbtData?: unknown;
-  onRequestSbtCacheRefresh?: unknown;
-  latestBlockNumber?: unknown;
-  sbtScanProgressBySlug?: Record<string, FeaturedProgressLike | unknown>;
-  sbtRealtimeCoverageBySlug?: unknown;
-  ensureLightSbtDiscovery?: unknown;
-  ensureLightSbtUniverse?: unknown;
-  refreshSessionUniverseRegistryCache?: unknown;
-};
-type SBTsPageState = {
-  showSBTsList: boolean;
-  showCreateGroup: boolean;
-};
+import type {
+  CacheBackedFeaturedCard,
+  FeaturedCacheCardsArgs,
+  FeaturedEntriesArgs,
+  FeaturedEntry,
+  FeaturedListArgs,
+  FeaturedProgressLike,
+  FeaturedRenderEntry,
+  FeaturedSbtLike,
+  FeaturedSbtMetadataLike,
+  MemoBucket,
+  SBTSessionConfigLike,
+  SBTsPageProps,
+  SBTsPageState,
+  UnknownRecord,
+} from './SBTsPage.types';
 
 const SBTsListComponent = SBTsList as React.ComponentType<Record<string, unknown>>;
 const CreateGroupComponent = CreateGroup as React.ComponentType<Record<string, unknown>>;
@@ -479,9 +410,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const detailSessionSlug = onWorkerGroupDetailRoute
       ? normalizeSessionSlug(
           this.props.sessionSlug ||
-            (typeof window !== 'undefined'
-              ? new URLSearchParams(window.location.search).get('sessionName') || ''
-              : ''),
+            (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('sessionName') || '' : ''),
         )
       : '';
     const urlSlugLike = onWorkerGroupDetailRoute

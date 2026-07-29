@@ -1,9 +1,8 @@
 import React from 'react';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
-import WorkerGroupMembershipPanel, {
-  resolveWorkerGroupJoinWindowDisplay,
-} from './WorkerGroupMembershipPanel';
+import WorkerGroupMembershipPanel from './WorkerGroupMembershipPanel';
+import { resolveWorkerGroupJoinWindowDisplay } from './workerGroupDisplayHelpers';
 
 const SESSION_ID = '0x11111111111111111111111111111111';
 const OTHER_SESSION_ID = '0x22222222222222222222222222222222';
@@ -410,9 +409,9 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.getByText('Agent · agent-grant-1')).toBeInTheDocument();
     expect(screen.getByText('(4)')).toBeInTheDocument();
     expect(screen.queryByText(/must-not-render/)).not.toBeInTheDocument();
-    expect(fetchImpl.mock.calls.filter(([url]) => new URL(String(url)).pathname.endsWith('/groups/members'))).toHaveLength(
-      1,
-    );
+    expect(
+      fetchImpl.mock.calls.filter(([url]) => new URL(String(url)).pathname.endsWith('/groups/members')),
+    ).toHaveLength(1);
   });
 
   it('omits descriptions from minimized cards without changing the full-view default', async () => {

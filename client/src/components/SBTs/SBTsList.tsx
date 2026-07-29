@@ -1,5 +1,3 @@
-/** @file SBTsList */
-
 import React, { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback } from 'react';
 import {
   getAllSessionEntries,
@@ -42,9 +40,12 @@ import {
   readStoredGlobalSessionSelection,
 } from '../../utilities/session/globalSessionState.js';
 import { hasUsableSessionWorkerConfig } from '../../utilities/session/sessionWorkerAvailability.js';
-import { claimsWorkerCanonicalAuthority, resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection.js';
+import {
+  claimsWorkerCanonicalAuthority,
+  resolveSessionCapabilityProjection,
+} from '../../utilities/session/sessionCapabilityProjection.js';
 import { getSbtDescriptionText, getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
-import { readPublicUrlBasePath, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
+import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
 import {
   filterSessionUniverseEntriesByDemoVisibility,
   getCustomDemoSessionEntries,
@@ -113,8 +114,10 @@ import {
   resolveSbtListSectionSessionSlugs,
   resolveSbtListSessionUniverseSnapshotUpdate,
   resolveSbtListCreateGroupInitialVisibility,
+  resolveSbtListInitialActiveSessionSlug,
   resolveSbtListRelativeImageStyle,
   resolveSbtListRegistryRetryPlan,
+  resolveSbtListRouteScope,
   SBT_LIST_MODE_SELECTION_STORAGE_KEY,
   SBT_LIST_NO_SESSION_UNIVERSE_SLUG,
   isSbtListSyntheticNoSessionSlug,
@@ -164,12 +167,6 @@ import type {
 } from './sbtListTypes';
 import WorkerGroupsListRoute, { resolveSbtListWorkerRouteConfig } from './WorkerGroupsListRoute';
 
-export const __test__areSbtListArraysEqual = areSbtListArraysEqual;
-export const __test__getSbtCardDetails = getSbtCardDetails;
-export const __test__buildSbtRenderBuckets = buildSbtListRenderBuckets;
-
-export { readSbtListCacheMetaSnapshot as readSbtCacheMetaSnapshot };
-
 const OnChainSBTsList = ({
   provider,
   network,
@@ -199,40 +196,26 @@ const OnChainSBTsList = ({
   communityTabCompactSettings = false,
   interactiveMiniCards = false,
 }: SBTsListProps) => {
-  const routeSlug = normalizeSessionSlug(sessionSlug || '');
-  const explicitRouteSessionConfig = useMemo(() => {
-    if (!routeSlug || !isRecord(sessionConfig)) return null;
-    const configSlug = normalizeSessionSlug(sessionConfig.slug || sessionConfig.sessionSlug || '');
-    return configSlug === routeSlug ? sessionConfig : null;
-  }, [routeSlug, sessionConfig]);
-  // Determine if we should enumerate ALL groups (route-based fallback + explicit prop)
-  const allSessionsMode = useMemo(() => {
-    if (allSessionsModeProp) return true;
-    try {
-      const path =
-        typeof window !== 'undefined' && window.location && window.location.pathname ? window.location.pathname : '';
-      const parts = stripPublicUrlBasePath(path).split('/').filter(Boolean);
-      return (parts[0] === 'sbts' || parts[0] === 'groups') && parts.length === 1;
-    } catch (_) {
-      return false;
-    }
-  }, [allSessionsModeProp]);
+  const { allSessionsMode, explicitRouteSessionConfig, routeSlug } = useMemo(
+    () =>
+      resolveSbtListRouteScope({
+        allSessionsMode: allSessionsModeProp,
+        pathname: typeof window !== 'undefined' ? window.location?.pathname : '',
+        sessionConfig,
+        sessionSlug,
+      }),
+    [allSessionsModeProp, sessionConfig, sessionSlug],
+  );
 
   const [globalSessionSelectionRevision, setGlobalSessionSelectionRevision] = useState<number>(0);
   const [sessionConfigRevision, setSessionConfigRevision] = useState<number>(0);
   const [activeTag, setActiveTag] = useState<string>('');
-  const [activeSessionSlug, setActiveGroupSlug] = useState<string>(() => {
-    const globalPrimarySessionSlug = normalizeSessionSlug(readStoredGlobalSessionSelection().primarySessionSlug || '');
-    try {
-      if (typeof window === 'undefined' || !window.localStorage) return normalizeSessionSlug(routeSlug);
-      const stored = window.localStorage.getItem('dg:lastActiveSbtSession');
-      if (stored != null) return normalizeSessionSlug(stored);
-    } catch (e) {
-      sbtLog.warn('SBTsList: fallback', e);
-    }
-    if (globalPrimarySessionSlug) return globalPrimarySessionSlug;
-    return normalizeSessionSlug(routeSlug);
-  });
+  const [activeSessionSlug, setActiveGroupSlug] = useState<string>(() =>
+    resolveSbtListInitialActiveSessionSlug({
+      globalPrimarySessionSlug: readStoredGlobalSessionSelection().primarySessionSlug,
+      routeSlug,
+    }),
+  );
 
   const shouldExpectRegistryUniverse = true;
 
@@ -2760,8 +2743,10 @@ const OnChainSBTsList = ({
   const shouldRenderCreateGroupPanel = showCreateGroup && (!embeddedMode || showEmbeddedCreateGroupControl);
   const createSessionConfig = getDisplaySessionConfig(listSlug);
   const createSessionCapabilities = resolveSessionCapabilityProjection(createSessionConfig);
-  const usesWorkerNativeCreate = (createSessionCapabilities.source === 'profile' &&
-    createSessionCapabilities.profileValid && createSessionCapabilities.isWorkerCanonical) ||
+  const usesWorkerNativeCreate =
+    (createSessionCapabilities.source === 'profile' &&
+      createSessionCapabilities.profileValid &&
+      createSessionCapabilities.isWorkerCanonical) ||
     claimsWorkerCanonicalAuthority(createSessionConfig);
 
   const rootClassName = viewMode === 'modal' ? styles.modalViewContainer : styles.standardViewContainer;
@@ -2933,20 +2918,34 @@ const OnChainSBTsList = ({
         <div className={styles.createGroupPanelWrap}>
           {usesWorkerNativeCreate ? (
             <WorkerSessionGroupsPanel
-              account={account} provider={provider}
-              networkChainId={network?.chainId || null} sessionConfig={createSessionConfig}
-              sessionName={String(createSessionConfig?.sessionName || '')} sessionSlug={listSlug}
-              showCreate={true} createOnly={true}
+              account={account}
+              provider={provider}
+              networkChainId={network?.chainId || null}
+              sessionConfig={createSessionConfig}
+              sessionName={String(createSessionConfig?.sessionName || '')}
+              sessionSlug={listSlug}
+              showCreate={true}
+              createOnly={true}
               toggleLoginModal={toggleLoginModal as ((open: boolean) => void) | undefined}
             />
           ) : (
             <CreateGroup
-              account={account} loginComplete={loginComplete}
-              provider={provider} litHooks={litHooks}
+              account={account}
+              loginComplete={loginComplete}
+              provider={provider}
+              litHooks={litHooks}
               toggleLoginModal={toggleLoginModal}
-              expanded={showCreateGroup} network={network} sessionSlug={listSlug}
-              lockGateSessionSources={showEmbeddedCreateGroupControl && isListModeScopeEnabled ? embeddedCreateGroupLockGateSources : undefined}
-              lockGatePreferredSessionSlug={showEmbeddedCreateGroupControl && isListModeScopeEnabled ? listSlug : undefined}
+              expanded={showCreateGroup}
+              network={network}
+              sessionSlug={listSlug}
+              lockGateSessionSources={
+                showEmbeddedCreateGroupControl && isListModeScopeEnabled
+                  ? embeddedCreateGroupLockGateSources
+                  : undefined
+              }
+              lockGatePreferredSessionSlug={
+                showEmbeddedCreateGroupControl && isListModeScopeEnabled ? listSlug : undefined
+              }
               sbtCacheRevision={sbtCacheRevision}
             />
           )}

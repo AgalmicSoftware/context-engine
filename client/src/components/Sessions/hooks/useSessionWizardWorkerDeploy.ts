@@ -1,4 +1,4 @@
-import { useCallback, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, useRef } from 'react';
 import { normalizeSparseSponsoredBundlePayload } from '../../../utilities/arweave/sponsoredBundles.js';
 import { normalizeBlockLimitsForConfig } from '../../../utilities/session/blockLimits.js';
 import { buildSponsoredFlagFields as buildSponsoredSessionFlagFields } from '../../../utilities/session/sponsoredFlags.js';
@@ -44,7 +44,6 @@ import {
 import {
   buildSessionWizardWorkerRequirementProof,
   resolveSessionWizardWorkerSecretSelection,
-  type SessionWizardWorkerRequirementProof,
 } from '../sessionWizardWorkerRequirementProof';
 import {
   buildSessionWizardLitBootstrapRecovery,
@@ -79,95 +78,18 @@ import {
   verifySessionWizardWorkerPublicDeployment,
 } from '../sessionWizardWorkerPublicVerification';
 import { postSessionWizardLitBootstrap } from '../sessionWizardWorkerDeployRequests';
-import type { AnyRecord, ChainIdLike, NetworkLike, WorkerSecretSyncResult, WorkerSecretsLike } from '../../shellTypes';
-type DeployFormLike = AnyRecord & {
-  apiToken?: string;
-  workerName?: string;
-  adminAddress?: string;
-  bundleUrl?: string;
-};
-type DraftLike = AnyRecord & {
-  slug?: string;
-  corsWorkerUrl?: string;
-  networkChainId?: ChainIdLike;
-  blockLimits?: AnyRecord;
-  contracts?: AnyRecord;
-  rpc?: AnyRecord;
-  faucet?: AnyRecord;
-};
+import type { AnyRecord, WorkerSecretSyncResult, WorkerSecretsLike } from '../../shellTypes';
+import type {
+  DeployFormLike,
+  SessionWizardWorkerDeployRuntime,
+  SessionWizardWorkerDeployStateUpdate,
+  UseSessionWizardWorkerDeployOptions,
+} from './useSessionWizardWorkerDeploy.types';
 
-export type SessionWizardWorkerDeployRuntime = {
-  account?: string;
-  provider?: AnyRecord | null;
-  network?: NetworkLike | null;
-  loginComplete?: boolean;
-  loginInProgress?: boolean;
-  toggleLoginModal?: ((nextOpen?: boolean) => unknown) | null;
-  registryAddress?: string;
-  registryChainId?: ChainIdLike;
-  wizardMode?: string;
-  workerMode?: string;
-  bundleMode?: string;
-  bundleFile?: File | null;
-  forceManualBundleFile?: boolean;
-  normalModeBundleUrlOverride?: string;
-  workerSecretsEnabled?: boolean;
-  workerLimitPerWallet?: string | number;
-  embeddedDeployHelperEnabled?: boolean;
-  deployHelperUrl?: string;
-  latestChainBlock?: number | null;
-  sessionId?: string | number | null;
-  sessionIdHex?: string;
-  workerCanonicalPublishCompleted?: boolean;
-  deployComplete?: boolean;
-  deployWorkerUrl?: string;
-  workerRequirementProof?: SessionWizardWorkerRequirementProof | null;
-  draft?: DraftLike | null;
-  deployForm?: DeployFormLike | null;
-};
-
-export type SessionWizardWorkerDeployStateUpdate = {
-  deployForm?: DeployFormLike;
-  deployStatus?: string;
-  deployInFlight?: boolean;
-  deployComplete?: boolean;
-  workerUrlAutoFilled?: boolean;
-  workerMode?: string;
-  deployWorkerUrl?: string;
-  workerRequirementProof?: SessionWizardWorkerRequirementProof | null;
-  provisionedSponsoredContext?: AnyRecord;
-  forceManualBundleFile?: boolean;
-  normalModeBundleUrlOverride?: string;
-};
-
-type UseSessionWizardWorkerDeployOptions = {
-  refs?: {
-    runtimeRef?: MutableRefObject<SessionWizardWorkerDeployRuntime | null>;
-    resolvedWalletAccountRef?: MutableRefObject<string>;
-    sponsoredBundleAppliedBundleRef?: MutableRefObject<AnyRecord | null>;
-  };
-  getCurrentWorkerSecrets?: () => WorkerSecretsLike;
-  applyWorkerSecretsUpdate?: (nextValueOrUpdater: unknown) => unknown;
-  getMissingWorkerSecretsForDeploy?: (secretsSnapshot?: WorkerSecretsLike) => string[];
-  resolveWorkerBaseUrl?: () => string;
-  resolveWorkerRpcUrl?: () => string;
-  resolveWorkerRpcUrlMap?: () => Record<string, string[]>;
-  resolveWorkerFaucetConfig?: () => AnyRecord;
-  parseAllowOriginsInput?: () => string[];
-  signTypedAdminAction?: (options?: {
-    action?: string;
-    body?: AnyRecord;
-    targetSlug?: string;
-    workerUrl?: string;
-    accountOverride?: string;
-  }) => Promise<AnyRecord>;
-  setDeployForm?: Dispatch<SetStateAction<DeployFormLike>>;
-  updateDraftValue?: (path: string[], value: unknown) => void;
-  updateDeploymentState?: (nextState?: SessionWizardWorkerDeployStateUpdate) => void;
-  clearSelectedBundleFile?: () => void;
-  clearCachedWorkerSecretsAfterDeploy?: () => void;
-  verifyPublicWorkerDeployment?: typeof verifySessionWizardWorkerPublicDeployment;
-};
+export type {
+  SessionWizardWorkerDeployRuntime,
+  SessionWizardWorkerDeployStateUpdate,
+} from './useSessionWizardWorkerDeploy.types';
 
 const readRuntime = (
   runtimeRef?: MutableRefObject<SessionWizardWorkerDeployRuntime | null>,
@@ -428,12 +350,23 @@ const useSessionWizardWorkerDeploy = ({
           resolveWorkerFaucetConfig,
         });
         [
-          'sessionId', 'sessionName', 'sessionInfo', 'sessionHeaderImg',
-          'sessionEndsAt', 'defaultTags', 'defaultGroupTags',
-          'questionsGenPrompt', 'defaultFilterState',
-          'defaultSbtTags', 'defaultFeaturedSBTs', 'autoFeatureSBTsBySessionSlug',
-          'sessionModeProfile', 'workerAuthority', 'groupCreationPolicy',
-          'ai', 'contracts',
+          'sessionId',
+          'sessionName',
+          'sessionInfo',
+          'sessionHeaderImg',
+          'sessionEndsAt',
+          'defaultTags',
+          'defaultGroupTags',
+          'questionsGenPrompt',
+          'defaultFilterState',
+          'defaultSbtTags',
+          'defaultFeaturedSBTs',
+          'autoFeatureSBTsBySessionSlug',
+          'sessionModeProfile',
+          'workerAuthority',
+          'groupCreationPolicy',
+          'ai',
+          'contracts',
         ].forEach((key) => {
           if (canonicalSeedConfig[key] !== undefined) payload[key] = canonicalSeedConfig[key];
         });
