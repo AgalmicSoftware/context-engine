@@ -434,8 +434,15 @@ const selectNormalModeCard = (label) => {
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
 };
 const createPublicWorkerVerificationResponder = () => {
-  let publicConfig = {};
-  return (url, options = {}) => {
+  type PublicWorkerVerificationConfig = {
+    ai?: {
+      models?: unknown;
+    };
+    litCredentials?: unknown;
+    [key: string]: unknown;
+  };
+  let publicConfig: PublicWorkerVerificationConfig = {};
+  return (url: unknown, options: RequestInit = {}) => {
     const normalizedUrl = String(url);
     if (normalizedUrl.endsWith('/admin/set-config')) {
       const payload = JSON.parse(String(options.body || '{}'));
