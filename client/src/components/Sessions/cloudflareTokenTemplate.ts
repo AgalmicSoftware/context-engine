@@ -6,7 +6,7 @@ type CloudflareTokenPermission = {
   type: string;
 };
 
-export const CLOUDFLARE_API_TOKENS_URL = 'https://dash.cloudflare.com/profile/api-tokens';
+const CLOUDFLARE_API_TOKENS_URL = 'https://dash.cloudflare.com/profile/api-tokens';
 export const CLOUDFLARE_TOKEN_SETUP_GUIDE_URL = buildPublicRepoBlobUrl(
   'docs/session-cors-worker.md#api-token-setup-and-handling',
 );
