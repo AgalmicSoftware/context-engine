@@ -246,19 +246,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:public-text:prepared', 'scripts/verify-prepared-public-text.sh');
   expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
   expectScriptContains('verify:release-version', 'scripts/release-version.mjs verify-worktree');
-  expectScriptContains('coverage-floor:check', 'scripts/check-coverage-floor.mjs');
+  expectScriptContains('coverage-floor:check', 'scripts/check-client-coverage-floors.mjs');
+  expectScriptContains('client:bundle-budget:check', 'scripts/check-client-bundle-budget.mjs');
   expectScriptContains('dead-exports:advisory', 'scripts/check-dead-exports-advisory.mjs');
   expectScriptContains('dead-exports:check', 'scripts/check-dead-exports-advisory.mjs --check');
-  expectScriptContains('verify:release', 'npm run lint');
-  expectScriptContains('verify:release', 'npm run typecheck:client');
-  expectScriptContains('verify:release', 'npm run verify:release-version');
-  expectScriptContains('verify:release', 'npm run -s test:node:tracked');
-  expectScriptContains('verify:release', 'npm run test:release:client');
-  expectScriptContains('verify:release', 'npm run verify:public-release-surface');
-  expectScriptContains('verify:release', 'npm run verify:public-assets');
-  expectScriptContains('verify:release', 'npm run worker:bundle');
-  expectScriptContains('verify:release', 'npm run verify:worker-bundle');
-  expectScriptContains('verify:release', 'npm --prefix client run build');
+  expectScriptContains('verify:release', 'scripts/run-ci-gates.mjs --profile release');
   expectScriptOmits('verify:release', 'NODE_OPTIONS=--openssl-legacy-provider');
 
   [
@@ -286,10 +278,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'npm run type-debt:check',
     'npm run lint',
     'npm --prefix client run format:check',
-    'npm run lint:workers',
-    'npm run typecheck:client',
-    'npm run typecheck:client-tests',
-    'npm run verify:public-release-surface',
+     'npm run lint:workers',
+     'npm run typecheck:client',
+     'npm run typecheck:client-tests',
+     'npm run verify:release-version',
+     'npm run verify:public-release-surface',
     'npm run verify:public-assets',
     'npm run worker:bundle',
     'npm run verify:worker-bundle',
@@ -320,10 +313,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectGateOmits('cecc-and-node', 'npm run test:node');
   expectGateContains('cecc-and-node', 'npm run test:cache-guard');
   [
-    'npm run lint',
-    'npm run typecheck:client',
-    'npm run typecheck:client-tests',
-    'npm run test:node:tracked',
+     'npm run lint',
+     'npm run typecheck:client',
+     'npm run typecheck:client-tests',
+     'npm run verify:release-version',
+     'npm run test:node:tracked',
     'npm run test:release:client',
     'npm run verify:public-release-surface',
     'npm run verify:public-assets',
@@ -360,18 +354,12 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('--require-base-sha', 'fail-closed baseline SHA requirement');
   expectWorkflowContains('fetch-depth: 0', 'complete history checkout for baseline comparison');
   expectWorkflowContains('node scripts/check-baseline-monotonicity.mjs', '"node scripts/check-baseline-monotonicity.mjs"');
-  expectWorkflowContains('run: npm run lint', '"npm run lint"');
-  expectWorkflowContains('run: npm run typecheck:client', '"npm run typecheck:client"');
-  expectWorkflowContains('run: npm run verify:release-version', '"npm run verify:release-version"');
   expectWorkflowContains(
     'node scripts/release-version.mjs verify-ref --candidate-ref HEAD --baseline-ref origin/main',
     'release-staging version advancement verification',
   );
-  expectWorkflowContains('run: npm run verify:public-release-surface', '"npm run verify:public-release-surface"');
-  expectWorkflowContains('run: npm run verify:public-assets', '"npm run verify:public-assets"');
-  expectWorkflowContains('run: npm run verify:public-text', '"npm run verify:public-text"');
-  expectWorkflowContains('run: npm run worker:bundle', '"npm run worker:bundle"');
-  expectWorkflowContains('run: npm run verify:worker-bundle', '"npm run verify:worker-bundle"');
+  expectWorkflowOmits('BASELINE_MONOTONICITY_ALLOW_TEXT', 'author-controlled baseline approval text');
+  expectWorkflowOmits('--allow-text', 'author-controlled baseline approval option');
   expectWorkflowContains('run: npm --prefix client run build', '"npm --prefix client run build"');
   expectWorkflowContains('run: npm run ci:gate -- contracts', 'the manifest-backed contracts gate');
   expectWorkflowContains('run: npm run ci:gate -- client', 'the manifest-backed client gate');
@@ -420,32 +408,57 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   if (/npm run (?:worker:bundle|verify:worker-bundle)/.test(publishWorkflow)) {
     failures.push('publish-worker-bundles workflow must consume tested CI bytes without rebuilding');
   }
-  if (!publishWorkflow.includes('run: npm run verify:worker-bundle')) {
-    failures.push('publish-worker-bundles workflow must execute "npm run verify:worker-bundle"');
-  }
-  if (!publishWorkflow.includes('softprops/action-gh-release@v2')) {
-    failures.push('publish-worker-bundles workflow must publish release assets with softprops/action-gh-release@v2');
-  }
-  if (!publishWorkflow.includes('make_latest: true')) {
-    failures.push('publish-worker-bundles workflow must explicitly mark worker bundle releases as latest');
-  }
   if (
-    !publishWorkflow.includes('APP_VERSION="$(node -p')
+    !publishWorkflow.includes('app_version="$(node -p')
     || !publishWorkflow.includes('require("./package.json").version')
   ) {
     failures.push('publish-worker-bundles workflow must read the canonical application version');
   }
-  if (!publishWorkflow.includes('steps.meta.outputs.app_version')) {
+  if (!publishWorkflow.includes('Context Engine ${app_version} Worker bundles')) {
     failures.push('publish-worker-bundles workflow must include the application version in release metadata');
   }
-  if (!publishWorkflow.includes('dist/sessionCorsWorker.bundle.js')) {
-    failures.push('publish-worker-bundles workflow must upload dist/sessionCorsWorker.bundle.js');
-  }
-  if (!publishWorkflow.includes('dist/deployHelper.bundle.js')) {
-    failures.push('publish-worker-bundles workflow must upload dist/deployHelper.bundle.js');
-  }
-  if (!publishWorkflow.includes('dist/agentBridgeWorker.bundle.js')) {
-    failures.push('publish-worker-bundles workflow must upload dist/agentBridgeWorker.bundle.js');
+  [
+    'workflow_run:',
+    'github.event.workflow_run.conclusion == \'success\'',
+    'worker-bundles-${{ steps.run.outputs.sourceCommit }}',
+    'node scripts/worker-release-artifacts.mjs validate-run',
+    'node scripts/worker-release-artifacts.mjs verify',
+    '--latest=false',
+    'cancel-in-progress: false',
+    'sessionCorsWorker.bundle.js',
+    'deployHelper.bundle.js',
+    'agentBridgeWorker.bundle.js',
+    'worker-release-manifest.json',
+  ].forEach((required) => {
+    if (!publishWorkflow.includes(required)) {
+      failures.push(`publish-worker-bundles workflow must include "${required}"`);
+    }
+  });
+  [
+    'environment: worker-release-promotion',
+    'group: worker-bundle-stable-promotion',
+    'cancel-in-progress: false',
+    'node scripts/worker-release-artifacts.mjs validate-run',
+    'node scripts/worker-release-artifacts.mjs verify',
+    'worker-bundles-previous',
+    'worker-bundles-stable',
+    'gh release edit "worker-bundles-${STABLE_COMMIT}" --latest',
+  ].forEach((required) => {
+    if (!promoteWorkflow.includes(required)) {
+      failures.push(`promote-worker-bundles workflow must include "${required}"`);
+    }
+  });
+  const workflowDir = path.join(rootDir, '.github', 'workflows');
+  const workflowFiles = fs.readdirSync(workflowDir)
+    .filter((file) => /\.ya?ml$/.test(file))
+    .map((file) => [`.github/workflows/${file}`, readText(rootDir, `.github/workflows/${file}`)]);
+  for (const [workflowPath, workflowText] of workflowFiles) {
+    const unpinned = [...workflowText.matchAll(/^\s*uses:\s*([^\s#]+)/gm)]
+      .map((match) => match[1])
+      .filter((action) => !/@[a-f0-9]{40}$/.test(action));
+    if (unpinned.length > 0) {
+      failures.push(`${workflowPath} has non-immutable action references: ${unpinned.join(', ')}`);
+    }
   }
   if (trackedDistFiles.includes('dist/sessionCorsWorker.bundle.js')) {
     failures.push('dist/sessionCorsWorker.bundle.js must not be tracked by git');

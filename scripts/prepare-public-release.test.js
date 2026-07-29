@@ -86,7 +86,7 @@ test('prepare-public-release strips private surfaces without publishing an inven
     writeFile(
       sourceDir,
       'public.txt',
-      `keep owner@example.test and /Users/alice/context-engine and contextengine${'@'}protonmail.com and ContextEngine${'@'}Protonmail.COM and agalmicsoftware${'@'}protonmail.com and contextengine+tag${'@'}protonmail.com\n`,
+      `keep [redacted-email] and /redacted-home and contextengine${'@'}protonmail.com and ContextEngine${'@'}Protonmail.COM and agalmicsoftware${'@'}protonmail.com and contextengine+tag${'@'}protonmail.com\n`,
     );
     const generatedWorkerBytes = `const wordlist = "Rfe${'@'}Rm.Rs"; // me${'@'}ricmoo.com\n`;
     writeFile(

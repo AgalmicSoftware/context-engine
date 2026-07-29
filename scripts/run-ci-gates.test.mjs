@@ -138,7 +138,8 @@ test('repository manifest keeps CI full-test universes single-pass and release s
   assert.equal(ciCommands.filter((value) => value === 'npm run test:client').length, 1);
   assert.equal(ciCommands.filter((value) => value === 'npm run test:node:tracked').length, 1);
   assert.equal(ciCommands.some((value) => value === 'npm run test:node'), false);
-  assert.equal(ciCommands.some((value) => value.includes('verify:release')), false);
+  assert.equal(ciCommands.filter((value) => value === 'npm run verify:release-version').length, 1);
+  assert.equal(ciCommands.some((value) => value === 'npm run verify:release'), false);
   assert.equal(ciCommands.some((value) => value.includes('test:release:client')), false);
   assert.ok(releaseCommands.includes('npm run test:release:client'));
   assert.ok(releaseCommands.includes('npm run test:node:tracked'));

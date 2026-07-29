@@ -88,7 +88,7 @@ function writeVersionSurfaces(rootDir, version, clientVersion = version) {
 
 function createVersionedCandidate(rootDir, candidateVersion, clientVersion = candidateVersion) {
   git(rootDir, ['config', 'user.name', 'Test User']);
-  git(rootDir, ['config', 'user.email', 'test@example.com']);
+  git(rootDir, ['config', 'user.email', '[redacted-email]']);
   writeVersionSurfaces(rootDir, '0.1.0');
   git(rootDir, ['add', '-A']);
   git(rootDir, ['commit', '--quiet', '-m', 'base']);

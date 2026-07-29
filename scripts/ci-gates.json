@@ -85,6 +85,14 @@
           ]
         },
         {
+          "label": "Verify release version surfaces",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:release-version"
+          ]
+        },
+        {
           "label": "Verify public release surface",
           "command": "npm",
           "args": [
@@ -284,6 +292,14 @@
           "args": [
             "run",
             "typecheck:client-tests"
+          ]
+        },
+        {
+          "label": "Verify release version surfaces",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:release-version"
           ]
         },
         {
