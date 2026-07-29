@@ -385,7 +385,7 @@ describe('SponsorPage', () => {
     }
   });
 
-  it('uploads an encrypted sponsored bundle and renders a share URL with tx query plus hash key', async () => {
+  it('uploads an encrypted sponsored bundle and renders an id-only URL with a separate memory-only key', async () => {
     getFetchMock().mockImplementation((url: any) =>
       Promise.resolve(
         String(url).endsWith('/auth/nonce')
@@ -555,8 +555,16 @@ describe('SponsorPage', () => {
 
     const shareInput = (await screen.findByLabelText('Sponsored share URL')) as HTMLInputElement;
     expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_SHARE_URL)).toBe(shareInput);
-    expect(shareInput.value).toMatch(/^http:\/\/localhost\/new\?sponsored=sponsor_tx_id#k=/);
-    expect(shareInput.value).toContain('?sponsored=sponsor_tx_id#k=');
+    expect(shareInput.value).toBe('http://localhost/new?sponsored=sponsor_tx_id');
+    expect(shareInput.value).not.toContain('#');
+    const shareKeyInput = (await screen.findByLabelText('Sponsored decryption key')) as HTMLInputElement;
+    const generatedKey = String(mockEncryptWithPassword.mock.calls[0][1] || '');
+    expect(screen.getByTestId(E2E_TESTIDS.SPONSOR_SHARE_KEY)).toBe(shareKeyInput);
+    expect(generatedKey).not.toBe('');
+    expect(shareKeyInput.value).toBe(generatedKey);
+    expect(shareInput.value).not.toContain(generatedKey);
+    expect(Object.values(window.sessionStorage).join('\n')).not.toContain(generatedKey);
+    expect(Object.values(window.localStorage).join('\n')).not.toContain(generatedKey);
     const txRow = await screen.findByTestId(E2E_TESTIDS.SPONSOR_TX_ID);
     expect(txRow).toHaveTextContent('Arweave tx:');
     expect(within(txRow).getByRole('link', { name: 'sponsor_tx_id' })).toHaveAttribute(

@@ -33,8 +33,16 @@ describe('sessionSourceResolver', () => {
     expect(typeof config?.sessionName).toBe('string');
   });
 
-  it('treats /session/demo as a display alias for the default demo config', () => {
-    expect(getDemoSessionConfigForDisplay('demo')).toEqual(getDefaultSessionConfig());
+  it('treats /session/demo as a display alias for the configured primary demo session', () => {
+    expect(getDemoSessionConfigForDisplay('demo')).toMatchObject({
+      slug: 'demo-sh',
+      sessionName: 'Demo Session',
+      sessionModeProfile: {
+        authority: {
+          mode: 'worker_canonical',
+        },
+      },
+    });
   });
 
   it('returns all demo sessions as normalized [key, config] pairs', () => {

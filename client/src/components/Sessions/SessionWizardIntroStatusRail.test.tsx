@@ -84,6 +84,6 @@ describe('SessionWizardIntroStatusRail', () => {
 
     expect(screen.queryByRole('heading', { name: /to create a session you'll need:/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_SPONSORED_STATUS)).not.toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Normal mode sections' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Session setup steps' })).not.toBeInTheDocument();
   });
 });

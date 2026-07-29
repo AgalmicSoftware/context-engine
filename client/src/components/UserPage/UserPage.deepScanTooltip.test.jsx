@@ -3,6 +3,7 @@ import UserPage from './UserPage';
 import styles from './UserPage.module.scss';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
 import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 jest.mock('../../utilities/crypto/litProtocol.js', () => ({
   getGlobalLitHooks: jest.fn(() => null),
@@ -907,6 +908,7 @@ describe('UserPage deep scan tooltip formatting', () => {
     jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockReturnValue({
       slug: 'demo-1',
       networkChainId: 11155420,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
     });
     const instance = makeInstance({
       account: viewAddress,
@@ -928,6 +930,38 @@ describe('UserPage deep scan tooltip formatting', () => {
     expect(addressLinks).toHaveLength(1);
     expect(addressLinks[0]?.props?.target).toBe('_blank');
     expect(contractScriptsModule.getSessionConfigBySlug).toHaveBeenCalledWith('demo-1');
+  });
+
+  it('suppresses the session explorer for a pure Worker profile with legacy chain metadata', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const instance = makeInstance({
+      account: viewAddress,
+      viewAddress,
+      minimized: true,
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: {
+        slug: 'demo-sh',
+        networkChainId: 11155420,
+        corsWorkerUrl: 'https://demo-sh.example.test',
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+      network: { id: 84532, chainId: 84532 },
+    });
+
+    const tree = instance.render();
+    const explorerLinks = collectTreeNodes(
+      tree,
+      (node) => node?.type === 'a' && node?.props?.['aria-label'] === 'View address on explorer',
+    );
+    const profileLinks = collectTreeNodes(
+      tree,
+      (node) => node?.type === 'a' && node?.props?.href === `/u/${viewAddress}`,
+    );
+
+    expect(instance.getExplorerChainId()).toBeNull();
+    expect(instance.getExplorerUrl()).toBeNull();
+    expect(explorerLinks).toHaveLength(0);
+    expect(profileLinks).toHaveLength(1);
   });
 
   it('omits explorer links when the active chain has no known explorer metadata', () => {

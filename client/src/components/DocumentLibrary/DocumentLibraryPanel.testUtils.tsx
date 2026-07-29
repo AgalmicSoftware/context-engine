@@ -120,6 +120,11 @@ jest.mock('../SBTs/SBTSelector', () => ({
 
 export const DocumentLibraryPanel = require('./DocumentLibraryPanel').default as React.ComponentType<any>;
 export const TEST_SESSION_CONFIG = {
+  networkChainId: 84532,
+  __registry: {
+    registryChainId: 84532,
+    sessionIdHex: `0x${'1'.repeat(32)}`,
+  },
   docLibrary: {
     provider: 'arweave',
     arweave: {

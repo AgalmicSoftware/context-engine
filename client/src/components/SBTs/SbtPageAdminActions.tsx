@@ -246,14 +246,14 @@ const SbtPageAdminActions = ({
         </div>
         {passwordInventoryDisplayState.shouldRenderGeneratedPasswordList ? (
           <div className={styles.generatedPasswordsList}>
-            <h5>Generated Passwords (including legacy cached passwords):</h5>
+            <h5>Generated Passwords (including codes kept in this tab):</h5>
             {SbtPagePasswordInviteRows({
               combinedPasswords,
               passwordInviteLinkContext,
             })}
             <p>
-              Export remains the primary recovery path. New passwords are stored only when encrypted local recovery is
-              enabled.
+              Export is the only durable recovery path. Optional recovery keeps new passwords in this tab&apos;s memory
+              only.
             </p>
             {SbtPagePasswordExportControls({
               exportFormat,
@@ -269,8 +269,8 @@ const SbtPageAdminActions = ({
 
     {passwordInventoryDisplayState.shouldRenderPreviousPasswordsSection && (
       <div className={styles.inviteGenerationSection}>
-        <h4>Previously Generated Password Invites</h4>
-        <p>{`These were previously cached or generated passwords from when the ${sbtLabel} was created:`}</p>
+        <h4>Password Invites Kept in This Tab</h4>
+        <p>{`These ${sbtLabel} codes exist only in memory and disappear when this tab reloads or closes:`}</p>
         {SbtPagePasswordInviteRows({
           combinedPasswords,
           passwordInviteLinkContext,

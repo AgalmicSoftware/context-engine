@@ -2,6 +2,10 @@ import { corsProxyUtils as defaultCorsProxyUtils } from '../../utilities/worker/
 import * as defaultWorkerCorsOrigins from '../../utilities/worker/workerCorsOrigins.js';
 import * as defaultWorkerAuth from '../../utilities/worker/workerAuth.js';
 import {
+  createWorkerAuthRemoteError,
+  getWorkerAuthRemoteErrorMessage,
+} from '../../utilities/worker/workerAuthRemoteError.js';
+import {
   bindWorkerAuthPublishAdapter,
   type WorkerAdminActionAuthInput,
   type WorkerBootstrapAdminAuthInput,
@@ -97,6 +101,12 @@ export type WorkerAdminAuthPort = {
 };
 
 export type WorkerSiweLoginPort = {
+  createRemoteError: (input: {
+    kind: 'admin_nonce' | 'worker_nonce' | 'worker_login';
+    payload: unknown;
+    status: unknown;
+  }) => Error & { reason: string; status: number };
+  getRemoteErrorMessage: (error: unknown) => string;
   prepareSiweLogin: (input: AdminPrepareSiweLoginInput) => Promise<AdminPrepareSiweLoginResult>;
 };
 
@@ -152,6 +162,8 @@ export const bindAdminWorkerPorts = ({
       fetchWorkerWithAuth: (url, options, context) => readWorkerAuth().fetchWorkerWithAuth(url, options, context),
     },
     siweLogin: {
+      createRemoteError: (input) => createWorkerAuthRemoteError(input),
+      getRemoteErrorMessage: (error) => getWorkerAuthRemoteErrorMessage(error),
       prepareSiweLogin: async ({
         workerUrl,
         address,
@@ -166,7 +178,7 @@ export const bindAdminWorkerPorts = ({
         });
         const nonceData = await readResponseJson(nonceResp);
         if (!nonceResp.ok) {
-          throw new Error(String(nonceData.error || `Nonce request failed (${nonceResp.status}).`));
+          throw createWorkerAuthRemoteError({ kind: 'admin_nonce', payload: nonceData, status: nonceResp.status });
         }
         const nonce = String(nonceData.nonce);
         return {

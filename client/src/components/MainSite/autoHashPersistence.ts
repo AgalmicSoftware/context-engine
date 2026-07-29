@@ -25,6 +25,28 @@ export function hasAutoFlag(raw: string | null | undefined): boolean {
   return false;
 }
 
+export function sanitizeAutoQueryForPersistence(raw: string | null | undefined): string {
+  const cleaned = String(raw || '').replace(/^[?#]/, '');
+  if (!cleaned) return '';
+  try {
+    const params = new URLSearchParams(cleaned);
+    Array.from(params.keys()).forEach((key) => {
+      const normalizedKey = key.toLowerCase();
+      if (
+        normalizedKey === 'gp' ||
+        normalizedKey === 'inv' ||
+        normalizedKey === 'password' ||
+        /^(gp|inv|password)\d+$/.test(normalizedKey)
+      ) {
+        params.delete(key);
+      }
+    });
+    return params.toString();
+  } catch (_) {
+    return '';
+  }
+}
+
 export function manageAutoHashPersistence(deps: AutoHashPersistenceDeps): void {
   try {
     if (typeof window === 'undefined') return;
@@ -33,7 +55,8 @@ export function manageAutoHashPersistence(deps: AutoHashPersistenceDeps): void {
     const currentSearch = deps.getLocationSearch();
 
     if (hasAutoFlag(currentSearch)) {
-      deps.sessionStorageSet(key, currentSearch.replace(/^\?/, ''));
+      const safeQuery = sanitizeAutoQueryForPersistence(currentSearch);
+      if (safeQuery) deps.sessionStorageSet(key, safeQuery);
       return;
     }
 
@@ -42,9 +65,13 @@ export function manageAutoHashPersistence(deps: AutoHashPersistenceDeps): void {
     const saved = deps.sessionStorageGet(key);
     if (!saved || !hasAutoFlag(saved)) return;
 
-    const clean = saved.replace(/^[?#]/, '');
-    deps.log('[MainSite] Restoring persisted auto-query:', clean);
-    deps.replaceState(`${deps.getLocationPathname()}${clean ? `?${clean}` : ''}`);
+    const safeQuery = sanitizeAutoQueryForPersistence(saved);
+    if (!safeQuery || !hasAutoFlag(safeQuery)) return;
+    if (safeQuery !== saved.replace(/^[?#]/, '')) {
+      deps.sessionStorageSet(key, safeQuery);
+    }
+    deps.log('[MainSite] Restoring persisted auto-query:', safeQuery);
+    deps.replaceState(`${deps.getLocationPathname()}?${safeQuery}`);
   } catch (error) {
     deps.warn('[MainSite] manageAutoHashPersistence error:', error);
   }

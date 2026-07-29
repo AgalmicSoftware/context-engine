@@ -42,11 +42,13 @@ import SBTSelector from '../SBTs/SBTSelector';
 import { JsonPanel } from '../Shared/Json/JsonControls';
 import CETooltip from '../Shared/CETooltip';
 import AdminPageMetadataEditor from './AdminPageMetadataEditor';
+import AdminPageSessionMetadataSummary from './AdminPageSessionMetadataSummary';
 import AdminPageTestsPanel from './AdminPageTestsPanel';
 import AdminPageWorkerSecretsPanel from './AdminPageWorkerSecretsPanel';
 import AdminAgentSessionWrappedPanel from './AdminAgentSessionWrappedPanel';
 import { resolveAdminAgentSessionWrappedWorkerOrigin } from './adminAgentSessionWrapped';
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
+import { resolveAdminCapabilityRoute, resolveAdminSessionRecoveryMessage } from './adminPageCapabilityRoutingHelpers';
 import { createLogger } from '../../utilities/logging';
 import { notify } from '../../utilities/ui/notify.js';
 import {
@@ -75,7 +77,6 @@ import {
 } from './adminPageDraftFormattingHelpers';
 import {
   areAdminEncryptedEntriesEquivalent,
-  buildAdminChainRegistryDisplay,
   buildAdminPageSessionIdentityKey,
   buildSessionUrl,
   collectEncryptedEntries,
@@ -197,9 +198,12 @@ const AdminPageRuntime = ({
   const initialWorkerCanonicalConfigRef = useRef<AdminSessionConfigLike | null>(null);
   if (!initialWorkerCanonicalConfigRef.current) {
     const candidate = asAdminSessionConfig(initialSessionConfig);
-    const candidateProfile = asAdminSessionConfig(candidate.sessionModeProfile);
-    const candidateAuthority = asAdminSessionConfig(candidateProfile.authority);
-    if (candidateAuthority.mode === 'worker_canonical' && normalizeSlug(candidate.slug)) {
+    const candidateCapabilities = resolveAdminCapabilityRoute(candidate).sessionCapabilities;
+    if (
+      candidateCapabilities.profileValid &&
+      candidateCapabilities.isWorkerCanonical &&
+      normalizeSlug(candidate.slug)
+    ) {
       initialWorkerCanonicalConfigRef.current = candidate;
     }
   }
@@ -596,18 +600,22 @@ const AdminPageRuntime = ({
     const match = availableSessions.find(([slug]) => slug === selectedSlug);
     return match ? asAdminSessionConfig(match[1]) : null;
   }, [availableSessions, selectedSlug]);
-  const effectiveWorkerAllowOrigins = useMemo(() => {
-    if (!selectedConfig) return [];
+  const adminCapabilityRoute = useMemo(() => resolveAdminCapabilityRoute(selectedConfig), [selectedConfig]);
+  const { sessionCapabilities, selectedWorkerSessionId } = adminCapabilityRoute;
+  const effectiveWorkerCorsState = useMemo(() => {
+    if (!selectedConfig) return { origins: [], reported: false };
     const cachedWorkerConfig: any =
       getCachedSessionWorkerConfig({
         slug: selectedSlug,
         sessionConfig: selectedConfig,
       }) || {};
     if (Object.prototype.hasOwnProperty.call(cachedWorkerConfig, 'allowOrigins')) {
-      return parseAllowOriginsDraft(cachedWorkerConfig.allowOrigins);
+      return { origins: parseAllowOriginsDraft(cachedWorkerConfig.allowOrigins), reported: true };
     }
-    return parseAllowOriginsDraft(selectedConfig?.allowOrigins);
+    const reported = Object.prototype.hasOwnProperty.call(selectedConfig, 'allowOrigins');
+    return { origins: parseAllowOriginsDraft(selectedConfig?.allowOrigins), reported };
   }, [selectedConfig, selectedSlug]);
+  const effectiveWorkerAllowOrigins = effectiveWorkerCorsState.origins;
   const effectiveAllowOriginsDraft = useMemo(
     () => formatAllowOriginsDraft(effectiveWorkerAllowOrigins),
     [effectiveWorkerAllowOrigins],
@@ -727,7 +735,7 @@ const AdminPageRuntime = ({
   );
 
   useEffect(() => {
-    if (!relevantSessionChainId) {
+    if (!sessionCapabilities.usesChainMetadata || !relevantSessionChainId) {
       setMetadataLatestBlock(null);
       setMetadataLatestBlockStatus('');
       return;
@@ -749,7 +757,7 @@ const AdminPageRuntime = ({
     return () => {
       cancelled = true;
     };
-  }, [relevantSessionChainId]);
+  }, [relevantSessionChainId, sessionCapabilities.usesChainMetadata]);
 
   useEffect(() => {
     if (metadataDraftTouched) return;
@@ -855,6 +863,17 @@ const AdminPageRuntime = ({
           slug: selectedSlug,
           sessionConfig: selectedConfig,
           allowSharedFallback: true,
+        }),
+      ),
+    [selectedConfig, selectedSlug],
+  );
+  const exactSelectedConfigWorkerUrl = useMemo(
+    () =>
+      normalizeWorkerUrl(
+        getUsableSessionWorkerUrl({
+          slug: selectedSlug,
+          sessionConfig: selectedConfig,
+          requireExactWorkerSession: true,
         }),
       ),
     [selectedConfig, selectedSlug],
@@ -1087,6 +1106,7 @@ const AdminPageRuntime = ({
       return adminWorkerPorts.adminAuth.buildSignedAdminActionAuth({
         action,
         slug,
+        sessionId: selectedWorkerSessionId || undefined,
         body,
         workerUrl: baseUrl,
         context: {
@@ -1103,6 +1123,7 @@ const AdminPageRuntime = ({
       selectedConfig,
       selectedConfigWorkerUrl,
       selectedSlug,
+      selectedWorkerSessionId,
       toggleLoginModal,
       workerUrl,
     ],
@@ -1508,8 +1529,13 @@ const AdminPageRuntime = ({
     setDeniedStatus(`Testing ${key} (expect 403)…`);
     try {
       const { loginResp, loginData } = await attemptWorkerLogin();
+      const loginError = adminWorkerPorts.siweLogin.createRemoteError({
+        kind: 'worker_login',
+        payload: loginData,
+        status: loginResp.status,
+      });
       if (loginResp.status === 403) {
-        const detail = toStr(loginData?.error || 'Forbidden').trim();
+        const detail = loginError?.reason || 'worker_auth_worker_login_failed';
         setDeniedResults((prev) => ({ ...prev, [key]: `OK (403 ${detail})` }));
         setDeniedStatus(`Expected 403 for ${key}.`);
         return;
@@ -1519,11 +1545,11 @@ const AdminPageRuntime = ({
         setDeniedStatus('Unexpectedly allowed login; gating may be misconfigured.');
         return;
       }
-      const detail = toStr(loginData?.error || `Login failed (${loginResp.status})`).trim();
+      const detail = loginError?.message || `Worker login failed (${loginResp.status}).`;
       setDeniedResults((prev) => ({ ...prev, [key]: `FAILED (${detail})` }));
       setDeniedStatus(detail);
     } catch (err: any) {
-      const msg = getErrorMessage(err, 'Denied test failed.');
+      const msg = adminWorkerPorts.siweLogin.getRemoteErrorMessage(err) || 'Denied access test failed.';
       setDeniedResults((prev) => ({ ...prev, [key]: `FAILED (${msg})` }));
       setDeniedStatus(msg);
     } finally {
@@ -1588,6 +1614,8 @@ const AdminPageRuntime = ({
 
   const { isWorkerCanonicalSession, workerAdminAddress, hasRegistryEntry, canAdminWorker, canAdminRegistry } =
     resolveAdminCapabilities({ account, sessionConfig: selectedConfig });
+  const { showAdminWorkerGroups, workerGroupsPanelTitle, workerGroupsPanelDescription } = adminCapabilityRoute;
+  const sessionRecoveryMessage = resolveAdminSessionRecoveryMessage({ sessionCapabilities, hasRegistryEntry });
   const baseWorkerUrl = normalizeWorkerUrl(workerUrl);
   const canRunTests = !!baseWorkerUrl && !!account;
   const canRunHealthTest = !!baseWorkerUrl && (defaultGateIsEmpty || walletReady);
@@ -2070,6 +2098,7 @@ const AdminPageRuntime = ({
         hasAutoFeatureOverride: metadataAutoFeatureTouched,
         advancedDraft: metadataConfigDraft,
         requireBlockLimits: canAdminRegistry,
+        includeChainFields: sessionCapabilities.usesChainMetadata,
       });
       const nextConfig = { ...selectedConfig, ...metadata };
       if (!canAdminRegistry) {
@@ -2077,6 +2106,7 @@ const AdminPageRuntime = ({
           metadata,
           slug: selectedSlug,
           adminAddress: workerAdminAddress,
+          includeChainFields: sessionCapabilities.usesChainMetadata,
         });
         await ensureWorkerSessionConfig({
           sessionConfigOverride: nextConfig,
@@ -2514,7 +2544,7 @@ const AdminPageRuntime = ({
             </div>
           </div>
           <div className={styles.heroStatusStack}>
-            {!availableSessions.length && (
+            {!availableSessions.length && !selectedConfig && (
               <div className={styles.warningNote}>
                 No sessions found in the registry{requestedChainId ? ` for chain ${requestedChainId}` : ''}.
               </div>
@@ -2527,10 +2557,8 @@ const AdminPageRuntime = ({
               </div>
             )}
             {corsPatchStatus && <div className={styles.statusNote}>{corsPatchStatus}</div>}
-            {selectedConfig && !hasRegistryEntry && !isWorkerCanonicalSession && (
-              <div className={styles.warningNote}>
-                Session is not registered on-chain yet. Register in /new before using worker actions.
-              </div>
+            {selectedConfig && sessionRecoveryMessage && (
+              <div className={styles.warningNote}>{sessionRecoveryMessage}</div>
             )}
           </div>
         </div>
@@ -2570,67 +2598,28 @@ const AdminPageRuntime = ({
           </div>
           {!groupMetadata && (
             <div className={styles.warningNote}>
-              No metadata found for this session yet. Register the session on-chain or select a legacy demo session.
+              {sessionCapabilities.isWorkerCanonical
+                ? 'No canonical Session Worker config was loaded. Restore the Worker URL and retry.'
+                : 'No metadata found for this session yet. Register the session on-chain or select a legacy demo session.'}
             </div>
           )}
           {metadataOpen && groupMetadata && (
             <>
-              <div className={styles.metadataGrid}>
-                <div className={styles.metadataItem}>
-                  <span>Slug</span>
-                  <span>
-                    {metadataSessionUrl ? (
-                      <a href={metadataSessionUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
-                        {metadataSlugDisplay}
-                      </a>
-                    ) : (
-                      metadataSlugDisplay
-                    )}
-                  </span>
-                </div>
-                <div className={styles.metadataItem}>
-                  <span>Session name</span>
-                  <span>{toStr(groupMetadata.sessionName || '').trim() || '—'}</span>
-                </div>
-                <div className={styles.metadataItem}>
-                  <span>Chain / Registry</span>
-                  <span>
-                    {buildAdminChainRegistryDisplay({
-                      chainId: groupMetadata.networkChainId || groupMetadata.__registry?.chainId || '',
-                      registryChainId: groupMetadata.__registry?.registryChainId || groupMetadata.registryChainId || '',
-                    })}
-                  </span>
-                </div>
-                <div className={styles.metadataItem}>
-                  <span>Admin</span>
-                  <span>
-                    {metadataAdminUrl ? (
-                      <a href={metadataAdminUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
-                        {shortAddress(metadataAdminAddress) || metadataAdminAddress}
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </span>
-                </div>
-                <div className={styles.metadataItem}>
-                  <span>Metadata URI</span>
-                  <span>
-                    {metadataUriUrl ? (
-                      <a href={metadataUriUrl} target="_blank" rel="noreferrer" className={styles.metadataLink}>
-                        {metadataUriValue}
-                      </a>
-                    ) : (
-                      '—'
-                    )}
-                  </span>
-                </div>
-                <div className={styles.metadataItem}>
-                  <span>Metadata source</span>
-                  <span>{metadataLoadStateLabel}</span>
-                </div>
-              </div>
-              {metadataContractsNeedVerification && (
+              <AdminPageSessionMetadataSummary
+                groupMetadata={groupMetadata}
+                isWorkerCanonical={sessionCapabilities.isWorkerCanonical}
+                workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
+                allowedOriginCount={effectiveWorkerAllowOrigins.length}
+                allowedOriginsReported={effectiveWorkerCorsState.reported}
+                metadataSlugDisplay={metadataSlugDisplay}
+                metadataSessionUrl={metadataSessionUrl}
+                metadataAdminAddress={metadataAdminAddress}
+                metadataAdminUrl={metadataAdminUrl}
+                metadataUriValue={metadataUriValue}
+                metadataUriUrl={metadataUriUrl}
+                metadataLoadStateLabel={metadataLoadStateLabel}
+              />
+              {sessionCapabilities.usesChainMetadata && metadataContractsNeedVerification && (
                 <div className={styles.warningNote}>
                   Session metadata could not be loaded, so the contract addresses below are currently synthesized from
                   chain defaults. Verify them before publishing any metadata update.
@@ -2665,6 +2654,7 @@ const AdminPageRuntime = ({
                   visibleMetadataContracts={visibleMetadataContracts}
                   handleSaveSessionMetadata={handleSaveSessionMetadata}
                   metadataUpdateStatus={metadataUpdateStatus}
+                  showChainFields={sessionCapabilities.usesChainMetadata}
                 />
               )}
               <div className={styles.metadataJsonSection}>
@@ -2730,102 +2720,114 @@ const AdminPageRuntime = ({
           )}
         </section>
 
-        <section className={`${styles.panel} ${styles.gatePanel}`}>
-          <div className={styles.panelHeader}>
-            <div className={styles.panelTitleGroup}>
-              <div className={styles.panelTitleRow}>
-                <div className={styles.panelTitle}>On-chain default gate</div>
-                {renderInfoTooltip(
-                  'admin-default-gate-tip',
-                  'Match the default worker-auth gate to the session’s intended access model.',
-                )}
-              </div>
-            </div>
-            <Button
-              size="sm"
-              color="secondary"
-              outline
-              className={styles.collapseToggle}
-              onClick={() => toggleSection('defaultGate')}
-              aria-label="Toggle On-chain default gate section"
-            >
-              <FontAwesomeIcon icon={defaultGateOpen ? faCaretUp : faCaretDown} />
-            </Button>
-          </div>
-          {defaultGateOpen && (
-            <>
-              <div className={styles.formRow}>
-                <FormGroup>
-                  <Label className={styles.gateLabelRow}>
-                    <span>Default gate SBTs</span>
-                    <Input
-                      type="select"
-                      value={defaultGateDraft.mode}
-                      data-testid={E2E_TESTIDS.ADMIN_GATE_MODE_SELECT}
-                      onChange={(e: any) => {
-                        setDefaultGateTouched(true);
-                        setGateConfigDirty(true);
-                        setDefaultGateDraft((prev: any) => ({ ...prev, mode: e.target.value }));
-                      }}
-                      className={styles.gateModeSelect}
-                    >
-                      <option value="any">ANY</option>
-                      <option value="all">ALL</option>
-                    </Input>
-                  </Label>
-                  <SBTSelector
-                    id="admin-default-gate-sbts"
-                    label=""
-                    selectedSBTs={dedupeSbtSelections(defaultGateDraft.sbts || [])}
-                    onAddSBT={(sbt: any) => {
-                      setDefaultGateTouched(true);
-                      setGateConfigDirty(true);
-                      setDefaultGateDraft((prev: any) => ({
-                        ...prev,
-                        sbts: dedupeSbtSelections([...(prev.sbts || []), sbt]),
-                      }));
-                    }}
-                    onRemoveSBT={(address: any) => {
-                      setDefaultGateTouched(true);
-                      setGateConfigDirty(true);
-                      setDefaultGateDraft((prev: any) => ({
-                        ...prev,
-                        sbts: dedupeSbtSelections(prev.sbts || []).filter(
-                          (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase(),
-                        ),
-                      }));
-                    }}
-                    network={network}
-                    chainId={
-                      Number(
-                        selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0,
-                      ) || null
-                    }
-                    sessionSlug={normalizeSlug(selectedSlug)}
-                    variant="admin"
-                    ensureLightSbtUniverse={ensureLightSbtUniverse}
-                  />
-                </FormGroup>
+        {sessionCapabilities.isRegistryCanonical ? (
+          <section className={`${styles.panel} ${styles.gatePanel}`}>
+            <div className={styles.panelHeader}>
+              <div className={styles.panelTitleGroup}>
+                <div className={styles.panelTitleRow}>
+                  <div className={styles.panelTitle}>On-chain default gate</div>
+                  {renderInfoTooltip(
+                    'admin-default-gate-tip',
+                    'Match the default worker-auth gate to the session’s intended access model.',
+                  )}
+                </div>
               </div>
               <Button
-                color="primary"
-                className={styles.actionButton}
-                onClick={handleSyncDefaultGate}
-                data-testid={E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON}
-                disabled={!canAdminRegistry || gateSyncBusy}
-                style={{ opacity: gateConfigDirty ? 1 : 0.5 }}
+                size="sm"
+                color="secondary"
+                outline
+                className={styles.collapseToggle}
+                onClick={() => toggleSection('defaultGate')}
+                aria-label="Toggle On-chain default gate section"
               >
-                Update default gate on-chain
+                <FontAwesomeIcon icon={defaultGateOpen ? faCaretUp : faCaretDown} />
               </Button>
-              {gateSyncStatus && (
-                <div className={styles.statusNote} data-testid={E2E_TESTIDS.ADMIN_GATE_STATUS}>
-                  {gateSyncStatus}
+            </div>
+            {defaultGateOpen && (
+              <>
+                <div className={styles.formRow}>
+                  <FormGroup>
+                    <Label className={styles.gateLabelRow}>
+                      <span>Default gate SBTs</span>
+                      <Input
+                        type="select"
+                        value={defaultGateDraft.mode}
+                        data-testid={E2E_TESTIDS.ADMIN_GATE_MODE_SELECT}
+                        onChange={(e: any) => {
+                          setDefaultGateTouched(true);
+                          setGateConfigDirty(true);
+                          setDefaultGateDraft((prev: any) => ({ ...prev, mode: e.target.value }));
+                        }}
+                        className={styles.gateModeSelect}
+                      >
+                        <option value="any">ANY</option>
+                        <option value="all">ALL</option>
+                      </Input>
+                    </Label>
+                    <SBTSelector
+                      id="admin-default-gate-sbts"
+                      label=""
+                      selectedSBTs={dedupeSbtSelections(defaultGateDraft.sbts || [])}
+                      onAddSBT={(sbt: any) => {
+                        setDefaultGateTouched(true);
+                        setGateConfigDirty(true);
+                        setDefaultGateDraft((prev: any) => ({
+                          ...prev,
+                          sbts: dedupeSbtSelections([...(prev.sbts || []), sbt]),
+                        }));
+                      }}
+                      onRemoveSBT={(address: any) => {
+                        setDefaultGateTouched(true);
+                        setGateConfigDirty(true);
+                        setDefaultGateDraft((prev: any) => ({
+                          ...prev,
+                          sbts: dedupeSbtSelections(prev.sbts || []).filter(
+                            (entry: any) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase(),
+                          ),
+                        }));
+                      }}
+                      network={network}
+                      chainId={
+                        Number(
+                          selectedConfig?.networkChainId || selectedConfig?.__registry?.chainId || network?.id || 0,
+                        ) || null
+                      }
+                      sessionSlug={normalizeSlug(selectedSlug)}
+                      variant="admin"
+                      ensureLightSbtUniverse={ensureLightSbtUniverse}
+                    />
+                  </FormGroup>
                 </div>
-              )}
-              {gateSyncResult && <div className={styles.statusNote}>{renderAdminTestResult(gateSyncResult)}</div>}
-            </>
-          )}
-        </section>
+                <Button
+                  color="primary"
+                  className={styles.actionButton}
+                  onClick={handleSyncDefaultGate}
+                  data-testid={E2E_TESTIDS.ADMIN_GATE_UPDATE_BUTTON}
+                  disabled={!canAdminRegistry || gateSyncBusy}
+                  style={{ opacity: gateConfigDirty ? 1 : 0.5 }}
+                >
+                  Update default gate on-chain
+                </Button>
+                {gateSyncStatus && (
+                  <div className={styles.statusNote} data-testid={E2E_TESTIDS.ADMIN_GATE_STATUS}>
+                    {gateSyncStatus}
+                  </div>
+                )}
+                {gateSyncResult && <div className={styles.statusNote}>{renderAdminTestResult(gateSyncResult)}</div>}
+              </>
+            )}
+          </section>
+        ) : null}
+
+        {sessionCapabilities.usesOnChainSbt && !sessionCapabilities.isRegistryCanonical ? (
+          <section className={`${styles.panel} ${styles.gatePanel}`} data-testid="ce-admin-worker-sbt-gates">
+            <div className={styles.panelTitle}>Advanced on-chain access gates</div>
+            <div className={styles.statusNote}>
+              This Worker-owned session checks the SBT conditions in its validated profile. Gate editing is read-only
+              here; update and republish the profile through the session wizard. No registry transaction is available.
+            </div>
+          </section>
+        ) : null}
 
         <AdminAgentSessionWrappedPanel
           canAdminWorker={canAdminWorker}
@@ -2837,12 +2839,19 @@ const AdminPageRuntime = ({
           onConfigUpdated={handleAgentSessionWrappedConfigUpdated}
         />
 
-        <AdminWorkerGroupsPanel
-          canAdminWorker={canAdminWorker}
-          sessionSlug={normalizeSlug(selectedSlug)}
-          workerUrl={baseWorkerUrl || selectedConfigWorkerUrl}
-          postSignedRequest={postSignedAdminRequest}
-        />
+        {showAdminWorkerGroups ? (
+          <AdminWorkerGroupsPanel
+            canAdminWorker={canAdminWorker}
+            sessionId={selectedWorkerSessionId}
+            sessionConfig={selectedConfig}
+            sessionSlug={normalizeSlug(selectedSlug)}
+            workerUrl={sessionCapabilities.usesWorkerGroups ? exactSelectedConfigWorkerUrl : selectedConfigWorkerUrl}
+            workerAuthContext={testContext}
+            postSignedRequest={postSignedAdminRequest}
+            title={workerGroupsPanelTitle}
+            description={workerGroupsPanelDescription}
+          />
+        ) : null}
 
         <AdminPageWorkerSecretsPanel
           workerSecretsOpen={workerSecretsOpen}
@@ -2872,6 +2881,7 @@ const AdminPageRuntime = ({
           handleSaveWorkerSecrets={handleSaveWorkerSecrets}
           saveStatus={saveStatus}
           chainStatus={chainStatus}
+          visibleCardKeys={sessionCapabilities.adminSecretCardKeys}
         />
 
         {showTestsPanel && (
@@ -2911,6 +2921,8 @@ const AdminPageRuntime = ({
             deniedStatus={deniedStatus}
             deniedResults={deniedResults}
             runDeniedAccessTest={runDeniedAccessTest}
+            visibleTestKeys={sessionCapabilities.adminTestKeys}
+            gateKind={sessionCapabilities.gateKind}
           />
         )}
       </div>

@@ -14,12 +14,15 @@ type SessionWizardIntroStatusRailProps = {
   isNormalMode: boolean;
   newSessionRequiresLitCredential?: boolean;
   normalModeCards: NormalModeCard[];
+  onSponsoredBundleKeyChange?: React.ComponentProps<typeof SessionWizardSponsoredStatus>['onDecryptionKeyChange'];
   onDismissRequirements: () => void;
   onFocusNormalModeSection: (key: string) => void;
   onRetrySponsoredBundle: () => void;
+  onSubmitSponsoredBundleKey?: React.ComponentProps<typeof SessionWizardSponsoredStatus>['onSubmitDecryptionKey'];
   requiredRequirementIds?: React.ComponentProps<typeof SessionWizardRequirementsBanner>['requiredRequirementIds'];
   showNewSessionRequirementsBanner: boolean;
   showNormalModeRail?: boolean;
+  sponsoredBundleKey?: React.ComponentProps<typeof SessionWizardSponsoredStatus>['decryptionKey'];
   sponsoredBundleStatus?: React.ComponentProps<typeof SessionWizardSponsoredStatus>['status'];
 };
 
@@ -32,12 +35,15 @@ const SessionWizardIntroStatusRail = ({
   isNormalMode,
   newSessionRequiresLitCredential = true,
   normalModeCards,
+  onSponsoredBundleKeyChange,
   onDismissRequirements,
   onFocusNormalModeSection,
   onRetrySponsoredBundle,
+  onSubmitSponsoredBundleKey,
   requiredRequirementIds,
   showNewSessionRequirementsBanner,
   showNormalModeRail = true,
+  sponsoredBundleKey = '',
   sponsoredBundleStatus = null,
 }: SessionWizardIntroStatusRailProps): React.ReactElement => (
   <>
@@ -52,7 +58,13 @@ const SessionWizardIntroStatusRail = ({
       />
     ) : null}
 
-    <SessionWizardSponsoredStatus onRetry={onRetrySponsoredBundle} status={sponsoredBundleStatus} />
+    <SessionWizardSponsoredStatus
+      decryptionKey={sponsoredBundleKey}
+      onDecryptionKeyChange={onSponsoredBundleKeyChange}
+      onRetry={onRetrySponsoredBundle}
+      onSubmitDecryptionKey={onSubmitSponsoredBundleKey}
+      status={sponsoredBundleStatus}
+    />
 
     {isNormalMode && showNormalModeRail ? (
       <SessionWizardNormalModeRail

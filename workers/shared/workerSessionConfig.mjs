@@ -10,7 +10,9 @@ const PUBLIC_CONFIG_KEYS = Object.freeze([
   'sessionName',
   'sessionInfo',
   'sessionHeaderImg',
+  'sessionEndsAt',
   'defaultTags',
+  'defaultGroupTags',
   'defaultSbtTags',
   'questionsGenPrompt',
   'defaultFilterState',
@@ -29,6 +31,7 @@ const PUBLIC_CONFIG_KEYS = Object.freeze([
   'sessionModeProfile',
   'agentSessionWrapped',
   'workerAuthority',
+  'groupCreationPolicy',
   'storageProfile',
   'ai',
   'limits',
@@ -47,9 +50,20 @@ const DEPLOY_CANONICAL_CONFIG_KEYS = Object.freeze([
   'sessionName',
   'sessionInfo',
   'sessionHeaderImg',
+  'sessionEndsAt',
+  'defaultTags',
+  'defaultGroupTags',
+  'defaultSbtTags',
+  'questionsGenPrompt',
+  'defaultFilterState',
+  'defaultFeaturedSBTs',
+  'autoFeatureSBTsBySessionSlug',
   'sessionModeProfile',
   'workerAuthority',
+  'groupCreationPolicy',
+  'storageProfile',
   'ai',
+  'networkChainId',
   'contracts',
 ]);
 
@@ -314,9 +328,33 @@ export const projectPublicWorkerSessionConfig = (config) => (
   selectFields(isObj(config) ? config : {}, PUBLIC_CONFIG_KEYS)
 );
 
-export const selectDeployWorkerSessionConfigFields = (body) => (
-  selectFields(isObj(body) ? body : {}, DEPLOY_CANONICAL_CONFIG_KEYS)
-);
+const profileUsesOnChainSbt = (profile) => {
+  if (profile?.authorization?.mechanisms?.includes?.('sbt_onchain')) return true;
+  return [
+    profile?.encryption?.accessConditions,
+    profile?.storage?.payloadAccessControl?.accessConditions,
+  ].some((document) => document?.conditions?.some?.((condition) => condition?.kind === 'sbt_onchain'));
+};
+
+export const selectDeployWorkerSessionConfigFields = (body) => {
+  const source = isObj(body) ? body : {};
+  const selected = selectFields(source, DEPLOY_CANONICAL_CONFIG_KEYS);
+  if (source?.sessionModeProfile?.authority?.mode !== 'worker_canonical') return selected;
+
+  const usesOnChainSbt = profileUsesOnChainSbt(source.sessionModeProfile);
+  if (!usesOnChainSbt) {
+    delete selected.defaultSbtTags;
+    delete selected.defaultFeaturedSBTs;
+    delete selected.autoFeatureSBTsBySessionSlug;
+    delete selected.contracts;
+  } else if (isObj(selected.contracts)) {
+    selected.contracts = selectFields(selected.contracts, ['sbtFactory'], 'config.contracts');
+  }
+  if (!usesOnChainSbt && source?.sessionModeProfile?.encryption?.mode !== 'lit') {
+    delete selected.networkChainId;
+  }
+  return selected;
+};
 
 export const sanitizeWorkerConfigOpenSubtree = (value) => {
   const sanitized = sanitizePublicValue(value, 'config.open');

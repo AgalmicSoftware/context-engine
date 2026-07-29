@@ -5,6 +5,7 @@ import {
   parseQuestionSessionSlugFromSearch,
 } from '../../utilities/survey/questionRouting.js';
 import type { ResolveSessionConfigById, ResolveSessionConfigBySlug, SessionConfigLike } from '../shellTypes';
+import { getSbtListRouteSessionSlug } from './sbtRoutePathHelpers';
 
 type FormatSessionId = ((value: string) => string | null | undefined) | undefined;
 type ResolveSessionSlugFromPathToken = ((sessionToken: string) => string | null | undefined) | undefined;
@@ -365,6 +366,12 @@ export const resolveMainSiteRenderActiveSessionSlug = ({
     if (routeSession.hasExplicitSessionSlug) return routeSession.sessionSlug;
     return normalizeSessionSlug(activeSessionSlug);
   }
+
+  const groupListRouteSlug = getSbtListRouteSessionSlug(path, {
+    normalizeSessionSlug,
+    search,
+  });
+  if (groupListRouteSlug) return groupListRouteSlug;
 
   const querySlug = resolveMainSiteRouteSessionSlugHint({
     search,

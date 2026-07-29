@@ -178,12 +178,13 @@ describe('admin worker ports', () => {
     });
   });
 
-  it('surfaces nonce request failures without signing a message', async () => {
+  it('maps nonce request failures without exposing arbitrary Worker text', async () => {
+    const canaryCredential = 'admin-nonce-credential-canary-never-render';
     const buildSiweMessage = jest.fn(() => 'should-not-run');
     const fetchImpl = jest.fn(async () => ({
       ok: false,
       status: 503,
-      json: async () => ({ error: 'nonce unavailable' }),
+      json: async () => ({ error: `Authorization: Bearer ${canaryCredential}` }),
     }));
     const ports = bindAdminWorkerPorts({
       corsProxy: () => ({ resolveCorsProxyUrl: jest.fn() }),
@@ -198,14 +199,20 @@ describe('admin worker ports', () => {
       fetchImpl: () => fetchImpl,
     });
 
-    await expect(
-      ports.siweLogin.prepareSiweLogin({
+    const error = await ports.siweLogin
+      .prepareSiweLogin({
         workerUrl: 'https://worker.example.test',
         address: '0x00000000000000000000000000000000000000aa',
         sessionSlug: 'edge',
         chainId: 84532,
-      }),
-    ).rejects.toThrow('nonce unavailable');
+      })
+      .catch((caught) => caught);
+    expect(error).toMatchObject({
+      message: 'Admin Worker nonce request failed (503).',
+      reason: 'worker_auth_admin_nonce_failed',
+      status: 503,
+    });
+    expect(String(error?.message || error)).not.toContain(canaryCredential);
     expect(buildSiweMessage).not.toHaveBeenCalled();
   });
 });

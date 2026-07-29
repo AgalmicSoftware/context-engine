@@ -51,6 +51,28 @@ describe('SbtPageRelevantInfo', () => {
     expect(onOpenEncryptedDoc).toHaveBeenCalledWith(encryptedUrl);
   });
 
+  it('renders worker-managed document references as public links even when they use a Lit-shaped URL', () => {
+    const encryptedUrl = 'lit://arweave/example-tx';
+    render(
+      <SbtPageRelevantInfo
+        {...createProps({
+          documentIDHashes: [],
+          documentURLs: [encryptedUrl],
+          documentUrlsArePublic: true,
+          introText: 'Relevant documents and tags for this group.',
+          shouldRenderDocumentIdHashes: false,
+          shouldRenderTags: false,
+          tags: [],
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Relevant documents and tags for this group.')).toBeInTheDocument();
+    expect(screen.getByText('Doc URL')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: encryptedUrl })).toHaveAttribute('href', encryptedUrl);
+    expect(screen.queryByRole('button', { name: 'Decrypt and view' })).not.toBeInTheDocument();
+  });
+
   it('preserves PUBLIC_URL when building document and tag routes', () => {
     const previousPublicUrl = process.env.PUBLIC_URL;
     process.env.PUBLIC_URL = '/ce/';

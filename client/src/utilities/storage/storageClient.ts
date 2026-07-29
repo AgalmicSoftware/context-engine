@@ -19,6 +19,8 @@ interface StorageWorkerOptions {
   sessionConfig?: unknown;
   context?: unknown;
   workerUrl?: unknown;
+  credentialToken?: unknown;
+  fetchImpl?: typeof fetch;
 }
 
 interface UploadDataToSessionStorageOptions extends StorageWorkerOptions {
@@ -101,6 +103,8 @@ export const uploadDataToSessionStorage = async (
     encrypted = false,
     payloadEncrypted = false,
     arweaveJwk = '',
+    credentialToken = '',
+    fetchImpl = fetch,
   }: UploadDataToSessionStorageOptions = {},
 ): Promise<UnknownRecord> => {
   const payloadIsEncrypted = encrypted || payloadEncrypted;
@@ -174,13 +178,24 @@ export const uploadDataToSessionStorage = async (
     };
   }
 
-  const response = await fetchWorkerWithAuth(endpoint, requestInit, {
-    sessionSlug,
-    sessionConfig,
-    context,
-    workerUrl: baseUrl,
-    allowDemoFallback: defaultStrictAllowDemoFallback(),
-  });
+  const normalizedCredentialToken = toStr(credentialToken).trim();
+  const credentialHeaders = new Headers(requestInit.headers);
+  if (normalizedCredentialToken) {
+    credentialHeaders.set('Authorization', `Bearer ${normalizedCredentialToken}`);
+    if (toStr(sessionSlug).trim()) credentialHeaders.set('X-Group-Slug', toStr(sessionSlug).trim());
+  }
+  const response = normalizedCredentialToken
+    ? await fetchImpl(endpoint, {
+        ...requestInit,
+        headers: credentialHeaders,
+      })
+    : await fetchWorkerWithAuth(endpoint, requestInit, {
+        sessionSlug,
+        sessionConfig,
+        context,
+        workerUrl: baseUrl,
+        allowDemoFallback: defaultStrictAllowDemoFallback(),
+      });
   const parsed = await parseStorageUploadResponse(response);
   return {
     ...parsed,

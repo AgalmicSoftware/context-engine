@@ -104,6 +104,11 @@ const buildWorkerCanonicalLitProfile = () => {
   const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
   profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
   profile.encryption = { mode: 'lit' };
+  profile.evm.registryChainId = 11155420;
+  profile.storage.payloadAccessControl = {
+    ...profile.storage.payloadAccessControl!,
+    encryption: 'lit',
+  };
   return profile;
 };
 
@@ -498,6 +503,40 @@ describe('useSessionWizardWorkerSecretsController', () => {
         preferDirectArweaveUpload: false,
         requireAdminAuthWithoutJwk: true,
         buildAdminAuth: expect.any(Function),
+      }),
+    );
+  });
+
+  it('keeps registry-canonical Arweave uploads off cached Worker transport', async () => {
+    const { result } = createControllerHarness({
+      draft: {
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+      },
+    });
+
+    await expect(
+      result.current.buildSessionWizardPublishArweaveUploadOptions({
+        arweaveJwk: '',
+        workerUrl: 'https://stale-worker.example.test',
+        sessionSlug: 'registry-session',
+      }),
+    ).rejects.toThrow('An Arweave JWK is required for registry-canonical metadata uploads.');
+    expect(mockedArweaveAdapter.resolveUploadOptions).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.buildSessionWizardPublishArweaveUploadOptions({
+        arweaveJwk: '{"kty":"RSA"}',
+        workerUrl: 'https://stale-worker.example.test',
+        sessionSlug: 'registry-session',
+      });
+    });
+
+    expect(mockedArweaveAdapter.resolveUploadOptions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        arweaveJwk: '{"kty":"RSA"}',
+        workerUrl: '',
+        preferDirectArweaveUpload: true,
+        requireAdminAuthWithoutJwk: false,
       }),
     );
   });

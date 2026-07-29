@@ -22,17 +22,39 @@ type DraftWithBlockLimits = {
 type UpdateDraftValueRef = MutableRefObject<null | ((path: string[], value: unknown) => void)>;
 
 export interface UseSessionWizardBlockLimitsOptions<TDraft extends DraftWithBlockLimits> {
+  enabled?: boolean;
   registryChainId: unknown;
   draftBlockLimitStart?: unknown;
   setDraft: Dispatch<SetStateAction<TDraft>>;
   updateDraftValueRef: UpdateDraftValueRef;
+  readLatestBlockNumber?: (args: { chainId: number; rpcUrl: string }) => Promise<number>;
 }
 
+const readLatestBlockNumberWithEthers = async ({
+  chainId,
+  rpcUrl,
+}: {
+  chainId: number;
+  rpcUrl: string;
+}): Promise<number> => {
+  // Static network avoids `detectNetwork()` overhead; rpcReadCache wraps `.send()` to dedupe/cache reads.
+  const providerRpc = new ethers.providers.JsonRpcProvider(rpcUrl, { chainId, name: `chain-${chainId}` });
+  wrapEthersJsonRpcSend(providerRpc, {
+    chainId,
+    providerKey: `sessionWizard:latestBlock:${chainId}`,
+    providerLabel: 'sessionWizard',
+    url: rpcUrl,
+  });
+  return providerRpc.getBlockNumber();
+};
+
 const useSessionWizardBlockLimits = <TDraft extends DraftWithBlockLimits>({
+  enabled = true,
   registryChainId,
   draftBlockLimitStart,
   setDraft,
   updateDraftValueRef,
+  readLatestBlockNumber = readLatestBlockNumberWithEthers,
 }: UseSessionWizardBlockLimitsOptions<TDraft>) => {
   const [latestChainBlock, setLatestChainBlock] = useState<number | null>(null);
   const [latestBlockStatus, setLatestBlockStatus] = useState('');
@@ -44,9 +66,14 @@ const useSessionWizardBlockLimits = <TDraft extends DraftWithBlockLimits>({
   useEffect(() => {
     blockStartManualRef.current = false;
     blockEndAutoRef.current = false;
-  }, [registryChainId]);
+  }, [enabled, registryChainId]);
 
   useEffect(() => {
+    if (!enabled) {
+      setLatestChainBlock(null);
+      setLatestBlockStatus('');
+      return;
+    }
     const chainId = Number(registryChainId || 0) || 0;
     if (!chainId) {
       setLatestChainBlock(null);
@@ -59,16 +86,7 @@ const useSessionWizardBlockLimits = <TDraft extends DraftWithBlockLimits>({
     }
     let alive = true;
     setLatestBlockStatus('Fetching latest block...');
-    // Static network avoids `detectNetwork()` overhead; rpcReadCache wraps `.send()` to dedupe/cache reads.
-    const providerRpc = new ethers.providers.JsonRpcProvider(rpcUrl, { chainId, name: `chain-${chainId}` });
-    wrapEthersJsonRpcSend(providerRpc, {
-      chainId,
-      providerKey: `sessionWizard:latestBlock:${chainId}`,
-      providerLabel: 'sessionWizard',
-      url: rpcUrl,
-    });
-    providerRpc
-      .getBlockNumber()
+    readLatestBlockNumber({ chainId, rpcUrl })
       .then((blockNumber) => {
         if (!alive) return;
         setLatestChainBlock(blockNumber);
@@ -82,9 +100,10 @@ const useSessionWizardBlockLimits = <TDraft extends DraftWithBlockLimits>({
     return () => {
       alive = false;
     };
-  }, [registryChainId]);
+  }, [enabled, readLatestBlockNumber, registryChainId]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (!latestChainBlock) return;
     if (blockStartManualRef.current) return;
     setDraft((prev) => {
@@ -98,9 +117,13 @@ const useSessionWizardBlockLimits = <TDraft extends DraftWithBlockLimits>({
       }
       return next as TDraft;
     });
-  }, [latestChainBlock, setDraft]);
+  }, [enabled, latestChainBlock, setDraft]);
 
   useEffect(() => {
+    if (!enabled) {
+      blockEndAutoRef.current = false;
+      return;
+    }
     const duration = Number(blockLimitDuration || 0);
     const unitMs = blockLimitUnit === 'days' ? 86400000 : blockLimitUnit === 'minutes' ? 60000 : 3600000;
     const startFromDraft = Number(draftBlockLimitStart);
@@ -126,6 +149,7 @@ const useSessionWizardBlockLimits = <TDraft extends DraftWithBlockLimits>({
   }, [
     blockLimitDuration,
     blockLimitUnit,
+    enabled,
     latestChainBlock,
     registryChainId,
     draftBlockLimitStart,

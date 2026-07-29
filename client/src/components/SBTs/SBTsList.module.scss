@@ -596,6 +596,73 @@ $filter-pill-active-border: rgba(0, 255, 157, 0.6);
   }
 }
 
+.workerRouteSessionHero {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(12px, 2.4vw, 20px);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 800px;
+  margin-bottom: 18px;
+  padding: clamp(14px, 2.4vw, 20px);
+  border: 1px solid rgba($clickable-color, 0.42);
+  border-radius: var(--ce-radius-12);
+  background:
+    radial-gradient(circle at 92% 8%, rgba($secondary-color, 0.24), transparent 42%),
+    linear-gradient(135deg, rgba($clickable-color, 0.14), rgba(10, 13, 30, 0.88));
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.28);
+}
+
+.workerRouteSessionEyebrow {
+  display: block;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.workerRouteSessionName {
+  min-width: 0;
+  margin: 0;
+  font-size: clamp(1.1rem, 3.2vw, 1.75rem);
+  line-height: 1.08;
+
+  a {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    max-width: 100%;
+    color: var(--ce-color-white);
+    text-decoration: none;
+    text-shadow: 0 4px 22px rgba(0, 0, 0, 0.42);
+
+    &:hover,
+    &:focus-visible {
+      color: $clickable-color;
+      outline: none;
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 6px;
+    }
+  }
+}
+
+.workerRouteSessionNameText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workerRouteSessionExternalIcon {
+  flex: 0 0 auto;
+  color: $clickable-color;
+  font-size: 0.72em;
+}
+
 /* Base styles for the standard full-page list layout */
 .standardBase {
   display: flex;

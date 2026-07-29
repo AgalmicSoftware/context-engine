@@ -172,7 +172,8 @@ Agent Village results post:
   median column. Participant metadata may remain in the source JSON, but this
   presentation intentionally has no separate participant footer. A companion
   `response-type-grid` may use the same presentation to align ranked bars and
-  freeform responses beneath the matrix.
+  freeform responses beneath the matrix. Precision freeform panels fill the
+  available matched-column height and scale response text responsively.
 
 Wrap related `ce-viz` blocks in a `ce-viz-group` fenced JSON block to render
 them as one disclosure. `"layout"` picks the body: `"carousel"` (default) is a

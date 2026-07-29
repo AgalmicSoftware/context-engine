@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - main
+      - 'release-staging*'
   pull_request:
     branches:
       - master
@@ -56,9 +57,21 @@ jobs:
           BASELINE_GROWTH_PR_NUMBER: ${{ github.event.pull_request.number }}
         run: node scripts/resolve-baseline-growth-approval.mjs
 
+      - name: Resolve baseline monotonicity base
+        id: baseline-monotonicity-base
+        env:
+          BASELINE_EVENT_NAME: ${{ github.event_name }}
+          BASELINE_REF_NAME: ${{ github.ref_name }}
+          BASELINE_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASELINE_PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          node scripts/resolve-baseline-monotonicity-base.mjs --github-output "$GITHUB_OUTPUT"
+
       - name: Check baseline monotonicity
         env:
-          BASELINE_MONOTONICITY_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          BASELINE_MONOTONICITY_BASE: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}
           BASELINE_MONOTONICITY_APPROVED: ${{ steps.baseline-growth-approval.outputs.approved }}
         run: |
           set -euo pipefail
@@ -78,6 +91,12 @@ jobs:
           node scripts/worker-release-artifacts.mjs stage
           --dist dist
           --output "${{ runner.temp }}/worker-bundle-candidate"
+
+      - name: Verify release-staging version advancement
+        if: ${{ startsWith(github.ref_name, 'release-staging') || startsWith(github.head_ref, 'release-staging') }}
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          node scripts/release-version.mjs verify-ref --candidate-ref HEAD --baseline-ref origin/main
 
       - name: Upload tested Worker bundle candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

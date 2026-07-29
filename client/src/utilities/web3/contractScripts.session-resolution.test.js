@@ -88,7 +88,7 @@ describe('contractScripts session resolution helpers', () => {
     expect(getDemoSessionConfigBySlug('DEBATE')).toBeNull();
   });
 
-  it('still allows explicit demo fallback for compatibility readers that opt in', () => {
+  it('allows explicit demo fallback while preserving the primary demo alias', () => {
     expect(getDemoSessionConfigBySlug(' GeNeRal!!! ', { allowDemoFallback: true })).toEqual(
       expect.objectContaining({
         slug: '',
@@ -97,8 +97,12 @@ describe('contractScripts session resolution helpers', () => {
     );
     expect(getDemoSessionConfigBySlug('demo', { allowDemoFallback: true })).toEqual(
       expect.objectContaining({
-        slug: '',
-        sessionName: 'Context Engine',
+        slug: 'demo-sh',
+        sessionName: 'Demo Session',
+        sessionModeProfile: expect.objectContaining({
+          authority: { mode: 'worker_canonical' },
+          evm: { registryChainId: null },
+        }),
       }),
     );
     expect(getDemoSessionConfigBySlug('DEBATE', { allowDemoFallback: true })).toBeNull();

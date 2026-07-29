@@ -136,6 +136,8 @@ broadcast/
 .codex-solc/
 .codex-tmp/
 /output/
+.results
+.supply-chain-risk-auditor/
 
 # Private content - present locally for dev, never committed
 /TODO/

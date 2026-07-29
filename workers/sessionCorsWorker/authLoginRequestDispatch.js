@@ -10,6 +10,7 @@ import {
   recordAbuseEvent as recordAbuseEventBoundary,
 } from './abuseObservability.js';
 import { readAuthorizationEpoch } from './authorizationScopeFreshness.js';
+import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 
 const recordAuthFailure = async ({ env, deps } = {}) => {
   try {
@@ -86,6 +87,16 @@ export const dispatchAuthLoginRequest = async ({
   if (authzEpoch === null) {
     return deps?.json?.({ error: 'Session authorization epoch is invalid.' }, 500, headers);
   }
+  const sessionId = resolveCanonicalWorkerSessionIdHex(config);
+  const workerCanonical = String(config?.sessionModeProfile?.authority?.mode || '').trim().toLowerCase() ===
+    'worker_canonical';
+  const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
+  if (workerCanonical && !sessionId) {
+    return deps?.json?.({ error: 'Worker session identity is invalid.' }, 500, headers);
+  }
+  if (workerCanonical && requestedSessionId !== sessionId) {
+    return deps?.json?.({ error: 'Session identity does not match worker session.' }, 409, headers);
+  }
   const buildJti = typeof deps?.buildAuthTokenJti === 'function'
     ? deps.buildAuthTokenJti
     : buildAuthTokenJti;
@@ -97,6 +108,7 @@ export const dispatchAuthLoginRequest = async ({
   const payload = {
     sub,
     slug: targetSlug,
+    ...(sessionId ? { sessionId } : {}),
     authzEpoch,
     scopes,
     exp,
@@ -125,5 +137,10 @@ export const dispatchAuthLoginRequest = async ({
     return deps?.json?.({ error: err?.message || 'Token persistence failed.' }, 500, headers);
   }
 
-  return deps?.json?.({ token, exp }, 200, headers);
+  return deps?.json?.({
+    token,
+    exp,
+    sessionSlug: targetSlug,
+    ...(sessionId ? { sessionId } : {}),
+  }, 200, headers);
 };

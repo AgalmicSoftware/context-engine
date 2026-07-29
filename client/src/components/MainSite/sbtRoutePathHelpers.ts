@@ -34,16 +34,23 @@ export const isSbtListRoutePath = (effectivePath: string): boolean => {
 
 export const getSbtListRouteSessionSlug = (
   effectivePath: string,
-  opts: { normalizeSessionSlug: SessionSlugNormalizer },
+  opts: { normalizeSessionSlug: SessionSlugNormalizer; search?: string },
 ): string => {
   const parts = splitCleanPath(effectivePath);
   const root = String(parts[0] || '')
     .trim()
     .toLowerCase();
+  if (root === 'group') {
+    const querySlug = new URLSearchParams(String(opts.search || '')).get('sessionName');
+    return querySlug == null ? '' : opts.normalizeSessionSlug(querySlug);
+  }
   if (root !== 'sbts' && root !== 'groups') return '';
   const slugOrMode = String(parts[1] || '').trim();
-  if (!slugOrMode || slugOrMode.toLowerCase() === 'new') return '';
-  return opts.normalizeSessionSlug(slugOrMode);
+  if (slugOrMode) {
+    return slugOrMode.toLowerCase() === 'new' ? '' : opts.normalizeSessionSlug(slugOrMode);
+  }
+  const querySlug = new URLSearchParams(String(opts.search || '')).get('sessionName');
+  return querySlug == null ? '' : opts.normalizeSessionSlug(querySlug);
 };
 
 export const getUserAddressFromPath = (path: string, opts: { isAddress: AddressValidator }): string | null => {

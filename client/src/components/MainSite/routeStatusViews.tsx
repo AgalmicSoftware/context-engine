@@ -65,15 +65,17 @@ export const NotFoundRoute = ({ path = '' }: { path?: string }) => (
   />
 );
 
-export const readHashQueryParam = (hashValue = '', key = ''): string => {
+export const removeHashQueryParam = (hashValue = '', key = ''): string => {
   const normalizedKey = String(key || '').trim();
-  if (!normalizedKey) return '';
   const rawHash = String(hashValue || '')
     .replace(/^#/, '')
     .trim();
-  if (!rawHash) return '';
+  if (!normalizedKey || !rawHash) return String(hashValue || '').trim();
+  if (!/[=&]/.test(rawHash)) return String(hashValue || '').trim();
   const params = new URLSearchParams(rawHash);
-  return String(params.get(normalizedKey) || '').trim();
+  params.delete(normalizedKey);
+  const nextHash = params.toString();
+  return nextHash ? `#${nextHash}` : '';
 };
 
 export const SESSION_LOADING_SKELETON_SECTION_LAYOUT = Object.freeze([

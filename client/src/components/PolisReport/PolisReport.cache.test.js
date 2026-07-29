@@ -395,6 +395,24 @@ describe('PolisReport cache read options', () => {
     expect(screen.queryByText('Base Sepolia (84532)')).not.toBeInTheDocument();
   });
 
+  it('omits the blockchain row when the validated session route supplies no chain context', async () => {
+    render(
+      <PolisReport
+        {...baseReportProps}
+        questionResponses={seededQuestionResponses}
+        network={{ id: null, chainId: null }}
+        networkChainId={null}
+        slug="demo-sh"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Summary and Statistics')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Blockchain:')).not.toBeInTheDocument();
+    expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
+  });
+
   it('keeps the participants graph guidance hidden until the tooltip is hovered', () => {
     render(<PolisReport {...baseReportProps} slug="demo" />);
 

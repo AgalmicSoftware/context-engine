@@ -44,6 +44,10 @@ describe('sessionWizardModeRequirements', () => {
     profile.preset = 'custom';
     profile.encryption = { mode: 'lit' };
     profile.evm.registryChainId = 11155420;
+    profile.storage.payloadAccessControl = {
+      ...profile.storage.payloadAccessControl!,
+      encryption: 'lit',
+    };
     const requirements = resolveSessionWizardModeRequirements(profile);
 
     expect(requirements.presetKeyChips).toEqual([
@@ -112,11 +116,17 @@ describe('sessionWizardModeRequirements', () => {
   });
 
   it('preserves decentralized Arweave, RPC, funding, registry, and optional Lit requirements', () => {
-    const plain = resolveSessionWizardModeRequirements(decentralizedProfile());
+    const decentralized = decentralizedProfile();
+    const plain = resolveSessionWizardModeRequirements(decentralized);
     const litProfile: SessionModeProfile = {
-      ...decentralizedProfile(),
+      ...decentralized,
       preset: 'custom',
       encryption: { mode: 'lit' },
+      results: {
+        ...decentralized.results,
+        visibility: 'participant_aggregate',
+      },
+      export: { scope: 'encrypted_envelopes_only' },
     };
     const lit = resolveSessionWizardModeRequirements(litProfile);
 
@@ -171,8 +181,30 @@ describe('sessionWizardModeRequirements', () => {
         requiredWorkerSecretFields: [],
         visibleWorkerResourceKeys: [],
         publishSettings: {
-          showArweaveMetadataControls: true,
-          showGasOverrideControls: true,
+          showArweaveMetadataControls: false,
+          showGasOverrideControls: false,
+        },
+      }),
+    );
+  });
+
+  it('fails closed when a malformed profile contains chain-shaped fields', () => {
+    const profile = cloudflareProfile();
+    profile.storage.backend = 'arweave';
+    profile.authorization.mechanisms.push('sbt_onchain');
+
+    expect(resolveSessionWizardModeRequirements(profile)).toEqual(
+      expect.objectContaining({
+        selected: false,
+        requiresArweave: false,
+        requiresRpc: false,
+        requiresFunding: false,
+        publish: {
+          deployPendingSbts: false,
+          persistWorkerConfig: false,
+          uploadMetadata: false,
+          registerSession: false,
+          refreshRegistryCache: false,
         },
       }),
     );

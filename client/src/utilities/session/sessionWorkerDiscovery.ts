@@ -1,5 +1,7 @@
 type UnknownRecord = Record<string, unknown>;
 
+import { classifySessionModeProfileSupport, type SessionModeProfile } from './sessionModeProfile';
+
 export type DiscoveryEnvironment = 'development' | 'production' | 'test' | string;
 
 type WorkerOriginOptions = {
@@ -35,17 +37,99 @@ const isRetryableBootstrapHttpStatus = (status: number): boolean =>
 export class WorkerSessionBootstrapRequestError extends Error {
   readonly retryable: boolean;
   readonly status: number | null;
+  readonly code: WorkerSessionBootstrapErrorCode;
 
   constructor(
     message: string,
-    { retryable = false, status = null }: { retryable?: boolean; status?: number | null } = {},
+    {
+      retryable = false,
+      status = null,
+      code = 'response',
+    }: { retryable?: boolean; status?: number | null; code?: WorkerSessionBootstrapErrorCode } = {},
   ) {
     super(message);
     this.name = 'WorkerSessionBootstrapRequestError';
     this.retryable = retryable;
     this.status = status;
+    this.code = code;
   }
 }
+
+export type WorkerSessionBootstrapErrorCode =
+  'cors' | 'identity_mismatch' | 'missing_config' | 'response' | 'unreachable';
+
+export type WorkerSessionBootstrapErrorDescriptor = {
+  kind: WorkerSessionBootstrapErrorCode | 'invalid_discovery';
+  title: string;
+  message: string;
+  canRetry: boolean;
+};
+
+export const describeWorkerSessionBootstrapError = (error: unknown): WorkerSessionBootstrapErrorDescriptor => {
+  if (error instanceof WorkerSessionBootstrapRequestError) {
+    if (error.code === 'cors') {
+      return {
+        kind: 'cors',
+        title: 'Browser origin not allowed',
+        message: 'The Session Worker is reachable, but its CORS policy rejected this browser origin.',
+        canRetry: true,
+      };
+    }
+    if (error.code === 'missing_config') {
+      return {
+        kind: 'missing_config',
+        title: 'Canonical Worker config missing',
+        message: 'The Worker responded, but it has no canonical config for this session slug yet.',
+        canRetry: true,
+      };
+    }
+    if (error.code === 'identity_mismatch') {
+      return {
+        kind: 'identity_mismatch',
+        title: 'Worker identity mismatch',
+        message: 'The returned canonical config does not match the requested session slug or pinned Worker identity.',
+        canRetry: false,
+      };
+    }
+    if (error.code === 'unreachable') {
+      return {
+        kind: 'unreachable',
+        title: 'Session Worker unreachable',
+        message: 'The browser could not reach the configured Session Worker.',
+        canRetry: true,
+      };
+    }
+    return {
+      kind: 'response',
+      title: 'Session Worker error',
+      message: error.message || 'The Session Worker returned an invalid response.',
+      canRetry: error.retryable,
+    };
+  }
+  const message = error instanceof Error ? error.message : '';
+  if (/slug does not match|worker origin|different canonical worker identity|identity change/i.test(message)) {
+    return {
+      kind: 'identity_mismatch',
+      title: 'Worker identity mismatch',
+      message: 'The returned canonical config does not match the requested session slug or pinned Worker identity.',
+      canRetry: false,
+    };
+  }
+  if (/discovery url|expected slug/i.test(message)) {
+    return {
+      kind: 'invalid_discovery',
+      title: 'Worker discovery record missing or invalid',
+      message: 'Restore a valid HTTPS Session Worker origin for this session.',
+      canRetry: false,
+    };
+  }
+  return {
+    kind: 'response',
+    title: 'Session Worker error',
+    message: message || 'Worker session bootstrap failed.',
+    canRetry: false,
+  };
+};
 
 export const isRetryableWorkerSessionBootstrapError = (error: unknown): boolean =>
   error instanceof TypeError || (error instanceof WorkerSessionBootstrapRequestError && error.retryable);
@@ -315,6 +399,25 @@ export const normalizeWorkerCanonicalSessionIdHex = (value: unknown): string => 
   return '';
 };
 
+export const resolveWorkerCanonicalSessionIdHex = (value: unknown): string => {
+  if (!isRecord(value)) return '';
+  const rawSessionId = Object.prototype.hasOwnProperty.call(value, 'sessionId') ? value.sessionId : undefined;
+  const rawSessionIdHex = Object.prototype.hasOwnProperty.call(value, 'sessionIdHex') ? value.sessionIdHex : undefined;
+  const hasSessionId = rawSessionId !== undefined && rawSessionId !== null && rawSessionId !== '';
+  const hasSessionIdHex = rawSessionIdHex !== undefined && rawSessionIdHex !== null && rawSessionIdHex !== '';
+  const sessionId = normalizeWorkerCanonicalSessionIdHex(rawSessionId);
+  const sessionIdHex = normalizeWorkerCanonicalSessionIdHex(rawSessionIdHex);
+  if (
+    (!sessionId && !sessionIdHex) ||
+    (hasSessionId && !sessionId) ||
+    (hasSessionIdHex && !sessionIdHex) ||
+    (sessionId && sessionIdHex && sessionId !== sessionIdHex)
+  ) {
+    return '';
+  }
+  return sessionId || sessionIdHex;
+};
+
 const comparableSessionId = (value: string): string => value.replace(/^0x/, '').replace(/-/g, '');
 
 const validateConfigSessionId = (config: UnknownRecord): string => {
@@ -363,10 +466,17 @@ export const validateWorkerCanonicalSessionBootstrap = (
     throw new Error('Worker bootstrap response slug does not match the requested session.');
   }
 
-  const profile = isRecord(payload.config.sessionModeProfile) ? payload.config.sessionModeProfile : null;
-  const authority = profile && isRecord(profile.authority) ? profile.authority : null;
-  if (authority?.mode !== 'worker_canonical') {
-    throw new Error('Worker bootstrap config is not worker-canonical.');
+  const profileSupport = classifySessionModeProfileSupport(payload.config.sessionModeProfile);
+  if (
+    profileSupport.status !== 'reachable' ||
+    (payload.config.sessionModeProfile as SessionModeProfile | undefined)?.authority?.mode !== 'worker_canonical'
+  ) {
+    const firstIssue = profileSupport.validation.issues[0];
+    throw new Error(
+      `Worker bootstrap config has an unsupported worker-canonical profile${
+        firstIssue ? ` at ${firstIssue.path || 'profile'} (${firstIssue.code})` : ''
+      }.`,
+    );
   }
 
   const forbiddenPath = findSecretLikeSessionWorkerBootstrapPath(payload, 'response');
@@ -407,23 +517,52 @@ export const fetchWorkerCanonicalSessionBootstrap = async ({
   const workerOrigin = parseSessionWorkerDiscoveryOrigin(workerQueryValue, { environment });
   const canonicalSlug = validateExactSlug(sessionSlug, 'Expected slug');
   const bootstrapUrl = buildSessionWorkerBootstrapUrl(workerOrigin, canonicalSlug, { environment });
-  const response = await fetchImpl(bootstrapUrl, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      'X-Session-Slug': canonicalSlug,
-    },
-    credentials: 'omit',
-    redirect: 'error',
-    cache: 'no-store',
-    mode: 'cors',
-    referrerPolicy: 'no-referrer',
-    signal,
-  });
+  let response: Response;
+  try {
+    response = await fetchImpl(bootstrapUrl, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        'X-Session-Slug': canonicalSlug,
+      },
+      credentials: 'omit',
+      redirect: 'error',
+      cache: 'no-store',
+      mode: 'cors',
+      referrerPolicy: 'no-referrer',
+      signal,
+    });
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error;
+    let reachableWithoutCors = false;
+    try {
+      await fetchImpl(new URL('/health', workerOrigin).toString(), {
+        method: 'GET',
+        credentials: 'omit',
+        cache: 'no-store',
+        mode: 'no-cors',
+        referrerPolicy: 'no-referrer',
+        signal,
+      });
+      reachableWithoutCors = true;
+    } catch {
+      reachableWithoutCors = false;
+    }
+    throw new WorkerSessionBootstrapRequestError(
+      reachableWithoutCors
+        ? 'Worker is reachable, but browser origin access was rejected.'
+        : 'Worker could not be reached.',
+      {
+        retryable: true,
+        code: reachableWithoutCors ? 'cors' : 'unreachable',
+      },
+    );
+  }
   if (!response.ok || response.redirected) {
     throw new WorkerSessionBootstrapRequestError(`Worker bootstrap request failed with status ${response.status}.`, {
       retryable: !response.redirected && isRetryableBootstrapHttpStatus(response.status),
       status: response.status,
+      code: response.status === 403 ? 'cors' : response.status === 404 ? 'missing_config' : 'response',
     });
   }
 
@@ -433,9 +572,16 @@ export const fetchWorkerCanonicalSessionBootstrap = async ({
   } catch {
     throw new Error('Worker bootstrap response was not valid JSON.');
   }
-  return validateWorkerCanonicalSessionBootstrap(payload, {
-    expectedSlug: canonicalSlug,
-    workerOrigin,
-    environment,
-  });
+  try {
+    return validateWorkerCanonicalSessionBootstrap(payload, {
+      expectedSlug: canonicalSlug,
+      workerOrigin,
+      environment,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Worker bootstrap validation failed.';
+    throw new WorkerSessionBootstrapRequestError(message, {
+      code: /slug does not match|worker origin/i.test(message) ? 'identity_mismatch' : 'response',
+    });
+  }
 };

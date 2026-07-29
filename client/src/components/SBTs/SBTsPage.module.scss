@@ -92,3 +92,14 @@
   font-size: 2em;
   color: var(--ce-color-white);
 }
+.advancedExternalNotice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 auto 12px;
+  max-width: 1200px;
+  padding: 12px 16px;
+  border: 1px solid var(--ce-color-accent, #7aa2ff);
+  border-radius: var(--ce-radius-8);
+  background: rgba(122, 162, 255, 0.12);
+}

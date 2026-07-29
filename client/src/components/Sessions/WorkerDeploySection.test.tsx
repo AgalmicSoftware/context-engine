@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import WorkerDeploySection, { type WorkerDeploySectionProps } from './WorkerDeploySection';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
@@ -95,6 +95,177 @@ describe('WorkerDeploySection', () => {
     expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY)).not.toBeInTheDocument();
   });
 
+  it('does not report success until Worker reachability, CORS, and canonical config readback verify', async () => {
+    const onNativeWorkerVerified = jest.fn();
+    const verifyNativeWorker = jest.fn().mockResolvedValue({
+      config: { slug: 'demo-sh' },
+      configRevision: 'revision-7',
+      sessionId: '0x11111111111111111111111111111111',
+      sessionSlug: 'demo-sh',
+      workerOrigin: 'https://demo-sh.example.workers.dev',
+    });
+    renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://demo-sh.example.workers.dev',
+      verifyNativeWorker,
+      onNativeWorkerVerified,
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-checklist')).toHaveTextContent(
+      /Return here and paste the resulting workers\.dev URL/i,
+    );
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).not.toHaveTextContent(/verified at revision/i);
+
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+
+    await waitFor(() =>
+      expect(onNativeWorkerVerified).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configRevision: 'revision-7',
+          workerOrigin: 'https://demo-sh.example.workers.dev',
+        }),
+      ),
+    );
+    expect(verifyNativeWorker).toHaveBeenCalledWith({
+      sessionSlug: 'demo-sh',
+      workerQueryValue: 'https://demo-sh.example.workers.dev',
+    });
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
+      /verified at revision revision-7/i,
+    );
+  });
+
+  it('invalidates native verification when the exact Worker session identity changes', async () => {
+    let resolveVerification:
+      | ((value: {
+          config: { slug: string };
+          configRevision: string;
+          sessionId: string;
+          sessionSlug: string;
+          workerOrigin: string;
+        }) => void)
+      | undefined;
+    const verifyNativeWorker = jest.fn(
+      () =>
+        new Promise<{
+          config: { slug: string };
+          configRevision: string;
+          sessionId: string;
+          sessionSlug: string;
+          workerOrigin: string;
+        }>((resolve) => {
+          resolveVerification = resolve;
+        }),
+    );
+    const onNativeWorkerVerified = jest.fn();
+    const { rerender } = renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'session-a',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://session-a.example.workers.dev',
+      verifyNativeWorker,
+      onNativeWorkerVerified,
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+    rerenderWorkerDeploySection(rerender, {
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'session-b',
+      account: '0x0000000000000000000000000000000000000002',
+      displayedWorkerUrl: 'https://session-b.example.workers.dev',
+      verifyNativeWorker,
+      onNativeWorkerVerified,
+    });
+
+    expect(screen.queryByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC)).not.toBeInTheDocument();
+    await act(async () => {
+      resolveVerification?.({
+        config: { slug: 'session-a' },
+        configRevision: 'revision-a',
+        sessionId: '0x11111111111111111111111111111111',
+        sessionSlug: 'session-a',
+        workerOrigin: 'https://session-a.example.workers.dev',
+      });
+      await Promise.resolve();
+    });
+
+    expect(onNativeWorkerVerified).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('ce-wizard-cloudflare-native-status')).not.toBeInTheDocument();
+  });
+
+  it('invalidates a completed native verification when the Worker URL changes', async () => {
+    const verifyNativeWorker = jest.fn().mockResolvedValue({
+      config: { slug: 'demo-sh' },
+      configRevision: 'revision-7',
+      sessionId: '0x11111111111111111111111111111111',
+      sessionSlug: 'demo-sh',
+      workerOrigin: 'https://demo-sh.example.workers.dev',
+    });
+    const { rerender } = renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://demo-sh.example.workers.dev',
+      verifyNativeWorker,
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+    expect(await screen.findByText('Session Worker verified')).toBeInTheDocument();
+
+    rerenderWorkerDeploySection(rerender, {
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://other.example.workers.dev',
+      verifyNativeWorker,
+    });
+
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-verify')).toHaveTextContent('Verify Session Worker');
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
+      /Worker URL changed.*Verify this exact Worker identity/i,
+    );
+  });
+
+  it('fails closed when the signed session verification callback is unavailable', () => {
+    renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://demo-sh.example.workers.dev',
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
+      /Session verification is unavailable/i,
+    );
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-status')).not.toHaveTextContent(/verified at revision/i);
+  });
+
+  it('keeps reachability or CORS failures actionable and retryable', async () => {
+    renderWorkerDeploySection({
+      cloudflareNativeDeployUrl: 'https://deploy.workers.cloudflare.com/?url=immutable',
+      cloudflareTokenSlug: 'demo-sh',
+      account: '0x0000000000000000000000000000000000000001',
+      displayedWorkerUrl: 'https://demo-sh.example.workers.dev',
+      verifyNativeWorker: jest.fn().mockRejectedValue(new TypeError('Failed to fetch')),
+    });
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE));
+    fireEvent.click(screen.getByTestId('ce-wizard-cloudflare-native-verify'));
+
+    expect(await screen.findByTestId('ce-wizard-cloudflare-native-status')).toHaveTextContent(
+      /could not be reached, or its CORS policy rejected this browser origin/i,
+    );
+    expect(screen.getByTestId('ce-wizard-cloudflare-native-verify')).toHaveTextContent('Verify Session Worker');
+  });
+
   it('shows the sponsored auto-deploy note without manual controls in normal mode', () => {
     renderWorkerDeploySection({
       isNormalMode: true,
@@ -145,8 +316,12 @@ describe('WorkerDeploySection', () => {
       { key: 'workers_scripts', type: 'edit' },
       { key: 'workers_kv_storage', type: 'edit' },
     ]);
-    expect(screen.getByText(/Cloudflare may preselect All accounts/i)).toBeInTheDocument();
-    expect(screen.getByText(/only when the token can see exactly one account/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Cloudflare may preselect All accounts/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/only when the token can see exactly one account/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cloudflare API token setup and security guide' })).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
+    );
 
     fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_DEPLOY_WORKER));
     expect(handleDeployWorker).toHaveBeenCalledTimes(1);
@@ -167,7 +342,7 @@ describe('WorkerDeploySection', () => {
       String(screen.getByRole('link', { name: 'Create prefilled API token' }).getAttribute('href')),
     );
     expect(tokenUrl.searchParams.get('accountId')).toBe('*');
-    expect(screen.getByText(/Cloudflare may preselect All accounts/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Cloudflare may preselect All accounts/i)).not.toBeInTheDocument();
   });
 
   it('describes the least-privilege default Cloudflare token scopes', () => {
@@ -183,23 +358,18 @@ describe('WorkerDeploySection', () => {
     );
   });
 
-  it('discloses the raw-token receiver, shortest lifetime, and revocation step', () => {
+  it('links to token handling documentation instead of repeating operational guidance', () => {
     renderWorkerDeploySection({
       deployHelperUrl: 'https://deploy-helper.example.test',
     });
 
-    expect(screen.getByText('https://deploy-helper.example.test')).toBeInTheDocument();
-    expect(
-      screen.getByText(/browser sends this token only for this deployment attempt to the deploy helper/i),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/not saved to the session draft or browser storage/i)).toBeInTheDocument();
-    expect(screen.getByText(/earliest expiration Cloudflare permits/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/revoke the token as soon as deployment succeeds or you abandon the attempt/i),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Cloudflare API Tokens' })).toHaveAttribute(
+    expect(screen.queryByText(/browser sends this token only for this deployment attempt/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not saved to the session draft or browser storage/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/earliest expiration Cloudflare permits/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/revoke the token as soon as deployment succeeds/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Cloudflare API token setup and security guide' })).toHaveAttribute(
       'href',
-      'https://dash.cloudflare.com/profile/api-tokens',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
     );
   });
 

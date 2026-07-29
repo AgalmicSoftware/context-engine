@@ -38,16 +38,16 @@ Network keys inside cache values are strings such as `"84532"`.
           "network": "Base Sepolia",
           "sessionSlug": "edge",
           "sessionName": "Edge 2025",
-          "groupName": "Edge 2025"
+          "groupName": "Edge 2025",
         },
         "mintedAddresses": [
           "0xabc0000000000000000000000000000000000abc",
-          "0xdef0000000000000000000000000000000000def"
+          "0xdef0000000000000000000000000000000000def",
         ],
         "burnedAddresses": [],
         "mintedCountByAddress": {
           "0xabc0000000000000000000000000000000000abc": 1,
-          "0xdef0000000000000000000000000000000000def": 1
+          "0xdef0000000000000000000000000000000000def": 1,
         },
         "burnedCountByAddress": {},
         "mintedEventCount": 2,
@@ -57,7 +57,7 @@ Network keys inside cache values are strings such as `"84532"`.
           "totalBurned": "0",
           "activeSupply": "2",
           "currentHolderCount": "2",
-          "historicalHolderCount": "2"
+          "historicalHolderCount": "2",
         },
         "countsScanCheckpoint": {
           "phase": "activity",
@@ -66,15 +66,15 @@ Network keys inside cache values are strings such as `"84532"`.
           "scanToBlock": 32562007,
           "mintedCountByAddress": {
             "0xabc0000000000000000000000000000000000abc": 1,
-            "0xdef0000000000000000000000000000000000def": 1
+            "0xdef0000000000000000000000000000000000def": 1,
           },
           "burnedCountByAddress": {},
           "mintedEventCount": 2,
-          "burnedEventCount": 0
-        }
-      }
-    }
-  }
+          "burnedEventCount": 0,
+        },
+      },
+    },
+  },
 }
 ```
 
@@ -161,20 +161,20 @@ dg:sbtCache:test-10
 SBT password/invite recovery is intentionally separate from the managed SBT
 metadata cache above:
 
-- New codes are export-only by default and are not written to browser storage.
-- Explicit opt-in recovery writes `ce:sbtPasswordRecovery:v2` to localStorage.
-  Entries contain AES-GCM ciphertext scoped by chain ID and SBT address; the
-  non-extractable AES key is stored in IndexedDB database
-  `ce-sbt-password-recovery-keys`.
-- The authenticated encryption context binds the envelope version, record key,
-  chain, address, timestamps, cipher, and key reference. Tampered or missing-key
-  records fail closed.
-- Recovery does not sync across devices and does not protect against a browser
-  profile compromise. Export remains the primary recovery path.
-- Legacy `ce:sbtPasswordRecovery:v1` plaintext entries remain read-only
-  compatible until the user clears local recovery for that group.
-- If WebCrypto or IndexedDB is unavailable, the UI falls back to export-only
-  behavior without writing plaintext.
+- Export/download is the only durable recovery path.
+- Optional recovery keeps codes in module memory for the current mounted tab.
+  Reloading, closing, or leaving the authoring surface clears them.
+- Codes are never written to localStorage, sessionStorage, IndexedDB, URLs, or
+  copied claim links.
+- On load, compatibility cleanup removes the retired
+  `ce:sbtPasswordRecovery:v1` and `ce:sbtPasswordRecovery:v2` storage entries
+  and requests deletion of the old `ce-sbt-password-recovery-keys` IndexedDB
+  database. Retired values are not imported into memory.
+
+Pending CREATE2 SBT drafts follow the same rule because they contain claim and
+deployment secrets. The wizard holds them only in mounted tab memory and purges
+the retired `ce:sessionWizardPendingSbtDrafts:v1` entry. A reload requires the
+user to recreate the pending SBT draft.
 
 ## LocalStorage-only readiness flags
 

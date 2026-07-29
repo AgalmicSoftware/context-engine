@@ -44,16 +44,18 @@ type SessionWizardConfigSyncStatus = Record<string, unknown> & {
 export const resolveDeployWorkerState = ({
   responseWorkerUrl,
   configuredWorkerUrl,
+  publicConfigVerified = false,
 }: {
   responseWorkerUrl?: unknown;
   configuredWorkerUrl?: unknown;
+  publicConfigVerified?: boolean;
 } = {}) => {
   const resolvedDeployWorkerUrl = normalizeWorkerAuthUrl(toStr(responseWorkerUrl).trim());
   const displayWorkerUrl = resolvedDeployWorkerUrl || normalizeWorkerAuthUrl(toStr(configuredWorkerUrl).trim());
   return {
     resolvedDeployWorkerUrl,
     displayWorkerUrl,
-    deployComplete: !!resolvedDeployWorkerUrl,
+    deployComplete: !!resolvedDeployWorkerUrl && publicConfigVerified,
   };
 };
 

@@ -41,6 +41,8 @@ export const assignLoginAndSettingsModalLegacyStatics = (
     tooltipsEnabled: PropTypes.bool,
     changeActiveSessionSlug: PropTypes.func,
     updateGlobalSessionSelection: PropTypes.func,
+    sessionConfig: PropTypes.object,
+    sessionSlug: PropTypes.string,
   };
 
   LoginAndSettingsModal.defaultProps = {

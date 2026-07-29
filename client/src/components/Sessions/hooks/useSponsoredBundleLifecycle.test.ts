@@ -37,10 +37,6 @@ jest.mock('../../../utilities/urlUtils.js', () => ({
   normalizeBaseUrl: jest.fn((value) => (value ? `normalized:${value}` : '')),
 }));
 
-jest.mock('../sessionWizardRouteState', () => ({
-  scrubSponsoredBundleHashSecret: jest.fn(),
-}));
-
 jest.mock('../sessionWizardGateUtils', () => ({
   buildEmptyProvisionedSponsoredContext: jest.fn(() => ({
     sessionSlug: '',
@@ -71,20 +67,40 @@ jest.mock('../sessionWizardWorkerSecretSupport', () => ({
   sanitizeSessionWizardSponsoredFieldSnapshotForLitMode: jest.fn((value = {}) => value || {}),
 }));
 
-const mockIsSponsoredBundleExpired = isSponsoredBundleExpired as jest.Mock;
-const mockNormalizeSparseSponsoredBundlePayload = normalizeSparseSponsoredBundlePayload as jest.Mock;
-const mockReadSponsoredBundleFromArweave = readSponsoredBundleFromArweave as jest.Mock;
-const mockClearSponsoredBootstrapFundingContext = clearSponsoredBootstrapFundingContext as jest.Mock;
-const mockNormalizeSponsoredBootstrapFundingContext = normalizeSponsoredBootstrapFundingContext as jest.Mock;
-const mockNormalizeBaseUrl = normalizeBaseUrl as jest.Mock;
-const mockBuildEmptyProvisionedSponsoredContext = buildEmptyProvisionedSponsoredContext as jest.Mock;
-const mockReadSessionWizardSponsoredBundleCache = readSessionWizardSponsoredBundleCache as jest.Mock;
-const mockBuildSponsoredBundleAppliedStatusMessage = buildSponsoredBundleAppliedStatusMessage as jest.Mock;
-const mockMergeSponsoredBundleDeployForm = mergeSponsoredBundleDeployForm as jest.Mock;
-const mockMergeSponsoredBundleWorkerSecrets = mergeSponsoredBundleWorkerSecrets as jest.Mock;
-const mockNormalizeWorkerSecrets = normalizeWorkerSecrets as jest.Mock;
+const mockIsSponsoredBundleExpired = isSponsoredBundleExpired as jest.MockedFunction<typeof isSponsoredBundleExpired>;
+const mockNormalizeSparseSponsoredBundlePayload = normalizeSparseSponsoredBundlePayload as jest.MockedFunction<
+  typeof normalizeSparseSponsoredBundlePayload
+>;
+const mockReadSponsoredBundleFromArweave = readSponsoredBundleFromArweave as jest.MockedFunction<
+  typeof readSponsoredBundleFromArweave
+>;
+const mockClearSponsoredBootstrapFundingContext = clearSponsoredBootstrapFundingContext as jest.MockedFunction<
+  typeof clearSponsoredBootstrapFundingContext
+>;
+const mockNormalizeSponsoredBootstrapFundingContext = normalizeSponsoredBootstrapFundingContext as jest.MockedFunction<
+  typeof normalizeSponsoredBootstrapFundingContext
+>;
+const mockNormalizeBaseUrl = normalizeBaseUrl as jest.MockedFunction<typeof normalizeBaseUrl>;
+const mockBuildEmptyProvisionedSponsoredContext = buildEmptyProvisionedSponsoredContext as jest.MockedFunction<
+  typeof buildEmptyProvisionedSponsoredContext
+>;
+const mockReadSessionWizardSponsoredBundleCache = readSessionWizardSponsoredBundleCache as jest.MockedFunction<
+  typeof readSessionWizardSponsoredBundleCache
+>;
+const mockBuildSponsoredBundleAppliedStatusMessage = buildSponsoredBundleAppliedStatusMessage as jest.MockedFunction<
+  typeof buildSponsoredBundleAppliedStatusMessage
+>;
+const mockMergeSponsoredBundleDeployForm = mergeSponsoredBundleDeployForm as jest.MockedFunction<
+  typeof mergeSponsoredBundleDeployForm
+>;
+const mockMergeSponsoredBundleWorkerSecrets = mergeSponsoredBundleWorkerSecrets as jest.MockedFunction<
+  typeof mergeSponsoredBundleWorkerSecrets
+>;
+const mockNormalizeWorkerSecrets = normalizeWorkerSecrets as jest.MockedFunction<typeof normalizeWorkerSecrets>;
 const mockSanitizeSessionWizardSponsoredFieldSnapshotForLitMode =
-  sanitizeSessionWizardSponsoredFieldSnapshotForLitMode as jest.Mock;
+  sanitizeSessionWizardSponsoredFieldSnapshotForLitMode as jest.MockedFunction<
+    typeof sanitizeSessionWizardSponsoredFieldSnapshotForLitMode
+  >;
 
 const buildEmptyContext = () => ({
   sessionSlug: '',
@@ -213,8 +229,12 @@ describe('useSponsoredBundleLifecycle', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsSponsoredBundleExpired.mockReturnValue(false);
-    mockNormalizeSparseSponsoredBundlePayload.mockImplementation((value) => value);
-    mockNormalizeSponsoredBootstrapFundingContext.mockImplementation((value) => value);
+    mockNormalizeSparseSponsoredBundlePayload.mockImplementation(
+      (value) => value as ReturnType<typeof normalizeSparseSponsoredBundlePayload>,
+    );
+    mockNormalizeSponsoredBootstrapFundingContext.mockImplementation(
+      (value) => value as ReturnType<typeof normalizeSponsoredBootstrapFundingContext>,
+    );
     mockNormalizeBaseUrl.mockImplementation((value) => (value ? `normalized:${value}` : ''));
     mockBuildEmptyProvisionedSponsoredContext.mockImplementation(buildEmptyContext);
     mockReadSessionWizardSponsoredBundleCache.mockResolvedValue(null);
@@ -228,7 +248,9 @@ describe('useSponsoredBundleLifecycle', () => {
       sponsoredBundleApplied: bundle?.id || '',
     }));
     mockNormalizeWorkerSecrets.mockImplementation((value = {}) => ({ ...value }));
-    mockSanitizeSessionWizardSponsoredFieldSnapshotForLitMode.mockImplementation((value = {}) => value || {});
+    mockSanitizeSessionWizardSponsoredFieldSnapshotForLitMode.mockImplementation(
+      (value = {}) => (value || {}) as ReturnType<typeof sanitizeSessionWizardSponsoredFieldSnapshotForLitMode>,
+    );
   });
 
   afterEach(() => {
@@ -318,6 +340,58 @@ describe('useSponsoredBundleLifecycle', () => {
     });
 
     expect(result.current.sponsoredBundleRetryNonce).toBe(1);
+  });
+
+  it('waits for an explicitly entered key before downloading and decrypting an uncached bundle', async () => {
+    const sponsoredBundle = buildSponsoredBundle();
+    mockReadSponsoredBundleFromArweave.mockResolvedValueOnce({
+      txId: sponsoredBundle.id,
+      envelope: {},
+      bundle: sponsoredBundle,
+    });
+    const { result } = renderHook(() =>
+      useSponsoredBundleLifecycle({
+        initialSponsoredBundleId: sponsoredBundle.id,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.sponsoredBundleStatus).toEqual({
+        tone: 'info',
+        message: 'Enter the sponsored bundle decryption key to continue.',
+        retryable: false,
+        requiresKey: true,
+      });
+    });
+    expect(mockReadSponsoredBundleFromArweave).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.setSponsoredBundleKeyInput('bundle-secret');
+    });
+    act(() => {
+      result.current.submitSponsoredBundleKey();
+    });
+
+    await waitFor(() => {
+      expect(mockReadSponsoredBundleFromArweave).toHaveBeenCalledWith({
+        txId: sponsoredBundle.id,
+        secret: 'bundle-secret',
+        arweaveOpts: {
+          debugContext: {
+            caller: 'SessionWizard.sponsoredBundle',
+            source: 'session_wizard',
+          },
+        },
+      });
+    });
+    await waitFor(() => {
+      expect(result.current.sponsoredBundleStatus).toEqual({
+        tone: 'success',
+        message: 'Applied sponsored bundle.',
+        retryable: false,
+      });
+    });
+    expect(result.current.sponsoredBundleKeyInput).toBe('');
   });
 
   it('handles non-object sponsored bundle load failures without crashing and keeps the status retryable', async () => {

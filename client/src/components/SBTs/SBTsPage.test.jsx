@@ -1,17 +1,41 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { SBTsPage } from './SBTsPage';
 import { peekCacheSync } from '../../utilities/cache/cacheScripts.js';
 import { getDemoSessionConfigBySlug, getSessionLists } from '../../utilities/web3/chainGateway.js';
 import { getShortenedAddress } from '../../utilities/ui/displayHelpers.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const mockSBTPage = jest.fn();
+const mockSBTsList = jest.fn();
+const mockCreateGroup = jest.fn();
+const mockWorkerGroupCreate = jest.fn();
 const mockIsCryptoMode = jest.fn(() => true);
 
-jest.mock('./SBTsList', () => () => null);
-jest.mock('./CreateSBTGroup', () => () => <div data-testid="create-group-panel">Create Group Panel</div>);
+jest.mock('./SBTsList', () => (props) => {
+  mockSBTsList(props);
+  return null;
+});
+jest.mock('./CreateSBTGroup', () => (props) => {
+  mockCreateGroup(props);
+  return (
+    <div data-testid="create-group-panel" data-network-name={props.network?.name || ''}>
+      Create Group Panel
+    </div>
+  );
+});
+jest.mock('../OnePageSession/WorkerSessionGroupsPanel', () => (props) => {
+  mockWorkerGroupCreate(props);
+  return (
+    <div data-testid="worker-group-create-panel">
+      <span>Active session</span>
+      <span>{props.sessionName}</span>
+      <span>/{props.sessionSlug}</span>
+    </div>
+  );
+});
 jest.mock('./SBTPage', () => {
   const React = require('react');
   return {
@@ -211,6 +235,272 @@ describe('SBTsPage auto-feature flag', () => {
     );
     expect(replaceStateSpy).toHaveBeenCalledWith(null, '', '/ce/groups/rxc');
     replaceStateSpy.mockRestore();
+  });
+
+  it('uses an explicitly supplied Worker session for session-scoped group creation', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const workerSessionConfig = {
+      slug: 'demo-sh',
+      groupCreationPolicy: 'participants',
+      networkChainId: 11155420,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === '' ? { slug: '' } : null,
+    );
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    getDemoSessionConfigBySlug.mockReturnValue(null);
+    window.history.replaceState({}, '', '/groups/new');
+
+    render(
+      <SBTsPage
+        sessionSlug="demo-sh"
+        sessionConfig={workerSessionConfig}
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        provider="wagmi"
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('Active session');
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('/demo-sh');
+    expect(screen.queryByText(/on-chain|contract address|gas|RPC/i)).not.toBeInTheDocument();
+    expect(mockWorkerGroupCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        createOnly: true,
+        sessionConfig: workerSessionConfig,
+        sessionSlug: 'demo-sh',
+        showCreate: true,
+      }),
+    );
+    expect(mockCreateGroup).not.toHaveBeenCalled();
+    expect(contractScripts.getSessionConfigBySlug).not.toHaveBeenCalledWith('demo-sh');
+    expect(getDemoSessionConfigBySlug).not.toHaveBeenCalledWith('demo-sh', { allowDemoFallback: true });
+  });
+
+  it('normalizes a legacy hash-scoped Worker detail route before asynchronous session discovery completes', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const workerSessionConfig = {
+      slug: 'demo-sh',
+      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+      sessionName: 'Demo Session',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    contractScripts.getSessionConfigBySlug.mockReturnValue(null);
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    getDemoSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === 'demo-sh' ? workerSessionConfig : null,
+    );
+    window.history.replaceState({}, '', '/groups?sessionName=demo-sh#group-public-reviewers');
+
+    render(
+      <SBTsPage
+        provider="wagmi"
+        network={null}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={false}
+        sessionSlug="demo-sh"
+        sessionConfig={null}
+      />,
+    );
+
+    expect(mockSBTsList).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe('/group/public-reviewers');
+    expect(window.location.search).toBe('?sessionName=demo-sh');
+    expect(window.location.hash).toBe('');
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        networkChainId: null,
+        selectedGroupId: 'public-reviewers',
+        sessionConfig: workerSessionConfig,
+        sessionName: 'Demo Session',
+        sessionSlug: 'demo-sh',
+        showCreate: false,
+      }),
+    );
+  });
+
+  it('renders the canonical Worker detail route from its path group id and session query', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const workerSessionConfig = {
+      slug: 'demo-sh',
+      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+      sessionName: 'Demo Session',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    contractScripts.getSessionConfigBySlug.mockReturnValue(null);
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    getDemoSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === 'demo-sh' ? workerSessionConfig : null,
+    );
+    window.history.replaceState({}, '', '/group/public-reviewers?sessionName=demo-sh');
+
+    render(
+      <SBTsPage
+        provider="wagmi"
+        network={null}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={false}
+        sessionSlug="demo-sh"
+        sessionConfig={null}
+        workerGroupId="public-reviewers"
+      />,
+    );
+
+    expect(window.location.pathname).toBe('/group/public-reviewers');
+    expect(window.location.search).toBe('?sessionName=demo-sh');
+    expect(window.location.hash).toBe('');
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        selectedGroupId: 'public-reviewers',
+        sessionConfig: workerSessionConfig,
+        sessionName: 'Demo Session',
+        sessionSlug: 'demo-sh',
+        showCreate: false,
+      }),
+    );
+  });
+
+  it('fails closed instead of re-resolving a mismatched explicit standalone session config', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const workerSessionConfig = {
+      slug: 'other-session',
+      networkChainId: 11155420,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === 'demo-sh'
+        ? {
+            slug: 'demo-sh',
+            networkChainId: 84532,
+            __registry: {
+              sessionIdHex: '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+            },
+          }
+        : String(slug || '') === ''
+          ? { slug: '' }
+          : null,
+    );
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    window.history.replaceState({}, '', '/sbts/new');
+
+    render(
+      <SBTsPage
+        sessionSlug="demo-sh"
+        sessionConfig={workerSessionConfig}
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        provider="wagmi"
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/session context could not be verified/i);
+    expect(mockCreateGroup).not.toHaveBeenCalled();
+    expect(contractScripts.getSessionConfigBySlug).not.toHaveBeenCalledWith('demo-sh');
+  });
+
+  it.each([
+    ['missing', { slug: 'broken-session', networkChainId: 84532 }],
+    ['invalid', { slug: 'broken-session', sessionModeProfile: { authority: { mode: 'worker_canonical' } } }],
+  ])('fails closed for an explicit concrete %s-profile standalone context', (_label, sessionConfig) => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === '' ? { slug: '' } : null,
+    );
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    window.history.replaceState({}, '', '/sbts/new');
+
+    render(
+      <SBTsPage
+        sessionSlug="broken-session"
+        sessionConfig={sessionConfig}
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        provider="wagmi"
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/session context could not be verified/i);
+    expect(mockCreateGroup).not.toHaveBeenCalled();
+    expect(contractScripts.getSessionConfigBySlug).not.toHaveBeenCalledWith('broken-session');
+  });
+
+  it('keeps the unscoped global standalone SBT tool available without a session profile', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === '' ? { slug: '' } : null,
+    );
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    window.history.replaceState({}, '', '/sbts/new');
+
+    render(
+      <SBTsPage
+        sessionConfig={{}}
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        provider="wagmi"
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(mockCreateGroup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        network: expect.objectContaining({ id: 84532 }),
+        sessionSlug: '',
+      }),
+    );
+  });
+
+  it('accepts an explicitly supplied legacy registry config for standalone authoring', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const registrySessionConfig = {
+      slug: 'legacy-session',
+      networkChainId: 84532,
+      __registry: {
+        sessionIdHex: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      },
+    };
+    contractScripts.getSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === '' ? { slug: '' } : null,
+    );
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    window.history.replaceState({}, '', '/sbts/new');
+
+    render(
+      <SBTsPage
+        sessionSlug="legacy-session"
+        sessionConfig={registrySessionConfig}
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        provider="wagmi"
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+      />,
+    );
+
+    expect(mockCreateGroup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preferConnectedNetworkForAuthoring: false,
+        sessionConfigOverride: registrySessionConfig,
+        sessionSlug: 'legacy-session',
+      }),
+    );
   });
 
   it('auto-features SBTs whose metadata sessionSlug matches the active session', () => {
@@ -736,6 +1026,11 @@ describe('SBTsPage auto-feature flag', () => {
   });
 
   it('supports externally controlled embedded create state while hiding the mini action row', () => {
+    const workerSessionConfig = {
+      slug: 'alpha',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
     render(
       <SBTsPage
         sbtCacheRevision={0}
@@ -747,6 +1042,7 @@ describe('SBTsPage auto-feature flag', () => {
         isSBTCacheReady={true}
         defaultFeaturedSBTs={[]}
         sessionSlug="alpha"
+        sessionConfig={workerSessionConfig}
         sessionName="Alpha"
         sessionInfo="Alpha session"
         hideMiniActionRow={true}
@@ -756,6 +1052,168 @@ describe('SBTsPage auto-feature flag', () => {
 
     expect(screen.queryByRole('button', { name: /^View All$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^Create$/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('Alpha');
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('/alpha');
+    expect(screen.queryByText(/on-chain|contract address|gas|RPC/i)).not.toBeInTheDocument();
+  });
+
+  it('routes an unregistered Worker /groups/:slug list directly to the active Worker session', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    contractScripts.getSessionConfigBySlug.mockReturnValue(null);
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    const workerSessionConfig = {
+      slug: 'unregistered-worker',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    window.history.replaceState({}, '', '/groups/unregistered-worker');
+
+    render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        loginComplete={true}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={true}
+        defaultFeaturedSBTs={[]}
+        sessionSlug="unregistered-worker"
+        sessionConfig={workerSessionConfig}
+      />,
+    );
+
+    expect(mockSBTsList).not.toHaveBeenCalled();
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        sessionConfig: workerSessionConfig,
+        sessionSlug: 'unregistered-worker',
+        showCreate: false,
+      }),
+    );
+    fireEvent.click(screen.getByTestId('ce-sbts-create-toggle'));
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('/unregistered-worker');
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        sessionConfig: workerSessionConfig,
+        sessionSlug: 'unregistered-worker',
+        showCreate: true,
+      }),
+    );
+  });
+
+  it('prefers an exact Worker route config over a same-slug registry config', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const workerSessionConfig = {
+      slug: 'shared-slug',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    const registrySessionConfig = {
+      slug: 'shared-slug',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+    };
+    contractScripts.getSessionConfigBySlug.mockReturnValue(registrySessionConfig);
+    window.history.replaceState({}, '', '/groups/shared-slug');
+
+    render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 84532, name: 'Base Sepolia' }}
+        account=""
+        loginComplete={true}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={true}
+        defaultFeaturedSBTs={[]}
+        sessionSlug="shared-slug"
+        sessionConfig={workerSessionConfig}
+      />,
+    );
+
+    expect(mockSBTsList).not.toHaveBeenCalled();
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        sessionConfig: workerSessionConfig,
+        sessionSlug: 'shared-slug',
+        showCreate: false,
+      }),
+    );
+    fireEvent.click(screen.getByTestId('ce-sbts-create-toggle'));
+    expect(screen.getByTestId('worker-group-create-panel')).toHaveTextContent('/shared-slug');
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        sessionConfig: workerSessionConfig,
+        sessionSlug: 'shared-slug',
+        showCreate: true,
+      }),
+    );
+  });
+
+  it('enforces the selected registry-session creation policy in Context Engine routes', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const adminAddress = '0x00000000000000000000000000000000000000aa';
+    const participantAddress = '0x00000000000000000000000000000000000000bb';
+    const registryConfig = {
+      slug: 'restricted',
+      groupCreationPolicy: 'admin_only',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+      __registry: {
+        registryChainId: 11155420,
+        adminAddress,
+        sessionIdHex: '0x00112233445566778899aabbccddeeff',
+      },
+    };
+    contractScripts.getSessionConfigBySlug.mockReturnValue(registryConfig);
+    window.history.replaceState({}, '', '/groups/restricted');
+
+    const { rerender } = render(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 11155420, name: 'OP Sepolia' }}
+        account={participantAddress}
+        loginComplete={true}
+        isSBTCacheReady={true}
+        sessionSlug="restricted"
+        sessionConfig={registryConfig}
+      />,
+    );
+
+    expect(screen.queryByTestId('ce-sbts-create-toggle')).not.toBeInTheDocument();
+
+    window.history.replaceState({}, '', `${sbtsListPath()}/new`);
+    rerender(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 11155420, name: 'OP Sepolia' }}
+        account={participantAddress}
+        loginComplete={true}
+        isSBTCacheReady={true}
+        sessionSlug="restricted"
+        sessionConfig={registryConfig}
+      />,
+    );
+    expect(screen.getByTestId('ce-session-group-creation-policy-denied')).toBeInTheDocument();
+    expect(screen.queryByTestId('create-group-panel')).not.toBeInTheDocument();
+
+    rerender(
+      <SBTsPage
+        sbtCacheRevision={0}
+        provider="wagmi"
+        network={{ id: 11155420, name: 'OP Sepolia' }}
+        account={adminAddress}
+        loginComplete={true}
+        isSBTCacheReady={true}
+        sessionSlug="restricted"
+        sessionConfig={registryConfig}
+      />,
+    );
     expect(screen.getByTestId('create-group-panel')).toBeInTheDocument();
   });
 
@@ -795,6 +1253,11 @@ describe('SBTsPage auto-feature flag', () => {
         isSBTCacheReady={true}
         defaultFeaturedSBTs={[featuredAddress]}
         sessionSlug="alpha"
+        sessionConfig={{
+          slug: 'alpha',
+          groupCreationPolicy: 'participants',
+          sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+        }}
         sessionName="Alpha"
         sessionInfo="Alpha session"
         hideMiniActionRow={true}

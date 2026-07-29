@@ -47,7 +47,7 @@ import { getChainById, getSessionRegistryChainIds } from '../../variables/chains
 import { sessionRegistryReadsPort } from '../../domains/sessions/registry/sessionRegistryReadPorts.js';
 import { normalizeSessionMediaUrl } from '../../domains/sessions/sessionMediaUrls.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
-import { getPrimaryDemoSessionSlug, isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
+import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { derivePrimarySessionSlugFromList } from '../../utilities/session/globalSessionState.js';
 import {
   createInitialProfileScanReport,
@@ -59,6 +59,10 @@ import {
   type SessionMetaRefreshController,
 } from '../../utilities/session/sessionMetaController.js';
 import { type SessionScanPolicy } from '../../utilities/session/mainSiteSessionScanPolicy.js';
+import {
+  claimsWorkerCanonicalAuthority,
+  resolveSessionCapabilityProjection,
+} from '../../utilities/session/sessionCapabilityProjection';
 import {
   createSessionProfileScanController,
   type SessionProfileScanController,
@@ -135,10 +139,8 @@ import {
   getSessionNetwork as _getSessionNetwork,
   type MainSiteSessionConfigLike,
 } from '../../utilities/session/mainSiteSessionConfig.js';
-import type { SessionConfigLike } from '../shellTypes';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import {
-  mergeMainSiteSessionDisplayConfig,
   resolveMainSiteExplicitSessionSlugFromPath,
   resolveMainSiteGlobalPrimarySessionSlug,
   resolveMainSiteQuestionRouteSessionContext,
@@ -193,15 +195,20 @@ import {
 import {
   ExperimentalStub as ExperimentalStubRaw,
   NotFoundRoute as NotFoundRouteRaw,
-  readHashQueryParam,
   SessionLoadingSkeleton as SessionLoadingSkeletonRaw,
 } from './routeStatusViews';
-import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE } from './routeConfig.js';
+import { QUESTION_RESULTS_RE, SURVEY_RESULTS_RE, VALID_SURVEY_ID_RE, isStaticNonCacheRoute } from './routeConfig.js';
 import { resolveMainSiteRouteMatch } from './routeTable.js';
 import { renderMainSiteRouteView } from './mainSiteRouteViewMap.js';
 import { createMainSiteRouteRenderers } from './mainSiteRouteRenderers.js';
 import { createMainSiteSessionScanPolicy } from './mainSiteSessionScanPolicyBinding.js';
-import { runMainSiteScanSpecificUserProfile } from './mainSiteProfileScanRuntime.js';
+import {
+  initializeMainSiteWorkerCanonicalCachesForGroup,
+  preloadMainSiteAboutDemoSessionData,
+  resolveMainSiteDisplaySessionChainId,
+  resolveMainSiteDisplaySessionConfig,
+  resolveMainSiteDisplaySessionNetwork,
+} from './mainSiteCapabilityHostRuntime';
 import {
   buildPublicRoute,
   buildPublicUrl,
@@ -358,7 +365,7 @@ interface RouteRenderCtx {
   requestedSessionId: string;
   requestedChainId: number | null;
   requestedSponsoredBundleId: string;
-  requestedSponsoredBundleKey: string;
+  requestedSponsoredBundleKey: string | null;
   defaultSlug: string;
   defaultSessionCfg: MainSiteSessionConfigLike | null;
   defaultSessionChainId: number | null;
@@ -865,6 +872,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),
     getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
     getAccount: () => this.props.account,
+    getProviderLike: () => this.props.provider,
     getCurrentPath: () => this.props?.path || (typeof window !== 'undefined' ? window.location.pathname : '') || '',
     shouldSkipSessionScanForSlug: (slug: string, op: string, scopeCtx?: unknown) =>
       this.shouldSkipSessionScanForSlug(slug, op, toMainSiteScanScopeContext(scopeCtx)),
@@ -968,6 +976,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     getSessionCfg: (slug: string) => this.getCacheSessionCfg(slug),
     getSessionChainId: (slug: string) => this.getCacheSessionChainId(slug),
     getAccount: () => this.props.account,
+    getProviderLike: () => this.props.provider,
     scanScopeNoop: (slug: string, op: string, onSkipped?: () => void) => this.scanScopeNoop(slug, op, onSkipped),
     setReadinessStateIfChanged: (nextState: Record<string, unknown> | null | undefined, cb?: () => void) =>
       this.setReadinessStateIfChanged(nextState, cb),
@@ -1356,69 +1365,20 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     });
   };
 
-  getDisplaySessionCfg = (slugIn: unknown): MainSiteSessionConfigLike | null => {
-    const normalized = normalizeSessionSlug(slugIn ?? '');
-    const strictCfg = this.getSessionCfg(normalized);
-    let demoCfg =
-      (getDemoSessionConfigBySlug(normalized, { allowDemoFallback: true }) as MainSiteSessionConfigLike | null) || null;
-    if (!demoCfg && normalized === 'demo') {
-      demoCfg =
-        (getDemoSessionConfigBySlug('', { allowDemoFallback: true }) as MainSiteSessionConfigLike | null) || null;
-    }
-    return mergeMainSiteSessionDisplayConfig(
-      strictCfg as SessionConfigLike | null,
-      demoCfg as SessionConfigLike | null,
-    ) as MainSiteSessionConfigLike | null;
-  };
-
-  getDisplaySessionChainId = (slugIn: unknown): number | null => {
-    const normalized = normalizeSessionSlug(slugIn ?? '');
-    const strictChainId = this.getSessionChainId(normalized);
-    if (strictChainId) return strictChainId;
-    const cfg = this.getDisplaySessionCfg(normalized);
-    const chainId = Number(cfg?.networkChainId || 0);
-    return Number.isFinite(chainId) && chainId > 0 ? chainId : null;
-  };
-
-  getCacheSessionCfg = (slugIn: unknown): MainSiteSessionConfigLike | null => {
-    const normalized = normalizeSessionSlug(slugIn ?? '');
-    return this.getDisplaySessionCfg(normalized);
-  };
-
-  getCacheSessionChainId = (slugIn: unknown): number | null => {
-    const normalized = normalizeSessionSlug(slugIn ?? '');
-    return this.getSessionChainId(normalized) || this.getDisplaySessionChainId(normalized);
-  };
-
-  getDisplaySessionNetwork = (slugIn: unknown) => {
-    const normalized = normalizeSessionSlug(slugIn ?? '');
-    const strictNetwork = this.getSessionNetwork(normalized);
-    if (strictNetwork?.id) return strictNetwork;
-    const chainId = this.getDisplaySessionChainId(normalized);
-    if (!chainId) return null;
-    const chain = getChainById(chainId);
-    if (chain) return chain;
-    return {
-      id: chainId,
-      name: `Chain ${chainId}`,
-      network: String(chainId),
-      nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-      rpcUrls: { default: { http: [] }, public: { http: [] } },
-      blockExplorers: { default: { name: '', url: '' } },
-      unsupported: false,
-    };
-  };
-
-  getInitializableSessionNetwork = (slugIn: unknown, pathIn: unknown = '') => {
-    const normalized = normalizeSessionSlug(slugIn ?? '');
-    const strictNetwork = this.getSessionNetwork(normalized);
-    if (strictNetwork?.id) return strictNetwork;
-    const path = this.getEffectiveRoutePath(
-      String(pathIn || '') || (typeof window !== 'undefined' ? window.location.pathname : '') || this.props.path || '',
+  getDisplaySessionCfg = (slugIn: unknown): MainSiteSessionConfigLike | null =>
+    resolveMainSiteDisplaySessionConfig(this, slugIn);
+  getDisplaySessionChainId = (slugIn: unknown): number | null => resolveMainSiteDisplaySessionChainId(this, slugIn);
+  getCacheSessionCfg = (slugIn: unknown): MainSiteSessionConfigLike | null => this.getDisplaySessionCfg(slugIn);
+  getCacheSessionChainId = (slugIn: unknown): number | null => this.getDisplaySessionChainId(slugIn);
+  getDisplaySessionNetwork = (slugIn: unknown) => resolveMainSiteDisplaySessionNetwork(this, slugIn);
+  getInitializableSessionNetwork = (slugIn: unknown, _pathIn: unknown = '') => this.getDisplaySessionNetwork(slugIn);
+  initializeWorkerCanonicalCachesForGroup = (
+    slugIn: unknown,
+    options: { resetReadiness?: boolean } = {},
+  ): Promise<boolean> =>
+    initializeMainSiteWorkerCanonicalCachesForGroup(this, slugIn, options, (message, error) =>
+      mainSiteLog.error(message, readMainSiteErrorMessage(error)),
     );
-    if (!path.startsWith('/session/')) return strictNetwork;
-    return this.getDisplaySessionNetwork(normalized);
-  };
 
   isAboutRoutePath = (pathIn: unknown = ''): boolean => {
     const path = this.getEffectiveRoutePath(
@@ -1427,46 +1387,10 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     return path === '/about' || path === '/about/';
   };
 
-  preloadAboutDemoSessionData = (pathIn: unknown = ''): Promise<void> | null => {
-    if (!this.isAboutRoutePath(pathIn)) return null;
-
-    const slug = normalizeSessionSlug(getPrimaryDemoSessionSlug());
-    if (!slug) return null;
-
-    const sessionNet = this.getDisplaySessionNetwork(slug);
-    if (!sessionNet?.id) return null;
-
-    if (this._aboutDemoSessionPreloadSlug === slug && this._aboutDemoSessionPreloadPromise) {
-      return this._aboutDemoSessionPreloadPromise;
-    }
-
-    const run = (async () => {
-      const preloadResults = await Promise.allSettled([
-        this.initializeQuestionCacheForGroup(slug, { background: true }),
-        this.initializeSurveyCacheForGroup(slug, { background: true }),
-        this.initializeSbtCacheForGroup(slug, { mode: 'partial', background: true }),
-      ]);
-      const firstRejected = preloadResults.find((result) => result.status === 'rejected');
-      if (firstRejected?.status === 'rejected') {
-        throw firstRejected.reason;
-      }
-    })()
-      .catch((err: unknown) => {
-        mainSiteLog.warn('[About] Demo session preload failed', {
-          slug,
-          error: readMainSiteErrorMessage(err),
-        });
-      })
-      .finally(() => {
-        if (this._aboutDemoSessionPreloadPromise === run) {
-          this._aboutDemoSessionPreloadPromise = null;
-        }
-      });
-
-    this._aboutDemoSessionPreloadSlug = slug;
-    this._aboutDemoSessionPreloadPromise = run;
-    return run;
-  };
+  preloadAboutDemoSessionData = (pathIn: unknown = ''): Promise<void> | null =>
+    preloadMainSiteAboutDemoSessionData(this, pathIn, (message, details) =>
+      mainSiteLog.warn(message, { ...details, error: readMainSiteErrorMessage(details.error) }),
+    );
 
   handleSessionRegistryCacheUpdated = () => {
     if (!this._mounted) return;
@@ -1592,10 +1516,13 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       this.getEffectiveRoutePath(pathIn || (typeof window !== 'undefined' ? window.location.pathname : '') || ''),
     );
 
-  getSbtListRouteSessionSlug = (pathIn = '') =>
+  getSbtListRouteSessionSlug = (pathIn = '', searchIn = '') =>
     getSbtListRouteSessionSlugFn(
       this.getEffectiveRoutePath(pathIn || (typeof window !== 'undefined' ? window.location.pathname : '') || ''),
-      { normalizeSessionSlug },
+      {
+        normalizeSessionSlug,
+        search: searchIn || (typeof window !== 'undefined' ? window.location.search : '') || '',
+      },
     );
 
   getUserAddressFromPath = (pathIn = '') =>
@@ -1984,8 +1911,19 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
   // Session config accessors (extracted to mainSiteSessionConfig.js)
   getSessionCfg = _getSessionCfg;
-  getSessionChainId = _getSessionChainId;
-  getSessionNetwork = _getSessionNetwork;
+  getSessionChainId = (slugIn: string | null | undefined): number | null => {
+    const projection = resolveSessionCapabilityProjection(this.getDisplaySessionCfg(slugIn));
+    if (projection.chainId) return projection.chainId;
+    if (projection.source !== 'legacy_registry') return null;
+    return _getSessionChainId(slugIn);
+  };
+  getSessionNetwork = (slugIn: string | null | undefined) => {
+    const chainId = this.getSessionChainId(slugIn);
+    if (!chainId) return null;
+    const configured = _getSessionNetwork(slugIn);
+    if (Number(configured?.id || configured?.chainId || 0) === chainId) return configured;
+    return getChainById(chainId) || null;
+  };
 
   isSbtInstanceListenerEnabledForGroup: SessionScanPolicy['isSbtInstanceListenerEnabledForGroup'] = (slugIn) =>
     this._scanPolicy.isSbtInstanceListenerEnabledForGroup(slugIn);
@@ -2371,8 +2309,10 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     }
   };
 
-  scanSpecificUserProfile = async (targetAddress: unknown): Promise<MainSiteProfileScanReport | null> =>
-    runMainSiteScanSpecificUserProfile(this, targetAddress);
+  scanSpecificUserProfile = async (targetAddress: unknown): Promise<MainSiteProfileScanReport | null> => {
+    const { runMainSiteScanSpecificUserProfile } = await import('./mainSiteProfileScanRuntime.js');
+    return runMainSiteScanSpecificUserProfile(this, targetAddress);
+  };
   // Tiny flag helpers (boolean-only)
   readFlag: SessionCachePersistenceController['readFlag'] = (name, slug) =>
     this._cachePersistenceController.readFlag(name, slug);
@@ -2468,7 +2408,9 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     if (!routeChangedDuringCacheInit) {
       this.props.changeActiveSessionSlug(slug);
     }
-    if (slug && !this.getDisplaySessionChainId(slug)) {
+    const bootstrapSessionConfig = this.getDisplaySessionCfg(slug);
+    const bootstrapClaimsWorkerAuthority = claimsWorkerCanonicalAuthority(bootstrapSessionConfig);
+    if (slug && !this.getDisplaySessionChainId(slug) && !bootstrapClaimsWorkerAuthority) {
       this.resolveSessionPathSlug(slug);
     }
     // Track the canonical active group chain id to detect changes without wallet involvement.
@@ -2477,39 +2419,53 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     this.refreshSessionInfo();
     this.refreshSessionMetaFields();
     this.refreshGroupCredentials();
-    try {
-      const lit = getGlobalLitHooks();
-      const bootstrapChainIds = resolveSessionRegistryBootstrapChainIds({
-        scope: this.getSessionScanScope(),
-        list: readSessionScanSlugs(),
-        activeChainId:
-          Number(this.getDisplaySessionChainId(slug) || 0) ||
-          Number(this.props?.network?.id || this.props?.network?.chainId || 0) ||
-          0,
-        defaultChainId: DEFAULT_CHAIN_ID,
-      });
-      const run = sessionRegistryReadsPort.loadGroupRegistryCache({
-        chainIds: bootstrapChainIds,
-        account: this.props.account,
-        providerLike: this.props.provider,
-        lit,
-        force: true,
-        bootstrapRpc: true,
-      });
-      this._registryBootstrapPromise = run;
-      this._registryBootstrapScopeKey = this.getRegistryBootstrapScopeKey(bootstrapChainIds);
-      run
-        .catch((err: unknown) => {
-          mainSiteLog.warn('[SessionRegistry] Failed to load on-chain registry cache:', err);
-        })
-        .finally(() => {
-          if (this._registryBootstrapPromise === run) {
-            this._registryBootstrapPromise = null;
-            this._registryBootstrapScopeKey = '';
-          }
+    const activeProjection = resolveSessionCapabilityProjection(bootstrapSessionConfig);
+    const hasExplicitSessionTarget =
+      !!this.getSessionTokenFromPath(bootstrapPath) ||
+      !!this.getSbtListRouteSessionSlug(bootstrapPath, currentSearch) ||
+      resolveMainSiteRouteSessionSlugHint({
+        search: currentSearch,
+        allowSessionIdLookup: true,
+        resolveSessionConfigById: (sessionId: string | number) =>
+          sessionRegistryReadsPort.getSessionConfigById(sessionId),
+      }) !== null;
+    const shouldBootstrapRegistry =
+      !hasExplicitSessionTarget || activeProjection.isRegistryCanonical || activeProjection.hasOnChainComponent;
+    if (shouldBootstrapRegistry) {
+      try {
+        const lit = getGlobalLitHooks();
+        const bootstrapChainIds = resolveSessionRegistryBootstrapChainIds({
+          scope: this.getSessionScanScope(),
+          list: readSessionScanSlugs(),
+          activeChainId:
+            Number(this.getDisplaySessionChainId(slug) || 0) ||
+            Number(this.props?.network?.id || this.props?.network?.chainId || 0) ||
+            0,
+          defaultChainId: DEFAULT_CHAIN_ID,
         });
-    } catch (err) {
-      mainSiteLog.warn('[SessionRegistry] Failed to initialize registry cache:', err);
+        const run = sessionRegistryReadsPort.loadGroupRegistryCache({
+          chainIds: bootstrapChainIds,
+          account: this.props.account,
+          providerLike: this.props.provider,
+          lit,
+          force: true,
+          bootstrapRpc: true,
+        });
+        this._registryBootstrapPromise = run;
+        this._registryBootstrapScopeKey = this.getRegistryBootstrapScopeKey(bootstrapChainIds);
+        run
+          .catch((err: unknown) => {
+            mainSiteLog.warn('[SessionRegistry] Failed to load on-chain registry cache:', err);
+          })
+          .finally(() => {
+            if (this._registryBootstrapPromise === run) {
+              this._registryBootstrapPromise = null;
+              this._registryBootstrapScopeKey = '';
+            }
+          });
+      } catch (err) {
+        mainSiteLog.warn('[SessionRegistry] Failed to initialize registry cache:', err);
+      }
     }
 
     // Cache busting (versioned; slug-scoped)
@@ -2595,13 +2551,25 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       pathname.startsWith('/question/') ||
       pathname.startsWith('/questions/results');
     const isBuiltInDemoSessionRoute = this.isBuiltInDemoSessionRoutePath(pathname);
+    const shouldInitializeActiveSessionCaches = !isStaticNonCacheRoute(pathname);
     mainSiteLog.log(
-      isDemoPath ? 'Initializing caches (demo prioritized order)...' : 'Initializing caches sequentially...',
+      shouldInitializeActiveSessionCaches
+        ? isDemoPath
+          ? 'Initializing caches (demo prioritized order)...'
+          : 'Initializing caches sequentially...'
+        : 'Skipping active session cache initialization for static route.',
     );
 
-    const sessionNet = this.getInitializableSessionNetwork(slug, pathname);
+    const workerCanonicalCachesInitialized = shouldInitializeActiveSessionCaches
+      ? await this.initializeWorkerCanonicalCachesForGroup(slug, {
+          resetReadiness: true,
+        })
+      : false;
+    const sessionNet = shouldInitializeActiveSessionCaches ? this.getInitializableSessionNetwork(slug, pathname) : null;
     mainSiteLog.log('session network (derived):', sessionNet);
-    if (sessionNet && sessionNet.id) {
+    if (workerCanonicalCachesInitialized) {
+      mainSiteLog.log('Worker-canonical caches initialized from the verified session authority.');
+    } else if (shouldInitializeActiveSessionCaches && sessionNet && sessionNet.id) {
       if (isSbtDetailRoute) {
         // SBT detail: load only this SBT first, defer everything else
         try {
@@ -3045,6 +3013,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
         isSBTCacheReady: false,
         isSurveyCacheReady: false,
         isQuestionCacheReady: false,
+        isResponsesCacheReady: false,
         isAllCachesReady: false,
         cacheHasLoaded: false,
         surveyCacheInitializationError: false,
@@ -3142,6 +3111,11 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       })();
     }
 
+    if (sessionPathResolutionChanged && !isStaticNonCacheRoute(currPath)) {
+      const workerRouteSlug = this.getBootstrapActiveSessionSlug(currPath, currSearch);
+      void this.initializeWorkerCanonicalCachesForGroup(workerRouteSlug, { resetReadiness: true });
+    }
+
     const nextDerivedActiveSlug = this.getBootstrapActiveSessionSlug(currPath, currSearch);
     if (!currPath.startsWith('/session/') && this.props.activeSessionSlug !== nextDerivedActiveSlug) {
       this.props.changeActiveSessionSlug(nextDerivedActiveSlug);
@@ -3237,6 +3211,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
       isSBTCacheReady: false,
       isSurveyCacheReady: false,
       isQuestionCacheReady: false,
+      isResponsesCacheReady: false,
       isAllCachesReady: false,
       cacheHasLoaded: false,
       surveyCacheInitializationError: false,
@@ -4155,6 +4130,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
   _renderContractsRoute = this._routeRenderers._renderContractsRoute;
   _renderAdminRoute = this._routeRenderers._renderAdminRoute;
   _renderSponsorRoute = this._routeRenderers._renderSponsorRoute;
+  _renderSbtCreateRoute = this._routeRenderers._renderSbtCreateRoute;
   _renderSbtsListRoute = this._routeRenderers._renderSbtsListRoute;
   _renderSbtDetailRoute = this._routeRenderers._renderSbtDetailRoute;
   _renderUserProfileRoute = this._routeRenderers._renderUserProfileRoute;
@@ -4206,6 +4182,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
 
   render() {
     const mainViewDisplay = this.getMainView(null);
+    const activeRouteSessionConfig = this.getDisplaySessionCfg(this.getSessionSlugFromProps());
 
     return (
       <>
@@ -4222,6 +4199,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           loginComplete={this.props.loginComplete}
           loginInProgress={this.props.loginInProgress}
           sendTestETH={this.getUserTestETH}
+          sessionConfig={activeRouteSessionConfig}
         />
 
         <DevE2eNav />

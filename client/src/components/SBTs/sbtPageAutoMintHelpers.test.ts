@@ -1,10 +1,13 @@
 import {
+  buildLegacySbtRouteCredentialCleanPath,
   buildSbtPageAutoMintStorageKey,
   buildSbtPageAutoMintCleanPath,
+  clearLegacySbtRouteCredential,
   collectAutoMintPairsFromSearchParams,
   decodeSbtPageInviteInput,
   hasSbtPageAutoMintFlag,
   normalizeSbtInviteCode,
+  resolveLegacySbtRouteCredential,
   resolveSbtPageUrlAutoMintIntent,
   sanitizeSbtPageMintedTokensOverride,
   shouldRunSbtPagePropListAutoMint,
@@ -12,6 +15,23 @@ import {
 } from './sbtPageAutoMintHelpers';
 
 describe('sbtPageAutoMintHelpers', () => {
+  afterEach(() => {
+    clearLegacySbtRouteCredential('0xabc');
+  });
+
+  it('keeps legacy path credentials in memory while producing an identity-only path', () => {
+    expect(resolveLegacySbtRouteCredential({ sbtAddress: '0xAbC', routeCredential: 'claim-secret' })).toBe(
+      'claim-secret',
+    );
+    expect(resolveLegacySbtRouteCredential({ sbtAddress: '0xabc' })).toBe('claim-secret');
+    expect(
+      buildLegacySbtRouteCredentialCleanPath('https://app.example/ce/sbt/0xabc/claim-secret?session=alpha#claim'),
+    ).toBe('/ce/sbt/0xabc?session=alpha#claim');
+
+    clearLegacySbtRouteCredential('0xABC');
+    expect(resolveLegacySbtRouteCredential({ sbtAddress: '0xabc' })).toBeNull();
+  });
+
   it('normalizes minted-token overrides', () => {
     expect(sanitizeSbtPageMintedTokensOverride(3)).toBe('3');
     expect(sanitizeSbtPageMintedTokensOverride('4')).toBe('4');
@@ -61,6 +81,9 @@ describe('sbtPageAutoMintHelpers', () => {
     ).toBe('/sbt/0xA?keep=yes');
     expect(buildSbtPageAutoMintCleanPath('https://example.test/sbt/0xA?auto1=1&sbt1=0xA&gp1=secret&keep=yes')).toBe(
       '/sbt/0xA?keep=yes',
+    );
+    expect(buildSbtPageAutoMintCleanPath('https://example.test/sbt/0xA?sbt=0xA&gp=secret&inv=invite&keep=yes')).toBe(
+      '/sbt/0xA?sbt=0xA&keep=yes',
     );
     expect(buildSbtPageAutoMintCleanPath('https://example.test/sbt/0xA?keep=yes')).toBeNull();
   });

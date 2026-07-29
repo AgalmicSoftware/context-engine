@@ -6,19 +6,33 @@ import {
   SESSION_MODE_PRESET_IDS,
   cloneSessionModePreset,
   type SessionModeProfile,
+  validateSessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
 
-const renderSection = (section: 'privacy' | 'worker' | 'publish', initialProfile?: SessionModeProfile) => {
+const VALID_SBT_CONTRACT = '0x00000000000000000000000000000000000000aa';
+
+const renderSection = (
+  section: 'privacy' | 'worker' | 'publish',
+  initialProfile?: SessionModeProfile,
+  initialGroupCreationPolicy = 'participants',
+) => {
   const onChange = jest.fn();
+  const onGroupCreationPolicyChange = jest.fn();
   const seed = initialProfile || cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
 
   const Harness = () => {
     const [profile, setProfile] = useState(seed);
+    const [groupCreationPolicy, setGroupCreationPolicy] = useState(initialGroupCreationPolicy);
     return (
       <SessionModeProfileSections
         section={section}
         registryChainId={11155420}
         value={profile}
+        groupCreationPolicy={groupCreationPolicy}
+        onGroupCreationPolicyChange={(next) => {
+          onGroupCreationPolicyChange(next);
+          setGroupCreationPolicy(next);
+        }}
         onChange={(next, compiled) => {
           onChange(next, compiled);
           setProfile(next);
@@ -28,7 +42,7 @@ const renderSection = (section: 'privacy' | 'worker' | 'publish', initialProfile
   };
 
   render(<Harness />);
-  return { onChange };
+  return { onChange, onGroupCreationPolicyChange };
 };
 
 describe('SessionModeProfileSections', () => {
@@ -41,6 +55,29 @@ describe('SessionModeProfileSections', () => {
     expect(screen.getByRole('combobox', { name: 'Who can see results' })).toBeInTheDocument();
     expect(screen.queryByText('Surfaces')).not.toBeInTheDocument();
     expect(screen.queryByText('Export scope')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['Cloudflare', cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE)],
+    ['on-chain', cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED)],
+  ])('offers admin and participant group creation policies for %s sessions', (_label, profile) => {
+    const { onGroupCreationPolicyChange } = renderSection('worker', profile);
+    const policy = screen.getByRole('radiogroup', { name: 'Who can create groups?' });
+
+    expect(within(policy).getByRole('radio', { name: 'All participants' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(within(policy).getByRole('radio', { name: 'Admins only' }));
+    expect(onGroupCreationPolicyChange).toHaveBeenLastCalledWith('admin_only');
+    expect(within(policy).getByRole('radio', { name: 'Admins only' })).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('discloses the public-factory limit for on-chain admin-only policy', () => {
+    renderSection(
+      'worker',
+      cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED),
+      'admin_only',
+    );
+
+    expect(screen.getByText(/Public SBT factories remain callable directly on-chain/i)).toBeInTheDocument();
   });
 
   it('uses the explicit Cloudflare defaults and reveals plain-language custom rules only on override', () => {
@@ -91,13 +128,44 @@ describe('SessionModeProfileSections', () => {
     expect(screen.getByRole('option', { name: 'Any SBT from this contract' })).toBeInTheDocument();
   });
 
+  it('updates the profile chain atomically when an SBT rule network changes', () => {
+    const { onChange } = renderSection('privacy');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Use default Cloudflare access rules' }));
+    fireEvent.click(screen.getByTestId('ce-new-envelope-add-sbt-onchain'));
+    fireEvent.change(screen.getByRole('textbox', { name: 'SBT contract address' }), {
+      target: { value: VALID_SBT_CONTRACT },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'SBT network' }), {
+      target: { value: '84532' },
+    });
+
+    const [profile, compiled] = onChange.mock.calls.at(-1) as [SessionModeProfile, { storageProfile: any }];
+    expect(profile.evm.registryChainId).toBe(84532);
+    expect(profile.encryption.accessConditions?.conditions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'sbt_onchain',
+          chainId: 84532,
+          contract: VALID_SBT_CONTRACT,
+        }),
+      ]),
+    );
+    expect(validateSessionModeProfile(profile)).toEqual({ valid: true, issues: [] });
+    expect(compiled.storageProfile.payloadAccessControl.accessConditions.conditions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: 'sbt_onchain', chainId: 84532 })]),
+    );
+  });
+
   it('keeps a configured custom SBT chain visible by name instead of dropping it', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.evm.registryChainId = 31337;
     profile.encryption.accessConditions = {
       match: 'any',
-      conditions: [{ kind: 'sbt_onchain', chainId: 31337, contract: '0x1234', anyOrAll: 'any' }],
+      conditions: [{ kind: 'sbt_onchain', chainId: 31337, contract: VALID_SBT_CONTRACT, anyOrAll: 'any' }],
     };
 
+    expect(validateSessionModeProfile(profile)).toEqual({ valid: true, issues: [] });
     renderSection('privacy', profile);
 
     expect(screen.getByRole('option', { name: 'Chain 31337' })).toBeInTheDocument();
@@ -108,8 +176,12 @@ describe('SessionModeProfileSections', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     renderSection('privacy', profile);
 
-    expect(screen.getByText(/Cloudflare encryption requires Cloudflare storage/)).toBeInTheDocument();
-    expect(screen.getByTestId('ce-new-encryption-worker_envelope')).toBeDisabled();
+    const explanation = screen.getByText(/Cloudflare encryption requires Cloudflare storage/);
+    const cloudflareEncryption = screen.getByTestId('ce-new-encryption-worker_envelope');
+
+    expect(explanation).toHaveAttribute('id', 'ce-new-encryption-worker-envelope-help');
+    expect(cloudflareEncryption).toBeDisabled();
+    expect(cloudflareEncryption).toHaveAttribute('aria-describedby', explanation.id);
   });
 
   it('shows privacy validation beside the invalid privacy rule', () => {
@@ -134,15 +206,42 @@ describe('SessionModeProfileSections', () => {
 
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({
+        authority: { mode: 'worker_canonical' },
+        evm: { registryChainId: null },
         storage: expect.objectContaining({
           backend: 'cloudflare',
           payloadAccessControl: expect.objectContaining({ gate: 'role_gate' }),
         }),
+        identity: { default: 'passkey', enabled: ['passkey'] },
+        authorization: { mechanisms: ['worker_roles'] },
+        results: expect.objectContaining({ visibility: 'participant_aggregate' }),
       }),
       expect.objectContaining({
         storageProfile: expect.objectContaining({
           payloadAccessControl: expect.objectContaining({ gate: 'role_gate' }),
         }),
+      }),
+    );
+  });
+
+  it('switches Cloudflare storage to a coherent registry, wallet, and SBT lineage', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const { onChange } = renderSection('privacy', profile);
+
+    const storage = screen.getByRole('radiogroup', { name: 'Data storage' });
+    fireEvent.click(within(storage).getByRole('radio', { name: 'Arweave' }));
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        authority: { mode: 'evm_registry_canonical' },
+        evm: { registryChainId: 11155420 },
+        storage: { backend: 'arweave' },
+        identity: { default: 'wallet', enabled: ['wallet', 'passkey'] },
+        authorization: { mechanisms: ['sbt_onchain'] },
+        encryption: { mode: 'none' },
+      }),
+      expect.objectContaining({
+        storageProfile: expect.objectContaining({ backend: 'arweave' }),
       }),
     );
   });
@@ -164,6 +263,12 @@ describe('SessionModeProfileSections', () => {
 
     expect(screen.getByRole('region', { name: 'Participation channels' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Website' })).toBeChecked();
+    expect(
+      within(screen.getByRole('group', { name: 'Session participation channels' })).getAllByRole('checkbox'),
+    ).toHaveLength(4);
+    for (const label of ['Website', 'Telegram', 'Telegram Mini App', 'Agent Session Wrapped']) {
+      expect(screen.getByRole('checkbox', { name: label })).toHaveAccessibleName(label);
+    }
     const wrapped = screen.getByRole('checkbox', { name: 'Agent Session Wrapped' });
     expect(wrapped).not.toBeChecked();
     expect(screen.getByText(/additional per-session Worker\/Bridge/i)).toBeInTheDocument();
@@ -209,6 +314,29 @@ describe('SessionModeProfileSections', () => {
     const visibility = screen.getByRole('combobox', { name: 'Who can see results' });
     expect(within(visibility).getByRole('option', { name: /Admins only/i })).toBeDisabled();
     expect(within(visibility).getByRole('option', { name: /redacted summary/i })).toBeDisabled();
+    expect(within(visibility).getByRole('option', { name: /public stored results/i })).toBeDisabled();
+  });
+
+  it('offers public results only for unencrypted Arweave storage and coerces them when encryption is enabled', () => {
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const { onChange } = renderSection('privacy', profile);
+    const visibility = screen.getByRole('combobox', { name: 'Who can see results' });
+
+    expect(within(visibility).getByRole('option', { name: /public stored results/i })).toBeEnabled();
+    expect(visibility).toHaveValue('public_full_if_storage_public');
+
+    fireEvent.click(screen.getByTestId('ce-new-encryption-lit'));
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        storage: { backend: 'arweave' },
+        encryption: { mode: 'lit' },
+        results: expect.objectContaining({ visibility: 'participant_aggregate' }),
+      }),
+      expect.any(Object),
+    );
+    expect(within(visibility).getByRole('option', { name: /public stored results/i })).toBeDisabled();
+    expect(visibility).toHaveValue('participant_aggregate');
   });
 
   it('lets a minimum group size be cleared while editing before committing a valid integer', () => {

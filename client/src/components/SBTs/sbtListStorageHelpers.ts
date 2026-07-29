@@ -18,6 +18,12 @@ type ResolveSbtListCreateGroupInitialVisibilityArgs = {
   listSlug?: unknown;
 };
 
+type ResolveSbtListInitialActiveSessionSlugArgs = {
+  globalPrimarySessionSlug?: unknown;
+  routeSlug?: unknown;
+  storage?: SbtListStorageReader | null;
+};
+
 export const SBT_LIST_MODE_SELECTION_STORAGE_KEY = 'dg:sbtListModeSelectedSessions';
 
 const SBT_LIST_MANAGED_DG_CACHE_NAMES = new Set<string>([
@@ -88,6 +94,21 @@ export const resolveSbtListCreateGroupInitialVisibility = ({
         clearInvalid: true,
       })
     : false;
+
+export const resolveSbtListInitialActiveSessionSlug = ({
+  globalPrimarySessionSlug,
+  routeSlug,
+  storage,
+}: ResolveSbtListInitialActiveSessionSlugArgs = {}): string => {
+  try {
+    const resolvedStorage = typeof storage === 'undefined' ? getDefaultSbtListStorage() : storage;
+    const stored = resolvedStorage?.getItem?.('dg:lastActiveSbtSession');
+    if (stored != null) return normalizeSessionSlug(stored);
+  } catch (_) {
+    // Fall through to the shared or route selection.
+  }
+  return normalizeSessionSlug(globalPrimarySessionSlug || routeSlug || '');
+};
 
 export const readSbtListUniverseCollapsedState = (storage?: SbtListStorageReader | null): boolean => {
   try {

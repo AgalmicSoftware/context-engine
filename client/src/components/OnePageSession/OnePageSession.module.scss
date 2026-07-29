@@ -222,10 +222,301 @@
 }
 
 .telegramPileFrame {
+  display: grid;
+  gap: 8px;
+
   :global(.card) {
     background: rgba(2, 6, 23, 0.72);
     color: #f8fafc;
     border-color: rgba(148, 163, 184, 0.28);
+  }
+}
+
+.workerGroupsPanel {
+  display: grid;
+  gap: 14px;
+  width: min(1180px, 100%);
+  margin-inline: auto;
+}
+
+.workerGroupNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: var(--ce-radius-6);
+  background: rgba(15, 23, 42, 0.58);
+  color: #cbd5e1;
+  font-size: 0.95rem;
+}
+
+.workerGroupImage {
+  width: min(100%, 240px);
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--ce-radius-6);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+.workerGroupsListPanel {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #f8fafc;
+}
+
+.workerGroupCardGrid {
+  align-items: stretch;
+  margin: 8px 0 2px;
+}
+
+.workerGroupCard {
+  box-sizing: border-box;
+  align-self: stretch;
+  cursor: default;
+
+  // SBTPage's mini card supplies the canonical card, image, title, and status-dot
+  // treatment. Worker-only content stays below those shared visual primitives.
+  .workerGroupCardDescription {
+    display: -webkit-box;
+    width: 100%;
+    min-height: 3.75em;
+    margin: 4px 0 10px;
+    overflow: hidden;
+    color: rgba(244, 247, 255, 0.82);
+    font-family: var(--ce-font-body);
+    font-size: 0.78rem;
+    line-height: 1.25;
+    text-align: left;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+}
+
+.workerGroupCardBodyButton {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--ce-radius-8);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid #4dffa4;
+    outline-offset: 4px;
+  }
+}
+
+.workerGroupCardLinkButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -6px -6px 0 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--ce-radius-6);
+  background: transparent;
+  color: rgba(244, 247, 255, 0.8);
+  cursor: pointer;
+  pointer-events: auto;
+  transition:
+    color 0.18s ease,
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: rgba(77, 255, 164, 0.5);
+    background: rgba(77, 255, 164, 0.14);
+    color: #4dffa4;
+    outline: none;
+    transform: translateY(-1px);
+  }
+}
+
+.workerGroupCardActions {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-height: 40px;
+  margin-top: auto;
+}
+
+.workerGroupCardPrimaryButton,
+.workerGroupCardLeaveButton,
+.workerGroupCardMemberStatus,
+.workerGroupCardInactiveStatus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: var(--ce-radius-6);
+  font-family: var(--ce-font-body);
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.workerGroupCardPrimaryButton {
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  background: rgba(255, 255, 255, 0.94);
+  color: #111827;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: #4dffa4;
+    background: #ffffff;
+    box-shadow: 0 5px 16px rgba(77, 255, 164, 0.24);
+    outline: none;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    border-color: rgba(255, 255, 255, 0.28);
+    background: rgba(226, 232, 240, 0.58);
+    color: #344054;
+    cursor: wait;
+    box-shadow: none;
+    transform: none;
+  }
+}
+
+.workerGroupCardLeaveButton {
+  border: 1px solid rgba(77, 255, 164, 0.42);
+  background: rgba(77, 255, 164, 0.12);
+  color: #b9ffd9;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover,
+  &:focus-visible {
+    border-color: #4dffa4;
+    background: rgba(77, 255, 164, 0.2);
+    box-shadow: 0 5px 16px rgba(77, 255, 164, 0.18);
+    outline: none;
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    cursor: wait;
+    opacity: 0.68;
+    box-shadow: none;
+    transform: none;
+  }
+}
+
+.workerGroupCardMemberStatus {
+  border: 1px solid rgba(77, 255, 164, 0.42);
+  background: rgba(77, 255, 164, 0.12);
+  color: #b9ffd9;
+}
+
+.workerGroupCardInactiveStatus {
+  border: 1px solid rgba(148, 163, 184, 0.32);
+  background: rgba(15, 23, 42, 0.72);
+  color: #e2e8f0;
+}
+
+.workerGroupDetailCard {
+  min-width: 0;
+}
+
+.workerGroupDetailStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(244, 247, 255, 0.84);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.workerGroupDetailStatusDot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--ce-radius-round);
+}
+
+.workerGroupDetailStatusDotOpen {
+  background: #00ff9d;
+}
+
+.workerGroupDetailStatusDotClosed {
+  background: #ff4d4d;
+}
+
+.workerGroupDetailImagePlaceholder {
+  width: 100%;
+  aspect-ratio: 1;
+  background: radial-gradient(circle at 50% 44%, rgba(77, 255, 164, 0.2), transparent 32%), rgba(15, 23, 42, 0.76);
+}
+
+.workerGroupDetailStaticHeader {
+  cursor: default !important;
+
+  &:hover {
+    background: transparent !important;
+  }
+}
+
+.workerGroupDetailActions {
+  .workerGroupCardPrimaryButton,
+  .workerGroupCardLeaveButton,
+  .workerGroupCardMemberStatus,
+  .workerGroupCardInactiveStatus {
+    max-width: 280px;
+  }
+}
+
+.workerGroupDetailAddress {
+  overflow-wrap: anywhere;
+  font-family: var(--ce-font-mono);
+  text-transform: none !important;
+}
+
+.workerGroupDetailNotFound {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+  width: 100%;
+  max-width: 720px;
+  margin: 20px auto;
+  padding: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: var(--ce-radius-10);
+  background: rgba(255, 255, 255, 0.06);
+
+  p {
+    margin: 0;
+    color: rgba(244, 247, 255, 0.84);
   }
 }
 
@@ -759,6 +1050,13 @@
   }
 }
 
+.sectionHeaderIconButton {
+  flex: 0 0 54px;
+  width: 54px;
+  min-width: 54px;
+  padding-inline: 0;
+}
+
 /* The content area inside each collapsible section */
 .miniSectionContent {
   box-sizing: border-box;
@@ -1072,6 +1370,13 @@
     font-size: 0.95rem;
   }
 
+  .sectionHeaderIconButton {
+    flex-basis: 48px;
+    width: 48px;
+    min-width: 48px;
+    padding-inline: 0;
+  }
+
   .pileHeaderRow {
     align-items: center;
     flex-wrap: nowrap;
@@ -1232,6 +1537,13 @@
     min-height: 50px;
     padding: 12px 18px;
     font-size: 1rem;
+  }
+
+  .sectionHeaderIconButton {
+    flex-basis: 50px;
+    width: 50px;
+    min-width: 50px;
+    padding-inline: 0;
   }
 
   .sectionHeaderViewModeButton {

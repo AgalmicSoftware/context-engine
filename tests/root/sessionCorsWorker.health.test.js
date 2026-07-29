@@ -19,6 +19,40 @@ const buildOpenSessionConfig = (overrides = {}) => ({
   ...overrides,
 });
 
+const buildWorkerCanonicalModeConfig = () => {
+  const payloadAccessControl = { gate: 'none', encryption: 'none' };
+  return {
+    sessionModeProfile: {
+      profileVersion: 1,
+      preset: 'custom',
+      authority: { mode: 'worker_canonical' },
+      evm: { registryChainId: null },
+      storage: { backend: 'cloudflare', payloadAccessControl },
+      identity: { default: 'passkey', enabled: ['passkey'] },
+      authorization: { mechanisms: ['worker_roles'] },
+      encryption: { mode: 'none' },
+      surfaces: {
+        web: true,
+        telegram: false,
+        miniApp: false,
+        agentHttp: false,
+        mcp: false,
+        ceCc: false,
+      },
+      results: {
+        visibility: 'public_full_if_storage_public',
+        exposure: {
+          aggregateResultsEnabled: true,
+          anonymizedGroupsEnabled: false,
+          minGroupSize: 2,
+        },
+      },
+      export: { scope: 'all_session' },
+    },
+    storageProfile: { backend: 'cloudflare', payloadAccessControl },
+  };
+};
+
 describe('sessionCorsWorker /health and request validation routes', () => {
   const originalFetch = global.fetch;
   const originalCrypto = global.crypto;
@@ -85,7 +119,7 @@ describe('sessionCorsWorker /health and request validation routes', () => {
           sessionName: 'Worker Bootstrap',
           corsWorkerUrl: 'https://worker.example',
           allowOrigins: ['https://app.example'],
-          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+          ...buildWorkerCanonicalModeConfig(),
           workerAuthority: { version: 1, participantScopes: ['storage'] },
           rpcUrl: 'https://rpc.example/secret',
           litCredentials: { litActionCid: 'secret-cid' },

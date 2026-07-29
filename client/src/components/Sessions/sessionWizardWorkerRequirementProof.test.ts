@@ -158,6 +158,11 @@ describe('sessionWizardWorkerRequirementProof', () => {
     const litProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     litProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     litProfile.encryption = { mode: 'lit' };
+    litProfile.evm.registryChainId = 11155420;
+    litProfile.storage.payloadAccessControl = {
+      ...litProfile.storage.payloadAccessControl!,
+      encryption: 'lit',
+    };
     expect(
       resolveReadiness({
         sessionModeProfile: litProfile,
@@ -184,6 +189,11 @@ describe('sessionWizardWorkerRequirementProof', () => {
     const litProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     litProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     litProfile.encryption = { mode: 'lit' };
+    litProfile.evm.registryChainId = 11155420;
+    litProfile.storage.payloadAccessControl = {
+      ...litProfile.storage.payloadAccessControl!,
+      encryption: 'lit',
+    };
     const litSecrets = {
       openaiKey: 'sk-verified-openai',
       customRpcUrl: 'https://rpc.example.test',
@@ -248,6 +258,11 @@ describe('sessionWizardWorkerRequirementProof', () => {
     const litProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     litProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     litProfile.encryption = { mode: 'lit' };
+    litProfile.evm.registryChainId = 11155420;
+    litProfile.storage.payloadAccessControl = {
+      ...litProfile.storage.payloadAccessControl!,
+      encryption: 'lit',
+    };
     const verifiedLitRuntime = {
       litApiBase: 'https://api.chipotle.litprotocol.com',
       litGroupId: 'group-1',

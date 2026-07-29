@@ -24,6 +24,15 @@ import {
   sanitizeDocumentUrls,
   selectManagedNetBucketSnapshot,
 } from './CreateQuestionsAndSurveys.cacheTestUtils';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+
+const buildRegistryLitProfile = () => {
+  const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+  profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+  profile.encryption = { mode: 'lit' };
+  profile.results.visibility = 'participant_aggregate';
+  return profile;
+};
 
 describe('CreateQuestionsAndSurveys managed cache reads', () => {
   beforeEach(() => {
@@ -122,6 +131,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         slug: 'chipotle-session',
         networkChainId: 11155420,
         corsWorkerUrl: 'https://worker.example.test',
+        sessionModeProfile: buildRegistryLitProfile(),
         __registry: {
           gateAuthority: 'onchain',
           gatesByResource: {
@@ -199,6 +209,7 @@ describe('CreateQuestionsAndSurveys managed cache reads', () => {
         networkChainId: 11155420,
         corsWorkerUrl: 'https://worker.example.test',
         lit: { network: 'chipotle' },
+        sessionModeProfile: buildRegistryLitProfile(),
         __registry: {
           gateAuthority: 'onchain',
           gatesByResource: {

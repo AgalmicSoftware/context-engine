@@ -255,30 +255,23 @@ export const readSponsoredBundleFromArweave = async ({
 
 export const buildSponsoredSessionUrl = ({
   txId,
-  secret,
   origin,
   path = '',
 }: {
   txId?: unknown;
-  secret?: unknown;
   origin?: unknown;
   path?: unknown;
 } = {}) => {
   const resolvedTxId = toStr(txId || '').trim();
-  const resolvedSecret = toStr(secret || '').trim();
   if (!resolvedTxId) {
     throw new Error('Sponsored bundle txId is required.');
-  }
-  if (!resolvedSecret) {
-    throw new Error('Sponsored bundle secret is required.');
   }
   const baseOrigin = toStr(
     origin || (typeof window !== 'undefined' && window.location ? window.location.origin : ''),
   ).trim();
   const normalizedPath = toStr(path || getDefaultSponsoredSessionPath()).trim() || getDefaultSponsoredSessionPath();
   const search = `?sponsored=${encodeURIComponent(resolvedTxId)}`;
-  const hash = `#k=${encodeURIComponent(resolvedSecret)}`;
-  return `${baseOrigin}${normalizedPath}${search}${hash}`;
+  return `${baseOrigin}${normalizedPath}${search}`;
 };
 
 export const uploadSponsoredBundle = async ({
@@ -342,21 +335,6 @@ export const uploadSponsoredBundle = async ({
   return {
     txId: toStr(txId || '').trim(),
     envelope,
-    url: buildSponsoredSessionUrl({ txId, secret: password }),
+    url: buildSponsoredSessionUrl({ txId }),
   };
-};
-
-export const sponsoredBundleUtils = {
-  buildSponsoredBundleEnvelope,
-  buildSponsoredBundlePlaintext,
-  buildSponsoredSessionUrl,
-  decryptSponsoredBundleEnvelope,
-  generateSponsoredBundleSecret,
-  hasSponsoredBundleFields,
-  isSponsoredBundleExpired,
-  normalizeSponsoredBundlePayload,
-  normalizeSparseSponsoredBundlePayload,
-  parseSponsoredBundleEnvelope,
-  readSponsoredBundleFromArweave,
-  uploadSponsoredBundle,
 };

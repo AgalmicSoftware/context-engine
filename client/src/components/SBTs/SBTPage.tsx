@@ -70,7 +70,8 @@ import {
   buildSbtPageNetHoldersMemoState,
   buildSbtPageLoadInfoLoadingStartPatch,
   buildSbtPageLoadInfoRequestKey,
-  buildSbtPageAutoMintCleanPath,
+  clearSbtPageAutoMintUrlIntent,
+  createSbtPageAutoMintIntentRuntime,
   buildSbtPageDetailsPayload,
   buildSbtPageClaimCountdownCompletePatch,
   buildSbtPageClaimCountdownTickPatch,
@@ -126,7 +127,6 @@ import {
   getDisplayImageFallbackCandidateCount,
   getErrorMessage,
   getExplicitSbtPageSessionSlug,
-  hasSbtPageAutoMintFlag,
   getNextDisplayImageFallbackState,
   isActiveSbtPageScanProgress,
   isRecord,
@@ -169,13 +169,15 @@ import {
   resolveSbtPageSessionDisplayConfig,
   resolveSbtPageSessionDisplayLabel,
   resolveSbtPageShouldRefreshCounts,
-  resolveSbtPageUrlAutoMintIntent,
+  resolveSbtPageMintFailure,
   resolveSbtPageUserAdminStatus,
   resolveSbtAddress,
   resolveSbtAddressString,
   sanitizeSbtPageMintedTokensOverride,
   shouldRunSbtPagePropListAutoMint,
   shouldRunSbtPagePropPasswordAutoMint,
+  SBT_ADMIN_INVITE_FAILURE_MESSAGE,
+  SBT_CLAIM_FAILURE_MESSAGE,
 } from './sbtPageHelpers';
 import type {
   ReconcileSbtPageHolderRefreshStateArgs,
@@ -188,9 +190,7 @@ import type {
 const sbtLog = createLogger('sbt');
 const inviteLog = createLogger('inviteDebug');
 const encodeSbtPageGroupPassword = (code: string): string => encodeSbtPageGroupPasswordForUrl(code, cryptoUtils);
-type QueueLocalStorageJsonWriteOptions = {
-  immediate?: boolean;
-};
+type QueueLocalStorageJsonWriteOptions = { immediate?: boolean };
 type SbtPageInviteClaimPayload = SbtPageDecodedInviteInput;
 type SbtPageInviteClaimOptions = {
   accountLowerOverride?: unknown;
@@ -198,12 +198,8 @@ type SbtPageInviteClaimOptions = {
   suppressErrors?: boolean;
   sessionSlugOverride?: unknown;
 };
-type SbtPageGroupPasswordClaimOptions = SbtPageInviteClaimOptions & {
-  groupPasswordHashOverride?: unknown;
-};
-type SbtPageAutoMintOptions = SbtPageInviteClaimOptions & {
-  sbtInfoOverride?: unknown;
-};
+type SbtPageGroupPasswordClaimOptions = SbtPageInviteClaimOptions & { groupPasswordHashOverride?: unknown };
+type SbtPageAutoMintOptions = SbtPageInviteClaimOptions & { sbtInfoOverride?: unknown };
 type SbtPageManualMintOptions = SbtPageInviteClaimOptions & {
   passwordOverride?: unknown;
   sbtAddressOverride?: unknown;
@@ -457,6 +453,7 @@ class SBTPage extends Component<any, any> {
   _decryptedImageBlobUrl = '';
   _burnSearchTimer: ReturnType<typeof setTimeout> | null = null;
   _activeMintPendingTargetKey = '';
+  _urlAutoMintIntentRuntime = createSbtPageAutoMintIntentRuntime();
 
   state: SbtPageState = buildSbtPageInitialState({ network: this.props.network }) as SbtPageState;
 
@@ -523,10 +520,10 @@ class SBTPage extends Component<any, any> {
 
       try {
         await this.handleUrlAutoMintIntent();
-      } catch (err) {
-        sbtLog.warn('Error parsing auto-mint params:', err);
+      } catch {
+        sbtLog.warn('Unable to process the auto-mint intent.');
       }
-    })().catch((e: unknown) => sbtLog.warn('componentDidMount async error:', e));
+    })().catch(() => sbtLog.warn('SBTPage mount task failed.'));
   }
 
   componentDidUpdate(prevProps: SbtPagePreviousProps): void {
@@ -538,6 +535,9 @@ class SBTPage extends Component<any, any> {
     const sbtAddressChanged = String(prevAddress || '').toLowerCase() !== String(nextAddress || '').toLowerCase();
 
     if (sbtAddressChanged || network?.id !== prevProps.network?.id) {
+      if (sbtAddressChanged) {
+        this._urlAutoMintIntentRuntime.clear(prevAddress);
+      }
       this._activeMintPendingTargetKey = '';
       if (this._isMounted) {
         const resetMintUiState = buildSbtPageAddressChangeResetMintUiPatch({
@@ -683,6 +683,7 @@ class SBTPage extends Component<any, any> {
 
   componentWillUnmount() {
     this._isMounted = false;
+    this._urlAutoMintIntentRuntime.clear(this.props.SBTAddress);
     if (this.state.intervalId) {
       clearInterval(this.state.intervalId);
     }
@@ -782,19 +783,8 @@ class SBTPage extends Component<any, any> {
     });
   };
 
-  clearAutoMintUrlIntent = (): void => {
-    try {
-      const search = typeof window !== 'undefined' && window.location.search ? window.location.search : '';
-      if (hasSbtPageAutoMintFlag(search)) {
-        if (typeof window !== 'undefined' && window.history && window.history.replaceState) {
-          const cleanUrl = buildSbtPageAutoMintCleanPath(window.location.href);
-          if (cleanUrl) window.history.replaceState(null, '', cleanUrl);
-        }
-      }
-    } catch (e: unknown) {
-      sbtLog.warn('SBTPage: fallback', e);
-    }
-  };
+  clearAutoMintUrlIntent = (): void =>
+    clearSbtPageAutoMintUrlIntent((error) => sbtLog.warn('SBTPage: fallback', error));
 
   decodeInviteInput = (raw: unknown): SbtPageDecodedInviteInput | null =>
     decodeSbtPageInviteInput(raw, cryptoUtils.decodeInvite);
@@ -803,7 +793,7 @@ class SBTPage extends Component<any, any> {
     searchRaw: unknown = null,
     propsIn: SbtAddressPropsLike = this.props,
   ): SbtPageUrlAutoMintIntent | null => {
-    return resolveSbtPageUrlAutoMintIntent({
+    return this._urlAutoMintIntentRuntime.resolve({
       chainId: this.props.network?.id || this.props.networkChainId,
       propsIn,
       searchRaw,
@@ -818,6 +808,7 @@ class SBTPage extends Component<any, any> {
   handleUrlAutoMintIntent = async (propsIn: SbtAddressPropsLike = this.props): Promise<boolean> => {
     const intent = this.resolveUrlAutoMintIntent(null, propsIn);
     if (!intent) return false;
+    this.clearAutoMintUrlIntent();
 
     const { currentSbtAddress, targetInvite, targetPassword, targetCode, shouldAttemptAuto, autoKey } = intent;
     const markAutoMintSuccess = () => {
@@ -1198,6 +1189,7 @@ class SBTPage extends Component<any, any> {
       }
       this.applyLocalMintSuccess(accountLower);
       this.clearAutoMintUrlIntent();
+      this._urlAutoMintIntentRuntime.clear(sbtAddress);
       this._activeMintPendingTargetKey = '';
     } else {
       this.clearMintPendingForTarget({ accountLower, chainId, sbtAddress, sessionSlug });
@@ -1379,8 +1371,8 @@ class SBTPage extends Component<any, any> {
         txHash: tx.transactionHash,
       });
       return { ok: true, tx };
-    } catch (error) {
-      inviteLog.error('[INVITE] claimWithInvite failed:', error);
+    } catch {
+      inviteLog.error('[INVITE] claimWithInvite failed.');
       if (
         this._isMounted &&
         !options.suppressErrors &&
@@ -1391,9 +1383,9 @@ class SBTPage extends Component<any, any> {
           sessionSlug: slug,
         })
       ) {
-        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, 'Invite claim failed.') }));
+        this.setState(buildSbtPageMintFailurePatch({ error: SBT_CLAIM_FAILURE_MESSAGE }));
       }
-      return { ok: false, error };
+      return { ok: false, error: new Error(SBT_CLAIM_FAILURE_MESSAGE) };
     }
   };
 
@@ -1482,8 +1474,6 @@ class SBTPage extends Component<any, any> {
                 password,
                 sbtAddress: walletScopeSbtAddress,
               });
-        inviteLog.log('[INVITE_DEBUG v4] local groupPasswordHash:', localHash);
-        inviteLog.log('[INVITE_DEBUG v4] on-chain groupPasswordHash:', onchainHash);
         if (!localHash || String(localHash).toLowerCase() !== String(onchainHash).toLowerCase()) {
           if (this._isMounted) {
             this.setState(buildSbtPageMintFailurePatch({ error: 'Group password mismatch.' }));
@@ -1503,7 +1493,6 @@ class SBTPage extends Component<any, any> {
       }
 
       const maxAttempts = 3;
-      let lastError: unknown = null;
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         if (
@@ -1587,7 +1576,6 @@ class SBTPage extends Component<any, any> {
         });
         if (result && result.ok) return true;
 
-        lastError = result?.error || new Error('Invite claim failed.');
         if (
           !this.isMintTargetContextCurrent({
             accountLower: mintAccountLower,
@@ -1625,13 +1613,13 @@ class SBTPage extends Component<any, any> {
 
         if (mintedAfterBig === null || mintedAfterBig.lte(mintedBig)) {
           if (this._isMounted && suppressErrors) {
-            this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(lastError, 'Invite claim failed.') }));
+            this.setState(buildSbtPageMintFailurePatch({ error: SBT_CLAIM_FAILURE_MESSAGE }));
           }
           return false;
         }
       }
-    } catch (error) {
-      inviteLog.error('[INVITE] claimWithGroupPassword failed:', error);
+    } catch {
+      inviteLog.error('[INVITE] claimWithGroupPassword failed.');
       if (
         this._isMounted &&
         this.isMintTargetContextCurrent({
@@ -1641,7 +1629,7 @@ class SBTPage extends Component<any, any> {
           sessionSlug: slug,
         })
       ) {
-        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, 'Invite claim failed.') }));
+        this.setState(buildSbtPageMintFailurePatch({ error: SBT_CLAIM_FAILURE_MESSAGE }));
       }
       return false;
     }
@@ -1868,9 +1856,9 @@ class SBTPage extends Component<any, any> {
       if (this.state.mintingStatus !== 'success') {
         // Rare race: if it failed after check, fall through silently (the UI already shows error)
       }
-    } catch (err) {
+    } catch {
       if (this._isMounted && isCurrentTarget()) {
-        this.setState(buildSbtPageErrorPatch({ error: getErrorMessage(err, 'Failed to mint with provided codes.') }));
+        this.setState(buildSbtPageErrorPatch({ error: SBT_CLAIM_FAILURE_MESSAGE }));
       }
     }
   }
@@ -3168,9 +3156,7 @@ class SBTPage extends Component<any, any> {
         return false;
       }
 
-      sbtLog.log('[MANUAL-MINT] Reading on-chain groupPasswordHash...');
       const onchain = await sbtMetadataReadsPort.getGroupPasswordHash('none', sbt, slug);
-      sbtLog.log('[MANUAL-MINT] On-chain groupPasswordHash:', onchain);
       if (
         !this.isMintTargetContextCurrent({
           accountLower: mintAccountLower,
@@ -3203,7 +3189,7 @@ class SBTPage extends Component<any, any> {
               sbtAddress: walletScopeSbtAddress,
             });
       if (!local || local.toLowerCase() !== onchain.toLowerCase()) {
-        sbtLog.error('[MANUAL-MINT] Sanity check FAILED', { expected: onchain, computed: local });
+        sbtLog.error('[MANUAL-MINT] Credential check failed.');
         if (
           !this.isMintTargetContextCurrent({
             accountLower: mintAccountLower,
@@ -3242,7 +3228,6 @@ class SBTPage extends Component<any, any> {
         userAddress: String(mintAccount || ''),
         walletScopeSbtAddress,
       });
-      sbtLog.log('[MANUAL-MINT] Signature:', sig);
 
       if (
         !this.isMintTargetContextCurrent({
@@ -3267,8 +3252,8 @@ class SBTPage extends Component<any, any> {
         txHash: tx.transactionHash,
       });
       return true;
-    } catch (error) {
-      sbtLog.error('Manual mint flow failed:', error);
+    } catch {
+      sbtLog.error('Manual mint flow failed.');
       if (
         this.isMintTargetContextCurrent({
           accountLower: mintAccountLower,
@@ -3277,7 +3262,7 @@ class SBTPage extends Component<any, any> {
           sessionSlug: slug,
         })
       ) {
-        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('mint')} failed.`) }));
+        this.setState(buildSbtPageMintFailurePatch({ error: SBT_CLAIM_FAILURE_MESSAGE }));
       }
       return false;
     }
@@ -3367,10 +3352,10 @@ class SBTPage extends Component<any, any> {
               if (this._isMounted) this.setState(buildSbtPageMintFailurePatch({ error: 'Invalid password.' }));
               return false;
             }
-          } catch (preCheckErr) {
+          } catch {
             // If the view call fails (e.g. network issue), proceed with the mint anyway —
             // the on-chain transaction will catch invalid passwords. Don't block the user.
-            sbtLog.warn('[SBTPage] Password pre-validation call failed, proceeding with mint:', preCheckErr);
+            sbtLog.warn('[SBTPage] Password pre-validation call failed; proceeding with mint.');
           }
 
           if (
@@ -3484,7 +3469,12 @@ class SBTPage extends Component<any, any> {
         return true;
       }
     } catch (error) {
-      sbtLog.error('Minting failed in handleMint:', error);
+      const failure = resolveSbtPageMintFailure({
+        error,
+        fallbackMessage: getErrorMessage(error, `${t('minting')} failed.`),
+        hasPasswordMint: !!sbtInfo.hasPasswordMint,
+      });
+      sbtLog.error(...failure.logArgs);
       if (
         this._isMounted &&
         this.isMintTargetContextCurrent({
@@ -3494,7 +3484,7 @@ class SBTPage extends Component<any, any> {
           sessionSlug: slug,
         })
       ) {
-        this.setState(buildSbtPageMintFailurePatch({ error: getErrorMessage(error, `${t('minting')} failed.`) }));
+        this.setState(buildSbtPageMintFailurePatch({ error: failure.message }));
       }
       return false;
     }
@@ -3843,7 +3833,7 @@ class SBTPage extends Component<any, any> {
           encryptedRecoveryStatus: recoveryWrite.ok ? 'saved' : 'unavailable',
         });
         if (!recoveryWrite.ok) {
-          notify.warn('Encrypted local recovery failed. Export the new passwords before leaving this page.');
+          notify.warn('Tab-memory recovery failed. Export the new passwords before leaving this page.');
         }
       }
 
@@ -3853,9 +3843,9 @@ class SBTPage extends Component<any, any> {
             passwordList: newPasswordList,
           }),
         );
-    } catch (error) {
-      sbtLog.error('Error adding hashed passwords:', error);
-      if (this._isMounted) this.setState(buildSbtPageErrorPatch({ error: getErrorMessage(error) }));
+    } catch {
+      sbtLog.error('Adding invite credentials failed.');
+      if (this._isMounted) this.setState(buildSbtPageErrorPatch({ error: SBT_ADMIN_INVITE_FAILURE_MESSAGE }));
     }
   };
 

@@ -9,6 +9,7 @@ import {
 } from './sessionWizardDraftCache.js';
 import {
   clearSessionWizardPendingSbtDraftsCache,
+  purgeLegacySessionWizardPendingSbtDrafts,
   writeSessionWizardPendingSbtDraftsCache,
   type PendingSbtDraft,
 } from './hooks/usePendingSbtDrafts.js';
@@ -135,20 +136,19 @@ export const clearSessionWizardCache = ({
 }: ClearCacheDeps = {}) => {
   const persistPendingSbtDrafts = () => {
     if (preservedPendingSbtDrafts === undefined) {
-      return retainPendingSbtDrafts
-        ? { ok: true, removed: 0, failed: 0, status: 'ok' as const }
-        : clearPendingSbtDrafts();
+      if (!retainPendingSbtDrafts) return clearPendingSbtDrafts();
+      const purgeResult = purgeLegacySessionWizardPendingSbtDrafts();
+      return {
+        ...purgeResult,
+        status: purgeResult.ok ? ('ok' as const) : ('partial-failure' as const),
+      };
     }
     const writeResult = writeSessionWizardPendingSbtDraftsCache(preservedPendingSbtDrafts);
     return {
       ok: writeResult.ok,
       removed: writeResult.ok ? 1 : 0,
       failed: writeResult.ok ? 0 : 1,
-      status: writeResult.ok
-        ? ('ok' as const)
-        : writeResult.status === 'missing-storage'
-          ? ('missing-storage' as const)
-          : ('partial-failure' as const),
+      status: writeResult.ok ? ('ok' as const) : ('partial-failure' as const),
     };
   };
   const result = clearDraftCache({

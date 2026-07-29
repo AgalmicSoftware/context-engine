@@ -28,7 +28,7 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts.prebuild).toBe('node scripts/clean-legacy-vite-output.mjs');
     expect(pkg.scripts.build).toBe('PUBLIC_URL=/ vite build');
     expect(pkg.scripts.preview).toBe('vite preview --host 0.0.0.0');
-    expect(pkg.scripts.start).toBe('serve -s build');
+    expect(pkg.scripts.start).toBe('npm run preview');
     expect(pkg.scripts.test).toBe('jest');
     expect(pkg.scripts.lint).toBe(expectedLintCommand);
     expect(pkg.scripts['format:check']).toBe(
@@ -36,13 +36,13 @@ describe('client package modernization contract', () => {
     );
   });
 
-  it('makes bundle analysis build its own sourcemaps without changing production builds', () => {
+  it('makes bundle analysis use the local Vite reporter without publishing sourcemaps', () => {
     const pkg = readClientPackageJson();
 
     expect(pkg.scripts.build).not.toContain('sourcemap');
-    expect(pkg.scripts.analyze).toBe(
-      "npm run build -- --sourcemap true && source-map-explorer 'build/assets/*.js' --no-border-checks --html build/bundle-report.html",
-    );
+    expect(pkg.scripts.analyze).toBe('CE_BUNDLE_REPORT=1 npm run build');
+    expect(pkg.scripts.analyze).not.toContain('source-map-explorer');
+    expect(pkg.scripts.analyze).not.toContain('sourcemap');
   });
 
   it('keeps legacy Vite aliases and CRA fallback scripts removed from the client package contract', () => {
@@ -56,7 +56,7 @@ describe('client package modernization contract', () => {
     expect(pkg.scripts['dev:cra']).toBeUndefined();
     expect(pkg.scripts['build:cra']).toBeUndefined();
     expect(pkg.scripts.eject).toBeUndefined();
-    expect(pkg.scripts.start).not.toContain('vite');
+    expect(pkg.scripts.start).toBe('npm run preview');
     expect(eslintConfig).not.toContain('react-app');
     expect(eslintConfig).toContain("const typedDomainFiles = ['src/domains/**/*.{ts,tsx}']");
     expect(eslintConfig).toContain("const typedSessionUtilityFiles = ['src/utilities/session/**/*.{ts,tsx}']");
@@ -177,9 +177,7 @@ describe('client package modernization contract', () => {
       'vendor-visualization',
       'vendor-canvas',
       'vendor-crypto-core',
-      'vendor-crypto-zk-poseidon-low',
-      'vendor-crypto-zk-poseidon-high',
-      'vendor-crypto-zk',
+      'vendor-crypto-zk-poseidon',
       'vendor-media-canvas-export',
       'vendor-media-pdf',
       'vendor-media-audio',
@@ -193,10 +191,29 @@ describe('client package modernization contract', () => {
     expectedVendorChunks.forEach((chunkName) => {
       expect(viteConfig).toContain(chunkName);
     });
+    expect(viteConfig).not.toContain('vendor-crypto-zk-poseidon-low');
+    expect(viteConfig).not.toContain('vendor-crypto-zk-poseidon-high');
+    expect(viteConfig).not.toContain("'/node_modules/poseidon-lite/constants/1.js'");
+    expect(viteConfig).not.toContain("'/node_modules/poseidon-lite/constants/4.js'");
+    expect(viteConfig).not.toContain("'/node_modules/poseidon-lite/constants/16.js'");
+    expect(viteConfig).not.toContain("'/node_modules/@dnd-kit/'");
     expect(viteConfig).not.toContain('vendor-lit');
     expect(viteConfig).toContain("'/node_modules/hash.js/'");
     expect(viteConfig).toContain("'/node_modules/inherits/'");
     expect(viteConfig).toContain("'/node_modules/minimalistic-assert/'");
+  });
+
+  it('loads only the Poseidon arities used by survey commitments', () => {
+    const runtimeMethods = readClientFile('src/components/SurveyTool/surveyQuestionsRuntimeMethods.tsx');
+    const poseidonAdapter = readClientFile('src/utilities/crypto/poseidonHasher.ts');
+
+    expect(runtimeMethods).toContain("import { loadPoseidonHasher } from '../../utilities/crypto/poseidonHasher.js'");
+    expect(runtimeMethods).toContain('const poseidonHasher = await loadPoseidonHasher()');
+    expect(runtimeMethods).not.toContain("import('poseidon-lite')");
+    expect(runtimeMethods).not.toMatch(/\{\s*poseidon\s*\}/);
+    expect(poseidonAdapter).toContain("import('poseidon-lite/poseidon2')");
+    expect(poseidonAdapter).toContain("import('poseidon-lite/poseidon3')");
+    expect(poseidonAdapter).not.toMatch(/poseidon(?:1|[4-9]|1[0-6])['"]/);
   });
 
   it('keeps the default passkey-only wallet profile and its bundle verifier wired', () => {
@@ -282,7 +299,7 @@ describe('client package modernization contract', () => {
     });
   });
 
-  it('keeps build, test, lint, analyze, and static serving tools out of production dependencies', () => {
+  it('keeps build, test, lint, and analysis tools out of production dependencies', () => {
     const pkg = readClientPackageJson();
     const devOnlyPackages = [
       '@babel/core',
@@ -297,14 +314,36 @@ describe('client package modernization contract', () => {
       'eslint-plugin-react-hooks',
       'globals',
       'sass',
-      'serve',
-      'source-map-explorer',
       'vite',
     ];
 
     devOnlyPackages.forEach((name) => {
       expect(pkg.dependencies[name]).toBeUndefined();
       expect(pkg.devDependencies[name]).toBeDefined();
+    });
+
+    ['serve', 'source-map-explorer'].forEach((name) => {
+      expect(pkg.dependencies[name]).toBeUndefined();
+      expect(pkg.devDependencies[name]).toBeUndefined();
+    });
+  });
+
+  it('keeps verified-unused packages out of the direct client dependency contract', () => {
+    const pkg = readClientPackageJson();
+    const removedDirectPackages = [
+      '@babel/runtime',
+      '@dnd-kit/core',
+      '@dnd-kit/sortable',
+      '@metamask/eth-sig-util',
+      '@noble/secp256k1',
+      'd3-scale',
+      'react-router',
+      'zod',
+    ];
+
+    removedDirectPackages.forEach((name) => {
+      expect(pkg.dependencies[name]).toBeUndefined();
+      expect(pkg.devDependencies[name]).toBeUndefined();
     });
   });
 

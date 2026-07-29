@@ -34,6 +34,31 @@ export type WorkerUrlResolutionDisplay = {
 };
 
 const asRecord = (value: unknown): AdminRecord => (value && typeof value === 'object' ? (value as AdminRecord) : {});
+const cloneConfigValue = <T>(value: T): T => {
+  if (value == null || typeof value !== 'object') return value;
+  return JSON.parse(JSON.stringify(value)) as T;
+};
+
+const isWorkerCanonicalConfig = (config: AdminRecord): boolean =>
+  toStr(asRecord(asRecord(config.sessionModeProfile).authority).mode).trim() === 'worker_canonical';
+
+const workerCanonicalUsesOnChainSbt = (config: AdminRecord): boolean => {
+  const profile = asRecord(config.sessionModeProfile);
+  const authorization = asRecord(profile.authorization);
+  if (Array.isArray(authorization.mechanisms) && authorization.mechanisms.includes('sbt_onchain')) {
+    return true;
+  }
+  const storage = asRecord(profile.storage);
+  const payloadAccess = asRecord(storage.payloadAccessControl);
+  const encryption = asRecord(profile.encryption);
+  return [payloadAccess.accessConditions, encryption.accessConditions].some((rawDocument) => {
+    const document = asRecord(rawDocument);
+    return (
+      Array.isArray(document.conditions) &&
+      document.conditions.some((condition) => asRecord(condition).kind === 'sbt_onchain')
+    );
+  });
+};
 
 export const normalizeRpcUrlList = (value: unknown): string[] => {
   if (Array.isArray(value)) {
@@ -204,6 +229,52 @@ export const buildWorkerSessionConfigPayload = ({
     adminAddress: toStr(registry.adminAddress || cfg.adminAddress || account).trim(),
   };
   const slug = normalizeSlug(cfg.slug || '');
+  if (isWorkerCanonicalConfig(cfg)) {
+    if (slug || slug === '') out.slug = slug;
+    const sessionId = toStr(cfg.sessionId || cfg.sessionIdHex || '').trim();
+    if (sessionId) out.sessionId = sessionId;
+    const workerCanonicalKeys = [
+      'sessionName',
+      'sessionInfo',
+      'sessionHeaderImg',
+      'sessionEndsAt',
+      'defaultTags',
+      'defaultGroupTags',
+      'questionsGenPrompt',
+      'defaultFilterState',
+      'adminAddresses',
+      'corsWorkerUrl',
+      'sessionModeProfile',
+      'agentSessionWrapped',
+      'workerAuthority',
+      'groupCreationPolicy',
+      'storageProfile',
+      'ai',
+      'embeddedDeployHelperEnabled',
+      'litCredentials',
+    ];
+    if (workerCanonicalUsesOnChainSbt(cfg)) {
+      workerCanonicalKeys.push('defaultSbtTags', 'defaultFeaturedSBTs', 'autoFeatureSBTsBySessionSlug');
+      if (inferredSessionChainId) out.networkChainId = inferredSessionChainId;
+      const sbtFactory = normalizeContractEntry(asRecord(cfg.contracts).sbtFactory, inferredSessionChainId);
+      if (sbtFactory) out.contracts = { sbtFactory };
+    } else if (
+      asRecord(cfg.sessionModeProfile).encryption &&
+      asRecord(asRecord(cfg.sessionModeProfile).encryption).mode === 'lit' &&
+      inferredSessionChainId
+    ) {
+      out.networkChainId = inferredSessionChainId;
+    }
+    workerCanonicalKeys.forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(cfg, key)) {
+        out[key] = cloneConfigValue(cfg[key]);
+      }
+    });
+    if (allowOrigins.length) out.allowOrigins = allowOrigins;
+    if (Object.keys(limits).length) out.limits = limits;
+    if (Object.keys(scopes).length) out.scopes = scopes;
+    return out;
+  }
   const registryAddress = toStr(registry.registryAddress || registry.address || '').trim();
   const resolvedRegistryAddress =
     registryAddress ||

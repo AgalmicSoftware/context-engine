@@ -20,6 +20,28 @@ test('dispatchAuthenticatedNonSecretActionRoute ignores unrelated actions', asyn
   assert.deepEqual(result, { handled: false });
 });
 
+test('dispatchAuthenticatedNonSecretActionRoute blocks fetch work after the session ends', async () => {
+  let preflightCalled = false;
+  const result = await dispatchAuthenticatedNonSecretActionRoute({
+    action: 'fetch_url',
+    config: { sessionEndsAt: '2030-01-02T03:04:00Z' },
+    headers: { 'Access-Control-Allow-Origin': '*' },
+    deps: {
+      now: () => Date.parse('2030-01-02T03:04:00Z'),
+      json: (body, status, headers) => ({ body, status, headers }),
+      evaluateAuthenticatedRoutePreflight: async () => {
+        preflightCalled = true;
+        return { ok: true };
+      },
+    },
+  });
+
+  assert.equal(preflightCalled, false);
+  assert.equal(result.handled, true);
+  assert.equal(result.response.status, 410);
+  assert.equal(result.response.body.code, 'session_ended');
+});
+
 test('dispatchAuthenticatedNonSecretActionRoute preserves fetch preflight failure passthrough', async () => {
   const response = new Response(JSON.stringify({ error: 'Token missing fetch scope.' }), {
     status: 403,

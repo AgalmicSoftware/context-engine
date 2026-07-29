@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import demoSessions from '../../variables/demo/demo_sessions.json';
 import demo1OnchainQuestionIds from '../../variables/demo/demo_1_onchain_question_ids.json';
 import { getTemporaryDemoSessionQuestionFixtures } from './demoSessionQuestionFixtures.js';
+import { classifySessionModeProfileSupport } from './sessionModeProfile';
 
 describe('getTemporaryDemoSessionQuestionFixtures', () => {
   it('maps the demo polis comments to temporary demo-1 question metadata', () => {
@@ -107,6 +108,7 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
       demoFixture: { workerCanonical: true },
     });
     expect(config).toMatchObject({
+      networkChainId: 11155420,
       slug: 'demo-sh',
       sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
       configRevision: 'demo-sh-v1',
@@ -116,6 +118,20 @@ describe('getTemporaryDemoSessionQuestionFixtures', () => {
         workerCanonical: true,
         questionCount: 42,
       },
+      sessionModeProfile: {
+        authority: { mode: 'worker_canonical' },
+        evm: { registryChainId: null },
+        results: {
+          visibility: 'public_full_if_storage_public',
+          exposure: {
+            aggregateResultsEnabled: true,
+            anonymizedGroupsEnabled: false,
+            minGroupSize: 2,
+          },
+        },
+        export: { scope: 'all_session' },
+      },
     });
+    expect(classifySessionModeProfileSupport(config.sessionModeProfile).status).toBe('reachable');
   });
 });

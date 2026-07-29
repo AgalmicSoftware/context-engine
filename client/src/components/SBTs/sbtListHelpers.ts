@@ -168,6 +168,7 @@ export {
   readSbtListUniverseCollapsedState,
   readStoredSbtListModeSelectedSessionSlugs,
   resolveSbtListCreateGroupInitialVisibility,
+  resolveSbtListInitialActiveSessionSlug,
   SBT_LIST_MODE_SELECTION_STORAGE_KEY,
 } from './sbtListStorageHelpers';
 export type { SbtListStorageReader } from './sbtListStorageHelpers';
@@ -183,4 +184,4 @@ export {
 } from './sbtListSessionBindingHelpers';
 export { buildSbtListRenderBuckets } from './sbtListRenderBucketHelpers';
 export type { BuildSbtRenderBucketsOptions, SbtRenderBuckets } from './sbtListRenderBucketHelpers';
-export { buildSbtListDetailHref } from './sbtListRouteHelpers';
+export { buildSbtListDetailHref, resolveSbtListRouteScope } from './sbtListRouteHelpers';

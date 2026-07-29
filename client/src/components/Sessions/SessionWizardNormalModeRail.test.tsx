@@ -41,7 +41,7 @@ describe('SessionWizardNormalModeRail', () => {
       />,
     );
 
-    expect(screen.getByRole('region', { name: 'Normal mode sections' })).toHaveStyle({
+    expect(screen.getByRole('region', { name: 'Session setup steps' })).toHaveStyle({
       '--session-wizard-card-count': '3',
     });
     expect(screen.getByRole('button', { name: 'Step 1: Session Details' })).toHaveClass('normalModeCardReady');

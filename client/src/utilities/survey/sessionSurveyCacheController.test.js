@@ -45,6 +45,57 @@ const { normalizeSessionSlug } = contractScriptsModule;
 const { normalizeArweaveFailureMeta, shouldStopPendingMetadataRetry } = require('../arweave/arweaveRetryHelpers.js');
 const { prepareSurveyMetadataCacheEntry } = require('./metadataCacheEntryBuilders.js');
 const { resolveScopedMetadataSessionSlug } = require('../session/metadataSessionBinding.js');
+const { resolveWorkerCanonicalCacheIdentity } = require('./workerCanonicalCacheIdentity.js');
+
+const WORKER_SESSION_ID = `0x${'4'.repeat(32)}`;
+
+const createWorkerCanonicalSessionConfig = ({
+  sessionId = WORKER_SESSION_ID,
+  workerUrl = 'https://alpha-worker.example.test',
+} = {}) => ({
+  slug: 'alpha',
+  sessionId,
+  corsWorkerUrl: workerUrl,
+  sessionModeProfile: {
+    profileVersion: 1,
+    preset: 'custom',
+    authority: { mode: 'worker_canonical' },
+    evm: { registryChainId: null },
+    storage: {
+      backend: 'cloudflare',
+      payloadAccessControl: { gate: 'none', encryption: 'none' },
+    },
+    identity: { default: 'passkey', enabled: ['passkey'] },
+    authorization: { mechanisms: ['worker_roles'] },
+    encryption: { mode: 'none' },
+    surfaces: {
+      web: true,
+      telegram: false,
+      miniApp: false,
+      agentHttp: false,
+      mcp: false,
+      ceCc: false,
+    },
+    results: {
+      visibility: 'public_full_if_storage_public',
+      exposure: {
+        aggregateResultsEnabled: true,
+        anonymizedGroupsEnabled: false,
+        minGroupSize: 2,
+      },
+    },
+    export: { scope: 'all_session' },
+  },
+  storageProfile: {
+    backend: 'cloudflare',
+    resources: { questions: 'active', surveys: 'active' },
+    payloadAccessControl: {
+      gate: 'none',
+      encryption: 'none',
+      mode: 'public_read',
+    },
+  },
+});
 
 const deepClone = (value) => (value == null ? value : JSON.parse(JSON.stringify(value)));
 
@@ -288,6 +339,164 @@ describe('createSessionSurveyCacheController', () => {
   });
 
   describe('initializeSurveyCacheForGroup', () => {
+    it('hydrates fresh Worker survey metadata before the chain-scan no-op without RPC calls', async () => {
+      const sessionCfg = createWorkerCanonicalSessionConfig();
+      const loadSurveys = jest.fn().mockResolvedValue([
+        {
+          id: '0xworkersurvey',
+          createdAtMs: 456,
+          storageRefId: 'cf_survey_fresh',
+          storageRef: {
+            backend: 'cloudflare',
+            id: 'cf_survey_fresh',
+            resource: 'surveys',
+          },
+          payload: {
+            id: '0xworkersurvey',
+            surveyID: '0xworkersurvey',
+            title: 'Fresh Worker survey',
+            sessionId: WORKER_SESSION_ID,
+            sessionSlug: 'alpha',
+          },
+        },
+      ]);
+      const host = createMockHost({
+        chainId: null,
+        getAccount: jest.fn(() => 'worker-account'),
+        getProviderLike: jest.fn(() => 'worker-provider'),
+        getSessionCfg: jest.fn(() => sessionCfg),
+        scanScopeNoop: jest.fn(() => true),
+        workerCanonicalMetadataHydrationPort: { loadSurveys },
+      });
+      const controller = createSessionSurveyCacheController(host);
+
+      await controller.initializeSurveyCacheForGroup('alpha');
+
+      expect(loadSurveys).toHaveBeenCalledWith({
+        account: 'worker-account',
+        providerLike: 'worker-provider',
+        sessionSlug: 'alpha',
+        sessionConfig: sessionCfg,
+      });
+      expect(host.scanScopeNoop).not.toHaveBeenCalled();
+      expect(host.getSessionChainId).not.toHaveBeenCalled();
+      expect(contractScripts.getRelevantBlockWindowForFilter).not.toHaveBeenCalled();
+      expect(contractScripts.fetchUserSubmittedSurveyIDs).not.toHaveBeenCalled();
+      expect(contractScripts.getSurveyDataById).not.toHaveBeenCalled();
+      expect(host.getStored('surveysCache', 'alpha')).toEqual(
+        expect.objectContaining({
+          worker: expect.objectContaining({
+            surveys: {
+              '0xworkersurvey': expect.objectContaining({
+                id: '0xworkersurvey',
+                surveyID: '0xworkersurvey',
+                title: 'Fresh Worker survey',
+              }),
+            },
+          }),
+        }),
+      );
+      expect(host.getStateSnapshot()).toMatchObject({ isSurveyCacheReady: true });
+    });
+
+    it('starts same-slug Worker B independently, clears empty B, and discards delayed Worker A surveys', async () => {
+      const sessionConfigA = createWorkerCanonicalSessionConfig();
+      const sessionConfigB = createWorkerCanonicalSessionConfig({
+        sessionId: `0x${'7'.repeat(32)}`,
+        workerUrl: 'https://alpha-survey-worker-b.example.test',
+      });
+      const identityA = resolveWorkerCanonicalCacheIdentity({
+        sessionConfig: sessionConfigA,
+        sessionSlug: 'alpha',
+      });
+      const identityB = resolveWorkerCanonicalCacheIdentity({
+        sessionConfig: sessionConfigB,
+        sessionSlug: 'alpha',
+      });
+      const delayedA = createDeferred();
+      const delayedB = createDeferred();
+      const workerALoaderStarted = createDeferred();
+      const workerBLoaderStarted = createDeferred();
+      let currentSessionConfig = sessionConfigA;
+      const loadSurveys = jest.fn(({ sessionConfig }) => {
+        if (sessionConfig === sessionConfigA) {
+          workerALoaderStarted.resolve();
+          return delayedA.promise;
+        }
+        workerBLoaderStarted.resolve();
+        return delayedB.promise;
+      });
+      const host = createMockHost({
+        chainId: null,
+        initialStorage: {
+          surveysCache: {
+            alpha: {
+              worker: {
+                surveysLatestBlock: 0,
+                surveys: {
+                  'survey-a-cached': {
+                    id: 'survey-a-cached',
+                    surveyID: 'survey-a-cached',
+                    title: 'Cached Session A survey',
+                  },
+                },
+                surveyResponses: {},
+                surveyResponsesLatestBlock: {},
+                pendingSurveyMetadata: {},
+                workerCanonicalIdentity: identityA,
+              },
+            },
+          },
+        },
+        getSessionCfg: jest.fn(() => currentSessionConfig),
+        workerCanonicalMetadataHydrationPort: { loadSurveys },
+      });
+      const controller = createSessionSurveyCacheController(host);
+
+      const runA = controller.initializeSurveyCacheForGroup('alpha');
+      await workerALoaderStarted.promise;
+      expect(controller.isInitInFlight('alpha')).toBe(true);
+
+      currentSessionConfig = sessionConfigB;
+      const runB = controller.initializeSurveyCacheForGroup('alpha');
+      await workerBLoaderStarted.promise;
+
+      expect(loadSurveys).toHaveBeenCalledTimes(2);
+      expect(host.getStored('surveysCache', 'alpha').worker).toMatchObject({
+        surveys: {},
+        workerCanonicalIdentity: identityB,
+      });
+
+      delayedB.resolve([]);
+      await runB;
+      delayedA.resolve([
+        {
+          id: 'survey-a-delayed',
+          createdAtMs: 987,
+          storageRefId: 'cf_survey_a_delayed',
+          storageRef: {
+            backend: 'cloudflare',
+            id: 'cf_survey_a_delayed',
+            resource: 'surveys',
+          },
+          payload: {
+            id: 'survey-a-delayed',
+            surveyID: 'survey-a-delayed',
+            title: 'Delayed Session A survey',
+            sessionId: sessionConfigA.sessionId,
+            sessionSlug: 'alpha',
+          },
+        },
+      ]);
+      await runA;
+
+      expect(host.getStored('surveysCache', 'alpha').worker).toMatchObject({
+        surveys: {},
+        workerCanonicalIdentity: identityB,
+      });
+      expect(controller.isInitInFlight('alpha')).toBe(false);
+    });
+
     it('short-circuits via scanScopeNoop and marks survey cache ready', async () => {
       const host = createMockHost({
         scanScopeNoop: jest.fn((slug, op, onSkipped) => {

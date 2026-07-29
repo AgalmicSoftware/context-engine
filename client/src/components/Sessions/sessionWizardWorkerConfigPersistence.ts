@@ -1,8 +1,10 @@
 import sha256 from 'crypto-js/sha256';
 import {
+  normalizeWorkerCanonicalSessionIdHex,
   parseSessionWorkerDiscoveryOrigin,
   type DiscoveryEnvironment,
 } from '../../utilities/session/sessionWorkerDiscovery';
+import { classifySessionModeProfileSupport, type SessionModeProfile } from '../../utilities/session/sessionModeProfile';
 import { CHIPOTLE_LIT_CONFIG_FIELDS } from './sessionWizardWorkerSecretSupport';
 
 type UnknownRecord = Record<string, unknown>;
@@ -60,12 +62,21 @@ const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'sessionName',
   'sessionInfo',
   'sessionHeaderImg',
+  'sessionEndsAt',
+  'defaultTags',
+  'defaultGroupTags',
+  'defaultSbtTags',
+  'questionsGenPrompt',
+  'defaultFilterState',
+  'defaultFeaturedSBTs',
+  'autoFeatureSBTsBySessionSlug',
   'adminAddress',
   'adminAddresses',
   'corsWorkerUrl',
   'allowOrigins',
   'sessionModeProfile',
   'workerAuthority',
+  'groupCreationPolicy',
   'storageProfile',
   'ai',
   'limits',
@@ -76,7 +87,6 @@ const PUBLIC_WORKER_CONFIG_FIELDS = Object.freeze([
   'networkChainId',
   'embeddedDeployHelperEnabled',
 ]);
-const SESSION_ID_PATTERN = /^0x[0-9a-f]{32}$/;
 const ADDRESS_PATTERN = /^0x[0-9a-f]{40}$/;
 const REVISION_PATTERN = /^[a-z0-9._:-]{1,128}$/i;
 const LIT_CREDENTIAL_DESCRIPTOR_FIELDS = new Set<string>(CHIPOTLE_LIT_CONFIG_FIELDS);
@@ -89,11 +99,7 @@ const normalizeSlug = (value: unknown): string =>
     .toLowerCase()
     .replace(/[^a-z0-9_-]/g, '');
 
-const normalizeSessionId = (value: unknown): string => {
-  const normalized = toTrimmedString(value).toLowerCase().replace(/-/g, '');
-  const withPrefix = normalized.startsWith('0x') ? normalized : `0x${normalized}`;
-  return SESSION_ID_PATTERN.test(withPrefix) ? withPrefix : '';
-};
+const normalizeSessionId = normalizeWorkerCanonicalSessionIdHex;
 
 const normalizeAdminAddress = (value: unknown): string => {
   const normalized = toTrimmedString(value).toLowerCase();
@@ -299,6 +305,23 @@ const getPublicConfigFromResponse = (body: UnknownRecord): UnknownRecord => {
   return clonePublicConfig(candidate);
 };
 
+const assertReachableWorkerCanonicalProfile = (profile: unknown, context: string): SessionModeProfile => {
+  const support = classifySessionModeProfileSupport(profile);
+  if (support.status !== 'reachable') {
+    const firstIssue = support.validation.issues[0];
+    throw new Error(
+      `${context} failed: unsupported session mode profile${
+        firstIssue ? ` at "${firstIssue.path || 'profile'}" (${firstIssue.code})` : ''
+      }.`,
+    );
+  }
+  const reachableProfile = profile as SessionModeProfile;
+  if (reachableProfile.authority.mode !== 'worker_canonical') {
+    throw new Error(`${context} is not worker_canonical.`);
+  }
+  return reachableProfile;
+};
+
 const verifyCriticalWorkerConfigFields = ({
   config,
   slug,
@@ -318,15 +341,7 @@ const verifyCriticalWorkerConfigFields = ({
   if (normalizeSessionId(config.sessionIdHex || config.sessionId) !== sessionId) {
     throw new Error('Worker config verification failed: session ID mismatch.');
   }
-  const profile =
-    config.sessionModeProfile && typeof config.sessionModeProfile === 'object'
-      ? (config.sessionModeProfile as UnknownRecord)
-      : {};
-  const authority =
-    profile.authority && typeof profile.authority === 'object' ? (profile.authority as UnknownRecord) : {};
-  if (authority.mode !== 'worker_canonical') {
-    throw new Error('Worker config verification failed: authority profile is not worker_canonical.');
-  }
+  assertReachableWorkerCanonicalProfile(config.sessionModeProfile, 'Worker config verification');
   let representedWorkerOrigin = '';
   try {
     representedWorkerOrigin = parseSessionWorkerDiscoveryOrigin(config.corsWorkerUrl, { environment });
@@ -367,15 +382,7 @@ export const persistAndVerifySessionWizardWorkerConfig = async ({
   if (typeof fetchImpl !== 'function') throw new Error('Worker config transport is unavailable.');
 
   const publicConfig = clonePublicConfig(config);
-  const profile =
-    publicConfig.sessionModeProfile && typeof publicConfig.sessionModeProfile === 'object'
-      ? (publicConfig.sessionModeProfile as UnknownRecord)
-      : {};
-  const authority =
-    profile.authority && typeof profile.authority === 'object' ? (profile.authority as UnknownRecord) : {};
-  if (authority.mode !== 'worker_canonical') {
-    throw new Error('Prepared worker config must declare authority.mode "worker_canonical".');
-  }
+  assertReachableWorkerCanonicalProfile(publicConfig.sessionModeProfile, 'Prepared worker config');
 
   const revisionConfig = { ...publicConfig };
   delete revisionConfig.configRevision;

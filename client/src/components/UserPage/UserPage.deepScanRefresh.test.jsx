@@ -98,6 +98,19 @@ describe('UserPage deep scan refresh state', () => {
     } catch (_) {}
   });
 
+  it('does not start a profile scan when the active session disables on-chain profile data', () => {
+    const scanSpecificUserProfile = jest.fn();
+    const instance = makeInstance({
+      onChainProfileEnabled: false,
+      scanSpecificUserProfile,
+    });
+
+    instance.startProfileDeepScan('mount');
+
+    expect(scanSpecificUserProfile).not.toHaveBeenCalled();
+    expect(instance.state.isDeepScanning).toBe(false);
+  });
+
   it('keeps loading state when data remains uncertain and no cache sources are available', () => {
     const instance = makeInstance();
     instance.state.hasUncertainUserData = true;

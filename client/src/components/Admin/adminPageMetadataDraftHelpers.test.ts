@@ -6,6 +6,7 @@ import {
   parseChainIdInput,
   shouldShowInlineResourceSummary,
 } from './adminPageMetadataDraftHelpers';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('adminPageMetadataDraftHelpers', () => {
   it('round-trips editable metadata and preserves contract chain fallback', () => {
@@ -142,6 +143,70 @@ describe('adminPageMetadataDraftHelpers', () => {
     expect(patch).not.toHaveProperty('workerCanonicalPublicationRevision');
     expect(patch).not.toHaveProperty('corsWorkerUrl');
     expect(patch).not.toHaveProperty('registryChainId');
+  });
+
+  it('does not require or synthesize chain defaults for a pure worker-canonical save', () => {
+    const metadata = buildEditableSessionMetadataPayload({
+      sessionConfig: {
+        slug: 'worker-session',
+        sessionName: 'Worker Session',
+        autoFeatureSBTsBySessionSlug: true,
+        blockLimits: { start: 123 },
+        contracts: {
+          sessionRegistry: {
+            address: '0x0000000000000000000000000000000000000001',
+            chainId: 11155420,
+          },
+        },
+        defaultFeaturedSBTs: ['0x0000000000000000000000000000000000000002'],
+        defaultSbtTags: 'legacy',
+        faucet: { amountEth: '0.01' },
+        registryChainId: 11155420,
+        sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      },
+      advancedDraft: {
+        ...buildAdminMetadataDraft({}),
+        defaultTags: 'worker',
+        defaultSbtTags: 'must-not-save',
+        contractSurveysAddress: '0x0000000000000000000000000000000000000001',
+        faucetAmountEth: '0.01',
+      },
+      requireBlockLimits: false,
+      includeChainFields: false,
+    });
+    const patch = buildWorkerCanonicalMetadataConfigPatch({
+      metadata,
+      slug: 'worker-session',
+      adminAddress: '0x00000000000000000000000000000000000000aa',
+      includeChainFields: false,
+    });
+
+    expect(metadata.defaultTags).toBe('worker');
+    [
+      'autoFeatureSBTsBySessionSlug',
+      'blockLimits',
+      'contracts',
+      'defaultSbtTags',
+      'defaultFeaturedSBTs',
+      'faucet',
+      'networkChainId',
+      'registryChainId',
+    ].forEach((key) => expect(metadata).not.toHaveProperty(key));
+    expect(patch).toEqual(
+      expect.objectContaining({
+        slug: 'worker-session',
+        adminAddress: '0x00000000000000000000000000000000000000aa',
+        defaultTags: 'worker',
+      }),
+    );
+    [
+      'autoFeatureSBTsBySessionSlug',
+      'blockLimits',
+      'contracts',
+      'defaultSbtTags',
+      'defaultFeaturedSBTs',
+      'faucet',
+    ].forEach((key) => expect(patch).not.toHaveProperty(key));
   });
 
   it('allowlists editor-owned worker metadata without replaying authority or runtime config', () => {

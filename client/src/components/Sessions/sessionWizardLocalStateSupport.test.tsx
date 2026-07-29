@@ -11,11 +11,16 @@ import {
   getSessionWizardWorkerSettlementStorageKey,
   writeSessionWizardWorkerSettlement,
 } from './sessionWizardWorkerSettlement';
+import {
+  clearSessionWizardPendingSbtDraftsCache,
+  readSessionWizardPendingSbtDraftsCache,
+} from './hooks/usePendingSbtDrafts';
 
 describe('sessionWizardLocalStateSupport', () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
+    clearSessionWizardPendingSbtDraftsCache();
   });
 
   it('keeps a stable object reference when the serialized value does not change', () => {
@@ -140,7 +145,7 @@ describe('sessionWizardLocalStateSupport', () => {
     expect(clearDraftCache).toHaveBeenCalledWith(expect.objectContaining({ expectedPublicationIdentity }));
   });
 
-  it('poisons the published draft while atomically retaining undeployed pending SBT drafts', () => {
+  it('poisons the published draft while retaining undeployed pending SBT drafts in memory', () => {
     sessionStorage.setItem(
       'ce:sessionWizardDraft:v1',
       JSON.stringify({
@@ -171,9 +176,8 @@ describe('sessionWizardLocalStateSupport', () => {
     expect(readSessionWizardCache()).toEqual({
       terminalWorkerSettlement: expect.objectContaining({ slug: 'published-session' }),
     });
-    expect(JSON.parse(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1') || '[]')).toEqual([
-      expect.objectContaining(pendingDraft),
-    ]);
+    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
+    expect(readSessionWizardPendingSbtDraftsCache()).toEqual([expect.objectContaining(pendingDraft)]);
   });
 
   it('clears only the relevant published worker identity before navigating to a fresh wizard', () => {

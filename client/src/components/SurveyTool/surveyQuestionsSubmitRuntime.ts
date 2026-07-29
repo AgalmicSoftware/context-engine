@@ -10,6 +10,7 @@ import type {
   SurveyQuestionsSubmitStaleStatePatch,
   SurveyQuestionsSubmitStartControllerResult,
 } from './surveyQuestionsSubmitController.js';
+import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation.js';
 
 export type SurveyQuestionsSubmitRuntime = SurveyQuestionsLegacyRecord;
 
@@ -40,6 +41,7 @@ export const createSurveyQuestionsSubmitRuntime = (
     prepareJsonAndHash,
     propsRef,
     resolveEffectiveSlug,
+    resolveEffectiveResponseGateConfig,
     resolveFieldEncryptionAudience,
     resolveFieldEncryptionGateId,
     resolveSessionChainId,
@@ -158,6 +160,10 @@ export const createSurveyQuestionsSubmitRuntime = (
       routeSlug: resolveEffectiveSlug(propsRef.current),
       normalizeSlug: normalizeSessionSlugValue,
     });
+    const workerTarget: SurveyQuestionsLegacyValue = resolveSurveyToolWorkerTargetSignature({
+      sessionConfig: resolveEffectiveResponseGateConfig(effectiveDraftSlug, propsRef.current),
+      sessionSlug: effectiveDraftSlug,
+    });
 
     return {
       props: propsRef.current,
@@ -174,6 +180,8 @@ export const createSurveyQuestionsSubmitRuntime = (
       questionID: propsRef.current.questionID || '',
       effectiveDraftSlug,
       chainId: resolveSessionChainId(effectiveDraftSlug, null, propsRef.current),
+      workerTargetKey: String(workerTarget?.key || ''),
+      workerTargetValid: workerTarget?.valid !== false,
       mounted: !!inst._isMounted,
     };
   };
@@ -197,11 +205,18 @@ export const createSurveyQuestionsSubmitRuntime = (
       String(context.questionID || '')
         .trim()
         .toLowerCase(),
+      ...(context.workerTargetKey ? [String(context.workerTargetKey).trim()] : []),
     ].join('|');
   };
 
   const isSubmitContextCurrent = (snapshot: SurveyQuestionsLegacyValue = null) =>
-    !!snapshot && (!snapshot.mounted || inst._isMounted) && buildSubmitContextKey(snapshot) === buildSubmitContextKey();
+    !!snapshot &&
+    snapshot.workerTargetValid !== false &&
+    (!snapshot.mounted || inst._isMounted) &&
+    (() => {
+      const current = buildSubmitContextSnapshot();
+      return current.workerTargetValid !== false && buildSubmitContextKey(snapshot) === buildSubmitContextKey(current);
+    })();
 
   const startSubmitAttempt = (): number => {
     const attemptId = (Number(inst._submitAttemptSeq) || 0) + 1;

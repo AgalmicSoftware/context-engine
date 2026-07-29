@@ -17,7 +17,9 @@ import {
 } from './sessionWizardAiConfig';
 import { normalizeSessionStorageProfileConfig } from './sessionWizardStorageProfile';
 import { WORKER_SECRET_CACHE_SAFE_FIELDS } from './sessionWizardWorkerSecretSupport';
+import { sanitizeSessionWizardDraftForBrowserCache } from './sessionWizardBrowserCacheSanitization';
 import {
+  classifySessionModeProfileSupport,
   compileSessionModeProfile,
   hasLegacyTelegramFirstSessionFlags,
   mergeSessionModeProfileStorageAccess,
@@ -173,6 +175,9 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
     draft.faucet.rpcUrl = getDefaultHttpRpc(chainId) || draft.faucet.rpcUrl;
   }
   const resolvedAutoFeature = resolveSessionWizardAutoFeatureBySessionSlug(draft);
+  draft.sessionEndsAt = toStr(draft.sessionEndsAt).trim();
+  draft.defaultGroupTags =
+    typeof draft.defaultGroupTags === 'string' ? draft.defaultGroupTags.trim() : DEFAULT_NEW_SESSION_SBT_TAGS;
   delete draft.autoFeatureSBTsWithFeaturedSbtTags;
   if (typeof resolvedAutoFeature !== 'boolean') {
     draft.autoFeatureSBTsBySessionSlug = true;
@@ -187,8 +192,13 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
       draft.sessionModeProfile as SessionModeProfile,
       draft.storageProfile,
     );
-    const compiled = compileSessionModeProfile(draft.sessionModeProfile as SessionModeProfile);
-    draft.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+    const support = classifySessionModeProfileSupport(draft.sessionModeProfile);
+    draft.storageProfile =
+      support.status === 'reachable'
+        ? normalizeSessionStorageProfileConfig(
+            compileSessionModeProfile(draft.sessionModeProfile as SessionModeProfile).storageProfile,
+          )
+        : normalizeSessionStorageProfileConfig(draft.storageProfile);
   } else {
     draft.storageProfile = normalizeSessionStorageProfileConfig(
       draft.storageProfile || draft.sessionStorageProfile || draft.storage,
@@ -207,6 +217,7 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   draft.sessionName = '';
   draft.sessionInfo = '';
   draft.sessionHeader = '';
+  draft.sessionEndsAt = '';
   delete draft.sessionModeProfile;
   delete draft.telegramOnly;
   delete draft.telegram_only;
@@ -218,6 +229,7 @@ export const buildSessionWizardDefaultTemplate = (): AnyRecord => {
   delete draft.sessionInfoEncrypted;
   draft.corsWorkerUrl = '';
   draft.defaultTags = '';
+  draft.defaultGroupTags = DEFAULT_NEW_SESSION_SBT_TAGS;
   draft.defaultSbtTags = DEFAULT_NEW_SESSION_SBT_TAGS;
   draft.questionsGenPrompt = '';
   draft.defaultFilterState = draft.defaultFilterState ?? null;
@@ -296,8 +308,11 @@ export const buildSessionWizardInitialDraftFromCache = ({
   const normalized = normalizeSessionWizardDraftShape(merged);
   if (shouldBuildCachedStorageModeProfile && !normalized.sessionModeProfile) {
     normalized.sessionModeProfile = buildCachedDraftSessionModeProfile(normalized);
-    const compiled = compileSessionModeProfile(normalized.sessionModeProfile as SessionModeProfile);
-    normalized.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+    const support = classifySessionModeProfileSupport(normalized.sessionModeProfile);
+    if (support.status === 'reachable') {
+      const compiled = compileSessionModeProfile(normalized.sessionModeProfile as SessionModeProfile);
+      normalized.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
+    }
   }
   if (normalModeSharedHostedWorkerEnabled === false && !cachedWizard?.deployComplete) {
     normalized.corsWorkerUrl = '';
@@ -310,11 +325,15 @@ export const applySessionWizardRegistryChainDraftDefaults = ({
   chainId = 0,
   contractDefaults = {},
   pathRpc = '',
+  includeContracts = true,
+  includeFaucet = true,
 }: {
   draft?: AnyRecord | null;
   chainId?: unknown;
   contractDefaults?: AnyRecord | null;
   pathRpc?: unknown;
+  includeContracts?: boolean;
+  includeFaucet?: boolean;
 } = {}): AnyRecord => {
   const resolvedChainId = Number(chainId || 0) || 0;
   const next = deepClone(draft && typeof draft === 'object' ? draft : {}) as AnyRecord;
@@ -324,19 +343,54 @@ export const applySessionWizardRegistryChainDraftDefaults = ({
     next.networkChainId = resolvedChainId;
   }
 
-  const defaults = contractDefaults && typeof contractDefaults === 'object' ? contractDefaults : {};
-  const contracts = next.contracts && typeof next.contracts === 'object' ? (next.contracts as AnyRecord) : {};
-  next.contracts = contracts;
-  const keys = new Set([...Object.keys(contracts || {}), ...Object.keys(defaults || {})]);
-  keys.forEach((key) => {
-    const entry = contracts[key] && typeof contracts[key] === 'object' ? (contracts[key] as AnyRecord) : {};
-    const fallback = toStr(defaults[key] || '').trim();
-    if (fallback) {
-      entry.address = fallback;
+  if (
+    next.sessionModeProfile &&
+    typeof next.sessionModeProfile === 'object' &&
+    !Array.isArray(next.sessionModeProfile)
+  ) {
+    const support = classifySessionModeProfileSupport(next.sessionModeProfile);
+    if (support.status === 'reachable') {
+      const profile = next.sessionModeProfile as SessionModeProfile;
+      const accessDocuments = [
+        profile.encryption.accessConditions,
+        profile.storage.payloadAccessControl?.accessConditions,
+      ];
+      const hasSbtCondition = accessDocuments.some(
+        (document) =>
+          Array.isArray(document?.conditions) &&
+          document.conditions.some((condition) => condition.kind === 'sbt_onchain'),
+      );
+      const chainRelevant =
+        profile.authority.mode === 'evm_registry_canonical' || profile.encryption.mode === 'lit' || hasSbtCondition;
+      if (chainRelevant) {
+        if (profile.evm.registryChainId !== resolvedChainId) {
+          profile.evm.registryChainId = resolvedChainId;
+          profile.preset = 'custom';
+        }
+        accessDocuments.forEach((document) => {
+          document?.conditions.forEach((condition) => {
+            if (condition.kind === 'sbt_onchain') condition.chainId = resolvedChainId;
+          });
+        });
+      }
     }
-    entry.chainId = resolvedChainId;
-    contracts[key] = entry;
-  });
+  }
+
+  if (includeContracts) {
+    const defaults = contractDefaults && typeof contractDefaults === 'object' ? contractDefaults : {};
+    const contracts = next.contracts && typeof next.contracts === 'object' ? (next.contracts as AnyRecord) : {};
+    next.contracts = contracts;
+    const keys = new Set([...Object.keys(contracts || {}), ...Object.keys(defaults || {})]);
+    keys.forEach((key) => {
+      const entry = contracts[key] && typeof contracts[key] === 'object' ? (contracts[key] as AnyRecord) : {};
+      const fallback = toStr(defaults[key] || '').trim();
+      if (fallback) {
+        entry.address = fallback;
+      }
+      entry.chainId = resolvedChainId;
+      contracts[key] = entry;
+    });
+  }
 
   const resolvedPathRpc = toStr(pathRpc).trim();
   if (resolvedPathRpc) {
@@ -354,10 +408,12 @@ export const applySessionWizardRegistryChainDraftDefaults = ({
       pathProvider.rpcUrl = resolvedPathRpc;
     }
 
-    const faucet = next.faucet && typeof next.faucet === 'object' ? (next.faucet as AnyRecord) : {};
-    next.faucet = faucet;
-    if (!toStr(faucet.rpcUrl).trim()) {
-      faucet.rpcUrl = resolvedPathRpc;
+    if (includeFaucet) {
+      const faucet = next.faucet && typeof next.faucet === 'object' ? (next.faucet as AnyRecord) : {};
+      next.faucet = faucet;
+      if (!toStr(faucet.rpcUrl).trim()) {
+        faucet.rpcUrl = resolvedPathRpc;
+      }
     }
   }
 
@@ -380,7 +436,6 @@ export const buildSessionWizardCacheWritePayload = ({
   manualMaxFeePerGasGwei = '',
   manualMaxPriorityFeePerGasGwei = '',
   workerSecretsEnabled = true,
-  effectivePersistWorkerSecrets = false,
   workerSecrets = {},
   deployForm = {},
   deployComplete = false,
@@ -392,10 +447,10 @@ export const buildSessionWizardCacheWritePayload = ({
     workerSecrets && typeof workerSecrets === 'object' && !Array.isArray(workerSecrets)
       ? (workerSecrets as AnyRecord)
       : {};
-  const redactedSecrets: AnyRecord = {};
-  Object.keys(workerSecretsRecord).forEach((key) => {
+  const publicWorkerConfig: AnyRecord = {};
+  WORKER_SECRET_CACHE_SAFE_FIELDS.forEach((key) => {
     const value = toStr(workerSecretsRecord[key]).trim();
-    redactedSecrets[key] = WORKER_SECRET_CACHE_SAFE_FIELDS.includes(key) ? value : value ? '[redacted]' : '';
+    if (value) publicWorkerConfig[key] = value;
   });
   const deployFormRecord =
     deployForm && typeof deployForm === 'object' && !Array.isArray(deployForm) ? (deployForm as AnyRecord) : {};
@@ -407,12 +462,12 @@ export const buildSessionWizardCacheWritePayload = ({
 
   return {
     sessionId,
-    draft,
+    draft: sanitizeSessionWizardDraftForBrowserCache(draft),
     privateSlugMode,
     lastManualSlug,
     encryptionGates,
-    // Regression guard: pending CREATE2 SBT drafts remain sessionStorage-only;
-    // this durable wizard cache must not turn them into long-lived local data.
+    // Regression guard: pending CREATE2 SBT drafts remain tab-memory-only;
+    // this durable wizard cache must never contain their deploy or claim secrets.
     pendingSbtDrafts: [],
     encryptedFieldGates,
     gateSelections,
@@ -424,8 +479,8 @@ export const buildSessionWizardCacheWritePayload = ({
     manualMaxFeePerGasGwei,
     manualMaxPriorityFeePerGasGwei,
     workerSecretsEnabled,
-    persistWorkerSecrets: !!effectivePersistWorkerSecrets,
-    workerSecrets: effectivePersistWorkerSecrets ? workerSecretsRecord : redactedSecrets,
+    persistWorkerSecrets: false,
+    workerSecrets: publicWorkerConfig,
     deployForm: durableDeployForm,
     // Remote requirement evidence is intentionally live-memory only. A reload
     // must replay the stable deployment request and reverify the same worker.

@@ -30,8 +30,9 @@
   "vars": {
     "DEFAULT_SESSION_SLUG": "replace-with-session-slug",
     "BOOTSTRAP_ADMIN_ADDRESS": "replace-with-context-engine-admin-address",
+    "CE_WORKER_GROUPS_BOOTSTRAP": "fresh-template-v2",
     "DEPLOY_HELPER_ENABLED": "0",
     "WORKER_DEBUG_LOGS": "0",
-    "CE_BUNDLE_SHA256": "f6dea01a3b88b7469df9b85f431a15016486d41423e7eca591fdb1a827df3404"
+    "CE_BUNDLE_SHA256": "0e66a1806c56593cd1d2b44036720cf14d6b2cdf2fbdc9ec89726331703c37b3"
   }
 }

@@ -20,9 +20,10 @@ changed. The Fast & Cheap card summarizes its inputs as
 `Cloudflare login / AI API Key`.
 
 For the default `Fast & Cheap (Cloudflare)` preset, the user needs a Cloudflare
-account and one API key for the selected AI provider. The native deploy button
-runs in Cloudflare and does not ask for a Cloudflare API token, OAuth token,
-Context Engine deploy helper, or local agent.
+account and one API key for the selected AI provider. The native path is a
+guided Cloudflare dashboard handoff: it does not ask for a Cloudflare API token,
+OAuth token, Context Engine deploy helper, or local agent, but it is not a
+browser OAuth callback or a one-click deployment.
 
 The app's passkey-derived EOA supplies the admin identity and signs the worker
 config, but it does not submit a transaction and needs no gas. Context Engine
@@ -35,17 +36,17 @@ deploy-grant paths remain explicit fallbacks.
 
 Use this matrix when choosing a non-default profile:
 
-| Input | Why it is needed | Required? | Can a sponsored bundle cover it? |
-| --- | --- | --- | --- |
-| Passkey account | Supplies the admin identity and signs worker or on-chain actions | Yes; the default path creates it in the app | No |
-| OP Sepolia ETH | Pays registry/SBT transactions | Decentralized or other on-chain profiles only | Partially |
-| Cloudflare Worker | Hosts worker-canonical config, auth, AI, storage, fetch, and optional faucet routes | Yes for Cloudflare profiles | Yes, if the sponsor gives you a deploy-ready bundle |
-| Cloudflare API token | Used only by the legacy deploy-helper fallback | No for the native default | Indirectly, through the separate legacy short-lived deploy-grant path |
-| AI provider key | Powers AI generation, chat, and transcription routes for the selected provider | Yes for the default preset | Yes |
-| Arweave JWK | Pays for Arweave metadata/payload uploads | Decentralized or explicitly Arweave-backed profiles only | Yes |
-| RPC URL | Provides chain reads and writes | Decentralized, Lit/on-chain gating, or explicitly chain-backed profiles only | Yes |
-| Faucet private key | Lets the session sponsor small OP Sepolia ETH grants for onboarding/publish support | Optional | Yes |
-| Lit credentials for gated fields or Lit-encrypted payloads | Needed only when the session uses worker-mediated Lit/Chipotle encryption, `lit-arweave`, or Cloudflare `lit_encrypted` payload mode. The manual `/new` setup asks only for one Lit API key; E2E/deploy env should prefer `LIT_USAGE_API_KEY`, while `litAccountApiKey` remains the internal worker-secret field backing the visible input. The worker derives `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid` after deploy when needed. Cloudflare `worker_sbt_gate` and `worker_envelope` modes do not require a Lit key. | Optional | Yes |
+| Input                                                      | Why it is needed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Required?                                                                    | Can a sponsored bundle cover it?                                      |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Passkey account                                            | Supplies the admin identity and signs worker or on-chain actions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Yes; the default path creates it in the app                                  | No                                                                    |
+| OP Sepolia ETH                                             | Pays registry/SBT transactions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Decentralized or other on-chain profiles only                                | Partially                                                             |
+| Cloudflare Worker                                          | Hosts worker-canonical config, auth, AI, storage, fetch, and optional faucet routes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Yes for Cloudflare profiles                                                  | Yes, if the sponsor gives you a deploy-ready bundle                   |
+| Cloudflare API token                                       | Used only by the legacy deploy-helper fallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | No for the native default                                                    | Indirectly, through the separate legacy short-lived deploy-grant path |
+| AI provider key                                            | Powers AI generation, chat, and transcription routes for the selected provider                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Yes for the default preset                                                   | Yes                                                                   |
+| Arweave JWK                                                | Pays for Arweave metadata/payload uploads                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Decentralized or explicitly Arweave-backed profiles only                     | Yes                                                                   |
+| RPC URL                                                    | Provides chain reads and writes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Decentralized, Lit/on-chain gating, or explicitly chain-backed profiles only | Yes                                                                   |
+| Faucet private key                                         | Lets the session sponsor small OP Sepolia ETH grants for onboarding/publish support                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Optional                                                                     | Yes                                                                   |
+| Lit credentials for gated fields or Lit-encrypted payloads | Needed only when the session uses worker-mediated Lit/Chipotle encryption, `lit-arweave`, or Cloudflare `encryption: "lit"`. The manual `/new` setup asks only for one Lit API key; E2E/deploy env should prefer `LIT_USAGE_API_KEY`, while `litAccountApiKey` remains the internal worker-secret field backing the visible input. The worker derives `litUsageApiKey` plus `litApiBase` / `litGroupId` / `litPkpId` / `litActionCid` after deploy when needed. Cloudflare `encryption: "none"` and `encryption: "worker_envelope"` profiles do not require a Lit key. | Optional                                                                     | Yes                                                                   |
 
 Important:
 
@@ -60,6 +61,32 @@ Important:
 - Secrets live in the worker's secrets store or encrypted sponsored bundles,
   never in public Worker config or Arweave session metadata.
 
+### Mode-aligned optional settings
+
+`Customize` reveals only settings supported by the selected profile:
+
+| Selected profile | Optional settings shown |
+| --- | --- |
+| Pure Cloudflare | Worker session end time, question defaults, Worker Group tag defaults, and Worker-backed privacy/results controls |
+| Cloudflare with explicit on-chain SBT access | The pure Cloudflare settings plus SBT curation and the on-chain Group Factory/network controls required by that access mode |
+| Decentralized | Block/time limits, Surveys, Group Factory and Session Registry contracts, and optional testnet faucet settings |
+
+Pure Cloudflare setup does not display or persist block numbers, registry
+contracts, Surveys contracts, faucet settings, or an EVM network. Choosing
+`Customize` does not override this capability boundary.
+
+The optional **Session end time** is a timestamp for Worker-canonical sessions.
+It must be in the future when the session is published. At that instant the
+Session Worker stops participant AI, transcription, fetch, upload, Group
+creation, and Group join work. Existing public or authorized Groups, stored
+payloads, and results remain readable, and signed admin recovery/configuration
+routes remain available.
+
+`Default Group Tags` seeds the tags in both participant and admin Worker Group
+creation. Existing Worker sessions that only carry `defaultSbtTags` use that
+value as a compatibility fallback; new pure Cloudflare sessions persist the
+generic `defaultGroupTags` field instead.
+
 ## Sponsored Bundles: Skip Manual Config
 
 If you do not want the recipient to paste worker secrets manually into `/new`, use `/sponsor`.
@@ -69,8 +96,12 @@ High-level flow:
 1. An existing session admin opens `/sponsor`
 2. They choose which worker-backed resources to sponsor
 3. The page uploads an encrypted bundle to Arweave
-4. It returns a share URL shaped like `/new?sponsored=<txId>#k=<secret>`
-5. The recipient opens that URL and the wizard auto-applies the bundled config client-side
+4. It returns an ID-only share URL shaped like `/new?sponsored=<txId>` and displays
+   the decryption key separately
+5. The recipient opens the URL, enters the separately delivered key, and the wizard
+   applies the bundled config client-side
+6. Decrypted credentials and the decryption key remain memory-only; a reload requires
+   the key again unless the bundle is still available in the current page runtime
 
 What the sponsored bundle can supply to the recipient:
 
@@ -97,7 +128,9 @@ now," the repo includes a deliberately simple tracked fixture:
 
 - `client/public/standard-sponsored-links.json`
 
-This file can hold up to ten intentionally public sponsored `/new` URLs. The
+This file can hold up to ten intentionally public sponsored `/new` URLs. The URLs
+contain only opaque bundle ids and are not redeemable without keys delivered through
+a separate channel. The
 checked-in version keeps every slot inactive and empty. Operators may paste
 disposable sponsored URLs into the file, set selected entries to `"active": true`,
 and publish the JSON through the app's static assets or a GitHub-hosted raw file.
@@ -106,8 +139,9 @@ revocable resources.
 
 This is not a durable availability system. A link is "unused" only because the
 operator has left it active in the manifest; the fixture does not mark links used
-after a click. Treat every active URL as a public bearer grant and remove it once
-it is consumed, expired, or reported broken. The fixture does not enforce spend
+after a click. Never add decryption keys to fixture URLs or fields. Treat each URL
+plus its separately delivered key as a bearer grant and remove the URL once it is
+consumed, expired, or reported broken. The fixture does not enforce spend
 limits, so cap AI/provider keys, faucet wallets, Arweave wallets, and any Lit
 usage keys or disposable Lit bundle accounts outside the manifest.
 
@@ -136,7 +170,10 @@ immutable. A release enables the native card by setting
 replay commit. The private source commit is not interchangeable with its public
 replay SHA. Moving branches, tags, abbreviated hashes, and non-GitHub sources
 are rejected. The token-based helper procedure later in this guide applies only
-to the legacy fallback.
+to the legacy fallback. See
+[API token setup and handling](session-cors-worker.md#api-token-setup-and-handling)
+for its account selection, one-attempt handling, expiration, and revocation
+requirements.
 
 ### 2. AI provider key
 
@@ -149,7 +186,9 @@ contents at rest, but the session Worker and Cloudflare runtime can decrypt it.
 
 ### 3. A signing identity
 
-The default client build is passkey-only and uses the Context Engine passkey EOA wallet to sign OP Sepolia transactions and SIWE-style messages.
+The default client build is passkey-only and uses the Context Engine passkey EOA
+to sign Worker SIWE-style messages. Chain-backed profiles use the same account
+for OP Sepolia transactions.
 
 - Context Engine passkey EOA wallet
 
@@ -218,12 +257,33 @@ separate Continue action for a new selection:
 - `Fast & Cheap (Cloudflare)` compiles to a Cloudflare-backed,
   worker-canonical session shape with Cloudflare-internal worker encryption
   (`worker_envelope`) enabled by default. After selection, the requirements
-  banner lists exactly the Cloudflare API token and one AI-provider key. It does
+  banner lists exactly a Cloudflare account and one AI-provider key. It does
   not ask for Arweave, Lit, RPC, funding, faucet, or gas inputs.
 - `Trustless & Public (Decentralized)` compiles to the public Arweave +
   EVM-registry session shape. Its requirements banner lists the Arweave
   wallet/JWK, RPC URL/key, AI provider key, and optional Lit key needed when
   encryption is enabled.
+
+The validated version-1 profile, rather than legacy top-level fields, determines
+which capabilities are reachable:
+
+| Reachable `/new` profile                   | Canonical authority and storage                              | Identity and Groups                                                                                | Chain-dependent capabilities                                                          |
+| ------------------------------------------ | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Fast & Cheap default                       | Session Worker + Cloudflare; `worker_envelope`               | Passkey + **Native Worker Groups**                                                                 | None; `evm.registryChainId` is `null`                                                 |
+| Custom Cloudflare, no encryption           | Session Worker + Cloudflare; `encryption: "none"`            | Passkey + **Native Worker Groups**                                                                 | None; `evm.registryChainId` is `null`                                                 |
+| Custom Cloudflare, Worker envelope         | Session Worker + Cloudflare; `encryption: "worker_envelope"` | Passkey + **Native Worker Groups**                                                                 | None unless an explicit `sbt_onchain` condition is added                              |
+| Custom Cloudflare + explicit `sbt_onchain` | Session Worker + Cloudflare; Worker envelope                 | Passkey + **Native Worker Groups**; SBT conditions are separate **Advanced on-chain access gates** | Positive chain ID and RPC; wallet/gas only when `/new` must create an SBT             |
+| Custom Cloudflare + Lit                    | Session Worker + Cloudflare; `encryption: "lit"`             | Passkey + **Native Worker Groups**                                                                 | Positive chain ID, RPC, and Lit credential; this does not make the registry canonical |
+| Trustless or custom Arweave                | EVM registry + Arweave; `encryption: "none"` or `"lit"`      | Wallet with passkey support + on-chain SBT Groups                                                  | Chain/RPC, registry transactions, gas, and Arweave; Lit also needs its credential     |
+
+Telegram, Mini App, Agent Session Wrapped, result-visibility, and export choices
+do not change that ownership split. Mini App requires Telegram. Profiles marked
+schema-only or unavailable, and malformed or cross-lineage profiles, do not
+receive partial capabilities: publication and downstream projection fail
+closed. A stored config with no version-1 profile may use the bounded legacy
+registry compatibility path only when its registry identity and positive chain
+are present; legacy chain fields never turn a validated chain-free Worker
+profile into a hybrid.
 
 After selection, the profile remains visible in the setup header. `Customize`
 switches to Advanced mode and opens Privacy instead of opening a separate
@@ -247,6 +307,15 @@ drafts do not also show the older `Session Storage` metadata editor, so storage
 has one visible authority. New session publishes write the
 `sessionModeProfile` profile as the source of truth and compile it down to the
 existing storage profile / payload-access fields for runtime compatibility.
+The publish boundary sends one canonical object-valued `storageProfile`; its
+backend, payload gate, encryption mode, and effective access-condition document
+must agree with the validated profile. Deploy, signed config mutation, and
+public Worker readback all fail closed on missing, ambiguous, or divergent
+profile/storage policy.
+Switching storage also replaces the mode-specific identity and authorization
+lineage: Cloudflare uses passkey plus Worker roles, while Arweave uses wallet
+plus on-chain SBT authorization. A stale wallet, Worker role, or legacy
+top-level chain ID cannot survive that switch as a hidden capability.
 The wizard validates that profile at the publish boundary and rechecks the live
 draft after asynchronous identity and duplicate-session preflight. A profile
 edit made while preflight is running therefore still stops before upload,
@@ -294,11 +363,19 @@ What gets stored where:
   human-readable session config on Arweave: name, description, AI defaults,
   block limits, contract pointers, featured lists, and any Lit-encrypted fields.
 - The Fast & Cheap preset combines `storageProfile.backend = "cloudflare"`
-  with `worker_envelope` encryption. Advanced Cloudflare profiles can instead
-  select `worker_sbt_gate`, where the session worker checks the requester's SBT
-  gate with configured chain/RPC before serving bytes. That is worker-enforced
-  access control, not end-to-end encryption.
+  with `worker_envelope` encryption and Worker-role/agent-grant access.
+  Advanced Cloudflare profiles can add an explicit `sbt_onchain` access
+  condition, which makes the profile hybrid and requires its configured
+  chain/RPC before the Worker serves bytes. That is a separately labelled
+  Advanced on-chain gate; it does not replace the session's Worker-native
+  Groups and is not end-to-end encryption.
 - Advanced encryption options are `none` (payload bytes are stored as provided), `lit` (Cloudflare stores caller-supplied Lit ciphertext and rejects plaintext uploads until the Lit path sends `payloadEncrypted=true`), and Cloudflare `worker_envelope`: data is encrypted before Cloudflare stores it, and the session worker decrypts only after checking access. `worker_envelope` is available only with Cloudflare storage. The operator and Cloudflare runtime can decrypt; it is not decentralized, not end-to-end, and not private from the session operator or Cloudflare runtime.
+- Public stored-results visibility requires unencrypted storage. The current
+  wizard offers it only for Arweave + no encryption; switching backend or
+  encryption coerces an incompatible selection back to participant aggregate.
+  Validated legacy Cloudflare public-result profiles remain readable only when
+  their payload gate is `none` and neither profile policy branch carries access
+  conditions.
 - When `/new` deploys a custom worker for Cloudflare storage, the deploy helper receives the normalized storage profile before Worker upload so it can bind the storage index KV and any requested R2 bucket. If `worker_envelope` is selected, the helper also generates the worker secret used as the deployment KEK; the generated value is not written to session metadata.
 - Worker-envelope key provider is fixed to `worker_secret` in this release. The default Cloudflare rule permits configured session admins or agents granted the `storage` scope; normal participant responses use their dedicated submission route. An explicit override can combine Session role (`worker_role`), SBT holders (`sbt_onchain`), or Authorized agents (`agent_grant_scope`) rules with any/all matching; the wizard writes those conditions to `storageProfile.payloadAccessControl.accessConditions` for the worker.
 - `SessionRegistry` does not store long-form content directly. Decentralized
@@ -323,6 +400,67 @@ version-1 `workerAuthority` policy. It does not require an SBT, registry, RPC,
 or Lit key. Participant and anonymous scopes, plus any login gate, are evaluated
 by the session worker.
 
+After publishing a worker-canonical session, its Groups section manages native
+Cloudflare records. The worker admin supplies the group name, optional
+description and HTTPS image, tags, public HTTPS reference URLs, an optional
+per-group member limit, an optional self-join deadline, group-admin address,
+join mode, and visibility. The deadline closes participant self-join; configured
+session admins can still manage membership. Image input supports a
+direct HTTPS URL, clipboard paste, or local upload with preview; uploaded files
+are published through the selected session storage before the group record is
+created. Public, ungated sessions can render stored group artwork before
+sign-in, while private-session storage reads keep using the authenticated
+session credential. No SBT contract is deployed, so there is no contract
+address, network transaction, gas payment, RPC setting, or burn authorization.
+The client pins the validated Worker origin,
+canonical slug, and canonical session ID. Worker-canonical nonce/login requests,
+login responses, JWTs, Group requests, Group responses, stored records, and the
+Durable Object coordinator all carry or verify that same slug/session-ID pair.
+A failed, unreachable, mismatched, stale, or empty Worker response never falls
+back to a generic Worker cache, SBT discovery, or a global session scan.
+
+A Worker/SBT hybrid still uses native Worker Groups for participation. Its
+configured SBT conditions appear separately as **Advanced on-chain access
+gates**, with chain/RPC requirements but no implied registry ownership. A
+Worker/Lit hybrid likewise remains Worker-canonical while exposing only its
+explicit Lit/RPC requirements. Registry-canonical sessions continue to use the
+on-chain SBT group flow below.
+
+The **Who can create groups?** choice is available for every `/new` mode and is
+persisted as `groupCreationPolicy`:
+
+- **All participants** is the new-session default. In Worker-native sessions,
+  an authenticated participant with the `groups` scope can join or create an
+  open, session-visible group without a wallet transaction. Participants can
+  supply the same tags, reference URLs, member limit, and join deadline as an
+  admin; the Worker generates the ID and records the signed participant address
+  as the group administrator instead of trusting a submitted address. Session
+  admins retain edit, delete, and membership controls. In
+  registry-canonical sessions, the session's SBT creation UI remains available
+  to participants.
+- **Admins only** hides and rejects the session-bound creation path for other
+  participants. Existing Worker configs that omit the field retain this
+  fail-closed default. For on-chain sessions this is a Context Engine UX
+  policy, not a factory-level access control: the deployed public SBT factory
+  can still be called independently outside the session UI.
+
+Group discovery is a separate privacy decision. A valid Worker-canonical mode
+with public stored results, unencrypted Cloudflare storage, and no payload
+access gate exposes only redacted, session-visible group metadata before
+sign-in. Participant-, member-, or admin-visible results modes and any gated or
+encrypted storage mode keep group discovery and results behind authentication,
+regardless of who may create groups.
+
+Ordinary pure-Worker session pages project that same chain-free contract
+downstream. Account settings do not offer Ethereum, MetaMask, or testnet
+controls; the session shell and Polis report do not show a network/blockchain;
+Lit hooks, SBT auto-mint, and SBT question filters do not run; and the Document
+Library accepts only Cloudflare references without exposing Arweave/Lit
+controls. If navigation or live config changes from a chain-backed profile to a
+pure Worker profile, stale auto-mint timers, stored targets, filter state,
+network values, and non-Cloudflare document references are cleared or ignored
+before the next operation.
+
 Advanced chain-backed profiles retain the existing controls:
 
 - One or more SBT gates
@@ -337,30 +475,43 @@ For those advanced profiles:
 - The final gate definitions are written on-chain through `SessionRegistry.setResourceGates(...)`
 - Lit-encrypted metadata keeps references to the selected gate IDs, but gate authority itself remains on-chain in `SessionRegistry`
 
+The standalone Create SBT (`/sbts/new`) and Contracts pages remain global on-chain tools.
+When opened from a Worker-native session, they are labelled
+**Advanced/external** and do not change that session's native Groups authority.
+
 ### 3. Worker deploy and secrets
 
-The default wizard deploys a worker before publishing the canonical session
-config.
+The default wizard guides the creator through deploying a Worker before
+publishing the canonical session config.
 
-In the default helper flow you provide:
+In the default native handoff you provide:
 
-- Cloudflare API token
+- a Cloudflare account and dashboard deployment
 - one OpenAI / Anthropic / OpenRouter key matching the selected AI models
 
-The wizard derives the worker name. Advanced profiles may additionally expose
+The wizard generates the session slug, passkey-derived public admin address,
+and two independent Worker runtime secrets. It provides a copy control for each
+value, opens Cloudflare in a separate tab, and waits for the creator to return
+with the resulting `workers.dev` URL. Advanced profiles may additionally expose
 Arweave, Lit, RPC, faucet, or custom-provider inputs when their selected
 capabilities actually require them.
 
 Common combinations:
 
 - Default Fast & Cheap session:
-  - Cloudflare API token
+  - Cloudflare account
   - one AI provider key matching the selected models
-- Decentralized or explicit Lit/chain-backed session:
-  - the profile-specific Arweave, Lit, RPC, wallet-transaction, and gas inputs
-    shown by the wizard
+- Worker/SBT hybrid:
+  - Cloudflare account, AI provider key, and RPC
+  - wallet and gas only when the wizard must create a new SBT
+- Worker/Lit hybrid:
+  - Cloudflare account, AI provider key, RPC, and Lit credential
+- Decentralized session:
+  - Arweave JWK, RPC, wallet/registry transaction funding, AI provider key, and
+    Lit credential only when Lit encryption is selected
 - Session created from a sponsored bundle:
-  - connected wallet
+  - the profile's signing identity: passkey for a pure Worker session, or wallet
+    plus passkey support for a registry session
   - session details
   - no manual worker-secret entry, as long as the bundle is deploy-ready
 
@@ -449,12 +600,12 @@ propagates no later than that shorter remaining lifetime.
 
 What gets stored where:
 
-| Store | Contents |
-| --- | --- |
-| Worker KV `session:{slug}:config` | canonical worker session identity/content plus public authority, storage, CORS, and limits config; no credentials |
-| Worker KV `session:{slug}:secrets` | OpenAI/Anthropic/OpenRouter keys, Arweave JWK, faucet private key, and other runtime secrets |
-| Arweave metadata | decentralized/Arweave profiles only; no worker secrets |
-| `SessionRegistry` | decentralized/registry profiles only; skipped by `worker_canonical` |
+| Store                              | Contents                                                                                                          |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Worker KV `session:{slug}:config`  | canonical worker session identity/content plus public authority, storage, CORS, and limits config; no credentials |
+| Worker KV `session:{slug}:secrets` | OpenAI/Anthropic/OpenRouter keys, Arweave JWK, faucet private key, and other runtime secrets                      |
+| Arweave metadata                   | decentralized/Arweave profiles only; no worker secrets                                                            |
+| `SessionRegistry`                  | decentralized/registry profiles only; skipped by `worker_canonical`                                               |
 
 ### 4. Registration and publish
 
@@ -497,35 +648,41 @@ After success, the wizard generates:
 
 ## Worker Deployment Options
 
-### CE-hosted deploy helper
+### Native Cloudflare dashboard handoff (default)
 
 This is the default path exposed in `/new`.
 
-Use it when you want:
-
-- the easiest path from the wizard
-- automatic worker URL discovery
-- automatic worker config and secrets bootstrap
-
 High-level flow:
 
-1. Click the onboarding banner's `Cloudflare API token` link. Cloudflare opens
-   the token form with the two required permissions prefilled. Restrict Account
-   Resources to the intended account, create the token, copy its generated
-   value, and paste it into the Worker step with one AI-provider key. Normal
-   mode automatically derives the worker name and uses the GitHub-hosted
-   `sessionCorsWorker.bundle.js` release asset.
-2. Click `Deploy worker`
-3. Wait for the helper to create an isolated physical worker, persist its
-   canonical config, and return the `workers.dev` URL
-4. If the helper cannot fetch the release asset, keep the default GitHub release URL and either paste a direct bundle URL override or run `nvm use 20 && npm run worker:bundle` and upload `dist/sessionCorsWorker.bundle.js`
-5. Publish only after the wizard verifies the public config readback
+1. Generate the setup values in the Worker step.
+2. Copy the session slug, public admin address, `TOKEN_HMAC_SECRET`, and
+   `CE_STORAGE_ENVELOPE_KEK` with the adjacent copy controls.
+3. Open the immutable Cloudflare deployment package, paste those values into
+   Cloudflare, and complete the dashboard deployment.
+4. Return to the still-open Context Engine tab and paste the resulting
+   `workers.dev` URL.
+5. Select `Verify Session Worker`. Context Engine checks Worker reachability,
+   the current browser origin/CORS policy, canonical config readback, and the
+   returned session identity before enabling deployment completion.
 
-The first-party wizard does not ask for an account ID. During deploy, the helper
-discovers exactly one visible Cloudflare account using the API token and stops on
-zero or multiple accounts.
+The runtime secrets remain in the current tab and Cloudflare's encrypted
+Worker-secret store. They are not placed in the deployment URL, logs, analytics
+payloads, or a Context Engine-controlled origin. There is no automatic callback
+from Cloudflare, so keep the wizard tab open and return to it manually.
+
+The native return step supports the default Worker-envelope mode and optional
+on-chain SBT checks. An Advanced Lit hybrid currently uses the labeled manual
+bootstrap fallback because Lit account/action provisioning is not yet part of
+the native return step.
 
 Reference: [session-cors-worker.md](session-cors-worker.md)
+
+### Legacy CE-hosted deploy-helper fallback
+
+The collapsed Advanced/fallback section retains the request-only Cloudflare API
+token flow for existing operators. It can create the Worker, discover its URL,
+and seed config automatically, but it requires trusting the helper with the
+request-only token. It is not required by the default Cloudflare path.
 
 ### Sponsored `/sponsor` handoff
 
@@ -534,12 +691,13 @@ Use this when one session admin wants to help someone else launch a session with
 Best fit:
 
 - onboarding a collaborator who should not have to paste OpenAI / Arweave / faucet credentials by hand
-- creating a near-one-click `/new` flow for internal pilots
+- shortening the guided `/new` handoff for internal pilots
 - preloading a worker deploy grant so the recipient does not need to enter a raw Cloudflare API token
 
 What the recipient still needs:
 
-- a connected wallet
+- the signing identity required by the selected profile (passkey for a pure
+  Worker session; wallet plus passkey support for a registry session)
 - session name / slug / metadata choices
 - enough publish authorization to complete the flow
 
@@ -598,7 +756,9 @@ Operational notes:
 - Leave `DEFAULT_SESSION_SLUG` empty for a multi-tenant worker, or set it to a specific session slug for a single-tenant worker
 - After deploy, paste the resulting worker URL back into the wizard before publishing
 
-If you also want one-click deploys from your own wizard instance later, separately self-host the deploy-helper described in [session-cors-worker.md](session-cors-worker.md).
+If you also want helper-assisted deployments from your own wizard instance
+later, separately self-host the legacy deploy-helper described in
+[session-cors-worker.md](session-cors-worker.md).
 
 ### Manual Cloudflare dashboard upload
 
@@ -689,12 +849,17 @@ returns the durable Cloudflare storage references without sending an EVM
 transaction. Chain-backed profiles retain their existing contract submission
 path.
 
-On reload, the client paginates the dedicated Worker's `responses` index and
-hydrates the stable `worker` cache scope. It keys each row by responder metadata
-that the Worker bound to the authenticated uploader; a response payload cannot
-claim another participant's address. Workers deployed before this metadata was
-added must be upgraded before their newly stored rows can participate in fresh-
-browser response hydration.
+On reload, the client paginates the dedicated Worker's `questions`, `surveys`,
+and `responses` indexes and hydrates the stable `worker` cache scope. Question
+and survey payloads must repeat the exact canonical slug and session ID before
+they enter the cache; mismatched rows are isolated. Response rows are keyed by
+responder metadata that the Worker bound to the authenticated uploader, so a
+response payload cannot claim another participant's address. These reads use
+the current passkey context when the storage policy is authenticated. A Worker
+read, auth, or pagination failure remains a retryable Worker error and never
+falls through to registry discovery. Workers deployed before trusted responder
+metadata was added must be upgraded before their newly stored rows can
+participate in fresh-browser response hydration.
 
 For payload examples, see [arweave-payloads.md](arweave-payloads.md).
 
@@ -716,18 +881,24 @@ trust-on-first-use pin.
 
 ### Worker deploy fails
 
-Check these first:
+For the default native handoff, check these first:
 
-- the Cloudflare API token has permission to manage Workers scripts and KV
-- the selected Cloudflare account is the one that should own the worker
+- the selected Cloudflare account owns the newly deployed Worker
 - the account has an active `workers.dev` subdomain
-- the deploy helper can confirm the generated physical worker name is absent
+- all four setup values were copied into the matching Cloudflare fields
+- the returned URL is the HTTPS `workers.dev` origin, without a path
+- the Worker allows the current Context Engine browser origin
 
-If the helper can deploy the worker but setup still fails afterward:
+If deployment succeeds but verification fails:
 
 - re-open `/admin`
-- verify the worker URL
+- verify or restore the Worker URL
 - use the Worker Tests panel to confirm `/health`
+- confirm the canonical config slug and public admin identity match the wizard
+
+For the collapsed legacy fallback, also verify that the request-only Cloudflare
+API token has permission to manage Workers scripts and KV and that the helper
+can access the selected account.
 
 ### Questions are not loading
 
@@ -754,9 +925,11 @@ Check both CORS and SIWE assumptions:
 
 - `allowOrigins` in the worker config must include the exact browser origin you are using
 - the SIWE message domain must match the request URI host
-- the connected wallet must be the session admin wallet for signed admin actions
-- the shared worker-canonical URL still includes the original HTTPS `worker`
-  query parameter
+- the active passkey-derived EOA or connected wallet must match the configured
+  session admin for signed admin actions
+- Worker-canonical discovery must resolve one validated HTTPS Worker origin,
+  slug, and canonical session ID; an old `worker` query hint is not authority
+  after canonical config discovery
 
 Typical symptoms:
 

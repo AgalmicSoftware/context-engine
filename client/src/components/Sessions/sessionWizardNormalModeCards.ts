@@ -26,6 +26,10 @@ export type NormalModeCardsInput = {
   deployVerifiedInUi: boolean;
   canUseSponsoredAutoDeployNow: boolean;
   publishReadiness: Pick<SessionWizardPublishReadinessDescriptor, 'canPublishNow' | 'uploadBlockedReason'>;
+  isWorkerCanonical: boolean;
+  deployPendingSbts: boolean;
+  publishesPendingSbts?: boolean;
+  usesLit?: boolean;
   t: NormalModeLabelFn;
 };
 
@@ -40,6 +44,9 @@ export type NormalModePublishSummaryInput = {
   workerMode: string;
   deployVerifiedInUi: boolean;
   pendingDraftCount: number;
+  isWorkerCanonical: boolean;
+  deployPendingSbts: boolean;
+  usesLit?: boolean;
   t: NormalModeLabelFn;
 };
 
@@ -51,6 +58,13 @@ export type NormalModePublishSummaryItem = {
 type NormalModeCardWithoutStepNumber = Omit<NormalModeCard, 'stepNumber'>;
 
 const normalizeDisplayString = (value: string): string => value.trim();
+
+const describeWorkerAccess = ({ deployPendingSbts, usesLit }: { deployPendingSbts: boolean; usesLit: boolean }) => {
+  const advancedAccess = [...(usesLit ? ['Lit'] : []), ...(deployPendingSbts ? ['on-chain SBT'] : [])].join(' + ');
+  return advancedAccess
+    ? `Passkey identity · Worker roles and Groups · Advanced/external ${advancedAccess} access`
+    : 'Passkey identity · Worker roles and Groups';
+};
 
 export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard[] {
   const {
@@ -65,6 +79,10 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
     deployVerifiedInUi,
     canUseSponsoredAutoDeployNow,
     publishReadiness,
+    isWorkerCanonical,
+    deployPendingSbts,
+    publishesPendingSbts = false,
+    usesLit = false,
     t,
   } = opts;
   const { canPublishNow, uploadBlockedReason } = publishReadiness;
@@ -82,11 +100,15 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
     ? [
         {
           key: 'worker',
-          title: 'Worker',
+          title: isWorkerCanonical ? 'Session Worker' : 'Worker',
           summary: normalModeRequiresCustomWorker
             ? resolvedWorkerBaseUrl
-              ? 'Your worker URL is configured.'
-              : 'Deploy or paste your own worker URL.'
+              ? isWorkerCanonical
+                ? 'Worker URL configured; verify canonical config and browser access.'
+                : 'Your worker URL is configured.'
+              : isWorkerCanonical
+                ? 'Complete the Cloudflare dashboard handoff, then verify the Worker URL.'
+                : 'Deploy or paste your own worker URL.'
             : workerMode === 'default'
               ? 'Using the shared default worker.'
               : deployVerifiedInUi
@@ -106,12 +128,14 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
     },
     {
       key: 'encryption',
-      title: 'Privacy',
-      summary: configuredPrivateGateCount
-        ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? `${t('sbt')} ${t('gate')}` : `${t('sbt')} ${t('gates')}`} selected`
-        : privateSlugMode
-          ? 'Private URL enabled'
-          : 'Open link by default',
+      title: isWorkerCanonical ? 'Session Access' : 'Privacy',
+      summary: isWorkerCanonical
+        ? describeWorkerAccess({ deployPendingSbts, usesLit })
+        : configuredPrivateGateCount
+          ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? `${t('sbt')} ${t('gate')}` : `${t('sbt')} ${t('gates')}`} selected`
+          : privateSlugMode
+            ? 'Private URL enabled'
+            : 'Open link by default',
       tone: privacyTone,
     },
     ...workerCards,
@@ -119,9 +143,13 @@ export function buildNormalModeCards(opts: NormalModeCardsInput): NormalModeCard
       key: 'publish',
       title: 'Deploy Session',
       summary: canPublishNow
-        ? canUseSponsoredAutoDeployNow
-          ? 'Publish will deploy the sponsored worker before uploading metadata.'
-          : 'Review the setup and deploy when ready.'
+        ? isWorkerCanonical
+          ? publishesPendingSbts
+            ? 'Deploy publishes pending SBTs, then saves and verifies canonical config in the Session Worker.'
+            : 'Deploy saves and verifies canonical config in the Session Worker.'
+          : canUseSponsoredAutoDeployNow
+            ? 'Publish will deploy the sponsored worker before uploading metadata.'
+            : 'Review the setup and deploy when ready.'
         : uploadBlockedReason,
       tone: publishTone,
     },
@@ -145,6 +173,9 @@ export function buildNormalModePublishSummary(opts: NormalModePublishSummaryInpu
     workerMode,
     deployVerifiedInUi,
     pendingDraftCount,
+    isWorkerCanonical,
+    deployPendingSbts,
+    usesLit = false,
     t,
   } = opts;
   const normalizedSessionName = normalizeDisplayString(sessionName);
@@ -155,32 +186,62 @@ export function buildNormalModePublishSummary(opts: NormalModePublishSummaryInpu
       value: normalizedSessionName || 'Add a session name',
     },
     {
-      label: 'Privacy',
+      label: isWorkerCanonical ? 'Session access' : 'Privacy',
       value: configuredPrivateGateCount
         ? `${configuredPrivateGateCount} ${configuredPrivateGateCount === 1 ? t('gate') : t('gates')} configured`
-        : privateSlugMode
-          ? 'Private URL mode'
-          : 'Open access',
+        : isWorkerCanonical
+          ? 'Passkey · Worker roles and Groups'
+          : privateSlugMode
+            ? 'Private URL mode'
+            : 'Open access',
     },
     {
       label: 'Worker',
-      value: canUseSponsoredAutoDeployNow
-        ? 'Sponsored auto-deploy on Publish'
-        : shouldUseSponsoredAutoDeployFlow
-          ? 'Sponsored auto-deploy waiting for the hosted bundle URL'
-          : normalModeRequiresCustomWorker
+      value:
+        isWorkerCanonical && deployVerifiedInUi
+          ? 'Canonical Worker config verified'
+          : isWorkerCanonical
             ? resolvedWorkerBaseUrl
-              ? 'Custom worker ready'
-              : 'Bring your own worker'
-            : workerMode === 'default'
-              ? 'Shared hosted worker'
-              : deployVerifiedInUi
-                ? 'Custom worker deployed'
-                : 'Custom worker setup',
+              ? 'Worker URL awaiting verification'
+              : 'Cloudflare dashboard handoff required'
+            : canUseSponsoredAutoDeployNow
+              ? 'Sponsored auto-deploy on Publish'
+              : shouldUseSponsoredAutoDeployFlow
+                ? 'Sponsored auto-deploy waiting for the hosted bundle URL'
+                : normalModeRequiresCustomWorker
+                  ? resolvedWorkerBaseUrl
+                    ? 'Custom worker ready'
+                    : 'Bring your own worker'
+                  : workerMode === 'default'
+                    ? 'Shared hosted worker'
+                    : deployVerifiedInUi
+                      ? 'Custom worker deployed'
+                      : 'Custom worker setup',
     },
-    {
-      label: `Pending ${t('sbts')}`,
-      value: pendingDraftCount ? `${pendingDraftCount} draft${pendingDraftCount === 1 ? '' : 's'} ready` : 'None',
-    },
+    ...(isWorkerCanonical && (usesLit || deployPendingSbts)
+      ? [
+          {
+            label: 'Advanced/external access',
+            value:
+              usesLit && deployPendingSbts
+                ? pendingDraftCount > 0
+                  ? 'Lit encryption · on-chain SBT access · SBT publishing required'
+                  : 'Lit encryption · existing on-chain SBT checks (read-only)'
+                : usesLit
+                  ? 'Lit encryption and on-chain access checks (read-only)'
+                  : pendingDraftCount > 0
+                    ? 'On-chain SBT access · SBT publishing required'
+                    : 'Existing on-chain SBT checks (read-only)',
+          },
+        ]
+      : []),
+    ...(deployPendingSbts && pendingDraftCount > 0
+      ? [
+          {
+            label: `Pending ${t('sbts')}`,
+            value: pendingDraftCount ? `${pendingDraftCount} draft${pendingDraftCount === 1 ? '' : 's'} ready` : 'None',
+          },
+        ]
+      : []),
   ];
 }

@@ -16,6 +16,7 @@ import {
   resolveSessionWizardWorkerBaseUrl,
   screen,
   selectNormalModeCard,
+  createPublicWorkerVerificationResponder,
   enableAdvancedMode,
   waitFor,
 } from './SessionWizard.workerPanel.testUtils';
@@ -58,7 +59,7 @@ describe('SessionWizard worker panel rendering', () => {
     expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveAttribute('readonly');
     expect(
       screen.getByText(
-        'Normal mode deploys use the GitHub-hosted worker bundle automatically. If a retry needs a different source, keep this Git URL as the default and add a manual bundle URL or upload below after a fetch failure.',
+        'Guided deploys use the GitHub-hosted worker bundle automatically. If a retry needs a different source, keep this Git URL as the default and add a manual bundle URL or upload below after a fetch failure.',
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText('Worker name')).not.toBeInTheDocument();
@@ -67,6 +68,30 @@ describe('SessionWizard worker panel rendering', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText('Worker code (unbundled, copy + paste)')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Reset to default' })).not.toBeInTheDocument();
+  });
+
+  it('shows the Worker URL return field before a native Cloudflare deploy is verified', async () => {
+    renderSessionWizard();
+
+    await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    const preset = screen.getByTestId('ce-new-preset-fast_cheap_cloudflare');
+    const originalConfirm = window.confirm;
+    window.confirm = jest.fn(() => true);
+    try {
+      fireEvent.click(preset);
+    } finally {
+      window.confirm = originalConfirm;
+    }
+    await waitFor(() => {
+      expect(preset).toHaveAttribute('aria-checked', 'true');
+    });
+
+    selectNormalModeCard('Worker');
+
+    expect(await screen.findByTestId(E2E_TESTIDS.WIZARD_WORKER_URL)).toBeInTheDocument();
+    expect(
+      screen.queryByText('Worker URL appears here after a successful custom worker deploy.'),
+    ).not.toBeInTheDocument();
   });
 
   it('defaults advanced custom-worker deploys to the configured release bundle URL', async () => {
@@ -155,7 +180,8 @@ describe('SessionWizard worker panel rendering', () => {
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
-    global.fetch = jest.fn(async (url) => {
+    const respondToPublicWorkerVerification = createPublicWorkerVerificationResponder();
+    global.fetch = jest.fn(async (url, options = {}) => {
       const normalizedUrl = String(url);
       if (normalizedUrl.endsWith('/deploy')) {
         return {
@@ -171,6 +197,8 @@ describe('SessionWizard worker panel rendering', () => {
       if (normalizedUrl.endsWith('/auth/nonce')) {
         return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
       }
+      const publicVerificationResponse = respondToPublicWorkerVerification(normalizedUrl, options);
+      if (publicVerificationResponse) return publicVerificationResponse;
       return { ok: true, json: async () => ({ ok: true }) };
     });
 
@@ -193,7 +221,7 @@ describe('SessionWizard worker panel rendering', () => {
         expect(advancedBundleUrlInput).toHaveValue('https://bundles.example.test/custom-sessionCorsWorker.bundle.js');
       });
 
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
+      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
       selectNormalModeCard('Worker');
 
       expect(screen.getByTestId(E2E_TESTIDS.WIZARD_BUNDLE_URL)).toHaveValue(WORKER_BUNDLE_URL);

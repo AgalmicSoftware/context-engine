@@ -16,6 +16,7 @@ import {
   resolveSessionWizardWorkerBaseUrl,
   screen,
   selectNormalModeCard,
+  createPublicWorkerVerificationResponder,
   enableAdvancedMode,
   waitFor,
 } from './SessionWizard.workerPanel.testUtils';
@@ -233,7 +234,8 @@ describe('SessionWizard worker panel rendering', () => {
       const trimmed = String(value || '').trim();
       return trimmed;
     });
-    global.fetch = jest.fn(async (url) => {
+    const respondToPublicWorkerVerification = createPublicWorkerVerificationResponder();
+    global.fetch = jest.fn(async (url, options = {}) => {
       const normalizedUrl = String(url);
       if (normalizedUrl.endsWith('/deploy')) {
         return {
@@ -249,6 +251,8 @@ describe('SessionWizard worker panel rendering', () => {
       if (normalizedUrl.endsWith('/auth/nonce')) {
         return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
       }
+      const publicVerificationResponse = respondToPublicWorkerVerification(normalizedUrl, options);
+      if (publicVerificationResponse) return publicVerificationResponse;
       return { ok: true, json: async () => ({ ok: true }) };
     });
 
@@ -312,7 +316,8 @@ describe('SessionWizard worker panel rendering', () => {
     const workerAuth = require('../../utilities/worker/workerAuth.js');
     const originalNormalizeWorkerUrl = workerAuth.normalizeWorkerUrl.getMockImplementation();
     workerAuth.normalizeWorkerUrl.mockImplementation((value = '') => String(value || '').trim());
-    global.fetch = jest.fn(async (url) => {
+    const respondToPublicWorkerVerification = createPublicWorkerVerificationResponder();
+    global.fetch = jest.fn(async (url, options = {}) => {
       const normalizedUrl = String(url);
       if (normalizedUrl.endsWith('/deploy')) {
         return {
@@ -331,6 +336,8 @@ describe('SessionWizard worker panel rendering', () => {
       if (normalizedUrl.endsWith('/auth/nonce')) {
         return { ok: true, json: async () => ({ nonce: 'wizard-admin-nonce' }) };
       }
+      const publicVerificationResponse = respondToPublicWorkerVerification(normalizedUrl, options);
+      if (publicVerificationResponse) return publicVerificationResponse;
       return { ok: true, json: async () => ({ ok: true }) };
     });
 

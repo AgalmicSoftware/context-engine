@@ -15,6 +15,45 @@ import {
 } from './authorizationScopeFreshness.js';
 
 const WORKER_CANONICAL_PUBLICATION_REVISION_KEY = 'workerCanonicalPublicationRevision';
+const WORKER_GROUPS_BOOTSTRAP_KEY = 'workerGroupsBootstrap';
+const WORKER_CANONICAL_SET_CONFIG_KEYS = new Set([
+  'slug',
+  'sessionId',
+  'sessionIdHex',
+  'configRevision',
+  'sessionName',
+  'sessionInfo',
+  'sessionHeaderImg',
+  'sessionEndsAt',
+  'defaultTags',
+  'defaultGroupTags',
+  'defaultSbtTags',
+  'questionsGenPrompt',
+  'defaultFilterState',
+  'defaultFeaturedSBTs',
+  'autoFeatureSBTsBySessionSlug',
+  'adminAddress',
+  'adminAddresses',
+  'corsWorkerUrl',
+  'allowOrigins',
+  'sessionModeProfile',
+  'agentSessionWrapped',
+  'workerAuthority',
+  'workerRoles',
+  'roles',
+  'authorization',
+  'groupCreationPolicy',
+  'storageProfile',
+  'storageEnvelope',
+  'ai',
+  'limits',
+  'scopes',
+  'networkChainId',
+  'contracts',
+  'embeddedDeployHelperEnabled',
+  'litCredentials',
+  WORKER_GROUPS_BOOTSTRAP_KEY,
+]);
 
 const toTrimmedString = (value) => (
   typeof value === 'string'
@@ -25,10 +64,72 @@ const toTrimmedString = (value) => (
 );
 
 const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+const validGroupCreationPolicy = (config) =>
+  !hasOwn(config, 'groupCreationPolicy') ||
+  config?.groupCreationPolicy === 'admin_only' ||
+  config?.groupCreationPolicy === 'participants';
 
 const getWorkerAuthorityMode = (config) => toTrimmedString(
   config?.sessionModeProfile?.authority?.mode,
 ).toLowerCase();
+
+const workerCanonicalUsesOnChainSbt = (config) => {
+  const profile = config?.sessionModeProfile;
+  if (profile?.authorization?.mechanisms?.includes?.('sbt_onchain')) return true;
+  const conditionSources = [
+    profile?.encryption?.accessConditions,
+    profile?.storage?.payloadAccessControl?.accessConditions,
+  ];
+  return conditionSources.some((source) =>
+    source?.conditions?.some?.((condition) => condition?.kind === 'sbt_onchain'));
+};
+
+const workerCanonicalUsesChain = (config) => (
+  workerCanonicalUsesOnChainSbt(config) ||
+  config?.sessionModeProfile?.encryption?.mode === 'lit'
+);
+
+const validateWorkerCanonicalIncomingFields = ({ incomingConfig, mergedConfig } = {}) => {
+  if (getWorkerAuthorityMode(mergedConfig) !== 'worker_canonical') return { ok: true };
+  const unsupportedKey = Object.keys(incomingConfig || {}).find(
+    (key) => !WORKER_CANONICAL_SET_CONFIG_KEYS.has(key),
+  );
+  if (unsupportedKey) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Unsupported worker-canonical session config field: ${unsupportedKey}.`,
+    };
+  }
+  const usesOnChainSbt = workerCanonicalUsesOnChainSbt(mergedConfig);
+  const sbtOnlyKeys = ['defaultSbtTags', 'defaultFeaturedSBTs', 'autoFeatureSBTsBySessionSlug'];
+  const unsupportedSbtKey = sbtOnlyKeys.find((key) => hasOwn(incomingConfig, key) && !usesOnChainSbt);
+  if (unsupportedSbtKey) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Worker-native Group sessions do not accept ${unsupportedSbtKey}.`,
+    };
+  }
+  if (hasOwn(incomingConfig, 'networkChainId') && !workerCanonicalUsesChain(mergedConfig)) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'Worker-native Group sessions do not accept networkChainId.',
+    };
+  }
+  if (hasOwn(incomingConfig, 'contracts')) {
+    const contractKeys = Object.keys(incomingConfig?.contracts || {});
+    if (!usesOnChainSbt || contractKeys.some((key) => key !== 'sbtFactory')) {
+      return {
+        ok: false,
+        status: 400,
+        error: 'Worker-canonical sessions accept only the on-chain SBT Group Factory contract.',
+      };
+    }
+  }
+  return { ok: true };
+};
 
 const normalizeCanonicalSessionId = (value) => {
   const raw = toTrimmedString(value).toLowerCase();
@@ -47,6 +148,11 @@ const resolveCanonicalSessionIdentity = (config) => {
     invalid: normalizedValues.some((value) => !value) || uniqueValues.size > 1,
     value: uniqueValues.size === 1 ? [...uniqueValues][0] : '',
   };
+};
+
+export const resolveCanonicalWorkerSessionIdHex = (config) => {
+  const identity = resolveCanonicalSessionIdentity(config);
+  return !identity.invalid && identity.value ? `0x${identity.value}` : '';
 };
 
 const normalizeConfigRevision = (value) => {
@@ -129,13 +235,31 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
     if (hasOwn(incomingConfig, AUTHORIZATION_EPOCH_KEY)) {
       return { ok: false, status: 400, error: 'Authorization epoch is server-managed.' };
     }
+    if (
+      hasOwn(incomingConfig, WORKER_GROUPS_BOOTSTRAP_KEY) &&
+      (
+        !hasOwn(authorityExisting, WORKER_GROUPS_BOOTSTRAP_KEY) ||
+        stableCanonicalSerialize(incomingConfig[WORKER_GROUPS_BOOTSTRAP_KEY]) !==
+          stableCanonicalSerialize(authorityExisting[WORKER_GROUPS_BOOTSTRAP_KEY])
+      )
+    ) {
+      return { ok: false, status: 400, error: 'Worker Group bootstrap state is server-managed.' };
+    }
     if (findForbiddenCloudflareDeploymentTokenPath(incomingConfig)) {
       return { ok: false, status: 400, error: 'Cloudflare deployment tokens are not allowed in session config.' };
     }
     if (findForbiddenWorkerConfigSecretPath(incomingConfig)) {
       return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
     }
-    const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig);
+    if (!validGroupCreationPolicy(incomingConfig)) {
+      return { ok: false, status: 400, error: 'Invalid group creation policy.' };
+    }
+    // A patch may update the profile without resending the already-persisted
+    // canonical storage object. The complete merged record below remains
+    // strict and is the only record eligible for persistence.
+    const incomingModeValidation = validateWorkerConfigModeValues(incomingConfig, {
+      allowPartialProfileStorage: true,
+    });
     if (!incomingModeValidation.ok) {
       return {
         ok: false,
@@ -178,6 +302,9 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
   if (findForbiddenWorkerConfigSecretPath(mergedConfig)) {
     return { ok: false, status: 400, error: 'Secret-like values are not allowed in public session config fields.' };
   }
+  if (!validGroupCreationPolicy(mergedConfig)) {
+    return { ok: false, status: 400, error: 'Invalid group creation policy.' };
+  }
   const mergedModeValidation = validateWorkerConfigModeValues(mergedConfig);
   if (!mergedModeValidation.ok) {
     return {
@@ -185,6 +312,13 @@ export const applySessionConfigMutation = ({ existingConfig, mutation, slug } = 
       status: 400,
       error: `Invalid session config mode at ${mergedModeValidation.path}.`,
     };
+  }
+  if (kind === 'set-config') {
+    const fieldValidation = validateWorkerCanonicalIncomingFields({
+      incomingConfig,
+      mergedConfig,
+    });
+    if (!fieldValidation.ok) return fieldValidation;
   }
 
   if (changesInitializedWorkerCanonicalIdentity({ existingConfig: authorityExisting, mergedConfig })) {

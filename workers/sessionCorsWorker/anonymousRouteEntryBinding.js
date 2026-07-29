@@ -49,6 +49,7 @@ export const dispatchAnonymousRouteEntryWithWorkerDeps = async ({
             proxyOpenRouter: deps?.proxyOpenRouter,
             proxyCustomRPC: deps?.proxyCustomRPC,
             json: deps?.json,
+            now: deps?.now,
           },
           constants: {
             anonymousRouteDeniedError: constants?.anonymousRouteDeniedError,

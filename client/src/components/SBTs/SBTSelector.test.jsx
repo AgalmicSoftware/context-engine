@@ -2,7 +2,23 @@ import SBTSelector from './SBTSelector';
 import * as sbtDisplayNameUtils from '../../utilities/sbt/sbtDisplayNames.js';
 import * as contractScriptsUtils from '../../utilities/web3/chainGateway.js';
 import { makeInstance, createDeferred, flushAsync } from './SBTSelector.testUtils';
-import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
+
+const makeLegacyRegistrySessionConfig = (slug = 'edge', networkChainId = 84532) => ({
+  slug,
+  networkChainId,
+  __registry: {
+    chainId: networkChainId,
+    sessionIdHex: `0x${'1'.repeat(64)}`,
+  },
+});
+
+const makeRegistrySbtInstance = (props = {}) => {
+  const slug = props.sessionSlug || 'edge';
+  return makeInstance({
+    ...props,
+    sessionConfig: makeLegacyRegistrySessionConfig(slug, props.chainId || props.network?.id || 84532),
+  });
+};
 
 describe('SBTSelector targeted hydration', () => {
   beforeEach(() => {
@@ -35,7 +51,7 @@ describe('SBTSelector targeted hydration', () => {
     }
   });
 
-  it('does not use demo-session metadata lookup context when the strict shared lookup misses in live mode', () => {
+  it('fails closed instead of using wallet or demo metadata when strict session lookup misses in live mode', () => {
     const instance = makeInstance({
       sessionSlug: 'rxc',
       chainId: 10,
@@ -53,16 +69,16 @@ describe('SBTSelector targeted hydration', () => {
     });
 
     try {
-      expect(instance.getSessionNetworkId('rxc')).toBe(10);
-      expect(instance.getMetadataLookupConfig('rxc')).toEqual(
+      expect(instance.getSessionNetworkId('rxc')).toBeNull();
+      const metadataLookupConfig = instance.getMetadataLookupConfig('rxc');
+      expect(metadataLookupConfig).toEqual(
         expect.objectContaining({
           slug: 'rxc',
-          networkChainId: 10,
-          __registry: expect.objectContaining({
-            chainId: 10,
-          }),
+          contracts: {},
         }),
       );
+      expect(metadataLookupConfig).not.toHaveProperty('networkChainId');
+      expect(metadataLookupConfig).not.toHaveProperty('__registry');
       expect(demoSpy).not.toHaveBeenCalled();
     } finally {
       strictSpy.mockRestore();
@@ -71,7 +87,7 @@ describe('SBTSelector targeted hydration', () => {
     }
   });
 
-  it('keeps unresolved live-mode session config placeholders instead of falling through to demo metadata', () => {
+  it('keeps unresolved live-mode placeholders and fails closed instead of inheriting a default chain', () => {
     const instance = makeInstance({
       sessionSlug: 'legacyEdge',
       sessionConfig: null,
@@ -102,7 +118,7 @@ describe('SBTSelector targeted hydration', () => {
           __unresolved: true,
         }),
       );
-      expect(instance.getSessionNetworkId('legacyEdge')).toBe(DEFAULT_CHAIN_ID);
+      expect(instance.getSessionNetworkId('legacyEdge')).toBeNull();
       expect(demoSpy).not.toHaveBeenCalled();
     } finally {
       demoSpy.mockRestore();
@@ -285,7 +301,7 @@ describe('SBTSelector targeted hydration', () => {
     const encryptedAddress = '0x2020202020202020202020202020202020202020';
     const visibleLower = visibleAddress.toLowerCase();
     const encryptedLower = encryptedAddress.toLowerCase();
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       defaultFeaturedSBTs: [encryptedAddress],
     });
     instance._isMounted = true;
@@ -328,7 +344,7 @@ describe('SBTSelector targeted hydration', () => {
     const plainAddress = '0x4040404040404040404040404040404040404040';
     const visibleLockedLower = visibleLockedAddress.toLowerCase();
     const plainLower = plainAddress.toLowerCase();
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       defaultFeaturedSBTs: [visibleLockedAddress],
     });
     instance._isMounted = true;
@@ -373,7 +389,7 @@ describe('SBTSelector targeted hydration', () => {
 
   it('avoids redundant selectedOption rerender state writes when hydration succeeds', async () => {
     const selectedAddress = '0x7777777777777777777777777777777777777777';
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       selectedSBTs: [{ address: selectedAddress }],
     });
     instance._isMounted = true;
@@ -407,7 +423,7 @@ describe('SBTSelector targeted hydration', () => {
     const selectedLower = selectedAddress.toLowerCase();
     const staleLabel = 'Stale Name';
     const resolvedLabel = 'Resolved Name';
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       selectedSBTs: [{ address: selectedAddress, name: staleLabel }],
       defaultFeaturedSBTs: [],
     });
@@ -475,7 +491,7 @@ describe('SBTSelector targeted hydration', () => {
 
   it('retries selected SBT hydration for same signature after a transient miss', async () => {
     const selectedAddress = '0x5555555555555555555555555555555555555555';
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       selectedSBTs: [{ address: selectedAddress }],
     });
     instance._isMounted = true;
@@ -505,7 +521,7 @@ describe('SBTSelector targeted hydration', () => {
     const previousPolicy = globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP;
     globalThis.ENABLE_TARGETED_SBT_METADATA_LOOKUP = false;
     const selectedAddress = '0x6666666666666666666666666666666666666666';
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       selectedSBTs: [{ address: selectedAddress }],
     });
     instance._isMounted = true;
@@ -533,7 +549,7 @@ describe('SBTSelector targeted hydration', () => {
   it('skips duplicate option loads when request inputs are unchanged', async () => {
     const selectedAddress = '0x1111111111111111111111111111111111111111';
     const selectedLower = selectedAddress.toLowerCase();
-    const instance = makeInstance({
+    const instance = makeRegistrySbtInstance({
       selectedSBTs: [{ address: selectedAddress }],
       sbtCacheRevision: 'rev-1',
       defaultFeaturedSBTs: [],

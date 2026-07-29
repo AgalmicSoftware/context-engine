@@ -522,6 +522,7 @@ describe('AdminPage metadata controls', () => {
 
     await renderAdminPage({ initialSessionConfig });
     expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
+    expect(mockGetReadProviderForChain).not.toHaveBeenCalled();
     const metadataPanel = screen.getByText('Session metadata').closest('section');
     fireEvent.click(within(metadataPanel).getByRole('button', { name: 'Toggle Session metadata section' }));
     fireEvent.change(getFieldInputByLabel('Default tags'), {
@@ -549,7 +550,7 @@ describe('AdminPage metadata controls', () => {
     expect(mockSetSessionFieldsOnChain).not.toHaveBeenCalled();
   });
 
-  it('preserves on-chain metadata authority for a distinct worker-canonical registry admin', async () => {
+  it('does not infer on-chain metadata authority from stale registry fields on a pure Worker profile', async () => {
     const registryAdminAddress = '0x00000000000000000000000000000000000000bb';
     const initialSessionConfig = {
       slug: 'split-metadata-admins',
@@ -576,18 +577,12 @@ describe('AdminPage metadata controls', () => {
     expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
     const metadataPanel = screen.getByText('Session metadata').closest('section');
     fireEvent.click(within(metadataPanel).getByRole('button', { name: 'Toggle Session metadata section' }));
-    fireEvent.change(getFieldInputByLabel('Default tags'), {
-      target: { value: 'registry-owned' },
-    });
-    await clickAndSettle(screen.getByRole('button', { name: 'Update metadata' }));
 
-    await waitFor(() => {
-      expect(mockUploadSessionMetadata).toHaveBeenCalledTimes(1);
-      expect(mockUpdateSessionMetadataOnChain).toHaveBeenCalledWith(
-        expect.objectContaining({ chainId: 84532, slug: 'split-metadata-admins' }),
-      );
-      expect(screen.getByText(/Session metadata updated\./)).toBeInTheDocument();
-    });
+    expect(screen.queryByText('Default tags')).not.toBeInTheDocument();
+    expect(screen.getByText(/You are not the admin for this session/i)).toBeInTheDocument();
+    expect(mockGetReadProviderForChain).not.toHaveBeenCalled();
+    expect(mockUploadSessionMetadata).not.toHaveBeenCalled();
+    expect(mockUpdateSessionMetadataOnChain).not.toHaveBeenCalled();
     expect(global.fetch.mock.calls.some(([url]) => String(url).endsWith('/admin/set-config'))).toBe(false);
     expect(mockSetSessionFieldsOnChain).not.toHaveBeenCalled();
   });

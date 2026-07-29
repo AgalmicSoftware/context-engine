@@ -196,6 +196,7 @@ import {
   readSessionScanSlugs,
 } from '../../utilities/session/sessionScanScope.js';
 import { resolveActiveSessionSlug } from '../../utilities/session/sessionNaming.js';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection.js';
 import {
   hasNamespaceEntriesSync,
   listNamespaceSlugsSync,
@@ -1185,7 +1186,13 @@ class UserPage extends Component<any, any> {
 
   startProfileDeepScan = (phase: unknown = 'mount'): void => {
     const targetAddress = String(this.props.viewAddress || '').trim();
-    if (!this._isMounted || !this.props.scanSpecificUserProfile || !targetAddress) return;
+    if (
+      !this._isMounted ||
+      this.props.onChainProfileEnabled === false ||
+      !this.props.scanSpecificUserProfile ||
+      !targetAddress
+    )
+      return;
 
     const requestSeq = Number(this._profileScanRequestSeq || 0) + 1;
     this._profileScanRequestSeq = requestSeq;
@@ -1293,7 +1300,7 @@ class UserPage extends Component<any, any> {
       // Phase 2 Task: Trigger global light discovery to populate caches for all groups
       // This ensures the "universe" of known SBT addresses is populated, which is
       // a prerequisite for the deep scan to find what the user owns.
-      if (this.props.ensureLightSbtUniverse) {
+      if (this.props.onChainProfileEnabled !== false && this.props.ensureLightSbtUniverse) {
         accountLog.log('[UserPage] Triggering ensureLightSbtUniverse...');
         this.props.ensureLightSbtUniverse();
       }
@@ -3257,13 +3264,14 @@ class UserPage extends Component<any, any> {
         : null;
     const rawSessionSlug = this.props.sessionSlug ?? this.props.activeSessionSlug ?? '';
     const sessionSlug = normalizeSessionSlug(rawSessionSlug || '');
-    const hasSessionContext = !!sessionConfigProp || !!sessionSlug;
+    const hasSessionContext = !!sessionSlug || !!(sessionConfigProp && Object.keys(sessionConfigProp).length);
     const sessionConfig =
       sessionConfigProp || (hasSessionContext ? this._getSessionConfigForSlugExact(sessionSlug) : null);
-    const sessionChainId = hasSessionContext
-      ? Number(sessionConfig?.networkChainId ?? this.props.networkChainId ?? 0) || null
-      : null;
-    return sessionChainId || Number(network?.chainId ?? network?.id ?? 0) || null;
+    if (hasSessionContext) {
+      const capabilities = resolveSessionCapabilityProjection(sessionConfig);
+      return capabilities.showNetworkControls && capabilities.chainId ? Number(capabilities.chainId) : null;
+    }
+    return Number(network?.chainId ?? network?.id ?? this.props.networkChainId ?? 0) || null;
   };
 
   getExplorerUrl = (): string | null => {
@@ -3771,20 +3779,22 @@ class UserPage extends Component<any, any> {
               />
             )}
 
-            <UserPageSbtSection
-              account={account}
-              heading={`${t('minted')} ${t('sbts')}:`}
-              isLoading={isSbtLoadingAny}
-              isSBTCacheReady={this.props.isSBTCacheReady}
-              loadingIndicator={renderDeepScanIndicator(isSbtLoadingAny, sbtSpinnerId)}
-              loginComplete={loginComplete}
-              network={network}
-              onRefreshSbtData={this.dispatchSbtDataRefresh}
-              provider={provider}
-              sbtDisplayState={sbtDisplayState}
-              sbtEmptyText={sbtEmptyText}
-              sbtEntries={sbtEntries}
-            />
+            {this.props.onChainProfileEnabled !== false && (
+              <UserPageSbtSection
+                account={account}
+                heading={`${t('minted')} ${t('sbts')}:`}
+                isLoading={isSbtLoadingAny}
+                isSBTCacheReady={this.props.isSBTCacheReady}
+                loadingIndicator={renderDeepScanIndicator(isSbtLoadingAny, sbtSpinnerId)}
+                loginComplete={loginComplete}
+                network={network}
+                onRefreshSbtData={this.dispatchSbtDataRefresh}
+                provider={provider}
+                sbtDisplayState={sbtDisplayState}
+                sbtEmptyText={sbtEmptyText}
+                sbtEntries={sbtEntries}
+              />
+            )}
           </div>
         )}
 

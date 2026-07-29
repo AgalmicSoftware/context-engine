@@ -1,5 +1,9 @@
 import type { ReactNode } from 'react';
 import { t } from '../../utilities/ui/terminology.js';
+import {
+  isSessionWizardModeHiddenTopLevelField,
+  type SessionWizardModeFieldPolicy,
+} from './sessionWizardModeFieldPolicy';
 
 type DraftLike = Record<string, unknown>;
 
@@ -20,6 +24,7 @@ type SessionWizardFieldVisibilityOptions = {
   path?: string[];
   currentPath?: string[];
   wizardMode?: string;
+  modeFieldPolicy?: SessionWizardModeFieldPolicy;
 };
 
 const pathKey = (path: string[] = []): string => path.join('.');
@@ -32,6 +37,8 @@ const HIDDEN_PATHS = new Set([
   'rpc.providers.path.rpcUrl',
   'rpc.providers.path.rpcUrlsByChainId',
   'faucet.rpcUrl',
+  'faucet.privateKey',
+  'faucet.encryptedPrivateKey',
 ]);
 
 const TOP_LEVEL_FIELD_ORDER = [
@@ -41,6 +48,7 @@ const TOP_LEVEL_FIELD_ORDER = [
   'sessionInfo',
   'sessionModeProfile',
   'sessionHeader',
+  'sessionEndsAt',
   'storageProfile',
   'contracts',
   'blockLimits',
@@ -50,6 +58,7 @@ const TOP_LEVEL_FIELD_ORDER = [
   'ai',
   'litCredentials',
   'defaultTags',
+  'defaultGroupTags',
   'defaultSbtTags',
   'defaultFeaturedSBTs',
   'autoFeatureSBTsBySessionSlug',
@@ -60,7 +69,9 @@ const TOP_LEVEL_FIELD_ORDER = [
 const WORKER_ONLY_DRAFT_FIELDS = new Set(['embeddedDeployHelperEnabled']);
 
 const MORE_OPTIONS_FIELDS = new Set([
+  'sessionEndsAt',
   'defaultTags',
+  'defaultGroupTags',
   'defaultSbtTags',
   'defaultFeaturedSBTs',
   'autoFeatureSBTsBySessionSlug',
@@ -77,9 +88,13 @@ const FIELD_TOOLTIPS: Record<string, string> = {
     'The session mode profile controls authority, storage, identity, authorization, encryption, surfaces, results, and export behavior.',
   corsWorkerUrl: 'Base URL for the worker (AI, transcription, Arweave uploads, faucet).',
   sessionHeader: 'The banner image for this session. Paste an image URL or upload a file.',
+  sessionEndsAt:
+    'Optional end time for this Cloudflare session. After this timestamp, participant writes stop while existing groups and results remain readable.',
   storageProfile: 'Advanced: choose the session-owned storage profile for documents, context, and media payloads.',
   defaultTags:
     'Suggested tags for AI-assisted question tagging. They guide the model, but they do not limit which questions or surveys appear.',
+  defaultGroupTags:
+    'Suggested tags prefilled when an admin or participant creates a Worker-native Group for this session.',
   defaultSbtTags: `Suggested tags for ${t('sbts')} created from this session. Matching tags are prefilled in the Create ${t('sbt')} flow, and you can still change them.`,
   questionsGenPrompt: 'Extra instructions for the AI when it generates questions for this session.',
   defaultFilterState:
@@ -98,8 +113,6 @@ const FIELD_TOOLTIPS: Record<string, string> = {
   'faucet.rpcUrl': 'RPC endpoint for faucet balance checks + transfers.',
   'faucet.amountEth': 'ETH amount to send for faucet requests.',
   'faucet.balanceThresholdEth': 'Max balance eligible for faucet transfers (ETH string).',
-  'faucet.privateKey': 'Private key for the faucet signer. Lock to store as Lit-encrypted.',
-  'faucet.encryptedPrivateKey': 'Lit-encrypted faucet private key (written when the field is locked).',
   ai: 'AI provider settings and API keys.',
   litCredentials: 'Lit integration credentials (optional).',
 };
@@ -111,8 +124,10 @@ const FIELD_LABELS: Record<string, string> = {
   sessionModeProfile: 'Session Mode',
   corsWorkerUrl: 'Worker URL',
   sessionHeader: 'Header Image',
+  sessionEndsAt: 'Session end time',
   storageProfile: 'Session Storage',
   defaultTags: 'Default Tag Suggestions',
+  defaultGroupTags: 'Default Group Tags',
   defaultFeaturedSBTs: `Default ${t('sbts')}`,
   autoFeatureSBTsBySessionSlug: `Auto-feature Session ${t('sbts')}`,
   sponsoredSbtAddress: `Sponsored ${t('sbt')} Address`,
@@ -172,13 +187,16 @@ export const shouldHideSessionWizardField = ({
   path = [],
   currentPath = [...path, key],
   wizardMode = 'advanced',
+  modeFieldPolicy,
 }: SessionWizardFieldVisibilityOptions): boolean => {
-  if (forceShow) return false;
-
+  if (currentPath.length === 1 && isSessionWizardModeHiddenTopLevelField(currentPath[0], modeFieldPolicy)) {
+    return true;
+  }
   const keyString = pathKey(currentPath);
-  const isNormalMode = wizardMode !== 'advanced';
 
-  if (path.length === 0 && (SESSION_WIZARD_ADMIN_ONLY_FIELDS.has(key) || SESSION_WIZARD_HIDDEN_FIELDS.has(key))) {
+  // These legacy faucet values are secret material, so a dedicated guided
+  // control must never be able to opt them back into the public draft renderer.
+  if (keyString === 'faucet.privateKey' || keyString === 'faucet.encryptedPrivateKey') {
     return true;
   }
 
@@ -186,7 +204,9 @@ export const shouldHideSessionWizardField = ({
     return true;
   }
 
-  if (isNormalMode && path.length === 0 && NORMAL_MODE_HIDDEN_TOP_LEVEL_FIELDS.has(key)) {
+  if (forceShow) return false;
+
+  if (path.length === 0 && (SESSION_WIZARD_ADMIN_ONLY_FIELDS.has(key) || SESSION_WIZARD_HIDDEN_FIELDS.has(key))) {
     return true;
   }
 
@@ -202,13 +222,25 @@ export const shouldHideSessionWizardField = ({
     return true;
   }
 
+  const isNormalMode = wizardMode !== 'advanced';
+
+  if (isNormalMode && path.length === 0 && NORMAL_MODE_HIDDEN_TOP_LEVEL_FIELDS.has(key)) {
+    return true;
+  }
+
   return false;
 };
 
-export const getSessionWizardOrderedDraftEntries = (draft: DraftLike | null | undefined): Array<[string, unknown]> => {
+export const getSessionWizardOrderedDraftEntries = (
+  draft: DraftLike | null | undefined,
+  modeFieldPolicy?: SessionWizardModeFieldPolicy,
+): Array<[string, unknown]> => {
   const source = draft && typeof draft === 'object' ? draft : {};
   const keys = Object.keys(source).filter(
-    (key) => !WORKER_ONLY_DRAFT_FIELDS.has(key) && !(key === 'storageProfile' && source.sessionModeProfile),
+    (key) =>
+      !WORKER_ONLY_DRAFT_FIELDS.has(key) &&
+      !(key === 'storageProfile' && source.sessionModeProfile) &&
+      !isSessionWizardModeHiddenTopLevelField(key, modeFieldPolicy),
   );
   const orderedKeys = [
     ...TOP_LEVEL_FIELD_ORDER.filter((key) => keys.includes(key)),

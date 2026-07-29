@@ -25,6 +25,16 @@ const primeQuestionCountState = (subject: any) => {
   };
 };
 
+const makeLegacySessionConfig = (slug: unknown, blockedQuestionIds: string[] = []) => ({
+  slug: String(slug || ''),
+  networkChainId: 84532,
+  BLOCKED_QUESTION_IDS: blockedQuestionIds,
+  __registry: {
+    registryChainId: 84532,
+    sessionIdHex: '0x00112233445566778899aabbccddeeff',
+  },
+});
+
 describe('SurveySelector question counts', () => {
   afterEach(() => {
     jest.clearAllMocks();
@@ -120,7 +130,7 @@ describe('SurveySelector question counts', () => {
     expect(subject.state.encryptedQuestionCount).toBe(0);
   });
 
-  it('does not filter question counts with borrowed general blocked ids when the slug is unresolved', async () => {
+  it('keeps unresolved question counts chainless instead of borrowing general blocked ids', async () => {
     jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('active');
     const generalCfg = {
       slug: '',
@@ -137,7 +147,7 @@ describe('SurveySelector question counts', () => {
     jest
       .spyOn(contractScriptsModule, 'getSessionConfigBySlugOrDefault')
       .mockImplementation((slug: any) => strictLookup(slug) || generalCfg);
-    jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
+    const readCacheSpy = jest.spyOn(cacheScripts, 'readCache').mockResolvedValue({
       '84532': {
         questions: {
           q1: {
@@ -168,11 +178,12 @@ describe('SurveySelector question counts', () => {
 
     expect(subject.getQuestionCountContext()).toEqual({
       slug: 'missing-session-slug',
-      networkID: '84532',
+      networkID: '',
       readSlugs: ['missing-session-slug'],
-      contextKey: 'missing-session-slug|84532',
+      contextKey: 'missing-session-slug|',
     });
-    expect(subject.state.filteredQuestionCount).toBe(2);
+    expect(readCacheSpy).not.toHaveBeenCalled();
+    expect(subject.state.filteredQuestionCount).toBe(0);
     expect(subject.state.encryptedQuestionCount).toBe(0);
   });
 
@@ -183,8 +194,8 @@ describe('SurveySelector question counts', () => {
       jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
       jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['alpha', 'beta']);
       const strictLookup = (slug: unknown) => {
-        if (slug === 'alpha') return { slug: 'alpha', networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
-        if (slug === 'beta') return { slug: 'beta', networkChainId: 84532, BLOCKED_QUESTION_IDS: ['qblockedbeta'] };
+        if (slug === 'alpha') return makeLegacySessionConfig(slug);
+        if (slug === 'beta') return makeLegacySessionConfig(slug, ['qblockedbeta']);
         return null;
       };
       jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup as any);
@@ -253,9 +264,7 @@ describe('SurveySelector question counts', () => {
         .spyOn(sessionScanScope, 'readSessionScanSlugs')
         .mockReturnValue(['edge', 'alpha', 'beta']);
       const strictLookup = (slug: unknown) => {
-        if (slug === 'edge') return { slug: 'edge', networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
-        if (slug === 'alpha') return { slug: 'alpha', networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
-        if (slug === 'beta') return { slug: 'beta', networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'edge' || slug === 'alpha' || slug === 'beta') return makeLegacySessionConfig(slug);
         return null;
       };
       jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup as any);
@@ -331,8 +340,7 @@ describe('SurveySelector question counts', () => {
       jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
       jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['alpha', 'beta']);
       const strictLookup = (slug: unknown) => {
-        if (slug === 'alpha') return { slug: 'alpha', networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
-        if (slug === 'beta') return { slug: 'beta', networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+        if (slug === 'alpha' || slug === 'beta') return makeLegacySessionConfig(slug);
         return null;
       };
       jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup as any);

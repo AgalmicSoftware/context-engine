@@ -5,6 +5,8 @@
 /.github/workflows/public-drift.yml @AgalmicSoftware
 /scripts/check-baseline-monotonicity.mjs @AgalmicSoftware
 /scripts/check-baseline-monotonicity.test.mjs @AgalmicSoftware
+/scripts/resolve-baseline-monotonicity-base.mjs @AgalmicSoftware
+/scripts/resolve-baseline-monotonicity-base.test.mjs @AgalmicSoftware
 /scripts/resolve-baseline-growth-approval.mjs @AgalmicSoftware
 /scripts/resolve-baseline-growth-approval.test.mjs @AgalmicSoftware
 /scripts/ci-gates.json @AgalmicSoftware

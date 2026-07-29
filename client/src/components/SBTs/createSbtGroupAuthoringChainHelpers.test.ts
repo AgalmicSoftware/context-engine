@@ -119,6 +119,23 @@ describe('createSbtGroupAuthoringChainHelpers', () => {
         resolvedSessionConfig: null,
       }),
     ).toBe(11155420);
+    expect(
+      resolveCreateSbtPreferredAuthoringChainId({
+        availableChainIds: [84532, 11155420],
+        network: { id: 84532 },
+        preferConnectedNetworkForAuthoring: true,
+        resolvedSessionConfig: { networkChainId: 11155420 },
+        sessionConfigOverride: { networkChainId: 11155420 },
+      }),
+    ).toBe(84532);
+    expect(
+      resolveCreateSbtPreferredAuthoringChainId({
+        availableChainIds: [84532, 11155420],
+        network: { id: 84532 },
+        resolvedSessionConfig: { networkChainId: 11155420 },
+        sessionConfigOverride: { networkChainId: 11155420 },
+      }),
+    ).toBe(11155420);
     expect(shouldHideCreateSbtNetworkSelector({ hideNetworkSelector: true })).toBe(true);
     expect(shouldHideCreateSbtNetworkSelector({ deferredDeploy: true })).toBe(true);
     expect(shouldHideCreateSbtNetworkSelector({ hideNetworkSelector: 0, deferredDeploy: '' })).toBe(false);

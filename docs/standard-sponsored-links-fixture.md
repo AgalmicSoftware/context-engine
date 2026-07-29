@@ -15,9 +15,10 @@ When the client is built, the file is served as:
 
 ## Important Warning
 
-Sponsored setup URLs are bearer grants. A full URL shaped like
-`/new?sponsored=<txId>#k=<secret>` lets whoever has the link decrypt and use the
-sponsored bundle until it is consumed, expires, or is rotated.
+Sponsored setup URLs contain only an opaque bundle id:
+`/new?sponsored=<txId>`. The separately delivered decryption key is the sensitive
+half of the handoff. Whoever has both can decrypt and use the sponsored bundle
+until it is consumed, expires, or is rotated.
 
 Do not put durable production secrets in this fixture. Only publish links that
 are intentionally public, limited, disposable, and safe to lose.
@@ -26,7 +27,8 @@ When creating fixture links through `/sponsor`, use a separate low-budget
 resource profile. Prefer provider-side spend caps or prepaid keys for AI,
 short expirations, small faucet balances, disposable Arweave/Lit payer wallets,
 and credentials that can be revoked without affecting normal sessions. Never
-publish a sponsored URL backed by unrestricted production API keys.
+publish a sponsored handoff backed by unrestricted production API keys. Never put
+the decryption key in the fixture, a URL fragment, or another URL field.
 
 ## Fixture Shape
 
@@ -37,7 +39,7 @@ publish a sponsored URL backed by unrestricted production API keys.
   "links": [
     {
       "label": "Sponsored setup 1",
-      "url": "https://contextengine.sh/new?sponsored=<txId>#k=<secret>",
+      "url": "https://contextengine.sh/new?sponsored=<txId>",
       "active": true
     }
   ]
@@ -49,11 +51,13 @@ temporary public deployment:
 
 1. Create sponsored URLs through `/sponsor` using resource-limited, disposable
    keys and short expirations.
-2. Paste up to ten URLs into the fixture.
-3. Set only intentionally available links to `"active": true`.
-4. Rebuild and redeploy the client, or upload the JSON file to the GitHub/static
+2. Paste up to ten ID-only URLs into the fixture.
+3. Keep each decryption key outside the fixture and deliver it through a separate,
+   ephemeral channel to the intended recipient.
+4. Set only intentionally available links to `"active": true`.
+5. Rebuild and redeploy the client, or upload the JSON file to the GitHub/static
    host that the deployment reads from.
-5. Remove or set `"active": false` after a link is used, expires, or fails.
+6. Remove or set `"active": false` after a link is used, expires, or fails.
 
 ## Temporary Contract
 
@@ -61,6 +65,7 @@ temporary public deployment:
   been clicked.
 - A link is "unused" only if the operator has left it active in the manifest.
 - The existing sponsored deploy/faucet grants remain the final safety check.
+- The fixture never contains decryption keys; the URL alone cannot redeem a bundle.
 - The fixture does not enforce spend limits. Budget limits must come from the
   credentials, wallets, provider account settings, or the future replacement
   service.

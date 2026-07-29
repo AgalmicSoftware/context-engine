@@ -1,4 +1,5 @@
 import { isWorkerGroupMember as isWorkerGroupMemberBoundary } from './workerGroups.js';
+import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 
 const toStr = (value) => (typeof value === 'string' ? value : value == null ? '' : String(value));
 const trim = (value) => toStr(value).trim();
@@ -72,6 +73,7 @@ const evaluateLoginCondition = async ({ condition, address, config, env, slug, d
     const result = await checkMembership({
       env,
       slug,
+      sessionId: resolveCanonicalWorkerSessionIdHex(config),
       groupId,
       requesterAddress: address,
       authScopes: {},

@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 
 import {
   fetchWorkerCanonicalSessionBootstrap,
+  describeWorkerSessionBootstrapError,
   isRetryableWorkerSessionBootstrapError,
+  parseSessionWorkerDiscoveryOrigin,
   type DiscoveryEnvironment,
   type WorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerDiscovery';
@@ -10,6 +12,7 @@ import {
   markWorkerCanonicalSessionBootstrapVerified,
   upsertWorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerConfigCache.js';
+import { buildPublicRoute } from '../../utilities/ui/publicUrl.js';
 
 type WorkerCanonicalSessionBootstrapBoundaryProps = {
   sessionSlug: string;
@@ -23,6 +26,8 @@ type WorkerCanonicalSessionBootstrapBoundaryProps = {
 
 type BootstrapViewState = {
   kind: 'loading' | 'ready' | 'error';
+  title?: string;
+  errorKind?: string;
   message: string;
   canRetry?: boolean;
 };
@@ -152,10 +157,13 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
         if (active) setViewState({ kind: 'ready', message: 'Worker session ready.' });
       } catch (error) {
         if (!active || abortController.signal.aborted) return;
+        const descriptor = describeWorkerSessionBootstrapError(error);
         setViewState({
           kind: 'error',
-          message: error instanceof Error && error.message ? error.message : 'Worker session bootstrap failed.',
-          canRetry: isRetryableWorkerSessionBootstrapError(error),
+          title: descriptor.title,
+          errorKind: descriptor.kind,
+          message: descriptor.message,
+          canRetry: descriptor.canRetry,
         });
       }
     };
@@ -169,14 +177,30 @@ const WorkerCanonicalSessionBootstrapBoundary = ({
   }, [confirmRepin, environment, fetchImpl, onResolved, retryDelaysMs, retryNonce, sessionSlug, workerQueryValue]);
 
   if (viewState.kind === 'error') {
+    let safeWorkerOrigin = '';
+    try {
+      safeWorkerOrigin = parseSessionWorkerDiscoveryOrigin(workerQueryValue, { environment });
+    } catch {
+      safeWorkerOrigin = '';
+    }
+    const adminHref = buildPublicRoute(
+      `/admin?sessionSlug=${encodeURIComponent(sessionSlug)}${
+        safeWorkerOrigin ? `&worker=${encodeURIComponent(safeWorkerOrigin)}` : ''
+      }`,
+    );
     return (
       <div role="alert" aria-live="assertive" data-testid="ce-worker-canonical-bootstrap-error">
+        <h3>{viewState.title}</h3>
         <div>{viewState.message}</div>
-        {viewState.canRetry && (
-          <button type="button" aria-label="Retry worker session" onClick={() => setRetryNonce((value) => value + 1)}>
-            Retry
-          </button>
-        )}
+        <div>
+          {viewState.canRetry && (
+            <button type="button" aria-label="Retry worker session" onClick={() => setRetryNonce((value) => value + 1)}>
+              Retry
+            </button>
+          )}
+          <a href={adminHref}>Open Admin</a>
+          <a href={buildPublicRoute('/new')}>Return to session selection</a>
+        </div>
       </div>
     );
   }

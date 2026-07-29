@@ -83,7 +83,6 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
     extractChainId,
     fetchLogsSmartWithProvider,
     getLocalAwareReadProviderForGroup,
-    getReadProviderForChain,
     getSurveysReadProviderForSession,
     hasNonZeroHashValue,
     hasPasswordMintForSbtMintMode,
@@ -164,6 +163,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         txOverrides,
         rpcFunction: 'startClaim',
         revertMessage: 'startClaim transaction reverted on-chain.',
+        sensitiveArgs: true,
       });
       return receipt;
     },
@@ -199,6 +199,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         txOverrides,
         rpcFunction: 'claimWithPassword',
         revertMessage: 'claimWithPassword transaction reverted on-chain.',
+        sensitiveArgs: true,
       });
       return receipt;
     },
@@ -206,167 +207,17 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
     claimWithInvite: async function (providerName: any, SBTAddress: any, nonce: any, signature: any) {
       if (providerName === 'none')
         throw new Error('claimWithInvite requires a signer-capable provider (not read-only).');
-      inviteLog.log('[INVITE_DEBUG v4] claimWithInvite (instrumented)');
-      inviteLog.log('--- Debug ClaimWithInvite ---');
-      inviteLog.log('SBT Address:', SBTAddress);
-      inviteLog.log('Nonce:', nonce);
-      inviteLog.log('Signature:', signature);
       if (!SBTAddress || !ethers.utils.isAddress(SBTAddress)) {
         throw new Error('Invalid SBT address for claimWithInvite.');
       }
       const providerLocation = this.getProviderLocation(providerName);
       const ethersProvider = new ethers.providers.Web3Provider(providerLocation as any, 'any');
       const signer = ethersProvider.getSigner();
-      let signerAddress = null;
-      try {
-        signerAddress = await signer.getAddress();
-        inviteLog.log('Signer Address:', signerAddress);
-      } catch (err: any) {
-        inviteLog.warn('Failed to resolve signer address:', err?.message || err);
-      }
       const CustomSBT = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, signer as any);
-      let callStaticFailure = null;
-
-      // Preflight debug: recover signer + compare to on-chain hash + nonce expectations.
       try {
-        const messageHash = cryptoUtils.buildInviteMessageHash({ sbtAddress: SBTAddress, nonce });
-        const recovered = ethers.utils.verifyMessage(ethers.utils.arrayify(messageHash), signature);
-        const recoveredHash = ethers.utils.solidityKeccak256(['address'], [recovered]);
-        inviteLog.log('[INVITE_DEBUG v4] recovered signer:', recovered);
-        inviteLog.log('[INVITE_DEBUG v4] recovered hash:', recoveredHash);
-
-        const onchainHash = await this.getGroupPasswordHash('none', SBTAddress, '');
-        inviteLog.log('[INVITE_DEBUG v4] on-chain groupPasswordHash:', onchainHash);
-        if (onchainHash && onchainHash !== ethers.constants.HashZero) {
-          inviteLog.log(
-            '[INVITE_DEBUG v4] signature matches on-chain:',
-            String(onchainHash).toLowerCase() === recoveredHash.toLowerCase(),
-          );
-        }
-
-        const mintedTokens = await this.getMintedTokens('none', SBTAddress, '');
-        inviteLog.log('[INVITE_DEBUG v4] mintedTokens:', mintedTokens);
-        if (mintedTokens != null) {
-          try {
-            const expected = ethers.BigNumber.from(mintedTokens).add(1).toString();
-            inviteLog.log('[INVITE_DEBUG v4] expected nonce:', expected);
-          } catch {}
-        }
-
-        try {
-          const signerHash = await CustomSBT.groupPasswordHash?.().catch(() => null);
-          if (signerHash) {
-            inviteLog.log('[INVITE_DEBUG v4] signer groupPasswordHash:', signerHash);
-            inviteLog.log(
-              '[INVITE_DEBUG v4] signature matches signer:',
-              String(signerHash).toLowerCase() === recoveredHash.toLowerCase(),
-            );
-          }
-        } catch {}
-
-        try {
-          const signerMinted = await CustomSBT.mintedTokens?.().catch(() => null);
-          if (signerMinted != null) {
-            inviteLog.log('[INVITE_DEBUG v4] signer mintedTokens:', ethers.BigNumber.from(signerMinted).toString());
-          }
-        } catch {}
-
-        try {
-          let readProvider = null;
-          let readChainId = null;
-          try {
-            const net = await ethersProvider.getNetwork();
-            readChainId = net?.chainId;
-            inviteLog.log('[INVITE_DEBUG v4] signer chainId:', readChainId);
-          } catch {}
-
-          if (readChainId) {
-            try {
-              readProvider = getReadProviderForChain(readChainId);
-            } catch {
-              readProvider = null;
-            }
-          }
-
-          if (readProvider) {
-            const readContract = new ethers.Contract(SBTAddress, CUSTOM_SBT_ABI, readProvider as any);
-            const [mintingEndTime, maxTokens, hasPasswordMint, userTokenId] = await Promise.all([
-              readContract.mintingEndTime?.().catch(() => null),
-              readContract.maxTokens?.().catch(() => null),
-              readContract.hasPasswordMint?.().catch(() => null),
-              readContract.getTokenIdByOwner?.(signerAddress || ethers.constants.AddressZero).catch(() => null),
-            ]);
-            let code = null;
-            let balanceOf = null;
-            try {
-              code = signerAddress ? await readProvider.getCode(signerAddress) : null;
-            } catch {}
-            try {
-              balanceOf = signerAddress ? await readContract.balanceOf?.(signerAddress).catch(() => null) : null;
-            } catch {}
-            const endSec = mintingEndTime != null ? Number(ethers.BigNumber.from(mintingEndTime).toString()) : null;
-            const nowSec = Math.floor(Date.now() / 1000);
-            inviteLog.log('[INVITE_DEBUG v4] mintingEndTime:', endSec, 'now:', nowSec);
-            inviteLog.log(
-              '[INVITE_DEBUG v4] maxTokens:',
-              maxTokens != null ? ethers.BigNumber.from(maxTokens).toString() : null,
-            );
-            inviteLog.log('[INVITE_DEBUG v4] hasPasswordMint:', hasPasswordMint);
-            inviteLog.log(
-              '[INVITE_DEBUG v4] userTokenId:',
-              userTokenId != null ? ethers.BigNumber.from(userTokenId).toString() : null,
-            );
-            if (code != null) {
-              inviteLog.log('[INVITE_DEBUG v4] signer code length:', code.length);
-              inviteLog.log('[INVITE_DEBUG v4] signer is contract:', code !== '0x');
-            }
-            if (balanceOf != null) {
-              inviteLog.log('[INVITE_DEBUG v4] balanceOf:', ethers.BigNumber.from(balanceOf).toString());
-            }
-
-            try {
-              await readContract.callStatic.claimWithInvite(nonce, signature, { from: signerAddress || undefined });
-              inviteLog.log('[INVITE_DEBUG v4] read callStatic.claimWithInvite: ok');
-            } catch (callErr: any) {
-              const errMsg =
-                callErr?.reason ||
-                callErr?.errorName ||
-                callErr?.error?.message ||
-                callErr?.data?.message ||
-                callErr?.message ||
-                callErr;
-              inviteLog.warn('[INVITE_DEBUG v4] read callStatic.claimWithInvite failed:', errMsg);
-            }
-          } else {
-            inviteLog.warn('[INVITE_DEBUG v4] read provider unavailable; skipping read callStatic');
-          }
-
-          try {
-            await CustomSBT.callStatic.claimWithInvite(nonce, signature, { from: signerAddress || undefined });
-            inviteLog.log('[INVITE_DEBUG v4] signer callStatic.claimWithInvite: ok');
-          } catch (callErr: any) {
-            const errMsg =
-              callErr?.reason ||
-              callErr?.errorName ||
-              callErr?.error?.message ||
-              callErr?.data?.message ||
-              callErr?.message ||
-              callErr;
-            inviteLog.error('[INVITE_DEBUG v4] signer callStatic.claimWithInvite failed:', errMsg);
-            if (callErr instanceof Error) {
-              callStaticFailure = callErr;
-            } else {
-              callStaticFailure = new Error(String(errMsg || 'callStatic.claimWithInvite failed'));
-            }
-          }
-        } catch (metaErr: any) {
-          inviteLog.warn('[INVITE_DEBUG v4] metadata checks failed:', metaErr?.message || metaErr);
-        }
-      } catch (preErr: any) {
-        inviteLog.warn('[INVITE_DEBUG v4] preflight check failed:', preErr?.message || preErr);
-      }
-      if (callStaticFailure) {
-        throw callStaticFailure;
+        await CustomSBT.callStatic.claimWithInvite(nonce, signature);
+      } catch {
+        throw new Error('Invite claim preflight failed.');
       }
       const txOverrides = await resolveTxGasOverrides({
         contract: CustomSBT,
@@ -381,8 +232,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         function: 'claimWithInvite',
         method: 'CustomSBT.claimWithInvite',
         params: {
-          nonce,
-          signatureLength: signature ? signature.length : 0,
+          credentialProvided: !!(nonce && signature),
           gasLimit: txOverrides?.gasLimit?.toString?.() || null,
         },
       });
@@ -396,6 +246,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         txOverrides,
         rpcFunction: 'claimWithInvite',
         revertMessage: 'claimWithInvite transaction reverted on-chain.',
+        sensitiveArgs: true,
       });
       return receipt;
     },
@@ -418,14 +269,14 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         try {
           const contract = new ethers.Contract(sbtAddress, CUSTOM_SBT_ABI, provider as any);
           ok = await callWithRetry(() => contract.isPasswordValid(hashedPasswordBytes32), 'CustomSBT.isPasswordValid');
-        } catch (e: any) {
-          inviteLog.error('[LIMITED][isPasswordValid] call failed:', e);
+        } catch {
+          inviteLog.error('[LIMITED][isPasswordValid] call failed.');
           ok = false;
         }
-        inviteLog.log(`[LIMITED][isPasswordValid] sbt=${sbtAddress}, hash=${hashedPasswordBytes32}, ok=${ok}`);
+        inviteLog.log('[LIMITED][isPasswordValid] completed.', { sbtAddress, ok });
         return ok;
-      } catch (e: any) {
-        inviteLog.error('[LIMITED][isPasswordValid] provider resolution failed:', e);
+      } catch {
+        inviteLog.error('[LIMITED][isPasswordValid] provider resolution failed.');
         return false;
       }
     },
@@ -488,13 +339,6 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         sbtAddress,
         nonceCount: nonces.length,
       });
-      try {
-        const localHash = cryptoUtils.computeGroupPasswordHash({
-          password: normalizedPassword,
-          sbtAddress: resolvedWalletScopeSbtAddress,
-        });
-        inviteLog.log('[INVITE_DEBUG v4] derived groupPasswordHash:', localHash);
-      } catch {}
       const out: InvitePayloadResult[] = [];
       for (const nonce of nonces) {
         const signature = await cryptoUtils.signInvite({
@@ -668,6 +512,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         txOverrides,
         rpcFunction: 'mintWithGroupSignature',
         revertMessage: 'mintWithGroupSignature transaction reverted on-chain.',
+        sensitiveArgs: true,
       });
       return receipt;
     },
@@ -733,6 +578,7 @@ export const createContractScriptsSbtMintMethods = (deps: ContractScriptsRuntime
         txOverrides,
         rpcFunction: 'addHashedPasswords',
         revertMessage: 'addHashedPasswords transaction reverted on-chain.',
+        sensitiveArgs: true,
       });
       return receipt;
     },

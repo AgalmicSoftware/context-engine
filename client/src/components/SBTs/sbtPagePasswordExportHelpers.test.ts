@@ -102,7 +102,7 @@ describe('sbtPagePasswordExportHelpers', () => {
         sbtAddr: '0xabc',
         sbtBasePathValue: '/sbt',
       }),
-    ).toBe('https://app.example/s/alpha?auto=1&sbt=0xabc&gp=enc%3Aone%20two');
+    ).toBe('https://app.example/s/alpha?auto=1&sbt=0xabc');
 
     const inviteRows = buildSbtPagePasswordExportRows({
       baseUrl: 'https://app.example',
@@ -117,7 +117,7 @@ describe('sbtPagePasswordExportHelpers', () => {
     expect(inviteRows).toEqual([
       {
         groupPassword: 'one two',
-        inviteLink: 'https://app.example/s/alpha?auto=1&sbt=0xabc&gp=enc%3Aone%20two',
+        inviteLink: 'https://app.example/s/alpha?auto=1&sbt=0xabc',
       },
     ]);
 
@@ -132,7 +132,7 @@ describe('sbtPagePasswordExportHelpers', () => {
     expect(passwordRows).toEqual([
       {
         password: 'pw1',
-        inviteLink: 'https://app.example/sbt/0xdef/pw1',
+        inviteLink: 'https://app.example/sbt/0xdef',
       },
     ]);
     expect(
@@ -145,7 +145,7 @@ describe('sbtPagePasswordExportHelpers', () => {
         sbtSymbolOrName: 'ALPHA',
       }),
     ).toEqual({
-      content: 'index,password,inviteLink\n0,pw1,https://app.example/sbt/0xdef/pw1',
+      content: 'index,password,inviteLink\n0,pw1,https://app.example/sbt/0xdef',
       fileName: 'ALPHA_passwords_2026-05-05.csv',
       mimeType: 'text/csv',
     });
@@ -188,9 +188,9 @@ describe('sbtPagePasswordExportHelpers', () => {
     ).toEqual({
       content: [
         'index,groupPassword,inviteLink',
-        '0,"alpha,beta","https://app.example/session?gp=alpha,beta"',
-        '1,"quote""code","https://app.example/session?gp=quote""code"',
-        '2,"line\nbreak",https://app.example/session?gp=line%0Abreak',
+        '0,"alpha,beta",https://app.example/session',
+        '1,"quote""code",https://app.example/session',
+        '2,"line\nbreak",https://app.example/session',
       ].join('\n'),
       fileName: 'ALPHA_group-passwords_2026-05-05.csv',
       mimeType: 'text/csv',

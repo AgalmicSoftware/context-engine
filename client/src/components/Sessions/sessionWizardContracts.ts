@@ -15,7 +15,7 @@ import type {
   SessionContractsLike,
 } from '../shellTypes';
 
-type VisibleSessionWizardContractKey = 'surveys' | 'sbtFactory' | 'sessionRegistry';
+export type VisibleSessionWizardContractKey = 'surveys' | 'sbtFactory' | 'sessionRegistry';
 type SessionWizardContractsRecord = Record<string, unknown>;
 
 type SessionWizardInitialRegistryChainInput = {
@@ -87,9 +87,14 @@ export const resolveSessionWizardRegistryAddress = (
   return toStr(getSessionRegistryAddress(chainId)).trim();
 };
 
-export const getVisibleSessionWizardContractKeys = (..._args: unknown[]): VisibleSessionWizardContractKey[] => [
-  ...SESSION_WIZARD_VISIBLE_CONTRACT_KEYS,
-];
+export const getVisibleSessionWizardContractKeys = (
+  _contracts?: unknown,
+  _defaults?: unknown,
+  allowedKeys?: readonly string[] | null,
+): VisibleSessionWizardContractKey[] => {
+  const allowed = Array.isArray(allowedKeys) ? new Set(allowedKeys) : null;
+  return SESSION_WIZARD_VISIBLE_CONTRACT_KEYS.filter((key) => !allowed || allowed.has(key));
+};
 
 export const sanitizeSessionWizardContracts = (
   contracts: SessionWizardContractsRecord | null | undefined,

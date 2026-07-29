@@ -287,9 +287,11 @@ describe('sessionCorsWorker auth routes', () => {
   it('issues passkey-wallet login tokens for unregistered worker-canonical sessions', async () => {
     global.fetch = jest.fn(() => Promise.reject(new Error('registry fetch must not run')));
     const workerSlug = 'worker-canonical-auth';
+    const workerSessionId = '0x1234567890abcdef1234567890abcdef';
     const kv = createMemoryKv({
       [`session:${workerSlug}:config`]: JSON.stringify({
         slug: workerSlug,
+        sessionId: workerSessionId,
         adminAddress: wallet.address,
         allowOrigins: [loginOrigin],
         sessionModeProfile: {
@@ -312,17 +314,25 @@ describe('sessionCorsWorker auth routes', () => {
       makeAuthJsonRequest('/auth/nonce', {
         address: wallet.address,
         sessionSlug: workerSlug,
+        sessionId: workerSessionId,
       }),
       env,
       {},
     );
-    const { nonce } = await nonceResponse.json();
+    const noncePayload = await nonceResponse.json();
+    expect(nonceResponse.status).toBe(200);
+    expect(noncePayload).toMatchObject({
+      sessionSlug: workerSlug,
+      sessionId: workerSessionId,
+    });
+    const { nonce } = noncePayload;
     const message = buildLoginSiweMessage({ address: wallet.address, nonce });
     const signature = await wallet.signMessage(message);
     const loginResponse = await sessionCorsWorker.fetch(
       makeAuthJsonRequest('/auth/login', {
         address: wallet.address,
         sessionSlug: workerSlug,
+        sessionId: workerSessionId,
         message,
         signature,
       }),
@@ -333,8 +343,13 @@ describe('sessionCorsWorker auth routes', () => {
 
     expect(loginResponse.status).toBe(200);
     expect(global.fetch).not.toHaveBeenCalled();
+    expect(payload).toMatchObject({
+      sessionSlug: workerSlug,
+      sessionId: workerSessionId,
+    });
     expect(decodeTokenPayload(payload.token)).toMatchObject({
       slug: workerSlug,
+      sessionId: workerSessionId,
       scopes: {
         admin: true,
         ai: true,

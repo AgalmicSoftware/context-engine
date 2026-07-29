@@ -18,17 +18,11 @@ import { sbtMintExecutionPort } from '../../domains/sbts/sbtMintExecutionPort.js
 
 import { resolveEffectiveSlug, normalizeSurveyToolFilterState } from '../SurveyTool/surveyToolUtils';
 import { resolvePolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool.js';
-import {
-  isQuestionAllowedByAuthoritativePool,
-  normalizeAuthoritativeQuestionPoolId,
-  resolveAuthoritativeQuestionPoolScope,
-} from '../SurveyTool/surveyAuthoritativeQuestionPool';
 import { serializeFilterState, deserializeFilterState } from '../../utilities/survey/filterStateUtils.js';
 import { createLogger } from 'utilities/logging.js';
 import { listNamespaceEntriesSync, peekCacheSync, writeCache } from '../../utilities/cache/cacheScripts.js';
 import { measureSync } from '../../utilities/ui/uiPerfStats.js';
 import { readPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
-import { hasCachedCreateSbtForm as hasCachedCreateSbtFormCache } from '../../utilities/sbt/sbtCreateFormCache.js';
 import { getSbtDisplayName } from '../../utilities/sbt/sbtDisplayNames.js';
 import { isDemoSessionSlug } from '../../utilities/session/demoSessionSlugs.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
@@ -51,8 +45,10 @@ import {
 import OnePageSessionTelegramShell from './OnePageSessionTelegramShell';
 import {
   buildCurrentSessionConfigRequest,
+  getAgentClientLoginEnvelopeMemoryKey,
   isOnePageTelegramBackendMode,
   normalizeOnePageSessionSlug,
+  resolveAgentClientLoginIdentityTarget,
   resolveCurrentSessionSlugForProps,
   resolveTelegramAgentBridgeUrl as resolveTelegramAgentBridgeUrlForSession,
   type OnePageSessionPropsLike,
@@ -63,6 +59,40 @@ import {
   type OnePageSessionTelegramState,
 } from './onePageSessionTelegramActions';
 import OnePageSessionStandardShell, { DEFAULT_CORPUS_VIEWER_LOAD_STATE } from './OnePageSessionStandardShell';
+import {
+  buildOnePageSessionCanonicalBaseUrl,
+  buildOnePageSessionRawResultsRoute,
+  resolveOnePageSessionAggregatorCacheScope,
+  resolveOnePageSessionRouteUiState,
+} from './onePageSessionRouteRuntime';
+import {
+  closeStaleSbtGroupEditor,
+  hasCachedCreateSbtForm,
+  hasCachedOnChainSbtGroup,
+  sessionSupportsOnChainSbt,
+  shouldKickoffSbtUniverseScan,
+} from './onePageSessionSbtGroupRuntime';
+import {
+  buildSbtAutoMintCredentialCleanPath,
+  clearUnsupportedSbtAutoMintState,
+  hasSbtAutoMintCredential,
+  initializeSbtAutoMintRuntime,
+  sanitizeSbtAutoMintQueryForStorage,
+} from './onePageSessionAutoMintRuntime';
+import { resolveOnePageSessionNetworkRuntime, sessionAllowsLitRuntime } from './onePageSessionCapabilityRuntime';
+import {
+  workerCanonicalCacheIdentityMatches,
+  withWorkerCanonicalCacheIdentity,
+} from '../../utilities/survey/workerCanonicalCacheIdentity';
+import {
+  buildAggregatorFallbackQuestions,
+  getUniqueAggregatorCandidateSlugs,
+  mergeAggregatorResultRows,
+  resolveOnePageSessionSurveySlug,
+  resolveOnePageSessionWorkerCacheIdentity,
+  scopeAggregatorNetworkNodeToQuestionPool,
+  shouldUseBuiltInDemoAggregatorFallback,
+} from './onePageSessionAggregatorCacheRuntime';
 
 const demoLog = createLogger('demo');
 const ONE_PAGE_DEMO_PERF_SCOPE = 'onePageDemo';
@@ -149,180 +179,6 @@ const normalizeOnePageSessionFilterState = (value: unknown = {}) => {
 const serializeOnePageSessionFilterState = (value: unknown = {}) =>
   serializeFilterState(normalizeOnePageSessionFilterState(value));
 
-const hasOwn = (value: unknown, key: string) =>
-  !!value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, key);
-
-const resolveOnePageSessionSurveySlug = (props: Record<string, unknown> | string = '') => {
-  const propsRecord = props && typeof props === 'object' ? props : {};
-  const sessionConfig =
-    propsRecord.sessionConfig && typeof propsRecord.sessionConfig === 'object'
-      ? (propsRecord.sessionConfig as Record<string, unknown>)
-      : {};
-  if (hasOwn(propsRecord, 'questionSessionSlug')) {
-    return normalizeOnePageSessionSlug(propsRecord.questionSessionSlug);
-  }
-  if (hasOwn(sessionConfig, 'slug')) {
-    return normalizeOnePageSessionSlug(sessionConfig.slug);
-  }
-  return normalizeOnePageSessionSlug(propsRecord.slug || '');
-};
-
-const getUniqueAggregatorCandidateSlugs = (...slugs: unknown[]) => {
-  const seen = new Set<string>();
-  return slugs
-    .map((value) => normalizeOnePageSessionSlug(value))
-    .filter((value) => {
-      const key = value || '__general__';
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-};
-
-const shouldUseBuiltInDemoAggregatorFallback = (displaySlug: unknown = '', questionSourceSlug: unknown = '') => {
-  const normalizedDisplaySlug = normalizeOnePageSessionSlug(displaySlug);
-  const normalizedQuestionSourceSlug = normalizeOnePageSessionSlug(questionSourceSlug);
-  return (
-    normalizedDisplaySlug === 'demo' && (normalizedQuestionSourceSlug === '' || normalizedQuestionSourceSlug === 'demo')
-  );
-};
-
-const buildAggregatorFallbackQuestions = (
-  questionPool: Array<Record<string, unknown>> = [],
-  sessionSlug: unknown = '',
-) => {
-  const out: Record<string, Record<string, unknown>> = {};
-  const normalizedSessionSlug = normalizeOnePageSessionSlug(sessionSlug);
-  (Array.isArray(questionPool) ? questionPool : []).forEach((entry) => {
-    const questionId = String(entry?.id || '').trim();
-    if (!questionId) return;
-    out[questionId.toLowerCase()] = {
-      creator: '',
-      tags: [],
-      ...entry,
-      id: questionId,
-      sessionSlug: normalizedSessionSlug,
-      sessionSlugExplicit: true,
-    };
-  });
-  return out;
-};
-
-const scopeAggregatorNetworkNodeToQuestionPool = (
-  networkNode: any = {},
-  fallbackQuestions: Record<string, any> = {},
-  sessionSlug: any = '',
-) => {
-  const fallbackQuestionPool = Object.values(fallbackQuestions || {});
-  const scope = resolveAuthoritativeQuestionPoolScope(fallbackQuestionPool, sessionSlug);
-  if (!scope) return networkNode;
-
-  const nextQuestions: Record<string, any> = {};
-  const sourceQuestions = networkNode?.questions || {};
-  Object.keys(sourceQuestions).forEach((qid) => {
-    const question = sourceQuestions[qid];
-    if (!isQuestionAllowedByAuthoritativePool(question, qid, scope)) return;
-    const questionId = String(question?.id || qid || '').trim();
-    if (!questionId) return;
-    nextQuestions[questionId.toLowerCase()] = {
-      ...question,
-      id: questionId,
-    };
-  });
-  Object.keys(fallbackQuestions || {}).forEach((qid) => {
-    const questionId = normalizeAuthoritativeQuestionPoolId(qid);
-    if (!questionId || nextQuestions[questionId]) return;
-    nextQuestions[questionId] = fallbackQuestions[qid];
-  });
-
-  const nextQuestionResponses: Record<string, any> = {};
-  const sourceQuestionResponses = networkNode?.questionResponses || {};
-  Object.keys(sourceQuestionResponses).forEach((qid) => {
-    const questionId = normalizeAuthoritativeQuestionPoolId(qid);
-    if (!questionId || !nextQuestions[questionId]) return;
-    nextQuestionResponses[qid] = sourceQuestionResponses[qid];
-  });
-
-  return {
-    ...networkNode,
-    questions: nextQuestions,
-    questionResponses: nextQuestionResponses,
-  };
-};
-
-const mergeAggregatorResultRows = (target: Record<string, any[]> = {}, source: any = {}) => {
-  const nextTarget = target && typeof target === 'object' ? target : {};
-  if (!source || typeof source !== 'object') return nextTarget;
-
-  Object.keys(source).forEach((qid) => {
-    const rows = Array.isArray(source[qid]) ? source[qid] : [];
-    if (rows.length === 0) {
-      if (!nextTarget[qid]) nextTarget[qid] = [];
-      return;
-    }
-    nextTarget[qid] = Array.isArray(nextTarget[qid]) ? nextTarget[qid] : [];
-    const seenRows = new Set(nextTarget[qid].map((row: any) => `${row?.responder || ''}|${row?.response || ''}`));
-    rows.forEach((row: any) => {
-      const key = `${row?.responder || ''}|${row?.response || ''}`;
-      if (seenRows.has(key)) return;
-      seenRows.add(key);
-      nextTarget[qid].push(row);
-    });
-  });
-
-  return nextTarget;
-};
-
-const resolveOnePageSessionRouteUiState = (props: any = {}) => {
-  const autoOpenResults = props.routeAutoOpenResults === true;
-  const showQuestions = autoOpenResults || props.routeQuestionsOpen === true;
-  return {
-    showQuestions,
-    autoOpenResults,
-  };
-};
-const buildOnePageSessionPublicRoute = (pathname: any = '') => {
-  const normalizedPath = String(pathname || '').trim();
-  const basePath = readPublicUrlBasePath();
-  if (!normalizedPath) return basePath || '/';
-  return `${basePath}${normalizedPath}` || normalizedPath;
-};
-
-const buildOnePageSessionCanonicalBaseUrl = (props: any = {}) => {
-  try {
-    const slug = resolveEffectiveSlug(props);
-    const nextUrl = new URL(window.location.href);
-    nextUrl.pathname = buildOnePageSessionPublicRoute(`/session${slug ? `/${slug}` : ''}`);
-    nextUrl.searchParams.delete('sessionSlug');
-    nextUrl.searchParams.delete('s');
-    if (slug) {
-      nextUrl.searchParams.set('session', slug);
-    } else {
-      nextUrl.searchParams.delete('session');
-    }
-    return `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
-  } catch (_) {
-    const slug = resolveEffectiveSlug(props);
-    return `${buildOnePageSessionPublicRoute(`/session${slug ? `/${slug}` : ''}`)}${slug ? `?session=${encodeURIComponent(slug)}` : ''}`;
-  }
-};
-
-const buildOnePageSessionRawResultsRoute = (props: any = {}) => {
-  const slug = resolveEffectiveSlug(props);
-  const path = slug ? `/session/${slug}/questions/results` : '/questions/results';
-  return buildOnePageSessionPublicRoute(path);
-};
-
-// Group helpers (for cross-group cache lookups)
-
-function hasCachedCreateSbtForm(slug: any = '') {
-  return hasCachedCreateSbtFormCache({
-    sessionSlug: slug,
-    migrateLegacyToSessionKey: true,
-    clearInvalid: true,
-  } as any);
-}
-
 export { buildAggregatorFromLocalCache, computeAggregatorSourceSnapshotSignature, hasCachedCreateSbtForm };
 
 class OnePageSession extends Component<any, any> {
@@ -331,7 +187,11 @@ class OnePageSession extends Component<any, any> {
   constructor(props: any) {
     super(props);
     const initialSlug = resolveEffectiveSlug(props);
-    const showEmbeddedCreateGroup = hasCachedCreateSbtForm(initialSlug);
+    const initialAgentLoginTarget = resolveAgentClientLoginIdentityTarget({
+      sessionConfig: props.sessionConfig,
+      sessionSlug: initialSlug,
+    });
+    const showEmbeddedCreateGroup = hasCachedOnChainSbtGroup(props.sessionConfig, initialSlug);
     const routeUiState = resolveOnePageSessionRouteUiState(props);
 
     // Hydrate filter state from URL if present (Consume)
@@ -392,7 +252,7 @@ class OnePageSession extends Component<any, any> {
       autoMintCountdown: null, // null = not counting, number = seconds remaining
       dismissedStatusItems: {},
 
-      ...buildInitialTelegramState(initialSlug, readAgentClientLoginEnvelope),
+      ...buildInitialTelegramState(initialAgentLoginTarget, readAgentClientLoginEnvelope),
     };
 
     // Ensure idempotent auto-open of Groups on mount (do not fight user toggles)
@@ -408,6 +268,7 @@ class OnePageSession extends Component<any, any> {
     );
     this._resolvedSessionConfigMemoInputs = null;
     this._resolvedSessionConfigMemoValue = null;
+    this._autoMintLegacyCredentialQuery = '';
     this._autoMintParseSourceSig = '';
     this._autoMintCountdownTimer = null;
     this._autoMintParseCachedTargets = [];
@@ -489,6 +350,7 @@ class OnePageSession extends Component<any, any> {
 
   kickoffLightSbtUniverseScan(propsIn: any = this.props) {
     if (typeof propsIn?.ensureLightSbtUniverse !== 'function') return;
+    if (!shouldKickoffSbtUniverseScan(this, propsIn, this.props)) return;
     const slug = resolveEffectiveSlug(propsIn);
     try {
       const result = propsIn.ensureLightSbtUniverse([slug], { forceScopeSlug: slug });
@@ -500,6 +362,10 @@ class OnePageSession extends Component<any, any> {
     } catch (e) {
       demoLog.warn('OnePageSession: callback', e);
     }
+  }
+
+  clearUnsupportedAutoMintState(updateState = true) {
+    clearUnsupportedSbtAutoMintState(this, updateState, (error) => demoLog.warn('OnePageSession: fallback', error));
   }
 
   componentDidMount() {
@@ -515,34 +381,7 @@ class OnePageSession extends Component<any, any> {
       demoLog.warn('OnePageSession: fallback', e);
     }
 
-    // Persist any incoming auto-mint params so they survive Web3Auth redirect cycles
-    try {
-      const currentSearch = typeof window !== 'undefined' ? window.location.search || '' : '';
-      const hasAutoFlag = () => {
-        try {
-          const raw = currentSearch.replace(/^\?/, '');
-          const params = new URLSearchParams(raw);
-          if (params.get('auto') === '1') return true;
-          for (const key of params.keys()) {
-            if (/^auto\d+$/.test(key) && params.get(key) === '1') return true;
-          }
-        } catch (e) {
-          demoLog.warn('OnePageSession: fallback', e);
-        }
-        return false;
-      };
-      if (currentSearch && hasAutoFlag()) {
-        sessionStorage.setItem(this.getAutoHashStorageKey(), currentSearch.replace(/^\?/, ''));
-      }
-    } catch (e) {
-      demoLog.warn('OnePageSession: fallback', e);
-    }
-
-    // Fragment-driven auto mint (both limited/unlimited)
-    const targets = this.parseAutoMintFragment();
-    if (targets.length > 0) {
-      this.primeAutoMintTargets(targets);
-    }
+    initializeSbtAutoMintRuntime(this, (error) => demoLog.warn('OnePageSession: fallback', error));
 
     window.addEventListener('sbt-mint-success', this.onSbtMintSuccess);
     window.addEventListener('ce-agent-client-login', this.handleAgentClientLoginEvent as EventListener);
@@ -550,7 +389,7 @@ class OnePageSession extends Component<any, any> {
     // Auto-open Groups section if a Create-SBT cache exists (idempotent, group-aware)
     try {
       const slug = resolveEffectiveSlug(this.props);
-      if (hasCachedCreateSbtForm(slug) && !this._autoOpenedGroups) {
+      if (hasCachedOnChainSbtGroup(this.resolveCurrentSessionConfig(), slug) && !this._autoOpenedGroups) {
         this.setState({ showGroups: true });
         this._autoOpenedGroups = true;
       }
@@ -564,6 +403,7 @@ class OnePageSession extends Component<any, any> {
   }
 
   componentWillUnmount() {
+    this._autoMintLegacyCredentialQuery = '';
     window.removeEventListener('ce-agent-client-login', this.handleAgentClientLoginEvent as EventListener);
     if (this._autoOpenResultsTimer) {
       clearTimeout(this._autoOpenResultsTimer);
@@ -588,11 +428,13 @@ class OnePageSession extends Component<any, any> {
     const state = stateIn || {};
     const displaySlug = resolveEffectiveSlug(props);
     const questionCacheSlug = resolveOnePageSessionSurveySlug(props);
-    const netId = props.network?.id ?? props.networkChainId ?? '';
+    const cacheScope = resolveOnePageSessionAggregatorCacheScope(props);
+    const workerCacheIdentity = resolveOnePageSessionWorkerCacheIdentity(props, cacheScope);
     return [
       String(displaySlug || ''),
       String(questionCacheSlug || ''),
-      String(netId || ''),
+      cacheScope,
+      cacheScope === 'worker' ? workerCacheIdentity?.key || 'invalid-worker-identity' : '',
       state.showResults ? 1 : 0,
       props.isQuestionCacheReady ? 1 : 0,
       props.isResponsesCacheReady ? 1 : 0,
@@ -656,6 +498,7 @@ class OnePageSession extends Component<any, any> {
   }
 
   resolveScopedLitHooks(sessionConfig: any = {}) {
+    if (!sessionAllowsLitRuntime(sessionConfig)) return null;
     if (this.props.litHooks && typeof this.props.litHooks === 'object') {
       return this.props.litHooks;
     }
@@ -709,9 +552,31 @@ class OnePageSession extends Component<any, any> {
     const prevSlug = normalizeOnePageSessionSlug(prevProps.slug || prevProps.sessionConfig?.slug || '');
     const nextSlug = normalizeOnePageSessionSlug(this.props.slug || this.props.sessionConfig?.slug || '');
     const slugChanged = prevSlug !== nextSlug;
+    const telegramTargetChanged =
+      getAgentClientLoginEnvelopeMemoryKey(
+        resolveAgentClientLoginIdentityTarget({
+          sessionConfig: this.resolveCurrentSessionConfig(prevProps),
+          sessionSlug: prevSlug,
+        }),
+      ) !==
+      getAgentClientLoginEnvelopeMemoryKey(
+        resolveAgentClientLoginIdentityTarget({
+          sessionConfig: this.resolveCurrentSessionConfig(this.props),
+          sessionSlug: nextSlug,
+        }),
+      );
     const prevRouteUiState = resolveOnePageSessionRouteUiState(prevProps);
     const nextRouteUiState = resolveOnePageSessionRouteUiState(this.props);
     const routeUiPatch: Record<string, any> = {};
+    if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) {
+      this.clearUnsupportedAutoMintState();
+    }
+    closeStaleSbtGroupEditor(
+      routeUiPatch,
+      slugChanged,
+      this.state.showEmbeddedCreateGroup,
+      this.resolveCurrentSessionConfig(),
+    );
     if (
       prevRouteUiState.showQuestions !== nextRouteUiState.showQuestions &&
       this.state.showQuestions !== nextRouteUiState.showQuestions
@@ -755,6 +620,7 @@ class OnePageSession extends Component<any, any> {
       this._autoMintCountdownTimer = null;
       this.setState({ autoMintCountdown: null, autoMintingMode: false });
     }
+    if (slugChanged) this._autoMintLegacyCredentialQuery = '';
     const loginJustCompleted = !prevProps.loginComplete && this.props.loginComplete;
     const runLoginTransitionAutoMint = () => {
       if (!loginJustCompleted) return false;
@@ -774,7 +640,9 @@ class OnePageSession extends Component<any, any> {
     const aggregatorInvalidated =
       slugChanged ||
       (this.props.isQuestionCacheReady && !prevProps.isQuestionCacheReady) ||
-      (this.props.network?.id ?? null) !== (prevProps.network?.id ?? null) ||
+      resolveOnePageSessionAggregatorCacheScope(this.props) !== resolveOnePageSessionAggregatorCacheScope(prevProps) ||
+      this.buildAggregatorInputSignature(this.props, this.state) !==
+        this.buildAggregatorInputSignature(prevProps, prevState) ||
       prevProps.questionResponsesNonce !== this.props.questionResponsesNonce ||
       (prevProps.isResponsesCacheReady !== this.props.isResponsesCacheReady && this.props.isResponsesCacheReady);
 
@@ -824,7 +692,7 @@ class OnePageSession extends Component<any, any> {
     }
 
     this.handleTelegramComponentDidUpdate({
-      slugChanged,
+      slugChanged: slugChanged || telegramTargetChanged,
       loginJustCompleted: !prevProps.loginComplete && this.props.loginComplete,
     });
   }
@@ -869,8 +737,18 @@ class OnePageSession extends Component<any, any> {
     try {
       const legacyVal = sessionStorage.getItem(legacy);
       if (legacyVal && !sessionStorage.getItem(newKey)) {
-        sessionStorage.setItem(newKey, legacyVal);
+        const safeLegacyValue = sanitizeSbtAutoMintQueryForStorage(legacyVal);
+        if (safeLegacyValue) sessionStorage.setItem(newKey, safeLegacyValue);
         sessionStorage.removeItem(legacy);
+      }
+      const currentValue = sessionStorage.getItem(newKey);
+      if (currentValue) {
+        const safeCurrentValue = sanitizeSbtAutoMintQueryForStorage(currentValue);
+        if (safeCurrentValue) {
+          if (safeCurrentValue !== currentValue) sessionStorage.setItem(newKey, safeCurrentValue);
+        } else {
+          sessionStorage.removeItem(newKey);
+        }
       }
     } catch (e) {
       demoLog.warn('OnePageSession: fallback', e);
@@ -942,12 +820,17 @@ class OnePageSession extends Component<any, any> {
 
       const displaySlug = resolveEffectiveSlug(this.props);
       const questionSourceSlug = resolveOnePageSessionSurveySlug(this.props);
-      const netIdVal = this.props.network?.id ?? this.props.networkChainId ?? 0;
+      const cacheScope = resolveOnePageSessionAggregatorCacheScope(this.props);
+      const workerCacheIdentity = resolveOnePageSessionWorkerCacheIdentity(this.props, cacheScope);
       const useBuiltInDemoFallback = shouldUseBuiltInDemoAggregatorFallback(displaySlug, questionSourceSlug);
-      const canBuildFromLocalCache = netIdVal != null && (this.props.isQuestionCacheReady || useBuiltInDemoFallback);
+      const canBuildFromLocalCache = !!cacheScope && (this.props.isQuestionCacheReady || useBuiltInDemoFallback);
 
       if (canBuildFromLocalCache) {
-        const netIdStr = String(netIdVal);
+        const netIdStr = cacheScope;
+        if (netIdStr === 'worker' && !workerCacheIdentity) {
+          applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|invalid-worker-identity`);
+          return;
+        }
         try {
           const candidateSlugs = useBuiltInDemoFallback
             ? getUniqueAggregatorCandidateSlugs(displaySlug)
@@ -972,14 +855,18 @@ class OnePageSession extends Component<any, any> {
             }
             sawCandidateCache = true;
 
-            if (!qCache[netIdStr]) {
+            const networkNode = qCache[netIdStr];
+            if (!networkNode) {
               sourceSigParts.push(`${slug || '__general__'}:missing-net`);
+              continue;
+            }
+            if (workerCacheIdentity && !workerCanonicalCacheIdentityMatches(networkNode, workerCacheIdentity)) {
+              sourceSigParts.push(`${slug || '__general__'}:worker-identity-mismatch`);
               continue;
             }
             sawNetworkCache = true;
 
             const fallbackQuestions = buildAggregatorFallbackQuestions(demoQuestionPool, slug);
-            const networkNode = qCache[netIdStr] || {};
             const networkNodeForAggregation = useBuiltInDemoFallback
               ? scopeAggregatorNetworkNodeToQuestionPool(networkNode, fallbackQuestions, slug)
               : networkNode;
@@ -998,21 +885,39 @@ class OnePageSession extends Component<any, any> {
             });
             mergeAggregatorResultRows(aggregateMap, map);
             if (dirty) {
+              if (workerCacheIdentity) {
+                qCache[netIdStr] = withWorkerCanonicalCacheIdentity(
+                  networkNode,
+                  workerCacheIdentity,
+                ) as typeof networkNode;
+              }
               void writeCache('questionsCache', slug, qCache);
             }
           }
 
           if (!sawCandidateCache) {
-            applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|empty-cache`);
+            applyAggregatorData(
+              {},
+              '0:0:0',
+              `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|empty-cache`,
+            );
             return;
           }
 
           if (!sawNetworkCache) {
-            applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|missing-net`);
+            applyAggregatorData(
+              {},
+              '0:0:0',
+              `${displaySlug}|${questionSourceSlug}|${netIdStr}|${
+                workerCacheIdentity?.key || ''
+              }|${sourceSigParts.join('|') || 'missing-net'}`,
+            );
             return;
           }
 
-          const sourceSigKey = `${displaySlug}|${questionSourceSlug}|${netIdStr}|${sourceSigParts.join('|')}`;
+          const sourceSigKey = `${displaySlug}|${questionSourceSlug}|${netIdStr}|${
+            workerCacheIdentity?.key || ''
+          }|${sourceSigParts.join('|')}`;
           if (sourceSigKey === this._aggregatorSourceSigKey) {
             bumpPerfCounter('aggregatorSourceSkips');
             return;
@@ -1020,11 +925,19 @@ class OnePageSession extends Component<any, any> {
           applyAggregatorData(aggregateMap, computeAggregatorDataSignature(aggregateMap), sourceSigKey);
         } catch (err) {
           demoLog.error('Error building aggregator in OnePageSession:', err);
-          applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|error`);
+          applyAggregatorData(
+            {},
+            '0:0:0',
+            `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|error`,
+          );
         }
       } else {
-        const netIdStr = String(netIdVal || '');
-        applyAggregatorData({}, '0:0:0', `${displaySlug}|${questionSourceSlug}|${netIdStr}|not-ready`);
+        const netIdStr = cacheScope;
+        applyAggregatorData(
+          {},
+          '0:0:0',
+          `${displaySlug}|${questionSourceSlug}|${netIdStr}|${workerCacheIdentity?.key || ''}|not-ready`,
+        );
       }
     });
 
@@ -1070,6 +983,7 @@ class OnePageSession extends Component<any, any> {
         } catch (e) {
           demoLog.warn('OnePageSession: fallback', e);
         }
+        this._autoMintLegacyCredentialQuery = '';
 
         // --- NEW: Clear URL hash to remove the 'intent' from the browser address bar ---
         try {
@@ -1105,18 +1019,22 @@ class OnePageSession extends Component<any, any> {
       typeof urlIn === 'string' && urlIn
         ? urlIn
         : `${window.location.pathname || ''}${window.location.search || ''}${window.location.hash || ''}`;
-    this.originalURL = nextUrl || '';
+    const cleanCredentialPath = buildSbtAutoMintCredentialCleanPath(
+      new URL(nextUrl || '/', window.location.origin).href,
+    );
+    this.originalURL = cleanCredentialPath || nextUrl || '';
   }
 
   /* =======================
    * Helpers: prefetch names for banner
    * ======================= */
   async prefetchTargetNames(targets: any) {
+    if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) return;
     const slug = resolveEffectiveSlug(this.props);
 
     // 1. Try to read from cache first to save RPC calls
-    let cachedNames: Record<string, any> = {};
-    let cachedImages: Record<string, any> = {};
+    let cachedNames: Record<string, string> = {};
+    let cachedImages: Record<string, unknown> = {};
     try {
       const parsed = peekCacheSync<OnePageSbtCache>('sbtCache', slug, { clone: false });
       if (parsed && typeof parsed === 'object') {
@@ -1234,17 +1152,27 @@ class OnePageSession extends Component<any, any> {
    * ======================= */
 
   parseAutoMintFragment() {
-    // Prefer the current URL query; if missing/overwritten by auth, fall back to sessionStorage
+    if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) {
+      this.clearUnsupportedAutoMintState();
+      return [];
+    }
+    // Preserve deliberate legacy credential-link compatibility in component memory only.
     let sourceQuery = '';
     try {
       const currentSearch = typeof window !== 'undefined' && window.location.search ? window.location.search : '';
-      sourceQuery = currentSearch || '';
-      if (
-        !sourceQuery ||
-        (!sourceQuery.includes('gp') && !sourceQuery.includes('inv') && !sourceQuery.includes('sbt'))
+      const saved = sessionStorage.getItem(this.getAutoHashStorageKey()) || '';
+      const identityQuery = currentSearch || saved;
+      const legacyCredentialQuery = String(this._autoMintLegacyCredentialQuery || '');
+      if (hasSbtAutoMintCredential(currentSearch)) {
+        this._autoMintLegacyCredentialQuery = currentSearch;
+        sourceQuery = currentSearch;
+      } else if (
+        legacyCredentialQuery &&
+        sanitizeSbtAutoMintQueryForStorage(legacyCredentialQuery) === sanitizeSbtAutoMintQueryForStorage(identityQuery)
       ) {
-        const saved = sessionStorage.getItem(this.getAutoHashStorageKey()) || '';
-        if (saved) sourceQuery = saved;
+        sourceQuery = legacyCredentialQuery;
+      } else {
+        sourceQuery = identityQuery;
       }
     } catch (e) {
       demoLog.warn('OnePageSession: fallback', e);
@@ -1271,7 +1199,7 @@ class OnePageSession extends Component<any, any> {
 
     // --- NEW: Robust Multi-Pair Parsing with Per-Target Auto Flag ---
     const pairs: any[] = [];
-    const seen: any = new Set();
+    const seen = new Set<string>();
 
     // Helper to add valid pair if it has an auto intent (global or local)
     const addIfAuto = (sbt: any, gp: any, inv: any, localAutoFlag: any) => {
@@ -1322,6 +1250,10 @@ class OnePageSession extends Component<any, any> {
   }
 
   primeAutoMintTargets(targets: any) {
+    if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) {
+      this.clearUnsupportedAutoMintState();
+      return;
+    }
     if (!Array.isArray(targets) || targets.length === 0) return;
     this.setState({ autoMintTargets: targets }, () => {
       // Prefetch group names so banner can include them before login
@@ -1331,6 +1263,7 @@ class OnePageSession extends Component<any, any> {
   }
 
   hasAutoMintIntent() {
+    if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) return false;
     try {
       if (typeof window === 'undefined') return false;
       const hasAuto = (raw: any) => {
@@ -1345,6 +1278,7 @@ class OnePageSession extends Component<any, any> {
       };
       const search = window.location.search || '';
       if (hasAuto(search)) return true;
+      if (hasAuto(this._autoMintLegacyCredentialQuery)) return true;
       const saved = sessionStorage.getItem(this.getAutoHashStorageKey()) || '';
       return hasAuto(saved);
     } catch (_) {
@@ -1356,6 +1290,7 @@ class OnePageSession extends Component<any, any> {
    * Verify password ↔ SBT binding (unlimited path)
    * ======================= */
   async verifyGroupPasswordBinding(sbtAddress: any, password: any) {
+    if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) return false;
     const slug = resolveEffectiveSlug(this.props);
     try {
       // Read-only provider internally
@@ -1379,6 +1314,10 @@ class OnePageSession extends Component<any, any> {
   }
 
   kickoffAutoMintIfNeeded() {
+    if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) {
+      this.clearUnsupportedAutoMintState();
+      return;
+    }
     const hasTargets = this.filterUnconsumedAutoMintTargets(this.state.autoMintTargets || []).length > 0;
     if (!hasTargets) return;
 
@@ -1493,6 +1432,10 @@ class OnePageSession extends Component<any, any> {
    * Core auto-mint queue, generalized
    * ======================= */
   async runAutoMintQueue() {
+    if (!sessionSupportsOnChainSbt(this.resolveCurrentSessionConfig())) {
+      this.clearUnsupportedAutoMintState();
+      return;
+    }
     const statuses = { ...(this.state.autoMintStatuses || {}) };
     const autoMintAccount = String(this.props.account || '')
       .trim()
@@ -1808,8 +1751,6 @@ class OnePageSession extends Component<any, any> {
                       password,
                       sbtAddress: walletScopeSbtAddress,
                     });
-              demoLog.log('[INVITE_DEBUG v4] auto-mint local groupPasswordHash:', localHash);
-              demoLog.log('[INVITE_DEBUG v4] auto-mint on-chain groupPasswordHash:', onchainHash);
               if (!localHash || String(localHash).toLowerCase() !== String(onchainHash).toLowerCase()) {
                 throw new Error('Group password mismatch');
               }
@@ -1931,7 +1872,11 @@ class OnePageSession extends Component<any, any> {
         } else if (msg.includes('max tokens') || msg.includes('limit reached')) {
           updateStatus(sbtKey, { status: 'failed', name: `Join Failed`, error: 'Group limit reached' });
         } else {
-          updateStatus(sbtKey, { status: 'failed', name: `Join Failed`, error: getErrorMessage(e, 'Mint failed') });
+          updateStatus(sbtKey, {
+            status: 'failed',
+            name: `Join Failed`,
+            error: 'Join failed. Verify the credential and network, then retry.',
+          });
         }
       }
 
@@ -2306,7 +2251,6 @@ class OnePageSession extends Component<any, any> {
       defaultFeaturedSBTs,
       contracts,
       blockLimits,
-      networkChainId,
       autoFeatureSBTsBySessionSlug,
       autoFeatureSBTsWithFeaturedSbtTags,
       questionsGenPrompt, // <-- Destructured
@@ -2327,6 +2271,10 @@ class OnePageSession extends Component<any, any> {
       incomingSessionConfig?.polisDemoDataBySlug ||
       resolvedSessionConfig?.polisDemoDataBySlug ||
       null;
+    const { network: routedNetwork, networkChainId: routedNetworkChainId } = resolveOnePageSessionNetworkRuntime(
+      resolvedSessionConfig,
+      this.props.network,
+    );
     const scopedLitHooks = this.resolveScopedLitHooks(resolvedSessionConfig);
     const effectiveSlug = resolveEffectiveSlug(this.props) || slug;
     const surveySessionSlug = resolveOnePageSessionSurveySlug({
@@ -2365,6 +2313,10 @@ class OnePageSession extends Component<any, any> {
       telegramSessionMeta: this.state.telegramSessionMeta,
       sessionSlug: displaySessionSlug,
     });
+    const telegramLoginTarget = resolveAgentClientLoginIdentityTarget({
+      sessionConfig: resolvedSessionConfig,
+      sessionSlug: displaySessionSlug,
+    });
 
     if (isTelegramSession) {
       return (
@@ -2377,8 +2329,8 @@ class OnePageSession extends Component<any, any> {
           displaySessionSlug={displaySessionSlug}
           filterState={this.state.filterState}
           loginComplete={this.props.loginComplete}
-          network={this.props.network}
-          networkChainId={networkChainId}
+          network={routedNetwork}
+          networkChainId={routedNetworkChainId}
           provider={this.props.provider}
           questionResponsesNonce={this.props.questionResponsesNonce}
           questionScanProgress={this.props.questionScanProgress}
@@ -2397,6 +2349,8 @@ class OnePageSession extends Component<any, any> {
           telegramSessionMeta={this.state.telegramSessionMeta}
           telegramSubmittedQuestionIds={this.state.telegramSubmittedQuestionIds}
           telegramSubmittingQuestionId={this.state.telegramSubmittingQuestionId}
+          workerGroupSessionId={String(telegramLoginTarget.sessionId || '')}
+          workerGroupWorkerUrl={String(telegramLoginTarget.workerUrl || '')}
           titleText={titleText}
           onLogout={this.handleTelegramLogout}
           onOpenLoginModal={() => this.props.toggleLoginModal?.(true)}
@@ -2448,8 +2402,8 @@ class OnePageSession extends Component<any, any> {
         litHooks={scopedLitHooks}
         loginComplete={this.props.loginComplete}
         needsLoginForAutoMint={this.state.needsLoginForAutoMint}
-        network={this.props.network}
-        networkChainId={networkChainId}
+        network={routedNetwork}
+        networkChainId={routedNetworkChainId}
         pileSubmitRailVisible={this.state.pileSubmitRailVisible}
         provider={this.props.provider}
         questionPool={sharedQuestionPool}

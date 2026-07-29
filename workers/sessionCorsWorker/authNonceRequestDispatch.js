@@ -4,6 +4,7 @@ import {
 import {
   validateTrustedLoginRequestOrigin,
 } from './siweMessageValidation.js';
+import { resolveCanonicalWorkerSessionIdHex } from './sessionConfigMutation.js';
 
 export const dispatchAuthNonceRequest = async ({
   request,
@@ -67,6 +68,18 @@ export const dispatchAuthNonceRequest = async ({
     return deps?.json?.({ error: originCheck?.error }, 403, headers);
   }
 
+  const workerCanonical = String(
+    corsState.config?.sessionModeProfile?.authority?.mode || '',
+  ).trim().toLowerCase() === 'worker_canonical';
+  const sessionId = resolveCanonicalWorkerSessionIdHex(corsState.config);
+  const requestedSessionId = resolveCanonicalWorkerSessionIdHex({ sessionId: body?.sessionId });
+  if (workerCanonical && !sessionId) {
+    return deps?.json?.({ error: 'Worker session identity is invalid.' }, 500, headers);
+  }
+  if (workerCanonical && requestedSessionId !== sessionId) {
+    return deps?.json?.({ error: 'Session identity does not match worker session.' }, 409, headers);
+  }
+
   const rateLimitIdentity = (
     typeof deps?.resolveAnonymousRateIdentity === 'function'
       ? deps.resolveAnonymousRateIdentity(request)
@@ -108,5 +121,8 @@ export const dispatchAuthNonceRequest = async ({
     );
   }
 
-  return deps?.json?.({ nonce }, 200, headers);
+  return deps?.json?.({
+    nonce,
+    ...(workerCanonical ? { sessionSlug: targetSlug, sessionId } : {}),
+  }, 200, headers);
 };

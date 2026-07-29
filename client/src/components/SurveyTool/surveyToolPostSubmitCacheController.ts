@@ -1,6 +1,11 @@
 import { ethers } from 'ethers';
 import { updateCacheAtomic } from '../../utilities/cache/cacheScripts.js';
 import {
+  workerCanonicalCacheIdentityMatches,
+  withWorkerCanonicalCacheIdentity,
+  WORKER_CANONICAL_CACHE_SCOPE_KEY,
+} from '../../utilities/survey/workerCanonicalCacheIdentity.js';
+import {
   ensureQuestionsNet,
   ensureSurveysNet,
   isIncomingResponseMetaNewer,
@@ -13,6 +18,7 @@ import {
 import { normalizeQuestionIdKey } from './surveyToolSignatures.js';
 import { normalizeSessionSlugValue } from './surveyToolScope.js';
 import type { UnknownRecord } from './surveyToolTypes.js';
+import { resolveSurveyToolWorkerTargetSignature } from './surveyToolWorkerCacheIsolation.js';
 
 type ResponseMetaBoundary = UnknownRecord & {
   blockNumber?: unknown;
@@ -45,13 +51,19 @@ type SubmittedSurveyResponse = UnknownRecord & {
   responses?: unknown[];
 };
 
+type SubmittedCacheWriteContext = {
+  networkIdStr: string;
+  sessionConfig?: unknown;
+  sessionSlug?: string | null;
+};
+
 export interface PostSubmitCacheDeps {
   account: string;
   effectiveDraftSlug: string;
   singleQuestionMode: boolean;
   isStandalone: boolean;
   deepClone: <T>(obj: T) => T;
-  resolveSubmittedCacheWriteContext: (slug: string) => { networkIdStr: string };
+  resolveSubmittedCacheWriteContext: (slug: string, current?: boolean) => SubmittedCacheWriteContext;
 }
 
 export interface PostSubmitCacheParams {
@@ -97,6 +109,34 @@ export async function writeSubmittedResponsesToLocalCaches(
   if (!netIdStr) {
     return { questionCacheWritten: false, surveyCacheWritten: false };
   }
+  const expectedWorkerTarget = resolveSurveyToolWorkerTargetSignature({
+    sessionConfig: cacheWriteContext.sessionConfig,
+    sessionSlug: cacheWriteContext.sessionSlug || slug,
+  });
+  if (
+    netIdStr === WORKER_CANONICAL_CACHE_SCOPE_KEY &&
+    (!expectedWorkerTarget.valid || !expectedWorkerTarget.identity)
+  ) {
+    return { questionCacheWritten: false, surveyCacheWritten: false };
+  }
+  const isWorkerTargetCurrent = (): boolean => {
+    if (netIdStr !== WORKER_CANONICAL_CACHE_SCOPE_KEY) return true;
+    try {
+      const currentContext = resolveSubmittedCacheWriteContext(slug, true);
+      if (currentContext.networkIdStr !== WORKER_CANONICAL_CACHE_SCOPE_KEY) return false;
+      const currentWorkerTarget = resolveSurveyToolWorkerTargetSignature({
+        sessionConfig: currentContext.sessionConfig,
+        sessionSlug: currentContext.sessionSlug || slug,
+      });
+      return (
+        currentWorkerTarget.valid &&
+        !!currentWorkerTarget.identity &&
+        currentWorkerTarget.key === expectedWorkerTarget.key
+      );
+    } catch {
+      return false;
+    }
+  };
 
   const recencyMeta = toResponseRecencyMeta(receipt);
   let questionCacheWritten = false;
@@ -105,7 +145,16 @@ export async function writeSubmittedResponsesToLocalCaches(
   const submittedQuestionResponses = Array.isArray(questionResponses) ? questionResponses : [];
   if (submittedQuestionResponses.length > 0) {
     await updateCacheAtomic<QuestionsCacheByNetwork>('questionsCache', slug, (current) => {
-      const nextCache = ensureQuestionsNet(current || {}, netIdStr);
+      if (!isWorkerTargetCurrent()) return current || {};
+      let cacheSeed = current || {};
+      if (
+        expectedWorkerTarget.identity &&
+        !workerCanonicalCacheIdentityMatches(cacheSeed[netIdStr], expectedWorkerTarget.identity)
+      ) {
+        cacheSeed = { ...cacheSeed };
+        delete cacheSeed[netIdStr];
+      }
+      const nextCache = ensureQuestionsNet(cacheSeed, netIdStr);
       const net = nextCache[netIdStr];
       if (!net.questions || typeof net.questions !== 'object') net.questions = {};
       if (!net.questionResponses || typeof net.questionResponses !== 'object') net.questionResponses = {};
@@ -149,6 +198,12 @@ export async function writeSubmittedResponsesToLocalCaches(
       });
 
       if (didWrite) questionCacheWritten = true;
+      if (expectedWorkerTarget.identity) {
+        nextCache[netIdStr] = withWorkerCanonicalCacheIdentity(
+          nextCache[netIdStr],
+          expectedWorkerTarget.identity,
+        ) as QuestionsCacheByNetwork[string];
+      }
       return nextCache;
     });
   }
@@ -163,7 +218,16 @@ export async function writeSubmittedResponsesToLocalCaches(
 
   if (shouldWriteSurveyCache) {
     await updateCacheAtomic<SurveysCacheByNetwork>('surveysCache', slug, (current) => {
-      const nextCache = ensureSurveysNet(current || {}, netIdStr);
+      if (!isWorkerTargetCurrent()) return current || {};
+      let cacheSeed = current || {};
+      if (
+        expectedWorkerTarget.identity &&
+        !workerCanonicalCacheIdentityMatches(cacheSeed[netIdStr], expectedWorkerTarget.identity)
+      ) {
+        cacheSeed = { ...cacheSeed };
+        delete cacheSeed[netIdStr];
+      }
+      const nextCache = ensureSurveysNet(cacheSeed, netIdStr);
       const net = nextCache[netIdStr];
       if (!net.surveys || typeof net.surveys !== 'object') net.surveys = {};
       if (!net.surveyResponses || typeof net.surveyResponses !== 'object') net.surveyResponses = {};
@@ -202,6 +266,12 @@ export async function writeSubmittedResponsesToLocalCaches(
         ...(mergedQuestionIds.length > 0 ? { questionIDs: mergedQuestionIds } : {}),
       };
       surveyCacheWritten = true;
+      if (expectedWorkerTarget.identity) {
+        nextCache[netIdStr] = withWorkerCanonicalCacheIdentity(
+          nextCache[netIdStr],
+          expectedWorkerTarget.identity,
+        ) as SurveysCacheByNetwork[string];
+      }
       return nextCache;
     });
   }

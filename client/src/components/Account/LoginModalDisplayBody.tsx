@@ -20,6 +20,7 @@ type AccountUserPageProps = {
 type LoginModalDisplayBodyProps = {
   account: string;
   activeSessionConfig: unknown;
+  activeSessionNetworkChainId: number | null;
   activeSessionSlug: string;
   handleLogout: () => void;
   handlePasskeyWalletCreate: () => void;
@@ -34,19 +35,20 @@ type LoginModalDisplayBodyProps = {
   passkeyMode: PasskeyWalletActionMode;
   provider: string;
   renderAgentTokenLoginPanel: () => React.ReactNode;
+  sessionIdentityUnavailable: boolean;
+  showAdvancedWalletAccess: boolean;
   showTestnetOnly: boolean;
+  showWalletIdentity: boolean;
 };
 
 const AccountUserPage = React.lazy(() => import('components/UserPage/UserPage')) as React.LazyExoticComponent<
   React.ComponentType<AccountUserPageProps>
 >;
 
-const asRecord = (value: unknown): Record<string, unknown> =>
-  value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-
 const LoginModalDisplayBody = ({
   account,
   activeSessionConfig,
+  activeSessionNetworkChainId,
   activeSessionSlug,
   handleLogout,
   handlePasskeyWalletCreate,
@@ -61,20 +63,33 @@ const LoginModalDisplayBody = ({
   passkeyMode,
   provider,
   renderAgentTokenLoginPanel,
+  sessionIdentityUnavailable,
+  showAdvancedWalletAccess,
   showTestnetOnly,
+  showWalletIdentity,
 }: LoginModalDisplayBodyProps) => {
   if (!loginComplete && !loginInProgress) {
     return (
       <CardBody>
         <div className={styles.accountWarningContainer}>
           <div className={styles.accountWarningMessage}>
-            <p>
-              Account is an{' '}
-              <a href="https://ethereum.org/en/wallets/" target="_blank" rel="noopener noreferrer">
-                Ethereum wallet
-              </a>
-              :
-            </p>
+            {sessionIdentityUnavailable ? (
+              <p data-testid="ce-session-identity-unavailable">
+                This session&apos;s capability profile is unavailable or invalid. Reload or repair the canonical session
+                configuration before using session-specific access.
+              </p>
+            ) : null}
+            {showWalletIdentity ? (
+              <p>
+                Account is an{' '}
+                <a href="https://ethereum.org/en/wallets/" target="_blank" rel="noopener noreferrer">
+                  Ethereum wallet
+                </a>
+                :
+              </p>
+            ) : (
+              <p>Account uses a passkey:</p>
+            )}
             <ul>
               <li>controlled by you</li>
               <li>no password</li>
@@ -117,11 +132,19 @@ const LoginModalDisplayBody = ({
 
           {renderAgentTokenLoginPanel()}
 
-          <MetaMaskLoginButton
-            onClick={openCryptoModal}
-            className={styles.cryptoLoginLink}
-            iconClassName={styles.cryptoLoginIcon}
-          />
+          {showAdvancedWalletAccess ? (
+            <div className={styles.advancedWalletAccessNotice} data-testid="ce-advanced-wallet-access">
+              <strong>Advanced on-chain access</strong>
+              <span>Use an Ethereum wallet only for this session&apos;s optional on-chain gates.</span>
+            </div>
+          ) : null}
+          {showWalletIdentity || showAdvancedWalletAccess ? (
+            <MetaMaskLoginButton
+              onClick={openCryptoModal}
+              className={styles.cryptoLoginLink}
+              iconClassName={styles.cryptoLoginIcon}
+            />
+          ) : null}
         </div>
       </CardBody>
     );
@@ -155,7 +178,7 @@ const LoginModalDisplayBody = ({
                     network={network}
                     activeSessionSlug={activeSessionSlug}
                     sessionConfig={activeSessionConfig}
-                    networkChainId={asRecord(activeSessionConfig).networkChainId}
+                    networkChainId={activeSessionNetworkChainId || undefined}
                   />
                 </Suspense>
               </div>

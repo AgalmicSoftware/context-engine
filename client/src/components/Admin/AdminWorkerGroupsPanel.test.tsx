@@ -1,25 +1,61 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AdminWorkerGroupsPanel from './AdminWorkerGroupsPanel';
 
 const ADDRESS = '0x00000000000000000000000000000000000000aa';
+const SESSION_ID = '0x11111111111111111111111111111111';
+const OTHER_SESSION_ID = '0x22222222222222222222222222222222';
 
 describe('AdminWorkerGroupsPanel', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
+  it('prefills Worker-native tag defaults for admin-created groups', () => {
+    render(
+      <AdminWorkerGroupsPanel
+        canAdminWorker={true}
+        sessionId={SESSION_ID}
+        sessionConfig={{ defaultGroupTags: ['facilitators', 'reviewers'] }}
+        sessionSlug="alpha"
+        workerUrl="https://session-worker.example"
+        postSignedRequest={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Remove facilitators' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove reviewers' })).toBeInTheDocument();
+  });
+
   it('manages the supported group and membership operations through signed worker requests', async () => {
+    const buildGroup = (group: Record<string, unknown> = {}) => {
+      const built: Record<string, unknown> = {
+        groupId: 'reviewers',
+        sessionSlug: 'alpha',
+        label: 'Reviewers',
+        joinMode: 'admin_add',
+        memberVisibility: 'members',
+        ...group,
+      };
+      if (built.memberLimit === 0) delete built.memberLimit;
+      if (!built.joinEndsAt) delete built.joinEndsAt;
+      if (!built.adminAddress) delete built.adminAddress;
+      return built;
+    };
     const postSignedRequest = jest.fn(async ({ action, body }) => {
       if (action === 'groups/list') {
         return {
           data: {
             ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
             groups: [
               {
                 groupId: 'reviewers',
+                sessionSlug: 'alpha',
                 label: 'Reviewers',
                 description: 'Can review session material.',
+                imageUrl: 'https://ar-io.dev/reviewers-image',
                 joinMode: 'admin_add',
                 memberVisibility: 'members',
               },
@@ -31,17 +67,53 @@ describe('AdminWorkerGroupsPanel', () => {
         return {
           data: {
             ok: true,
-            members: [{ principal: { kind: 'evm_address', address: ADDRESS }, principalKey: `evm:${ADDRESS}` }],
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            group: buildGroup(),
+            members: [
+              {
+                sessionSlug: 'alpha',
+                principal: { kind: 'evm_address', address: ADDRESS },
+                principalKey: `evm:${ADDRESS}`,
+              },
+            ],
           },
         };
       }
-      return { data: { ok: true, body } };
+      if (action === 'groups/create') {
+        return {
+          data: {
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            group: buildGroup({ groupId: 'open-participants', ...body?.group }),
+          },
+        };
+      }
+      if (action === 'groups/update') {
+        return {
+          data: { ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', group: buildGroup(body?.group) },
+        };
+      }
+      if (action === 'groups/add-member') {
+        return {
+          data: {
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            group: buildGroup(),
+            member: { sessionSlug: 'alpha', principal: body?.principal },
+          },
+        };
+      }
+      return { data: { ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', body } };
     });
     jest.spyOn(window, 'confirm').mockReturnValue(true);
 
     render(
       <AdminWorkerGroupsPanel
         canAdminWorker={true}
+        sessionId={SESSION_ID}
         sessionSlug="alpha"
         workerUrl="https://session-worker.example"
         postSignedRequest={postSignedRequest}
@@ -50,24 +122,56 @@ describe('AdminWorkerGroupsPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
     expect(await screen.findByText('Reviewers')).toBeInTheDocument();
+    expect(postSignedRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'groups/list',
+        workerUrl: 'https://session-worker.example',
+      }),
+    );
+    expect(screen.getByTestId('ce-admin-worker-group-image')).toHaveAttribute(
+      'src',
+      'https://ar-io.dev/reviewers-image',
+    );
 
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), {
       target: { value: 'Open participants' },
     });
+    fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-description'), {
+      target: { value: 'Public acceleration discussion group.' },
+    });
+    fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-image'), {
+      target: { value: 'https://upload.wikimedia.org/wikipedia/commons/rocket.jpg' },
+    });
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-mode'), {
       target: { value: 'open' },
     });
-    fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-visibility'), {
-      target: { value: 'session' },
+    fireEvent.change(screen.getByLabelText('Tag'), { target: { value: 'reviewers' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add tag' }));
+    fireEvent.change(screen.getByLabelText('Reference URL'), {
+      target: { value: 'https://docs.example.test/brief' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add reference URL' }));
+    fireEvent.change(screen.getByLabelText('Member limit'), { target: { value: '25' } });
+    fireEvent.change(screen.getByLabelText('Join deadline'), { target: { value: '2030-01-01T12:00' } });
+    fireEvent.change(screen.getByLabelText('Group admin address'), { target: { value: ADDRESS } });
+    expect(screen.getByTestId('ce-admin-worker-group-create-visibility')).toHaveValue('session');
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
     await waitFor(() =>
       expect(postSignedRequest).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'groups/create',
+          workerUrl: 'https://session-worker.example',
           body: expect.objectContaining({
+            sessionId: SESSION_ID,
             group: expect.objectContaining({
               label: 'Open participants',
+              description: 'Public acceleration discussion group.',
+              imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/rocket.jpg',
+              tags: ['reviewers'],
+              documentURLs: ['https://docs.example.test/brief'],
+              memberLimit: 25,
+              joinEndsAt: new Date('2030-01-01T12:00').toISOString(),
+              adminAddress: ADDRESS,
               joinMode: 'open',
               memberVisibility: 'session',
             }),
@@ -76,6 +180,8 @@ describe('AdminWorkerGroupsPanel', () => {
       ),
     );
     expect(await screen.findByText('Group created.')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/network/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/contract address/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Reviewers' }));
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-edit-label'), {
@@ -90,8 +196,9 @@ describe('AdminWorkerGroupsPanel', () => {
         }),
       ),
     );
+    await screen.findByRole('button', { name: 'Delete Session reviewers' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Manage Reviewers members' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Manage Session reviewers members' }));
     expect(await screen.findByText(ADDRESS)).toBeInTheDocument();
     fireEvent.change(screen.getByTestId('ce-admin-worker-group-member-address'), { target: { value: ADDRESS } });
     fireEvent.click(screen.getByRole('button', { name: 'Add member' }));
@@ -103,10 +210,98 @@ describe('AdminWorkerGroupsPanel', () => {
     await waitFor(() =>
       expect(postSignedRequest).toHaveBeenCalledWith(expect.objectContaining({ action: 'groups/remove-member' })),
     );
+    expect(await screen.findByText('Member removed.')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Reviewers' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Session reviewers' }));
     await waitFor(() =>
       expect(postSignedRequest).toHaveBeenCalledWith(expect.objectContaining({ action: 'groups/delete' })),
+    );
+  });
+
+  it('loads additional signed member pages without presenting the first page as complete', async () => {
+    const secondAddress = '0x00000000000000000000000000000000000000bb';
+    const group = {
+      groupId: 'reviewers',
+      sessionSlug: 'alpha',
+      label: 'Reviewers',
+      joinMode: 'admin_add',
+      memberVisibility: 'members',
+    };
+    const postSignedRequest = jest.fn(async ({ action, body }) => {
+      if (action === 'groups/list') {
+        return { data: { ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', groups: [group] } };
+      }
+      if (action === 'groups/list-members' && body?.cursor === 'page-2') {
+        return {
+          data: {
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            group,
+            members: [
+              {
+                sessionSlug: 'alpha',
+                principal: { kind: 'evm_address', address: secondAddress },
+                principalKey: `evm:${secondAddress}`,
+              },
+            ],
+            nextCursor: '',
+          },
+        };
+      }
+      return {
+        data: {
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'alpha',
+          group,
+          members: [
+            {
+              sessionSlug: 'alpha',
+              principal: { kind: 'evm_address', address: ADDRESS },
+              principalKey: `evm:${ADDRESS}`,
+            },
+            {
+              sessionSlug: 'alpha',
+              principal: { kind: 'telegram', principalId: 'telegram:12345' },
+              principalKey: 'telegram:12345',
+            },
+          ],
+          nextCursor: 'page-2',
+        },
+      };
+    });
+
+    render(
+      <AdminWorkerGroupsPanel
+        canAdminWorker={true}
+        sessionId={SESSION_ID}
+        sessionSlug="alpha"
+        workerUrl="https://session-worker.example"
+        postSignedRequest={postSignedRequest}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Manage Reviewers members' }));
+    expect(await screen.findByText(ADDRESS)).toBeInTheDocument();
+    expect(screen.getByText('telegram:12345')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove telegram:12345' })).not.toBeInTheDocument();
+    const loadMore = screen.getByRole('button', { name: 'Load more members' });
+    fireEvent.click(loadMore);
+
+    expect(await screen.findByText(secondAddress)).toBeInTheDocument();
+    expect(screen.getByText(ADDRESS)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Load more members' })).not.toBeInTheDocument();
+    expect(postSignedRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'groups/list-members',
+        body: {
+          groupId: 'reviewers',
+          cursor: 'page-2',
+          sessionId: SESSION_ID,
+        },
+      }),
     );
   });
 
@@ -115,6 +310,7 @@ describe('AdminWorkerGroupsPanel', () => {
     render(
       <AdminWorkerGroupsPanel
         canAdminWorker={false}
+        sessionId={SESSION_ID}
         sessionSlug="alpha"
         workerUrl="https://session-worker.example"
         postSignedRequest={postSignedRequest}
@@ -125,14 +321,18 @@ describe('AdminWorkerGroupsPanel', () => {
     expect(postSignedRequest).not.toHaveBeenCalled();
   });
 
-  it('preserves an unsaved group draft when the signed create request fails', async () => {
+  it('preserves an unsaved group draft without rendering arbitrary signed-request errors', async () => {
+    const canarySignature = '0xsigned-admin-canary-never-render';
     const postSignedRequest = jest.fn(async ({ action }) => {
-      if (action === 'groups/list') return { data: { ok: true, groups: [] } };
-      throw new Error('Group create denied.');
+      if (action === 'groups/list') {
+        return { data: { ok: true, sessionId: SESSION_ID, sessionSlug: 'alpha', groups: [] } };
+      }
+      throw new Error(`Worker echoed signature ${canarySignature}`);
     });
     render(
       <AdminWorkerGroupsPanel
         canAdminWorker={true}
+        sessionId={SESSION_ID}
         sessionSlug="alpha"
         workerUrl="https://session-worker.example"
         postSignedRequest={postSignedRequest}
@@ -140,9 +340,88 @@ describe('AdminWorkerGroupsPanel', () => {
     );
     const label = await screen.findByTestId('ce-admin-worker-group-create-label');
     fireEvent.change(label, { target: { value: 'Keep this draft' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create group' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));
 
-    expect(await screen.findByText('Group create denied.')).toBeInTheDocument();
+    expect(await screen.findByText('worker_group_admin_request_failed')).toBeInTheDocument();
+    expect(screen.queryByText(new RegExp(canarySignature, 'i'))).not.toBeInTheDocument();
     expect(label).toHaveValue('Keep this draft');
+  });
+
+  it('clears drafts and ignores a late admin list when only the exact session identity changes', async () => {
+    let resolveFirstIdentity: (value: { data: unknown }) => void = () => {};
+    const firstIdentityRequest = jest.fn(
+      () =>
+        new Promise<{ data: unknown }>((resolve) => {
+          resolveFirstIdentity = resolve;
+        }),
+    );
+    const secondIdentityRequest = jest.fn(async () => ({
+      data: {
+        ok: true,
+        sessionId: OTHER_SESSION_ID,
+        sessionSlug: 'alpha',
+        groups: [
+          {
+            groupId: 'second-reviewers',
+            sessionSlug: 'alpha',
+            label: 'Second-identity reviewers',
+            joinMode: 'open',
+            memberVisibility: 'session',
+          },
+        ],
+      },
+    }));
+
+    const { rerender } = render(
+      <AdminWorkerGroupsPanel
+        canAdminWorker={true}
+        sessionId={SESSION_ID}
+        sessionSlug="alpha"
+        workerUrl="https://session-worker.example"
+        postSignedRequest={firstIdentityRequest}
+        autoLoad={true}
+      />,
+    );
+    await waitFor(() => expect(firstIdentityRequest).toHaveBeenCalledTimes(1));
+    fireEvent.change(screen.getByTestId('ce-admin-worker-group-create-label'), {
+      target: { value: 'Alpha draft' },
+    });
+
+    rerender(
+      <AdminWorkerGroupsPanel
+        canAdminWorker={true}
+        sessionId={OTHER_SESSION_ID}
+        sessionSlug="alpha"
+        workerUrl="https://session-worker.example"
+        postSignedRequest={secondIdentityRequest}
+        autoLoad={true}
+      />,
+    );
+
+    expect(screen.getByTestId('ce-admin-worker-group-create-label')).toHaveValue('');
+    expect(await screen.findByText('Second-identity reviewers')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveFirstIdentity({
+        data: {
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'alpha',
+          groups: [
+            {
+              groupId: 'first-reviewers',
+              sessionSlug: 'alpha',
+              label: 'First-identity reviewers',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+          ],
+        },
+      });
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('Second-identity reviewers')).toBeInTheDocument();
+    expect(screen.queryByText('First-identity reviewers')).not.toBeInTheDocument();
   });
 });

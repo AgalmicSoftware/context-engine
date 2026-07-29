@@ -5,6 +5,10 @@ export type SBTsPageUnknownRecord = Record<string, unknown>;
 export type SBTsPageMaybeRecord = SBTsPageUnknownRecord | null;
 export type SBTsPageSessionConfigLike = SBTsPageUnknownRecord & {
   slug?: unknown;
+  adminAddress?: unknown;
+  __registry?: SBTsPageUnknownRecord | null;
+  sessionModeProfile?: unknown;
+  groupCreationPolicy?: unknown;
   featured_SBTs_LIST?: unknown;
   ignored_SBTs_LIST?: unknown;
   autoFeatureSBTsBySessionSlug?: unknown;

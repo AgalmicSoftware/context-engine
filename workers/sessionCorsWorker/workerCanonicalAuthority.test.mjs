@@ -9,9 +9,11 @@ import {
 
 const ADMIN = '0x0000000000000000000000000000000000000001';
 const PARTICIPANT = '0x0000000000000000000000000000000000000002';
+const SESSION_ID = '0x00112233445566778899aabbccddeeff';
 
 const buildConfig = (overrides = {}) => ({
   adminAddress: ADMIN,
+  sessionId: SESSION_ID,
   sessionModeProfile: {
     authority: { mode: 'worker_canonical' },
     authorization: { mechanisms: ['worker_roles'] },
@@ -101,6 +103,7 @@ test('worker-canonical login evaluates configured worker-group gates and fails c
   assert.deepEqual(membershipChecks, [{
     env: { CE_WORKER_GROUPS_KV: {} },
     slug: 'session-a',
+    sessionId: SESSION_ID,
     groupId: 'participants',
     requesterAddress: PARTICIPANT,
     authScopes: {},

@@ -85,6 +85,14 @@
           ]
         },
         {
+          "label": "Verify release version surfaces",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:release-version"
+          ]
+        },
+        {
           "label": "Verify public release surface",
           "command": "npm",
           "args": [
@@ -147,11 +155,11 @@
     "public-text": {
       "commands": [
         {
-          "label": "Verify public text exposure",
+          "label": "Prepare and verify public text exposure",
           "command": "npm",
           "args": [
             "run",
-            "verify:public-text"
+            "verify:public-text:prepared"
           ]
         }
       ]
@@ -284,6 +292,14 @@
           "args": [
             "run",
             "typecheck:client-tests"
+          ]
+        },
+        {
+          "label": "Verify release version surfaces",
+          "command": "npm",
+          "args": [
+            "run",
+            "verify:release-version"
           ]
         },
         {

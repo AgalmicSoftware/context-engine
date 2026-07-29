@@ -12,7 +12,6 @@ import {
 } from '../../../utilities/session/sponsoredBootstrapFunding.js';
 import { toStr } from '../../../utilities/shared/primitives.js';
 import { normalizeBaseUrl } from '../../../utilities/urlUtils.js';
-import { scrubSponsoredBundleHashSecret } from '../sessionWizardRouteState';
 import { buildEmptyProvisionedSponsoredContext } from '../sessionWizardGateUtils';
 import {
   readSessionWizardSponsoredBundleCache,
@@ -70,6 +69,7 @@ export type SponsoredBundleStatusState = {
   tone?: string;
   message?: string;
   retryable?: boolean;
+  requiresKey?: boolean;
 };
 
 export type UseSponsoredBundleLifecycleOptions = {
@@ -115,14 +115,84 @@ const useSponsoredBundleLifecycle = ({
   } = refs;
   const [sponsoredBundleStatus, setSponsoredBundleStatus] = useState<SponsoredBundleStatusState | null>(null);
   const [sponsoredBundleRetryNonce, setSponsoredBundleRetryNonce] = useState(0);
+  const bundleId = toStr(initialSponsoredBundleId || '').trim();
+  const providedBundleKey = toStr(initialSponsoredBundleKey || '').trim();
+  const [sponsoredBundleKeyState, setSponsoredBundleKeyState] = useState(() => ({
+    bundleId,
+    input: providedBundleKey,
+    submitted: providedBundleKey,
+  }));
+  const activeSponsoredBundleKeyState =
+    sponsoredBundleKeyState.bundleId === bundleId
+      ? sponsoredBundleKeyState
+      : {
+          bundleId,
+          input: providedBundleKey,
+          submitted: providedBundleKey,
+        };
   const sponsoredBundleApplyRef = useRef('');
   const sponsoredBundleBaselineRef = useRef<SponsoredBundleBaselineState | null>(null);
   const sponsoredBundleAppliedBundleRef = useRef<SponsoredBundleLike | null>(null);
   const sponsoredBundleTerminalTxIdRef = useRef('');
   const hasSponsoredBundleLink = useMemo(
-    () => !!toStr(initialSponsoredBundleId || '').trim() || !!toStr(initialSponsoredBundleKey || '').trim(),
-    [initialSponsoredBundleId, initialSponsoredBundleKey],
+    () => !!bundleId || !!activeSponsoredBundleKeyState.submitted,
+    [activeSponsoredBundleKeyState.submitted, bundleId],
   );
+
+  useEffect(() => {
+    setSponsoredBundleKeyState((current) => {
+      if (current.bundleId !== bundleId) {
+        return {
+          bundleId,
+          input: providedBundleKey,
+          submitted: providedBundleKey,
+        };
+      }
+      if (providedBundleKey && current.submitted !== providedBundleKey) {
+        return {
+          bundleId,
+          input: providedBundleKey,
+          submitted: providedBundleKey,
+        };
+      }
+      return current;
+    });
+  }, [bundleId, providedBundleKey]);
+
+  const setSponsoredBundleKeyInput = useCallback(
+    (value = '') => {
+      const nextInput = toStr(value);
+      setSponsoredBundleKeyState((current) => ({
+        bundleId,
+        input: nextInput,
+        submitted: current.bundleId === bundleId ? current.submitted : '',
+      }));
+    },
+    [bundleId],
+  );
+
+  const submitSponsoredBundleKey = useCallback(() => {
+    const nextKey = toStr(activeSponsoredBundleKeyState.input).trim();
+    if (!bundleId) {
+      setSponsoredBundleStatus({ tone: 'error', message: 'Malformed sponsored link.', retryable: false });
+      return;
+    }
+    if (!nextKey) {
+      setSponsoredBundleStatus({
+        tone: 'error',
+        message: 'Enter the sponsored bundle decryption key to continue.',
+        retryable: false,
+        requiresKey: true,
+      });
+      return;
+    }
+    setSponsoredBundleKeyState({
+      bundleId,
+      input: nextKey,
+      submitted: nextKey,
+    });
+    setSponsoredBundleStatus({ tone: 'info', message: 'Loading sponsored bundle…', retryable: false });
+  }, [activeSponsoredBundleKeyState.input, bundleId]);
 
   const buildRestoredSponsoredWorkerSecrets = useCallback(
     ({
@@ -380,8 +450,7 @@ const useSponsoredBundleLifecycle = ({
   }, [draftSlug, syncSponsoredBootstrapFundingContext]);
 
   useEffect(() => {
-    const bundleId = toStr(initialSponsoredBundleId || '').trim();
-    const bundleKey = toStr(initialSponsoredBundleKey || '').trim();
+    const bundleKey = toStr(activeSponsoredBundleKeyState.submitted).trim();
     if (!bundleId && !bundleKey) {
       // Regression guard: query-only route changes do not remount SessionWizard,
       // so removing `?sponsored=` must explicitly roll back sponsor-applied state.
@@ -389,7 +458,7 @@ const useSponsoredBundleLifecycle = ({
       setSponsoredBundleStatus(null);
       return;
     }
-    const applyKey = bundleKey ? `${bundleId}::${bundleKey}` : `${bundleId}::__session_cache__`;
+    const applyKey = bundleKey ? `${bundleId}::${bundleKey}` : `${bundleId}::__memory_cache__`;
     const activeApplyKey = sponsoredBundleRetryNonce > 0 ? `${applyKey}::retry:${sponsoredBundleRetryNonce}` : applyKey;
     if (sponsoredBundleApplyRef.current === activeApplyKey) return;
     let cancelled = false;
@@ -413,12 +482,20 @@ const useSponsoredBundleLifecycle = ({
         });
         return;
       }
-      if (!bundleKey && sponsoredBundleTerminalTxIdRef.current === bundleId) return;
-
-      if (!bundleId || !bundleKey) {
+      if (!bundleId) {
         restoreSponsoredBundleOverrides();
-        scrubSponsoredBundleHashSecret();
         setSponsoredBundleStatus({ tone: 'error', message: 'Malformed sponsored link.', retryable: false });
+        return;
+      }
+      if (!bundleKey && sponsoredBundleTerminalTxIdRef.current === bundleId) return;
+      if (!bundleKey) {
+        restoreSponsoredBundleOverrides();
+        setSponsoredBundleStatus({
+          tone: 'info',
+          message: 'Enter the sponsored bundle decryption key to continue.',
+          retryable: false,
+          requiresKey: true,
+        });
         return;
       }
 
@@ -439,7 +516,14 @@ const useSponsoredBundleLifecycle = ({
         applySponsoredBundleOverrides(result.bundle, activeApplyKey, bundleId);
         await writeSessionWizardSponsoredBundleCache(bundleId, result.bundle);
         if (cancelled) return;
-        scrubSponsoredBundleHashSecret();
+        setSponsoredBundleKeyState((current) =>
+          current.bundleId === bundleId
+            ? {
+                ...current,
+                input: '',
+              }
+            : current,
+        );
         setSponsoredBundleStatus({
           tone: 'success',
           message: buildSponsoredBundleAppliedStatusMessage(result.bundle),
@@ -455,7 +539,6 @@ const useSponsoredBundleLifecycle = ({
         if (code === 'expired_bundle') {
           await writeSessionWizardSponsoredBundleCache(bundleId, null);
           if (cancelled) return;
-          scrubSponsoredBundleHashSecret();
           sponsoredBundleTerminalTxIdRef.current = bundleId;
           setSponsoredBundleStatus({ tone: 'error', message: 'Sponsored bundle expired.', retryable: false });
           return;
@@ -463,15 +546,23 @@ const useSponsoredBundleLifecycle = ({
         if (code === 'decrypt_failed') {
           await writeSessionWizardSponsoredBundleCache(bundleId, null);
           if (cancelled) return;
-          scrubSponsoredBundleHashSecret();
           sponsoredBundleTerminalTxIdRef.current = bundleId;
-          setSponsoredBundleStatus({ tone: 'error', message: 'Failed to decrypt sponsored bundle.', retryable: false });
+          setSponsoredBundleKeyState({
+            bundleId,
+            input: '',
+            submitted: '',
+          });
+          setSponsoredBundleStatus({
+            tone: 'error',
+            message: 'Failed to decrypt sponsored bundle. Enter the key again.',
+            retryable: false,
+            requiresKey: true,
+          });
           return;
         }
         if (code === 'malformed_link') {
           await writeSessionWizardSponsoredBundleCache(bundleId, null);
           if (cancelled) return;
-          scrubSponsoredBundleHashSecret();
           sponsoredBundleTerminalTxIdRef.current = bundleId;
           setSponsoredBundleStatus({ tone: 'error', message: 'Malformed sponsored link.', retryable: false });
           return;
@@ -479,7 +570,6 @@ const useSponsoredBundleLifecycle = ({
         if (code === 'invalid_bundle' || code === 'empty_bundle') {
           await writeSessionWizardSponsoredBundleCache(bundleId, null);
           if (cancelled) return;
-          scrubSponsoredBundleHashSecret();
           sponsoredBundleTerminalTxIdRef.current = bundleId;
           setSponsoredBundleStatus({ tone: 'error', message: 'Invalid sponsored bundle.', retryable: false });
           return;
@@ -492,9 +582,9 @@ const useSponsoredBundleLifecycle = ({
       cancelled = true;
     };
   }, [
+    activeSponsoredBundleKeyState.submitted,
     applySponsoredBundleOverrides,
-    initialSponsoredBundleId,
-    initialSponsoredBundleKey,
+    bundleId,
     restoreSponsoredBundleOverrides,
     sponsoredBundleRetryNonce,
   ]);
@@ -507,6 +597,9 @@ const useSponsoredBundleLifecycle = ({
     restoreSponsoredBundleOverrides,
     clearSponsoredBundleTracking,
     hasSponsoredBundleLink,
+    sponsoredBundleKeyInput: activeSponsoredBundleKeyState.input,
+    setSponsoredBundleKeyInput,
+    submitSponsoredBundleKey,
   };
 };
 

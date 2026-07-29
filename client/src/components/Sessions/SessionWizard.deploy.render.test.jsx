@@ -33,6 +33,20 @@ const NEW_SESSION_BANNER_DISMISSED_KEY = 'ce_new_session_banner_dismissed';
 const ORIGINAL_PUBLIC_URL = process.env.PUBLIC_URL;
 const mockSelectorSourceFactory = '0x538A48BC439A36D2A86e63114DCD9c429d2ddEcA';
 const mockSelectorSourceStartBlock = 30297069;
+let mockPersistedPublicWorkerConfig = null;
+const maybeHandlePublicWorkerVerificationRequest = (url, init = {}) => {
+  const normalizedUrl = String(url);
+  if (normalizedUrl.endsWith('/admin/set-config')) {
+    mockPersistedPublicWorkerConfig = JSON.parse(String(init.body || '{}')).config;
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  }
+  if (normalizedUrl.includes('/session-config')) {
+    const { litCredentials: _privateLitDescriptor, ...publicConfig } = mockPersistedPublicWorkerConfig || {};
+    if (publicConfig.ai) publicConfig.ai = { models: publicConfig.ai.models };
+    return { ok: true, status: 200, json: async () => ({ config: publicConfig }) };
+  }
+  return null;
+};
 const buildMockSponsoredBundleEnvelope = () =>
   JSON.stringify({
     type: 'contextengine-sponsored-bundle',
@@ -383,7 +397,11 @@ const createPendingFeaturedDraft = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
   await waitFor(() => {
     expect(screen.queryByTestId('mock-create-sbt-group')).not.toBeInTheDocument();
-    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toContain(mockPendingSbtAddress);
+    expect(screen.getByTestId(E2E_TESTIDS.WIZARD_PENDING_SBT)).toHaveAttribute(
+      'data-ce-sbt-address',
+      mockPendingSbtAddress.toLowerCase(),
+    );
+    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
   });
 };
 
@@ -405,6 +423,7 @@ describe('SessionWizard deploy render validation', () => {
     window.history.replaceState({}, '', '/');
     localStorage.clear();
     sessionStorage.clear();
+    mockPersistedPublicWorkerConfig = null;
     buildContractViewerContracts.mockImplementation(({ sessionContracts = {} } = {}) =>
       Object.keys(sessionContracts).map((contractKey) => ({
         key: contractKey,
@@ -473,8 +492,10 @@ describe('SessionWizard deploy render validation', () => {
       const trimmed = String(value || '').trim();
       return trimmed || 'https://deploy-helper.example.test';
     });
-    global.fetch = jest.fn(async (url) => {
+    global.fetch = jest.fn(async (url, init = {}) => {
       const normalizedUrl = String(url);
+      const publicVerificationResponse = maybeHandlePublicWorkerVerificationRequest(normalizedUrl, init);
+      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/account')) {
         return { ok: true, json: async () => ({ accountId: 'cf-account-1', accountName: 'Test Account' }) };
       }
@@ -586,8 +607,10 @@ describe('SessionWizard deploy render validation', () => {
       const trimmed = String(value || '').trim();
       return trimmed || 'https://deploy-helper.example.test';
     });
-    global.fetch = jest.fn(async (url) => {
+    global.fetch = jest.fn(async (url, init = {}) => {
       const normalizedUrl = String(url);
+      const publicVerificationResponse = maybeHandlePublicWorkerVerificationRequest(normalizedUrl, init);
+      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/account')) {
         return { ok: true, json: async () => ({ accountId: 'cf-account-1', accountName: 'Test Account' }) };
       }
@@ -756,8 +779,10 @@ describe('SessionWizard deploy render validation', () => {
       const trimmed = String(value || '').trim();
       return trimmed || 'https://deploy-helper.example.test';
     });
-    global.fetch = jest.fn(async (url) => {
+    global.fetch = jest.fn(async (url, init = {}) => {
       const normalizedUrl = String(url);
+      const publicVerificationResponse = maybeHandlePublicWorkerVerificationRequest(normalizedUrl, init);
+      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/deploy')) {
         return {
           ok: true,
@@ -902,8 +927,10 @@ describe('SessionWizard deploy render validation', () => {
       const trimmed = String(value || '').trim();
       return trimmed || 'https://deploy-helper.example.test';
     });
-    global.fetch = jest.fn(async (url) => {
+    global.fetch = jest.fn(async (url, init = {}) => {
       const normalizedUrl = String(url);
+      const publicVerificationResponse = maybeHandlePublicWorkerVerificationRequest(normalizedUrl, init);
+      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/deploy')) {
         return {
           ok: true,
@@ -1076,8 +1103,10 @@ describe('SessionWizard deploy render validation', () => {
       const trimmed = String(value || '').trim();
       return trimmed || 'https://deploy-helper.example.test';
     });
-    global.fetch = jest.fn(async (url) => {
+    global.fetch = jest.fn(async (url, init = {}) => {
       const normalizedUrl = String(url);
+      const publicVerificationResponse = maybeHandlePublicWorkerVerificationRequest(normalizedUrl, init);
+      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/account')) {
         return { ok: true, json: async () => ({ accountId: 'cf-account-1', accountName: 'Test Account' }) };
       }
@@ -1178,8 +1207,10 @@ describe('SessionWizard deploy render validation', () => {
     cryptoUtils._getProvider.mockImplementation(() => ({
       request: providerRequest,
     }));
-    global.fetch = jest.fn(async (url) => {
+    global.fetch = jest.fn(async (url, init = {}) => {
       const normalizedUrl = String(url);
+      const publicVerificationResponse = maybeHandlePublicWorkerVerificationRequest(normalizedUrl, init);
+      if (publicVerificationResponse) return publicVerificationResponse;
       if (normalizedUrl.endsWith('/account')) {
         return { ok: true, json: async () => ({ accountId: 'cf-account-1', accountName: 'Test Account' }) };
       }

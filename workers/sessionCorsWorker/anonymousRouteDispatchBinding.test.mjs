@@ -25,6 +25,7 @@ test('dispatchAnonymousRouteWithWorkerDeps preserves anonymous dispatch wiring a
         const secretResult = await value.deps.getSessionSecrets('session-a');
         calls.push(['getSessionSecrets', secretResult]);
         assert.equal(value.deps.storageRoute, 'storageRoute');
+        assert.equal(value.deps.dispatchPublicWorkerGroupListRequest, 'dispatchPublicWorkerGroupListRequest');
         assert.equal(value.deps.readTranscribeRequestPayload, 'readTranscribeRequestPayload');
         assert.equal(value.deps.evaluateAnonymousRouteAccess, 'evaluateAnonymousRouteAccess');
         assert.equal(value.deps.transcribe, 'transcribe');
@@ -40,6 +41,7 @@ test('dispatchAnonymousRouteWithWorkerDeps preserves anonymous dispatch wiring a
       },
       readTranscribeRequestPayload: 'readTranscribeRequestPayload',
       storageRoute: 'storageRoute',
+      dispatchPublicWorkerGroupListRequest: 'dispatchPublicWorkerGroupListRequest',
       evaluateAnonymousRouteAccess: 'evaluateAnonymousRouteAccess',
       getSessionSecrets: async (receivedEnv, slug) => {
         assert.equal(receivedEnv, env);

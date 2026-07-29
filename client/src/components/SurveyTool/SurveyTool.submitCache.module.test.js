@@ -4,10 +4,44 @@ import { buildSubmissionGroupContext } from './surveyToolHydrationFlow';
 import { processRatingEnvelopesForSubmit } from './surveyToolRatingEnvelopeSubmitController';
 import { resolveSurveyToolSubmittedCacheWriteContext } from './surveyToolSessionResolution';
 import * as cacheScripts from '../../utilities/cache/cacheScripts.js';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+import {
+  resolveWorkerCanonicalCacheIdentity,
+  withWorkerCanonicalCacheIdentity,
+} from '../../utilities/survey/workerCanonicalCacheIdentity';
 
 const TX_HASH = `0x${'6'.repeat(64)}`;
 
 const deepClone = (value) => JSON.parse(JSON.stringify(value));
+const resolveLegacyBySlug = (slug) =>
+  slug
+    ? {
+        slug,
+        networkChainId: 84532,
+        __registry: {
+          registryChainId: 84532,
+          sessionIdHex: '0x00112233445566778899aabbccddeeff',
+        },
+      }
+    : null;
+const makeWorkerConfig = (workerOrigin, sessionId) => ({
+  slug: 'edge-worker-submit',
+  sessionId,
+  corsWorkerUrl: workerOrigin,
+  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  storageProfile: {
+    backend: 'cloudflare',
+    resources: {
+      questions: 'active',
+      surveys: 'active',
+    },
+    payloadAccessControl: {
+      gate: 'role_gate',
+      encryption: 'worker_envelope',
+      mode: 'authorized_read',
+    },
+  },
+});
 
 const makeCacheDeps = ({
   account = '0xabc',
@@ -17,18 +51,19 @@ const makeCacheDeps = ({
   network = { id: 84532 },
   networkChainId = undefined,
   resolveBySlug = undefined,
+  currentResolveBySlug = resolveBySlug,
 } = {}) => ({
   account,
   effectiveDraftSlug,
   singleQuestionMode,
   isStandalone,
   deepClone,
-  resolveSubmittedCacheWriteContext: (sessionSlug) =>
+  resolveSubmittedCacheWriteContext: (sessionSlug, current = false) =>
     resolveSurveyToolSubmittedCacheWriteContext({
       sessionSlug,
       network,
       networkChainId,
-      resolveBySlug,
+      resolveBySlug: current ? currentResolveBySlug : resolveBySlug,
     }),
 });
 
@@ -149,6 +184,7 @@ describe('SurveyTool submit cache writes', () => {
         makeCacheDeps({
           account: responder,
           effectiveDraftSlug: slug,
+          resolveBySlug: resolveLegacyBySlug,
         }),
       );
 
@@ -250,6 +286,7 @@ describe('SurveyTool submit cache writes', () => {
         makeCacheDeps({
           account: responder,
           effectiveDraftSlug: routeSlug,
+          resolveBySlug: resolveLegacyBySlug,
         }),
       );
 
@@ -534,6 +571,117 @@ describe('SurveyTool submit cache writes', () => {
         }),
       );
       expect(surveysCache?.['84532']?.surveyResponses?.[surveyId]?.[responder]).toBeUndefined();
+    } finally {
+      await cacheScripts.removeCache('questionsCache', slug).catch(() => null);
+      await cacheScripts.removeCache('surveysCache', slug).catch(() => null);
+    }
+  });
+
+  it('resets and stamps both response caches for the exact Worker submit target', async () => {
+    const slug = 'edge-worker-submit';
+    const responder = '0xabc';
+    const surveyId = 'survey-worker';
+    const configA = makeWorkerConfig('https://a.example.com', '0x00112233445566778899aabbccddeeff');
+    const configB = makeWorkerConfig('https://b.example.com', '0xffeeddccbbaa99887766554433221100');
+    const identityA = resolveWorkerCanonicalCacheIdentity({ sessionConfig: configA, sessionSlug: slug });
+    const identityB = resolveWorkerCanonicalCacheIdentity({ sessionConfig: configB, sessionSlug: slug });
+    const resolveB = (requestedSlug) => (requestedSlug === slug ? configB : null);
+
+    await cacheScripts.writeCache('questionsCache', slug, {
+      worker: withWorkerCanonicalCacheIdentity(
+        {
+          questions: { old: { id: 'old' } },
+          questionResponses: {},
+          questionResponsesMeta: {},
+        },
+        identityA,
+      ),
+    });
+    await cacheScripts.writeCache('surveysCache', slug, {
+      worker: withWorkerCanonicalCacheIdentity(
+        {
+          surveys: { old: { id: 'old' } },
+          surveyResponses: {},
+          surveyResponsesLatestBlock: {},
+        },
+        identityA,
+      ),
+    });
+
+    try {
+      const result = await writeSubmittedResponsesToLocalCaches(
+        {
+          receipt: { blockNumber: 22, transactionIndex: 3 },
+          questionResponses: [{ questionID: 'q1', prompt: 'Worker B question' }],
+          surveyResponse: {
+            surveyID: surveyId,
+            surveyTitle: 'Worker B survey',
+            responses: [{ questionID: 'q1' }],
+          },
+          surveyId,
+        },
+        makeCacheDeps({
+          account: responder,
+          effectiveDraftSlug: slug,
+          network: null,
+          resolveBySlug: resolveB,
+        }),
+      );
+
+      expect(result).toEqual({ questionCacheWritten: true, surveyCacheWritten: true });
+      const questionsCache = await cacheScripts.readCache('questionsCache', slug);
+      const surveysCache = await cacheScripts.readCache('surveysCache', slug);
+      expect(questionsCache.worker.workerCanonicalIdentity).toEqual(identityB);
+      expect(questionsCache.worker.questions.old).toBeUndefined();
+      expect(questionsCache.worker.questionResponses.q1[responder]).toBeDefined();
+      expect(surveysCache.worker.workerCanonicalIdentity).toEqual(identityB);
+      expect(surveysCache.worker.surveys.old).toBeUndefined();
+      expect(surveysCache.worker.surveyResponses[surveyId][responder]).toBeDefined();
+    } finally {
+      await cacheScripts.removeCache('questionsCache', slug).catch(() => null);
+      await cacheScripts.removeCache('surveysCache', slug).catch(() => null);
+    }
+  });
+
+  it('drops post-submit writes when the same slug changes Worker target before the atomic update', async () => {
+    const slug = 'edge-worker-submit';
+    const configA = makeWorkerConfig('https://a.example.com', '0x00112233445566778899aabbccddeeff');
+    const configB = makeWorkerConfig('https://b.example.com', '0xffeeddccbbaa99887766554433221100');
+    const identityA = resolveWorkerCanonicalCacheIdentity({ sessionConfig: configA, sessionSlug: slug });
+    const resolveA = (requestedSlug) => (requestedSlug === slug ? configA : null);
+    const resolveB = (requestedSlug) => (requestedSlug === slug ? configB : null);
+
+    await cacheScripts.writeCache('questionsCache', slug, {
+      worker: withWorkerCanonicalCacheIdentity(
+        {
+          questions: { existing: { id: 'existing' } },
+          questionResponses: {},
+          questionResponsesMeta: {},
+        },
+        identityA,
+      ),
+    });
+
+    try {
+      await expect(
+        writeSubmittedResponsesToLocalCaches(
+          {
+            receipt: { blockNumber: 22 },
+            questionResponses: [{ questionID: 'stale', prompt: 'Stale Worker A question' }],
+          },
+          makeCacheDeps({
+            effectiveDraftSlug: slug,
+            network: null,
+            resolveBySlug: resolveA,
+            currentResolveBySlug: resolveB,
+          }),
+        ),
+      ).resolves.toEqual({ questionCacheWritten: false, surveyCacheWritten: false });
+
+      const questionsCache = await cacheScripts.readCache('questionsCache', slug);
+      expect(questionsCache.worker.workerCanonicalIdentity).toEqual(identityA);
+      expect(questionsCache.worker.questions.existing).toEqual({ id: 'existing' });
+      expect(questionsCache.worker.questions.stale).toBeUndefined();
     } finally {
       await cacheScripts.removeCache('questionsCache', slug).catch(() => null);
       await cacheScripts.removeCache('surveysCache', slug).catch(() => null);

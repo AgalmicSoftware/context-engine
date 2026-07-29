@@ -964,11 +964,11 @@ describe('PostsPage', () => {
     );
   });
 
-  it('keeps precision freeform responses comfortably readable', () => {
+  it('expands precision freeform responses to use their available panel space', () => {
     const scss = fs.readFileSync(path.join(__dirname, 'PostsPage.module.scss'), 'utf8');
 
     expect(scss).toMatch(
-      /\.responseTypePrecisionPanel[\s\S]*\.responseQuotes blockquote\s*{[\s\S]*font-size:\s*1\.08rem;[\s\S]*line-height:\s*1\.5;/,
+      /\.responseTypePrecisionPanel\.responseTypeFreeformPanel\s*{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*column;[\s\S]*\.responseQuotes\s*{[\s\S]*flex:\s*1 1 auto;[\s\S]*grid-auto-rows:\s*minmax\(0, 1fr\);[\s\S]*\.responseQuotes figure\s*{[\s\S]*display:\s*flex;[\s\S]*justify-content:\s*center;[\s\S]*\.responseQuotes blockquote\s*{[\s\S]*font-size:\s*clamp\(1\.2rem, 2\.2cqi, 1\.55rem\);[\s\S]*line-height:\s*1\.4;/,
     );
   });
 

@@ -5,7 +5,11 @@ import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import { CLOUDFLARE_NATIVE_DEPLOY_URL } from '../../variables/publicDeploymentConfig.js';
 import { createCloudflareNativeSetupSecrets } from '../../utilities/worker/cloudflareNativeDeploy.js';
-import { buildCloudflareTokenTemplateUrl, CLOUDFLARE_API_TOKENS_URL } from './cloudflareTokenTemplate.js';
+import type {
+  fetchWorkerCanonicalSessionBootstrap,
+  WorkerCanonicalSessionBootstrap,
+} from '../../utilities/session/sessionWorkerDiscovery';
+import { buildCloudflareTokenTemplateUrl, CLOUDFLARE_TOKEN_SETUP_GUIDE_URL } from './cloudflareTokenTemplate.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 
@@ -23,6 +27,35 @@ type DeployForm = {
   apiToken?: string;
   adminAddress?: string;
 };
+
+const normalizeNativeWorkerOrigin = (value: unknown) => {
+  const candidate = String(value || '').trim();
+  if (!candidate) return '';
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return candidate.toLowerCase();
+    return parsed.origin.toLowerCase();
+  } catch {
+    return candidate.toLowerCase();
+  }
+};
+
+const buildNativeSetupIdentity = ({ sessionSlug, adminAddress }: { sessionSlug: string; adminAddress: string }) =>
+  `${sessionSlug.trim().toLowerCase()}\n${adminAddress.trim().toLowerCase()}`;
+
+const buildNativeVerificationIdentity = ({
+  workerUrl,
+  sessionSlug,
+  adminAddress,
+}: {
+  workerUrl: unknown;
+  sessionSlug: string;
+  adminAddress: string;
+}) =>
+  `${normalizeNativeWorkerOrigin(workerUrl)}\n${buildNativeSetupIdentity({
+    sessionSlug,
+    adminAddress,
+  })}`;
 
 export type WorkerDeploySectionProps = {
   isNormalMode: boolean;
@@ -57,6 +90,9 @@ export type WorkerDeploySectionProps = {
   setDeployForm: React.Dispatch<React.SetStateAction<DeployForm>>;
   handleDeployWorker: () => void;
   deployStatusDisplayState: SessionWizardDeployStatusDisplayState;
+  displayedWorkerUrl?: string;
+  onNativeWorkerVerified?: (bootstrap: WorkerCanonicalSessionBootstrap) => void;
+  verifyNativeWorker?: typeof fetchWorkerCanonicalSessionBootstrap;
 };
 
 const WorkerDeploySection = ({
@@ -92,12 +128,22 @@ const WorkerDeploySection = ({
   setDeployForm,
   handleDeployWorker,
   deployStatusDisplayState,
+  displayedWorkerUrl = '',
+  onNativeWorkerVerified,
+  verifyNativeWorker,
 }: WorkerDeploySectionProps) => {
   const [nativeSetupSecrets, setNativeSetupSecrets] = React.useState<{
     tokenHmacSecret: string;
     storageEnvelopeKek: string;
   } | null>(null);
+  const [nativeSetupSecretsIdentity, setNativeSetupSecretsIdentity] = React.useState('');
   const [nativeSetupError, setNativeSetupError] = React.useState('');
+  const [nativeProgress, setNativeProgress] = React.useState<'generated' | 'opened' | 'verifying' | 'verified' | ''>(
+    '',
+  );
+  const [nativeStatus, setNativeStatus] = React.useState('');
+  const [copiedNativeField, setCopiedNativeField] = React.useState('');
+  const [verifiedNativeIdentity, setVerifiedNativeIdentity] = React.useState('');
   const renderTooltip = typeof renderInfoTooltip === 'function' ? renderInfoTooltip : () => null;
   const {
     deployButtonDisabled,
@@ -111,20 +157,142 @@ const WorkerDeploySection = ({
   const cloudflareTokenTemplateHref = buildCloudflareTokenTemplateUrl({
     slug: cloudflareTokenSlug,
   });
-  const cloudflareTokenReceiver = String(deployHelperUrl || '').trim();
   const nativeDeployUrl = String(cloudflareNativeDeployUrl || '').trim();
   const nativeSessionSlug = String(cloudflareTokenSlug || '').trim();
   const nativeAdminAddress = String(deployForm.adminAddress || account || '').trim();
-  const nativeDeployReady = !!(nativeDeployUrl && nativeSetupSecrets && nativeSessionSlug && nativeAdminAddress);
+  const nativeSetupIdentity = buildNativeSetupIdentity({
+    sessionSlug: nativeSessionSlug,
+    adminAddress: nativeAdminAddress,
+  });
+  const nativeVerificationIdentity = buildNativeVerificationIdentity({
+    workerUrl: displayedWorkerUrl,
+    sessionSlug: nativeSessionSlug,
+    adminAddress: nativeAdminAddress,
+  });
+  const previousNativeSetupIdentityRef = React.useRef(nativeSetupIdentity);
+  const previousNativeVerificationIdentityRef = React.useRef(nativeVerificationIdentity);
+  const currentNativeVerificationIdentityRef = React.useRef(nativeVerificationIdentity);
+  currentNativeVerificationIdentityRef.current = nativeVerificationIdentity;
+  const currentNativeSetupSecrets = nativeSetupSecretsIdentity === nativeSetupIdentity ? nativeSetupSecrets : null;
+  const nativeDeployReady = !!(nativeDeployUrl && currentNativeSetupSecrets && nativeSessionSlug && nativeAdminAddress);
+  const nativeVerificationIsCurrent =
+    nativeProgress === 'verified' && verifiedNativeIdentity === nativeVerificationIdentity;
+
+  React.useEffect(() => {
+    const setupIdentityChanged = previousNativeSetupIdentityRef.current !== nativeSetupIdentity;
+    const verificationIdentityChanged = previousNativeVerificationIdentityRef.current !== nativeVerificationIdentity;
+    previousNativeSetupIdentityRef.current = nativeSetupIdentity;
+    previousNativeVerificationIdentityRef.current = nativeVerificationIdentity;
+    if (!verificationIdentityChanged) return;
+
+    setVerifiedNativeIdentity('');
+    setCopiedNativeField('');
+    if (setupIdentityChanged) {
+      setNativeSetupSecrets(null);
+      setNativeSetupSecretsIdentity('');
+      setNativeSetupError('');
+      setNativeProgress('');
+      setNativeStatus('');
+      return;
+    }
+    setNativeProgress((progress) => (progress ? 'generated' : ''));
+    setNativeStatus((status) =>
+      status && currentNativeSetupSecrets
+        ? 'The Session Worker URL changed. Verify this exact Worker identity before deploying the session.'
+        : '',
+    );
+  }, [currentNativeSetupSecrets, nativeSetupIdentity, nativeVerificationIdentity]);
+
   const generateNativeSetupSecrets = () => {
     try {
       setNativeSetupSecrets(createCloudflareNativeSetupSecrets());
+      setNativeSetupSecretsIdentity(nativeSetupIdentity);
       setNativeSetupError('');
-    } catch (error) {
+      setNativeProgress('generated');
+      setNativeStatus('Setup values generated in this tab. Copy each value into Cloudflare.');
+      setCopiedNativeField('');
+      setVerifiedNativeIdentity('');
+    } catch {
       setNativeSetupSecrets(null);
-      setNativeSetupError(error instanceof Error ? error.message : 'Secure setup-secret generation failed.');
+      setNativeSetupSecretsIdentity('');
+      setNativeSetupError('Secure setup-secret generation failed.');
     }
   };
+  const copyNativeValue = async (label: string, value: string) => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard is unavailable.');
+      await navigator.clipboard.writeText(value);
+      setCopiedNativeField(label);
+      setNativeStatus(`${label} copied. The value is not shown in this status message.`);
+    } catch {
+      setNativeStatus(`Could not copy ${label}. Select the field and copy it manually.`);
+    }
+  };
+  const verifyNativeDeployment = async () => {
+    const candidate = String(displayedWorkerUrl || '').trim();
+    if (!candidate) {
+      setNativeStatus('Paste the deployed Worker URL into the Worker URL field before verification.');
+      return;
+    }
+    if (!verifyNativeWorker) {
+      setNativeProgress('opened');
+      setNativeStatus('Session verification is unavailable. Keep this setup open and retry from the session wizard.');
+      return;
+    }
+    setNativeProgress('verifying');
+    setVerifiedNativeIdentity('');
+    setNativeStatus(
+      'Writing required session config and AI secrets, then verifying Worker reachability, browser origin access, and canonical config readback…',
+    );
+    const requestedIdentity = nativeVerificationIdentity;
+    try {
+      const bootstrap = await verifyNativeWorker({
+        sessionSlug: nativeSessionSlug,
+        workerQueryValue: candidate,
+      });
+      if (currentNativeVerificationIdentityRef.current !== requestedIdentity) return;
+      const returnedOrigin = normalizeNativeWorkerOrigin(bootstrap.workerOrigin);
+      if (
+        returnedOrigin !== normalizeNativeWorkerOrigin(candidate) ||
+        String(bootstrap.sessionSlug || '')
+          .trim()
+          .toLowerCase() !== nativeSessionSlug.toLowerCase()
+      ) {
+        setNativeProgress('generated');
+        setNativeStatus('Worker verification returned a different session identity. Check the Worker URL and retry.');
+        return;
+      }
+      setVerifiedNativeIdentity(requestedIdentity);
+      setNativeProgress('verified');
+      setNativeStatus(`Session Worker verified at revision ${bootstrap.configRevision}. You can deploy the session.`);
+      onNativeWorkerVerified?.(bootstrap);
+    } catch (error) {
+      if (currentNativeVerificationIdentityRef.current !== requestedIdentity) return;
+      setVerifiedNativeIdentity('');
+      setNativeProgress('opened');
+      setNativeStatus(
+        error instanceof TypeError
+          ? 'The Worker could not be reached, or its CORS policy rejected this browser origin. Check Cloudflare and retry.'
+          : 'Worker verification failed. Check the Worker URL and session identity, then retry.',
+      );
+    }
+  };
+  const renderCopyField = (label: string, value: string, testId: string) => (
+    <FormGroup>
+      <Label>{label}</Label>
+      <div className={styles.bundleFileInputRow}>
+        <Input value={value} readOnly autoComplete="off" data-testid={testId} />
+        <Button
+          type="button"
+          className={styles.secondaryButton}
+          data-testid={`ce-wizard-cloudflare-native-copy-${label.toLowerCase().replace(/_/g, '-')}`}
+          onClick={() => void copyNativeValue(label, value)}
+        >
+          {copiedNativeField === label ? 'Copied' : 'Copy'}
+        </Button>
+      </div>
+    </FormGroup>
+  );
   const updateApiToken = (nextApiToken: string) => {
     setDeployForm((prev) => {
       const { accountId: _discardedAccountId, ...accountIndependentForm } = (prev || {}) as DeployForm & {
@@ -160,51 +328,47 @@ const WorkerDeploySection = ({
             data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_GENERATE}
             onClick={generateNativeSetupSecrets}
           >
-            {nativeSetupSecrets ? 'Replace setup values' : 'Generate setup values'}
+            {currentNativeSetupSecrets ? 'Replace setup values' : 'Generate setup values'}
           </Button>
-          {nativeSetupSecrets && (
-            <div className={styles.cloudflareNativeDeployGrid}>
-              <FormGroup>
-                <Label>DEFAULT_SESSION_SLUG</Label>
-                <Input
-                  value={nativeSessionSlug}
-                  readOnly
-                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_SESSION_SLUG}
-                />
-              </FormGroup>
-              <FormGroup>
-                <Label>BOOTSTRAP_ADMIN_ADDRESS</Label>
-                <Input
-                  value={nativeAdminAddress}
-                  readOnly
-                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_ADMIN_ADDRESS}
-                />
-              </FormGroup>
-              <FormGroup>
-                <Label>TOKEN_HMAC_SECRET</Label>
-                <Input
-                  value={nativeSetupSecrets.tokenHmacSecret}
-                  readOnly
-                  autoComplete="off"
-                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC}
-                />
-              </FormGroup>
-              <FormGroup>
-                <Label>CE_STORAGE_ENVELOPE_KEK</Label>
-                <Input
-                  value={nativeSetupSecrets.storageEnvelopeKek}
-                  readOnly
-                  autoComplete="off"
-                  data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK}
-                />
-              </FormGroup>
-            </div>
+          {currentNativeSetupSecrets && (
+            <>
+              <ol data-testid="ce-wizard-cloudflare-native-checklist">
+                <li>Copy the four setup values below.</li>
+                <li>Open Cloudflare and complete the dashboard deployment in the new tab.</li>
+                <li>Return here and paste the resulting workers.dev URL into the Worker URL field.</li>
+                <li>
+                  Sign the initial config and AI-secret write, then verify canonical readback and browser-origin access.
+                </li>
+              </ol>
+              <div className={styles.cloudflareNativeDeployGrid}>
+                {renderCopyField(
+                  'DEFAULT_SESSION_SLUG',
+                  nativeSessionSlug,
+                  E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_SESSION_SLUG,
+                )}
+                {renderCopyField(
+                  'BOOTSTRAP_ADMIN_ADDRESS',
+                  nativeAdminAddress,
+                  E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_ADMIN_ADDRESS,
+                )}
+                {renderCopyField(
+                  'TOKEN_HMAC_SECRET',
+                  currentNativeSetupSecrets.tokenHmacSecret,
+                  E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_TOKEN_HMAC,
+                )}
+                {renderCopyField(
+                  'CE_STORAGE_ENVELOPE_KEK',
+                  currentNativeSetupSecrets.storageEnvelopeKek,
+                  E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_STORAGE_KEK,
+                )}
+              </div>
+            </>
           )}
           {nativeSetupError && <div className={styles.errorText}>{nativeSetupError}</div>}
-          {nativeSetupSecrets && !nativeSessionSlug && (
+          {currentNativeSetupSecrets && !nativeSessionSlug && (
             <div className={styles.errorText}>Enter the session slug before opening Cloudflare.</div>
           )}
-          {nativeSetupSecrets && !nativeAdminAddress && (
+          {currentNativeSetupSecrets && !nativeAdminAddress && (
             <div className={styles.errorText}>Log in with the session admin passkey before opening Cloudflare.</div>
           )}
           {nativeDeployReady && (
@@ -214,6 +378,10 @@ const WorkerDeploySection = ({
               rel="noopener noreferrer"
               className={`${styles.secondaryButton} btn btn-secondary`}
               data-testid={E2E_TESTIDS.WIZARD_CLOUDFLARE_NATIVE_DEPLOY}
+              onClick={() => {
+                setNativeProgress('opened');
+                setNativeStatus('Cloudflare opened in a new tab. Finish deployment there, then return to verify.');
+              }}
             >
               Open Cloudflare deployment
             </a>
@@ -223,14 +391,38 @@ const WorkerDeploySection = ({
             runtime secrets, not Cloudflare credentials; they stay only in this tab and Cloudflare&apos;s encrypted
             Worker-secret store. After deployment, paste the resulting workers.dev URL into the Worker URL field.
           </div>
+          {currentNativeSetupSecrets ? (
+            <Button
+              type="button"
+              className={styles.secondaryButton}
+              data-testid="ce-wizard-cloudflare-native-verify"
+              disabled={nativeProgress === 'verifying'}
+              onClick={() => void verifyNativeDeployment()}
+            >
+              {nativeProgress === 'verifying'
+                ? 'Verifying Session Worker…'
+                : nativeVerificationIsCurrent
+                  ? 'Session Worker verified'
+                  : 'Verify Session Worker'}
+            </Button>
+          ) : null}
+          {nativeStatus ? (
+            <div
+              className={nativeVerificationIsCurrent ? styles.statusNote : styles.helperText}
+              role="status"
+              data-testid="ce-wizard-cloudflare-native-status"
+            >
+              {nativeStatus}
+            </div>
+          ) : null}
         </section>
       )}
       {shouldUseSponsoredAutoDeployFlow && (
         <div className={styles.statusNote}>
-          Sponsored deploy bundle is ready. Normal mode will use the GitHub-hosted worker bundle automatically. If a
+          Sponsored deploy bundle is ready. Guided setup will use the GitHub-hosted worker bundle automatically. If a
           retry needs a different source, keep that Git URL as the default and add a manual bundle URL or upload
-          override after a fetch failure. In advanced mode you can still switch between Upload file and Use URL for
-          manual testing.
+          override after a fetch failure. While customizing, you can switch between Upload file and Use URL for manual
+          testing.
         </div>
       )}
       {(!shouldUseSponsoredAutoDeployFlow || !isNormalMode) && (
@@ -417,32 +609,9 @@ const WorkerDeploySection = ({
                   its generated value, then paste it into the field above.
                 </div>
                 <div className={styles.helperText}>
-                  Cloudflare may preselect All accounts. Before creating the token, restrict Account Resources to the
-                  one account where this worker will run.
-                </div>
-                <div className={styles.helperText}>
-                  Account is inferred during deploy only when the token can see exactly one account.
-                </div>
-                <div className={styles.helperText}>
-                  This browser sends this token only for this deployment attempt to the deploy helper
-                  {cloudflareTokenReceiver ? (
-                    <>
-                      {' '}
-                      at <code>{cloudflareTokenReceiver}</code>
-                    </>
-                  ) : (
-                    ' at the deploy-helper URL shown above'
-                  )}
-                  . The helper uses it to call Cloudflare; it is not saved to the session draft or browser storage and
-                  is not installed in the deployed Session Worker.
-                </div>
-                <div className={styles.helperText}>
-                  Set the earliest expiration Cloudflare permits that still covers setup and an immediate retry. Revoke
-                  the token as soon as deployment succeeds or you abandon the attempt from{' '}
-                  <a href={CLOUDFLARE_API_TOKENS_URL} target="_blank" rel="noopener noreferrer">
-                    Cloudflare API Tokens
+                  <a href={CLOUDFLARE_TOKEN_SETUP_GUIDE_URL} target="_blank" rel="noopener noreferrer">
+                    Cloudflare API token setup and security guide
                   </a>
-                  .
                 </div>
               </FormGroup>
               <FormGroup>

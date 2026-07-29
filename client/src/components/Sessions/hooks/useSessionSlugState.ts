@@ -15,6 +15,7 @@ type SessionExistsArgs = {
 };
 
 type UseSessionSlugStateArgs = {
+  enabled?: boolean;
   slug?: string;
   privateSlugMode?: boolean;
   registryChainId?: ChainIdLike;
@@ -27,6 +28,7 @@ const defaultIsReservedSlug = (_slug: string) => false;
 const defaultSessionExists = async (_args: SessionExistsArgs) => false;
 
 const useSessionSlugState = ({
+  enabled = true,
   slug = '',
   privateSlugMode = false,
   registryChainId = null,
@@ -51,7 +53,7 @@ const useSessionSlugState = ({
     if (slugCheckTimerRef.current) clearTimeout(slugCheckTimerRef.current);
     slugCheckTimerRef.current = null;
 
-    if (privateSlugMode) {
+    if (!enabled || privateSlugMode) {
       setSlugAvailability({ status: 'idle' });
       return undefined;
     }
@@ -87,7 +89,7 @@ const useSessionSlugState = ({
       if (slugCheckTimerRef.current) clearTimeout(slugCheckTimerRef.current);
       slugCheckTimerRef.current = null;
     };
-  }, [debounceMs, isReservedSlug, privateSlugMode, registryChainId, sessionExists, slug]);
+  }, [debounceMs, enabled, isReservedSlug, privateSlugMode, registryChainId, sessionExists, slug]);
 
   return {
     slugAvailability,

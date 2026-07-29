@@ -33,7 +33,7 @@ const makeHost = (overrides = {}) => ({
   getSessionSlugHintFromSearch: jest.fn().mockReturnValue(null),
   getSessionTokenFromPath: jest.fn().mockReturnValue(''),
   isSbtListRoutePath: jest.fn().mockReturnValue(false),
-  isWorkerCanonicalSessionSlug: jest.fn().mockReturnValue(false),
+  shouldSuppressSbtScansForSessionSlug: jest.fn().mockReturnValue(false),
   ...overrides,
 });
 
@@ -299,6 +299,44 @@ describe('createSessionScanPolicy', () => {
     expect(scanScopeModule.getAllowedSessionSlugs).toHaveBeenCalledWith('list', ['alpha'], 'alpha');
   });
 
+  it('filters capability-suppressed slugs from all, list, and active scan plans', () => {
+    contractScriptsModule.getAllSessionSlugs.mockReturnValue([
+      'pure-worker',
+      'invalid-profile',
+      'registry-session',
+      'worker-sbt-hybrid',
+    ]);
+    const host = makeHost({
+      getActiveSessionSlug: jest.fn().mockReturnValue('worker-sbt-hybrid'),
+      shouldSuppressSbtScansForSessionSlug: jest.fn((slug) => slug === 'pure-worker' || slug === 'invalid-profile'),
+    });
+    let policy = createSessionScanPolicy(host);
+
+    scanScopeModule.readSessionScanScope.mockReturnValue('all');
+    expect(policy.getScopedSessionSlugs()).toEqual(['registry-session', 'worker-sbt-hybrid']);
+
+    scanScopeModule.readSessionScanScope.mockReturnValue('list');
+    scanScopeModule.readSessionScanSlugs.mockReturnValue([
+      'pure-worker',
+      'invalid-profile',
+      'registry-session',
+      'worker-sbt-hybrid',
+    ]);
+    scanScopeModule.getAllowedSessionSlugs.mockReturnValue([
+      'pure-worker',
+      'invalid-profile',
+      'registry-session',
+      'worker-sbt-hybrid',
+    ]);
+    policy = createSessionScanPolicy(host);
+    expect(policy.getScopedSessionSlugs()).toEqual(['registry-session', 'worker-sbt-hybrid']);
+
+    scanScopeModule.readSessionScanScope.mockReturnValue('active');
+    scanScopeModule.getAllowedSessionSlugs.mockReturnValue(['pure-worker', 'worker-sbt-hybrid']);
+    policy = createSessionScanPolicy(host);
+    expect(policy.getScopedSessionSlugs()).toEqual(['worker-sbt-hybrid']);
+  });
+
   it('never skips scans in all scope and skips disallowed slugs in restricted scope', () => {
     let policy = createSessionScanPolicy(makeHost());
 
@@ -321,7 +359,7 @@ describe('createSessionScanPolicy', () => {
 
   it('always skips chain scans and SBT listeners for worker-canonical sessions', () => {
     const host = makeHost({
-      isWorkerCanonicalSessionSlug: jest.fn((slug) => slug === 'worker-session'),
+      shouldSuppressSbtScansForSessionSlug: jest.fn((slug) => slug === 'worker-session'),
     });
     const policy = createSessionScanPolicy(host);
 
@@ -361,9 +399,13 @@ describe('createSessionScanPolicy', () => {
     expect(mockLogger.info).toHaveBeenCalledTimes(1);
 
     scanScopeModule.readSessionScanScope.mockReturnValue('all');
-    policy = createSessionScanPolicy(makeHost());
+    policy = createSessionScanPolicy(
+      makeHost({
+        shouldSuppressSbtScansForSessionSlug: jest.fn((slug) => slug === 'beta'),
+      }),
+    );
 
-    expect(policy.getScopeFilteredSlugs([' Alpha ', 'alpha', 'Beta '])).toEqual(['alpha', 'beta']);
+    expect(policy.getScopeFilteredSlugs([' Alpha ', 'alpha', 'Beta '])).toEqual(['alpha']);
   });
 
   it('delegates slug allowance checks to isSessionSlugAllowedByScope', () => {

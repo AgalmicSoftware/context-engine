@@ -4,7 +4,11 @@ import type { SessionModeProfile } from '../../../utilities/session/sessionModeP
 import type { UnknownRecord } from '../../../utilities/session/sessionTypes';
 import SessionModeProfileSections from '../SessionModeProfileSections';
 import SessionWizardSessionModeProfileControl from '../SessionWizardSessionModeProfileControl';
-import { applySessionModeProfileSelectionToDraft } from '../sessionWizardModeProfileDraftController';
+import {
+  applyGroupCreationPolicyToDraft,
+  applySessionModeProfileSelectionToDraft,
+} from '../sessionWizardModeProfileDraftController';
+import type { GroupCreationPolicy } from '../../../utilities/session/groupCreationPolicy';
 
 type SessionModeDraft = UnknownRecord & {
   sessionModeProfile?: unknown;
@@ -16,6 +20,8 @@ type SessionWizardModeProfileControlsProps<Draft extends SessionModeDraft, Secti
   entryOnly: boolean;
   onContinue: () => void;
   onEnterAdvancedMode: () => void;
+  onEnterNormalMode: () => void;
+  customizing: boolean;
   registryChainId: number | null;
   setCollapsedSections: Dispatch<SetStateAction<Sections>>;
   setDraft: Dispatch<SetStateAction<Draft>>;
@@ -48,6 +54,8 @@ const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sec
   entryOnly,
   onContinue,
   onEnterAdvancedMode,
+  onEnterNormalMode,
+  customizing,
   registryChainId,
   setCollapsedSections,
   setDraft,
@@ -68,6 +76,14 @@ const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sec
     registryChainId,
     value: draft.sessionModeProfile,
     onChange: handleChange,
+    groupCreationPolicy: draft.groupCreationPolicy,
+    onGroupCreationPolicyChange: (policy: GroupCreationPolicy) => {
+      setDraft((prev) => {
+        const next = applyGroupCreationPolicyToDraft(prev, policy);
+        draftRef.current = next;
+        return next;
+      });
+    },
   };
 
   return {
@@ -76,9 +92,15 @@ const useSessionWizardModeProfileControls = <Draft extends SessionModeDraft, Sec
         {...sharedSectionProps}
         onContinue={onContinue}
         onCustomize={() => {
+          if (customizing) {
+            onEnterNormalMode();
+            return;
+          }
           onEnterAdvancedMode();
           focusSessionModeProfilePrivacy(setCollapsedSections);
         }}
+        onSelectPreset={onEnterNormalMode}
+        customizing={customizing}
         entryOnly={entryOnly}
         showContinue={showContinue}
       />

@@ -29,6 +29,7 @@ import { normalizeContractKeyParam } from './contractMetadata.js';
 import { buildContractViewerContracts } from './contractViewerUtils.js';
 import { sbtsListPath, t } from '../../utilities/ui/terminology.js';
 import { buildPublicContractSourceUrl } from '../../variables/publicRepoMetadata.js';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 
 type ContractPageProps = {
   activeSessionSlug?: string;
@@ -85,6 +86,8 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
   });
 
   const canonicalSlug = activeSession?.slug || ''; // '' means general
+  const sessionCapabilities = useMemo(() => resolveSessionCapabilityProjection(activeSession), [activeSession]);
+  const contributesSessionContracts = sessionCapabilities.usesChainMetadata;
 
   // Sync generic /contracts URLs to ?session= while preserving unrelated search params.
   useEffect(() => {
@@ -190,10 +193,10 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
     [clusterAnalysisPromptDisplay, compareToolkitPromptDisplay, photoAnalysisPromptDisplay, userAnalysisPromptDisplay],
   );
 
-  const sessionNetworkChainId = activeSession?.networkChainId;
+  const sessionNetworkChainId = contributesSessionContracts ? activeSession?.networkChainId : undefined;
   const contracts = useMemo(() => {
     const sessionContracts =
-      activeSession?.contracts && typeof activeSession.contracts === 'object'
+      contributesSessionContracts && activeSession?.contracts && typeof activeSession.contracts === 'object'
         ? (activeSession.contracts as SessionContractsMap)
         : {};
     const firstContract = Object.values(sessionContracts)[0] || null;
@@ -201,7 +204,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
     return buildContractsForViewer({
       sessionContracts,
       chainId,
-      includeSessionRegistry: true,
+      includeSessionRegistry: contributesSessionContracts,
       includeCustomSBT: true,
     }).map((contract) =>
       contract.key === 'sbtFactory'
@@ -218,7 +221,7 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
           }
         : contract,
     );
-  }, [activeSession?.contracts, sessionNetworkChainId]);
+  }, [activeSession?.contracts, contributesSessionContracts, sessionNetworkChainId]);
 
   const [bytes32Input, setBytes32Input] = useState('');
   const [base64urlInput, setBase64urlInput] = useState('');
@@ -383,6 +386,26 @@ export const ContractPage = ({ activeSessionSlug, reduxActiveSessionSlug }: Cont
 
   return (
     <div className={styles.contractPage} data-testid={E2E_TESTIDS.PAGE_CONTRACTS_ROOT}>
+      {!contributesSessionContracts ? (
+        <aside
+          className={styles.advancedExternalNotice}
+          data-testid={E2E_TESTIDS.CONTRACTS_ADVANCED_EXTERNAL_NOTICE}
+          aria-label="Advanced external on-chain tools"
+        >
+          <strong>Advanced/external on-chain tools</strong>
+          {sessionCapabilities.usesWorkerGroups ? (
+            <span>
+              These global contract references are optional and are not part of this session&apos;s Worker-native Groups
+              or authority.
+            </span>
+          ) : (
+            <span>
+              These global contract references are optional and are not inferred as part of this session&apos;s
+              authority.
+            </span>
+          )}
+        </aside>
+      ) : null}
       <ContractViewer
         contracts={contracts}
         autoOpenContractKey={deepLinkedContractKey}

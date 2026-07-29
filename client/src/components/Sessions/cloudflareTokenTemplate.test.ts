@@ -2,6 +2,7 @@ import {
   buildTokenName,
   buildCloudflareTokenTemplateUrl,
   buildCloudflareTokenTemplatePermissions,
+  CLOUDFLARE_TOKEN_SETUP_GUIDE_URL,
 } from './cloudflareTokenTemplate.js';
 
 describe('cloudflareTokenTemplate', () => {
@@ -27,6 +28,12 @@ describe('cloudflareTokenTemplate', () => {
       { key: 'workers_scripts', type: 'edit' },
       { key: 'workers_kv_storage', type: 'edit' },
     ]);
+  });
+
+  test('points legacy token guidance at the canonical worker documentation', () => {
+    expect(CLOUDFLARE_TOKEN_SETUP_GUIDE_URL).toBe(
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
+    );
   });
 
   test('adds only R2 when an advanced deployment explicitly opts into R2 storage', () => {

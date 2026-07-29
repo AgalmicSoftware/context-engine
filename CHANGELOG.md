@@ -6,12 +6,113 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Streamlined the client dependency surface by removing eight unused direct
+  packages, replacing standalone preview and source-map tools with Vite-native
+  preview and a local deterministic bundle report, and loading only the
+  two-input and three-input Poseidon implementations used by survey runtime.
+- Added automatic patch-version commits for each prepared public release
+  candidate, synchronized across root/client manifests and lockfiles. Public
+  release tooling, pre-push checks, CI, and worker-release metadata now enforce
+  the shared version, while minor and major bumps remain explicit
+  operator-directed decisions.
+- `/new` now capability-filters optional fields even after `Customize`: pure
+  Cloudflare sessions omit block, faucet, and contract controls, persist
+  generic Worker/Group defaults, and may set a Worker-enforced closing
+  timestamp that stops participant resource use and mutations while preserving
+  reads and signed admin access. Explicit Cloudflare + on-chain SBT profiles
+  expose only their network and Group Factory subset; decentralized profiles
+  retain their chain controls. Worker Group creators now prefill the configured
+  generic tags with legacy `defaultSbtTags` fallback. Joining a Worker Group now
+  reports success and changes the membership action to **Leave**; authenticated
+  participants can remove only their own membership through `/groups/leave`.
+  Permission-visible Groups expose a paginated SBT-style member browser without
+  leaking Worker storage keys, and unlimited capacity now uses only the
+  infinity icon instead of repeating “Unlimited.”
+- Telegram group approval no longer creates bearer-capability `startgroup`
+  URLs. Bot, Mini App, and Agent API compatibility surfaces now direct a
+  configured session admin to approve from inside the target group with
+  `/join <session>`, while legacy approval payloads fail closed. Mini App
+  onboarding now accepts signed Telegram `initData` only in a POST JSON body or
+  the canonical request header; GET and query-string credential transport are
+  rejected.
+- Worker-canonical sessions now project setup, account settings, Admin metadata,
+  diagnostics, secrets, and route errors from the active capability profile.
+  Pure Cloudflare sessions use passkey access, Worker config, AI, storage, and
+  native Groups without presenting RPC, gas, faucet, Arweave, Lit, registry, or
+  SBT requirements; explicitly enabled hybrid and registry sessions retain
+  their chain controls. Profile compilation, persistence, canonical readback,
+  and Worker validation now reject schema-only, unavailable, malformed, and
+  cross-lineage combinations instead of inferring capabilities from legacy
+  chain fields. Profile-bearing Worker records now require one matching
+  canonical storage object, including exact backend, payload policy, and access
+  conditions; incoherent deploys, mutations, and public readbacks fail closed.
+  Public-result claims require unencrypted public storage. Session pages also suppress wallet/network controls, Lit hooks,
+  SBT auto-mint and filters, non-Cloudflare document references, and Polis
+  blockchain metadata for pure Worker profiles, clearing stale chain-backed
+  state when the active capability profile changes.
+- The native `/new` deployment path now presents an honest Cloudflare dashboard
+  checklist with copy controls, return guidance, and Worker URL/CORS/canonical
+  config verification before success. Its entry chooser removes redundant
+  infrastructure guidance, identifies decentralized gas as EVM testnet gas,
+  and links directly to the README architecture diagram on GitHub. The
+  deploy-helper remains a collapsed legacy fallback.
+- Worker route failures now distinguish missing discovery, reachability, CORS,
+  missing canonical config, and identity mismatch, while native Group cards add
+  stable detail/share links and state the current admin-managed leave boundary.
+- Worker-canonical web sessions now use native Cloudflare Groups instead of
+  opening the on-chain SBT deployment form. Group records support names,
+  descriptions, HTTPS images, open or admin-added membership, and visibility
+  without contract addresses, chain transactions, gas, RPC, or burn settings.
+  They also retain SBT-style tags and public reference URLs plus Worker-native
+  member limits, self-join deadlines, and group-admin addresses; limits and
+  deadlines are enforced in the authoritative Durable Object membership path,
+  and participant creation derives the admin address from the signed principal;
+  their creator now shares the compact URL, clipboard-paste, file-upload, and
+  preview workflow used by the SBT creator, publishing uploaded files through
+  the active session storage policy before group creation;
+  the client pins the exact Worker origin while nonce/login, JWT, Group
+  request/response, record, and Durable Object state bind the canonical slug and
+  session ID. Missing or conflicting identity and pre-existing same-slug data
+  fail closed with reconciliation required, late cross-session responses are
+  discarded, Worker/SBT hybrids label their configured on-chain conditions
+  separately as Advanced access, Worker-native creation stays scoped to the
+  active session, and registry-backed sessions retain the SBT flow. Native
+  Group card bodies now open the full SBT-style detail layout in a new tab;
+  canonical list links use `/groups?sessionName=<slug>` and detail links use
+  `/group/<groupId>?sessionName=<slug>`, while legacy `/groups/:slug` and
+  hash-scoped detail links silently normalize to the canonical routes.
+  Full detail translates SBT stats into member capacity and a live join
+  deadline, exposes member counts and identities only through authenticated
+  visibility-aware responses, and renders the Group's public document
+  references and tags in the shared More section.
+  Legacy per-session Worker question payloads without an embedded session ID
+  remain readable from their verified Worker authority, while present
+  mismatched or malformed IDs still fail closed; cache readiness now commits
+  after the final Worker hydration state so session question collections render
+  immediately.
+- Every `/new` mode now offers an admin-only or all-participants group-creation
+  policy. Worker participants use an authenticated, chain-free create route
+  that forces open session-visible groups while admin mutation controls remain
+  signed. Independently, explicitly public, unencrypted, ungated Worker modes
+  expose only redacted, session-visible group metadata before sign-in; private
+  modes and all joining, creation, memberships, member identities, and member
+  counts remain authenticated. Public group routes stay anonymous even when the
+  browser remembers an account, deferring Worker authentication until a visitor
+  chooses Create or Join; session-scoped group routes also expose their
+  canonical session identifier in the query string and a prominent link back
+  to the active session. Registry sessions enforce the creation choice across
+  their session and SBT page controls while disclosing that public factories
+  remain independently callable on-chain. Legacy Worker configs remain
+  admin-only.
 - Git-backed Netlify builds now bind the native Cloudflare Deploy Button to
   Netlify's exact public `COMMIT_REF`; builds without a public commit remain
   fail-closed with the native deployment card disabled.
 - Public-release scrubbing now preserves the byte-stable generated Cloudflare
   Worker package while continuing to scan its bundled dependency contacts,
   preventing email-shaped wordlist data from being rewritten after hashing.
+  Hosted public-text verification now builds a temporary canonical release
+  artifact and scans its actual bytes, while direct source-tree verification
+  remains strict.
 - SBT claim and invite codes now default to explicit export without silent
   browser persistence; existing scoped recovery entries remain readable for
   compatibility.
@@ -336,12 +437,19 @@ All notable changes to this project will be documented in this file.
 - Added explicit dual-field helpers, made question/survey/response client and CE-CC records prefer `storageRef` before legacy `arweaveTxId`, extended worker storage tests for `questions`, `surveys`, and `responses`, and documented the future canonical `storageRef` naming migration.
 - Routed Cloudflare-configured session question, survey, and response writes through sessionCorsWorker `/storage/upload`, using opaque bytes32-compatible Cloudflare IDs in existing Surveys pointer fields without changing the contract ABI; readers now try Cloudflare `storageRef` resolution before Arweave fallback.
 - Clarified Cloudflare setup permissions for R2 payload blobs, D1/KV metadata indexes, and Durable Objects only for signer/runtime coordination.
-- Added `/new` Cloudflare payload access modes: default `worker_sbt_gate` worker-enforced SBT access control without Lit credential requirements, plus a `lit_encrypted` scaffold that requires pre-encrypted payloads and rejects plaintext Cloudflare uploads until the Lit envelope path is complete.
+- Added the then-current `/new` Cloudflare payload aliases:
+  `worker_sbt_gate` was the default in this release and `lit_encrypted` required
+  pre-encrypted payloads. Both names are now legacy read compatibility; current
+  profiles use explicit `gate` and `encryption` fields, and pure Worker profiles
+  do not default to an SBT gate.
 - Fixed encrypted Document Library image thumbnails so scoped Lit hooks arriving after initial render trigger preview loading.
 
 ### Remaining TODOs
 
-- Finish the Cloudflare `lit_encrypted` envelope producer/reader so documents, private questions/responses, surveys, and generated artifacts can be encrypted before `/storage/upload` without routing through Lit-Arweave.
+- Finish the Cloudflare `encryption: "lit"` envelope producer/reader (legacy
+  alias `lit_encrypted`) so documents, private questions/responses, surveys, and
+  generated artifacts can be encrypted before `/storage/upload` without routing
+  through Lit-Arweave.
 - Once all public and agent readers are storageRef-aware, rename the top-level payload pointer contract to `storageRef` in API docs and schemas, leaving `arweaveTxId` as a deprecated Arweave compatibility alias.
 
 ## 2026-05-04

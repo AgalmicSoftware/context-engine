@@ -72,6 +72,14 @@ const emptySlice = () => ({
 });
 
 const deepClone = (value) => JSON.parse(JSON.stringify(value));
+const LEGACY_EDGE_SESSION_CONFIG = {
+  slug: 'edge',
+  networkChainId: 84532,
+  __registry: {
+    registryChainId: 84532,
+    sessionIdHex: '0x00112233445566778899aabbccddeeff',
+  },
+};
 
 const mergeSurveyResponseState = (currentState = [], questionPool = [], surveyIndex = 0) => {
   const next = Array.isArray(currentState) ? [...currentState] : [];
@@ -169,6 +177,7 @@ describe('SurveyQuestions runtime helpers', () => {
           return null;
         },
       },
+      sessionConfig: LEGACY_EDGE_SESSION_CONFIG,
       sessionSlug: 'edge',
       viewAddress: '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     });
@@ -208,6 +217,7 @@ describe('SurveyQuestions runtime helpers', () => {
           return null;
         },
       },
+      sessionConfig: LEGACY_EDGE_SESSION_CONFIG,
       sessionSlug: 'edge',
     });
 
@@ -370,6 +380,7 @@ describe('SurveyQuestions runtime helpers', () => {
       networkChainId: 84532,
       provider: { request: jest.fn() },
       questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      sessionConfig: LEGACY_EDGE_SESSION_CONFIG,
       runtimeStrategy: {
         render: (engine) => {
           runtimeEngine = engine;
@@ -453,6 +464,7 @@ describe('SurveyQuestions runtime helpers', () => {
       networkChainId: 84532,
       provider: { request: jest.fn() },
       questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      sessionConfig: LEGACY_EDGE_SESSION_CONFIG,
       runtimeStrategy: {
         render: (engine) => {
           runtimeEngine = engine;

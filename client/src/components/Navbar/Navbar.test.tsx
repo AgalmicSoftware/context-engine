@@ -8,12 +8,16 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { Navbar } from './Navbar';
 
 const navbarStylesheet = fs.readFileSync(path.join(__dirname, 'Navbar.module.scss'), 'utf8');
+const mockLoginAndSettingsModal = jest.fn((_props: unknown) => <div data-testid="web3-modal" />);
 
 jest.mock('./AccountDisplay', () => ({
   AccountDisplayTorus: ({ account }: any) => <div data-testid="account-display">{account}</div>,
 }));
 
-jest.mock('../Account/LoginAndSettingsModal', () => () => <div data-testid="web3-modal" />);
+jest.mock('../Account/LoginAndSettingsModal', () => ({
+  __esModule: true,
+  default: (props: unknown) => mockLoginAndSettingsModal(props),
+}));
 jest.mock('components/Account/LoginButton', () => () => <button type="button">Connect Wallet</button>);
 jest.mock('utilities/ui/blockieAvatars.js', () => ({
   generateBlockieDataUrl: () => '',
@@ -69,6 +73,7 @@ describe('Navbar logo navigation', () => {
 
   beforeEach(() => {
     (process.env as Record<string, string | undefined>).PUBLIC_URL = '/ce-base';
+    mockLoginAndSettingsModal.mockClear();
   });
 
   afterEach(() => {
@@ -145,6 +150,21 @@ describe('Navbar logo navigation', () => {
     renderNavbar();
 
     expect(screen.queryByTestId('ce-navbar-link-github')).not.toBeInTheDocument();
+  });
+
+  it('forwards the active route session config to the account settings modal', () => {
+    const sessionConfig = {
+      slug: 'worker-session',
+      corsWorkerUrl: 'https://worker-session.example',
+    };
+
+    renderNavbar({ sessionConfig });
+
+    expect(mockLoginAndSettingsModal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionConfig,
+      }),
+    );
   });
 
   it('keeps the navbar account controls anchored to the right edge after legacy widget removal', () => {

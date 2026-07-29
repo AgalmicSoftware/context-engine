@@ -5,6 +5,9 @@ import styles from './Account.module.scss';
 
 type LoginSettingsOverview = {
   activeSession: unknown;
+  capabilities: {
+    showNetworkControls: boolean;
+  };
   cryptoTerminology: boolean;
   showWalletNetwork: boolean;
   targetNetworkName: string;
@@ -58,14 +61,15 @@ const LoginPreLoginSettingsDisplay = ({
             configOpen: preLoginConfigOpen,
             onToggleConfig: togglePreLoginConfigPanel,
             configTestId: 'ce-prelogin-config-toggle',
-            betweenSessionAndTooltips: cryptoTerminology
-              ? renderInlineNetworkSummary({
-                  targetNetworkName: overview.targetNetworkName,
-                  walletNetworkName: overview.walletNetworkName,
-                  showWalletNetwork: overview.showWalletNetwork,
-                  tooltipId: 'preLoginNetworkInfoTooltipInline',
-                })
-              : null,
+            betweenSessionAndTooltips:
+              cryptoTerminology && overview.capabilities.showNetworkControls
+                ? renderInlineNetworkSummary({
+                    targetNetworkName: overview.targetNetworkName,
+                    walletNetworkName: overview.walletNetworkName,
+                    showWalletNetwork: overview.showWalletNetwork,
+                    tooltipId: 'preLoginNetworkInfoTooltipInline',
+                  })
+                : null,
             tooltipsInfoId: 'preLoginTooltipsToggleTooltip',
             tooltipPlacement: 'right',
             containerClassName: styles.preLoginSettingsSummaryContainer,

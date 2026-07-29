@@ -1,13 +1,11 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { NotFoundRoute, readHashQueryParam, SessionLoadingSkeleton } from './routeStatusViews';
+import { NotFoundRoute, removeHashQueryParam, SessionLoadingSkeleton } from './routeStatusViews';
 
 describe('routeStatusViews', () => {
-  it('reads query params from hash values', () => {
-    expect(readHashQueryParam('#session=edge&key=abc', 'key')).toBe('abc');
-    expect(readHashQueryParam('session=edge', 'missing')).toBe('');
-    expect(readHashQueryParam('#session=edge', '')).toBe('');
+  it('removes sensitive query params from hash values', () => {
+    expect(removeHashQueryParam('#k=secret&preview=1', 'k')).toBe('#preview=1');
   });
 
   it('renders the not-found route status page with the path', () => {

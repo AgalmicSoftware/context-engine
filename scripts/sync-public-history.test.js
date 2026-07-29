@@ -14,6 +14,7 @@ const ASSET_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-assets.js
 const TEXT_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-text.js');
 const PII_VERIFIER_SOURCE_PATH = path.join(__dirname, 'verify-public-release-pii.sh');
 const PACKAGE_SCRUBBER_SOURCE_PATH = path.join(__dirname, 'scrub-public-package-json.js');
+const RELEASE_VERSION_SOURCE_PATH = path.join(__dirname, 'release-version.mjs');
 const PRIVATE_BRANCH_GUARD_INSTALLER_SOURCE_PATH = path.join(__dirname, 'install-private-branch-guard.sh');
 const PRE_PUSH_HOOK_SOURCE_PATH = path.join(__dirname, '..', '.githooks', 'pre-push');
 const TEST_TMP_ROOT = path.join(__dirname, '.tmp-sync-public-history-tests');
@@ -68,6 +69,11 @@ function installSyncScriptFixture(sourceDir) {
     sourceDir,
     path.join('scripts', 'scrub-public-package-json.js'),
     fs.readFileSync(PACKAGE_SCRUBBER_SOURCE_PATH, 'utf8'),
+  );
+  writeFile(
+    sourceDir,
+    path.join('scripts', 'release-version.mjs'),
+    fs.readFileSync(RELEASE_VERSION_SOURCE_PATH, 'utf8'),
   );
   writeFile(
     sourceDir,
@@ -138,7 +144,36 @@ function setupSourceRepo() {
     writeFile(
       sourceDir,
       'package.json',
-      `${JSON.stringify({ scripts: { 'test:node': 'node scripts/public-node-test-fixture.js' } }, null, 2)}\n`,
+      `${JSON.stringify({
+        name: 'contextEngine',
+        version: '0.1.0',
+        scripts: { 'test:node': 'node scripts/public-node-test-fixture.js' },
+      }, null, 2)}\n`,
+    );
+    writeFile(
+      sourceDir,
+      'package-lock.json',
+      `${JSON.stringify({
+        name: 'contextEngine',
+        version: '0.1.0',
+        lockfileVersion: 3,
+        packages: { '': { name: 'contextEngine', version: '0.1.0' } },
+      }, null, 2)}\n`,
+    );
+    writeFile(
+      sourceDir,
+      path.join('client', 'package.json'),
+      `${JSON.stringify({ name: 'client', version: '0.1.0', private: true }, null, 2)}\n`,
+    );
+    writeFile(
+      sourceDir,
+      path.join('client', 'package-lock.json'),
+      `${JSON.stringify({
+        name: 'client',
+        version: '0.1.0',
+        lockfileVersion: 3,
+        packages: { '': { name: 'client', version: '0.1.0' } },
+      }, null, 2)}\n`,
     );
     writeFile(sourceDir, path.join('scripts', 'public-node-test-fixture.js'), "console.log('public node fixture passed');\n");
     commitAll(sourceDir, 'Initial public base', {
@@ -220,6 +255,8 @@ function setupSourceRepo() {
       'package.json',
       `${JSON.stringify(
         {
+          name: 'contextEngine',
+          version: '0.1.0',
           scripts: {
             'test:node': 'node scripts/public-node-test-fixture.js',
             'test:worker:agent-bridge': 'node scripts/run-agent-bridge-worker-tests.js',
@@ -398,6 +435,8 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.match(result.stdout, /Branch name: release-staging/);
     assert.match(result.stdout, /Replayed commits: 2/);
     assert.match(result.stdout, /Skipped commits: 2/);
+    assert.match(result.stdout, /Release impact suggestion: patch/);
+    assert.match(result.stdout, /Release version: 0\.1\.1/);
     assert.match(result.stdout, /To push: git push -u origin release-staging/);
 
     const tempDir = parseSummaryValue(result.stdout, 'Temp dir');
@@ -411,10 +450,14 @@ test('sync-public-history replays public commits, skips private-only commits, an
       'origin/main..release-staging',
     ]).trim().split('\n');
 
-    assert.deepEqual(historyLines, [
-      'Public commit title|2025-01-02T03:04:05Z|2025-01-02T03:04:05Z|Agalmic <[redacted-email]>|Agalmic <[redacted-email]>',
-      'Mixed commit|2025-01-04T05:06:07Z|2025-01-04T05:06:07Z|Agalmic <[redacted-email]>|Agalmic <[redacted-email]>',
+    assert.deepEqual(historyLines.slice(0, 2), [
+      'Public commit title|2025-01-02T03:04:05Z|2025-01-02T03:04:05Z|Agalmic <agalmicsoftware@protonmail.com>|Agalmic <agalmicsoftware@protonmail.com>',
+      'Mixed commit|2025-01-04T05:06:07Z|2025-01-04T05:06:07Z|Agalmic <agalmicsoftware@protonmail.com>|Agalmic <agalmicsoftware@protonmail.com>',
     ]);
+    assert.match(
+      historyLines[2],
+      /^chore: bump public version to 0\.1\.1\|.+\|.+\|Agalmic <agalmicsoftware@protonmail\.com>\|Agalmic <agalmicsoftware@protonmail\.com>$/,
+    );
 
     const replayedShas = git(sourceDir, [
       'log',
@@ -432,7 +475,10 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.deepEqual(commitBodies, [
       `Public commit title\n\nPublic commit body line.\n\nCE-Private-Source: ${sourceShasBySubject.get('Public commit title')}\n\n`,
       `Mixed commit\n\nCE-Private-Source: ${sourceShasBySubject.get('Mixed commit')}\n\n`,
+      'chore: bump public version to 0.1.1\n\n',
     ]);
+    assert.equal(JSON.parse(git(sourceDir, ['show', 'release-staging:package.json'])).version, '0.1.1');
+    assert.equal(JSON.parse(git(sourceDir, ['show', 'release-staging:client/package.json'])).version, '0.1.1');
 
     const preCutoverPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', replayedShas[0]]);
     assert.doesNotMatch(preCutoverPaths, /^workers\/agentBridgeWorker\//m);
@@ -868,7 +914,12 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     assert.deepEqual(historySubjects, [
       'Public commit title',
       'Mixed commit',
+      'chore: bump public version to 0.1.1',
     ]);
+    assert.equal(
+      JSON.parse(git(sourceDir, ['show', 'origin/release-staging:package.json'])).version,
+      '0.1.1',
+    );
 
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'origin/release-staging']);
     assertNoPrivatePlanningPaths(trackedPaths);
@@ -889,6 +940,79 @@ test('sync-public-history refreshes an existing remote PR branch safely without 
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e\.local$/m);
     assert.doesNotMatch(trackedPaths, /^\.env\.e2e\.example$/m);
     assert.doesNotMatch(trackedPaths, /^private-pack\.manifest\.json$/m);
+  });
+});
+
+test('sync-public-history advances every successive release-staging candidate', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const firstPush = runSyncScript(sourceDir, ['--push', 'release-staging']);
+    assert.equal(firstPush.status, 0, syncFailureMessage(firstPush));
+    assert.match(firstPush.stdout, /Release version: 0\.1\.1/);
+
+    const secondPush = runSyncScript(sourceDir, [
+      '--push',
+      '--force-with-lease',
+      'release-staging',
+    ]);
+    assert.equal(secondPush.status, 0, syncFailureMessage(secondPush));
+    assert.match(secondPush.stdout, /Release version: 0\.1\.2/);
+
+    for (const manifestPath of [
+      'package.json',
+      'package-lock.json',
+      'client/package.json',
+      'client/package-lock.json',
+    ]) {
+      assert.equal(
+        JSON.parse(git(sourceDir, ['show', `origin/release-staging:${manifestPath}`])).version,
+        '0.1.2',
+      );
+    }
+  });
+});
+
+test('sync-public-history applies an operator-selected minor version', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const result = runSyncScript(sourceDir, [
+      '--release-version',
+      '0.2.0',
+      'release-staging-minor',
+    ]);
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stdout, /Release version: 0\.2\.0/);
+    assert.equal(
+      JSON.parse(git(sourceDir, ['show', 'release-staging-minor:package.json'])).version,
+      '0.2.0',
+    );
+    assert.equal(
+      JSON.parse(git(sourceDir, ['show', 'release-staging-minor:client/package.json'])).version,
+      '0.2.0',
+    );
+  });
+});
+
+test('sync-public-history suggests minor releases and requires an operator decision', () => {
+  withSourceRepo(({ sourceDir }) => {
+    writeFile(sourceDir, 'feature.txt', 'new public capability\n');
+    commitAll(sourceDir, 'feat: add public capability', {
+      authorDate: '2025-01-05T06:07:08Z',
+      committerDate: '2025-01-05T06:07:08Z',
+    });
+
+    const blocked = runSyncScript(sourceDir, ['release-staging-feature']);
+    assert.equal(blocked.status, 1);
+    assert.match(blocked.stderr, /release impact suggests minor/i);
+    assert.match(blocked.stderr, /--release-version/);
+    assert.match(blocked.stderr, /--acknowledge-patch/);
+
+    const acknowledged = runSyncScript(sourceDir, [
+      '--acknowledge-patch',
+      'release-staging-feature',
+    ]);
+    assert.equal(acknowledged.status, 0, syncFailureMessage(acknowledged));
+    assert.match(acknowledged.stdout, /Release impact suggestion: minor/);
+    assert.match(acknowledged.stdout, /Release version: 0\.1\.1/);
   });
 });
 
@@ -948,6 +1072,7 @@ test('sync-public-history recreates a deleted remote branch from an existing loc
       'Public commit title',
       'Mixed commit',
       'Follow-up public commit',
+      'chore: bump public version to 0.1.1',
     ]);
 
     const trackedPaths = git(sourceDir, ['ls-tree', '-r', '--name-only', 'origin/release-staging']);

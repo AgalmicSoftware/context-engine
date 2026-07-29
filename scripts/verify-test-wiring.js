@@ -150,6 +150,8 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/dead-exports-baseline.json');
   expectFile('scripts/check-baseline-monotonicity.mjs');
   expectFile('scripts/check-baseline-monotonicity.test.mjs');
+  expectFile('scripts/resolve-baseline-monotonicity-base.mjs');
+  expectFile('scripts/resolve-baseline-monotonicity-base.test.mjs');
   expectFile('scripts/resolve-baseline-growth-approval.mjs');
   expectFile('scripts/resolve-baseline-growth-approval.test.mjs');
   expectFile(gateManifestPath);
@@ -180,6 +182,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/verify-public-text.js');
   expectFile('scripts/verify-public-text.test.js');
   expectFile('scripts/sync-public-history.sh');
+  expectFile('scripts/release-version.mjs');
   expectFile('workers/sessionCorsWorker/package.json');
   expectFile('workers/agentBridgeWorker/package.json');
   expectFile('scripts/run-agent-bridge-worker-tests.js');
@@ -242,7 +245,9 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectScriptContains('verify:public-release-surface', 'scripts/verify-public-release-surface.js');
   expectScriptContains('verify:public-assets', 'scripts/verify-public-assets.js');
   expectScriptContains('verify:public-text', 'scripts/verify-public-text.js');
+  expectScriptContains('verify:public-text:prepared', 'scripts/verify-prepared-public-text.sh');
   expectScriptContains('verify:public-release-pii', 'scripts/verify-public-release-pii.sh');
+  expectScriptContains('verify:release-version', 'scripts/release-version.mjs verify-worktree');
   expectScriptContains('coverage-floor:check', 'scripts/check-client-coverage-floors.mjs');
   expectScriptContains('client:bundle-budget:check', 'scripts/check-client-bundle-budget.mjs');
   expectScriptContains('dead-exports:advisory', 'scripts/check-dead-exports-advisory.mjs');
@@ -275,10 +280,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'npm run type-debt:check',
     'npm run lint',
     'npm --prefix client run format:check',
-    'npm run lint:workers',
-    'npm run typecheck:client',
-    'npm run typecheck:client-tests',
-    'npm run verify:public-release-surface',
+     'npm run lint:workers',
+     'npm run typecheck:client',
+     'npm run typecheck:client-tests',
+     'npm run verify:release-version',
+     'npm run verify:public-release-surface',
     'npm run verify:public-assets',
     'npm run worker:bundle',
     'npm run verify:worker-bundle',
@@ -290,7 +296,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     'npm --prefix client run build',
     'npm run client:bundle-budget:check',
   );
-  expectGateContains('public-text', 'npm run verify:public-text');
+  expectGateContains('public-text', 'npm run verify:public-text:prepared');
   expectGateContains('contracts', 'npm run test:contracts');
   expectGateContains('contracts', 'npm run abi:check');
   expectGateOmits('contracts', 'npm run verify:abi-sync');
@@ -309,10 +315,11 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectGateOmits('cecc-and-node', 'npm run test:node');
   expectGateContains('cecc-and-node', 'npm run test:cache-guard');
   [
-    'npm run lint',
-    'npm run typecheck:client',
-    'npm run typecheck:client-tests',
-    'npm run test:node:tracked',
+     'npm run lint',
+     'npm run typecheck:client',
+     'npm run typecheck:client-tests',
+     'npm run verify:release-version',
+     'npm run test:node:tracked',
     'npm run test:release:client',
     'npm run verify:public-release-surface',
     'npm run verify:public-assets',
@@ -342,13 +349,20 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('test:', 'the final aggregate test job');
   expectWorkflowContains('run: npm run ci:gate -- wiring-and-release', 'the manifest-backed wiring-and-release gate');
   expectWorkflowContains('run: npm run ci:gate -- public-text', 'the hosted public-text gate');
-  expectWorkflowContains('BASELINE_MONOTONICITY_BASE:', 'baseline monotonicity base env');
-  expectWorkflowContains("github.event.pull_request.base.sha || github.event.before", 'exact event comparison SHA selection');
+  expectWorkflowContains('node scripts/resolve-baseline-monotonicity-base.mjs', 'baseline monotonicity base resolver');
+  expectWorkflowContains(
+    'BASELINE_MONOTONICITY_BASE: ${{ steps.baseline-monotonicity-base.outputs.base_sha }}',
+    'resolved baseline monotonicity SHA',
+  );
   expectWorkflowContains('node scripts/resolve-baseline-growth-approval.mjs', 'verified baseline growth approval resolver');
   expectWorkflowContains('BASELINE_MONOTONICITY_APPROVED:', 'verified baseline growth approval output');
   expectWorkflowContains('--require-base-sha', 'fail-closed baseline SHA requirement');
   expectWorkflowContains('fetch-depth: 0', 'complete history checkout for baseline comparison');
   expectWorkflowContains('node scripts/check-baseline-monotonicity.mjs', '"node scripts/check-baseline-monotonicity.mjs"');
+  expectWorkflowContains(
+    'node scripts/release-version.mjs verify-ref --candidate-ref HEAD --baseline-ref origin/main',
+    'release-staging version advancement verification',
+  );
   expectWorkflowOmits('BASELINE_MONOTONICITY_ALLOW_TEXT', 'author-controlled baseline approval text');
   expectWorkflowOmits('--allow-text', 'author-controlled baseline approval option');
   expectWorkflowContains('run: npm --prefix client run build', '"npm --prefix client run build"');
@@ -377,6 +391,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     '/.github/workflows/promote-worker-bundles.yml @AgalmicSoftware',
     '/.github/workflows/public-drift.yml @AgalmicSoftware',
     '/scripts/check-baseline-monotonicity.mjs @AgalmicSoftware',
+    '/scripts/resolve-baseline-monotonicity-base.mjs @AgalmicSoftware',
     '/scripts/resolve-baseline-growth-approval.mjs @AgalmicSoftware',
     '/scripts/ci-gates.json @AgalmicSoftware',
     '/scripts/run-ci-gates.mjs @AgalmicSoftware',
@@ -398,6 +413,15 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   });
   if (/npm run (?:worker:bundle|verify:worker-bundle)/.test(publishWorkflow)) {
     failures.push('publish-worker-bundles workflow must consume tested CI bytes without rebuilding');
+  }
+  if (
+    !publishWorkflow.includes('app_version="$(node -p')
+    || !publishWorkflow.includes('require("./package.json").version')
+  ) {
+    failures.push('publish-worker-bundles workflow must read the canonical application version');
+  }
+  if (!publishWorkflow.includes('Context Engine ${app_version} Worker bundles')) {
+    failures.push('publish-worker-bundles workflow must include the application version in release metadata');
   }
   [
     'workflow_run:',

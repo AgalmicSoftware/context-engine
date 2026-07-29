@@ -369,13 +369,22 @@ const useSessionWizardWorkerSecretsController = ({
       workerUrl = '',
       sessionSlug = '',
       authAccount = '',
-    }: PublishArweaveUploadOptionsInput = {}) =>
-      arweavePublishAdapter.resolveUploadOptions({
-        arweaveJwk,
-        workerUrl,
-        preferDirectArweaveUpload: !!toStr(arweaveJwk).trim(),
+    }: PublishArweaveUploadOptionsInput = {}) => {
+      const modeRequirements = resolveSessionWizardModeRequirements(draft?.sessionModeProfile);
+      const requiresDirectRegistryUpload =
+        modeRequirements.selected &&
+        modeRequirements.publish.registerSession &&
+        modeRequirements.publish.uploadMetadata;
+      const resolvedArweaveJwk = toStr(arweaveJwk).trim();
+      if (requiresDirectRegistryUpload && !resolvedArweaveJwk) {
+        throw new Error('An Arweave JWK is required for registry-canonical metadata uploads.');
+      }
+      return arweavePublishAdapter.resolveUploadOptions({
+        arweaveJwk: resolvedArweaveJwk,
+        workerUrl: requiresDirectRegistryUpload ? '' : workerUrl,
+        preferDirectArweaveUpload: requiresDirectRegistryUpload || !!resolvedArweaveJwk,
         allowDirectFallbackOnBootstrapFailure: false,
-        requireAdminAuthWithoutJwk: true,
+        requireAdminAuthWithoutJwk: !requiresDirectRegistryUpload,
         buildAdminAuth: ({ workerUrl: resolvedWorkerUrl }) =>
           signBootstrapAdminAction({
             statement: 'Admin request: bootstrap arweave upload',
@@ -383,8 +392,9 @@ const useSessionWizardWorkerSecretsController = ({
             workerUrl: resolvedWorkerUrl,
             accountOverride: authAccount,
           }),
-      }),
-    [signBootstrapAdminAction],
+      });
+    },
+    [draft?.sessionModeProfile, signBootstrapAdminAction],
   );
 
   const signTypedAdminAction = useCallback(

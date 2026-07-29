@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { dispatchAuthNonceRequest } from './authNonceRequestDispatch.js';
 import { checkNonceRateLimit } from './nonceLifecycle.js';
 
+const workerSessionId = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const replacementWorkerSessionId = '0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 const createJsonStub = () => (body, status, headers) => ({ body, status, headers });
 
 const createNonceBody = (overrides = {}) => ({
@@ -178,6 +180,60 @@ test('dispatchAuthNonceRequest rejects missing and untrusted Origins before nonc
     status: 403,
     headers: { 'Access-Control-Allow-Origin': 'https://blocked.example' },
   });
+});
+
+test('dispatchAuthNonceRequest rejects missing or stale canonical session ids before nonce work', async () => {
+  for (const requestedSessionId of [undefined, replacementWorkerSessionId]) {
+    let rateLimitCalled = false;
+    let buildNonceCalled = false;
+    let issueNonceCalled = false;
+    const result = await dispatchAuthNonceRequest({
+      request: {
+        json: async () => createNonceBody({
+          ...(requestedSessionId ? { sessionId: requestedSessionId } : {}),
+        }),
+        headers: new Headers({ Origin: 'https://allowed.example' }),
+      },
+      env: { GROUP_KV: {} },
+      baseHeaders: { 'Access-Control-Allow-Origin': '*' },
+      slug: '',
+      deps: createNonceDeps({
+        resolveExistingSessionCors: async () => ({
+          ok: true,
+          headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+          config: {
+            allowOrigins: ['https://allowed.example'],
+            sessionId: workerSessionId,
+            sessionModeProfile: {
+              authority: { mode: 'worker_canonical' },
+            },
+          },
+        }),
+        checkNonceRateLimit: async () => {
+          rateLimitCalled = true;
+          return { ok: true };
+        },
+        buildNonce: () => {
+          buildNonceCalled = true;
+          return 'must-not-build';
+        },
+        issueNonce: async () => {
+          issueNonceCalled = true;
+          return { ok: true };
+        },
+      }),
+    });
+
+    assert.equal(result.status, 409, String(requestedSessionId));
+    assert.deepEqual(
+      result.body,
+      { error: 'Session identity does not match worker session.' },
+      String(requestedSessionId),
+    );
+    assert.equal(rateLimitCalled, false, String(requestedSessionId));
+    assert.equal(buildNonceCalled, false, String(requestedSessionId));
+    assert.equal(issueNonceCalled, false, String(requestedSessionId));
+  }
 });
 
 test('dispatchAuthNonceRequest applies nonce rate limits before nonce creation', async () => {
@@ -382,6 +438,7 @@ test('dispatchAuthNonceRequest lowercases the nonce storage key, preserves ttl, 
       json: async () => createNonceBody({
         address: '0xAbCDEF',
         sessionSlug: 'session-b',
+        sessionId: workerSessionId,
       }),
       headers: new Headers({ Origin: 'https://allowed.example' }),
     },
@@ -392,6 +449,17 @@ test('dispatchAuthNonceRequest lowercases the nonce storage key, preserves ttl, 
       resolveWorkerBodySlugContext: () => ({
         ok: true,
         targetSlug: 'session-b',
+      }),
+      resolveExistingSessionCors: async () => ({
+        ok: true,
+        headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
+        config: {
+          allowOrigins: ['https://allowed.example'],
+          sessionId: workerSessionId,
+          sessionModeProfile: {
+            authority: { mode: 'worker_canonical' },
+          },
+        },
       }),
       issueNonce: async (...args) => {
         writes.push(args);
@@ -410,7 +478,11 @@ test('dispatchAuthNonceRequest lowercases the nonce storage key, preserves ttl, 
     123,
   ]]);
   assert.deepEqual(result, {
-    body: { nonce: 'nonce-success' },
+    body: {
+      nonce: 'nonce-success',
+      sessionSlug: 'session-b',
+      sessionId: workerSessionId,
+    },
     status: 200,
     headers: { 'Access-Control-Allow-Origin': 'https://allowed.example' },
   });

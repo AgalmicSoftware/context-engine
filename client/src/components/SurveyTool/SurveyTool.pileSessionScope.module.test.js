@@ -13,15 +13,23 @@ const defaultCacheNode = {
   pendingQuestionMetadata: {},
 };
 
+const makeLegacySessionConfig = (slug, blockedQuestionIds = []) => ({
+  slug,
+  networkChainId: 84532,
+  BLOCKED_QUESTION_IDS: blockedQuestionIds,
+  __registry: {
+    registryChainId: 84532,
+    sessionIdHex: '0x00112233445566778899aabbccddeeff',
+  },
+});
+
 const setupListScope = (blockedAlpha = []) => {
   jest.spyOn(sessionScanScope, 'readSessionScanScope').mockReturnValue('list');
   jest.spyOn(sessionScanScope, 'readSessionScanSlugs').mockReturnValue(['edge', 'alpha', 'beta']);
 
   const strictLookup = (slug) => {
-    if (slug === 'edge') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
-    if (slug === 'alpha') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: blockedAlpha };
-    if (slug === 'beta') return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
-    return { networkChainId: 84532, BLOCKED_QUESTION_IDS: [] };
+    if (slug === 'alpha') return makeLegacySessionConfig(slug, blockedAlpha);
+    return makeLegacySessionConfig(slug);
   };
 
   jest.spyOn(contractScriptsModule, 'getSessionConfigBySlug').mockImplementation(strictLookup);

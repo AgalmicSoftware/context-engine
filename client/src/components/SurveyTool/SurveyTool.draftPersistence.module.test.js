@@ -1,5 +1,6 @@
 import { act, waitFor } from '@testing-library/react';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext.js';
+import * as contractScriptsModule from '../../utilities/web3/chainGateway.js';
 import {
   buildDraftHydrationPatchForQuestion,
   buildPersistDraftAllowedQuestionIds,
@@ -176,6 +177,14 @@ const draftContext = {
   sessionSlug: 'edge',
   networkId: 84532,
 };
+const legacyEdgeSessionConfig = {
+  slug: 'edge',
+  networkChainId: 84532,
+  __registry: {
+    registryChainId: 84532,
+    sessionIdHex: '0x00112233445566778899aabbccddeeff',
+  },
+};
 
 describe('SurveyTool draft persistence', () => {
   afterEach(() => {
@@ -226,6 +235,9 @@ describe('SurveyTool draft persistence', () => {
 
   it('flushes pending standalone draft to storage on unmount', async () => {
     jest.useFakeTimers();
+    jest
+      .spyOn(contractScriptsModule, 'getSessionConfigBySlug')
+      .mockImplementation((slug) => (slug === 'edge' ? legacyEdgeSessionConfig : null));
     const key = buildSurveyDraftStorageKey({
       sessionSlug: 'edge',
       networkIdStr: '84532',
@@ -241,6 +253,7 @@ describe('SurveyTool draft persistence', () => {
       network: { id: 84532 },
       networkChainId: 84532,
       questionPool: [{ id: 'q1', type: 'freeform', prompt: 'Question one' }],
+      sessionConfig: legacyEdgeSessionConfig,
       runtimeStrategy: {
         render: (engine) => {
           runtimeEngine = engine;

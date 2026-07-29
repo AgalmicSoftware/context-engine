@@ -24,7 +24,7 @@ const SessionWizardNormalModeRail = ({
 }: SessionWizardNormalModeRailProps): React.ReactElement => (
   <section
     className={styles.normalModeRail}
-    aria-label="Normal mode sections"
+    aria-label="Session setup steps"
     style={{ '--session-wizard-card-count': String(normalModeCards.length) } as React.CSSProperties}
   >
     {normalModeCards.map((card, index) => {

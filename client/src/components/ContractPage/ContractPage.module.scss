@@ -19,6 +19,21 @@
   }
 }
 
+.advancedExternalNotice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 2px solid var(--retro-blue-300);
+  border-radius: var(--ce-radius-8);
+  background: var(--retro-blue-100);
+  color: var(--retro-ink);
+
+  strong {
+    letter-spacing: 0.04em;
+  }
+}
+
 .contractsSection {
   border: 2px solid var(--retro-blue-300);
   border-radius: var(--ce-radius-10);

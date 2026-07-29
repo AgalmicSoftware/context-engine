@@ -100,6 +100,7 @@ jobs:
           SOURCE_TREE: ${{ steps.source.outputs.sourceTree }}
         run: |
           set -euo pipefail
+          app_version="$(node -p 'require("./package.json").version')"
           tag="worker-bundles-${SOURCE_COMMIT}"
           artifact_dir="${RUNNER_TEMP}/worker-release"
           if gh release view "$tag" >/dev/null 2>&1; then
@@ -127,6 +128,7 @@ jobs:
           {
             echo "Immutable Worker bundles produced and verified by canonical CI run ${RUN_ID}."
             echo
+            echo "Context Engine version: \`${app_version}\`"
             echo "Source commit: \`${SOURCE_COMMIT}\`"
             echo "Source ref: \`${SOURCE_REF}\`"
             echo "Provenance and SHA-256 checksums: \`worker-release-manifest.json\`"
@@ -139,6 +141,6 @@ jobs:
             "$artifact_dir/agentBridgeWorker.bundle.js" \
             "$artifact_dir/worker-release-manifest.json" \
             --target "$SOURCE_COMMIT" \
-            --title "Worker bundles ${SOURCE_COMMIT}" \
+            --title "Context Engine ${app_version} Worker bundles ${SOURCE_COMMIT}" \
             --notes-file "$notes" \
             --latest=false

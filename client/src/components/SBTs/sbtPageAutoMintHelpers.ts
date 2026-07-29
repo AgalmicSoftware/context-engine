@@ -129,6 +129,49 @@ export const normalizeSbtInviteCode = (raw: unknown): string => {
   return trimmed;
 };
 
+const legacySbtRouteCredentialMemory = new Map<string, string>();
+
+const getLegacySbtRouteCredentialKey = (sbtAddress: unknown): string =>
+  String(sbtAddress || '')
+    .trim()
+    .toLowerCase();
+
+export const resolveLegacySbtRouteCredential = ({
+  routeCredential = null,
+  sbtAddress = '',
+}: {
+  routeCredential?: unknown;
+  sbtAddress?: unknown;
+} = {}): string | null => {
+  const key = getLegacySbtRouteCredentialKey(sbtAddress);
+  if (!key) return null;
+  const credential = String(routeCredential || '').trim();
+  if (credential) {
+    legacySbtRouteCredentialMemory.set(key, credential);
+    return credential;
+  }
+  return legacySbtRouteCredentialMemory.get(key) || null;
+};
+
+export const clearLegacySbtRouteCredential = (sbtAddress: unknown): void => {
+  const key = getLegacySbtRouteCredentialKey(sbtAddress);
+  if (key) legacySbtRouteCredentialMemory.delete(key);
+};
+
+export const buildLegacySbtRouteCredentialCleanPath = (hrefRaw: unknown = ''): string | null => {
+  try {
+    const url = new URL(String(hrefRaw || ''));
+    const pathSegments = url.pathname.split('/').filter(Boolean);
+    const sbtRouteIndex = pathSegments.findIndex((segment) => segment === 'sbt' || segment === 'group');
+    if (sbtRouteIndex < 0 || pathSegments.length <= sbtRouteIndex + 2) return null;
+    const cleanSegments = pathSegments.slice(0, sbtRouteIndex + 2);
+    const query = url.searchParams.toString();
+    return `/${cleanSegments.join('/')}${query ? `?${query}` : ''}${url.hash || ''}`;
+  } catch (_) {
+    return null;
+  }
+};
+
 export const decodeSbtPageInviteInput = (
   raw: unknown,
   decodeInvite: DecodeSbtPageInviteInput,
@@ -158,20 +201,33 @@ export const buildSbtPageAutoMintCleanPath = (hrefRaw: unknown = ''): string | n
   try {
     const url = new URL(String(hrefRaw || ''));
     const params = url.searchParams;
-    if (!hasSbtPageAutoMintFlag(params.toString())) return null;
+    const hasAutoFlag = hasSbtPageAutoMintFlag(params.toString());
+    const hasCredential = Array.from(params.keys()).some((key) => /^(gp|inv|password)\d*$/.test(key.toLowerCase()));
+    if (!hasAutoFlag && !hasCredential) return null;
 
-    params.delete('auto');
-    params.delete('sbt');
-    params.delete('gp');
-    params.delete('inv');
+    if (hasAutoFlag) {
+      params.delete('auto');
+      params.delete('sbt');
+    }
     Array.from(params.keys()).forEach((key) => {
-      if (/^(sbt|gp|inv|auto)\d+$/.test(key)) params.delete(key);
+      if (/^(gp|inv|password)\d*$/.test(key.toLowerCase())) params.delete(key);
+      if (hasAutoFlag && /^(sbt|auto)\d+$/.test(key.toLowerCase())) params.delete(key);
     });
 
     const qs = params.toString();
     return url.pathname + (qs ? `?${qs}` : '');
   } catch (_) {
     return null;
+  }
+};
+
+export const clearSbtPageAutoMintUrlIntent = (onError?: (error: unknown) => void): void => {
+  try {
+    if (typeof window === 'undefined' || !window.history?.replaceState) return;
+    const cleanUrl = buildSbtPageAutoMintCleanPath(window.location.href);
+    if (cleanUrl) window.history.replaceState(null, '', cleanUrl);
+  } catch (error) {
+    onError?.(error);
   }
 };
 
@@ -273,6 +329,36 @@ export const resolveSbtPageUrlAutoMintIntent = ({
       !alreadyTried,
     ),
     autoKey,
+  };
+};
+
+export const createSbtPageAutoMintIntentRuntime = () => {
+  let rememberedSearch = '';
+  return {
+    clear: (sbtAddress: unknown): void => {
+      rememberedSearch = '';
+      clearLegacySbtRouteCredential(sbtAddress);
+    },
+    resolve: ({
+      searchRaw = null,
+      windowSearch = '',
+      ...input
+    }: ResolveSbtPageUrlAutoMintIntentArgs = {}): SbtPageUrlAutoMintIntent | null => {
+      const browserSearch = String(windowSearch || '');
+      const effectiveSearch =
+        typeof searchRaw === 'string'
+          ? searchRaw
+          : hasSbtPageAutoMintFlag(browserSearch)
+            ? browserSearch
+            : rememberedSearch || browserSearch;
+      const intent = resolveSbtPageUrlAutoMintIntent({
+        ...input,
+        searchRaw: effectiveSearch,
+        windowSearch: '',
+      });
+      if (intent && hasSbtPageAutoMintFlag(effectiveSearch)) rememberedSearch = effectiveSearch;
+      return intent;
+    },
   };
 };
 

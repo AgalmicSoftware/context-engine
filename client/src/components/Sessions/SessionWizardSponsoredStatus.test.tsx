@@ -33,6 +33,34 @@ describe('SessionWizardSponsoredStatus', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
+  it('accepts a decryption key through an explicit password input', () => {
+    const onDecryptionKeyChange = jest.fn();
+    const onSubmitDecryptionKey = jest.fn();
+
+    render(
+      <SessionWizardSponsoredStatus
+        decryptionKey="memory-only-key"
+        onDecryptionKeyChange={onDecryptionKeyChange}
+        onRetry={jest.fn()}
+        onSubmitDecryptionKey={onSubmitDecryptionKey}
+        status={{
+          message: 'Enter the sponsored bundle decryption key to continue.',
+          requiresKey: true,
+          tone: 'info',
+        }}
+      />,
+    );
+
+    const input = screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_KEY_INPUT);
+    expect(input).toHaveAttribute('type', 'password');
+    expect(input).toHaveAttribute('autocomplete', 'off');
+    fireEvent.change(input, { target: { value: 'next-memory-only-key' } });
+    expect(onDecryptionKeyChange).toHaveBeenCalledWith('next-memory-only-key');
+
+    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_SPONSORED_KEY_APPLY));
+    expect(onSubmitDecryptionKey).toHaveBeenCalledTimes(1);
+  });
+
   it('maps status tones to the existing classes', () => {
     expect(getSponsoredBundleStatusToneClassName('success')).toBe('sponsoredBundleStatusSuccess');
     expect(getSponsoredBundleStatusToneClassName('error')).toBe('sponsoredBundleStatusError');

@@ -100,7 +100,14 @@ export const E2E_TESTIDS = Object.freeze({
   DATABASE_QUESTION_COUNT_INCREMENT: 'ce-database-question-count-increment',
 
   SESSION_RESULTS_TOGGLE: 'ce-session-results-toggle',
+  SESSION_ADVANCED_ONCHAIN_ACCESS_GATES: 'ce-session-advanced-onchain-access-gates',
+  SESSION_GROUPS_UNAVAILABLE: 'ce-session-groups-unavailable',
+  SESSION_GROUP_CREATION_POLICY_DENIED: 'ce-session-group-creation-policy-denied',
+  SESSION_WORKER_PARTICIPANT_GROUP_CREATE: 'ce-session-worker-participant-group-create',
+  SESSION_WORKER_PARTICIPANT_GROUP_LABEL: 'ce-session-worker-participant-group-label',
+  SESSION_WORKER_PARTICIPANT_GROUP_SUBMIT: 'ce-session-worker-participant-group-submit',
   SURVEY_FILTER_TOGGLE: 'ce-survey-filter-toggle',
+  CONTRACTS_ADVANCED_EXTERNAL_NOTICE: 'ce-contracts-advanced-external-notice',
 
   // Wallet display (for E2E assertions)
   WALLET_DISPLAY: 'ce-wallet-display',
@@ -114,6 +121,7 @@ export const E2E_TESTIDS = Object.freeze({
 
   // Session Wizard (/session/new)
   WIZARD_SESSION_NAME: 'ce-wizard-session-name',
+  WIZARD_SESSION_ENDS_AT: 'ce-wizard-session-ends-at',
   WIZARD_SESSION_INFO: 'ce-wizard-session-info',
   WIZARD_SESSION_HEADER_INLINE_BAR: 'ce-wizard-session-header-inline-bar',
   WIZARD_SESSION_HEADER_URL_TOGGLE: 'ce-wizard-session-header-url-toggle',
@@ -123,7 +131,8 @@ export const E2E_TESTIDS = Object.freeze({
   WIZARD_SLUG_AVAILABLE: 'ce-wizard-slug-available',
   WIZARD_SLUG_TAKEN: 'ce-wizard-slug-taken',
   WIZARD_MODE_NORMAL: 'ce-wizard-mode-normal',
-  WIZARD_MODE_ADVANCED: 'ce-wizard-mode-advanced',
+  WIZARD_MODE_ADVANCED: 'ce-wizard-customize',
+  WIZARD_GROUP_CREATION_POLICY: 'ce-wizard-group-creation-policy',
   WIZARD_METADATA_PANEL_TOGGLE: 'ce-wizard-metadata-panel-toggle',
   WIZARD_WORKER_MODE_TOGGLE: 'ce-wizard-worker-mode-toggle',
   WIZARD_WORKER_MODE_BUTTON: 'ce-wizard-worker-mode-button',
@@ -170,6 +179,8 @@ export const E2E_TESTIDS = Object.freeze({
   WIZARD_DEPLOY_STATUS: 'ce-wizard-deploy-status',
   WIZARD_WORKER_URL: 'ce-wizard-worker-url',
   WIZARD_SPONSORED_STATUS: 'ce-wizard-sponsored-status',
+  WIZARD_SPONSORED_KEY_INPUT: 'ce-wizard-sponsored-key-input',
+  WIZARD_SPONSORED_KEY_APPLY: 'ce-wizard-sponsored-key-apply',
   WIZARD_PUBLISH: 'ce-wizard-publish',
   WIZARD_METADATA_URI: 'ce-wizard-metadata-uri',
   WIZARD_ADMIN_URL: 'ce-wizard-admin-url',
@@ -181,6 +192,7 @@ export const E2E_TESTIDS = Object.freeze({
   SPONSOR_CREATE: 'ce-sponsor-create',
   SPONSOR_STATUS: 'ce-sponsor-status',
   SPONSOR_SHARE_URL: 'ce-sponsor-share-url',
+  SPONSOR_SHARE_KEY: 'ce-sponsor-share-key',
   SPONSOR_TX_ID: 'ce-sponsor-tx-id',
 
   // Agent page UI

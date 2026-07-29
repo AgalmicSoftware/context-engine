@@ -393,6 +393,8 @@ describe('SessionWizard pending SBT login rendering', () => {
     });
 
     await screen.findByTestId(E2E_TESTIDS.WIZARD_SESSION_NAME);
+    fireEvent.click(screen.getByTestId('ce-new-preset-trustless_public_decentralized'));
+    fireEvent.click(screen.getByTestId('ce-new-preset-continue'));
     selectNormalModeCard('Privacy');
 
     fireEvent.click(screen.getByRole('button', { name: 'Create Group' }));

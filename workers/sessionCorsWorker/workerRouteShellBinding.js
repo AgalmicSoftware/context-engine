@@ -342,6 +342,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           proxyOpenAI: deps?.proxyOpenAI,
           proxyOpenRouter: deps?.proxyOpenRouter,
           proxyCustomRPC: deps?.proxyCustomRPC,
+          now: deps?.now,
         },
         constants: {
           missingSlugError: constants?.missingSlugError,
@@ -380,6 +381,7 @@ export const createWorkerRouteShellWithWorkerDeps = ({
           storageRoute: deps?.storageRoute,
           fetchImage: deps?.fetchImage,
           fetchUrl: deps?.fetchUrl,
+          now: deps?.now,
           normalizeAiRequestPayload: deps?.normalizeAiRequestPayload,
           proxyAnthropic: deps?.proxyAnthropic,
           proxyOpenAI: deps?.proxyOpenAI,

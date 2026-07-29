@@ -4,7 +4,33 @@ import * as contractScriptsUtils from '../../utilities/web3/chainGateway.js';
 import * as sessionScanScopeUtils from '../../utilities/session/sessionScanScope.js';
 import * as cacheScriptsUtils from '../../utilities/cache/cacheScripts.js';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
-import { makeInstance, findElement, createDeferred, flushAsync } from './SBTSelector.testUtils';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+import { makeInstance as makeBaseInstance, findElement, createDeferred, flushAsync } from './SBTSelector.testUtils';
+
+const buildLegacyRegistryConfig = (slug, config = {}) => ({
+  slug,
+  ...config,
+  __registry: {
+    registryChainId: 84532,
+    sessionIdHex: '0x00112233445566778899aabbccddeeff',
+    ...(config.__registry || {}),
+  },
+});
+
+const makeInstance = (props = {}) => {
+  const slug = props.sessionSlug || 'edge';
+  const instance = makeBaseInstance({
+    ...props,
+    sessionConfig: buildLegacyRegistryConfig(slug, props.sessionConfig || {}),
+  });
+  const readDisplayConfig = instance.getDisplayLookupSessionConfig;
+  instance.getDisplayLookupSessionConfig = (targetSlug) => {
+    const config = readDisplayConfig(targetSlug);
+    if (Object.prototype.hasOwnProperty.call(config || {}, 'sessionModeProfile')) return config;
+    return buildLegacyRegistryConfig(targetSlug, config || {});
+  };
+  return instance;
+};
 
 describe('SBTSelector scoped options', () => {
   beforeEach(() => {
@@ -18,6 +44,93 @@ describe('SBTSelector scoped options', () => {
     try {
       delete globalThis.CE_SBT_SELECTOR_AUTO_SEARCH_OTHER_SESSIONS;
     } catch (_) {}
+  });
+
+  it('keeps SBT options cleared when an old chain cache read resolves after switching to pure Worker mode', async () => {
+    const cachedAddress = '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+    const cachedLower = cachedAddress.toLowerCase();
+    const registryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+    const pureWorkerProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const deferredCacheRead = createDeferred();
+    const instance = makeInstance({
+      sessionSlug: 'edge',
+      defaultFeaturedSBTs: [],
+      sessionConfig: {
+        slug: 'edge',
+        sessionModeProfile: registryProfile,
+      },
+    });
+    instance._isMounted = true;
+    instance.readSbtCacheBySlug = jest.fn(() => deferredCacheRead.promise);
+
+    const groupListsSpy = jest
+      .spyOn(contractScriptsUtils, 'getSessionLists')
+      .mockReturnValue({ featured_SBTs_LIST: [], ignored_SBTs_LIST: [] });
+
+    try {
+      const pendingRegistryLoad = instance.loadSBTOptions({ force: true });
+      await flushAsync();
+
+      instance.props = {
+        ...instance.props,
+        sessionConfig: {
+          slug: 'edge',
+          sessionModeProfile: pureWorkerProfile,
+        },
+      };
+      await instance.loadSBTOptions({ force: true });
+
+      expect(instance.state.sbtOptions).toEqual([]);
+      expect(instance.state.loadingOptions).toBe(false);
+
+      deferredCacheRead.resolve({
+        11155420: {
+          sbtList: {
+            [cachedLower]: {
+              sbtAddress: cachedAddress,
+              sbtInfo: { name: 'Registry Badge', unlisted: false },
+              slug: 'edge',
+            },
+          },
+          nameLookupState: {},
+        },
+      });
+      await pendingRegistryLoad;
+      await flushAsync();
+
+      expect(instance.state.sbtOptions).toEqual([]);
+      expect(instance.state.loadingOptions).toBe(false);
+
+      instance.props = {
+        ...instance.props,
+        sessionConfig: {
+          slug: 'edge',
+          sessionModeProfile: registryProfile,
+        },
+      };
+      instance.readSbtCacheBySlug = jest.fn().mockResolvedValue({
+        11155420: {
+          sbtList: {
+            [cachedLower]: {
+              sbtAddress: cachedAddress,
+              sbtInfo: { name: 'Current Registry Badge', unlisted: false },
+              slug: 'edge',
+            },
+          },
+          nameLookupState: {},
+        },
+      });
+      await instance.loadSBTOptions({ force: true });
+
+      expect(instance.state.sbtOptions).toEqual([
+        expect.objectContaining({
+          address: cachedLower,
+          name: 'Current Registry Badge',
+        }),
+      ]);
+    } finally {
+      groupListsSpy.mockRestore();
+    }
   });
 
   it('aggregates SBT cache entries from all known sessions when scope mode is all', async () => {

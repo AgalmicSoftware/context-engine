@@ -71,9 +71,8 @@ export const normalizeSbtSelection = (value: unknown): SbtSelection[] => {
 
 export const serializeDefaultFeaturedSbtSelections = (value: unknown = []): Array<string | AnyRecord> => {
   const seen = new Set();
-  // Keep pending featured selections marked in the cached draft so a refresh can
-  // safely re-bind or prune undeployed placeholder addresses without persisting
-  // the full pending draft secrets to localStorage.
+  // A public placeholder may remain selected, but the pending draft that can
+  // authorize its deployment exists only in the mounted wizard's memory.
   return normalizeSbtSelection(value)
     .map((entry) => {
       const address = toStr(entry?.address).trim();

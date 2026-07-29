@@ -100,7 +100,7 @@ describe('CreateSBTGroup render and image authoring', () => {
     expect(screen.getByText('One-use URLs')).toBeInTheDocument();
   });
 
-  it('offers encrypted local recovery only as an explicit post-create opt-in', () => {
+  it('offers tab-memory recovery only as an explicit post-create opt-in', () => {
     const instance = makeInstance({ network: { id: 84532, name: 'Base Sepolia' }, sessionSlug: 'test' });
     instance.state = {
       ...instance.state,
@@ -117,8 +117,8 @@ describe('CreateSBTGroup render and image authoring', () => {
 
     render(instance.render());
 
-    expect(screen.getByRole('checkbox', { name: 'Keep encrypted recovery on this browser' })).not.toBeChecked();
-    expect(screen.getByText(/export-only is the default/i)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Keep recovery codes in this tab' })).not.toBeChecked();
+    expect(screen.getByText(/export is the only durable recovery path/i)).toBeInTheDocument();
   });
 
   it('opens the first section by default and hides open section titles', () => {

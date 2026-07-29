@@ -91,14 +91,37 @@ describe('SessionWizardRequirementsBanner', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/permissions prefilled/i)).toBeInTheDocument();
     expect(screen.getByText(/copy it into the Worker step/i)).toBeInTheDocument();
-    expect(screen.getByText(/Under Account Resources, choose only the account/i)).toBeInTheDocument();
-    expect(screen.getByText(/earliest expiration Cloudflare permits/i)).toBeInTheDocument();
-    expect(screen.getByText(/revoke it after deployment succeeds or you abandon the attempt/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Under Account Resources, choose only the account/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/earliest expiration Cloudflare permits/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/revoke it after deployment succeeds or you abandon the attempt/i),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Token setup and security guide' })).toHaveAttribute(
+      'href',
+      'https://github.com/AgalmicSoftware/context-engine/blob/main/docs/session-cors-worker.md#api-token-setup-and-handling',
+    );
     expect(screen.getByRole('link', { name: 'AI provider key' })).toBeInTheDocument();
     expect(screen.queryByText(/Arweave|Lit|RPC|wallet|faucet|funding|gas/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/not required/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/turnkey tool/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'contextengine@protonmail.com' })).not.toBeInTheDocument();
+  });
+
+  it('renders the native Cloudflare account requirement as a concise dashboard link', () => {
+    render(
+      <SessionWizardRequirementsBanner
+        fundingRequirementLabel="OP Sepolia ETH"
+        onDismiss={jest.fn()}
+        requiredRequirementIds={['cloudflareAccount', 'aiProviderKey']}
+      />,
+    );
+
+    const cloudflareAccount = screen.getByRole('link', { name: 'Cloudflare account' });
+    expect(cloudflareAccount).toHaveAttribute('href', SESSION_WIZARD_REQUIREMENT_LINKS.cloudflareAccount);
+    expect(cloudflareAccount).toHaveAttribute('target', '_blank');
+    expect(cloudflareAccount).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(screen.queryByText(/Worker step deploys the full Session Worker/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Context Engine deploy helper/i)).not.toBeInTheDocument();
   });
 
   it('preserves explicit decentralized and Lit requirements without the legacy faucet notice', () => {
@@ -141,5 +164,20 @@ describe('SessionWizardRequirementsBanner', () => {
 
     expect(screen.getByText('A connected wallet for on-chain SBT publishing')).toBeInTheDocument();
     expect(screen.queryByText('A connected wallet for on-chain registration')).not.toBeInTheDocument();
+  });
+
+  it('describes Worker Lit or existing SBT RPC as read-only when no transaction inputs are required', () => {
+    render(
+      <SessionWizardRequirementsBanner
+        fundingRequirementLabel="OP Sepolia ETH for on-chain SBT publishing"
+        onDismiss={jest.fn()}
+        requiredRequirementIds={['aiProviderKey', 'rpc', 'lit']}
+      />,
+    );
+
+    expect(screen.getByText(/RPC URL or provider key for read-only access checks or encryption/i)).toBeInTheDocument();
+    expect(screen.getByText(/no on-chain publishing transaction is required/i)).toBeInTheDocument();
+    expect(screen.queryByText(/on-chain reads and publishing/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/connected wallet/i)).not.toBeInTheDocument();
   });
 });

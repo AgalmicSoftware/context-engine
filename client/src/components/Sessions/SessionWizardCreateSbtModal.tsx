@@ -57,53 +57,57 @@ const SessionWizardCreateSbtModal = ({
   signBootstrapAdminAction,
   handleSavePendingSbtDraft,
   t,
-}: SessionWizardCreateSbtModalProps) => (
-  <Modal
-    isOpen={createSbtModalState.open}
-    toggle={closeCreateSbtModal}
-    className={styles.createSbtModal}
-    size="xl"
-    scrollable
-  >
-    <ModalHeader toggle={closeCreateSbtModal} className={styles.createSbtModalHeader}>
-      {`Add ${t('sbt')} to Session`}
-    </ModalHeader>
-    <ModalBody className={styles.createSbtModalBody}>
-      <CreateSBTGroup
-        account={account}
-        provider={provider}
-        network={createSbtModalNetwork}
-        loginComplete={!!account}
-        toggleLoginModal={toggleLoginModal}
-        sessionSlug={createSbtModalSessionSlug}
-        sessionConfigOverride={{
-          ...(draft && typeof draft === 'object' ? draft : {}),
-          slug: createSbtModalSessionSlug,
-          networkChainId: createSbtModalChainId,
-          contracts: draft && typeof draft.contracts === 'object' ? draft.contracts : {},
-        }}
-        arweaveJwkOverride={createSbtModalArweaveJwkOverride}
-        encryptionGates={encryptionGates.map((gate) => ({
-          id: gate.id,
-          gateId: gate.id,
-          label: gate.label,
-          name: gate.label,
-          color: gate.color,
-          mode: gate.mode,
-          requireAll: gate.mode === 'all',
-          sbtAddresses: normalizeSbtSelection(gate.sbts || []).map((entry) => entry.address),
-          chainId: createSbtModalChainId,
-        }))}
-        defaultGateId={defaultGateId || encryptionGates[0]?.id || ''}
-        defaultSbtTags={draft?.defaultSbtTags || ''}
-        deferredDeploy={true}
-        attemptImmediateDeferredUpload={false}
-        hideNetworkSelector={true}
-        signAdminAction={signBootstrapAdminAction}
-        onSaveDraft={handleSavePendingSbtDraft}
-      />
-    </ModalBody>
-  </Modal>
-);
+}: SessionWizardCreateSbtModalProps) => {
+  const sessionConfigOverride = {
+    ...(draft && typeof draft === 'object' ? draft : {}),
+    slug: createSbtModalSessionSlug,
+    networkChainId: createSbtModalChainId,
+    contracts: draft && typeof draft.contracts === 'object' ? draft.contracts : {},
+  };
+
+  return (
+    <Modal
+      isOpen={createSbtModalState.open}
+      toggle={closeCreateSbtModal}
+      className={styles.createSbtModal}
+      size="xl"
+      scrollable
+    >
+      <ModalHeader toggle={closeCreateSbtModal} className={styles.createSbtModalHeader}>
+        {`Add ${t('sbt')} to Session`}
+      </ModalHeader>
+      <ModalBody className={styles.createSbtModalBody}>
+        <CreateSBTGroup
+          account={account}
+          provider={provider}
+          network={createSbtModalNetwork}
+          loginComplete={!!account}
+          toggleLoginModal={toggleLoginModal}
+          sessionSlug={createSbtModalSessionSlug}
+          sessionConfigOverride={sessionConfigOverride}
+          arweaveJwkOverride={createSbtModalArweaveJwkOverride}
+          encryptionGates={encryptionGates.map((gate) => ({
+            id: gate.id,
+            gateId: gate.id,
+            label: gate.label,
+            name: gate.label,
+            color: gate.color,
+            mode: gate.mode,
+            requireAll: gate.mode === 'all',
+            sbtAddresses: normalizeSbtSelection(gate.sbts || []).map((entry) => entry.address),
+            chainId: createSbtModalChainId,
+          }))}
+          defaultGateId={defaultGateId || encryptionGates[0]?.id || ''}
+          defaultSbtTags={draft?.defaultSbtTags || ''}
+          deferredDeploy={true}
+          attemptImmediateDeferredUpload={false}
+          hideNetworkSelector={true}
+          signAdminAction={signBootstrapAdminAction}
+          onSaveDraft={handleSavePendingSbtDraft}
+        />
+      </ModalBody>
+    </Modal>
+  );
+};
 
 export default SessionWizardCreateSbtModal;

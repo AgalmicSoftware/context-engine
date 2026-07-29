@@ -2,8 +2,10 @@ import type { FormEvent } from 'react';
 import type { AgentClientLoginEnvelope } from '../../utilities/session/agentClientLogin';
 import {
   cacheAgentClientLoginEnvelope,
+  resolveAgentClientLoginIdentityTarget,
   resolveTelegramAgentBridgeUrl,
 } from '../OnePageSession/onePageSessionTelegramController';
+import { resolveSessionCapabilityProjection } from '../../utilities/session/sessionCapabilityProjection';
 
 type UnknownRecord = Record<string, unknown>;
 export type LoginDisplaySessionConfig = UnknownRecord & {
@@ -18,8 +20,11 @@ export type LoginDisplaySessionConfig = UnknownRecord & {
 
 export type LoginAgentSessionContext = {
   agentBridgeUrl: string;
+  sessionId: string;
   sessionConfig: LoginDisplaySessionConfig;
   sessionSlug: string;
+  workerCanonical: boolean;
+  workerUrl: string;
 };
 
 type AgentClientTokenValidation = { ok: boolean; reason?: string };
@@ -31,8 +36,10 @@ export type LoginAgentActionsDeps = {
   changeAccount: (payload: unknown) => void;
   exchangeAgentClientLogin: (args: {
     agentBridgeUrl: string;
+    sessionId?: unknown;
     sessionSlug: string;
     tokenOrLink: string;
+    workerUrl?: unknown;
   }) => Promise<AgentClientLoginEnvelope>;
   extractAgentClientToken: (tokenOrLink: string) => AgentClientTokenValidation;
   getActiveSessionSlug: () => string;
@@ -65,6 +72,23 @@ const isRecord = (value: unknown): value is UnknownRecord =>
 
 const toRecord = (value: unknown): UnknownRecord => (isRecord(value) ? value : {});
 
+export const resolveValidatedWorkerCanonicalLoginConfig = ({
+  sessionConfig,
+  expectedSlug = '',
+  normalizeSessionSlug,
+}: {
+  sessionConfig: unknown;
+  expectedSlug?: unknown;
+  normalizeSessionSlug: (slug: unknown) => string;
+}): LoginDisplaySessionConfig | null => {
+  if (!isRecord(sessionConfig)) return null;
+  const configSlug = normalizeSessionSlug(sessionConfig.slug);
+  const normalizedExpectedSlug = normalizeSessionSlug(expectedSlug);
+  if (!configSlug || (normalizedExpectedSlug && configSlug !== normalizedExpectedSlug)) return null;
+  const projection = resolveSessionCapabilityProjection(sessionConfig);
+  return projection.profileValid && projection.isWorkerCanonical ? sessionConfig : null;
+};
+
 const mergeDisplaySessionConfig = (overlay: UnknownRecord, canonical: UnknownRecord): LoginDisplaySessionConfig => ({
   ...overlay,
   ...canonical,
@@ -85,14 +109,16 @@ export const formatAgentTokenError = (error: unknown): string => {
   if (reason.includes('expired'))
     return 'This token is expired. Create a fresh agent token in Telegram and paste it again.';
   if (reason.includes('session_mismatch')) return 'This token is for a different session.';
+  if (reason.includes('session_identity'))
+    return 'This session’s exact Worker identity is unavailable. Reload its canonical session configuration and try again.';
   if (reason.includes('scope_denied')) return 'This token does not have permission to unlock the client view.';
   if (reason.includes('origin_denied') || reason.includes('origin_not_allowed'))
     return 'This browser origin is not allowed for this session.';
   if (reason.includes('not_enabled') || reason.includes('disabled'))
     return 'Client token login is not enabled for this session.';
   if (reason.includes('empty')) return 'Paste a Context Engine agent token first.';
-  if (reason.includes('multiline')) return 'Paste one token or token link on a single line.';
-  if (reason.includes('unsupported_format')) return 'Paste a ceagt_ token or a Context Engine token link.';
+  if (reason.includes('multiline')) return 'Paste one raw token on a single line.';
+  if (reason.includes('unsupported_format')) return 'Paste the raw ceagt_ token, not a link.';
   return 'Agent token login failed. Create a fresh token in Telegram and try again.';
 };
 
@@ -103,6 +129,12 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
     const propSessionConfig = deps.getPropSessionConfig();
     const propConfigRecord = isRecord(propSessionConfig) ? propSessionConfig : null;
     const propConfigSlug = deps.normalizeSettingsSessionSlug(propConfigRecord?.slug || slug);
+    const verifiedWorkerConfig = resolveValidatedWorkerCanonicalLoginConfig({
+      sessionConfig: propSessionConfig,
+      expectedSlug: slug,
+      normalizeSessionSlug: deps.normalizeSettingsSessionSlug,
+    });
+    if (!cfgIn && verifiedWorkerConfig) return verifiedWorkerConfig;
     if (!cfgIn && propConfigRecord && propConfigSlug === slug) {
       const canonicalConfig = deps.getSessionConfigBySlugOrDefault(slug);
       // Regression guard: route/demo overlays may add display fields, but registry
@@ -124,10 +156,15 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
   const getAgentTokenLoginSessionContext = (): LoginAgentSessionContext => {
     const sessionSlug = deps.getActiveSessionSlug();
     const sessionConfig = getDisplaySessionConfig(sessionSlug);
+    const projection = resolveSessionCapabilityProjection(sessionConfig);
+    const identity = resolveAgentClientLoginIdentityTarget({ sessionConfig, sessionSlug });
     return {
       sessionSlug,
       sessionConfig,
       agentBridgeUrl: resolveAgentBridgeUrl(sessionConfig),
+      sessionId: toStr(identity.sessionId),
+      workerCanonical: projection.isWorkerCanonical,
+      workerUrl: toStr(identity.workerUrl),
     };
   };
 
@@ -180,7 +217,7 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
   const handleAgentTokenLoginSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
     if (!shouldShowAgentTokenLogin()) return;
-    const { sessionSlug, agentBridgeUrl } = getAgentTokenLoginSessionContext();
+    const { sessionSlug, agentBridgeUrl, sessionId, workerCanonical, workerUrl } = getAgentTokenLoginSessionContext();
     const tokenOrLink = deps.getAgentTokenInput();
     const validation = deps.extractAgentClientToken(tokenOrLink);
     deps.setState({
@@ -189,6 +226,14 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
       agentTokenStatus: validation.ok ? 'loading' : 'error',
     });
     if (!validation.ok) return;
+    if (workerCanonical && (!sessionId || !workerUrl)) {
+      deps.setStateIfMounted({
+        agentTokenInput: '',
+        agentTokenStatus: 'error',
+        agentTokenError: formatAgentTokenError(new Error('session_identity_missing')),
+      });
+      return;
+    }
 
     deps.updateLoginInfo({
       loginInProgress: true,
@@ -199,8 +244,10 @@ export const createLoginAgentActions = (deps: LoginAgentActionsDeps): LoginAgent
     try {
       const envelope = await deps.exchangeAgentClientLogin({
         agentBridgeUrl,
+        sessionId,
         sessionSlug,
         tokenOrLink,
+        workerUrl,
       });
       deps.setStateIfMounted({
         agentTokenInput: '',

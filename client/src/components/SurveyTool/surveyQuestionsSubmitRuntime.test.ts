@@ -1,5 +1,25 @@
 import { createSurveyQuestionsSubmitRuntime } from './surveyQuestionsSubmitRuntime';
 import type { SurveyQuestionsLegacyRecord } from './surveyQuestionsTypes';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+
+const makeWorkerConfig = (workerOrigin: string, sessionId: string) => ({
+  slug: 'draft-edge',
+  sessionId,
+  corsWorkerUrl: workerOrigin,
+  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  storageProfile: {
+    backend: 'cloudflare',
+    resources: {
+      questions: 'active',
+      surveys: 'active',
+    },
+    payloadAccessControl: {
+      gate: 'role_gate',
+      encryption: 'worker_envelope',
+      mode: 'authorized_read',
+    },
+  },
+});
 
 const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
   buildCurrentStepState: jest.fn((step) => ({ currentStep: step })),
@@ -68,6 +88,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
       network: { chainId: 11155420 },
       provider: { id: 'provider' },
       questionID: 'q1',
+      sessionConfig: null as unknown,
       singleQuestionMode: false,
       surveyId: 'survey-1',
       surveyIndex: 2,
@@ -75,6 +96,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
     },
   },
   resolveEffectiveSlug: jest.fn(() => 'route-edge'),
+  resolveEffectiveResponseGateConfig: jest.fn((_slug, props) => props?.sessionConfig || {}),
   resolveFieldEncryptionAudience: jest.fn(),
   resolveFieldEncryptionGateId: jest.fn(),
   resolveSessionChainId: jest.fn(() => 11155420),
@@ -186,6 +208,26 @@ describe('surveyQuestionsSubmitRuntime', () => {
     expect(context.inst._activeSubmitAttemptSeq).toBe(1);
     runtime.finishSubmitAttempt(1);
     expect(context.inst._activeSubmitAttemptSeq).toBe(0);
+  });
+
+  it('invalidates a submit snapshot when the same slug switches Worker identity', () => {
+    const configA = makeWorkerConfig('https://a.example.com', '0x00112233445566778899aabbccddeeff');
+    const configB = makeWorkerConfig('https://b.example.com', '0xffeeddccbbaa99887766554433221100');
+    const context = createContext();
+    context.propsRef.current.sessionConfig = configA;
+    context.resolveSessionChainId.mockReturnValue(null as unknown as number);
+    const runtime = createSurveyQuestionsSubmitRuntime(context);
+    const snapshotA = runtime.buildSubmitContextSnapshot();
+
+    context.propsRef.current = {
+      ...context.propsRef.current,
+      sessionConfig: configB,
+    };
+    const snapshotB = runtime.buildSubmitContextSnapshot();
+
+    expect(snapshotA.workerTargetValid).toBe(true);
+    expect(snapshotA.workerTargetKey).not.toBe(snapshotB.workerTargetKey);
+    expect(runtime.isSubmitContextCurrent(snapshotA)).toBe(false);
   });
 
   it('runs stale submit cleanup through the submit controller ports', () => {

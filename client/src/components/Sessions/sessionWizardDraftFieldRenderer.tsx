@@ -31,6 +31,7 @@ import {
   shouldHideSessionWizardField,
   type SessionWizardRenderFieldOptions,
 } from './sessionWizardFieldDescriptors';
+import type { SessionWizardModeFieldPolicy } from './sessionWizardModeFieldPolicy';
 import { applyStorageProfileChangeToModeDraft } from './sessionWizardModeProfileDraftController';
 import { normalizeSbtSelection, serializeDefaultFeaturedSbtSelections } from './sessionWizardSbtSelections';
 import { getChainName } from './sessionWizardCoreUtils';
@@ -87,6 +88,7 @@ type SessionWizardDraftFieldRendererOptions = {
   launchCreateSbtModal: (options: { targetType: string }) => void;
   markBlockStartManual: () => void;
   metadataObjectCollapsed: MetadataObjectCollapsedState;
+  modeFieldPolicy?: SessionWizardModeFieldPolicy;
   network: NetworkLike | undefined;
   openContractViewerModal: (contractKey: string) => void;
   openLockKey: string;
@@ -158,6 +160,7 @@ export const buildSessionWizardDraftFieldRenderer = ({
   launchCreateSbtModal,
   markBlockStartManual,
   metadataObjectCollapsed,
+  modeFieldPolicy,
   network,
   normalizeGateIds,
   openContractViewerModal,
@@ -213,6 +216,7 @@ export const buildSessionWizardDraftFieldRenderer = ({
         path,
         currentPath,
         wizardMode,
+        modeFieldPolicy,
       })
     ) {
       return null;
@@ -220,7 +224,10 @@ export const buildSessionWizardDraftFieldRenderer = ({
     const keyString = pathKey(currentPath);
     const isSlugField = keyString === 'slug';
     const isNormalMode = wizardMode !== 'advanced';
-    const displayLabel = getSessionWizardFieldLabel(keyString, key);
+    const displayLabel =
+      keyString === 'contracts' && modeFieldPolicy?.visibleContractKeys.join(',') === 'sbtFactory'
+        ? 'On-chain Group Factory'
+        : getSessionWizardFieldLabel(keyString, key);
     const isSecretPath = isSecretFieldPath(currentPath);
     const canLock = shouldLockable(value) && (!isSecretPath || !workerSecretsEnabled);
     if (!forceShow && isSecretPath && workerSecretsEnabled) return null;
@@ -235,6 +242,7 @@ export const buildSessionWizardDraftFieldRenderer = ({
       if (keyString === 'sessionInfo') return E2E_TESTIDS.WIZARD_SESSION_INFO;
       if (keyString === 'slug') return E2E_TESTIDS.WIZARD_SLUG;
       if (keyString === 'corsWorkerUrl') return E2E_TESTIDS.WIZARD_WORKER_URL;
+      if (keyString === 'sessionEndsAt') return E2E_TESTIDS.WIZARD_SESSION_ENDS_AT;
       return '';
     })();
     const gateIds = gateOptions.map((opt) => toStr(opt.id).trim()).filter(Boolean);
@@ -378,7 +386,11 @@ export const buildSessionWizardDraftFieldRenderer = ({
       const contracts: SessionContractsLike =
         value && typeof value === 'object' && !Array.isArray(value) ? (value as SessionContractsLike) : {};
       const defaults = getSessionWizardContractDefaults(registryChainId);
-      const visibleKeys = getVisibleSessionWizardContractKeys(contracts, defaults);
+      const visibleKeys = getVisibleSessionWizardContractKeys(
+        contracts,
+        defaults,
+        modeFieldPolicy?.visibleContractKeys,
+      );
       const isCollapsed = metadataObjectCollapsed.contracts;
       return (
         <SessionWizardContractsField
@@ -489,6 +501,29 @@ export const buildSessionWizardDraftFieldRenderer = ({
           label={displayLabelText}
           tooltipControl={fieldTooltipControl}
         />
+      );
+    }
+
+    if (path.length === 0 && key === 'sessionEndsAt') {
+      const raw = toStr(value).trim();
+      const parsed = raw ? new Date(raw) : null;
+      const localValue =
+        parsed && Number.isFinite(parsed.getTime())
+          ? new Date(parsed.getTime() - parsed.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+          : raw;
+      return (
+        <LockableFieldFrame key={keyString} {...fieldFrameProps} fieldError={fieldErrors[keyString]}>
+          <Input
+            type="datetime-local"
+            value={localValue}
+            data-testid={e2eTestId || undefined}
+            onChange={(event) => updateDraftValue(currentPath, event.target.value)}
+          />
+          <div className={styles.helperText}>
+            Optional. Participant submissions and group mutations stop at this time; existing groups and results stay
+            readable.
+          </div>
+        </LockableFieldFrame>
       );
     }
 

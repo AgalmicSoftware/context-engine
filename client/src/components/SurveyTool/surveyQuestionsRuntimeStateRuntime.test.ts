@@ -1,5 +1,25 @@
 import { createSurveyQuestionsRuntimeStateRuntime } from './surveyQuestionsRuntimeStateRuntime';
 import type { SurveyQuestionsLegacyRecord } from './surveyQuestionsTypes';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
+
+const makeWorkerConfig = (workerOrigin: string, sessionId: string) => ({
+  slug: 'edge',
+  sessionId,
+  corsWorkerUrl: workerOrigin,
+  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+  storageProfile: {
+    backend: 'cloudflare',
+    resources: {
+      questions: 'active',
+      surveys: 'active',
+    },
+    payloadAccessControl: {
+      gate: 'role_gate',
+      encryption: 'worker_envelope',
+      mode: 'authorized_read',
+    },
+  },
+});
 
 const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
   buildCanDecryptContext: jest.fn(() => ({
@@ -28,7 +48,7 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
   getPendingStatsSnapshotFromState: jest.fn(() => ({ encrypted: 1, total: 2 })),
   getResponseGatePolicy: jest.fn(() => ({ primaryResource: 'questionResponses' })),
   getSessionSlugHintFromProps: jest.fn((props) => props.sessionSlug || ''),
-  getSessionSlugPinnedFromProps: jest.fn((props) => props.pinnedSessionSlug || ''),
+  getSessionSlugPinnedFromProps: jest.fn((props) => props.sessionSlugPinned === true),
   inst: {
     _autoDecryptMaskedAttemptSignature: { q1: true },
     _autoDecryptVisibleSweepCache: { previous: true },
@@ -43,6 +63,11 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
     _pendingEditStatsCache: { cached: true },
   },
   isResponseGateQuestionFlow: jest.fn(() => true),
+  normalizeSessionSlugValue: jest.fn((value) =>
+    String(value || '')
+      .trim()
+      .toLowerCase(),
+  ),
   propsRef: {
     current: {
       account: '0xabc',
@@ -55,6 +80,9 @@ const createContext = (overrides: SurveyQuestionsLegacyRecord = {}) => ({
       questionPool: [{ id: 'q1' }],
       responderAddress: '',
       sbtCacheRevision: 1,
+      sessionConfig: null as unknown,
+      sessionSlug: '',
+      sessionSlugPinned: false,
       singleQuestionMode: false,
       surveyId: 'survey-1',
       surveyIndex: 3,
@@ -171,5 +199,33 @@ describe('surveyQuestionsRuntimeStateRuntime', () => {
     runtime.invalidateDiffCaches();
     expect(context.inst._changedQidsAndFieldsCache).toBeNull();
     expect(context.inst._pendingEditStatsCache).toBeNull();
+  });
+
+  it('invalidates edit and hydration state when the same slug switches Worker identity', () => {
+    const configA = makeWorkerConfig('https://a.example.com', '0x00112233445566778899aabbccddeeff');
+    const configB = makeWorkerConfig('https://b.example.com', '0xffeeddccbbaa99887766554433221100');
+    const context = createContext();
+    const prevProps = {
+      ...context.propsRef.current,
+      sessionConfig: configA,
+      sessionSlug: 'edge',
+      sessionSlugPinned: true,
+    };
+    context.propsRef.current = {
+      ...prevProps,
+      sessionConfig: configB,
+    };
+    const runtime = createSurveyQuestionsRuntimeStateRuntime(context);
+
+    expect(
+      runtime.didEditDiffInputsChange(prevProps, {
+        ...context.stateRef.current,
+        questionPool: [{ id: 'q1' }],
+        pileQuestions: [],
+      }),
+    ).toBe(true);
+    expect(runtime.resolveWorkerTargetForProps(prevProps).key).not.toBe(
+      runtime.resolveWorkerTargetForProps(context.propsRef.current).key,
+    );
   });
 });

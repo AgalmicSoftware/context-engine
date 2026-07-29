@@ -8,10 +8,13 @@ import {
   getHighlightedQuestionIdsSet,
   resolveCurrentTagSessionSlug,
   resolveQuestionCountContext,
+  resolveResponseHydrationContext,
+  resolveSurveyReadContext,
   shouldInheritResolvedTagSessionScope,
 } from './surveyToolScope.js';
 import { getAllSessionSlugs, getSessionConfigBySlug } from '../../utilities/web3/chainGateway.js';
 import { readSessionScanScope, readSessionScanSlugs } from '../../utilities/session/sessionScanScope.js';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile.js';
 
 jest.mock('../../utilities/web3/chainGateway.js', () => ({
   getAllSessionSlugs: jest.fn(() => []),
@@ -44,6 +47,10 @@ describe('surveyToolScope', () => {
         return {
           slug: 'edge',
           networkChainId: 84532,
+          __registry: {
+            registryChainId: 84532,
+            sessionIdHex: '0x00112233445566778899aabbccddeeff',
+          },
           sessionName: 'Edge Session',
           BLOCKED_QUESTION_IDS: ['q-blocked'],
           HIGHLIGHTED_QUESTION_IDS: ['q-highlighted'],
@@ -53,6 +60,10 @@ describe('surveyToolScope', () => {
         return {
           slug: 'other',
           networkChainId: 84532,
+          __registry: {
+            registryChainId: 84532,
+            sessionIdHex: '0xffeeddccbbaa99887766554433221100',
+          },
         };
       }
       if (slug === '') {
@@ -148,6 +159,53 @@ describe('surveyToolScope', () => {
     expect(resolved.scopedSessionSlugs).toEqual(['edge', 'other']);
     expect(resolved.networkId).toBe(84532);
     expect(resolved.networkIdStr).toBe('84532');
+  });
+
+  it('uses an exact passed Worker config when the direct route is not registry-backed', () => {
+    const sessionConfig = {
+      slug: 'demo-sh',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      corsWorkerUrl: 'https://worker.example.com',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+
+    expect(
+      resolveResponseHydrationContext(
+        {
+          sessionSlug: 'demo-sh',
+          sessionConfig,
+          network: { id: 84532 },
+        },
+        'demo-sh',
+      ),
+    ).toMatchObject({
+      sessionSlug: 'demo-sh',
+      sessionConfig,
+      networkId: null,
+      networkIdStr: 'worker',
+      networkSourceSlug: 'demo-sh',
+    });
+    expect(resolveSurveyReadContext({ sessionConfig }, 'other')).toMatchObject({
+      sessionSlug: 'other',
+      sessionConfig: expect.objectContaining({ slug: 'other' }),
+      networkIdStr: '84532',
+    });
+  });
+
+  it('does not borrow a mismatched passed Worker config for an unknown slug', () => {
+    const sessionConfig = {
+      slug: 'demo-sh',
+      sessionId: '0x00112233445566778899aabbccddeeff',
+      corsWorkerUrl: 'https://worker.example.com',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+
+    expect(resolveSurveyReadContext({ sessionConfig }, 'missing')).toMatchObject({
+      sessionSlug: 'missing',
+      sessionConfig: null,
+      networkId: null,
+      networkIdStr: '',
+    });
   });
 
   it('derives blocked and highlighted question ids from strict session config context', () => {

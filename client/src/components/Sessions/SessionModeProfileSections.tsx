@@ -18,6 +18,13 @@ import {
   type SessionModeResultsVisibility,
   type SessionModeSurface,
 } from '../../utilities/session/sessionModeProfile';
+import {
+  DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
+  normalizeGroupCreationPolicy,
+  GROUP_CREATION_POLICIES,
+  type GroupCreationPolicy,
+} from '../../utilities/session/groupCreationPolicy';
+import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 
 export type SessionModeProfileSection = 'privacy' | 'worker' | 'publish';
 
@@ -26,6 +33,8 @@ export type SessionModeProfileSectionsProps = {
   registryChainId?: number | null;
   value?: unknown;
   onChange: (profile: SessionModeProfile, compiled: { storageProfile: AnyRecord }) => void;
+  groupCreationPolicy?: unknown;
+  onGroupCreationPolicyChange?: (policy: GroupCreationPolicy) => void;
 };
 
 const RESULT_VISIBILITY_OPTIONS: Array<{ value: SessionModeResultsVisibility; label: string; available?: boolean }> = [
@@ -61,6 +70,8 @@ const DEFAULT_CUSTOM_ACCESS_CONDITIONS: SessionModeAccessConditionDocument = {
     { kind: 'agent_grant_scope', scope: 'storage' },
   ],
 };
+
+const WORKER_ENVELOPE_DISABLED_HELP_ID = 'ce-new-encryption-worker-envelope-help';
 
 const defaultCloudflarePayloadAccessControl = (): NonNullable<SessionModeProfile['storage']['payloadAccessControl']> =>
   JSON.parse(
@@ -99,11 +110,28 @@ const setWorkerEnvelopeCondition = (profile: SessionModeProfile, conditions?: Se
   else delete profile.encryption.accessConditions;
 };
 
+const hasSbtOnchainCondition = (profile: SessionModeProfile): boolean =>
+  [profile.encryption.accessConditions, profile.storage.payloadAccessControl?.accessConditions].some(
+    (document) =>
+      Array.isArray(document?.conditions) && document.conditions.some((condition) => condition.kind === 'sbt_onchain'),
+  );
+
+const supportsWizardPublicResults = (profile: SessionModeProfile): boolean =>
+  profile.storage.backend === 'arweave' && profile.encryption.mode === 'none';
+
+const coerceUnavailablePublicResults = (profile: SessionModeProfile): void => {
+  if (profile.results.visibility === 'public_full_if_storage_public' && !supportsWizardPublicResults(profile)) {
+    profile.results.visibility = 'participant_aggregate';
+  }
+};
+
 const SessionModeProfileSections = ({
   section,
   registryChainId = null,
   value = null,
   onChange,
+  groupCreationPolicy: groupCreationPolicyValue = null,
+  onGroupCreationPolicyChange,
 }: SessionModeProfileSectionsProps): React.ReactElement => {
   const profile = isProfile(value) ? value : null;
   const validation = useMemo(
@@ -122,7 +150,12 @@ const SessionModeProfileSections = ({
     base.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     mutate(base);
     base.surfaces.web = true;
-    const compiled = compileSessionModeProfile(base);
+    const compileSource = validateSessionModeProfile(base).valid
+      ? base
+      : profile && validateSessionModeProfile(profile).valid
+        ? profile
+        : cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const compiled = compileSessionModeProfile(compileSource);
     onChange(base, { storageProfile: compiled.storageProfile });
   };
 
@@ -135,6 +168,10 @@ const SessionModeProfileSections = ({
   }
 
   if (section === 'worker') {
+    const groupCreationPolicy = normalizeGroupCreationPolicy(
+      groupCreationPolicyValue,
+      DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
+    );
     return (
       <section className={styles.modeSection} aria-label="Participation channels">
         <div className={styles.modeSectionHeading}>
@@ -156,8 +193,8 @@ const SessionModeProfileSections = ({
                     if (surface.value === 'miniApp' && event.target.checked) draft.surfaces.telegram = true;
                   })
                 }
-              />{' '}
-              {surface.label}
+              />
+              <span className={styles.modeCheckboxText}>{surface.label}</span>
             </Label>
           ))}
         </div>
@@ -165,6 +202,25 @@ const SessionModeProfileSections = ({
           Agent Session Wrapped deploys an additional per-session Worker/Bridge. Telegram stays optional and is off by
           default.
         </p>
+        <FormRow label="Who can create groups?">
+          <div>
+            <SegmentedButtons
+              ariaLabel="Who can create groups?"
+              options={[
+                { value: GROUP_CREATION_POLICIES.ADMIN_ONLY, label: 'Admins only' },
+                { value: GROUP_CREATION_POLICIES.PARTICIPANTS, label: 'All participants' },
+              ]}
+              value={groupCreationPolicy}
+              onChange={(policy) => onGroupCreationPolicyChange?.(policy as GroupCreationPolicy)}
+              dataTestIdPrefix={E2E_TESTIDS.WIZARD_GROUP_CREATION_POLICY}
+            />
+            <p className={styles.helperText}>
+              {profile.authority.mode === 'worker_canonical'
+                ? 'Participant-created groups are open to session participants. Updating groups and managing membership remain admin-only.'
+                : 'This controls group creation in Context Engine. Public SBT factories remain callable directly on-chain, so “Admins only” cannot block independent contract deployments.'}
+            </p>
+          </div>
+        </FormRow>
         <ValidationIssues issues={sectionValidationIssues} />
       </section>
     );
@@ -238,6 +294,8 @@ const SessionModeProfileSections = ({
               draft.storage.backend = backend as SessionModeProfile['storage']['backend'];
               if (backend === 'cloudflare') {
                 draft.authority.mode = 'worker_canonical';
+                draft.identity = { default: 'passkey', enabled: ['passkey'] };
+                draft.authorization = { mechanisms: ['worker_roles'] };
                 const defaultAccess = defaultCloudflarePayloadAccessControl();
                 draft.storage.payloadAccessControl = {
                   ...defaultAccess,
@@ -248,11 +306,13 @@ const SessionModeProfileSections = ({
                         ? 'lit'
                         : 'none',
                 };
-                if (draft.results.visibility === 'public_full_if_storage_public') {
-                  draft.results.visibility = 'participant_aggregate';
+                if (draft.encryption.mode !== 'lit' && !hasSbtOnchainCondition(draft)) {
+                  draft.evm.registryChainId = null;
                 }
               } else {
                 draft.authority.mode = 'evm_registry_canonical';
+                draft.identity = { default: 'wallet', enabled: ['wallet', 'passkey'] };
+                draft.authorization = { mechanisms: ['sbt_onchain'] };
                 draft.evm.registryChainId = draft.evm.registryChainId || registryChainId || 11155420;
                 delete draft.storage.payloadAccessControl;
                 if (draft.encryption.mode === 'worker_envelope') draft.encryption = { mode: 'none' };
@@ -260,6 +320,7 @@ const SessionModeProfileSections = ({
                   draft.export.scope = 'admin_raw';
                 }
               }
+              coerceUnavailablePublicResults(draft);
             })
           }
         />
@@ -276,6 +337,7 @@ const SessionModeProfileSections = ({
               label: 'Cloudflare',
               disabled: !!workerEnvelopeDisabledReason,
               title: workerEnvelopeDisabledReason,
+              describedBy: workerEnvelopeDisabledReason ? WORKER_ENVELOPE_DISABLED_HELP_ID : undefined,
             },
           ]}
           value={profile.encryption.mode}
@@ -291,12 +353,17 @@ const SessionModeProfileSections = ({
               if (mode === 'none' && draft.export.scope === 'encrypted_envelopes_only') {
                 draft.export.scope = 'admin_raw';
               }
+              coerceUnavailablePublicResults(draft);
             })
           }
           dataTestIdPrefix="ce-new-encryption"
         />
         {litDisabledReason ? <div className={styles.helperText}>{litDisabledReason}</div> : null}
-        {workerEnvelopeDisabledReason ? <div className={styles.helperText}>{workerEnvelopeDisabledReason}</div> : null}
+        {workerEnvelopeDisabledReason ? (
+          <div id={WORKER_ENVELOPE_DISABLED_HELP_ID} className={styles.helperText}>
+            {workerEnvelopeDisabledReason}
+          </div>
+        ) : null}
         {profile.encryption.mode === 'worker_envelope' ? (
           <div className={styles.modeAdvancedNested}>
             <ul className={styles.modeSummaryList}>
@@ -330,11 +397,18 @@ const SessionModeProfileSections = ({
                 The worker grants storage access to configured admins and agents granted the storage scope.
               </p>
             ) : (
-              <WorkerEnvelopeOptions
-                profile={profile}
-                registryChainId={registryChainId || null}
-                updateProfile={updateProfile}
-              />
+              <>
+                <div className={styles.modeValidationList} data-testid="ce-new-hybrid-requirements">
+                  Advanced hybrid access can add on-chain SBT checks. It requires an RPC URL; creating an SBT also
+                  requires a wallet and testnet gas. Lit encryption additionally requires a Lit credential and the
+                  Advanced manual bootstrap flow.
+                </div>
+                <WorkerEnvelopeOptions
+                  profile={profile}
+                  registryChainId={registryChainId || null}
+                  updateProfile={updateProfile}
+                />
+              </>
             )}
           </div>
         ) : null}
@@ -360,7 +434,7 @@ const SessionModeProfileSections = ({
               value={option.value}
               disabled={
                 option.available === false ||
-                (option.value === 'public_full_if_storage_public' && profile.storage.backend === 'cloudflare')
+                (option.value === 'public_full_if_storage_public' && !supportsWizardPublicResults(profile))
               }
             >
               {option.label}
@@ -461,7 +535,7 @@ const FormRow = ({ label, children }: FormRowProps): React.ReactElement => (
 
 type SegmentedButtonsProps = {
   ariaLabel: string;
-  options: Array<{ value: string; label: string; disabled?: boolean; title?: string }>;
+  options: Array<{ value: string; label: string; disabled?: boolean; title?: string; describedBy?: string }>;
   value: string;
   onChange: (value: string) => void;
   dataTestIdPrefix?: string;
@@ -488,6 +562,7 @@ const SegmentedButtons = ({
             type="button"
             role="radio"
             aria-checked={isSelected}
+            aria-describedby={option.describedBy}
             disabled={option.disabled}
             title={option.title}
             tabIndex={option.disabled || (!isSelected && !(selectedEnabledIndex < 0 && enabledIndex === 0)) ? -1 : 0}
@@ -571,6 +646,24 @@ const WorkerEnvelopeOptions = ({
     commitConditions(next);
   };
 
+  const updateSbtConditionChain = (chainId: number) => {
+    if (!Number.isSafeInteger(chainId) || chainId <= 0) return;
+    const next = cloneAccessConditions(profile.encryption.accessConditions);
+    next.conditions = next.conditions.map((condition) =>
+      condition.kind === 'sbt_onchain' ? { ...condition, chainId } : condition,
+    );
+    updateProfile((draft) => {
+      draft.evm.registryChainId = chainId;
+      const storedConditions = draft.storage.payloadAccessControl?.accessConditions;
+      if (storedConditions) {
+        storedConditions.conditions = storedConditions.conditions.map((condition) =>
+          condition.kind === 'sbt_onchain' ? { ...condition, chainId } : condition,
+        );
+      }
+      setWorkerEnvelopeCondition(draft, next);
+    });
+  };
+
   return (
     <div className={styles.modeRuleBuilder}>
       <Label className={styles.modeFieldLabel} htmlFor="ce-new-envelope-condition-match">
@@ -604,7 +697,7 @@ const WorkerEnvelopeOptions = ({
           onClick={() => addCondition('sbt_onchain')}
           data-testid="ce-new-envelope-add-sbt-onchain"
         >
-          Add SBT holders
+          Add SBT holders (Advanced hybrid)
         </Button>
         <Button
           type="button"
@@ -659,9 +752,7 @@ const WorkerEnvelopeOptions = ({
                   aria-label="SBT network"
                   value={condition.chainId || ''}
                   data-testid={`ce-new-envelope-sbt-chain-${index}`}
-                  onChange={(event) =>
-                    updateCondition(index, () => ({ ...condition, chainId: Number(event.target.value || 0) || 0 }))
-                  }
+                  onChange={(event) => updateSbtConditionChain(Number(event.target.value || 0) || 0)}
                 >
                   {Array.from(new Set([condition.chainId, 11155420, 84532]))
                     .filter((chainId) => Number(chainId) > 0)

@@ -27,6 +27,16 @@ import {
 import { MASKED_Q_DECRYPT_BACKOFF_MAX, MASKED_Q_DECRYPT_BACKOFF_TTL_MS } from '../cache/sessionCacheConstants.js';
 import { isMaskedQuestionPayload, pickBetterQuestionPayload } from './questionRouting.js';
 import { isResponseRecencyAtLeast, toResponseRecencyPair, type ResponseRecencyPair } from './responseRecency';
+import {
+  shouldHydrateWorkerCanonicalMetadata,
+  type WorkerMetadataHydrationHost,
+} from './workerCanonicalCacheHydration';
+import {
+  hydrateSessionWorkerQuestionCache,
+  isWorkerMetadataHydrationInFlight,
+  resolveWorkerMetadataHydrationTarget,
+} from './sessionWorkerMetadataCacheRuntime';
+import { createSessionCacheRevisionUpdater } from './sessionCacheRevisionRuntime';
 
 type CacheRecord = Record<string, unknown>;
 type StateRecord = {
@@ -193,7 +203,7 @@ interface QuestionCacheContractScripts {
   ) => Promise<void>;
 }
 
-export interface SessionQuestionCacheHost {
+export interface SessionQuestionCacheHost extends WorkerMetadataHydrationHost {
   [key: string]: unknown;
   setState?: (updater: SetStateArg, cb?: () => void) => void;
   getState?: () => StateRecord;
@@ -202,13 +212,8 @@ export interface SessionQuestionCacheHost {
   updateQuestionsCacheAtomic: (slug: string, updater: QuestionsCacheAtomicUpdater) => Promise<boolean>;
   updateUserCacheAtomic: (slug: string, updater: UserCacheAtomicUpdater) => Promise<boolean>;
   getActiveSessionSlug?: () => string | null | undefined;
-  getSessionCfg?: (slug: string) => CacheRecord | null | undefined;
   getSessionChainId?: (slug: string) => string | number | null | undefined;
   getSessionScanScope?: () => string | null | undefined;
-  getAccount?: () => string | null | undefined;
-  getProviderLike?: () => unknown;
-  getProvider?: () => unknown;
-  provider?: unknown;
   getNetwork?: () => NetworkLike | null | undefined;
   network?: NetworkLike | null | undefined;
   scanScopeNoop?: (slug: string, op: string, onSkipped?: () => void) => boolean;
@@ -367,7 +372,6 @@ export const createSessionQuestionCacheController = (
   let _maskedQuestionRefreshLastStart: Record<string, number | undefined> | null = {};
   let _maskedQuestionRefreshCursor: Record<string, number | undefined> = {};
   let _maskedQuestionDecryptBackoff: Map<string, MaskedQuestionDecryptBackoffEntry> = new Map();
-
   const setState = (updater: SetStateArg, cb?: () => void): void => {
     if (typeof host.setState === 'function') {
       host.setState(updater, cb);
@@ -447,31 +451,15 @@ export const createSessionQuestionCacheController = (
       );
     }
   };
-  const queueLocalRevisionUpdate = (opts: QueueLocalRevisionUpdateOptions = {}): void => {
-    if (typeof host.queueLocalRevisionUpdate === 'function') {
-      host.queueLocalRevisionUpdate(opts);
-      return;
-    }
-    const shouldBumpQuestionResponsesNonce = !!opts?.needsQuestionResponsesNonce;
-    const shouldCheckAllCachesReady = !!opts?.checkAllCachesReady;
-    if (!shouldBumpQuestionResponsesNonce && !shouldCheckAllCachesReady) return;
-    setState(
-      (prev) => {
-        const next: StateRecord = {};
-        if (shouldBumpQuestionResponsesNonce) {
-          next.questionResponsesNonce = Number(prev?.questionResponsesNonce || 0) + 1;
-        }
-        return Object.keys(next).length ? next : null;
-      },
-      () => {
-        if (shouldCheckAllCachesReady) checkAllCachesReady();
-      },
-    );
-  };
+  const queueLocalRevisionUpdate = createSessionCacheRevisionUpdater<StateRecord, QueueLocalRevisionUpdateOptions>({
+    host,
+    setState,
+    checkAllCachesReady,
+  });
 
   const isInitInFlight = (slugIn = ''): boolean => {
     const slug = normalizeSessionSlug(slugIn || '');
-    return !!_questionInitInFlight?.[slug];
+    return isWorkerMetadataHydrationInFlight(_questionInitInFlight, host, slug);
   };
 
   const destroy = (): void => {
@@ -534,7 +522,8 @@ export const createSessionQuestionCacheController = (
     const forceDiscoveryRescan = !skipDiscoveryScan && !!(opts && opts.forceDiscoveryRescan === true);
     const QUESTION_METADATA_BULK_ARWEAVE_RETRIES = 0;
     const QUESTION_METADATA_BULK_ARWEAVE_TIMEOUT_MS = 4500;
-    const initRunKey = slug;
+    const workerTarget = resolveWorkerMetadataHydrationTarget(host, slug);
+    const initRunKey = workerTarget.runKey;
     const rerunOpts = {
       ...(opts && typeof opts === 'object' ? opts : {}),
       background: suppressUiState,
@@ -550,6 +539,7 @@ export const createSessionQuestionCacheController = (
       checkAllCachesReady();
     };
     if (
+      !workerTarget.isWorkerCanonical &&
       scanScopeNoop(slug, 'initializeQuestionCacheForGroup', () => {
         setQuestionState({ isQuestionCacheReady: true }, checkAllCachesReady);
       })
@@ -558,9 +548,12 @@ export const createSessionQuestionCacheController = (
     }
     _questionInitInFlight = _questionInitInFlight || {};
     _questionInitPending = _questionInitPending || {};
-    if (_questionInitInFlight[initRunKey]) {
-      _questionInitPending[initRunKey] = mergePendingQuestionInitOpts(_questionInitPending[initRunKey], rerunOpts);
-      return _questionInitInFlight[initRunKey];
+    if (_questionInitInFlight[workerTarget.runKey]) {
+      _questionInitPending[workerTarget.runKey] = mergePendingQuestionInitOpts(
+        _questionInitPending[workerTarget.runKey],
+        rerunOpts,
+      );
+      return _questionInitInFlight[workerTarget.runKey];
     }
 
     const run = (async () => {
@@ -568,6 +561,22 @@ export const createSessionQuestionCacheController = (
       setQuestionState((prev) =>
         prev.questionCacheInitializationError ? { questionCacheInitializationError: false } : null,
       );
+
+      if (workerTarget.isWorkerCanonical) {
+        await hydrateSessionWorkerQuestionCache<QuestionCache>({
+          host,
+          target: workerTarget,
+          sessionSlug: slug,
+          createPersistenceError: () =>
+            new QuestionCachePersistenceError(`Failed to persist Worker questions cache for ${slug}`),
+          onSuccess: (count) => {
+            setQuestionState({ isQuestionCacheReady: true, questionScanProgress: null });
+            if (count > 0) queueLocalRevisionUpdate({ needsQuestionResponsesNonce: true });
+            maybeCheckAllCachesReady();
+          },
+        });
+        return;
+      }
 
       const networkID = String(getSessionChainId(slug) || '');
       const scopedSlug = normalizeSessionSlug(slug || '');
@@ -2322,9 +2331,11 @@ export const createSessionQuestionCacheController = (
 
   async function refreshQuestionMetadataForGroup(slug: string, opts: QuestionInitOptions = {}): Promise<void> {
     mainSiteLog.log('refreshQuestionMetadataForGroup() - invoked', { slug });
-    if (!getSessionChainId(slug)) {
-      mainSiteLog.warn('No group chainId for refreshQuestionMetadataForGroup');
-      return;
+    if (!shouldHydrateWorkerCanonicalMetadata(getSessionCfg(slug))) {
+      if (!getSessionChainId(slug)) {
+        mainSiteLog.warn('No group chainId for refreshQuestionMetadataForGroup');
+        return;
+      }
     }
     // Re-running initializeQuestionCacheForGroup will handle fetching new QIDs and their metadata
     // from the last known block.

@@ -46,6 +46,7 @@ type AdminPageMetadataEditorProps = {
   visibleMetadataContracts: Array<[string, AdminContractEntry]>;
   handleSaveSessionMetadata: () => void;
   metadataUpdateStatus: string;
+  showChainFields?: boolean;
 };
 
 const draftValue = (draft: AdminMetadataDraft, key: string): string => toStr(draft[key]);
@@ -85,11 +86,13 @@ const AdminPageMetadataEditor = ({
   visibleMetadataContracts,
   handleSaveSessionMetadata,
   metadataUpdateStatus,
+  showChainFields = true,
 }: AdminPageMetadataEditorProps) => (
   <div className={styles.metadataEditorCard}>
     <div className={styles.metadataEditorIntro}>
-      Publish session defaults and curation metadata here. Block limits, faucet settings, contracts, and registry/RPC
-      context are also synced to worker config when a worker URL is available.
+      {showChainFields
+        ? 'Publish session defaults and curation metadata here. Block limits, faucet settings, contracts, and registry/RPC context are also synced to worker config when a worker URL is available.'
+        : 'Update canonical Session Worker defaults here. This Worker-native save does not require chain defaults, contracts, block limits, a faucet, or Arweave metadata.'}
     </div>
     <div className={styles.metadataSectionGrid}>
       <div className={styles.metadataSectionCard}>
@@ -103,16 +106,18 @@ const AdminPageMetadataEditor = ({
               onChange={(event: AdminFormChangeEvent) => updateMetadataConfigDraft('defaultTags', getInputValue(event))}
             />
           </FormGroup>
-          <FormGroup>
-            <Label>Default SBT tags</Label>
-            <Input
-              value={draftValue(metadataConfigDraft, 'defaultSbtTags')}
-              placeholder="member, contributor"
-              onChange={(event: AdminFormChangeEvent) =>
-                updateMetadataConfigDraft('defaultSbtTags', getInputValue(event))
-              }
-            />
-          </FormGroup>
+          {showChainFields ? (
+            <FormGroup>
+              <Label>Default SBT tags</Label>
+              <Input
+                value={draftValue(metadataConfigDraft, 'defaultSbtTags')}
+                placeholder="member, contributor"
+                onChange={(event: AdminFormChangeEvent) =>
+                  updateMetadataConfigDraft('defaultSbtTags', getInputValue(event))
+                }
+              />
+            </FormGroup>
+          ) : null}
         </div>
         <FormGroup className={styles.metadataTextAreaGroup}>
           <Label>Question generation prompt</Label>
@@ -138,50 +143,54 @@ const AdminPageMetadataEditor = ({
             }
           />
         </FormGroup>
-        <FormGroup check className={styles.metadataToggle}>
-          <Label check className={styles.metadataToggleLabel}>
-            <Input
-              type="checkbox"
-              checked={metadataAutoFeatureDraft}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                setMetadataDraftTouched(true);
-                setMetadataAutoFeatureTouched(true);
-                setMetadataAutoFeatureDraft(!!event.target.checked);
+        {showChainFields ? (
+          <FormGroup check className={styles.metadataToggle}>
+            <Label check className={styles.metadataToggleLabel}>
+              <Input
+                type="checkbox"
+                checked={metadataAutoFeatureDraft}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                  setMetadataDraftTouched(true);
+                  setMetadataAutoFeatureTouched(true);
+                  setMetadataAutoFeatureDraft(!!event.target.checked);
+                }}
+              />
+              Auto-feature by session slug
+            </Label>
+          </FormGroup>
+        ) : null}
+        {showChainFields ? (
+          <FormGroup className={styles.metadataSelectorGroup}>
+            <Label>Default featured SBTs</Label>
+            <SBTSelector
+              id="admin-default-featured-sbts"
+              label=""
+              selectedSBTs={metadataConfigDraft.defaultFeaturedSBTs}
+              onAddSBT={(sbt: unknown) => {
+                updateMetadataConfigDraft(
+                  'defaultFeaturedSBTs',
+                  dedupeSbtSelections([...draftArray(metadataConfigDraft.defaultFeaturedSBTs), sbt]),
+                );
               }}
+              onRemoveSBT={(address: string) => {
+                updateMetadataConfigDraft(
+                  'defaultFeaturedSBTs',
+                  dedupeSbtSelections(metadataConfigDraft.defaultFeaturedSBTs).filter(
+                    (entry: AdminSbtSelection) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase(),
+                  ),
+                );
+              }}
+              network={network}
+              chainId={relevantSessionChainId || asRecord(network).id || null}
+              sessionSlug={normalizeSlug(selectedSlug)}
+              variant="admin"
+              ensureLightSbtUniverse={ensureLightSbtUniverse}
+              defaultFeaturedSBTs={draftArray(metadataConfigDraft.defaultFeaturedSBTs).map((entry) =>
+                toStr(asRecord(entry).address),
+              )}
             />
-            Auto-feature by session slug
-          </Label>
-        </FormGroup>
-        <FormGroup className={styles.metadataSelectorGroup}>
-          <Label>Default featured SBTs</Label>
-          <SBTSelector
-            id="admin-default-featured-sbts"
-            label=""
-            selectedSBTs={metadataConfigDraft.defaultFeaturedSBTs}
-            onAddSBT={(sbt: unknown) => {
-              updateMetadataConfigDraft(
-                'defaultFeaturedSBTs',
-                dedupeSbtSelections([...draftArray(metadataConfigDraft.defaultFeaturedSBTs), sbt]),
-              );
-            }}
-            onRemoveSBT={(address: string) => {
-              updateMetadataConfigDraft(
-                'defaultFeaturedSBTs',
-                dedupeSbtSelections(metadataConfigDraft.defaultFeaturedSBTs).filter(
-                  (entry: AdminSbtSelection) => toStr(entry.address).toLowerCase() !== toStr(address).toLowerCase(),
-                ),
-              );
-            }}
-            network={network}
-            chainId={relevantSessionChainId || asRecord(network).id || null}
-            sessionSlug={normalizeSlug(selectedSlug)}
-            variant="admin"
-            ensureLightSbtUniverse={ensureLightSbtUniverse}
-            defaultFeaturedSBTs={draftArray(metadataConfigDraft.defaultFeaturedSBTs).map((entry) =>
-              toStr(asRecord(entry).address),
-            )}
-          />
-        </FormGroup>
+          </FormGroup>
+        ) : null}
       </div>
 
       <div className={styles.metadataSectionCard}>
@@ -259,145 +268,149 @@ const AdminPageMetadataEditor = ({
         </div>
       </div>
 
-      <div className={styles.metadataSectionCard}>
-        <div className={styles.panelSubtitle}>Runtime sync</div>
-        <div className={styles.metadataEditorGrid}>
-          <FormGroup>
-            <Label>Start block</Label>
-            <Input
-              type="number"
-              value={metadataBlockLimitsDraft.start}
-              onChange={(event: AdminFormChangeEvent) => {
-                setMetadataDraftTouched(true);
-                setMetadataBlockLimitsDraft((prev) => ({
-                  ...(prev || {}),
-                  start: getInputValue(event),
-                }));
-              }}
-            />
-          </FormGroup>
-          <FormGroup>
-            <Label>End block</Label>
-            <Input
-              type="number"
-              value={metadataBlockLimitsDraft.end}
-              placeholder="Optional"
-              onChange={(event: AdminFormChangeEvent) => {
-                setMetadataDraftTouched(true);
-                setMetadataBlockLimitsDraft((prev) => ({
-                  ...(prev || {}),
-                  end: getInputValue(event),
-                }));
-              }}
-            />
-          </FormGroup>
-          <FormGroup>
-            <Label>Faucet amount (ETH)</Label>
-            <Input
-              value={draftValue(metadataConfigDraft, 'faucetAmountEth')}
-              placeholder="0.0002"
-              onChange={(event: AdminFormChangeEvent) =>
-                updateMetadataConfigDraft('faucetAmountEth', getInputValue(event))
-              }
-            />
-          </FormGroup>
-          <FormGroup>
-            <Label>Faucet threshold (ETH)</Label>
-            <Input
-              value={draftValue(metadataConfigDraft, 'faucetBalanceThresholdEth')}
-              placeholder="0.001"
-              onChange={(event: AdminFormChangeEvent) =>
-                updateMetadataConfigDraft('faucetBalanceThresholdEth', getInputValue(event))
-              }
-            />
-          </FormGroup>
-        </div>
-        {currentBlockSummary && <div className={styles.statusNote}>{currentBlockSummary}</div>}
-        <Button
-          size="sm"
-          color="secondary"
-          outline
-          className={styles.actionButton}
-          onClick={handleUseCurrentBlockForMetadata}
-          disabled={metadataUpdateBusy || !metadataLatestBlock}
-        >
-          Use current block
-        </Button>
-      </div>
-
-      <div className={styles.metadataSectionCard}>
-        <div className={styles.panelSubtitle}>Contracts</div>
-        <div className={styles.metadataEditorGrid}>
-          <FormGroup>
-            <Label>Surveys contract</Label>
-            <Input
-              value={draftValue(metadataConfigDraft, 'contractSurveysAddress')}
-              placeholder="0x..."
-              onChange={(event: AdminFormChangeEvent) =>
-                updateMetadataConfigDraft('contractSurveysAddress', getInputValue(event))
-              }
-            />
-            <FormText color="muted">Chain: {relevantSessionChainLabel || 'Uses session chain'}</FormText>
-          </FormGroup>
-          <FormGroup>
-            <Label>SBT factory contract</Label>
-            <Input
-              value={draftValue(metadataConfigDraft, 'contractSbtFactoryAddress')}
-              placeholder="0x..."
-              onChange={(event: AdminFormChangeEvent) =>
-                updateMetadataConfigDraft('contractSbtFactoryAddress', getInputValue(event))
-              }
-            />
-            <FormText color="muted">Chain: {relevantSessionChainLabel || 'Uses session chain'}</FormText>
-          </FormGroup>
-          <FormGroup>
-            <Label>SessionRegistry contract</Label>
-            <Input
-              value={draftValue(metadataConfigDraft, 'contractSessionRegistryAddress')}
-              placeholder="0x..."
-              onChange={(event: AdminFormChangeEvent) =>
-                updateMetadataConfigDraft('contractSessionRegistryAddress', getInputValue(event))
-              }
-            />
-            <FormText color="muted">
-              Chain: {relevantRegistryChainLabel || relevantSessionChainLabel || 'Uses registry chain'}
-            </FormText>
-          </FormGroup>
-        </div>
-        {metadataContractsNeedVerification && metadataDefaultedEditableContractKeys.length > 0 && (
-          <FormGroup check className={styles.metadataToggle}>
-            <Label check className={styles.metadataToggleLabel}>
+      {showChainFields ? (
+        <div className={styles.metadataSectionCard}>
+          <div className={styles.panelSubtitle}>Runtime sync</div>
+          <div className={styles.metadataEditorGrid}>
+            <FormGroup>
+              <Label>Start block</Label>
               <Input
-                type="checkbox"
-                checked={metadataContractsVerified}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                  setMetadataContractsVerified(!!event.target.checked)
+                type="number"
+                value={metadataBlockLimitsDraft.start}
+                onChange={(event: AdminFormChangeEvent) => {
+                  setMetadataDraftTouched(true);
+                  setMetadataBlockLimitsDraft((prev) => ({
+                    ...(prev || {}),
+                    start: getInputValue(event),
+                  }));
+                }}
+              />
+            </FormGroup>
+            <FormGroup>
+              <Label>End block</Label>
+              <Input
+                type="number"
+                value={metadataBlockLimitsDraft.end}
+                placeholder="Optional"
+                onChange={(event: AdminFormChangeEvent) => {
+                  setMetadataDraftTouched(true);
+                  setMetadataBlockLimitsDraft((prev) => ({
+                    ...(prev || {}),
+                    end: getInputValue(event),
+                  }));
+                }}
+              />
+            </FormGroup>
+            <FormGroup>
+              <Label>Faucet amount (ETH)</Label>
+              <Input
+                value={draftValue(metadataConfigDraft, 'faucetAmountEth')}
+                placeholder="0.0002"
+                onChange={(event: AdminFormChangeEvent) =>
+                  updateMetadataConfigDraft('faucetAmountEth', getInputValue(event))
                 }
               />
-              I verified these fallback defaults and want to publish them if I save metadata
-            </Label>
-          </FormGroup>
-        )}
-        {metadataContractsNeedVerification && !metadataContractsReadyForSave && (
-          <div className={styles.warningNote}>
-            Saving is blocked until you verify or edit the synthesized contract addresses above.
+            </FormGroup>
+            <FormGroup>
+              <Label>Faucet threshold (ETH)</Label>
+              <Input
+                value={draftValue(metadataConfigDraft, 'faucetBalanceThresholdEth')}
+                placeholder="0.001"
+                onChange={(event: AdminFormChangeEvent) =>
+                  updateMetadataConfigDraft('faucetBalanceThresholdEth', getInputValue(event))
+                }
+              />
+            </FormGroup>
           </div>
-        )}
-        {readonlyMetadataContracts.length ? (
-          <div className={styles.metadataReadonlyGrid}>
-            {readonlyMetadataContracts.map(([key, value]) => (
-              <div key={key} className={styles.metadataReadonlyItem}>
-                <span>{key}</span>
-                <strong>{toStr(value.address).trim() || '—'}</strong>
-                <span>{toStr(value.chainId).trim() || '—'}</span>
-              </div>
-            ))}
+          {currentBlockSummary && <div className={styles.statusNote}>{currentBlockSummary}</div>}
+          <Button
+            size="sm"
+            color="secondary"
+            outline
+            className={styles.actionButton}
+            onClick={handleUseCurrentBlockForMetadata}
+            disabled={metadataUpdateBusy || !metadataLatestBlock}
+          >
+            Use current block
+          </Button>
+        </div>
+      ) : null}
+
+      {showChainFields ? (
+        <div className={styles.metadataSectionCard}>
+          <div className={styles.panelSubtitle}>Contracts</div>
+          <div className={styles.metadataEditorGrid}>
+            <FormGroup>
+              <Label>Surveys contract</Label>
+              <Input
+                value={draftValue(metadataConfigDraft, 'contractSurveysAddress')}
+                placeholder="0x..."
+                onChange={(event: AdminFormChangeEvent) =>
+                  updateMetadataConfigDraft('contractSurveysAddress', getInputValue(event))
+                }
+              />
+              <FormText color="muted">Chain: {relevantSessionChainLabel || 'Uses session chain'}</FormText>
+            </FormGroup>
+            <FormGroup>
+              <Label>SBT factory contract</Label>
+              <Input
+                value={draftValue(metadataConfigDraft, 'contractSbtFactoryAddress')}
+                placeholder="0x..."
+                onChange={(event: AdminFormChangeEvent) =>
+                  updateMetadataConfigDraft('contractSbtFactoryAddress', getInputValue(event))
+                }
+              />
+              <FormText color="muted">Chain: {relevantSessionChainLabel || 'Uses session chain'}</FormText>
+            </FormGroup>
+            <FormGroup>
+              <Label>SessionRegistry contract</Label>
+              <Input
+                value={draftValue(metadataConfigDraft, 'contractSessionRegistryAddress')}
+                placeholder="0x..."
+                onChange={(event: AdminFormChangeEvent) =>
+                  updateMetadataConfigDraft('contractSessionRegistryAddress', getInputValue(event))
+                }
+              />
+              <FormText color="muted">
+                Chain: {relevantRegistryChainLabel || relevantSessionChainLabel || 'Uses registry chain'}
+              </FormText>
+            </FormGroup>
           </div>
-        ) : null}
-        {!visibleMetadataContracts.length && (
-          <div className={styles.statusNote}>No contract metadata found for this session.</div>
-        )}
-      </div>
+          {metadataContractsNeedVerification && metadataDefaultedEditableContractKeys.length > 0 && (
+            <FormGroup check className={styles.metadataToggle}>
+              <Label check className={styles.metadataToggleLabel}>
+                <Input
+                  type="checkbox"
+                  checked={metadataContractsVerified}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                    setMetadataContractsVerified(!!event.target.checked)
+                  }
+                />
+                I verified these fallback defaults and want to publish them if I save metadata
+              </Label>
+            </FormGroup>
+          )}
+          {metadataContractsNeedVerification && !metadataContractsReadyForSave && (
+            <div className={styles.warningNote}>
+              Saving is blocked until you verify or edit the synthesized contract addresses above.
+            </div>
+          )}
+          {readonlyMetadataContracts.length ? (
+            <div className={styles.metadataReadonlyGrid}>
+              {readonlyMetadataContracts.map(([key, value]) => (
+                <div key={key} className={styles.metadataReadonlyItem}>
+                  <span>{key}</span>
+                  <strong>{toStr(value.address).trim() || '—'}</strong>
+                  <span>{toStr(value.chainId).trim() || '—'}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          {!visibleMetadataContracts.length && (
+            <div className={styles.statusNote}>No contract metadata found for this session.</div>
+          )}
+        </div>
+      ) : null}
     </div>
 
     <div className={styles.metadataSectionCard}>
@@ -451,30 +464,34 @@ const AdminPageMetadataEditor = ({
             }
           />
         </FormGroup>
-        <FormGroup className={styles.metadataTextAreaGroup}>
-          <Label>Ignored SBT list</Label>
-          <Input
-            type="textarea"
-            rows={3}
-            value={draftValue(metadataConfigDraft, 'ignoredSbtsList')}
-            placeholder="One SBT address per line"
-            onChange={(event: AdminFormChangeEvent) =>
-              updateMetadataConfigDraft('ignoredSbtsList', getInputValue(event))
-            }
-          />
-        </FormGroup>
-        <FormGroup className={styles.metadataTextAreaGroup}>
-          <Label>Featured SBT list</Label>
-          <Input
-            type="textarea"
-            rows={3}
-            value={draftValue(metadataConfigDraft, 'featuredSbtsList')}
-            placeholder="One SBT address per line"
-            onChange={(event: AdminFormChangeEvent) =>
-              updateMetadataConfigDraft('featuredSbtsList', getInputValue(event))
-            }
-          />
-        </FormGroup>
+        {showChainFields ? (
+          <FormGroup className={styles.metadataTextAreaGroup}>
+            <Label>Ignored SBT list</Label>
+            <Input
+              type="textarea"
+              rows={3}
+              value={draftValue(metadataConfigDraft, 'ignoredSbtsList')}
+              placeholder="One SBT address per line"
+              onChange={(event: AdminFormChangeEvent) =>
+                updateMetadataConfigDraft('ignoredSbtsList', getInputValue(event))
+              }
+            />
+          </FormGroup>
+        ) : null}
+        {showChainFields ? (
+          <FormGroup className={styles.metadataTextAreaGroup}>
+            <Label>Featured SBT list</Label>
+            <Input
+              type="textarea"
+              rows={3}
+              value={draftValue(metadataConfigDraft, 'featuredSbtsList')}
+              placeholder="One SBT address per line"
+              onChange={(event: AdminFormChangeEvent) =>
+                updateMetadataConfigDraft('featuredSbtsList', getInputValue(event))
+              }
+            />
+          </FormGroup>
+        ) : null}
       </div>
     </div>
 

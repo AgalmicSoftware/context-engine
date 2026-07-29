@@ -19,6 +19,7 @@ describe('MainSite route table', () => {
       'compare',
       'surveysOrQuestionsList',
       'questionDetail',
+      'sbtCreate',
       'sbtsList',
       'sbtDetail',
       'simUser',
@@ -41,7 +42,10 @@ describe('MainSite route table', () => {
     ['/session/edge/docs', 'session', { sessionToken: 'edge' }],
     [`/survey/${SURVEY_ID}/results`, 'surveyId', { surveyIDFromPath: SURVEY_ID }],
     [`/question/${QUESTION_ID}?session=edge`, 'questionDetail', { questionId: QUESTION_ID }],
+    ['/sbts/new', 'sbtCreate', {}],
+    ['/groups/new/', 'sbtCreate', {}],
     [`/sbt/${ADDRESS}`, 'sbtDetail', { sbtAddress: ADDRESS }],
+    ['/group/public-reviewers', 'sbtsList', { sbtAddress: null }],
     [`/u/${ADDRESS}`, 'userProfile', {}],
     ['/admin', 'admin', {}],
     ['/sponsor', 'sponsor', {}],
@@ -81,6 +85,12 @@ describe('MainSite route table', () => {
         sbtAddress: ADDRESS,
       }),
     );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/group/public-reviewers', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtsList',
+        sbtAddress: null,
+      }),
+    );
   });
 
   it('keeps accepted double-slash SBT address paths on the SBT detail route', () => {
@@ -117,6 +127,34 @@ describe('MainSite route table', () => {
         key: 'posts',
         isKnownRoutePrefix: true,
         shouldBypassCacheHydrationWait: true,
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/groups/demo-sh', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtsList',
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/group/public-reviewers', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtsList',
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/groups/new', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtCreate',
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/sbts/demo-sh', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtsList',
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: false,
       }),
     );
     expect(resolveMainSiteRouteMatch({ fullPath: '/not-a-route', isAddress })).toEqual(

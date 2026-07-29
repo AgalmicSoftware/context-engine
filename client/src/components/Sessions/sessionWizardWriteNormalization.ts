@@ -25,6 +25,11 @@ import {
   normalizeSessionStorageProfileConfig,
 } from './sessionWizardStorageProfile';
 import {
+  DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
+  normalizeGroupCreationPolicy,
+} from '../../utilities/session/groupCreationPolicy';
+import {
+  classifySessionModeProfileSupport,
   compileSessionModeProfile,
   hasLegacyTelegramFirstSessionFlags,
   mergeSessionModeProfileStorageAccess,
@@ -32,6 +37,8 @@ import {
   type SessionModeProfile,
 } from '../../utilities/session/sessionModeProfile';
 import { resolveSessionWizardModeRequirements } from './sessionWizardModeRequirements';
+import { normalizeSessionWizardDefaultFeaturedSbtMetadata } from './sessionWizardMetadataPayload';
+import { normalizeSessionWizardEndsAt } from './sessionWizardSessionLifecycle';
 import type {
   AnyRecord,
   ChainIdLike,
@@ -49,6 +56,17 @@ const WORKER_METADATA_ALIAS_KEYS = Object.freeze([
 ]);
 
 export { SESSION_WIZARD_ONCHAIN_COMPAT_FIELD_PATHS, buildSessionWizardRegistrySessionFields };
+
+function assertReachableSessionModeProfile(profile: unknown, context: string): asserts profile is SessionModeProfile {
+  const support = classifySessionModeProfileSupport(profile);
+  if (support.status === 'reachable') return;
+  const firstIssue = support.validation.issues[0];
+  throw new Error(
+    `${context} requires a reachable session mode profile${
+      firstIssue ? ` (${firstIssue.path || 'profile'}: ${firstIssue.code})` : ''
+    }.`,
+  );
+}
 
 const orderMetadataFields = (metadata: AnyRecord, fieldOrder: string[] = []): AnyRecord => {
   if (!isObj(metadata)) return metadata;
@@ -188,11 +206,15 @@ export const sanitizeSessionWizardMetadataPayload = (
     }
   }
 
+  if (Object.prototype.hasOwnProperty.call(next, 'sessionModeProfile') && !isObj(next.sessionModeProfile)) {
+    throw new Error('Session metadata publication requires a reachable session mode profile.');
+  }
   if (isObj(next.sessionModeProfile)) {
     const sessionModeProfile = mergeSessionModeProfileStorageAccess(
       next.sessionModeProfile as SessionModeProfile,
       next.storageProfile,
     );
+    assertReachableSessionModeProfile(sessionModeProfile, 'Session metadata publication');
     next.sessionModeProfile = sessionModeProfile;
     const compiled = compileSessionModeProfile(sessionModeProfile);
     next.storageProfile = normalizeSessionStorageProfileConfig(compiled.storageProfile);
@@ -239,6 +261,12 @@ export const resolveSessionWizardWorkerStorageProfilePayload = ({
   const resolvedDraft = isObj(draft) ? draft : {};
   const resolvedDeployPayload = isObj(deployPayload) ? deployPayload : {};
   const rawStorageProfile = resolvedDraft.storageProfile || resolvedDeployPayload.storageProfile;
+  if (
+    Object.prototype.hasOwnProperty.call(resolvedDraft, 'sessionModeProfile') &&
+    !isObj(resolvedDraft.sessionModeProfile)
+  ) {
+    throw new Error('Worker config publication requires a reachable session mode profile.');
+  }
   const sessionModeProfile = isObj(resolvedDraft.sessionModeProfile)
     ? (resolvedDraft.sessionModeProfile as SessionModeProfile)
     : hasLegacyTelegramFirstSessionFlags(resolvedDraft)
@@ -247,6 +275,9 @@ export const resolveSessionWizardWorkerStorageProfilePayload = ({
   const effectiveSessionModeProfile = sessionModeProfile
     ? mergeSessionModeProfileStorageAccess(sessionModeProfile, rawStorageProfile)
     : null;
+  if (effectiveSessionModeProfile) {
+    assertReachableSessionModeProfile(effectiveSessionModeProfile, 'Worker config publication');
+  }
   const compiledProfile = effectiveSessionModeProfile ? compileSessionModeProfile(effectiveSessionModeProfile) : null;
   const storageProfile = normalizeSessionStorageProfileConfig(compiledProfile?.storageProfile || rawStorageProfile);
   return {
@@ -313,21 +344,32 @@ export const buildSessionWizardWorkerConfigPayload = ({
     });
   const modeRequirements = resolveSessionWizardModeRequirements(effectiveSessionModeProfile);
   const isWorkerCanonical = modeRequirements.isWorkerCanonical;
-  const workerAuthority = isObj(resolvedDeployPayload.workerAuthority)
-    ? cloneValue(resolvedDeployPayload.workerAuthority)
-    : isWorkerCanonical
-      ? {
-          version: 1,
-          participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
-          anonymousScopes: [],
-        }
-      : undefined;
+  const usesOnChainSbt = isWorkerCanonical && modeRequirements.publish.deployPendingSbts;
+  const workerAuthority = isObj(resolvedDraft.workerAuthority)
+    ? cloneValue(resolvedDraft.workerAuthority)
+    : isObj(resolvedDeployPayload.workerAuthority)
+      ? cloneValue(resolvedDeployPayload.workerAuthority)
+      : isWorkerCanonical
+        ? {
+            version: 1,
+            participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
+            anonymousScopes: [],
+          }
+        : undefined;
   const next: AnyRecord = {
     slug: trimString(slug),
     adminAddress: trimString(resolvedDeployPayload.adminAddress || account),
     sessionName: trimString(resolvedDraft.sessionName),
     sessionInfo: trimString(resolvedDraft.sessionInfo),
-    sessionHeaderImg: trimString(resolvedDraft.sessionHeaderImg),
+    sessionHeaderImg: trimString(resolvedDraft.sessionHeader || resolvedDraft.sessionHeaderImg),
+    defaultTags: trimString(resolvedDraft.defaultTags),
+    defaultGroupTags: trimString(resolvedDraft.defaultGroupTags),
+    questionsGenPrompt: trimString(resolvedDraft.questionsGenPrompt),
+    defaultFilterState: cloneValue(resolvedDraft.defaultFilterState ?? null),
+    groupCreationPolicy: normalizeGroupCreationPolicy(
+      resolvedDraft.groupCreationPolicy,
+      DEFAULT_NEW_SESSION_GROUP_CREATION_POLICY,
+    ),
     ai: buildSessionWizardPublicAiConfig(resolvedDraft.ai),
     registryAddress: isWorkerCanonical ? '' : trimString(resolvedDeployPayload.registryAddress || registryAddress),
     registryChainId: isWorkerCanonical
@@ -362,6 +404,13 @@ export const buildSessionWizardWorkerConfigPayload = ({
   };
 
   if (isWorkerCanonical) {
+    const sessionEndsAt = normalizeSessionWizardEndsAt(resolvedDraft.sessionEndsAt);
+    if (sessionEndsAt) next.sessionEndsAt = sessionEndsAt;
+    if (usesOnChainSbt) {
+      next.defaultSbtTags = trimString(resolvedDraft.defaultSbtTags);
+      next.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(resolvedDraft.defaultFeaturedSBTs);
+      next.autoFeatureSBTsBySessionSlug = resolvedDraft.autoFeatureSBTsBySessionSlug !== false;
+    }
     delete next.registryAddress;
     delete next.registryChainId;
     delete next.faucet;
@@ -387,6 +436,10 @@ export const buildSessionWizardWorkerConfigPayload = ({
   }
   if (!isWorkerCanonical && Object.keys(normalizedContracts).length) {
     next.contracts = normalizedContracts;
+  } else if (usesOnChainSbt && normalizedContracts.sbtFactory) {
+    next.contracts = {
+      sbtFactory: normalizedContracts.sbtFactory,
+    };
   }
 
   const sessionIdHex = sessionRegistryUtils.normalizeSessionIdHex(sessionId);

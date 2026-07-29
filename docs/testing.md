@@ -122,6 +122,7 @@ public `test:ci` graph self-consistent.
 ```bash
 npm run verify:public-release-surface
 npm run verify:public-assets
+npm run verify:public-text:prepared
 ```
 
 The release-surface check rejects retained code that imports a stripped path.
@@ -129,7 +130,10 @@ The asset check rejects image files that have no literal owner in source,
 documentation, or a public asset manifest. Public artifact preparation also
 runs the documentation and all-text checks after private paths and package
 commands have been removed; `verify:public-text` is therefore intended for a
-prepared public tree rather than the full development checkout.
+prepared public tree rather than the full development checkout. The
+`verify:public-text:prepared` command is the development/hosted-CI entry point:
+it builds an isolated temporary artifact with the canonical release script,
+relies on that script's strict public-text check, and removes the artifact.
 
 ## E2E Workflows
 

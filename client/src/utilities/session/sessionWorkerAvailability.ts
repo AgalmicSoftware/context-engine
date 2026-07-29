@@ -2,6 +2,8 @@ import { CLOUDFLARE_CORS_WORKER_URL, USE_ONCHAIN_SESSION_REGISTRY } from '../../
 import { canonicalizeSessionSlug } from './canonicalSessionContext.js';
 import { overlayCachedSessionWorkerConfig } from './sessionWorkerConfigCache.js';
 import { parseWorkerConfig } from './sessionParsers.js';
+import { resolveSessionCapabilityProjection } from './sessionCapabilityProjection.js';
+import { parseSessionWorkerDiscoveryOrigin, resolveWorkerCanonicalSessionIdHex } from './sessionWorkerDiscovery.js';
 import { normalizeWorkerUrl } from '../worker/workerUrl.js';
 import type { SessionConfigLike } from './sessionTypes.js';
 
@@ -11,6 +13,7 @@ type SessionWorkerAvailabilityOptions = {
   slug?: unknown;
   sessionConfig?: unknown;
   allowSharedFallback?: boolean;
+  requireExactWorkerSession?: boolean;
 };
 
 const isObj = (value: unknown): value is SessionConfigLike =>
@@ -61,9 +64,33 @@ export const getUsableSessionWorkerUrl = ({
   slug,
   sessionConfig,
   allowSharedFallback = false,
+  requireExactWorkerSession = false,
 }: SessionWorkerAvailabilityOptions = {}): string => {
   const sessionConfigSource = isObj(sessionConfig) ? sessionConfig : null;
   const normalizedSlug = canonicalizeSessionSlug(slug ?? sessionConfigSource?.slug ?? '');
+  if (requireExactWorkerSession) {
+    const configuredSlug = canonicalizeSessionSlug(sessionConfigSource?.slug ?? '');
+    const sessionId = resolveWorkerCanonicalSessionIdHex(sessionConfigSource);
+    const projection = resolveSessionCapabilityProjection(sessionConfigSource);
+    if (
+      !normalizedSlug ||
+      configuredSlug !== normalizedSlug ||
+      !sessionId ||
+      projection.source !== 'profile' ||
+      !projection.profileValid ||
+      !projection.isWorkerCanonical
+    ) {
+      return '';
+    }
+    // Exact Worker-native routes are pinned to the already validated canonical
+    // config. A generic slug cache replica may refresh non-authoritative read
+    // paths, but it must never repoint Groups to a different Worker origin.
+    try {
+      return parseSessionWorkerDiscoveryOrigin(resolveConfiguredSessionWorkerUrlFromConfig(sessionConfigSource));
+    } catch {
+      return '';
+    }
+  }
   const effectiveSessionConfig = getEffectiveSessionWorkerConfig({
     slug: normalizedSlug,
     sessionConfig,

@@ -26,8 +26,8 @@ import {
 import {
   buildTokenCacheEnvelope,
   buildTokenCacheKey,
+  clearAllTokenCaches,
   clearTokenCache,
-  isWorkerTokenCacheKey,
   normalizeTokenCacheEntry,
   readScopedTokenCache,
   writeTokenCache,
@@ -47,11 +47,21 @@ import {
 } from './workerAuthFallbackPolicy.js';
 import { fetchWorkerAuthEndpoint, resolveAdminActionAudience } from './workerAuthReachability.js';
 import { ADMIN_ACTION_TYPES, buildAdminActionBodyHash, buildAdminActionTypedData } from './adminTypedData.mjs';
+import {
+  assertWorkerAuthResponseIdentity,
+  bindWorkerAuthRequestIdentity,
+  resolveAdminActionSessionId,
+  resolveWorkerAuthSessionId,
+  type WorkerLoginResponse,
+} from './workerAuthSessionIdentity.js';
+import {
+  createWorkerAuthRemoteError,
+  NONCE_MISMATCH_ERROR,
+  ONCHAIN_GATE_UNAVAILABLE_ERROR,
+} from './workerAuthRemoteError.js';
 
 const accountLog = createLogger('account');
 
-const NONCE_MISMATCH_ERROR = 'nonce mismatch or expired';
-const ONCHAIN_GATE_UNAVAILABLE_ERROR = 'on-chain gate data unavailable';
 const LOGIN_GATE_UNAVAILABLE_RETRIES = 2;
 const LOGIN_GATE_UNAVAILABLE_RETRY_BASE_MS = 700;
 const ADMIN_ACTION_EXPIRATION_WINDOW_SECONDS = 5 * 60;
@@ -109,6 +119,7 @@ type AdminActionAuthOptions = {
   body?: unknown;
   context?: unknown;
   nonce?: unknown;
+  sessionId?: unknown;
   slug?: unknown;
   workerUrl?: unknown;
 };
@@ -134,12 +145,6 @@ type InFlightTokenRequest = {
   };
   promise: Promise<string> | null;
 };
-type WorkerLoginResponse = {
-  error?: unknown;
-  exp?: unknown;
-  token?: string;
-};
-
 const asStoreState = (value: unknown): WorkerAuthStoreState =>
   value && typeof value === 'object' ? (value as WorkerAuthStoreState) : {};
 const asWorkerAuthContext = (value: unknown): WorkerAuthContext =>
@@ -241,6 +246,7 @@ const abortInFlightTokenRequests = () => {
 const invalidateWorkerAuthState = ({ nextAddress = '' } = {}) => {
   workerAuthEpoch += 1;
   abortInFlightTokenRequests();
+  clearAllTokenCaches();
   trackedWorkerAuthAddress = normalizeAddress(nextAddress);
   return workerAuthEpoch;
 };
@@ -349,6 +355,7 @@ const resolveWorkerTokenRequestContext = async ({
     getDefaultAllowDemoFallback: defaultWorkerAuthAllowDemoFallback,
   });
   const slug = resolvedSession.sessionSlug;
+  const sessionId = resolveWorkerAuthSessionId(resolvedSession.sessionConfig);
   const wallet = getWalletContext(context || {});
   const resolvedSigner = normalizeAddress(resolvedAddress)
     ? null
@@ -375,7 +382,8 @@ const resolveWorkerTokenRequestContext = async ({
     resolvedSigner,
     address,
     resolvedWorkerUrl,
-    storageKey: resolvedWorkerUrl ? buildTokenCacheKey({ workerUrl: resolvedWorkerUrl, slug, address }) : '',
+    sessionId,
+    storageKey: resolvedWorkerUrl ? buildTokenCacheKey({ workerUrl: resolvedWorkerUrl, slug, sessionId, address }) : '',
     authEpoch,
   };
 };
@@ -458,6 +466,7 @@ export const buildSignedAdminActionAuth = async ({
   workerUrl,
   context,
   nonce: providedNonce,
+  sessionId: providedSessionId,
 }: AdminActionAuthOptions = {}) => {
   const actionName = toStr(action).trim().toLowerCase();
   if (!actionName) throw new Error('Admin action is required.');
@@ -473,34 +482,49 @@ export const buildSignedAdminActionAuth = async ({
   }
 
   const targetSlug = normalizeSessionSlug(slug);
+  const actionBody = body && typeof body === 'object' ? (body as UnknownRecord) : {};
+  const exactSessionId = resolveAdminActionSessionId({ body: actionBody, providedSessionId });
   const audience = resolveAdminActionAudience(resolvedWorkerUrl);
   if (!audience) {
     throw new Error('Unable to resolve admin audience.');
   }
 
-  let nonce = toStr(providedNonce).trim();
+  // An externally supplied slug-scoped nonce cannot prove which same-slug
+  // Worker identity issued it. Exact Worker actions always obtain a fresh
+  // nonce bound to the canonical session ID.
+  let nonce = exactSessionId ? '' : toStr(providedNonce).trim();
   if (!nonce) {
     const nonceEndpoint = `${resolvedWorkerUrl}/auth/nonce`;
     const nonceResp = await fetchWorkerAuthEndpoint(nonceEndpoint, {
       method: 'POST',
       headers: buildWorkerAuthNonceHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ address, sessionSlug: targetSlug, adminAction: true }),
+      body: JSON.stringify({
+        address,
+        sessionSlug: targetSlug,
+        ...(exactSessionId ? { sessionId: exactSessionId } : {}),
+        adminAction: true,
+      }),
     });
     const nonceData = await nonceResp.json().catch(() => ({}));
     if (!nonceResp.ok) {
       if (Number(nonceResp.status || 0) === 404) {
         throw new Error('Worker auth nonce route not supported (404).');
       }
-      throw new Error(nonceData?.error || `Failed to request admin nonce (${nonceResp.status}).`);
+      throw createWorkerAuthRemoteError({ kind: 'admin_nonce', payload: nonceData, status: nonceResp.status });
     }
     if (!nonceData?.nonce) {
       throw new Error('Worker nonce response missing nonce.');
     }
+    assertWorkerAuthResponseIdentity(nonceData, {
+      expectedSessionId: exactSessionId,
+      expectedSessionSlug: targetSlug,
+      kind: 'admin_nonce',
+    });
     nonce = toStr(nonceData.nonce).trim();
   }
 
   const expiration = Math.floor(Date.now() / 1000) + ADMIN_ACTION_EXPIRATION_WINDOW_SECONDS;
-  const bodyHash = buildAdminActionBodyHash(body && typeof body === 'object' ? body : {});
+  const bodyHash = buildAdminActionBodyHash(actionBody);
   const typedData = buildAdminActionTypedData({
     action: actionName,
     slug: targetSlug,
@@ -570,7 +594,7 @@ export const buildSignedBootstrapAdminAuth = async ({
       if (Number(nonceResp.status || 0) === 404) {
         throw new Error('Worker auth nonce route not supported (404).');
       }
-      throw new Error(nonceData?.error || `Failed to request admin nonce (${nonceResp.status}).`);
+      throw createWorkerAuthRemoteError({ kind: 'admin_nonce', payload: nonceData, status: nonceResp.status });
     }
     if (!nonceData?.nonce) {
       throw new Error('Worker nonce response missing nonce.');
@@ -622,6 +646,7 @@ export const getWorkerSessionToken = async ({
     resolvedSigner,
     address,
     resolvedWorkerUrl,
+    sessionId,
     storageKey,
     authEpoch: requestAuthEpoch,
   } = resolvedRequest;
@@ -635,6 +660,7 @@ export const getWorkerSessionToken = async ({
   }
   const cached = readScopedTokenCache(storageKey, {
     workerUrl: resolvedWorkerUrl,
+    sessionId,
     sessionSlug: slug,
     address,
   });
@@ -659,7 +685,7 @@ export const getWorkerSessionToken = async ({
       const nonceResp = await fetch(`${resolvedWorkerUrl}/auth/nonce`, {
         method: 'POST',
         headers: buildWorkerAuthNonceHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ address, sessionSlug: slug }),
+        body: JSON.stringify(bindWorkerAuthRequestIdentity({ address, sessionSlug: slug }, sessionId)),
         signal: signal || undefined,
       });
       const nonceData = await nonceResp.json().catch(() => ({}));
@@ -667,11 +693,16 @@ export const getWorkerSessionToken = async ({
         if (Number(nonceResp.status || 0) === 404) {
           throw new Error('Worker auth nonce route not supported (404).');
         }
-        throw new Error(nonceData?.error || `Failed to request worker nonce (${nonceResp.status}).`);
+        throw createWorkerAuthRemoteError({ kind: 'worker_nonce', payload: nonceData, status: nonceResp.status });
       }
       if (!nonceData?.nonce) {
         throw new Error('Worker nonce response missing nonce.');
       }
+      assertWorkerAuthResponseIdentity(nonceData, {
+        expectedSessionId: sessionId,
+        expectedSessionSlug: slug,
+        kind: 'nonce',
+      });
 
       assertWorkerAuthRequestCurrent(signal, requestAuthEpoch, address);
       const message = buildSiweMessage({
@@ -690,7 +721,9 @@ export const getWorkerSessionToken = async ({
       const loginResp = await fetch(`${resolvedWorkerUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address, message, signature, sessionSlug: slug }),
+        body: JSON.stringify(
+          bindWorkerAuthRequestIdentity({ address, message, signature, sessionSlug: slug }, sessionId),
+        ),
         signal: signal || undefined,
       });
       const loginData: WorkerLoginResponse = await loginResp.json().catch(() => ({}));
@@ -698,11 +731,16 @@ export const getWorkerSessionToken = async ({
         if (Number(loginResp.status || 0) === 404) {
           throw new Error('Worker auth login route not supported (404).');
         }
-        throw new Error(toStr(loginData?.error || `Worker login failed (${loginResp.status}).`));
+        throw createWorkerAuthRemoteError({ kind: 'worker_login', payload: loginData, status: loginResp.status });
       }
       if (!loginData?.token) {
         throw new Error('Worker login did not return a token.');
       }
+      assertWorkerAuthResponseIdentity(loginData, {
+        expectedSessionId: sessionId,
+        expectedSessionSlug: slug,
+        kind: 'login',
+      });
       return loginData;
     };
 
@@ -746,6 +784,7 @@ export const getWorkerSessionToken = async ({
         token: loginData.token,
         exp: Number(loginData.exp || 0),
         workerUrl: resolvedWorkerUrl,
+        sessionId,
         sessionSlug: slug,
         address,
       }),
@@ -793,14 +832,6 @@ export const clearWorkerSessionToken = ({
 
 export const clearAllWorkerSessionTokens = () => {
   invalidateWorkerAuthState({ nextAddress: '' });
-  if (typeof window === 'undefined') return;
-  try {
-    Object.keys(localStorage).forEach((key) => {
-      if (isWorkerTokenCacheKey(key)) {
-        localStorage.removeItem(key);
-      }
-    });
-  } catch (_) {}
 };
 
 const buildWorkerAuthHeadersForToken = ({ token, slug }: { slug?: unknown; token?: unknown } = {}) => {
@@ -948,17 +979,6 @@ export const fetchWorkerWithAuth = async (
     return fetch(url, { ...options, headers: retryHeaders });
   }
   return response;
-};
-
-export const workerAuthUtils = {
-  buildSiweMessage,
-  buildSignedBootstrapAdminAuth,
-  buildSignedAdminActionAuth,
-  getWorkerSessionToken,
-  getWorkerAuthHeaders,
-  clearWorkerSessionToken,
-  clearAllWorkerSessionTokens,
-  fetchWorkerWithAuth,
 };
 
 export const __test__workerAuthTokenCache = {

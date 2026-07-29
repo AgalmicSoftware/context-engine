@@ -16,7 +16,9 @@ import {
   normalizeSessionSlugListForSig,
   resolveSbtSelectorSessionLabel,
   resolveSbtSelectorSessionNetworkId,
+  shouldDiscoverSbtForSessionConfig,
 } from './sbtSelectorSessionRuntimeHelpers';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 describe('sbtSelectorSessionRuntimeHelpers', () => {
   it('normalizes signature lists, chain values, and lookup keys', () => {
@@ -54,7 +56,23 @@ describe('sbtSelectorSessionRuntimeHelpers', () => {
     expect(getNormalizedNetworkChainValue(null)).toBeNull();
   });
 
-  it('resolves selector session network id by source precedence', () => {
+  it('resolves selector chains only from validated SBT-capable sessions', () => {
+    const pureWorker = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const workerSbt = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    workerSbt.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    workerSbt.evm.registryChainId = 11155420;
+    workerSbt.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        {
+          kind: 'sbt_onchain',
+          chainId: 11155420,
+          contract: '0x1111111111111111111111111111111111111111',
+          anyOrAll: 'any',
+        },
+      ],
+    };
+    const registry = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     const baseArgs = {
       defaultFallbackChainId: 11155420,
       directChainId: 84532,
@@ -67,38 +85,51 @@ describe('sbtSelectorSessionRuntimeHelpers', () => {
     expect(
       resolveSbtSelectorSessionNetworkId({
         ...baseArgs,
-        propsSessionConfig: { networkChainId: '999' },
+        propsSessionConfig: {
+          networkChainId: '999',
+          sessionModeProfile: pureWorker,
+        },
         shouldUsePropsSessionConfig: true,
       }),
-    ).toBe(999);
+    ).toBeNull();
     expect(
       resolveSbtSelectorSessionNetworkId({
         ...baseArgs,
-        displayLookupSessionConfig: { networkChainId: 777 },
-        getSessionChainId: () => null,
+        propsSessionConfig: {
+          networkChainId: '999',
+          sessionModeProfile: workerSbt,
+        },
+        shouldUsePropsSessionConfig: true,
       }),
-    ).toBe(777);
+    ).toBe(11155420);
     expect(
       resolveSbtSelectorSessionNetworkId({
         ...baseArgs,
-        displayLookupSessionConfig: { __registry: { chainId: 778 } },
+        displayLookupSessionConfig: {
+          sessionModeProfile: registry,
+        },
+      }),
+    ).toBe(11155420);
+    expect(
+      resolveSbtSelectorSessionNetworkId({
+        ...baseArgs,
+        displayLookupSessionConfig: {
+          __registry: {
+            chainId: 778,
+            sessionIdHex: '0x00112233445566778899aabbccddeeff',
+          },
+        },
         getSessionChainId: () => null,
       }),
     ).toBe(778);
     expect(
       resolveSbtSelectorSessionNetworkId({
         ...baseArgs,
-        displayLookupSessionConfig: { contracts: { sbtFactory: { chainId: 779 } } },
-        getSessionChainId: () => null,
-      }),
-    ).toBe(779);
-    expect(
-      resolveSbtSelectorSessionNetworkId({
-        ...baseArgs,
+        displayLookupSessionConfig: {},
         getSessionChainId: () => null,
         directChainId: '',
       }),
-    ).toBe(10);
+    ).toBeNull();
     expect(
       resolveSbtSelectorSessionNetworkId({
         defaultFallbackChainId: 11155420,
@@ -106,6 +137,18 @@ describe('sbtSelectorSessionRuntimeHelpers', () => {
         getSessionChainId: () => null,
       }),
     ).toBe(11155420);
+    expect(
+      shouldDiscoverSbtForSessionConfig({
+        sessionConfig: { networkChainId: 11155420, sessionModeProfile: pureWorker },
+        sessionSlug: 'demo-sh',
+      }),
+    ).toBe(false);
+    expect(
+      shouldDiscoverSbtForSessionConfig({
+        sessionConfig: { sessionModeProfile: workerSbt },
+        sessionSlug: 'worker-hybrid',
+      }),
+    ).toBe(true);
   });
 
   it('builds selector metadata lookup config and display labels', () => {

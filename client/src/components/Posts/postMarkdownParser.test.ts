@@ -244,6 +244,17 @@ type Record = { score: number };
       '#c4a7ff',
     ]);
     expect(markdown).toContain('Autonomous agents changing collective governance at scale.');
+    expect(markdown).toContain(
+      'A [proposal for "Agent Village Wrapped"](https://www.simocracy.org/proposals/did%3Aplc%3Abnb2onvsvtmryjvy77fmrtou/3mognd4flwk2i) was made on Simocracy and allocated $626 by Sims on the platform.',
+    );
+    expect(markdown).toContain(
+      'These funds will be donated to Edge, because we did not end up needing them to complete the AI actions related to Agent Village Wrapped.',
+    );
+    expect(markdown).not.toContain('This experiment was funded by Simocracy Agents');
+    expect(markdown).not.toContain('evaluated by Simocracy');
+    expect(markdown).toContain('pairwise question comparisons');
+    expect(markdown).toContain('Elo importance ranking');
+    expect(markdown).toMatch(/quadratic or standard upvotes and downvotes/i);
     expect(markdown).not.toContain('Short excerpts from agent-predicted freeform answers.');
     expect(markdown).not.toContain('"P4", "text": "Agree."');
     expect(markdown).not.toContain('latest internal test');

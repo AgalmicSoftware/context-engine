@@ -10,6 +10,27 @@ type StorageLike = {
 };
 
 type CreateSbtDraftPayload = Record<string, unknown>;
+const CREATE_SBT_CREDENTIAL_FIELDS = Object.freeze([
+  'claimCode',
+  'claimCodes',
+  'groupPassword',
+  'groupPasswordInput',
+  'invite',
+  'inviteCode',
+  'inviteCodes',
+  'inviteNonce',
+  'inviteNonces',
+  'invitePayload',
+  'invitePayloads',
+  'inviteLinks',
+  'manualPasswordInput',
+  'mintPassword',
+  'password',
+  'passwordList',
+  'sbtCodes',
+  'sbtInviteLinks',
+]);
+const CREATE_SBT_CREDENTIAL_FIELD_SET = new Set(CREATE_SBT_CREDENTIAL_FIELDS.map((field) => field.toLowerCase()));
 
 export const CREATE_SBT_FORM_CACHE_LEGACY_POLICY = Object.freeze({
   legacyKey: LEGACY_CREATE_SBT_FORM_CACHE_KEY,
@@ -20,6 +41,21 @@ export const CREATE_SBT_FORM_CACHE_LEGACY_POLICY = Object.freeze({
 });
 
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object';
+
+const sanitizeCreateSbtFormCacheValue = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(sanitizeCreateSbtFormCacheValue);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([field]) => !CREATE_SBT_CREDENTIAL_FIELD_SET.has(field.toLowerCase()))
+      .map(([field, nestedValue]) => [field, sanitizeCreateSbtFormCacheValue(nestedValue)]),
+  );
+};
+
+export const sanitizeCreateSbtFormCachePayload = (value: unknown): CreateSbtDraftPayload | null => {
+  if (!isRecord(value) || Array.isArray(value)) return null;
+  return sanitizeCreateSbtFormCacheValue(value) as CreateSbtDraftPayload;
+};
 
 const getSessionStorage = (storageIn?: StorageLike | null): StorageLike | null => {
   if (storageIn !== undefined) return storageIn;
@@ -96,7 +132,6 @@ export const hasMeaningfulCreateSbtFormPayload = (parsed: unknown): boolean => {
     hasNonEmptyText(parsed.documentUrl) ||
     hasNonEmptyList(parsed.documentURLs) ||
     hasNonEmptyText(parsed.documentIDHashes) ||
-    hasNonEmptyText(parsed.groupPassword) ||
     hasMetadataLockDraft(parsed.metadataLockGateIds) ||
     hasSubstantiveDistributionDraft(parsed.sbtDistribution);
 
@@ -122,7 +157,14 @@ const readCreateSbtFormPayload = ({
     },
     { clearInvalid },
   );
-  return result.ok ? result.value : null;
+  if (!result.ok) return null;
+  const safePayload = sanitizeCreateSbtFormCachePayload(result.value);
+  if (!safePayload) return null;
+  try {
+    const safeJson = JSON.stringify(safePayload);
+    if (storage.getItem(key) !== safeJson) storage.setItem(key, safeJson);
+  } catch (_) {}
+  return safePayload;
 };
 
 const migrateLegacyCreateSbtFormCache = ({
@@ -148,7 +190,7 @@ const migrateLegacyCreateSbtFormCache = ({
     if (legacySessionSlug !== null && legacySessionSlug !== normalizeCreateSbtFormCacheSessionSlug(sessionSlug)) {
       return;
     }
-    storage.setItem(scopedKey, legacyValue);
+    storage.setItem(scopedKey, JSON.stringify(legacyPayload));
     storage.removeItem(LEGACY_CREATE_SBT_FORM_CACHE_KEY);
   } catch (e) {
     void e;

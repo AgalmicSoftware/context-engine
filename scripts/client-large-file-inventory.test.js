@@ -102,6 +102,7 @@ function listTrackedClientProductionFiles(rootDir = ROOT_DIR) {
     .filter((relativePath) => PRODUCTION_FILE_RE.test(relativePath))
     .filter((relativePath) => !TEST_OR_DECLARATION_FILE_RE.test(relativePath))
     .filter((relativePath) => !GENERATED_OR_FIXTURE_PATH_RE.test(relativePath))
+    .filter((relativePath) => fs.existsSync(path.join(rootDir, relativePath)))
     .sort();
 }
 

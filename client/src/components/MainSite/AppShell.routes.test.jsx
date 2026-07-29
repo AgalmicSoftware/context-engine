@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AppShell, appShellDispatchActions } from './AppShell';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
@@ -20,16 +20,24 @@ import { FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY } from './sessionFallbac
 import { getPolisDemoQuestionPool } from '../SurveyTool/surveyPolisDemoQuestionPool';
 import { createLitHooks, setGlobalLitHooks } from '../../utilities/crypto/litProtocol.js';
 import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile.js';
+import {
+  resolveWorkerCanonicalCacheIdentity,
+  withWorkerCanonicalCacheIdentity,
+} from '../../utilities/survey/workerCanonicalCacheIdentity';
 
 const mockAdminPage = jest.fn(() => null);
+const mockNavbar = jest.fn(() => null);
 const mockSponsorPage = jest.fn(() => null);
 const mockSessionWizard = jest.fn(() => null);
 const mockSurveyPage = jest.fn(() => null);
+const mockSurveyTool = jest.fn(() => null);
 const mockSessionDocumentsPage = jest.fn(() => null);
 const mockOnePageSession = jest.fn(() => null);
 const mockSBTPage = jest.fn(() => null);
+const mockSBTCreatePage = jest.fn(() => null);
 const mockSBTsPage = jest.fn(() => null);
 const mockCompareAddresses = jest.fn(() => null);
+const mockUserPage = jest.fn(() => null);
 const mockTagPage = jest.fn(() => null);
 const mockDebateMap = jest.fn(() => null);
 const mockPostsPage = jest.fn(() => null);
@@ -62,11 +70,31 @@ jest.mock('../HooksHOC/withWagmiBridge', () => ({
   WagmiHooksHOC: (Comp) => Comp,
 }));
 
-jest.mock('../Navbar/Navbar', () => () => null);
+jest.mock('../Navbar/Navbar', () => ({
+  __esModule: true,
+  default: (props) => {
+    mockNavbar(props);
+    return null;
+  },
+}));
 jest.mock('../MainContent/MainAreaTabs', () => () => null);
 jest.mock('../Onboarding/OnboardingOverlay', () => () => null);
 jest.mock('../Footer/Footer', () => () => null);
 jest.mock('../UserPage/SimUserPage', () => () => null);
+jest.mock('../UserPage/UserPage', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockUserPage(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-user-page',
+        'data-network-id': String(props.network?.id || ''),
+        'data-on-chain-profile-enabled': String(props.onChainProfileEnabled !== false),
+      });
+    },
+  };
+});
 jest.mock('../Shared/LazyFallback', () => () => null);
 jest.mock('../E2E/DevE2eNav', () => () => null);
 jest.mock('../ErrorBoundary/RouteErrorBoundary', () => ({
@@ -141,6 +169,22 @@ jest.mock('../SurveyTool/SurveyPage', () => {
   };
 });
 
+jest.mock('../SurveyTool/SurveyTool', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockSurveyTool(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-survey-tool',
+        'data-network-id': String(props.network?.id || ''),
+        'data-network-chain-id': String(props.networkChainId || ''),
+        'data-session-slug': String(props.sessionSlug || ''),
+      });
+    },
+  };
+});
+
 jest.mock('../DocumentLibrary/SessionDocumentsPage', () => {
   const React = require('react');
   return {
@@ -202,7 +246,23 @@ jest.mock('../SBTs/SBTsList', () => {
         'data-testid': 'mock-sbts-page',
         'data-network-id': String(props.network?.id || ''),
         'data-session-slug': String(props.sessionSlug || ''),
+        'data-session-config-slug': String(props.sessionConfig?.slug || ''),
         'data-all-sessions-mode': String(props.allSessionsMode === true),
+      });
+    },
+  };
+});
+
+jest.mock('../SBTs/SBTsPage', () => {
+  const React = require('react');
+  return {
+    __esModule: true,
+    default: (props) => {
+      mockSBTCreatePage(props);
+      return React.createElement('div', {
+        'data-testid': 'mock-sbt-create-page',
+        'data-network-id': String(props.network?.id || ''),
+        'data-session-slug': String(props.sessionSlug || ''),
       });
     },
   };
@@ -763,10 +823,7 @@ describe('AppShell route render smoke', () => {
       'data-initial-sponsored-bundle-id',
       'sponsor-tx-id',
     );
-    expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute(
-      'data-initial-sponsored-bundle-key',
-      'sponsor-secret',
-    );
+    expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute('data-initial-sponsored-bundle-key', '');
     expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute('data-network-id', '84532');
     expect(mockSessionWizard.mock.calls[mockSessionWizard.mock.calls.length - 1][0]?.ensureLightSbtUniverse).toBe(
       subject.ensureLightSbtUniverse,
@@ -774,8 +831,22 @@ describe('AppShell route render smoke', () => {
     expect(replaceStateSpy).toHaveBeenCalledWith(
       {},
       '',
-      '/session/new?sessionId=edge-session-id&chainId=chain-84532&sponsored=sponsor-tx-id#k=sponsor-secret',
+      '/session/new?sessionId=edge-session-id&chainId=chain-84532&sponsored=sponsor-tx-id',
     );
+    expect(window.location.hash).toBe('');
+  });
+
+  it('scrubs a legacy sponsored key fragment even when the bundle ID is missing', async () => {
+    const subject = createSubject({ path: '/new' });
+    window.history.replaceState({}, '', '/new#k=sponsor-secret&preview=1');
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_WIZARD_ROOT)).toBeInTheDocument();
+    expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute('data-initial-sponsored-bundle-id', '');
+    expect(screen.getByTestId('mock-session-wizard')).toHaveAttribute('data-initial-sponsored-bundle-key', '');
+    expect(window.location.hash).toBe('#preview=1');
+    expect(window.location.href).not.toContain('sponsor-secret');
   });
 
   it('renders the admin root and forwards session query params to AdminPage', async () => {
@@ -803,7 +874,7 @@ describe('AppShell route render smoke', () => {
       sessionId,
       configRevision: 'admin-revision-1',
       corsWorkerUrl: workerOrigin,
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     };
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
@@ -889,11 +960,7 @@ describe('AppShell route render smoke', () => {
       corsWorkerUrl: workerOrigin,
       sessionName: 'Worker Session',
       networkChainId: 11155420,
-      sessionModeProfile: {
-        authority: { mode: 'worker_canonical' },
-        storage: { mode: 'worker_kv' },
-        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
-      },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
       workerAuthority: { participantScopes: ['ai', 'storage'] },
     };
     const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -913,23 +980,78 @@ describe('AppShell route render smoke', () => {
       sessionConfig: null,
     });
     subject.resolveSessionPathSlug = jest.fn();
+    subject._mounted = true;
+    subject.getSessionSlugFromState = jest.fn(() => 'worker-session');
+    subject.handleNetworkChange = jest.fn();
+    subject.syncSessionFallbackRedirectConsumption = jest.fn();
+    subject.initializeQuestionCacheForGroup = jest.fn(async () => {
+      subject.state = { ...subject.state, isQuestionCacheReady: true };
+    });
+    subject.initializeSurveyCacheForGroup = jest.fn(async () => {
+      subject.state = { ...subject.state, isSurveyCacheReady: true };
+    });
+    subject.fetchQuestionResponsesChunkedForGroup = jest.fn(async () => {
+      subject.state = { ...subject.state, isResponsesCacheReady: true };
+    });
+    subject.initializeSbtCacheForGroup = jest.fn(async () => undefined);
+    subject.startSbtEventListenerForGroup = jest.fn();
+    subject.startSurveyAndQuestionEventListenerForGroup = jest.fn();
+    subject.setReadinessStateIfChanged = jest.fn((patch) => {
+      subject.state = { ...subject.state, ...(patch || {}) };
+    });
+    subject.checkAllCachesReady = jest.fn(() => {
+      subject.state = {
+        ...subject.state,
+        isAllCachesReady:
+          subject.state.isSBTCacheReady && subject.state.isSurveyCacheReady && subject.state.isQuestionCacheReady,
+      };
+    });
 
     const view = render(subject.render());
 
     expect(await screen.findByTestId('ce-worker-canonical-bootstrap-status')).toHaveTextContent(
       'Loading worker session',
     );
+    expect(mockNavbar.mock.calls.at(-1)?.[0]?.sessionConfig).toBeNull();
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(subject.state.sessionPathResolutionNonce).toBeGreaterThan(0));
+
+    const previousState = {
+      ...subject.state,
+      sessionPathResolutionNonce: 0,
+    };
+    subject.getSessionCfg.mockClear();
+    subject.componentDidUpdate(subject.props, previousState);
+    await waitFor(() => expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('worker-session'));
+
+    expect(subject.getCacheSessionCfg('worker-session')).toEqual(workerConfig);
+    expect(subject.getSessionCfg).not.toHaveBeenCalled();
+    expect(subject.initializeQuestionCacheForGroup).toHaveBeenCalledWith('worker-session');
+    expect(subject.fetchQuestionResponsesChunkedForGroup).toHaveBeenCalledWith('worker-session');
+    expect(subject.initializeSbtCacheForGroup).not.toHaveBeenCalled();
+    expect(subject.startSbtEventListenerForGroup).not.toHaveBeenCalled();
+    expect(subject.startSurveyAndQuestionEventListenerForGroup).not.toHaveBeenCalled();
+    expect(subject.state).toMatchObject({
+      isSBTCacheReady: true,
+      isSurveyCacheReady: true,
+      isQuestionCacheReady: true,
+      isResponsesCacheReady: true,
+      isAllCachesReady: true,
+    });
 
     view.rerender(subject.render());
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(mockNavbar.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual(workerConfig);
     expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'worker-session');
-    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-network-id', '11155420');
-    expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual(workerConfig);
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-network-id', '');
+    expect(mockOnePageSession.mock.calls.at(-1)?.[0]?.sessionConfig).toEqual({
+      ...workerConfig,
+      networkChainId: null,
+    });
     expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
     expect(fetchSpy.mock.calls[0][0]).toBe('https://worker-session.example.com/session-config?slug=worker-session');
+    subject._mounted = false;
   });
 
   it('installs verified explicit-Lit worker hooks through the boundary and route controller', async () => {
@@ -938,6 +1060,7 @@ describe('AppShell route render smoke', () => {
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     sessionModeProfile.encryption = { mode: 'lit' };
     sessionModeProfile.evm.registryChainId = 11155420;
+    sessionModeProfile.storage.payloadAccessControl.encryption = 'lit';
     const workerConfig = {
       slug: 'worker-lit',
       sessionId: '0x11223344556677889900aabbccddeeff',
@@ -1295,6 +1418,7 @@ describe('AppShell route render smoke', () => {
     const subject = createSubject({
       path: '/surveys',
       activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
     });
     subject.onNewSurveyEventDetectedForGroup = jest.fn();
 
@@ -1366,12 +1490,12 @@ describe('AppShell route render smoke', () => {
       path: '/new',
       search: '?sessionId=edge-session-id',
     });
-    window.history.replaceState({}, '', '/ce/new?sessionId=edge-session-id#k=sponsor-secret');
+    window.history.replaceState({}, '', '/ce/new?sessionId=edge-session-id#preview=1');
 
     render(subject.render());
 
     expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_WIZARD_ROOT)).toBeInTheDocument();
-    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/ce/session/new?sessionId=edge-session-id#k=sponsor-secret');
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/ce/session/new?sessionId=edge-session-id#preview=1');
   });
 
   it('renders the sponsor root and forwards session query params to SponsorPage', async () => {
@@ -1695,11 +1819,7 @@ describe('AppShell route render smoke', () => {
       configRevision: 'worker-docs-revision-1',
       corsWorkerUrl: workerOrigin,
       sessionName: 'Worker Docs',
-      sessionModeProfile: {
-        authority: { mode: 'worker_canonical' },
-        storage: { backend: 'cloudflare' },
-        encryption: { mode: 'worker_envelope', keyProvider: 'worker_secret' },
-      },
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     };
     jest.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
@@ -1896,6 +2016,34 @@ describe('AppShell route render smoke', () => {
     expect(getDemoSessionConfigBySlug).toHaveBeenCalledWith('demo', { allowDemoFallback: true });
   });
 
+  it('surfaces the canonical primary demo name through the /session/demo alias', async () => {
+    const demoConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+      sessionName: 'Demo Session',
+      sessionInfo: 'Canonical Worker demo session info',
+      networkChainId: 11155420,
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = createSubject({
+      path: '/session/demo',
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: null,
+    });
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (slug === 'demo' ? demoConfig : null));
+    subject.resolveSessionPathSlug = jest.fn();
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SESSION_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-one-page-demo')).toHaveAttribute('data-session-name', 'Demo Session');
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-session-slug', 'demo-sh');
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-question-session-slug', 'demo-sh');
+    expect(screen.getByTestId('mock-one-page-demo')).toHaveAttribute('data-network-id', '');
+    expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
+  });
+
   it('uses registry-backed /session/demo metadata instead of the placeholder display fallback', async () => {
     const registryConfig = buildSessionConfig({
       slug: 'demo',
@@ -2029,6 +2177,7 @@ describe('AppShell route render smoke', () => {
       sessionName: 'Demo Session',
       networkChainId: DEFAULT_NETWORK.id,
       __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
     });
     const subject = createSubject({
       path: '/about',
@@ -2059,6 +2208,7 @@ describe('AppShell route render smoke', () => {
     subject.initializeSurveyCache = jest.fn(async () => undefined);
     subject.startSbtEventListener = jest.fn();
     subject.startSurveyAndQuestionEventListener = jest.fn();
+    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => false);
     subject.setReadinessStateIfChanged = jest.fn((patch) => {
       subject.state = { ...subject.state, ...(patch || {}) };
     });
@@ -2069,16 +2219,88 @@ describe('AppShell route render smoke', () => {
       await subject.componentDidMount();
     });
 
-    expect(subject.getDisplaySessionNetwork).toHaveBeenCalledWith('demo-sh');
+    expect(subject.getDisplaySessionNetwork).not.toHaveBeenCalledWith('demo-sh');
     expect(subject.initializeQuestionCacheForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
     expect(subject.fetchQuestionResponsesChunkedForGroup).not.toHaveBeenCalled();
     expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('demo-sh', { background: true });
-    expect(subject.initializeSbtCacheForGroup).toHaveBeenCalledWith('demo-sh', {
-      mode: 'partial',
-      background: true,
-    });
+    expect(subject.initializeSbtCacheForGroup).not.toHaveBeenCalled();
+    expect(subject.initializeWorkerCanonicalCachesForGroup).not.toHaveBeenCalled();
 
     subject.componentWillUnmount();
+  });
+
+  it('does not initialize the active Worker session cache on static non-cache routes', async () => {
+    const workerConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = stubMainSiteMountSideEffects(
+      createSubject({
+        path: '/contracts',
+        activeSessionSlug: 'demo-sh',
+        sessionConfig: workerConfig,
+      }),
+    );
+    subject.preloadAboutDemoSessionData = jest.fn(() => null);
+    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => true);
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(subject.initializeWorkerCanonicalCachesForGroup).not.toHaveBeenCalled();
+    expect(subject.getInitializableSessionNetwork).not.toHaveBeenCalled();
+    subject.componentWillUnmount();
+  });
+
+  it('does not initialize a resolved Worker session while a static route remains active', () => {
+    const workerConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = stubMainSiteMountSideEffects(
+      createSubject({
+        path: '/contracts',
+        activeSessionSlug: 'demo-sh',
+        sessionConfig: workerConfig,
+      }),
+    );
+    subject._mounted = true;
+    subject.getCurrentPathname = jest.fn(() => '/contracts');
+    subject.handleNetworkChange = jest.fn();
+    subject.initializeWorkerCanonicalCachesForGroup = jest.fn(async () => true);
+    subject.state = {
+      ...subject.state,
+      sessionPathResolutionNonce: 1,
+    };
+    const previousState = {
+      ...subject.state,
+      sessionPathResolutionNonce: 0,
+    };
+
+    subject.componentDidUpdate(subject.props, previousState);
+
+    expect(subject.initializeWorkerCanonicalCachesForGroup).not.toHaveBeenCalled();
+    subject.componentWillUnmount();
+  });
+
+  it('skips about-page Worker preloads when the browser origin is not allowed', () => {
+    const demoConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      allowOrigins: ['https://contextengine.sh'],
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = createSubject({ path: '/about', activeSessionSlug: '', sessionConfig: null });
+    getDemoSessionConfigBySlug.mockImplementation((slug) => (slug === 'demo-sh' ? demoConfig : null));
+    subject.initializeQuestionCacheForGroup = jest.fn(async () => undefined);
+    subject.initializeSurveyCacheForGroup = jest.fn(async () => undefined);
+
+    expect(subject.preloadAboutDemoSessionData('/about')).toBeNull();
+    expect(subject.initializeQuestionCacheForGroup).not.toHaveBeenCalled();
+    expect(subject.initializeSurveyCacheForGroup).not.toHaveBeenCalled();
   });
 
   it('preserves session question-results subroutes and forwards route-open flags to OnePageSession', async () => {
@@ -2217,6 +2439,22 @@ describe('AppShell route render smoke', () => {
     expect(await screen.findByTestId('mock-sbts-page')).toHaveAttribute('data-network-id', '84532');
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-all-sessions-mode', 'false');
     expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-slug', 'edge');
+    expect(screen.getByTestId('mock-sbts-page')).toHaveAttribute('data-session-config-slug', 'edge');
+  });
+
+  it.each(['/sbts/new', '/groups/new/'])('renders the standalone SBT create route for %s', async (path) => {
+    const sessionConfig = buildSessionConfig();
+    const subject = createSubject({
+      path,
+      activeSessionSlug: 'edge',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId(E2E_TESTIDS.PAGE_SBTS_ROOT)).toBeInTheDocument();
+    expect(await screen.findByTestId('mock-sbt-create-page')).toHaveAttribute('data-network-id', '84532');
+    expect(screen.getByTestId('mock-sbt-create-page')).toHaveAttribute('data-session-slug', 'edge');
   });
 
   it('does not access window directly while rendering atlas and stubbed experimental routes', () => {
@@ -2356,6 +2594,501 @@ describe('AppShell route render smoke', () => {
 
     expect(subject._registryBootstrapPromise).toBeNull();
     expect(subject._registryBootstrapScopeKey).toBe('');
+  });
+
+  it('does not bootstrap an on-chain registry RPC for a pure Worker session route', async () => {
+    const workerConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      networkChainId: DEFAULT_NETWORK.id,
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = stubMainSiteMountSideEffects(
+      createSubject({
+        path: '/session/demo-sh',
+        activeSessionSlug: 'demo-sh',
+        sessionConfig: workerConfig,
+      }),
+    );
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(loadGroupRegistryCache).not.toHaveBeenCalled();
+    expect(subject._registryBootstrapPromise).toBeNull();
+    expect(subject._registryBootstrapScopeKey).toBe('');
+  });
+
+  it('does not bootstrap an on-chain registry RPC for a canonical pure Worker Group detail route', async () => {
+    const workerConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      networkChainId: DEFAULT_NETWORK.id,
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = stubMainSiteMountSideEffects(
+      createSubject({
+        path: '/group/public-reviewers',
+        search: '?sessionName=demo-sh',
+        activeSessionSlug: 'stale-session',
+        sessionConfig: workerConfig,
+      }),
+    );
+    subject.getDisplaySessionChainId = jest.fn(() => null);
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+
+    expect(subject.getBootstrapActiveSessionSlug('/group/public-reviewers', '?sessionName=demo-sh')).toBe('demo-sh');
+    expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
+    expect(loadGroupRegistryCache).not.toHaveBeenCalled();
+    expect(subject._registryBootstrapPromise).toBeNull();
+    expect(subject._registryBootstrapScopeKey).toBe('');
+  });
+
+  it('keeps an exact pure Worker question route free of registry and wallet-chain context', async () => {
+    const questionId = `0x${'12'.repeat(32)}`;
+    const workerConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      sessionId: '0x12121212121212121212121212121212',
+      corsWorkerUrl: 'https://demo-sh.example.workers.dev',
+      networkChainId: DEFAULT_NETWORK.id,
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = stubMainSiteMountSideEffects(
+      createSubject({
+        path: `/question/${questionId}`,
+        search: '?session=demo-sh',
+        activeSessionSlug: 'demo-sh',
+        sessionConfig: workerConfig,
+      }),
+    );
+
+    await act(async () => {
+      await subject.componentDidMount();
+    });
+    render(subject.render());
+
+    expect(loadGroupRegistryCache).not.toHaveBeenCalled();
+    expect(await screen.findByTestId('mock-survey-tool')).toHaveAttribute('data-session-slug', 'demo-sh');
+    const questionProps = mockSurveyTool.mock.calls[mockSurveyTool.mock.calls.length - 1][0] || {};
+    expect(questionProps.network).toBeNull();
+    expect(questionProps.networkChainId).toBeNull();
+    expect(questionProps.ensureLightSbtUniverse).toBeUndefined();
+    expect(questionProps.refreshSbtData).toBeUndefined();
+    expect(questionProps.scanForSurveyGroup).toBeUndefined();
+    expect(questionProps.litHooks).toBeNull();
+  });
+
+  it('uses a cache-discovered pure Worker question profile before the canonical session query rerender', async () => {
+    const questionId = `0x${'34'.repeat(32)}`;
+    const workerConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      corsWorkerUrl: 'https://demo-sh.example.workers.dev',
+      networkChainId: DEFAULT_NETWORK.id,
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = createSubject({
+      path: `/question/${questionId}`,
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: workerConfig,
+    });
+    subject.findGroupSlugForQuestion = jest.fn(() => 'demo-sh');
+    subject.state = {
+      ...subject.state,
+      litHooks: { getKey: jest.fn() },
+    };
+
+    render(subject.render());
+
+    expect(await screen.findByTestId('mock-survey-tool')).toHaveAttribute('data-session-slug', 'demo-sh');
+    const questionProps = mockSurveyTool.mock.calls.at(-1)?.[0] || {};
+    expect(questionProps.sessionSlugPinned).toBe(false);
+    expect(questionProps.sessionConfig).toEqual(
+      expect.objectContaining({
+        slug: 'demo-sh',
+        sessionModeProfile: workerConfig.sessionModeProfile,
+      }),
+    );
+    expect(questionProps.network).toBeNull();
+    expect(questionProps.networkChainId).toBeNull();
+    expect(questionProps.ensureLightSbtUniverse).toBeUndefined();
+    expect(questionProps.refreshSbtData).toBeUndefined();
+    expect(questionProps.scanForSurveyGroup).toBeUndefined();
+    expect(questionProps.litHooks).toBeNull();
+    expect(window.location.search).toContain('session=demo-sh');
+  });
+
+  it('retains unscoped question chain fallback only when discovery has no concrete session profile', async () => {
+    const questionId = `0x${'56'.repeat(32)}`;
+    const subject = createSubject({
+      path: `/question/${questionId}`,
+      activeSessionSlug: '',
+      sessionConfig: null,
+    });
+    subject.findGroupSlugForQuestion = jest.fn(() => '');
+    subject.state = {
+      ...subject.state,
+      litHooks: { getKey: jest.fn() },
+    };
+
+    render(subject.render());
+
+    const questionProps = mockSurveyTool.mock.calls.at(-1)?.[0] || {};
+    expect(questionProps.sessionConfig).toEqual({});
+    expect(questionProps.network).toEqual(DEFAULT_NETWORK);
+    expect(questionProps.networkChainId).toBe(DEFAULT_NETWORK.id);
+    expect(questionProps.ensureLightSbtUniverse).toBe(subject.ensureLightSbtUniverse);
+    expect(questionProps.refreshSbtData).toEqual(expect.any(Function));
+    expect(questionProps.scanForSurveyGroup).toBe(subject.scanForSurveyGroup);
+    expect(questionProps.litHooks).toEqual(expect.objectContaining({ getKey: expect.any(Function) }));
+  });
+
+  it('opens a fresh-load pure Worker survey from the Worker cache scope without chain fallbacks', async () => {
+    const surveyId = `0x${'78'.repeat(32)}`;
+    const workerConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      sessionId: `0x${'7'.repeat(32)}`,
+      corsWorkerUrl: 'https://demo-sh.example.workers.dev',
+      networkChainId: DEFAULT_NETWORK.id,
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      storageProfile: {
+        backend: 'cloudflare',
+        resources: { questions: 'active', surveys: 'active' },
+      },
+    });
+    const workerCacheIdentity = resolveWorkerCanonicalCacheIdentity({
+      sessionConfig: workerConfig,
+      sessionSlug: 'demo-sh',
+    });
+    const subject = createSubject({
+      path: `/survey/${surveyId}`,
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: workerConfig,
+    });
+    subject.findGroupSlugForSurvey = jest.fn(() => 'demo-sh');
+    subject.queueSurveyGroupScan = jest.fn();
+    subject.state = {
+      ...subject.state,
+      litHooks: { getKey: jest.fn() },
+    };
+    attachDgStore(subject, {
+      'surveysCache:demo-sh': {
+        worker: withWorkerCanonicalCacheIdentity(
+          {
+            surveys: {
+              [surveyId]: {
+                surveyID: surveyId,
+                title: 'Worker survey',
+              },
+            },
+          },
+          workerCacheIdentity,
+        ),
+      },
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId('mock-survey-page')).toHaveAttribute('data-survey-id', surveyId);
+    const surveyProps = mockSurveyPage.mock.calls.at(-1)?.[0] || {};
+    expect(surveyProps.activeSessionSlug).toBe('demo-sh');
+    expect(surveyProps.sessionSlug).toBe('demo-sh');
+    expect(surveyProps.sessionSlugPinned).toBe(true);
+    expect(surveyProps.sessionConfig).toEqual(
+      expect.objectContaining({
+        slug: 'demo-sh',
+        sessionModeProfile: workerConfig.sessionModeProfile,
+      }),
+    );
+    expect(surveyProps.network).toBeNull();
+    expect(surveyProps.networkChainId).toBeNull();
+    expect(surveyProps.refreshSbtData).toBeUndefined();
+    expect(surveyProps.scanForSurveyGroup).toBeUndefined();
+    expect(surveyProps.litHooks).toBeNull();
+    expect(subject.queueSurveyGroupScan).not.toHaveBeenCalled();
+
+    surveyProps.refreshSurveyResponsesByID(surveyId);
+    surveyProps.refreshQuestionMetadata({ reason: 'worker-survey-route' });
+    surveyProps.refreshQuestionResponses(['question-1'], { reason: 'worker-survey-route' });
+
+    expect(subject.refreshSurveyResponsesByIDForGroup).toHaveBeenCalledWith('demo-sh', surveyId);
+    expect(subject.refreshQuestionMetadataForGroup).toHaveBeenCalledWith('demo-sh', {
+      reason: 'worker-survey-route',
+    });
+    expect(subject.refreshQuestionResponses).toHaveBeenCalledWith(['question-1'], {
+      reason: 'worker-survey-route',
+      slug: 'demo-sh',
+    });
+  });
+
+  it('rejects same-slug survey metadata cached for another Worker identity', async () => {
+    const surveyId = `0x${'7b'.repeat(32)}`;
+    const workerConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      sessionId: `0x${'b'.repeat(32)}`,
+      corsWorkerUrl: 'https://worker-b-survey.example.test',
+      networkChainId: DEFAULT_NETWORK.id,
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      storageProfile: {
+        backend: 'cloudflare',
+        resources: { questions: 'active', surveys: 'active' },
+      },
+    });
+    const workerAIdentity = resolveWorkerCanonicalCacheIdentity({
+      sessionConfig: {
+        ...workerConfig,
+        sessionId: `0x${'a'.repeat(32)}`,
+        corsWorkerUrl: 'https://worker-a-survey.example.test',
+      },
+      sessionSlug: 'demo-sh',
+    });
+    const subject = createSubject({
+      path: `/survey/${surveyId}`,
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: workerConfig,
+    });
+    subject.findGroupSlugForSurvey = jest.fn(() => 'demo-sh');
+    subject.queueSurveyGroupScan = jest.fn();
+    subject.state = {
+      ...subject.state,
+      cacheHasLoaded: true,
+      isAllCachesReady: true,
+      isSurveyCacheReady: true,
+    };
+    attachDgStore(subject, {
+      'surveysCache:demo-sh': {
+        worker: withWorkerCanonicalCacheIdentity(
+          {
+            surveys: {
+              [surveyId]: {
+                surveyID: surveyId,
+                title: 'Worker A survey',
+              },
+            },
+          },
+          workerAIdentity,
+        ),
+      },
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByRole('heading', { name: 'Survey Not Found' })).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-survey-page')).not.toBeInTheDocument();
+    expect(subject.queueSurveyGroupScan).not.toHaveBeenCalled();
+  });
+
+  it('keeps a fresh-load Worker survey in session-scoped metadata loading before final not found', async () => {
+    const surveyId = `0x${'79'.repeat(32)}`;
+    const workerConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      sessionId: `0x${'8'.repeat(32)}`,
+      corsWorkerUrl: 'https://demo-sh.example.workers.dev',
+      networkChainId: DEFAULT_NETWORK.id,
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      storageProfile: {
+        backend: 'cloudflare',
+        resources: { questions: 'active', surveys: 'active' },
+      },
+    });
+    const subject = createSubject({
+      path: `/survey/${surveyId}`,
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: workerConfig,
+    });
+    subject.findGroupSlugForSurvey = jest.fn(() => 'demo-sh');
+    subject.queueSurveyGroupScan = jest.fn();
+    subject.state = {
+      ...subject.state,
+      cacheHasLoaded: true,
+      isAllCachesReady: true,
+      isSurveyCacheReady: false,
+      surveyCacheInitializationError: false,
+    };
+    attachDgStore(subject, {
+      'surveysCache:demo-sh': {
+        worker: {
+          surveys: {},
+        },
+      },
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByRole('heading', { name: 'Loading Survey Metadata...' })).toBeInTheDocument();
+    expect(screen.getByText('Loading surveys for session "demo-sh"...')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Survey Not Found' })).not.toBeInTheDocument();
+    expect(subject.queueSurveyGroupScan).not.toHaveBeenCalled();
+  });
+
+  it('retries failed Worker survey metadata hydration for the resolved session without a registry scan', async () => {
+    const surveyId = `0x${'7a'.repeat(32)}`;
+    const workerConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      sessionId: `0x${'9'.repeat(32)}`,
+      corsWorkerUrl: 'https://demo-sh.example.workers.dev',
+      networkChainId: DEFAULT_NETWORK.id,
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+      storageProfile: {
+        backend: 'cloudflare',
+        resources: { questions: 'active', surveys: 'active' },
+      },
+    });
+    const subject = createSubject({
+      path: `/survey/${surveyId}`,
+      activeSessionSlug: 'demo-sh',
+      sessionConfig: workerConfig,
+    });
+    subject.findGroupSlugForSurvey = jest.fn(() => 'demo-sh');
+    subject.queueSurveyGroupScan = jest.fn();
+    subject.initializeSurveyCacheForGroup = jest.fn(async () => undefined);
+    subject.state = {
+      ...subject.state,
+      cacheHasLoaded: true,
+      isAllCachesReady: false,
+      isSurveyCacheReady: false,
+      surveyCacheInitializationError: true,
+    };
+    attachDgStore(subject, {
+      'surveysCache:demo-sh': {
+        worker: {
+          surveys: {},
+        },
+      },
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByRole('heading', { name: 'Survey Metadata Load Error' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() =>
+      expect(subject.initializeSurveyCacheForGroup).toHaveBeenCalledWith('demo-sh', {
+        background: false,
+      }),
+    );
+    expect(subject.state).toEqual(
+      expect.objectContaining({
+        isSurveyCacheReady: false,
+        surveyCacheInitializationError: false,
+      }),
+    );
+    expect(subject.queueSurveyGroupScan).not.toHaveBeenCalled();
+  });
+
+  it('keeps an active pure Worker user profile free of SBT scans and wallet-chain context', async () => {
+    const target = '0x00000000000000000000000000000000000000ab';
+    const sessionConfig = buildSessionConfig({
+      slug: 'demo-sh',
+      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+      corsWorkerUrl: 'https://demo-sh.example.workers.dev',
+      networkChainId: DEFAULT_NETWORK.id,
+      __registry: undefined,
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    });
+    const subject = createSubject({
+      path: `/u/${target}`,
+      activeSessionSlug: 'demo-sh',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId('mock-user-page')).toHaveAttribute('data-network-id', '');
+    expect(screen.getByTestId('mock-user-page')).toHaveAttribute('data-on-chain-profile-enabled', 'false');
+    expect(mockUserPage.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({
+        activeSessionSlug: 'demo-sh',
+        network: null,
+        onChainProfileEnabled: false,
+        sessionConfig: expect.objectContaining({
+          slug: 'demo-sh',
+          sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+          sessionModeProfile: sessionConfig.sessionModeProfile,
+        }),
+        scanSpecificUserProfile: undefined,
+      }),
+    );
+  });
+
+  it('keeps a Worker/Lit-only user profile free of SBT universe and profile scans', async () => {
+    const target = '0x00000000000000000000000000000000000000ac';
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.evm.registryChainId = DEFAULT_NETWORK.id;
+    profile.encryption = { mode: 'lit' };
+    profile.storage.payloadAccessControl.encryption = 'lit';
+    const sessionConfig = buildSessionConfig({
+      slug: 'worker-lit',
+      __registry: undefined,
+      sessionModeProfile: profile,
+    });
+    const subject = createSubject({
+      path: `/u/${target}`,
+      activeSessionSlug: 'worker-lit',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId('mock-user-page')).toHaveAttribute('data-network-id', '');
+    expect(screen.getByTestId('mock-user-page')).toHaveAttribute('data-on-chain-profile-enabled', 'false');
+    expect(mockUserPage.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({
+        network: null,
+        onChainProfileEnabled: false,
+        scanSpecificUserProfile: undefined,
+      }),
+    );
+  });
+
+  it('retains SBT profile scans only for a Worker hybrid with explicit on-chain SBT authorization', async () => {
+    const target = '0x00000000000000000000000000000000000000ad';
+    const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    profile.evm.registryChainId = DEFAULT_NETWORK.id;
+    profile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        {
+          kind: 'sbt_onchain',
+          chainId: DEFAULT_NETWORK.id,
+          contract: '0x1111111111111111111111111111111111111111',
+          anyOrAll: 'any',
+        },
+      ],
+    };
+    const sessionConfig = buildSessionConfig({
+      slug: 'worker-sbt',
+      __registry: undefined,
+      sessionModeProfile: profile,
+    });
+    const subject = createSubject({
+      path: `/u/${target}`,
+      activeSessionSlug: 'worker-sbt',
+      sessionConfig,
+    });
+
+    render(subject.render());
+
+    expect(await screen.findByTestId('mock-user-page')).toHaveAttribute('data-network-id', String(DEFAULT_NETWORK.id));
+    expect(screen.getByTestId('mock-user-page')).toHaveAttribute('data-on-chain-profile-enabled', 'true');
+    expect(mockUserPage.mock.calls.at(-1)?.[0]).toEqual(
+      expect.objectContaining({
+        network: expect.objectContaining({ id: DEFAULT_NETWORK.id }),
+        onChainProfileEnabled: true,
+        scanSpecificUserProfile: expect.any(Function),
+      }),
+    );
   });
 
   it('reuses registry hydration in flight for a scope and restarts on scope changes', async () => {
@@ -2972,6 +3705,7 @@ describe('AppShell single-SBT counts checkpoints', () => {
     const subject = createSubject({
       path: `/sbt/${sbtAddress}`,
       activeSessionSlug: 'edge',
+      sessionConfig: buildSessionConfig(),
     });
     subject.isSbtHistoryScanEnabled = jest.fn(() => true);
 

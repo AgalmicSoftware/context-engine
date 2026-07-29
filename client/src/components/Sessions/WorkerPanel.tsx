@@ -6,12 +6,13 @@ import { faCaretDown, faCaretUp, faExternalLinkAlt } from '@fortawesome/free-sol
 import styles from './SessionWizard.module.scss';
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import WorkerConnectionSection from './WorkerConnectionSection';
-import WorkerDeploySection from './WorkerDeploySection';
+import WorkerDeploySection, { type WorkerDeploySectionProps } from './WorkerDeploySection';
 import WorkerSecretsSection from './WorkerSecretsSection';
 import { normalizeWorkerUrl as normalizeWorkerAuthUrl } from '../../utilities/worker/workerAuth.js';
 import { toStr } from '../../utilities/shared/primitives.js';
 import { PUBLIC_GITHUB_BRANCH, PUBLIC_REPO_URL } from '../../variables/publicRepoMetadata.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
+import type { WorkerCanonicalSessionBootstrap } from '../../utilities/session/sessionWorkerDiscovery';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 import type { SessionWizardRenderField } from './sessionWizardFieldDescriptors';
 
@@ -52,13 +53,9 @@ export type WorkerPanelProps = {
   draft?: DraftState;
   deployWorkerUrl?: string;
   deployComplete: boolean;
-  devPersistWorkerSecrets: boolean;
-  persistWorkerSecrets: boolean;
-  setPersistWorkerSecrets: (value: boolean) => void;
   workerSecretsEnabled: boolean;
   setWorkerSecretsEnabled: (value: boolean) => void;
   clearWorkerSecretFields: () => void;
-  effectivePersistWorkerSecrets: boolean;
   workerResourceKeys?: string[];
   renderResourceCard?: (resourceKey: string, index: number) => React.ReactNode;
   workerAllowOrigins: string;
@@ -97,6 +94,8 @@ export type WorkerPanelProps = {
   renderField: SessionWizardRenderField;
   workerUrlAutoFilled: boolean;
   sessionModeProfileWorkerControl?: React.ReactNode;
+  onNativeWorkerVerified?: (bootstrap: WorkerCanonicalSessionBootstrap) => void;
+  verifyNativeWorker?: WorkerDeploySectionProps['verifyNativeWorker'];
 };
 
 const WorkerPanel = ({
@@ -114,13 +113,9 @@ const WorkerPanel = ({
   draft = {},
   deployWorkerUrl,
   deployComplete,
-  devPersistWorkerSecrets,
-  persistWorkerSecrets,
-  setPersistWorkerSecrets,
   workerSecretsEnabled,
   setWorkerSecretsEnabled,
   clearWorkerSecretFields,
-  effectivePersistWorkerSecrets,
   workerResourceKeys = [],
   renderResourceCard,
   workerAllowOrigins,
@@ -159,6 +154,8 @@ const WorkerPanel = ({
   renderField,
   workerUrlAutoFilled,
   sessionModeProfileWorkerControl = null,
+  onNativeWorkerVerified,
+  verifyNativeWorker,
 }: WorkerPanelProps) => {
   const translate = typeof t === 'function' ? t : (key: string) => key;
   const renderInfoTooltip =
@@ -256,13 +253,9 @@ const WorkerPanel = ({
             isNormalMode={isNormalMode}
             translate={translate}
             renderInfoTooltip={renderInfoTooltip}
-            devPersistWorkerSecrets={devPersistWorkerSecrets}
-            persistWorkerSecrets={persistWorkerSecrets}
-            setPersistWorkerSecrets={setPersistWorkerSecrets}
             workerSecretsEnabled={workerSecretsEnabled}
             setWorkerSecretsEnabled={setWorkerSecretsEnabled}
             clearWorkerSecretFields={clearWorkerSecretFields}
-            effectivePersistWorkerSecrets={effectivePersistWorkerSecrets}
             workerResourceKeys={workerResourceKeys}
             renderResource={renderResource}
             workerAllowOrigins={workerAllowOrigins}
@@ -301,6 +294,9 @@ const WorkerPanel = ({
             setDeployForm={setDeployForm}
             handleDeployWorker={handleDeployWorker}
             deployStatusDisplayState={deployStatusDisplayState}
+            displayedWorkerUrl={displayedWorkerUrl}
+            onNativeWorkerVerified={onNativeWorkerVerified}
+            verifyNativeWorker={verifyNativeWorker}
           />
 
           <WorkerConnectionSection

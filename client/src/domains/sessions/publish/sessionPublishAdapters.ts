@@ -119,6 +119,7 @@ export type WorkerBootstrapAdminAuthInput = {
 export type WorkerAdminActionAuthInput = {
   action?: string;
   slug?: string;
+  sessionId?: string;
   body?: PublishRecord;
   workerUrl?: string;
   context?: PublishRecord;

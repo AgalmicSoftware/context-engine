@@ -456,7 +456,7 @@ const AboutPage = () => {
               </a>
             </div>
             <p className={styles.tagline}>
-              An open-source toolkit for deliberation, sensemaking, and negotiation (for humans and AI agents)
+              An open-source toolkit for deliberation, decision-making, and negotiation (for humans and AI agents)
             </p>
 
             <div className={styles.heroActions}>

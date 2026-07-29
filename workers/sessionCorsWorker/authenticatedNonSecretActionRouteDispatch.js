@@ -1,3 +1,5 @@
+import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
+
 export const dispatchAuthenticatedNonSecretActionRoute = async ({
   action,
   body,
@@ -14,6 +16,18 @@ export const dispatchAuthenticatedNonSecretActionRoute = async ({
   const isFetchUrlAction = action === 'fetch_url';
   if (!isFetchImageAction && !isFetchUrlAction) {
     return { handled: false };
+  }
+  const endedResponse = buildSessionEndedResponse({
+    config,
+    headers,
+    json: deps?.json,
+    now: deps?.now,
+  });
+  if (endedResponse) {
+    return {
+      handled: true,
+      response: endedResponse,
+    };
   }
 
   const preflight = await deps?.evaluateAuthenticatedRoutePreflight?.({

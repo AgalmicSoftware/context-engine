@@ -8,6 +8,7 @@ const buildLitWorkerConfig = () => {
   const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
   sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
   sessionModeProfile.encryption = { mode: 'lit' };
+  sessionModeProfile.storage.payloadAccessControl!.encryption = 'lit';
   sessionModeProfile.evm.registryChainId = 11155420;
   return {
     slug: 'worker-lit-session',
@@ -15,6 +16,12 @@ const buildLitWorkerConfig = () => {
     sessionModeProfile,
   };
 };
+
+const buildPureWorkerConfig = () => ({
+  slug: 'demo-sh',
+  networkChainId: 11155420,
+  sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+});
 
 describe('workerCanonicalSessionRouteContext', () => {
   it('aligns explicit worker Lit session config to the validated profile chain without mutating its source', () => {
@@ -57,9 +64,28 @@ describe('workerCanonicalSessionRouteContext', () => {
     expect(
       resolveExplicitWorkerSessionNetwork({
         workerOrigin: 'https://worker.example.test',
-        sessionConfig: { ...sessionConfig, networkChainId: null },
+        sessionConfig: buildPureWorkerConfig(),
         fallbackNetwork,
       }),
     ).toBeNull();
+  });
+
+  it('removes a legacy top-level chain from explicit pure Worker route context', () => {
+    const sessionConfig = buildPureWorkerConfig();
+
+    expect(
+      resolveExplicitWorkerSessionConfig({
+        workerOrigin: 'https://worker.example.test',
+        sessionConfig,
+      }),
+    ).toEqual(expect.objectContaining({ networkChainId: null }));
+    expect(
+      resolveExplicitWorkerSessionNetwork({
+        workerOrigin: 'https://worker.example.test',
+        sessionConfig,
+        fallbackNetwork: { id: 84532 },
+      }),
+    ).toBeNull();
+    expect(sessionConfig.networkChainId).toBe(11155420);
   });
 });

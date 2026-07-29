@@ -1,6 +1,7 @@
 import { readArweaveUploadRequestPayload } from './arweaveUploadRequestNormalization.js';
 import { resolveMaxUploadBytes } from './uploadSizeLimits.js';
 import { workerGroupsRoute as workerGroupsRouteBoundary } from './workerGroups.js';
+import { buildSessionEndedResponse } from '../shared/sessionLifecycle.mjs';
 
 export const dispatchAuthenticatedSecretPathRoute = async ({
   path,
@@ -25,11 +26,31 @@ export const dispatchAuthenticatedSecretPathRoute = async ({
   );
   const isWorkerGroupsRoute = (
     (path === '/groups/my-memberships' && (method === 'GET' || method === 'POST')) ||
+    (path === '/groups/members' && (method === 'GET' || method === 'POST')) ||
     (path === '/groups/list' && (method === 'GET' || method === 'POST')) ||
-    (path === '/groups/join' && method === 'POST')
+    (path === '/groups/create' && method === 'POST') ||
+    (path === '/groups/join' && method === 'POST') ||
+    (path === '/groups/leave' && method === 'POST')
   );
   if (!isTranscribeRoute && !isArweaveUploadRoute && !isStorageRoute && !isWorkerGroupsRoute) {
     return { handled: false };
+  }
+  const isParticipantWrite = (
+    isTranscribeRoute ||
+    isArweaveUploadRoute ||
+    (path === '/storage/upload' && method === 'POST') ||
+    (path === '/groups/create' && method === 'POST') ||
+    (path === '/groups/join' && method === 'POST') ||
+    (path === '/groups/leave' && method === 'POST')
+  );
+  const endedResponse = isParticipantWrite
+    ? buildSessionEndedResponse({ config, headers, json: deps?.json, now: deps?.now })
+    : null;
+  if (endedResponse) {
+    return {
+      handled: true,
+      response: endedResponse,
+    };
   }
 
   const route = isTranscribeRoute

@@ -17,10 +17,12 @@ import {
   resolveSurveyToolRenderMode,
   resolveSurveyToolSelectorRenderState,
   shouldBumpSurveyToolQuestionsCacheNonce,
+  shouldFetchSurveyToolSurveyIndex,
   shouldFetchSurveyToolSurveysOnPropsChange,
   shouldOpenSurveyToolResultsOnPropsChange,
   shouldRouteSurveyToolMountToQuestions,
 } from './surveyToolTopLevelHelpers';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 describe('surveyToolTopLevelHelpers', () => {
   it('builds a fresh initial cache state', () => {
@@ -276,24 +278,38 @@ describe('surveyToolTopLevelHelpers', () => {
   });
 
   it('resolves SurveyTool prop-change lifecycle guards', () => {
+    const registrySessionConfig = {
+      slug: 'legacy',
+      networkChainId: 1,
+      __registry: {
+        chainId: 1,
+        sessionIdHex: '0x00112233445566778899aabbccddeeff',
+      },
+    };
     expect(
       shouldFetchSurveyToolSurveysOnPropsChange({
-        prevProps: { network: { id: 1 }, isSurveyCacheReady: false },
-        props: { network: { id: 2 }, isSurveyCacheReady: false },
+        prevProps: { network: { id: 1 }, isSurveyCacheReady: false, sessionConfig: registrySessionConfig },
+        props: { network: { id: 2 }, isSurveyCacheReady: false, sessionConfig: registrySessionConfig },
       }),
     ).toBe(true);
     expect(
       shouldFetchSurveyToolSurveysOnPropsChange({
-        prevProps: { network: { id: 1 }, isSurveyCacheReady: false },
-        props: { network: { id: 1 }, isSurveyCacheReady: true },
+        prevProps: { network: { id: 1 }, isSurveyCacheReady: false, sessionConfig: registrySessionConfig },
+        props: { network: { id: 1 }, isSurveyCacheReady: true, sessionConfig: registrySessionConfig },
       }),
     ).toBe(true);
     expect(
       shouldFetchSurveyToolSurveysOnPropsChange({
-        prevProps: { network: { id: 1 }, isSurveyCacheReady: true },
-        props: { network: { id: 1 }, isSurveyCacheReady: false },
+        prevProps: { network: { id: 1 }, isSurveyCacheReady: true, sessionConfig: registrySessionConfig },
+        props: { network: { id: 1 }, isSurveyCacheReady: false, sessionConfig: registrySessionConfig },
       }),
     ).toBe(false);
+    expect(
+      shouldFetchSurveyToolSurveysOnPropsChange({
+        prevProps: { minifiedMode: 'pile', network: { id: 1 }, sessionConfig: registrySessionConfig },
+        props: { network: { id: 1 }, isSurveyCacheReady: false, sessionConfig: registrySessionConfig },
+      }),
+    ).toBe(true);
 
     expect(
       shouldOpenSurveyToolResultsOnPropsChange({
@@ -340,6 +356,73 @@ describe('surveyToolTopLevelHelpers', () => {
         props: { isQuestionCacheReady: false, questionResponsesNonce: 1, network: { id: 1 } },
       }),
     ).toBe(false);
+  });
+
+  it('discovers the legacy survey index only for registry authority', () => {
+    const pureWorkerProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const workerSbtProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    workerSbtProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    workerSbtProfile.evm.registryChainId = 11155420;
+    workerSbtProfile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        {
+          kind: 'sbt_onchain',
+          chainId: 11155420,
+          contract: '0x00000000000000000000000000000000000000aa',
+          anyOrAll: 'any',
+        },
+      ],
+    };
+    const workerLitProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    workerLitProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    workerLitProfile.evm.registryChainId = 11155420;
+    workerLitProfile.encryption = { mode: 'lit' };
+    workerLitProfile.storage.payloadAccessControl!.encryption = 'lit';
+    const registryProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+
+    expect(shouldFetchSurveyToolSurveyIndex({ minifiedMode: 'pile' })).toBe(false);
+    expect(shouldFetchSurveyToolSurveyIndex({ singleQuestionMode: true })).toBe(false);
+    [pureWorkerProfile, workerSbtProfile, workerLitProfile].forEach((sessionModeProfile) => {
+      expect(
+        shouldFetchSurveyToolSurveyIndex({
+          sessionConfig: {
+            slug: 'worker-session',
+            networkChainId: 11155420,
+            sessionModeProfile,
+          },
+        }),
+      ).toBe(false);
+    });
+    expect(
+      shouldFetchSurveyToolSurveyIndex({
+        sessionConfig: {
+          slug: 'invalid',
+          sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+        },
+      }),
+    ).toBe(false);
+    expect(shouldFetchSurveyToolSurveyIndex({ sessionConfig: { slug: 'missing', networkChainId: 11155420 } })).toBe(
+      false,
+    );
+    expect(shouldFetchSurveyToolSurveyIndex({ network: { id: 11155420 } })).toBe(false);
+    expect(
+      shouldFetchSurveyToolSurveyIndex({
+        sessionConfig: { slug: 'registry', sessionModeProfile: registryProfile },
+      }),
+    ).toBe(true);
+    expect(
+      shouldFetchSurveyToolSurveyIndex({
+        sessionConfig: {
+          slug: 'legacy',
+          networkChainId: 11155420,
+          __registry: {
+            chainId: 11155420,
+            sessionIdHex: '0x00112233445566778899aabbccddeeff',
+          },
+        },
+      }),
+    ).toBe(true);
   });
 
   it('resolves results modal close URL state', () => {
@@ -457,7 +540,7 @@ describe('surveyToolTopLevelHelpers', () => {
 
   it('finds surveys across all survey cache entries through an injected cache reader', () => {
     const survey = { id: '0xabc', title: 'Stored survey' };
-    const listNamespaceEntries = jest.fn(() => [
+    const listNamespaceEntries = jest.fn((_namespace?: string, _options?: { cloneValues?: boolean }) => [
       {
         slug: 'cached-session',
         value: {

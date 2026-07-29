@@ -45,7 +45,8 @@ Primary storage and authority split:
 ## Glossary (Core Concepts)
 
 - Session: A named "space" (identified by `slug` and/or `sessionId`) that ties together contracts, metadata, worker config, and access gates.
-- Group: Typically an SBT contract (non-transferable ERC-721) representing membership/entitlement.
+- Group: Either an on-chain SBT contract representing membership/entitlement,
+  or a Worker-native group record for a Worker-canonical session.
 - Gate: An access rule stored on-chain in `SessionRegistry` that says which SBT(s) are required (and whether Any/All) to access a resource.
 - Passkey EOA wallet: A passkey-unlocked embedded EOA wallet using WebAuthn PRF
   to derive the EOA key by default, with optional AES-GCM encrypted private-key
@@ -78,7 +79,11 @@ Core routes:
 - `/surveys`, `/survey/:id`, `/survey/:id/results`: Survey list/view/results.
 - `/questions`, `/questions/results`: Question list/results.
 - `/question/:id`: Single question view. Canonical session hint uses `?session=<slug>` (legacy `?group=<slug>` accepted).
-- `/sbts` and `/groups`: SBT groups list and creation UI (including session-scoped list aliases such as `/sbts/:slug` and `/groups/:slug`).
+- `/sbts` and `/groups`: group list and creation UI. Registry-backed SBT
+  sessions accept scoped aliases such as `/sbts/:slug` and `/groups/:slug`.
+  Worker-canonical sessions use `/groups?sessionName=<slug>`; a selected native
+  Group uses `#group-<groupId>` for its full SBT-style detail view. Legacy
+  Worker `/groups/:slug` links are accepted and silently canonicalized.
 - `/sbt/:address` and `/group/:address` (legacy password suffixes still supported on detail flows where applicable): SBT detail and minting/claim UI.
 - `/admin`: Session admin UI (registry and worker tests; sessionId query supported).
 - `/sponsor`: Sponsor page for generating grant-backed sponsored-bundle links into the Session Wizard.
@@ -128,14 +133,41 @@ Deep-dive docs:
 - `docs/session-registry.md`
 - `docs/session-cors-worker.md`
 
-### 2) SBT Groups (Membership and Gating)
+### 2) Groups (Membership and Gating)
 
 What users can do:
 - Create SBT contracts (via `SBTFactory`) with tokenURI metadata stored on Arweave.
+- Create chain-free Worker-native groups in a Worker-canonical session. The
+  session's `groupCreationPolicy` chooses configured admins only or all
+  participants. Authenticated principals with the `groups` scope may join and,
+  when the policy permits, create. Participant-created groups are forced to
+  open self-join and session visibility, while retaining validated tags,
+  public reference URLs, a per-group member limit, a self-join deadline, and
+  the signed creator's group-admin address. Anonymous discovery is independent:
+  only an explicitly public, unencrypted, ungated session mode exposes redacted
+  session-visible group metadata before sign-in.
 - Mint/claim SBTs using multiple distribution modes (open claim, password claim, invite-limited flows, and signature-based flows).
 - View SBT group details and mint status, and interact with group gates (as used by the session and worker).
+- View Worker-native Groups in the corresponding SBT-style detail hierarchy,
+  translated to member capacity, a live join deadline, Join/Leave actions,
+  public document references, and tags. Authenticated viewers may browse
+  member identities and the authoritative count when `memberVisibility`
+  permits their session or Group membership; Worker Groups do not invent
+  contract, network, gas, transaction, or burn fields.
 
 What the system does:
+- Keeps Worker-native group IDs, records, membership, and capacity bound to the
+  exact Worker origin, slug, and canonical session ID. Signed admins retain
+  edit, delete, and membership management under either creation policy. The
+  Durable Object enforces each group limit and join deadline in the same
+  serialized path that reserves membership capacity.
+- Applies an optional Worker-canonical `sessionEndsAt` timestamp to participant
+  resource use and mutations. At closure, AI, transcription, fetch, uploads,
+  Group creation, and Group joins stop while existing Group/storage/result
+  reads and signed admin operations remain available.
+- Applies the same group-creation choice to Context Engine's session-bound
+  on-chain SBT creation controls. This is not factory-level authorization:
+  public SBT factory methods remain independently callable on-chain.
 - Uses SBT ownership for worker auth gating (scopes for AI/Arweave/transcribe/faucet/fetch/Lit delegation).
 - Uses SBT ownership for Lit encryption access control (decrypting gated metadata and responses).
 
@@ -331,6 +363,31 @@ Worker API (selected endpoints):
 - `POST /ai`: AI proxy (provider-based); authenticated by default, with anonymous access supported when the session config allows it. Also supports `POST /` with `{ action: "ai", ... }`.
 - `POST /transcribe`: Transcription proxy; authenticated by default, with anonymous access supported when the session config allows it.
 - `POST /arweave/upload`: Authenticated Arweave upload (also supports an admin-signed bootstrap path when no auth header).
+- `POST /groups/create`: Authenticated participant Worker-group creation,
+  enabled only by `groupCreationPolicy: "participants"` and forced to an open,
+  session-visible record. Tags, public reference URLs, member limit, and join
+  deadline are retained; the group-admin address is derived from the signed
+  principal.
+- `GET /groups/list`: Redacted session-visible Worker-group discovery is
+  anonymous only for a validated Worker-canonical mode with public stored
+  results and unencrypted, ungated Cloudflare storage. Memberships, member
+  identities/counts, and join/create remain authenticated; creation permission
+  is controlled separately by `groupCreationPolicy`.
+- `GET|POST /groups/my-memberships`: Authenticated self-membership projection.
+- `GET|POST /groups/members`: Authenticated, paginated member identities and
+  authoritative count. `session` permits any authenticated session principal,
+  `members` requires Group membership, and `admin_only` remains on the signed
+  Admin route.
+- `POST /groups/join`: Authenticated self-join for an open Worker group before
+  its configured deadline and within its member limits.
+- `POST /groups/leave`: Authenticated self-removal. The principal is derived
+  from the bearer credential rather than request JSON.
+- `POST /admin/groups/create`: Signed-admin Worker-group creation under either
+  creation policy, including Worker-native metadata, membership limits, join
+  deadlines, and a group-admin address.
+- `POST /admin/groups/reconcile-empty`: Signed-admin recovery for an exact
+  `legacy_locked` coordinator; succeeds only with a valid server-managed fresh
+  bootstrap proof and no current or deleted Group rows.
 - `POST /lit/chipotle-action`: Authenticated worker-mediated Lit Chipotle execution for check/encrypt/decrypt requests.
 - `POST /sponsored/redeem-deploy`: Redeem a sponsored worker deploy grant.
 - `POST /sponsored/redeem-faucet`: Redeem a sponsored faucet grant.
@@ -359,7 +416,13 @@ Client-side:
 - `client/src/variables/local-contracts.json`: local chain contract address overrides (written by deploy scripts).
 
 Worker-side:
-- Worker KV session config and secrets (see `docs/session-cors-worker.md` for shapes and bindings).
+- Worker KV session config and secrets, including the top-level
+  `groupCreationPolicy` enum (`admin_only` or `participants`; omitted legacy
+  Worker configs default to `admin_only`), optional `sessionEndsAt`, and generic
+  `defaultGroupTags`. Pure Worker profiles reject block/faucet/registry
+  configuration; explicit Worker + on-chain SBT profiles accept only the
+  required network and Group Factory subset. See `docs/session-cors-worker.md`
+  for shapes and bindings.
 
 Resource keys:
 - Keys can live in worker secrets, with optional per-user local overrides (see `docs/resource-keys.md`).

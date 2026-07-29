@@ -1401,6 +1401,14 @@ const executeDeployHelperRequestCore = async ({
   const workerCanonicalRequested = (
     toStr(body?.sessionModeProfile?.authority?.mode).trim().toLowerCase() === 'worker_canonical'
   );
+  const groupCreationPolicy = body?.groupCreationPolicy == null
+    ? 'admin_only'
+    : toStr(body.groupCreationPolicy).trim().toLowerCase();
+  if (!['admin_only', 'participants'].includes(groupCreationPolicy)) {
+    return buildFailure(400, {
+      error: 'groupCreationPolicy must be "admin_only" or "participants".',
+    });
+  }
   if (workerCanonicalRequested && !/^0x[0-9a-f]{40}$/i.test(adminAddress)) {
     return buildFailure(400, { error: 'A valid adminAddress is required for worker-canonical deploys.' });
   }
@@ -1540,6 +1548,11 @@ const executeDeployHelperRequestCore = async ({
   const config = {
     slug: sessionSlug,
     authzEpoch: 1,
+    workerGroupsBootstrap: {
+      version: 2,
+      state: 'fresh_empty',
+      bootstrapId: deploymentId,
+    },
     adminAddress,
     allowOrigins,
     limits,
@@ -1558,6 +1571,7 @@ const executeDeployHelperRequestCore = async ({
         }
       : {}),
     ...selectDeployWorkerSessionConfigFields(body),
+    groupCreationPolicy,
   };
   if (workerCanonicalRequested) {
     config.workerAuthority = workerCanonicalAuthority.value;

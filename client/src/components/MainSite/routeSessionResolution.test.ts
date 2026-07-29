@@ -199,6 +199,39 @@ describe('routeSessionResolution', () => {
     expect(resolveSessionSlugFromPathToken).toHaveBeenCalledWith('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
   });
 
+  it.each(['/groups/demo-sh', '/sbts/demo-sh/'])(
+    'uses the scoped group-list slug for render-time session context on %s',
+    (path) => {
+      expect(
+        resolveMainSiteRenderActiveSessionSlug({
+          path,
+          search: '',
+          activeSessionSlug: 'stale-session',
+          isCacheManagerReady: false,
+          getSessionConfigBySlug: () => null,
+          resolveDisplaySessionConfigBySlug: () => null,
+          resolveSessionConfigById: () => null,
+          resolveSessionSlugFromPathToken: () => '',
+        }),
+      ).toBe('demo-sh');
+    },
+  );
+
+  it('uses the query-only Worker Groups session slug for render-time context', () => {
+    expect(
+      resolveMainSiteRenderActiveSessionSlug({
+        path: '/groups',
+        search: '?sessionName=demo-sh',
+        activeSessionSlug: 'stale-session',
+        isCacheManagerReady: false,
+        getSessionConfigBySlug: () => null,
+        resolveDisplaySessionConfigBySlug: () => null,
+        resolveSessionConfigById: () => null,
+        resolveSessionSlugFromPathToken: () => '',
+      }),
+    ).toBe('demo-sh');
+  });
+
   it('preserves an explicit general session route instead of falling back to the active session', () => {
     expect(
       resolveMainSiteRenderActiveSessionSlug({

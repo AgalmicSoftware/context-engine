@@ -70,14 +70,13 @@ describe('sponsoredBundles', () => {
     else env.PUBLIC_URL = originalPublicUrl;
   });
 
-  it('builds the expected sponsored URL shape', () => {
+  it('builds an opaque-id-only sponsored URL', () => {
     expect(
       buildSponsoredSessionUrl({
         txId: 'arweave_tx_id',
-        secret: 'secret value',
         origin: 'https://contextengine.example',
       }),
-    ).toBe('https://contextengine.example/new?sponsored=arweave_tx_id#k=secret%20value');
+    ).toBe('https://contextengine.example/new?sponsored=arweave_tx_id');
   });
 
   it('prepends PUBLIC_URL when building the default sponsored route', () => {
@@ -86,10 +85,9 @@ describe('sponsoredBundles', () => {
     expect(
       buildSponsoredSessionUrl({
         txId: 'arweave_tx_id',
-        secret: 'secret value',
         origin: 'https://contextengine.example',
       }),
-    ).toBe('https://contextengine.example/ce/new?sponsored=arweave_tx_id#k=secret%20value');
+    ).toBe('https://contextengine.example/ce/new?sponsored=arweave_tx_id');
   });
 
   it('normalizes supported bundle fields and ignores unsupported customRpcKey', () => {
@@ -271,7 +269,7 @@ describe('sponsoredBundles', () => {
     expect(result).toEqual({
       txId: 'arweave_tx_id',
       envelope,
-      url: 'http://localhost/new?sponsored=arweave_tx_id#k=bundle-secret',
+      url: 'http://localhost/new?sponsored=arweave_tx_id',
     });
   });
 

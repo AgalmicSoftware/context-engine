@@ -2,15 +2,25 @@
 import React, { act } from 'react';
 import { ethers } from 'ethers';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 
 const ADMIN_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const SESSION_REGISTRY_CACHE_UPDATED_EVENT = 'ce:session-registry-cache-updated';
+const buildRegistryLitProfile = () => {
+  const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
+  profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+  profile.encryption = { mode: 'lit' };
+  profile.results.visibility = 'participant_aggregate';
+  return profile;
+};
+const buildWorkerProfile = () => cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
 
 const buildSessionConfig = (overrides = {}) => ({
   slug: 'edge',
   sessionName: 'Edge Session',
   corsWorkerUrl: 'https://worker.example.test',
   networkChainId: 84532,
+  sessionModeProfile: buildRegistryLitProfile(),
   __registry: {
     registryChainId: 84532,
     chainId: 84532,
@@ -208,7 +218,7 @@ describe('AdminPage worker secrets controls', () => {
       sessionName: 'Worker Admin Session',
       corsWorkerUrl: 'https://worker-admin.example.test',
       adminAddress: ADMIN_ADDRESS,
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      sessionModeProfile: buildWorkerProfile(),
     };
     mockResolveCorsProxyUrl.mockResolvedValue({
       url: initialSessionConfig.corsWorkerUrl,
@@ -222,6 +232,11 @@ describe('AdminPage worker secrets controls', () => {
     expect(screen.queryByText(/Register in \/new before using worker actions/i)).not.toBeInTheDocument();
 
     const workerSecretsPanel = await openWorkerSecretsPanel();
+    expect(within(workerSecretsPanel).getByRole('button', { name: 'AI' })).toBeInTheDocument();
+    expect(within(workerSecretsPanel).queryByRole('button', { name: 'RPC' })).not.toBeInTheDocument();
+    expect(within(workerSecretsPanel).queryByRole('button', { name: 'Arweave' })).not.toBeInTheDocument();
+    expect(within(workerSecretsPanel).queryByRole('button', { name: 'Faucet' })).not.toBeInTheDocument();
+    expect(within(workerSecretsPanel).queryByRole('button', { name: 'Lit' })).not.toBeInTheDocument();
     fireEvent.click(within(workerSecretsPanel).getByRole('button', { name: 'AI' }));
     fireEvent.change(getSecretInputByLabel('OpenAI API key'), {
       target: { value: 'test-openai-key' },
@@ -243,9 +258,7 @@ describe('AdminPage worker secrets controls', () => {
     expect(mockUploadSessionMetadata).not.toHaveBeenCalled();
     expect(mockUpdateSessionMetadataOnChain).not.toHaveBeenCalled();
 
-    const gatePanel = screen.getByText('On-chain default gate').closest('section');
-    await clickAndSettle(within(gatePanel).getByRole('button', { name: 'Toggle On-chain default gate section' }));
-    expect(screen.getByRole('button', { name: 'Update default gate on-chain' })).toBeDisabled();
+    expect(screen.queryByText('On-chain default gate')).not.toBeInTheDocument();
   });
 
   it('does not grant registry mutations to a different worker-canonical top-level admin', async () => {
@@ -261,7 +274,7 @@ describe('AdminPage worker secrets controls', () => {
         chainId: 84532,
         adminAddress: '0x00000000000000000000000000000000000000bb',
       },
-      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+      sessionModeProfile: buildWorkerProfile(),
     };
     mockResolveCorsProxyUrl.mockResolvedValue({
       url: initialSessionConfig.corsWorkerUrl,
@@ -273,9 +286,7 @@ describe('AdminPage worker secrets controls', () => {
     expect(await screen.findByDisplayValue(initialSessionConfig.corsWorkerUrl)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit worker URL' })).toBeInTheDocument();
 
-    const gatePanel = screen.getByText('On-chain default gate').closest('section');
-    await clickAndSettle(within(gatePanel).getByRole('button', { name: 'Toggle On-chain default gate section' }));
-    expect(screen.getByRole('button', { name: 'Update default gate on-chain' })).toBeDisabled();
+    expect(screen.queryByText('On-chain default gate')).not.toBeInTheDocument();
     expect(mockSetSessionFieldsOnChain).not.toHaveBeenCalled();
   });
 

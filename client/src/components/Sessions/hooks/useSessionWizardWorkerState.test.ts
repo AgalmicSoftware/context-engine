@@ -23,7 +23,6 @@ const renderWorkerState = (overrides = {}) =>
       cachedWizard: null,
       deployHelperUrlDefault: 'https://deploy-helper.example',
       workerBundleUrlDefault: 'https://bundle.example/session-worker.js',
-      devPersistWorkerSecrets: true,
       defaultAllowedOrigins: 'http://localhost:3010\nhttp://127.0.0.1:3010',
       buildProvisionedSponsoredContextState,
       ...overrides,
@@ -40,7 +39,7 @@ describe('useSessionWizardWorkerState', () => {
 
     expect(result.current.workerMode).toBe('default');
     expect(result.current.workerSecretsEnabled).toBe(true);
-    expect(result.current.persistWorkerSecrets).toBe(true);
+    expect(result.current.persistWorkerSecrets).toBe(false);
     expect(result.current.deployHelperUrl).toBe('https://deploy-helper.example');
     expect(result.current.deployForm).toEqual({
       apiToken: '',
@@ -113,15 +112,14 @@ describe('useSessionWizardWorkerState', () => {
       fields: { prompt: 'enabled' },
     });
     expect(result.current.workerSecrets.openaiKey).toBe('');
-    expect(result.current.workerSecrets.customRpcUrl).toBe('https://rpc.example');
-    expect(result.current.workerSecrets.litAccountApiKey).toBe('lit-account');
-    expect(result.current.workerSecrets.litApiBase).toBe('');
+    expect(result.current.workerSecrets.customRpcUrl).toBe('');
+    expect(result.current.workerSecrets.litAccountApiKey).toBe('');
+    expect(result.current.workerSecrets.litApiBase).toBe('https://lit.example');
   });
 
   it('uses upload bundle mode when no hosted worker bundle default exists', () => {
     const { result } = renderWorkerState({
       workerBundleUrlDefault: '',
-      devPersistWorkerSecrets: false,
     });
 
     expect(result.current.bundleMode).toBe('upload');

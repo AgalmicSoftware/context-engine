@@ -16,6 +16,8 @@ import {
 
 const TEST_ADDRESS = '0x00000000000000000000000000000000000000aa';
 const NEXT_TEST_ADDRESS = '0x00000000000000000000000000000000000000bb';
+const CANONICAL_SESSION_ID = '0x1234567890abcdef1234567890abcdef';
+const NEXT_CANONICAL_SESSION_ID = '0xfedcba0987654321fedcba0987654321';
 
 jest.mock('ethers', () => {
   class MockWeb3Provider {
@@ -119,6 +121,10 @@ const flushPromises = async () => {
   await new Promise((resolve) => setTimeout(resolve, 0));
 };
 
+beforeEach(() => {
+  clearAllWorkerSessionTokens();
+});
+
 describe('workerAuth normalizeWorkerUrl', () => {
   it('strips known endpoint suffixes to recover worker base URL', () => {
     expect(normalizeWorkerUrl('https://worker.example/arweave/upload')).toBe('https://worker.example');
@@ -148,6 +154,23 @@ describe('workerAuth normalizeWorkerUrl', () => {
 });
 
 describe('workerAuth token cache envelopes', () => {
+  it('purges legacy persisted bearer entries when the cache module initializes', () => {
+    const cacheKey = `ce:workerToken:v1:https://worker.example:edge:${TEST_ADDRESS}`;
+    localStorage.setItem(
+      cacheKey,
+      JSON.stringify({
+        token: 'persisted-worker-token',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      }),
+    );
+
+    jest.isolateModules(() => {
+      require('./workerAuthTokenCache.js');
+    });
+
+    expect(localStorage.getItem(cacheKey)).toBeNull();
+  });
+
   it('normalizes scoped v1 token envelopes', () => {
     const envelope = __test__workerAuthTokenCache.buildTokenCacheEnvelope({
       token: 'token-1',
@@ -182,6 +205,7 @@ describe('workerAuth token cache envelopes', () => {
       token: 'token-1',
       exp: 4600,
       workerUrl: 'https://worker.example',
+      sessionId: CANONICAL_SESSION_ID,
       sessionSlug: 'edge',
       address: TEST_ADDRESS,
       issuedAt: 1000,
@@ -190,6 +214,7 @@ describe('workerAuth token cache envelopes', () => {
     expect(
       __test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
         workerUrl: 'https://other-worker.example',
+        sessionId: CANONICAL_SESSION_ID,
         sessionSlug: 'edge',
         address: TEST_ADDRESS,
         nowSeconds: 1200,
@@ -199,6 +224,7 @@ describe('workerAuth token cache envelopes', () => {
     expect(
       __test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
         workerUrl: 'https://worker.example',
+        sessionId: CANONICAL_SESSION_ID,
         sessionSlug: 'other-session',
         address: TEST_ADDRESS,
         nowSeconds: 1200,
@@ -208,8 +234,19 @@ describe('workerAuth token cache envelopes', () => {
     expect(
       __test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
         workerUrl: 'https://worker.example',
+        sessionId: CANONICAL_SESSION_ID,
         sessionSlug: 'edge',
         address: NEXT_TEST_ADDRESS,
+        nowSeconds: 1200,
+      }),
+    ).toEqual({ ok: false, status: 'scope-mismatch' });
+
+    expect(
+      __test__workerAuthTokenCache.normalizeTokenCacheEntry(envelope, {
+        workerUrl: 'https://worker.example',
+        sessionId: NEXT_CANONICAL_SESSION_ID,
+        sessionSlug: 'edge',
+        address: TEST_ADDRESS,
         nowSeconds: 1200,
       }),
     ).toEqual({ ok: false, status: 'scope-mismatch' });
@@ -245,6 +282,24 @@ describe('workerAuth token cache envelopes', () => {
         },
       ),
     ).toEqual({ ok: false, status: 'missing-expiry' });
+  });
+
+  it('rejects a legacy cache entry when an exact canonical session identity is expected', () => {
+    expect(
+      __test__workerAuthTokenCache.normalizeTokenCacheEntry(
+        {
+          token: 'legacy-token',
+          exp: 4600,
+        },
+        {
+          workerUrl: 'https://worker.example',
+          sessionId: CANONICAL_SESSION_ID,
+          sessionSlug: 'edge',
+          address: TEST_ADDRESS,
+          nowSeconds: 1200,
+        },
+      ),
+    ).toEqual({ ok: false, status: 'scope-mismatch' });
   });
 
   it('rejects scoped v1 token envelopes with excessive cache lifetimes', () => {
@@ -338,7 +393,7 @@ describe('workerAuth canonical session resolution', () => {
 
   it('logs into an unregistered worker-canonical session using the freshly verified route config', async () => {
     const workerOrigin = 'https://unregistered-worker.example.com';
-    const sessionId = '0x1234567890abcdef1234567890abcdef';
+    const sessionId = CANONICAL_SESSION_ID;
     const workerConfig = {
       slug: 'unregistered-worker',
       sessionId,
@@ -362,8 +417,21 @@ describe('workerAuth canonical session resolution', () => {
     getCorsProxyUrlOrThrow.mockResolvedValueOnce(workerOrigin);
     global.fetch = jest
       .fn()
-      .mockResolvedValueOnce(jsonResp(200, { nonce: 'worker-nonce' }))
-      .mockResolvedValueOnce(jsonResp(200, { token: 'worker-token', exp: Math.floor(Date.now() / 1000) + 3600 }));
+      .mockResolvedValueOnce(
+        jsonResp(200, {
+          nonce: 'worker-nonce',
+          sessionSlug: workerConfig.slug,
+          sessionId,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResp(200, {
+          token: 'worker-token',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+          sessionSlug: workerConfig.slug,
+          sessionId,
+        }),
+      );
 
     await expect(getWorkerSessionToken({ sessionSlug: 'unregistered-worker', context: authContext })).resolves.toBe(
       'worker-token',
@@ -379,9 +447,128 @@ describe('workerAuth canonical session resolution', () => {
       `${workerOrigin}/auth/nonce`,
       `${workerOrigin}/auth/login`,
     ]);
-    expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual(
-      expect.objectContaining({ sessionSlug: 'unregistered-worker' }),
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'unregistered-worker',
+        sessionId,
+      }),
     );
+    expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual(
+      expect.objectContaining({
+        sessionSlug: 'unregistered-worker',
+        sessionId,
+      }),
+    );
+  });
+
+  it('rejects a worker-canonical nonce response for a different exact session identity', async () => {
+    const sessionConfig = {
+      slug: 'edge',
+      sessionId: CANONICAL_SESSION_ID,
+      corsWorkerUrl: 'https://worker.example',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    global.fetch = jest.fn().mockResolvedValueOnce(
+      jsonResp(200, {
+        nonce: 'worker-nonce',
+        sessionSlug: 'edge',
+        sessionId: NEXT_CANONICAL_SESSION_ID,
+      }),
+    );
+
+    await expect(
+      getWorkerSessionToken({
+        sessionConfig,
+        workerUrl: sessionConfig.corsWorkerUrl,
+        context: authContext,
+      }),
+    ).rejects.toThrow('Worker nonce returned a different canonical session identity.');
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails before auth requests when a worker-canonical session lacks an exact session ID', async () => {
+    const sessionConfig = {
+      slug: 'edge',
+      corsWorkerUrl: 'https://worker.example',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    global.fetch = jest.fn();
+
+    await expect(
+      getWorkerSessionToken({
+        sessionConfig,
+        workerUrl: sessionConfig.corsWorkerUrl,
+        context: authContext,
+      }),
+    ).rejects.toThrow('Worker-canonical authentication requires an exact session identity.');
+
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a worker-canonical login response for a different exact session slug', async () => {
+    const sessionConfig = {
+      slug: 'edge',
+      sessionId: CANONICAL_SESSION_ID,
+      corsWorkerUrl: 'https://worker.example',
+      sessionModeProfile: { authority: { mode: 'worker_canonical' } },
+    };
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResp(200, {
+          nonce: 'worker-nonce',
+          sessionSlug: 'edge',
+          sessionId: CANONICAL_SESSION_ID,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResp(200, {
+          token: 'worker-token',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+          sessionSlug: 'other-session',
+          sessionId: CANONICAL_SESSION_ID,
+        }),
+      );
+
+    await expect(
+      getWorkerSessionToken({
+        sessionConfig,
+        workerUrl: sessionConfig.corsWorkerUrl,
+        context: authContext,
+      }),
+    ).rejects.toThrow('Worker login returned a different canonical session slug.');
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves registry-session auth without imposing the Worker-canonical response envelope', async () => {
+    const sessionConfig = {
+      slug: 'registry-session',
+      sessionIdHex: CANONICAL_SESSION_ID,
+      corsWorkerUrl: 'https://worker.example',
+      sessionModeProfile: { authority: { mode: 'evm_registry_canonical' } },
+    };
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(jsonResp(200, { nonce: 'registry-nonce' }))
+      .mockResolvedValueOnce(
+        jsonResp(200, {
+          token: 'registry-token',
+          exp: Math.floor(Date.now() / 1000) + 3600,
+        }),
+      );
+
+    await expect(
+      getWorkerSessionToken({
+        sessionConfig,
+        workerUrl: sessionConfig.corsWorkerUrl,
+        context: authContext,
+      }),
+    ).resolves.toBe('registry-token');
+
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).not.toHaveProperty('sessionId');
+    expect(JSON.parse(global.fetch.mock.calls[1][1].body)).not.toHaveProperty('sessionId');
   });
 
   it('does not inject demo general config into worker lookup for implicit default session in on-chain mode', async () => {
@@ -449,7 +636,7 @@ describe('workerAuth canonical session resolution', () => {
     });
   });
 
-  it('writes scoped v1 token envelopes after successful login', async () => {
+  it('reuses scoped token envelopes in page memory without persisting the bearer', async () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     global.fetch = jest
       .fn()
@@ -464,26 +651,27 @@ describe('workerAuth canonical session resolution', () => {
       }),
     ).resolves.toBe('token-1');
 
+    await expect(
+      getWorkerSessionToken({
+        sessionSlug: 'edge',
+        workerUrl: 'https://worker.example/auth/login',
+        context: authContext,
+      }),
+    ).resolves.toBe('token-1');
+
     expect(new Headers(global.fetch.mock.calls[0][1].headers).get('X-Anonymous-Client-Id')).toMatch(
       /^[a-z0-9_-]{8,128}$/,
     );
     expect(new Headers(global.fetch.mock.calls[1][1].headers).get('X-Anonymous-Client-Id')).toBeNull();
+    expect(global.fetch).toHaveBeenCalledTimes(2);
 
     const cacheKey = __test__workerAuthTokenCache.buildTokenCacheKey({
       workerUrl: 'https://worker.example',
       slug: 'edge',
       address: TEST_ADDRESS,
     });
-    expect(JSON.parse(localStorage.getItem(cacheKey))).toEqual(
-      expect.objectContaining({
-        v: 1,
-        workerUrl: 'https://worker.example',
-        sessionSlug: 'edge',
-        address: TEST_ADDRESS,
-        expiresAt: exp,
-        token: 'token-1',
-      }),
-    );
+    expect(localStorage.getItem(cacheKey)).toBeNull();
+    expect(JSON.stringify(localStorage)).not.toContain('token-1');
   });
 
   it('keeps explicit demo fallback opt-in fail-closed when no shipped demo session exists', async () => {
@@ -637,6 +825,81 @@ describe('workerAuth bootstrap admin signing', () => {
       expect.objectContaining({
         method: 'eth_signTypedData_v4',
         params: [TEST_ADDRESS, expect.any(String)],
+      }),
+    );
+  });
+
+  it('binds Worker-canonical admin nonces to the exact session identity', async () => {
+    const { ethers } = require('ethers');
+    const { cryptoUtils } = require('../crypto/cryptography.js');
+    const sessionId = '0x12121212121212121212121212121212';
+    cryptoUtils._getProvider.mockReturnValue({ request: mockProviderRequest });
+    ethers.utils.verifyTypedData.mockReturnValueOnce(NEXT_TEST_ADDRESS);
+    global.fetch = jest.fn(async () =>
+      jsonResp(200, {
+        nonce: 'nonce-worker-session-1',
+        sessionSlug: 'edge',
+        sessionId,
+      }),
+    );
+
+    await expect(
+      buildSignedAdminActionAuth({
+        action: 'groups/list',
+        slug: 'edge',
+        sessionId,
+        nonce: 'slug-only-stale-nonce',
+        body: { sessionId },
+        workerUrl: 'https://worker.example',
+        context: {
+          account: TEST_ADDRESS,
+          providerLike: 'wagmi',
+          chainId: 1,
+        },
+      }),
+    ).rejects.toThrow('Typed data signature does not match signer address');
+
+    expect(JSON.parse(global.fetch.mock.calls[0][1].body)).toEqual({
+      address: TEST_ADDRESS,
+      sessionSlug: 'edge',
+      sessionId,
+      adminAction: true,
+    });
+    expect(mockProviderRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'eth_signTypedData_v4',
+      }),
+    );
+  });
+
+  it('rejects a Worker-canonical admin nonce response for another session identity before signing', async () => {
+    const sessionId = '0x12121212121212121212121212121212';
+    global.fetch = jest.fn(async () =>
+      jsonResp(200, {
+        nonce: 'nonce-worker-session-wrong',
+        sessionSlug: 'edge',
+        sessionId: '0x34343434343434343434343434343434',
+      }),
+    );
+
+    await expect(
+      buildSignedAdminActionAuth({
+        action: 'groups/list',
+        slug: 'edge',
+        sessionId,
+        body: { sessionId },
+        workerUrl: 'https://worker.example',
+        context: {
+          account: TEST_ADDRESS,
+          providerLike: 'wagmi',
+          chainId: 1,
+        },
+      }),
+    ).rejects.toThrow('Worker nonce response does not match the exact session identity');
+
+    expect(mockProviderRequest).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'eth_signTypedData_v4',
       }),
     );
   });

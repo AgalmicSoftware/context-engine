@@ -81,6 +81,7 @@ describe('sessionWizardWriteNormalization', () => {
 
   test('sanitizeSessionWizardMetadataPayload writes profile-only mode metadata', () => {
     const profile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    profile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     profile.surfaces.telegram = true;
     profile.surfaces.miniApp = true;
 
@@ -105,6 +106,32 @@ describe('sessionWizardWriteNormalization', () => {
     expect(metadata.sessionMode).toBeUndefined();
     expect(metadata.telegramBridgeEnabled).toBeUndefined();
     expect(metadata.telegram).toBeUndefined();
+  });
+
+  test('publication normalization rejects invalid profiles before compiling storage metadata', () => {
+    const malformedProfile = {
+      profileVersion: 1,
+      preset: 'custom',
+      authority: { mode: 'worker_canonical' },
+    };
+
+    expect(() =>
+      sanitizeSessionWizardMetadataPayload({
+        slug: 'invalid-profile',
+        sessionModeProfile: malformedProfile,
+        storageProfile: { backend: 'cloudflare' },
+      }),
+    ).toThrow(/requires a reachable session mode profile/i);
+
+    expect(() =>
+      buildSessionWizardWorkerConfigPayload({
+        slug: 'invalid-profile',
+        draft: {
+          sessionModeProfile: malformedProfile,
+          storageProfile: { backend: 'cloudflare' },
+        },
+      }),
+    ).toThrow(/requires a reachable session mode profile/i);
   });
 
   test('sanitizeSessionWizardMetadataPayload upgrades legacy Telegram flags to a profile without dual-write fields', () => {
@@ -352,6 +379,14 @@ describe('sessionWizardWriteNormalization', () => {
         sessionName: 'Two Key Session',
         sessionInfo: 'Worker-canonical session content.',
         sessionHeaderImg: 'https://images.example/header.png',
+        sessionEndsAt: '2099-01-02T03:04:00Z',
+        defaultTags: 'governance,ai',
+        defaultGroupTags: 'facilitators,reviewers',
+        questionsGenPrompt: 'Prefer concrete tradeoffs.',
+        defaultFilterState: { sort: 'recent' },
+        defaultSbtTags: 'must-not-persist',
+        defaultFeaturedSBTs: ['0x0000000000000000000000000000000000000001'],
+        autoFeatureSBTsBySessionSlug: true,
         networkChainId: DEFAULT_CONFIG_CHAIN_ID,
         blockLimits: { start: 250 },
         contracts: {
@@ -393,15 +428,24 @@ describe('sessionWizardWriteNormalization', () => {
         sessionName: 'Two Key Session',
         sessionInfo: 'Worker-canonical session content.',
         sessionHeaderImg: 'https://images.example/header.png',
+        sessionEndsAt: '2099-01-02T03:04:00.000Z',
+        defaultTags: 'governance,ai',
+        defaultGroupTags: 'facilitators,reviewers',
+        questionsGenPrompt: 'Prefer concrete tradeoffs.',
+        defaultFilterState: { sort: 'recent' },
         adminAddress: '0x00000000000000000000000000000000000000aa',
         workerAuthority: {
           version: 1,
           participantScopes: ['ai', 'transcribe', 'storage', 'groups', 'fetch'],
           anonymousScopes: [],
         },
+        groupCreationPolicy: 'participants',
       }),
     );
     expect(payload.contracts).toBeUndefined();
+    expect(payload.defaultSbtTags).toBeUndefined();
+    expect(payload.defaultFeaturedSBTs).toBeUndefined();
+    expect(payload.autoFeatureSBTsBySessionSlug).toBeUndefined();
     expect(payload.blockLimits).toBeUndefined();
     expect(payload.registryAddress).toBeUndefined();
     expect(payload.registryChainId).toBeUndefined();
@@ -415,11 +459,89 @@ describe('sessionWizardWriteNormalization', () => {
     expect(JSON.stringify(payload)).not.toMatch(/must-never-persist|0xRegistry|rpc\.example|faucet\.example/i);
   });
 
+  test('buildSessionWizardWorkerConfigPayload keeps only SBT defaults and Group Factory for explicit hybrid mode', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.evm.registryChainId = DEFAULT_CONFIG_CHAIN_ID;
+    sessionModeProfile.authorization.mechanisms.push('sbt_onchain');
+    sessionModeProfile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        {
+          kind: 'sbt_onchain',
+          chainId: DEFAULT_CONFIG_CHAIN_ID,
+          contract: '0x0000000000000000000000000000000000000001',
+          anyOrAll: 'any',
+        },
+      ],
+    };
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'hybrid-session',
+      draft: {
+        sessionModeProfile,
+        networkChainId: DEFAULT_CONFIG_CHAIN_ID,
+        defaultGroupTags: 'worker-groups',
+        defaultSbtTags: 'on-chain-groups',
+        defaultFeaturedSBTs: [
+          '0x0000000000000000000000000000000000000002',
+          '0x0000000000000000000000000000000000000002',
+        ],
+        autoFeatureSBTsBySessionSlug: false,
+        contracts: {
+          surveys: {
+            address: '0x0000000000000000000000000000000000000010',
+            chainId: DEFAULT_CONFIG_CHAIN_ID,
+          },
+          sbtFactory: {
+            address: '0x0000000000000000000000000000000000000020',
+            chainId: DEFAULT_CONFIG_CHAIN_ID,
+          },
+          sessionRegistry: {
+            address: '0x0000000000000000000000000000000000000030',
+            chainId: DEFAULT_CONFIG_CHAIN_ID,
+          },
+        },
+      },
+    });
+
+    expect(payload.networkChainId).toBe(DEFAULT_CONFIG_CHAIN_ID);
+    expect(payload.defaultGroupTags).toBe('worker-groups');
+    expect(payload.defaultSbtTags).toBe('on-chain-groups');
+    expect(payload.defaultFeaturedSBTs).toEqual(['0x0000000000000000000000000000000000000002']);
+    expect(payload.autoFeatureSBTsBySessionSlug).toBe(false);
+    expect(payload.contracts).toEqual({
+      sbtFactory: {
+        address: '0x0000000000000000000000000000000000000020',
+        chainId: DEFAULT_CONFIG_CHAIN_ID,
+      },
+    });
+  });
+
+  test('buildSessionWizardWorkerConfigPayload preserves an explicit admin-only group creation policy', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const payload = buildSessionWizardWorkerConfigPayload({
+      slug: 'restricted-groups',
+      draft: {
+        sessionModeProfile,
+        groupCreationPolicy: 'admin_only',
+      },
+      account: '0x00000000000000000000000000000000000000aa',
+      sessionId: '123e4567-e89b-12d3-a456-426614174000',
+      workerUrl: 'https://worker.example',
+    });
+
+    expect(payload.groupCreationPolicy).toBe('admin_only');
+  });
+
   test('buildSessionWizardWorkerConfigPayload keeps only the Lit public descriptor for worker-canonical Lit mode', () => {
     const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
     sessionModeProfile.encryption = { mode: 'lit' };
     sessionModeProfile.evm.registryChainId = DEFAULT_CONFIG_CHAIN_ID;
+    sessionModeProfile.storage.payloadAccessControl = {
+      ...sessionModeProfile.storage.payloadAccessControl!,
+      encryption: 'lit',
+    };
 
     const payload = buildSessionWizardWorkerConfigPayload({
       slug: 'worker-lit-session',
@@ -551,7 +673,7 @@ describe('sessionWizardWriteNormalization', () => {
     expect(workerPayload.storageProfile).toEqual(
       expect.objectContaining({
         backend: 'cloudflare',
-        payloadAccessControl: expect.objectContaining({ mode: 'worker_sbt_gate' }),
+        payloadAccessControl: expect.objectContaining({ mode: 'public_read' }),
       }),
     );
     expect(workerPayload.telegramOnly).toBeUndefined();

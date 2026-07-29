@@ -14,6 +14,10 @@ import {
 } from '../ContractPage/contractMetadata.js';
 import { buildContractViewerContracts } from '../ContractPage/contractViewerUtils.js';
 import { buildSbtDetailPath } from '../../utilities/sbt/sbtDetailPath.js';
+import {
+  clearSessionWizardPendingSbtDraftsCache,
+  readSessionWizardPendingSbtDraftsCache,
+} from './hooks/usePendingSbtDrafts.js';
 
 const mockRegisterSessionOnChain = jest.fn();
 const mockFetchSessionFromRegistry = jest.fn();
@@ -294,6 +298,7 @@ jest.mock('../../variables/appConfig.js', () => {
 });
 
 import SessionWizard, {
+  __test__resetSessionWizardSponsoredBundleCacheKey,
   buildPublishedPendingSbtLinks,
   getSessionWizardPublishProgressPercent,
   REQUIRED_SESSION_SLUG_ERROR,
@@ -344,10 +349,12 @@ const getWizardResourceCard = (resourceKey) =>
     .getAllByTestId(E2E_TESTIDS.WIZARD_RESOURCE_CARD)
     .find((card) => card.getAttribute('data-ce-resource-key') === resourceKey);
 const enableAdvancedMode = () => {
-  act(() => {
-    fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED));
-  });
   ensureSessionModeProfileReady();
+  const customizeButton = screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
+  if (customizeButton.getAttribute('aria-pressed') === 'true') return;
+  act(() => {
+    fireEvent.click(customizeButton);
+  });
 };
 const readCachedSessionWizardDraft = () => {
   try {
@@ -416,23 +423,39 @@ const ensureSessionModeProfileSelected = () => {
   commitSessionModeProfileGateIfPresent();
   if (hasSelectedSessionModeProfile()) return;
   const presetTestId = resolveSessionModePresetTestId();
-  const normalModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL);
-  const advancedModeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
-  if (!normalModeButton || !advancedModeButton) return;
-  const wasNormalMode = normalModeButton.getAttribute('aria-pressed') === 'true';
-  act(() => {
-    fireEvent.click(advancedModeButton);
-  });
   clickSessionModePresetForTest(presetTestId);
-  if (wasNormalMode) {
-    act(() => {
-      fireEvent.click(screen.getByTestId(E2E_TESTIDS.WIZARD_MODE_NORMAL));
-    });
-  }
 };
 const selectNormalModeCard = (label) => {
   ensureSessionModeProfileSelected();
+  const customizeButton = screen.queryByTestId(E2E_TESTIDS.WIZARD_MODE_ADVANCED);
+  if (customizeButton?.getAttribute('aria-pressed') === 'true') {
+    fireEvent.click(customizeButton);
+  }
   fireEvent.click(screen.getByRole('button', { name: new RegExp(label, 'i') }));
+};
+const createPublicWorkerVerificationResponder = () => {
+  type PublicWorkerVerificationConfig = {
+    ai?: {
+      models?: unknown;
+    };
+    litCredentials?: unknown;
+    [key: string]: unknown;
+  };
+  let publicConfig: PublicWorkerVerificationConfig = {};
+  return (url: unknown, options: RequestInit = {}) => {
+    const normalizedUrl = String(url);
+    if (normalizedUrl.endsWith('/admin/set-config')) {
+      const payload = JSON.parse(String(options.body || '{}'));
+      publicConfig = payload.config || publicConfig;
+      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+    }
+    if (normalizedUrl.includes('/session-config')) {
+      const { litCredentials: _privateLitDescriptor, ...verifiedConfig } = publicConfig;
+      if (verifiedConfig.ai) verifiedConfig.ai = { models: verifiedConfig.ai.models };
+      return { ok: true, status: 200, json: async () => ({ config: verifiedConfig }) };
+    }
+    return null;
+  };
 };
 const getMockSelectorById = (selectorId) =>
   screen
@@ -471,12 +494,17 @@ const createPendingFeaturedDraft = async () => {
   fireEvent.click(await screen.findByRole('button', { name: 'Save pending SBT' }));
   await waitFor(() => {
     expect(screen.queryByTestId('mock-create-sbt-group')).not.toBeInTheDocument();
-    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toContain(mockPendingSbtAddress);
+    expect(readSessionWizardPendingSbtDraftsCache()).toEqual([
+      expect.objectContaining({ predictedAddress: mockPendingSbtAddress }),
+    ]);
+    expect(sessionStorage.getItem('ce:sessionWizardPendingSbtDrafts:v1')).toBeNull();
   });
 };
 
 const resetSessionWizardWorkerPanelTestState = () => {
   jest.clearAllMocks();
+  clearSessionWizardPendingSbtDraftsCache();
+  __test__resetSessionWizardSponsoredBundleCacheKey();
   if (!ethers.providers.JsonRpcProvider.prototype.getBlockNumber._isMockFunction) {
     jest.spyOn(ethers.providers.JsonRpcProvider.prototype, 'getBlockNumber');
   }
@@ -590,6 +618,7 @@ export {
   getWizardResourceCard,
   enableAdvancedMode,
   selectNormalModeCard,
+  createPublicWorkerVerificationResponder,
   getMockSelectorById,
   expectSelectorAddresses,
   openAdvancedMoreOptions,
