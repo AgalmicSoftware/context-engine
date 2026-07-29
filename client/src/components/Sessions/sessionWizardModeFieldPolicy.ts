@@ -43,10 +43,7 @@ export const resolveSessionWizardModeFieldPolicy = (
   };
 };
 
-export const isSessionWizardModeHiddenTopLevelField = (
-  key: string,
-  policy?: SessionWizardModeFieldPolicy,
-): boolean => {
+export const isSessionWizardModeHiddenTopLevelField = (key: string, policy?: SessionWizardModeFieldPolicy): boolean => {
   if (!policy) return false;
   if (key === 'blockLimits') return !policy.showBlockLimits;
   if (key === 'faucet') return !policy.showFaucet;

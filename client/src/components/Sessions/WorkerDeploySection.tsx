@@ -9,10 +9,7 @@ import type {
   fetchWorkerCanonicalSessionBootstrap,
   WorkerCanonicalSessionBootstrap,
 } from '../../utilities/session/sessionWorkerDiscovery';
-import {
-  buildCloudflareTokenTemplateUrl,
-  CLOUDFLARE_TOKEN_SETUP_GUIDE_URL,
-} from './cloudflareTokenTemplate.js';
+import { buildCloudflareTokenTemplateUrl, CLOUDFLARE_TOKEN_SETUP_GUIDE_URL } from './cloudflareTokenTemplate.js';
 import type { SessionWizardDeployStatusDisplayState } from './sessionWizardDeployErrors';
 import type { SessionWizardTooltipRenderOptions } from './SessionWizardInfoTooltip';
 

@@ -215,14 +215,7 @@ const AdminWorkerGroupsPanel = ({
     setBusy(false);
     setStatus('');
     if (autoLoad && !createOnly) void loadGroups();
-  }, [
-    autoLoad,
-    createOnly,
-    defaultGroupTags,
-    loadGroups,
-    signedAccount,
-    targetKey,
-  ]); // targetKey includes normalized defaults.
+  }, [autoLoad, createOnly, defaultGroupTags, loadGroups, signedAccount, targetKey]); // targetKey includes normalized defaults.
 
   const runMutation = async (
     operation: () => Promise<unknown>,
@@ -506,7 +499,11 @@ const AdminWorkerGroupsPanel = ({
                 {url}
               </a>
             ))}
-            {group.memberLimit ? <span>Limit: {group.memberLimit} members</span> : <span>No group-specific member limit</span>}
+            {group.memberLimit ? (
+              <span>Limit: {group.memberLimit} members</span>
+            ) : (
+              <span>No group-specific member limit</span>
+            )}
             {group.joinEndsAt ? <span>Join deadline: {new Date(group.joinEndsAt).toLocaleString()}</span> : null}
             {group.adminAddress ? <span>Group admin: {group.adminAddress}</span> : null}
             <div>

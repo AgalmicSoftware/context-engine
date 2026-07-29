@@ -267,12 +267,8 @@ const normalizeGroup = (value: unknown, expectedSessionSlug?: unknown): WorkerGr
   const label = toStringValue(source.label);
   const joinMode = toStringValue(source.joinMode);
   const memberVisibility = toStringValue(source.memberVisibility);
-  const tags = Array.isArray(source.tags)
-    ? source.tags.map(toStringValue).filter(Boolean)
-    : [];
-  const documentURLs = Array.isArray(source.documentURLs)
-    ? source.documentURLs.map(toStringValue).filter(Boolean)
-    : [];
+  const tags = Array.isArray(source.tags) ? source.tags.map(toStringValue).filter(Boolean) : [];
+  const documentURLs = Array.isArray(source.documentURLs) ? source.documentURLs.map(toStringValue).filter(Boolean) : [];
   const memberLimit = Number(source.memberLimit);
   const joinEndsAt = toStringValue(source.joinEndsAt);
   const adminAddress = toStringValue(source.adminAddress);
@@ -350,23 +346,17 @@ const normalizeVisibleWorkerGroupPrincipal = (value: unknown): WorkerGroupPrinci
   const kind = toStringValue(source.kind).toLowerCase();
   if (kind === 'evm_address' || kind === 'passkey_account') {
     const address = toStringValue(source.address);
-    return /^0x[0-9a-fA-F]{40}$/.test(address)
-      ? { kind, address: address.toLowerCase() }
-      : null;
+    return /^0x[0-9a-fA-F]{40}$/.test(address) ? { kind, address: address.toLowerCase() } : null;
   }
   if (kind === 'telegram') {
     const principalId = toStringValue(source.principalId);
-    return principalId &&
-      principalId.length <= 180 &&
-      /^[A-Za-z0-9:_@./=-]+$/.test(principalId)
+    return principalId && principalId.length <= 180 && /^[A-Za-z0-9:_@./=-]+$/.test(principalId)
       ? { kind, principalId }
       : null;
   }
   if (kind === 'agent') {
     const grantId = toStringValue(source.grantId);
-    return grantId && grantId.length <= 180 && /^[A-Za-z0-9:_@./=-]+$/.test(grantId)
-      ? { kind, grantId }
-      : null;
+    return grantId && grantId.length <= 180 && /^[A-Za-z0-9:_@./=-]+$/.test(grantId) ? { kind, grantId } : null;
   }
   return null;
 };

@@ -58,14 +58,12 @@ describe('mainSiteWorkerCanonicalCacheRuntime', () => {
     const { host } = makeHost();
     const committedReadiness: Record<string, unknown> = {};
     const queuedCommits: Array<() => void> = [];
-    host.setReadinessStateIfChanged.mockImplementation(
-      (patch: Record<string, unknown>, callback?: () => void) => {
-        queuedCommits.push(() => {
-          Object.assign(committedReadiness, patch);
-          callback?.();
-        });
-      },
-    );
+    host.setReadinessStateIfChanged.mockImplementation((patch: Record<string, unknown>, callback?: () => void) => {
+      queuedCommits.push(() => {
+        Object.assign(committedReadiness, patch);
+        callback?.();
+      });
+    });
     host.checkAllCachesReady.mockImplementation(() => {
       expect(committedReadiness).toMatchObject({
         isSBTCacheReady: true,
@@ -90,11 +88,9 @@ describe('mainSiteWorkerCanonicalCacheRuntime', () => {
     const { host } = makeHost();
     let current = true;
     let finalCallback: (() => void) | undefined;
-    host.setReadinessStateIfChanged.mockImplementation(
-      (patch: Record<string, unknown>, callback?: () => void) => {
-        if (patch.isSurveyCacheReady) finalCallback = callback;
-      },
-    );
+    host.setReadinessStateIfChanged.mockImplementation((patch: Record<string, unknown>, callback?: () => void) => {
+      if (patch.isSurveyCacheReady) finalCallback = callback;
+    });
 
     await initializeMainSiteWorkerCanonicalCaches({
       host,

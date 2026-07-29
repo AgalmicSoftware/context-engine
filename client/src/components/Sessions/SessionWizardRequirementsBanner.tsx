@@ -4,10 +4,7 @@ import { faTimes } from '@fortawesome/free-solid-svg-icons';
 
 import { E2E_TESTIDS } from '../../utilities/e2eTestIds.js';
 import styles from './SessionWizard.module.scss';
-import {
-  buildCloudflareTokenTemplateUrl,
-  CLOUDFLARE_TOKEN_SETUP_GUIDE_URL,
-} from './cloudflareTokenTemplate.js';
+import { buildCloudflareTokenTemplateUrl, CLOUDFLARE_TOKEN_SETUP_GUIDE_URL } from './cloudflareTokenTemplate.js';
 import type { SessionWizardRequirementId } from './sessionWizardModeRequirements';
 
 export const SESSION_WIZARD_REQUIREMENT_LINKS = Object.freeze({

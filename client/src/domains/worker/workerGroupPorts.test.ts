@@ -30,10 +30,7 @@ describe('worker group ports', () => {
         defaultSbtTags: 'ignored',
       }),
     ).toEqual(['Facilitators', 'reviewers']);
-    expect(normalizeWorkerGroupDefaultTags({ defaultSbtTags: ['legacy', 'tags'] })).toEqual([
-      'legacy',
-      'tags',
-    ]);
+    expect(normalizeWorkerGroupDefaultTags({ defaultSbtTags: ['legacy', 'tags'] })).toEqual(['legacy', 'tags']);
   });
 
   it('loads public session-visible groups without sending a credential', async () => {

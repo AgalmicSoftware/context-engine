@@ -1,9 +1,6 @@
 import { DEFAULT_CHAIN_ID } from '../../variables/appConfig.js';
 import { getDefaultHttpRpc, getSessionRegistryAddress } from '../../variables/chains.js';
-import {
-  SESSION_MODE_PRESET_IDS,
-  cloneSessionModePreset,
-} from '../../utilities/session/sessionModeProfile';
+import { SESSION_MODE_PRESET_IDS, cloneSessionModePreset } from '../../utilities/session/sessionModeProfile';
 import {
   buildWorkerUrlResolutionDisplay,
   buildWorkerSessionConfigPayload,
@@ -334,9 +331,7 @@ describe('adminPageWorkerSessionConfigHelpers', () => {
   });
 
   it('allowlists Worker-native config and omits legacy chain controls', () => {
-    const sessionModeProfile = cloneSessionModePreset(
-      SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE,
-    );
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
     const payload = buildWorkerSessionConfigPayload({
       sessionConfig: {
         slug: 'worker-admin',

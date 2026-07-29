@@ -408,9 +408,7 @@ export const buildSessionWizardWorkerConfigPayload = ({
     if (sessionEndsAt) next.sessionEndsAt = sessionEndsAt;
     if (usesOnChainSbt) {
       next.defaultSbtTags = trimString(resolvedDraft.defaultSbtTags);
-      next.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(
-        resolvedDraft.defaultFeaturedSBTs,
-      );
+      next.defaultFeaturedSBTs = normalizeSessionWizardDefaultFeaturedSbtMetadata(resolvedDraft.defaultFeaturedSBTs);
       next.autoFeatureSBTsBySessionSlug = resolvedDraft.autoFeatureSBTsBySessionSlug !== false;
     }
     delete next.registryAddress;

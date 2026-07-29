@@ -4,10 +4,7 @@ import {
   resolveSessionStorageBackend,
   SESSION_STORAGE_PAYLOAD_ENCRYPTION_MODES,
 } from '../../utilities/storage/sessionStorageConfig';
-import {
-  normalizeStorageRef,
-  STORAGE_BACKENDS,
-} from '../../utilities/storage/storageRefs';
+import { normalizeStorageRef, STORAGE_BACKENDS } from '../../utilities/storage/storageRefs';
 import { canonicalizeSessionSlug } from '../../utilities/session/canonicalSessionContext';
 import { normalizeWorkerUrl } from '../../utilities/worker/workerUrl';
 
@@ -15,12 +12,7 @@ type UnknownRecord = Record<string, unknown>;
 
 export const MAX_WORKER_GROUP_IMAGE_BYTES = 10 * 1024 * 1024;
 
-const SUPPORTED_WORKER_GROUP_IMAGE_TYPES = new Set([
-  'image/gif',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-]);
+const SUPPORTED_WORKER_GROUP_IMAGE_TYPES = new Set(['image/gif', 'image/jpeg', 'image/png', 'image/webp']);
 
 const asRecord = (value: unknown): UnknownRecord =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : {};
@@ -34,20 +26,20 @@ const imageFormatForType = (contentType: string): string => {
 
 export const validateWorkerGroupImageFile = (file: Blob | null | undefined): string => {
   if (!(file instanceof Blob)) return 'Choose an image to upload.';
-  if (!SUPPORTED_WORKER_GROUP_IMAGE_TYPES.has(String(file.type || '').trim().toLowerCase())) {
+  if (
+    !SUPPORTED_WORKER_GROUP_IMAGE_TYPES.has(
+      String(file.type || '')
+        .trim()
+        .toLowerCase(),
+    )
+  ) {
     return 'Use a PNG, JPEG, GIF, or WebP image.';
   }
   if (file.size > MAX_WORKER_GROUP_IMAGE_BYTES) return 'Image too large (>10MB).';
   return '';
 };
 
-export const resolveWorkerGroupImageUrl = ({
-  result,
-  workerUrl,
-}: {
-  result: unknown;
-  workerUrl: unknown;
-}): string => {
+export const resolveWorkerGroupImageUrl = ({ result, workerUrl }: { result: unknown; workerUrl: unknown }): string => {
   const payload = asRecord(result);
   const storageRef = normalizeStorageRef(payload.storageRef || payload, {
     fallbackBackend: payload.storage,
@@ -59,10 +51,7 @@ export const resolveWorkerGroupImageUrl = ({
   if (storageRef.backend === STORAGE_BACKENDS.CLOUDFLARE) {
     const baseUrl = normalizeWorkerUrl(workerUrl);
     if (!baseUrl) throw new Error('Worker URL is missing for the uploaded image.');
-    const imageUrl = new URL(
-      storageRef.uri || `/storage/read?id=${encodeURIComponent(storageRef.id)}`,
-      `${baseUrl}/`,
-    );
+    const imageUrl = new URL(storageRef.uri || `/storage/read?id=${encodeURIComponent(storageRef.id)}`, `${baseUrl}/`);
     if (imageUrl.protocol !== 'https:' || imageUrl.origin !== new URL(baseUrl).origin) {
       throw new Error('Worker image upload returned an unsafe URL.');
     }
@@ -116,7 +105,9 @@ export const uploadWorkerGroupImage = async ({
     throw new Error('Encrypted image storage cannot be used as a group thumbnail. Use a public HTTPS URL.');
   }
 
-  const contentType = String(file.type || '').trim().toLowerCase();
+  const contentType = String(file.type || '')
+    .trim()
+    .toLowerCase();
   const result = await uploadData(file, imageFormatForType(contentType), {
     sessionSlug: normalizedSessionSlug,
     sessionConfig,

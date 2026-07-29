@@ -507,9 +507,7 @@ describe('sessionWizardWriteNormalization', () => {
     expect(payload.networkChainId).toBe(DEFAULT_CONFIG_CHAIN_ID);
     expect(payload.defaultGroupTags).toBe('worker-groups');
     expect(payload.defaultSbtTags).toBe('on-chain-groups');
-    expect(payload.defaultFeaturedSBTs).toEqual([
-      '0x0000000000000000000000000000000000000002',
-    ]);
+    expect(payload.defaultFeaturedSBTs).toEqual(['0x0000000000000000000000000000000000000002']);
     expect(payload.autoFeatureSBTsBySessionSlug).toBe(false);
     expect(payload.contracts).toEqual({
       sbtFactory: {

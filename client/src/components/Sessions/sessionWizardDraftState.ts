@@ -177,9 +177,7 @@ export const normalizeSessionWizardDraftShape = (draftIn: AnyRecord = {}): AnyRe
   const resolvedAutoFeature = resolveSessionWizardAutoFeatureBySessionSlug(draft);
   draft.sessionEndsAt = toStr(draft.sessionEndsAt).trim();
   draft.defaultGroupTags =
-    typeof draft.defaultGroupTags === 'string'
-      ? draft.defaultGroupTags.trim()
-      : DEFAULT_NEW_SESSION_SBT_TAGS;
+    typeof draft.defaultGroupTags === 'string' ? draft.defaultGroupTags.trim() : DEFAULT_NEW_SESSION_SBT_TAGS;
   delete draft.autoFeatureSBTsWithFeaturedSbtTags;
   if (typeof resolvedAutoFeature !== 'boolean') {
     draft.autoFeatureSBTsBySessionSlug = true;
