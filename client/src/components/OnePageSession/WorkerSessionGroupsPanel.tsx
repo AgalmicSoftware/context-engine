@@ -30,6 +30,7 @@ export type WorkerSessionGroupsPanelProps = {
   selectedGroupId?: string;
   showGroupDescriptions?: boolean;
   showMembershipListHeader?: boolean;
+  membershipsOnly?: boolean;
   toggleLoginModal?: (open: boolean) => void;
 };
 
@@ -63,6 +64,7 @@ const WorkerSessionGroupsPanel = ({
   selectedGroupId = '',
   showGroupDescriptions = true,
   showMembershipListHeader = true,
+  membershipsOnly = false,
   toggleLoginModal,
 }: WorkerSessionGroupsPanelProps) => {
   const config = asRecord(sessionConfig);
@@ -103,7 +105,8 @@ const WorkerSessionGroupsPanel = ({
   const participantGroupCreationEnabled = resolveGroupCreationPolicy(config) === GROUP_CREATION_POLICIES.PARTICIPANTS;
   const allowAnonymousGroupDiscovery = sessionModeAllowsAnonymousWorkerGroupDiscovery(config.sessionModeProfile);
   const chainId = projection.hasOnChainComponent && projection.chainId ? projection.chainId : 1;
-  const shouldAuthenticateOnRender = !allowAnonymousGroupDiscovery || (showCreate && !!normalizedAccount);
+  const shouldAuthenticateOnRender =
+    !allowAnonymousGroupDiscovery || (showCreate && !!normalizedAccount) || (membershipsOnly && !!normalizedAccount);
 
   const authenticate = useCallback(async () => {
     const requestTargetKey = targetKey;
@@ -356,7 +359,7 @@ const WorkerSessionGroupsPanel = ({
           </button>
         </div>
       ) : null}
-      {workerToken || allowAnonymousGroupDiscovery ? (
+      {workerToken || (!membershipsOnly && allowAnonymousGroupDiscovery) ? (
         <WorkerGroupMembershipPanel
           key={`worker-memberships:${targetKey}`}
           canReadGroups={true}
@@ -370,6 +373,7 @@ const WorkerSessionGroupsPanel = ({
           selectedGroupId={selectedGroupId}
           showDescriptions={showGroupDescriptions}
           showListHeader={showMembershipListHeader}
+          membershipsOnly={membershipsOnly}
           participantAddress={normalizedAccount}
           onSignIn={requestActionAuthentication}
         />

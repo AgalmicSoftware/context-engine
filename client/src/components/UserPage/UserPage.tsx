@@ -171,6 +171,7 @@ import UserPageQuestionSection from './UserPageQuestionSection';
 import UserPageSbtSection from './UserPageSbtSection';
 import UserPageSimulatedActions from './UserPageSimulatedActions';
 import UserPageSurveySection from './UserPageSurveySection';
+import UserPageWorkerGroupSection from './UserPageWorkerGroupSection';
 import {
   runUserPageAnalyzeActionController,
   runUserPageBookmarkActionController,
@@ -3580,6 +3581,15 @@ class UserPage extends Component<any, any> {
       viewAddress: propViewAddress,
     });
     const { isOwner, showPen, showUsernamePen } = headerPassiveDisplayState.profileEditVisibility;
+    const activeSessionCapabilities = resolveSessionCapabilityProjection(this.props.sessionConfig);
+    const activeSessionSlug = this.getActiveSessionSlug();
+    const shouldRenderWorkerGroupMemberships =
+      activeSessionCapabilities.source === 'profile' &&
+      activeSessionCapabilities.profileValid &&
+      activeSessionCapabilities.usesWorkerGroups &&
+      isOwner &&
+      !isSimulated &&
+      Boolean(activeSessionSlug);
     const headerActionVisibility = headerPassiveDisplayState.headerActionVisibility;
     const bookmarkActionPlan = {
       blockedReason: 'none',
@@ -3779,21 +3789,34 @@ class UserPage extends Component<any, any> {
               />
             )}
 
-            {this.props.onChainProfileEnabled !== false && (
-              <UserPageSbtSection
-                account={account}
-                heading={`${t('minted')} ${t('sbts')}:`}
-                isLoading={isSbtLoadingAny}
-                isSBTCacheReady={this.props.isSBTCacheReady}
-                loadingIndicator={renderDeepScanIndicator(isSbtLoadingAny, sbtSpinnerId)}
-                loginComplete={loginComplete}
-                network={network}
-                onRefreshSbtData={this.dispatchSbtDataRefresh}
-                provider={provider}
-                sbtDisplayState={sbtDisplayState}
-                sbtEmptyText={sbtEmptyText}
-                sbtEntries={sbtEntries}
-              />
+            {(shouldRenderWorkerGroupMemberships || this.props.onChainProfileEnabled !== false) && (
+              <div className={styles.rightColumn}>
+                {shouldRenderWorkerGroupMemberships && (
+                  <UserPageWorkerGroupSection
+                    account={account}
+                    provider={provider}
+                    sessionConfig={this.props.sessionConfig}
+                    sessionSlug={activeSessionSlug}
+                  />
+                )}
+                {this.props.onChainProfileEnabled !== false && (
+                  <UserPageSbtSection
+                    account={account}
+                    heading={`${t('minted')} ${t('sbts')}:`}
+                    isLoading={isSbtLoadingAny}
+                    isSBTCacheReady={this.props.isSBTCacheReady}
+                    loadingIndicator={renderDeepScanIndicator(isSbtLoadingAny, sbtSpinnerId)}
+                    loginComplete={loginComplete}
+                    network={network}
+                    onRefreshSbtData={this.dispatchSbtDataRefresh}
+                    provider={provider}
+                    sbtDisplayState={sbtDisplayState}
+                    sbtEmptyText={sbtEmptyText}
+                    sbtEntries={sbtEntries}
+                    wrapColumn={false}
+                  />
+                )}
+              </div>
             )}
           </div>
         )}

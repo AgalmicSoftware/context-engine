@@ -8,6 +8,7 @@ import {
   setupUserPageCacheRefreshTestLifecycle,
 } from './UserPage.cacheRefresh.testUtils';
 import { t } from '../../utilities/ui/terminology.js';
+import { cloneSessionModePreset, SESSION_MODE_PRESET_IDS } from '../../utilities/session/sessionModeProfile';
 
 describe('UserPage cache refresh render and SBT fallbacks', () => {
   setupUserPageCacheRefreshTestLifecycle();
@@ -569,6 +570,124 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     const sbtSections = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSbtSection');
 
     expect(sbtSections).toHaveLength(0);
+  });
+
+  it('renders the signed-in user’s Worker memberships instead of SBTs for a pure Worker session', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const instance = makeInstance({
+      account: viewAddress,
+      activeSessionSlug: 'demo-sh',
+      onChainProfileEnabled: false,
+      sessionConfig: {
+        slug: 'demo-sh',
+        sessionIdHex: '0x11111111111111111111111111111111',
+        corsWorkerUrl: 'https://demo-sh-worker.example',
+        sessionModeProfile,
+      },
+      viewAddress,
+    });
+
+    const tree = instance.render();
+    const workerSections = collectTreeNodes(
+      tree,
+      (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection',
+    );
+    const sbtSections = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSbtSection');
+
+    expect(workerSections).toHaveLength(1);
+    expect(workerSections[0].props).toEqual(
+      expect.objectContaining({
+        account: viewAddress,
+        sessionSlug: 'demo-sh',
+        sessionConfig: expect.objectContaining({ slug: 'demo-sh', sessionModeProfile }),
+      }),
+    );
+    expect(sbtSections).toHaveLength(0);
+  });
+
+  it('renders both Worker memberships and SBTs for an explicit hybrid session', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    sessionModeProfile.preset = SESSION_MODE_PRESET_IDS.CUSTOM;
+    sessionModeProfile.evm.registryChainId = 11155420;
+    sessionModeProfile.authorization.mechanisms.push('sbt_onchain');
+    sessionModeProfile.encryption.accessConditions = {
+      match: 'any',
+      conditions: [
+        {
+          kind: 'sbt_onchain',
+          chainId: 11155420,
+          contract: '0x1111111111111111111111111111111111111111',
+          anyOrAll: 'any',
+        },
+      ],
+    };
+    const instance = makeInstance({
+      account: viewAddress,
+      activeSessionSlug: 'hybrid',
+      onChainProfileEnabled: true,
+      sessionConfig: {
+        slug: 'hybrid',
+        sessionIdHex: '0x11111111111111111111111111111111',
+        corsWorkerUrl: 'https://hybrid-worker.example',
+        sessionModeProfile,
+      },
+      viewAddress,
+    });
+
+    const tree = instance.render();
+
+    expect(
+      collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection'),
+    ).toHaveLength(1);
+    expect(collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSbtSection')).toHaveLength(1);
+  });
+
+  it('keeps a decentralized session profile on the existing SBT-only path', () => {
+    const viewAddress = '0x00000000000000000000000000000000000000aa';
+    const sessionModeProfile = cloneSessionModePreset(
+      SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
+    );
+    const instance = makeInstance({
+      account: viewAddress,
+      activeSessionSlug: 'decentralized',
+      onChainProfileEnabled: true,
+      sessionConfig: {
+        slug: 'decentralized',
+        sessionModeProfile,
+      },
+      viewAddress,
+    });
+
+    const tree = instance.render();
+
+    expect(
+      collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection'),
+    ).toHaveLength(0);
+    expect(collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSbtSection')).toHaveLength(1);
+  });
+
+  it('does not expose principal-scoped Worker memberships on another user’s profile', () => {
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE);
+    const instance = makeInstance({
+      account: '0x00000000000000000000000000000000000000bb',
+      activeSessionSlug: 'demo-sh',
+      onChainProfileEnabled: false,
+      sessionConfig: {
+        slug: 'demo-sh',
+        sessionIdHex: '0x11111111111111111111111111111111',
+        corsWorkerUrl: 'https://demo-sh-worker.example',
+        sessionModeProfile,
+      },
+      viewAddress: '0x00000000000000000000000000000000000000aa',
+    });
+
+    const tree = instance.render();
+
+    expect(
+      collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection'),
+    ).toHaveLength(0);
   });
 
   it('uses clone:false when reading survey and question creation caches for analysis payloads', async () => {

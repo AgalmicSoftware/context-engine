@@ -673,6 +673,13 @@ still disable it explicitly. The legacy `arweave` compatibility scope applies
 only to storage routes. Group membership is visible to the worker/operator by
 design. This is the same trust domain as worker-enforced gates.
 
+The signed-in user's own `/u/<address>` profile reads
+`/groups/my-memberships` and shows only that principal's joined Worker Groups.
+A pure Worker profile replaces the on-chain SBT profile section with this
+membership list; an explicit Worker/SBT hybrid shows both lists; a
+registry-canonical profile remains SBT-only. The client does not infer or expose
+another profile's Worker memberships from this self-scoped route.
+
 That single-verifier model is identical for worker-canonical and
 registry-canonical sessions: the latter's session-Worker login evaluates the
 configured registry/on-chain gates before `/groups/my-memberships` can attest

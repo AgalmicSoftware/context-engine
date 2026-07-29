@@ -44,6 +44,7 @@ export type WorkerGroupMembershipPanelProps = {
   selectedGroupId?: string;
   showDescriptions?: boolean;
   showListHeader?: boolean;
+  membershipsOnly?: boolean;
 };
 
 const emptyOverview: WorkerGroupOverview = { groups: [], memberships: [] };
@@ -505,6 +506,7 @@ const WorkerGroupMembershipPanel = ({
   selectedGroupId: selectedGroupIdProp = '',
   showDescriptions = true,
   showListHeader = true,
+  membershipsOnly = false,
 }: WorkerGroupMembershipPanelProps) => {
   const canReadGroups = canReadGroupsProp ?? envelope?.capabilities?.readGroups === true;
   const workerUrl = normalizeWorkerUrl(workerUrlProp || envelope?.workerUrl || '');
@@ -611,6 +613,7 @@ const WorkerGroupMembershipPanel = ({
     [overview.memberships],
   );
   const availableGroups = overview.groups.filter((group) => !membershipIds.has(group.groupId));
+  const displayedAvailableGroups = membershipsOnly ? [] : availableGroups;
   const selectedMembership = overview.memberships.find((membership) => membership.group.groupId === selectedGroupId);
   const selectedGroup = selectedMembership?.group || availableGroups.find((group) => group.groupId === selectedGroupId);
   const canViewSelectedGroupMembers = Boolean(
@@ -964,7 +967,7 @@ const WorkerGroupMembershipPanel = ({
         </div>
       ) : null}
       {shareStatus ? <div className={styles.telegramReportApprox}>{shareStatus}</div> : null}
-      {overview.memberships.length || availableGroups.length ? (
+      {overview.memberships.length || displayedAvailableGroups.length ? (
         <div className={`${sbtsPageStyles.sbtGrid} ${styles.workerGroupCardGrid}`}>
           {overview.memberships.map((membership) => (
             <WorkerGroupCard
@@ -983,7 +986,7 @@ const WorkerGroupMembershipPanel = ({
               {renderMembershipAction(membership.group, true)}
             </WorkerGroupCard>
           ))}
-          {availableGroups.map((group) => (
+          {displayedAvailableGroups.map((group) => (
             <WorkerGroupCard
               key={group.groupId}
               copyGroupLink={copyGroupLink}
@@ -1002,8 +1005,10 @@ const WorkerGroupMembershipPanel = ({
           ))}
         </div>
       ) : null}
-      {status === 'ready' && !overview.memberships.length && !availableGroups.length ? (
-        <div className={styles.telegramListEmpty}>No visible Groups are configured.</div>
+      {status === 'ready' && !overview.memberships.length && !displayedAvailableGroups.length ? (
+        <div className={styles.telegramListEmpty}>
+          {membershipsOnly ? 'No Groups joined yet.' : 'No visible Groups are configured.'}
+        </div>
       ) : null}
     </section>
   );

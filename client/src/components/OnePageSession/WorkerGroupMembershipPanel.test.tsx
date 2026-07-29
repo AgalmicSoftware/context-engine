@@ -454,6 +454,77 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(groupCard).not.toHaveAttribute('aria-describedby');
   });
 
+  it('shows only joined Groups when embedded in the signed-in user profile', async () => {
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith('/groups/my-memberships')) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            memberships: [
+              {
+                group: {
+                  groupId: 'joined-reviewers',
+                  sessionSlug: 'alpha',
+                  label: 'Joined reviewers',
+                  joinMode: 'open',
+                  memberVisibility: 'session',
+                },
+                member: {
+                  groupId: 'joined-reviewers',
+                  sessionSlug: 'alpha',
+                  principalKey: 'evm:0xaa',
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'alpha',
+          groups: [
+            {
+              groupId: 'joined-reviewers',
+              sessionSlug: 'alpha',
+              label: 'Joined reviewers',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+            {
+              groupId: 'available-reviewers',
+              sessionSlug: 'alpha',
+              label: 'Available reviewers',
+              joinMode: 'open',
+              memberVisibility: 'session',
+            },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    });
+
+    render(
+      <WorkerGroupMembershipPanel
+        envelope={envelope}
+        fetchImpl={fetchImpl as typeof fetch}
+        membershipsOnly={true}
+        showDescriptions={false}
+        showListHeader={false}
+      />,
+    );
+
+    expect(await screen.findByRole('article', { name: 'Joined reviewers' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Leave Joined reviewers' })).toBeInTheDocument();
+    expect(screen.queryByText('Available reviewers')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Join Available reviewers' })).not.toBeInTheDocument();
+  });
+
   it('hides the redundant list header and reloads when the parent refresh nonce changes', async () => {
     const fetchImpl = jest.fn(
       async () =>

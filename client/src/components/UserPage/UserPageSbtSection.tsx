@@ -28,6 +28,7 @@ type UserPageSbtSectionProps = {
   sbtDisplayState: UserPageSbtDisplayState;
   sbtEmptyText: React.ReactNode;
   sbtEntries: UserPageSbtEntry[];
+  wrapColumn?: boolean;
 };
 
 const UserPageSbtSection = ({
@@ -43,8 +44,9 @@ const UserPageSbtSection = ({
   sbtDisplayState,
   sbtEmptyText,
   sbtEntries,
-}: UserPageSbtSectionProps): React.ReactElement => (
-  <div className={styles.rightColumn}>
+  wrapColumn = true,
+}: UserPageSbtSectionProps): React.ReactElement => {
+  const content = (
     <div className={styles.sbtSection}>
       <h2>
         {heading}
@@ -72,7 +74,9 @@ const UserPageSbtSection = ({
         <p>{sbtEmptyText}</p>
       ) : null}
     </div>
-  </div>
-);
+  );
+
+  return wrapColumn ? <div className={styles.rightColumn}>{content}</div> : content;
+};
 
 export default UserPageSbtSection;
