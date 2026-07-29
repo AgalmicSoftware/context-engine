@@ -589,10 +589,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
     });
 
     const tree = instance.render();
-    const workerSections = collectTreeNodes(
-      tree,
-      (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection',
-    );
+    const workerSections = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection');
     const sbtSections = collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSbtSection');
 
     expect(workerSections).toHaveLength(1);
@@ -638,17 +635,13 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
 
     const tree = instance.render();
 
-    expect(
-      collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection'),
-    ).toHaveLength(1);
+    expect(collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection')).toHaveLength(1);
     expect(collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSbtSection')).toHaveLength(1);
   });
 
   it('keeps a decentralized session profile on the existing SBT-only path', () => {
     const viewAddress = '0x00000000000000000000000000000000000000aa';
-    const sessionModeProfile = cloneSessionModePreset(
-      SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED,
-    );
+    const sessionModeProfile = cloneSessionModePreset(SESSION_MODE_PRESET_IDS.TRUSTLESS_PUBLIC_DECENTRALIZED);
     const instance = makeInstance({
       account: viewAddress,
       activeSessionSlug: 'decentralized',
@@ -662,9 +655,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
 
     const tree = instance.render();
 
-    expect(
-      collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection'),
-    ).toHaveLength(0);
+    expect(collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection')).toHaveLength(0);
     expect(collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageSbtSection')).toHaveLength(1);
   });
 
@@ -685,9 +676,7 @@ describe('UserPage cache refresh render and SBT fallbacks', () => {
 
     const tree = instance.render();
 
-    expect(
-      collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection'),
-    ).toHaveLength(0);
+    expect(collectTreeNodes(tree, (node) => getNodeTypeName(node) === 'UserPageWorkerGroupSection')).toHaveLength(0);
   });
 
   it('uses clone:false when reading survey and question creation caches for analysis payloads', async () => {

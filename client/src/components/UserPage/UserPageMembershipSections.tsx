@@ -13,10 +13,7 @@ type UserPageMembershipSectionsArgs = {
   onChainProfileEnabled?: boolean;
   provider: unknown;
   sessionConfig: unknown;
-  sbtSectionProps: Omit<
-    React.ComponentProps<typeof UserPageSbtSection>,
-    'account' | 'provider' | 'wrapColumn'
-  >;
+  sbtSectionProps: Omit<React.ComponentProps<typeof UserPageSbtSection>, 'account' | 'provider' | 'wrapColumn'>;
 };
 
 export const renderUserPageMembershipSections = ({
@@ -52,12 +49,7 @@ export const renderUserPageMembershipSections = ({
         />
       ) : null}
       {showOnChainSbts ? (
-        <UserPageSbtSection
-          {...sbtSectionProps}
-          account={account}
-          provider={provider}
-          wrapColumn={false}
-        />
+        <UserPageSbtSection {...sbtSectionProps} account={account} provider={provider} wrapColumn={false} />
       ) : null}
     </div>
   );

@@ -15,16 +15,12 @@ export const reconcileConfirmedWorkerGroupMembership = ({
   const groups = hasGroup
     ? overview.groups.map((candidate) => (candidate.groupId === group.groupId ? group : candidate))
     : [...overview.groups, group];
-  const existingMembership = overview.memberships.find(
-    (membership) => membership.group.groupId === group.groupId,
-  );
+  const existingMembership = overview.memberships.find((membership) => membership.group.groupId === group.groupId);
 
   if (!isMember) {
     return {
       groups,
-      memberships: overview.memberships.filter(
-        (membership) => membership.group.groupId !== group.groupId,
-      ),
+      memberships: overview.memberships.filter((membership) => membership.group.groupId !== group.groupId),
     };
   }
 
