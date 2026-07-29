@@ -61,6 +61,7 @@ import {
   resolveExplicitWorkerSessionConfig,
   resolveExplicitWorkerSessionNetwork,
 } from './workerCanonicalSessionRouteContext';
+import { readWorkerGroupIdFromPath } from '../../utilities/worker/workerGroupRoutes.js';
 import {
   renderMainSiteSurveyResolutionStatus,
   resolveMainSiteRouteCapabilityContext,
@@ -355,6 +356,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
   _renderSbtsListRoute: (ctx: RouteRenderCtx) => {
     const { fullPath, searchStr, defaultSessionNetwork } = ctx;
     const routeSessionSlug = host.getSbtListRouteSessionSlug(fullPath, searchStr);
+    const workerGroupId = readWorkerGroupIdFromPath(fullPath);
     const allSessionsMode = !routeSessionSlug;
     const routeSessionConfig = routeSessionSlug ? host.getDisplaySessionCfg(routeSessionSlug) : null;
     return (
@@ -372,6 +374,7 @@ export const createMainSiteRouteRenderers = (host: MainSiteRouteRendererHost) =>
               miniaturized={false}
               sessionSlug={routeSessionSlug || undefined}
               sessionConfig={routeSessionConfig}
+              workerGroupId={workerGroupId || undefined}
               allSessionsMode={allSessionsMode}
               isSBTCacheReady={host.state.isSBTCacheReady}
               sbtCacheRevision={host.state.sbtCacheRevision}

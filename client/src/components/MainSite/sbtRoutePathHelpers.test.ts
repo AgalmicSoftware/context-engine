@@ -46,6 +46,12 @@ describe('getSbtListRouteSessionSlug', () => {
         search: '?sessionName=Demo-SH',
       }),
     ).toBe('demo-sh');
+    expect(
+      getSbtListRouteSessionSlug('/group/public-reviewers', {
+        normalizeSessionSlug,
+        search: '?sessionName=Demo-SH',
+      }),
+    ).toBe('demo-sh');
   });
 });
 

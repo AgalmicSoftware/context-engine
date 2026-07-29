@@ -116,7 +116,7 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(screen.queryByText('Tags: research, reviewers')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Open group details for Open reviewers' }));
     expect(window.open).toHaveBeenCalledWith(
-      'http://localhost/groups?sessionName=alpha#group-open-reviewers',
+      'http://localhost/group/open-reviewers?sessionName=alpha',
       '_blank',
       'noopener,noreferrer',
     );
@@ -615,8 +615,8 @@ describe('WorkerGroupMembershipPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy Invited reviewers group link' }));
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1));
     const copiedGroupLink = new URL(String((navigator.clipboard.writeText as jest.Mock).mock.calls[0][0]));
-    expect(copiedGroupLink.pathname).toBe('/groups');
-    expect(copiedGroupLink.hash).toBe('#group-invited-reviewers');
+    expect(copiedGroupLink.pathname).toBe('/group/invited-reviewers');
+    expect(copiedGroupLink.hash).toBe('');
     expect(copiedGroupLink.searchParams.get('sessionName')).toBe('alpha');
     expect([...copiedGroupLink.searchParams.keys()]).toEqual(['sessionName']);
     expect(copiedGroupLink.searchParams.has('inv')).toBe(false);

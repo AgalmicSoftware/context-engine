@@ -1,5 +1,5 @@
 import { canonicalizeSessionSlug } from '../session/canonicalSessionContext.js';
-import { buildPublicRoute } from '../ui/publicUrl.js';
+import { buildPublicRoute, stripPublicUrlBasePath } from '../ui/publicUrl.js';
 
 const WORKER_GROUP_HASH_PREFIX = '#group-';
 
@@ -20,14 +20,15 @@ export const buildWorkerGroupsPath = ({
   sessionSlug: unknown;
 }): string => {
   const slug = canonicalizeSessionSlug(sessionSlug);
-  const path = buildPublicRoute(normalizeListRoot(rootPath));
+  const normalizedGroupId = String(groupId || '').trim();
+  const path = normalizedGroupId
+    ? buildPublicRoute(`/group/${encodeURIComponent(normalizedGroupId)}`)
+    : buildPublicRoute(normalizeListRoot(rootPath));
   if (!slug) return path;
 
   const params = new URLSearchParams();
   params.set('sessionName', slug);
-  const normalizedGroupId = String(groupId || '').trim();
-  const hash = normalizedGroupId ? `${WORKER_GROUP_HASH_PREFIX}${encodeURIComponent(normalizedGroupId)}` : '';
-  return `${path}?${params.toString()}${hash}`;
+  return `${path}?${params.toString()}`;
 };
 
 export const readWorkerGroupIdFromHash = (hash: unknown): string => {
@@ -35,6 +36,20 @@ export const readWorkerGroupIdFromHash = (hash: unknown): string => {
   if (!normalizedHash.startsWith(WORKER_GROUP_HASH_PREFIX)) return '';
   try {
     return decodeURIComponent(normalizedHash.slice(WORKER_GROUP_HASH_PREFIX.length)).trim();
+  } catch {
+    return '';
+  }
+};
+
+export const readWorkerGroupIdFromPath = (path: unknown): string => {
+  const parts = stripPublicUrlBasePath(String(path || ''))
+    .split('?')[0]
+    .split('#')[0]
+    .split('/')
+    .filter(Boolean);
+  if (String(parts[0] || '').toLowerCase() !== 'group' || !parts[1] || parts.length !== 2) return '';
+  try {
+    return decodeURIComponent(parts[1]).trim();
   } catch {
     return '';
   }

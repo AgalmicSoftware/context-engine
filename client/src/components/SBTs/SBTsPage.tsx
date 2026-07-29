@@ -109,6 +109,7 @@ type SBTsPageProps = UnknownRecord & {
   activeSessionSlug?: string | null;
   sessionName?: string;
   sessionInfo?: string;
+  workerGroupId?: string;
   provider?: unknown;
   network?: unknown;
   account?: unknown;
@@ -472,8 +473,22 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
   getResolvedRouting() {
     const path = stripPublicUrlBasePath((typeof window !== 'undefined' ? window.location.pathname : '') || '');
     const parts = path.split('/').filter(Boolean);
-    const onSbtsRoute = parts[0] === 'sbts' || parts[0] === 'groups';
-    const urlSlugLike = onSbtsRoute && parts.length > 1 ? parts[1] : undefined;
+    const workerGroupId = String(this.props.workerGroupId || '').trim();
+    const onWorkerGroupDetailRoute = !!workerGroupId;
+    const onSbtsRoute = parts[0] === 'sbts' || parts[0] === 'groups' || onWorkerGroupDetailRoute;
+    const detailSessionSlug = onWorkerGroupDetailRoute
+      ? normalizeSessionSlug(
+          this.props.sessionSlug ||
+            (typeof window !== 'undefined'
+              ? new URLSearchParams(window.location.search).get('sessionName') || ''
+              : ''),
+        )
+      : '';
+    const urlSlugLike = onWorkerGroupDetailRoute
+      ? detailSessionSlug || undefined
+      : onSbtsRoute && parts.length > 1
+        ? parts[1]
+        : undefined;
     const isCreateRoute = onSbtsRoute && urlSlugLike === 'new';
     const effectiveUrlSlug = isCreateRoute ? undefined : urlSlugLike;
 
@@ -596,6 +611,10 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
       typeof this.props.showCreateGroupExternal === 'boolean' ? this.props.showCreateGroupExternal : showCreateGroup;
     const hideMiniActionRow = this.props.hideMiniActionRow === true;
     const showCreateGroupAboveFeatured = this.props.showCreateGroupAboveFeatured === true;
+    const routeWorkerGroupId = String(
+      this.props.workerGroupId ||
+        (typeof window !== 'undefined' ? readWorkerGroupIdFromHash(window.location.hash) : ''),
+    ).trim();
 
     // Resolve routing + slug once per render
     const { activeGroup, canonicalSlug, urlHasNoSlug, onSbtsRoute, isCreateRoute, sessionConfigError } =
@@ -664,6 +683,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         sessionConfig={workerSessionConfig}
         sessionName={String((workerSessionConfig as Record<string, unknown> | null)?.sessionName || sessionName || '')}
         sessionSlug={activeWorkerSessionSlug}
+        selectedGroupId={routeWorkerGroupId}
         showCreate={showCreate}
         createOnly={createOnly}
         toggleLoginModal={toggleLoginModal as ((open: boolean) => void) | undefined}
@@ -983,6 +1003,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
             /* group-aware routing */
             sessionSlug={effectiveSessionSlug}
             sessionConfig={activeGroup}
+            selectedGroupId={routeWorkerGroupId}
             allSessionsMode={allSessionsMode}
             ensureLightSbtDiscovery={this.props.ensureLightSbtDiscovery}
             ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}

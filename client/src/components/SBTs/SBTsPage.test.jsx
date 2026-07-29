@@ -280,7 +280,7 @@ describe('SBTsPage auto-feature flag', () => {
     expect(getDemoSessionConfigBySlug).not.toHaveBeenCalledWith('demo-sh', { allowDemoFallback: true });
   });
 
-  it('routes a query-scoped built-in Worker group list before asynchronous session discovery completes', () => {
+  it('normalizes a legacy hash-scoped Worker detail route before asynchronous session discovery completes', () => {
     const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
     const workerSessionConfig = {
       slug: 'demo-sh',
@@ -310,13 +310,59 @@ describe('SBTsPage auto-feature flag', () => {
     );
 
     expect(mockSBTsList).not.toHaveBeenCalled();
-    expect(window.location.pathname).toBe('/groups');
+    expect(window.location.pathname).toBe('/group/public-reviewers');
     expect(window.location.search).toBe('?sessionName=demo-sh');
-    expect(window.location.hash).toBe('#group-public-reviewers');
+    expect(window.location.hash).toBe('');
     expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
       expect.objectContaining({
         createOnly: false,
         networkChainId: null,
+        selectedGroupId: 'public-reviewers',
+        sessionConfig: workerSessionConfig,
+        sessionName: 'Demo Session',
+        sessionSlug: 'demo-sh',
+        showCreate: false,
+      }),
+    );
+  });
+
+  it('renders the canonical Worker detail route from its path group id and session query', () => {
+    const contractScripts = jest.requireMock('../../utilities/web3/chainGateway.js');
+    const workerSessionConfig = {
+      slug: 'demo-sh',
+      sessionId: '0xb822b3eca85bdc35cf83cb947bceb6b2',
+      sessionName: 'Demo Session',
+      groupCreationPolicy: 'participants',
+      sessionModeProfile: cloneSessionModePreset(SESSION_MODE_PRESET_IDS.FAST_CHEAP_CLOUDFLARE),
+    };
+    contractScripts.getSessionConfigBySlug.mockReturnValue(null);
+    contractScripts.getSessionConfigBySlugOrDefault.mockReturnValue({ slug: '' });
+    getDemoSessionConfigBySlug.mockImplementation((slug) =>
+      String(slug || '') === 'demo-sh' ? workerSessionConfig : null,
+    );
+    window.history.replaceState({}, '', '/group/public-reviewers?sessionName=demo-sh');
+
+    render(
+      <SBTsPage
+        provider="wagmi"
+        network={null}
+        account=""
+        loginComplete={false}
+        toggleLoginModal={jest.fn()}
+        isSBTCacheReady={false}
+        sessionSlug="demo-sh"
+        sessionConfig={null}
+        workerGroupId="public-reviewers"
+      />,
+    );
+
+    expect(window.location.pathname).toBe('/group/public-reviewers');
+    expect(window.location.search).toBe('?sessionName=demo-sh');
+    expect(window.location.hash).toBe('');
+    expect(mockWorkerGroupCreate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        createOnly: false,
+        selectedGroupId: 'public-reviewers',
         sessionConfig: workerSessionConfig,
         sessionName: 'Demo Session',
         sessionSlug: 'demo-sh',

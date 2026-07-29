@@ -45,6 +45,7 @@ describe('MainSite route table', () => {
     ['/sbts/new', 'sbtCreate', {}],
     ['/groups/new/', 'sbtCreate', {}],
     [`/sbt/${ADDRESS}`, 'sbtDetail', { sbtAddress: ADDRESS }],
+    ['/group/public-reviewers', 'sbtsList', { sbtAddress: null }],
     [`/u/${ADDRESS}`, 'userProfile', {}],
     ['/admin', 'admin', {}],
     ['/sponsor', 'sponsor', {}],
@@ -82,6 +83,12 @@ describe('MainSite route table', () => {
       expect.objectContaining({
         key: 'sbtDetail',
         sbtAddress: ADDRESS,
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/group/public-reviewers', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtsList',
+        sbtAddress: null,
       }),
     );
   });
@@ -123,6 +130,13 @@ describe('MainSite route table', () => {
       }),
     );
     expect(resolveMainSiteRouteMatch({ fullPath: '/groups/demo-sh', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtsList',
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/group/public-reviewers', isAddress })).toEqual(
       expect.objectContaining({
         key: 'sbtsList',
         isKnownRoutePrefix: true,
