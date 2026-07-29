@@ -201,10 +201,11 @@ export function resolveMainSiteRouteMatch({
     (pathWithoutQuery.startsWith('/survey/') && pathSegments[1] && VALID_SURVEY_ID_RE.test(pathSegments[1])
       ? pathSegments[1]
       : null);
-  const isSbtsListRoute = isSbtListRoutePath(pathWithoutQuery);
   const sbtAddress = getSbtAddressFromPath(pathWithoutQuery, { isAddress });
-  const isSbtDetailRoute =
-    !!sbtAddress || pathWithoutQuery.startsWith('/sbt/') || pathWithoutQuery.startsWith('/group/');
+  const isWorkerGroupDetailRoute =
+    firstPathSegment === 'group' && pathSegments.length === 2 && !!pathSegments[1] && !sbtAddress;
+  const isSbtsListRoute = isSbtListRoutePath(pathWithoutQuery) || isWorkerGroupDetailRoute;
+  const isSbtDetailRoute = !!sbtAddress || pathWithoutQuery.startsWith('/sbt/');
   const isKnownRoutePrefix =
     pathWithoutQuery === '/' ||
     pathWithoutQuery === '' ||
@@ -215,6 +216,7 @@ export function resolveMainSiteRouteMatch({
     pathWithoutQuery === '/debate/' ||
     pathWithoutQuery.startsWith('/tag/') ||
     firstPathSegment === 'groups' ||
+    isWorkerGroupDetailRoute ||
     isStaticNonCacheRoute(fullPath);
   const context: RouteDefinitionContext = {
     firstPathSegment,

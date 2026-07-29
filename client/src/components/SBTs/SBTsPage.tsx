@@ -103,6 +103,7 @@ type SBTsPageProps = UnknownRecord & {
   activeSessionSlug?: string | null;
   sessionName?: string;
   sessionInfo?: string;
+  workerGroupId?: string;
   provider?: unknown;
   network?: unknown;
   account?: unknown;
@@ -469,7 +470,9 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const detailSessionSlug = onWorkerGroupDetailRoute
       ? normalizeSessionSlug(
           this.props.sessionSlug ||
-            (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('sessionName') || '' : ''),
+            (typeof window !== 'undefined'
+              ? new URLSearchParams(window.location.search).get('sessionName') || ''
+              : ''),
         )
       : '';
     const urlSlugLike = onWorkerGroupDetailRoute
@@ -601,7 +604,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
     const showCreateGroupAboveFeatured = this.props.showCreateGroupAboveFeatured === true;
     const routeWorkerGroupId = String(
       this.props.workerGroupId ||
-        (typeof window !== 'undefined' ? workerGroupNavigationPort.readGroupIdFromHash(window.location.hash) : ''),
+        (typeof window !== 'undefined' ? readWorkerGroupIdFromHash(window.location.hash) : ''),
     ).trim();
 
     // Resolve routing + slug once per render
@@ -671,6 +674,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
         sessionConfig={workerSessionConfig}
         sessionName={String((workerSessionConfig as Record<string, unknown> | null)?.sessionName || sessionName || '')}
         sessionSlug={activeWorkerSessionSlug}
+        selectedGroupId={routeWorkerGroupId}
         showCreate={showCreate}
         createOnly={createOnly}
         toggleLoginModal={toggleLoginModal as ((open: boolean) => void) | undefined}
@@ -990,6 +994,7 @@ export class SBTsPage extends Component<SBTsPageProps, SBTsPageState> {
             /* group-aware routing */
             sessionSlug={effectiveSessionSlug}
             sessionConfig={activeGroup}
+            selectedGroupId={routeWorkerGroupId}
             allSessionsMode={allSessionsMode}
             ensureLightSbtDiscovery={this.props.ensureLightSbtDiscovery}
             ensureLightSbtUniverse={this.props.ensureLightSbtUniverse}

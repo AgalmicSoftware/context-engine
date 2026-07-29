@@ -2562,7 +2562,7 @@ describe('AppShell route render smoke', () => {
     expect(subject._registryBootstrapScopeKey).toBe('');
   });
 
-  it('does not bootstrap an on-chain registry RPC for a query-scoped pure Worker Groups route', async () => {
+  it('does not bootstrap an on-chain registry RPC for a canonical pure Worker Group detail route', async () => {
     const workerConfig = buildSessionConfig({
       slug: 'demo-sh',
       networkChainId: DEFAULT_NETWORK.id,
@@ -2571,7 +2571,7 @@ describe('AppShell route render smoke', () => {
     });
     const subject = stubMainSiteMountSideEffects(
       createSubject({
-        path: '/groups',
+        path: '/group/public-reviewers',
         search: '?sessionName=demo-sh',
         activeSessionSlug: 'stale-session',
         sessionConfig: workerConfig,
@@ -2583,7 +2583,7 @@ describe('AppShell route render smoke', () => {
       await subject.componentDidMount();
     });
 
-    expect(subject.getBootstrapActiveSessionSlug('/groups', '?sessionName=demo-sh')).toBe('demo-sh');
+    expect(subject.getBootstrapActiveSessionSlug('/group/public-reviewers', '?sessionName=demo-sh')).toBe('demo-sh');
     expect(subject.resolveSessionPathSlug).not.toHaveBeenCalled();
     expect(loadGroupRegistryCache).not.toHaveBeenCalled();
     expect(subject._registryBootstrapPromise).toBeNull();

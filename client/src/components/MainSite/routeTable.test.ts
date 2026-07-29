@@ -85,6 +85,12 @@ describe('MainSite route table', () => {
         sbtAddress: ADDRESS,
       }),
     );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/group/public-reviewers', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtsList',
+        sbtAddress: null,
+      }),
+    );
   });
 
   it('keeps accepted double-slash SBT address paths on the SBT detail route', () => {
@@ -124,6 +130,13 @@ describe('MainSite route table', () => {
       })
     );
     expect(resolveMainSiteRouteMatch({ fullPath: '/groups/demo-sh', isAddress })).toEqual(
+      expect.objectContaining({
+        key: 'sbtsList',
+        isKnownRoutePrefix: true,
+        shouldBypassCacheHydrationWait: true,
+      }),
+    );
+    expect(resolveMainSiteRouteMatch({ fullPath: '/group/public-reviewers', isAddress })).toEqual(
       expect.objectContaining({
         key: 'sbtsList',
         isKnownRoutePrefix: true,

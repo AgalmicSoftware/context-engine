@@ -14,7 +14,11 @@ import {
   resolveSessionCapabilityProjection,
 } from '../../utilities/session/sessionCapabilityProjection.js';
 import { buildPublicRoute, stripPublicUrlBasePath } from '../../utilities/ui/publicUrl.js';
-import { buildWorkerGroupsPath, readWorkerGroupIdFromHash } from '../../utilities/worker/workerGroupRoutes';
+import {
+  buildWorkerGroupsPath,
+  readWorkerGroupIdFromHash,
+  readWorkerGroupIdFromPath,
+} from '../../utilities/worker/workerGroupRoutes';
 import { buildSbtListRootClassName } from './sbtListHelpers';
 import { isRecord } from './sbtListRuntimeValues';
 import type { SBTsListProps, UnknownRecord } from './sbtListTypes';
@@ -69,7 +73,11 @@ const WorkerGroupsListRoute = ({ props, workerSessionConfig }: WorkerGroupsListR
       : '';
   const sessionName = configuredSessionName || querySessionName || sessionSlug;
   const sessionHref = buildPublicRoute(`/session/${encodeURIComponent(sessionSlug)}`);
-  const selectedGroupId = typeof window !== 'undefined' ? readWorkerGroupIdFromHash(window.location.hash) : '';
+  const selectedGroupId =
+    String(props.selectedGroupId || '').trim() ||
+    (typeof window !== 'undefined'
+      ? readWorkerGroupIdFromPath(window.location.pathname) || readWorkerGroupIdFromHash(window.location.hash)
+      : '');
 
   useEffect(() => {
     if (!sessionSlug || !sessionName || typeof window === 'undefined') return;

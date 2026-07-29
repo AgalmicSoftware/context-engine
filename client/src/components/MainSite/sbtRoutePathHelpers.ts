@@ -40,6 +40,10 @@ export const getSbtListRouteSessionSlug = (
   const root = String(parts[0] || '')
     .trim()
     .toLowerCase();
+  if (root === 'group') {
+    const querySlug = new URLSearchParams(String(opts.search || '')).get('sessionName');
+    return querySlug == null ? '' : opts.normalizeSessionSlug(querySlug);
+  }
   if (root !== 'sbts' && root !== 'groups') return '';
   const slugOrMode = String(parts[1] || '').trim();
   if (slugOrMode) {
