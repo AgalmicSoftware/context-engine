@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Streamlined the client dependency surface by removing eight unused direct
+  packages, replacing standalone preview and source-map tools with Vite-native
+  preview and a local deterministic bundle report, and loading only the
+  two-input and three-input Poseidon implementations used by survey runtime.
+- Added automatic patch-version commits for each prepared public release
+  candidate, synchronized across root/client manifests and lockfiles. Public
+  release tooling, pre-push checks, CI, and worker-release metadata now enforce
+  the shared version, while minor and major bumps remain explicit
+  operator-directed decisions.
 - `/new` now capability-filters optional fields even after `Customize`: pure
   Cloudflare sessions omit block, faucet, and contract controls, persist
   generic Worker/Group defaults, and may set a Worker-enforced closing
