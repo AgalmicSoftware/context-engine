@@ -426,6 +426,15 @@ test('sync-public-history installs the private dev push guard before replaying',
   });
 });
 
+test('sync-public-history avoids local object-copy races when cloning the source', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const result = runSyncScript(sourceDir, ['--dry-run'], { GIT_TRACE: '1' });
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stderr, /run_command:.*git-upload-pack/);
+  });
+});
+
 test('sync-public-history replays public commits, skips private-only commits, and enforces public identity', () => {
   withSourceRepo(({ sourceDir }) => {
     const result = runSyncScript(sourceDir);
@@ -475,7 +484,7 @@ test('sync-public-history replays public commits, skips private-only commits, an
     assert.deepEqual(commitBodies, [
       `Public commit title\n\nPublic commit body line.\n\nCE-Private-Source: ${sourceShasBySubject.get('Public commit title')}\n\n`,
       `Mixed commit\n\nCE-Private-Source: ${sourceShasBySubject.get('Mixed commit')}\n\n`,
-      'chore: bump public version to 0.1.1\n\n',
+      `chore: bump public version to 0.1.1\n\nCE-Private-Source: ${sourceShasBySubject.get('Mixed commit')}\n\n`,
     ]);
     assert.equal(JSON.parse(git(sourceDir, ['show', 'release-staging:package.json'])).version, '0.1.1');
     assert.equal(JSON.parse(git(sourceDir, ['show', 'release-staging:client/package.json'])).version, '0.1.1');

@@ -26,6 +26,7 @@ import SbtPageRelevantInfo from '../SBTs/SbtPageRelevantInfo';
 import sbtsPageStyles from '../SBTs/SBTsPage.module.scss';
 import WorkerGroupCard from './WorkerGroupCard';
 import { resolveWorkerGroupJoinWindowDisplay } from './workerGroupDisplayHelpers';
+import { reconcileConfirmedWorkerGroupMembership } from './workerGroupMembershipProjection';
 import styles from './OnePageSession.module.scss';
 
 export type WorkerGroupMembershipPanelProps = {
@@ -44,6 +45,7 @@ export type WorkerGroupMembershipPanelProps = {
   selectedGroupId?: string;
   showDescriptions?: boolean;
   showListHeader?: boolean;
+  membershipsOnly?: boolean;
 };
 
 const emptyOverview: WorkerGroupOverview = { groups: [], memberships: [] };
@@ -458,6 +460,7 @@ const WorkerGroupMembershipPanel = ({
   selectedGroupId: selectedGroupIdProp = '',
   showDescriptions = true,
   showListHeader = true,
+  membershipsOnly = false,
 }: WorkerGroupMembershipPanelProps) => {
   const canReadGroups = canReadGroupsProp ?? envelope?.capabilities?.readGroups === true;
   const workerUrl = normalizeWorkerUrl(workerUrlProp || envelope?.workerUrl || '');
@@ -564,6 +567,7 @@ const WorkerGroupMembershipPanel = ({
     [overview.memberships],
   );
   const availableGroups = overview.groups.filter((group) => !membershipIds.has(group.groupId));
+  const displayedAvailableGroups = membershipsOnly ? [] : availableGroups;
   const selectedMembership = overview.memberships.find((membership) => membership.group.groupId === selectedGroupId);
   const selectedGroup = selectedMembership?.group || availableGroups.find((group) => group.groupId === selectedGroupId);
   const canViewSelectedGroupMembers = Boolean(
@@ -687,6 +691,21 @@ const WorkerGroupMembershipPanel = ({
       memberListRequestIdRef.current += 1;
       setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
       await reload();
+      if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
+      setViewState((current) => {
+        if (current.targetKey !== mutationTargetKey) return current;
+        return {
+          ...current,
+          overview: reconcileConfirmedWorkerGroupMembership({
+            overview: current.overview,
+            group,
+            isMember: true,
+            sessionSlug,
+          }),
+          status: 'ready',
+          error: '',
+        };
+      });
     } catch (joinError) {
       if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
       setViewState((current) => ({
@@ -724,6 +743,21 @@ const WorkerGroupMembershipPanel = ({
       memberListRequestIdRef.current += 1;
       setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
       await reload();
+      if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
+      setViewState((current) => {
+        if (current.targetKey !== mutationTargetKey) return current;
+        return {
+          ...current,
+          overview: reconcileConfirmedWorkerGroupMembership({
+            overview: current.overview,
+            group,
+            isMember: false,
+            sessionSlug,
+          }),
+          status: 'ready',
+          error: '',
+        };
+      });
     } catch (leaveError) {
       if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
       setViewState((current) => ({
@@ -887,7 +921,7 @@ const WorkerGroupMembershipPanel = ({
         </div>
       ) : null}
       {shareStatus ? <div className={styles.telegramReportApprox}>{shareStatus}</div> : null}
-      {overview.memberships.length || availableGroups.length ? (
+      {overview.memberships.length || displayedAvailableGroups.length ? (
         <div className={`${sbtsPageStyles.sbtGrid} ${styles.workerGroupCardGrid}`}>
           {overview.memberships.map((membership) => (
             <WorkerGroupCard
@@ -906,7 +940,7 @@ const WorkerGroupMembershipPanel = ({
               {renderMembershipAction(membership.group, true)}
             </WorkerGroupCard>
           ))}
-          {availableGroups.map((group) => (
+          {displayedAvailableGroups.map((group) => (
             <WorkerGroupCard
               key={group.groupId}
               copyGroupLink={copyGroupLink}
@@ -925,8 +959,10 @@ const WorkerGroupMembershipPanel = ({
           ))}
         </div>
       ) : null}
-      {status === 'ready' && !overview.memberships.length && !availableGroups.length ? (
-        <div className={styles.telegramListEmpty}>No visible Groups are configured.</div>
+      {status === 'ready' && !overview.memberships.length && !displayedAvailableGroups.length ? (
+        <div className={styles.telegramListEmpty}>
+          {membershipsOnly ? 'No Groups joined yet.' : 'No visible Groups are configured.'}
+        </div>
       ) : null}
     </section>
   );

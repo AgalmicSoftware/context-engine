@@ -167,8 +167,8 @@ import UserPageComparePanel from './UserPageComparePanel';
 import UserPageDeepScanStatusIndicator from './UserPageDeepScanStatusIndicator';
 import UserPageFullProfileModal from './UserPageFullProfileModal';
 import UserPageHeader from './UserPageHeader';
+import { renderUserPageMembershipSections } from './UserPageMembershipSections';
 import UserPageQuestionSection from './UserPageQuestionSection';
-import UserPageSbtSection from './UserPageSbtSection';
 import UserPageSimulatedActions from './UserPageSimulatedActions';
 import UserPageSurveySection from './UserPageSurveySection';
 import {
@@ -3779,22 +3779,27 @@ class UserPage extends Component<any, any> {
               />
             )}
 
-            {this.props.onChainProfileEnabled !== false && (
-              <UserPageSbtSection
-                account={account}
-                heading={`${t('minted')} ${t('sbts')}:`}
-                isLoading={isSbtLoadingAny}
-                isSBTCacheReady={this.props.isSBTCacheReady}
-                loadingIndicator={renderDeepScanIndicator(isSbtLoadingAny, sbtSpinnerId)}
-                loginComplete={loginComplete}
-                network={network}
-                onRefreshSbtData={this.dispatchSbtDataRefresh}
-                provider={provider}
-                sbtDisplayState={sbtDisplayState}
-                sbtEmptyText={sbtEmptyText}
-                sbtEntries={sbtEntries}
-              />
-            )}
+            {renderUserPageMembershipSections({
+              account,
+              activeSessionSlug: this.getActiveSessionSlug(),
+              isOwner,
+              isSimulated,
+              onChainProfileEnabled: this.props.onChainProfileEnabled,
+              provider,
+              sessionConfig: this.props.sessionConfig,
+              sbtSectionProps: {
+                heading: `${t('minted')} ${t('sbts')}:`,
+                isLoading: isSbtLoadingAny,
+                isSBTCacheReady: this.props.isSBTCacheReady,
+                loadingIndicator: renderDeepScanIndicator(isSbtLoadingAny, sbtSpinnerId),
+                loginComplete,
+                network,
+                onRefreshSbtData: this.dispatchSbtDataRefresh,
+                sbtDisplayState,
+                sbtEmptyText,
+                sbtEntries,
+              },
+            })}
           </div>
         )}
 

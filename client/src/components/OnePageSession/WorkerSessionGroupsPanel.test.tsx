@@ -364,6 +364,34 @@ describe('WorkerSessionGroupsPanel', () => {
     );
   });
 
+  it('authenticates a remembered account when the user profile requests only its memberships', async () => {
+    mockGetWorkerSessionToken.mockResolvedValue('profile-membership-token');
+    render(
+      <WorkerSessionGroupsPanel
+        account={ADMIN}
+        provider="wagmi"
+        networkChainId={11155420}
+        sessionConfig={{
+          ...sessionConfig,
+          sessionModeProfile: publicSessionModeProfile,
+        }}
+        sessionSlug="demo-sh"
+        showCreate={false}
+        membershipsOnly={true}
+      />,
+    );
+
+    await waitFor(() => expect(mockGetWorkerSessionToken).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(mockMembershipPanel).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          membershipsOnly: true,
+          workerToken: 'profile-membership-token',
+        }),
+      ),
+    );
+  });
+
   it('keeps a private session sign-in-only when participants may create groups', () => {
     const toggleLoginModal = jest.fn();
     render(

@@ -106,7 +106,7 @@ for index in "${!release_candidate_shas[@]}"; do
   )
 
   if [ "$baseline_sha" != "$ZERO_OID" ]; then
-    verify_args+=(--baseline-ref "$baseline_sha")
+    verify_args+=(--minimum-ref "$baseline_sha")
   fi
 
   main_ref="refs/remotes/${REMOTE_NAME}/main"
