@@ -1001,7 +1001,10 @@ REPLAY_HOOKS_DIR="$TMP_ROOT/replay-hooks"
 mkdir -p "$REPLAY_HOOKS_DIR"
 
 log_info "Cloning source repo into temporary workspace: $TEMP_CLONE"
-git clone --quiet "$REPO_ROOT" "$TEMP_CLONE"
+# Avoid Git's local hardlink/copy optimization. The source repository can gain
+# objects while release checks run, and a local clone may race with that object
+# database on CI. The upload-pack transport produces one consistent snapshot.
+git clone --quiet --no-local "$REPO_ROOT" "$TEMP_CLONE"
 
 log_info "Setting public git identity in temp clone."
 git -C "$TEMP_CLONE" config user.name "$PUBLIC_GIT_NAME"

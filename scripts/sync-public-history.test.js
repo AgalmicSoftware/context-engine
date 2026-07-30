@@ -426,6 +426,15 @@ test('sync-public-history installs the private dev push guard before replaying',
   });
 });
 
+test('sync-public-history avoids local object-copy races when cloning the source', () => {
+  withSourceRepo(({ sourceDir }) => {
+    const result = runSyncScript(sourceDir, ['--dry-run'], { GIT_TRACE: '1' });
+
+    assert.equal(result.status, 0, syncFailureMessage(result));
+    assert.match(result.stderr, /run_command:.*git-upload-pack/);
+  });
+});
+
 test('sync-public-history replays public commits, skips private-only commits, and enforces public identity', () => {
   withSourceRepo(({ sourceDir }) => {
     const result = runSyncScript(sourceDir);
