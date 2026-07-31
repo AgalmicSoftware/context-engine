@@ -7,13 +7,19 @@ Use it for new files, refactors, and cleanup PRs.
 
 - `client/` holds the React SPA, frontend assets, and frontend-adjacent tests.
 - `workers/` holds Cloudflare Worker source and worker-specific support files.
+- `deploy/` holds reviewed, installable deployment packages generated from
+  canonical source. It is separate from `workers/` source, untracked `dist/`
+  build output, and immutable CI release assets; see
+  [`deploy/README.md`](../deploy/README.md).
 - `contracts/` holds Solidity contracts, interfaces, and contract-focused tests.
 - `scripts/` holds build, verification, migration, and supported automation entrypoints.
 - `foundry/` holds Foundry-specific Solidity entry points; `foundry/script/` and `foundry/test/` intentionally keep Foundry's singular directory names one level below repo root.
 - `docs/` holds canonical implementation and operations documentation.
 - `posts/` holds public Markdown posts and the `/posts` route manifest.
 - `tests/` holds source-of-truth root Node/Jest test harnesses that are not practical to colocate elsewhere; shared helpers live under `tests/helpers/`.
-- `broadcast/`, `cache/`, `dist/`, `out/`, and `tmp/` are generated or runtime output locations and are not canonical homes for new source files.
+- `broadcast/`, `cache/`, `dist/`, `out/`, `release-public/`, and `tmp/` are
+  generated or runtime output locations and are not canonical homes for new
+  source files.
 - New top-level directories are rare. Reuse an existing root area unless the new code has a clearly separate runtime, deployment surface, or ownership boundary.
 
 ## 2. React Component Structure

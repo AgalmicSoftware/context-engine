@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- Clarified the repository boundary between canonical Worker source,
+  Cloudflare-native deployment packages, local bundle output, immutable CI
+  bundle releases, and the stripped public-source snapshot. Release docs now
+  accurately distinguish immutable bundle publication from the separately
+  approved stable/`latest` promotion workflow. Source-tree public-text checks
+  now scan the same tracked and non-ignored files as the release exporter,
+  avoiding ignored local caches without overlooking untracked release input.
 - Streamlined the client dependency surface by removing eight unused direct
   packages, replacing standalone preview and source-map tools with Vite-native
   preview and a local deterministic bundle report, and loading only the

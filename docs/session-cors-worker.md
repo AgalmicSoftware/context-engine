@@ -59,12 +59,18 @@ origins.
 - Native deploy does not use a Context Engine deploy helper, Cloudflare API token, OAuth token, or local agent. The legacy helper path remains an explicit fallback.
 - A full shared multi-session worker product is planned but not yet shipped.
 
-Preferred worker sources:
-- Native Cloudflare package: `deploy/cloudflare/session-worker/`
-- `sessionCorsWorker` source tree: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
+Worker source and distribution surfaces:
+
+- Canonical `sessionCorsWorker` source tree: `workers/sessionCorsWorker/`
+- Native Cloudflare deployment package: `deploy/cloudflare/session-worker/`
+- Public `sessionCorsWorker` source tree: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/sessionCorsWorker`
 - `sessionCorsWorker` release bundle asset: `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`
 - Deploy-helper source tree: `https://github.com/AgalmicSoftware/context-engine/tree/main/workers/deploy-helper`
-- The repo's `.github/workflows/publish-worker-bundles.yml` workflow rebuilds and republishes both bundle assets on every push to `main`/`master`, and it explicitly marks that worker-bundle release as GitHub's latest release so the `releases/latest/download/...` URLs stay current after GitHub Actions is enabled.
+- Canonical CI publishes each successful public-branch bundle set as an
+  immutable, commit-addressed GitHub release without moving `latest`.
+  `.github/workflows/promote-worker-bundles.yml` separately verifies an
+  operator-selected release before advancing the protected stable and GitHub
+  `latest` channels used by `releases/latest/download/...` URLs.
 
 ## Deployment modes
 
@@ -2059,7 +2065,12 @@ worker. Sponsored deploy grants are the separately documented legacy exception.
 - This repo no longer mirrors `.js.txt` worker copies into the client asset tree.
 - Rebuild local fallback bundles with `nvm use 20 && npm run worker:bundle` and verify they match source with `npm run verify:worker-bundle`.
 - `dist/sessionCorsWorker.bundle.js` and `dist/deployHelper.bundle.js` are generated local/manual fallback bundles for worker upload flows; they are not tracked git artifacts anymore.
-- GitHub bundle publishing is now automated via `.github/workflows/publish-worker-bundles.yml`. Once Actions are enabled in the GitHub repo, every push to `main`/`master` creates a fresh release containing both bundle assets and explicitly marks that release as latest, which keeps `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js` live.
+- `.github/workflows/publish-worker-bundles.yml` publishes verified bundle
+  bytes as an immutable, commit-addressed release without moving `latest`.
+  After review, `.github/workflows/promote-worker-bundles.yml` re-verifies the
+  selected release, retains the previous rollback ref, and advances the
+  protected stable and GitHub `latest` channels used by
+  `https://github.com/AgalmicSoftware/context-engine/releases/latest/download/sessionCorsWorker.bundle.js`.
 - The worker currently pins `ethers@6.15.0` intentionally. The root app and client remain on `ethers@5.7.2` until the broader client migration is done, so this version split is expected.
 
 ## Future work

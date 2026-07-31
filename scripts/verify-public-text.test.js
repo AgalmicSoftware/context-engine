@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 
 const { scrubPublicPackageJson } = require('./scrub-public-package-json');
 const { verifyPublicText } = require('./verify-public-text');
@@ -115,5 +116,22 @@ test('verifyPublicText still fails on companion references that survive the pack
       { file: 'client/package.json', kind: 'private companion path' },
       { file: 'package.json', kind: 'private companion path' },
     ]);
+  });
+});
+
+test('verifyPublicText matches release export visibility in a git checkout', () => {
+  withFixture((rootDir) => {
+    execFileSync('git', ['init', '--quiet'], { cwd: rootDir });
+    writeFile(rootDir, '.gitignore', '.tmp/\n');
+    writeFile(rootDir, 'README.md', '# Public\n');
+    writeFile(rootDir, '.tmp/ignored.txt', 'contextEngine-cc/private.mjs\n');
+    writeFile(rootDir, 'visible-untracked.json', '{"source":"contextEngine-cc/private.mjs"}\n');
+
+    const { findings } = verifyPublicText(rootDir);
+
+    assert.deepEqual(findings.map(({ file, kind }) => ({ file, kind })), [{
+      file: 'visible-untracked.json',
+      kind: 'private companion path',
+    }]);
   });
 });
