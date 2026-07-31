@@ -634,11 +634,13 @@ const WorkerGroupMembershipPanel = ({
       setViewState(emptyViewState(requestTargetKey));
       return;
     }
-    setViewState({
-      targetKey: requestTargetKey,
-      overview: emptyOverview,
-      status: 'loading',
-      error: '',
+    setViewState((current) => {
+      const base = current.targetKey === requestTargetKey ? current : emptyViewState(requestTargetKey);
+      return {
+        ...base,
+        status: 'loading',
+        error: '',
+      };
     });
     try {
       const next = anonymousDiscoveryActive
@@ -667,11 +669,13 @@ const WorkerGroupMembershipPanel = ({
       });
     } catch (loadError) {
       if (targetKeyRef.current !== requestTargetKey || requestIdRef.current !== requestId) return;
-      setViewState({
-        targetKey: requestTargetKey,
-        overview: emptyOverview,
-        status: 'error',
-        error: loadError instanceof Error ? loadError.message : 'worker_group_load_failed',
+      setViewState((current) => {
+        const base = current.targetKey === requestTargetKey ? current : emptyViewState(requestTargetKey);
+        return {
+          ...base,
+          status: 'error',
+          error: loadError instanceof Error ? loadError.message : 'worker_group_load_failed',
+        };
       });
     }
   }, [anonymousDiscoveryActive, canReadGroups, fetchImpl, sessionId, sessionSlug, targetKey, workerToken, workerUrl]);
@@ -813,6 +817,31 @@ const WorkerGroupMembershipPanel = ({
     void loadSelectedGroupMembers({ cursor: activeMemberListState.nextCursor, append: true });
   };
 
+  const applyConfirmedMembership = ({
+    mutationTargetKey,
+    group,
+    isMember,
+  }: {
+    mutationTargetKey: string;
+    group: WorkerGroup;
+    isMember: boolean;
+  }) => {
+    setViewState((current) => {
+      if (current.targetKey !== mutationTargetKey) return current;
+      return {
+        ...current,
+        overview: reconcileConfirmedWorkerGroupMembership({
+          overview: current.overview,
+          group,
+          isMember,
+          sessionSlug,
+        }),
+        status: 'ready',
+        error: '',
+      };
+    });
+  };
+
   const handleJoin = async (group: WorkerGroup) => {
     const mutationTargetKey = targetKey;
     const mutationId = mutationIdRef.current + 1;
@@ -836,22 +865,10 @@ const WorkerGroupMembershipPanel = ({
       setMembershipStatusState({ targetKey: mutationTargetKey, status: `Joined ${group.label}.` });
       memberListRequestIdRef.current += 1;
       setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
+      applyConfirmedMembership({ mutationTargetKey, group, isMember: true });
       await reload();
       if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
-      setViewState((current) => {
-        if (current.targetKey !== mutationTargetKey) return current;
-        return {
-          ...current,
-          overview: reconcileConfirmedWorkerGroupMembership({
-            overview: current.overview,
-            group,
-            isMember: true,
-            sessionSlug,
-          }),
-          status: 'ready',
-          error: '',
-        };
-      });
+      applyConfirmedMembership({ mutationTargetKey, group, isMember: true });
     } catch (joinError) {
       if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
       setViewState((current) => ({
@@ -888,7 +905,10 @@ const WorkerGroupMembershipPanel = ({
       setMembershipStatusState({ targetKey: mutationTargetKey, status: `Left ${group.label}.` });
       memberListRequestIdRef.current += 1;
       setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
+      applyConfirmedMembership({ mutationTargetKey, group, isMember: false });
       await reload();
+      if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
+      applyConfirmedMembership({ mutationTargetKey, group, isMember: false });
     } catch (leaveError) {
       if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
       setViewState((current) => ({
@@ -1037,12 +1057,6 @@ const WorkerGroupMembershipPanel = ({
             Refresh
           </button>
         </div>
-      ) : null}
-      {!anonymousDiscoveryActive ? (
-        <p className={styles.telegramReportApprox}>
-          These worker-managed access groups control session authorization. They are separate from research profile
-          categories.
-        </p>
       ) : null}
       {status === 'loading' ? <div className={styles.telegramListEmpty}>Loading access groups…</div> : null}
       {error ? <div className={styles.telegramListEmpty}>{error}</div> : null}

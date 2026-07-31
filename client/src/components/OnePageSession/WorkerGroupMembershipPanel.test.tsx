@@ -620,6 +620,158 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(fetchImpl.mock.calls.some(([url]) => new URL(String(url)).pathname.endsWith('/groups/leave'))).toBe(true);
   });
 
+  it('updates the minimized card after confirmed membership changes when the refreshed projection is stale', async () => {
+    let membershipReadCount = 0;
+    const group = {
+      groupId: 'open-reviewers',
+      sessionSlug: 'alpha',
+      label: 'Open reviewers',
+      description: 'Join this access group.',
+      joinMode: 'open',
+      memberVisibility: 'session',
+    };
+    const membership = {
+      group,
+      member: {
+        groupId: group.groupId,
+        sessionSlug: 'alpha',
+        principalKey: 'evm:0xaa',
+      },
+      memberCount: 4,
+    };
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith('/groups/join')) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            group,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (pathname.endsWith('/groups/leave')) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            groupId: group.groupId,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (pathname.endsWith('/groups/my-memberships')) {
+        membershipReadCount += 1;
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            // The post-join read has not caught up, while the post-leave read still
+            // reports the old membership.
+            memberships: membershipReadCount >= 3 ? [membership] : [],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'alpha',
+          groups: [group],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    });
+
+    render(
+      <WorkerGroupMembershipPanel
+        envelope={envelope}
+        fetchImpl={fetchImpl as typeof fetch}
+        showDescriptions={false}
+        showListHeader={false}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Join Open reviewers' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Joined Open reviewers.');
+    expect(await screen.findByRole('button', { name: 'Leave Open reviewers' })).toHaveTextContent(/^Leave$/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Open reviewers' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Left Open reviewers.');
+    expect(await screen.findByRole('button', { name: 'Join Open reviewers' })).toHaveTextContent(/^Join$/);
+    expect(membershipReadCount).toBe(3);
+  });
+
+  it('shows Leave immediately while the post-join membership refresh is still pending', async () => {
+    let joined = false;
+    let releasePostJoinRefresh: () => void = () => {};
+    const postJoinRefresh = new Promise<void>((resolve) => {
+      releasePostJoinRefresh = resolve;
+    });
+    const group = {
+      groupId: 'open-reviewers',
+      sessionSlug: 'alpha',
+      label: 'Open reviewers',
+      description: 'Join this access group.',
+      joinMode: 'open',
+      memberVisibility: 'session',
+    };
+    const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
+      const pathname = new URL(String(input)).pathname;
+      if (pathname.endsWith('/groups/join')) {
+        joined = true;
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            sessionId: SESSION_ID,
+            sessionSlug: 'alpha',
+            group,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
+      }
+      if (joined && (pathname.endsWith('/groups/list') || pathname.endsWith('/groups/my-memberships'))) {
+        await postJoinRefresh;
+      }
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          sessionId: SESSION_ID,
+          sessionSlug: 'alpha',
+          ...(pathname.endsWith('/groups/my-memberships') ? { memberships: [] } : { groups: [group] }),
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    });
+
+    render(
+      <WorkerGroupMembershipPanel
+        envelope={envelope}
+        fetchImpl={fetchImpl as typeof fetch}
+        showDescriptions={false}
+        showListHeader={false}
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Join Open reviewers' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Joined Open reviewers.');
+    expect(screen.getByRole('button', { name: 'Leave Open reviewers' })).toHaveTextContent(/^Leave$/);
+    expect(screen.queryByText(/worker-managed access groups/i)).not.toBeInTheDocument();
+
+    releasePostJoinRefresh();
+
+    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(5));
+    expect(await screen.findByRole('button', { name: 'Leave Open reviewers' })).toHaveTextContent(/^Leave$/);
+  });
+
   it('does not consume the worker credential when the exchanged source lacks group-read capability', () => {
     const fetchImpl = jest.fn();
     render(
