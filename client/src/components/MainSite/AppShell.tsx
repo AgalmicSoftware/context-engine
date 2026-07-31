@@ -2359,7 +2359,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
     }
     this.redirectLegacyDemoPath();
     let didRedirectInitialLoadToAbout = false;
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && this.shouldForceOneTimeFirstVisitRootRedirect()) {
       const currentPath = window.location.pathname || this.props.path || '';
       const aboutRedirectTarget = this.getTemporaryInitialLoadAboutRedirectTarget(currentPath);
       const shouldRedirectForPersistedCache = aboutRedirectTarget?.requiresPersistedCache
@@ -2375,6 +2375,7 @@ export class AppShell extends Component<MainSiteProps, MainSiteState> {
           '',
           buildPublicUrl(aboutRedirectTarget.path, window.location.search || '', window.location.hash || ''),
         );
+        this.consumeOneTimeFirstVisitRootRedirect();
         didRedirectInitialLoadToAbout = true;
       }
     }

@@ -140,8 +140,9 @@ const getTemporaryInitialLoadSessionCacheSlug = (
   return normalizeSessionSlug(token || '');
 };
 
-// Temporary demo-launch guard: root loads go to /about, and cached session
-// document loads may go to /about while stale pages retire.
+// Temporary demo-launch guard: the first eligible root or cached-session
+// document load goes to /about while stale pages retire. The caller owns the
+// one-time consumption check so this path matcher stays storage-independent.
 export const isTemporaryInitialLoadAboutRedirectPath = (
   pathIn: unknown,
   deps: { normalizeRoutePath: NormalizeSessionSlugFn },

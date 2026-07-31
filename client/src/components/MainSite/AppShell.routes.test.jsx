@@ -1239,6 +1239,7 @@ describe('AppShell route render smoke', () => {
 
     expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
     expect(window.location.pathname).toBe('/about');
+    expect(localStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBe('true');
 
     render(<MemoryRouter initialEntries={['/about']}>{subject.render()}</MemoryRouter>);
 
@@ -1263,10 +1264,11 @@ describe('AppShell route render smoke', () => {
     expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
     expect(window.location.pathname).toBe('/about');
     expect(localStorage.getItem(FIRST_VISIT_STORAGE_KEY)).toBe('false');
+    expect(localStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBe('true');
     subject.componentWillUnmount();
   });
 
-  it('redirects a root refresh to about even after the old one-time toggle is consumed', async () => {
+  it('keeps the root route after the one-time about redirect is consumed', async () => {
     localStorage.setItem(FIRST_VISIT_STORAGE_KEY, 'false');
     localStorage.setItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY, 'true');
     const subject = stubMainSiteMountSideEffects(
@@ -1281,12 +1283,12 @@ describe('AppShell route render smoke', () => {
       await subject.componentDidMount();
     });
 
-    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
-    expect(window.location.pathname).toBe('/about');
+    expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/');
     subject.componentWillUnmount();
   });
 
-  it('temporarily redirects cached session page refreshes to the about page', async () => {
+  it('redirects one cached session load to about and disarms later refreshes', async () => {
     const subject = stubMainSiteMountSideEffects(
       createSubject({
         path: '/session/demo-1',
@@ -1303,7 +1305,27 @@ describe('AppShell route render smoke', () => {
     expect(subject.hasPersistedManagedCacheData).toHaveBeenCalledWith('demo-1');
     expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/about');
     expect(window.location.pathname).toBe('/about');
+    expect(localStorage.getItem(FIRST_VISIT_ROOT_REDIRECT_CONSUMED_STORAGE_KEY)).toBe('true');
     subject.componentWillUnmount();
+
+    window.history.replaceState({}, '', '/session/demo-1');
+    replaceStateSpy.mockClear();
+    const refreshedSubject = stubMainSiteMountSideEffects(
+      createSubject({
+        path: '/session/demo-1',
+        firstVisit: false,
+      }),
+    );
+    refreshedSubject.hasPersistedManagedCacheData = jest.fn(async () => true);
+
+    await act(async () => {
+      await refreshedSubject.componentDidMount();
+    });
+
+    expect(refreshedSubject.hasPersistedManagedCacheData).not.toHaveBeenCalled();
+    expect(replaceStateSpy).not.toHaveBeenCalledWith({}, '', '/about');
+    expect(window.location.pathname).toBe('/session/demo-1');
+    refreshedSubject.componentWillUnmount();
   });
 
   it('does not redirect first-time direct session loads without persisted session cache', async () => {
