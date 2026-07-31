@@ -866,9 +866,6 @@ const WorkerGroupMembershipPanel = ({
       memberListRequestIdRef.current += 1;
       setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
       applyConfirmedMembership({ mutationTargetKey, group, isMember: true });
-      await reload();
-      if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
-      applyConfirmedMembership({ mutationTargetKey, group, isMember: true });
     } catch (joinError) {
       if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
       setViewState((current) => ({
@@ -905,9 +902,6 @@ const WorkerGroupMembershipPanel = ({
       setMembershipStatusState({ targetKey: mutationTargetKey, status: `Left ${group.label}.` });
       memberListRequestIdRef.current += 1;
       setMemberListState(emptyMemberListState(mutationTargetKey, group.groupId));
-      applyConfirmedMembership({ mutationTargetKey, group, isMember: false });
-      await reload();
-      if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;
       applyConfirmedMembership({ mutationTargetKey, group, isMember: false });
     } catch (leaveError) {
       if (targetKeyRef.current !== mutationTargetKey || mutationIdRef.current !== mutationId) return;

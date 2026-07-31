@@ -620,7 +620,7 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(fetchImpl.mock.calls.some(([url]) => new URL(String(url)).pathname.endsWith('/groups/leave'))).toBe(true);
   });
 
-  it('updates the minimized card after confirmed membership changes when the refreshed projection is stale', async () => {
+  it('updates only the changed card without reloading the full group collection', async () => {
     let membershipReadCount = 0;
     const group = {
       groupId: 'open-reviewers',
@@ -629,15 +629,6 @@ describe('WorkerGroupMembershipPanel', () => {
       description: 'Join this access group.',
       joinMode: 'open',
       memberVisibility: 'session',
-    };
-    const membership = {
-      group,
-      member: {
-        groupId: group.groupId,
-        sessionSlug: 'alpha',
-        principalKey: 'evm:0xaa',
-      },
-      memberCount: 4,
     };
     const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
       const pathname = new URL(String(input)).pathname;
@@ -670,9 +661,7 @@ describe('WorkerGroupMembershipPanel', () => {
             ok: true,
             sessionId: SESSION_ID,
             sessionSlug: 'alpha',
-            // The post-join read has not caught up, while the post-leave read still
-            // reports the old membership.
-            memberships: membershipReadCount >= 3 ? [membership] : [],
+            memberships: [],
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         );
@@ -706,15 +695,11 @@ describe('WorkerGroupMembershipPanel', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('Left Open reviewers.');
     expect(await screen.findByRole('button', { name: 'Join Open reviewers' })).toHaveTextContent(/^Join$/);
-    expect(membershipReadCount).toBe(3);
+    expect(membershipReadCount).toBe(1);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 
-  it('shows Leave immediately while the post-join membership refresh is still pending', async () => {
-    let joined = false;
-    let releasePostJoinRefresh: () => void = () => {};
-    const postJoinRefresh = new Promise<void>((resolve) => {
-      releasePostJoinRefresh = resolve;
-    });
+  it('shows Leave immediately without starting a post-join collection refresh', async () => {
     const group = {
       groupId: 'open-reviewers',
       sessionSlug: 'alpha',
@@ -726,7 +711,6 @@ describe('WorkerGroupMembershipPanel', () => {
     const fetchImpl = jest.fn(async (input: RequestInfo | URL) => {
       const pathname = new URL(String(input)).pathname;
       if (pathname.endsWith('/groups/join')) {
-        joined = true;
         return new Response(
           JSON.stringify({
             ok: true,
@@ -736,9 +720,6 @@ describe('WorkerGroupMembershipPanel', () => {
           }),
           { status: 200, headers: { 'content-type': 'application/json' } },
         );
-      }
-      if (joined && (pathname.endsWith('/groups/list') || pathname.endsWith('/groups/my-memberships'))) {
-        await postJoinRefresh;
       }
       return new Response(
         JSON.stringify({
@@ -765,11 +746,7 @@ describe('WorkerGroupMembershipPanel', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Joined Open reviewers.');
     expect(screen.getByRole('button', { name: 'Leave Open reviewers' })).toHaveTextContent(/^Leave$/);
     expect(screen.queryByText(/worker-managed access groups/i)).not.toBeInTheDocument();
-
-    releasePostJoinRefresh();
-
-    await waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(5));
-    expect(await screen.findByRole('button', { name: 'Leave Open reviewers' })).toHaveTextContent(/^Leave$/);
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
   it('does not consume the worker credential when the exchanged source lacks group-read capability', () => {
