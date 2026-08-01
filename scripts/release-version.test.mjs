@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   assessReleaseImpact,
@@ -12,6 +14,14 @@ import {
   readVersionSurfaces,
   writeVersionSurfaces,
 } from './release-version.mjs';
+
+const SCRIPT_PATH = fileURLToPath(new URL('./release-version.mjs', import.meta.url));
+
+const git = (repoRoot, args) => execFileSync('git', args, {
+  cwd: repoRoot,
+  encoding: 'utf8',
+  stdio: ['ignore', 'pipe', 'pipe'],
+}).trim();
 
 const packageJson = (name, version) => `${JSON.stringify({ name, version, private: true }, null, 2)}\n`;
 const packageLock = (name, version) => `${JSON.stringify({
@@ -111,6 +121,40 @@ test('version surfaces are synchronized without changing unrelated metadata', ()
       },
     });
     assert.equal(JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8')).private, true);
+  } finally {
+    fs.rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+test('verify-ref fails when a supplied release floor cannot be resolved', () => {
+  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-release-ref-'));
+  try {
+    fs.mkdirSync(path.join(rootDir, 'client'), { recursive: true });
+    fs.writeFileSync(path.join(rootDir, 'package.json'), packageJson('contextEngine', '0.1.1'));
+    fs.writeFileSync(path.join(rootDir, 'package-lock.json'), packageLock('contextEngine', '0.1.1'));
+    fs.writeFileSync(path.join(rootDir, 'client', 'package.json'), packageJson('client', '0.1.1'));
+    fs.writeFileSync(path.join(rootDir, 'client', 'package-lock.json'), packageLock('client', '0.1.1'));
+    git(rootDir, ['init', '--quiet']);
+    git(rootDir, ['config', 'user.name', 'Release Tester']);
+    git(rootDir, ['config', 'user.email', '[redacted-email]']);
+    git(rootDir, ['add', 'package.json', 'package-lock.json', 'client/package.json', 'client/package-lock.json']);
+    git(rootDir, ['commit', '--quiet', '-m', 'candidate']);
+
+    for (const option of ['--baseline-ref', '--minimum-ref']) {
+      const result = spawnSync(process.execPath, [
+        SCRIPT_PATH,
+        'verify-ref',
+        '--repo-root',
+        rootDir,
+        '--candidate-ref',
+        'HEAD',
+        option,
+        'f'.repeat(40),
+      ], { encoding: 'utf8' });
+
+      assert.notEqual(result.status, 0, `${option} unexpectedly passed`);
+      assert.match(result.stderr, /Release version ref was not found/);
+    }
   } finally {
     fs.rmSync(rootDir, { recursive: true, force: true });
   }

@@ -327,7 +327,10 @@ const verifyCandidateRef = (options) => {
   const repoRoot = path.resolve(options.repo_root || process.cwd());
   const candidate = readVersionAtRef(repoRoot, options.candidate_ref);
   const baselines = options.baselineRefs
-    .filter((ref) => ref && ref !== '0000000000000000000000000000000000000000' && refExists(repoRoot, ref))
+    .filter((ref) => ref && ref !== '0000000000000000000000000000000000000000')
+    .map((ref) => ({ ref, version: readVersionAtRef(repoRoot, ref).version }));
+  const minimums = options.minimumRefs
+    .filter((ref) => ref && ref !== '0000000000000000000000000000000000000000')
     .map((ref) => ({ ref, version: readVersionAtRef(repoRoot, ref).version }));
 
   for (const baseline of baselines) {

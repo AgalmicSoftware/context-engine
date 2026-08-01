@@ -152,6 +152,61 @@ test('pre-push guard allows release-staging pushes to the public origin', () => 
   });
 });
 
+test('pre-push guard allows a same-version follow-up to an existing release candidate', () => {
+  withHookFixture((rootDir) => {
+    const { candidateSha } = createVersionedCandidate(rootDir, '0.1.1');
+    writeFile(rootDir, 'follow-up.txt', 'release candidate fix\n');
+    git(rootDir, ['add', '-A']);
+    git(rootDir, ['commit', '--quiet', '-m', 'follow-up']);
+    const followUpSha = git(rootDir, ['rev-parse', 'HEAD']);
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: followUpSha,
+      remoteRef: 'refs/heads/release-staging',
+      remoteSha: candidateSha,
+    }));
+
+    assert.equal(result.status, 0);
+    assert.match(result.stderr, /release version verified: 0\.1\.1/);
+  });
+});
+
+test('pre-push guard blocks a version below the existing release candidate', () => {
+  withHookFixture((rootDir) => {
+    const { candidateSha } = createVersionedCandidate(rootDir, '0.1.2');
+    writeVersionSurfaces(rootDir, '0.1.1');
+    git(rootDir, ['add', '-A']);
+    git(rootDir, ['commit', '--quiet', '-m', 'downgrade']);
+    const downgradeSha = git(rootDir, ['rev-parse', 'HEAD']);
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: downgradeSha,
+      remoteRef: 'refs/heads/release-staging',
+      remoteSha: candidateSha,
+    }));
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Candidate version 0\.1\.1 must not be lower/);
+    assert.match(result.stderr, /Blocked release-staging push/);
+  });
+});
+
+test('pre-push guard blocks when the existing release candidate is unavailable', () => {
+  withHookFixture((rootDir) => {
+    const { candidateSha } = createVersionedCandidate(rootDir, '0.1.1');
+    const result = runHook(rootDir, pushLine({
+      localRef: 'refs/heads/release-staging',
+      localSha: candidateSha,
+      remoteRef: 'refs/heads/release-staging',
+      remoteSha: NON_ZERO_SHA,
+    }));
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Release version ref was not found/);
+    assert.match(result.stderr, /Blocked release-staging push/);
+  });
+});
+
 test('pre-push guard blocks release-staging versions that do not advance public main', () => {
   withHookFixture((rootDir) => {
     const { candidateSha } = createVersionedCandidate(rootDir, '0.1.0');
