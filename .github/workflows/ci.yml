@@ -100,9 +100,19 @@ jobs:
 
       - name: Verify release-staging version advancement
         if: ${{ startsWith(github.ref_name, 'release-staging') || startsWith(github.head_ref, 'release-staging') }}
+        env:
+          RELEASE_EVENT_NAME: ${{ github.event_name }}
+          RELEASE_PUSH_BEFORE_SHA: ${{ github.event.before }}
+          ZERO_OID: 0000000000000000000000000000000000000000
         run: |
+          set -euo pipefail
           git fetch --no-tags --depth=1 origin main
-          node scripts/release-version.mjs verify-ref --candidate-ref HEAD --baseline-ref origin/main
+          verify_args=(verify-ref --candidate-ref HEAD --baseline-ref origin/main)
+          if [ "$RELEASE_EVENT_NAME" = "push" ] && [ "$RELEASE_PUSH_BEFORE_SHA" != "$ZERO_OID" ]; then
+            git fetch --no-tags --depth=1 origin "$RELEASE_PUSH_BEFORE_SHA"
+            verify_args+=(--minimum-ref "$RELEASE_PUSH_BEFORE_SHA")
+          fi
+          node scripts/release-version.mjs "${verify_args[@]}"
 
       - name: Verify public release surface
         run: npm run verify:public-release-surface

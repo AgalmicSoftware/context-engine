@@ -367,7 +367,27 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectWorkflowContains('run: npm run typecheck:client', '"npm run typecheck:client"');
   expectWorkflowContains('run: npm run verify:release-version', '"npm run verify:release-version"');
   expectWorkflowContains(
-    'node scripts/release-version.mjs verify-ref --candidate-ref HEAD --baseline-ref origin/main',
+    'RELEASE_PUSH_BEFORE_SHA: ${{ github.event.before }}',
+    'release-staging previous push SHA',
+  );
+  expectWorkflowContains(
+    'RELEASE_EVENT_NAME: ${{ github.event_name }}',
+    'release-staging push event discriminator',
+  );
+  expectWorkflowContains(
+    'if [ "$RELEASE_EVENT_NAME" = "push" ] && [ "$RELEASE_PUSH_BEFORE_SHA" != "$ZERO_OID" ]; then',
+    'release-staging nonzero previous push guard',
+  );
+  expectWorkflowContains(
+    'git fetch --no-tags --depth=1 origin "$RELEASE_PUSH_BEFORE_SHA"',
+    'release-staging previous push object fetch',
+  );
+  expectWorkflowContains(
+    'verify_args+=(--minimum-ref "$RELEASE_PUSH_BEFORE_SHA")',
+    'release-staging minimum version ref',
+  );
+  expectWorkflowContains(
+    'node scripts/release-version.mjs "${verify_args[@]}"',
     'release-staging version advancement verification',
   );
   expectWorkflowContains('run: npm run verify:public-release-surface', '"npm run verify:public-release-surface"');
