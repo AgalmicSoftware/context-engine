@@ -118,6 +118,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/deploy-helper-deploy.mjs');
   expectFile('scripts/run-node-tests.js');
   expectFile('scripts/run-node-tests.test.js');
+  expectFile('.githooks/pre-push');
   expectFile('scripts/pre-push-guard.test.js');
   expectFile('scripts/check-client-boundaries.mjs');
   expectFile('scripts/check-client-boundaries.test.mjs');
@@ -183,6 +184,7 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
   expectFile('scripts/verify-public-text.test.js');
   expectFile('scripts/sync-public-history.sh');
   expectFile('scripts/release-version.mjs');
+  expectFile('scripts/release-version.test.mjs');
   expectFile('workers/sessionCorsWorker/package.json');
   expectFile('workers/agentBridgeWorker/package.json');
   expectFile('scripts/run-agent-bridge-worker-tests.js');
@@ -420,6 +422,10 @@ function verifyTestWiring(rootDir = path.resolve(__dirname, '..')) {
     '/.github/workflows/publish-worker-bundles.yml @AgalmicSoftware',
     '/.github/workflows/promote-worker-bundles.yml @AgalmicSoftware',
     '/.github/workflows/public-drift.yml @AgalmicSoftware',
+    '/.githooks/pre-push @AgalmicSoftware',
+    '/scripts/pre-push-guard.test.js @AgalmicSoftware',
+    '/scripts/release-version.mjs @AgalmicSoftware',
+    '/scripts/release-version.test.mjs @AgalmicSoftware',
     '/scripts/check-baseline-monotonicity.mjs @AgalmicSoftware',
     '/scripts/resolve-baseline-monotonicity-base.mjs @AgalmicSoftware',
     '/scripts/resolve-baseline-growth-approval.mjs @AgalmicSoftware',

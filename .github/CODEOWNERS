@@ -3,6 +3,10 @@
 /.github/workflows/publish-worker-bundles.yml @AgalmicSoftware
 /.github/workflows/promote-worker-bundles.yml @AgalmicSoftware
 /.github/workflows/public-drift.yml @AgalmicSoftware
+/.githooks/pre-push @AgalmicSoftware
+/scripts/pre-push-guard.test.js @AgalmicSoftware
+/scripts/release-version.mjs @AgalmicSoftware
+/scripts/release-version.test.mjs @AgalmicSoftware
 /scripts/check-baseline-monotonicity.mjs @AgalmicSoftware
 /scripts/check-baseline-monotonicity.test.mjs @AgalmicSoftware
 /scripts/resolve-baseline-monotonicity-base.mjs @AgalmicSoftware
