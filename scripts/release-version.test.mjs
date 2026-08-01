@@ -159,3 +159,12 @@ test('verify-ref fails when a supplied release floor cannot be resolved', () => 
     fs.rmSync(rootDir, { recursive: true, force: true });
   }
 });
+
+test('release guidance documents staging version and ratchet floors', () => {
+  const guide = fs.readFileSync(new URL('../docs/releasing.md', import.meta.url), 'utf8');
+
+  assert.match(guide, /greater than public `main`/);
+  assert.match(guide, /equal to the previous staging version/);
+  assert.match(guide, /Fast-forward staging pushes compare ratchets to their prior tip/);
+  assert.match(guide, /New or replayed staging histories compare ratchets to public `main`/);
+});
