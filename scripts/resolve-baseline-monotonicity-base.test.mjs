@@ -39,6 +39,47 @@ const withTempRepo = (run) => {
   }
 };
 
+const commitFixture = (repoDir, contents, subject) => {
+  fs.writeFileSync(path.join(repoDir, 'fixture.txt'), `${contents}\n`);
+  git(repoDir, ['add', 'fixture.txt']);
+  git(repoDir, ['commit', '--quiet', '-m', subject]);
+  return git(repoDir, ['rev-parse', 'HEAD']);
+};
+
+test('fast-forward release-staging pushes compare against their previous tip', () => {
+  withTempRepo(({ repoDir }) => {
+    const previousStagingSha = commitFixture(repoDir, 'staging', 'staging');
+    commitFixture(repoDir, 'candidate', 'candidate');
+
+    const resolved = resolveBaselineMonotonicitySha({
+      repoDir,
+      eventName: 'push',
+      refName: 'release-staging',
+      pushBeforeSha: previousStagingSha,
+    });
+
+    assert.equal(resolved, previousStagingSha);
+  });
+});
+
+test('rewritten release-staging pushes compare against public main', () => {
+  withTempRepo(({ repoDir, baseSha }) => {
+    git(repoDir, ['switch', '--quiet', '-c', 'previous-staging']);
+    const previousStagingSha = commitFixture(repoDir, 'previous', 'previous staging');
+    git(repoDir, ['switch', '--quiet', 'main']);
+    commitFixture(repoDir, 'candidate', 'candidate');
+
+    const resolved = resolveBaselineMonotonicitySha({
+      repoDir,
+      eventName: 'push',
+      refName: 'release-staging',
+      pushBeforeSha: previousStagingSha,
+    });
+
+    assert.equal(resolved, baseSha);
+  });
+});
+
 test('release-staging pushes compare against origin/main instead of the rewritten before SHA', () => {
   withTempRepo(({ repoDir, baseSha }) => {
     const resolved = resolveBaselineMonotonicitySha({
