@@ -2588,6 +2588,9 @@ export default function PolisReport({
         {arr.map((rq, idx) => {
           const qIndex = rq.questionIndex;
           const questionPrompt = rq.prompt;
+          const representativeDifference = Number(rq.difference);
+          const hasRepresentativeDifference =
+            rq.difference !== null && rq.difference !== undefined && Number.isFinite(representativeDifference);
           const clusterVotes = getVotesForQuestionInCluster(
             qIndex,
             clusterIndex,
@@ -2607,8 +2610,9 @@ export default function PolisReport({
             >
               <strong>{rq.label}</strong>: {questionPrompt} <br />
               <small style={{ color: '#666' }}>
-                ({rq.repfulFor === 'disagree' ? 'disagreement' : 'agreement'} rate differs from the overall conversation
-                by {(rq.difference * 100).toFixed(1)} percentage points)
+                {hasRepresentativeDifference
+                  ? `(${rq.repfulFor === 'disagree' ? 'disagreement' : 'agreement'} rate differs from the overall conversation by ${(representativeDifference * 100).toFixed(1)} percentage points)`
+                  : '(difference from the overall conversation is unavailable)'}
               </small>
               <div style={{ marginTop: '4px' }}>
                 <PolisBoxPlot votes={clusterVotes} />

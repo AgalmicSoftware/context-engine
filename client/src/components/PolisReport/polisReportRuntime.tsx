@@ -99,7 +99,7 @@ export interface PolisRepresentativeQuestion extends UnknownRecord {
   label: string;
   questionIndex: number;
   prompt: string;
-  difference: number;
+  difference: number | null;
   repfulFor?: string;
 }
 
@@ -1101,12 +1101,17 @@ export const resolvePrecomputedClusterDifference = (
   differenceFromData: unknown,
   clusterAgreeRate: unknown,
   overallAgreeRate: unknown,
-): number => {
-  const difference = Number(differenceFromData);
-  if (Number.isFinite(difference)) return difference;
-  const clusterRate = Number(clusterAgreeRate);
-  const overallRate = Number(overallAgreeRate);
-  if (!Number.isFinite(clusterRate) || !Number.isFinite(overallRate)) return 0;
+): number | null => {
+  const toFiniteNumber = (value: unknown): number | null => {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const difference = toFiniteNumber(differenceFromData);
+  if (difference !== null) return difference;
+  const clusterRate = toFiniteNumber(clusterAgreeRate);
+  const overallRate = toFiniteNumber(overallAgreeRate);
+  if (clusterRate === null || overallRate === null) return null;
   return +Math.abs(clusterRate - overallRate).toFixed(1);
 };
 

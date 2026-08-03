@@ -213,6 +213,18 @@ describe('PolisReport cache read options', () => {
     });
   });
 
+  it('keeps invalid precomputed cluster difference inputs unavailable', () => {
+    expect(resolvePrecomputedClusterDifference(undefined, undefined, undefined)).toBeNull();
+    expect(resolvePrecomputedClusterDifference(undefined, 70, 40)).toBe(30);
+    expect(resolvePrecomputedClusterDifference(12, undefined, undefined)).toBe(12);
+  });
+
+  it('resolves exploratory cluster counts without allowing zero-cluster k-means', () => {
+    expect(resolveExploratoryClusterCount({ activeClusterCount: 0, manualClusterCountValue: null })).toBe(0);
+    expect(resolveExploratoryClusterCount({ activeClusterCount: 0, manualClusterCountValue: '2' })).toBe(2);
+    expect(resolveExploratoryClusterCount({ activeClusterCount: 3, manualClusterCountValue: null })).toBe(3);
+  });
+
   it('excludes seeded demo fixture rows from real report calculations', async () => {
     const mixedQuestionResponses = {
       qFixture: [
@@ -1162,6 +1174,18 @@ describe('PolisReport demo data defaults', () => {
         short: expect.stringMatching(/Safety-minded institutionalists/i),
       }),
     );
+    expect(Object.values(precomputedState.repQuestions).flat().every((question) => question.difference === null)).toBe(
+      true,
+    );
+  });
+
+  it('labels missing demo representative differences as unavailable', async () => {
+    render(<PolisReport {...baseReportProps} slug="demo" questionResponses={seededQuestionResponses} />);
+
+    fireEvent.change(screen.getByDisplayValue('UMAP'), { target: { value: 'POLIS' } });
+
+    expect(await screen.findAllByText(/difference from the overall conversation is unavailable/i)).not.toHaveLength(0);
+    expect(screen.queryByText(/by 0\.0 percentage points/i)).not.toBeInTheDocument();
   });
 
   it('skips precomputed cluster analysis when the fixture version does not match', () => {
