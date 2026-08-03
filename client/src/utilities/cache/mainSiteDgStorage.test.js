@@ -22,19 +22,7 @@ jest.mock(
   { virtual: true },
 );
 
-jest.mock('../../components/MainSite/cacheConstants', () => ({
-  __esModule: true,
-  DG_MANAGED_CACHE_NAMES: new Set([
-    'questionsCache',
-    'surveysCache',
-    'bookmarksCache',
-    'filters',
-    'sbtCache',
-    'userCache',
-  ]),
-}));
-
-jest.mock('../../components/MainSite/storageEviction', () => ({
+jest.mock('./sessionCacheEviction', () => ({
   __esModule: true,
   evictOldDgEntries: jest.fn(),
   removeDgMetaTimestamp: jest.fn(),
@@ -84,21 +72,25 @@ describe('createMainSiteDgStorage', () => {
 
     await expect(storage.remove('questionsCache', 'edge')).resolves.toBeUndefined();
     expect(cacheScripts.removeCache).toHaveBeenCalledWith('questionsCache', 'edge');
+
+    await expect(storage.write('analysisCache', 'edge', { summary: 'cached' })).resolves.toBe(true);
+    expect(cacheScripts.writeCacheOptimistic).toHaveBeenCalledWith('analysisCache', 'edge', { summary: 'cached' });
+    expect(localStorage.getItem('dg:analysisCache:edge')).toBeNull();
   });
 
   it('deduplicates non-managed writes by persisted storage match and by last-written snapshot', async () => {
     const storage = createMainSiteDgStorage();
     const payload = { value: 1 };
-    const storageKey = 'dg:analysisCache:edge';
+    const storageKey = 'dg:viewState:edge';
     localStorage.setItem(storageKey, JSON.stringify(payload));
     const setSpy = jest.spyOn(Storage.prototype, 'setItem');
 
-    await expect(storage.write('analysisCache', 'edge', payload)).resolves.toBe(true);
+    await expect(storage.write('viewState', 'edge', payload)).resolves.toBe(true);
     expect(setSpy).not.toHaveBeenCalled();
     expect(storageEviction.updateDgMetaTimestamp).toHaveBeenCalledWith(storageKey);
 
     storageEviction.updateDgMetaTimestamp.mockClear();
-    await expect(storage.write('analysisCache', 'edge', payload)).resolves.toBe(true);
+    await expect(storage.write('viewState', 'edge', payload)).resolves.toBe(true);
     expect(setSpy).not.toHaveBeenCalled();
     expect(storageEviction.updateDgMetaTimestamp).toHaveBeenCalledWith(storageKey);
 
@@ -108,13 +100,13 @@ describe('createMainSiteDgStorage', () => {
   it('rewrites a non-managed value when the dedupe snapshot exists but localStorage was cleared externally', async () => {
     const storage = createMainSiteDgStorage();
     const payload = { value: 1 };
-    const storageKey = 'dg:analysisCache:edge';
+    const storageKey = 'dg:viewState:edge';
 
-    await expect(storage.write('analysisCache', 'edge', payload)).resolves.toBe(true);
+    await expect(storage.write('viewState', 'edge', payload)).resolves.toBe(true);
     localStorage.removeItem(storageKey);
     const setSpy = jest.spyOn(Storage.prototype, 'setItem');
 
-    await expect(storage.write('analysisCache', 'edge', payload)).resolves.toBe(true);
+    await expect(storage.write('viewState', 'edge', payload)).resolves.toBe(true);
     expect(setSpy).toHaveBeenCalledTimes(1);
     expect(localStorage.getItem(storageKey)).toBe(JSON.stringify(payload));
 
@@ -124,7 +116,7 @@ describe('createMainSiteDgStorage', () => {
   it('retries quota failures for non-managed writes after eviction and trim while emitting perf counters', async () => {
     const storage = createMainSiteDgStorage();
     const payload = { items: [1, 2, 3, 4] };
-    const storageKey = 'dg:analysisCache:edge';
+    const storageKey = 'dg:viewState:edge';
     const originalSetItem = Storage.prototype.setItem;
     let attempts = 0;
 
@@ -148,7 +140,7 @@ describe('createMainSiteDgStorage', () => {
       return originalSetItem.call(localStorage, key, value);
     });
 
-    await expect(storage.write('analysisCache', 'edge', payload)).resolves.toBe(true);
+    await expect(storage.write('viewState', 'edge', payload)).resolves.toBe(true);
 
     expect(storageEviction.evictOldDgEntries).toHaveBeenCalledTimes(1);
     expect(storageEviction.trimLargeArrays).toHaveBeenCalledTimes(1);
@@ -167,10 +159,10 @@ describe('createMainSiteDgStorage', () => {
 
   it('removes non-managed localStorage entries and DG metadata timestamps', async () => {
     const storage = createMainSiteDgStorage();
-    const storageKey = 'dg:analysisCache:edge';
+    const storageKey = 'dg:viewState:edge';
     localStorage.setItem(storageKey, JSON.stringify({ value: 1 }));
 
-    await expect(storage.remove('analysisCache', 'edge')).resolves.toBeUndefined();
+    await expect(storage.remove('viewState', 'edge')).resolves.toBeUndefined();
 
     expect(localStorage.getItem(storageKey)).toBeNull();
     expect(storageEviction.removeDgMetaTimestamp).toHaveBeenCalledWith(storageKey);

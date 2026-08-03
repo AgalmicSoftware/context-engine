@@ -13,6 +13,12 @@ The app currently manages these namespaces through the shared cache layer:
 - `filters`
 - `sbtCache`
 - `userCache`
+- `analysisCache`
+
+The canonical namespace registry is
+`client/src/utilities/cache/managedCacheNamespaces.json`. Runtime cache APIs,
+the MainSite DG facade, and the direct-localStorage guard all consume that
+registry; a parity test keeps this documentation aligned with it.
 
 Logical key format:
 

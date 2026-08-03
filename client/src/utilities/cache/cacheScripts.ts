@@ -13,6 +13,7 @@ import {
   set as idbSet,
 } from './cacheScripts.idb.impl.js';
 import { createLogger } from '../logging.js';
+import { DG_MANAGED_CACHE_NAMESPACE_LIST } from './sessionCacheConstants.js';
 
 const cacheLog = createLogger('cacheScripts');
 
@@ -111,16 +112,7 @@ const IDB_RECOVERY_RETRY_MS = 30 * 1000;
 const READ_FAILED = Symbol('dg-cache-read-failed');
 const safeClone = typeof structuredClone === 'function' ? structuredClone : (v) => JSON.parse(JSON.stringify(v));
 
-const MANAGED_NAMESPACE_LIST = [
-  'questionsCache',
-  'surveysCache',
-  'bookmarksCache',
-  'filters',
-  'sbtCache',
-  'userCache',
-  'analysisCache',
-];
-const MANAGED_NAMESPACES = new Set(MANAGED_NAMESPACE_LIST);
+const MANAGED_NAMESPACES = new Set(DG_MANAGED_CACHE_NAMESPACE_LIST);
 
 const mirrorByKey = new Map<string, CacheValue>();
 const mirrorByNamespace = new Map<string, Map<string, CacheValue>>();
